@@ -30,7 +30,7 @@ journalctl -u mistgate-node -n 100 --no-pager
 
 3. Check that the node can reach the panel: the agent always dials out, to the address in its install command (`--panel host:port`, port 443 by default). An outbound firewall on the node or an inbound one on the panel server blocks it.
 4. On the panel side, the agent endpoint needs TLS: the public listener must run with `--acme-domain` or `--tls-cert`, or the panel needs a separate `--agent-listen`. See [Configuration](../reference/configuration.md).
-5. If the log says the agent is not enrolled, or the node was retired, the agent exits and systemd does not restart it. Enroll it again with a **New install command** from the node's page.
+5. If the log says the agent is not enrolled, or the node was retired, the agent exits and systemd does not restart it. Enroll it again with a **New install command** from the node's **Settings** tab. A retired node cannot be enrolled again: add the server as a new node.
 6. For a far or slow node, raise **Drop the agent connection after** and **Agent dial timeout** in the node's **Settings**.
 
 A pending node whose command has expired needs a **New install command**; the old one never works again.

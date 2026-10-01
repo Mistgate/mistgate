@@ -7,7 +7,7 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
 import { SettingsTab } from "./settings";
 
-// Node → Settings: what retiring says when the node could not be told.
+// Node → Settings: a new install command for an enrolled node, and what retiring says when the node could not be told.
 
 const retireNode = vi.fn();
 const me = vi.fn();
@@ -17,6 +17,8 @@ vi.mock("@/lib/api", () => ({
 }));
 const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
+const addNode = vi.fn();
+vi.mock("@/components/add-node", () => ({ useAddNode: () => addNode }));
 vi.mock("./warp", () => ({ WarpCard: () => null }));
 vi.mock("./awg-backend", () => ({ AwgBackendCard: () => null }));
 vi.mock("./ssh-access", () => ({ SSHAccessCard: () => null }));
@@ -34,7 +36,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [retireNode, me, navigate]) m.mockReset();
+  for (const m of [retireNode, me, navigate, addNode]) m.mockReset();
 });
 
 const data = (status = NodeStatus.DOWN) =>
@@ -82,6 +84,26 @@ async function retire() {
   await type(dialog()!.querySelector<HTMLInputElement>('input[placeholder="de1"]')!, "de1");
   await click(inDialog(en["node.retire"]));
 }
+
+describe("a new install command", () => {
+  it("is offered to the owner for a node that was enrolled before", async () => {
+    await mount(NodeStatus.ONLINE);
+    expect(text()).toContain(en["node.add.reenrollBody"]);
+    await click(button(en["node.banner.newCommand"]));
+    expect(addNode).toHaveBeenCalledWith({ id: "nod_1", name: "de1" });
+  });
+
+  it("is not offered to a helper, whom the API refuses", async () => {
+    me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
+    await mount(NodeStatus.DOWN);
+    expect(button(en["node.banner.newCommand"])).toBeUndefined();
+  });
+
+  it("is not offered for a retired node", async () => {
+    await mount(NodeStatus.RETIRED);
+    expect(button(en["node.banner.newCommand"])).toBeUndefined();
+  });
+});
 
 describe("retiring a node", () => {
   it("goes back to the list when the agent got the order", async () => {

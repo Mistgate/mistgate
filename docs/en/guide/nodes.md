@@ -136,7 +136,7 @@ The node's own host checks, grouped into **Needs attention**, **Accepted as norm
 
 ### Settings
 
-The tab holds, top to bottom, the WARP card, the node's fields, the **AmneziaWG backend** card and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md).
+The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access** card (a node installed over SSH), the **AmneziaWG backend** card, **New install command** (the owner only) and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md). **New install command** is for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md).
 
 | Field | What it does |
 |:--|:--|

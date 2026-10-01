@@ -125,7 +125,7 @@ Lines with `panel connection lost` carry the reason. Check also that the server 
 
 A node that is waiting for install has a **New install command** button on its page, on the Overview and in the first-run checklist. Use it when the command expired or was lost. A new command makes the older unused ones stop working.
 
-For a node that was enrolled before (a reinstalled server, a lost state directory), the admin has no such button today: retire the node and add the server again as a new node under another name. If the old state directory is still on the server, `enroll` refuses with `already enrolled; use --force to replace the identity`: add `--force` after `enroll`.
+A node that was enrolled before (a lost certificate, a reinstalled server, a lost state directory) has the same button on its **Settings** tab, for every node that is not retired. Only the owner sees it. The node keeps its name, profiles and users; the old certificate stops working once the new agent connects. If the old state directory is still on the server, `enroll` refuses with `already enrolled; use --force to replace the identity`: add `--force` after `enroll`.
 
 ## Remove a node
 

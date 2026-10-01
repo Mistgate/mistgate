@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type FormEvent } from "react";
+import { useAddNode } from "@/components/add-node";
 import { DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -8,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Stepper } from "@/components/ui/stepper";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
@@ -16,6 +18,7 @@ import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { meQuery } from "@/lib/session";
 import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
 import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
@@ -65,6 +68,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
   const qc = useQueryClient();
   const node = data.node!;
   const retired = node.status === NodeStatus.RETIRED;
+  const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
   // retired while offline: shown here, not in the retire dialog, which goes once the node reads as retired
   const [unreached, setUnreached] = useState(false);
 
@@ -282,9 +286,25 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
 
       {!retired && <AwgBackendCard data={data} />}
 
+      {!retired && owner && <ReinstallRow nodeId={node.id} name={node.name} />}
+
       {!retired && <RetireZone nodeId={node.id} name={node.name} onUnreached={() => setUnreached(true)} />}
       {unreached && <UnreachedModal name={node.name} />}
     </div>
+  );
+}
+
+/** A fresh install command for a node that was enrolled before: a lost certificate or a reinstalled server. Owner only, like the API. */
+function ReinstallRow({ nodeId, name }: { nodeId: string; name: string }) {
+  const t = useT();
+  const addNode = useAddNode();
+  return (
+    <section className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface px-3.5 py-3">
+      <p className="min-w-[220px] flex-1 text-[13px] leading-snug text-pretty">{t("node.add.reenrollBody")}</p>
+      <Button variant="secondary" size="md" onClick={() => addNode({ id: nodeId, name })}>
+        {t("node.banner.newCommand")}
+      </Button>
+    </section>
   );
 }
 
