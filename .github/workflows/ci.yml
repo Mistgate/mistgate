@@ -24,7 +24,13 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - run: go build ./...
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      # GO-2026-5288 (an OOM in hysteria's QUIC sniffer) is fixed upstream by apernet/hysteria#1547, which v2.12.3
+      # includes, but the vulnerability database names no fixed version; it is skipped, any other called one fails.
+      - name: govulncheck
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -format json ./... > vuln.json
+          n=$(jq -s '[.[] | .finding? // empty | select(.osv != "GO-2026-5288" and .trace[0].function != null)] | length' vuln.json)
+          if [ "$n" -gt 0 ]; then go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...; exit 1; fi
 
   buf:
     runs-on: ubuntu-latest
