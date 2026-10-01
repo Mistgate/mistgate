@@ -100,7 +100,7 @@ While you edit, the editor warns about legal but risky values: too many junk pac
 
 ## Client networks and addresses
 
-Each AmneziaWG profile has its own client networks, and the networks of two AmneziaWG profiles must not overlap. The panel's slots are `10.66.4.0/22` with `fd66:66:0:1::/64`, then `10.66.8.0/22` with `fd66:66:0:2::/64`, and so on: `10.66.0.0/16` holds 63 of them. A profile created without naming its networks (through the API, or as a twin) takes the first free slot. The editor fills in the first slot; if another profile already has it, the field says "overlaps the network of profile …": type a free network, for example the next slot.
+Each AmneziaWG profile has its own client networks, and the networks of two AmneziaWG profiles must not overlap. The panel's slots are `10.66.4.0/22` with `fd66:66:0:1::/64`, then `10.66.8.0/22` with `fd66:66:0:2::/64`, and so on: `10.66.0.0/16` holds 63 of them. A profile created without naming its networks (in the editor, through the API, or as a twin) takes the first free slot. In the editor the network fields of a new profile start empty ("Leave blank to assign a free client network automatically."): left empty, the new profile gets the first free slot, which its page then shows. A network you type is kept; if another profile already has it, the field says "overlaps the network of profile …".
 
 The node takes `.1`; every device gets the next free address of the profile. When the network is full, a new device is refused ("The profile's client network is full"); remove unused devices or use another profile. Once the profile is on a node or has a device, its networks are fixed: every issued config holds an address from them.
 

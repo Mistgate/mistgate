@@ -242,8 +242,9 @@ func sortInts(a []int) {
 
 // DefaultSettings implements protocols.Protocol: a fresh 3.1 profile with everything random and the secret
 // generated. Port: random in 10000-60000 without knownPorts (the WireGuard and Amnezia defaults, the first ports
-// a scanner tries). Networks: the first slot (SubnetsFor(1)); access replaces them with the first slot
-// that no other profile uses. Per-device signatures are on: a new profile has no devices to surprise.
+// a scanner tries). Networks: the first slot (SubnetsFor(1)). access keeps networks a create request names;
+// for one it leaves out it picks the first slot no other profile uses, so the editor drops them from a
+// new profile. Per-device signatures are on: a new profile has no devices to surprise.
 func (*Protocol) DefaultSettings() (json.RawMessage, error) { return defaultSettings() }
 
 func defaultSettings() (json.RawMessage, error) {
