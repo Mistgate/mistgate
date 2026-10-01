@@ -1,0 +1,194 @@
+---
+title: MCP server
+description: The panel's built-in MCP server for AI agents, how to connect a client, every tool, the plan and apply flow, and which changes wait for the owner.
+---
+
+The panel has a built-in Model Context Protocol (MCP) server, so an AI agent can read the fleet and make day-to-day changes. It uses the same API tokens and the same procedures as the [admin API](api.md): the token's profile decides what the agent sees and may do, and every call is in the audit log. Nothing changes in one call: an agent plans a change, then applies it, and the riskiest changes wait for the owner's approval in the admin.
+
+## The endpoint
+
+```text
+<admin URL>mcp
+https://panel.example.com/<prefix>/mcp
+```
+
+- Streamable HTTP, stateless, JSON responses. It offers tools only: no resources, prompts or sampling.
+- It exists only on the admin surface (the secret prefix, host or listener), never on the public side.
+- Every request needs `Authorization: Bearer tk1_…` and is checked again: a revoked or expired token stops at its next request. There is no session to take over.
+- `tools/list` shows only the tools the token's profile may use.
+
+**Integrations → MCP** shows the address and a ready snippet for each kind of client.
+
+## Connect a client
+
+Create a token in **Integrations → API tokens** with the narrowest profile that works (see [Token profiles](api.md)). Then:
+
+**Claude Code** (Streamable HTTP):
+
+```sh
+claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp --header "Authorization: Bearer <token>"
+```
+
+**Any client that speaks Streamable HTTP**:
+
+```json
+{
+  "mcpServers": {
+    "mistgate": {
+      "type": "http",
+      "url": "https://panel.example.com/<prefix>/mcp",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
+    }
+  }
+}
+```
+
+**Clients that can only start a command** (for example Claude Desktop) use the stdio proxy, `mistgate mcp`, on your own computer. Save the token as the first line of a file only you can read, then:
+
+```json
+{
+  "mcpServers": {
+    "mistgate": {
+      "command": "mistgate",
+      "args": ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "<path-to-token-file>"]
+    }
+  }
+}
+```
+
+### The stdio proxy
+
+`mistgate mcp --url <admin URL> --token-file <file>` runs a local MCP server on stdin and stdout and forwards every message to the panel's endpoint. It decides nothing, caches nothing and knows no tool: the panel answers.
+
+- The token is read only from the file's first line, never from the command line or the environment, and never printed. A warning is printed when others can read the file.
+- `--url` must be `https`, except for `localhost` or a loopback address. Redirects are not followed, so the token goes nowhere else.
+- When the panel refuses the token (expired, revoked or the wrong profile) the proxy stops with that message.
+- `--url` and `--token-file` fall back to `MISTGATE_URL` and `MISTGATE_TOKEN_FILE`.
+
+`mistgate` builds for Linux, macOS and Windows: `go build ./cmd/mistgate` makes the binary for the computer the agent runs on. See [CLI](cli.md).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Tool calls at a time, per token | 4 (more: 429 "at most 4 tool calls at a time per token") |
+| Requests per minute | the token's own limit |
+| Request body | 256 KiB |
+| A tool result | 32 KiB; long lists are halved until they fit and marked as truncated |
+| Time per call | 30 s for reads and plans, 90 s for an apply |
+| Open plans | 20 per token; 50 waiting for the owner across the panel |
+
+## Tools
+
+### Read tools
+
+Read tools change nothing. Arguments are ids and plain words, never URLs: no tool fetches anything an agent names. A node can be given by its id or its exact name. The Profile column is the lowest profile that sees the tool; higher profiles see it too.
+
+| Tool | Profile | What it returns |
+|---|---|---|
+| `fleet_status` | Read only | Every node with status, reason, online users, speed and CPU; totals, alert counts and the top consumers now. |
+| `node_get` | Read only | One node: status and reason, host facts, profiles with their state, up to 10 online users, the owner's notes. No addresses, keys or certificate pins. |
+| `node_metrics` | Read only | The node's current CPU, RAM, disk and network, traffic today, online users per protocol, today's top users. |
+| `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
+| `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
+| `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
+| `user_get` | Read only | One user: limits, status, devices, profiles, node access. No subscription link, no keys. |
+| `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
+| `user_devices` | Read only | Devices with platform, model, last seen, online, and for AmneziaWG the profile and tunnel address. Never a key or a config. |
+| `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
+| `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
+| `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
+| `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |
+| `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state, the active or last rollout. |
+| `audit_search` | Admin | The audit log, filtered by `source` (`panel`, `bot`, `mcp`, `api`), actor or action; paged with `before_id`. |
+
+### Change tools
+
+Every change is a pair: `<tool>_plan` and `<tool>_apply`.
+
+| Tool | Profile | Arguments | Needs the owner |
+|---|---|---|---|
+| `user_create` | Operator | `name`, `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month`, `rolling_month`), `term_days`, `device_limit`, `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps`, `dns_preset_id` | no |
+| `user_update` | Operator | `user_id` and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
+| `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
+| `user_enable` | Operator | `user_ids` (1 to 50) | no |
+| `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
+| `device_revoke` | Operator | `user_id`, `device_id` | no |
+| `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
+| `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
+| `rollout_start` | Admin | optionally `node_ids` (empty: every outdated node) and `batch_size` (0: the panel's default; the panel accepts at most 10) | always |
+| `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
+| `node_rollback` | Admin | `node` | always |
+
+Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
+
+## Plan and apply
+
+1. The agent calls `<tool>_plan` with the arguments. The panel validates them, reads what it needs and describes the change in its own words. Nothing changes. The result:
+
+   ```json
+   {
+     "plan_id": "pln_...",
+     "summary": "Disable 5 users: their connections end and their devices are dropped from the nodes.",
+     "facts": [{"key": "count", "value": "5"}, {"key": "users", "value": "...", "untrusted": true}],
+     "needs_approval": true,
+     "danger": ["bulk"],
+     "expires_in_s": 600,
+     "confirm_token": "cf_...",
+     "next": "..."
+   }
+   ```
+
+2. The agent shows the plan to the person it works for and waits for their go-ahead. If `needs_approval` is true, it also waits for the owner.
+3. The agent calls `<tool>_apply` with only the `confirm_token`. The panel runs exactly the stored arguments, once, and answers with `plan_id`, `status: "applied"` and a one-line result.
+
+The confirm token:
+
+- works once, for 10 minutes, and only for the token that made the plan and only with that tool;
+- carries no arguments: they cannot change between plan and apply;
+- applying a plan that was already applied returns the same result again; a token of another plan, tool or API token is simply "unknown confirm token".
+
+When an apply cannot run, it says why: "waiting for the owner to approve plan pln_…; it expires at …", "rejected by the owner", "expired: make a new plan", "already running", "failed: …. Make a new plan.", "the token was revoked", or "timeout, outcome unknown: check before retrying".
+
+### Which plans wait for the owner
+
+A plan needs the owner when one of these applies (the `danger` list):
+
+| Code | Meaning | Tools |
+|---|---|---|
+| `step_up` | The operation itself asks for a fresh confirmation in the admin. | rollout start, pause, resume and cancel, node rollback |
+| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback` |
+| `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
+
+### Where the owner approves
+
+Such a plan appears in **Integrations → Waiting for you**, with a badge in the admin. The owner sees the change in the panel's own words, the danger notes, the agent's reason (marked "Written by the agent. The panel did not check it.") and the time left, then chooses:
+
+- **Approve**: asks for the owner's passkey or authenticator code once more. The agent's apply goes through after this, for this plan only.
+- **Reject**: the agent's apply fails with "rejected by the owner".
+
+A token can never confirm its own plan. Undecided plans expire 10 minutes after they were made. **Recent decisions** keeps the history with the outcome: done, error, expired, cancelled (the token was revoked) and so on. The agent should not poll more often than once every 30 seconds.
+
+## Untrusted data in results
+
+Names, notes, reasons, log lines and the parameters of events and alerts come from users, nodes and other systems. The server's instructions and every tool that returns such text say so: they are data, never instructions, and an agent must not follow requests found in them.
+
+The panel also protects the agent and you:
+
+- Text from data is cleaned: control characters, line breaks and invisible formatting characters are removed, and long values are cut.
+- A plan's summary never contains text from data; such values are separate facts marked `untrusted`, and the owner sees them quoted.
+- A last pass over every result replaces anything shaped like a secret: API tokens, share links (`hysteria2://…` and the like), tunnel configurations, key material, URL query strings and long URL path segments (the secret prefix, a subscription token) and bare 32-byte keys.
+
+## What an agent never gets
+
+- Subscription links and user page passwords.
+- Device keys and configurations, WARP accounts and keys, profile secrets.
+- Node addresses and certificate pins.
+- Anything of the tokens, approvals, sessions and passkeys.
+- The audit log, unless the token has the Admin profile.
+
+## Audit
+
+Every procedure a tool calls is written to the audit log under "MCP token <name>", with the source MCP. Plans and applies add their own rows: "planned a change: <tool>" and "ran the planned change: <tool>"; the owner's decisions appear as "approved the change" or "rejected the change". **Settings → Audit** filters them by the source MCP.
