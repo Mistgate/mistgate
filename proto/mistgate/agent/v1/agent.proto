@@ -1,0 +1,1017 @@
+syntax = "proto3";
+
+package mistgate.agent.v1;
+
+// Panel <-> node agent protocol.
+//
+// TRANSPORT
+//   Connect-RPC over HTTP/2 with TLS on the panel's MAIN listener (usually :443), selected by a secret
+//   SNI name generated at setup (a random label under the panel domain, e.g. "q3m8x2kd7wzp4n6t.example.com"; it never needs a DNS record). For that SNI the panel
+//   presents a server certificate from its own CA (never a public CA, so the name never reaches CT logs)
+//   and requests a client certificate; any other SNI gets the normal public/admin behaviour, so a
+//   prober without the name sees only the decoy. A separate --agent-listen address exists for dev.
+//   The install command carries: panel address, agent SNI, CA fingerprint, enrollment token.
+//   - EnrollmentService.Enroll: server-auth TLS only. The agent pins the panel CA: it accepts the
+//     server chain only if the CA certificate in it has the SHA-256 fingerprint from the install
+//     command. Authentication is the one-time enrollment token.
+//   - Everything else: mutual TLS. The client certificate is issued by the panel CA; its identity is the
+//     URI SAN "mistgate://node/<node_id>". The panel rejects a revoked serial or a retired node at
+//     handshake (tls.Config.VerifyConnection) and never trusts a node_id sent in a message body
+//     over the one in the certificate.
+//   - The node always dials out; the node needs no inbound management port.
+//
+// ONE STREAM, ONE OWNER
+//   A node holds exactly one AgentService.Connect stream. A newer stream from the same node_id
+//   supersedes the older one (the panel closes the old one with ABORTED). The first message on a
+//   stream must be Hello; anything else is INVALID_ARGUMENT.
+//
+// LIVENESS AND TIMEOUTS (a slow node is not a dead node)
+//   - Node liveness is judged ONLY by receiving any message from the node. Latency of the reply to a
+//     particular command is never a liveness signal.
+//   - StatsBatch is sent every NodeSettings.stats_interval_s even when empty, so it doubles as heartbeat.
+//   - The panel closes a stream after NodeSettings.liveness_timeout_s of total silence (default 90 s,
+//     per-node, stored in node.liveness_timeout_s). A command without a CommandResult within
+//     apply_timeout_s (default 120 s) is marked "no answer" in the UI; the node stays online.
+//   - HTTP/2 PING keepalive on the agent side: keepalive_interval_s / keepalive_timeout_s (defaults 20/45).
+//   - The agent dials with NodeSettings.dial_timeout_s (default 15 s; raise for far/slow nodes).
+//
+// RECONNECT
+//   Backoff 1 s -> 60 s, factor 2, +-20% jitter; reset once a stream has lived 60 s. While the panel is
+//   unreachable the engines keep running the last applied state (persisted by the agent in its state
+//   directory, file mode 0600), and unacked reliable messages stay queued (see "RELIABLE MESSAGES").
+//
+// RELIABLE MESSAGES, SEQUENCE NUMBERS, DEDUPLICATION
+//   ConnectRequest.seq is set ONLY for StatsBatch and Event ("reliable" messages); all other node
+//   messages have seq = 0.
+//   - Every agent process start generates a random Hello.instance_id; seq restarts at 1 per instance and
+//     is strictly increasing for that instance (gaps are allowed, e.g. after coalescing).
+//   - The panel processes a reliable message in ONE DB transaction that also stores
+//     node.last_seq = seq (together with node.agent_instance_id). A message with
+//     seq <= node.last_seq for the same instance_id is a duplicate: skip the effects, still Ack.
+//     Therefore counters are added exactly once even if a batch is resent after a reconnect.
+//   - The panel sends Ack{up_to_seq} (cumulative) after each committed reliable message
+//     (it may coalesce to at most one Ack per second). The agent keeps a message until acked.
+//   - After reconnecting, the agent sends Hello.first_unacked_seq; the panel answers HelloAck.acked_seq
+//     (the stored last_seq if instance_id matches, else 0 and the stored row is reset for the new
+//     instance). The agent drops everything <= acked_seq and resends the rest, in order.
+//   - A NEW instance_id (agent restart) loses at most the unacked tail; traffic counted by the engine
+//     in memory since the last batch is lost too (<= one interval). This is accepted.
+//   - Coalescing: when more than 360 batches are pending, the agent merges pending StatsBatch messages
+//     that belong to the SAME UTC hour (traffic deltas add up, sessions/host/health = newest) and marks
+//     the result coalesced = true. It never merges across an hour boundary (buckets are hourly). Events
+//     are never merged. If more than 6 h are pending, the oldest batches are dropped and the agent emits
+//     Event{code: "stats_dropped"}.
+//   - Timestamps are the agent's clock corrected by HelloAck.server_time_unix (offset measured at Hello).
+//     The panel clamps timestamps more than 5 min in the future to its receive time and ignores the
+//     hour of a batch older than 48 h (it is attributed to the receive hour, flagged in the event log).
+//
+// DESIRED STATE
+//   The panel owns the truth. It sends DesiredState after HelloAck whenever the agent's
+//   Hello.applied_state_hash differs from the panel's desired hash, and again on every change.
+//   - A full state (base_revision = 0) lists every inbound; anything not listed is removed.
+//   - A delta (base_revision = N) applies on top of revision N; it exists so that "add one user" does not
+//     ship 500 KB to every node (target: new user on all nodes < 5 s).
+//     If base_revision != the agent's applied revision the agent answers
+//     ApplyResult{status: APPLY_STATUS_BASE_MISMATCH} and the panel resends a full state.
+//   - state_hash is the hash of the COMPLETE resulting state (see "STATE HASH"). After applying, the
+//     agent recomputes the hash from what the engines actually hold (Engine.Observed) and returns it in
+//     ApplyResult.state_hash. Equal -> in sync. Different -> the panel raises the event
+//     "state_drift", resends a full state once, and alerts if it persists.
+//   - The agent applies a user-only change without restarting any engine. An inbound whose spec
+//     changed (see spec_hash) is restarted by its engine; the agent reports that in InboundResult.restarted.
+//   - Re-delivery of the same revision is idempotent. The agent ignores revision < applied_revision
+//     unless base_revision = 0.
+//   - Credentials carry only what the engine must VERIFY (Credential.data_json). Raw end-user secrets
+//     never reach a node at rest: for Hysteria2 data_json holds the SHA-256 of the auth token and the
+//     engine hashes the client's auth string when it connects.
+//   - The persisted copy of the state on the node therefore contains profile secrets (the Salamander
+//     password, the self-signed key) but no end-user tokens.
+//
+// STATE HASH (shared Go code in internal/statehash; both ends must produce the same hex)
+//   spec_hash(i)  = hex(sha256(join("\x1f", inbound_id, protocol, profile_id, spec_version, enabled,
+//                   listen.network, listen.port, listen.hop_from, listen.hop_to, tls.mode,
+//                   tls.server_name, egress, settings_json)))                 // decimal integers, "1"/"0" bools
+//   creds_hash(i) = hex(sha256(join("\n", sorted(cred_id + "\x1f" + hex(sha256(data_json)) + "\x1f" +
+//                   rate_limit_bps + "\x1f" + valid_until_unix for every credential))))
+//   state_hash    = hex(sha256(join("\n", sorted(inbound_id + "\x1f" + spec_hash + "\x1f" + creds_hash
+//                   for every inbound))))
+//   spec_version is deliberately part of the hash: it is bumped by the panel when profile settings
+//   or inbound overrides change, so a missed update shows up as a mismatch.
+//   L3 additions ("AWG AND WARP" below). Both are appended ONLY when present, so every hash of a node
+//   without them is byte for byte what it was before they existed (golden test in internal/statehash):
+//   - InboundSpec.tunnel set: spec_hash input gets three more fields after settings_json:
+//     tunnel.addr_v4, tunnel.addr_v6, tunnel.mtu (decimal; an empty address is "").
+//   - DesiredState.warp set: state_hash input gets one more line AFTER the sorted inbound lines (it is not
+//     sorted among them): "warp" + "\x1f" + warp_hash, with
+//     warp_hash = hex(sha256(join("\x1f", enabled, private_key, peer_public_key, endpoint_v4, endpoint_v6,
+//                 join(",", ports), address_v4, address_v6, mtu, hex(reserved), backend)))
+//     (enabled "1"/"0", integers decimal, reserved lowercase hex, empty = "").
+//
+// COMMANDS
+//   Kick, RestartInbound, Retire, ApplyFix and PrepareAwgKernel carry a request_id and get exactly one CommandResult. Removing a
+//   credential from the desired state implicitly kicks its sessions; the explicit Kick is for "kick now,
+//   keep access" and for diagnostics.
+//   Kick is best effort in Hysteria2: the core can only close a connection from inside a traffic callback,
+//   so an idle connection is closed at its next packet.
+//
+// DOCTOR (node self-diagnosis; additive, protocol api_version stays 1)
+//   A node runs a fixed list of host checks and reports them as DoctorResult rows. Nothing here changes
+//   the api_version: a peer that does not know these messages simply never sends them and ignores them
+//   (an unknown oneof member is dropped by both ends, which log "unknown ... message ignored").
+//   - CAPABILITY GATE. An agent that implements the doctor lists "doctor/1" in Hello.capabilities. The panel
+//     sends RunDoctor / ApplyFix ONLY to a stream whose Hello carried that string; for any other agent it
+//     answers the admin call with FAILED_PRECONDITION ("agent too old") and sends nothing. So a new panel
+//     with an old agent never waits for a CommandResult that cannot come, and a new agent with an old
+//     panel just has its DoctorReport dropped.
+//   - SCHEDULE. The agent sends an unsolicited DoctorReport (request_id = "") about 30 s after every
+//     connect (engines need a moment to settle) and then every 10 min +-60 s jitter. A RunDoctor is
+//     answered with a DoctorReport that echoes request_id. One run at a time: a RunDoctor that arrives
+//     while a run is in progress is answered with DoctorReport{error: "busy"}.
+//   - WHAT A REPORT HOLDS. A full run (RunDoctor.checks empty, or the periodic run) has exactly one
+//     DoctorResult per check id in the CHECK IDS list below, in that order, so the panel replaces its stored
+//     set. A partial run (RunDoctor.checks non-empty, or the re-check after a fix) has partial = true and
+//     only those ids; the panel merges by id. An unknown id in RunDoctor.checks yields
+//     DoctorResult{status: SKIP, detail: "unknown check"}, never an error. A check that cannot run on this
+//     host (container virtualisation, no systemd, not root) is SKIP with a detail, never a false OK.
+//   - NOT RELIABLE. DoctorReport has seq = 0: it is a snapshot, the newest one wins, a lost one is replaced
+//     within 10 min (or by the panel's RunDoctor). It is never queued for resend.
+//   - TIMESTAMPS are the corrected agent clock like everywhere else (HelloAck.server_time_unix).
+//   - I18N. title_key is a stable dotted key ("doctor.disk_space.title") that the admin UI localizes;
+//     params fill its placeholders; detail is a short English fact line for logs and for the UI to show as
+//     a mono caption ("/ 91% used, 1.2 GB free"). The agent never sends prose meant to be read as a sentence.
+//     detail_code + params let the UI write that fact line in the viewer's language (numbers as plain decimal
+//     strings, formatted by the UI); detail stays for old panels, logs and unknown codes.
+//   - ApplyFix {fix_id, dry_run, params}. dry_run = true changes NOTHING and answers CommandResult{ok,
+//     detail, params} describing what would happen (the admin API turns it into the "plan" step). dry_run =
+//     false performs the fix and answers CommandResult{ok, affected, detail, params}; on ok the agent then
+//     re-runs the checks that offer that fix and sends a partial DoctorReport (request_id = "") so the
+//     panel and the UI see the result without waiting 10 min. A fix that has nothing to do is ok = true,
+//     affected = 0, params{noop:"1"}. The agent owns a compiled allow-list of fix ids; an id is never a
+//     shell string, params are validated (an inbound_id must be one the agent runs), and only one fix runs at a
+//     time ("busy").
+//   CommandResult.error vocabulary for ApplyFix: unknown_fix, bad_params, not_applicable (the check is
+//   already OK / the host cannot do it), unsupported_host, busy, or "failed: <short message>".
+//
+//   CHECK IDS (stable; new ids may be appended, none is renamed or removed; the panel shows an id it does
+//   not know with its title_key or the id itself).
+//     disk_space        free space / inode use on / and on the volume of the agent state dir
+//     journald_size     size of the systemd journal on disk (cap is 200 MB)
+//     dstate_tasks      tasks stuck in uninterruptible sleep (D) + TTM/QXL lines in dmesg (hint "qxl_ttm")
+//     time_sync         NTP synchronisation and offset against the panel clock
+//     resolver          the host resolver answers the control domains (+ gosuslugi.ru on RU nodes)
+//     ipv6              IPv6 present and working; WARP egress without IPv6 needs ForceIPv4
+//     foreign_vpn       leftovers of other VPN stacks: x-ui, xray, remnanode, amnezia containers, old wg interfaces
+//     foreign_nft       nftables tables/rules that are not ours (nat/redirect in particular)
+//     port_conflicts    inbound ports (and hop ranges) held by a process that is not us
+//     net_baseline      fq + bbr sysctls and the journald drop-in (what hostctl.ApplyBaseline installs, nothing more)
+//     cert_expiry       inbound certificates (expiry, SNI match) and the agent's own mTLS certificate
+//     memory_pressure   MemAvailable, swap use, PSI memory, OOM kills in dmesg
+//     cpu_softirq       softirq share and total CPU over the last 10 min
+//     kernel_headers    kernel headers / DKMS possible for the AmneziaWG module. The module is optional: OK while the
+//                       userspace backend serves (mode auto/userspace), WARN only when kernel mode is asked and the
+//                       module does not run. Params: kernel, missing, mode, backend
+//     awg_backend       the AmneziaWG backend the engine runs (kernel module or userspace) or why it has none; SKIP while the
+//                       node has no awg inbound. Params: backend/version/mode, or reason + hint no_tun | unit_outdated (the
+//                       systemd unit of generation < 3 hides /dev/net/tun) | no_module | docker_forward_drop (WARN)
+//     warp_path         the node's WARP tunnel and its routes; SKIP while the node has no WARP account and no inbound with
+//                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
+//                       table_in_use | rule_pref_in_use | interface_in_use
+//   FIX IDS (stable; only these four exist; all are safe: no data loss, no package install, no ssh or
+//   firewall change). The check that offers a fix puts its id into DoctorResult.fix_id.
+//     journald_vacuum   journalctl --vacuum-size=200M (+ --vacuum-time=7d)           offered by journald_size, disk_space
+//     apply_baseline    hostctl.ApplyBaseline: sysctl + journald drop-in + ssh guard  offered by net_baseline
+//     restart_inbound   restart one inbound (params{inbound_id}) or all failed ones   offered by port_conflicts, cert_expiry (self-signed only)
+//     set_resolver      point the host resolver at the node's resolvers (NodeSettings.dns_resolvers, else the
+//                       agent's default for NodeSettings.country_code); the previous config is backed up and
+//                       removed again by Cleanup                                      offered by resolver
+//
+// UPDATE (agent self-update; additive, protocol api_version stays 1)
+//   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it
+//   with the public key compiled into its own binary, downloads the file for its GOOS/GOARCH over the same
+//   mutual-TLS endpoint, swaps its executable, re-executes itself (same PID, systemd sees nothing) and
+//   reports the outcome in the next Hello. The panel is only a courier: a compromised panel cannot make a
+//   node run code the owner did not sign.
+//   - CAPABILITY GATE. An agent lists "update/1" in Hello.capabilities only when it CAN update itself: its
+//     build carries a release key, its executable directory is writable (the hardened unit allows that only
+//     from unit generation 2 on) and it runs under the expected supervisor. It additionally lists
+//     "update-guard/1" when the systemd unit carries the crash-loop guard (ExecStartPre). The panel sends
+//     UpdateAgent / RollbackAgent ONLY to a stream that listed "update/1"; any other node is shown as
+//     "update by hand once". Old agents and old panels ignore the new messages like any unknown oneof member.
+//   - MANIFEST. manifest is the exact byte string that was signed (JSON, schema 1: version, built, expires,
+//     files[{os, arch, name, size, sha256}]); signature is a detached ed25519 signature over those bytes. The
+//     agent never re-serialises it. "built" is the Unix time of the source commit: it, not the version string,
+//     orders releases. Format and checks: internal/release.
+//   - UpdateAgent steps on the agent, in this order; the first failure ends it with CommandResult{ok=false,
+//     error=<code>} and leaves the installed binary untouched: signature valid under the compiled-in key
+//     (bad_signature; unsigned_build when the binary has no key); schema known (bad_manifest); not expired
+//     (expired); built > own built (equal: ok=true, affected=0, params{noop:"1"}, detail "already current";
+//     lower: downgrade); a file for runtime.GOOS/GOARCH (no_file_for_platform); download via FetchUpdate to
+//     "<exe>.new" (download_failed); size and sha256 equal the manifest (size_mismatch, hash_mismatch); chmod
+//     0755 and fsync; copy the running exe to "<exe>.prev"; write the marker <state-dir>/update.pending; rename
+//     "<exe>.new" over the exe (any filesystem failure up to here is not_writable, and the marker and ".new"
+//     are removed again); answer CommandResult{ok=true, affected=1, params{from_version, from_built,
+//     to_version, to_built}}; drain the engines; syscall.Exec the same path with the same args and environment.
+//     One update or rollback at a time ("busy").
+//   - COMMIT. A process that starts with update.pending present and whose own built equals the marker's
+//     to_built connects, has its desired state applied without a FAILED inbound, then deletes the marker: the
+//     update is committed and the next Hello says last_update{OK}. A process whose built differs from to_built,
+//     or that has not committed 5 minutes after start, rolls itself back: ".prev" over the exe, writes
+//     <state-dir>/update.rolledback{from, to, reason}, removes the marker, re-executes. A crash loop is caught
+//     by the unit (ExecStartPre counts starts while the marker exists and restores ".prev" on the third, reason
+//     crash_loop). The old build reports last_update{ROLLED_BACK, reason} in its Hello and then deletes
+//     update.rolledback.
+//   - RollbackAgent restores ".prev" (error no_previous when absent) and re-executes, by the same steps.
+//     It is what the panel sends when a rollout gate fails and what "roll back this node" does.
+//   - FetchUpdate is a server-streaming RPC on AgentService (mTLS like Connect, same agent SNI). The panel
+//     streams the named file of its bundle directory in chunks of at most 256 KiB, from the byte offset asked
+//     for, so an interrupted download resumes. It serves only a file name listed in the panel's current
+//     manifest, to any valid node certificate, at most 4 concurrent streams (RESOURCE_EXHAUSTED: retry).
+//   - LAST_UPDATE. Hello.last_update carries the outcome of the most recent self-update that this node has not
+//     reported yet (ok after a commit, rolled_back / failed after a rollback). The agent keeps it on disk and
+//     repeats it in every Hello until a HelloAck for that Hello arrives; then it forgets it (one report per
+//     outcome).
+//   - EVENTS. The agent raises the reliable Event "update_committed" {from_version, to_version} when the new
+//     build commits, and "update_rolled_back" {from_version, to_version, reason} when the old build starts again
+//     after a rollback (severity WARNING). The panel's rollout gate waits for the first one.
+//   CommandResult.error vocabulary for UpdateAgent: bad_signature, unsigned_build, bad_manifest, expired,
+//   downgrade, no_file_for_platform, download_failed, size_mismatch, hash_mismatch, not_writable, busy,
+//   "failed: <short message>"; for RollbackAgent: no_previous, not_writable, busy, "failed: <short message>".
+//
+// AWG AND WARP (additive, protocol api_version stays 1)
+//   An L3 protocol (AmneziaWG, protocol id "awg") and the node-level WARP egress ride the same desired state.
+//   - CAPABILITY GATES. An agent lists "awg/1" in Hello.capabilities when it can run awg inbounds (InboundSpec.tunnel,
+//     NodeSettings.awg_backend, InboundHealth.awg) and "warp/1" when it can run WARP (DesiredState.warp,
+//     StatsBatch.warp). The panel puts an awg inbound or a WarpSpec into the desired state of a stream ONLY when
+//     it listed the string (an old agent would reject the unknown protocol and the whole state with it), and
+//     answers the admin calls that need them with FAILED_PRECONDITION ("agent too old"). A new agent with an old
+//     panel simply never receives them, and its new health fields are ignored.
+//   - DesiredState.warp. Presence replaces the WHOLE WARP configuration, in a delta too; absence in a delta means
+//     "unchanged"; absence in a full state (base_revision = 0) means "this node has no WARP". Because a delta
+//     cannot say "remove", the panel sends a full state when an account is deleted. enabled = false with a
+//     spec present is "paused": the tunnel is torn down and every inbound with egress "warp" fails closed.
+//     An inbound with egress "warp" on a node without a WarpSpec is NOT started: InboundResult.error is
+//     "egress warp: not configured on this node" (there is never a silent direct exit).
+//   - WarpSpec.private_key is plaintext on the wire and in the agent's state directory (mode 0600), like the
+//     Salamander password and the self-signed key: the channel is mutual TLS and the copy on disk is the same
+//     trust class.
+//   - Credential.data_json for awg is {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],
+//     "psk":"<base64>"} in that field order (the bytes are hashed). The client's private key never reaches a node.
+//   - Session for awg: connected_at_unix = the peer's last handshake, remote_ip = the peer's current endpoint
+//     (the health "hopping endpoint" rule reads it from successive snapshots). A peer is a session while its last
+//     handshake is younger than 190 s.
+//   - TrafficDelta for awg: bytes_up = the peer's received bytes (client -> internet), bytes_down = its
+//     transmitted bytes; the engine keeps the previous absolute value per (inbound, public key) and a smaller new
+//     value means the peer or interface was recreated (the delta is then the new value).
+//   - Kick for awg removes the peer and puts it back one second later if the credential is still valid.
+//   - Engine.version in EngineInfo for awg names the backend: "amneziawg-go v3.1.20260828" (userspace) or
+//     "amneziawg kernel module, genl v3, maxattr 34" (kernel).
+//   Event codes added: awg_backend_unavailable {reason}, warp_state {state, from}, warp_needs_attention {reason}.
+//   - PREPARE THE KERNEL MODULE (additive). An agent lists "awg-prepare/1" when it can put the
+//     AmneziaWG kernel module on its host by itself. The panel sends PrepareAwgKernel ONLY to a stream that listed
+//     it; for any other agent the admin UI keeps showing the manual command (`mistgate-node awg prepare-kernel`).
+//     The agent never installs anything inside its own sandboxed unit (ProtectSystem=strict, a tiny capability
+//     set, MemoryMax): a real run starts `mistgate-node awg prepare-kernel --yes` as a separate transient systemd
+//     unit (systemd-run, name mistgate-awg-prepare) with a hard timeout of 15 minutes, apt non-interactive and a
+//     bounded wait for the dpkg lock; the job reports through a status file in the state directory and survives an
+//     agent restart. Only Debian/Ubuntu (apt) hosts that are not containers, are not under Secure Boot and run
+//     systemd are supported; the rest answer state "unsupported" with a code.
+//     PrepareAwgKernel{request_id, dry_run} is answered with exactly one CommandResult (ok = true unless the job
+//     could not be started: error "failed: <short message>") whose params say what is the case:
+//       state   ready          the module is loaded and speaks genl v3 with room for AWG 3.1: nothing to do
+//               needs_prepare  it is not, and a run is possible (this is all a dry run ever answers besides the others)
+//               started        a real run began (kernel: the release it builds for)
+//               running        one is already going: a repeated request is a no-op (since_unix: when it began)
+//               unsupported    it cannot be done here; code container | distro | unknown_kernel | secure_boot | no_systemd |
+//                              launch_failed (systemd-run refused to start the unit), reason: a short English fact
+//     dry_run = true changes nothing. The node keeps its current backend (userspace) the whole time; switching to
+//     the module is the panel's job, after the node says "done" (NodeSettings.awg_backend = "kernel").
+//     Events (reliable, severity in brackets): awg_kernel_prepare_started {kernel} (info), awg_kernel_prepare_done
+//     {kernel, minutes} (info) and awg_kernel_prepare_failed {code, reason, kernel, minutes} (error). code is one of
+//     timeout | apt_lock | step_failed | source_moved | module_not_loaded | module_unusable | interrupted;
+//     reason is one short English sentence, never package-manager output (that is in the node's journal, unit
+//     mistgate-awg-prepare). After done and after failed the agent re-runs the checks kernel_headers and awg_backend.
+//     A run that ended while the agent was down is reported when it starts again; a run whose job stopped writing its
+//     status (the host rebooted, the unit was killed) ends as failed / interrupted.
+//
+// LOGS
+//   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
+//   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
+
+// Bootstrap and certificate renewal.
+service EnrollmentService {
+  // Exchange a one-time enrollment token plus a CSR for a node certificate (valid 30 days).
+  // The token is single-use, but a repeat call with the same token AND the same CSR public key within
+  // 10 minutes of first use returns the same certificate (the response may have been lost).
+  // Errors: UNAUTHENTICATED (unknown/expired/used token), INVALID_ARGUMENT (bad CSR),
+  // FAILED_PRECONDITION (node retired, api_version unsupported).
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+
+  // Replace the certificate before it expires. mTLS with the current certificate. The agent renews when
+  // less than 10 days remain (day 20 of 30) and generates a NEW key each time. The panel ignores the
+  // subject in the CSR and sets the URI SAN itself.
+  rpc Renew(RenewRequest) returns (RenewResponse);
+}
+
+service AgentService {
+  // Long-lived bidirectional stream. The request stream is node -> panel, the response stream is
+  // panel -> node (the names are fixed by the buf STANDARD lint rule RPC_REQUEST_STANDARD_NAME).
+  rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+
+  // Download one file of the panel's release bundle (see "UPDATE"). Server streaming, mutual TLS: the same
+  // agent middleware as Connect, so only a valid, non-revoked node certificate gets bytes. Errors: NOT_FOUND
+  // (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (too many concurrent
+  // downloads, retry in a few seconds), FAILED_PRECONDITION (the panel has no bundle).
+  rpc FetchUpdate(FetchUpdateRequest) returns (stream FetchUpdateResponse);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Enrollment
+
+message EnrollRequest {
+  string enrollment_token = 1;
+  // PKCS#10 certificate request, DER. Key: ECDSA P-256 (the panel rejects anything else).
+  bytes csr_der = 2;
+  string agent_version = 3;
+  uint32 api_version = 4;
+}
+
+message EnrollResponse {
+  string node_id = 1;
+  // Leaf certificate, PEM. Validity 30 days, extended key usage clientAuth.
+  string certificate_pem = 2;
+  // The panel CA certificate, PEM. The agent stores it and from now on trusts only it.
+  string ca_certificate_pem = 3;
+  int64 not_after_unix = 4;
+  int64 renew_after_unix = 5;
+}
+
+message RenewRequest {
+  bytes csr_der = 1;
+}
+
+message RenewResponse {
+  string certificate_pem = 1;
+  int64 not_after_unix = 2;
+  int64 renew_after_unix = 3;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Node -> panel
+
+message ConnectRequest {
+  // Non-zero only for stats and event (see "RELIABLE MESSAGES").
+  uint64 seq = 1;
+  oneof message {
+    Hello hello = 10;
+    StatsBatch stats = 11;
+    Event event = 12;
+    ApplyResult apply_result = 13;
+    CommandResult command_result = 14;
+    LogChunk log_chunk = 15;
+    Pong pong = 16;
+    // Doctor snapshot (seq = 0, see "DOCTOR"). Sent only by agents that list "doctor/1" in capabilities.
+    DoctorReport doctor_report = 17;
+  }
+}
+
+message Hello {
+  // Informational; the certificate is authoritative.
+  string node_id = 1;
+  string agent_version = 2;
+  // Wire API version this agent speaks. The panel closes the stream with FAILED_PRECONDITION
+  // (error detail carries the supported range) if it cannot serve it.
+  uint32 api_version = 3;
+  string instance_id = 4;
+  // seq that the next NEW reliable message will use.
+  uint64 next_seq = 5;
+  // Smallest seq still waiting for an Ack, 0 if none.
+  uint64 first_unacked_seq = 6;
+  // Revision and hash (spec section "STATE HASH") of the state the engines run RIGHT NOW (restored from
+  // disk at boot, then reconciled). 0 / "" = nothing applied yet.
+  uint64 applied_revision = 7;
+  string applied_state_hash = 8;
+  repeated EngineInfo engines = 9;
+  HostFacts facts = 10;
+  // Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
+  // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
+  // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
+  // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
+  // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp) and "awg-prepare/1" (PrepareAwgKernel; see
+  // "AWG AND WARP").
+  // An agent that predates the field sends none, which the panel reads as "no optional features".
+  repeated string capabilities = 11;
+  // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
+  // Orders releases (the version string does not); the panel compares it with the bundle manifest.
+  int64 built = 12;
+  // Outcome of the last self-update that this node has not reported yet; unset when there is none
+  // (see "UPDATE", LAST_UPDATE).
+  LastUpdate last_update = 13;
+}
+
+enum UpdateOutcome {
+  UPDATE_OUTCOME_UNSPECIFIED = 0;
+  // The new build started, connected, applied its state and committed.
+  UPDATE_OUTCOME_OK = 1;
+  // The new build did not commit; the previous one runs again. `reason` says why.
+  UPDATE_OUTCOME_ROLLED_BACK = 2;
+  // The update could not finish on the agent (the process died between the swap and the commit marker, or
+  // the swap failed after the command was acknowledged); the running build is the old one.
+  UPDATE_OUTCOME_FAILED = 3;
+}
+
+message LastUpdate {
+  UpdateOutcome outcome = 1;
+  string from_version = 2;
+  int64 from_built = 3;
+  string to_version = 4;
+  int64 to_built = 5;
+  // Empty for OK. Vocabulary: not_committed (5 minutes without a connected, applied state), built_mismatch,
+  // crash_loop, apply_failed, manual (RollbackAgent), "failed: <short message>".
+  string reason = 6;
+  // When the outcome was decided (corrected agent clock).
+  int64 at_unix = 7;
+}
+
+message EngineInfo {
+  string protocol = 1;
+  // Library/binary version that matters for client compatibility, e.g. "hysteria core v2.12.3".
+  string version = 2;
+}
+
+// Facts that the agent can learn without root tricks. The deep pre-checks come with SSH provisioning.
+message HostFacts {
+  string hostname = 1;
+  string os = 2;
+  string kernel = 3;
+  string arch = 4;
+  uint32 cpu_count = 5;
+  uint64 ram_total_bytes = 6;
+  uint64 disk_total_bytes = 7;
+  // systemd-detect-virt style: "kvm", "openvz", "lxc", "none", ...
+  string virt = 8;
+  bool has_ipv6 = 9;
+  // Boot time of the host. A changed value between two connections means the host really rebooted;
+  // an unchanged value after a gap means the host/network blipped.
+  int64 boot_unix = 10;
+}
+
+message StatsBatch {
+  // [start, end) in corrected agent time. end decides the hourly bucket.
+  int64 interval_start_unix = 1;
+  int64 interval_end_unix = 2;
+  // Non-zero deltas only, since the previous batch of this instance.
+  repeated TrafficDelta traffic = 3;
+  // ABSOLUTE snapshot of open sessions at interval_end (latest wins; idempotent).
+  repeated Session sessions = 4;
+  HostMetrics host = 5;
+  repeated InboundHealth health = 6;
+  bool coalesced = 7;
+  // Node-level WARP health; absent when the node has no WarpSpec. Newest batch wins (coalescing keeps the last).
+  WarpHealth warp = 8;
+}
+
+// Directions are from the END USER's point of view, not the server-remote view used inside the
+// Hysteria core (core "Tx" = bytes_up, core "Rx" = bytes_down).
+message TrafficDelta {
+  // Resolves to user x device x protocol on the panel. Credentials are soft-deleted there, so a
+  // revoked credential still resolves.
+  string cred_id = 1;
+  string inbound_id = 2;
+  // client -> internet
+  uint64 bytes_up = 3;
+  // internet -> client
+  uint64 bytes_down = 4;
+}
+
+message Session {
+  string cred_id = 1;
+  string inbound_id = 2;
+  // Client address without port. Never shown in full in the UI by default.
+  string remote_ip = 3;
+  int64 connected_at_unix = 4;
+}
+
+message HostMetrics {
+  float cpu_pct = 1;
+  // Part of cpu_pct spent in softirq.
+  float softirq_pct = 2;
+  float load1 = 3;
+  uint64 ram_used_bytes = 4;
+  uint64 ram_total_bytes = 5;
+  uint64 disk_used_bytes = 6;
+  uint64 disk_total_bytes = 7;
+  // Main NIC, averaged over the interval.
+  uint64 net_rx_bps = 8;
+  uint64 net_tx_bps = 9;
+  uint64 uptime_s = 10;
+}
+
+enum InboundRunState {
+  INBOUND_RUN_STATE_UNSPECIFIED = 0;
+  INBOUND_RUN_STATE_STARTING = 1;
+  INBOUND_RUN_STATE_RUNNING = 2;
+  INBOUND_RUN_STATE_FAILED = 3;
+  INBOUND_RUN_STATE_STOPPED = 4;
+}
+
+message InboundHealth {
+  string inbound_id = 1;
+  InboundRunState state = 2;
+  // Short machine-readable reason when not RUNNING, e.g. "bind: address already in use".
+  string detail = 3;
+  uint32 restart_count = 4;
+  int64 started_at_unix = 5;
+  // Only for protocol "awg" (agents with "awg/1").
+  AwgHealth awg = 6;
+  // The leaf certificate the inbound serves right now (InboundResult.cert_*, but live): an ACME certificate is issued
+  // after the apply was answered, and renewed later, so only the stats stream can tell the panel. Empty = not known.
+  string cert_pin_sha256 = 7;
+  int64 cert_not_after_unix = 8;
+}
+
+message AwgHealth {
+  // "kernel" | "userspace".
+  string backend = 1;
+  // "amneziawg kernel module, genl v3, maxattr 34" | "amneziawg-go v3.1.20260828".
+  string backend_version = 2;
+  bool iface_up = 3;
+  // Peers in the interface.
+  uint32 peers = 4;
+  // Peers that completed a handshake at least once (peers - this = devices that never connected).
+  uint32 peers_handshaken = 5;
+  // Peers whose last handshake is younger than 190 s.
+  uint32 peers_online = 6;
+  int64 newest_handshake_unix = 7;
+  // Cumulative nft counter of datagrams to the UDP port: 0 -> provider or firewall, > 0 without handshakes ->
+  // obfuscation parameters.
+  uint64 udp_rx_packets = 8;
+  // Kernel backend only (multicast group "auth"): valid initiations from an unknown key since the previous batch;
+  // always 0 for userspace.
+  uint32 unknown_peer_events = 9;
+}
+
+enum WarpState {
+  WARP_STATE_UNSPECIFIED = 0;
+  // No usable backend on this host (no kernel WireGuard and no /dev/net/tun).
+  WARP_STATE_UNAVAILABLE = 1;
+  WARP_STATE_STARTING = 2;
+  WARP_STATE_UP = 3;
+  WARP_STATE_DOWN = 4;
+  // WarpSpec.enabled is false.
+  WARP_STATE_DISABLED = 5;
+}
+
+message WarpHealth {
+  WarpState state = 1;
+  // "kernel" | "userspace".
+  string backend = 2;
+  // ip:port in use right now (after a port rotation).
+  string endpoint = 3;
+  int64 last_handshake_unix = 4;
+  // Probe A (cdn-cgi/trace through the tunnel): "on" | "plus" | "off" | "" (probe failed).
+  string warp_flag = 5;
+  string colo = 6;
+  bool probe_cloudflare_ok = 7;
+  // Probe B, a host that is not Cloudflare: a handshake can work while everything else is black-holed.
+  bool probe_other_ok = 8;
+  uint32 consecutive_failures = 9;
+  uint64 rx_bytes = 10;
+  uint64 tx_bytes = 11;
+  // Short English fact, e.g. "probe_other_timeout".
+  string last_error = 12;
+  // The latest round of each probe (unset = the round did not run it, or an agent that predates these fields):
+  // probe_cloudflare_ok / probe_other_ok above say the same as .ok but cannot tell "failed" from "not run".
+  WarpProbeResult probe_cloudflare = 13;
+  WarpProbeResult probe_other = 14;
+  // When the latest health check finished (0 = unknown), whatever it found.
+  int64 checked_unix = 15;
+}
+
+// One probe of the latest health check.
+message WarpProbeResult {
+  bool ok = 1;
+  // How long the probe took, failed ones included (a timeout shows the timeout).
+  uint32 latency_ms = 2;
+  int64 at_unix = 3;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_WARNING = 2;
+  SEVERITY_ERROR = 3;
+}
+
+// Reliable (carries seq). The code vocabulary is open (plugins add their own); the UI maps
+// code -> localized text and falls back to the code. Codes: engine_started, engine_failed,
+// engine_restarted, state_applied, state_drift, cert_renewed, clock_skew, host_rebooted,
+// stats_dropped, disk_low, credential_expired. Update (see "UPDATE"): update_committed, update_rolled_back.
+// agent_started {version, prev_version, reason: update | boot | restart}: once per process start, before anything else.
+// engine_started / engine_restarted {protocol, reason}: reason is agent_start | profile_added | recovered, and
+// restart_command | config_changed. state_applied {revision, inbounds, added, removed, changed, users}.
+// AWG and WARP (see "AWG AND WARP"): awg_backend_unavailable, warp_state, warp_needs_attention, awg_kernel_prepare_started,
+// awg_kernel_prepare_done, awg_kernel_prepare_failed.
+message Event {
+  Severity severity = 1;
+  string code = 2;
+  string inbound_id = 3;
+  int64 time_unix = 4;
+  map<string, string> params = 5;
+}
+
+enum ApplyStatus {
+  APPLY_STATUS_UNSPECIFIED = 0;
+  // Every inbound reached its target state.
+  APPLY_STATUS_APPLIED = 1;
+  // Some inbounds failed (see per-inbound results); the rest run. The panel shows the failing ones.
+  APPLY_STATUS_PARTIAL = 2;
+  // A delta whose base_revision is not the applied revision. Nothing was changed.
+  APPLY_STATUS_BASE_MISMATCH = 3;
+  // The message was malformed (unknown protocol, settings rejected by the plugin...). Nothing changed.
+  APPLY_STATUS_REJECTED = 4;
+}
+
+// One per DesiredState, matched by revision.
+message ApplyResult {
+  uint64 revision = 1;
+  ApplyStatus status = 2;
+  // Hash computed from Engine.Observed after applying ("what actually runs").
+  string state_hash = 3;
+  repeated InboundResult inbounds = 4;
+  // Set for REJECTED / BASE_MISMATCH.
+  string error = 5;
+  uint32 duration_ms = 6;
+}
+
+message InboundResult {
+  string inbound_id = 1;
+  InboundRunState state = 2;
+  string spec_hash = 3;
+  uint32 cred_count = 4;
+  bool restarted = 5;
+  string error = 6;
+  // SHA-256 of the DER leaf certificate the inbound now serves (hex, lowercase). The panel puts it into
+  // subscriptions as pinSHA256 when tls.mode is SELF_SIGNED.
+  string cert_pin_sha256 = 7;
+  int64 cert_not_after_unix = 8;
+}
+
+message CommandResult {
+  string request_id = 1;
+  bool ok = 2;
+  string error = 3;
+  // Kick: sessions closed or marked; RestartInbound: inbounds restarted; ApplyFix: units changed.
+  uint32 affected = 4;
+  // Short English fact line (ApplyFix: what would happen / what was done). Empty for the older commands.
+  string detail = 5;
+  // Facts for i18n placeholders (ApplyFix: e.g. {"before_mb":"3200","after_mb":"200"}). Empty for the older commands.
+  map<string, string> params = 6;
+}
+
+message LogChunk {
+  string request_id = 1;
+  repeated LogLine lines = 2;
+  // Set on the last chunk of a request (tail without follow, LogCancel, timeout, error).
+  bool eof = 3;
+  // Records that fell out of the ring buffer or were dropped to keep the stream moving.
+  uint32 dropped = 4;
+  string error = 5;
+}
+
+message LogLine {
+  int64 time_unix_ms = 1;
+  Severity level = 2;
+  // "agent", "hysteria2", ...
+  string source = 3;
+  string message = 4;
+  map<string, string> attrs = 5;
+}
+
+message Pong {
+  uint64 nonce = 1;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Panel -> node
+
+message ConnectResponse {
+  oneof message {
+    HelloAck hello_ack = 10;
+    Ack ack = 11;
+    DesiredState desired_state = 12;
+    Kick kick = 13;
+    RestartInbound restart_inbound = 14;
+    Retire retire = 15;
+    LogRequest log_request = 16;
+    LogCancel log_cancel = 17;
+    Ping ping = 18;
+    // Only sent to agents with "doctor/1" in Hello.capabilities.
+    RunDoctor run_doctor = 19;
+    ApplyFix apply_fix = 20;
+    // Only sent to agents with "update/1" in Hello.capabilities (see "UPDATE").
+    UpdateAgent update_agent = 21;
+    RollbackAgent rollback_agent = 22;
+    // Only sent to agents with "awg-prepare/1" in Hello.capabilities (see "AWG AND WARP").
+    PrepareAwgKernel prepare_awg_kernel = 23;
+  }
+}
+
+// Ask the node to put the AmneziaWG kernel module on itself (or, with dry_run, only say whether that is needed and
+// possible). Answered with one CommandResult; see "AWG AND WARP", PREPARE THE KERNEL MODULE.
+message PrepareAwgKernel {
+  string request_id = 1;
+  bool dry_run = 2;
+}
+
+message HelloAck {
+  // Highest seq the panel has committed for Hello.instance_id (0 for an unknown instance).
+  uint64 acked_seq = 1;
+  // Panel clock; the agent stores offset = server_time - local_time and applies it to timestamps it sends.
+  int64 server_time_unix = 2;
+  NodeSettings settings = 3;
+}
+
+message Ack {
+  uint64 up_to_seq = 1;
+}
+
+// Per-node tunables; also present in every DesiredState so a change does not need a reconnect.
+message NodeSettings {
+  // Default 10.
+  uint32 stats_interval_s = 1;
+  // Default 20 / 45.
+  uint32 keepalive_interval_s = 2;
+  uint32 keepalive_timeout_s = 3;
+  // Default 15.
+  uint32 dial_timeout_s = 4;
+  // Resolver used by the node for its own lookups and by protocol engines for sniffed domains.
+  // Empty = agent default by geolocation rules. host:port or bare IP.
+  repeated string dns_resolvers = 5;
+  // ISO 3166-1 alpha-2 of the node (node.country_code), "" = unknown. The doctor needs it: on "RU" the
+  // resolver check also resolves gosuslugi.ru and set_resolver defaults to Russian resolvers.
+  string country_code = 6;
+  // AmneziaWG backend: "auto" | "kernel" | "userspace"; "" = "auto". auto = the kernel module when it is already
+  // loaded (the agent installs no packages), else userspace. kernel = fail awg inbounds with
+  // awg_backend_unavailable when the module is missing. Read only by agents with "awg/1".
+  string awg_backend = 7;
+}
+
+message DesiredState {
+  // Per-node, strictly increasing, bumped by every change (including credential changes).
+  uint64 revision = 1;
+  // 0 = full snapshot. Otherwise a delta on top of exactly this revision.
+  uint64 base_revision = 2;
+  // Hash of the COMPLETE state after applying this message.
+  string state_hash = 3;
+  // Full: all inbounds. Delta: only added or changed ones.
+  repeated InboundState inbounds = 4;
+  // Delta only.
+  repeated string removed_inbound_ids = 5;
+  NodeSettings settings = 6;
+  // Node-level WARP (see "AWG AND WARP"). Presence replaces the whole WARP configuration, also in a delta;
+  // absence in a delta = unchanged; absence in a full state = no WARP. Sent only to agents with "warp/1".
+  WarpSpec warp = 7;
+}
+
+message WarpSpec {
+  // false with the rest kept = paused (the owner's switch).
+  bool enabled = 1;
+  // base64 X25519; plaintext on the wire, 0600 on the node.
+  string private_key = 2;
+  string peer_public_key = 3;
+  // IP literals, no port. endpoint_v6 only after the panel checked that IPv6 to Cloudflare works; "" = never.
+  string endpoint_v4 = 4;
+  string endpoint_v6 = 5;
+  // In order of preference, normally 2408, 500, 1701, 4500; the agent rotates when no handshake comes.
+  repeated uint32 ports = 6;
+  // "172.16.0.2/32"; address_v6 "" = none (new accounts often have no IPv6).
+  string address_v4 = 7;
+  string address_v6 = 8;
+  uint32 mtu = 9;
+  // 0 or 3 bytes (the "reserved" bytes of the account's client_id); non-empty = the agent stamps them.
+  bytes reserved = 10;
+  // "auto" | "kernel" | "userspace"; "" = "auto".
+  string backend = 11;
+}
+
+message InboundState {
+  string inbound_id = 1;
+  // Required for a new inbound and in a full state; absent in a delta = spec unchanged.
+  InboundSpec spec = 2;
+  // true: `creds` is the complete credential set of the inbound. false: `creds` are upserts and
+  // `removed_cred_ids` are deletions.
+  bool creds_replace = 3;
+  repeated Credential creds = 4;
+  repeated string removed_cred_ids = 5;
+}
+
+// Protocol-agnostic description of one listener. Everything the HOST layer needs (ports, DNAT, firewall,
+// certificates) is a first-class field; everything the PROTOCOL needs is opaque JSON in settings_json,
+// validated by the protocol plugin on both ends (panel: Protocol.Validate, node: Engine.Apply).
+message InboundSpec {
+  string inbound_id = 1;
+  // Plugin id, e.g. "hysteria2".
+  string protocol = 2;
+  string profile_id = 3;
+  // Bumped by the panel whenever profile settings or inbound overrides change.
+  uint64 spec_version = 4;
+  bool enabled = 5;
+  Listen listen = 6;
+  Tls tls = 7;
+  // "direct" (default) or "warp". The agent resolves the name to an egress handed to the engine; "warp"
+  // needs DesiredState.warp (an inbound without it is not started, see "AWG AND WARP").
+  string egress = 8;
+  // Protocol-specific settings. Secrets inside (Salamander password, AWG server private key) are plaintext here.
+  string settings_json = 9;
+  // L3 protocols only (awg); absent for hysteria2. Part of spec_hash when present ("STATE HASH").
+  Tunnel tunnel = 10;
+}
+
+// What the host layer needs for a tunnel protocol. The client subnets are derived from the prefixes
+// (masquerade source, "ip rule from" for egress warp).
+message Tunnel {
+  // "10.66.4.1/22": the node's address inside the client subnet.
+  string addr_v4 = 1;
+  // "fd66:66:0:1::1/64" or "" (no IPv6 in the tunnel).
+  string addr_v6 = 2;
+  uint32 mtu = 3;
+}
+
+message Listen {
+  // "udp" or "tcp". Hysteria2: "udp".
+  string network = 1;
+  // The single port the engine binds.
+  uint32 port = 2;
+  // Port hopping: the agent (host owner) installs an nft DNAT hop_from-hop_to -> port in its own table.
+  // Both 0 = off. The engine never sees the range.
+  uint32 hop_from = 3;
+  uint32 hop_to = 4;
+}
+
+enum TlsMode {
+  TLS_MODE_UNSPECIFIED = 0;
+  // The agent obtains a certificate for server_name (built-in ACME).
+  TLS_MODE_ACME_DOMAIN = 1;
+  // Let's Encrypt IP-address certificate (server_name is the IP).
+  TLS_MODE_ACME_IP = 2;
+  // The agent generates a key and a self-signed certificate; the pin is reported in InboundResult.
+  TLS_MODE_SELF_SIGNED = 3;
+}
+
+message Tls {
+  TlsMode mode = 1;
+  string server_name = 2;
+}
+
+message Credential {
+  // One per device x protocol. Stable for the life of the device.
+  string cred_id = 1;
+  // For attribution in logs and per-user limits inside an engine. Not secret.
+  string user_id = 2;
+  string device_id = 3;
+  // Protocol-specific VERIFIER (never the raw end-user secret). Hysteria2: {"auth_sha256":"<hex>"}.
+  // AmneziaWG: {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],"psk":"<base64>"}
+  // (see "AWG AND WARP"; the PSK is a per-peer secret, like any WireGuard server holds).
+  string data_json = 4;
+  // 0 = unlimited. Engines that cannot shape traffic ignore it and say so in Engine.Capabilities.
+  uint64 rate_limit_bps = 5;
+  // 0 = no expiry. The agent drops the credential (and closes its sessions) at this time by itself, so a
+  // term ends on time even while the panel link is down. Quotas cannot be enforced offline.
+  int64 valid_until_unix = 6;
+}
+
+message Kick {
+  string request_id = 1;
+  repeated string cred_ids = 2;
+  string reason = 3;
+}
+
+message RestartInbound {
+  string request_id = 1;
+  // Empty = all inbounds.
+  string inbound_id = 2;
+}
+
+// Retire the node: stop engines, delete state and key material, stop reconnecting, exit.
+// Removing units and nft tables from the host belongs to an SSH-driven uninstall; Retire stops at "agent exits".
+message Retire {
+  string request_id = 1;
+}
+
+message LogRequest {
+  string request_id = 1;
+  // Empty = all sources.
+  repeated string sources = 2;
+  // Max 1000.
+  uint32 tail_lines = 3;
+  bool follow = 4;
+  // Capped at 600.
+  uint32 follow_max_seconds = 5;
+  // Minimum severity; UNSPECIFIED = all.
+  Severity min_level = 6;
+}
+
+message LogCancel {
+  string request_id = 1;
+}
+
+message Ping {
+  uint64 nonce = 1;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Doctor (see "DOCTOR" at the top)
+
+enum DoctorStatus {
+  DOCTOR_STATUS_UNSPECIFIED = 0;
+  DOCTOR_STATUS_OK = 1;
+  // Degraded or about to be a problem; traffic still flows.
+  DOCTOR_STATUS_WARN = 2;
+  // Broken now or will be within hours.
+  DOCTOR_STATUS_FAIL = 3;
+  // Could not be evaluated on this host (and why is in detail); not a problem.
+  DOCTOR_STATUS_SKIP = 4;
+}
+
+// Panel -> node. Answered with one DoctorReport carrying the same request_id.
+message RunDoctor {
+  string request_id = 1;
+  // Check ids to run (see CHECK IDS). Empty = all.
+  repeated string checks = 2;
+}
+
+// Node -> panel. seq = 0 (snapshot, not reliable).
+message DoctorReport {
+  // Echo of RunDoctor.request_id; empty for the periodic/start report and for the re-check after a fix.
+  string request_id = 1;
+  repeated DoctorResult results = 2;
+  // true: only a subset of checks ran; merge by id instead of replacing the stored set.
+  bool partial = 3;
+  // Set when the run did not happen ("busy", "not_root"); results is empty then.
+  string error = 4;
+  // Wall time of the whole run.
+  uint32 duration_ms = 5;
+}
+
+message DoctorResult {
+  // One of CHECK IDS.
+  string id = 1;
+  DoctorStatus status = 2;
+  // i18n key of the one-line title, e.g. "doctor.disk_space.title". Stable; the UI falls back to id.
+  string title_key = 3;
+  // Short English facts, no advice, at most 200 bytes: "/ 91% used, 1.2 GB free".
+  string detail = 4;
+  // Values for the placeholders of title_key and of the panel's why/fix texts, e.g.
+  // {"used_pct":"91","free_mb":"1200","mount":"/"}. Numbers are plain decimal strings, lists are comma separated.
+  map<string, string> params = 5;
+  // Fix offered for this result (one of FIX IDS); empty = no automatic fix. Only set when status is WARN or FAIL.
+  string fix_id = 6;
+  // When this result was measured (corrected agent clock).
+  int64 measured_unix = 7;
+  // Stable code of the fact line, "<check id>.<variant>" ("disk_space.usage", "kernel_headers.userspace"). The UI
+  // writes a localized sentence for the code from params and falls back to `detail` for a code it does not know and
+  // for an agent that sends none. Empty = the agent predates the codes.
+  string detail_code = 8;
+}
+
+// Panel -> node. Answered with one CommandResult carrying the same request_id.
+message ApplyFix {
+  string request_id = 1;
+  // One of FIX IDS.
+  string fix_id = 2;
+  // true: describe, change nothing.
+  bool dry_run = 3;
+  // Fix arguments: restart_inbound {"inbound_id"} (empty = all FAILED inbounds). Others take none.
+  map<string, string> params = 4;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Update (see "UPDATE" at the top)
+
+// Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.
+message UpdateAgent {
+  string request_id = 1;
+  // The signed bytes of manifest.json, verbatim.
+  bytes manifest = 2;
+  // Detached ed25519 signature over `manifest` (64 bytes).
+  bytes signature = 3;
+}
+
+// Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.
+message RollbackAgent {
+  string request_id = 1;
+}
+
+message FetchUpdateRequest {
+  // File name exactly as in the manifest files[].name (no path).
+  string name = 1;
+  // Byte offset to start from (resume); 0 = from the start.
+  uint64 offset = 2;
+}
+
+message FetchUpdateResponse {
+  // At most 256 KiB per message, in order; the stream ends after the last byte of the file.
+  bytes data = 1;
+  // Size of the whole file, set on every message so a resumed download can check it against the manifest.
+  uint64 total_size = 2;
+}

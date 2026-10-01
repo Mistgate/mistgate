@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/profile.proto";
+
+// Stateless helpers of the AmneziaWG profile editor. Nothing here stores or
+// changes anything; the profile itself is an ordinary ProfileService profile of protocol "awg".
+service AwgService {
+  // The mimicry presets the editor offers as cards.
+  rpc ListMimicryPresets(ListMimicryPresetsRequest) returns (ListMimicryPresetsResponse);
+  // "Generate" (mode FULL, the default): a complete, valid `obfuscation` object (random values, as the defaults
+  // are) for a version and a preset. The UI lays it over the form and shows how many fields changed. Always
+  // passes the validator. Changes critical fields: the editor's usual reissue confirmation applies on save.
+  //
+  // Picking a mimicry card (mode SIGNATURE): only fresh `preset`, `domain` and `i1`..`i5`, nothing the node or the
+  // issued configs depend on, so no device is affected. The caller lays the few keys over the form.
+  rpc GenerateObfuscation(GenerateObfuscationRequest) returns (GenerateObfuscationResponse);
+}
+
+message MimicryPreset {
+  // "quic", "curl_quic", "dns", "stun", "webrtc", "sip", "ntp", "rtp", "ssdp", "dtls", "custom".
+  string id = 1;
+  // Display name; the UI may localise by id.
+  string name = 2;
+  // AWG versions the preset supports ("3.1", "2.0").
+  repeated string versions = 3;
+  // The preset's packets carry a host name (GenerateObfuscationRequest.domain, obfuscation.domain): show the
+  // domain field for it. quic, curl_quic, dns, sip.
+  bool uses_domain = 4;
+  // UDP ports where this traffic is normal (QUIC 443, DNS 53, NTP 123, SIP 5060, SSDP 1900); empty = any port.
+  // A profile on another port gets the preset_port warning.
+  repeated uint32 natural_ports = 5;
+  // The generator draws different I1-I5 each time, so per-device signatures give every device another chain.
+  // False for stun, webrtc, dtls (and custom): the same packets whatever the seed, the switch does nothing.
+  bool varies_per_device = 6;
+}
+
+message ListMimicryPresetsRequest {}
+
+message ListMimicryPresetsResponse {
+  repeated MimicryPreset presets = 1;
+  // The built-in host names an empty domain is drawn from: suggestions for the domain field.
+  repeated string domains = 2;
+}
+
+enum GenerateMode {
+  // Same as FULL.
+  GENERATE_MODE_UNSPECIFIED = 0;
+  // Everything: junk, S, H, timers, key, seed, signature packets.
+  GENERATE_MODE_FULL = 1;
+  // Only preset, domain and I1-I5. Not for the "custom" preset (INVALID_ARGUMENT: it has no generator).
+  GENERATE_MODE_SIGNATURE = 2;
+}
+
+message GenerateObfuscationRequest {
+  // "3.1" | "2.0".
+  string version = 1;
+  // A preset id from ListMimicryPresets.
+  string preset = 2;
+  // The profile MTU; the generator keeps every packet below it and S4 within the room 1500 leaves. 0 = 1280.
+  // Not used by mode SIGNATURE.
+  uint32 mtu = 3;
+  // Host name for the presets that carry one (MimicryPreset.uses_domain); empty = a random one from the built-in
+  // list. A name that is not a valid host name is INVALID_ARGUMENT, whatever the preset.
+  string domain = 4;
+  GenerateMode mode = 5;
+}
+
+message GenerateObfuscationResponse {
+  // JSON object for the settings key `obfuscation`, secrets included (the header protection key is new).
+  // FULL: every obfuscation key but per_device_signature (the owner's choice stays) and `domain` (what was asked
+  // for, normalised). SIGNATURE: only `preset`, `domain`, `i1`..`i5`.
+  string obfuscation_json = 1;
+  // Non-fatal notes as validator-style FieldError rows (severity is implied: warnings), with params. Empty for
+  // SIGNATURE: PreviewProfile has the live ones.
+  repeated FieldError warnings = 2;
+}

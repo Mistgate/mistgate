@@ -1,0 +1,11 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use: [STANDARD]
+  ignore_only:
+    # AWG_PREPARE_STATE_NONE is already in the API; renaming it would change the JSON the clients send and read.
+    ENUM_ZERO_VALUE_SUFFIX:
+      - proto/mistgate/admin/v1/node.proto
+breaking:
+  use: [FILE]

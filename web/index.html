@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <base href="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Mistgate</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <!--
+      The splash (#mg-splash below): plain markup and CSS, on screen before the bundle runs; lib/splash.ts takes it down once
+      the first real screen is ready. The badge and the mark's motion come from src/assets (vite.config.ts inlines them).
+      The panel's CSP has no inline scripts, so public/splash.js (same origin, tiny, blocking) picks up the saved theme,
+      accent, language and the instance's cached brand, and adds the "cannot load" message if the app never starts.
+    -->
+    <style>
+      html { background: #0c0c0e; color-scheme: dark; }
+      html[data-theme="light"] { background: #f8f8f6; color-scheme: light; }
+      :root { --accent: #b8acf2; }
+
+      #mg-splash {
+        --sp-fg: #f3f3f5; --sp-muted: #8b8b94; --sp-txt: 100%;
+        position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; overflow: auto;
+        background: #0c0c0e; color: var(--sp-fg);
+        font: 500 14px/1.45 "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        /* it waits ~200 ms before it shows, so a fast load never flashes it */
+        animation: sp-in 0.25s ease-out 0.2s both;
+      }
+      html[data-theme="light"] #mg-splash { --sp-fg: #16161a; --sp-muted: #6b6b73; --sp-txt: 50%; background: #f8f8f6; }
+      @keyframes sp-in { from { opacity: 0; } }
+
+      #mg-splash .sp-in { display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 340px; padding: 24px; text-align: center; }
+      #mg-splash .sp-mark {
+        display: block; width: 96px; height: 96px;
+        --mg-accent: var(--accent);
+        --logo-w: #fff;
+        --logo-l: oklch(from var(--accent) l calc(c * 1.3) h);
+        --logo-d: oklch(from var(--accent) calc(l * 0.56) calc(c * 2.1) h);
+      }
+      #mg-splash .sp-mark > svg { display: block; width: 100%; height: 100%; }
+      #mg-splash .sp-wm { font-size: 26px; line-height: 1; font-weight: 800; letter-spacing: -0.03em; }
+      #mg-splash .sp-b { color: color-mix(in oklch, var(--accent) var(--sp-txt), #000); }
+      #mg-splash .sp-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      #mg-splash .sp-fail { display: none; flex-direction: column; align-items: center; gap: 14px; }
+      #mg-splash .sp-fail p { margin: 0; color: var(--sp-muted); font-size: 14px; text-wrap: balance; }
+      #mg-splash .sp-fail button {
+        height: 40px; padding: 0 20px; border: 0; border-radius: 11px; background: var(--accent); color: #0c0c0e;
+        font: inherit; font-weight: 700; cursor: pointer;
+      }
+      #mg-splash .sp-fail button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      /* the app never started (public/splash.js sets this after ~10 s): the mark rests and the message shows */
+      #mg-splash[data-state="fail"] .sp-fail { display: flex; }
+      #mg-splash[data-state="fail"] .sp-sr { display: none; }
+      #mg-splash[data-state="fail"] .sp-mark * { animation-play-state: paused; }
+      @media (prefers-reduced-motion: reduce) { #mg-splash { animation-duration: 0.01ms; } }
+
+      /*MG_MARK_MOTION*/
+    </style>
+    <script src="splash.js"></script>
+  </head>
+  <body>
+    <div id="mg-splash" role="status">
+      <div class="sp-in">
+        <span class="sp-mark mg-motion" data-mode="loading" data-kind="builtin" aria-hidden="true"><!--MG_SPLASH_BADGE--></span>
+        <span class="sp-wm" aria-hidden="true"><span class="sp-a">mist</span><span class="sp-b">gate</span></span>
+        <span class="sp-sr">Loading…</span>
+        <div class="sp-fail">
+          <p>Cannot load the panel. Reload the page.</p>
+          <button type="button">Reload</button>
+        </div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

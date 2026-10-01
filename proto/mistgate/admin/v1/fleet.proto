@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Overview screen and the event feed. Read-only; the SPA polls Overview every 10 s
+// (the agents report every 10 s, so there is nothing fresher to show).
+service FleetService {
+  rpc Overview(OverviewRequest) returns (OverviewResponse);
+  // Events for the Overview feed, the node "Events" tab and the user "History" section.
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+}
+
+enum OverviewRange {
+  // 24 hours.
+  OVERVIEW_RANGE_UNSPECIFIED = 0;
+  OVERVIEW_RANGE_24H = 1;
+  // 7 days. Still hourly points (168): the SPA folds them into local-time days, so the server needs no
+  // time zone.
+  OVERVIEW_RANGE_7D = 2;
+}
+
+message OverviewRequest {
+  OverviewRange range = 1;
+  // Events to return. 0 = 6. Only the ones worth the fleet feed: WARNING and above, node_down, node_blip,
+  // node_recovered, node_enrolled, node_retired, engine_failed, update_* and user_*; the rest is on the node's tab.
+  uint32 event_limit = 2;
+}
+
+// One card of the 5-column node grid. The SPA sorts problems first; the server returns name order.
+message NodeCard {
+  string id = 1;
+  string name = 2;
+  string country_code = 3;
+  string location = 4;
+  string provider = 5;
+  NodeStatus status = 6;
+  StatusReason reason = 7;
+  repeated ProtocolCount online = 8;
+  // Current download speed (all users), bits per second; 0 when down.
+  uint64 down_bps = 9 [jstype = JS_NUMBER];
+  uint64 up_bps = 10 [jstype = JS_NUMBER];
+  bool has_metrics = 11;
+  float cpu_pct = 12;
+  // Bytes per hour for the last 24 hours, oldest first, exactly 24 values (the tiny bar chart on the card).
+  repeated uint64 spark_bytes = 13 [jstype = JS_NUMBER];
+}
+
+// One hourly point. `values` has one entry per protocol that has data; absent protocol = 0.
+message SeriesPoint {
+  // Start of the hour, UTC.
+  int64 start_unix = 1 [jstype = JS_NUMBER];
+  repeated ProtocolValue values = 2;
+}
+
+message ProtocolValue {
+  string protocol = 1;
+  // Traffic series: bytes (up + down). Online series: peak people online in that hour.
+  uint64 value = 2 [jstype = JS_NUMBER];
+}
+
+message TopConsumer {
+  string user_id = 1;
+  string user_name = 2;
+  string node_id = 3;
+  string node_name = 4;
+  // Download speed over the last ~60 s, bits per second.
+  uint64 down_bps = 5 [jstype = JS_NUMBER];
+}
+
+message OverviewResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  // Health strip. Healthy/problem nodes can be derived from `nodes`; these are the ready numbers.
+  uint32 nodes_total = 2;
+  uint32 nodes_problem = 3;
+  uint32 users_online = 4;
+  repeated NodeCard nodes = 5;
+  // "Traffic - GB/h": hourly, oldest first, ending with the current (partial) hour.
+  repeated SeriesPoint traffic = 6;
+  // "Online - people": hourly peaks, same span; the last point is the live value.
+  repeated SeriesPoint online = 7;
+  repeated Event events = 8;
+  // Top 5 by current download speed.
+  repeated TopConsumer top_consumers = 9;
+  // Health badge (sidebar count, mobile dot): active alerts that are not muted and not INFO, and how many of
+  // them are CRITICAL. Same numbers HealthService.ListAlerts would give; here so the 10 s Overview poll feeds
+  // the badge without a second call.
+  uint32 alerts_active = 10;
+  uint32 alerts_critical = 11;
+}
+
+enum EventSeverity {
+  EVENT_SEVERITY_UNSPECIFIED = 0;
+  EVENT_SEVERITY_INFO = 1;
+  EVENT_SEVERITY_WARNING = 2;
+  EVENT_SEVERITY_ERROR = 3;
+}
+
+message Event {
+  // Monotonic; also the pagination cursor.
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 time_unix = 2 [jstype = JS_NUMBER];
+  EventSeverity severity = 3;
+  // Open vocabulary, localized in the SPA (agent codes such as "engine_failed", panel codes such as
+  // "user_over_quota", "node_down", "node_blip", "node_recovered", "user_created", "device_revoked").
+  string code = 4;
+  map<string, string> params = 5;
+  // Either or both may be set; names are resolved by the server (retired/deleted subjects keep their
+  // last name).
+  string node_id = 6;
+  string node_name = 7;
+  string user_id = 8;
+  string user_name = 9;
+  // Events about one profile on a node (engine_started, profile_added, ...): the inbound, and the profile it deploys,
+  // joined when the list is read (a removed inbound falls back to the names the event itself recorded).
+  string inbound_id = 10;
+  string profile_name = 11;
+  string protocol = 12;
+  // Who wrote it: "agent" | "panel" | "admin" (an admin action; params.actor says which admin).
+  string source = 13;
+}
+
+message ListEventsRequest {
+  // Filters; empty = any.
+  string node_id = 1;
+  string user_id = 2;
+  // Minimum severity; UNSPECIFIED = all.
+  EventSeverity min_severity = 3;
+  // Return events with id < before_id (0 = newest). Newest first.
+  int64 before_id = 4 [jstype = JS_NUMBER];
+  // Default 50, max 200.
+  uint32 limit = 5;
+  // "" = any. "profiles": events about a profile on a node (engine_*, profile_added, profile_removed,
+  // profiles_restarted, awg_backend_unavailable, hop_failed, hop_rejected, credential_expired); "agent": all the others.
+  // Anything else is INVALID_ARGUMENT.
+  string family = 6;
+}
+
+message ListEventsResponse {
+  repeated Event events = 1;
+  // Empty page = no more.
+  bool has_more = 2;
+}

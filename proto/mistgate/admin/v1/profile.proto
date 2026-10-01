@@ -1,0 +1,283 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Profiles screen (protocol presets) and the placement of a profile on nodes (inbounds).
+//
+// A profile is protocol + name + settings. The settings are a JSON document whose shape belongs to the
+// protocol plugin; the plugin also publishes a JSON Schema, and the SPA renders the form from it
+// (groups, field types, units, "generate" buttons, "N changed" counter). No per-protocol UI code.
+//
+// SECRET FIELDS. A schema property marked "x-secret": true (Salamander password, later AWG keys) is
+// stored encrypted by the vault, never in settings_json. On the way out the server replaces every
+// secret value by the constant "••••". On the way in:
+//    "••••"               keep the stored value
+//    "" or "$generate"    generate a new value (the plugin's generator)
+//    anything else        use it as the new value
+//
+// SCHEMA VOCABULARY (subset of JSON Schema 2020-12 the form renderer understands):
+//   type string|integer|number|boolean|object, enum (+ x-enum-labels), minimum/maximum, pattern, default,
+//   title, description, x-unit ("Mbit/s", "s", "bytes"), x-group ("basics"|"obfuscation"|"advanced"),
+//   x-widget ("port-range"|"generate"|"segmented"), x-secret, x-critical (changing it breaks issued client
+//   configs or drops sessions; drives the confirmation modal), x-order. Anything else is ignored.
+service ProfileService {
+  // Protocol plugins registered in this panel, with their schema and defaults. Small and static, the SPA
+  // caches it.
+  rpc ListProtocols(ListProtocolsRequest) returns (ListProtocolsResponse);
+  rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+  // Validates, stores, returns the profile. Settings missing from settings_json take the plugin default
+  // (including generated secrets).
+  rpc CreateProfile(CreateProfileRequest) returns (CreateProfileResponse);
+  // Optimistic concurrency via expected_version (ABORTED on mismatch). With dry_run the request is only
+  // validated and its impact is computed; nothing changes. A real update bumps the profile version and
+  // the spec_version of its inbounds; connected users of a restarted inbound reconnect.
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  // Live validation and "What the client sees" preview while the form is edited. Never stores anything.
+  rpc PreviewProfile(PreviewProfileRequest) returns (PreviewProfileResponse);
+  // Deletes a profile. FAILED_PRECONDITION while it is deployed on any node (delete its inbounds first).
+  rpc DeleteProfile(DeleteProfileRequest) returns (DeleteProfileResponse);
+  // Deploy a profile on a node. The node must be ONLINE or PENDING; the desired state is pushed at once. With
+  // validate_only (also on UpdateInbound) it is the check before the click: same refusals, nothing written.
+  rpc CreateInbound(CreateInboundRequest) returns (CreateInboundResponse);
+  rpc UpdateInbound(UpdateInboundRequest) returns (UpdateInboundResponse);
+  // Remove the profile from the node; its users lose this endpoint.
+  rpc DeleteInbound(DeleteInboundRequest) returns (DeleteInboundResponse);
+  // "The same server with and without WARP": a twin of a profile whose exit is flipped (direct <-> WARP). Same
+  // protocol and settings, the name with " · WARP" added or removed, a port that is free on every node, fresh secrets
+  // (and, for AmneziaWG, its own client network), no port hopping. It goes on the nodes and into the groups the
+  // profile is in; one failing step undoes the others. With dry_run nothing changes: the answer is the plan the
+  // confirmation window shows. Owner only, like the CreateProfile / CreateInbound it stands for.
+  rpc TwinProfile(TwinProfileRequest) returns (TwinProfileResponse);
+}
+
+message ProtocolInfo {
+  // Plugin id: "hysteria2".
+  string id = 1;
+  string display_name = 2;
+  // JSON Schema of the settings object.
+  string settings_schema_json = 3;
+  // Settings for a brand-new profile, secrets already generated (shown masked).
+  string default_settings_json = 4;
+  // Which user-facing app can consume the protocol (drives the user's Happ/Amnezia toggles).
+  repeated App apps = 5;
+}
+
+message ListProtocolsRequest {}
+
+message ListProtocolsResponse {
+  repeated ProtocolInfo protocols = 1;
+}
+
+message ProfileSummary {
+  string id = 1;
+  string name = 2;
+  string protocol = 3;
+  // Short mono parameter line from the plugin, e.g. "UDP 443 · Salamander · Let's Encrypt".
+  string summary = 4;
+  uint32 node_count = 5;
+  // Users whose group contains this profile and whose app toggles allow the protocol.
+  uint32 user_count = 6;
+  // Plugin or fleet warning for the amber dot, e.g. code "udp_blocked_on_node" + params.
+  repeated StatusReason warnings = 7;
+  uint32 version = 8;
+}
+
+message ListProfilesRequest {}
+
+message ListProfilesResponse {
+  repeated ProfileSummary profiles = 1;
+}
+
+message GetProfileRequest {
+  string profile_id = 1;
+}
+
+message GetProfileResponse {
+  ProfileSummary profile = 1;
+  // Secrets masked.
+  string settings_json = 2;
+  repeated Inbound inbounds = 3;
+}
+
+message CreateProfileRequest {
+  string protocol = 1;
+  string name = 2;
+  string settings_json = 3;
+}
+
+message CreateProfileResponse {
+  ProfileSummary profile = 1;
+}
+
+message UpdateProfileRequest {
+  string profile_id = 1;
+  optional string name = 2;
+  optional string settings_json = 3;
+  uint32 expected_version = 4;
+  bool dry_run = 5;
+}
+
+// What saving would do; filled for dry_run and real updates alike.
+message ProfileImpact {
+  // Inbounds that will be restarted (connected users of these reconnect).
+  uint32 inbounds_restarted = 1;
+  // Users connected through those inbounds right now.
+  uint32 users_online = 2;
+  // Devices that hold an already issued config which stops working (x-critical change of an AmneziaWG profile:
+  // every live device of the profile, each becomes "stale" and needs a new key; always 0 for Hysteria2 because
+  // its URI is re-fetched from the subscription).
+  uint32 devices_need_reissue = 3;
+  // Names of the affected users, at most 50, for the confirmation modal.
+  repeated string affected_user_names = 4;
+  // JSON pointers of changed x-critical fields.
+  repeated string critical_fields = 5;
+}
+
+message UpdateProfileResponse {
+  ProfileSummary profile = 1;
+  ProfileImpact impact = 2;
+}
+
+message FieldError {
+  // JSON pointer into settings, "/obfs/password".
+  string pointer = 1;
+  // Short message, already in English; the UI may map `code`.
+  string code = 2;
+  string message = 3;
+  // Numbers the text of a warning needs, by name (AWG mtu_headroom: suggested_mtu). Empty for errors.
+  map<string, string> params = 4;
+}
+
+message PreviewProfileRequest {
+  string protocol = 1;
+  string settings_json = 2;
+  // Render the fragment for this node's address and certificate; empty = any node / placeholder host.
+  string node_id = 3;
+}
+
+message PreviewProfileResponse {
+  repeated FieldError errors = 1;
+  // Mono text of the client fragment with secrets as "••••" (for Hysteria2: the hysteria2:// URI).
+  string client_preview = 2;
+  // What the client receives it as: "Happ · URI list".
+  string client_label = 3;
+  // Same line ProfileSummary.summary would carry.
+  string summary = 4;
+  // Legal but notable settings (AWG: awg.Warnings): code is stable, the UI owns the text (awg.warn.<code>), pointer
+  // is the field to mark. Empty while there are errors. Hysteria2 has none.
+  repeated FieldError warnings = 5;
+  // AWG only, absent otherwise and while there are errors.
+  ObfuscationScore obfuscation_score = 6;
+}
+
+// How far an AWG profile is from the fingerprints a censor knows, 0-100, and why. value = clamp(base + the sum of
+// the items' delta, 0, 100). It rates the configuration, not a censor.
+message ObfuscationScore {
+  uint32 value = 1;
+  // The starting point of the tier.
+  uint32 base = 2;
+  // What the headers and handshake show on the wire: "header_protection" | "ranges" | "cps" | "headers" |
+  // "wireguard". The UI text is awg.score.tier.<tier>.
+  string tier = 3;
+  repeated ScoreItem items = 4;
+}
+
+// One reason of the score. The UI text is awg.score.<code>.
+message ScoreItem {
+  string code = 1;
+  // The field to fix.
+  string pointer = 2;
+  // Negative for a penalty; the one bonus (per_device_signature) is positive.
+  sint32 delta = 3;
+  // As FieldError.params.
+  map<string, string> params = 4;
+}
+
+// The refusals of CreateInbound and UpdateInbound are codes the admin UI words itself (web/src/lib/errors.ts), the values
+// after the code as a query string: "acme_needs_domain: address=203.0.113.10&node=de1" (a Let's Encrypt certificate and no
+// domain: the node address is an IP and no SNI is set), "port_taken: port=443&profile=Main&node=de1&free=8443" (another
+// profile of the node listens there; hop=20000-30000 when it is that profile's hop range; free = a port to take instead,
+// 0 = none found), "hop_taken: from=20000&to=30000&profile=Main&node=de1" (this profile's own hop range overlaps another
+// profile: no port fixes it), "port_in_hop: from=20000&to=30000" (the port lies inside the profile's own hop range),
+// "sni_needs_domain: name=1.2.3.4" (an IP where Let's Encrypt wants a domain), "sni_invalid: name=..." (neither a domain
+// nor an IP), "already_on_node", "node_retired".
+message CreateInboundRequest {
+  string profile_id = 1;
+  string node_id = 2;
+  // 0 = use the profile's port.
+  uint32 port_override = 3;
+  // Empty = profile sni, else node address.
+  string tls_server_name_override = 4;
+  // Check only: the same checks and refusals as the real call, but nothing is written, no event and no state push, and
+  // no key is kept (an AmneziaWG inbound is built with a throwaway one). The answer is the inbound as it would be, its
+  // warnings and free_port. The add-profile dialog asks this on every change, before the click.
+  bool validate_only = 5;
+}
+
+message CreateInboundResponse {
+  Inbound inbound = 1;
+  // What the admin should know although nothing stops the call: "warp_missing" {state: "none" | "paused" | "down"} (the
+  // profile exits through WARP and the node has no WARP account, it is paused, or the node's last report says the tunnel
+  // is down: the profile will not pass traffic there).
+  repeated StatusReason warnings = 2;
+  // validate_only: a UDP port the inbound could take on this node instead of its own (TwinProfile's picker: 8443, 4443,
+  // 2053, 2083, 2087, 2096, then random ones in 10000-60000; hop ranges count). 0 = none found, or not a check.
+  uint32 free_port = 3;
+}
+
+message UpdateInboundRequest {
+  string inbound_id = 1;
+  optional uint32 port_override = 2;
+  optional string tls_server_name_override = 3;
+  optional bool enabled = 4;
+  // As CreateInboundRequest.validate_only.
+  bool validate_only = 5;
+}
+
+message UpdateInboundResponse {
+  Inbound inbound = 1;
+  // As CreateInboundResponse.
+  repeated StatusReason warnings = 2;
+  uint32 free_port = 3;
+}
+
+message TwinProfileRequest {
+  string profile_id = 1;
+  // "direct" | "warp": the twin's exit. Empty = the other one than the profile's own.
+  string egress = 2;
+  bool dry_run = 3;
+  // The port a dry run named; the real call sends it back so that the plan that was confirmed is the one that is made.
+  // 0 = choose one.
+  uint32 port = 4;
+  // Nodes of the profile the twin is not put on (the owner unticked them: a node without WARP, where a WARP twin
+  // never starts). The response's node_ids leave them out; a dry run is usually asked without, to list them all.
+  repeated string skip_node_ids = 5;
+}
+
+message TwinProfileResponse {
+  // The new profile; unset on a dry run.
+  ProfileSummary profile = 1;
+  string name = 2;
+  string egress = 3;
+  uint32 port = 4;
+  // Where the twin goes: the nodes the profile runs on (enabled inbounds) and the groups it is in.
+  repeated string node_ids = 5;
+  repeated string group_ids = 6;
+  // The profile has port hopping and the twin has none (the two ranges would overlap).
+  bool hop_dropped = 7;
+}
+
+message DeleteProfileRequest {
+  string profile_id = 1;
+}
+
+message DeleteProfileResponse {}
+
+message DeleteInboundRequest {
+  string inbound_id = 1;
+}
+
+message DeleteInboundResponse {}

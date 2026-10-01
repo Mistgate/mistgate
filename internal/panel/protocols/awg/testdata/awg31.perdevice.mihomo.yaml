@@ -1,0 +1,44 @@
+- name: "de1 · AWG 3.1"
+  type: wireguard
+  server: "203.0.113.10"
+  port: 51842
+  ip: "10.66.4.5/32"
+  ipv6: "fd66:66:0:1::5/128"
+  private-key: "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+  public-key: "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8="
+  pre-shared-key: "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8="
+  allowed-ips:
+    - "0.0.0.0/0"
+    - "::/0"
+  udp: true
+  mtu: 1280
+  persistent-keepalive: 25
+  remote-dns-resolve: true
+  dns:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  amnezia-wg-option:
+    version: 3
+    jc: 6
+    jmin: 10
+    jmax: 50
+    s1: 24
+    s2: 24
+    s3: 24
+    s4: 24
+    h1: "1"
+    h2: "2"
+    h3: "3"
+    h4: "4"
+    i1: "<r 2><b 0x01000001000000000001076578616d706c6503636f6d00001c00010000291000000000000000>"
+    i2: "<r 2><b 0x01000001000000000001076578616d706c6503636f6d00004100010000291000000000000000>"
+    i3: "<r 2><b 0x01000001000000000001076578616d706c6503636f6d00000100010000291000000000000000>"
+    header-protection-key: "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8="
+    content-padding-addition: "2-10"
+    rekey-after-time: "100-120"
+    rekey-timeout: "3-7"
+    reject-after-time: "150-180"
+    keepalive-timeout: "5-15"
+    max-handshake-attempts: "15-20"
+    random-trailers: true
+    disable-cookies: true

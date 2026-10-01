@@ -1,0 +1,320 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Nodes screen, node detail screen, and adding a node by running an install command.
+// SSH provisioning (wizard, pre-checks, install log, uninstall) is not here yet and will get its own service.
+service NodeService {
+  // All nodes. The fleet is at most ~50 nodes, so no pagination; filtering by country, status and
+  // protocol is done in the SPA.
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+  // Creates the node row (PENDING) and a one-time enrollment token; returns the command to run on the
+  // server. Passing node_id re-enrolls an existing node (lost certificate, reinstall).
+  rpc CreateEnrollment(CreateEnrollmentRequest) returns (CreateEnrollmentResponse);
+  rpc UpdateNode(UpdateNodeRequest) returns (UpdateNodeResponse);
+  // Restart one inbound or all inbounds of a node ("Restart profiles" button). Drops its sessions.
+  rpc RestartInbounds(RestartInboundsRequest) returns (RestartInboundsResponse);
+  // The node's AmneziaWG kernel module (agents with "awg-prepare/1"). confirm = false only asks the node whether the
+  // module is ready or can be built there (nothing changes); confirm = true starts building it in the background. The
+  // node keeps its current backend meanwhile; when the module is built and loaded the panel switches the node to
+  // awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
+  // "agent too old" / "the node is not connected".
+  rpc PrepareAwgKernel(PrepareAwgKernelRequest) returns (PrepareAwgKernelResponse);
+  // "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
+  // every user's access. The row stays (audit, traffic history) with status RETIRED.
+  rpc RetireNode(RetireNodeRequest) returns (RetireNodeResponse);
+  // Live log tail of the agent and its engines, relayed from the node. Ends with eof = true, on client
+  // cancel, or when the node link drops (then the last chunk has error set).
+  rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse);
+}
+
+// One row of the nodes table / one card.
+message Node {
+  string id = 1;
+  // Short unique name shown everywhere: "de1".
+  string name = 2;
+  // ISO 3166-1 alpha-2, for the flag/code badge.
+  string country_code = 3;
+  // Free text shown next to the country: "Estonia", "Helsinki", "Moscow".
+  string location = 4;
+  string provider = 5;
+  // Public host or IP that clients connect to; used in subscriptions.
+  string address = 6;
+  NodeStatus status = 7;
+  StatusReason reason = 8;
+  // Plugin ids of the protocols deployed here (from inbounds).
+  repeated string protocols = 9;
+  // People online now, per protocol.
+  repeated ProtocolCount online = 10;
+  // Bytes (up + down) since 00:00 UTC.
+  uint64 traffic_today_bytes = 11 [jstype = JS_NUMBER];
+  // Latest gauges; unset (has_metrics = false) while the node is down or pending.
+  bool has_metrics = 12;
+  float cpu_pct = 13;
+  float ram_pct = 14;
+  string agent_version = 15;
+  // Host uptime from the agent; 0 when unknown.
+  uint64 uptime_s = 16 [jstype = JS_NUMBER];
+  // Last time anything was received from the agent.
+  int64 last_seen_unix = 17 [jstype = JS_NUMBER];
+  // AmneziaWG backend setting of the node: "auto" | "kernel" | "userspace" (what is running is in
+  // Inbound.awg.backend).
+  string awg_backend = 18;
+  // WARP egress of this node; state NOT_CONFIGURED when it has no account.
+  WarpSummary warp = 19;
+  // Building the AmneziaWG kernel module on the node.
+  AwgPrepare awg_prepare = 20;
+}
+
+enum AwgPrepareState {
+  // Nothing was asked of this node yet (or the last result was cleared).
+  AWG_PREPARE_STATE_NONE = 0;
+  // Building: since_unix is when it began.
+  AWG_PREPARE_STATE_RUNNING = 1;
+  // Built and loaded; since_unix is when it finished.
+  AWG_PREPARE_STATE_DONE = 2;
+  // Did not work; the node kept its backend. reason_code / reason say why, since_unix when.
+  AWG_PREPARE_STATE_FAILED = 3;
+}
+
+// The automatic preparation of the kernel module, as the panel last learned it from the node.
+message AwgPrepare {
+  // The agent lists "awg-prepare/1" (live stream, else its last Hello): false = the UI shows the manual command.
+  bool supported = 1;
+  AwgPrepareState state = 2;
+  int64 since_unix = 3 [jstype = JS_NUMBER];
+  // FAILED: a stable code (timeout, apt_lock, step_failed, source_moved, module_not_loaded, module_unusable,
+  // interrupted) and one short English sentence. Never package-manager output.
+  string reason_code = 4;
+  string reason = 5;
+}
+
+message ListNodesRequest {
+  // Retired nodes are hidden unless asked for.
+  bool include_retired = 1;
+}
+
+message ListNodesResponse {
+  repeated Node nodes = 1;
+  // Newest agent version this panel ships; the UI marks older agents "outdated agent".
+  string expected_agent_version = 2;
+}
+
+message GetNodeRequest {
+  string node_id = 1;
+}
+
+// Gauges for the Overview tab of the node (CPU incl. softirq, RAM, disk, network).
+message NodeMetrics {
+  float cpu_pct = 1;
+  float softirq_pct = 2;
+  float load1 = 3;
+  uint64 ram_used_bytes = 4 [jstype = JS_NUMBER];
+  uint64 ram_total_bytes = 5 [jstype = JS_NUMBER];
+  uint64 disk_used_bytes = 6 [jstype = JS_NUMBER];
+  uint64 disk_total_bytes = 7 [jstype = JS_NUMBER];
+  // Bits per second, main NIC.
+  uint64 net_rx_bps = 8 [jstype = JS_NUMBER];
+  uint64 net_tx_bps = 9 [jstype = JS_NUMBER];
+  int64 at_unix = 10 [jstype = JS_NUMBER];
+}
+
+// "Host facts" block. The full pre-check result comes with SSH provisioning.
+message NodeFacts {
+  string hostname = 1;
+  string os = 2;
+  string kernel = 3;
+  string arch = 4;
+  uint32 cpu_count = 5;
+  uint64 ram_total_bytes = 6 [jstype = JS_NUMBER];
+  uint64 disk_total_bytes = 7 [jstype = JS_NUMBER];
+  string virt = 8;
+  bool has_ipv6 = 9;
+  int64 boot_unix = 10 [jstype = JS_NUMBER];
+  // Engine versions, "hysteria2: hysteria core v2.12.3".
+  repeated string engines = 11;
+}
+
+// Per-node tunables. Zero = default.
+message NodeTimeouts {
+  // Silence before the panel closes the agent stream. Default 90.
+  uint32 liveness_timeout_s = 1;
+  // Wait for a command result before marking it "no answer". Default 120.
+  uint32 apply_timeout_s = 2;
+  // Agent dial timeout. Default 15.
+  uint32 dial_timeout_s = 3;
+}
+
+message OnlineUser {
+  string user_id = 1;
+  string user_name = 2;
+  string protocol = 3;
+  string device_model = 4;
+  int64 connected_at_unix = 5 [jstype = JS_NUMBER];
+  // Current download speed through this node, bits per second.
+  uint64 down_bps = 6 [jstype = JS_NUMBER];
+}
+
+message TopUser {
+  string user_id = 1;
+  string user_name = 2;
+  uint64 bytes = 3 [jstype = JS_NUMBER];
+}
+
+message GetNodeResponse {
+  Node node = 1;
+  // Unset while no metrics have arrived.
+  NodeMetrics metrics = 2;
+  NodeFacts facts = 3;
+  repeated Inbound inbounds = 4;
+  // "On this node now".
+  repeated OnlineUser online_users = 5;
+  // "Top today": by bytes since 00:00 UTC, at most 10.
+  repeated TopUser top_today = 6;
+  string notes = 7;
+  repeated string dns_resolvers = 8;
+  NodeTimeouts timeouts = 9;
+  // PENDING nodes: when the enrollment token stops working.
+  int64 enrollment_expires_unix = 10 [jstype = JS_NUMBER];
+  int64 created_unix = 11 [jstype = JS_NUMBER];
+}
+
+message CreateEnrollmentRequest {
+  // Empty = create a new node. Set = re-enroll this node (its old certificate is revoked on success).
+  string node_id = 1;
+  // Required for a new node. [a-z0-9-]{2,24}, unique, case-insensitive.
+  string name = 2;
+  // Required for a new node: the public host or IP that clients will connect to.
+  string address = 3;
+  string country_code = 4;
+  string location = 5;
+  string provider = 6;
+  // Token lifetime. 0 = 3600. Max 86400.
+  uint32 ttl_seconds = 7;
+}
+
+message CreateEnrollmentResponse {
+  Node node = 1;
+  // The exact command to run as root on the server, one line: it runs the agent binary from /root/mistgate-node
+  // (chmod, enroll, install; install copies it to /usr/local/bin), so nothing depends on PATH. It contains the one-time
+  // token, so it is shown once and is not retrievable afterwards (create a new enrollment instead).
+  string install_command = 2;
+  // "sha256:" + hex, of the panel CA certificate. Shown separately so the admin can compare it with
+  // what the command contains.
+  string ca_fingerprint = 3;
+  int64 expires_unix = 4 [jstype = JS_NUMBER];
+  // A command to run on the panel's own server that puts the linux/amd64 agent binary of the trusted update bundle at
+  // /root/mistgate-node on the node ("scp <data-dir>/dist/mistgate-node-linux-amd64 root@<address>:/root/mistgate-node").
+  // Empty when the panel has no trusted bundle.
+  string copy_command = 5;
+}
+
+message UpdateNodeRequest {
+  string node_id = 1;
+  optional string name = 2;
+  optional string address = 3;
+  optional string country_code = 4;
+  optional string location = 5;
+  optional string provider = 6;
+  optional string notes = 7;
+  // Presence = replace the whole list (empty list = use the agent default by geolocation).
+  optional DnsResolvers dns_resolvers = 8;
+  optional NodeTimeouts timeouts = 9;
+  // "auto" | "kernel" | "userspace". Needs an agent with "awg/1" while the node has awg inbounds
+  // (FAILED_PRECONDITION "agent too old" otherwise).
+  optional string awg_backend = 10;
+}
+
+message DnsResolvers {
+  repeated string values = 1;
+}
+
+message UpdateNodeResponse {
+  Node node = 1;
+}
+
+message RestartInboundsRequest {
+  string node_id = 1;
+  // Empty = all inbounds of the node.
+  string inbound_id = 2;
+}
+
+message RestartInboundsResponse {
+  // Inbounds restarted. Fails with FAILED_PRECONDITION if the node is not connected.
+  uint32 restarted = 1;
+}
+
+message PrepareAwgKernelRequest {
+  string node_id = 1;
+  // false: ask only (the answer is READY, NEEDS_PREPARE, RUNNING or UNSUPPORTED). true: start the build when the module is
+  // not ready (answer STARTED, or RUNNING when one already runs, READY when there is nothing to do).
+  bool confirm = 2;
+}
+
+enum PrepareAwgOutcome {
+  PREPARE_AWG_OUTCOME_UNSPECIFIED = 0;
+  // The module is loaded and usable: switching to it is just a setting.
+  PREPARE_AWG_OUTCOME_READY = 1;
+  // Not ready, and it can be built on this node (confirm = false).
+  PREPARE_AWG_OUTCOME_NEEDS_PREPARE = 2;
+  // The build began just now.
+  PREPARE_AWG_OUTCOME_STARTED = 3;
+  // A build is already going; nothing was started.
+  PREPARE_AWG_OUTCOME_RUNNING = 4;
+  // It cannot be built here (reason_code: container, distro, unknown_kernel, secure_boot, no_systemd, launch_failed).
+  PREPARE_AWG_OUTCOME_UNSUPPORTED = 5;
+}
+
+message PrepareAwgKernelResponse {
+  PrepareAwgOutcome outcome = 1;
+  string reason_code = 2;
+  string reason = 3;
+  // The node as it is after the call (awg_prepare included).
+  Node node = 4;
+}
+
+message RetireNodeRequest {
+  string node_id = 1;
+  // The node name typed by the admin; must equal the current name.
+  string confirm_name = 2;
+}
+
+message RetireNodeResponse {
+  // false if the agent was offline; it cannot reconnect anyway (its certificate is revoked).
+  bool agent_notified = 1;
+}
+
+message StreamLogsRequest {
+  string node_id = 1;
+  // "agent", "hysteria2". Empty = all.
+  repeated string sources = 2;
+  // Max 1000.
+  uint32 tail_lines = 3;
+  bool follow = 4;
+  LogLevel min_level = 5;
+}
+
+message LogLine {
+  int64 time_unix_ms = 1 [jstype = JS_NUMBER];
+  LogLevel level = 2;
+  string source = 3;
+  string message = 4;
+}
+
+message StreamLogsResponse {
+  repeated LogLine lines = 1;
+  bool eof = 2;
+  uint32 dropped = 3;
+  string error = 4;
+}
+
+enum LogLevel {
+  // As a filter: all levels.
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_INFO = 1;
+  LOG_LEVEL_WARNING = 2;
+  LOG_LEVEL_ERROR = 3;
+}

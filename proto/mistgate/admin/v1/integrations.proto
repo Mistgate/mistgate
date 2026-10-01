@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// API tokens and the approval inbox. One token model serves scripts
+// (Connect-RPC with "Authorization: Bearer <secret>") and the MCP server. Conventions: common.proto.
+//
+// Everything here is OWNER-ONLY and is reached only from the signed-in admin UI: a token itself can never call
+// these procedures (they are not on the token allow-list). Creating and revoking a token and
+// approving a change also need a fresh step-up (auth.Service.RequireStepUp), like removing a passkey.
+//
+// TOKENS. A token has a name, a profile (what it may do: readonly, operator, admin, mapped to the roles
+// readonly, helper, owner), a lifetime (default 90 days, at most 365: "never expires" does not exist), a
+// request rate limit and a revocation flag. Only SHA-256 of the secret is stored; the secret is returned once,
+// by CreateApiToken. A token never passes step-up: a procedure that needs it is refused for a token, except
+// through an approved change (below).
+//
+// APPROVALS. An MCP agent changes things in two steps (plan, then apply with a one-time confirm token). A
+// dangerous change (anything that needs step-up, a fix on a node, a bulk
+// disable) also waits for the owner: the plan becomes an Approval, the owner reads what it will do and
+// approves or rejects it here, with a step-up for approving. Only after that does the agent's apply go
+// through. An approval lives 10 minutes from the plan; after that it is EXPIRED and nothing can be applied.
+//
+// I18N like health.proto: the server sends keys and facts, the SPA writes the sentences. Keys: tool titles
+// "approval.tool.<tool>", fact labels "approval.fact.<key>", danger notes "approval.danger.<code>". A key the
+// SPA does not know is shown as is.
+//
+// ERRORS. NOT_FOUND: an unknown token or approval. FAILED_PRECONDITION: the approval is not awaiting any more
+// (decided, expired, or its token was revoked). INVALID_ARGUMENT: an empty or long name, a profile that is not
+// set, a lifetime or rate limit out of range. ALREADY_EXISTS: another live token has the same name (case
+// insensitive). RESOURCE_EXHAUSTED: 50 live tokens already exist.
+service ApiTokenService {
+  // Creates a token and returns its secret once. Needs a step-up.
+  rpc CreateApiToken(CreateApiTokenRequest) returns (CreateApiTokenResponse);
+  // Every token, newest first, revoked and expired ones included (they stay for the audit trail). No secrets.
+  rpc ListApiTokens(ListApiTokensRequest) returns (ListApiTokensResponse);
+  // Revokes a token at once: its next request is refused and its pending changes are cancelled. Idempotent.
+  // Needs a step-up.
+  rpc RevokeApiToken(RevokeApiTokenRequest) returns (RevokeApiTokenResponse);
+}
+
+service ApprovalService {
+  // Approvals waiting for the owner first (oldest first), then the recent history (newest first).
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  // The owner agrees to exactly what the approval lists. Needs a step-up. The agent's apply goes through
+  // only after this.
+  rpc Approve(ApproveRequest) returns (ApproveResponse);
+  // The owner refuses. The agent's apply fails with "rejected by the owner". No step-up.
+  rpc Reject(RejectRequest) returns (RejectResponse);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Tokens
+
+enum TokenProfile {
+  TOKEN_PROFILE_UNSPECIFIED = 0;
+  // Reads only. Role readonly.
+  TOKEN_PROFILE_READONLY = 1;
+  // Reads and day-to-day changes (users, devices, alerts). Role helper.
+  TOKEN_PROFILE_OPERATOR = 2;
+  // Everything a token may do, including fixes and rollouts (those through the owner's approval). Role owner.
+  TOKEN_PROFILE_ADMIN = 3;
+}
+
+// Where a token was last used.
+enum TokenChannel {
+  TOKEN_CHANNEL_UNSPECIFIED = 0;
+  // Connect-RPC call with a Bearer header (a script).
+  TOKEN_CHANNEL_API = 1;
+  // The MCP endpoint.
+  TOKEN_CHANNEL_MCP = 2;
+}
+
+message ApiToken {
+  // "tok_..." opaque. Also what the audit log shows: "token:<id>" and "mcp:<id>".
+  string id = 1;
+  string name = 2;
+  TokenProfile profile = 3;
+  int64 created_unix = 4 [jstype = JS_NUMBER];
+  // Always set: a token cannot be unlimited.
+  int64 expires_unix = 5 [jstype = JS_NUMBER];
+  // 0 = never used. Written at most once a minute.
+  int64 last_used_unix = 6 [jstype = JS_NUMBER];
+  // Client address of the last use; empty when never used.
+  string last_used_ip = 7;
+  TokenChannel last_used_via = 8;
+  // 0 = active (it may still be expired: compare with now).
+  int64 revoked_unix = 9 [jstype = JS_NUMBER];
+  // Display name of the admin that created it.
+  string created_by_name = 10;
+  // Requests per minute the token may make (the effective value, never 0).
+  uint32 rate_limit_per_min = 11;
+  // The last four characters of the secret, to tell tokens apart in a list. Not usable for anything.
+  string hint = 12;
+}
+
+message CreateApiTokenRequest {
+  // 1..64 characters, unique among the live tokens ignoring case ("claude-ops", "backup-script").
+  string name = 1;
+  // Required. The owner chooses; the UI preselects READONLY.
+  TokenProfile profile = 2;
+  // Lifetime from now in days. 0 = 90. At most 365.
+  uint32 ttl_days = 3;
+  // Requests per minute. 0 = 120. At most 600.
+  uint32 rate_limit_per_min = 4;
+}
+
+message CreateApiTokenResponse {
+  ApiToken token = 1;
+  // The secret, "tk1_" + 43 URL-safe characters. Shown once here; the panel keeps only its hash.
+  string secret = 2;
+}
+
+message ListApiTokensRequest {}
+
+message ListApiTokensResponse {
+  repeated ApiToken tokens = 1;
+  // Server time, so the SPA can tell expired from active without trusting its own clock.
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+}
+
+message RevokeApiTokenRequest {
+  string id = 1;
+}
+
+message RevokeApiTokenResponse {
+  ApiToken token = 1;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Approvals
+
+enum ApprovalState {
+  APPROVAL_STATE_UNSPECIFIED = 0;
+  // Waiting for the owner.
+  APPROVAL_STATE_AWAITING = 1;
+  // The owner agreed; the agent may apply until expires_unix.
+  APPROVAL_STATE_APPROVED = 2;
+  APPROVAL_STATE_REJECTED = 3;
+  // Nobody decided, or the agent did not apply, within 10 minutes of the plan.
+  APPROVAL_STATE_EXPIRED = 4;
+  // The agent applied; the call is running.
+  APPROVAL_STATE_APPLYING = 5;
+  APPROVAL_STATE_APPLIED = 6;
+  // The agent applied and the operation itself failed (`error` says why).
+  APPROVAL_STATE_FAILED = 7;
+  // The token was revoked before the change went through.
+  APPROVAL_STATE_CANCELLED = 8;
+}
+
+// One line of "what this will do". Built by the panel from the structured parameters, never copied from what
+// the agent wrote, except where `untrusted` is set.
+message ApprovalFact {
+  // Label key suffix: "approval.fact.<key>" ("node", "version", "users", "count", "fix").
+  string key = 1;
+  // The panel's own short English line (what the agent reads too). The SPA shows it when it has no words for `code`.
+  string value = 2;
+  // The value comes from data an attacker could have written (a user or node name, a note, the agent's own
+  // reason): the SPA shows it as quoted plain text, apart from the panel's own wording.
+  bool untrusted = 3;
+  // The same line as a code the SPA words itself, with its values: {key "effect", code "traffic_reset"}, {key
+  // "duration", code "seconds", params {n: "3600"}}, {key "quota", code "quota", params {bytes, reset}}. Empty when the
+  // fact has none (a name, a version).
+  string code = 4;
+  map<string, string> params = 5;
+  // The params that come from data (a node or profile name): the SPA puts them in quotes on a plate of their own,
+  // never into the panel's own wording.
+  repeated string untrusted_params = 6;
+}
+
+message Approval {
+  // "pln_..." opaque: the plan the agent made.
+  string id = 1;
+  string token_id = 2;
+  string token_name = 3;
+  TokenProfile token_profile = 4;
+  // The MCP tool, without the _plan suffix: "rollout_start", "node_fix", "node_rollback", "user_disable".
+  string tool = 5;
+  repeated ApprovalFact facts = 6;
+  // Why this needs a human: "step_up" (the operation itself asks for one), "fleet" (it changes what runs on
+  // the nodes), "bulk" (many users at once).
+  repeated string danger = 7;
+  // The agent's own explanation, at most 300 characters. Untrusted: shown as a quote.
+  string reason = 8;
+  ApprovalState state = 9;
+  int64 created_unix = 10 [jstype = JS_NUMBER];
+  // Plan time + 10 minutes.
+  int64 expires_unix = 11 [jstype = JS_NUMBER];
+  // Who approved or rejected, and when; empty / 0 before that.
+  string decided_by_name = 12;
+  int64 decided_unix = 13 [jstype = JS_NUMBER];
+  // When the apply finished; 0 before that.
+  int64 applied_unix = 14 [jstype = JS_NUMBER];
+  // One short English line of what was done, once APPLIED.
+  string result = 15;
+  // Why it FAILED, short and without secrets.
+  string error = 16;
+  // What came of an APPLIED or FAILED change as a code the SPA words itself, with its values: "users_disabled" {n},
+  // "rollout_started" {n}; for a failure the panel's own refusal ("no_trusted_bundle", "node_offline"), "timeout" or
+  // "interrupted". Empty for plans made before codes existed: the SPA then shows `result` or `error`.
+  string outcome_code = 17;
+  map<string, string> outcome_params = 18;
+}
+
+message ListApprovalsRequest {
+  // Only the AWAITING ones (the badge and the banner poll with this).
+  bool awaiting_only = 1;
+  // How many history rows after the awaiting ones. 0 = 50, at most 200.
+  uint32 history_limit = 2;
+}
+
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+  // Number of AWAITING approvals (the badge).
+  uint32 awaiting = 2;
+  int64 now_unix = 3 [jstype = JS_NUMBER];
+}
+
+message ApproveRequest {
+  string id = 1;
+}
+
+message ApproveResponse {
+  Approval approval = 1;
+}
+
+message RejectRequest {
+  string id = 1;
+}
+
+message RejectResponse {
+  Approval approval = 1;
+}

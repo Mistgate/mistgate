@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Conventions for every admin message (same as auth.proto, plus):
+//  - Ids are opaque prefixed strings ("nod_...", "usr_...", "prf_...", "grp_...", "dev_...", "inb_...").
+//  - Times are Unix seconds (int64, field suffix _unix), 0 = unset. Byte and bit counters are uint64.
+//    Time and counter fields carry [jstype = JS_NUMBER] so the generated TypeScript uses `number`
+//    (2^53 bytes is 9 PB; nothing here gets close).
+//  - Updates use proto3 `optional` for scalar fields and message presence for wrapper messages:
+//    absent = leave unchanged.
+//  - Errors are Connect codes with short messages: NOT_FOUND, ALREADY_EXISTS (name clash),
+//    INVALID_ARGUMENT, FAILED_PRECONDITION (e.g. deleting a group that still has users),
+//    ABORTED (optimistic-concurrency version mismatch).
+
+// Status of a node as the admin UI shows it.
+// NO_TRAFFIC needs the synthetic checks and UPDATING needs an agent rollout; the other states need neither.
+enum NodeStatus {
+  NODE_STATUS_UNSPECIFIED = 0;
+  // Enrollment created, the agent has not connected yet.
+  NODE_STATUS_PENDING = 1;
+  NODE_STATUS_ONLINE = 2;
+  // No agent stream and the host did not come back within the blip window (10 min).
+  NODE_STATUS_DOWN = 3;
+  // Stream lost < 10 min ago, or it returned with an unchanged boot time: host blip, not an alert.
+  NODE_STATUS_BLIP = 4;
+  // Agent connected but the synthetic check fails.
+  NODE_STATUS_NO_TRAFFIC = 5;
+  // Agent update in progress.
+  NODE_STATUS_UPDATING = 6;
+  NODE_STATUS_RETIRED = 7;
+}
+
+// Why a status is what it is. The UI localizes `code`; `params` fill the placeholders.
+// Codes: agent_silent {minutes}, host_blip {minutes}, enrollment_pending {expires_in_minutes, expires_unix},
+// enrollment_expired (PENDING without a usable install command), inbound_failed {inbound, error, profile, failed,
+// total} (failed of the node's total enabled profiles do not run), state_drift, clock_skew {seconds}, no_profiles
+// (ONLINE, nothing else wrong, but no enabled profile: nobody gets the node).
+// The health checks add no_traffic {failed, total} (status NO_TRAFFIC: agent on, synthetic
+// checks failing) and doctor_fail {check} (status stays ONLINE, reason shows the worst FAIL of the doctor).
+message StatusReason {
+  string code = 1;
+  map<string, string> params = 2;
+}
+
+enum App {
+  APP_UNSPECIFIED = 0;
+  // Happ (Hysteria2 today; any Happ-consumable protocol later).
+  APP_HAPP = 1;
+  // AmneziaVPN / AmneziaWG apps.
+  APP_AMNEZIA = 2;
+}
+
+// Online people on one protocol ("Online by protocol", "Hysteria2 n / AmneziaWG m").
+message ProtocolCount {
+  // Plugin id, e.g. "hysteria2".
+  string protocol = 1;
+  uint32 users = 2;
+}
+
+enum InboundState {
+  INBOUND_STATE_UNSPECIFIED = 0;
+  // Created on the panel, not yet sent or not yet answered.
+  INBOUND_STATE_PENDING = 1;
+  INBOUND_STATE_ACTIVE = 2;
+  INBOUND_STATE_FAILED = 3;
+  // Admin switched it off (kept in the database, removed from the desired state).
+  INBOUND_STATE_DISABLED = 4;
+}
+
+// A profile deployed on a node (profile x node).
+message Inbound {
+  string id = 1;
+  string profile_id = 2;
+  string profile_name = 3;
+  string protocol = 4;
+  string node_id = 5;
+  string node_name = 6;
+  // Effective UDP/TCP port: the override if set, else the profile's port.
+  uint32 port = 7;
+  // Effective TLS server name (override, else the profile's sni, else the node address if it is a hostname).
+  string tls_server_name = 8;
+  InboundState state = 9;
+  string last_error = 10;
+  // Reported by the node after apply (self-signed / ACME certificate of this inbound).
+  string cert_pin_sha256 = 11;
+  int64 cert_not_after_unix = 12 [jstype = JS_NUMBER];
+  // Protocol "awg" only: what the node last reported; unset until the first report or for an older agent.
+  AwgInboundStatus awg = 13;
+  // Where the inbound's traffic leaves the node: "direct" | "warp" (the profile's egress; empty when the plugin cannot
+  // build the inbound).
+  string egress = 14;
+}
+
+// AmneziaWG interface state of one inbound (agent.v1.AwgHealth).
+message AwgInboundStatus {
+  // "kernel" | "userspace".
+  string backend = 1;
+  // "amneziawg kernel module, genl v3, maxattr 34" | "amneziawg-go v3.1.20260828".
+  string backend_version = 2;
+  bool iface_up = 3;
+  uint32 peers = 4;
+  // Peers that completed a handshake at least once; peers - this = devices that never connected.
+  uint32 peers_handshaken = 5;
+  // Peers with a handshake younger than 190 s.
+  uint32 peers_online = 6;
+  int64 newest_handshake_unix = 7 [jstype = JS_NUMBER];
+  // Datagrams to the UDP port since the interface came up: 0 = the provider or a firewall, > 0 without
+  // handshakes = obfuscation parameters.
+  uint64 udp_rx_packets = 8 [jstype = JS_NUMBER];
+  uint32 unknown_peer_events = 9;
+  // When the node reported this, for "stale" captions.
+  int64 reported_unix = 10 [jstype = JS_NUMBER];
+}
+
+// State of the WARP egress of one node (WarpService; agent.v1.WarpState plus "not configured" and "unknown").
+enum WarpState {
+  WARP_STATE_UNSPECIFIED = 0;
+  // No WARP account on this node.
+  WARP_STATE_NOT_CONFIGURED = 1;
+  // An account exists but the node has not reported yet, or the node is offline.
+  WARP_STATE_UNKNOWN = 2;
+  // No usable backend on the host.
+  WARP_STATE_UNAVAILABLE = 3;
+  WARP_STATE_STARTING = 4;
+  WARP_STATE_UP = 5;
+  // Handshake or probes failing; inbounds with egress "warp" fail closed.
+  WARP_STATE_DOWN = 6;
+  // Paused by the owner.
+  WARP_STATE_DISABLED = 7;
+}
+
+// Where a WARP account came from.
+enum WarpSource {
+  WARP_SOURCE_UNSPECIFIED = 0;
+  // Registered by the panel at the owner's click (anonymous device registration, terms accepted).
+  WARP_SOURCE_REGISTERED = 1;
+  // Imported from wgcf files.
+  WARP_SOURCE_IMPORTED = 2;
+}
+
+// The WARP badge of a node card.
+message WarpSummary {
+  WarpState state = 1;
+  WarpSource source = 2;
+  // Cloudflare data centre from the last probe ("FRA"); empty when unknown.
+  string colo = 3;
+  // "free" | "plus" | "".
+  string account_type = 4;
+}

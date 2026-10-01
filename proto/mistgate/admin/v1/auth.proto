@@ -1,0 +1,492 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// AuthService signs admins in and manages their sign-in methods and sessions.
+// Passkeys (WebAuthn) are the primary factor; "password + authenticator code" is the
+// fallback an admin may choose at setup instead.
+//
+// WebAuthn options and credentials travel as the JSON the browser API
+// produces and consumes (PublicKeyCredential.parseCreationOptionsFromJSON /
+// parseRequestOptionsFromJSON and credential.toJSON()), so the server hands
+// them to go-webauthn unchanged. User verification (PIN / biometrics) is required for
+// every ceremony. A successful Finish* / PasswordLogin sets the session cookie.
+//
+// Every RPC except the ones marked "public" needs a session (an HTTP middleware
+// enforces that for everything under api/, not only for this service). The same middleware
+// enforces the admin role per procedure (owner-only, write = owner or helper, everything
+// else readable by every role); a forbidden call is PERMISSION_DENIED.
+//
+// Cloudflare Turnstile. When the owner enabled it (GetSecuritySettings) every public call that
+// STARTS a sign-in or setup must carry a fresh `turnstile_token` from the widget: BeginSetup,
+// BeginLogin and PasswordLogin. The server checks it with Cloudflare's siteverify; a missing,
+// used, expired or unverifiable token (Cloudflare unreachable included) is refused with
+// PERMISSION_DENIED ("captcha required" / "captcha failed") and the ceremony is not started. A token is
+// single-use, so after any failed attempt the widget must be reset to get a new one.
+// Finish* calls do NOT need a new token: the ceremony id that Begin handed out is the proof that
+// Begin passed the check (it is single-use, expires in 5 minutes and is capped per source address),
+// so the user solves one challenge per sign-in instead of two. The turnstile_token field on the
+// Finish* messages exists for symmetry and is ignored.
+service AuthService {
+  // Public. What the sign-in and setup pages need before anyone is signed in.
+  rpc GetLoginInfo(GetLoginInfoRequest) returns (GetLoginInfoResponse);
+  // Public. First admin. `mistgate setup` prints a one-time link carrying setup_token (valid 30 min).
+  // method PASSKEY (default) continues with FinishSetup.credential_json; method PASSWORD hashes the
+  // password, returns a TOTP secret to scan and continues with FinishSetup.totp_code.
+  rpc BeginSetup(BeginSetupRequest) returns (BeginSetupResponse);
+  rpc FinishSetup(FinishSetupRequest) returns (FinishSetupResponse);
+  // Public. Passkey sign-in with discoverable credentials (no username field).
+  rpc BeginLogin(BeginLoginRequest) returns (BeginLoginResponse);
+  rpc FinishLogin(FinishLoginRequest) returns (FinishLoginResponse);
+  // Public. Sign-in with login + password + 6-digit authenticator code. Failures are
+  // UNAUTHENTICATED with a SignInFailure detail; after 5 failures the login is locked
+  // (locked_until_unix > 0) even for the right credentials.
+  rpc PasswordLogin(PasswordLoginRequest) returns (PasswordLoginResponse);
+  // Public; tolerates a missing or expired session.
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // The signed-in admin. Returns Unauthenticated without a valid session.
+  rpc Me(MeRequest) returns (MeResponse);
+
+  // Settings -> Security. The signed-in admin's own passkeys.
+  rpc ListPasskeys(ListPasskeysRequest) returns (ListPasskeysResponse);
+  rpc BeginAddPasskey(BeginAddPasskeyRequest) returns (BeginAddPasskeyResponse);
+  rpc FinishAddPasskey(FinishAddPasskeyRequest) returns (FinishAddPasskeyResponse);
+  // FAILED_PRECONDITION if it is the only way the admin can sign in.
+  rpc RemovePasskey(RemovePasskeyRequest) returns (RemovePasskeyResponse);
+
+  // Settings -> Security -> "Password and code": the signed-in admin's own password + authenticator-code sign-in, the
+  // fallback to passkeys. GetPasswordLogin says whether the admin has one. A lost phone with no session left is
+  // `mistgate auth reset-login <login>` on the panel server (the CLI), not an RPC.
+  rpc GetPasswordLogin(GetPasswordLoginRequest) returns (GetPasswordLoginResponse);
+  // A new password. Needs a step-up and the current password, and ends the admin's other sessions. Errors:
+  // FAILED_PRECONDITION "no_password_login"; INVALID_ARGUMENT "wrong_password" (it counts against the step-up lock: five
+  // wrong proofs lock it for 15 minutes, then RESOURCE_EXHAUSTED) or the password rule.
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+  // A new authenticator secret, shown as a QR code like in the setup wizard and confirmed by its first code. Needs a
+  // step-up. With a password login it replaces the app ("re-bind": login and password stay, the other sessions end);
+  // without one it adds the password login, and then login and password are required. Errors: FAILED_PRECONDITION
+  // "no_master_key"; INVALID_ARGUMENT "password_login_exists" (a login or password sent for a re-bind) or the login and
+  // password rules; ALREADY_EXISTS "login_taken". FinishTotpEnrollment takes a code of the NEW secret: INVALID_ARGUMENT
+  // "invalid_code" may be retried on the same ceremony (5 tries), "enrollment_expired" means start again.
+  rpc BeginTotpEnrollment(BeginTotpEnrollmentRequest) returns (BeginTotpEnrollmentResponse);
+  rpc FinishTotpEnrollment(FinishTotpEnrollmentRequest) returns (FinishTotpEnrollmentResponse);
+
+  // Settings -> Sessions. The signed-in admin's own sessions.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc EndSession(EndSessionRequest) returns (EndSessionResponse);
+  rpc EndOtherSessions(EndOtherSessionsRequest) returns (EndOtherSessionsResponse);
+
+  // Settings -> Audit. Owner only.
+  rpc ListAudit(ListAuditRequest) returns (ListAuditResponse);
+
+  // Settings -> Security -> Captcha. Owner only. The secret key is never returned.
+  rpc GetSecuritySettings(GetSecuritySettingsRequest) returns (GetSecuritySettingsResponse);
+  rpc UpdateSecuritySettings(UpdateSecuritySettingsRequest) returns (UpdateSecuritySettingsResponse);
+
+  // Step-up re-authentication. Adding or removing a passkey, ending another session, changing the password and binding
+  // an authenticator app need the admin to have proved a sign-in factor within the last 5 minutes (signing in counts): otherwise
+  // the call is PERMISSION_DENIED with a StepUpRequired detail and the UI asks for a passkey or an
+  // authenticator code, then retries. BeginStepUp + FinishStepUp with a passkey; FinishStepUp with
+  // only totp_code for a password admin (no BeginStepUp needed). Me and FinishStepUp report
+  // step_up_until_unix so the UI knows when to ask.
+  rpc BeginStepUp(BeginStepUpRequest) returns (BeginStepUpResponse);
+  rpc FinishStepUp(FinishStepUpRequest) returns (FinishStepUpResponse);
+}
+
+message GetLoginInfoRequest {}
+
+message GetLoginInfoResponse {
+  // Wordmark parts: head in the text colour, tail in the accent colour. See InstanceService.
+  string brand_head = 1;
+  string brand_tail = 2;
+  // "#rrggbb".
+  string accent = 3;
+  // Default UI language, "en" or "ru".
+  string language = 4;
+  // A custom logo exists; it is served at GET brand/logo.svg next to the admin UI.
+  bool has_logo = 5;
+  // No admin exists yet: the setup page may be offered.
+  bool setup_open = 6;
+  // At least one admin can sign in with a password: show "another way" on the sign-in page.
+  bool password_login = 7;
+  // Cloudflare Turnstile is on: render the widget (site_key) and send its token as
+  // turnstile_token with BeginSetup, BeginLogin and PasswordLogin. Load the Cloudflare script
+  // only when this is true. Both fields are empty/false when it is off.
+  bool turnstile_enabled = 8;
+  string turnstile_site_key = 9;
+}
+
+enum SetupMethod {
+  // Same as PASSKEY.
+  SETUP_METHOD_UNSPECIFIED = 0;
+  SETUP_METHOD_PASSKEY = 1;
+  SETUP_METHOD_PASSWORD = 2;
+}
+
+message BeginSetupRequest {
+  string setup_token = 1;
+  string display_name = 2;
+  SetupMethod method = 3;
+  // PASSWORD only. 3-64 characters of a-z 0-9 . _ @ - (case-insensitive, stored lower case).
+  string login = 4;
+  // PASSWORD only. 12 to 256 bytes.
+  string password = 5;
+  // Turnstile token when GetLoginInfo.turnstile_enabled (see the service comment).
+  string turnstile_token = 6;
+}
+
+message BeginSetupResponse {
+  // Binds Begin to Finish; the server keeps the ceremony for 5 minutes.
+  string ceremony_id = 1;
+  // PASSKEY: PublicKeyCredentialCreationOptionsJSON.
+  string options_json = 2;
+  // PASSWORD: otpauth://totp/... for the QR code, and the same secret in base32 for typing in.
+  string totp_uri = 3;
+  string totp_secret = 4;
+}
+
+message FinishSetupRequest {
+  string setup_token = 1;
+  string ceremony_id = 2;
+  // PASSKEY: RegistrationResponseJSON (credential.toJSON()).
+  string credential_json = 3;
+  // PASSWORD: the current 6-digit code from the authenticator app, proving the secret was scanned.
+  // A wrong code is INVALID_ARGUMENT and can be retried (5 times) on the same ceremony.
+  string totp_code = 4;
+  // Ignored: Begin already passed the Turnstile check (see the service comment).
+  string turnstile_token = 5;
+}
+
+message FinishSetupResponse {
+  Admin admin = 1;
+}
+
+message BeginLoginRequest {
+  // Turnstile token when GetLoginInfo.turnstile_enabled (see the service comment).
+  string turnstile_token = 1;
+}
+
+message BeginLoginResponse {
+  string ceremony_id = 1;
+  // PublicKeyCredentialRequestOptionsJSON.
+  string options_json = 2;
+}
+
+message FinishLoginRequest {
+  string ceremony_id = 1;
+  // AuthenticationResponseJSON (credential.toJSON()).
+  string credential_json = 2;
+  // Ignored: Begin already passed the Turnstile check (see the service comment).
+  string turnstile_token = 3;
+}
+
+message FinishLoginResponse {
+  Admin admin = 1;
+}
+
+message PasswordLoginRequest {
+  string login = 1;
+  string password = 2;
+  // 6 digits; spaces are ignored. A code can be used once.
+  string totp_code = 3;
+  // Turnstile token when GetLoginInfo.turnstile_enabled (see the service comment). Each attempt
+  // needs a fresh one: there is no Begin step to carry it.
+  string turnstile_token = 4;
+}
+
+message PasswordLoginResponse {
+  Admin admin = 1;
+}
+
+// Connect error detail attached to UNAUTHENTICATED by PasswordLogin. The same for unknown
+// logins, so it does not reveal which logins exist.
+message SignInFailure {
+  // Failures left before the lockout; 0 when locked.
+  int32 attempts_left = 1;
+  // Unix seconds until the login is locked; 0 = not locked. The lock also applies when the
+  // sign-in address (IPv4, or the IPv6 /64) made too many failed attempts, whatever the login.
+  int64 locked_until_unix = 2 [jstype = JS_NUMBER];
+}
+
+// Connect error detail attached to PERMISSION_DENIED when a call needs step-up
+// re-authentication (see BeginStepUp).
+message StepUpRequired {
+  // The admin has a passkey: BeginStepUp / FinishStepUp with credential_json.
+  bool passkey = 1;
+  // The admin has a password + authenticator app: FinishStepUp with totp_code.
+  bool totp = 2;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+message MeRequest {}
+
+message MeResponse {
+  Admin admin = 1;
+  // Panel build version, e.g. "0.1.0-dev".
+  string version = 2;
+  // This session proved a sign-in factor recently: step-up protected calls work until this Unix
+  // time. 0 = step-up needed now.
+  int64 step_up_until_unix = 3 [jstype = JS_NUMBER];
+  // Where the source code of this panel is published (serve --source-url), linked next to the version in the admin
+  // (AGPL-3.0 section 13). Empty = no link.
+  string source_url = 4;
+}
+
+message Admin {
+  string id = 1;
+  string display_name = 2;
+  Role role = 3;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_OWNER = 1;
+  ROLE_HELPER = 2;
+  ROLE_READONLY = 3;
+}
+
+message Passkey {
+  string id = 1;
+  string name = 2;
+  int64 created_at_unix = 3 [jstype = JS_NUMBER];
+  // 0 = never used to sign in.
+  int64 last_used_at_unix = 4 [jstype = JS_NUMBER];
+  // "internal", "usb", "hybrid" ...
+  repeated string transports = 5;
+  // Synced passkey (backup state flag).
+  bool backed_up = 6;
+}
+
+message ListPasskeysRequest {}
+
+message ListPasskeysResponse {
+  repeated Passkey passkeys = 1;
+}
+
+message BeginAddPasskeyRequest {
+  // Shown in the list; default "Passkey". At most 64 characters.
+  string name = 1;
+}
+
+message BeginAddPasskeyResponse {
+  string ceremony_id = 1;
+  // PublicKeyCredentialCreationOptionsJSON; existing passkeys are excluded.
+  string options_json = 2;
+}
+
+message FinishAddPasskeyRequest {
+  string ceremony_id = 1;
+  string credential_json = 2;
+}
+
+message FinishAddPasskeyResponse {
+  Passkey passkey = 1;
+}
+
+message RemovePasskeyRequest {
+  string id = 1;
+}
+
+message RemovePasskeyResponse {}
+
+message GetPasswordLoginRequest {}
+
+message GetPasswordLoginResponse {
+  // The admin can sign in with login + password + authenticator code.
+  bool enabled = 1;
+  // The login, lower case; empty when not enabled.
+  string login = 2;
+  // This server can keep authenticator secrets (it has a master key): without one a password login cannot be added
+  // or re-bound.
+  bool available = 3;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  // At least 12 characters, at most 256 bytes.
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {
+  // How many other sessions of the admin were ended.
+  uint32 ended_sessions = 1;
+}
+
+message BeginTotpEnrollmentRequest {
+  // Only when adding a password login (the admin has none): 3-64 characters of a-z 0-9 . _ @ - (stored lower case).
+  string login = 1;
+  // Only when adding: at least 12 characters, at most 256 bytes.
+  string password = 2;
+}
+
+message BeginTotpEnrollmentResponse {
+  // Binds Begin to Finish for this session; the server keeps the ceremony for 5 minutes.
+  string ceremony_id = 1;
+  // otpauth://totp/... for the QR code, and the same secret in base32 for typing in.
+  string totp_uri = 2;
+  string totp_secret = 3;
+}
+
+message FinishTotpEnrollmentRequest {
+  string ceremony_id = 1;
+  // The current 6-digit code of the new secret.
+  string totp_code = 2;
+}
+
+message FinishTotpEnrollmentResponse {
+  // The login the admin signs in with.
+  string login = 1;
+  // A re-bind ends the admin's other sessions: how many.
+  uint32 ended_sessions = 2;
+}
+
+message AdminSession {
+  // Opaque; pass it to EndSession.
+  string id = 1;
+  int64 created_at_unix = 2 [jstype = JS_NUMBER];
+  int64 last_seen_at_unix = 3 [jstype = JS_NUMBER];
+  string ip = 4;
+  string user_agent = 5;
+  // The session making this call.
+  bool current = 6;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  // Live sessions, most recently used first.
+  repeated AdminSession sessions = 1;
+}
+
+message EndSessionRequest {
+  string id = 1;
+}
+
+message EndSessionResponse {}
+
+message EndOtherSessionsRequest {}
+
+message EndOtherSessionsResponse {
+  uint32 ended = 1;
+}
+
+enum AuditSource {
+  // No filter: all sources.
+  AUDIT_SOURCE_UNSPECIFIED = 0;
+  AUDIT_SOURCE_PANEL = 1;
+  AUDIT_SOURCE_BOT = 2;
+  AUDIT_SOURCE_MCP = 3;
+  AUDIT_SOURCE_API = 4;
+}
+
+message AuditEntry {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 time_unix = 2 [jstype = JS_NUMBER];
+  AuditSource source = 3;
+  // Admin id, or "anonymous".
+  string actor_id = 4;
+  // Display name of the admin, empty if unknown.
+  string actor_name = 5;
+  // e.g. "login", "setup", "logout", "passkey_add".
+  string action = 6;
+  // JSON object, never contains secrets.
+  string params_json = 7;
+  // "ok", "fail", ...
+  string result = 8;
+  // Client address the action came from.
+  string ip = 9;
+}
+
+// What a ListAudit page holds besides the source filter.
+enum AuditKind {
+  // Everything.
+  AUDIT_KIND_UNSPECIFIED = 0;
+  // Sign-ins and the admins' own security: setup, sign-in and out, lockouts (the panel's and a subscription page's),
+  // step-up, captcha, passkeys, passwords, authenticator apps, sessions.
+  AUDIT_KIND_SIGN_IN = 1;
+  // What people and their tokens changed: users, groups, profiles and their nodes, devices, DNS presets, nodes, WARP,
+  // updates, health fixes, tokens, approvals and the panel's settings.
+  AUDIT_KIND_CHANGES = 2;
+  // Rows whose result is not "ok": failed, refused or locked attempts of any kind.
+  AUDIT_KIND_FAILURES = 3;
+}
+
+message ListAuditRequest {
+  AuditSource source = 1;
+  // Cursor: only entries with id < before_id; 0 = from the newest.
+  int64 before_id = 2 [jstype = JS_NUMBER];
+  // Default 50, at most 200.
+  uint32 page_size = 3;
+  // Only one kind of action; unspecified = all. Combines with source.
+  AuditKind kind = 4;
+}
+
+message ListAuditResponse {
+  // Newest first.
+  repeated AuditEntry entries = 1;
+  // Pass as before_id for the next page; 0 = no more.
+  int64 next_before_id = 2 [jstype = JS_NUMBER];
+}
+
+// Owner-only security settings. Absent fields are left unchanged.
+message GetSecuritySettingsRequest {}
+
+message GetSecuritySettingsResponse {
+  bool turnstile_enabled = 1;
+  string turnstile_site_key = 2;
+  // A secret key is stored. The key itself is never returned.
+  bool turnstile_secret_set = 3;
+}
+
+message UpdateSecuritySettingsRequest {
+  // Turning it on needs a site key and a secret key (stored or sent in this request): otherwise
+  // FAILED_PRECONDITION. Whenever the call leaves the check on with keys it has not been proven with (switching it on,
+  // or a new site key or secret key while it is on), the keys are tried first: see turnstile_test_token.
+  optional bool turnstile_enabled = 1;
+  // At most 128 characters of letters, digits, - and _.
+  optional string turnstile_site_key = 2;
+  // At most 256 characters; sealed with the master key at rest. "" removes it (and with it the
+  // captcha is switched off).
+  optional string turnstile_secret_key = 3;
+  // The proof that the new keys work: a token the widget made with the new site key on the admin page, checked with
+  // Cloudflare's siteverify and the new secret key before anything is saved. Nothing is saved without it when a proof is
+  // needed: FAILED_PRECONDITION "turnstile_test_required"; a secret key Cloudflare does not know is FAILED_PRECONDITION
+  // "turnstile_secret_rejected", a token it refuses (another widget's site key, used or expired) "turnstile_token_rejected",
+  // and Cloudflare out of reach is UNAVAILABLE "turnstile_unreachable". The way out if the check still locks everyone
+  // out: `mistgate auth turnstile off` on the panel server.
+  string turnstile_test_token = 4;
+}
+
+message UpdateSecuritySettingsResponse {
+  bool turnstile_enabled = 1;
+  string turnstile_site_key = 2;
+  bool turnstile_secret_set = 3;
+}
+
+message BeginStepUpRequest {}
+
+message BeginStepUpResponse {
+  // Binds Begin to Finish; the server keeps the ceremony for 5 minutes.
+  string ceremony_id = 1;
+  // PublicKeyCredentialRequestOptionsJSON limited to the admin's own passkeys. Empty when the
+  // admin has no passkey (use totp_code).
+  string options_json = 2;
+}
+
+message FinishStepUpRequest {
+  // Passkey: from BeginStepUp, with the AuthenticationResponseJSON.
+  string ceremony_id = 1;
+  string credential_json = 2;
+  // Password admin: the current 6-digit authenticator code. A code works once, and it must
+  // be a newer one than the one the admin signed in with (wait for the next 30 s step).
+  // 5 wrong codes lock step-up for 15 minutes.
+  string totp_code = 3;
+}
+
+message FinishStepUpResponse {
+  // Step-up protected calls work until this Unix time (5 minutes from now).
+  int64 step_up_until_unix = 1 [jstype = JS_NUMBER];
+}

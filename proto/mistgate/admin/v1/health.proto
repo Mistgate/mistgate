@@ -1,0 +1,410 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Health screen (Alerts / Checks / Doctor tabs), the Doctor tab of the node page and the synthetic-check
+// pills of the node Overview tab. Conventions: common.proto.
+//
+// Roles (internal/panel/auth/policy.go): the three reads are open to every role; MuteAlert, RunChecksNow and
+// RunDoctor need owner or helper; ApplyFix needs the owner (it changes the host), except that the panel may
+// let a helper apply restart_inbound with an in-handler role check.
+//
+// I18N. Every human sentence is a key + params resolved in the SPA (web/src/i18n/health.ts); the server
+// never sends prose. A key the SPA does not know is shown as the key itself, so a newer panel with an older
+// SPA degrades to readable text. Key naming (stable, dotted): alert titles "health.alert.<kind>.title",
+// alert reasons "health.alert.<kind>.why[.<variant>]", doctor rows "doctor.<check_id>.title" (from the
+// agent) and "health.doctor.<check_id>.why" (from the panel), fix buttons "health.fix.<fix_id>.label",
+// fix plans "health.fix.<fix_id>.plan", check error codes "health.check.err.<code>".
+service HealthService {
+  // Active alerts (newest first) and the resolved ones of a recent window (newest resolution first).
+  rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse);
+  // Mute an active alert for a while (no bot/webhook notification, no badge count, the card stays with a
+  // "muted until" caption), or unmute it. Muting never hides the alert from the list and never stops the
+  // panel from resolving it.
+  rpc MuteAlert(MuteAlertRequest) returns (MuteAlertResponse);
+
+  // Node x profile matrix of the synthetic checks, with the last result and the last 24 h per cell.
+  rpc GetChecks(GetChecksRequest) returns (GetChecksResponse);
+  // "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
+  // once; the results show up in GetChecks within seconds. Rate limit: one round per inbound per 30 s
+  // (RESOURCE_EXHAUSTED with the seconds left in the message).
+  rpc RunChecksNow(RunChecksNowRequest) returns (RunChecksNowResponse);
+
+  // The last DoctorReport of one node, or of every node, with its age. Never contacts a node.
+  rpc GetDoctor(GetDoctorRequest) returns (GetDoctorResponse);
+  // "Run again": ask the node(s) to run the doctor now and return the fresh report. Waits for the agent
+  // (up to 30 s per node, in parallel). FAILED_PRECONDITION: the node is offline or its agent has no
+  // "doctor/1" capability (older agent: "agent too old").
+  rpc RunDoctor(RunDoctorRequest) returns (RunDoctorResponse);
+  // Apply a doctor fix in two steps. Step 1: dry_run = true asks the node what would happen and returns the
+  // plan plus a plan_id. Step 2: dry_run = false with that plan_id performs it. The plan_id is single use, valid
+  // 10 minutes and bound to (node, fix, params); a missing or stale one is FAILED_PRECONDITION ("no fresh
+  // plan"), so nothing is ever applied that the admin has not seen. Audit: both steps are written to the
+  // audit log with the plan facts.
+  rpc ApplyFix(ApplyFixRequest) returns (ApplyFixResponse);
+  // "This is normal for this node": accept a WARN of the doctor (Docker's nft tables, a host without IPv6...). The
+  // panel remembers (node, check, detail_code): the item opens no alert and counts in no badge until its detail_code
+  // changes or it turns FAIL, and the acceptance is dropped then. Only a WARN can be accepted (FAILED_PRECONDITION).
+  rpc AcceptDoctorItem(AcceptDoctorItemRequest) returns (AcceptDoctorItemResponse);
+  // Take an acceptance back: the warning counts again.
+  rpc UnacceptDoctorItem(UnacceptDoctorItemRequest) returns (UnacceptDoctorItemResponse);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Alerts
+
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  // Worth knowing, nobody has to act. Never notifies, never counted in the badge.
+  ALERT_SEVERITY_INFO = 1;
+  ALERT_SEVERITY_WARNING = 2;
+  ALERT_SEVERITY_CRITICAL = 3;
+}
+
+// What the alert is about. One active alert per (kind, node_id, subject).
+enum AlertKind {
+  ALERT_KIND_UNSPECIFIED = 0;
+  // No agent stream and the host did not come back within the blip window (10 min), and (once the
+  // cross-node probe exists) other nodes cannot reach it either. CRITICAL.
+  ALERT_KIND_NODE_DOWN = 1;
+  // HISTORY ONLY (a blip is an event, not an alert). A record with severity INFO written when a
+  // node that was silent < 10 min came back with an unchanged boot time: first_seen = silence start,
+  // resolved_at = return. It is never active, never notifies and never reboots anything; it exists so the
+  // 7-day history shows it. A silence that outlasts the window becomes NODE_DOWN instead.
+  ALERT_KIND_HOST_BLIP = 2;
+  // Agent connected and inbounds RUNNING, but every synthetic check of the node fails (node status
+  // NO_TRAFFIC). CRITICAL. subject = "".
+  ALERT_KIND_NO_TRAFFIC = 3;
+  // Some, not all, inbounds of an online node fail their synthetic check. WARNING (CRITICAL when the failing
+  // inbound is the only one of its protocol on the node). subject = inbound id.
+  ALERT_KIND_CHECK_FAILED = 4;
+  // A doctor check reports WARN. subject = check id. WARNING.
+  ALERT_KIND_DOCTOR_WARN = 5;
+  // A doctor check reports FAIL. subject = check id. CRITICAL.
+  ALERT_KIND_DOCTOR_FAIL = 6;
+  // Applied state hash differs from the desired one after the automatic full resend (agent.proto
+  // "DESIRED STATE"). WARNING.
+  ALERT_KIND_STATE_DRIFT = 7;
+  // A user reached the quota (status limited). INFO. node_id = "", subject = user id, params{user_name}.
+  ALERT_KIND_QUOTA = 8;
+  // A certificate expires soon or does not match its SNI: inbound certificates and the agent's own mTLS
+  // certificate. Raised from the doctor check cert_expiry (not duplicated as DOCTOR_*) and from the panel's
+  // own view of Inbound.cert_not_after_unix. subject = inbound id or "agent". WARNING, CRITICAL < 3 days.
+  ALERT_KIND_CERT_EXPIRY = 9;
+  // One subscription looks shared between people (AWG endpoint jumping, device count above the limit).
+  // INFO. node_id = "", subject = user id.
+  ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT = 10;
+  // A rollout of the node agent paused because a node failed its update gate or rejected the update.
+  // WARNING. node_id = the failing node, subject = rollout id, params{rollout_id, reason}. Resolves by itself
+  // when the rollout is resumed, cancelled or replaced. Produced from the updates module through a health
+  // condition source, not from a doctor check.
+  ALERT_KIND_UPDATE_FAILED = 11;
+}
+
+message Alert {
+  // "alt_..." opaque. A re-opened alert (same key returns within 1 h of resolving) keeps its id.
+  string id = 1;
+  AlertSeverity severity = 2;
+  AlertKind kind = 3;
+  // Empty for fleet-wide and user alerts (QUOTA, SUBSCRIPTION_SHARED_SUSPECT, the panel-egress guard).
+  string node_id = 4;
+  // Resolved by the server; a retired or renamed node keeps its last name.
+  string node_name = 5;
+  // What the alert concerns beyond the node: doctor check id, inbound id, "agent", user id. May be empty.
+  string subject = 6;
+  // One-line title and the plain-language "why", both i18n keys (see the service comment). `why_key` already
+  // contains the diagnosis variant, e.g. "health.alert.no_traffic.why.udp_blocked".
+  string title_key = 7;
+  map<string, string> params = 8;
+  string why_key = 9;
+  int64 first_seen_unix = 10 [jstype = JS_NUMBER];
+  // Last time the condition was observed to hold; for an active alert this trails "now" by at most one
+  // evaluation interval (10 s for agent-driven conditions, the check round for synthetic ones).
+  int64 last_seen_unix = 11 [jstype = JS_NUMBER];
+  // 0 = still active.
+  int64 resolved_at_unix = 12 [jstype = JS_NUMBER];
+  // How it ended, for the history rows: "cleared" (the condition went away by itself), "fix_applied"
+  // (ApplyFix), "node_retired", "node_returned" (HOST_BLIP), "superseded" (a bigger alert says the same),
+  // "accepted" (the owner accepted the doctor warning as normal for the node). Empty while active.
+  string resolution = 13;
+  // 0 = not muted. Unix time when the mute ends. A mute ends by itself when the alert's severity rises.
+  int64 muted_until_unix = 14 [jstype = JS_NUMBER];
+  // Buttons, in display order. Vocabulary: "apply_fix:<fix_id>" (start the two-step fix; only offered while the
+  // doctor result still carries that fix_id and the agent is connected), "restart_inbound" (NodeService.RestartInbounds
+  // of the alert's inbound, params.inbound; params.online = its open sessions now), "restart_inbounds" (every profile
+  // of the node), "open_profiles" (the node's Profiles tab: a port or a certificate to change there), "open_warp" (the
+  // node's WARP card), "open_node" (go to the node page), "accept" (a doctor warning: AcceptDoctorItem), "mute".
+  // Unknown entries are ignored by the SPA.
+  repeated string actions = 15;
+}
+
+message ListAlertsRequest {
+  // Filter; empty = all nodes (fleet-wide alerts have no node and show only in the unfiltered list).
+  string node_id = 1;
+  // History window in seconds. 0 = 7 days, max 30 days.
+  uint32 history_window_s = 2;
+}
+
+message ListAlertsResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  // Not resolved (muted ones included), CRITICAL first, then newest first_seen.
+  repeated Alert active = 2;
+  // Resolved inside the window, at most 200, newest resolved_at first.
+  repeated Alert history = 3;
+}
+
+message MuteAlertRequest {
+  string alert_id = 1;
+  // 0 = unmute. Max 7 days (604800). Typical: 3600 ("Mute for 1 h").
+  uint32 duration_s = 2;
+}
+
+message MuteAlertResponse {
+  Alert alert = 1;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Synthetic checks ("eyes of the client": the panel connects as a client to every inbound)
+
+enum CheckStatus {
+  CHECK_STATUS_UNSPECIFIED = 0;
+  // Both probes passed.
+  CHECK_STATUS_OK = 1;
+  // The tunnel works but one of the two probes failed (for example the exit cannot reach gstatic.com).
+  // Shown as latency in warning colour; never opens an alert by itself.
+  CHECK_STATUS_DEGRADED = 2;
+  // The client could not establish the tunnel or neither probe passed.
+  CHECK_STATUS_FAILED = 3;
+  // Not measured on purpose: inbound disabled, node offline or updating, protocol has no client yet.
+  CHECK_STATUS_SKIPPED = 4;
+}
+
+// One column of the matrix: a profile (the same profile is deployed on many nodes).
+message CheckColumn {
+  string profile_id = 1;
+  // "hy2 · 443".
+  string profile_name = 2;
+  // Plugin id, "hysteria2".
+  string protocol = 3;
+}
+
+// One result of one probe round.
+message CheckResult {
+  CheckStatus status = 1;
+  int64 at_unix = 2 [jstype = JS_NUMBER];
+  // Time from the start of the dial to the first response byte of the generate_204 probe, milliseconds;
+  // 0 when the tunnel did not come up.
+  uint32 latency_ms = 3;
+  // Exit IP and ISO 3166-1 alpha-2 country as seen by https://www.cloudflare.com/cdn-cgi/trace ("ip=", "loc=");
+  // empty when that probe failed.
+  string exit_ip = 4;
+  string exit_country = 5;
+  // Machine code for a non-OK result, the tail of the key "health.check.err.<code>": "timeout" (no QUIC
+  // handshake, typical for blocked UDP), "auth" (credential refused), "tls" (certificate / SNI / pin),
+  // "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active".
+  string error_code = 6;
+  // Short English fact for the mono caption ("handshake timeout after 8s"). Never secrets.
+  string error_detail = 7;
+}
+
+// Half-hour bucket of one cell. start is aligned to :00 or :30 UTC.
+message CheckBucket {
+  int64 start_unix = 1 [jstype = JS_NUMBER];
+  // Rounds in the bucket (a round is one attempt plus at most one immediate retry).
+  uint32 ok = 2;
+  uint32 failed = 3;
+  // Median latency of the OK rounds, milliseconds; 0 = none.
+  uint32 latency_ms = 4;
+}
+
+// One node x profile cell.
+message CheckCell {
+  // False: the profile is not deployed on this node (the "-" cell); everything below is empty.
+  bool deployed = 1;
+  string inbound_id = 2;
+  // Last finished result; unset (status UNSPECIFIED) before the first round.
+  CheckResult last = 3;
+  // Consecutive failed rounds up to now (the alert opens at 2).
+  uint32 fail_streak = 4;
+  // Exactly 48 buckets, oldest first, the last one is the current partial bucket.
+  repeated CheckBucket history = 5;
+}
+
+message CheckRow {
+  string node_id = 1;
+  string node_name = 2;
+  string country_code = 3;
+  NodeStatus node_status = 4;
+  // One cell per entry of GetChecksResponse.columns, same order.
+  repeated CheckCell cells = 5;
+}
+
+message GetChecksRequest {
+  // Empty = every node (the Health tab); set = only that node (the node Overview pills).
+  string node_id = 1;
+}
+
+message GetChecksResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  // Seconds between rounds of one inbound (default 300).
+  uint32 interval_s = 2;
+  repeated CheckColumn columns = 3;
+  // Name order. Retired nodes are omitted.
+  repeated CheckRow rows = 4;
+}
+
+message RunChecksNowRequest {
+  // Empty = every node.
+  string node_id = 1;
+}
+
+message RunChecksNowResponse {
+  // Inbounds scheduled.
+  uint32 scheduled = 1;
+  // Inbounds skipped by the rate limit, node offline or protocol without a client.
+  uint32 skipped = 2;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Doctor
+
+enum DoctorStatus {
+  DOCTOR_STATUS_UNSPECIFIED = 0;
+  DOCTOR_STATUS_OK = 1;
+  DOCTOR_STATUS_WARN = 2;
+  DOCTOR_STATUS_FAIL = 3;
+  // Not evaluated on this host (detail says why).
+  DOCTOR_STATUS_SKIP = 4;
+}
+
+message DoctorItem {
+  // Check id, see agent.proto "CHECK IDS".
+  string id = 1;
+  DoctorStatus status = 2;
+  // From the agent: "doctor.<id>.title" + params. `detail` is its short English fact line for the mono caption.
+  string title_key = 3;
+  string detail = 4;
+  map<string, string> params = 5;
+  // Panel-side plain-language explanation, "health.doctor.<id>.why" (+ ".<variant>"); uses the same params.
+  string why_key = 6;
+  // Offered automatic fix (agent.proto "FIX IDS"); empty = none. Already cleared by the server when the node
+  // is offline or its agent cannot apply fixes.
+  string fix_id = 7;
+  int64 measured_unix = 8 [jstype = JS_NUMBER];
+  // Code of the fact line (agent.proto DoctorResult.detail_code); the SPA writes the sentence from it and `params`
+  // and shows `detail` when the code is empty or unknown (an older agent). The panel adds "profile" next to an
+  // "inbound_id" param, "profiles" next to "inbounds" (the profiles' names) and, for warp_path, "profiles" of the
+  // node's WARP-exit profiles.
+  string detail_code = 9;
+  // Set while a WARN is accepted as normal for this node (AcceptDoctorItem): when and by whom (admin id and name).
+  int64 accepted_unix = 10 [jstype = JS_NUMBER];
+  string accepted_by = 11;
+  string accepted_by_name = 12;
+}
+
+// The doctor state of one node.
+message NodeDoctor {
+  string node_id = 1;
+  string node_name = 2;
+  NodeStatus node_status = 3;
+  // false: this agent predates the doctor (no "doctor/1" capability); `items` is empty and the UI says so.
+  bool agent_supported = 4;
+  // false: supported but no report yet (first report comes ~30 s after the agent connects).
+  bool has_report = 5;
+  // When the panel received the report, and its age in seconds at the time of this response. A report older
+  // than 25 min (2.5 periods) is stale: the UI greys it out and says how old it is.
+  int64 received_unix = 6 [jstype = JS_NUMBER];
+  uint32 age_s = 7;
+  bool stale = 8;
+  // Check order of agent.proto "CHECK IDS" (fixed, not sorted by status: the SPA sorts problems first).
+  repeated DoctorItem items = 9;
+  // The agent version of the last Hello (the fleet tab says which agent is too old) and when the node was last
+  // heard from (an offline node's report is its last one).
+  string agent_version = 10;
+  int64 last_seen_unix = 11 [jstype = JS_NUMBER];
+}
+
+message GetDoctorRequest {
+  // Empty = every non-retired node (the fleet Doctor tab).
+  string node_id = 1;
+}
+
+message GetDoctorResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  // Name order.
+  repeated NodeDoctor nodes = 2;
+}
+
+message RunDoctorRequest {
+  // Empty = every connected node with doctor support; offline nodes keep their old report (not an error).
+  string node_id = 1;
+}
+
+message RunDoctorResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  repeated NodeDoctor nodes = 2;
+}
+
+// What a fix will do (dry run) or did.
+message FixPlan {
+  string fix_id = 1;
+  // "health.fix.<fix_id>.plan": one sentence with placeholders, e.g. "Shrink the journal from {before_mb}
+  // MB to {after_mb} MB".
+  string title_key = 2;
+  // Facts from the node (agent CommandResult.params), short English line in `detail`.
+  map<string, string> params = 3;
+  string detail = 4;
+  // true when the fix drops client sessions (restart_inbound). The UI shows it in warning style.
+  bool disruptive = 5;
+}
+
+message ApplyFixRequest {
+  string node_id = 1;
+  string fix_id = 2;
+  // restart_inbound: {"inbound_id"} (empty = all failed inbounds of the node). Others: none.
+  map<string, string> params = 3;
+  // true = step 1 (plan, changes nothing). false = step 2 (perform; needs plan_id).
+  bool dry_run = 4;
+  // From the dry run's response; required when dry_run is false.
+  string plan_id = 5;
+}
+
+message ApplyFixResponse {
+  FixPlan plan = 1;
+  // Step 1 only: pass it back in step 2.
+  string plan_id = 2;
+  // Step 1 only: unix time when the plan_id expires.
+  int64 plan_expires_unix = 3 [jstype = JS_NUMBER];
+  // Step 2 only: the node reported ok. On false, `error` carries the agent's short code
+  // (agent.proto "CommandResult.error vocabulary") and the state is unchanged or partly changed as stated.
+  bool applied = 4;
+  string error = 5;
+  // Step 2 only: units changed, and the node's result facts.
+  uint32 affected = 6;
+  map<string, string> result_params = 7;
+  // Step 2 only, when applied: the node's doctor state after the automatic re-check (may still be the old
+  // report if the re-check did not arrive within 10 s).
+  NodeDoctor doctor = 8;
+}
+
+message AcceptDoctorItemRequest {
+  string node_id = 1;
+  // The doctor check id ("foreign_nft").
+  string check_id = 2;
+}
+
+message AcceptDoctorItemResponse {
+  // The node's doctor state with the acceptance.
+  NodeDoctor doctor = 1;
+}
+
+message UnacceptDoctorItemRequest {
+  string node_id = 1;
+  string check_id = 2;
+}
+
+message UnacceptDoctorItemResponse {
+  NodeDoctor doctor = 1;
+}

@@ -1,0 +1,30 @@
+- name: "de1 · AWG 2.0"
+  type: wireguard
+  server: "203.0.113.10"
+  port: 43210
+  ip: "10.66.8.5/32"
+  private-key: "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+  public-key: "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8="
+  pre-shared-key: "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8="
+  allowed-ips:
+    - "0.0.0.0/0"
+  udp: true
+  mtu: 1280
+  persistent-keepalive: 25
+  remote-dns-resolve: true
+  dns:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  amnezia-wg-option:
+    jc: 5
+    jmin: 12
+    jmax: 60
+    s1: 40
+    s2: 60
+    s3: 25
+    s4: 18
+    h1: "100000-200000"
+    h2: "300000-400000"
+    h3: "500000-600000"
+    h4: "700000-800000"
+    i1: "<r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>"

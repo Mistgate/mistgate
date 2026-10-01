@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/user.proto";
+
+// Access groups (a group is a set of profiles). The users screen has a
+// "Groups" tab for them; the create-user form and the user card pick one, and the profile page adds a profile to them.
+service GroupService {
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc UpdateGroup(UpdateGroupRequest) returns (UpdateGroupResponse);
+  // FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
+  rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse);
+}
+
+message Group {
+  string id = 1;
+  string name = 2;
+  repeated string profile_ids = 3;
+  uint32 user_count = 4;
+  // Empty = the instance default.
+  string dns_preset_id = 5;
+  // Nodes where the group's profiles give something right now: an enabled, pending or running inbound on an enrolled
+  // node (the subscription's rule, without a user's own node choice and app switches), by the kind of app that takes
+  // it: the subscription apps and AmneziaVPN keys. What a new user of the group gets; 0 = nothing there.
+  uint32 happ_nodes = 6;
+  uint32 amnezia_nodes = 7;
+}
+
+message ListGroupsRequest {}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message CreateGroupRequest {
+  string name = 1;
+  repeated string profile_ids = 2;
+  string dns_preset_id = 3;
+}
+
+message CreateGroupResponse {
+  Group group = 1;
+}
+
+message UpdateGroupRequest {
+  string group_id = 1;
+  optional string name = 2;
+  // Presence = replace the set.
+  optional ProfileIds profile_ids = 3;
+  // "" = the instance default.
+  optional string dns_preset_id = 4;
+  // Check the change and say what it does (UpdateGroupResponse.impact); nothing is written, the nodes hear nothing.
+  bool dry_run = 5;
+}
+
+message ProfileIds {
+  repeated string values = 1;
+}
+
+message UpdateGroupResponse {
+  // The group after the update; with dry_run, as it is now.
+  Group group = 1;
+  // What the new profile set does to the group's users; unset when the set stays.
+  AccessImpact impact = 2;
+}
+
+message DeleteGroupRequest {
+  string group_id = 1;
+  // The group's users move here first, in the same transaction. Empty: refused with FAILED_PRECONDITION
+  // "group_not_empty: users=N" while users belong to the group.
+  string move_users_to = 2;
+}
+
+message DeleteGroupResponse {}

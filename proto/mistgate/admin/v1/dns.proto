@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// DnsService manages DNS presets. A preset is assigned per user, falling back to the user's
+// group and then to SubscriptionSettings.default_dns_preset_id. It reaches clients through the
+// subscription (Happ routing header, Mihomo "dns:", AmneziaWG "DNS ="); DNS queries travel inside the tunnel.
+// Built-in presets exist on every install, can be edited but not deleted; they reference the provider catalog
+// (ListDnsPresetsResponse.providers).
+service DnsService {
+  rpc ListDnsPresets(ListDnsPresetsRequest) returns (ListDnsPresetsResponse);
+  rpc CreateDnsPreset(CreateDnsPresetRequest) returns (CreateDnsPresetResponse);
+  rpc UpdateDnsPreset(UpdateDnsPresetRequest) returns (UpdateDnsPresetResponse);
+  // Users and groups that used it fall back to the default. FAILED_PRECONDITION for a built-in preset
+  // or for the instance default.
+  rpc DeleteDnsPreset(DeleteDnsPresetRequest) returns (DeleteDnsPresetResponse);
+}
+
+enum DnsServerKind {
+  DNS_SERVER_KIND_UNSPECIFIED = 0;
+  // Plain DNS over UDP/TCP: "77.88.8.8" or "77.88.8.8:53".
+  DNS_SERVER_KIND_PLAIN = 1;
+  // DNS over HTTPS: "https://dns.adguard-dns.com/dns-query".
+  DNS_SERVER_KIND_DOH = 2;
+  // DNS over TLS: "dns.adguard-dns.com" or "94.140.14.14:853".
+  DNS_SERVER_KIND_DOT = 3;
+}
+
+// How queries travel to a resolver. A preset has one preferred transport; each app gets it if it can carry it,
+// else the next one down the chain DoH -> DoT -> plain.
+enum DnsTransport {
+  DNS_TRANSPORT_UNSPECIFIED = 0;
+  // Plain DNS over UDP/TCP (IP addresses).
+  DNS_TRANSPORT_PLAIN = 1;
+  // DNS over TLS (host name).
+  DNS_TRANSPORT_DOT = 2;
+  // DNS over HTTPS (URL).
+  DNS_TRANSPORT_DOH = 3;
+}
+
+// What a provider variant is for; the UI groups the catalog and filters the presets by it. For a preset the value
+// is computed by the server (built-ins: fixed; custom: the category of its first catalog server); UNSPECIFIED = "own".
+enum DnsCategory {
+  DNS_CATEGORY_UNSPECIFIED = 0;
+  DNS_CATEGORY_RUSSIA = 1;
+  DNS_CATEGORY_REGULAR = 2;
+  DNS_CATEGORY_NO_ADS = 3;
+  DNS_CATEGORY_FAMILY = 4;
+  DNS_CATEGORY_SECURITY = 5;
+}
+
+// An app that carries the DNS of a subscription.
+enum DnsClient {
+  DNS_CLIENT_UNSPECIFIED = 0;
+  DNS_CLIENT_HAPP = 1;
+  // Mihomo core and apps built on it (Clash Verge, FlClash...).
+  DNS_CLIENT_MIHOMO = 2;
+  // AmneziaWG (.conf and the Amnezia vpn:// key).
+  DNS_CLIENT_AMNEZIAWG = 3;
+}
+
+// A resolver of a preset: a catalog variant (provider_variant set; kind and address are then filled with a plain
+// or DoH address for old clients and ignored on input) or a custom address (kind + address, as before).
+message DnsServer {
+  DnsServerKind kind = 1;
+  string address = 2;
+  // DnsProviderVariant.id, e.g. "cloudflare/family". The addresses come from the built-in catalog at render time.
+  string provider_variant = 3;
+}
+
+// One way to use a provider: its plain, DoT and DoH endpoints.
+message DnsProviderVariant {
+  // "provider/variant", e.g. "adguard/family".
+  string id = 1;
+  string name_ru = 2;
+  string name_en = 3;
+  DnsCategory category = 4;
+  // Plain DNS addresses, primary first. For a variant with plain = false they only bootstrap DoT/DoH.
+  repeated string ipv4 = 5;
+  repeated string ipv6 = 6;
+  // Whether the addresses answer plain DNS (Mullvad's do not).
+  bool plain = 7;
+  // DoT host name and port; empty host = no DoT endpoint known.
+  string dot_host = 8;
+  uint32 dot_port = 9;
+  // DoH URL; empty = none known.
+  string doh_url = 10;
+  string note_ru = 11;
+  string note_en = 12;
+}
+
+message DnsProvider {
+  // "cloudflare".
+  string id = 1;
+  string name = 2;
+  repeated DnsProviderVariant variants = 3;
+}
+
+// Which transports an app can carry in what a subscription hands it.
+message ClientDnsSupport {
+  DnsClient client = 1;
+  repeated DnsTransport transports = 2;
+  // IPv6 resolver addresses are usable (Amnezia keys and Happ take IPv4 only).
+  bool ipv6 = 3;
+}
+
+// Domains ending in one of the suffixes resolve through these servers instead of the preset's main ones.
+message DnsSplitRule {
+  // ".ru", "gosuslugi.ru", ".рф" (IDN is normalised to punycode by the server).
+  repeated string suffixes = 1;
+  repeated DnsServer servers = 2;
+}
+
+message DnsPreset {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  bool builtin = 4;
+  // Main resolvers, in order of preference.
+  repeated DnsServer servers = 5;
+  repeated DnsSplitRule split = 6;
+  // Resolve A records only (useful where IPv6 inside the tunnel is broken).
+  bool ipv4_only = 7;
+  // Users whose effective preset this is (direct, via group, or via the default).
+  uint32 user_count = 8;
+  bool is_default = 9;
+  // Domains of the split rules bypass the VPN (Happ can only send a split resolver's domains direct). Off = the
+  // split is ignored by clients that cannot keep it proxied; everything resolves through the main servers
+  // inside the tunnel.
+  bool split_direct = 10;
+  // The transport every app gets if it can carry it (catalog servers only; custom addresses keep their own kind).
+  DnsTransport preferred_transport = 11;
+  // Computed, see DnsCategory.
+  DnsCategory category = 12;
+}
+
+message ListDnsPresetsRequest {}
+
+message ListDnsPresetsResponse {
+  // Built-ins first, then custom presets by name.
+  repeated DnsPreset presets = 1;
+  // The built-in provider catalog (it changes with panel releases), grouped by provider.
+  repeated DnsProvider providers = 2;
+  // What each app can carry, in display order.
+  repeated ClientDnsSupport client_support = 3;
+}
+
+message CreateDnsPresetRequest {
+  string name = 1;
+  string description = 2;
+  repeated DnsServer servers = 3;
+  repeated DnsSplitRule split = 4;
+  bool ipv4_only = 5;
+  // Domains of the split rules bypass the VPN (Happ can only send a split resolver's domains direct). Off = the
+  // split is ignored by clients that cannot keep it proxied; everything resolves through the main servers
+  // inside the tunnel.
+  bool split_direct = 6;
+  // UNSPECIFIED = plain.
+  DnsTransport preferred_transport = 7;
+}
+
+message CreateDnsPresetResponse {
+  DnsPreset preset = 1;
+}
+
+message UpdateDnsPresetRequest {
+  // Replaces every field except id and builtin.
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated DnsServer servers = 4;
+  repeated DnsSplitRule split = 5;
+  bool ipv4_only = 6;
+  // Domains of the split rules bypass the VPN (Happ can only send a split resolver's domains direct). Off = the
+  // split is ignored by clients that cannot keep it proxied; everything resolves through the main servers
+  // inside the tunnel.
+  bool split_direct = 7;
+  // UNSPECIFIED keeps the stored value (clients that predate this field).
+  DnsTransport preferred_transport = 8;
+}
+
+message UpdateDnsPresetResponse {
+  DnsPreset preset = 1;
+}
+
+message DeleteDnsPresetRequest {
+  string id = 1;
+}
+
+message DeleteDnsPresetResponse {}

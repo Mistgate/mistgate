@@ -1,0 +1,361 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Users screen, create-user modal, user detail. Product rules:
+//  - Every user gets BOTH apps by default. Two toggles (Happ, Amnezia), at least one on.
+//  - Node selection per user: all nodes (automatic, includes nodes added later) or an explicit list.
+//  - Group, quota (+ reset period), term, device limit, optional speed limit.
+//  - "Via" = the apps the user really used recently (derived from traffic/sessions of the last 7 days),
+//    independent of the toggles.
+//
+// EFFECTIVE ACCESS (what the panel turns into desired state for a node):
+//   for every inbound I (profile P on node N) and every non-revoked device credential C of user U:
+//     U.status == ACTIVE  AND  P in U.group.profiles  AND  (U.all_nodes OR N in U.nodes)
+//     AND  some enabled app of U consumes P.protocol (Protocol.Clients)  AND  I is enabled  ->  C goes to N.
+//   Changing any of these changes desired state and is pushed to the nodes at once.
+//
+// STATUS (precedence disabled > expired > limited > active; maintained by the access module):
+//   DISABLED  admin switch. EXPIRED  expires_at passed. LIMITED  used_bytes >= quota_bytes.
+//   "Devices full" in the UI is not a status; it is devices_used >= device_limit.
+service UserService {
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  // Returns the subscription link too (the UI copies it straight away).
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  // Bulk bar and single actions share these two. Each returns the updated users.
+  rpc SetUsersEnabled(SetUsersEnabledRequest) returns (SetUsersEnabledResponse);
+  // New expiry = max(now, current expiry) + days. Also lifts EXPIRED.
+  rpc ExtendUsers(ExtendUsersRequest) returns (ExtendUsersResponse);
+  // Zeroes the traffic counter of the current quota period (used_bytes). The period and its end stay, history
+  // (daily and per-node traffic) is kept, and LIMITED is lifted when the quota was the only reason. Audited.
+  rpc ResetUserTraffic(ResetUserTrafficRequest) returns (ResetUserTrafficResponse);
+  // Removes one device: its credentials are revoked and dropped from every node, sessions are kicked.
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  // Deletes users for good: credentials are dropped from every node, sessions kicked, the link dies.
+  // Their per-user traffic history goes too; node-level totals stay. The UI asks for the name first.
+  rpc DeleteUsers(DeleteUsersRequest) returns (DeleteUsersResponse);
+  // "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
+  rpc GetSubscriptionLink(GetSubscriptionLinkRequest) returns (GetSubscriptionLinkResponse);
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_DISABLED = 2;
+  USER_STATUS_EXPIRED = 3;
+  // Quota used up.
+  USER_STATUS_LIMITED = 4;
+}
+
+enum QuotaReset {
+  QUOTA_RESET_UNSPECIFIED = 0;
+  QUOTA_RESET_NONE = 1;
+  QUOTA_RESET_DAY = 2;
+  QUOTA_RESET_WEEK = 3;
+  // 1st of the month, UTC.
+  QUOTA_RESET_MONTH = 4;
+  // 30 days after the previous reset.
+  QUOTA_RESET_ROLLING_MONTH = 5;
+}
+
+enum UserFilter {
+  // "All".
+  USER_FILTER_UNSPECIFIED = 0;
+  USER_FILTER_ONLINE = 1;
+  // expires within 7 days and not disabled ("Expiring <= 7 d").
+  USER_FILTER_EXPIRING = 2;
+  // used_bytes > quota_bytes ("Over quota").
+  USER_FILTER_OVER_QUOTA = 3;
+}
+
+message AppToggles {
+  bool happ = 1;
+  bool amnezia = 2;
+}
+
+message NodeSelection {
+  // true: every node, including future ones ("new nodes are added automatically"). node_ids is ignored.
+  bool all = 1;
+  repeated string node_ids = 2;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string group_id = 3;
+  string group_name = 4;
+  UserStatus status = 5;
+  AppToggles apps = 6;
+  // Apps actually used in the last 7 days. Empty = never connected. Both = "Both".
+  repeated App via = 7;
+  // Non-revoked devices / limit ("3/5").
+  uint32 devices_used = 8;
+  uint32 device_limit = 9;
+  // Traffic (up + down) in the current quota period.
+  uint64 used_bytes = 10 [jstype = JS_NUMBER];
+  // 0 = unlimited.
+  uint64 quota_bytes = 11 [jstype = JS_NUMBER];
+  QuotaReset quota_reset = 12;
+  // Next reset; 0 when quota_reset is NONE.
+  int64 next_reset_unix = 13 [jstype = JS_NUMBER];
+  // 0 = never expires.
+  int64 expires_unix = 14 [jstype = JS_NUMBER];
+  // Last time any session of this user was seen; 0 = never.
+  int64 last_seen_unix = 15 [jstype = JS_NUMBER];
+  bool online = 16;
+  // Node of the newest open session; empty when offline.
+  string current_node_id = 17;
+  string current_node_name = 18;
+  // 0 = no limit. Experimental: token bucket in the Hysteria traffic callback.
+  uint64 speed_limit_bps = 19 [jstype = JS_NUMBER];
+  NodeSelection nodes = 20;
+  int64 created_unix = 21 [jstype = JS_NUMBER];
+  // DNS preset set on the user; empty = inherited (group, then the instance default).
+  string dns_preset_id = 22;
+  // The preset that applies (own, group or default) and where it comes from.
+  string effective_dns_preset_id = 23;
+  string effective_dns_preset_name = 24;
+  DnsSource dns_source = 25;
+  // What the user's page offers, by app, as the subscription decides it: the app is switched on and the group gives
+  // it something on a node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
+  // the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
+  bool access_happ = 26;
+  bool access_amnezia = 27;
+}
+
+enum DnsSource {
+  DNS_SOURCE_UNSPECIFIED = 0;
+  DNS_SOURCE_USER = 1;
+  DNS_SOURCE_GROUP = 2;
+  DNS_SOURCE_DEFAULT = 3;
+}
+
+message ListUsersRequest {
+  UserFilter filter = 1;
+  // Case-insensitive substring of name or group name.
+  string query = 2;
+  string group_id = 3;
+  // Default 50, max 200. Order: name, then id (keyset pagination, stable under inserts).
+  uint32 page_size = 4;
+  string page_token = 5;
+}
+
+// Badge numbers on the filter chips; computed for the same query and group_id, ignoring `filter`.
+message UserCounts {
+  uint32 all = 1;
+  uint32 online = 2;
+  uint32 expiring = 3;
+  uint32 over_quota = 4;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  // Empty on the last page.
+  string next_page_token = 2;
+  UserCounts counts = 3;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message Device {
+  string id = 1;
+  // "ios", "android", "windows", "macos", "linux", "other".
+  string platform = 2;
+  string model = 3;
+  int64 first_seen_unix = 4 [jstype = JS_NUMBER];
+  int64 last_seen_unix = 5 [jstype = JS_NUMBER];
+  bool online = 6;
+  // Protocols this device holds credentials for ("hysteria2").
+  repeated string protocols = 7;
+  // AmneziaWG devices (DeviceService.CreateAwgDevice): one device = one peer bound to ONE profile. Empty /
+  // zero for every other device. `model` carries the device label.
+  string awg_profile_id = 8;
+  string awg_profile_name = 9;
+  // "3.1" | "2.0".
+  string awg_version = 10;
+  // The profile changed in a way that breaks the issued config (x-critical): the user must fetch a new one.
+  bool stale = 11;
+  // The peer's tunnel address(es), "10.66.4.5, fd66:66:0:1::5".
+  string address = 12;
+  // Last handshake of the peer on any node; 0 = never connected.
+  int64 last_handshake_unix = 13 [jstype = JS_NUMBER];
+}
+
+message DayTraffic {
+  // 00:00 UTC of the day.
+  int64 day_unix = 1 [jstype = JS_NUMBER];
+  uint64 bytes = 2 [jstype = JS_NUMBER];
+}
+
+message NodeTraffic {
+  string node_id = 1;
+  string node_name = 2;
+  string protocol = 3;
+  // In the current quota period.
+  uint64 bytes = 4 [jstype = JS_NUMBER];
+}
+
+// One row of the Access section: a node and what this user could use there.
+message NodeAccess {
+  string node_id = 1;
+  string node_name = 2;
+  string country_code = 3;
+  string location = 4;
+  string provider = 5;
+  // Protocols deployed on that node that the user's group and app toggles allow (empty = nothing usable
+  // there; the UI greys it out).
+  repeated string protocols = 6;
+  // Protocols deployed on the node at all, for the "Hysteria2 only" note.
+  repeated string node_protocols = 7;
+  // Whether the node is part of the user's selection (true for every node when nodes.all).
+  bool selected = 8;
+}
+
+message ProfileRef {
+  string id = 1;
+  string name = 2;
+  string protocol = 3;
+}
+
+message GetUserResponse {
+  User user = 1;
+  // Non-revoked devices.
+  repeated Device devices = 2;
+  // Last 14 days, oldest first, zero days included.
+  repeated DayTraffic daily_traffic = 3;
+  repeated NodeTraffic node_traffic = 4;
+  // Profiles that come from the group (chips in Access).
+  repeated ProfileRef profiles = 5;
+  repeated NodeAccess node_access = 6;
+  // History comes from FleetService.ListEvents(user_id).
+}
+
+message CreateUserRequest {
+  // Required, unique case-insensitively.
+  string name = 1;
+  string group_id = 2;
+  // 0 = unlimited.
+  uint64 quota_bytes = 3 [jstype = JS_NUMBER];
+  // Unspecified = MONTH.
+  QuotaReset quota_reset = 4;
+  // Term from now. 0 = never expires.
+  uint32 term_days = 5;
+  // 0 = default 5.
+  uint32 device_limit = 6;
+  // Absent = both on. At least one must be on.
+  AppToggles apps = 7;
+  // Absent = all nodes.
+  NodeSelection nodes = 8;
+  uint64 speed_limit_bps = 9 [jstype = JS_NUMBER];
+  // Empty = inherit (group, then the instance default).
+  string dns_preset_id = 10;
+}
+
+message CreateUserResponse {
+  User user = 1;
+  string subscription_url = 2;
+  // The page password (xxxx-xxxx) of the new link; empty when the instance does not ask for one.
+  string page_password = 3;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  optional string name = 2;
+  optional string group_id = 3;
+  optional uint64 quota_bytes = 4 [jstype = JS_NUMBER];
+  optional QuotaReset quota_reset = 5;
+  // 0 = never. Setting a future date lifts EXPIRED.
+  optional int64 expires_unix = 6 [jstype = JS_NUMBER];
+  optional uint32 device_limit = 7;
+  optional AppToggles apps = 8;
+  optional NodeSelection nodes = 9;
+  // 0 = remove the limit.
+  optional uint64 speed_limit_bps = 10 [jstype = JS_NUMBER];
+  // "" = inherit.
+  optional string dns_preset_id = 11;
+  // Check the change and say what it does (UpdateUserResponse.impact); nothing is written, the nodes hear nothing.
+  bool dry_run = 12;
+}
+
+message UpdateUserResponse {
+  // The user after the update; with dry_run, as it is now.
+  User user = 1;
+  // What a new group does to the user's profiles; unset when the group stays.
+  AccessImpact impact = 2;
+}
+
+// What a change of group (a user's, or a group's profile set) does to access: the profiles the people lose and gain.
+// An AmneziaVPN key belongs to one profile, so the keys of a lost profile stop working.
+message AccessImpact {
+  repeated ImpactProfile lost = 1;
+  repeated ImpactProfile gained = 2;
+  // People touched: the user, or the group's users.
+  uint32 users = 3;
+}
+
+message ImpactProfile {
+  string id = 1;
+  string name = 2;
+  string protocol = 3;
+  // Live AmneziaVPN keys (AWG devices) of the touched people bound to this profile.
+  uint32 awg_devices = 4;
+}
+
+message SetUsersEnabledRequest {
+  repeated string user_ids = 1;
+  bool enabled = 2;
+}
+
+message SetUsersEnabledResponse {
+  repeated User users = 1;
+}
+
+message ExtendUsersRequest {
+  repeated string user_ids = 1;
+  uint32 days = 2;
+}
+
+message ExtendUsersResponse {
+  repeated User users = 1;
+}
+
+message ResetUserTrafficRequest {
+  repeated string user_ids = 1;
+}
+
+message ResetUserTrafficResponse {
+  repeated User users = 1;
+}
+
+message RevokeDeviceRequest {
+  string device_id = 1;
+}
+
+message RevokeDeviceResponse {
+  User user = 1;
+}
+
+message DeleteUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message DeleteUsersResponse {}
+
+message GetSubscriptionLinkRequest {
+  string user_id = 1;
+  bool rotate = 2;
+}
+
+message GetSubscriptionLinkResponse {
+  // https://<subscription domain>/<secret prefix>/<token>. The token is shown only here and to the user.
+  string url = 1;
+  // The password of the user's page for this link (xxxx-xxxx), derived from the token: a new link is a new password.
+  // Empty when the instance does not ask for one. Like the link, never shown to agents.
+  string page_password = 2;
+}

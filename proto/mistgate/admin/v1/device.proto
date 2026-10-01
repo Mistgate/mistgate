@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/user.proto";
+
+// Devices that hold their own keys: AmneziaWG. A Happ/Hysteria2 device needs no call here: it appears
+// by itself when the client fetches the subscription.
+//
+// MODEL. One AWG device = one WireGuard peer of ONE profile (a person who needs both AWG 3.1 and 2.0 has two
+// devices). One key pair and one tunnel address per (device, profile); the config differs between the nodes
+// that run the profile only by Endpoint and the server public key. The user's device limit counts devices
+// that hold at least one live credential.
+//
+// SECRETS. GetDeviceConfigs, CreateAwgDevice and RotateDeviceKeys return PRIVATE KEYS. They need write
+// access (owner or helper), write an audit row that names the action and the device but carries no key, and
+// are never part of a bot or MCP scope. The panel never logs a config.
+//
+// ERRORS. FAILED_PRECONDITION with a short code in the message: device_limit ("5/5"), user_disabled,
+// app_disabled (the user's Amnezia toggle is off), profile_not_in_group, no_inbound (no enabled inbound of the
+// profile on a node the user may use), subnet_full, "agent too old" (every node of the profile lacks "awg/1").
+service DeviceService {
+  // Creates the device, its key pair and its tunnel address, and returns the configs for every usable node.
+  rpc CreateAwgDevice(CreateAwgDeviceRequest) returns (CreateAwgDeviceResponse);
+  // The configs of an existing device. Marks the device as having received the current profile epoch (the
+  // "needs a new key" badge goes away).
+  rpc GetDeviceConfigs(GetDeviceConfigsRequest) returns (GetDeviceConfigsResponse);
+  // New key pair for the same device and the same tunnel address. The old key stops working at once.
+  rpc RotateDeviceKeys(RotateDeviceKeysRequest) returns (RotateDeviceKeysResponse);
+  // Changes the label only (Device.model).
+  rpc RenameDevice(RenameDeviceRequest) returns (RenameDeviceResponse);
+}
+
+message CreateAwgDeviceRequest {
+  string user_id = 1;
+  // Required; an AWG profile that is in the user's group.
+  string profile_id = 2;
+  // "ios", "android", "windows", "macos", "linux", "other".
+  string platform = 3;
+  // 1..40 characters; empty = "<platform> <n>".
+  string label = 4;
+}
+
+message CreateAwgDeviceResponse {
+  Device device = 1;
+  repeated DeviceConfig configs = 2;
+  // The user after the change (devices_used).
+  User user = 3;
+}
+
+message GetDeviceConfigsRequest {
+  string device_id = 1;
+}
+
+message GetDeviceConfigsResponse {
+  Device device = 1;
+  repeated DeviceConfig configs = 2;
+}
+
+message RotateDeviceKeysRequest {
+  string device_id = 1;
+}
+
+message RotateDeviceKeysResponse {
+  Device device = 1;
+  repeated DeviceConfig configs = 2;
+}
+
+message RenameDeviceRequest {
+  string device_id = 1;
+  string label = 2;
+}
+
+message RenameDeviceResponse {
+  Device device = 1;
+}
+
+// One config of a device on one node. The QR code is rendered by the SPA from `conf`.
+message DeviceConfig {
+  string inbound_id = 1;
+  string node_id = 2;
+  string node_name = 3;
+  string country_code = 4;
+  string profile_name = 5;
+  // "3.1" | "2.0".
+  string awg_version = 6;
+  // WireGuard-style .conf: imports into AmneziaWG and AmneziaVPN; one QR code covers both.
+  string conf = 7;
+  // The vpn:// key for pasting into AmneziaVPN.
+  string vpn_key = 8;
+  // The device is behind the profile's current epoch: this config replaces the one it holds.
+  bool stale = 9;
+  // Shown next to the config: an older client drops unknown keys silently.
+  repeated ClientRequirement min_clients = 10;
+  // Stable codes the UI localises: amnezia_desktop_mtu, dns_no_split, dns_fallback, ...
+  repeated string warnings = 11;
+  // File name for "Download .conf", already safe ("de1-31.conf"); never derived from raw user input.
+  string conf_filename = 12;
+}
+
+message ClientRequirement {
+  // "AmneziaVPN", "AmneziaWG Android", "Mihomo".
+  string app = 1;
+  // Release tag or version: "5.0.1.5".
+  string min_version = 2;
+}

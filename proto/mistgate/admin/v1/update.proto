@@ -1,0 +1,301 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Updates screen: the release bundle the panel holds, what every node runs, and the
+// staged rollout of the node agent (canary, then batches, gate per node, automatic rollback of a failed node).
+// Conventions: common.proto. The panel itself is not updated from here: the page shows the
+// CLI steps instead.
+//
+// Roles (internal/panel/auth/policy.go): GetUpdates is open to every role; every other procedure needs the owner
+// AND a fresh step-up (the handler calls auth.Service.RequireStepUp, like the passkey and session changes): they
+// decide what code runs as root on every node.
+//
+// I18N like health.proto: the server sends keys + params, never prose. Keys: bundle errors
+// "updates.bundle.err.<code>", rollout pause reasons "updates.pause.<code>", step errors "updates.step.err.<code>",
+// last-update reasons "updates.last.reason.<code>" (the agent's LastUpdate.reason, a key suffix; a value the SPA
+// does not know is shown as is).
+//
+// Errors: FAILED_PRECONDITION with a short message for "no trusted bundle", "no release key in this build",
+// "a rollout is already active", "no node to update", "rollout is not paused/active", "node cannot update itself";
+// NOT_FOUND for an unknown node or rollout; INVALID_ARGUMENT for a bad batch_size.
+service UpdateService {
+  // The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
+  // contacts a node and never rescans the bundle directory (RescanBundle does).
+  rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
+  // Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
+  // that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
+  // steps. Only one rollout is active (RUNNING or PAUSED) at a time. Audited.
+  rpc StartRollout(StartRolloutRequest) returns (StartRolloutResponse);
+  // Stop launching new steps; a step already sent finishes (and is gated) normally. A failed gate pauses by itself.
+  rpc PauseRollout(PauseRolloutRequest) returns (PauseRolloutResponse);
+  // Continue a PAUSED rollout: steps that FAILED or were ROLLED_BACK stay as they are (retry them with a new
+  // rollout), the remaining PENDING ones go on.
+  rpc ResumeRollout(ResumeRolloutRequest) returns (ResumeRolloutResponse);
+  // End the rollout: PENDING steps become SKIPPED; a step that is in flight finishes and is gated but nothing new
+  // starts. The nodes already updated stay updated.
+  rpc CancelRollout(CancelRolloutRequest) returns (CancelRolloutResponse);
+  // Send RollbackAgent to one node (the .prev binary comes back, the agent re-executes). Works outside a rollout.
+  rpc RollbackNode(RollbackNodeRequest) returns (RollbackNodeResponse);
+  // Re-read <data-dir>/dist now (the panel also notices a changed manifest by itself, within a minute).
+  rpc RescanBundle(RescanBundleRequest) returns (RescanBundleResponse);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// This panel and the bundle
+
+message PanelBuild {
+  string version = 1;
+  // buildinfo.Built: Unix time of the commit, 0 when the binary was built without it.
+  int64 built = 2 [jstype = JS_NUMBER];
+  // False: this build has no release key compiled in, so it cannot judge a bundle and will not start a rollout.
+  bool has_release_key = 3;
+  // First 16 hex characters of SHA-256 of the compiled-in public key, to compare with what the owner printed at
+  // `mistgate release keygen`. Empty without a key.
+  string release_key_fingerprint = 4;
+}
+
+enum BundleStatus {
+  BUNDLE_STATUS_UNSPECIFIED = 0;
+  // <data-dir>/dist has no manifest.json (or no directory).
+  BUNDLE_STATUS_MISSING = 1;
+  // The signature verifies under this panel's release key, the manifest is valid and every listed file is
+  // present with the right size and SHA-256. Only a TRUSTED bundle can be rolled out.
+  BUNDLE_STATUS_TRUSTED = 2;
+  // Anything else that makes it unusable: bad signature, unreadable manifest, missing or altered file, expired.
+  // `error_key` says which.
+  BUNDLE_STATUS_UNTRUSTED = 3;
+  // This panel build has no release key, so the bundle cannot be judged here (nodes judge it themselves).
+  BUNDLE_STATUS_NO_KEY = 4;
+}
+
+message BundleFile {
+  string os = 1;
+  string arch = 2;
+  string name = 3;
+  uint64 size = 4 [jstype = JS_NUMBER];
+  // Lowercase hex.
+  string sha256 = 5;
+}
+
+// The release bundle read from <data-dir>/dist.
+message Bundle {
+  BundleStatus status = 1;
+  // From manifest.json; empty / 0 when it could not be parsed.
+  string version = 2;
+  int64 built = 3 [jstype = JS_NUMBER];
+  int64 expires_unix = 4 [jstype = JS_NUMBER];
+  repeated BundleFile files = 5;
+  // Set for MISSING and UNTRUSTED. Codes: no_manifest, no_signature, bad_manifest, bad_signature, file_missing,
+  // file_mismatch, expired, unsupported_schema.
+  string error_key = 6;
+  // {file: name} for file_missing / file_mismatch.
+  map<string, string> params = 7;
+  // When the directory was last read.
+  int64 scanned_unix = 8 [jstype = JS_NUMBER];
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Nodes
+
+enum NodeUpdateState {
+  NODE_UPDATE_STATE_UNSPECIFIED = 0;
+  // built >= the reference built: the trusted bundle's, and without a trusted bundle the panel's own
+  // (PanelBuild.built), so the page is useful before a bundle exists.
+  NODE_UPDATE_STATE_UP_TO_DATE = 1;
+  // Can update and its built is lower than the reference built.
+  NODE_UPDATE_STATE_OUTDATED = 2;
+  // A rollout step of this node is in flight (command sent, reconnect or gate pending).
+  NODE_UPDATE_STATE_UPDATING = 3;
+  // Its last update ended in a rollback (by the agent or by the gate); it runs the previous build.
+  NODE_UPDATE_STATE_ROLLED_BACK = 4;
+  // Its last update failed on the agent without a rollback record (see LastUpdate FAILED).
+  NODE_UPDATE_STATE_FAILED = 5;
+  // No "update/1" capability: an old agent, or a build without a release key, or a read-only install. Update
+  // by hand once (`mistgate-node install` with the new binary).
+  NODE_UPDATE_STATE_UNSUPPORTED = 6;
+  // No agent stream now. The last known build is shown.
+  NODE_UPDATE_STATE_OFFLINE = 7;
+}
+
+// What the node reported in Hello.last_update. outcome is the agent.proto UpdateOutcome name in lowercase:
+// "ok", "rolled_back", "failed".
+message LastUpdate {
+  string outcome = 1;
+  string from_version = 2;
+  int64 from_built = 3 [jstype = JS_NUMBER];
+  string to_version = 4;
+  int64 to_built = 5 [jstype = JS_NUMBER];
+  // The agent's reason code, or the gate's ("gate_probe_failed", ...), see the service comment. An agent says "manual"
+  // for any RollbackAgent it got; GetUpdates names the sender from the panel's records: "gate_<step error code>" when
+  // the rollout's gate rolled the node back, "manual" only when the owner did (audit update_rollback_node), else
+  // "command".
+  string reason = 6;
+  int64 at_unix = 7 [jstype = JS_NUMBER];
+}
+
+message NodeUpdate {
+  string node_id = 1;
+  string name = 2;
+  // Last Hello of the node (kept while it is offline).
+  string version = 3;
+  int64 built = 4 [jstype = JS_NUMBER];
+  // "update/1" was in the last Hello.
+  bool supports_update = 5;
+  // "update-guard/1" was in the last Hello: the unit restores the previous binary after a crash loop. False on a
+  // node that supports updates: the UI warns that only the 5-minute self-rollback protects it.
+  bool crash_guard = 6;
+  NodeUpdateState state = 7;
+  // Unset when the node never had an update.
+  LastUpdate last_update = 8;
+  // Live inbound count, for the canary choice and the gate; the UI shows it next to the name.
+  uint32 inbounds = 9;
+  uint32 online_users = 10;
+  // The node's public address and its CPU architecture from the last Hello facts ("amd64", "arm64"; empty when
+  // unknown): the UI builds the manual update commands of an UNSUPPORTED node from them.
+  string address = 11;
+  string arch = 12;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Rollout
+
+enum RolloutStatus {
+  ROLLOUT_STATUS_UNSPECIFIED = 0;
+  ROLLOUT_STATUS_RUNNING = 1;
+  // Paused by the owner or by a failed gate (`pause_key`).
+  ROLLOUT_STATUS_PAUSED = 2;
+  // Every step is decided and none failed.
+  ROLLOUT_STATUS_DONE = 3;
+  ROLLOUT_STATUS_CANCELLED = 4;
+  // Finished with at least one FAILED or ROLLED_BACK step (the owner chose not to resume, or cancelled).
+  ROLLOUT_STATUS_FAILED = 5;
+}
+
+enum StepState {
+  STEP_STATE_UNSPECIFIED = 0;
+  // Waiting for its turn (canary first, then batches).
+  STEP_STATE_PENDING = 1;
+  // UpdateAgent sent; waiting for the agent's answer and its reconnect.
+  STEP_STATE_SENT = 2;
+  // The node reconnected with the target built; the gate (5 minutes) is running.
+  STEP_STATE_GATING = 3;
+  // Gate passed.
+  STEP_STATE_PASSED = 4;
+  // Sent but the node rejected the update (error codes of agent.proto UPDATE), or it never came back in time and
+  // nothing could be done. The node still runs the old build unless rolled back by the agent itself.
+  STEP_STATE_FAILED = 5;
+  // The node came back but failed the gate (or rolled itself back) and RollbackAgent was sent / confirmed.
+  STEP_STATE_ROLLED_BACK = 6;
+  // Not attempted: rollout cancelled, node already up to date, offline when its turn came, or unsupported.
+  STEP_STATE_SKIPPED = 7;
+}
+
+message RolloutStep {
+  string node_id = 1;
+  string node_name = 2;
+  // 0 = canary, 1.. = batches in order.
+  uint32 stage = 3;
+  StepState state = 4;
+  string from_version = 5;
+  int64 from_built = 6 [jstype = JS_NUMBER];
+  int64 started_unix = 7 [jstype = JS_NUMBER];
+  int64 finished_unix = 8 [jstype = JS_NUMBER];
+  // "updates.step.err.<error_key>" for FAILED / ROLLED_BACK / SKIPPED. Codes: the agent's (bad_signature, expired,
+  // download_failed, ...), and the gate's: not_reconnected, state_not_applied, inbound_failed, probe_failed,
+  // rolled_back_by_agent, no_answer, offline, unsupported, up_to_date, cancelled.
+  string error_key = 9;
+  map<string, string> params = 10;
+}
+
+message Rollout {
+  // "rol_..." opaque.
+  string id = 1;
+  RolloutStatus status = 2;
+  // The bundle the rollout ships (copied at start; a later bundle change does not affect it).
+  string to_version = 3;
+  int64 to_built = 4 [jstype = JS_NUMBER];
+  uint32 batch_size = 5;
+  int64 created_unix = 6 [jstype = JS_NUMBER];
+  // 0 while RUNNING or PAUSED.
+  int64 finished_unix = 7 [jstype = JS_NUMBER];
+  // Set while PAUSED: "updates.pause.<code>". Codes: owner; step_failed (a node rejected the update, agent error
+  // code in pause_params.reason); gate_failed (a node came back but failed the gate, or never came back);
+  // bundle_changed (the bundle directory now holds another release than the one being rolled out: cancel and
+  // start again); panel_restart_ambiguous (the panel restarted while a step was in flight and the node had not
+  // reported by its deadline: check the node).
+  string pause_key = 8;
+  // {node: name, reason: step error code} for gate_failed / step_failed.
+  map<string, string> pause_params = 9;
+  repeated RolloutStep steps = 10;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Requests
+
+message GetUpdatesRequest {}
+
+message GetUpdatesResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  PanelBuild panel = 2;
+  Bundle bundle = 3;
+  repeated NodeUpdate nodes = 4;
+  // The active rollout, else the most recent finished one, else unset.
+  Rollout rollout = 5;
+  // Where the panel reads the bundle on its own server (<data-dir>/dist, absolute): the source of the scp line of a
+  // manual update. Empty when the panel has no data directory.
+  string dist_dir = 6;
+}
+
+message StartRolloutRequest {
+  // Empty = every OUTDATED node.
+  repeated string node_ids = 1;
+  // Nodes updated at the same time after the canary. 0 = default: 1 while the fleet has fewer than 5 nodes to
+  // update, else 2. Maximum 10. The canary is always one node.
+  uint32 batch_size = 2;
+}
+
+message StartRolloutResponse {
+  Rollout rollout = 1;
+}
+
+message PauseRolloutRequest {
+  string rollout_id = 1;
+}
+
+message PauseRolloutResponse {
+  Rollout rollout = 1;
+}
+
+message ResumeRolloutRequest {
+  string rollout_id = 1;
+}
+
+message ResumeRolloutResponse {
+  Rollout rollout = 1;
+}
+
+message CancelRolloutRequest {
+  string rollout_id = 1;
+}
+
+message CancelRolloutResponse {
+  Rollout rollout = 1;
+}
+
+message RollbackNodeRequest {
+  string node_id = 1;
+}
+
+message RollbackNodeResponse {
+  // The node as it is when the agent answered (the re-execution follows; its state turns to ROLLED_BACK
+  // after it reconnects). FAILED_PRECONDITION with the agent's error code in the message when it refused
+  // ("no_previous").
+  NodeUpdate node = 1;
+}
+
+message RescanBundleRequest {}
+
+message RescanBundleResponse {
+  Bundle bundle = 1;
+}

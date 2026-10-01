@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// SubscriptionService configures what subscriptions look like: names and texts, which app the public user
+// page recommends on each platform, how server names are rendered, and which format a client gets.
+// Settings apply at request time (no restart); the subscription handler reads them on every fetch
+// through a small in-memory cache that UpdateSubscriptionSettings invalidates.
+service SubscriptionService {
+  rpc GetSubscriptionSettings(GetSubscriptionSettingsRequest) returns (GetSubscriptionSettingsResponse);
+  rpc UpdateSubscriptionSettings(UpdateSubscriptionSettingsRequest) returns (UpdateSubscriptionSettingsResponse);
+  // "Formats & clients" tab: which client apps the registered protocol plugins support.
+  rpc ListClients(ListClientsRequest) returns (ListClientsResponse);
+  // "Serving rules" tab: which rule and format a sample User-Agent gets.
+  rpc TestUserAgent(TestUserAgentRequest) returns (TestUserAgentResponse);
+}
+
+message SubscriptionSettings {
+  // Subscription name shown in apps (profile-title). Empty = the instance brand.
+  string title = 1;
+  // Announcement shown in apps (announce header) and on the user page. Empty = none.
+  string announcement = 2;
+  // Support link (support-url header, "Message support" on the user page). Empty = none.
+  string support_url = 3;
+  // Hours between app refreshes (profile-update-interval). 0 = 12.
+  uint32 update_interval_hours = 4;
+  // Server name template. Placeholders: {flag} (emoji from the node country), {country} (localised
+  // country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country}". When servers
+  // of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany 2").
+  string server_name_template = 5;
+  // What the user page recommends, per platform and access kind. Order = display order.
+  repeated PlatformApp apps = 6;
+  UserPageOptions user_page = 7;
+  // Tried in order; the first match wins. No match: a browser-like User-Agent gets the user page,
+  // anything else gets SUB_FORMAT_BASE64_URIS.
+  repeated ServeRule rules = 8;
+  // DNS preset for users and groups that have none of their own (DnsService). Empty = the built-in default.
+  string default_dns_preset_id = 9;
+}
+
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_IOS = 1;
+  PLATFORM_ANDROID = 2;
+  PLATFORM_WINDOWS = 3;
+  PLATFORM_MACOS = 4;
+  PLATFORM_LINUX = 5;
+}
+
+// One app the user page recommends: e.g. iOS + APP_HAPP -> "Happ" (App Store link, happ://add/{url}),
+// Windows + APP_HAPP -> an instance's own desktop client, any platform + APP_AMNEZIA -> AmneziaVPN.
+message PlatformApp {
+  Platform platform = 1;
+  // APP_HAPP = apps that take the subscription link ("by subscription link" in the admin UI); APP_AMNEZIA = apps that take
+  // per-device AWG keys ("AmneziaWG key"). The enum names are kept for compatibility.
+  App kind = 2;
+  string name = 3;
+  string download_url = 4;
+  // One-tap "add" link. Placeholders: {url} (subscription URL as is), {url_enc} (URL-encoded),
+  // {name_enc} (URL-encoded subscription title). Empty = the page offers "copy the link" instead.
+  string add_link_template = 5;
+  // One plain-text line on the app's card of the public page ("what you get"); at most 80 characters. Empty = none.
+  string description = 6;
+  // Marks the app with a "recommended" badge on the card. Several apps may share a platform and a kind.
+  bool recommended = 7;
+}
+
+message UserPageOptions {
+  bool show_announcement = 1;
+  bool show_support = 2;
+  bool show_qr = 3;
+  // Users may add, rotate and revoke their own AmneziaWG devices on the public page (limited by the user's
+  // device limit, a per-token write counter and the token itself). Absent = true: settings stored before AmneziaWG
+  // support have no such key and must not silently turn the feature off.
+  optional bool allow_device_self_service = 4;
+  // The user's page asks for a password (shown to the admin next to the link) before it shows anything or answers a
+  // self-service call. The subscription itself, which apps fetch from the same address, is never gated. Absent = true:
+  // settings stored before this key existed turn it on, which is the default.
+  optional bool require_page_password = 5;
+}
+
+enum SubFormat {
+  SUB_FORMAT_UNSPECIFIED = 0;
+  // base64 list of share links (hysteria2://…): Happ, v2rayNG, mihomo-based desktop clients, …
+  SUB_FORMAT_BASE64_URIS = 1;
+  // The public HTML user page (browsers).
+  SUB_FORMAT_USER_PAGE = 2;
+  // Pretend the link does not exist (the decoy 404).
+  SUB_FORMAT_DECOY = 3;
+  // Mihomo / Clash Meta YAML with every protocol the user has.
+  SUB_FORMAT_MIHOMO_YAML = 4;
+}
+
+message ServeRule {
+  // Case-insensitive substring of the User-Agent, e.g. "mihomo", "happ", "curl".
+  string ua_contains = 1;
+  SubFormat format = 2;
+}
+
+message GetSubscriptionSettingsRequest {}
+
+message GetSubscriptionSettingsResponse {
+  SubscriptionSettings settings = 1;
+  // The effective subscription title (settings.title or the brand), for placeholders in the UI.
+  string effective_title = 2;
+  // What a person of the group most people are in gets in Happ right now, in subscription order: the preview of the
+  // server names draws these. Empty when there is no such group or none of its servers runs.
+  repeated ServerSample server_samples = 3;
+  // That group's name ("" with no samples).
+  string sample_group = 4;
+  // The language {country} is written in (the instance language).
+  string names_language = 5;
+}
+
+// One server of the preview: what a server name is built from.
+message ServerSample {
+  string node = 1;
+  string country_code = 2;
+  string profile = 3;
+}
+
+message UpdateSubscriptionSettingsRequest {
+  // Replaces all settings. Owner or admin.
+  SubscriptionSettings settings = 1;
+}
+
+message UpdateSubscriptionSettingsResponse {
+  SubscriptionSettings settings = 1;
+}
+
+message ClientInfo {
+  // Stable id ("happ", "amnezia", "mihomo", …) and display name.
+  string id = 1;
+  string name = 2;
+  // Protocol plugin ids this client can use ("hysteria2", "awg").
+  repeated string protocols = 3;
+  // Formats this client understands.
+  repeated SubFormat formats = 4;
+}
+
+message ListClientsRequest {}
+
+message ListClientsResponse {
+  repeated ClientInfo clients = 1;
+}
+
+message TestUserAgentRequest {
+  string user_agent = 1;
+}
+
+message TestUserAgentResponse {
+  // Index into settings.rules; -1 = no rule matched (fallback).
+  int32 rule_index = 1;
+  SubFormat format = 2;
+  // True when the fallback treated the User-Agent as a browser.
+  bool browser = 3;
+}

@@ -1,0 +1,162 @@
+/*
+ * Motion of the built-in Mistgate badge (assets/mistgate-badge.svg), built from the badge's own parts: the mist drifts in
+ * across the disc, the gate rises out of it, the cat comes up behind the mist, opens its eye and winks.
+ * Pure CSS on the inlined SVG. Shared by the admin (components/brand.tsx, index.css), the splash (inlined into
+ * index.html by vite.config.ts) and the public user page (sub/sub.css).
+ *
+ *   <span class="mg-motion" data-mode="intro|loading" data-kind="builtin|custom"> <svg class="mg-badge">...</svg> </span>
+ *
+ *   intro    plays once (about 1 s) and ends on exactly the static badge: every keyframe below states only the start
+ *            ("from"), so the end is the badge's own style, and a browser without these properties just shows the badge
+ *   loading  a slow loop of the same parts: mist and pool sway, the cat bobs, one blink per cycle
+ *   custom   an uploaded logo: only this container fades and breathes, nothing inside it is touched
+ *
+ * Only the individual `translate` / `scale` properties are used (they compose with a `transform` attribute); the
+ * eye carries a rotate() attribute, so it is animated through its `ry`, never through a transform.
+ */
+.mg-motion {
+  --mg-ease: cubic-bezier(0.25, 0.7, 0.25, 1);
+}
+.mg-motion .mg-deep {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* ---- the container: the whole motion of an uploaded logo, the entrance of the built-in one ---- */
+.mg-motion[data-mode="intro"] {
+  animation: mg-pop 0.5s var(--mg-ease) both;
+}
+.mg-motion[data-mode="loading"][data-kind="custom"] {
+  animation: mg-breathe 2.6s ease-in-out infinite;
+}
+@keyframes mg-pop {
+  from {
+    opacity: 0;
+    scale: 0.9;
+  }
+}
+@keyframes mg-breathe {
+  50% {
+    opacity: 0.62;
+    scale: 0.94;
+  }
+}
+
+/* ---- intro of the built-in badge ---- */
+.mg-motion[data-mode="intro"] .mg-mist {
+  animation: mg-mist 0.9s var(--mg-ease) both;
+}
+.mg-motion[data-mode="intro"] .mg-paper {
+  animation: mg-rise 0.65s var(--mg-ease) 0.1s both;
+}
+.mg-motion[data-mode="intro"] .mg-acc {
+  animation: mg-rise 0.65s var(--mg-ease) 0.18s both;
+}
+.mg-motion[data-mode="intro"] .mg-deep {
+  animation: mg-pool 0.55s var(--mg-ease) 0.4s both;
+}
+.mg-motion[data-mode="intro"] .mg-badge g > .mg-ink {
+  animation: mg-cat 0.62s var(--mg-ease) 0.38s both;
+}
+.mg-motion[data-mode="intro"] .mg-eye {
+  animation:
+    mg-cat 0.62s var(--mg-ease) 0.38s both,
+    mg-eye 0.2s ease-out 0.78s both;
+}
+.mg-motion[data-mode="intro"] .mg-wink {
+  animation:
+    mg-cat 0.62s var(--mg-ease) 0.38s both,
+    mg-wink 0.22s ease-out 0.88s both;
+}
+@keyframes mg-mist {
+  from {
+    opacity: 0;
+    translate: -36px 8px;
+  }
+}
+@keyframes mg-rise {
+  from {
+    opacity: 0;
+    translate: 0 24px;
+  }
+}
+@keyframes mg-pool {
+  from {
+    opacity: 0;
+    scale: 0.6 1;
+  }
+}
+@keyframes mg-cat {
+  from {
+    opacity: 0;
+    translate: 0 38px;
+  }
+}
+@keyframes mg-eye {
+  from {
+    ry: 1px;
+  }
+}
+@keyframes mg-wink {
+  from {
+    opacity: 0;
+    stroke-dasharray: 56;
+    stroke-dashoffset: 56;
+  }
+  to {
+    stroke-dasharray: 56;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---- loading loop of the built-in badge: every part is a seamless back-and-forth, so the loop has no seam ---- */
+.mg-motion[data-mode="loading"][data-kind="builtin"] .mg-mist {
+  animation: mg-drift 5.6s ease-in-out infinite alternate;
+}
+.mg-motion[data-mode="loading"][data-kind="builtin"] .mg-deep {
+  animation: mg-sway 5.6s ease-in-out infinite alternate;
+}
+.mg-motion[data-mode="loading"][data-kind="builtin"] .mg-badge g > .mg-ink,
+.mg-motion[data-mode="loading"][data-kind="builtin"] .mg-wink {
+  animation: mg-bob 3.6s ease-in-out infinite alternate;
+}
+.mg-motion[data-mode="loading"][data-kind="builtin"] .mg-eye {
+  animation:
+    mg-bob 3.6s ease-in-out infinite alternate,
+    mg-blink 5.2s linear infinite;
+}
+@keyframes mg-drift {
+  to {
+    translate: 18px -6px;
+  }
+}
+@keyframes mg-sway {
+  to {
+    translate: -10px 0;
+    scale: 1.04 1;
+  }
+}
+@keyframes mg-bob {
+  to {
+    translate: 0 -6px;
+  }
+}
+@keyframes mg-blink {
+  /* 21.3px is the eye's own ry in the badge */
+  0%,
+  90%,
+  100% {
+    ry: 21.3px;
+  }
+  94% {
+    ry: 1px;
+  }
+}
+
+/* no motion at all: the static badge, whatever the mode */
+@media (prefers-reduced-motion: reduce) {
+  .mg-motion,
+  .mg-motion * {
+    animation: none !important;
+  }
+}

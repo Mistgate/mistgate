@@ -1,0 +1,240 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// WARP egress of a node. One Cloudflare WARP
+// account per node; inbounds whose egress is "warp" leave through it, and fail closed when the tunnel is down.
+//
+// Everything here is owner-only. RegisterWarp, ImportWarp (it carries a private key) and DeleteWarp also
+// require a fresh step-up (auth.Service.RequireStepUp), like showing a server password.
+//
+// The panel talks to Cloudflare only when the owner clicks (RegisterWarp, RefreshWarp, DeleteWarp of a
+// registered account) or when the stored setting auto_reregister is on (off by default). Registering creates an
+// anonymous device account, without e-mail or password, from the panel's address and accepts the Cloudflare
+// WARP terms on the owner's behalf: the UI links the terms and the request must say accept_tos. An imported
+// wgcf profile is the fallback when the registration endpoint answers 429.
+//
+// ERRORS. FAILED_PRECONDITION: "agent too old" (the node has no "warp/1"), account_exists (one account per
+// node: delete first), no_account, tos_not_accepted. INVALID_ARGUMENT: a file that is not a wgcf profile.
+// RESOURCE_EXHAUSTED: Cloudflare answered 429 (import a wgcf profile instead). UNAVAILABLE: Cloudflare not
+// reachable from the panel.
+service WarpService {
+  // Account summary (no secrets), the node's last WarpHealth and whether the node has applied the account.
+  rpc GetWarp(GetWarpRequest) returns (GetWarpResponse);
+  // Registers a new anonymous WARP device for this node and stores it encrypted. Step-up.
+  rpc RegisterWarp(RegisterWarpRequest) returns (RegisterWarpResponse);
+  // Stores the account from wgcf-profile.conf (and wgcf-account.toml when given). Step-up.
+  rpc ImportWarp(ImportWarpRequest) returns (ImportWarpResponse);
+  // Pause (false) or resume (true). Paused: the tunnel is torn down and egress "warp" inbounds fail closed.
+  rpc SetWarpEnabled(SetWarpEnabledRequest) returns (SetWarpEnabledResponse);
+  // "Restart WARP": pause and resume as one action. The node tears the tunnel down and brings it up again with its
+  // recovery ladder from the start. The resume always follows, also when the node does not confirm the pause in time
+  // (and also when the browser goes away), so the call never leaves WARP paused. FAILED_PRECONDITION: node_offline,
+  // no_account, account_paused (a paused account is resumed, not restarted).
+  rpc RestartWarp(RestartWarpRequest) returns (RestartWarpResponse);
+  // Re-reads the account from Cloudflare (endpoint, addresses, client id); needs the access token, so an
+  // imported profile without wgcf-account.toml cannot refresh. Creates nothing.
+  rpc RefreshWarp(RefreshWarpRequest) returns (RefreshWarpResponse);
+  // Deletes the device at Cloudflare when a token is known, then the local account; the node loses WARP
+  // (a full desired state is sent). Step-up.
+  rpc DeleteWarp(DeleteWarpRequest) returns (DeleteWarpResponse);
+  // Advanced: the constants the registration request is built from (they changed twice in 2026 and ship as
+  // data, not code).
+  rpc GetWarpRegistrationParams(GetWarpRegistrationParamsRequest) returns (GetWarpRegistrationParamsResponse);
+  rpc UpdateWarpRegistrationParams(UpdateWarpRegistrationParamsRequest) returns (UpdateWarpRegistrationParamsResponse);
+}
+
+// A WARP account without its secrets (private key, access token, license).
+message WarpAccount {
+  string node_id = 1;
+  WarpSource source = 2;
+  // "free" | "plus" | "".
+  string account_type = 3;
+  bool enabled = 4;
+  string peer_public_key = 5;
+  // IP literals as stored (no port).
+  string endpoint_v4 = 6;
+  string endpoint_v6 = 7;
+  repeated uint32 ports = 8;
+  string address_v4 = 9;
+  string address_v6 = 10;
+  uint32 mtu = 11;
+  // The account carries the "reserved" bytes and the node stamps them.
+  bool use_reserved = 12;
+  // An access token is stored, so RefreshWarp and the remote part of DeleteWarp work.
+  bool has_token = 13;
+  // The terms URL the owner was shown and who accepted (empty for an import).
+  string tos_url = 14;
+  string tos_accepted_by = 15;
+  int64 tos_accepted_unix = 16 [jstype = JS_NUMBER];
+  // API version + user agent used at registration (diagnosis of 429s).
+  string registered_with = 17;
+  int64 created_unix = 18 [jstype = JS_NUMBER];
+  int64 updated_unix = 19 [jstype = JS_NUMBER];
+}
+
+// agent.v1.WarpHealth as the panel last stored it.
+message WarpHealthView {
+  WarpState state = 1;
+  string backend = 2;
+  string endpoint = 3;
+  int64 last_handshake_unix = 4 [jstype = JS_NUMBER];
+  // "on" | "plus" | "off" | "".
+  string warp_flag = 5;
+  string colo = 6;
+  bool probe_cloudflare_ok = 7;
+  bool probe_other_ok = 8;
+  uint32 consecutive_failures = 9;
+  uint64 rx_bytes = 10 [jstype = JS_NUMBER];
+  uint64 tx_bytes = 11 [jstype = JS_NUMBER];
+  string last_error = 12;
+  // When the node reported it.
+  int64 reported_unix = 13 [jstype = JS_NUMBER];
+  // The latest round of each probe; unset = not run, or a node whose agent predates it (fall back to the *_ok flags).
+  WarpProbeResult probe_cloudflare = 14;
+  WarpProbeResult probe_other = 15;
+  // When the node's latest health check finished (0 = unknown, an old agent).
+  int64 checked_unix = 16 [jstype = JS_NUMBER];
+}
+
+message WarpProbeResult {
+  bool ok = 1;
+  uint32 latency_ms = 2;
+  int64 at_unix = 3 [jstype = JS_NUMBER];
+}
+
+message GetWarpRequest {
+  string node_id = 1;
+}
+
+message GetWarpResponse {
+  // Unset = no account on this node.
+  WarpAccount account = 1;
+  // Unset until the node has reported.
+  WarpHealthView health = 2;
+  // The account is in the desired state but the node has not confirmed it yet.
+  bool pending_apply = 3;
+  string apply_error = 4;
+  // The node's agent can run WARP ("warp/1").
+  bool agent_supports = 5;
+  // The terms the UI links next to the register button.
+  string tos_url = 6;
+  // The registration needs attention (it failed, or WARP went down and cannot heal itself): the owner decides.
+  bool needs_attention = 7;
+  // Why (a code: revoked, down_after_ladder, table_in_use, rule_pref_in_use, apply_failed; "" with needs_attention
+  // false). The UI words the ones it knows.
+  string attention_reason = 8;
+  // The node's enabled profiles that exit through WARP: they stop while WARP is down or paused (the pause dialog
+  // names them and how many are connected through them now).
+  repeated WarpInbound inbounds = 9;
+}
+
+// A profile on the node whose traffic leaves through WARP.
+message WarpInbound {
+  string inbound_id = 1;
+  string profile_name = 2;
+  // Sessions open through it now (one per connected device).
+  uint32 online = 3;
+}
+
+message RegisterWarpRequest {
+  string node_id = 1;
+  // The owner read the terms and accepts them for THIS account. false = INVALID_ARGUMENT tos_not_accepted.
+  bool accept_tos = 2;
+  // The URL the UI showed; stored with the acceptance.
+  string tos_url_shown = 3;
+  // The node has an account (Cloudflare revoked it): register a new device and replace the old account with it in
+  // one step, the way the automatic re-registration does; the old device is deleted at Cloudflare afterwards. Without
+  // it an existing account is FAILED_PRECONDITION account_exists.
+  bool replace_existing = 4;
+}
+
+message RegisterWarpResponse {
+  WarpAccount account = 1;
+}
+
+message ImportWarpRequest {
+  string node_id = 1;
+  // Text of wgcf-profile.conf (required).
+  string profile_conf = 2;
+  // Text of wgcf-account.toml (optional; adds the token, device id and license, which enable Refresh/Delete).
+  string account_toml = 3;
+}
+
+message ImportWarpResponse {
+  WarpAccount account = 1;
+}
+
+message SetWarpEnabledRequest {
+  string node_id = 1;
+  bool enabled = 2;
+}
+
+message SetWarpEnabledResponse {
+  WarpAccount account = 1;
+}
+
+message RestartWarpRequest {
+  string node_id = 1;
+}
+
+message RestartWarpResponse {
+  WarpAccount account = 1;
+  // The node confirmed the pause before the resume went out (false: it did not answer in time, the resume went out
+  // anyway).
+  bool confirmed = 2;
+}
+
+message RefreshWarpRequest {
+  string node_id = 1;
+}
+
+message RefreshWarpResponse {
+  WarpAccount account = 1;
+}
+
+message DeleteWarpRequest {
+  string node_id = 1;
+  // The node name typed by the owner; must equal the current name.
+  string confirm_name = 2;
+}
+
+message DeleteWarpResponse {
+  // The device was also deleted at Cloudflare (false: no token, or Cloudflare did not answer; the local
+  // account is gone either way).
+  bool remote_deleted = 1;
+}
+
+// What the registration request is built from. Empty fields in an update fall back to the built-in value.
+message WarpRegistrationParams {
+  // The API version segment of the registration URL ("v0a5641").
+  string api_version = 1;
+  string user_agent = 2;
+  string cf_client_version = 3;
+  // The uTLS ClientHello identifier that makes the request look like the Android app ("wgcf_v2.3.0").
+  string tls_spec_id = 4;
+  // Re-register by itself when the account is revoked: off by default; at most once an hour, with jitter and
+  // a back-off on 429. Turning it on means the owner accepts the terms for future accounts too.
+  bool auto_reregister = 5;
+}
+
+message GetWarpRegistrationParamsRequest {}
+
+message GetWarpRegistrationParamsResponse {
+  WarpRegistrationParams params = 1;
+  // The built-in values, for the "reset" button.
+  WarpRegistrationParams defaults = 2;
+  // params differ from the built-in values.
+  bool customised = 3;
+}
+
+message UpdateWarpRegistrationParamsRequest {
+  WarpRegistrationParams params = 1;
+}
+
+message UpdateWarpRegistrationParamsResponse {
+  WarpRegistrationParams params = 1;
+  bool customised = 2;
+}

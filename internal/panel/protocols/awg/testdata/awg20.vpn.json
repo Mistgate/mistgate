@@ -1,0 +1,19 @@
+{
+    "format_version": 1,
+    "description": "de1 · AWG 2.0",
+    "hostName": "203.0.113.10",
+    "containers": [
+        {
+            "container": "amnezia-awg2",
+            "awg": {
+                "port": "43210",
+                "transport_proto": "udp",
+                "protocol_version": "2",
+                "last_config": "{\"config\":\"[Interface]\\nAddress = 10.66.8.5/32\\nDNS = 1.1.1.1, 8.8.8.8\\nMTU = 1280\\nPrivateKey = AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=\\nJc = 5\\nJmin = 12\\nJmax = 60\\nS1 = 40\\nS2 = 60\\nS3 = 25\\nS4 = 18\\nH1 = 100000-200000\\nH2 = 300000-400000\\nH3 = 500000-600000\\nH4 = 700000-800000\\nI1 = \\u003cr 2\\u003e\\u003cb 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737\\u003e\\n\\n[Peer]\\nPublicKey = wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=\\nPresharedKey = gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=\\nAllowedIPs = 0.0.0.0/0, ::/0\\nEndpoint = 203.0.113.10:43210\\nPersistentKeepalive = 25\\n\",\"hostName\":\"203.0.113.10\",\"port\":43210,\"client_ip\":\"10.66.8.5\",\"client_priv_key\":\"AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=\",\"client_pub_key\":\"B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=\",\"server_pub_key\":\"wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=\",\"psk_key\":\"gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=\",\"clientId\":\"B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=\",\"allowed_ips\":[\"0.0.0.0/0\",\"::/0\"],\"persistent_keep_alive\":\"25\",\"mtu\":\"1280\",\"Jc\":\"5\",\"Jmin\":\"12\",\"Jmax\":\"60\",\"S1\":\"40\",\"S2\":\"60\",\"S3\":\"25\",\"S4\":\"18\",\"H1\":\"100000-200000\",\"H2\":\"300000-400000\",\"H3\":\"500000-600000\",\"H4\":\"700000-800000\",\"I1\":\"\\u003cr 2\\u003e\\u003cb 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737\\u003e\"}"
+            }
+        }
+    ],
+    "defaultContainer": "amnezia-awg2",
+    "dns1": "1.1.1.1",
+    "dns2": "8.8.8.8"
+}

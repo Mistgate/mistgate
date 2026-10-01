@@ -1,0 +1,12 @@
+- name: "de2 · hy2 · 443"
+  type: hysteria2
+  server: "de2.example.com"
+  port: 443
+  ports: "20000-30000"
+  hop-interval: "30"
+  password: "tok-DEVICE_secret_0123456789abcdefghijklmn"
+  obfs: gecko
+  obfs-password: "gawrgura-pw"
+  sni: "de1.example.com"
+  skip-cert-verify: false
+  alpn: [h3]

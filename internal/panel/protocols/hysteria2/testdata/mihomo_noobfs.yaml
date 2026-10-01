@@ -1,0 +1,7 @@
+- name: "de2 · hy2 · 443"
+  type: hysteria2
+  server: "de2.example.com"
+  port: 443
+  password: "tok-DEVICE_secret_0123456789abcdefghijklmn"
+  skip-cert-verify: false
+  alpn: [h3]

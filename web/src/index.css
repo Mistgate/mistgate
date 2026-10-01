@@ -1,0 +1,316 @@
+@import "tailwindcss";
+@import "./fonts/fonts.css";
+@import "./assets/mark-motion.css";
+
+/*
+ * Design tokens. This is the ONE place colours, radii, type and
+ * motion live. Dark is the default theme, light is `data-theme="light"` on <html> (src/lib/theme.ts).
+ * The accent is user-selectable (src/lib/accent.ts sets --accent inline on <html>); everything tinted is
+ * derived from it with color-mix(in oklch). No shadows, except the dock/toast/modal ones noted below.
+ * Components use the Tailwind names mapped in @theme below, never raw colours.
+ */
+:root {
+  color-scheme: dark;
+
+  /* the six accent presets; --accent itself is the one in use */
+  --accent-mint: #7dd3a0;
+  --accent-lavender: #b8acf2;
+  --accent-sky: #8ec8ea;
+  --accent-sand: #dcc68c;
+  --accent-rose: #e6a6b0;
+  --accent-sage: #b0cc90;
+  --accent: #b8acf2;
+
+  --bg: #0c0c0e;
+  --surface: #141417;
+  --surface-2: #1d1d22;
+  --border: #25252b;
+  --text: #f3f3f5;
+  --muted: #8b8b94;
+  --faint: #4a4a52;
+  --them: #d4d4dc;
+  --them: #d4d4dc; /* second series on charts */
+  --dock: rgb(24 24 28 / 0.78);
+  --ink-on-accent: #0c0c0e; /* text on the accent: always this, in both themes */
+
+  /* status */
+  --warning: #febc2e;
+  --warning-soft: rgb(254 188 46 / 0.12);
+  --warning-line: rgb(254 188 46 / 0.35);
+  --danger: #ff5a5f;
+  --danger-soft: rgb(255 90 95 / 0.14);
+
+  /* theme-dependent mix ratios */
+  --_soft-pct: 14%;
+  --_line-pct: 50%;
+  --_text-pct: 100%;
+  --_chroma: 1; /* the darkened light-theme tones lose colour, so section tones get it back (index.css .id-chip) */
+
+  /* derived accent tokens */
+  --accent-soft: color-mix(in oklch, var(--accent) var(--_soft-pct), var(--bg));
+  --accent-line: color-mix(in oklch, var(--accent) var(--_line-pct), var(--border));
+  --accent-text: color-mix(in oklch, var(--accent) var(--_text-pct), #000);
+  --warning-text: color-mix(in oklch, var(--warning) var(--_text-pct), #000);
+  --danger-text: color-mix(in oklch, var(--danger) var(--_text-pct), #000);
+
+  /* the logo has three fills: white, light, dark; the last two are tinted by the accent */
+  --logo-w: #fff;
+  --logo-l: oklch(from var(--accent) l calc(c * 1.3) h);
+  --logo-d: oklch(from var(--accent) calc(l * 0.56) calc(c * 2.1) h);
+
+  /* charts: the accent line and how strong the fill under each line is (first line = accent, the rest = --them) */
+  --chart-line: var(--accent);
+  --chart-fill-a: 0.3;
+  --chart-fill-b: 0.2;
+
+  /* the only shadows in the product; off in the light theme */
+  --shadow-dock: 0 12px 30px -12px rgb(0 0 0 / 0.5);
+  --shadow-toast: 0 14px 30px -10px rgb(0 0 0 / 0.5);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f8f8f6;
+  --surface: #ffffff;
+  --surface-2: #efefec;
+  --border: #e3e3df;
+  --text: #16161a;
+  --muted: #6b6b73;
+  --faint: #c4c4c8;
+  --them: #a4a4ac;
+  --them: #a4a4ac;
+  --dock: rgb(255 255 255 / 0.82);
+  --chart-line: color-mix(in oklch, var(--accent) 65%, #3a2f7a);
+  --chart-fill-a: 0.16;
+  --chart-fill-b: 0;
+  --_soft-pct: 24%;
+  --_line-pct: 65%;
+  --_text-pct: 50%;
+  --_chroma: 1.9;
+  --shadow-dock: none;
+  --shadow-toast: none;
+}
+
+@theme {
+  /* the single breakpoint is ~720px: tables -> cards, sidebar -> dock, modal -> sheet */
+  --breakpoint-md: 45rem;
+  /* the node grid goes from 3 to 5 columns here (5 need ~1000px of content width) */
+  --breakpoint-wide: 68.75rem;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.3, 1.5, 0.5, 1);
+  --ease-spring-strong: cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-them: var(--them);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--ink-on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-accent-text: var(--accent-text);
+  --color-warn: var(--warning);
+  --color-warn-soft: var(--warning-soft);
+  --color-warn-line: var(--warning-line);
+  --color-warn-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+  --color-ok: var(--accent-mint);
+  --color-busy: var(--accent-sky);
+  --color-dock: var(--dock);
+
+  /* radii: fields/44px buttons 14 . 36px buttons/chips 11 . cards 16 . large cards 18 . dock 20 . sheet 22 */
+  --radius-chip: 11px;
+  --radius-ctl: 11px;
+  --radius-field: 14px;
+  --radius-card: 16px;
+  --radius-card-lg: 18px;
+  --radius-dock: 20px;
+  --radius-sheet: 22px;
+
+  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* the scrollbar's room is always kept: a short screen and a long one have the same width, nothing jumps */
+    scrollbar-gutter: stable;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background-color 0.5s,
+      color 0.5s;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  ::placeholder {
+    color: inherit;
+    opacity: 0.4;
+  }
+}
+
+/* Status tones: one --c per state; pills, dots and glyphs derive everything from it.
+   Status is always colour + glyph + word, never colour alone. */
+.tone-ok {
+  --c: var(--accent-mint);
+}
+.tone-warn {
+  --c: var(--warning);
+}
+.tone-bad {
+  --c: var(--danger);
+}
+.tone-off {
+  --c: var(--muted);
+}
+.tone-busy {
+  --c: var(--accent-sky);
+}
+.tone-blip {
+  /* grey-blue, never red: a hoster blip is not an outage */
+  --c: color-mix(in oklch, var(--accent-sky) 40%, var(--muted));
+}
+/* status-coloured text that stays readable on the light theme (like the pill's text) */
+.tone-text {
+  color: color-mix(in oklch, var(--c) var(--_text-pct), #000);
+}
+/* a status-tinted panel (node state banner): the pill's background and border without its text colour */
+.tint {
+  background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
+  border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));
+}
+.pill {
+  background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
+  border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));
+  color: color-mix(in oklch, var(--c) var(--_text-pct), #000);
+}
+
+/* Section identity tones (the sidebar's pastels): data-tone sets --t; the chip and .id-fg derive from it, darkened on
+   the light theme like the status tones. Names a section, never a state. */
+[data-tone="lavender"] {
+  --t: var(--accent-lavender);
+}
+[data-tone="sky"] {
+  --t: var(--accent-sky);
+}
+[data-tone="sand"] {
+  --t: var(--accent-sand);
+}
+[data-tone="sage"] {
+  --t: var(--accent-sage);
+}
+[data-tone="mint"] {
+  --t: var(--accent-mint);
+}
+[data-tone="rose"] {
+  --t: var(--accent-rose);
+}
+.id-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--t) calc(var(--_soft-pct) + 4%), var(--surface));
+  color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
+}
+.id-fg {
+  color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
+}
+
+/* Motion: screens fade + rise in, cards lift on hover, buttons press. Reduced motion is honoured below. */
+@keyframes mg-ui-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mg-ui-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes mg-ui-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes mg-ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.screen-enter {
+  animation: mg-ui-in 0.45s var(--ease-out-soft) both;
+}
+.pop-in {
+  animation: mg-ui-pop 0.4s both;
+}
+.card-hover {
+  transition:
+    transform 0.3s var(--ease-spring),
+    border-color 0.2s;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-line);
+}
+
+/* horizontally scrollable strips (settings sub-nav) without a visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
