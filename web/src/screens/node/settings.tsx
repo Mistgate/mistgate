@@ -16,8 +16,9 @@ import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
+import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
+import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
 import { SSHAccessCard } from "./ssh-access";
 import { WarpCard } from "./warp";
 
@@ -36,6 +37,21 @@ const none = "none";
 
 const parseResolvers = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 
+/**
+ * What to run as root on a node that was offline when it was retired and so never got the order (docs: Add a node, Remove
+ * a node): stop the agent (its stop runs `mistgate-node cleanup-net`), undo what it set up, remove its files.
+ */
+export const retiredCleanupCommand = [
+  "systemctl disable --now mistgate-node",
+  "nft delete table inet mistgate_node",
+  "rm -f /etc/sysctl.d/90-mistgate.conf /etc/systemd/journald.conf.d/90-mistgate.conf",
+  "systemctl restart systemd-journald",
+  "rm -f /etc/systemd/system/mistgate-node.service",
+  "systemctl daemon-reload",
+  "rm -f /usr/local/bin/mistgate-node /usr/local/bin/mistgate-node.prev /usr/local/bin/mistgate-node.new /root/mistgate-node",
+  "rm -rf /var/lib/mistgate-node",
+].join("\n");
+
 export function SettingsTab({ data }: { data: Plain<GetNodeResponse> }) {
   const node = data.node!;
   // keyed by the node: switching nodes starts from that node's values
@@ -49,6 +65,8 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
   const qc = useQueryClient();
   const node = data.node!;
   const retired = node.status === NodeStatus.RETIRED;
+  // retired while offline: shown here, not in the retire dialog, which goes once the node reads as retired
+  const [unreached, setUnreached] = useState(false);
 
   // initialised once per node (the parent is keyed by it): a poll must not overwrite what is being typed
   const [start] = useState(() => ({
@@ -264,12 +282,13 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
 
       {!retired && <AwgBackendCard data={data} />}
 
-      {!retired && <RetireZone nodeId={node.id} name={node.name} />}
+      {!retired && <RetireZone nodeId={node.id} name={node.name} onUnreached={() => setUnreached(true)} />}
+      {unreached && <UnreachedModal name={node.name} />}
     </div>
   );
 }
 
-function RetireZone({ nodeId, name }: { nodeId: string; name: string }) {
+function RetireZone({ nodeId, name, onUnreached }: { nodeId: string; name: string; onUnreached: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
@@ -280,13 +299,13 @@ function RetireZone({ nodeId, name }: { nodeId: string; name: string }) {
           {t("node.retire")}
         </Button>
       </div>
-      {open && <RetireModal nodeId={nodeId} name={name} onClose={() => setOpen(false)} />}
+      {open && <RetireModal nodeId={nodeId} name={name} onClose={() => setOpen(false)} onUnreached={onUnreached} />}
     </DangerZone>
   );
 }
 
 /** "Retire from fleet": the node's name has to be typed. */
-function RetireModal({ nodeId, name, onClose }: { nodeId: string; name: string; onClose: () => void }) {
+function RetireModal({ nodeId, name, onClose, onUnreached }: { nodeId: string; name: string; onClose: () => void; onUnreached: () => void }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
@@ -294,12 +313,14 @@ function RetireModal({ nodeId, name, onClose }: { nodeId: string; name: string; 
   const [typed, setTyped] = useState("");
   const retire = useMutation({
     mutationFn: () => nodesApi.retireNode({ nodeId, confirmName: typed.trim() }),
-    onSuccess: () => {
+    onSuccess: (r) => {
       onClose();
       toast(t("node.retired", { name }));
       void qc.invalidateQueries({ queryKey: ["nodes"] });
       void qc.invalidateQueries({ queryKey: ["overview"] });
-      void navigate({ to: "/nodes" });
+      // an agent that was not on the line keeps serving: the admin has to clean the server, so stay and say how
+      if (r.agentNotified) void navigate({ to: "/nodes" });
+      else onUnreached();
     },
     onError: (e) => toast.error(errorText(e, t)),
   });
@@ -342,6 +363,29 @@ function RetireModal({ nodeId, name, onClose }: { nodeId: string; name: string; 
         autoCapitalize="off"
         spellCheck={false}
       />
+    </Modal>
+  );
+}
+
+/** The node was retired but its agent was offline and never got the order: it keeps serving until the server is cleaned. */
+function UnreachedModal({ name }: { name: string }) {
+  const t = useT();
+  const navigate = useNavigate();
+  const leave = () => void navigate({ to: "/nodes" });
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && leave()}
+      title={t("node.retiredUnreached", { name })}
+      description={t("node.retiredUnreachedBody")}
+      footer={
+        <Button variant="primary" size="md" onClick={leave}>
+          {t("common.done")}
+        </Button>
+      }
+    >
+      <CodeBlock text={retiredCleanupCommand} lang="sh" />
+      <p className="text-xs leading-normal text-pretty text-muted">{t("node.retiredUnreachedResolver")}</p>
     </Modal>
   );
 }

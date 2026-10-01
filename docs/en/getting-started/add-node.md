@@ -152,7 +152,7 @@ rm -f /usr/local/bin/mistgate-node /usr/local/bin/mistgate-node.prev /usr/local/
 rm -rf /var/lib/mistgate-node
 ```
 
-> **Warning:** a node that was offline when you retired it never got the order. The panel refuses its certificate, but the agent keeps running the last state it applied (its servers keep working for the users it had) and keeps trying to connect. Clean such a server by hand, starting with the steps below, then run the commands above.
+> **Warning:** a node that was offline when you retired it never got the order. The panel refuses its certificate, but the agent keeps running the last state it applied (its servers keep working for the users it had) and keeps trying to connect. The panel says so right away ("{name} did not get the order") and shows all the commands to copy. Clean such a server by hand, starting with the steps below, then run the commands above.
 
 ```sh
 systemctl disable --now mistgate-node      # its stop runs cleanup-net: tunnel interfaces, WARP routes, their tables

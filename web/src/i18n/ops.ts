@@ -625,6 +625,10 @@ export const en = {
   "node.retireList3": "The node’s record stays in the audit log",
   "node.retireConfirm": "To confirm, type the node name: {name}",
   "node.retired": "{name} retired from the fleet",
+  "node.retiredUnreached": "{name} did not get the order",
+  "node.retiredUnreachedBody":
+    "The node was offline, so its agent was not told to stop. The panel no longer accepts it, but on the server it keeps serving the users it had and keeps trying to connect. Clean the server by hand: run this as root.",
+  "node.retiredUnreachedResolver": "If you applied the doctor’s resolver fix on this node, undo it too: see “Remove a node” in the documentation.",
 
   "event.node_down": "stopped answering (since {since})",
   "event.node_down.plain": "stopped answering",
@@ -1540,6 +1544,10 @@ export const ru: typeof en = {
   "node.retireList3": "Запись о ноде останется в аудите",
   "node.retireConfirm": "Чтобы подтвердить, введи имя ноды: {name}",
   "node.retired": "{name} выведена из флота",
+  "node.retiredUnreached": "{name} не получила приказ",
+  "node.retiredUnreachedBody":
+    "Нода была не на связи, и её агенту не сказали остановиться. Панель его больше не принимает, но на сервере он продолжает обслуживать прежних пользователей и пытается подключиться. Почисти сервер вручную: выполни это от root.",
+  "node.retiredUnreachedResolver": "Если на этой ноде применялось исправление резолвера от доктора, откати и его: см. «Удаление ноды» в документации.",
 
   "event.node_down": "перестала отвечать (с {since})",
   "event.node_down.plain": "перестала отвечать",
