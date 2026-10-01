@@ -17,7 +17,7 @@ const mcpUsage = `usage: mistgate mcp --url <admin url> --token-file <file>
   panel's MCP endpoint (the admin URL plus "mcp"). It decides nothing: the panel answers, with the token's profile.
 
   --url          the admin URL "mistgate setup" printed, like https://panel.example.com/<prefix>/   (env MISTGATE_URL)
-  --token-file   a file whose first line is an API token made in the admin panel (Settings, Tokens)   (env MISTGATE_TOKEN_FILE)
+  --token-file   a file whose first line is an API token made in the admin panel (Integrations, API tokens)   (env MISTGATE_TOKEN_FILE)
 
   The token is read from the file only: never from the command line or the environment, and never printed.
   Plain http is refused unless the host is localhost.

@@ -292,7 +292,7 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 		ExpiresInS: int(planTTL / time.Second), ConfirmToken: confirm,
 	}
 	if needs {
-		out.Next = fmt.Sprintf("Waiting for the owner to approve plan %s in the admin panel (Settings, Approvals). Tell the user. "+
+		out.Next = fmt.Sprintf("Waiting for the owner to approve plan %s in the admin panel (Integrations, Waiting for you). Tell the user. "+
 			"Do not poll more than once every 30 seconds; call %s_apply with the confirm_token after the owner approved.", p.ID, tool)
 	} else {
 		out.Next = "Show the plan to the user and, once they agree, call " + tool + "_apply with the confirm_token."
