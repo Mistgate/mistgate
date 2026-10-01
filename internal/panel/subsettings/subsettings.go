@@ -196,8 +196,9 @@ func noControl(s string) bool {
 	return !strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f })
 }
 
-// httpURL checks an optional link: empty, or an absolute http(s) URL without spaces or control characters.
-func httpURL(what, s string) error {
+// httpURL checks an optional link: empty, or an absolute http(s) URL without spaces or control characters. With tg
+// a tg:// link (a Telegram chat, the usual support link: tg://resolve?domain=...) passes too.
+func httpURL(what, s string, tg bool) error {
 	if s == "" {
 		return nil
 	}
@@ -205,7 +206,10 @@ func httpURL(what, s string) error {
 		return invalid("%s: not a valid link", what)
 	}
 	u, err := url.Parse(s)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https" && (!tg || u.Scheme != "tg")) {
+		if tg {
+			return invalid("%s: must be an http(s) or tg:// link", what)
+		}
 		return invalid("%s: must be an http(s) link", what)
 	}
 	return nil
@@ -232,7 +236,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if err := text("announcement", s.Announcement, maxAnnouncement); err != nil {
 		return err
 	}
-	if err := httpURL("support_url", s.SupportUrl); err != nil {
+	if err := httpURL("support_url", s.SupportUrl, true); err != nil {
 		return err
 	}
 	if s.UpdateIntervalHours > maxIntervalH {
@@ -265,7 +269,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 		if err := text(w+".name", a.Name, maxName); err != nil {
 			return err
 		}
-		if err := httpURL(w+".download_url", a.DownloadUrl); err != nil {
+		if err := httpURL(w+".download_url", a.DownloadUrl, false); err != nil {
 			return err
 		}
 		// A card line of plain text (the page shows it as text, never as markup): no control characters, no newline.

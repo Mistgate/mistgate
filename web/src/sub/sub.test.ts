@@ -178,6 +178,13 @@ describe("view", () => {
     expect(el.querySelector(".sup")).toBeNull();
   });
 
+  it("opens a tg:// support link as a Telegram link", () => {
+    const tg = "tg://resolve?domain=example_support";
+    const el = view(normalize({ ...cases.happ, support_url: tg }), state("en"), acts());
+    expect(el.querySelector(".sup")?.textContent).toContain("We reply in Telegram");
+    expect([...el.querySelectorAll(`a[href='${tg}']`)].map((a) => a.textContent)).toContain("Message on Telegram →");
+  });
+
   it("a closed announcement stays closed through redraws; a new text shows again", () => {
     const log: string[] = [];
     const d = normalize(cases.happ);

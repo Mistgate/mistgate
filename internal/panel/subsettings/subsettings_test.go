@@ -49,6 +49,32 @@ func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 
 // An install that never saved settings (every existing instance at upgrade time) gets the defaults; a saved
 // document round-trips, and an unreadable one makes the cache fall back instead of failing a fetch.
+// The support link is a web link or a Telegram one (tg://, what the editor offers); a download link stays http(s).
+func TestSupportURL(t *testing.T) {
+	for link, ok := range map[string]bool{
+		"":                                    true,
+		"https://t.me/example_support":        true,
+		"http://example.com/help":             true,
+		"tg://resolve?domain=example_support": true,
+		"TG://resolve?domain=example_support": true,
+		"tg:resolve?domain=example_support":   false,
+		"javascript:alert(1)":                 false,
+		"ftp://example.com/":                  false,
+		"https://example.com/a b":             false,
+	} {
+		s := Defaults()
+		s.SupportUrl = link
+		if err := Validate(s); (err == nil) != ok {
+			t.Errorf("support_url %q: %v, want ok=%v", link, err, ok)
+		}
+	}
+	s := Defaults()
+	s.Apps[0].DownloadUrl = "tg://resolve?domain=example_support"
+	if Validate(s) == nil {
+		t.Error("a tg:// download link was accepted")
+	}
+}
+
 func TestLoadUpdateAndFallback(t *testing.T) {
 	ctx := context.Background()
 	st := openStore(t)

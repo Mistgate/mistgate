@@ -67,7 +67,7 @@ The Mihomo YAML carries the same headers, one proxy group with every server, and
 |:--|:--|
 | **Name in the app** | Shown at the top of the list in Happ. Empty means the panel's name (the brand). |
 | **Announcement** | One or two lines above the servers; the user page shows it too. The counter says how much Happ shows: 200 characters. A longer text is cut at a word with "…" for the apps. |
-| **Support link** | Opens from the "Message support" button. A Telegram (`https://t.me/…`) or web link. |
+| **Support link** | Opens from the "Message support" button. A Telegram link (`https://t.me/…` or `tg://resolve?domain=…`) or a web link (`https://…`). |
 | **Refresh every** | 1–72 hours, default 12: how often the app downloads the subscription again. |
 
 **Server names** is a template built from pieces:
