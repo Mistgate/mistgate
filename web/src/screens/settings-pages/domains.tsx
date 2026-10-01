@@ -28,7 +28,7 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Settings -> Domains: where the admin and the subscription links live. Read-only: `mistgate setup` sets both. */
+/** Settings -> Domains: where the admin and the subscription links live. Read-only: `mistgate setup` sets both once, and nothing changes them. */
 export function DomainsPage() {
   const t = useT();
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;

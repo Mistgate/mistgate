@@ -367,12 +367,12 @@ describe("Settings → Admins, Domains, Backups", () => {
     expect(document.querySelector("a[href='/integrations']")?.textContent).toBe(en["set.admins.tokens"]);
   });
 
-  it("shows the owner both addresses to copy and where to change them", async () => {
+  it("shows the owner both addresses to copy and that setup fixed them", async () => {
     getInstance.mockResolvedValue({ instance: { adminUrl: "https://panel.example/s3cret/", subscriptionBase: "", brandHead: "", brandTail: "", accent: "", language: "en", hasLogo: false, logoVersion: "" } });
     await mount(<DomainsPage />);
     expect(text()).toContain("https://panel.example/s3cret/");
     expect(text()).toContain(en["set.domains.subNone"]);
-    expect(text()).toContain("To change them, run mistgate setup on the panel server.");
+    expect(text()).toContain("mistgate setup sets them once, when the panel is installed; they cannot be changed yet.");
     expect(button(en["common.copy"])).toBeDefined();
   });
 
