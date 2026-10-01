@@ -1,5 +1,6 @@
 import { Checkbox } from "@base-ui/react/checkbox";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import type { IconName, Tone } from "@/components/ui/icons";
@@ -167,6 +168,9 @@ export function ConfirmModal({ open, onOpenChange, title, description, children,
 }
 
 /** ConfirmModal that also asks for `match` to be typed (the user's name) before the red button lights up. */
+/** A typed confirmation ignores how the spaces were typed: "Alice  Smith" and "Alice Smith" are the same name to a person. */
+const spaced = (s: string) => s.trim().replace(/\s+/g, " ");
+
 export function TypeConfirmModal({ match, ...props }: Omit<ConfirmProps, "confirmDisabled" | "danger"> & { match: string }) {
   const t = useTx();
   const [typed, setTyped] = useState("");
@@ -179,12 +183,18 @@ export function TypeConfirmModal({ match, ...props }: Omit<ConfirmProps, "confir
         onOpenChange(o);
       }}
       danger
-      confirmDisabled={typed.trim() !== match}
+      confirmDisabled={spaced(typed) !== spaced(match)}
     >
       {props.children}
       <TextField
         aria-label={t("users.deleteType", { name: match })}
-        hint={t("users.deleteType", { name: match })}
+        hint={
+          // pre-wrap: a name with two spaces in a row shows them; the button copies it exactly
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="whitespace-pre-wrap">{t("users.deleteType", { name: match })}</span>
+            <CopyButton value={match} />
+          </span>
+        }
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         autoComplete="off"
