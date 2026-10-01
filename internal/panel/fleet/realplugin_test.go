@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
@@ -74,5 +77,37 @@ func TestDesiredStateWithHysteria2Plugin(t *testing.T) {
 	m.apply(ds)
 	if m.hash() != ds.StateHash {
 		t.Error("state hash of the real-plugin state")
+	}
+}
+
+// The node's address is the endpoint in every issued AmneziaWG config (.conf, vpn://): changing it marks the configs of
+// the node's per-device profiles stale, as a port change does. A profile the subscription carries, and an address that
+// stays the same, leave them alone.
+func TestAddressChangeMarksAWGKeysStale(t *testing.T) {
+	e := newEnvWith(t, builtin.Registry())
+	id, _, _ := e.createEnrollment("de1", "de1.example.com")
+	now := time.Now().Unix()
+	for _, p := range []string{"awg", "hysteria2"} {
+		e.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES (?, ?, ?, '{}', 1, ?, ?)`, "prf_"+p, p, p, now, now)
+		e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)`, "inb_"+p, "prf_"+p, id, now, now)
+	}
+	epoch := func(profile string) (n int) {
+		if err := e.st.R.QueryRowContext(e.ctx, `SELECT critical_epoch FROM profile WHERE id = ?`, profile).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	setAddress := func(addr string) {
+		if _, err := (nodeService{e.f}).UpdateNode(e.ctx, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: id, Address: &addr})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setAddress("de1.example.com")
+	if a, h := epoch("prf_awg"), epoch("prf_hysteria2"); a != 0 || h != 0 {
+		t.Errorf("the same address: epochs awg %d hysteria2 %d, want 0 0", a, h)
+	}
+	setAddress("203.0.113.7")
+	if a, h := epoch("prf_awg"), epoch("prf_hysteria2"); a != 1 || h != 0 {
+		t.Errorf("a new address: epochs awg %d hysteria2 %d, want 1 0", a, h)
 	}
 }

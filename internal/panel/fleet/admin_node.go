@@ -18,6 +18,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -630,6 +631,12 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		bandwidth := int(*m.BandwidthMbps)
 		p.BandwidthMbps = &bandwidth
 	}
+	oldAddress := ""
+	if m.Address != nil {
+		if cur, err := f.st.Node(ctx, m.NodeId); err == nil { // a missing node is answered by the update
+			oldAddress = cur.Address
+		}
+	}
 	n, err := f.st.UpdateNode(ctx, m.NodeId, p)
 	switch {
 	case errors.Is(err, store.ErrConflict):
@@ -639,6 +646,11 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	case err != nil:
 		return nil, internalErr(f.log.Error, "update node", err)
 	}
+	if m.Address != nil && n.Address != oldAddress {
+		if err := f.staleKeysOn(ctx, n.ID); err != nil {
+			return nil, internalErr(f.log.Error, "mark devices stale", err)
+		}
+	}
 	f.audit(ctx, "node.update", map[string]string{"node_id": n.ID})
 	f.StateChanged() // address, DNS, timeouts and node settings feed the desired state
 	now := f.now().UTC()
@@ -646,6 +658,25 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	today, _ := f.todayBytesByNode(ctx, now)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now)}), nil
+}
+
+// staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the
+// node's address as its endpoint. A port change of an inbound does the same (access.Service.UpdateInbound).
+func (f *Fleet) staleKeysOn(ctx context.Context, nodeID string) error {
+	ins, err := f.st.FleetInbounds(ctx, nodeID, false)
+	if err != nil {
+		return err
+	}
+	done := map[string]bool{}
+	for _, in := range ins {
+		if p, ok := f.reg.Get(in.Protocol); ok && protocols.IsPerDevice(p) && !done[in.ProfileID] {
+			done[in.ProfileID] = true
+			if err := f.st.Access().BumpProfileEpoch(ctx, in.ProfileID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (s nodeService) RestartInbounds(ctx context.Context, req *connect.Request[adminv1.RestartInboundsRequest]) (*connect.Response[adminv1.RestartInboundsResponse], error) {

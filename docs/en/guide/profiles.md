@@ -139,7 +139,7 @@ Some fields are critical: the node and the app must agree on them, so the config
 
 For a Hysteria2 change the window gives the two ways around it: ask people to update the subscription by hand, or make a copy of the profile on a new port and remove the old one later.
 
-Changing the port of an AmneziaWG profile on one node (in the node's **Profiles** tab) also marks that profile's devices outdated, because their configs hold the old port.
+Changing the port of an AmneziaWG profile on one node (in the node's **Profiles** tab) also marks that profile's devices outdated, because their configs hold the old port. So does changing a node's **Address** (in its **Settings**), for every AmneziaWG profile on that node: the configs hold the old address.
 
 If someone else saved the profile while you were editing, saving says "This profile was changed somewhere else" with **Reload**: the panel never overwrites a newer version silently.
 

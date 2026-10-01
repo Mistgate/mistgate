@@ -157,7 +157,7 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 
 **DNS for user traffic** is not the same as the server's own resolver that the doctor checks, and not the same as the DNS presets that apps receive: see [DNS](dns.md).
 
-> **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
+> **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
 
 #### Renaming a node
 
