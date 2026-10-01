@@ -20,3 +20,19 @@ func TestSourceURLDefault(t *testing.T) {
 		t.Errorf("unset: default %q, want the project's repository", got)
 	}
 }
+
+// MISTGATE_ACME_HTTP set to "" turns the port-80 listener off, as --acme-http= does; unset, it is :80.
+func TestACMEHTTPEnvEmptyTurnsItOff(t *testing.T) {
+	t.Setenv("MISTGATE_ACME_HTTP", "")
+	if got := envSetOr("MISTGATE_ACME_HTTP", ":80"); got != "" {
+		t.Errorf("MISTGATE_ACME_HTTP=\"\": %q, want empty (off)", got)
+	}
+	t.Setenv("MISTGATE_ACME_HTTP", "127.0.0.1:8088")
+	if got := envSetOr("MISTGATE_ACME_HTTP", ":80"); got != "127.0.0.1:8088" {
+		t.Errorf("MISTGATE_ACME_HTTP set: %q", got)
+	}
+	os.Unsetenv("MISTGATE_ACME_HTTP")
+	if got := envSetOr("MISTGATE_ACME_HTTP", ":80"); got != ":80" {
+		t.Errorf("unset: %q, want :80", got)
+	}
+}

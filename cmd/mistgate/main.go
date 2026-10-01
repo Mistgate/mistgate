@@ -76,11 +76,14 @@ const defaultSourceURL = "https://github.com/Mistgate/mistgate"
 
 // sourceURLDefault is the default of serve --source-url: MISTGATE_SOURCE_URL when it is set, even to "" (no link),
 // else defaultSourceURL.
-func sourceURLDefault() string {
-	if v, ok := os.LookupEnv("MISTGATE_SOURCE_URL"); ok {
+func sourceURLDefault() string { return envSetOr("MISTGATE_SOURCE_URL", defaultSourceURL) }
+
+// envSetOr is envOr for a variable whose empty value means "off": set at all, even to "", it wins over def.
+func envSetOr(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
-	return defaultSourceURL
+	return def
 }
 
 func envBool(key string) bool {

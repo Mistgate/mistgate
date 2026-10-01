@@ -8,7 +8,7 @@ The panel has no configuration file. `mistgate setup` stores the addresses of an
 ## How flags and environment variables combine
 
 - A flag on the command line wins over its environment variable.
-- An environment variable set to an empty string counts as not set, so the default applies. The one exception is `MISTGATE_SOURCE_URL`: set to empty, it hides the source link.
+- An environment variable set to an empty string counts as not set, so the default applies. The exceptions are `MISTGATE_SOURCE_URL` (set to empty, it hides the source link) and `MISTGATE_ACME_HTTP` (set to empty, it turns the port 80 listener off).
 - Boolean variables (`MISTGATE_DEV`) accept `1`, `true`, `yes` or `on`, in any case.
 - The repeatable flags `--acme-domain` and `--trusted-proxy` also take comma-separated values. Their environment variables are comma-separated lists and are read only when the flag is not given at all.
 
@@ -21,7 +21,7 @@ The panel has no configuration file. `mistgate setup` stores the addresses of an
 | `--tls-key` | `MISTGATE_TLS_KEY` | none | The private key of `--tls-cert`. The two go together. |
 | `--acme-domain` | `MISTGATE_ACME_DOMAIN` | none | Get a Let's Encrypt certificate for this host name. Repeatable. Plain host names only, no wildcards. Uses TLS-ALPN-01 on the public listener, which must be reachable on port 443. Using it accepts the CA's terms of service. With `--tls-cert` as well, these names use Let's Encrypt and every other name the static certificate. |
 | `--acme-email` | `MISTGATE_ACME_EMAIL` | none | Contact address for Let's Encrypt. Optional. |
-| `--acme-http` | `MISTGATE_ACME_HTTP` | `:80` | Listener for ACME HTTP-01 and the redirect from HTTP to HTTPS, used only with `--acme-domain`. Other host names and unknown paths get the decoy's 404. Pass `--acme-http=` (empty) to turn it off; an empty environment variable does not. |
+| `--acme-http` | `MISTGATE_ACME_HTTP` | `:80` | Listener for ACME HTTP-01 and the redirect from HTTP to HTTPS, used only with `--acme-domain`. Other host names and unknown paths get the decoy's 404. Pass `--acme-http=` (empty) or set `MISTGATE_ACME_HTTP=` (empty) to turn it off. |
 | `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | Separate plain-HTTP listener for the admin. Only for an installation set up with `setup --admin-listen`; with a secret prefix or host it is an error. It overrides the stored address, but passkeys stay bound to the port setup stored. |
 | `--agent-listen` | `MISTGATE_AGENT_LISTEN` | none (`127.0.0.1:8082` with `--dev`) | Separate TLS listener for the node agent endpoint. Without it agents use the public listener with the secret TLS name, which needs TLS on the public listener. |
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | derived | The `host:port` agents dial, written into new install commands. Without it: `--agent-listen` when it names a concrete host (not empty, `0.0.0.0` or `[::]`), else the host and port of the public URL (443 when the URL has no port). Enrolled nodes keep the address they enrolled with. |

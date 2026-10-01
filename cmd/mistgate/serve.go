@@ -55,7 +55,7 @@ func runServe(args []string) error {
 	tlsCert := fs.String("tls-cert", os.Getenv("MISTGATE_TLS_CERT"), "TLS certificate for the public listener (reloaded when the file changes)")
 	tlsKey := fs.String("tls-key", os.Getenv("MISTGATE_TLS_KEY"), "TLS private key for the public listener")
 	acmeEmail := fs.String("acme-email", os.Getenv("MISTGATE_ACME_EMAIL"), "contact address for Let's Encrypt (optional)")
-	acmeHTTP := fs.String("acme-http", envOr("MISTGATE_ACME_HTTP", ":80"), "listener for ACME HTTP-01 and the http -> https redirect, used with --acme-domain (empty disables it)")
+	acmeHTTP := fs.String("acme-http", envSetOr("MISTGATE_ACME_HTTP", ":80"), "listener for ACME HTTP-01 and the http -> https redirect, used with --acme-domain (empty disables it)")
 	sourceURL := fs.String("source-url", sourceURLDefault(), "where the source code of this build is published, linked next to the version in the admin only (AGPL-3.0 section 13); a fork points it at its own repository, empty hides the link")
 	var acmeDomains, trustedProxies listFlag
 	fs.Var(&acmeDomains, "acme-domain", "get a Let's Encrypt certificate for this host name (repeatable; comma-separated env MISTGATE_ACME_DOMAIN); the public listener must be reachable on port 443; using it accepts the CA's terms of service")
