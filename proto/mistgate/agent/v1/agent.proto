@@ -15,7 +15,8 @@ package mistgate.agent.v1;
 //     server chain only if the CA certificate in it has the SHA-256 fingerprint from the install
 //     command. Authentication is the one-time enrollment token.
 //   - Everything else: mutual TLS. The client certificate is issued by the panel CA; its identity is the
-//     URI SAN "mistgate://node/<node_id>". The panel rejects a revoked serial or a retired node at
+//     URI SAN "spiffe://agent/<node_id>" (certificates issued before 2026-09-30 say "mistgate://node/<node_id>",
+//     still accepted, to be dropped after 2026-11-30). The panel rejects a revoked serial or a retired node at
 //     handshake (tls.Config.VerifyConnection) and never trusts a node_id sent in a message body
 //     over the one in the certificate.
 //   - The node always dials out; the node needs no inbound management port.
