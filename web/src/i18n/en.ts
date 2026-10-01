@@ -149,7 +149,7 @@ const core = {
   "auth.attemptsLeft": "{n} attempt left|{n} attempts left",
   "auth.lockedTitle": "Too many attempts",
   "auth.lockedBody":
-    "Sign-in is locked for 15 minutes. The owner got a Telegram bot alert — if it wasn’t you, they’ll see the IP and time.",
+    "Sign-in is locked for 15 minutes. The lockout is recorded in Settings → Audit with the IP address and time.",
   "auth.missingToken.title": "This setup link is incomplete",
   "auth.missingToken.body":
     "Open the full link printed by `mistgate setup`, including the part after the # sign. If it has expired, run the command again.",
