@@ -12,6 +12,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 | Getting started | The concepts, what you need, and the path from an empty server to the first user with a working subscription. |
 | Guide | Day-to-day work in the admin: nodes, profiles, protocols, WARP, users, subscriptions, the user page, DNS. |
 | Operations | Keeping the fleet healthy, updated and safe, and what to do when something breaks. |
+| Roadmap | Planned milestones and their acceptance criteria. |
 | Reference | Exact commands, flags, environment variables, the API, the MCP server and how the parts fit together. |
 
 ## Reading order for a new admin
@@ -50,6 +51,10 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Updates](operations/updates.md): node self-update, release keys, rollouts, and updating the panel.
 - [Security](operations/security.md): admin sign-in, roles, step-up, sessions, audit, the decoy site and the hidden admin, the data directory and backups, recovering access.
 - [Troubleshooting](operations/troubleshooting.md): common problems and how to find their cause.
+
+### Roadmap
+
+- [M2: SSH provisioning and recovery](roadmap/m2-ssh-provisioning.md): planned scope and acceptance criteria; implementation has not started.
 
 ### Reference
 
