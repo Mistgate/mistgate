@@ -62,10 +62,10 @@ describe("WARP's last_error in words", () => {
 
   it("words the owner's case: the Cloudflare probe timed out and the node reasserted", () => {
     const w = describeWarpError(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")!;
-    expect(w.head).toBe("Cloudflare не ответил через WARP за 6 с.");
+    expect(w.head).toBe("Проверка через WARP до Cloudflare завершилась ошибкой.");
     expect(w.more).toContain("Туннель поднят");
     expect(w.ladder).toBe("Пробую восстановить: переподключение.");
-    expect(warpErrorLine(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")).toBe("Cloudflare не ответил через WARP за 6 с. Пробую восстановить: переподключение.");
+    expect(warpErrorLine(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")).toBe("Проверка через WARP до Cloudflare завершилась ошибкой. Пробую восстановить: переподключение.");
     expect(describeWarpError(tOf("en"), "warp_flag_off")!.head).toBe("Cloudflare answered, but the traffic does not go through WARP (warp=off).");
     expect(describeWarpError(tOf("ru"), "ladder: rotated to 162.159.192.1:500")!.ladder).toContain("162.159.192.1:500");
   });

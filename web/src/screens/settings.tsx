@@ -10,11 +10,13 @@ import { DomainsPage } from "./settings-pages/domains";
 import { InterfacePage } from "./settings-pages/interface";
 import { SecurityPage } from "./settings-pages/security";
 import { SessionsPage } from "./settings-pages/sessions";
+import { SystemPage } from "./settings-pages/system";
 
 // Interface first: it is where /settings lands, and it works for every role. The pages that only explain what is not
 // there yet (no second admin, no automatic backups) come last.
 export const pages = [
   { id: "interface", label: "settings.interface" },
+  { id: "system", label: "settings.system" },
   { id: "security", label: "settings.security" },
   { id: "sessions", label: "settings.sessions" },
   { id: "audit", label: "settings.audit" },
@@ -102,6 +104,8 @@ export function SettingsPage() {
   switch (section) {
     case "interface":
       return <InterfacePage />;
+    case "system":
+      return <SystemPage />;
     case "security":
       return <SecurityPage />;
     case "sessions":

@@ -278,3 +278,22 @@ func TestHy2TCPPort(t *testing.T) {
 		}
 	}
 }
+
+func TestDoctorReconnectWarpRunsOnWorker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	w := newFakeWarp(&order{})
+	a := &Agent{cfg: Config{Warp: w}, jobs: make(chan job)}
+	done := make(chan struct{})
+	go func() {
+		a.worker(ctx)
+		close(done)
+	}()
+
+	reconnected, err := a.doctorReconnectWarp(ctx)
+	if err != nil || !reconnected || w.reconnectCount() != 1 {
+		t.Fatalf("reconnected=%v calls=%d err=%v", reconnected, w.reconnectCount(), err)
+	}
+	cancel()
+	<-done
+}

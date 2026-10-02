@@ -144,28 +144,39 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
   const updateKind: StatusKind = update?.installing ? "busy" : update?.errorKey === "check_failed" ? "bad" : update?.available || update?.errorKey === "unsupported" || update?.errorKey === "asset_missing" ? "warn" : "ok";
   return (
     <section className={card}>
-      <SectionLabel as="h2" icon="server" tone="lavender">
-        {t("up.panel.title")}
-      </SectionLabel>
-      <dl className="flex flex-col gap-2">
-        <Row label={t("up.panel.version")}>
-          <span className="font-mono text-xs">{p?.version || "—"}</span>
-        </Row>
-        <Row label={t("up.panel.built")}>{p?.built ? fmt.dateTime(p.built) : "—"}</Row>
-        <Row label={t("up.panel.key")}>
-          {p?.hasReleaseKey ? <span className="font-mono text-xs">{p.releaseKeyFingerprint}</span> : <span className="text-warn-text">{t("up.panel.noKey")}</span>}
-        </Row>
-        {update?.version && <Row label={t("up.panel.latest")}>
-          <a href={update.url} target="_blank" rel="noreferrer" className="font-mono text-xs text-accent underline underline-offset-2">
-            {update.version}
-          </a>
-        </Row>}
-      </dl>
-      <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-        <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SectionLabel as="h2" icon="server" tone="lavender">
+          {t("up.panel.title")}
+        </SectionLabel>
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPill kind={updateKind} label={updateLabel} sm />
           {update?.checkedUnix ? <span className="text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
-          <span className="flex-1" />
+        </div>
+      </div>
+
+      <dl className="grid gap-2 sm:grid-cols-2">
+        <div className="min-w-0 rounded-field border border-line bg-surface-2 p-3.5">
+          <dt className="text-xs text-muted">{t("up.panel.version")}</dt>
+          <dd className="mt-1 break-words font-mono text-base font-bold text-fg">{p?.version || "—"}</dd>
+          <p className="mt-1 text-xs text-muted">{t("up.panel.built")}: {p?.built ? fmt.dateTime(p.built) : "—"}</p>
+        </div>
+        <div className="min-w-0 rounded-field border border-line bg-surface-2 p-3.5">
+          <dt className="text-xs text-muted">{t("up.panel.latest")}</dt>
+          <dd className="mt-1 break-words font-mono text-base font-bold text-fg">
+            {update?.version && update.url ? (
+              <a href={update.url} target="_blank" rel="noreferrer" className="cursor-pointer text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                {update.version}
+              </a>
+            ) : updateLabel}
+          </dd>
+          <p className="mt-1 text-xs text-muted">
+            {t("up.panel.key")}: {p?.hasReleaseKey ? <span className="font-mono text-fg">{p.releaseKeyFingerprint}</span> : <span className="font-semibold text-warn-text">{t("up.panel.noKey")}</span>}
+          </p>
+        </div>
+      </dl>
+
+      <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" disabled={actions.busy} onClick={() => void actions.checkPanel()}>
             <Icon name="refresh" size={12} />
             {t("up.panel.check")}
@@ -179,11 +190,11 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
         <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>
       </div>
       {!update?.supported && (
-      <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-        <h3 className="text-[13px] font-bold">{t("up.panel.how")}</h3>
-        <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.howBody")}</p>
-        <Code>{t("up.panel.steps")}</Code>
-      </div>
+        <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+          <h3 className="text-[13px] font-bold">{t("up.panel.how")}</h3>
+          <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.howBody")}</p>
+          <Code>{t("up.panel.steps")}</Code>
+        </div>
       )}
     </section>
   );

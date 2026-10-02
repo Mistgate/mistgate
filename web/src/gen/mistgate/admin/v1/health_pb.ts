@@ -831,7 +831,7 @@ export type FixPlan = Message<"mistgate.admin.v1.FixPlan"> & {
   detail: string;
 
   /**
-   * true when the fix drops client sessions (restart_inbound). The UI shows it in warning style.
+   * true when the fix interrupts client traffic (restart_inbound or reconnect_warp). The UI shows a warning.
    *
    * @generated from field: bool disruptive = 5;
    */

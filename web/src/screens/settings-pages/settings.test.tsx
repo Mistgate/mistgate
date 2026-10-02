@@ -137,7 +137,7 @@ describe("Settings: the strip of pages", () => {
   it("puts Interface first and the pages that only explain what is missing last", async () => {
     await mount(<SettingsLayout />);
     const labels = [...document.querySelectorAll("nav a")].map((a) => a.textContent);
-    expect(labels).toEqual(["Interface", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
+    expect(labels).toEqual(["Interface", "System", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
     expect(document.querySelector("nav a[data-status=active]")?.textContent).toBe("Interface");
   });
 });

@@ -168,7 +168,14 @@ export function DoctorRow({
   const who = { nodeId, nodeName, checkId: item.id };
 
   let action = null;
-  if (target) action = <FixControl flow={flow} target={target} variant={item.status === DoctorStatus.FAIL ? "primary" : "secondary"} />;
+  if (target && item.id === "warp_path")
+    action = (
+      <>
+        <FixControl flow={flow} target={target} variant={item.status === DoctorStatus.FAIL ? "primary" : "secondary"} />
+        <WarpPathActions nodeId={nodeId} hasFix />
+      </>
+    );
+  else if (target) action = <FixControl flow={flow} target={target} variant={item.status === DoctorStatus.FAIL ? "primary" : "secondary"} />;
   else if (command)
     action = (
       <div className="flex max-w-full items-center gap-2">
@@ -269,12 +276,12 @@ function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: 
 }
 
 /** What the owner can do about warp_path: look at the WARP card (node settings), or have the node report again right now. */
-function WarpPathActions({ nodeId }: { nodeId: string }) {
+function WarpPathActions({ nodeId, hasFix = false }: { nodeId: string; hasFix?: boolean }) {
   const t = useT();
   const run = useRunDoctor(nodeId);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "settings" }} hash="warp" className={buttonClass("primary", "sm")}>
+      <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "settings" }} hash="warp" className={buttonClass(hasFix ? "secondary" : "primary", "sm")}>
         {t("warp.open")}
       </Link>
       <Button variant="secondary" size="sm" onClick={() => run.mutate()} disabled={run.isPending}>

@@ -356,7 +356,7 @@ message FixPlan {
   // Facts from the node (agent CommandResult.params), short English line in `detail`.
   map<string, string> params = 3;
   string detail = 4;
-  // true when the fix drops client sessions (restart_inbound). The UI shows it in warning style.
+  // true when the fix interrupts client traffic (restart_inbound or reconnect_warp). The UI shows a warning.
   bool disruptive = 5;
 }
 

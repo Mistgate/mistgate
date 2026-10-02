@@ -684,12 +684,14 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 // Worker: everything that mutates engines or host state
 
 type job struct {
-	s       *session // where the reply goes; nil for internal jobs
-	ds      *pb.DesiredState
-	kick    *pb.Kick
-	restart *pb.RestartInbound
-	retire  *pb.Retire
-	sweep   bool
+	ctx           context.Context
+	s             *session // where the reply goes; nil for internal jobs
+	ds            *pb.DesiredState
+	kick          *pb.Kick
+	restart       *pb.RestartInbound
+	reconnectWarp bool
+	retire        *pb.Retire
+	sweep         bool
 	// res, when set, receives the restart's CommandResult instead of the stream (the doctor's restart_inbound).
 	res chan *pb.CommandResult
 }
@@ -737,6 +739,17 @@ func (a *Agent) handle(ctx context.Context, j job) {
 		reply(cmdResult(a.kick(ctx, j.kick)))
 	case j.restart != nil:
 		if r := a.restartInbound(ctx, j.restart); j.res != nil {
+			j.res <- r
+		} else {
+			reply(cmdResult(r))
+		}
+	case j.reconnectWarp:
+		reconnectCtx := j.ctx
+		if reconnectCtx == nil {
+			reconnectCtx = ctx
+		}
+		r := a.reconnectWarp(reconnectCtx)
+		if j.res != nil {
 			j.res <- r
 		} else {
 			reply(cmdResult(r))

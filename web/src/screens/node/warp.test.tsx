@@ -93,7 +93,7 @@ const slowEdge = {
 describe("the WARP card after a failed check", () => {
   it("says what happened in words, and what the node does about it", async () => {
     await mount(data(slowEdge));
-    expect(text()).toContain("Cloudflare did not answer through WARP within 6 s.");
+    expect(text()).toContain("The Cloudflare probe failed through WARP.");
     expect(text()).toContain("The tunnel is up, but WARP is slow or not passing traffic right now.");
     expect(text()).toContain("Trying to recover: reconnecting.");
     expect(text()).not.toContain("probe_cloudflare_failed"); // never the raw code for a code it knows
@@ -105,9 +105,9 @@ describe("the WARP card after a failed check", () => {
     expect(spinner()).toBeNull();
   });
 
-  it("shows the failed probe as a red dot and 'no answer', the passing one with its latency", async () => {
+  it("shows the failed probe as a red dot and 'failed', the passing one with its latency", async () => {
     await mount(data(slowEdge));
-    expect(text()).toContain("Cloudflareno answer");
+    expect(text()).toContain("Cloudflarefailed");
     expect(text()).toContain("Other siteok · 0.4 s");
     expect(dotOf("Cloudflare")).toContain("tone-bad");
     expect(dotOf("Cloudflare")).not.toContain("tone-ok");
@@ -122,7 +122,7 @@ describe("the WARP card after a failed check", () => {
   it("a green 'Working' cannot sit next to a failed check", async () => {
     await mount(data({ ...slowEdge, state: WarpState.UP }));
     expect(text()).toContain("Working: last check failed");
-    expect(text()).toContain("Cloudflare did not answer through WARP");
+    expect(text()).toContain("The Cloudflare probe failed through WARP.");
   });
 
   it("is quiet when the latest check passed: no error text, plain 'Working'", async () => {
@@ -277,8 +277,8 @@ describe("a node whose agent predates the per-probe results", () => {
     await mount(data({ state: WarpState.DOWN, probeCloudflareOk: true, probeOtherOk: false, lastError: "probe_other_failed", checkedUnix: 0, reportedUnix: nowS() - 20 }));
     expect(text()).toContain("Cloudflareok");
     expect(text()).not.toContain("Cloudflareok ·");
-    expect(text()).toContain("Other siteno answer");
-    expect(text()).toContain("A site outside Cloudflare did not answer through WARP");
+    expect(text()).toContain("Other sitefailed");
+    expect(text()).toContain("The other-site probe failed through WARP.");
     expect(text()).toMatch(/Checked \d+ s ago/);
   });
 });

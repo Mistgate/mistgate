@@ -17,8 +17,8 @@ import (
 // capDoctor is the Hello capability of an agent that can run the doctor (agent.proto "DOCTOR").
 const capDoctor = "doctor/1"
 
-// fixIDs are the four fixes the agent has (agent.proto "FIX IDS"). A fix id anywhere else is ignored.
-var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver"}
+// fixIDs are the five fixes the agent has (agent.proto "FIX IDS"). A fix id anywhere else is ignored.
+var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp"}
 
 func knownFix(id string) string {
 	if slices.Contains(fixIDs, id) {

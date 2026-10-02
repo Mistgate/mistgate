@@ -38,7 +38,7 @@ func TestFullRunListsEveryCheckInOrder(t *testing.T) {
 	if got := strings.Join(ids, ","); got != want {
 		t.Errorf("check ids changed:\n got %s\nwant %s", got, want)
 	}
-	if got := strings.Join(FixIDs(), ","); got != "journald_vacuum,apply_baseline,restart_inbound,set_resolver" {
+	if got := strings.Join(FixIDs(), ","); got != "journald_vacuum,apply_baseline,restart_inbound,set_resolver,reconnect_warp" {
 		t.Errorf("fix ids = %s", got)
 	}
 }

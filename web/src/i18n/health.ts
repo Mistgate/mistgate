@@ -166,6 +166,7 @@ export const en = {
   "hl.fix.asking": "Asking the node what it would do…",
   "hl.fix.nothing": "Nothing to do: the node is already in the wanted state.",
   "hl.fix.disruptive": "Client connections through this profile drop for a moment and reconnect by themselves.",
+  "hl.fix.disruptiveWarp": "Traffic from profiles using WARP on this node may pause briefly while the tunnel reconnects.",
   "hl.fix.restartNamed": "Restart “{profile}”",
   "hl.fix.details": "Details",
   "hl.fix.safe": "This changes nothing you would have to undo: only Mistgate’s own files and services are touched.",
@@ -409,6 +410,8 @@ export const en = {
   "health.fix.restart_inbound.plan": "Restart {profiles}.",
   "health.fix.set_resolver.label": "Fix the resolver",
   "health.fix.set_resolver.plan": "Point the host resolver ({mode}) from {before} to {after}. The previous setting is backed up.",
+  "health.fix.reconnect_warp.label": "Reconnect WARP",
+  "health.fix.reconnect_warp.plan": "Reconnect the configured WARP tunnel and reapply its routes.",
 
   // ---- check errors (health.check.err.<code>)
   "health.check.err.timeout": "No handshake: the UDP traffic probably does not arrive",
@@ -580,6 +583,7 @@ export const ru: typeof en = {
   "hl.fix.asking": "Спрашиваю у ноды, что она сделает…",
   "hl.fix.nothing": "Делать нечего: нода уже в нужном состоянии.",
   "hl.fix.disruptive": "Подключения клиентов через этот профиль на миг оборвутся и восстановятся сами.",
+  "hl.fix.disruptiveWarp": "Трафик профилей с выходом через WARP на этой ноде может ненадолго прерваться при переподключении туннеля.",
   "hl.fix.restartNamed": "Перезапустить «{profile}»",
   "hl.fix.details": "Подробности",
   "hl.fix.safe": "Ничего такого, что пришлось бы откатывать: затрагиваются только файлы и службы самого Mistgate.",
@@ -823,6 +827,8 @@ export const ru: typeof en = {
   "health.fix.restart_inbound.plan": "Перезапустить {profiles}.",
   "health.fix.set_resolver.label": "Исправить резолвер",
   "health.fix.set_resolver.plan": "Направить резолвер хоста ({mode}) с {before} на {after}. Прежняя настройка сохраняется.",
+  "health.fix.reconnect_warp.label": "Переподключить WARP",
+  "health.fix.reconnect_warp.plan": "Переподключить настроенный туннель WARP и восстановить его маршруты.",
 
   // ---- check errors
   "health.check.err.timeout": "Нет рукопожатия: UDP-трафик, скорее всего, не доходит",

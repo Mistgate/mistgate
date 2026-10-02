@@ -89,6 +89,7 @@ const core = {
   "status.blip": "Host blip",
 
   "settings.interface": "Interface",
+  "settings.system": "System",
   "settings.admins": "Admins",
   "settings.security": "Security",
   "settings.sessions": "Sessions",

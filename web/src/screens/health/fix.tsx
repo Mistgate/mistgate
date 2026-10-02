@@ -137,7 +137,13 @@ function FixDialog({ dlg, onClose, onConfirm }: { dlg: Dialog | null; onClose: (
   // a fix the SPA has no words for says what the node says, in the open
   const worded = plan ? lookup(t, plan.titleKey, params) : null;
   const sentence = plan && !restart ? (worded ?? plan.detail) : "";
-  const consequence = plan && restart ? (restartConsequence(t, many ? "many" : "one", plan.params.online) ?? t("hl.fix.disruptive")) : "";
+  const consequence = plan
+    ? restart
+      ? (restartConsequence(t, many ? "many" : "one", plan.params.online) ?? t("hl.fix.disruptive"))
+      : plan.disruptive
+        ? t(d.target.fixId === "reconnect_warp" ? "hl.fix.disruptiveWarp" : "hl.fix.disruptive")
+        : ""
+    : "";
 
   return (
     <Modal
@@ -170,7 +176,7 @@ function FixDialog({ dlg, onClose, onConfirm }: { dlg: Dialog | null; onClose: (
           ) : (
             <>
               {sentence && <p className="text-sm leading-normal text-pretty">{sentence}</p>}
-              {restart ? <Notice>{consequence}</Notice> : plan.disruptive ? <Notice>{t("hl.fix.disruptive")}</Notice> : <p className="text-xs text-muted">{t("hl.fix.safe")}</p>}
+              {plan.disruptive ? <Notice>{consequence}</Notice> : <p className="text-xs text-muted">{t("hl.fix.safe")}</p>}
               {plan.detail && sentence !== plan.detail && (
                 <details className="group text-xs">
                   <summary className="flex w-fit cursor-pointer list-none items-center gap-1 font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">

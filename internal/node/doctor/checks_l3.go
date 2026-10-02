@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// The two checks of the L3 protocols: awg_backend and warp_path. Neither offers a fix: a
-// missing /dev/net/tun is the unit's (run `mistgate-node install`), a missing kernel module is an explicit owner
-// action (`mistgate-node awg prepare-kernel`), a clash of the routing table is the owner's to resolve; installing
-// packages or rewriting the firewall is not in the safe set.
+// The two checks of the L3 protocols: awg_backend and warp_path. A down WARP tunnel can be reconnected with its
+// current account; host collisions, missing configuration, and unavailable WireGuard backends still need owner action.
+// Missing /dev/net/tun is the unit's (run `mistgate-node install`), and a missing kernel module is an explicit owner
+// action (`mistgate-node awg prepare-kernel`). Installing packages or rewriting the firewall is not in the safe set.
 
 // AwgBackend is the choice of the AmneziaWG backend as the engine made it (awg.BackendStatus).
 type AwgBackend struct {
@@ -146,7 +146,7 @@ func checkWarpPath(ctx context.Context, e *Env) Result {
 		if w.LastError != "" {
 			params["error"] = clip(w.LastError, 120)
 		}
-		return Result{Status: Fail, Code: CodeWarpDown, Params: params, Detail: clip("down: "+orStr(w.LastError, "no handshake"), 200)}
+		return Result{Status: Fail, Code: CodeWarpDown, FixID: FixReconnectWarp, Params: params, Detail: clip("down: "+orStr(w.LastError, "no handshake"), 200)}
 	}
 	return Result{Status: Warn, Code: CodeWarpUnknown, Params: params, Detail: "unknown state " + w.State}
 }

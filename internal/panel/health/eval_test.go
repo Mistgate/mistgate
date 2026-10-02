@@ -312,16 +312,16 @@ func TestKernelHeadersIsInfoWithoutAmneziaWG(t *testing.T) {
 	}
 }
 
-func TestDoctorFixIdsAreTheFourKnownOnes(t *testing.T) {
+func TestDoctorFixIdsAreTheFiveKnownOnes(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
-	e.report("de1", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"))
+	e.report("de1", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"), res("warp_path", dFail, "reconnect_warp"))
 	rows, _ := e.st.DoctorResults(e.ctx, "de1")
 	fixes := map[string]string{}
 	for _, r := range rows {
 		fixes[r.CheckID] = r.FixID
 	}
-	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" {
+	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" || fixes["warp_path"] != "reconnect_warp" {
 		t.Fatalf("fix ids: %v", fixes)
 	}
 }

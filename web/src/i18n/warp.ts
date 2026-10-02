@@ -52,7 +52,7 @@ export const en = {
   "warp.probe.a": "Cloudflare",
   "warp.probe.b": "Other site",
   "warp.probe.ok": "ok",
-  "warp.probe.fail": "no answer",
+  "warp.probe.fail": "failed",
   "warp.probe.slow": "slow",
   "warp.probe.httpStatus": "HTTP {status}",
   "warp.probe.error.timeout": "timed out",
@@ -72,10 +72,10 @@ export const en = {
   "warp.recheck": "Check again",
 
   // The agent's last_error in words (lib/warp-error.ts): "warp.e.<code>" says what happened, ".more" what it means.
-  "warp.e.probe_cloudflare_failed": "Cloudflare did not answer through WARP within 6 s.",
+  "warp.e.probe_cloudflare_failed": "The Cloudflare probe failed through WARP.",
   "warp.e.probe_cloudflare_failed.more":
     "The tunnel is up, but WARP is slow or not passing traffic right now. Until the check passes, profiles that exit through WARP may be slow or fail.",
-  "warp.e.probe_other_failed": "A site outside Cloudflare did not answer through WARP within 6 s.",
+  "warp.e.probe_other_failed": "The other-site probe failed through WARP.",
   "warp.e.probe_other_failed.more": "The handshake works, but traffic does not get past the tunnel, or only very slowly. Profiles that exit through WARP may fail.",
   "warp.e.warp_flag": "Cloudflare answered, but the traffic does not go through WARP (warp={flag}).",
   "warp.e.warp_flag.more": "The account may have been limited or revoked. Read it from Cloudflare again or import a new profile.",
@@ -231,7 +231,7 @@ export const ru: typeof en = {
   "warp.probe.a": "Cloudflare",
   "warp.probe.b": "Другой сайт",
   "warp.probe.ok": "ок",
-  "warp.probe.fail": "не ответил",
+  "warp.probe.fail": "ошибка",
   "warp.probe.slow": "медленно",
   "warp.probe.httpStatus": "HTTP {status}",
   "warp.probe.error.timeout": "тайм-аут",
@@ -250,10 +250,10 @@ export const ru: typeof en = {
   "warp.open": "Открыть WARP",
   "warp.recheck": "Перепроверить",
 
-  "warp.e.probe_cloudflare_failed": "Cloudflare не ответил через WARP за 6 с.",
+  "warp.e.probe_cloudflare_failed": "Проверка через WARP до Cloudflare завершилась ошибкой.",
   "warp.e.probe_cloudflare_failed.more":
     "Туннель поднят, но WARP сейчас медленный или не пропускает трафик. Пока проверка не пройдёт, профили с выходом через WARP могут тормозить или не работать.",
-  "warp.e.probe_other_failed": "Сайт вне Cloudflare не ответил через WARP за 6 с.",
+  "warp.e.probe_other_failed": "Проверка через WARP до другого сайта завершилась ошибкой.",
   "warp.e.probe_other_failed.more": "Рукопожатие есть, но дальше туннеля трафик не идёт или идёт очень медленно. Профили с выходом через WARP могут не работать.",
   "warp.e.warp_flag": "Cloudflare ответил, но трафик идёт не через WARP (warp={flag}).",
   "warp.e.warp_flag.more": "Аккаунт могли ограничить или отозвать. Перечитай его у Cloudflare или импортируй новый профиль.",

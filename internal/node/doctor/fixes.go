@@ -39,7 +39,7 @@ func noop(detail string) FixOutcome {
 	return FixOutcome{OK: true, Detail: detail, Params: p("noop", "1")}
 }
 
-// Apply runs one of the four fixes. The id is compared against a compiled list and never reaches a shell;
+// Apply runs one of the five fixes. The id is compared against a compiled list and never reaches a shell;
 // params are validated (an inbound id must be one this agent runs). dryRun changes nothing: it only reads
 // and describes. One fix at a time.
 func (d *Doctor) Apply(ctx context.Context, fixID string, dryRun bool, params map[string]string) FixOutcome {
@@ -68,9 +68,37 @@ func (d *Doctor) Apply(ctx context.Context, fixID string, dryRun bool, params ma
 		return fixBaseline(ctx, e, dryRun, params)
 	case FixRestartInbound:
 		return fixRestart(ctx, e, dryRun, params)
+	case FixReconnectWarp:
+		return fixReconnectWarp(ctx, e, dryRun, params)
 	default:
 		return fixResolver(ctx, e, dryRun, params)
 	}
+}
+
+// reconnect_warp reinitializes only a configured tunnel that Doctor still sees as down. The manager preserves its
+// current account and routes, and the caller re-runs warp_path after the operation.
+func fixReconnectWarp(ctx context.Context, e *Env, dry bool, params map[string]string) FixOutcome {
+	if !noParams(params) {
+		return FixOutcome{Err: ErrBadParams}
+	}
+	if e.Warp == nil || e.ReconnectWarp == nil {
+		return FixOutcome{Err: ErrUnsupportedHost}
+	}
+	w := e.Warp(ctx)
+	if !w.Configured || w.State != "down" {
+		return noop("WARP is no longer down; no reconnect is needed")
+	}
+	if dry {
+		return FixOutcome{OK: true, Affected: 1, Params: p("state", w.State), Detail: "would reconnect the configured WARP tunnel"}
+	}
+	reconnected, err := e.ReconnectWarp(ctx)
+	if err != nil {
+		return failed(err)
+	}
+	if !reconnected {
+		return noop("WARP recovered before the reconnect; no change was made")
+	}
+	return FixOutcome{OK: true, Affected: 1, Params: p("state", "starting"), Detail: "WARP tunnel reconnected; waiting for a fresh handshake"}
 }
 
 // noParams rejects any parameter for the fixes that take none.

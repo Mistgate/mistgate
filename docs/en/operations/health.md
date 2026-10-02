@@ -114,7 +114,7 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | CPU softirq (`cpu_softirq`) | Mean softirq share and total CPU over 10 minutes. Skipped until 30 samples are collected. | Softirq 50% or more | Softirq 90% or more, or CPU 97% or more | None |
 | Kernel headers (`kernel_headers`) | Headers, `dkms`, `make` and `gcc` for the AmneziaWG kernel module. Skipped without an AmneziaWG profile; only a fact while AmneziaWG runs in userspace. | Kernel mode is requested and the module does not run while tools are missing | None | None: see [AmneziaWG](../guide/amneziawg.md) |
 | AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | None |
-| WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | None: see [WARP](../guide/warp.md) |
+| WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Reconnect WARP, only while the tunnel is down |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 
@@ -122,7 +122,7 @@ A warning or problem opens an alert (see "Kinds of alerts" below). The certifica
 
 ### Fixes
 
-There are exactly four fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
+There are exactly five fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
 
 | Button | What it does | Offered by |
 |---|---|---|
@@ -130,6 +130,7 @@ There are exactly four fixes. They are compiled into the agent: the panel sends 
 | Restore the base settings | Writes Mistgate's sysctl file (`/etc/sysctl.d/90-mistgate.conf`: fq and BBR) and journald drop-in (`/etc/systemd/journald.conf.d/90-mistgate.conf`: the 200 MB cap) again, and the SSH guard (a per-address rate limit on new SSH connections). | Base network settings |
 | Restart profile | Restarts one profile on the node, or every profile that failed to start. Connections through it drop for a couple of seconds and come back by themselves. | Ports in use, Certificates (self-signed) |
 | Fix the resolver | Points the host resolver at the node's **DNS for user traffic** (node settings) or, when that is empty, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
+| Reconnect WARP | Rebuilds the configured tunnel and its routes while keeping the same account. Profiles using WARP may briefly lose traffic. The plan is refused if the tunnel recovered before Apply. | WARP exit, only when the tunnel is down |
 
 A fix always takes two steps:
 

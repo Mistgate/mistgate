@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
+import { SystemPage } from "@/screens/settings-pages/system";
 import { UpdatesScreen } from "./index";
 
 const getUpdates = vi.fn();
@@ -125,7 +126,7 @@ const outdated = [
   node({ nodeId: "nod_2", name: "nl1", state: NodeUpdateState.OUTDATED, onlineUsers: 1 }),
 ];
 
-async function mount(data: unknown) {
+async function mount(data: unknown, screen: ReactNode = <UpdatesScreen />) {
   getUpdates.mockResolvedValue(data);
   host = document.createElement("div");
   document.body.append(host);
@@ -134,7 +135,7 @@ async function mount(data: unknown) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <UpdatesScreen />
+        {screen}
       </QueryClientProvider>,
     ),
   );
@@ -161,6 +162,25 @@ describe("panel self-update", () => {
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
     expect(button("Update panel")).toBeUndefined();
     expect(text()).toContain("Version v0.3.0 is available");
+  });
+
+  it("shows the same update controls and an About card in Settings → System", async () => {
+    await mount(
+      page({
+        panel: {
+          ...page().panel,
+          update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" },
+        },
+      }),
+      <SystemPage />,
+    );
+    expect(text()).toContain("About Mistgate");
+    expect(text()).toContain("Panel version");
+    expect(text()).toContain("Build date");
+    expect(button("Update panel")).toBeTruthy();
+    expect(document.querySelector('a[href="https://mistgate.app/"]')).toBeTruthy();
+    expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate"]')).toBeTruthy();
+    expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate/blob/main/LICENSE"]')).toBeTruthy();
   });
 });
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");

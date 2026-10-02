@@ -579,3 +579,25 @@ func TestApplyFixOneAtATimePerNode(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReconnectWarpPlanIsDisruptiveAndRequiresConfirmation(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	r := rpc{e.s}
+	e.fl.fix = func(c fixCall) (*agentv1.CommandResult, error) {
+		return &agentv1.CommandResult{Ok: true, Detail: "would reconnect the configured WARP tunnel"}, nil
+	}
+
+	plan, err := r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "reconnect_warp", DryRun: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Msg.Plan == nil || plan.Msg.Plan.FixId != "reconnect_warp" || !plan.Msg.Plan.Disruptive || plan.Msg.Plan.TitleKey != "health.fix.reconnect_warp.plan" {
+		t.Fatalf("plan must warn before reconnecting WARP: %+v", plan.Msg)
+	}
+	_, err = r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "reconnect_warp"}))
+	wantCode(t, err, connect.CodeFailedPrecondition, "no fresh plan")
+	if len(e.fl.fixCalls) != 1 || !e.fl.fixCalls[0].dry {
+		t.Fatalf("WARP changed before confirmation: %+v", e.fl.fixCalls)
+	}
+}

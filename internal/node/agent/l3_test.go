@@ -118,16 +118,18 @@ func (e *fakeAwg) NodeSettings(_ context.Context, st *pb.NodeSettings) bool {
 type fakeWarp struct {
 	ord *order
 
-	mu       sync.Mutex
-	spec     *plugin.WarpSpec
-	applied  int
-	applyErr error
-	routes   []netip.Prefix
-	routeErr error
-	cleaned  bool
-	health   *warp.Health
-	findings []warp.Finding
-	ran      chan struct{}
+	mu           sync.Mutex
+	spec         *plugin.WarpSpec
+	applied      int
+	applyErr     error
+	routes       []netip.Prefix
+	routeErr     error
+	cleaned      bool
+	reconnects   int
+	reconnectErr error
+	health       *warp.Health
+	findings     []warp.Finding
+	ran          chan struct{}
 }
 
 func newFakeWarp(ord *order) *fakeWarp { return &fakeWarp{ord: ord, ran: make(chan struct{}, 1)} }
@@ -144,6 +146,20 @@ func (w *fakeWarp) Apply(_ context.Context, spec *plugin.WarpSpec) error {
 	}
 	w.ord.add("warp.apply")
 	return w.applyErr
+}
+
+func (w *fakeWarp) Reconnect(context.Context) (bool, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.reconnects++
+	w.ord.add("warp.reconnect")
+	return w.reconnectErr == nil, w.reconnectErr
+}
+
+func (w *fakeWarp) reconnectCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.reconnects
 }
 
 func (w *fakeWarp) SetRoutedSubnets(_ context.Context, ps []netip.Prefix) error {
