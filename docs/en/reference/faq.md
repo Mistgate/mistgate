@@ -1,6 +1,6 @@
 ---
 title: FAQ
-description: Short answers to common questions about Mistgate: Docker, memory, apps, size, IPv6, Cloudflare, migration, the license and where to report problems.
+description: "Short answers to common questions about Mistgate: Docker, memory, apps, size, IPv6, Cloudflare, migration, the license and where to report problems."
 ---
 
 ## Why is there no Docker image?

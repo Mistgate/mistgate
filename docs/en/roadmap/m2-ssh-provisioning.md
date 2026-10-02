@@ -7,7 +7,7 @@ description: "Planned M2 scope for provisioning nodes over SSH, managing server 
 
 ## Goal
 
-From the admin UI, take a supported, empty Linux server to an online Mistgate node in five minutes or less. The current manual flow is documented in [Add a node](../../getting-started/add-node.md); M2 is intended to run that setup over SSH and make failures recoverable from the UI.
+From the admin UI, take a supported, empty Linux server to an online Mistgate node in five minutes or less. The current manual flow is documented in [Add a node](../getting-started/add-node.md); M2 is intended to run that setup over SSH and make failures recoverable from the UI.
 
 ## Planned scope
 
@@ -34,7 +34,7 @@ From the admin UI, take a supported, empty Linux server to an online Mistgate no
 
 ### Node removal
 
-Extend the existing node retirement flow so that removal also deletes saved SSH credentials, revokes the node identity, invalidates unused enrollment commands, and leaves an audit record. The current node removal behavior is described in [Add a node](../../getting-started/add-node.md).
+Extend the existing node retirement flow so that removal also deletes saved SSH credentials, revokes the node identity, invalidates unused enrollment commands, and leaves an audit record. The current node removal behavior is described in [Add a node](../getting-started/add-node.md).
 
 ## Acceptance criteria
 
