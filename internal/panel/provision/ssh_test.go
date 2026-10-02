@@ -207,15 +207,30 @@ func testSSHClient(t *testing.T, signer ssh.Signer, passwords chan<- string) *Cl
 		if err != nil {
 			return nil, err
 		}
+		accepted := make(chan struct{})
 		go func() {
 			serverConn, err := listener.Accept()
+			close(accepted)
 			if err == nil {
 				serveTestSSH(serverConn, server)
 			}
 		}()
 		clientConn, err := (&net.Dialer{}).DialContext(ctx, "tcp", listener.Addr().String())
-		listener.Close()
-		return clientConn, nil
+		if err != nil {
+			_ = listener.Close()
+			<-accepted
+			return nil, err
+		}
+		select {
+		case <-accepted:
+			_ = listener.Close()
+			return clientConn, nil
+		case <-ctx.Done():
+			_ = listener.Close()
+			_ = clientConn.Close()
+			<-accepted
+			return nil, ctx.Err()
+		}
 	})
 	return client
 }
