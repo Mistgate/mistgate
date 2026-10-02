@@ -62,23 +62,26 @@ var tokenProcedures = map[string]int{
 // stepUpProcedures lists exactly the procedures whose handlers call RequireStepUp. A token cannot call them
 // directly (none is TokenAccessDirect); through MCP they run only inside an approved plan.
 var stepUpProcedures = map[string]bool{
-	adminv1connect.AuthServiceBeginAddPasskeyProcedure:      true,
-	adminv1connect.AuthServiceRemovePasskeyProcedure:        true,
-	adminv1connect.AuthServiceEndSessionProcedure:           true, // another session
-	adminv1connect.AuthServiceEndOtherSessionsProcedure:     true,
-	adminv1connect.UpdateServiceStartRolloutProcedure:       true,
-	adminv1connect.UpdateServicePauseRolloutProcedure:       true,
-	adminv1connect.UpdateServiceResumeRolloutProcedure:      true,
-	adminv1connect.UpdateServiceCancelRolloutProcedure:      true,
-	adminv1connect.UpdateServiceRollbackNodeProcedure:       true,
-	adminv1connect.UpdateServiceRescanBundleProcedure:       true,
-	adminv1connect.UpdateServiceInstallPanelUpdateProcedure: true,
-	adminv1connect.WarpServiceRegisterWarpProcedure:         true,
-	adminv1connect.WarpServiceImportWarpProcedure:           true,
-	adminv1connect.WarpServiceDeleteWarpProcedure:           true,
-	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:   true,
-	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure:   true,
-	adminv1connect.ApprovalServiceApproveProcedure:          true,
+	adminv1connect.AuthServiceBeginAddPasskeyProcedure:            true,
+	adminv1connect.AuthServiceRemovePasskeyProcedure:              true,
+	adminv1connect.AuthServiceEndSessionProcedure:                 true, // another session
+	adminv1connect.AuthServiceEndOtherSessionsProcedure:           true,
+	adminv1connect.UpdateServiceStartRolloutProcedure:             true,
+	adminv1connect.UpdateServicePauseRolloutProcedure:             true,
+	adminv1connect.UpdateServiceResumeRolloutProcedure:            true,
+	adminv1connect.UpdateServiceCancelRolloutProcedure:            true,
+	adminv1connect.UpdateServiceRollbackNodeProcedure:             true,
+	adminv1connect.UpdateServiceRescanBundleProcedure:             true,
+	adminv1connect.UpdateServiceInstallPanelUpdateProcedure:       true,
+	adminv1connect.ProvisioningServiceCheckSSHProcedure:           true,
+	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure: true,
+	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure: true,
+	adminv1connect.WarpServiceRegisterWarpProcedure:               true,
+	adminv1connect.WarpServiceImportWarpProcedure:                 true,
+	adminv1connect.WarpServiceDeleteWarpProcedure:                 true,
+	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:         true,
+	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure:         true,
+	adminv1connect.ApprovalServiceApproveProcedure:                true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,

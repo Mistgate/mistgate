@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"os"
@@ -48,6 +50,45 @@ func TestEnrollStoresIdentity(t *testing.T) {
 	// A second enrollment must not silently replace the identity.
 	if _, err := Enroll(context.Background(), cfg); err == nil {
 		t.Error("re-enroll without --force succeeded")
+	}
+}
+
+func TestInterruptedEnrollmentReusesPendingKey(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "state")
+	first, firstCSR, err := pendingKeyAndCSR(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, secondCSR, err := pendingKeyAndCSR(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.D.Cmp(second.D) != 0 {
+		t.Fatal("retry generated a different key after an interrupted enrollment")
+	}
+	for _, csrDER := range [][]byte{firstCSR, secondCSR} {
+		csr, err := x509.ParseCertificateRequest(csrDER)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := csr.CheckSignature(); err != nil {
+			t.Fatalf("retry CSR signature: %v", err)
+		}
+		if !csr.PublicKey.(*ecdsa.PublicKey).Equal(&first.PublicKey) {
+			t.Fatal("retry CSR does not use the persisted key")
+		}
+	}
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(filepath.Join(dir, filePendingKey)); err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("pending key permissions = %v, err %v", info, err)
+		}
+	}
+	forced, _, err := pendingKeyAndCSR(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.D.Cmp(forced.D) == 0 {
+		t.Fatal("force did not replace the pending key")
 	}
 }
 

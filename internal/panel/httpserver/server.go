@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +30,14 @@ import (
 // generated constructor returns ("/mistgate.admin.v1.NodeService/"). It is served at
 // /api<Path> behind the session middleware, so handlers can rely on auth.AdminFrom.
 type AdminHandler struct {
+	Path    string
+	Handler http.Handler
+}
+
+// AdminPage is a server-rendered page on the authenticated admin surface. Path must be
+// an exact path without a trailing slash; both forms are served without redirects so a
+// secret admin prefix is preserved.
+type AdminPage struct {
 	Path    string
 	Handler http.Handler
 }
@@ -53,6 +62,9 @@ type Config struct {
 	// AdminHandlers are further admin API services (nodes, users, profiles ...), mounted
 	// with AuthService and InstanceService behind the session middleware.
 	AdminHandlers []AdminHandler
+	// AdminPages are Go-rendered pages mounted on the signed-in admin surface. They use
+	// the same owner-only session policy as unknown admin procedures and do not accept API tokens.
+	AdminPages []AdminPage
 	// PublicMounts maps secret prefixes ("/" + secret + "/", like AdminPrefix) on the
 	// public listener to public handlers, e.g. the subscription endpoint. The handler sees
 	// the path with the prefix (minus its trailing slash) stripped. Everything outside the
@@ -142,6 +154,7 @@ type Server struct {
 	cop   *http.CrossOriginProtection
 
 	api      apiRouter
+	pages    map[string]http.Handler
 	logo     http.Handler
 	mounts   []mount
 	agentSNI string // normalised
@@ -232,6 +245,17 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 		seen[h.Path] = true
 		s.api = append(s.api, h)
 	}
+	seenPages := make(map[string]bool, len(cfg.AdminPages))
+	s.pages = make(map[string]http.Handler, len(cfg.AdminPages)*2)
+	for _, page := range cfg.AdminPages {
+		if !validAdminPagePath(page.Path) || page.Handler == nil || seenPages[page.Path] {
+			return nil, fmt.Errorf("admin page path %q: must be a unique absolute route without a trailing slash and have a handler", page.Path)
+		}
+		seenPages[page.Path] = true
+		protected := a.RequireSession(page.Handler)
+		s.pages[page.Path] = protected
+		s.pages[page.Path+"/"] = protected
+	}
 	s.logo = NewLogoHandler(st, cfg.Log)
 	if cfg.MCP != nil {
 		s.mcp = cfg.MCP(a.RequireSession(s.api))
@@ -271,6 +295,19 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 		s.prefixAdmin = http.StripPrefix(strings.TrimSuffix(cfg.AdminPrefix, "/"), s.newAdmin(cfg.AdminPrefix))
 	}
 	return s, nil
+}
+
+func validAdminPagePath(route string) bool {
+	if route == "" || route == "/" || !strings.HasPrefix(route, "/") || strings.HasSuffix(route, "/") ||
+		strings.ContainsAny(route, "?#\\") || strings.Contains(route, "//") || route != path.Clean(route) {
+		return false
+	}
+	for _, reserved := range []string{"/api", "/mcp", "/brand", "/assets", "/preview"} {
+		if route == reserved || strings.HasPrefix(route, reserved+"/") {
+			return false
+		}
+	}
+	return true
 }
 
 // agentRequest reports whether r arrived on a TLS connection negotiated for the agent SNI.
@@ -394,6 +431,8 @@ func (s *Server) newAdmin(base string) http.Handler {
 			s.logo.ServeHTTP(w, r)
 		case s.preview != nil && strings.HasPrefix(p, previewPrefix):
 			s.preview.ServeHTTP(w, r)
+		case s.pages[p] != nil:
+			s.pages[p].ServeHTTP(w, r)
 		default:
 			spa.ServeHTTP(w, r)
 		}

@@ -23,6 +23,7 @@ import (
 	settings "github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
@@ -44,14 +45,15 @@ type panelOpts struct {
 
 // panel is the assembled panel: the HTTP server and the modules whose background loops run starts.
 type panel struct {
-	srv    *httpserver.Server
-	fleet  *fleet.Fleet
-	access *access.Service
-	health *health.Service
-	update *update.Service
-	warp   *warp.Service
-	st     *store.Store // for the sweep of MCP plans
-	log    *slog.Logger
+	srv       *httpserver.Server
+	fleet     *fleet.Fleet
+	access    *access.Service
+	health    *health.Service
+	update    *update.Service
+	warp      *warp.Service
+	provision *nodeprovision.Service
+	st        *store.Store // for the sweep of MCP plans
+	log       *slog.Logger
 	// desired is the desired-state source of the fleet (tests read it).
 	desired func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
 }
@@ -132,6 +134,13 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	}
 	fl.SetUpdates(upd)
 	hl.AddConditionSource(upd.Conditions)
+	prov, err := nodeprovision.NewService(st, vlt, nodeprovision.Config{
+		StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
+		PanelAddr: o.panelAddr, AgentSNI: o.in.AgentSNI, Log: log,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// WARP: the account of a node, registered at the owner's click or imported. The fleet asks it for the node's
 	// WarpSpec (only for agents that list warp/1) and hands it what the node reports; it asks the fleet whether the node
@@ -168,6 +177,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		func() (string, http.Handler) { return fl.FleetHandler() },
 		acc.ProfileHandler, acc.UserHandler, acc.GroupHandler, acc.DeviceHandler, acc.AwgHandler, subSvc.Handler, dnsSvc.Handler,
 		func() (string, http.Handler) { return wsv.Handler() },
+		func() (string, http.Handler) { return prov.Handler() },
 		func() (string, http.Handler) { return hl.Handler() },
 		func() (string, http.Handler) { return upd.Handler() },
 	} {
@@ -184,6 +194,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		TrustedOrigins: o.in.RPOrigins,
 		Log:            log,
 		AdminHandlers:  admin,
+		AdminPages:     []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: prov.PageHandler()}},
 		MCP:            mcpEndpoint(authSvc, st, log),
 		PublicMounts:   map[string]http.Handler{o.in.SubPrefix: sub},
 		AgentSNI:       o.in.AgentSNI,
@@ -197,19 +208,32 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if err != nil {
 		return nil, err
 	}
-	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, desired: desired, st: st, log: log}, nil
+	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, provision: prov, desired: desired, st: st, log: log}, nil
 }
 
 // run starts the background loops of the modules and serves until ctx ends or a listener fails.
 func (p *panel) run(ctx context.Context, o httpserver.ServeOptions) error {
 	bg, stop := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(6)
 	go func() { defer wg.Done(); sweepPlans(bg, p.st, p.log) }()
 	go func() { defer wg.Done(); p.fleet.Run(bg) }()
 	go func() { defer wg.Done(); p.access.Run(bg) }()
 	go func() { defer wg.Done(); p.health.Run(bg) }()
 	go func() { defer wg.Done(); p.update.Run(bg) }()
+	go func() {
+		defer wg.Done()
+		for bg.Err() == nil {
+			if err := p.provision.Run(bg); err != nil && bg.Err() == nil {
+				p.log.Error("provision worker stopped; retrying", "err", err)
+			}
+			select {
+			case <-bg.Done():
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}()
 	err := p.srv.Serve(ctx, o)
 	stop()
 	wg.Wait() // the store must not be closed under a running sweep

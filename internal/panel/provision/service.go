@@ -1,0 +1,471 @@
+package provision
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"connectrpc.com/connect"
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/vault"
+)
+
+const (
+	defaultEnrollmentTTL = time.Hour
+	sshPasswordMaxBytes  = 1024
+	maxBinaryBytes       = 256 << 20
+)
+
+var provisionNodeName = regexp.MustCompile(`^[a-z0-9-]{2,24}$`)
+
+// NodeSpec is the node metadata reserved by one provisioning job.
+type NodeSpec struct {
+	ID, Name, Address, CountryCode, Location, Provider string
+}
+
+// NodeManager joins a durable installation job to the fleet CA and agent stream.
+type NodeManager interface {
+	CreateProvisionEnrollment(context.Context, NodeSpec, string, time.Time, time.Time) (token, caFingerprint string, err error)
+	ProvisionNodeState(context.Context, string) (string, error)
+	ProvisionNodeConnected(string) bool
+}
+
+// BinarySource returns a file from the currently trusted release bundle and the digest in its signed manifest.
+type BinarySource interface {
+	OpenNodeBinary(goos, goarch string) (*os.File, int64, string, error)
+}
+
+// Config contains the services needed for durable SSH provisioning.
+type Config struct {
+	StepUp     func(context.Context) error
+	Nodes      NodeManager
+	Binaries   BinarySource
+	PanelAddr  string
+	AgentSNI   string
+	Log        *slog.Logger
+	Now        func() time.Time
+	SSH        *Client
+	WaitOnline time.Duration
+	RetryDelay time.Duration
+}
+
+// Service exposes the owner-only provisioning API and runs durable jobs.
+type Service struct {
+	st    *store.Store
+	vault *vault.Vault
+	cfg   Config
+	ssh   *Client
+	work  chan struct{}
+}
+
+type credentials struct {
+	Password         string `json:"password"`
+	EnrollmentToken  string `json:"enrollment_token,omitempty"`
+	CAFingerprint    string `json:"ca_fingerprint,omitempty"`
+	TokenExpiresUnix int64  `json:"token_expires_unix,omitempty"`
+}
+
+// NewService builds the provisioning API and its background worker.
+func NewService(st *store.Store, vlt *vault.Vault, cfg Config) (*Service, error) {
+	if st == nil || vlt == nil || cfg.Nodes == nil || cfg.Binaries == nil || cfg.StepUp == nil {
+		return nil, errors.New("provision: store, vault, node manager, binary source and step-up are required")
+	}
+	if cfg.AgentSNI == "" {
+		return nil, errors.New("provision: agent SNI is required")
+	}
+	if cfg.PanelAddr != "" {
+		host, port, err := net.SplitHostPort(cfg.PanelAddr)
+		portNumber, portErr := strconv.Atoi(port)
+		if err != nil || host == "" || portErr != nil || portNumber < 1 || portNumber > 65535 || strings.ContainsRune(host, '\x00') {
+			return nil, errors.New("provision: agent panel address must be host:port")
+		}
+	}
+	if cfg.Log == nil {
+		cfg.Log = slog.Default()
+	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
+	if cfg.SSH == nil {
+		cfg.SSH = NewClient()
+	}
+	if cfg.WaitOnline <= 0 {
+		cfg.WaitOnline = 2 * time.Minute
+	}
+	if cfg.RetryDelay <= 0 {
+		cfg.RetryDelay = 2 * time.Second
+	}
+	return &Service{st: st, vault: vlt, cfg: cfg, ssh: cfg.SSH, work: make(chan struct{}, 1)}, nil
+}
+
+// Handler mounts the owner-only ProvisioningService Connect handler.
+func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) {
+	options := append([]connect.HandlerOption{connect.WithReadMaxBytes(64 << 10)}, opts...)
+	return adminv1connect.NewProvisioningServiceHandler(s, options...)
+}
+
+// GetSSHFingerprint reads the remote SSH host key without sending authentication.
+func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[adminv1.GetSSHFingerprintRequest]) (*connect.Response[adminv1.GetSSHFingerprintResponse], error) {
+	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
+	if err != nil {
+		return nil, invalidArgument("invalid SSH target")
+	}
+	fingerprint, err := s.ssh.Fingerprint(ctx, target)
+	if err != nil {
+		if errors.Is(err, ErrUnsafeTarget) || errors.Is(err, ErrNoAddress) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("ssh_target_not_public"))
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil, connect.NewError(connect.CodeCanceled, errors.New("ssh_fingerprint_canceled"))
+		}
+		if isTimeoutError(err) {
+			return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("ssh_fingerprint_timeout"))
+		}
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_fingerprint_unavailable"))
+	}
+	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{
+		Host: target.Host(), Port: uint32(target.Port()), Fingerprint: fingerprint,
+	}), nil
+}
+
+// CheckSSH authenticates only after the submitted fingerprint exactly matches the host key.
+func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.CheckSSHRequest]) (*connect.Response[adminv1.CheckSSHResponse], error) {
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if s.cfg.PanelAddr == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
+	}
+	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
+	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validPassword(req.Msg.Password) {
+		return nil, invalidArgument("invalid SSH credentials or target")
+	}
+	conn, err := s.ssh.Dial(ctx, target, req.Msg.Password, req.Msg.Fingerprint)
+	if err != nil {
+		return nil, sshConnectError(err)
+	}
+	defer conn.Close()
+	remote, err := readPreflight(ctx, conn, s.cfg.PanelAddr)
+	if err != nil {
+		return nil, preflightConnectError(err)
+	}
+	if _, code := supportedPreflight(remote.facts); code != "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New(code))
+	}
+	return connect.NewResponse(&adminv1.CheckSSHResponse{Preflight: remote.facts}), nil
+}
+
+// StartNodeProvision stores the SSH credential sealed to this job and queues installation.
+func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if !req.Msg.ConfirmInstall {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("confirm_install_required"))
+	}
+	if s.cfg.PanelAddr == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
+	}
+	target, err := NewTarget(req.Msg.SshHost, req.Msg.SshPort)
+	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validPassword(req.Msg.Password) {
+		return nil, invalidArgument("invalid SSH credentials or target")
+	}
+	name := strings.ToLower(req.Msg.Name)
+	country := strings.ToUpper(req.Msg.CountryCode)
+	if !provisionNodeName.MatchString(name) || !validNodeAddress(req.Msg.Address) || !validCountryCode(country) ||
+		!validPlainText(req.Msg.Location, 100) || !validPlainText(req.Msg.Provider, 100) {
+		return nil, invalidArgument("invalid node metadata")
+	}
+	admin, ok := auth.AdminFrom(ctx)
+	if !ok || admin.ID == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
+	}
+	now := s.cfg.Now().UTC()
+	job := store.NodeProvisionJob{
+		ID: store.NewID("prv_"), NodeID: store.NewID("nod_"), Name: name, Address: req.Msg.Address,
+		CountryCode: country, Location: req.Msg.Location, Provider: req.Msg.Provider,
+		SSHHost: target.Host(), SSHPort: target.Port(), HostFingerprint: req.Msg.Fingerprint,
+		CreatedBy: admin.ID, CreatedAt: now, UpdatedAt: now,
+	}
+	secret, err := s.sealCredentials(job.ID, credentials{Password: req.Msg.Password})
+	if err != nil {
+		return nil, internalConnectError()
+	}
+	job.Secret = secret
+	if err := s.st.CreateNodeProvisionJob(ctx, job); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("name_taken"))
+		}
+		s.cfg.Log.Error("save node provisioning job", "err", err)
+		return nil, internalConnectError()
+	}
+	s.audit(ctx, "node.ssh_provision_start", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
+	s.signalWorker()
+	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: toProvisionJob(job)}), nil
+}
+
+// RetryNodeProvision requeues a failed job with a freshly supplied SSH password.
+func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[adminv1.RetryNodeProvisionRequest]) (*connect.Response[adminv1.RetryNodeProvisionResponse], error) {
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if !req.Msg.ConfirmInstall || !validPassword(req.Msg.Password) {
+		return nil, invalidArgument("confirmation and a valid SSH password are required")
+	}
+	job, err := s.st.NodeProvisionJob(ctx, req.Msg.JobId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("provision_job_not_found"))
+	}
+	if err != nil {
+		s.cfg.Log.Error("read node provisioning job", "err", err)
+		return nil, internalConnectError()
+	}
+	if job.State != "failed" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("provision_job_not_failed"))
+	}
+	secret, err := s.sealCredentials(job.ID, credentials{Password: req.Msg.Password})
+	if err != nil {
+		return nil, internalConnectError()
+	}
+	now := s.cfg.Now().UTC()
+	if err := s.st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "queued", "queued", "", secret, "retry_requested", now); err != nil {
+		s.cfg.Log.Error("retry node provisioning job", "job_id", job.ID, "err", err)
+		return nil, internalConnectError()
+	}
+	job.State, job.Phase, job.ErrorCode, job.Secret, job.UpdatedAt = "queued", "queued", "", secret, now
+	s.audit(ctx, "node.ssh_provision_retry", map[string]string{"job_id": job.ID, "node_id": job.NodeID})
+	s.signalWorker()
+	return connect.NewResponse(&adminv1.RetryNodeProvisionResponse{Job: toProvisionJob(job)}), nil
+}
+
+// GetNodeProvision returns public job status; its encrypted secret is omitted.
+func (s *Service) GetNodeProvision(ctx context.Context, req *connect.Request[adminv1.GetNodeProvisionRequest]) (*connect.Response[adminv1.GetNodeProvisionResponse], error) {
+	job, err := s.st.NodeProvisionJob(ctx, req.Msg.JobId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("provision_job_not_found"))
+	}
+	if err != nil {
+		s.cfg.Log.Error("read node provisioning job", "err", err)
+		return nil, internalConnectError()
+	}
+	return connect.NewResponse(&adminv1.GetNodeProvisionResponse{Job: toProvisionJob(job)}), nil
+}
+
+// ListNodeProvisions returns the most recently updated provisioning jobs.
+func (s *Service) ListNodeProvisions(ctx context.Context, _ *connect.Request[adminv1.ListNodeProvisionsRequest]) (*connect.Response[adminv1.ListNodeProvisionsResponse], error) {
+	jobs, err := s.st.NodeProvisionJobs(ctx, 100)
+	if err != nil {
+		s.cfg.Log.Error("list node provisioning jobs", "err", err)
+		return nil, internalConnectError()
+	}
+	out := &adminv1.ListNodeProvisionsResponse{Jobs: make([]*adminv1.NodeProvisionJob, 0, len(jobs))}
+	for _, job := range jobs {
+		out.Jobs = append(out.Jobs, toProvisionJob(job))
+	}
+	return connect.NewResponse(out), nil
+}
+
+// ListNodeProvisionEvents returns only stable event codes, never remote output.
+func (s *Service) ListNodeProvisionEvents(ctx context.Context, req *connect.Request[adminv1.ListNodeProvisionEventsRequest]) (*connect.Response[adminv1.ListNodeProvisionEventsResponse], error) {
+	if _, err := s.st.NodeProvisionJob(ctx, req.Msg.JobId); errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("provision_job_not_found"))
+	} else if err != nil {
+		s.cfg.Log.Error("read node provisioning job for events", "err", err)
+		return nil, internalConnectError()
+	}
+	if req.Msg.AfterId > uint64(^uint64(0)>>1) {
+		return nil, invalidArgument("event cursor is out of range")
+	}
+	limit := int(req.Msg.Limit)
+	if limit == 0 {
+		limit = 100
+	}
+	events, next, err := s.st.NodeProvisionEvents(ctx, req.Msg.JobId, int64(req.Msg.AfterId), limit)
+	if err != nil {
+		s.cfg.Log.Error("list node provisioning events", "err", err)
+		return nil, internalConnectError()
+	}
+	out := &adminv1.ListNodeProvisionEventsResponse{Events: make([]*adminv1.NodeProvisionEvent, 0, len(events)), NextAfterId: uint64(next)}
+	for _, event := range events {
+		out.Events = append(out.Events, &adminv1.NodeProvisionEvent{Id: uint64(event.ID), Phase: event.Phase, Code: event.Code, CreatedUnix: event.CreatedAt.Unix()})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (s *Service) sealCredentials(jobID string, secret credentials) ([]byte, error) {
+	plain, err := json.Marshal(secret)
+	if err != nil {
+		return nil, err
+	}
+	ciphertext := s.vault.Seal(plain, "node-provision:"+jobID)
+	clearBytes(plain)
+	return ciphertext, nil
+}
+
+func (s *Service) openCredentials(jobID string, ciphertext []byte) (credentials, error) {
+	plain, err := s.vault.Open(ciphertext, "node-provision:"+jobID)
+	if err != nil {
+		return credentials{}, err
+	}
+	defer clearBytes(plain)
+	var secret credentials
+	if err := json.Unmarshal(plain, &secret); err != nil {
+		return credentials{}, err
+	}
+	if !validPassword(secret.Password) {
+		return credentials{}, errors.New("provision: encrypted SSH password is invalid")
+	}
+	return secret, nil
+}
+
+func (s *Service) audit(ctx context.Context, action string, params map[string]string) {
+	admin, ok := auth.AdminFrom(ctx)
+	if !ok {
+		return
+	}
+	b, _ := json.Marshal(params)
+	if err := s.st.Audit(ctx, s.cfg.Now(), store.AuditEntry{Actor: admin.ID, Action: action, Params: string(b), Result: "ok"}); err != nil {
+		s.cfg.Log.Warn("audit node provisioning", "action", action, "err", err)
+	}
+}
+
+func (s *Service) signalWorker() {
+	select {
+	case s.work <- struct{}{}:
+	default:
+	}
+}
+
+func toProvisionJob(job store.NodeProvisionJob) *adminv1.NodeProvisionJob {
+	return &adminv1.NodeProvisionJob{
+		Id: job.ID, NodeId: job.NodeID, Name: job.Name, SshHost: job.SSHHost, SshPort: uint32(job.SSHPort),
+		State: job.State, Phase: job.Phase, ErrorCode: job.ErrorCode,
+		CreatedUnix: job.CreatedAt.Unix(), UpdatedUnix: job.UpdatedAt.Unix(),
+	}
+}
+
+func validPassword(password string) bool {
+	return password != "" && len(password) <= sshPasswordMaxBytes && utf8.ValidString(password) && !strings.ContainsRune(password, '\x00')
+}
+
+func validCountryCode(value string) bool {
+	if value == "" {
+		return true
+	}
+	if len(value) != 2 {
+		return false
+	}
+	return value[0] >= 'A' && value[0] <= 'Z' && value[1] >= 'A' && value[1] <= 'Z'
+}
+
+func validPlainText(value string, max int) bool {
+	if len(value) > max || !utf8.ValidString(value) {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func validNodeAddress(value string) bool {
+	if len(value) > 253 || strings.TrimSpace(value) != value || strings.ContainsAny(value, "\x00/\\@?#[]") {
+		return false
+	}
+	if net.ParseIP(value) != nil {
+		return true
+	}
+	target, err := NewTarget(value, 22)
+	return err == nil && target.Host() == strings.ToLower(strings.TrimSuffix(value, "."))
+}
+
+func invalidArgument(message string) error {
+	return connect.NewError(connect.CodeInvalidArgument, errors.New(message))
+}
+
+func internalConnectError() error {
+	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+}
+
+func sshConnectError(err error) error {
+	code := publicSSHCode(err)
+	status := connect.CodeUnavailable
+	switch code {
+	case "ssh_target_not_public":
+		status = connect.CodeInvalidArgument
+	case "ssh_host_key_changed":
+		status = connect.CodeFailedPrecondition
+	case "ssh_connection_canceled":
+		status = connect.CodeCanceled
+	case "ssh_connection_timeout":
+		status = connect.CodeDeadlineExceeded
+	case "ssh_authentication_failed":
+		status = connect.CodeUnauthenticated
+	}
+	return connect.NewError(status, errors.New(code))
+}
+
+func preflightConnectError(err error) error {
+	var code preflightFailure
+	if errors.As(err, &code) {
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New(string(code)))
+	}
+	if errors.Is(err, context.Canceled) {
+		return connect.NewError(connect.CodeCanceled, errors.New("ssh_preflight_canceled"))
+	}
+	if isTimeoutError(err) {
+		return connect.NewError(connect.CodeDeadlineExceeded, errors.New("ssh_preflight_timeout"))
+	}
+	return connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_preflight_failed"))
+}
+
+func isTimeoutError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr) && networkErr.Timeout()
+}
+
+func clearBytes(data []byte) {
+	for i := range data {
+		data[i] = 0
+	}
+}
+
+func versionAtLeast(version string, major, minor int) bool {
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) == 0 {
+		return false
+	}
+	gotMajor, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return false
+	}
+	gotMinor := 0
+	if len(parts) > 1 {
+		gotMinor, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return false
+		}
+	}
+	return gotMajor > major || gotMajor == major && gotMinor >= minor
+}
+
+func invalidPreflightFacts() error {
+	return errors.New("provision: malformed remote preflight response")
+}

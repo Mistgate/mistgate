@@ -243,6 +243,44 @@ func (s *Service) NodeBinary(goos, goarch string) string {
 	return filepath.ToSlash(p)
 }
 
+// OpenNodeBinary opens a verified node binary from the current trusted bundle. The caller receives the signed
+// manifest's digest as well and must verify the bytes it transfers: the descriptor is stable across path replacement,
+// while an in-place write can still change bytes after this method returns.
+func (s *Service) OpenNodeBinary(goos, goarch string) (*os.File, int64, string, error) {
+	b := s.current()
+	if b == nil || !b.trusted || b.manifest == nil || s.now().Unix() > b.manifest.Expires {
+		return nil, 0, "", errors.New("update: no current trusted bundle")
+	}
+	entry, err := b.manifest.FileFor(goos, goarch)
+	if err != nil {
+		return nil, 0, "", errors.New("update: the bundle has no binary for this platform")
+	}
+	path := filepath.Join(s.dist, entry.Name)
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() != entry.Size {
+		return nil, 0, "", errors.New("update: the trusted node binary is missing or changed")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, "", errors.New("update: the trusted node binary is unavailable")
+	}
+	opened, err := f.Stat()
+	if err != nil || !opened.Mode().IsRegular() || opened.Size() != entry.Size {
+		f.Close()
+		return nil, 0, "", errors.New("update: the trusted node binary is missing or changed")
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil || hex.EncodeToString(h.Sum(nil)) != entry.SHA256 {
+		f.Close()
+		return nil, 0, "", errors.New("update: the trusted node binary failed its digest check")
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		return nil, 0, "", errors.New("update: the trusted node binary cannot be rewound")
+	}
+	return f, entry.Size, entry.SHA256, nil
+}
+
 // Serve is fleet.Updates.Serve: it streams one file of the current trusted bundle to an agent that already
 // authenticated with its node certificate. Only names in the trusted manifest are served, at most maxServes at a
 // time; the descriptor is opened once, so a file replaced during a download cannot corrupt it.

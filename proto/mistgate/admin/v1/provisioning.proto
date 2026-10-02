@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Owner-only SSH installation of a Mistgate node. Credentials are accepted only after the
+// administrator has confirmed the SSH host-key fingerprint shown by GetSSHFingerprint.
+service ProvisioningService {
+  rpc GetSSHFingerprint(GetSSHFingerprintRequest) returns (GetSSHFingerprintResponse);
+  rpc CheckSSH(CheckSSHRequest) returns (CheckSSHResponse);
+  rpc StartNodeProvision(StartNodeProvisionRequest) returns (StartNodeProvisionResponse);
+  rpc RetryNodeProvision(RetryNodeProvisionRequest) returns (RetryNodeProvisionResponse);
+  rpc GetNodeProvision(GetNodeProvisionRequest) returns (GetNodeProvisionResponse);
+  rpc ListNodeProvisions(ListNodeProvisionsRequest) returns (ListNodeProvisionsResponse);
+  rpc ListNodeProvisionEvents(ListNodeProvisionEventsRequest) returns (ListNodeProvisionEventsResponse);
+}
+
+message GetSSHFingerprintRequest {
+  string host = 1;
+  uint32 port = 2;
+}
+
+message GetSSHFingerprintResponse {
+  string host = 1;
+  uint32 port = 2;
+  string fingerprint = 3;
+}
+
+message CheckSSHRequest {
+  string host = 1;
+  uint32 port = 2;
+  string fingerprint = 3;
+  string password = 4;
+}
+
+message NodePreflight {
+  string distribution = 1;
+  string version = 2;
+  string kernel = 3;
+  string architecture = 4;
+  uint32 cpu_count = 5;
+  uint64 memory_bytes = 6 [jstype = JS_NUMBER];
+  uint64 disk_available_bytes = 7 [jstype = JS_NUMBER];
+  bool systemd = 8;
+  bool already_enrolled = 9;
+  bool panel_reachable = 10;
+}
+
+message CheckSSHResponse {
+  NodePreflight preflight = 1;
+}
+
+message StartNodeProvisionRequest {
+  bool confirm_install = 1;
+  string name = 2;
+  string address = 3;
+  string country_code = 4;
+  string location = 5;
+  string provider = 6;
+  string ssh_host = 7;
+  uint32 ssh_port = 8;
+  string fingerprint = 9;
+  string password = 10;
+}
+
+message RetryNodeProvisionRequest {
+  string job_id = 1;
+  bool confirm_install = 2;
+  string password = 3;
+}
+
+message StartNodeProvisionResponse {
+  NodeProvisionJob job = 1;
+}
+
+message RetryNodeProvisionResponse {
+  NodeProvisionJob job = 1;
+}
+
+message GetNodeProvisionRequest {
+  string job_id = 1;
+}
+
+message GetNodeProvisionResponse {
+  NodeProvisionJob job = 1;
+}
+
+message ListNodeProvisionsRequest {}
+
+message ListNodeProvisionsResponse {
+  repeated NodeProvisionJob jobs = 1;
+}
+
+message NodeProvisionJob {
+  string id = 1;
+  string node_id = 2;
+  string name = 3;
+  string ssh_host = 4;
+  uint32 ssh_port = 5;
+  string state = 6;
+  string phase = 7;
+  string error_code = 8;
+  int64 created_unix = 9 [jstype = JS_NUMBER];
+  int64 updated_unix = 10 [jstype = JS_NUMBER];
+}
+
+message ListNodeProvisionEventsRequest {
+  string job_id = 1;
+  uint64 after_id = 2 [jstype = JS_NUMBER];
+  uint32 limit = 3;
+}
+
+message NodeProvisionEvent {
+  uint64 id = 1 [jstype = JS_NUMBER];
+  string phase = 2;
+  string code = 3;
+  int64 created_unix = 4 [jstype = JS_NUMBER];
+}
+
+message ListNodeProvisionEventsResponse {
+  repeated NodeProvisionEvent events = 1;
+  uint64 next_after_id = 2 [jstype = JS_NUMBER];
+}
