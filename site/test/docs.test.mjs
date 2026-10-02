@@ -18,9 +18,13 @@ test("M2 roadmap pages are built in both languages", () => {
   const ru = page("ru", "roadmap/m2-ssh-provisioning");
 
   assert.ok(en.includes("M2: SSH provisioning and recovery"));
-  assert.ok(en.includes("M2 implementation has not started"));
+  assert.ok(en.includes("server-rendered Go wizard"));
+  assert.ok(en.includes("/nodes/install"));
+  assert.ok(en.includes("M2 remains incomplete"));
   assert.ok(ru.includes("M2: установка по SSH и восстановление"));
-  assert.ok(ru.includes("Реализация M2 ещё не начата"));
+  assert.ok(ru.includes("серверный Go-мастер"));
+  assert.ok(ru.includes("/nodes/install"));
+  assert.ok(ru.includes("M2 пока не завершён"));
 });
 
 test("M2 roadmap pages appear in both documentation sidebars", () => {

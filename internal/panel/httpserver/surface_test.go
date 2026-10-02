@@ -176,6 +176,37 @@ func TestAdminHandlerConfigIsValidated(t *testing.T) {
 	}
 }
 
+func TestAdminPageConfigIsValidated(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "pages.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a, err := auth.New(st, auth.Config{RPID: testRPID, Origins: []string{testOrigin}}, quietLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := http.NotFoundHandler()
+	for name, pages := range map[string][]AdminPage{
+		"relative path":      {{"nodes/install", page}},
+		"root path":          {{"/", page}},
+		"trailing slash":     {{"/nodes/install/", page}},
+		"unclean path":       {{"/nodes/../install", page}},
+		"query in path":      {{"/nodes/install?job=1", page}},
+		"reserved API route": {{"/api/nodes", page}},
+		"reserved MCP route": {{"/mcp", page}},
+		"nil handler":        {{"/nodes/install", nil}},
+		"duplicate route":    {{"/nodes/install", page}, {"/nodes/install", page}},
+	} {
+		if _, err := New(Config{AdminPages: pages, Dist: fstest.MapFS{}, Log: quietLog}, a, st); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	if _, err := New(Config{AdminPages: []AdminPage{{"/nodes/install", page}}, Dist: fstest.MapFS{}, Log: quietLog}, a, st); err != nil {
+		t.Fatalf("valid page refused: %v", err)
+	}
+}
+
 // A redirect from the admin would drop the secret prefix (the mux under StripPrefix
 // redirects "/x" to "/x/"): the admin never answers with one, in any mode.
 func TestAdminNeverRedirects(t *testing.T) {

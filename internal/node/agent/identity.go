@@ -36,10 +36,11 @@ const apiVersion = 1
 // Files in the state directory (directory 0700, files 0600). The key and the leaf certificate live in ONE
 // file so that a renewal (a new key every time) is a single atomic rename.
 const (
-	fileIdentity = "identity.pem" // EC PRIVATE KEY + CERTIFICATE
-	fileCA       = "ca.pem"       // the panel CA; from enrollment on it is the only trust anchor
-	fileMeta     = "agent.json"   // panel address, agent SNI, node id
-	fileState    = "state.json"   // last applied desired state
+	fileIdentity   = "identity.pem"       // EC PRIVATE KEY + CERTIFICATE
+	filePendingKey = "enroll-pending.pem" // private key kept only for a retried, interrupted enrollment
+	fileCA         = "ca.pem"             // the panel CA; from enrollment on it is the only trust anchor
+	fileMeta       = "agent.json"         // panel address, agent SNI, node id
+	fileState      = "state.json"         // last applied desired state
 )
 
 // renewBefore is how long before expiry the agent renews (day 20 of 30).
@@ -69,14 +70,15 @@ func (id *identity) notAfter() time.Time { return id.cert.Leaf.NotAfter }
 
 // EnrollConfig is the input of the `enroll` command.
 type EnrollConfig struct {
-	StateDir string
-	Panel    string // host:port
-	SNI      string
-	CASHA256 string // hex fingerprint of the panel CA certificate (colons and case ignored)
-	Token    string
-	Version  string // defaults to buildinfo.Version
-	Force    bool   // overwrite an existing identity
-	Timeout  time.Duration
+	StateDir         string
+	Panel            string // host:port
+	SNI              string
+	CASHA256         string // hex fingerprint of the panel CA certificate (colons and case ignored)
+	Token            string
+	Version          string // defaults to buildinfo.Version
+	Force            bool   // overwrite an existing identity
+	ResumePendingKey bool   // persist and reuse the CSR key if enrollment is interrupted
+	Timeout          time.Duration
 }
 
 // Enroll generates a P-256 key and a CSR, exchanges the one-time token for a node certificate over TLS
@@ -103,7 +105,13 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 			return Meta{}, errors.New("already enrolled; use --force to replace the identity")
 		}
 	}
-	key, csr, err := newKeyAndCSR()
+	var key *ecdsa.PrivateKey
+	var csr []byte
+	if cfg.ResumePendingKey {
+		key, csr, err = pendingKeyAndCSR(cfg.StateDir, cfg.Force)
+	} else {
+		key, csr, err = newKeyAndCSR()
+	}
 	if err != nil {
 		return Meta{}, err
 	}
@@ -151,6 +159,11 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 		{fileIdentity, identityPEM(key, m.CertificatePem)}, // last: its presence means "enrolled"
 	} {
 		if err := writeFileAtomic(filepath.Join(cfg.StateDir, f.name), f.data, 0o600); err != nil {
+			return Meta{}, err
+		}
+	}
+	if cfg.ResumePendingKey {
+		if err := os.Remove(filepath.Join(cfg.StateDir, filePendingKey)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return Meta{}, err
 		}
 	}
@@ -221,11 +234,57 @@ func newKeyAndCSR() (*ecdsa.PrivateKey, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	csr, err := csrForKey(key)
+	return key, csr, err
+}
+
+func csrForKey(key *ecdsa.PrivateKey) ([]byte, error) {
 	// The panel ignores the subject and sets the URI SAN itself; the CN is only a label.
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
+	return x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
 		Subject: pkix.Name{CommonName: "mistgate-node"}, SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}, key)
-	return key, csr, err
+}
+
+func pendingKeyAndCSR(dir string, force bool) (*ecdsa.PrivateKey, []byte, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, nil, err
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return nil, nil, err
+	}
+	path := filepath.Join(dir, filePendingKey)
+	if !force {
+		if raw, err := os.ReadFile(path); err == nil {
+			block, _ := pem.Decode(raw)
+			if block == nil || block.Type != "EC PRIVATE KEY" {
+				return nil, nil, errors.New("pending enrollment key is invalid")
+			}
+			key, err := x509.ParseECPrivateKey(block.Bytes)
+			if err != nil {
+				return nil, nil, errors.New("pending enrollment key is invalid")
+			}
+			csr, err := csrForKey(key)
+			return key, csr, err
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, nil, err
+		}
+	}
+	key, csr, err := newKeyAndCSR()
+	if err != nil {
+		return nil, nil, err
+	}
+	der, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	var raw bytes.Buffer
+	if err := pem.Encode(&raw, &pem.Block{Type: "EC PRIVATE KEY", Bytes: der}); err != nil {
+		return nil, nil, err
+	}
+	if err := writeFileAtomic(path, raw.Bytes(), 0o600); err != nil {
+		return nil, nil, err
+	}
+	return key, csr, nil
 }
 
 func parseOneCert(p []byte) (*x509.Certificate, error) {

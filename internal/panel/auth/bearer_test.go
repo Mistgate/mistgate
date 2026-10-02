@@ -934,8 +934,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// step-up procedures that exist today, as the plan lists them (the handlers call RequireStepUp), plus the password
 	// change, the authenticator enrollment and the login captcha of Settings -> Security
-	if len(stepUpProcedures) != 20 {
-		t.Errorf("%d step-up procedures, the plan lists 20", len(stepUpProcedures))
+	if len(stepUpProcedures) != 23 {
+		t.Errorf("%d step-up procedures, want 23", len(stepUpProcedures))
 	}
 }
 

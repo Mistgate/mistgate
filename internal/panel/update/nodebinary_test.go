@@ -1,6 +1,9 @@
 package update
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,5 +27,42 @@ func TestNodeBinary(t *testing.T) {
 	e.s.rescan()
 	if p := e.s.NodeBinary("linux", "amd64"); p != "" {
 		t.Fatalf("a bundle that no longer verifies: %q", p)
+	}
+}
+
+func TestOpenNodeBinaryRechecksTheBytesItWillTransfer(t *testing.T) {
+	e := newEnv(t)
+	want := []byte("trusted node binary")
+	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": want})
+	f, size, digest, err := e.s.OpenNodeBinary("linux", "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(f)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(want)
+	if string(got) != string(want) || size != int64(len(want)) || digest != hex.EncodeToString(sum[:]) {
+		t.Fatalf("opened node binary = %q, size %d, digest %q", got, size, digest)
+	}
+
+	path := filepath.Join(e.dir, "dist", "mistgate-node-linux-amd64")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("tampered node binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if f, _, _, err := e.s.OpenNodeBinary("linux", "amd64"); err == nil {
+		f.Close()
+		t.Fatal("tampered binary passed the signed digest check")
 	}
 }
