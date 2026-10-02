@@ -59,7 +59,24 @@ export function warpTrouble(d: {
 /** A probe that passes but takes longer than this is "slow". */
 export const slowProbeMs = 2000;
 
-export type ProbeLook = { kind: StatusKind; word: MessageKey | null; ms: number | null };
+export type ProbeLook = { kind: StatusKind; word: MessageKey | null; ms: number | null; failure: MessageKey | null; httpStatus: number | null };
+
+const probeFailureWords: Record<string, MessageKey> = {
+  timeout: "warp.probe.error.timeout",
+  cancelled: "warp.probe.error.other",
+  dns: "warp.probe.error.dns",
+  connection: "warp.probe.error.connection",
+  network: "warp.probe.error.network",
+  invalid_trace: "warp.probe.error.trace",
+  warp_off: "warp.probe.error.warpOff",
+  other: "warp.probe.error.other",
+};
+
+function probeFailure(code: string | undefined): Pick<ProbeLook, "failure" | "httpStatus"> {
+  const status = /^http_(\d{3})$/.exec(code ?? "");
+  if (status) return { failure: "warp.probe.httpStatus", httpStatus: Number(status[1]) };
+  return { failure: code ? probeFailureWords[code] ?? "warp.probe.error.other" : null, httpStatus: null };
+}
 
 /**
  * One probe dot of the card, from the LATEST check: failed = red "no answer", passed but slow = warn, passed = ok, each with
@@ -67,13 +84,17 @@ export type ProbeLook = { kind: StatusKind; word: MessageKey | null; ms: number 
  * flag of the last check, no timing); `checked` says whether the node sent any check time (a new agent that did not run
  * the probe, e.g. the link was down, has `checked` and no `p`: nothing to claim, "—").
  */
-export function probeLook(p: { ok: boolean; latencyMs: number } | undefined, legacyOk: boolean | undefined, checked: boolean): ProbeLook {
+export function probeLook(p: { ok: boolean; latencyMs: number; failureCode?: string } | undefined, legacyOk: boolean | undefined, checked: boolean): ProbeLook {
   if (p) {
-    if (!p.ok) return { kind: "bad", word: "warp.probe.fail", ms: null };
-    return p.latencyMs > slowProbeMs ? { kind: "warn", word: "warp.probe.slow", ms: p.latencyMs } : { kind: "ok", word: "warp.probe.ok", ms: p.latencyMs };
+    if (!p.ok) return { kind: "bad", word: "warp.probe.fail", ms: null, ...probeFailure(p.failureCode) };
+    return p.latencyMs > slowProbeMs
+      ? { kind: "warn", word: "warp.probe.slow", ms: p.latencyMs, failure: null, httpStatus: null }
+      : { kind: "ok", word: "warp.probe.ok", ms: p.latencyMs, failure: null, httpStatus: null };
   }
-  if (checked || legacyOk === undefined) return { kind: "off", word: null, ms: null };
-  return legacyOk ? { kind: "ok", word: "warp.probe.ok", ms: null } : { kind: "bad", word: "warp.probe.fail", ms: null };
+  if (checked || legacyOk === undefined) return { kind: "off", word: null, ms: null, failure: null, httpStatus: null };
+  return legacyOk
+    ? { kind: "ok", word: "warp.probe.ok", ms: null, failure: null, httpStatus: null }
+    : { kind: "bad", word: "warp.probe.fail", ms: null, failure: null, httpStatus: null };
 }
 
 export const sourceWord: Record<WarpSource, MessageKey> = {

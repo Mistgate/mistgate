@@ -1,18 +1,18 @@
 ---
 title: Updates
-description: How node agents update themselves from bundles you sign, how a staged rollout checks and rolls back nodes, and how to update the panel by hand.
+description: How node agents update themselves from bundles you sign, how a staged rollout checks and rolls back nodes, and how the panel installs GitHub releases.
 ---
 
-Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. The panel itself is updated by hand (self-update of the panel is planned).
+Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. On root systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases.
 
 ## How trust works
 
-- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. The public half is compiled into both binaries at build time (`RELEASE_KEY`).
+- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. A keyed panel build stores the public key in `<data-dir>/release.pub`; node agents carry it in their binaries. Generic GitHub panel builds preserve and use the saved key.
 - For every release you sign a manifest: the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256.
 - The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
 - The panel is only a courier: a compromised panel cannot make a node run code you did not sign.
 - Releases are ordered by their build time (the Unix time of the source commit), not by the version string. A release with the same build time as the node is "already current"; an older one is refused as a downgrade.
-- A binary built without `RELEASE_KEY` never updates itself. `mistgate version` and `mistgate-node version` print the fingerprint of the key a binary trusts, or say that it has none.
+- A node agent built without `RELEASE_KEY` cannot update itself. `mistgate-node version` prints its compiled key fingerprint. The panel uses `release.pub` for bundle verification, even after a generic GitHub panel update.
 
 ## Publish a release
 
@@ -32,7 +32,7 @@ It writes the private key to the file (mode 0600; an existing file is never over
 RELEASE_KEY=<public key> make build
 ```
 
-This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}` and stamps into both the release key, the version (`git describe --tags --always --dirty`) and the build time (`git log -1 --format=%ct`). Build the panel with the key too: without it the panel cannot check a bundle and will not start a rollout.
+This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}` and stamps into both the release key, the version (`git describe --tags --always --dirty`) and the build time (`git log -1 --format=%ct`). The first panel build for an installation must have the key so it can save the public half to `release.pub`; later GitHub panel releases intentionally omit installation-specific keys and reuse that saved file.
 
 ### 3. Sign the node binaries
 
@@ -62,7 +62,7 @@ The **Release bundle** card shows the result:
 |---|---|
 | Signature verified | The signature matches this panel's release key, the manifest is valid and every file is present with the right size and checksum. Only such a bundle can be rolled out. |
 | Failed the check | Something is wrong; the card says what (see below). |
-| Not checked | This panel was built without a release key and cannot judge the bundle. The nodes still check it themselves. |
+| Not checked | This installation has no release key in its build or `release.pub`, so the panel cannot judge the bundle. The nodes still check it themselves. |
 | No bundle | `<data-dir>/dist` has no `manifest.json`. |
 
 | Reason | What to do |
@@ -183,9 +183,15 @@ Older agents keep working with a newer panel: changes to the agent protocol are 
 
 ## Update the panel
 
-The panel does not update itself yet. Update it by hand:
+The Updates page checks the latest stable release from `Mistgate/mistgate` at startup and every six hours. Use **Check GitHub** to check immediately. The panel only downloads the matching Linux amd64 or arm64 asset after confirming its GitHub SHA-256 digest and ELF architecture.
 
-1. Build the new version with the same `RELEASE_KEY` (see above). A panel built without it can no longer check bundles or start rollouts.
+Automatic installation is available when the panel runs as root under systemd. The default unit is `mistgate.service`; set `MISTGATE_UPDATE_SERVICE` or pass `--update-service` if yours has another name. The owner must confirm with a fresh step-up, and an active node rollout must finish first. A detached systemd helper stops the panel, makes a backup of its data directory, replaces the binary and starts the panel. If the service does not stay active, it restores both the previous binary and the database backup. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`.
+
+Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. Until the first stable release is published, the Updates page reports that no release is available.
+
+For a non-systemd installation or a manual fallback:
+
+1. Build the new version with the same `RELEASE_KEY` (see above), or keep the installation's existing `<data-dir>/release.pub`. Without either, the panel cannot check bundles or start rollouts.
 2. Do not update the panel while a rollout is running: pause it or let it finish. A restart in the middle of a step pauses the rollout ("the panel restarted during a step").
 3. Copy the new binary next to the installed one, then stop the panel, back up the data directory, replace the binary and start it again. Here the binary is `/usr/local/bin/mistgate` and the systemd unit is `mistgate.service`, as in [Install the panel](../getting-started/install-panel.md); use your own names:
 

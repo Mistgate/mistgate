@@ -88,7 +88,7 @@ export function UpdatesScreen() {
       />
       <div className="grid items-start gap-3.5 md:grid-cols-2">
         <BundleCard data={d} owner={owner} actions={actions} />
-        <PanelCard data={d} />
+        <PanelCard data={d} owner={owner} actions={actions} />
       </div>
       {dialog?.kind === "start" && (
         <StartDialog

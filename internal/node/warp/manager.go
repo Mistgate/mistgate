@@ -32,7 +32,7 @@ type Options struct {
 	HandshakeWait time.Duration
 	// ProbeAURL and ProbeBURL override the probe targets (tests); see DefaultProbeA and DefaultProbeB.
 	ProbeAURL, ProbeBURL string
-	// ProbeTimeout bounds one probe, dial included (6 s).
+	// ProbeTimeout bounds one probe, dial included (12 s).
 	ProbeTimeout time.Duration
 	// AllowPrivate lets the tunnel egress dial private and documentation-range addresses (tests, dev).
 	AllowPrivate bool
@@ -567,8 +567,8 @@ func (m *Manager) healthTick(ctx context.Context) {
 		m.h.WarpFlag, m.h.Colo = flag, colo
 		m.h.ProbeCloudflareOK = aErr == nil && (flag == "on" || flag == "plus")
 		m.h.ProbeOtherOK = bErr == nil
-		m.h.ProbeCloudflare = &ProbeResult{OK: m.h.ProbeCloudflareOK, Latency: aTook, At: now}
-		m.h.ProbeOther = &ProbeResult{OK: m.h.ProbeOtherOK, Latency: bTook, At: now}
+		m.h.ProbeCloudflare = &ProbeResult{OK: m.h.ProbeCloudflareOK, Latency: aTook, At: now, FailureCode: probeFailureCode(aErr, flag)}
+		m.h.ProbeOther = &ProbeResult{OK: m.h.ProbeOtherOK, Latency: bTook, At: now, FailureCode: probeFailureCode(bErr, "")}
 	} else {
 		m.h.WarpFlag, m.h.Colo, m.h.ProbeCloudflareOK, m.h.ProbeOtherOK = "", "", false, false
 		m.h.ProbeCloudflare, m.h.ProbeOther = nil, nil

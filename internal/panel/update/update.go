@@ -91,6 +91,8 @@ type Config struct {
 	// PanelVersion and PanelBuilt describe this panel's own build (buildinfo.Version, buildinfo.BuiltUnix()).
 	PanelVersion string
 	PanelBuilt   int64
+	// PanelUpdater checks official GitHub releases and schedules a checked panel binary replacement when available.
+	PanelUpdater PanelUpdater
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
 	StepUp func(context.Context) error
 	// Actor returns the admin id for audit rows and for the rollout's created_by. Default: the signed-in admin.
@@ -115,12 +117,15 @@ type Service struct {
 	hashes map[string]hashEntry
 	serves int // concurrent downloads, guarded by bmu
 
-	mu       sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
-	runCtx   context.Context
-	wg       sync.WaitGroup
-	inflight map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
-	orphans  map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
-	failing  map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
+	mu                     sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
+	panelInstalling        bool
+	panelInstallGeneration uint64
+	panelInstallTimer      *time.Timer
+	runCtx                 context.Context
+	wg                     sync.WaitGroup
+	inflight               map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
+	orphans                map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
+	failing                map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
 
 	updMu    sync.RWMutex
 	updating map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
@@ -173,6 +178,13 @@ func (s *Service) Run(ctx context.Context) {
 	s.runCtx = ctx
 	s.mu.Unlock()
 	s.recover(ctx)
+	if s.cfg.PanelUpdater != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.cfg.PanelUpdater.Run(ctx)
+		}()
+	}
 	tick := time.NewTicker(s.cfg.Tick)
 	defer tick.Stop()
 	poll := time.NewTicker(s.cfg.Rescan)

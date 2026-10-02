@@ -103,6 +103,8 @@ message WarpProbeResult {
   bool ok = 1;
   uint32 latency_ms = 2;
   int64 at_unix = 3 [jstype = JS_NUMBER];
+  // Safe diagnostic category such as timeout, dns, connection, http_502, or warp_off; never raw error text.
+  string failure_code = 4;
 }
 
 message GetWarpRequest {

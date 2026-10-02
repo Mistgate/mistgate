@@ -16,6 +16,13 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+func TestProbeMsgKeepsFailureCode(t *testing.T) {
+	got := probeMsg(&agentv1.WarpProbeResult{FailureCode: "http_502"})
+	if got == nil || got.FailureCode != "http_502" {
+		t.Fatalf("probe failure code was lost: %v", got)
+	}
+}
+
 func (e *env) register(node string) (*adminv1.RegisterWarpResponse, error) {
 	r, err := e.rpc().RegisterWarp(e.ctx, connect.NewRequest(&adminv1.RegisterWarpRequest{NodeId: node, AcceptTos: true, TosUrlShown: TOSURL}))
 	if err != nil {

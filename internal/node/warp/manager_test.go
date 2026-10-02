@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"net"
 	"net/netip"
 	"strings"
 	"sync"
@@ -330,11 +331,11 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	r.m.Apply(context.Background(), spec())
 	r.healthy()
 	r.pr.mu.Lock()
-	r.pr.a = errors.New("probe A: timeout")
+	r.pr.a = context.DeadlineExceeded
 	r.pr.mu.Unlock()
 	r.tick(5 * time.Second)
 	h, _ := r.m.Health()
-	if h.State != StateStarting || h.LastError != "probe_cloudflare_failed" || h.ProbeCloudflare == nil || h.ProbeCloudflare.OK ||
+	if h.State != StateStarting || h.LastError != "probe_cloudflare_failed" || h.ProbeCloudflare == nil || h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "timeout" ||
 		h.ProbeOther == nil || !h.ProbeOther.OK || !h.ProbeCloudflare.At.Equal(r.clk.now()) || !h.CheckedAt.Equal(r.clk.now()) {
 		t.Fatalf("after a failed check: %+v", h)
 	}
@@ -344,7 +345,7 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	r.healthy()
 	r.tick(5 * time.Second)
 	h, _ = r.m.Health()
-	if h.State != StateStarting || h.LastError != "" || !h.ProbeCloudflare.OK || h.Failures != 0 {
+	if h.State != StateStarting || h.LastError != "" || !h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "" || h.Failures != 0 {
 		t.Fatalf("after a good check the failure of the previous one is stale: %+v", h)
 	}
 	// the link is down: nothing was probed, so no probe result (not a fake "failed")
@@ -355,6 +356,32 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	h, _ = r.m.Health()
 	if h.ProbeCloudflare != nil || h.ProbeOther != nil || h.LastError == "" || h.CheckedAt.IsZero() {
 		t.Fatalf("without a link: %+v", h)
+	}
+}
+
+func TestProbeFailureCodesAreSafeAndSpecific(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		flag string
+		want string
+	}{
+		{"timeout", context.DeadlineExceeded, "", "timeout"},
+		{"http status", &probeHTTPStatusError{probe: "probe A", status: 502}, "", "http_502"},
+		{"dns", &net.DNSError{Err: "no such host", Name: "probe.example"}, "", "dns"},
+		{"connection", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("refused")}, "", "connection"},
+		{"invalid trace", errProbeTraceMissing, "", "invalid_trace"},
+		{"warp off", nil, "off", "warp_off"},
+		{"unexpected flag", nil, "unknown", "invalid_trace"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := probeFailureCode(tc.err, tc.flag); got != tc.want {
+				t.Fatalf("probeFailureCode() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+	if got := (&httpProber{}).limit(); got != 12*time.Second {
+		t.Fatalf("default probe timeout = %s, want 12s", got)
 	}
 }
 

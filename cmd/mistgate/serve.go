@@ -51,6 +51,7 @@ func runServe(args []string) error {
 	agentListen := fs.String("agent-listen", os.Getenv("MISTGATE_AGENT_LISTEN"), "separate TLS listener for the node agent endpoint (default 127.0.0.1:8082 with --dev; otherwise agents use the public listener with the secret SNI name)")
 	agentAddr := fs.String("agent-addr", os.Getenv("MISTGATE_AGENT_ADDR"), "host:port agents dial, put into the install command (default: --agent-listen, else the public URL's host and port)")
 	decoyDir := fs.String("decoy-dir", os.Getenv("MISTGATE_DECOY_DIR"), "directory with the decoy site (default: built-in page)")
+	updateService := fs.String("update-service", os.Getenv("MISTGATE_UPDATE_SERVICE"), "systemd unit to restart after a GitHub panel update (default mistgate.service)")
 	tlsCert := fs.String("tls-cert", os.Getenv("MISTGATE_TLS_CERT"), "TLS certificate for the public listener (reloaded when the file changes)")
 	tlsKey := fs.String("tls-key", os.Getenv("MISTGATE_TLS_KEY"), "TLS private key for the public listener")
 	acmeEmail := fs.String("acme-email", os.Getenv("MISTGATE_ACME_EMAIL"), "contact address for Let's Encrypt (optional)")
@@ -80,6 +81,9 @@ func runServe(args []string) error {
 		if *dev {
 			*dataDir = "./.data"
 		}
+	}
+	if *updateService == "" && !*dev {
+		*updateService = "mistgate.service"
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -153,7 +157,7 @@ func runServe(args []string) error {
 	}
 	p, err := newPanel(st, vlt, authSvc, panelOpts{
 		in: in, decoyDir: *decoyDir, title: brand.BrandName(), dataDir: *dataDir,
-		panelAddr: agentAddress(*agentAddr, *agentListen, in.PublicURL),
+		panelAddr: agentAddress(*agentAddr, *agentListen, in.PublicURL), updateService: *updateService,
 	}, log)
 	if err != nil {
 		return err

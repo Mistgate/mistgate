@@ -2,14 +2,13 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
-// Updates screen: the release bundle the panel holds, what every node runs, and the
+// Updates screen: the panel release, the release bundle it holds, what every node runs, and the
 // staged rollout of the node agent (canary, then batches, gate per node, automatic rollback of a failed node).
-// Conventions: common.proto. The panel itself is not updated from here: the page shows the
-// CLI steps instead.
+// Conventions: common.proto.
 //
-// Roles (internal/panel/auth/policy.go): GetUpdates is open to every role; every other procedure needs the owner
-// AND a fresh step-up (the handler calls auth.Service.RequireStepUp, like the passkey and session changes): they
-// decide what code runs as root on every node.
+// Roles (internal/panel/auth/policy.go): reads are open to every role; every change needs the owner AND a fresh
+// step-up (the handler calls auth.Service.RequireStepUp, like the passkey and session changes): they decide what
+// code runs as root on the panel and every node.
 //
 // I18N like health.proto: the server sends keys + params, never prose. Keys: bundle errors
 // "updates.bundle.err.<code>", rollout pause reasons "updates.pause.<code>", step errors "updates.step.err.<code>",
@@ -23,6 +22,11 @@ service UpdateService {
   // The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
   // contacts a node and never rescans the bundle directory (RescanBundle does).
   rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
+  // Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
+  rpc CheckPanelUpdate(CheckPanelUpdateRequest) returns (CheckPanelUpdateResponse);
+  // Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
+  // Owner-only with a fresh step-up; refused while a node rollout is active.
+  rpc InstallPanelUpdate(InstallPanelUpdateRequest) returns (InstallPanelUpdateResponse);
   // Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
   // that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
   // steps. Only one rollout is active (RUNNING or PAUSED) at a time. Audited.
@@ -53,6 +57,21 @@ message PanelBuild {
   // First 16 hex characters of SHA-256 of the compiled-in public key, to compare with what the owner printed at
   // `mistgate release keygen`. Empty without a key.
   string release_key_fingerprint = 4;
+  // Latest stable GitHub panel release and whether this installation can apply it.
+  PanelUpdate update = 5;
+}
+
+message PanelUpdate {
+  string version = 1;
+  string url = 2;
+  int64 published_unix = 3 [jstype = JS_NUMBER];
+  int64 checked_unix = 4 [jstype = JS_NUMBER];
+  bool available = 5;
+  bool supported = 6;
+  bool installable = 7;
+  bool installing = 8;
+  // Stable UI key: no_release, check_failed, asset_missing, download_failed, schedule_failed, or empty.
+  string error_key = 9;
 }
 
 enum BundleStatus {
@@ -246,6 +265,12 @@ message GetUpdatesResponse {
   // manual update. Empty when the panel has no data directory.
   string dist_dir = 6;
 }
+
+message CheckPanelUpdateRequest {}
+message CheckPanelUpdateResponse { PanelUpdate update = 1; }
+
+message InstallPanelUpdateRequest {}
+message InstallPanelUpdateResponse { PanelUpdate update = 1; }
 
 message StartRolloutRequest {
   // Empty = every OUTDATED node.

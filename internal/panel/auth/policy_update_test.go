@@ -16,6 +16,8 @@ func TestUpdateServiceRolePolicy(t *testing.T) {
 		read  bool
 	}{
 		{"GetUpdates", adminv1connect.UpdateServiceGetUpdatesProcedure, true, true},
+		{"CheckPanelUpdate", adminv1connect.UpdateServiceCheckPanelUpdateProcedure, true, true},
+		{"InstallPanelUpdate", adminv1connect.UpdateServiceInstallPanelUpdateProcedure, true, false},
 		{"StartRollout", adminv1connect.UpdateServiceStartRolloutProcedure, true, false},
 		{"PauseRollout", adminv1connect.UpdateServicePauseRolloutProcedure, true, false},
 		{"ResumeRollout", adminv1connect.UpdateServiceResumeRolloutProcedure, true, false},

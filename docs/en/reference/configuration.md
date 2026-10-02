@@ -28,6 +28,7 @@ The panel has no configuration file. `mistgate setup` stores the addresses of an
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | CIDR or IP of a reverse proxy whose `X-Forwarded-For` and `Forwarded` headers are believed. Repeatable. Without it the TCP peer is the client, whatever the headers say. |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | Directory with your own static decoy site (`index.html`, optional `404.html`, `429.html`, `robots.txt`). |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | The data directory. It must exist (run `mistgate setup` first); `serve` sets its mode to 0700 at every start. |
+| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` | systemd unit restarted by the panel's GitHub self-updater. Used only on supported root systemd installations. |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | Where the source code of this build is published, linked as "Source code" next to the version in the admin (AGPL-3.0, section 13). A fork points it at its own repository; empty hides the link. |
 | `--dev` | `MISTGATE_DEV` | off | Development mode: data in `./.data` (created with a master key), plain HTTP with the decoy on `--listen` (`127.0.0.1:8080`) and the admin on `127.0.0.1:8081`, the agent endpoint on `127.0.0.1:8082`, WebAuthn on `localhost`, and a setup link printed at start while no admin exists. Nothing about the addresses is stored. Never on a public server. |
 
@@ -120,6 +121,7 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `mistgate.db` | The SQLite database: settings and addresses, admins and sessions, nodes and their certificates, profiles, groups, users, devices, credentials, traffic, events, alerts, rollouts, API tokens and the audit log. Secrets inside (the panel CA key, authenticator secrets, subscription tokens, device keys, WARP keys and the like) are encrypted with the master key; passwords are stored as argon2id hashes, API and enrollment tokens as SHA-256 hashes. | yes |
 | `mistgate.db-wal`, `mistgate.db-shm` | SQLite's write-ahead log and its index. Part of the database: copy them together with it, or stop the panel first. | yes |
 | `master.key` | 32 random bytes, mode 0600. Encrypts every stored secret (XChaCha20-Poly1305) and derives the user page passwords, which are never stored. The panel refuses to start when the file is readable by group or others. | the most sensitive file |
+| `release.pub` | Public ed25519 key used to verify signed node-update bundles. The first keyed panel build saves it here; GitHub panel updates preserve it. | no |
 | `acme/` | Let's Encrypt account key and certificates, only with `--acme-domain`. Rebuilt by itself when lost. | yes |
 | `dist/` | The release bundle for node updates that you copy here: `manifest.json`, `manifest.sig` and `mistgate-node-linux-amd64` / `-arm64`. The panel rescans it every minute. | no |
 

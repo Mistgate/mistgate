@@ -170,9 +170,10 @@ type Health struct {
 
 // ProbeResult is one probe of a health check: ok, how long it took (a timeout shows the timeout) and when it ended.
 type ProbeResult struct {
-	OK      bool
-	Latency time.Duration
-	At      time.Time
+	OK          bool
+	Latency     time.Duration
+	At          time.Time
+	FailureCode string
 }
 
 // Event is what the manager tells the agent (which turns it into an agent.v1.Event). Codes: "warp_state"

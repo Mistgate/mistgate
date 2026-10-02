@@ -178,7 +178,8 @@ function Account({ d, nodeId, retired, onDialog }: { d: WarpData; nodeId: string
       <span className="text-muted">{label}</span>
       <b className={look.kind === "warn" ? "text-warn-text" : look.kind === "bad" ? "text-danger-text" : undefined}>
         {look.word ? t(look.word) : "—"}
-        {look.ms !== null && ` · ${fmt.num(look.ms / 1000, 1)} ${t("warp.sec")}`}
+        {look.failure && ` · ${look.httpStatus !== null ? t(look.failure, { status: look.httpStatus }) : t(look.failure)}`}
+        {!look.failure && look.ms !== null && ` · ${fmt.num(look.ms / 1000, 1)} ${t("warp.sec")}`}
       </b>
     </span>
   );

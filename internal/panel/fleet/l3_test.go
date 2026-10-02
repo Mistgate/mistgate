@@ -641,6 +641,12 @@ func TestWarpStateChangedSeesAFlippedCheck(t *testing.T) {
 	if !warpStateChanged(ok, failed) || !warpStateChanged(failed, ok) {
 		t.Error("a check that flipped must be written at once")
 	}
+	if !warpStateChanged(
+		&agentv1.WarpHealth{State: st, ProbeCloudflare: &agentv1.WarpProbeResult{FailureCode: "timeout"}},
+		&agentv1.WarpHealth{State: st, ProbeCloudflare: &agentv1.WarpProbeResult{FailureCode: "http_502"}},
+	) {
+		t.Error("a probe diagnostic change must be written at once")
+	}
 	if !warpStateChanged(ok, &agentv1.WarpHealth{State: agentv1.WarpState_WARP_STATE_UP, ProbeCloudflareOk: true, ProbeOtherOk: true}) {
 		t.Error("a state change must be written at once")
 	}

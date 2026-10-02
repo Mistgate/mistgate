@@ -89,7 +89,7 @@ func probeMsg(p *agentv1.WarpProbeResult) *adminv1.WarpProbeResult {
 	if p == nil {
 		return nil
 	}
-	return &adminv1.WarpProbeResult{Ok: p.Ok, LatencyMs: p.LatencyMs, AtUnix: p.AtUnix}
+	return &adminv1.WarpProbeResult{Ok: p.Ok, LatencyMs: p.LatencyMs, AtUnix: p.AtUnix, FailureCode: p.FailureCode}
 }
 
 // accountMsg is the account without its secrets.

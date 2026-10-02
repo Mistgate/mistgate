@@ -12,9 +12,18 @@ import (
 )
 
 const (
-	probeTotalTimeout = 6 * time.Second
+	probeTotalTimeout = 12 * time.Second
 	probeBodyLimit    = 4096
 )
+
+var errProbeTraceMissing = errors.New("probe A: no warp= line")
+
+type probeHTTPStatusError struct {
+	probe  string
+	status int
+}
+
+func (e *probeHTTPStatusError) Error() string { return fmt.Sprintf("%s: HTTP %d", e.probe, e.status) }
 
 // httpProber fetches the two probe URLs through dial (the tunnel egress). Plain HTTP on purpose: no TLS stack
 // needed, and a failure means the path, not a certificate.
@@ -96,11 +105,11 @@ func (p *httpProber) A(ctx context.Context) (flag, colo string, err error) {
 		return "", "", err
 	}
 	if st != http.StatusOK {
-		return "", "", fmt.Errorf("probe A: HTTP %d", st)
+		return "", "", &probeHTTPStatusError{probe: "probe A", status: st}
 	}
 	flag, colo = parseTrace(body)
 	if flag == "" {
-		return "", colo, errors.New("probe A: no warp= line")
+		return "", colo, errProbeTraceMissing
 	}
 	return flag, colo, nil
 }
@@ -112,9 +121,52 @@ func (p *httpProber) B(ctx context.Context) error {
 		return err
 	}
 	if st < 200 || st > 299 {
-		return fmt.Errorf("probe B: HTTP %d", st)
+		return &probeHTTPStatusError{probe: "probe B", status: st}
 	}
 	return nil
+}
+
+// probeFailureCode carries a small, safe reason to the panel without exposing request URLs or arbitrary error text.
+func probeFailureCode(err error, warpFlag string) string {
+	if err == nil {
+		switch warpFlag {
+		case "on", "plus":
+			return ""
+		case "off":
+			return "warp_off"
+		default:
+			return "invalid_trace"
+		}
+	}
+	var statusErr *probeHTTPStatusError
+	if errors.As(err, &statusErr) {
+		return fmt.Sprintf("http_%d", statusErr.status)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	if errors.Is(err, errProbeTraceMissing) {
+		return "invalid_trace"
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return "dns"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if opErr.Op == "dial" {
+			return "connection"
+		}
+		return "network"
+	}
+	return "other"
 }
 
 // parseTrace reads "key=value" lines of /cdn-cgi/trace.

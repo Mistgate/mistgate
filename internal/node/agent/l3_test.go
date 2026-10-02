@@ -682,9 +682,9 @@ func TestWarpHealthAndEventsReachThePanel(t *testing.T) {
 	}
 	hs := time.Unix(1700000000, 0)
 	x.warp.mu.Lock()
-	x.warp.health = &warp.Health{State: warp.StateUp, Backend: "kernel", Endpoint: "203.0.113.10:2408", LastHandshake: hs, WarpFlag: "on", Colo: "FRA",
-		ProbeCloudflareOK: true, ProbeOtherOK: true, Failures: 0, RxBytes: 10, TxBytes: 20, LastError: "",
-		ProbeCloudflare: &warp.ProbeResult{OK: true, Latency: 420 * time.Millisecond, At: hs}, CheckedAt: hs}
+	x.warp.health = &warp.Health{State: warp.StateStarting, Backend: "kernel", Endpoint: "203.0.113.10:2408", LastHandshake: hs,
+		ProbeCloudflareOK: false, ProbeOtherOK: true, Failures: 0, RxBytes: 10, TxBytes: 20, LastError: "probe_cloudflare_failed",
+		ProbeCloudflare: &warp.ProbeResult{OK: false, Latency: 420 * time.Millisecond, At: hs, FailureCode: "http_502"}, CheckedAt: hs}
 	x.warp.mu.Unlock()
 	var wh *pb.WarpHealth
 	eventually(t, func() bool {
@@ -694,12 +694,12 @@ func TestWarpHealthAndEventsReachThePanel(t *testing.T) {
 		}
 		return false
 	}, "a stats batch with the WARP health")
-	if wh.State != pb.WarpState_WARP_STATE_UP || wh.Backend != "kernel" || wh.Colo != "FRA" || wh.WarpFlag != "on" || !wh.ProbeCloudflareOk || !wh.ProbeOtherOk ||
+	if wh.State != pb.WarpState_WARP_STATE_STARTING || wh.Backend != "kernel" || wh.Colo != "" || wh.WarpFlag != "" || wh.ProbeCloudflareOk || !wh.ProbeOtherOk ||
 		wh.RxBytes != 10 || wh.TxBytes != 20 || wh.Endpoint != "203.0.113.10:2408" || wh.LastHandshakeUnix < hs.Unix()-2 || wh.LastHandshakeUnix > hs.Unix()+2 {
 		t.Errorf("warp health = %v", wh)
 	}
 	// the per-probe results travel too; a probe the round did not run stays unset
-	if p := wh.ProbeCloudflare; p == nil || !p.Ok || p.LatencyMs != 420 || p.AtUnix < hs.Unix()-2 || p.AtUnix > hs.Unix()+2 ||
+	if p := wh.ProbeCloudflare; p == nil || p.Ok || p.LatencyMs != 420 || p.FailureCode != "http_502" || p.AtUnix < hs.Unix()-2 || p.AtUnix > hs.Unix()+2 ||
 		wh.ProbeOther != nil || wh.CheckedUnix < hs.Unix()-2 || wh.CheckedUnix > hs.Unix()+2 {
 		t.Errorf("probe results = %v / %v, checked %d", wh.ProbeCloudflare, wh.ProbeOther, wh.CheckedUnix)
 	}

@@ -342,6 +342,13 @@ export function useUpdateActions() {
     },
   });
 
+  const checkPanel = useMutation({
+    mutationFn: () => updates.checkPanelUpdate({}),
+    onSuccess: () => toast(t("up.panel.checked")),
+    onSettled: () => void qc.invalidateQueries({ queryKey: updatesQuery.queryKey }),
+    onError: (e) => toast.error(callErrorText(e, t)),
+  });
+
   /** Runs one call; resolves true when it went through (the dialogs close on it). */
   const run = (fn: () => Promise<unknown>, done?: string) =>
     call.mutateAsync(fn).then(
@@ -353,12 +360,14 @@ export function useUpdateActions() {
     );
 
   return {
-    busy: call.isPending,
+    busy: call.isPending || checkPanel.isPending,
     start: (nodeIds: string[]) => run(() => updates.startRollout({ nodeIds, batchSize: 0 }), t("up.start.started")),
     pause: (id: string) => run(() => updates.pauseRollout({ rolloutId: id }), t("up.toast.paused")),
     resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed")),
     cancel: (id: string) => run(() => updates.cancelRollout({ rolloutId: id }), t("up.toast.cancelled")),
     rollback: (n: { id: string; name: string }) => run(() => updates.rollbackNode({ nodeId: n.id }), t("up.toast.rollback", { name: n.name })),
     rescan: () => run(() => updates.rescanBundle({}), t("up.bundle.rescanned")),
+    checkPanel: () => checkPanel.mutateAsync().then(() => true, () => false),
+    installPanel: () => run(() => updates.installPanelUpdate({}), t("up.panel.installStarted")),
   };
 }

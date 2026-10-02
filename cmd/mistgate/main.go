@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
 
 const usage = `usage: mistgate <command> [flags]
@@ -40,6 +41,8 @@ func main() {
 		err = runAuth(os.Args[2:], os.Stdout)
 	case "release":
 		err = runRelease(os.Args[2:], os.Stdout)
+	case "panel-update-helper":
+		err = panelupdate.RunPanelUpdateHelper(os.Args[2:])
 	case "mcp":
 		// stdout is the protocol channel: nothing else may be written to it
 		err = runMCP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)

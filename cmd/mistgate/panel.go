@@ -34,11 +34,12 @@ import (
 
 // panelOpts is what newPanel needs besides the open store, vault and auth service.
 type panelOpts struct {
-	in        instance
-	decoyDir  string
-	panelAddr string // host:port agents dial (goes into the install command); "" = not configured
-	dataDir   string // holds dist/, the release bundle of the node-agent updates
-	title     string // subscription title apps show (the brand name)
+	in            instance
+	decoyDir      string
+	panelAddr     string // host:port agents dial (goes into the install command); "" = not configured
+	dataDir       string // holds dist/, the release bundle of the node-agent updates
+	updateService string // systemd unit restarted by the GitHub panel updater
+	title         string // subscription title apps show (the brand name)
 }
 
 // panel is the assembled panel: the HTTP server and the modules whose background loops run starts.
@@ -109,14 +110,22 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	fl.SetHealth(hl)
 
 	// Node-agent updates: the signed bundle in <data-dir>/dist, its distribution through the agent endpoint and
-	// the staged rollout. The release key is the one compiled into this binary; without it bundles are shown, never trusted.
+	// the staged rollout. Keep the installation's release key in dataDir so a generic GitHub panel build does not
+	// lose the key that its nodes already trust.
 	relKey, err := buildinfo.ReleasePublicKey()
+	if o.dataDir != "" {
+		relKey, err = buildinfo.LoadReleasePublicKey(o.dataDir)
+	}
 	if err != nil && !errors.Is(err, buildinfo.ErrUnsignedBuild) {
 		log.Warn("release key is unusable, node updates are off", "err", err)
 	}
+	panelUpdater := update.NewGitHubPanelUpdater(update.PanelUpdateConfig{
+		CurrentVersion: buildinfo.Version, CurrentBuilt: buildinfo.BuiltUnix(), DataDir: o.dataDir,
+		ServiceUnit: o.updateService, Enabled: update.PanelUpdateHostSupported(), Log: log,
+	})
 	upd, err := update.New(st, fl, hl, update.Config{
 		DataDir: o.dataDir, Key: relKey, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
-		StepUp: authSvc.RequireStepUp, Log: log,
+		StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, Log: log,
 	})
 	if err != nil {
 		return nil, err

@@ -306,6 +306,25 @@ func TestStartPreconditions(t *testing.T) {
 	check("second rollout", err, connect.CodeFailedPrecondition, "a rollout is already active")
 }
 
+func TestPanelUpdateAndRolloutAreMutuallyExclusive(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	node := e.addNode("n1", nodeOpts{})
+
+	if err := e.s.beginPanelUpdate(e.ctx); err != nil {
+		t.Fatalf("reserve panel update: %v", err)
+	}
+	if _, err := e.s.start(e.ctx, []string{node}, 0); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "panel update") {
+		t.Fatalf("rollout during panel update: %v", err)
+	}
+	e.s.finishPanelUpdate(false)
+
+	e.startRollout(node)
+	if err := e.s.beginPanelUpdate(e.ctx); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "active node rollout") {
+		t.Fatalf("panel update during rollout: %v", err)
+	}
+}
+
 // A listed node that is up to date, offline or unsupported becomes a SKIPPED step; it does not make a rollout.
 func TestOldAgentsAndOfflineNodesAreSkipped(t *testing.T) {
 	e := newEnv(t)
@@ -1162,6 +1181,10 @@ func TestStepUpIsRequiredForEveryChange(t *testing.T) {
 	r := rpc{e.s}
 
 	calls := map[string]func() error{
+		"InstallPanelUpdate": func() error {
+			_, err := r.InstallPanelUpdate(e.ctx, connect.NewRequest(&adminv1.InstallPanelUpdateRequest{}))
+			return err
+		},
 		"StartRollout": func() error {
 			_, err := r.StartRollout(e.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{}))
 			return err

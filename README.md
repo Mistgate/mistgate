@@ -34,9 +34,9 @@ Mistgate is pre-release. It runs in production for its author, but the API, the 
 
 | Stage | What |
 |:--|:--|
-| **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · API tokens and MCP server · admin UI in ru / en |
+| **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · GitHub panel self-update with checksum verification and rollback · API tokens and MCP server · admin UI in ru / en |
 | **M2 — planned; not started** | Node provisioning over SSH from the UI, with preflight checks · encrypted vault for server passwords · encrypted panel backups to R2 · [M2 plan](docs/en/roadmap/m2-ssh-provisioning.md) |
-| **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · panel self-update · a one-line installer |
+| **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 
 Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the control domains of the node doctor, split-DNS presets); all of them are settings.
@@ -138,8 +138,8 @@ scp dist/* panel.example.com:/var/lib/mistgate/dist/      # the panel picks it u
 
 Then start a rollout on the **Updates** page (owner only, with a step-up).
 
-- Binaries built without `RELEASE_KEY` never update themselves.
-- The panel itself is updated by hand: replace the binary and restart the service.
+- Node agents built without `RELEASE_KEY` cannot update themselves. The panel keeps this installation's bundle-verification key in `release.pub` while its own binary updates from GitHub.
+- The panel checks official GitHub Releases and can install a verified Linux release on root systemd installations. It keeps the previous binary and a stopped-service data backup for rollback.
 - Nodes that predate self-update are updated once by hand (`mistgate-node install` with the new binary).
 
 ## Security notes

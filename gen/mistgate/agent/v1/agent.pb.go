@@ -2036,8 +2036,10 @@ type WarpProbeResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Ok    bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
 	// How long the probe took, failed ones included (a timeout shows the timeout).
-	LatencyMs     uint32 `protobuf:"varint,2,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
-	AtUnix        int64  `protobuf:"varint,3,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	LatencyMs uint32 `protobuf:"varint,2,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
+	AtUnix    int64  `protobuf:"varint,3,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	// Safe diagnostic category such as timeout, dns, connection, http_502, or warp_off; never raw error text.
+	FailureCode   string `protobuf:"bytes,4,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2091,6 +2093,13 @@ func (x *WarpProbeResult) GetAtUnix() int64 {
 		return x.AtUnix
 	}
 	return 0
+}
+
+func (x *WarpProbeResult) GetFailureCode() string {
+	if x != nil {
+		return x.FailureCode
+	}
+	return ""
 }
 
 // Reliable (carries seq). The code vocabulary is open (plugins add their own); the UI maps
@@ -4932,12 +4941,13 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x10probe_cloudflare\x18\r \x01(\v2\".mistgate.agent.v1.WarpProbeResultR\x0fprobeCloudflare\x12C\n" +
 	"\vprobe_other\x18\x0e \x01(\v2\".mistgate.agent.v1.WarpProbeResultR\n" +
 	"probeOther\x12!\n" +
-	"\fchecked_unix\x18\x0f \x01(\x03R\vcheckedUnix\"Y\n" +
+	"\fchecked_unix\x18\x0f \x01(\x03R\vcheckedUnix\"|\n" +
 	"\x0fWarpProbeResult\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1d\n" +
 	"\n" +
 	"latency_ms\x18\x02 \x01(\rR\tlatencyMs\x12\x17\n" +
-	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"\x89\x02\n" +
+	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\x12!\n" +
+	"\ffailure_code\x18\x04 \x01(\tR\vfailureCode\"\x89\x02\n" +
 	"\x05Event\x127\n" +
 	"\bseverity\x18\x01 \x01(\x0e2\x1b.mistgate.agent.v1.SeverityR\bseverity\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1d\n" +

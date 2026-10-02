@@ -43,20 +43,26 @@ describe("the pill agrees with the latest check", () => {
 
 describe("probeLook (the dots show the latest check)", () => {
   it("a failed probe is a red dot and 'no answer', not 'ok', whatever the flag of an older check said", () => {
-    expect(probeLook({ ok: false, latencyMs: 6000 }, true, true)).toEqual({ kind: "bad", word: "warp.probe.fail", ms: null });
+    expect(probeLook({ ok: false, latencyMs: 6000 }, true, true)).toEqual({ kind: "bad", word: "warp.probe.fail", ms: null, failure: null, httpStatus: null });
+    expect(probeLook({ ok: false, latencyMs: 6000, failureCode: "timeout" }, true, true)).toEqual({
+      kind: "bad", word: "warp.probe.fail", ms: null, failure: "warp.probe.error.timeout", httpStatus: null,
+    });
+    expect(probeLook({ ok: false, latencyMs: 6000, failureCode: "http_502" }, true, true)).toEqual({
+      kind: "bad", word: "warp.probe.fail", ms: null, failure: "warp.probe.httpStatus", httpStatus: 502,
+    });
   });
   it("a passing probe shows its latency; one over 2 s is slow and warn", () => {
-    expect(probeLook({ ok: true, latencyMs: 420 }, true, true)).toEqual({ kind: "ok", word: "warp.probe.ok", ms: 420 });
+    expect(probeLook({ ok: true, latencyMs: 420 }, true, true)).toEqual({ kind: "ok", word: "warp.probe.ok", ms: 420, failure: null, httpStatus: null });
     expect(probeLook({ ok: true, latencyMs: 2000 }, true, true).kind).toBe("ok");
-    expect(probeLook({ ok: true, latencyMs: 3200 }, true, true)).toEqual({ kind: "warn", word: "warp.probe.slow", ms: 3200 });
+    expect(probeLook({ ok: true, latencyMs: 3200 }, true, true)).toEqual({ kind: "warn", word: "warp.probe.slow", ms: 3200, failure: null, httpStatus: null });
   });
   it("a probe the round did not run claims nothing", () => {
-    expect(probeLook(undefined, false, true)).toEqual({ kind: "off", word: null, ms: null });
+    expect(probeLook(undefined, false, true)).toEqual({ kind: "off", word: null, ms: null, failure: null, httpStatus: null });
     expect(probeLook(undefined, undefined, false).kind).toBe("off");
   });
   it("an agent without per-probe results falls back to the flags, with no timing", () => {
-    expect(probeLook(undefined, true, false)).toEqual({ kind: "ok", word: "warp.probe.ok", ms: null });
-    expect(probeLook(undefined, false, false)).toEqual({ kind: "bad", word: "warp.probe.fail", ms: null });
+    expect(probeLook(undefined, true, false)).toEqual({ kind: "ok", word: "warp.probe.ok", ms: null, failure: null, httpStatus: null });
+    expect(probeLook(undefined, false, false)).toEqual({ kind: "bad", word: "warp.probe.fail", ms: null, failure: null, httpStatus: null });
   });
 });
 
