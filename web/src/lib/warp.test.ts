@@ -42,7 +42,7 @@ describe("the pill agrees with the latest check", () => {
 });
 
 describe("probeLook (the dots show the latest check)", () => {
-  it("a failed probe is a red dot and 'no answer', not 'ok', whatever the flag of an older check said", () => {
+  it("a failed probe is a red dot and 'failed', not 'ok', whatever the flag of an older check said", () => {
     expect(probeLook({ ok: false, latencyMs: 6000 }, true, true)).toEqual({ kind: "bad", word: "warp.probe.fail", ms: null, failure: null, httpStatus: null });
     expect(probeLook({ ok: false, latencyMs: 6000, failureCode: "timeout" }, true, true)).toEqual({
       kind: "bad", word: "warp.probe.fail", ms: null, failure: "warp.probe.error.timeout", httpStatus: null,

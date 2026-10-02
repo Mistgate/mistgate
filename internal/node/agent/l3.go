@@ -40,6 +40,8 @@ type WarpManager interface {
 	// Apply makes the node match the spec: nil removes WARP, Enabled=false pauses it. Idempotent and cheap for a
 	// spec it already runs (it only re-asserts the routing).
 	Apply(ctx context.Context, spec *plugin.WarpSpec) error
+	// Reconnect rebuilds a down tunnel without changing its account or routed subnets. False means it recovered already.
+	Reconnect(ctx context.Context) (bool, error)
 	// SetRoutedSubnets sets the client subnets of the awg inbounds with egress "warp".
 	SetRoutedSubnets(ctx context.Context, subnets []netip.Prefix) error
 	// Configured says whether the node has a WARP configuration (paused included).
@@ -88,6 +90,21 @@ func (a *Agent) WarpEvent(ev warp.Event) {
 var warpPathChecks = []string{doctor.CheckWarpPath}
 
 func (a *Agent) warpConfigured() bool { return a.cfg.Warp != nil && a.cfg.Warp.Configured() }
+
+func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
+	if a.cfg.Warp == nil {
+		return &pb.CommandResult{Error: "unsupported_host"}
+	}
+	reconnected, err := a.cfg.Warp.Reconnect(ctx)
+	if err != nil {
+		return &pb.CommandResult{Error: err.Error()}
+	}
+	var affected uint32
+	if reconnected {
+		affected = 1
+	}
+	return &pb.CommandResult{Ok: true, Affected: affected}
+}
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {

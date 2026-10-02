@@ -49,6 +49,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 	e.AgentCertNotAfter = func() time.Time { return a.id.Load().notAfter() }
 	e.ApplyBaseline = a.host.ApplyBaseline
 	e.RestartInbound = a.doctorRestart
+	e.ReconnectWarp = a.doctorReconnectWarp
 	e.UnitGen = a.cfg.UnitGen
 	e.OwnIface = func(name string) bool {
 		return strings.HasPrefix(name, hostctl.TunnelIfacePrefix) || name == hostctl.WarpIface
@@ -197,6 +198,25 @@ func (a *Agent) doctorRestart(ctx context.Context, inboundID string) (uint32, er
 		return r.Affected, nil
 	case <-ctx.Done():
 		return 0, ctx.Err()
+	}
+}
+
+// doctorReconnectWarp runs the manager mutation on the worker alongside normal desired-state reconciliation.
+func (a *Agent) doctorReconnectWarp(ctx context.Context) (bool, error) {
+	ch := make(chan *pb.CommandResult, 1)
+	select {
+	case a.jobs <- job{ctx: ctx, reconnectWarp: true, res: ch}:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	select {
+	case r := <-ch:
+		if r.Error != "" {
+			return false, errors.New(r.Error)
+		}
+		return r.Affected > 0, nil
+	case <-ctx.Done():
+		return false, ctx.Err()
 	}
 }
 

@@ -193,6 +193,26 @@ func (m *Manager) Apply(ctx context.Context, spec *plugin.WarpSpec) error {
 	return m.upLocked(ctx)
 }
 
+// Reconnect rebuilds the current tunnel only while it is down. It leaves the configured account and routed subnets
+// intact; the routes remain fail-closed while the tunnel comes back. A fresh doctor result may make this a no-op.
+func (m *Manager) Reconnect(ctx context.Context) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.spec == nil || !m.spec.Enabled || m.state != StateDown {
+		return false, nil
+	}
+	// Recheck ownership immediately before rebuilding. The regular guard is cached after initial setup, but host
+	// routing can change while the WARP tunnel is running.
+	for _, f := range m.plane.Preflight(ctx) {
+		switch f.ID {
+		case "table_in_use", "rule_pref_in_use":
+			m.attention(f.ID)
+			return false, fmt.Errorf("warp: %s: %s", f.ID, f.Detail)
+		}
+	}
+	return true, m.upLocked(ctx)
+}
+
 func (m *Manager) removeLocked(ctx context.Context) error {
 	if m.spec == nil {
 		if len(m.subnets) == 0 {

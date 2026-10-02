@@ -86,6 +86,7 @@ const core: CoreMessages = {
   "status.blip": "Хостер моргнул",
 
   "settings.interface": "Интерфейс",
+  "settings.system": "Система",
   "settings.admins": "Админы",
   "settings.security": "Безопасность",
   "settings.sessions": "Сессии",

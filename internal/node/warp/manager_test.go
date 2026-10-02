@@ -227,6 +227,51 @@ func TestNodeWithoutWarpDoesNotTouchTheHost(t *testing.T) {
 	}
 }
 
+func TestReconnectOnlyRebuildsAConfiguredDownTunnel(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	if err := r.m.Apply(ctx, spec()); err != nil {
+		t.Fatal(err)
+	}
+	r.m.mu.Lock()
+	r.m.setStateLocked(StateDown)
+	r.m.mu.Unlock()
+
+	before := len(r.pl.ups)
+	reconnected, err := r.m.Reconnect(ctx)
+	health, ok := r.m.Health()
+	if err != nil || !reconnected || !ok || len(r.pl.ups) != before+1 || health.State != StateStarting {
+		t.Fatalf("reconnected=%v err=%v ups=%d health=%+v", reconnected, err, len(r.pl.ups), health)
+	}
+	original, rebuilt := r.pl.ups[before-1], r.pl.ups[before]
+	if rebuilt.Endpoint != original.Endpoint || rebuilt.PrivateKey != original.PrivateKey {
+		t.Fatalf("reconnect changed the current account or endpoint: before=%+v after=%+v", original, rebuilt)
+	}
+	if again, err := r.m.Reconnect(ctx); err != nil || again || len(r.pl.ups) != before+1 {
+		t.Fatalf("healthy tunnel was reconnected again: reconnected=%v err=%v ups=%d", again, err, len(r.pl.ups))
+	}
+}
+
+func TestReconnectRechecksHostRouteOwnership(t *testing.T) {
+	r := newRig(t)
+	if err := r.m.Apply(context.Background(), spec()); err != nil {
+		t.Fatal(err)
+	}
+	r.m.mu.Lock()
+	r.m.setStateLocked(StateDown)
+	r.m.mu.Unlock()
+	r.pl.findings = []Finding{{ID: "table_in_use", Detail: "a new owner uses the WARP table"}}
+
+	before := len(r.pl.ups)
+	reconnected, err := r.m.Reconnect(context.Background())
+	if err == nil || reconnected || len(r.pl.ups) != before {
+		t.Fatalf("reconnected=%v err=%v ups=%d", reconnected, err, len(r.pl.ups))
+	}
+	if events := r.events("warp_needs_attention"); len(events) != 1 || events[0].Params["reason"] != "table_in_use" {
+		t.Fatalf("host clash was not reported: %+v", events)
+	}
+}
+
 func TestApplyNilAndHealth(t *testing.T) {
 	r := newRig(t)
 	if _, ok := r.m.Health(); ok {

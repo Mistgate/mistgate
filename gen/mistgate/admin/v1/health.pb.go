@@ -1765,7 +1765,7 @@ type FixPlan struct {
 	// Facts from the node (agent CommandResult.params), short English line in `detail`.
 	Params map[string]string `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Detail string            `protobuf:"bytes,4,opt,name=detail,proto3" json:"detail,omitempty"`
-	// true when the fix drops client sessions (restart_inbound). The UI shows it in warning style.
+	// true when the fix interrupts client traffic (restart_inbound or reconnect_warp). The UI shows a warning.
 	Disruptive    bool `protobuf:"varint,5,opt,name=disruptive,proto3" json:"disruptive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

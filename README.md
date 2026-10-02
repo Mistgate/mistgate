@@ -43,7 +43,7 @@ Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the 
 
 ## Documentation
 
-The full documentation lives in [`docs/en`](docs/en/index.md) (Russian: [`docs/ru`](docs/ru/index.md)). Good places to start:
+Read the full documentation at [mistgate.app](https://mistgate.app/) (Russian: [mistgate.app/ru](https://mistgate.app/ru/)). The source lives in [`docs/en`](docs/en/index.md) and [`docs/ru`](docs/ru/index.md). Good places to start:
 
 - [Overview](docs/en/getting-started/overview.md): the concepts (panel, node, profile, user, group, device, subscription).
 - [Install the panel](docs/en/getting-started/install-panel.md), [add a node](docs/en/getting-started/add-node.md), [first users](docs/en/getting-started/first-users.md).

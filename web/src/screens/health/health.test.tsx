@@ -141,6 +141,52 @@ describe("the node's Doctor tab", () => {
     expect(applyFix.mock.calls[1]![0]).toMatchObject({ nodeId: "nod_1", fixId: "apply_baseline", dryRun: false, planId: "pln_1" });
   });
 
+  it("offers a confirmed WARP reconnect while preserving the WARP card and recheck actions", async () => {
+    getDoctor.mockResolvedValue({
+      nowUnix: 1n,
+      nodes: [
+        node({
+          items: [
+            item({
+              id: "warp_path",
+              status: DoctorStatus.FAIL,
+              titleKey: "doctor.warp_path.title",
+              detailCode: "warp_path.down",
+              whyKey: "health.doctor.warp_path.why",
+              fixId: "reconnect_warp",
+              params: { state: "down", error: "handshake_stale" },
+            }),
+          ],
+        }),
+      ],
+    });
+    applyFix
+      .mockResolvedValueOnce({
+        plan: {
+          fixId: "reconnect_warp",
+          titleKey: "health.fix.reconnect_warp.plan",
+          params: {},
+          detail: "would reconnect the configured WARP tunnel",
+          disruptive: true,
+        },
+        planId: "pln_warp",
+      })
+      .mockResolvedValueOnce({ applied: true, affected: 1, resultParams: {} });
+    await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
+
+    expect(button("Reconnect WARP")).toBeDefined();
+    expect([...document.querySelectorAll("a")].some((a) => a.textContent === "Open WARP")).toBe(true);
+    expect(button("Check again")).toBeDefined();
+    await click(button("Reconnect WARP"));
+    expect(applyFix.mock.calls[0]![0]).toMatchObject({ nodeId: "nod_1", fixId: "reconnect_warp", dryRun: true });
+    const dialog = document.querySelector("[role=dialog]")!;
+    expect(dialog.textContent).toContain("Reconnect the configured WARP tunnel and reapply its routes.");
+    expect(dialog.textContent).toContain("Traffic from profiles using WARP on this node may pause briefly while the tunnel reconnects.");
+
+    await click(button("Apply"));
+    expect(applyFix.mock.calls[1]![0]).toMatchObject({ nodeId: "nod_1", fixId: "reconnect_warp", dryRun: false, planId: "pln_warp" });
+  });
+
   it("does not offer a fix to a helper (the owner alone changes the host) but still explains the problem", async () => {
     role = Role.HELPER;
     getDoctor.mockResolvedValue({

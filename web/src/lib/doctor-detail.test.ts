@@ -134,7 +134,7 @@ describe("the node's fact lines", () => {
     expect(render("ru", "warp_path.down", { state: "down" })).toBe("WARP не работает: нет рукопожатия");
     // the reason goes through the same words as the WARP card, with the recovery step the node is on
     expect(render("ru", "warp_path.down", { state: "down", error: "probe_cloudflare_failed; ladder: reassert" })).toBe(
-      "WARP не работает: Cloudflare не ответил через WARP за 6 с. Пробую восстановить: переподключение.",
+      "WARP не работает: Проверка через WARP до Cloudflare завершилась ошибкой. Пробую восстановить: переподключение.",
     );
     expect(render("en", "warp_path.down", { state: "down", error: "handshake_never" })).toBe("WARP is down: There has been no handshake with WARP yet.");
     expect(render("en", "warp_path.down", { state: "down", error: "brand_new_failure" })).toBe("WARP is down: brand_new_failure");

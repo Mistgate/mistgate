@@ -176,7 +176,7 @@ package mistgate.agent.v1;
 //     warp_path         the node's WARP tunnel and its routes; SKIP while the node has no WARP account and no inbound with
 //                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
 //                       table_in_use | rule_pref_in_use | interface_in_use
-//   FIX IDS (stable; only these four exist; all are safe: no data loss, no package install, no ssh or
+//   FIX IDS (stable; only these five exist; all are safe: no data loss, no package install, no ssh or
 //   firewall change). The check that offers a fix puts its id into DoctorResult.fix_id.
 //     journald_vacuum   journalctl --vacuum-size=200M (+ --vacuum-time=7d)           offered by journald_size, disk_space
 //     apply_baseline    hostctl.ApplyBaseline: sysctl + journald drop-in + ssh guard  offered by net_baseline
@@ -184,6 +184,7 @@ package mistgate.agent.v1;
 //     set_resolver      point the host resolver at the node's resolvers (NodeSettings.dns_resolvers, else the
 //                       agent's default for NodeSettings.country_code); the previous config is backed up and
 //                       removed again by Cleanup                                      offered by resolver
+//     reconnect_warp    rebuild the current WARP tunnel and reapply its routes (no account changes) offered by warp_path while down
 //
 // UPDATE (agent self-update; additive, protocol api_version stays 1)
 //   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it

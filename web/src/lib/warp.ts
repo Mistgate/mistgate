@@ -79,7 +79,7 @@ function probeFailure(code: string | undefined): Pick<ProbeLook, "failure" | "ht
 }
 
 /**
- * One probe dot of the card, from the LATEST check: failed = red "no answer", passed but slow = warn, passed = ok, each with
+ * One probe dot of the card, from the LATEST check: failed = red "failed", passed but slow = warn, passed = ok, each with
  * its latency. `p` is the per-probe result of a node that sends it; an agent that predates it gives only `legacyOk` (the
  * flag of the last check, no timing); `checked` says whether the node sent any check time (a new agent that did not run
  * the probe, e.g. the link was down, has `checked` and no `p`: nothing to claim, "—").

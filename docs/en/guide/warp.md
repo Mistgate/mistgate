@@ -69,13 +69,15 @@ Next to the title the card shows where the account came from (**Registered here*
 - **Handshake**: when the tunnel last completed a handshake with Cloudflare.
 - **Endpoint**: the Cloudflare address and port in use.
 - **Traffic**: bytes in and out through the tunnel.
-- **Cloudflare** and **Other site**: two probes through the tunnel, one to Cloudflare and one to a site outside it. Each reads **ok** with its time, **slow** (over 2 seconds) or **no answer** (nothing within 6 seconds).
+- **Cloudflare** and **Other site**: two probes through the tunnel, one to Cloudflare and one to a site outside it. Each reads **ok** with its time, **slow** (over 2 seconds), or **failed**. A probe times out after 12 seconds; HTTP failures show their status.
 - "Checked N s ago". The node checks every 30 seconds, every 5 while the tunnel is starting. A run of failures shows as "3 failed checks in a row".
 - **Details**: the WireGuard backend, Cloudflare's own flag (`warp=on`, `warp=plus` or `warp=off`) and whether the account's reserved bytes are stamped on packets.
 
-When a check fails, the card says what happened and what it means, in words: Cloudflare did not answer through WARP, the traffic does not go through WARP (`warp=off`), no handshake for over 3 minutes, no handshake yet, the interface is not up, no WireGuard on the host.
+When a check fails, the card says what happened and what it means, in words: a probe failed, traffic does not go through WARP (`warp=off`), the handshake is stale or missing, the interface is down, or the host has no WireGuard backend.
 
 ### Recovering by itself
+
+The health panel's Doctor offers **Reconnect WARP** when it confirms that the tunnel is down. Review and confirm the plan first. It rebuilds the current tunnel and reapplies its routes without changing the account. Profiles using WARP may pause briefly. A slow but successful probe does not trigger a reconnect.
 
 While the tunnel is down, the node climbs a ladder, one step per failed check:
 

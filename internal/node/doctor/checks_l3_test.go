@@ -111,7 +111,7 @@ func TestWarpPathCheck(t *testing.T) {
 	t.Run("down carries the last error", func(t *testing.T) {
 		f := newFake(t)
 		r := run(t, f.doctor(withInbounds(via), warpEnv(WarpInfo{Configured: true, State: "down", LastError: "probe_other_failed"})), CheckWarpPath)
-		want(t, r, Fail, "")
+		want(t, r, Fail, FixReconnectWarp)
 		param(t, r, "error", "probe_other_failed")
 		code(t, r, CodeWarpDown)
 	})

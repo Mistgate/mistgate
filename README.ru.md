@@ -43,7 +43,7 @@ Mistgate ещё не вышел. Автор использует его в ра�
 
 ## Документация
 
-Полная документация — в [`docs/ru`](docs/ru/index.md) (на английском: [`docs/en`](docs/en/index.md)). С чего начать:
+Полная документация доступна на [mistgate.app/ru](https://mistgate.app/ru/) (английская версия: [mistgate.app](https://mistgate.app/)). Исходники лежат в [`docs/ru`](docs/ru/index.md) и [`docs/en`](docs/en/index.md). С чего начать:
 
 - [Обзор](docs/ru/getting-started/overview.md): основные понятия (панель, нода, профиль, пользователь, группа, устройство, подписка).
 - [Установка панели](docs/ru/getting-started/install-panel.md), [добавление ноды](docs/ru/getting-started/add-node.md), [первые пользователи](docs/ru/getting-started/first-users.md).

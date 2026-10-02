@@ -1,5 +1,5 @@
 // Package doctor is the node's self-diagnosis: sixteen host
-// checks that each come from a real incident, and four safe fixes the panel may ask for.
+// checks that each come from a real incident, and five safe fixes the panel may ask for.
 //
 // Rules the package keeps:
 //
@@ -74,12 +74,13 @@ const (
 	CheckWarpPath       = "warp_path"
 )
 
-// Fix ids (agent.proto "FIX IDS"). Only these four exist.
+// Fix ids (agent.proto "FIX IDS"). Only these five exist.
 const (
 	FixJournaldVacuum = "journald_vacuum"
 	FixApplyBaseline  = "apply_baseline"
 	FixRestartInbound = "restart_inbound"
 	FixSetResolver    = "set_resolver"
+	FixReconnectWarp  = "reconnect_warp"
 )
 
 // Result is one check's outcome; it becomes one DoctorResult.
@@ -144,9 +145,9 @@ func CheckIDs() []string {
 	return ids
 }
 
-// FixIDs returns the four fix ids.
+// FixIDs returns the five fix ids.
 func FixIDs() []string {
-	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver}
+	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp}
 }
 
 // fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix").
@@ -155,6 +156,7 @@ var fixChecks = map[string][]string{
 	FixApplyBaseline:  {CheckNetBaseline},
 	FixRestartInbound: {CheckPortConflicts, CheckCertExpiry},
 	FixSetResolver:    {CheckResolver},
+	FixReconnectWarp:  {CheckWarpPath},
 }
 
 // RecheckIDs returns the checks to re-run after a fix, nil for an unknown fix id.

@@ -79,6 +79,7 @@ type Env struct {
 	// Fix actions.
 	ApplyBaseline  func(ctx context.Context) error
 	RestartInbound func(ctx context.Context, inboundID string) (uint32, error) // "" = every FAILED inbound
+	ReconnectWarp  func(ctx context.Context) (bool, error)                     // true when a down tunnel was reconnected
 	Fixer          hostctl.Fixer                                               // nil = journal/resolver fixes unsupported
 
 	// Set by Run: the previous result of a check.

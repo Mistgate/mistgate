@@ -37,10 +37,11 @@ func (f *fakeFixer) SetResolver(_ context.Context, s []string) error {
 
 // fixRig is a host that needs every fix, with recorders for everything that would change it.
 type fixRig struct {
-	f        *fake
-	fx       *fakeFixer
-	baseline int
-	restarts []string
+	f                 *fake
+	fx                *fakeFixer
+	baseline          int
+	restarts          []string
+	warpReconnections int
 }
 
 func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
@@ -65,6 +66,8 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 				return nil
 			}
 			e.RestartInbound = func(_ context.Context, id string) (uint32, error) { r.restarts = append(r.restarts, id); return 1, nil }
+			e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "down"} }
+			e.ReconnectWarp = func(context.Context) (bool, error) { r.warpReconnections++; return true, nil }
 			e.Inbounds = func() []Inbound {
 				return []Inbound{
 					{ID: "inb_1", Enabled: true, State: "failed", Network: "udp", Port: 443, Error: "address already in use"},
@@ -91,8 +94,8 @@ func TestDryRunChangesNothing(t *testing.T) {
 			t.Errorf("%s dry run found nothing to do on a host that needs it: %+v", fix, out)
 		}
 	}
-	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 {
-		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v", r.fx.vacuum, r.fx.set, r.baseline, r.restarts)
+	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 {
+		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v warp_reconnects=%d", r.fx.vacuum, r.fx.set, r.baseline, r.restarts, r.warpReconnections)
 	}
 	if after := snapshot(t, r.f.root); after != before {
 		t.Fatalf("a dry run changed the filesystem:\nbefore:\n%s\nafter:\n%s", before, after)
@@ -120,6 +123,32 @@ func TestDryRunFacts(t *testing.T) {
 	out = d.Apply(context.Background(), FixSetResolver, true, nil)
 	if out.Params["mode"] != "resolv_conf" || out.Params["before"] != "10.0.0.1" || out.Params["after"] != "1.1.1.1,8.8.8.8" {
 		t.Errorf("resolver plan: %+v", out)
+	}
+}
+
+func TestReconnectWarpOnlyActsOnAStillDownTunnel(t *testing.T) {
+	_, mk := newFixRig(t)
+	d := mk()
+
+	plan := d.Apply(context.Background(), FixReconnectWarp, true, nil)
+	if !plan.OK || plan.Affected != 1 || plan.Params["state"] != "down" || plan.Detail == "" {
+		t.Fatalf("plan: %+v", plan)
+	}
+	if out := d.Apply(context.Background(), FixReconnectWarp, true, map[string]string{"endpoint": "203.0.113.1"}); out.Err != ErrBadParams {
+		t.Fatalf("unexpected params: %+v", out)
+	}
+
+	result := d.Apply(context.Background(), FixReconnectWarp, false, nil)
+	if !result.OK || result.Affected != 1 || result.Params["state"] != "starting" || result.Detail == "" {
+		t.Fatalf("reconnect: %+v", result)
+	}
+
+	_, recovered := newFixRig(t)
+	noLongerDown := recovered(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "up"} }
+	})
+	if out := noLongerDown.Apply(context.Background(), FixReconnectWarp, false, nil); !out.OK || out.Params["noop"] != "1" {
+		t.Fatalf("stale fix should be a no-op: %+v", out)
 	}
 }
 
