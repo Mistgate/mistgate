@@ -122,6 +122,48 @@ func updatable(st adminv1.NodeUpdateState) bool {
 		st == adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK || st == adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED
 }
 
+// beginPanelUpdate reserves the same mutex used by rollout creation so the panel cannot begin an agent rollout
+// while a panel binary replacement is being downloaded and scheduled.
+func (s *Service) beginPanelUpdate(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.panelInstalling {
+		return precondition("a panel update is already being installed")
+	}
+	if _, err := s.st.ActiveRollout(ctx); err == nil {
+		return precondition("finish or cancel the active node rollout before updating the panel")
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return s.internal("check active rollout before panel update", err)
+	}
+	s.panelInstalling = true
+	return nil
+}
+
+// finishPanelUpdate releases a failed reservation immediately. A successful systemd-run may still fail to start
+// its detached helper, so the reservation expires after the helper's systemd timeout plus a margin.
+func (s *Service) finishPanelUpdate(scheduled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.panelInstallGeneration++
+	generation := s.panelInstallGeneration
+	if s.panelInstallTimer != nil {
+		s.panelInstallTimer.Stop()
+		s.panelInstallTimer = nil
+	}
+	if !scheduled {
+		s.panelInstalling = false
+		return
+	}
+	s.panelInstallTimer = time.AfterFunc(panelUpdateGuardTimeout, func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.panelInstallGeneration == generation {
+			s.panelInstalling = false
+			s.panelInstallTimer = nil
+		}
+	})
+}
+
 // start creates a rollout of the trusted bundle. nodeIDs empty = every OUTDATED node.
 func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store.RolloutRow, error) {
 	if batch < 0 || batch > maxBatch {
@@ -136,6 +178,9 @@ func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.panelInstalling {
+		return store.RolloutRow{}, precondition("a panel update is being installed")
+	}
 	if _, err := s.st.ActiveRollout(ctx); err == nil {
 		return store.RolloutRow{}, precondition("a rollout is already active")
 	} else if !errors.Is(err, store.ErrNotFound) {

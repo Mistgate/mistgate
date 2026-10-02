@@ -24,6 +24,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.ListUsersResponse.next_page_token":   "a page cursor (a user name)",
 		"mistgate.admin.v1.PanelBuild.has_release_key":          "a bool",
 		"mistgate.admin.v1.PanelBuild.release_key_fingerprint":  "the fingerprint of the public release key",
+		"mistgate.admin.v1.PanelUpdate.url":                     "a public link to the official GitHub release",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

@@ -14,6 +14,8 @@ const resumeRollout = vi.fn();
 const cancelRollout = vi.fn();
 const rollbackNode = vi.fn();
 const rescanBundle = vi.fn();
+const checkPanelUpdate = vi.fn();
+const installPanelUpdate = vi.fn();
 let role = Role.OWNER;
 vi.mock("@/lib/api", () => ({
   updates: {
@@ -24,6 +26,8 @@ vi.mock("@/lib/api", () => ({
     cancelRollout: (...a: unknown[]) => cancelRollout(...a),
     rollbackNode: (...a: unknown[]) => rollbackNode(...a),
     rescanBundle: (...a: unknown[]) => rescanBundle(...a),
+    checkPanelUpdate: (...a: unknown[]) => checkPanelUpdate(...a),
+    installPanelUpdate: (...a: unknown[]) => installPanelUpdate(...a),
   },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
@@ -51,7 +55,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUpdates, startRollout, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle]) m.mockReset();
+  for (const m of [getUpdates, startRollout, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
 });
 
 const node = (over: Record<string, unknown> = {}) => ({
@@ -107,7 +111,10 @@ const rollout = (over: Record<string, unknown> = {}) => ({
 });
 const page = (over: Record<string, unknown> = {}) => ({
   nowUnix: 1000,
-  panel: { version: "0.2.0-bbb", built: 200, hasReleaseKey: true, releaseKeyFingerprint: "abcd1234abcd1234" },
+  panel: {
+    version: "0.2.0-bbb", built: 200, hasReleaseKey: true, releaseKeyFingerprint: "abcd1234abcd1234",
+    update: { version: "0.2.0-bbb", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.2.0-bbb", publishedUnix: 0, checkedUnix: 1000, available: false, supported: true, installable: false, installing: false, errorKey: "" },
+  },
   bundle: bundle(),
   nodes: [],
   distDir: "/var/lib/mistgate/dist",
@@ -138,6 +145,24 @@ const text = () => document.body.textContent ?? "";
 const buttons = () => [...document.querySelectorAll("button")];
 const button = (label: string) => buttons().find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+describe("panel self-update", () => {
+  it("lets an owner check GitHub and exposes an available release", async () => {
+    checkPanelUpdate.mockResolvedValue({ update: {} });
+    await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
+    expect(text()).toContain("Version v0.3.0 is available");
+    expect(button("Update panel")).toBeTruthy();
+    await click(button("Check GitHub"));
+    expect(checkPanelUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show the panel install action to a non-owner", async () => {
+    role = Role.READONLY;
+    await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
+    expect(button("Update panel")).toBeUndefined();
+    expect(text()).toContain("Version v0.3.0 is available");
+  });
+});
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");
 const inDialog = (label: string) => [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));

@@ -126,5 +126,5 @@ func probeToPB(p *warp.ProbeResult, off time.Duration) *pb.WarpProbeResult {
 	if p == nil {
 		return nil
 	}
-	return &pb.WarpProbeResult{Ok: p.OK, LatencyMs: uint32(p.Latency.Milliseconds()), AtUnix: p.At.Add(off).Unix()}
+	return &pb.WarpProbeResult{Ok: p.OK, LatencyMs: uint32(p.Latency.Milliseconds()), AtUnix: p.At.Add(off).Unix(), FailureCode: p.FailureCode}
 }

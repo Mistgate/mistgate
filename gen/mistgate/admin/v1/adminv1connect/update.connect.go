@@ -36,6 +36,12 @@ const (
 	// UpdateServiceGetUpdatesProcedure is the fully-qualified name of the UpdateService's GetUpdates
 	// RPC.
 	UpdateServiceGetUpdatesProcedure = "/mistgate.admin.v1.UpdateService/GetUpdates"
+	// UpdateServiceCheckPanelUpdateProcedure is the fully-qualified name of the UpdateService's
+	// CheckPanelUpdate RPC.
+	UpdateServiceCheckPanelUpdateProcedure = "/mistgate.admin.v1.UpdateService/CheckPanelUpdate"
+	// UpdateServiceInstallPanelUpdateProcedure is the fully-qualified name of the UpdateService's
+	// InstallPanelUpdate RPC.
+	UpdateServiceInstallPanelUpdateProcedure = "/mistgate.admin.v1.UpdateService/InstallPanelUpdate"
 	// UpdateServiceStartRolloutProcedure is the fully-qualified name of the UpdateService's
 	// StartRollout RPC.
 	UpdateServiceStartRolloutProcedure = "/mistgate.admin.v1.UpdateService/StartRollout"
@@ -61,6 +67,11 @@ type UpdateServiceClient interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
 	// contacts a node and never rescans the bundle directory (RescanBundle does).
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
+	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
+	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
+	// Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
+	// Owner-only with a fresh step-up; refused while a node rollout is active.
+	InstallPanelUpdate(context.Context, *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error)
 	// Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
 	// that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
 	// steps. Only one rollout is active (RUNNING or PAUSED) at a time. Audited.
@@ -94,6 +105,18 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+UpdateServiceGetUpdatesProcedure,
 			connect.WithSchema(updateServiceMethods.ByName("GetUpdates")),
+			connect.WithClientOptions(opts...),
+		),
+		checkPanelUpdate: connect.NewClient[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse](
+			httpClient,
+			baseURL+UpdateServiceCheckPanelUpdateProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("CheckPanelUpdate")),
+			connect.WithClientOptions(opts...),
+		),
+		installPanelUpdate: connect.NewClient[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse](
+			httpClient,
+			baseURL+UpdateServiceInstallPanelUpdateProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("InstallPanelUpdate")),
 			connect.WithClientOptions(opts...),
 		),
 		startRollout: connect.NewClient[v1.StartRolloutRequest, v1.StartRolloutResponse](
@@ -137,18 +160,30 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // updateServiceClient implements UpdateServiceClient.
 type updateServiceClient struct {
-	getUpdates    *connect.Client[v1.GetUpdatesRequest, v1.GetUpdatesResponse]
-	startRollout  *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
-	pauseRollout  *connect.Client[v1.PauseRolloutRequest, v1.PauseRolloutResponse]
-	resumeRollout *connect.Client[v1.ResumeRolloutRequest, v1.ResumeRolloutResponse]
-	cancelRollout *connect.Client[v1.CancelRolloutRequest, v1.CancelRolloutResponse]
-	rollbackNode  *connect.Client[v1.RollbackNodeRequest, v1.RollbackNodeResponse]
-	rescanBundle  *connect.Client[v1.RescanBundleRequest, v1.RescanBundleResponse]
+	getUpdates         *connect.Client[v1.GetUpdatesRequest, v1.GetUpdatesResponse]
+	checkPanelUpdate   *connect.Client[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse]
+	installPanelUpdate *connect.Client[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse]
+	startRollout       *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
+	pauseRollout       *connect.Client[v1.PauseRolloutRequest, v1.PauseRolloutResponse]
+	resumeRollout      *connect.Client[v1.ResumeRolloutRequest, v1.ResumeRolloutResponse]
+	cancelRollout      *connect.Client[v1.CancelRolloutRequest, v1.CancelRolloutResponse]
+	rollbackNode       *connect.Client[v1.RollbackNodeRequest, v1.RollbackNodeResponse]
+	rescanBundle       *connect.Client[v1.RescanBundleRequest, v1.RescanBundleResponse]
 }
 
 // GetUpdates calls mistgate.admin.v1.UpdateService.GetUpdates.
 func (c *updateServiceClient) GetUpdates(ctx context.Context, req *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error) {
 	return c.getUpdates.CallUnary(ctx, req)
+}
+
+// CheckPanelUpdate calls mistgate.admin.v1.UpdateService.CheckPanelUpdate.
+func (c *updateServiceClient) CheckPanelUpdate(ctx context.Context, req *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error) {
+	return c.checkPanelUpdate.CallUnary(ctx, req)
+}
+
+// InstallPanelUpdate calls mistgate.admin.v1.UpdateService.InstallPanelUpdate.
+func (c *updateServiceClient) InstallPanelUpdate(ctx context.Context, req *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error) {
+	return c.installPanelUpdate.CallUnary(ctx, req)
 }
 
 // StartRollout calls mistgate.admin.v1.UpdateService.StartRollout.
@@ -186,6 +221,11 @@ type UpdateServiceHandler interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
 	// contacts a node and never rescans the bundle directory (RescanBundle does).
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
+	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
+	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
+	// Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
+	// Owner-only with a fresh step-up; refused while a node rollout is active.
+	InstallPanelUpdate(context.Context, *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error)
 	// Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
 	// that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
 	// steps. Only one rollout is active (RUNNING or PAUSED) at a time. Audited.
@@ -215,6 +255,18 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		UpdateServiceGetUpdatesProcedure,
 		svc.GetUpdates,
 		connect.WithSchema(updateServiceMethods.ByName("GetUpdates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceCheckPanelUpdateHandler := connect.NewUnaryHandler(
+		UpdateServiceCheckPanelUpdateProcedure,
+		svc.CheckPanelUpdate,
+		connect.WithSchema(updateServiceMethods.ByName("CheckPanelUpdate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceInstallPanelUpdateHandler := connect.NewUnaryHandler(
+		UpdateServiceInstallPanelUpdateProcedure,
+		svc.InstallPanelUpdate,
+		connect.WithSchema(updateServiceMethods.ByName("InstallPanelUpdate")),
 		connect.WithHandlerOptions(opts...),
 	)
 	updateServiceStartRolloutHandler := connect.NewUnaryHandler(
@@ -257,6 +309,10 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		switch r.URL.Path {
 		case UpdateServiceGetUpdatesProcedure:
 			updateServiceGetUpdatesHandler.ServeHTTP(w, r)
+		case UpdateServiceCheckPanelUpdateProcedure:
+			updateServiceCheckPanelUpdateHandler.ServeHTTP(w, r)
+		case UpdateServiceInstallPanelUpdateProcedure:
+			updateServiceInstallPanelUpdateHandler.ServeHTTP(w, r)
 		case UpdateServiceStartRolloutProcedure:
 			updateServiceStartRolloutHandler.ServeHTTP(w, r)
 		case UpdateServicePauseRolloutProcedure:
@@ -280,6 +336,14 @@ type UnimplementedUpdateServiceHandler struct{}
 
 func (UnimplementedUpdateServiceHandler) GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.GetUpdates is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.CheckPanelUpdate is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) InstallPanelUpdate(context.Context, *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.InstallPanelUpdate is not implemented"))
 }
 
 func (UnimplementedUpdateServiceHandler) StartRollout(context.Context, *connect.Request[v1.StartRolloutRequest]) (*connect.Response[v1.StartRolloutResponse], error) {

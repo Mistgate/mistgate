@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 
 	"connectrpc.com/connect"
@@ -78,6 +79,9 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 	b := s.current()
 	resp := &adminv1.GetUpdatesResponse{NowUnix: s.now().Unix(), Bundle: b.view, Panel: &adminv1.PanelBuild{
 		Version: s.cfg.PanelVersion, Built: s.cfg.PanelBuilt, HasReleaseKey: s.cfg.Key != nil}}
+	if s.cfg.PanelUpdater != nil {
+		resp.Panel.Update = panelUpdateProto(s.cfg.PanelUpdater.Status())
+	}
 	if s.cfg.Key != nil {
 		resp.Panel.ReleaseKeyFingerprint = fingerprint(s.cfg.Key)
 	}
@@ -121,6 +125,47 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 		}
 	}
 	return connect.NewResponse(resp), nil
+}
+
+func panelUpdateProto(s PanelUpdateStatus) *adminv1.PanelUpdate {
+	return &adminv1.PanelUpdate{
+		Version: s.Version, Url: s.URL, PublishedUnix: s.PublishedUnix, CheckedUnix: s.CheckedUnix,
+		Available: s.Available, Supported: s.Supported, Installable: s.Installable, Installing: s.Installing, ErrorKey: s.ErrorKey,
+	}
+}
+
+func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.CheckPanelUpdateRequest]) (*connect.Response[adminv1.CheckPanelUpdateResponse], error) {
+	if r.s.cfg.PanelUpdater == nil {
+		return connect.NewResponse(&adminv1.CheckPanelUpdateResponse{Update: &adminv1.PanelUpdate{ErrorKey: "unsupported"}}), nil
+	}
+	status := r.s.cfg.PanelUpdater.Check(ctx)
+	return connect.NewResponse(&adminv1.CheckPanelUpdateResponse{Update: panelUpdateProto(status)}), nil
+}
+
+func (r rpc) InstallPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if r.s.cfg.PanelUpdater == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, ErrPanelUnsupported)
+	}
+	if err := r.s.beginPanelUpdate(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.s.cfg.PanelUpdater.Install(ctx); err != nil {
+		r.s.finishPanelUpdate(false)
+		switch {
+		case errors.Is(err, ErrPanelUnsupported), errors.Is(err, ErrNoPanelRelease), errors.Is(err, ErrNoPanelUpdate), errors.Is(err, ErrPanelAssetMissing):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		default:
+			return nil, connect.NewError(connect.CodeUnavailable, err)
+		}
+	}
+	r.s.finishPanelUpdate(true)
+	status := r.s.cfg.PanelUpdater.Status()
+	r.s.audit(ctx, "panel_update", map[string]string{"version": status.Version})
+	status.Installing = true // The helper is detached; this process will exit when systemd restarts the panel.
+	return connect.NewResponse(&adminv1.InstallPanelUpdateResponse{Update: panelUpdateProto(status)}), nil
 }
 
 func (r rpc) StartRollout(ctx context.Context, req *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {

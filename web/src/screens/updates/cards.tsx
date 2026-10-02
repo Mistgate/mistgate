@@ -118,11 +118,30 @@ export function BundleCard({ data, owner, actions }: { data: Updates; owner: boo
   );
 }
 
-/** This panel's build, its release key and how to update the panel itself (by hand). */
-export function PanelCard({ data }: { data: Updates }) {
+/** This panel's build, its release key and GitHub self-update controls. */
+export function PanelCard({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
   const t = useT();
   const fmt = useFmt();
   const p = data.panel;
+  const update = p?.update;
+  const updateLabel = update?.installing
+    ? t("up.panel.installing")
+    : update?.errorKey === "no_release"
+      ? t("up.panel.noRelease")
+      : update?.errorKey === "asset_missing"
+        ? t("up.panel.noAsset")
+      : update?.errorKey === "check_failed"
+        ? t("up.panel.checkFailed")
+        : update?.errorKey === "unsupported"
+          ? t("up.panel.unsupported")
+        : update?.available && !update.supported
+            ? t("up.panel.unsupported")
+            : update?.available
+              ? t("up.panel.available", { version: update.version })
+              : update?.checkedUnix
+                ? t("up.panel.current")
+                : t("up.panel.checking");
+  const updateKind: StatusKind = update?.installing ? "busy" : update?.errorKey === "check_failed" ? "bad" : update?.available || update?.errorKey === "unsupported" || update?.errorKey === "asset_missing" ? "warn" : "ok";
   return (
     <section className={card}>
       <SectionLabel as="h2" icon="server" tone="lavender">
@@ -136,12 +155,36 @@ export function PanelCard({ data }: { data: Updates }) {
         <Row label={t("up.panel.key")}>
           {p?.hasReleaseKey ? <span className="font-mono text-xs">{p.releaseKeyFingerprint}</span> : <span className="text-warn-text">{t("up.panel.noKey")}</span>}
         </Row>
+        {update?.version && <Row label={t("up.panel.latest")}>
+          <a href={update.url} target="_blank" rel="noreferrer" className="font-mono text-xs text-accent underline underline-offset-2">
+            {update.version}
+          </a>
+        </Row>}
       </dl>
+      <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusPill kind={updateKind} label={updateLabel} sm />
+          {update?.checkedUnix ? <span className="text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
+          <span className="flex-1" />
+          <Button variant="secondary" size="sm" disabled={actions.busy} onClick={() => void actions.checkPanel()}>
+            <Icon name="refresh" size={12} />
+            {t("up.panel.check")}
+          </Button>
+          {owner && update?.available && update.installable && (
+            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel()}>
+              {t("up.panel.install")}
+            </Button>
+          )}
+        </div>
+        <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>
+      </div>
+      {!update?.supported && (
       <div className="flex flex-col gap-2.5 border-t border-line pt-3">
         <h3 className="text-[13px] font-bold">{t("up.panel.how")}</h3>
         <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.howBody")}</p>
         <Code>{t("up.panel.steps")}</Code>
       </div>
+      )}
     </section>
   );
 }

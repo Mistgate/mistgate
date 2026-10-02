@@ -1,0 +1,51 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Build embedded admin panel
+        run: cd web && pnpm install --frozen-lockfile && pnpm build
+      - name: Build panel binaries
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "release tag must be semantic version vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+          mkdir -p release
+          built="$(git log -1 --format=%ct)"
+          bi="github.com/mistgate/mistgate/internal/buildinfo"
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X ${bi}.Version=${TAG} -X ${bi}.Built=${built}" \
+              -o "release/mistgate-linux-${arch}" ./cmd/mistgate
+          done
+          (cd release && sha256sum mistgate-linux-* > SHA256SUMS)
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/SHA256SUMS --title "$TAG" --generate-notes

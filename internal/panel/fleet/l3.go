@@ -116,7 +116,9 @@ func warpStateChanged(prev, next *agentv1.WarpHealth) bool {
 	return prev.GetState() != next.GetState() ||
 		prev.GetLastError() != next.GetLastError() ||
 		prev.GetProbeCloudflareOk() != next.GetProbeCloudflareOk() ||
-		prev.GetProbeOtherOk() != next.GetProbeOtherOk()
+		prev.GetProbeOtherOk() != next.GetProbeOtherOk() ||
+		prev.GetProbeCloudflare().GetFailureCode() != next.GetProbeCloudflare().GetFailureCode() ||
+		prev.GetProbeOther().GetFailureCode() != next.GetProbeOther().GetFailureCode()
 }
 
 // touchAwgDevices writes the time of the newest handshake of every AWG peer that has a session into the device's
