@@ -1,6 +1,6 @@
 ---
 title: Subscriptions
-description: One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription.
+description: "One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription."
 ---
 
 Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has five tabs: **Apps & formats**, **Who gets what**, **Names & texts**, **User page** and **DNS**.

@@ -35,7 +35,7 @@ Mistgate is pre-release. It runs in production for its author, but the API, the 
 | Stage | What |
 |:--|:--|
 | **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · API tokens and MCP server · admin UI in ru / en |
-| **Now** | Node provisioning over SSH from the UI, with preflight checks · encrypted vault for server passwords · encrypted panel backups to R2 |
+| **M2 — planned; not started** | Node provisioning over SSH from the UI, with preflight checks · encrypted vault for server passwords · encrypted panel backups to R2 · [M2 plan](docs/en/roadmap/m2-ssh-provisioning.md) |
 | **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · panel self-update · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 

@@ -9,7 +9,8 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "node build.mjs",
-    "serve": "node serve.mjs"
+    "serve": "node serve.mjs",
+    "test": "node --test test/docs.test.mjs"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",

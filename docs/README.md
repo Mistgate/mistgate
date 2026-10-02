@@ -11,6 +11,7 @@ docs/
     getting-started/*.md
     guide/*.md
     operations/*.md
+    roadmap/*.md
     reference/*.md
   ru/                        the same tree, page for page, in Russian
 ```
