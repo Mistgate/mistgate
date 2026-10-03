@@ -41,15 +41,17 @@ func TestRemarks(t *testing.T) {
 		lang     string
 		want     []string
 	}{
-		{"default template is flag and country", []access.SubServer{srv("de1", "DE", "p"), srv("nl1", "NL", "p")}, "", "ru", []string{de + " Германия", nl + " Нидерланды"}},
-		{"no country: the node, no stray space", []access.SubServer{srv("de1", "", "p")}, "", "en", []string{"de1"}},
+		{"default template includes country and profile", []access.SubServer{srv("de1", "DE", "Hysteria2"), srv("nl1", "NL", "AmneziaWG")}, "", "ru", []string{de + " Германия · Hysteria2", nl + " Нидерланды · AmneziaWG"}},
+		{"no country: profile, no stray separator", []access.SubServer{srv("de1", "", "Hysteria2")}, "", "en", []string{"Hysteria2"}},
+		{"empty profile: no trailing separator", []access.SubServer{srv("de1", "DE", "")}, "", "en", []string{de + " Germany"}},
 		{"no country with the node template", []access.SubServer{srv("de1", "", "p")}, "{flag} {node}", "en", []string{"de1"}},
 		{"country name follows the language", []access.SubServer{srv("de1", "DE", "p")}, "{country} {node}", "ru", []string{"Германия de1"}},
 		{"profile placeholder", []access.SubServer{srv("de1", "DE", "hy2")}, "{flag} {node} ({profile})", "en", []string{de + " de1 (hy2)"}},
-		// two servers in one country (two nodes, two profiles, a profile and its WARP twin) read apart by a number, never
-		// by the panel's profile names
+		// A custom template without {profile} still uses numeric suffixes when names collide.
 		{"one country twice gets a number", []access.SubServer{srv("de1", "DE", "fast"), srv("de2", "DE", "safe"), srv("nl1", "NL", "fast")},
-			"", "ru", []string{de + " Германия", de + " Германия 2", nl + " Нидерланды"}},
+			"{flag} {country}", "ru", []string{de + " Германия", de + " Германия 2", nl + " Нидерланды"}},
+		{"default template distinguishes a WARP twin", []access.SubServer{srv("de1", "DE", "files"), srv("de1", "DE", "files · WARP")},
+			"", "en", []string{de + " Germany · files", de + " Germany · files · WARP"}},
 		{"a profile and its WARP twin", []access.SubServer{srv("de1", "DE", "files"), srv("de1", "DE", "files · WARP"), srv("nl1", "NL", "files")},
 			"{flag} {node}", "en", []string{de + " de1", de + " de1 2", nl + " nl1"}},
 		{"three times", []access.SubServer{srv("de1", "DE", "p"), srv("de1", "DE", "p"), srv("de1", "DE", "q")},

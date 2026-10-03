@@ -18,9 +18,9 @@ describe("move", () => {
 
 describe("renderName", () => {
   const v = { flag: "🇩🇪", country: "Germany", node: "de1", profile: "hy2" };
-  it("falls back to flag and country", () => {
-    expect(renderName("", v)).toBe("🇩🇪 Germany");
-    expect(renderName("   ", v)).toBe("🇩🇪 Germany");
+  it("uses country and profile by default", () => {
+    expect(renderName("", v)).toBe("🇩🇪 Germany · hy2");
+    expect(renderName("   ", v)).toBe("🇩🇪 Germany · hy2");
   });
   it("fills every placeholder and tidies the spaces", () => {
     expect(renderName("{flag} {country} · {node} · {profile}", v)).toBe("🇩🇪 Germany · de1 · hy2");
@@ -32,15 +32,16 @@ describe("renderName", () => {
 describe("serverNames", () => {
   const country = (code: string) => ({ DE: "Германия", NL: "Нидерланды" })[code] ?? code;
   const s = (node: string, countryCode: string, profile = "p") => ({ node, countryCode, profile });
-  it("a name that repeats gets a number from 2 on, never the profile", () => {
-    expect(serverNames("", [s("de1", "DE", "fast"), s("de2", "DE", "safe"), s("nl1", "NL")], country)).toEqual(["🇩🇪 Германия", "🇩🇪 Германия 2", "🇳🇱 Нидерланды"]);
+  it("the default includes profile labels; a custom template can still use numeric suffixes", () => {
+    expect(serverNames("", [s("de1", "DE", "fast"), s("de2", "DE", "safe"), s("nl1", "NL")], country)).toEqual(["🇩🇪 Германия · fast", "🇩🇪 Германия · safe", "🇳🇱 Нидерланды · p"]);
     expect(serverNames("{flag} {node}", [s("de1", "DE", "files"), s("de1", "DE", "files · WARP"), s("nl1", "NL")], country)).toEqual(["🇩🇪 de1", "🇩🇪 de1 2", "🇳🇱 nl1"]);
     expect(serverNames("{node}", [s("de1", "DE"), s("de1", "DE"), s("de1", "DE")], country)).toEqual(["de1", "de1 2", "de1 3"]);
     expect(serverNames("{node}", [s("x", ""), s("x 2", ""), s("x", "")], country)).toEqual(["x", "x 2", "x 3"]);
   });
-  it("the profile shows where the template asks for it; no country falls back to the node", () => {
+  it("the profile shows by default and missing country does not leave a separator", () => {
     expect(serverNames("{node} {profile}", [s("de1", "DE", "a"), s("de1", "DE", "b")], country)).toEqual(["de1 a", "de1 b"]);
-    expect(serverNames("", [s("de1", "")], country)).toEqual(["de1"]);
+    expect(serverNames("", [s("de1", "", "Hysteria2")], country)).toEqual(["Hysteria2"]);
+    expect(serverNames("", [s("de1", "DE", "")], country)).toEqual(["🇩🇪 Германия"]);
     expect(serverNames("{flag}", [s("de1", "")], country)).toEqual(["de1"]);
   });
 });

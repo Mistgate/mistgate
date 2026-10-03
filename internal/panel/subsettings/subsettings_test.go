@@ -26,6 +26,9 @@ func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 	if err := Validate(d); err != nil {
 		t.Fatalf("the defaults do not validate: %v", err)
 	}
+	if d.ServerNameTemplate != DefaultNameTemplate {
+		t.Errorf("default server name template = %q, want %q", d.ServerNameTemplate, DefaultNameTemplate)
+	}
 	got := map[string]string{}
 	for _, a := range d.Apps {
 		got[a.Platform.String()+"/"+a.Kind.String()] = a.Name + " " + a.AddLinkTemplate

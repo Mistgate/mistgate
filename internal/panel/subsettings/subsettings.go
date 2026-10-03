@@ -51,9 +51,10 @@ func invalid(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
 
-// DefaultNameTemplate is the server-name template of a fresh install and of an empty template: the country, as a
-// friend knows it ("🇩🇪 Germany"), not the node's name. Migration 00026 moves installs off the old "{flag} {node}".
-const DefaultNameTemplate = "{flag} {country}"
+// DefaultNameTemplate is the server-name template of a fresh install and of an empty template: the country and profile,
+// so servers using different protocols or exits stay recognizable in the client's list. Migration 00035 moves
+// installations off the previous "{flag} {country}" default.
+const DefaultNameTemplate = "{flag} {country} · {profile}"
 
 // Official AmneziaVPN downloads (amnezia.org/downloads): the stores on phones, the site everywhere else.
 const (

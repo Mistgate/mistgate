@@ -48,8 +48,8 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
 
   /**
    * Server name template. Placeholders: {flag} (emoji from the node country), {country} (localised
-   * country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country}". When servers
-   * of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany 2").
+   * country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
+   * of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany · Hysteria2 2").
    *
    * @generated from field: string server_name_template = 5;
    */

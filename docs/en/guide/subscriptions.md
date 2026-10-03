@@ -79,7 +79,7 @@ The Mihomo YAML carries the same headers, one proxy group with every server, and
 | `{node}` | The node name. |
 | `{profile}` | The profile name. |
 
-The default is `{flag} {country}`: "🇩🇪 Germany". When two servers of one person get the same name, the second gets a number: "🇩🇪 Germany 2". The profile name shows only if you add `{profile}`; it is a word of the panel, not of the person. A node without a country falls back to its name. Happ shows a flag as the server icon only when the name starts with one.
+The default is `{flag} {country} · {profile}`: "🇩🇪 Germany · Hysteria2". Profile names come from the panel, so protocol variants and WARP twins stay easy to tell apart. A number is added only if the full name repeats. A node without a country keeps its profile name; if the name is empty too, it falls back to the node. Happ shows a flag as the server icon only when the name starts with one.
 
 **How it looks in the app** draws the list as Happ shows it, with the servers of the group most people are in, or with made-up servers when there is none.
 

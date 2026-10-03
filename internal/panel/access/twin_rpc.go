@@ -21,8 +21,8 @@ import (
 // The same server with and without WARP (docs: two profiles of one protocol on different ports, one of them with
 // egress "warp"; the client lists both entries). TwinProfile makes the second one in a single step.
 
-// twinSuffix marks the WARP twin in its name; the subscription adds the profile name to a server name only when a user
-// holds two profiles on one node (subs/names.go), so "files" and "files · WARP" read apart in the client.
+// twinSuffix marks the WARP twin in its name; the default subscription template includes profile names, so "files" and
+// "files · WARP" read apart in the client.
 const twinSuffix = " · WARP"
 
 // twinPreferred are the UDP ports a Hysteria2 twin tries first: another "web-looking" port, since 443 stays with the

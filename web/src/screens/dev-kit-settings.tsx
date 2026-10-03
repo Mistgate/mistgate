@@ -106,7 +106,7 @@ const subsSettings = {
   announcement: "",
   supportUrl: "",
   updateIntervalHours: 12,
-  serverNameTemplate: "{flag} {node}",
+  serverNameTemplate: "{flag} {country} · {profile}",
   rules: [
     { uaContains: "mihomo", format: SubFormat.MIHOMO_YAML },
     { uaContains: "clash", format: SubFormat.MIHOMO_YAML },
