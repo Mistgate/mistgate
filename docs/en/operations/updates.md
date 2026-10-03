@@ -187,7 +187,7 @@ The Updates page checks the latest stable release from `Mistgate/mistgate` at st
 
 Automatic installation is available when the panel runs as root under systemd. The default unit is `mistgate.service`; set `MISTGATE_UPDATE_SERVICE` or pass `--update-service` if yours has another name. The owner must confirm with a fresh step-up, and an active node rollout must finish first. A detached systemd helper stops the panel, makes a backup of its data directory, replaces the binary and starts the panel. If the service does not stay active, it restores both the previous binary and the database backup. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`.
 
-Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. Until the first stable release is published, the Updates page reports that no release is available.
+Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. The first stable release, `v0.1.0`, is available now. To update an earlier commit build, open **Settings → System**, press **Check GitHub**, then **Update panel** when `v0.1.0` appears. The panel restarts after the owner confirms the update. The automatic updater requires root under systemd; use the manual steps below for other installations.
 
 For a non-systemd installation or a manual fallback:
 

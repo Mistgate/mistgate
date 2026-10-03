@@ -3,11 +3,11 @@ title: Add a node
 description: Enroll a Linux server with the node agent, watch it come online, and remove it cleanly later.
 ---
 
-A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** now offers two paths: install automatically over SSH, or create a one-time command for a manual install. This page covers both and explains how to remove a node later.
+A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two paths: **Install automatically over SSH** or **Get a manual install command**. This page covers both and explains how to remove a node later. If the dialog opens directly on the name, country and address fields, update the panel first through **Settings → System**; the current chooser appears after that update.
 
 ## Automatic SSH installation
 
-In **Nodes → Add node**, choose **Set up SSH installation**. The owner-only Go wizard opens under the panel's admin prefix, so it works when the admin URL uses a secret path.
+In **Nodes → Add node**, press **Install automatically over SSH**. The owner-only wizard opens under the panel's admin prefix, so it works when the admin URL uses a secret path.
 
 1. Enter the node name and client-facing address, then the server's public SSH host, port, login and password. Use `root` or an account with non-interactive `sudo -n`.
 2. The panel fetches the SSH host-key fingerprint. Compare and confirm that fingerprint before entering the password. The panel then checks the operating system, architecture, systemd, available memory and disk, and the connection back to the panel.
@@ -25,7 +25,7 @@ For owner-approved agent operation, see the [AI agent guide](ai-agents.md). The 
 
 ## 1. Choose manual installation
 
-In **Nodes → Add node**, choose **Get a manual install command**. The same window opens from the **Add node** tile on the Overview, the command palette and the end of the setup wizard.
+In **Nodes → Add node**, choose **Get a manual install command**. The same window opens from the **Add node** tile on the Overview, the command palette and the end of the setup wizard. If you already created a pending manual node, retire it before using the same name in the SSH wizard, or choose another unused name.
 
 | Field | What to enter |
 |:--|:--|

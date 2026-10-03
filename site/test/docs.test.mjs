@@ -67,3 +67,19 @@ test("M2 pages link to the matching add-node guide and GitHub source", () => {
   assert.ok(en.includes("github.com/Mistgate/mistgate/edit/main/docs/en/roadmap/m2-ssh-provisioning.md"));
   assert.ok(ru.includes("github.com/Mistgate/mistgate/edit/main/docs/ru/roadmap/m2-ssh-provisioning.md"));
 });
+
+test("node guides show the SSH install choice and the published panel update path", () => {
+  const addEn = page("en", "getting-started/add-node");
+  const addRu = page("ru", "getting-started/add-node");
+  const updatesEn = page("en", "operations/updates");
+  const updatesRu = page("ru", "operations/updates");
+
+  assert.ok(addEn.includes("Install automatically over SSH"));
+  assert.ok(addEn.includes("Settings → System"));
+  assert.ok(addRu.includes("Запустить автоустановку по SSH"));
+  assert.ok(addRu.includes("Настройки → Система"));
+  assert.ok(updatesEn.includes("v0.1.0"));
+  assert.ok(updatesEn.includes("Check GitHub"));
+  assert.ok(updatesRu.includes("v0.1.0"));
+  assert.ok(updatesRu.includes("Проверить GitHub"));
+});
