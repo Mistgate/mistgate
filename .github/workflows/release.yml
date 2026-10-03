@@ -37,16 +37,18 @@ jobs:
             echo "release tag must be semantic version vMAJOR.MINOR.PATCH" >&2
             exit 1
           fi
-          if [[ -n "$RELEASE_KEY" ]]; then
-            if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
-              echo "MISTGATE_RELEASE_PUBLIC_KEY must be a base64-encoded Ed25519 public key" >&2
-              exit 1
-            fi
-            key_bytes="$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)"
-            if [[ "$key_bytes" -ne 32 ]]; then
-              echo "MISTGATE_RELEASE_PUBLIC_KEY must decode to 32 bytes" >&2
-              exit 1
-            fi
+          if [[ -z "$RELEASE_KEY" ]]; then
+            echo "Set the repository variable MISTGATE_RELEASE_PUBLIC_KEY before creating a release" >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+            echo "MISTGATE_RELEASE_PUBLIC_KEY must be a base64-encoded Ed25519 public key" >&2
+            exit 1
+          fi
+          key_bytes="$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)"
+          if [[ "$key_bytes" -ne 32 ]]; then
+            echo "MISTGATE_RELEASE_PUBLIC_KEY must decode to 32 bytes" >&2
+            exit 1
           fi
           mkdir -p release
           built="$(git log -1 --format=%ct)"
@@ -61,37 +63,22 @@ jobs:
               -ldflags "${ldflags[*]}" \
               -o "release/mistgate-linux-${arch}" ./cmd/mistgate
           done
-          node_bundle_mode=none
-          if [[ -n "$RELEASE_KEY" ]]; then
-            for arch in amd64 arm64; do
-              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-                -ldflags "${ldflags[*]}" \
-                -o "release/mistgate-node-linux-${arch}" ./cmd/mistgate-node
-            done
-            node_bundle_mode=unsigned
-            echo "::notice::Node binaries are built with the release key. Keep the private key offline, sign these binaries, then upload manifest.json and manifest.sig to this release."
-          else
-            echo "::notice::Set MISTGATE_RELEASE_PUBLIC_KEY to publish node agents that trust the release key."
-          fi
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+              -ldflags "${ldflags[*]}" \
+              -o "release/mistgate-node-linux-${arch}" ./cmd/mistgate-node
+          done
           (
             cd release
-            checksums=(mistgate-linux-amd64 mistgate-linux-arm64)
-            if [[ -f mistgate-node-linux-amd64 ]]; then
-              checksums+=(mistgate-node-linux-amd64 mistgate-node-linux-arm64)
-            fi
+            checksums=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64)
             sha256sum "${checksums[@]}" > SHA256SUMS
           )
-          echo "node_bundle_mode=${node_bundle_mode}" >> "$GITHUB_OUTPUT"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         shell: bash
         run: |
-          assets=(release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/SHA256SUMS release/BUILDINFO)
-          case "${{ steps.build.outputs.node_bundle_mode }}" in
-            unsigned)
-              assets+=(release/mistgate-node-linux-amd64 release/mistgate-node-linux-arm64)
-              ;;
-          esac
-          gh release create "$TAG" "${assets[@]}" --title "$TAG" --generate-notes
+          assets=(release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/mistgate-node-linux-amd64 release/mistgate-node-linux-arm64 release/SHA256SUMS release/BUILDINFO)
+          gh release create "$TAG" "${assets[@]}" --draft --title "$TAG" --generate-notes
+          echo "::notice::Release is a draft until the owner signs the node bundle and uploads manifest.json and manifest.sig. Publish it only after both signature files are attached."

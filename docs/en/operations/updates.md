@@ -16,9 +16,9 @@ Node agents update themselves, but only to a build signed with your release key.
 
 ## Publish a release
 
-GitHub Actions builds the panel and, when the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` is set, publishes agent binaries with that version and key. The private key is never passed to Actions: the owner signs the binaries on a trusted machine and uploads `manifest.json` and `manifest.sig` to the same release. The panel picks up the package automatically within 10 minutes and starts its canary rollout. The GitHub public-key variable must match `<data-dir>/release.pub` and the key compiled into the already installed agents. A mismatched signature is refused.
+For every stable tag, GitHub Actions requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and builds the panel and both Linux node agents with the same version and key. It creates a **draft** release containing the binaries, `BUILDINFO` and `SHA256SUMS`. A draft is not visible to panels as the latest release. The private key never goes to Actions: the owner signs the node binaries on a trusted machine, uploads `manifest.json` and `manifest.sig`, then publishes the draft. Within 10 minutes, the panel downloads and verifies the package and starts the canary rollout automatically. The public-key variable must match `<data-dir>/release.pub` and the key compiled into already installed agents; a mismatched signature is refused.
 
-If `MISTGATE_RELEASE_PUBLIC_KEY` is not set, a GitHub release contains only the panel. A panel version such as `v0.1.5` therefore does not mean its agent bundle is also `v0.1.5`. Until both signature files are attached to the latest release, the panel considers no agent package available and does not start an automatic rollout.
+If the public-key variable is missing or invalid, the release workflow fails instead of publishing a panel-only release. This keeps the panel and agent package on one version and prevents an incomplete release from becoming visible to running panels.
 
 To sign offline, download `BUILDINFO`, the panel binary and both `mistgate-node-linux-*` binaries from the release. `BUILDINFO` contains the exact `version` and Unix `built` timestamp; the panel binary from the same release carries that version and public key:
 
@@ -35,7 +35,10 @@ BUILT="$(sed -n 's/^built=//p' downloaded/BUILDINFO)"
   --out signed
 gh release upload "$VERSION" signed/manifest.json signed/manifest.sig \
   --repo Mistgate/mistgate --clobber
+gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 ```
+
+The last command publishes the draft. Do not publish it before both signature files have uploaded successfully.
 
 Run signing on a Linux machine that can access the offline key file. The binaries and signature must come from the same tag; the command checks the version and matching key.
 
