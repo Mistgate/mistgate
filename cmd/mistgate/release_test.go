@@ -240,6 +240,28 @@ func TestReleaseSignRequiresPanelVersion(t *testing.T) {
 	}
 }
 
+func TestReleaseSignRequiresMatchingCompiledKey(t *testing.T) {
+	setBuildVersion(t, "v0.1.4")
+	keyFile, _ := newKeyFile(t)
+	_, bins := makeBinaries(t, "mistgate-node-linux-amd64")
+	outDir := filepath.Join(t.TempDir(), "dist")
+	otherPub, _, err := release.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := buildinfo.ReleaseKey
+	buildinfo.ReleaseKey = release.EncodePublicKey(otherPub)
+	t.Cleanup(func() { buildinfo.ReleaseKey = previous })
+	args := []string{"--key", keyFile, "--version", "v0.1.4", "--built", "1789000000", bins[0], "--out", outDir}
+	err = releaseSign(args, &bytes.Buffer{}, time.Unix(1_790_000_000, 0))
+	if err == nil || !strings.Contains(err.Error(), "does not match the public key compiled into this signer") {
+		t.Fatalf("mismatched release key error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "manifest.json")); err == nil {
+		t.Fatal("a manifest was written with a key that differs from the compiled trust root")
+	}
+}
+
 // --out may be the directory the binaries already sit in; --expires takes days or a Go duration.
 func TestReleaseSignInPlaceAndExpires(t *testing.T) {
 	setBuildVersion(t, "1.0.0")

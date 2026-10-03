@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"errors"
 	"flag"
@@ -134,6 +135,13 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		return fmt.Errorf("%s: %w", *keyFile, err)
 	}
 	pub := priv.Public().(ed25519.PublicKey)
+	if expected, err := buildinfo.ReleasePublicKey(); err == nil {
+		if !bytes.Equal(pub, expected) {
+			return errors.New("release key does not match the public key compiled into this signer")
+		}
+	} else if !errors.Is(err, buildinfo.ErrUnsignedBuild) {
+		return fmt.Errorf("compiled release key: %w", err)
+	}
 
 	m := &release.Manifest{Schema: release.Schema, Version: *version, Built: *built, Expires: now.Add(life).Unix()}
 	for _, b := range bins {

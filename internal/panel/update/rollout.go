@@ -127,6 +127,9 @@ func updatable(st adminv1.NodeUpdateState) bool {
 func (s *Service) beginPanelUpdate(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.bundleSyncing {
+		return precondition("a GitHub node bundle is being installed")
+	}
 	if s.panelInstalling {
 		return precondition("a panel update is already being installed")
 	}
@@ -166,18 +169,21 @@ func (s *Service) finishPanelUpdate(scheduled bool) {
 
 // start creates a rollout of the trusted bundle. nodeIDs empty = every OUTDATED node.
 func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store.RolloutRow, error) {
+	return s.startWithActor(ctx, nodeIDs, batch, s.cfg.Actor(ctx))
+}
+
+func (s *Service) startWithActor(ctx context.Context, nodeIDs []string, batch int, actor string) (store.RolloutRow, error) {
 	if batch < 0 || batch > maxBatch {
 		return store.RolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("batch_size must be 0 to 10"))
 	}
 	if s.cfg.Key == nil {
 		return store.RolloutRow{}, precondition("no release key in this build")
 	}
-	b := s.rescan() // what is on disk now is what ships
-	if !b.trusted {
-		return store.RolloutRow{}, precondition("no trusted bundle")
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.bundleSyncing {
+		return store.RolloutRow{}, precondition("the GitHub node bundle is being installed")
+	}
 	if s.panelInstalling {
 		return store.RolloutRow{}, precondition("a panel update is being installed")
 	}
@@ -185,6 +191,10 @@ func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store
 		return store.RolloutRow{}, precondition("a rollout is already active")
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return store.RolloutRow{}, s.internal("active rollout", err)
+	}
+	b := s.rescan() // what is on disk now is what ships
+	if !b.trusted {
+		return store.RolloutRow{}, precondition("no trusted bundle")
 	}
 	views, err := s.nodes(ctx, b, nil)
 	if err != nil {
@@ -225,7 +235,7 @@ func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store
 	}
 	now := s.now()
 	ro := store.RolloutRow{ID: store.NewID("rol_"), Status: store.RolloutRunning, ToVersion: b.manifest.Version, ToBuilt: b.manifest.Built,
-		Manifest: b.raw, Signature: b.sig, BatchSize: batch, CreatedBy: s.cfg.Actor(ctx), CreatedAt: now}
+		Manifest: b.raw, Signature: b.sig, BatchSize: batch, CreatedBy: actor, CreatedAt: now}
 	var steps []store.StepRow
 	lastStage := 0
 	for i, v := range cands {
@@ -247,7 +257,7 @@ func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store
 		}
 		return store.RolloutRow{}, s.internal("create rollout", err)
 	}
-	s.audit(ctx, "update_rollout_start", map[string]string{"rollout_id": ro.ID, "version": ro.ToVersion, "nodes": fmt.Sprint(len(cands)),
+	s.auditAs(ctx, actor, "update_rollout_start", map[string]string{"rollout_id": ro.ID, "version": ro.ToVersion, "nodes": fmt.Sprint(len(cands)),
 		"batch_size": fmt.Sprint(batch)})
 	s.loadUpdating(ctx)
 	s.kick()

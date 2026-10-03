@@ -129,9 +129,15 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		ServiceUnit: o.updateService, Enabled: update.PanelUpdateHostSupported(),
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
+	var nodeBundleSource update.NodeBundleSource
+	if len(relKey) > 0 && o.dataDir != "" {
+		nodeBundleSource = update.NewGitHubNodeBundleSource(update.GitHubNodeBundleConfig{
+			DataDir: o.dataDir, Key: relKey, Log: log,
+		})
+	}
 	upd, err := update.New(st, fl, hl, update.Config{
 		DataDir: o.dataDir, Key: relKey, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
-		StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, Log: log,
+		StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, NodeBundleSource: nodeBundleSource, Log: log,
 	})
 	if err != nil {
 		return nil, err

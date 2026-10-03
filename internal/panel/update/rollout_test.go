@@ -2,6 +2,8 @@ package update
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -72,6 +74,106 @@ func idsOf(steps []store.StepRow, state string) []string {
 		}
 	}
 	return out
+}
+
+type fixedNodeBundleSource struct {
+	manifestSHA256 string
+}
+
+func (s fixedNodeBundleSource) Sync(context.Context, int64) (bool, error) { return false, nil }
+func (s fixedNodeBundleSource) BundleStatus() (bool, string)              { return true, s.manifestSHA256 }
+
+func syncCurrentTestBundleFromGitHub(e *env) {
+	b := e.s.current()
+	if b == nil || !b.trusted {
+		e.t.Fatal("test bundle is not trusted")
+	}
+	sum := sha256.Sum256(b.raw)
+	e.s.cfg.NodeBundleSource = fixedNodeBundleSource{manifestSHA256: hex.EncodeToString(sum[:])}
+	e.s.syncNodeBundle(e.ctx)
+}
+
+func TestTrustedBundleStartsAutomaticCanaryRollout(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	syncCurrentTestBundleFromGitHub(e)
+	slow := e.addNode("slow", nodeOpts{online: 0})
+	busy := e.addNode("busy", nodeOpts{online: 8})
+
+	e.s.startAutomaticRollout(e.ctx)
+	ro := e.rollout()
+	if ro.Status != store.RolloutRunning || ro.CreatedBy != "system:auto" || ro.ToVersion != "0.2.0-new" {
+		t.Fatalf("automatic rollout: %+v", ro)
+	}
+	steps, err := e.st.RolloutSteps(e.ctx, ro.ID)
+	if err != nil || len(steps) != 2 {
+		t.Fatalf("automatic rollout steps: %+v, %v", steps, err)
+	}
+	wantStage := map[string]int{slow: 0, busy: 1}
+	for _, step := range steps {
+		if step.State != store.StepPending || step.Stage != wantStage[step.NodeID] {
+			t.Fatalf("automatic rollout did not preserve canary ordering: %+v", steps)
+		}
+	}
+	e.s.startAutomaticRollout(e.ctx)
+	if got := e.rollout(); got.ID != ro.ID {
+		t.Fatalf("poll started a duplicate rollout: old=%s new=%s", ro.ID, got.ID)
+	}
+}
+
+func TestTrustedLocalBundleDoesNotStartAutomaticRollout(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	e.addNode("local-only", nodeOpts{})
+	e.s.startAutomaticRollout(e.ctx)
+	if _, err := e.st.LatestRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a local-only bundle started an automatic rollout: %v", err)
+	}
+}
+
+func TestAutomaticRolloutPicksUpNewlyOnlineNodeOncePerBuild(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	syncCurrentTestBundleFromGitHub(e)
+	first := e.addNode("first", nodeOpts{})
+	e.s.startAutomaticRollout(e.ctx)
+	e.tick()
+	e.upgrade(first)
+	e.tick()
+	e.commit(first)
+	e.tick()
+	e.wantRollout(store.RolloutDone, "")
+
+	late := e.addNode("late", nodeOpts{})
+	e.s.startAutomaticRollout(e.ctx)
+	ro := e.rollout()
+	if ro.CreatedBy != "system:auto" || ro.Status != store.RolloutRunning {
+		t.Fatalf("late-node rollout: %+v", ro)
+	}
+	steps, err := e.st.RolloutSteps(e.ctx, ro.ID)
+	if err != nil || len(steps) != 1 || steps[0].NodeID != late {
+		t.Fatalf("late-node rollout steps: %+v, %v", steps, err)
+	}
+	if first == late {
+		t.Fatal("test setup reused a node id")
+	}
+}
+
+func TestAutomaticRolloutDoesNotRetryCancelledNodeForSameBuild(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	syncCurrentTestBundleFromGitHub(e)
+	e.addNode("node", nodeOpts{})
+	e.s.startAutomaticRollout(e.ctx)
+	first := e.rollout()
+	if _, err := e.s.cancel(e.ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.s.startAutomaticRollout(e.ctx)
+	got := e.rollout()
+	if got.ID != first.ID || got.Status != store.RolloutCancelled {
+		t.Fatalf("automatic poll restarted a cancelled rollout: first=%+v latest=%+v", first, got)
+	}
 }
 
 func TestRolloutSuccess(t *testing.T) {
@@ -1344,13 +1446,14 @@ func TestRetention(t *testing.T) {
 	}
 }
 
-// Run drives the same machine by itself: a canary, a pass and the end, with real time.
+// Run automatically starts the trusted bundle's canary and drives it to completion.
 func TestRunLoop(t *testing.T) {
 	e := newEnv(t)
 	e.clk = &clock{t: time.Now()}
 	e.s = e.newService(e.pub)
 	e.s.cfg.Tick = 10 * time.Millisecond
 	e.defaultBundle()
+	syncCurrentTestBundleFromGitHub(e)
 	a := e.addNode("a", nodeOpts{})
 	e.fl.onUpdate = func(id string) (*agentv1.CommandResult, error) {
 		go func() { // the agent re-executes and comes back with the new build
@@ -1366,7 +1469,6 @@ func TestRunLoop(t *testing.T) {
 	done := make(chan struct{})
 	go func() { e.s.Run(ctx); close(done) }()
 	defer func() { cancel(); <-done }()
-	e.startRollout()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if ro, err := e.st.LatestRollout(e.ctx); err == nil && ro.Status == store.RolloutDone {

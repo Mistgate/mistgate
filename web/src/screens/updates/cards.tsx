@@ -86,6 +86,7 @@ export function BundleCard({ data, owner, actions }: { data: Updates; owner: boo
           </Button>
         )}
       </div>
+      <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.bundle.githubNote")}</p>
       {missing ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-[13px] leading-normal text-pretty text-muted">
