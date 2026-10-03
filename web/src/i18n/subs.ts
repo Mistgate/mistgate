@@ -282,6 +282,8 @@ export const en = {
   "subs.dns.src.group": "from the group",
   "subs.dns.src.default": "the default preset",
   "subs.dns.delivery": "When it arrives: the apps on the link ({apps}) with the next subscription update; AmneziaVPN only in new keys.",
+  "subs.dns.scopeUser": "Applies across every node in this user's subscription. It does not change when they switch servers.",
+  "subs.dns.scopeGroup": "Default for group members across their available nodes. A user's own DNS choice takes priority.",
 };
 
 export const ru: Record<keyof typeof en, string> = {
@@ -557,4 +559,6 @@ export const ru: Record<keyof typeof en, string> = {
   "subs.dns.src.group": "из группы",
   "subs.dns.src.default": "пресет по умолчанию",
   "subs.dns.delivery": "Когда дойдёт: приложения по ссылке ({apps}) — при следующем обновлении подписки; AmneziaVPN — только в новых ключах.",
+  "subs.dns.scopeUser": "Действует на всех нодах в подписке пользователя и не меняется при переключении сервера.",
+  "subs.dns.scopeGroup": "Действует по умолчанию на всех доступных нодах участников группы. Личный выбор пользователя важнее.",
 };

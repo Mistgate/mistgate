@@ -21,8 +21,9 @@ import (
 
 // Capabilities this build can list in Hello.capabilities besides "doctor/1" and the update ones.
 const (
-	capAWG  = "awg/1"
-	capWarp = "warp/1"
+	capAWG          = "awg/1"
+	capWarp         = "warp/1"
+	capTorrentGuard = "torrentguard/1"
 	// capUnit3 says the node runs from a systemd unit of generation 3: /dev/net/tun is reachable (the userspace AWG
 	// and WARP backends need it) and ExecStopPost cleans the tunnel interfaces. A node without it keeps working with
 	// the kernel backends and shows the hint "unit_outdated" on the awg_backend doctor check.
@@ -116,6 +117,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if a.cfg.Warp != nil {
 		caps = append(caps, capWarp)
+	}
+	if hostctl.TorrentGuardSupported() {
+		caps = append(caps, capTorrentGuard)
 	}
 	if a.cfg.UnitGen >= 3 {
 		caps = append(caps, capUnit3)
@@ -249,7 +253,12 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 	}
 
 	th, ok := a.host.(hostctl.TunnelHost)
-	if !ok || (len(ts) == 0 && !a.tunUsed) {
+	if !ok {
+		a.syncTorrentGuard(ctx, next, nil, false)
+		return
+	}
+	if len(ts) == 0 && !a.tunUsed {
+		a.syncTorrentGuard(ctx, next, nil, true)
 		return
 	}
 	if err := th.SetTunnels(ctx, ts); err != nil {
@@ -266,10 +275,12 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 			a.event(pb.Severity_SEVERITY_ERROR, "tunnel_failed", "", map[string]string{"error": msg})
 		}
 		a.tunErr = msg
+		a.syncTorrentGuard(ctx, next, nil, false)
 		return
 	}
 	a.tunErr = ""
 	a.tunUsed = len(ts) > 0
+	a.syncTorrentGuard(ctx, next, ts, true)
 }
 
 // blockedFail is the failure of an inbound that may not run now. A running one is stopped: no engine keeps serving

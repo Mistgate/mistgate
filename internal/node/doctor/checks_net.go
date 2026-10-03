@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/dnsdefaults"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 )
 
@@ -23,13 +24,6 @@ import (
 var controlDomains = []string{"www.cloudflare.com", "www.gstatic.com", "www.google.com"}
 
 const ruDomain = "gosuslugi.ru"
-
-// Default resolvers by country (Russian resolvers on RU nodes, because a public resolver makes
-// gosuslugi.ru fail). Used when NodeSettings.dns_resolvers is empty.
-var (
-	defaultResolversRU    = []string{"77.88.8.8", "77.88.8.1"}
-	defaultResolversWorld = []string{"1.1.1.1", "8.8.8.8"}
-)
 
 // ResolverTargets is what set_resolver configures: the usable (IP, optionally host:port) entries of
 // NodeSettings.dns_resolvers, else the default for the country.
@@ -43,10 +37,7 @@ func ResolverTargets(s Settings) []string {
 	if len(out) > 0 {
 		return out
 	}
-	if strings.EqualFold(s.Country, "RU") {
-		return append([]string(nil), defaultResolversRU...)
-	}
-	return append([]string(nil), defaultResolversWorld...)
+	return dnsdefaults.ForCountry(s.Country)
 }
 
 // dialAddr turns "ip" or "ip:port" into "ip:port" for dialing; names are not accepted.

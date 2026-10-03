@@ -3118,9 +3118,11 @@ type NodeSettings struct {
 	// AmneziaWG backend: "auto" | "kernel" | "userspace"; "" = "auto". auto = the kernel module when it is already
 	// loaded (the agent installs no packages), else userspace. kernel = fail awg inbounds with
 	// awg_backend_unavailable when the module is missing. Read only by agents with "awg/1".
-	AwgBackend    string `protobuf:"bytes,7,opt,name=awg_backend,json=awgBackend,proto3" json:"awg_backend,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AwgBackend string `protobuf:"bytes,7,opt,name=awg_backend,json=awgBackend,proto3" json:"awg_backend,omitempty"`
+	// Blocks recognized BitTorrent protocols. Read only by agents with "torrentguard/1".
+	TorrentBlockerEnabled bool `protobuf:"varint,8,opt,name=torrent_blocker_enabled,json=torrentBlockerEnabled,proto3" json:"torrent_blocker_enabled,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *NodeSettings) Reset() {
@@ -3200,6 +3202,13 @@ func (x *NodeSettings) GetAwgBackend() string {
 		return x.AwgBackend
 	}
 	return ""
+}
+
+func (x *NodeSettings) GetTorrentBlockerEnabled() bool {
+	if x != nil {
+		return x.TorrentBlockerEnabled
+	}
+	return false
 }
 
 type DesiredState struct {
@@ -5038,7 +5047,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x10server_time_unix\x18\x02 \x01(\x03R\x0eserverTimeUnix\x12;\n" +
 	"\bsettings\x18\x03 \x01(\v2\x1f.mistgate.agent.v1.NodeSettingsR\bsettings\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xa9\x02\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xe1\x02\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -5047,7 +5056,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\rdns_resolvers\x18\x05 \x03(\tR\fdnsResolvers\x12!\n" +
 	"\fcountry_code\x18\x06 \x01(\tR\vcountryCode\x12\x1f\n" +
 	"\vawg_backend\x18\a \x01(\tR\n" +
-	"awgBackend\"\xc9\x02\n" +
+	"awgBackend\x126\n" +
+	"\x17torrent_blocker_enabled\x18\b \x01(\bR\x15torrentBlockerEnabled\"\xc9\x02\n" +
 	"\fDesiredState\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12\x1d\n" +

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// A live database (00018) with a node: 00019 adds one column with a default, touches nothing, the column rejects what is
-// not JSON, rolling back drops just it, and it applies again.
+// A live database (00018) with a node: 00019 adds one column with a default; the old row stays readable after later
+// migrations, the column rejects what is not JSON, rolling back drops it, and migrations apply again.
 func TestAwgPrepareMigrationUpDownUp(t *testing.T) {
 	ctx := context.Background()
 	s, p := openProvider(t)
@@ -15,12 +15,12 @@ func TestAwgPrepareMigrationUpDownUp(t *testing.T) {
 		t.Fatalf("up to 18: %v", err)
 	}
 	execT(t, s, `INSERT INTO node (id, name, address, state, created_at, awg_backend) VALUES ('nod_a', 'na', 'a.example.com', 'active', 1, 'userspace')`)
-	if _, err := p.UpTo(ctx, 19); err != nil {
-		t.Fatalf("up to 19: %v", err)
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("up to latest: %v", err)
 	}
 	n, err := s.Node(ctx, "nod_a")
-	if err != nil || n.AwgPrepareJSON != "" || n.AwgBackend != "userspace" || n.AwgPrepare() != (AwgPrepareRow{}) {
-		t.Fatalf("an existing node after 00019 = %+v, %v", n, err)
+	if err != nil || n.AwgPrepareJSON != "" || n.AwgBackend != "userspace" || n.AwgPrepare() != (AwgPrepareRow{}) || n.TorrentBlockerEnabled {
+		t.Fatalf("an existing node after migration = %+v, %v", n, err)
 	}
 	if _, err := s.W.ExecContext(ctx, `UPDATE node SET awg_prepare_json = 'not json' WHERE id = 'nod_a'`); err == nil {
 		t.Fatal("a non-JSON state was accepted")
@@ -37,7 +37,7 @@ func TestAwgPrepareMigrationUpDownUp(t *testing.T) {
 	if _, err := s.W.ExecContext(ctx, `SELECT awg_prepare_json FROM node`); err == nil {
 		t.Fatal("the column is left after down")
 	}
-	if _, err := p.UpTo(ctx, 19); err != nil {
+	if _, err := p.Up(ctx); err != nil {
 		t.Fatalf("up again: %v", err)
 	}
 	if n, _ := s.Node(ctx, "nod_a"); n.AwgPrepareJSON != "" {

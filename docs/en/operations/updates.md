@@ -29,21 +29,24 @@ It writes the private key to the file (mode 0600; an existing file is never over
 ### 2. Build with the public key
 
 ```sh
-RELEASE_KEY=<public key> make build
+VERSION="$(git describe --tags --always --dirty)"
+BUILT="$(git log -1 --format=%ct)"
+RELEASE_KEY=<public key> VERSION="$VERSION" BUILT="$BUILT" make build
 ```
 
-This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}` and stamps into both the release key, the version (`git describe --tags --always --dirty`) and the build time (`git log -1 --format=%ct`). The first panel build for an installation must have the key so it can save the public half to `release.pub`; later GitHub panel releases intentionally omit installation-specific keys and reuse that saved file.
+This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}`. The panel and agents receive the same `VERSION`, `BUILT` and release public key. If the panel tag is `v0.1.4`, the agent and signed bundle must also use `v0.1.4` (shown as `v0.1.4` in the UI). The first panel build for an installation must have the key so it can save the public half to `release.pub`; later GitHub panel releases intentionally omit installation-specific keys and reuse that saved file.
 
 ### 3. Sign the node binaries
 
 ```sh
 mistgate release sign --key ~/mistgate-release.key \
-  --version "$(git describe --tags --always)" \
-  --built "$(git log -1 --format=%ct)" --expires 30d \
+  --version "$VERSION" \
+  --built "$BUILT" --expires 30d \
   bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
 ```
 
 - The binaries must be named `<name>-<os>-<arch>`, as `make build` names them.
+- `--version` must match the panel and agent versions. Signing refuses to create a bundle whose version differs from the panel binary used to sign it.
 - `--built` must be the build time stamped into the binaries: build and sign from the same commit. A new build whose own build time differs from the manifest rolls itself back after the update (`built_mismatch`).
 - `--expires` is a number of days (`30d`) or a Go duration (`720h`); the default is `30d`. After that the panel and the nodes refuse the manifest, so a captured old manifest cannot be replayed for long.
 - The command writes `dist/manifest.json` and `dist/manifest.sig`, copies the binaries next to them, reads the result back and verifies it, then prints the version, the expiry, every file with its size and the key fingerprint.

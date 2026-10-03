@@ -16,6 +16,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	torrentlinux "github.com/mistgate/mistgate/internal/node/torrentguard/linux"
 )
 
 // runner runs an external command with optional stdin and returns its combined output.
@@ -52,6 +54,11 @@ type linuxHost struct {
 	// The tunnel table of the L3 protocols (tunnel_linux.go) and the deletion of our links; nil links = none (tests).
 	tun   tunnelState
 	links func() error
+
+	// Torrent guard owns a separate nft table and one fail-open NFQUEUE runtime.
+	torrentMu     sync.Mutex
+	torrent       *torrentlinux.Runtime
+	torrentIfaces []string
 
 	mu      sync.Mutex
 	prevCPU cpuSample
@@ -278,8 +285,8 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 }
 
 func (h *linuxHost) Cleanup(ctx context.Context) error {
-	errs := []error{h.cleanupTunnels(ctx)}               // the tunnel table and our mgawg*/mgwarp links
-	errs = append(errs, h.SyncInboundUDPPorts(ctx, nil)) // only UFW rules with Mistgate's exact ownership tag
+	errs := []error{h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx)} // torrent table, tunnel table and our links
+	errs = append(errs, h.SyncInboundUDPPorts(ctx, nil))                     // only UFW rules with Mistgate's exact ownership tag
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()
 	h.hops, h.sshPorts = nil, nil

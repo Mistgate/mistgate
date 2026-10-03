@@ -252,6 +252,7 @@ The node's **Events** tab and the Overview's event feed keep a timeline that ans
 | traffic flows again (…) | It closed as cleared or fixed, with how long it lasted. |
 | "<profile>" fails the client-eye check | A per-profile check alert opened. |
 | "<profile>" passes the check again (…) | It closed as cleared or fixed. |
+| BitTorrent attempt detected | The node blocked a recognized torrent request. Details include the protocol and destination, plus the user when attribution is reliable. A degraded-guard event means the protection could not be enabled on this node. |
 | updated to … / update failed / update rolled back | A rollout step ended. |
 
 Events of severity info are kept for 90 days, warnings and errors for 400 days. Raw check rounds are kept for 25 hours after the day is summarised; the daily summaries for 90 days.

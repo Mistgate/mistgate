@@ -31,9 +31,11 @@ import (
 	"github.com/apernet/hysteria/extras/v2/obfs"
 	"github.com/apernet/hysteria/extras/v2/sniff"
 
+	agentpb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/torrentguard"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -58,10 +60,12 @@ func bindHost() string {
 }
 
 type eng struct {
-	env engine.Env
-	log *slog.Logger
-	now func() time.Time
-	out func(name string) (engine.Egress, error)
+	env            engine.Env
+	log            *slog.Logger
+	now            func() time.Time
+	out            func(name string) (engine.Egress, error)
+	torrentEnabled atomic.Bool
+	torrentVersion uint64 // guards inbound generations under mu so toggles replace existing outbound flows
 
 	mu       sync.Mutex // guards everything below; never taken on the data path
 	inbounds map[string]*inbound
@@ -113,31 +117,48 @@ func (e *eng) Capabilities() engine.Capabilities {
 	return engine.Capabilities{RateLimitPerCred: true, HardExpiry: true}
 }
 
+// NodeSettings changes the protocol-level torrent detector. Reapplying inbounds closes outbound flows that
+// were opened under the previous policy, so enabling the guard cannot leave old uninspected connections alive.
+func (e *eng) NodeSettings(_ context.Context, st *agentpb.NodeSettings) bool {
+	enabled := st != nil && st.GetTorrentBlockerEnabled()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.torrentEnabled.Load() == enabled {
+		return false
+	}
+	e.torrentEnabled.Store(enabled)
+	e.torrentVersion++
+	return true
+}
+
 // inbound is one core server plus its credential index.
 type inbound struct {
-	e        *eng
-	spec     plugin.InboundSpec
-	specHash string
-	cfg      settings
-	creds    []plugin.UserCred // as delivered, for Observed (guarded by e.mu)
+	e              *eng
+	spec           plugin.InboundSpec
+	specHash       string
+	torrentVersion uint64
+	cfg            settings
+	creds          []plugin.UserCred // as delivered, for Observed (guarded by e.mu)
 
 	idx    atomic.Pointer[index]
 	ctx    context.Context // ends when the inbound stops; unblocks rate-limit waits
 	cancel context.CancelFunc
 
-	srv       server.Server
-	tcp       *tcpMasq
-	cert      engine.Cert
-	certHeld  bool
-	smu       sync.Mutex // guards sessions
-	sessions  map[string]session
-	mu        sync.Mutex // guards the fields below
-	state     plugin.RunState
-	detail    string
-	since     time.Time
-	restarts  uint32
-	stopping  bool
-	everServe bool // a listener was started at some point for this incarnation
+	srv             server.Server
+	tcp             *tcpMasq
+	cert            engine.Cert
+	certHeld        bool
+	smu             sync.Mutex // guards sessions
+	sessions        map[string]session
+	mu              sync.Mutex // guards the fields below
+	state           plugin.RunState
+	requestMu       sync.Mutex
+	pendingRequests map[string]pendingRequest
+	detail          string
+	since           time.Time
+	restarts        uint32
+	stopping        bool
+	everServe       bool // a listener was started at some point for this incarnation
 }
 
 func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin.UserCred) (engine.ApplyReport, error) {
@@ -164,14 +185,14 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	}
 
 	// Same spec, and either serving or deliberately stopped: a users-only change. Swap the index.
-	if old != nil && old.specHash == sh && old.settled() {
+	if old != nil && old.specHash == sh && old.torrentVersion == e.torrentVersion && old.settled() {
 		e.swapIndex(old, oldIdx, ix, creds)
 		return e.report(old, len(creds), false), nil
 	}
 
 	// New inbound, changed spec, or a retry of one that failed: (re)build it.
 	in := &inbound{
-		e: e, spec: spec, specHash: sh, cfg: cfg, creds: creds,
+		e: e, spec: spec, specHash: sh, torrentVersion: e.torrentVersion, cfg: cfg, creds: creds,
 		sessions: map[string]session{}, state: plugin.RunStarting, since: e.now(),
 	}
 	in.ctx, in.cancel = context.WithCancel(context.Background())
@@ -284,7 +305,7 @@ func (in *inbound) start(ctx context.Context) error {
 		TLSConfig:             server.TLSConfig{GetCertificate: cert.GetCertificate},
 		Conn:                  conn,
 		RequestHook:           &sniff.Sniffer{}, // all ports, default 4 s timeout; client IPs are replaced by sniffed domains
-		Outbound:              outbound{egr},
+		Outbound:              outbound{e: egr, in: in},
 		CongestionConfig:      server.CongestionConfig{Type: "bbr", BBRProfile: cfg.bbrProfile},
 		BandwidthConfig:       server.BandwidthConfig{MaxTx: cfg.maxTx, MaxRx: cfg.maxRx},
 		IgnoreClientBandwidth: cfg.ignoreBW,
@@ -505,14 +526,53 @@ func (in *inbound) UntraceStream(server.HyStream)                    {}
 
 // outbound adapts engine.Egress to server.Outbound. The two UDP interfaces have the same methods but are
 // distinct named types, so Go needs this shim.
-type outbound struct{ e engine.Egress }
+type outbound struct {
+	e  engine.Egress
+	in *inbound
+}
 
-func (o outbound) TCP(addr string) (net.Conn, error) { return o.e.TCP(addr) }
-func (o outbound) CheckUDP(addr string) error        { return o.e.CheckUDP(addr) }
+func (o outbound) TCP(addr string) (net.Conn, error) {
+	var userID string
+	if o.in != nil && o.in.e.torrentEnabled.Load() {
+		userID = o.in.takeRequestUserID(addr)
+	}
+	c, err := o.e.TCP(addr)
+	if err != nil || o.in == nil || !o.in.e.torrentEnabled.Load() {
+		return c, err
+	}
+	return newTorrentTCPConn(c, func() { o.in.reportTorrent(torrentguard.ProtocolBitTorrentTCP, "tcp", addr, userID) }), nil
+}
+func (o outbound) CheckUDP(addr string) error { return o.e.CheckUDP(addr) }
 func (o outbound) UDP(addr string) (server.UDPConn, error) {
+	var userID string
+	if o.in != nil && o.in.e.torrentEnabled.Load() {
+		userID = o.in.takeRequestUserID(addr)
+	}
 	c, err := o.e.UDP(addr)
 	if err != nil {
 		return nil, err
 	}
+	if o.in != nil && o.in.e.torrentEnabled.Load() {
+		return torrentUDPConn{UDPConn: c, attempt: func(protocol torrentguard.Protocol) {
+			o.in.reportTorrent(protocol, "udp", addr, userID)
+		}}, nil
+	}
 	return c, nil
+}
+
+func (in *inbound) reportTorrent(protocol torrentguard.Protocol, transport, destination, userID string) {
+	if in == nil || in.e == nil || in.e.env.Event == nil {
+		return
+	}
+	params := map[string]string{"protocol": transport, "torrent_protocol": string(protocol)}
+	if len(destination) > 256 {
+		destination = destination[:256]
+	}
+	if destination != "" {
+		params["destination"] = destination
+	}
+	if userID != "" {
+		params["user_id"] = userID
+	}
+	in.e.env.Event(engine.Event{Code: "torrent_attempt", InboundID: in.spec.ID, Warning: true, Params: params})
 }

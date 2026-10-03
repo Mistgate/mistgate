@@ -23,8 +23,8 @@ const releaseUsage = `usage:
   keygen  make the owner's release key: the private key goes to FILE (mode 0600, never overwritten), the public key and
           its fingerprint are printed. Put the public key into the build (RELEASE_KEY=<public key> make build).
   sign    write DIR/manifest.json and DIR/manifest.sig for the binaries (named <name>-<os>-<arch>, e.g.
-          mistgate-node-linux-amd64) and copy them into DIR; --built is the Unix time of the source commit
-          (git log -1 --format=%ct). Copy DIR to <data-dir>/dist on the panel.
+          mistgate-node-linux-amd64) and copy them into DIR; --version must match this panel build, and --built is
+          the Unix time of the source commit (git log -1 --format=%ct). Copy DIR to <data-dir>/dist on the panel.
 `
 
 // runRelease implements `mistgate release ...`, the owner's commands on the machine that holds the release key.
@@ -107,7 +107,7 @@ func parseExpires(s string) (time.Duration, error) {
 func releaseSign(args []string, out io.Writer, now time.Time) error {
 	fs := flag.NewFlagSet("release sign", flag.ContinueOnError)
 	keyFile := fs.String("key", "", "release private key file (made by release keygen)")
-	version := fs.String("version", "", "release version, e.g. the output of git describe")
+	version := fs.String("version", "", "release version; must match this panel build, e.g. v0.1.4")
 	built := fs.Int64("built", 0, "Unix time of the source commit (git log -1 --format=%ct); it orders releases")
 	expires := fs.String("expires", "30d", "how long the manifest stays installable (30d, 720h)")
 	outDir := fs.String("out", "", "directory for manifest.json, manifest.sig and the copies of the binaries")
@@ -153,6 +153,9 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 	body, err := m.Marshal() // validates: version, names, sizes, duplicates
 	if err != nil {
 		return err
+	}
+	if *version != buildinfo.Version {
+		return fmt.Errorf("release version %q must match this panel build's version %q; build the panel and node binaries from the same release tag", *version, buildinfo.Version)
 	}
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
 		return err

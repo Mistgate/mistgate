@@ -148,7 +148,7 @@ mistgate release sign --key FILE --version V --built UNIX [--expires 30d] BINARY
 | Flag | Default | Meaning |
 |---|---|---|
 | `--key` | none | The release private key file made by `release keygen`. |
-| `--version` | none | Release version, for example the output of `git describe`. |
+| `--version` | none | Release version. It must match the panel binary used to sign the bundle and the built agents, for example `v0.1.4`. |
 | `--built` | none | Unix time of the source commit (`git log -1 --format=%ct`). It orders releases and must match the build time stamped into the binaries. |
 | `--expires` | `30d` | How long the manifest stays installable: days (`30d`) or a Go duration (`720h`). |
 | `--out` | none | Directory for `manifest.json`, `manifest.sig` and the copies of the binaries. |
@@ -156,11 +156,15 @@ mistgate release sign --key FILE --version V --built UNIX [--expires 30d] BINARY
 The binaries are named `<name>-<os>-<arch>`, for example `mistgate-node-linux-amd64`. Flags may come after the binaries. The command verifies what it wrote and prints every file with its size and the key fingerprint. Copy the directory to `<data-dir>/dist` on the panel.
 
 ```sh
+VERSION="$(git describe --tags --always --dirty)"
+BUILT="$(git log -1 --format=%ct)"
 mistgate release sign --key ~/mistgate-release.key \
-  --version "$(git describe --tags --always)" \
-  --built "$(git log -1 --format=%ct)" --expires 30d \
+  --version "$VERSION" \
+  --built "$BUILT" --expires 30d \
   bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
 ```
+
+Signing refuses a bundle whose `--version` differs from the panel binary's version. Build the panel and agents from the same release tag; see [Updates](../operations/updates.md).
 
 ### mistgate version
 

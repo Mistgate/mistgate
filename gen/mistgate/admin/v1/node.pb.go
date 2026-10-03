@@ -229,9 +229,13 @@ type Node struct {
 	// WARP egress of this node; state NOT_CONFIGURED when it has no account.
 	Warp *WarpSummary `protobuf:"bytes,19,opt,name=warp,proto3" json:"warp,omitempty"`
 	// Building the AmneziaWG kernel module on the node.
-	AwgPrepare    *AwgPrepare `protobuf:"bytes,20,opt,name=awg_prepare,json=awgPrepare,proto3" json:"awg_prepare,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AwgPrepare *AwgPrepare `protobuf:"bytes,20,opt,name=awg_prepare,json=awgPrepare,proto3" json:"awg_prepare,omitempty"`
+	// Whether the node blocks recognized BitTorrent traffic.
+	TorrentBlockerEnabled bool `protobuf:"varint,21,opt,name=torrent_blocker_enabled,json=torrentBlockerEnabled,proto3" json:"torrent_blocker_enabled,omitempty"`
+	// The connected or last-seen agent lists "torrentguard/1".
+	TorrentBlockerSupported bool `protobuf:"varint,22,opt,name=torrent_blocker_supported,json=torrentBlockerSupported,proto3" json:"torrent_blocker_supported,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Node) Reset() {
@@ -402,6 +406,20 @@ func (x *Node) GetAwgPrepare() *AwgPrepare {
 		return x.AwgPrepare
 	}
 	return nil
+}
+
+func (x *Node) GetTorrentBlockerEnabled() bool {
+	if x != nil {
+		return x.TorrentBlockerEnabled
+	}
+	return false
+}
+
+func (x *Node) GetTorrentBlockerSupported() bool {
+	if x != nil {
+		return x.TorrentBlockerSupported
+	}
+	return false
 }
 
 // The automatic preparation of the kernel module, as the panel last learned it from the node.
@@ -1401,9 +1419,11 @@ type UpdateNodeRequest struct {
 	Timeouts     *NodeTimeouts `protobuf:"bytes,9,opt,name=timeouts,proto3,oneof" json:"timeouts,omitempty"`
 	// "auto" | "kernel" | "userspace". Needs an agent with "awg/1" while the node has awg inbounds
 	// (FAILED_PRECONDITION "agent too old" otherwise).
-	AwgBackend    *string `protobuf:"bytes,10,opt,name=awg_backend,json=awgBackend,proto3,oneof" json:"awg_backend,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AwgBackend *string `protobuf:"bytes,10,opt,name=awg_backend,json=awgBackend,proto3,oneof" json:"awg_backend,omitempty"`
+	// Requires an agent with "torrentguard/1" when true. Disabling is always allowed.
+	TorrentBlockerEnabled *bool `protobuf:"varint,11,opt,name=torrent_blocker_enabled,json=torrentBlockerEnabled,proto3,oneof" json:"torrent_blocker_enabled,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *UpdateNodeRequest) Reset() {
@@ -1504,6 +1524,13 @@ func (x *UpdateNodeRequest) GetAwgBackend() string {
 		return *x.AwgBackend
 	}
 	return ""
+}
+
+func (x *UpdateNodeRequest) GetTorrentBlockerEnabled() bool {
+	if x != nil && x.TorrentBlockerEnabled != nil {
+		return *x.TorrentBlockerEnabled
+	}
+	return false
 }
 
 type DnsResolvers struct {
@@ -2131,7 +2158,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xf1\x05\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xe5\x06\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -2156,7 +2183,9 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"awgBackend\x122\n" +
 	"\x04warp\x18\x13 \x01(\v2\x1e.mistgate.admin.v1.WarpSummaryR\x04warp\x12>\n" +
 	"\vawg_prepare\x18\x14 \x01(\v2\x1d.mistgate.admin.v1.AwgPrepareR\n" +
-	"awgPrepare\"\xc0\x01\n" +
+	"awgPrepare\x126\n" +
+	"\x17torrent_blocker_enabled\x18\x15 \x01(\bR\x15torrentBlockerEnabled\x12:\n" +
+	"\x19torrent_blocker_supported\x18\x16 \x01(\bR\x17torrentBlockerSupported\"\xc0\x01\n" +
 	"\n" +
 	"AwgPrepare\x12\x1c\n" +
 	"\tsupported\x18\x01 \x01(\bR\tsupported\x128\n" +
@@ -2244,7 +2273,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0finstall_command\x18\x02 \x01(\tR\x0einstallCommand\x12%\n" +
 	"\x0eca_fingerprint\x18\x03 \x01(\tR\rcaFingerprint\x12%\n" +
 	"\fexpires_unix\x18\x04 \x01(\x03B\x020\x02R\vexpiresUnix\x12!\n" +
-	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\x95\x04\n" +
+	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\xee\x04\n" +
 	"\x11UpdateNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
@@ -2257,7 +2286,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\btimeouts\x18\t \x01(\v2\x1f.mistgate.admin.v1.NodeTimeoutsH\aR\btimeouts\x88\x01\x01\x12$\n" +
 	"\vawg_backend\x18\n" +
 	" \x01(\tH\bR\n" +
-	"awgBackend\x88\x01\x01B\a\n" +
+	"awgBackend\x88\x01\x01\x12;\n" +
+	"\x17torrent_blocker_enabled\x18\v \x01(\bH\tR\x15torrentBlockerEnabled\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_addressB\x0f\n" +
@@ -2267,7 +2297,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x06_notesB\x10\n" +
 	"\x0e_dns_resolversB\v\n" +
 	"\t_timeoutsB\x0e\n" +
-	"\f_awg_backend\"&\n" +
+	"\f_awg_backendB\x1a\n" +
+	"\x18_torrent_blocker_enabled\"&\n" +
 	"\fDnsResolvers\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\"A\n" +
 	"\x12UpdateNodeResponse\x12+\n" +

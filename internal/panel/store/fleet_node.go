@@ -48,13 +48,15 @@ type NodeRow struct {
 	AwgBackend string
 	// AwgPrepareJSON is the state of the automatic kernel-module build (migration 00019, see AwgPrepareRow); "" = never asked.
 	AwgPrepareJSON string
+	// TorrentBlockerEnabled is the per-node recognized BitTorrent traffic setting (migration 00036).
+	TorrentBlockerEnabled bool
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,
 	liveness_timeout_s, apply_timeout_s, dial_timeout_s, state, cert_serial, agent_version, api_version,
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
-	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json`
+	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -70,7 +72,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&n.LivenessTimeoutS, &n.ApplyTimeoutS, &n.DialTimeoutS, &n.State, &serial, &n.AgentVersion, &n.APIVersion,
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
-		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON)
+		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -120,6 +122,7 @@ type NodePatch struct {
 	DNSResolvers                                          *[]string
 	LivenessTimeoutS, ApplyTimeoutS, DialTimeoutS         *int
 	AwgBackend                                            *string // "auto" | "kernel" | "userspace"
+	TorrentBlockerEnabled                                 *bool
 }
 
 // UpdateNode applies the patch and returns the new row. ErrConflict on a name clash.
@@ -135,6 +138,9 @@ func (s *Store) UpdateNode(ctx context.Context, id string, p NodePatch) (NodeRow
 		if f.v != nil {
 			add(f.col, *f.v)
 		}
+	}
+	if p.TorrentBlockerEnabled != nil {
+		add("torrent_blocker_enabled", *p.TorrentBlockerEnabled)
 	}
 	if p.AwgBackend != nil {
 		// A backend chosen by hand ends the wish of an unfinished kernel-module build: it must not switch the node later.

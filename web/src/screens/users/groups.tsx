@@ -457,7 +457,7 @@ export function GroupForm({
             <SectionLabel icon="dns" tone="sky">
               {t("subs.dns.field")}
             </SectionLabel>
-            <DnsSelect value={dnsPreset} inherited={inheritedDns} onChange={setDnsPreset} />
+            <DnsSelect value={dnsPreset} inherited={inheritedDns} onChange={setDnsPreset} scope="group" />
             <span className="text-[11px] leading-snug text-muted">{t("subs.dns.inheritGroupHint")}</span>
           </div>
         </details>

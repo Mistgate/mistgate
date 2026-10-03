@@ -136,5 +136,12 @@ describe("the DNS preset select", () => {
     settings = settingsWith([]);
     await mount(<DnsSelect value="" onChange={() => {}} inherited={{ id: "p1", fromGroup: false }} />);
     expect(text()).toContain(fill(en["subs.dns.delivery"], { apps: en["subs.kind.happ"] }));
+    expect(text()).toContain(en["subs.dns.scopeUser"]);
+  });
+
+  it("explains that a group preset is shared and a user override wins", async () => {
+    settings = settingsWith([]);
+    await mount(<DnsSelect value="" onChange={() => {}} inherited={{ id: "p1", fromGroup: false }} scope="group" />);
+    expect(text()).toContain(en["subs.dns.scopeGroup"]);
   });
 });

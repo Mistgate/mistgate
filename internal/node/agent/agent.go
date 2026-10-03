@@ -94,6 +94,9 @@ type Agent struct {
 	protocols []string // sorted keys of engines
 	closeOnce sync.Once
 
+	torrentEventsMu sync.Mutex
+	torrentEvents   map[string]time.Time
+
 	instanceID string
 	out        *outbox
 	jobs       chan job
@@ -134,6 +137,8 @@ type Agent struct {
 	warpRouteErr        string
 	warpNoted           bool
 	tunUsed, warpRouted bool
+	torrentGuardErr     string
+	torrentGuardActive  bool
 	hostFirewallErr     string // Last reported host-firewall sync failure; worker-owned.
 
 	// Timing knobs; tests shorten them.
@@ -187,14 +192,15 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	ring := newLogRing()
 	a := &Agent{
 		cfg: cfg, ring: ring, host: host, meta: id.meta,
-		log:        slog.New(&ringHandler{ring: ring, inner: inner}),
-		engines:    map[string]engine.Engine{},
-		instanceID: hex.EncodeToString(inst),
-		out:        newOutbox(cfg.MaxPending, cfg.MaxPendingBytes),
-		jobs:       make(chan job, 256),
-		model:      newModel(),
-		held:       map[string]*held{},
-		backoffMin: time.Second, backoffMax: time.Minute,
+		log:           slog.New(&ringHandler{ring: ring, inner: inner}),
+		engines:       map[string]engine.Engine{},
+		torrentEvents: map[string]time.Time{},
+		instanceID:    hex.EncodeToString(inst),
+		out:           newOutbox(cfg.MaxPending, cfg.MaxPendingBytes),
+		jobs:          make(chan job, 256),
+		model:         newModel(),
+		held:          map[string]*held{},
+		backoffMin:    time.Second, backoffMax: time.Minute,
 		renewEvery: time.Hour, sweepEvery: 30 * time.Second,
 		commitTick: commitTick, commitSettle: commitSettle, upd: cfg.Updater,
 	}
@@ -204,6 +210,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	for proto, f := range engines {
 		e, err := f(engine.Env{
 			Log:        a.log.With("source", proto),
+			Event:      a.engineEvent,
 			Certs:      cfg.Certs,
 			Egress:     a.egress,
 			DNS:        a.DNS,
@@ -679,6 +686,64 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 	a.push(&pb.ConnectRequest{Message: &pb.ConnectRequest_Event{Event: &pb.Event{
 		Severity: sev, Code: code, InboundId: inboundID, TimeUnix: a.now().Unix(), Params: params,
 	}}})
+}
+
+// engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue.
+// The key is the user when it is known, then the AWG client address, and finally the destination. This keeps one
+// noisy client or flow from filling the durable queue with repeated detections.
+func (a *Agent) engineEvent(ev engine.Event) {
+	if ev.Code != "torrent_attempt" {
+		return
+	}
+	keyPart := ev.Params["user_id"]
+	if keyPart == "" {
+		keyPart = ev.Params["client_ip"]
+	}
+	if keyPart == "" {
+		keyPart = ev.Params["destination"]
+	}
+	if keyPart == "" {
+		keyPart = "unknown"
+	}
+	key := ev.InboundID + "\x00" + keyPart
+	now := a.now()
+	a.torrentEventsMu.Lock()
+	for k, last := range a.torrentEvents {
+		if now.Sub(last) >= 15*time.Minute {
+			delete(a.torrentEvents, k)
+		}
+	}
+	if last := a.torrentEvents[key]; !last.IsZero() && now.Sub(last) < 5*time.Minute {
+		a.torrentEventsMu.Unlock()
+		return
+	}
+	if len(a.torrentEvents) >= 4096 {
+		// Keep the throttle map bounded even if a node sees many one-off destinations.
+		for k, last := range a.torrentEvents {
+			if now.Sub(last) >= 5*time.Minute {
+				delete(a.torrentEvents, k)
+			}
+		}
+		if len(a.torrentEvents) >= 4096 {
+			a.torrentEventsMu.Unlock()
+			return
+		}
+	}
+	a.torrentEvents[key] = now
+	a.torrentEventsMu.Unlock()
+
+	params := make(map[string]string, len(ev.Params))
+	for k, v := range ev.Params {
+		if len(k) > 64 || len(v) > 256 {
+			continue
+		}
+		params[k] = v
+	}
+	sev := pb.Severity_SEVERITY_INFO
+	if ev.Warning {
+		sev = pb.Severity_SEVERITY_WARNING
+	}
+	a.event(sev, ev.Code, ev.InboundID, params)
 }
 
 // ---------------------------------------------------------------------------------------------------

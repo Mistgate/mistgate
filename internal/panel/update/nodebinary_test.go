@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // The add-node window offers scp of the trusted bundle's binary: only a verified file, by its absolute path.
@@ -23,7 +24,20 @@ func TestNodeBinary(t *testing.T) {
 	if p := e.s.NodeBinary("linux", "arm64"); p != "" {
 		t.Fatalf("a platform the bundle lacks: %q", p)
 	}
-	os.WriteFile(filepath.Join(e.dir, "dist", "mistgate-node-linux-amd64"), []byte("binary two"), 0o755) // same size, other bytes
+	path := filepath.Join(e.dir, "dist", "mistgate-node-linux-amd64")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("binary two"), 0o755); err != nil { // same size, other bytes
+		t.Fatal(err)
+	}
+	// Some filesystems report the same timestamp for consecutive writes. Make the changed stamp explicit so this test
+	// verifies rescan invalidation; TestOpenNodeBinaryRechecksTheBytesItWillTransfer covers same-stamp tampering.
+	changedAt := info.ModTime().Add(time.Second)
+	if err := os.Chtimes(path, changedAt, changedAt); err != nil {
+		t.Fatal(err)
+	}
 	e.s.rescan()
 	if p := e.s.NodeBinary("linux", "amd64"); p != "" {
 		t.Fatalf("a bundle that no longer verifies: %q", p)

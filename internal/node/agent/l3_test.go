@@ -374,12 +374,18 @@ func TestL3CapabilitiesAreListedOnlyWhenTheBuildHasThem(t *testing.T) {
 			t.Errorf("a full build does not list %q: %v", c, full)
 		}
 	}
+	if full[capTorrentGuard] != hostctl.TorrentGuardSupported() {
+		t.Errorf("torrent guard capability=%v, build support=%v", full[capTorrentGuard], hostctl.TorrentGuardSupported())
+	}
 	// An engine-less, manager-less build on a generation 2 unit lists none of the new strings.
 	plain := caps(newHarness(t, harnessOpts{cfg: func(c *Config) { c.UnitGen = 2 }}))
 	for _, c := range []string{"awg/1", "warp/1", "unit/3"} {
 		if plain[c] {
 			t.Errorf("a build without the feature lists %q", c)
 		}
+	}
+	if plain[capTorrentGuard] != hostctl.TorrentGuardSupported() {
+		t.Errorf("torrent guard capability=%v, build support=%v", plain[capTorrentGuard], hostctl.TorrentGuardSupported())
 	}
 	// AWG but no WARP manager and a generation 2 unit.
 	mid := caps(newL3(t, 2, false).harness)

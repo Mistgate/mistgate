@@ -148,6 +148,9 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	for _, id := range next.ids() {
 		results = append(results, a.applyInbound(ctx, next.inbounds[id], now, force[id]))
 	}
+	// NFQUEUE rules are installed before an AWG interface is created. Refresh its interface-index map now that
+	// the engines have applied, so packets use exact active interface identities from this point on.
+	a.syncTorrentGuardApplied(ctx, next, results)
 	active := successfullyAppliedEnabledInbounds(results)
 	hops := a.syncHops(ctx, next, results, active)
 	a.syncInboundUDPPorts(ctx, next, results, active, hops)

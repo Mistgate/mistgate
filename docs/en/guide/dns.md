@@ -103,8 +103,9 @@ The editor says the same under the DNS select: "When it arrives: the apps on the
 
 Two node settings also involve DNS, and neither is a preset:
 
-- **DNS for user traffic** in the node's **Settings**: the resolvers the node uses for the names in its users' traffic. A Hysteria2 node reads the destination name from the connection and resolves it itself, so this decides what the sites resolve to on the node's side. Empty means the server's own resolver. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
-- **The server resolver**: the host's own resolver, which apt, certificate renewal and the WARP exit use. The doctor checks it, and on nodes in Russia it checks gosuslugi.ru and offers Yandex DNS. See [Health](../operations/health.md).
+- **Node DNS resolvers** in **Settings**: the addresses used by the node and its VPN engines. When the list is empty, the panel chooses by country: RU uses Yandex DNS (`77.88.8.8`, `77.88.8.1`); other countries use Cloudflare and Google (`1.1.1.1`, `8.8.8.8`). Pick a preset or enter custom addresses. Doctor uses the same list when it offers to repair the system resolver. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
+- **A user's or group's DNS preset** sets DNS in client subscriptions and applies across every node that user can access. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN; a user's own preset takes priority over the group.
+- **The server's system resolver** is the host DNS used by apt and certificate renewal. Doctor checks it and can offer to set it to the node's selected resolvers. See [Health](../operations/health.md).
 
 ## Who can do what
 
