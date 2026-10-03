@@ -49,6 +49,22 @@ function known(c: ConnectError, t: T): string | undefined {
   return errorCodes.includes(code) ? t(`err.${code}`, errorVars(c.rawMessage)) : undefined;
 }
 
+/** PermissionDenied messages from bearer policy have distinct causes; keep the actual role denial distinct too. */
+function permissionDenied(c: ConnectError, t: T): string {
+  switch (c.rawMessage) {
+    case "this call is not available to API tokens":
+      return t("err.apiTokenCallUnavailable");
+    case "this token's profile cannot do this":
+      return t("err.apiTokenProfileDenied");
+    case "this needs the owner's approval; it is not available over the API":
+      return t("err.apiOwnerApprovalRequired");
+    case "your role cannot do this":
+      return t("err.denied");
+    default:
+      return t("err.permissionDenied");
+  }
+}
+
 /**
  * A sentence for a failed admin RPC. A listed code reads as our sentence. Otherwise the server's own short message is kept
  * for the codes that mean "you sent something the rules refuse" (it names the rule); everything else gets a localized
@@ -64,7 +80,7 @@ export function errorText(e: unknown, t: T): string {
     case Code.DeadlineExceeded:
       return known(c, t) ?? t("err.network");
     case Code.PermissionDenied:
-      return t("err.denied");
+      return permissionDenied(c, t);
     case Code.NotFound:
       return t("err.notFound");
     case Code.ResourceExhausted:

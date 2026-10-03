@@ -28,6 +28,24 @@ describe("the panel's refusal codes", () => {
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });
 
+  it("localizes known API-token denial reasons and keeps role denial separate", () => {
+    const cases = [
+      ["this call is not available to API tokens", "err.apiTokenCallUnavailable"],
+      ["this token's profile cannot do this", "err.apiTokenProfileDenied"],
+      ["this needs the owner's approval; it is not available over the API", "err.apiOwnerApprovalRequired"],
+    ] as const;
+
+    for (const [message, key] of cases) {
+      expect(say(message, Code.PermissionDenied)).toBe(en[key]);
+      expect(say(message, Code.PermissionDenied, "ru")).toBe(ru[key]);
+      expect(ru[key]).not.toBe(en[key]);
+    }
+    expect(say("your role cannot do this", Code.PermissionDenied)).toBe(en["err.denied"]);
+    expect(say("your role cannot do this", Code.PermissionDenied, "ru")).toBe(ru["err.denied"]);
+    expect(say("unknown denial", Code.PermissionDenied)).toBe(en["err.permissionDenied"]);
+    expect(say("unknown denial", Code.PermissionDenied, "ru")).toBe(ru["err.permissionDenied"]);
+  });
+
   it("leave a code they do not know as the server wrote it, as before", () => {
     expect(say("brand_new_code: x=1", Code.FailedPrecondition)).toBe("brand_new_code: x=1");
     expect(say("a rollout is already active", Code.FailedPrecondition)).toBe("a rollout is already active");

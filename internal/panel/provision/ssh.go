@@ -187,7 +187,8 @@ func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Ad
 
 	var fingerprint string
 	config := &ssh.ClientConfig{
-		User: "root",
+		User:              "root",
+		HostKeyAlgorithms: preferredHostKeyAlgorithms(),
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			fingerprint = ssh.FingerprintSHA256(key)
 			return errHostKeySeen
@@ -201,6 +202,20 @@ func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Ad
 		return "", errors.New("provision: SSH handshake unexpectedly continued past host-key discovery")
 	}
 	return "", err
+}
+
+// preferredHostKeyAlgorithms moves Ed25519 to the front of the supported SSH
+// host-key list while retaining the library's remaining order and fallbacks.
+func preferredHostKeyAlgorithms() []string {
+	algorithms := ssh.SupportedAlgorithms().HostKeys
+	for i, algorithm := range algorithms {
+		if algorithm == ssh.KeyAlgoED25519 {
+			copy(algorithms[1:i+1], algorithms[:i])
+			algorithms[0] = ssh.KeyAlgoED25519
+			break
+		}
+	}
+	return algorithms
 }
 
 func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Target, addr netip.Addr, username, password, expected string) (*Connection, error) {
@@ -218,8 +233,9 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	defer stopHandshake()
 
 	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
+		User:              username,
+		Auth:              []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyAlgorithms: preferredHostKeyAlgorithms(),
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			if ssh.FingerprintSHA256(key) != expected {
 				return ErrHostKey

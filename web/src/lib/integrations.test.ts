@@ -212,6 +212,6 @@ describe("failed calls", () => {
     expect(callErrorText(new ConnectError("exists", Code.AlreadyExists), t)).toBe(en["int.err.nameTaken"]);
     expect(callErrorText(new ConnectError("no such approval", Code.NotFound), t)).toBe(en["int.err.gone"]);
     expect(callErrorText(new ConnectError("this approval is not waiting any more", Code.FailedPrecondition), t)).toBe(en["int.err.notWaiting"]);
-    expect(callErrorText(new ConnectError("nope", Code.PermissionDenied), t)).toBe(en["err.denied"]);
+    expect(callErrorText(new ConnectError("nope", Code.PermissionDenied), t)).toBe(en["err.permissionDenied"]);
   });
 });

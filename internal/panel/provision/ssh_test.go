@@ -2,8 +2,11 @@ package provision
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"net"
 	"net/netip"
@@ -98,6 +101,96 @@ func TestFingerprintDoesNotSendAuthentication(t *testing.T) {
 	case got := <-passwords:
 		t.Fatalf("fingerprint probe sent a password: %q", got)
 	default:
+	}
+}
+
+func TestPreferredHostKeyAlgorithmsPrefersEd25519AndExcludesInsecureAlgorithms(t *testing.T) {
+	got := preferredHostKeyAlgorithms()
+	if len(got) == 0 || got[0] != ssh.KeyAlgoED25519 {
+		t.Fatalf("preferred host-key algorithms = %v, want Ed25519 first", got)
+	}
+
+	gotSet := make(map[string]struct{}, len(got))
+	for _, algorithm := range got {
+		gotSet[algorithm] = struct{}{}
+	}
+	for _, algorithm := range ssh.InsecureAlgorithms().HostKeys {
+		if _, ok := gotSet[algorithm]; ok {
+			t.Errorf("insecure host-key algorithm %q is enabled", algorithm)
+		}
+	}
+	if _, ok := gotSet[ssh.KeyAlgoRSA]; ok {
+		t.Errorf("legacy RSA/SHA-1 host-key algorithm %q is enabled", ssh.KeyAlgoRSA)
+	}
+
+	want := []string{ssh.KeyAlgoED25519}
+	for _, algorithm := range ssh.SupportedAlgorithms().HostKeys {
+		if algorithm != ssh.KeyAlgoED25519 {
+			want = append(want, algorithm)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("preferred host-key algorithms = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("preferred host-key algorithms = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestFingerprintPrefersEd25519AndDialUsesSamePreference(t *testing.T) {
+	ed25519Signer := testSigner(t)
+	ecdsaSigner := testECDSASigner(t)
+	rsaSigner := testRSASigner(t)
+	passwords := make(chan string, 1)
+	client := testSSHClientWithHostKeys(t, []ssh.Signer{ecdsaSigner, rsaSigner, ed25519Signer}, passwords, nil)
+	want := ssh.FingerprintSHA256(ed25519Signer.PublicKey())
+
+	got, err := client.Fingerprint(context.Background(), mustTarget(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("fingerprint = %q, want preferred Ed25519 key %q", got, want)
+	}
+
+	conn, err := client.Dial(context.Background(), mustTarget(t), "ssh-secret", got)
+	if err != nil {
+		t.Fatalf("Dial() with discovered fingerprint: %v", err)
+	}
+	defer conn.Close()
+	select {
+	case got := <-passwords:
+		if got != "ssh-secret" {
+			t.Fatalf("password sent to SSH server = %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SSH server did not receive password after the host key was confirmed")
+	}
+}
+
+func TestFingerprintFallsBackToECDSAAndRSA(t *testing.T) {
+	ecdsaSigner := testECDSASigner(t)
+	rsaSigner := testRSASigner(t)
+	for _, tc := range []struct {
+		name    string
+		signers []ssh.Signer
+		want    ssh.Signer
+	}{
+		{name: "ECDSA when it is the only key", signers: []ssh.Signer{ecdsaSigner}, want: ecdsaSigner},
+		{name: "RSA/SHA-2 when it is the only key", signers: []ssh.Signer{rsaSigner}, want: rsaSigner},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := testSSHClientWithHostKeys(t, tc.signers, make(chan string, 1), nil)
+			got, err := client.Fingerprint(context.Background(), mustTarget(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := ssh.FingerprintSHA256(tc.want.PublicKey()); got != want {
+				t.Fatalf("fingerprint = %q, want %q", got, want)
+			}
+		})
 	}
 }
 
@@ -225,6 +318,10 @@ func testSSHClient(t *testing.T, signer ssh.Signer, passwords chan<- string) *Cl
 }
 
 func testSSHClientWithUser(t *testing.T, signer ssh.Signer, passwords chan<- string, users chan<- string) *Client {
+	return testSSHClientWithHostKeys(t, []ssh.Signer{signer}, passwords, users)
+}
+
+func testSSHClientWithHostKeys(t *testing.T, signers []ssh.Signer, passwords chan<- string, users chan<- string) *Client {
 	t.Helper()
 	server := &ssh.ServerConfig{PasswordCallback: func(meta ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		passwords <- string(password)
@@ -233,7 +330,9 @@ func testSSHClientWithUser(t *testing.T, signer ssh.Signer, passwords chan<- str
 		}
 		return nil, nil
 	}}
-	server.AddHostKey(signer)
+	for _, signer := range signers {
+		server.AddHostKey(signer)
+	}
 	client := NewClient()
 	client.timeout = time.Second
 	client.resolver = testResolver{netip.MustParseAddr("8.8.8.8")}
@@ -291,6 +390,32 @@ func serveTestSSH(conn net.Conn, config *ssh.ServerConfig) {
 func testSigner(t *testing.T) ssh.Signer {
 	t.Helper()
 	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
+
+func testECDSASigner(t *testing.T) ssh.Signer {
+	t.Helper()
+	private, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
+
+func testRSASigner(t *testing.T) ssh.Signer {
+	t.Helper()
+	private, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
