@@ -8,9 +8,21 @@ import { AddNodeProvider, useAddNode } from "./add-node";
 
 const createEnrollment = vi.fn();
 const getNode = vi.fn();
+const getSSHFingerprint = vi.fn();
+const checkSSH = vi.fn();
+const startNodeProvision = vi.fn();
+const getNodeProvision = vi.fn();
+const retryNodeProvision = vi.fn();
 vi.mock("@/lib/api", () => ({
   basepath: "/secret-panel/",
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: (...a: unknown[]) => getNode(...a) },
+  provisioning: {
+    getSSHFingerprint: (...a: unknown[]) => getSSHFingerprint(...a),
+    checkSSH: (...a: unknown[]) => checkSSH(...a),
+    startNodeProvision: (...a: unknown[]) => startNodeProvision(...a),
+    getNodeProvision: (...a: unknown[]) => getNodeProvision(...a),
+    retryNodeProvision: (...a: unknown[]) => retryNodeProvision(...a),
+  },
 }));
 const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
@@ -27,6 +39,11 @@ afterEach(() => {
   root = host = null;
   createEnrollment.mockReset();
   getNode.mockReset();
+  getSSHFingerprint.mockReset();
+  checkSSH.mockReset();
+  startNodeProvision.mockReset();
+  getNodeProvision.mockReset();
+  retryNodeProvision.mockReset();
   navigate.mockReset();
 });
 
@@ -43,6 +60,7 @@ const settle = () => act(async () => void (await new Promise((r) => setTimeout(r
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+const toggle = (el: HTMLInputElement | null | undefined) => act(async () => void el?.click());
 const input = (placeholder: string) => document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!;
 async function type(el: HTMLInputElement, value: string) {
   await act(async () => {
@@ -97,7 +115,8 @@ async function issue(over: Record<string, unknown> = {}) {
 describe("the add-node window", () => {
   it("says before the click that an IP gets no Let's Encrypt certificate, and what to do", async () => {
     await open();
-    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')?.textContent).toContain("Install automatically over SSH");
+    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')).toBeNull();
+    expect(button("Install automatically over SSH")).toBeDefined();
     expect(text()).toContain("Automatic installation over SSH");
     expect(input("de1")).toBeNull();
     await manual();
@@ -110,6 +129,100 @@ describe("the add-node window", () => {
     expect(text()).toContain("Happ is not verified yet");
     await type(input("de1.example.com"), "de1.example.com");
     expect(text()).not.toContain("This is an IP, not a domain.");
+  });
+
+  it("opens the SSH setup as a panel modal and confirms the server fingerprint before credentials", async () => {
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    await open();
+    await click(button("Install automatically over SSH"));
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(text()).toContain("Install a node over SSH");
+    expect(input("de1.example.com")).not.toBeNull();
+    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')).toBeNull();
+
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    expect(getSSHFingerprint).toHaveBeenCalledWith({ host: "de1.example.com", port: 22 });
+    expect(text()).toContain("Confirm the SSH host key");
+    expect(text()).toContain("SHA256:server-key");
+    expect(button("Continue")?.disabled).toBe(true);
+  });
+
+  it("explains that SSH fingerprint timeouts are measured from the panel server", async () => {
+    getSSHFingerprint.mockRejectedValue(new ConnectError("ssh_fingerprint_timeout", Code.DeadlineExceeded));
+    await open();
+    await click(button("Install automatically over SSH"));
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    expect(text()).toContain("from the panel server");
+    expect(text()).toContain("allow TCP access from the panel server");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("preflights before installation, asks for the password again, and starts only after explicit confirmation", async () => {
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    checkSSH.mockResolvedValue({
+      preflight: {
+        distribution: "Ubuntu",
+        version: "22.04",
+        kernel: "6.8.0",
+        architecture: "amd64",
+        cpuCount: 2,
+        memoryBytes: 2_147_483_648n,
+        diskAvailableBytes: 10_737_418_240n,
+        systemd: true,
+        alreadyEnrolled: false,
+        panelReachable: true,
+      },
+    });
+    startNodeProvision.mockResolvedValue({
+      job: { id: "prv_1", nodeId: "nod_1", name: "de1", state: "queued", phase: "queued", errorCode: "" },
+    });
+    getNodeProvision.mockReturnValue(new Promise(() => {}));
+
+    await open();
+    await click(button("Install automatically over SSH"));
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    expect(text()).toContain("Confirm the SSH host key");
+    expect(checkSSH).not.toHaveBeenCalled();
+
+    const passwords = () => document.querySelector<HTMLInputElement>('input[type="password"]')!;
+    await type(passwords(), "check-only-secret");
+    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button("Continue"));
+    await settle();
+    expect(checkSSH).toHaveBeenCalledWith({
+      host: "de1.example.com",
+      port: 22,
+      fingerprint: "SHA256:server-key",
+      password: "check-only-secret",
+      username: "root",
+    });
+    expect(text()).toContain("Server checks passed");
+    expect(passwords().value).toBe("");
+
+    await type(passwords(), "install-secret");
+    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button("Start installation"));
+    await settle();
+    expect(startNodeProvision).toHaveBeenCalledWith({
+      confirmInstall: true,
+      name: "de1",
+      address: "de1.example.com",
+      countryCode: "",
+      location: "",
+      provider: "",
+      sshHost: "de1.example.com",
+      sshPort: 22,
+      fingerprint: "SHA256:server-key",
+      password: "install-secret",
+      sshUsername: "root",
+    });
+    expect(text()).toContain("Waiting to start");
   });
 
   it("keeps a refusal in the window, above its buttons", async () => {
