@@ -34,11 +34,11 @@ const paletteKeys = isMac ? ["⌘", "K"] : ["Ctrl", "K"];
 
 export function Shell() {
   return (
-    <AddNodeProvider>
-      <StepUpProvider>
+    <StepUpProvider>
+      <AddNodeProvider>
         <ShellFrame />
-      </StepUpProvider>
-    </AddNodeProvider>
+      </AddNodeProvider>
+    </StepUpProvider>
   );
 }
 

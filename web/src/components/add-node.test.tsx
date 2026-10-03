@@ -3,7 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { StepUpRequiredSchema } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { StepUpProvider } from "./step-up";
 import { AddNodeProvider, useAddNode } from "./add-node";
 
 const createEnrollment = vi.fn();
@@ -13,8 +15,11 @@ const checkSSH = vi.fn();
 const startNodeProvision = vi.fn();
 const getNodeProvision = vi.fn();
 const retryNodeProvision = vi.fn();
+const finishStepUp = vi.fn();
 vi.mock("@/lib/api", () => ({
   basepath: "/secret-panel/",
+  auth: { finishStepUp: (...a: unknown[]) => finishStepUp(...a), beginStepUp: vi.fn() },
+  webauthnSupported: () => false,
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: (...a: unknown[]) => getNode(...a) },
   provisioning: {
     getSSHFingerprint: (...a: unknown[]) => getSSHFingerprint(...a),
@@ -44,6 +49,7 @@ afterEach(() => {
   startNodeProvision.mockReset();
   getNodeProvision.mockReset();
   retryNodeProvision.mockReset();
+  finishStepUp.mockReset();
   navigate.mockReset();
 });
 
@@ -77,9 +83,11 @@ async function open() {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <AddNodeProvider>
-          <Opener />
-        </AddNodeProvider>
+        <StepUpProvider>
+          <AddNodeProvider>
+            <Opener />
+          </AddNodeProvider>
+        </StepUpProvider>
       </QueryClientProvider>,
     ),
   );
@@ -227,6 +235,52 @@ describe("the add-node window", () => {
       sshUsername: "root",
     });
     expect(text()).toContain("Waiting to start");
+  });
+
+  it("opens step-up for the SSH modal and retries the credential check after confirmation", async () => {
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    checkSSH
+      .mockRejectedValueOnce(
+        new ConnectError("confirm it is you first (step-up required)", Code.PermissionDenied, undefined, [
+          { desc: StepUpRequiredSchema, value: { passkey: false, totp: true } },
+        ]),
+      )
+      .mockResolvedValue({
+        preflight: {
+          distribution: "Ubuntu",
+          version: "22.04",
+          kernel: "6.8.0",
+          architecture: "amd64",
+          cpuCount: 2,
+          memoryBytes: 2_147_483_648n,
+          diskAvailableBytes: 10_737_418_240n,
+          systemd: true,
+          alreadyEnrolled: false,
+          panelReachable: true,
+        },
+      });
+    finishStepUp.mockResolvedValue({ stepUpUntilUnix: 1n });
+
+    await open();
+    await click(button("Install automatically over SSH"));
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-only-secret");
+    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button("Continue"));
+    await settle();
+
+    expect(text()).toContain("Confirm it is you");
+    const code = document.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]');
+    expect(code).not.toBeNull();
+    await type(code!, "123456");
+    await click(button("Confirm"));
+    await settle();
+
+    expect(finishStepUp).toHaveBeenCalledWith({ totpCode: "123456" });
+    expect(checkSSH).toHaveBeenCalledTimes(2);
+    expect(text()).toContain("Server checks passed");
   });
 
   it("keeps a refusal in the window, above its buttons", async () => {
