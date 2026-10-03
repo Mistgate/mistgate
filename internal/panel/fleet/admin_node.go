@@ -229,18 +229,28 @@ func pct(used, total uint64) float32 {
 
 // nodeMsg builds the Node message. protos, todayBytes and enabled (see statusOf) are looked up by the caller once per
 // request.
+func capabilityPresent(caps []string, want string) bool {
+	for _, cap := range caps {
+		if cap == want {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time) *adminv1.Node {
 	s := f.session(n.ID)
 	st := f.statusOf(ctx, n, s, enabled, now)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
-		LastSeenUnix: fleetUnix(n.LastSeenAt), AwgBackend: n.AwgBackend,
+		LastSeenUnix: fleetUnix(n.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
 	}
 	caps := n.AgentCaps
 	if s != nil {
 		caps = s.caps
 	}
+	out.TorrentBlockerSupported = capabilityPresent(caps, capTorrentGuard)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	if s != nil {
 		out.Online = protocolCounts(s.onlineByProtocol())
@@ -593,6 +603,25 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		}
 		p.AwgBackend = m.AwgBackend
 	}
+	if m.TorrentBlockerEnabled != nil {
+		if *m.TorrentBlockerEnabled {
+			cur, err := f.st.Node(ctx, m.NodeId)
+			if errors.Is(err, store.ErrNotFound) {
+				return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+			}
+			if err != nil {
+				return nil, internalErr(f.log.Error, "update node", err)
+			}
+			caps := cur.AgentCaps
+			if sess := f.session(cur.ID); sess != nil {
+				caps = sess.caps
+			}
+			if !capabilityPresent(caps, capTorrentGuard) {
+				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
+			}
+		}
+		p.TorrentBlockerEnabled = m.TorrentBlockerEnabled
+	}
 	n, err := f.st.UpdateNode(ctx, m.NodeId, p)
 	switch {
 	case errors.Is(err, store.ErrConflict):
@@ -603,7 +632,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		return nil, internalErr(f.log.Error, "update node", err)
 	}
 	f.audit(ctx, "node.update", map[string]string{"node_id": n.ID})
-	f.StateChanged() // address, DNS and timeouts feed inbound specs and node settings
+	f.StateChanged() // address, DNS, timeouts and node settings feed the desired state
 	now := f.now().UTC()
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, now)

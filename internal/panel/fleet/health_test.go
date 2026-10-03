@@ -332,9 +332,15 @@ func TestCountryCodeReachesTheAgent(t *testing.T) {
 	if ack.Settings.CountryCode != "RU" {
 		t.Fatalf("settings in HelloAck: %+v", ack.Settings)
 	}
+	if got := strings.Join(ack.Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {
+		t.Fatalf("Russian DNS resolvers in HelloAck = %q", got)
+	}
 	ds := c.desired()
 	if ds.Settings.CountryCode != "RU" {
 		t.Fatalf("settings in DesiredState: %+v", ds.Settings)
+	}
+	if got := strings.Join(ds.Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {
+		t.Fatalf("Russian DNS resolvers in DesiredState = %q", got)
 	}
 	m := newModel()
 	m.apply(ds)
@@ -349,6 +355,9 @@ func TestCountryCodeReachesTheAgent(t *testing.T) {
 	next := c.desired()
 	if next.Settings.CountryCode != "DE" {
 		t.Fatalf("a changed country was not re-sent: %+v", next.Settings)
+	}
+	if got := strings.Join(next.Settings.DnsResolvers, ","); got != "1.1.1.1,8.8.8.8" {
+		t.Fatalf("world DNS resolvers after country change = %q", got)
 	}
 }
 

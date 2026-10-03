@@ -148,7 +148,7 @@ mistgate release sign --key FILE --version V --built UNIX [--expires 30d] BINARY
 | Флаг | По умолчанию | Значение |
 |---|---|---|
 | `--key` | нет | Файл закрытого ключа релиза от `release keygen`. |
-| `--version` | нет | Версия релиза, например вывод `git describe`. |
+| `--version` | нет | Версия релиза. Должна совпадать с версией бинарника панели, который подписывает пакет, и с версией собранных агентов, например `v0.1.4`. |
 | `--built` | нет | Unix-время коммита исходников (`git log -1 --format=%ct`). Задаёт порядок релизов и должно совпадать со временем сборки, вшитым в бинарники. |
 | `--expires` | `30d` | Сколько манифест можно устанавливать: дни (`30d`) или длительность в формате Go (`720h`). |
 | `--out` | нет | Каталог для `manifest.json`, `manifest.sig` и копий бинарников. |
@@ -156,11 +156,15 @@ mistgate release sign --key FILE --version V --built UNIX [--expires 30d] BINARY
 Бинарники называются `<имя>-<ос>-<архитектура>`, например `mistgate-node-linux-amd64`. Флаги можно писать и после бинарников. Команда проверяет то, что записала, и печатает каждый файл с размером и отпечаток ключа. Скопируйте каталог в `<data-dir>/dist` на панели.
 
 ```sh
+VERSION="$(git describe --tags --always --dirty)"
+BUILT="$(git log -1 --format=%ct)"
 mistgate release sign --key ~/mistgate-release.key \
-  --version "$(git describe --tags --always)" \
-  --built "$(git log -1 --format=%ct)" --expires 30d \
+  --version "$VERSION" \
+  --built "$BUILT" --expires 30d \
   bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
 ```
+
+Команда откажется подписывать пакет, если `--version` не совпадает с версией панели. Соберите панель и агенты с одним тегом; см. [Обновления](../operations/updates.md).
 
 ### mistgate version
 

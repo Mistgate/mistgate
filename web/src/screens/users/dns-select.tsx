@@ -48,7 +48,7 @@ export function DnsDelivery() {
  * "Default — name" (or "Like the group — name") or one of the presets, each with what is inside under its name. `value` is the preset id set on the user or group, "" = inherit.
  * Under it, when the change reaches the apps (`note={false}` leaves that out).
  */
-export function DnsSelect({ value, onChange, inherited, label, note = true }: { value: string; onChange: (id: string) => void; inherited: Inherited; label?: string; note?: boolean }) {
+export function DnsSelect({ value, onChange, inherited, label, note = true, scope = "user" }: { value: string; onChange: (id: string) => void; inherited: Inherited; label?: string; note?: boolean; scope?: "user" | "group" }) {
   const t = useTx();
   const presets = useQuery(dnsPresetsQuery);
   const list = presets.data?.presets ?? [];
@@ -69,7 +69,12 @@ export function DnsSelect({ value, onChange, inherited, label, note = true }: { 
       <div className="[&>button>span:first-child]:min-w-0 [&>button>span:first-child]:truncate">
         <Select aria-label={label ?? t("subs.dns.field")} value={shown} onValueChange={(v) => onChange(v === INHERIT ? "" : v)} options={options} />
       </div>
-      {note && <DnsDelivery />}
+      {note && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] leading-snug text-muted">{t(scope === "group" ? "subs.dns.scopeGroup" : "subs.dns.scopeUser")}</span>
+          <DnsDelivery />
+        </div>
+      )}
     </>
   );
 }

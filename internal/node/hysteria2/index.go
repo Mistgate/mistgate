@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -24,6 +25,7 @@ type credState struct {
 	id        string
 	inboundID string
 	hash      [32]byte // sha256(auth token); immutable (a changed token makes a new credState)
+	owner     atomic.Pointer[credIdentity]
 
 	validUntil atomic.Int64 // unix seconds, 0 = never
 	limit      atomic.Pointer[limiter]
@@ -34,6 +36,8 @@ type credState struct {
 	lastKill   atomic.Int64  // unix nano of the last token taken
 	removed    atomic.Bool   // dropped from the index; its sessions are dying
 }
+
+type credIdentity struct{ userID string }
 
 // limiter is a token bucket per direction, in bytes.
 type limiter struct {
@@ -115,6 +119,7 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred) (*index, 
 		if cs == nil {
 			cs = &credState{id: p.c.CredID, inboundID: inboundID, hash: p.hash}
 		}
+		cs.owner.Store(&credIdentity{userID: p.c.UserID})
 		var vu int64
 		if !p.c.ValidUntil.IsZero() {
 			vu = p.c.ValidUntil.Unix()
@@ -283,8 +288,88 @@ func addrIP(a net.Addr) netip.Addr {
 }
 
 // Everything else the core offers is deliberately ignored: per-request events would be destination logs.
-func (in *inbound) LogOnlineState(string, bool)                 {}
-func (in *inbound) TCPRequest(net.Addr, string, string)         {}
-func (in *inbound) TCPError(net.Addr, string, string, error)    {}
-func (in *inbound) UDPRequest(net.Addr, string, uint32, string) {}
-func (in *inbound) UDPError(net.Addr, string, uint32, error)    {}
+func (in *inbound) LogOnlineState(string, bool)               {}
+func (in *inbound) TCPRequest(_ net.Addr, id, reqAddr string) { in.rememberRequest(reqAddr, id) }
+func (in *inbound) TCPError(net.Addr, string, string, error)  {}
+func (in *inbound) UDPRequest(_ net.Addr, id string, _ uint32, reqAddr string) {
+	in.rememberRequest(reqAddr, id)
+}
+func (in *inbound) UDPError(net.Addr, string, uint32, error) {}
+
+const pendingRequestTTL = 5 * time.Second
+
+type pendingRequest struct {
+	userID    string
+	count     int
+	ambiguous bool
+	expires   time.Time
+}
+
+func requestKey(addr string) string { return strings.ToLower(strings.TrimSpace(addr)) }
+
+// rememberRequest correlates Hysteria's EventLogger callback with its following Outbound call. The
+// server API does not carry a user identifier to Outbound; concurrent requests to the same destination
+// are deliberately marked ambiguous when their owners differ.
+func (in *inbound) rememberRequest(addr, credID string) {
+	if in == nil || !in.e.torrentEnabled.Load() {
+		return
+	}
+	key := requestKey(addr)
+	if key == "" {
+		return
+	}
+	var userID string
+	if ix := in.idx.Load(); ix != nil {
+		if cs := ix.byID[credID]; cs != nil {
+			if owner := cs.owner.Load(); owner != nil {
+				userID = owner.userID
+			}
+		}
+	}
+	now := time.Now()
+	in.requestMu.Lock()
+	if in.pendingRequests == nil {
+		in.pendingRequests = make(map[string]pendingRequest)
+	}
+	for k, pending := range in.pendingRequests {
+		if !pending.expires.After(now) {
+			delete(in.pendingRequests, k)
+		}
+	}
+	if pending, ok := in.pendingRequests[key]; ok {
+		pending.count++
+		if pending.userID != userID {
+			pending.ambiguous = true
+		}
+		pending.expires = now.Add(pendingRequestTTL)
+		in.pendingRequests[key] = pending
+	} else if len(in.pendingRequests) < 256 {
+		in.pendingRequests[key] = pendingRequest{userID: userID, count: 1, expires: now.Add(pendingRequestTTL)}
+	}
+	in.requestMu.Unlock()
+}
+
+func (in *inbound) takeRequestUserID(addr string) string {
+	if in == nil {
+		return ""
+	}
+	key := requestKey(addr)
+	now := time.Now()
+	in.requestMu.Lock()
+	defer in.requestMu.Unlock()
+	pending, ok := in.pendingRequests[key]
+	if !ok || !pending.expires.After(now) {
+		delete(in.pendingRequests, key)
+		return ""
+	}
+	if pending.count <= 1 {
+		delete(in.pendingRequests, key)
+	} else {
+		pending.count--
+		in.pendingRequests[key] = pending
+	}
+	if pending.ambiguous {
+		return ""
+	}
+	return pending.userID
+}

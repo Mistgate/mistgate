@@ -126,7 +126,7 @@ The tab works while the agent is connected (**Healthy** or **No traffic**). If t
 
 ### Events
 
-The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build. Related events are joined into one line.
+The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the protocol and destination; the panel adds a user's name only when the node can identify that user reliably.
 
 The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. **Show more** loads older events; when a filter finds nothing among the latest ones, **Search further** does the same.
 
@@ -151,7 +151,9 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **AmneziaWG 
 | **Agent dial timeout** | 5–120 s, default 15: how long the agent waits when it connects to the panel. |
 | **DNS for user traffic** | IP addresses separated by commas, up to 8 (`1.1.1.1, 8.8.8.8`, an `ip:port` works too). The node resolves the names of its users' traffic with them. Empty means the server's own resolver. |
 
-**Save** sends only what changed; the node gets the new settings at once, without a reconnect.
+**Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts Hysteria2 inbounds as described below.
+
+**Block recognized BitTorrent traffic** is an optional per-node setting, off by default, for Linux agents that advertise `torrentguard/1`. It inspects plaintext BitTorrent handshakes and validated DHT, UDP tracker and uTP requests. On AmneziaWG it drops only the identified flow crossing that node's AWG interface; in Hysteria2 it closes the matching outbound connection or drops the matching UDP datagram. Changing this setting restarts only the node's Hysteria2 inbounds so existing outbound connections cannot keep using the old policy. Detection is best effort: encrypted BitTorrent, traffic inside another proxy, HTTPS web seeds, fragmented packets and unknown formats can pass. A `torrent_guard_degraded` event appears if the Linux queue cannot start.
 
 **DNS for user traffic** is not the same as the server's own resolver that the doctor checks, and not the same as the DNS presets that apps receive: see [DNS](dns.md).
 

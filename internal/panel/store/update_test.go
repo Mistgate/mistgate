@@ -56,10 +56,10 @@ func TestUpdatesMigrationUpgradesVersion12(t *testing.T) {
 	if err := s.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM node) + (SELECT count(*) FROM inbound) + (SELECT count(*) FROM event) + (SELECT count(*) FROM health_alert)`).Scan(&n); err != nil || n != 4 {
 		t.Fatalf("existing rows after upgrade: %d %v", n, err)
 	}
-	// The Go row scan follows the newest schema (nodeCols carries awg_backend since 00014 and awg_prepare_json since 00019),
-	// so a node is read through the API only after the later migrations; the rows of version 12 must have survived all of them.
-	if _, err := p.UpTo(ctx, 19); err != nil {
-		t.Fatalf("up to 19: %v", err)
+	// The Go row scan follows the newest schema (nodeCols carries columns added through 00036), so a node is read only after
+	// the later migrations; rows of version 12 must have survived all of them.
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("up to latest: %v", err)
 	}
 	node, err := s.Node(ctx, nodeID)
 	if err != nil {

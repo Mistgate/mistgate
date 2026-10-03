@@ -110,6 +110,8 @@ function appliedTitle(t: T, p: Record<string, string>): string {
 
 function eventTitle(t: T, e: NodeEvent, stamp?: (unix: number) => string): string {
   switch (e.code) {
+    case "torrent_attempt":
+      return t("node.ev.torrentAttempt", { user: e.params.user_name || e.params.user_id || t("node.ev.torrentUnknown") });
     case "engine_failed":
       return t("node.ev.failed", { profile: profileLabel(t, e) });
     case "awg_backend_unavailable":
@@ -125,6 +127,13 @@ function eventTitle(t: T, e: NodeEvent, stamp?: (unix: number) => string): strin
 
 function eventSub(t: T, e: NodeEvent): string {
   const p = e.params;
+  if (e.code === "torrent_attempt") {
+    const protocol = [p.protocol, p.torrent_protocol].filter(Boolean).join(" / ");
+    return [
+      protocol ? t("node.ev.torrentProtocol", { protocol }) : "",
+      p.destination ? t("node.ev.torrentDestination", { destination: p.destination }) : "",
+    ].filter(Boolean).join("; ");
+  }
   if (e.code === "update_step_failed") return p.reason ? reasonText(t, p.reason) : "";
   if (e.code === "engine_started" || e.code === "engine_restarted") return p.reason && reasonKeys[p.reason] ? t(reasonKeys[p.reason]!) : "";
   if (e.code === "awg_kernel_prepare_failed") return prepReasonText(t, p.code ?? "", p.reason ?? "");

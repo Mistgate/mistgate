@@ -16,6 +16,7 @@ import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
 import { AwgBackendCard } from "./awg-backend";
 import { SSHAccessCard } from "./ssh-access";
 import { WarpCard } from "./warp";
@@ -61,8 +62,10 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
       liveness: data.timeouts?.livenessTimeoutS || timeoutDefs.liveness.def,
       apply: data.timeouts?.applyTimeoutS || timeoutDefs.apply.def,
       dial: data.timeouts?.dialTimeoutS || timeoutDefs.dial.def,
+      torrentBlockerEnabled: node.torrentBlockerEnabled,
   }));
   const [f, setF] = useState(start);
+  const [dnsMode, setDnsMode] = useState<NodeDnsMode>(() => nodeDnsMode(data.dnsResolvers));
   const set = <K extends keyof typeof start>(k: K, v: (typeof start)[K]) => setF((x) => ({ ...x, [k]: v }));
 
   const countries = useMemo(() => {
@@ -80,7 +83,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
   const errors = {
     name: namePattern.test(f.name) ? undefined : t("node.add.nameError"),
     address: addressPattern.test(f.address.trim()) ? undefined : t("node.add.addressError"),
-    dns: resolvers.every((r) => resolverPattern.test(r)) ? undefined : t("node.settings.dnsError"),
+    dns: dnsMode !== "custom" || (resolvers.length > 0 && resolvers.every((r) => resolverPattern.test(r))) ? undefined : t("node.settings.dnsError"),
   };
   const dirty = (Object.keys(start) as (keyof typeof start)[]).some((k) => f[k] !== start[k]);
 
@@ -101,6 +104,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
         timeouts: timeoutsChanged
           ? { livenessTimeoutS: tv("liveness"), applyTimeoutS: tv("apply"), dialTimeoutS: tv("dial") }
           : undefined,
+        torrentBlockerEnabled: changed("torrentBlockerEnabled") ? f.torrentBlockerEnabled : undefined,
       });
     },
     onSuccess: () => {
@@ -122,6 +126,18 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
     { key: "apply", label: t("node.settings.apply"), hint: t("node.settings.applyHint") },
     { key: "dial", label: t("node.settings.dial"), hint: t("node.settings.dialHint") },
   ];
+  const dnsModes: { value: NodeDnsMode; label: string; hint: string }[] = [
+    { value: "auto", label: t("node.settings.dnsMode.auto"), hint: t("node.settings.dnsMode.autoHint") },
+    { value: "yandex", label: t("node.settings.dnsMode.yandex"), hint: "77.88.8.8 · 77.88.8.1" },
+    { value: "cloudflareGoogle", label: t("node.settings.dnsMode.cloudflareGoogle"), hint: "1.1.1.1 · 8.8.8.8" },
+    ...(dnsMode === "custom" ? [{ value: "custom" as const, label: t("node.settings.dnsMode.custom"), hint: t("node.settings.dnsMode.customHint") }] : []),
+  ];
+
+  function chooseDnsMode(value: string) {
+    const mode = value as NodeDnsMode;
+    setDnsMode(mode);
+    if (mode !== "custom") set("dns", nodeDnsResolvers(mode).join(", "));
+  }
 
   return (
     <div className="flex max-w-[640px] flex-col gap-3.5">
@@ -168,20 +184,52 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
             );
           })}
           <div className="flex min-h-14 flex-col justify-center gap-1.5 border-t border-line py-2.5">
-            <TextField
-              icon="dns"
-              tone="sky"
-              label={t("node.settings.dns")}
-              value={f.dns}
-              onChange={(e) => set("dns", e.target.value)}
-              placeholder={t("node.settings.dnsPh")}
-              mono
-              error={errors.dns}
-              hint={t("node.settings.dnsHint")}
-              autoCapitalize="off"
-              spellCheck={false}
+            <SectionLabel as="span" icon="dns" tone="sky">
+              {t("node.settings.dns")}
+            </SectionLabel>
+            <Select
+              aria-label={t("node.settings.dns")}
+              value={dnsMode}
+              onValueChange={chooseDnsMode}
+              options={dnsModes}
             />
+            <span className="text-xs leading-snug text-muted">{t("node.settings.dnsHint")}</span>
+            {dnsMode === "custom" && (
+              <TextField
+                tone="sky"
+                label={t("node.settings.dnsCustom")}
+                value={f.dns}
+                onChange={(e) => {
+                  set("dns", e.target.value);
+                  setDnsMode("custom");
+                }}
+                placeholder={t("node.settings.dnsPh")}
+                mono
+                error={errors.dns}
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+            )}
           </div>
+        </div>
+
+        <div className="rounded-card border border-line bg-surface px-3.5 py-3">
+          <label className={`flex items-start gap-3 ${retired || !node.torrentBlockerSupported ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-accent"
+              checked={f.torrentBlockerEnabled}
+              onChange={(e) => set("torrentBlockerEnabled", e.target.checked)}
+              disabled={retired || !node.torrentBlockerSupported}
+            />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="text-[13px] font-bold">{t("node.settings.torrentBlocker")}</span>
+              <span className="text-xs leading-snug text-muted">{t("node.settings.torrentBlockerHint")}</span>
+              {!node.torrentBlockerSupported && (
+                <span className="text-xs leading-snug text-muted">{t("node.settings.torrentBlockerUnsupported")}</span>
+              )}
+            </span>
+          </label>
         </div>
 
         <div className="flex justify-end">

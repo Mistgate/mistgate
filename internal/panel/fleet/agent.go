@@ -13,18 +13,20 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/dnsdefaults"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 const (
-	helloTimeout  = 15 * time.Second
-	ackEvery      = time.Second
-	outQueue      = 256
-	maxFuture     = 5 * time.Minute // agent timestamps further ahead are clamped to the receive time
-	maxStatsAge   = 48 * time.Hour  // older batches are attributed to the receive hour
-	maxEventParam = 16
-	maxEngines    = 32 // engines listed in one Hello
+	helloTimeout    = 15 * time.Second
+	ackEvery        = time.Second
+	outQueue        = 256
+	maxFuture       = 5 * time.Minute // agent timestamps further ahead are clamped to the receive time
+	maxStatsAge     = 48 * time.Hour  // older batches are attributed to the receive hour
+	maxEventParam   = 16
+	maxEngines      = 32 // engines listed in one Hello
+	capTorrentGuard = "torrentguard/1"
 )
 
 type agentService struct{ f *Fleet }
@@ -490,7 +492,21 @@ func (f *Fleet) onEvent(ctx context.Context, s *session, seq uint64, ev *agentv1
 		code = "agent_event"
 	}
 	row := store.EventRow{Time: t, Severity: sev, Code: store.Clip(code, 64), InboundID: store.Clip(ev.InboundId, 64)}
-	if len(ev.Params) > 0 {
+	if row.Code == "torrent_attempt" {
+		row.Params = map[string]string{}
+		if userID := store.Clip(ev.Params["user_id"], 256); userID != "" {
+			row.Params["user_id"] = userID
+			if user, err := f.st.Access().User(ctx, userID); err == nil && user.Name != "" {
+				row.Params["user_name"] = store.Clip(user.Name, 256)
+			}
+		}
+		// This event has a fixed, non-secret contract. Do not persist arbitrary params such as a credential by mistake.
+		for _, k := range []string{"protocol", "torrent_protocol", "destination", "client_ip"} {
+			if v := ev.Params[k]; v != "" {
+				row.Params[k] = store.Clip(v, 256)
+			}
+		}
+	} else if len(ev.Params) > 0 {
 		row.Params = map[string]string{}
 		for k, v := range ev.Params {
 			if len(row.Params) == maxEventParam {
@@ -644,20 +660,33 @@ const (
 	reconcileFull                         // resend everything (base mismatch, drift)
 )
 
-// nodeSettings is what the agent of a stream with these capabilities is told. The AWG backend goes only to an agent that
-// lists "awg/1" (the setting is meaningless to the others, and the signature below must not move for them).
+// nodeSettings is what the agent of a stream with these capabilities is told. The AWG and torrent blocker settings
+// are sent only to agents that advertise the capability, keeping old-agent settings signatures unchanged.
 func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
+	resolvers := n.DNSResolvers
+	if len(resolvers) == 0 {
+		resolvers = dnsdefaults.ForCountry(n.CountryCode)
+	} else {
+		resolvers = slices.Clone(resolvers)
+	}
 	s := &agentv1.NodeSettings{StatsIntervalS: defaultStatsIntervalS, KeepaliveIntervalS: defaultKeepaliveInterval,
-		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: n.DNSResolvers,
+		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: resolvers,
 		CountryCode: n.CountryCode}
 	if slices.Contains(caps, capAWG) {
 		s.AwgBackend = n.AwgBackend
+	}
+	if slices.Contains(caps, capTorrentGuard) {
+		s.TorrentBlockerEnabled = n.TorrentBlockerEnabled
 	}
 	return s
 }
 
 func settingsSig(s *agentv1.NodeSettings) string {
-	return fmt.Sprint(s.StatsIntervalS, s.KeepaliveIntervalS, s.KeepaliveTimeoutS, s.DialTimeoutS, s.DnsResolvers, s.CountryCode, s.AwgBackend)
+	sig := fmt.Sprint(s.StatsIntervalS, s.KeepaliveIntervalS, s.KeepaliveTimeoutS, s.DialTimeoutS, s.DnsResolvers, s.CountryCode, s.AwgBackend)
+	if s.TorrentBlockerEnabled {
+		return sig + "|torrentguard=enabled"
+	}
+	return sig
 }
 
 // reconcile computes the node's desired state and sends what the agent lacks. Revisions are per node,

@@ -23,6 +23,7 @@ import (
 	"github.com/apernet/quic-go/http3"
 	"golang.org/x/net/dns/dnsmessage"
 
+	agentpb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
@@ -372,6 +373,31 @@ func TestHealthReportsTheServedCertificate(t *testing.T) {
 	h := r.e.Health()
 	if len(h) != 1 || len(h[0].CertPinSHA256) != 64 || !h[0].CertNotAfter.After(time.Now()) {
 		t.Fatalf("health after issuance: %+v", h)
+	}
+}
+
+func TestTorrentSettingToggleRestartsExistingOutboundFlows(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	en := r.e.(*eng)
+
+	if !en.NodeSettings(context.Background(), &agentpb.NodeSettings{TorrentBlockerEnabled: true}) {
+		t.Fatal("enabling torrent blocking must request an inbound reapply")
+	}
+	if en.NodeSettings(context.Background(), &agentpb.NodeSettings{TorrentBlockerEnabled: true}) {
+		t.Fatal("an unchanged torrent setting must not request another reapply")
+	}
+	rep, err := r.e.Apply(context.Background(), r.spec, []plugin.UserCred{cred("a")})
+	if err != nil || !rep.Restarted {
+		t.Fatalf("enabling must replace existing outbound flows: report=%+v err=%v", rep, err)
+	}
+
+	if !en.NodeSettings(context.Background(), &agentpb.NodeSettings{TorrentBlockerEnabled: false}) {
+		t.Fatal("disabling torrent blocking must request an inbound reapply")
+	}
+	rep, err = r.e.Apply(context.Background(), r.spec, []plugin.UserCred{cred("a")})
+	if err != nil || !rep.Restarted {
+		t.Fatalf("disabling must replace existing outbound flows: report=%+v err=%v", rep, err)
 	}
 }
 

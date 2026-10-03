@@ -205,6 +205,23 @@ describe("event lines say what happened, once", () => {
     expect(lineText(tn as never, l!).title).toBe("The update to 0.3.1 rolled back: The new version crashed three times in a row.");
   });
 
+  it("makes a torrent attempt actionable with the user identity, protocol and destination", () => {
+    const named = buildLines([ev("torrent_attempt", T0, {
+      user_name: "alice", user_id: "usr_alice", protocol: "hysteria2", torrent_protocol: "bittorrent",
+      destination: "203.0.113.8:51413",
+    })]);
+    expect(lineText(tn as never, named[0]!)).toEqual({
+      title: "Possible BitTorrent attempt by alice",
+      sub: "protocol: hysteria2 / bittorrent; destination: 203.0.113.8:51413",
+    });
+
+    const fallback = buildLines([ev("torrent_attempt", T0 + 1, { user_id: "usr_missing", torrent_protocol: "bittorrent" })]);
+    expect(lineText(tn as never, fallback[0]!)).toEqual({
+      title: "Possible BitTorrent attempt by usr_missing",
+      sub: "protocol: bittorrent",
+    });
+  });
+
   it("words an applied configuration without the zeros, and the link to the panel with its length", () => {
     const applied = (p: Record<string, string>) => lineText(tn as never, buildLines([ev("state_applied", T0, { revision: "4", ...p })])[0]!).title;
     expect(applied({ added: "1", removed: "0", changed: "0", users: "14" })).toBe("Settings applied: 1 profile added · 14 devices");

@@ -88,6 +88,13 @@ func newKeyFile(t *testing.T) (keyFile, pubB64 string) {
 	return keyFile, lineValue(t, out.String(), "public key: ")
 }
 
+func setBuildVersion(t *testing.T, version string) {
+	t.Helper()
+	previous := buildinfo.Version
+	buildinfo.Version = version
+	t.Cleanup(func() { buildinfo.Version = previous })
+}
+
 func makeBinaries(t *testing.T, names ...string) (dir string, paths []string) {
 	t.Helper()
 	dir = t.TempDir()
@@ -103,12 +110,13 @@ func makeBinaries(t *testing.T, names ...string) (dir string, paths []string) {
 
 // The bundle `sign` writes verifies with the printed public key, file by file; flags may follow the binaries.
 func TestReleaseSignRoundTrip(t *testing.T) {
+	setBuildVersion(t, "v0.1.4")
 	keyFile, pubB64 := newKeyFile(t)
 	_, bins := makeBinaries(t, "mistgate-node-linux-amd64", "mistgate-node-linux-arm64")
 	outDir := filepath.Join(t.TempDir(), "dist")
 	now := time.Unix(1_790_000_000, 0)
 	var out bytes.Buffer
-	args := []string{"--key", keyFile, "--version", "0.2.0-1a2b3c4", "--built", "1789000000", "--expires", "30d", bins[0], bins[1], "--out", outDir}
+	args := []string{"--key", keyFile, "--version", "v0.1.4", "--built", "1789000000", "--expires", "30d", bins[0], bins[1], "--out", outDir}
 	if err := releaseSign(args, &out, now); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +130,7 @@ func TestReleaseSignRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the written bundle does not verify with the printed key: %v", err)
 	}
-	if m.Version != "0.2.0-1a2b3c4" || m.Built != 1_789_000_000 || m.Expires != now.Add(30*24*time.Hour).Unix() || len(m.Files) != 2 {
+	if m.Version != "v0.1.4" || m.Built != 1_789_000_000 || m.Expires != now.Add(30*24*time.Hour).Unix() || len(m.Files) != 2 {
 		t.Fatalf("manifest %+v", m)
 	}
 	if len(sig) != 64 {
@@ -139,7 +147,7 @@ func TestReleaseSignRoundTrip(t *testing.T) {
 			t.Fatalf("copied file %s: %v", f.Name, err)
 		}
 	}
-	for _, want := range []string{"version 0.2.0-1a2b3c4", "mistgate-node-linux-amd64", "mistgate-node-linux-arm64", "signed with key " + buildinfo.KeyFingerprint(pub)} {
+	for _, want := range []string{"version v0.1.4", "mistgate-node-linux-amd64", "mistgate-node-linux-arm64", "signed with key " + buildinfo.KeyFingerprint(pub)} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
@@ -160,6 +168,7 @@ func TestReleaseSignRoundTrip(t *testing.T) {
 }
 
 func TestReleaseSignRefusals(t *testing.T) {
+	setBuildVersion(t, "1.0.0")
 	keyFile, _ := newKeyFile(t)
 	_, good := makeBinaries(t, "mistgate-node-linux-amd64")
 	_, noPlatform := makeBinaries(t, "mistgate-node")
@@ -216,8 +225,24 @@ func TestReleaseSignRefusals(t *testing.T) {
 	}
 }
 
+func TestReleaseSignRequiresPanelVersion(t *testing.T) {
+	setBuildVersion(t, "v0.1.4")
+	keyFile, _ := newKeyFile(t)
+	_, bins := makeBinaries(t, "mistgate-node-linux-amd64")
+	outDir := filepath.Join(t.TempDir(), "dist")
+	args := []string{"--key", keyFile, "--version", "0.1.0-d5293c2", "--built", "1789000000", bins[0], "--out", outDir}
+	err := releaseSign(args, &bytes.Buffer{}, time.Unix(1_790_000_000, 0))
+	if err == nil || !strings.Contains(err.Error(), `must match this panel build's version "v0.1.4"`) {
+		t.Fatalf("mismatched version error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "manifest.json")); err == nil {
+		t.Fatal("a manifest was written with a version that differs from the panel")
+	}
+}
+
 // --out may be the directory the binaries already sit in; --expires takes days or a Go duration.
 func TestReleaseSignInPlaceAndExpires(t *testing.T) {
+	setBuildVersion(t, "1.0.0")
 	keyFile, pubB64 := newKeyFile(t)
 	dir, bins := makeBinaries(t, "mistgate-node-linux-amd64")
 	now := time.Unix(1_790_000_000, 0)

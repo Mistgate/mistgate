@@ -67,6 +67,10 @@ message Node {
   WarpSummary warp = 19;
   // Building the AmneziaWG kernel module on the node.
   AwgPrepare awg_prepare = 20;
+  // Whether the node blocks recognized BitTorrent traffic.
+  bool torrent_blocker_enabled = 21;
+  // The connected or last-seen agent lists "torrentguard/1".
+  bool torrent_blocker_supported = 22;
 }
 
 enum AwgPrepareState {
@@ -226,6 +230,8 @@ message UpdateNodeRequest {
   // "auto" | "kernel" | "userspace". Needs an agent with "awg/1" while the node has awg inbounds
   // (FAILED_PRECONDITION "agent too old" otherwise).
   optional string awg_backend = 10;
+  // Requires an agent with "torrentguard/1" when true. Disabling is always allowed.
+  optional bool torrent_blocker_enabled = 11;
 }
 
 message DnsResolvers {

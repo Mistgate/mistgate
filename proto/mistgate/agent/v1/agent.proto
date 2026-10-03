@@ -757,6 +757,8 @@ message NodeSettings {
   // loaded (the agent installs no packages), else userspace. kernel = fail awg inbounds with
   // awg_backend_unavailable when the module is missing. Read only by agents with "awg/1".
   string awg_backend = 7;
+  // Blocks recognized BitTorrent protocols. Read only by agents with "torrentguard/1".
+  bool torrent_blocker_enabled = 8;
 }
 
 message DesiredState {

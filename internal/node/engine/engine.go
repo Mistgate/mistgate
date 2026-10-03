@@ -85,6 +85,9 @@ type Collected struct {
 // touch nftables, sysctl, the resolver configuration or certificates directly.
 type Env struct {
 	Log *slog.Logger
+	// Event reports protocol-level detections to the owning agent. Implementations must keep event parameters
+	// bounded and must not include credentials or other secrets.
+	Event func(Event)
 	// Certs issues/renews certificates per inbound (ACME domain, ACME IP, self-signed).
 	Certs CertSource
 	// Egress returns the outbound for InboundSpec.Egress: "direct", or "warp" (the WARP manager's, bound to the
@@ -97,6 +100,14 @@ type Env struct {
 	// for HTTP/3 (the core's MasqHandler) and for TCP 443 (hysteria extras/masq.MasqTCPServer).
 	Masquerade func(inboundID string) http.Handler
 	Now        func() time.Time
+}
+
+// Event is a small, protocol-neutral signal from an engine to the node agent.
+type Event struct {
+	Code      string
+	InboundID string
+	Warning   bool
+	Params    map[string]string
 }
 
 // Factory builds an engine; registered from main: engine.Register("hysteria2", hysteria2.New).
