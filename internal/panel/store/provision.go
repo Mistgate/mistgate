@@ -95,6 +95,16 @@ func (s *Store) NodeProvisionJob(ctx context.Context, id string) (NodeProvisionJ
 		`SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE id = ?`, id))
 }
 
+// NodeProvisionJobState reads only the durable worker state, without loading the encrypted credential blob.
+func (s *Store) NodeProvisionJobState(ctx context.Context, id string) (string, error) {
+	var state string
+	err := s.R.QueryRowContext(ctx, `SELECT state FROM node_provision_job WHERE id = ?`, id).Scan(&state)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return state, err
+}
+
 // NodeProvisionJobs returns the most recently changed jobs, newest first.
 func (s *Store) NodeProvisionJobs(ctx context.Context, limit int) ([]NodeProvisionJob, error) {
 	if limit < 1 || limit > 100 {
@@ -249,6 +259,37 @@ func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, 
 		return false, err
 	}
 	return true, nil
+}
+
+// cancelNodeProvisionForRetiredNode releases a name reserved by an install
+// whose node is being retired. The job may already have changed the host, so
+// preserve the remote-outcome warning while clearing its saved credentials.
+func cancelNodeProvisionForRetiredNode(ctx context.Context, tx *sql.Tx, nodeID string, now time.Time) error {
+	var jobID string
+	err := tx.QueryRowContext(ctx, `SELECT id FROM node_provision_job
+		WHERE node_id = ? AND state IN ('queued', 'running', 'cancel_requested')`, nodeID).Scan(&jobID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+		SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
+		WHERE id = ? AND state IN ('queued', 'running', 'cancel_requested')`, unix(now), jobID)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed != 1 {
+		return ErrConflict
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+		VALUES (?, 'cancelled', 'remote_outcome_unknown', ?)`, jobID, unix(now))
+	return err
 }
 
 // ClaimNodeProvisionJob atomically claims the oldest queued job for the single panel worker.

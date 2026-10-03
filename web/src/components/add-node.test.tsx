@@ -157,7 +157,9 @@ describe("the add-node window", () => {
     await click(button("Check server"));
     await settle();
     expect(text()).toContain("from the panel server");
-    expect(text()).toContain("allow TCP access from the panel server");
+    expect(text()).toContain("allow inbound TCP from the panel server's public egress IP");
+    expect(text()).toContain("If the host firewall blocks SSH, use provider console or recovery access to open it first");
+    expect(text()).toContain("provider rules must be changed in provider controls");
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
@@ -203,6 +205,8 @@ describe("the add-node window", () => {
       username: "root",
     });
     expect(text()).toContain("Server checks passed");
+    expect(text()).toContain("After SSH succeeds");
+    expect(text()).toContain("An inactive firewall stays inactive");
     expect(passwords().value).toBe("");
 
     await type(passwords(), "install-secret");

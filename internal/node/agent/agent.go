@@ -134,6 +134,7 @@ type Agent struct {
 	warpRouteErr        string
 	warpNoted           bool
 	tunUsed, warpRouted bool
+	hostFirewallErr     string // Last reported host-firewall sync failure; worker-owned.
 
 	// Timing knobs; tests shorten them.
 	statsEvery   time.Duration // 0 = NodeSettings.stats_interval_s

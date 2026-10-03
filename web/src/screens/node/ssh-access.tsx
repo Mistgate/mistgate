@@ -1,0 +1,153 @@
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { isStepUpCancelled, useStepUp } from "@/components/step-up";
+import { Button } from "@/components/ui/button";
+import { SectionLabel } from "@/components/ui/bits";
+import { useToast } from "@/components/ui/toast";
+import { useT } from "@/i18n";
+import { errorText } from "@/lib/errors";
+import { provisioning } from "@/lib/api";
+
+export function SSHAccessCard({ nodeId }: { nodeId: string }) {
+  return <SSHAccessCardContent key={nodeId} nodeId={nodeId} />;
+}
+
+function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
+  const t = useT();
+  const toast = useToast();
+  const guard = useStepUp();
+  const [password, setPassword] = useState("");
+  const [passwordNodeId, setPasswordNodeId] = useState("");
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const cardRef = useRef<HTMLElement>(null);
+  const expiryTimer = useRef<number | undefined>(undefined);
+  const revealEpoch = useRef(0);
+  const showingPassword = visible && passwordNodeId === nodeId;
+  const access = useQuery({
+    queryKey: ["node-server-access", nodeId],
+    queryFn: async ({ signal }) => {
+      const response = await provisioning.listNodeServerAccess({}, { signal });
+      return response.access.find((item) => item.nodeId === nodeId) ?? null;
+    },
+    staleTime: 60_000,
+  });
+
+  const clearSecret = useCallback(() => {
+    revealEpoch.current += 1;
+    if (expiryTimer.current !== undefined) {
+      window.clearTimeout(expiryTimer.current);
+      expiryTimer.current = undefined;
+    }
+    setVisible(false);
+    setPassword("");
+    setPasswordNodeId("");
+    setBusy(false);
+  }, []);
+
+  useEffect(() => {
+    const accessLoaded = access.data !== undefined || access.isError;
+    if (!accessLoaded) return;
+    const panel = cardRef.current?.closest<HTMLElement>('[role="tabpanel"]');
+    const clearIfInactive = () => {
+      if (document.visibilityState === "hidden" || panel?.hidden || panel?.getAttribute("aria-hidden") === "true") {
+        clearSecret();
+      }
+    };
+    const observer = panel ? new MutationObserver(clearIfInactive) : undefined;
+    if (panel) observer?.observe(panel, { attributes: true, attributeFilter: ["hidden", "aria-hidden"] });
+    document.addEventListener("visibilitychange", clearIfInactive);
+    window.addEventListener("pagehide", clearSecret);
+    return () => {
+      revealEpoch.current += 1;
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", clearIfInactive);
+      window.removeEventListener("pagehide", clearSecret);
+      if (expiryTimer.current !== undefined) window.clearTimeout(expiryTimer.current);
+      expiryTimer.current = undefined;
+    };
+  }, [access.data, access.isError, clearSecret]);
+
+  async function reveal() {
+    const requestedNodeId = nodeId;
+    const epoch = ++revealEpoch.current;
+    setBusy(true);
+    try {
+      const response = await guard(() => provisioning.revealNodeServerPassword({ nodeId: requestedNodeId }));
+      const panel = cardRef.current?.closest<HTMLElement>('[role="tabpanel"]');
+      if (
+        epoch !== revealEpoch.current ||
+        document.visibilityState === "hidden" ||
+        panel?.hidden ||
+        panel?.getAttribute("aria-hidden") === "true"
+      ) {
+        return;
+      }
+      setPassword(response.password);
+      setPasswordNodeId(requestedNodeId);
+      setVisible(true);
+      if (expiryTimer.current !== undefined) window.clearTimeout(expiryTimer.current);
+      expiryTimer.current = window.setTimeout(() => {
+        expiryTimer.current = undefined;
+        if (epoch === revealEpoch.current) clearSecret();
+      }, 60_000);
+    } catch (error) {
+      if (epoch === revealEpoch.current && !isStepUpCancelled(error)) toast.error(errorText(error, t));
+    } finally {
+      if (epoch === revealEpoch.current) setBusy(false);
+    }
+  }
+
+  if (!access.data && !access.isError) return null;
+
+  return (
+    <section ref={cardRef} className="rounded-card-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionLabel as="h2" icon="server" tone="sky">
+          {t("node.sshAccess.title")}
+        </SectionLabel>
+        {access.data && (
+          <Button variant="secondary" size="md" disabled={busy} onClick={() => (showingPassword ? clearSecret() : void reveal())}>
+            {busy ? t("common.loading") : showingPassword ? t("node.sshAccess.hide") : t("node.sshAccess.show")}
+          </Button>
+        )}
+      </div>
+      {access.isError ? (
+        <p role="alert" className="mt-3 text-[13px] text-danger">
+          {t("node.sshAccess.loadFailed")}
+        </p>
+      ) : access.data ? (
+        <>
+          <p className="mt-2 text-[13px] leading-snug text-muted">{t("node.sshAccess.body")}</p>
+          <dl className="mt-3 grid gap-2 text-[13px] sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-muted">{t("node.sshAccess.host")}</dt>
+              <dd className="mt-0.5 break-all font-mono">{access.data.host}:{access.data.port}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">{t("node.sshAccess.username")}</dt>
+              <dd className="mt-0.5 break-all font-mono">{access.data.username}</dd>
+            </div>
+          </dl>
+          {showingPassword && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              <label htmlFor={`ssh-password-${nodeId}`} className="text-xs font-semibold text-muted">
+                {t("node.sshAccess.password")}
+              </label>
+              <input
+                id={`ssh-password-${nodeId}`}
+                type="text"
+                value={password}
+                readOnly
+                autoComplete="off"
+                spellCheck={false}
+                className="min-h-11 rounded-xl border border-line bg-inset px-3 font-mono text-sm text-main outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+              <p className="text-xs leading-snug text-muted">{t("node.sshAccess.revealHint")}</p>
+            </div>
+          )}
+        </>
+      ) : null}
+    </section>
+  );
+}

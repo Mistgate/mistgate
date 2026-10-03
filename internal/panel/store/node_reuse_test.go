@@ -55,6 +55,24 @@ func TestRetiredNodeAndFinishedProvisionNamesCanBeReused(t *testing.T) {
 		VALUES ('prv_old', 'complete', 'installed', 2)`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := st.W.ExecContext(ctx, `
+		INSERT INTO node (id, name, address, state, created_at, retired_at)
+		VALUES ('nod_retired_active', 'de2', 'de2.example.com', 'retired', 1, 3)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `
+		INSERT INTO node_provision_job (
+			id, node_id, name, address, ssh_host, ssh_port, host_fingerprint, secret,
+			state, phase, created_by, created_at, updated_at
+		) VALUES ('prv_active_old', 'nod_retired_active', 'de2', 'de2.example.com', '192.0.2.2', 22,
+			'SHA256:active', x'CAFE', 'running', 'install', 'adm_old', 1, 2)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `
+		INSERT INTO node_provision_event (job_id, phase, code, created_at)
+		VALUES ('prv_active_old', 'install', 'starting_agent', 2)`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := provider.Up(ctx); err != nil {
 		t.Fatalf("apply name reuse migration: %v", err)
 	}
@@ -65,6 +83,14 @@ func TestRetiredNodeAndFinishedProvisionNamesCanBeReused(t *testing.T) {
 	}
 	if got := countT(t, st, `SELECT count(*) FROM node_provision_event WHERE job_id = 'prv_old' AND code = 'installed'`); got != 1 {
 		t.Fatalf("finished install event count = %d, want 1", got)
+	}
+	var oldJob NodeProvisionJob
+	oldJob, err = st.NodeProvisionJob(ctx, "prv_active_old")
+	if err != nil || oldJob.State != "cancelled" || oldJob.ErrorCode != "remote_outcome_unknown" || len(oldJob.Secret) != 0 {
+		t.Fatalf("retired node's active install after migration = %+v, err %v", oldJob, err)
+	}
+	if got := countT(t, st, `SELECT count(*) FROM node_provision_event WHERE job_id = 'prv_active_old' AND code = 'remote_outcome_unknown'`); got != 1 {
+		t.Fatalf("retired install cancellation event count = %d, want 1", got)
 	}
 	var foreignKeyProblems int
 	rows, err := st.W.QueryContext(ctx, `PRAGMA foreign_key_check`)
@@ -124,5 +150,49 @@ func TestRetiredNodeAndFinishedProvisionNamesCanBeReused(t *testing.T) {
 	}
 	if err := st.CreateNodeProvisionJob(ctx, makeJob("prv_retry")); err != nil {
 		t.Fatalf("reuse a finished SSH name: %v", err)
+	}
+	de2Job := makeJob("prv_de2_reused")
+	de2Job.Name, de2Job.NodeID, de2Job.Address = "de2", "nod_de2_reused", "new-de2.example.com"
+	if err := st.CreateNodeProvisionJob(ctx, de2Job); err != nil {
+		t.Fatalf("reuse a name whose retired install was cleaned during migration: %v", err)
+	}
+}
+
+func TestRetiringNodeCancelsActiveProvisionAndReleasesName(t *testing.T) {
+	ctx := context.Background()
+	st := openTemp(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `
+		INSERT INTO node (id, name, address, state, created_at)
+		VALUES ('nod_inflight', 'edge-1', 'edge.example.com', 'pending', ?)`, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	job := NodeProvisionJob{
+		ID: "prv_inflight", NodeID: "nod_inflight", Name: "edge-1", Address: "edge.example.com",
+		SSHHost: "192.0.2.1", SSHPort: 22, HostFingerprint: "SHA256:pin", Secret: []byte("encrypted"),
+		CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now,
+	}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
+		t.Fatalf("claim install: ok=%v err=%v", ok, err)
+	}
+	if err := st.RetireNode(ctx, job.NodeID, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := st.NodeProvisionJob(ctx, job.ID)
+	if err != nil || loaded.State != "cancelled" || loaded.Phase != "cancelled" || loaded.ErrorCode != "remote_outcome_unknown" || len(loaded.Secret) != 0 {
+		t.Fatalf("retired install = %+v, err %v", loaded, err)
+	}
+	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 10)
+	if err != nil || len(events) != 3 || events[2].Phase != "cancelled" || events[2].Code != "remote_outcome_unknown" {
+		t.Fatalf("retired install events = %+v, err %v", events, err)
+	}
+	reused := job
+	reused.ID, reused.NodeID, reused.Address = "prv_reused", "nod_reused", "new.example.com"
+	reused.Secret = []byte("new-encrypted")
+	if err := st.CreateNodeProvisionJob(ctx, reused); err != nil {
+		t.Fatalf("create a new install with the retired node's name: %v", err)
 	}
 }

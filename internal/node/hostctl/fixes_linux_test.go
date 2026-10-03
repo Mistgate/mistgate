@@ -22,6 +22,8 @@ func fixHost(t *testing.T, resolvedActive bool) (*linuxHost, *[]call, string) {
 		line := strings.Join(args, " ")
 		*calls = append(*calls, call{stdin, name, line})
 		switch {
+		case name == "ufw" && line == "status":
+			return []byte("Status: inactive\n"), nil
 		case name == "systemctl" && line == "is-active --quiet systemd-resolved":
 			if resolvedActive {
 				return nil, nil

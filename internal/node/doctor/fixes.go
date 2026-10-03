@@ -75,18 +75,66 @@ func (d *Doctor) Apply(ctx context.Context, fixID string, dryRun bool, params ma
 	}
 }
 
-// reconnect_warp reinitializes only a configured tunnel that Doctor still sees as down. The manager preserves its
-// current account and routes, and the caller re-runs warp_path after the operation.
+// reconnect_warp retries the current health check when a configured tunnel is up/starting but its latest check failed.
+// It reconnects only when that check reaches the manager's failure threshold and leaves the tunnel down.
 func fixReconnectWarp(ctx context.Context, e *Env, dry bool, params map[string]string) FixOutcome {
 	if !noParams(params) {
 		return FixOutcome{Err: ErrBadParams}
 	}
-	if e.Warp == nil || e.ReconnectWarp == nil {
+	if e.Warp == nil {
 		return FixOutcome{Err: ErrUnsupportedHost}
 	}
 	w := e.Warp(ctx)
-	if !w.Configured || w.State != "down" {
-		return noop("WARP is no longer down; no reconnect is needed")
+	if !w.Configured {
+		return noop("WARP is no longer configured; no repair is needed")
+	}
+	if (w.State == "up" || w.State == "starting") && warpHasCurrentFailure(w.LastError) {
+		if e.RecheckWarp == nil {
+			return FixOutcome{Err: ErrUnsupportedHost}
+		}
+		if dry {
+			return FixOutcome{OK: true, Affected: 1, Params: p("state", w.State), Detail: "would rerun WARP health checks and reconnect only if the existing failure threshold makes the tunnel down"}
+		}
+		rechecked, thresholdDown, err := e.RecheckWarp(ctx)
+		if err != nil {
+			return failed(err)
+		}
+		if !rechecked && !thresholdDown {
+			return noop("WARP no longer needs a health check; no tunnel change was made")
+		}
+
+		// A recheck can be the third consecutive failure. Require the manager's explicit threshold result and current
+		// Down state; Reconnect also has its own Down-state and host-route ownership guards.
+		latest := e.Warp(ctx)
+		if thresholdDown && latest.Configured && latest.State == "down" {
+			if e.ReconnectWarp == nil {
+				return FixOutcome{Err: ErrUnsupportedHost}
+			}
+			reconnected, err := e.ReconnectWarp(ctx)
+			if err != nil {
+				return failed(err)
+			}
+			if !reconnected {
+				return noop("WARP recovered before the guarded reconnect; no change was made")
+			}
+			return FixOutcome{OK: true, Affected: 1, Params: p("state", "starting"), Detail: "WARP reached its failure threshold; the guarded reconnect started"}
+		}
+		if !rechecked {
+			return noop("WARP is no longer down at the failure threshold; no tunnel change was made")
+		}
+		if (latest.State == "up" || latest.State == "starting") && warpHasCurrentFailure(latest.LastError) {
+			return FixOutcome{OK: true, Affected: 1, Params: p("state", latest.State), Detail: "WARP health check still fails below the automatic failure threshold; the tunnel was not restarted"}
+		}
+		if latest.State == "down" {
+			return FixOutcome{OK: true, Affected: 1, Params: p("state", latest.State), Detail: "WARP is Down, but this check did not reach the failure threshold; no reconnect was started"}
+		}
+		return FixOutcome{OK: true, Affected: 1, Params: p("state", latest.State), Detail: "WARP health check rerun; the tunnel was not restarted"}
+	}
+	if w.State != "down" {
+		return noop("WARP is no longer failing; no reconnect is needed")
+	}
+	if e.ReconnectWarp == nil {
+		return FixOutcome{Err: ErrUnsupportedHost}
 	}
 	if dry {
 		return FixOutcome{OK: true, Affected: 1, Params: p("state", w.State), Detail: "would reconnect the configured WARP tunnel"}

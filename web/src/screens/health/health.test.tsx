@@ -166,7 +166,7 @@ describe("the node's Doctor tab", () => {
           fixId: "reconnect_warp",
           titleKey: "health.fix.reconnect_warp.plan",
           params: {},
-          detail: "would reconnect the configured WARP tunnel",
+          detail: "would rerun WARP health checks without restarting the tunnel",
           disruptive: true,
         },
         planId: "pln_warp",
@@ -174,14 +174,14 @@ describe("the node's Doctor tab", () => {
       .mockResolvedValueOnce({ applied: true, affected: 1, resultParams: {} });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
 
-    expect(button("Reconnect WARP")).toBeDefined();
+    expect(button("Check WARP / reconnect if down")).toBeDefined();
     expect([...document.querySelectorAll("a")].some((a) => a.textContent === "Open WARP")).toBe(true);
     expect(button("Check again")).toBeDefined();
-    await click(button("Reconnect WARP"));
+    await click(button("Check WARP / reconnect if down"));
     expect(applyFix.mock.calls[0]![0]).toMatchObject({ nodeId: "nod_1", fixId: "reconnect_warp", dryRun: true });
     const dialog = document.querySelector("[role=dialog]")!;
-    expect(dialog.textContent).toContain("Reconnect the configured WARP tunnel and reapply its routes.");
-    expect(dialog.textContent).toContain("Traffic from profiles using WARP on this node may pause briefly while the tunnel reconnects.");
+    expect(dialog.textContent).toContain("Rerun the WARP checks now; reconnect the configured tunnel and reapply its routes only if it is down.");
+    expect(dialog.textContent).toContain("If WARP is still down when applied, traffic from profiles using it may pause briefly while the tunnel reconnects.");
 
     await click(button("Apply"));
     expect(applyFix.mock.calls[1]![0]).toMatchObject({ nodeId: "nod_1", fixId: "reconnect_warp", dryRun: false, planId: "pln_warp" });

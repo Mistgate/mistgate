@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	probeTotalTimeout = 12 * time.Second
+	probeTotalTimeout = 20 * time.Second
 	probeBodyLimit    = 4096
 )
 
@@ -28,7 +28,7 @@ func (e *probeHTTPStatusError) Error() string { return fmt.Sprintf("%s: HTTP %d"
 // httpProber fetches the two probe URLs through dial (the tunnel egress). Plain HTTP on purpose: no TLS stack
 // needed, and a failure means the path, not a certificate.
 type httpProber struct {
-	dial       func(addr string) (net.Conn, error)
+	dial       func(context.Context, string, string) (net.Conn, error)
 	aURL, bURL string
 	timeout    time.Duration // per probe, dial included (probeTotalTimeout when zero)
 }
@@ -42,42 +42,21 @@ func (p *httpProber) limit() time.Duration {
 	return probeTotalTimeout
 }
 
-func (p *httpProber) client() *http.Client {
+func (p *httpProber) client(requestCtx context.Context) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy:             nil,
 			DisableKeepAlives: true,
-			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
-				return dialCtx(ctx, p.dial, addr)
+			DialContext: func(transportCtx context.Context, network, address string) (net.Conn, error) {
+				dialCtx, cancel := context.WithCancel(requestCtx)
+				stop := context.AfterFunc(transportCtx, cancel)
+				defer stop()
+				defer cancel()
+				return p.dial(dialCtx, network, address)
 			},
 			ResponseHeaderTimeout: p.limit(),
 		},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-}
-
-// dialCtx adapts the context-less egress dial: the dial runs in a goroutine and a connection that arrives after
-// the context ended is closed.
-func dialCtx(ctx context.Context, dial func(string) (net.Conn, error), addr string) (net.Conn, error) {
-	type res struct {
-		c   net.Conn
-		err error
-	}
-	ch := make(chan res, 1)
-	go func() {
-		c, err := dial(addr)
-		ch <- res{c, err}
-	}()
-	select {
-	case r := <-ch:
-		return r.c, r.err
-	case <-ctx.Done():
-		go func() {
-			if r := <-ch; r.c != nil {
-				r.c.Close()
-			}
-		}()
-		return nil, ctx.Err()
 	}
 }
 
@@ -89,7 +68,7 @@ func (p *httpProber) get(ctx context.Context, url string) (status int, body stri
 		return 0, "", err
 	}
 	req.Header.Set("User-Agent", "mistgate-node")
-	resp, err := p.client().Do(req)
+	resp, err := p.client(ctx).Do(req)
 	if err != nil {
 		return 0, "", err
 	}
@@ -130,6 +109,9 @@ func (p *httpProber) B(ctx context.Context) error {
 func probeFailureCode(err error, warpFlag string) string {
 	if err == nil {
 		switch warpFlag {
+		case "":
+			// Probe B is intentionally not Cloudflare and has no WARP trace flag.
+			return ""
 		case "on", "plus":
 			return ""
 		case "off":

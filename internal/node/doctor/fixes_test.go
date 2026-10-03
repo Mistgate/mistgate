@@ -42,6 +42,7 @@ type fixRig struct {
 	baseline          int
 	restarts          []string
 	warpReconnections int
+	warpRechecks      int
 }
 
 func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
@@ -68,6 +69,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 			e.RestartInbound = func(_ context.Context, id string) (uint32, error) { r.restarts = append(r.restarts, id); return 1, nil }
 			e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "down"} }
 			e.ReconnectWarp = func(context.Context) (bool, error) { r.warpReconnections++; return true, nil }
+			e.RecheckWarp = func(context.Context) (bool, bool, error) { r.warpRechecks++; return true, false, nil }
 			e.Inbounds = func() []Inbound {
 				return []Inbound{
 					{ID: "inb_1", Enabled: true, State: "failed", Network: "udp", Port: 443, Error: "address already in use"},
@@ -149,6 +151,109 @@ func TestReconnectWarpOnlyActsOnAStillDownTunnel(t *testing.T) {
 	})
 	if out := noLongerDown.Apply(context.Background(), FixReconnectWarp, false, nil); !out.OK || out.Params["noop"] != "1" {
 		t.Fatalf("stale fix should be a no-op: %+v", out)
+	}
+}
+
+func TestReconnectWarpRetriesCurrentFailureWithoutRestartingAnUpTunnel(t *testing.T) {
+	r, mk := newFixRig(t)
+	d := mk(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo {
+			return WarpInfo{Configured: true, State: "up", LastError: "probe_other_failed"}
+		}
+	})
+
+	plan := d.Apply(context.Background(), FixReconnectWarp, true, nil)
+	if !plan.OK || plan.Affected != 1 || !strings.Contains(plan.Detail, "only if the existing failure threshold") || r.warpRechecks != 0 {
+		t.Fatalf("recheck plan=%+v checks=%d", plan, r.warpRechecks)
+	}
+	out := d.Apply(context.Background(), FixReconnectWarp, false, nil)
+	if !out.OK || out.Affected != 1 || out.Params["state"] != "up" || !strings.Contains(out.Detail, "below the automatic failure threshold") || r.warpRechecks != 1 || r.warpReconnections != 0 {
+		t.Fatalf("recheck result=%+v checks=%d reconnects=%d", out, r.warpRechecks, r.warpReconnections)
+	}
+
+	noLongerFailing := mk(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "up"} }
+	})
+	if out := noLongerFailing.Apply(context.Background(), FixReconnectWarp, false, nil); !out.OK || out.Params["noop"] != "1" || r.warpRechecks != 1 {
+		t.Fatalf("stale recheck should be a no-op: %+v checks=%d", out, r.warpRechecks)
+	}
+}
+
+func TestReconnectWarpRechecksThenReconnectsOnlyAfterFailureThreshold(t *testing.T) {
+	r, mk := newFixRig(t)
+	state := "up"
+	d := mk(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo {
+			lastError := "probe_other_failed"
+			if state == "down" || state == "starting" {
+				lastError = "probe_other_failed; ladder: reassert"
+			}
+			return WarpInfo{Configured: true, State: state, LastError: lastError}
+		}
+		e.RecheckWarp = func(context.Context) (bool, bool, error) {
+			r.warpRechecks++
+			state = "down" // the recheck became the existing third consecutive failure
+			return true, true, nil
+		}
+		e.ReconnectWarp = func(context.Context) (bool, error) {
+			if state != "down" {
+				t.Fatalf("guarded reconnect called while WARP state is %q", state)
+			}
+			r.warpReconnections++
+			state = "starting"
+			return true, nil
+		}
+	})
+
+	plan := d.Apply(context.Background(), FixReconnectWarp, true, nil)
+	if !plan.OK || !strings.Contains(plan.Detail, "only if the existing failure threshold") || r.warpRechecks != 0 || r.warpReconnections != 0 {
+		t.Fatalf("threshold plan=%+v checks=%d reconnects=%d", plan, r.warpRechecks, r.warpReconnections)
+	}
+	out := d.Apply(context.Background(), FixReconnectWarp, false, nil)
+	if !out.OK || out.Affected != 1 || out.Params["state"] != "starting" || !strings.Contains(out.Detail, "failure threshold") ||
+		r.warpRechecks != 1 || r.warpReconnections != 1 || state != "starting" {
+		t.Fatalf("threshold result=%+v checks=%d reconnects=%d state=%s", out, r.warpRechecks, r.warpReconnections, state)
+	}
+}
+
+func TestReconnectWarpDoesNotReconnectDownStateWithoutThresholdSignal(t *testing.T) {
+	r, mk := newFixRig(t)
+	state := "up"
+	d := mk(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo {
+			return WarpInfo{Configured: true, State: state, LastError: "probe_other_failed"}
+		}
+		e.RecheckWarp = func(context.Context) (bool, bool, error) {
+			r.warpRechecks++
+			state = "down"
+			return true, false, nil
+		}
+	})
+
+	out := d.Apply(context.Background(), FixReconnectWarp, false, nil)
+	if !out.OK || out.Params["state"] != "down" || !strings.Contains(out.Detail, "did not reach the failure threshold") ||
+		r.warpRechecks != 1 || r.warpReconnections != 0 {
+		t.Fatalf("result=%+v checks=%d reconnects=%d", out, r.warpRechecks, r.warpReconnections)
+	}
+}
+
+func TestReconnectWarpUsesScheduledThresholdReachedBeforeDoctorRecheck(t *testing.T) {
+	r, mk := newFixRig(t)
+	state := "up"
+	d := mk(func(e *Env) {
+		e.Warp = func(context.Context) WarpInfo {
+			return WarpInfo{Configured: true, State: state, LastError: "probe_other_failed"}
+		}
+		e.RecheckWarp = func(context.Context) (bool, bool, error) {
+			r.warpRechecks++
+			state = "down" // the scheduled poll reached the threshold just before CheckNow
+			return false, true, nil
+		}
+	})
+
+	out := d.Apply(context.Background(), FixReconnectWarp, false, nil)
+	if !out.OK || out.Params["state"] != "starting" || r.warpRechecks != 1 || r.warpReconnections != 1 {
+		t.Fatalf("result=%+v checks=%d reconnects=%d", out, r.warpRechecks, r.warpReconnections)
 	}
 }
 

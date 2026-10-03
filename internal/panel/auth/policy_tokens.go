@@ -81,6 +81,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: true,
+	adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure: true,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     true,
 	adminv1connect.WarpServiceImportWarpProcedure:                       true,
 	adminv1connect.WarpServiceDeleteWarpProcedure:                       true,

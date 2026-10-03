@@ -126,7 +126,8 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	}
 	panelUpdater := update.NewGitHubPanelUpdater(update.PanelUpdateConfig{
 		CurrentVersion: buildinfo.Version, CurrentBuilt: buildinfo.BuiltUnix(), DataDir: o.dataDir,
-		ServiceUnit: o.updateService, Enabled: update.PanelUpdateHostSupported(), Log: log,
+		ServiceUnit: o.updateService, Enabled: update.PanelUpdateHostSupported(),
+		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
 	upd, err := update.New(st, fl, hl, update.Config{
 		DataDir: o.dataDir, Key: relKey, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),

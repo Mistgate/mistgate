@@ -120,6 +120,11 @@ func checkWarpPath(ctx context.Context, e *Env) Result {
 	if w.Colo != "" {
 		params["colo"] = w.Colo
 	}
+	if (w.State == "up" || w.State == "starting") && warpHasCurrentFailure(w.LastError) {
+		params["error"] = clip(w.LastError, 120)
+		return Result{Status: Warn, Code: CodeWarpCheckFailed, Params: params,
+			FixID: FixReconnectWarp, Detail: clip(w.State+" but the latest WARP check failed: "+w.LastError, 200)}
+	}
 	switch w.State {
 	case "up":
 		d := "up"
@@ -149,6 +154,16 @@ func checkWarpPath(ctx context.Context, e *Env) Result {
 		return Result{Status: Fail, Code: CodeWarpDown, FixID: FixReconnectWarp, Params: params, Detail: clip("down: "+orStr(w.LastError, "no handshake"), 200)}
 	}
 	return Result{Status: Warn, Code: CodeWarpUnknown, Params: params, Detail: "unknown state " + w.State}
+}
+
+// Health.LastError describes the latest check and is empty after a passing check. A ladder-only note records a
+// recovery action, not a failed check, so it must not turn an otherwise healthy path into a warning.
+func warpHasCurrentFailure(lastError string) bool {
+	reason := strings.TrimSpace(lastError)
+	if i := strings.Index(reason, "; ladder: "); i >= 0 {
+		reason = strings.TrimSpace(reason[:i])
+	}
+	return reason != "" && !strings.HasPrefix(reason, "ladder: ")
 }
 
 func orStr(s, def string) string {

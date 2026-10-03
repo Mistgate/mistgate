@@ -60,6 +60,9 @@ const (
 	// ProvisioningServiceRotateNodeServerPasswordProcedure is the fully-qualified name of the
 	// ProvisioningService's RotateNodeServerPassword RPC.
 	ProvisioningServiceRotateNodeServerPasswordProcedure = "/mistgate.admin.v1.ProvisioningService/RotateNodeServerPassword"
+	// ProvisioningServiceRevealNodeServerPasswordProcedure is the fully-qualified name of the
+	// ProvisioningService's RevealNodeServerPassword RPC.
+	ProvisioningServiceRevealNodeServerPasswordProcedure = "/mistgate.admin.v1.ProvisioningService/RevealNodeServerPassword"
 )
 
 // ProvisioningServiceClient is a client for the mistgate.admin.v1.ProvisioningService service.
@@ -73,6 +76,7 @@ type ProvisioningServiceClient interface {
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
+	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
 }
 
 // NewProvisioningServiceClient constructs a client for the mistgate.admin.v1.ProvisioningService
@@ -140,6 +144,12 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(provisioningServiceMethods.ByName("RotateNodeServerPassword")),
 			connect.WithClientOptions(opts...),
 		),
+		revealNodeServerPassword: connect.NewClient[v1.RevealNodeServerPasswordRequest, v1.RevealNodeServerPasswordResponse](
+			httpClient,
+			baseURL+ProvisioningServiceRevealNodeServerPasswordProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("RevealNodeServerPassword")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -154,6 +164,7 @@ type provisioningServiceClient struct {
 	listNodeProvisionEvents  *connect.Client[v1.ListNodeProvisionEventsRequest, v1.ListNodeProvisionEventsResponse]
 	listNodeServerAccess     *connect.Client[v1.ListNodeServerAccessRequest, v1.ListNodeServerAccessResponse]
 	rotateNodeServerPassword *connect.Client[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse]
+	revealNodeServerPassword *connect.Client[v1.RevealNodeServerPasswordRequest, v1.RevealNodeServerPasswordResponse]
 }
 
 // GetSSHFingerprint calls mistgate.admin.v1.ProvisioningService.GetSSHFingerprint.
@@ -201,6 +212,11 @@ func (c *provisioningServiceClient) RotateNodeServerPassword(ctx context.Context
 	return c.rotateNodeServerPassword.CallUnary(ctx, req)
 }
 
+// RevealNodeServerPassword calls mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword.
+func (c *provisioningServiceClient) RevealNodeServerPassword(ctx context.Context, req *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error) {
+	return c.revealNodeServerPassword.CallUnary(ctx, req)
+}
+
 // ProvisioningServiceHandler is an implementation of the mistgate.admin.v1.ProvisioningService
 // service.
 type ProvisioningServiceHandler interface {
@@ -213,6 +229,7 @@ type ProvisioningServiceHandler interface {
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
+	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
 }
 
 // NewProvisioningServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -276,6 +293,12 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		connect.WithSchema(provisioningServiceMethods.ByName("RotateNodeServerPassword")),
 		connect.WithHandlerOptions(opts...),
 	)
+	provisioningServiceRevealNodeServerPasswordHandler := connect.NewUnaryHandler(
+		ProvisioningServiceRevealNodeServerPasswordProcedure,
+		svc.RevealNodeServerPassword,
+		connect.WithSchema(provisioningServiceMethods.ByName("RevealNodeServerPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.ProvisioningService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProvisioningServiceGetSSHFingerprintProcedure:
@@ -296,6 +319,8 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 			provisioningServiceListNodeServerAccessHandler.ServeHTTP(w, r)
 		case ProvisioningServiceRotateNodeServerPasswordProcedure:
 			provisioningServiceRotateNodeServerPasswordHandler.ServeHTTP(w, r)
+		case ProvisioningServiceRevealNodeServerPasswordProcedure:
+			provisioningServiceRevealNodeServerPasswordHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -339,4 +364,8 @@ func (UnimplementedProvisioningServiceHandler) ListNodeServerAccess(context.Cont
 
 func (UnimplementedProvisioningServiceHandler) RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword is not implemented"))
 }

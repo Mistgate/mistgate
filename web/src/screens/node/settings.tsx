@@ -17,6 +17,7 @@ import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { AwgBackendCard } from "./awg-backend";
+import { SSHAccessCard } from "./ssh-access";
 import { WarpCard } from "./warp";
 
 // Defaults the panel uses when a timeout is 0 (node.proto, NodeTimeouts).
@@ -189,6 +190,8 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           </Button>
         </div>
       </form>
+
+      <SSHAccessCard nodeId={node.id} />
 
       {!retired && <AwgBackendCard data={data} />}
 

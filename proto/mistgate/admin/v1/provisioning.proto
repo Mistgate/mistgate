@@ -14,6 +14,7 @@ service ProvisioningService {
   rpc ListNodeProvisionEvents(ListNodeProvisionEventsRequest) returns (ListNodeProvisionEventsResponse);
   rpc ListNodeServerAccess(ListNodeServerAccessRequest) returns (ListNodeServerAccessResponse);
   rpc RotateNodeServerPassword(RotateNodeServerPasswordRequest) returns (RotateNodeServerPasswordResponse);
+  rpc RevealNodeServerPassword(RevealNodeServerPasswordRequest) returns (RevealNodeServerPasswordResponse);
 }
 
 message GetSSHFingerprintRequest {
@@ -147,3 +148,7 @@ message RotateNodeServerPasswordRequest {
   bool confirm = 3;
 }
 message RotateNodeServerPasswordResponse { bool rotated = 1; }
+
+// Owner-only, step-up protected retrieval. This procedure is deliberately not exposed as an MCP tool.
+message RevealNodeServerPasswordRequest { string node_id = 1; }
+message RevealNodeServerPasswordResponse { string password = 1; }

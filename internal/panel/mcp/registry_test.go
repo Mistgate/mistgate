@@ -148,8 +148,30 @@ func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
 	if properties["node_install_plan"]["password"] != nil || properties["node_server_password_rotate_plan"]["new_password"] != nil {
 		t.Fatal("password appeared in an MCP plan input")
 	}
-	if properties["node_install_apply"]["password"] == nil || properties["node_server_password_rotate_apply"]["new_password"] == nil {
-		t.Fatal("apply tools must accept their one-call secret inputs")
+	if properties["node_install_apply"]["password"] == nil {
+		t.Fatal("node installation must accept its one-call SSH credential")
+	}
+	if properties["node_server_password_rotate_apply"]["new_password"] != nil {
+		t.Fatal("the generated node password must never be an MCP input")
+	}
+	if properties["node_server_password_rotate_apply"]["confirm_token"] == nil {
+		t.Fatal("password rotation still requires an owner-approved plan")
+	}
+}
+
+func TestProvisioningRevealIsNotAnMCPProcedure(t *testing.T) {
+	if _, ok := auth.TokenAccess(adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure); ok {
+		t.Fatal("an MCP token can reach the panel-only password reveal procedure")
+	}
+	if !auth.NeedsStepUp(adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure) {
+		t.Fatal("password reveal does not require step-up")
+	}
+	for _, td := range registry {
+		for _, procedure := range td.procs {
+			if procedure == adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure {
+				t.Fatalf("%s exposes the panel-only SSH password reveal procedure", td.name)
+			}
+		}
 	}
 }
 

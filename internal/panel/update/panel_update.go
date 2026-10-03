@@ -33,12 +33,13 @@ const (
 	panelUpdateApplyTimeout    = 30 * time.Minute
 	panelUpdateGuardTimeout    = panelUpdateApplyTimeout + 5*time.Minute
 	panelUpdateApplyTimeoutArg = "30min"
+	panelUpdateHelperService   = "mistgate-panel-update.service"
 )
 
 var (
 	ErrNoPanelRelease    = errors.New("no stable panel release is published")
 	ErrNoPanelUpdate     = errors.New("the panel is already up to date")
-	ErrPanelUnsupported  = errors.New("panel self-update requires a root systemd installation")
+	ErrPanelUnsupported  = errors.New("panel self-update requires a supported systemd update path")
 	ErrPanelAssetMissing = errors.New("the latest release has no binary for this architecture")
 )
 
@@ -73,8 +74,11 @@ type PanelUpdateConfig struct {
 	DataDir        string
 	ServiceUnit    string
 	Executable     string
-	// Enabled is set only for a root Linux process with systemd available. Tests may set it explicitly.
+	// Enabled is set only for a supported Linux systemd installation. Tests may set it explicitly.
 	Enabled bool
+	// UseRootHelperService makes Install request the fixed, root-owned helper unit. It is used by non-root panel
+	// services; the helper independently fetches and verifies the release before replacing the panel.
+	UseRootHelperService bool
 	// APIURL, HTTPClient, Runner, OS, Arch and Now are injectable test seams. Production uses the fixed Mistgate
 	// endpoint, the default GitHub client and the host values.
 	APIURL     string
@@ -119,8 +123,11 @@ type GitHubPanelUpdater struct {
 	install sync.Mutex
 }
 
-// PanelUpdateHostSupported reports whether this process can use the root system service manager to replace the panel.
+// PanelUpdateHostSupported reports whether this installation has the required systemd update path.
 func PanelUpdateHostSupported() bool { return panelUpdateHostSupported() }
+
+// PanelUpdateUsesRootHelperService reports whether a non-root panel should request the fixed privileged helper unit.
+func PanelUpdateUsesRootHelperService() bool { return panelUpdateUsesRootHelperService() }
 
 // NewGitHubPanelUpdater creates a fail-closed checker. An unsupported installation can still read release metadata,
 // but the RPC never schedules a binary replacement for it.
@@ -292,29 +299,40 @@ func (u *GitHubPanelUpdater) Install(ctx context.Context) error {
 		}
 	}()
 
-	stagePath, err := u.downloadAndStage(ctx, asset, status.Version)
-	if err != nil {
-		u.setStatus(status, false, "download_failed")
-		return err
-	}
-	executable, err := filepath.Abs(u.cfg.Executable)
-	if err != nil || executable == "." {
-		_ = os.Remove(stagePath)
-		return ErrPanelUnsupported
-	}
-	unit := fmt.Sprintf("mistgate-panel-update-%d.service", u.now().UnixNano())
-	args := []string{
-		"--unit=" + unit, "--collect", "--no-block", "--property=Type=oneshot", "--property=TimeoutStartSec=" + panelUpdateApplyTimeoutArg, "--",
-		executable, "panel-update-helper", "--data-dir", u.cfg.DataDir, "--service", strings.TrimSpace(u.cfg.ServiceUnit),
-		"--sha256", strings.TrimPrefix(asset.Digest, "sha256:"),
-	}
 	runCtx, cancelRun := context.WithTimeout(context.Background(), 15*time.Second)
-	err = u.runner(runCtx, "systemd-run", args...)
+	if u.cfg.UseRootHelperService {
+		// The unit is root-owned and accepts no caller-supplied paths or checksums. It downloads the official asset
+		// itself so a process running as the panel user cannot substitute a binary or digest between verification and
+		// installation.
+		err = u.runner(runCtx, "systemctl", "start", "--no-block", panelUpdateHelperService)
+	} else {
+		stagePath, stageErr := u.downloadAndStage(ctx, asset, status.Version)
+		if stageErr != nil {
+			cancelRun()
+			u.setStatus(status, false, "download_failed")
+			return stageErr
+		}
+		executable, pathErr := filepath.Abs(u.cfg.Executable)
+		if pathErr != nil || executable == "." {
+			_ = os.Remove(stagePath)
+			cancelRun()
+			return ErrPanelUnsupported
+		}
+		unit := fmt.Sprintf("mistgate-panel-update-%d.service", u.now().UnixNano())
+		args := []string{
+			"--unit=" + unit, "--collect", "--no-block", "--property=Type=oneshot", "--property=TimeoutStartSec=" + panelUpdateApplyTimeoutArg, "--",
+			executable, "panel-update-helper", "--data-dir", u.cfg.DataDir, "--service", strings.TrimSpace(u.cfg.ServiceUnit),
+			"--sha256", strings.TrimPrefix(asset.Digest, "sha256:"),
+		}
+		err = u.runner(runCtx, "systemd-run", args...)
+		if err != nil {
+			_ = os.Remove(stagePath)
+		}
+	}
 	cancelRun()
 	if err != nil {
-		_ = os.Remove(stagePath)
 		u.setStatus(status, false, "schedule_failed")
-		return fmt.Errorf("schedule panel restart: %w", err)
+		return fmt.Errorf("schedule panel update: %w", err)
 	}
 	accepted = true
 	time.AfterFunc(panelUpdateGuardTimeout, func() {

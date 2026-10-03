@@ -46,6 +46,7 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	commands := make(chan string, 8)
 	uploaded := make(chan []byte, 1)
 	enrolled := make(chan string, 1)
+	firewallScript := make(chan []byte, 1)
 	passwords := make(chan string, 8)
 	var serverPasswordMu sync.Mutex
 	serverPassword := password
@@ -85,6 +86,12 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 				"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=1073741824",
 				"systemd=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=yes", "",
 			}, "\n")), nil
+		case strings.HasPrefix(command, "sh -s -- "):
+			data, err := io.ReadAll(channel)
+			if err == nil {
+				firewallScript <- data
+			}
+			return nil, err
 		case command == "cat > /root/mistgate-node.new":
 			data, err := io.ReadAll(channel)
 			if err == nil {
@@ -199,6 +206,24 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	if got := <-enrolled; got != token+"\n" {
 		t.Fatalf("enrollment token stdin = %q", got)
 	}
+	gotFirewallScript := <-firewallScript
+	if string(gotFirewallScript) != remoteFirewallPreparationScript {
+		t.Fatalf("host firewall script = %q", gotFirewallScript)
+	}
+	for _, rule := range []string{
+		`ufw allow "$ssh_port/tcp"`, "ufw allow 80/tcp", "ufw allow 443/tcp", "ufw allow 443/udp",
+		"80/tcp", "443/tcp", "443/udp", "firewall-cmd --reload",
+	} {
+		if !strings.Contains(string(gotFirewallScript), rule) {
+			t.Errorf("host firewall script does not include %q", rule)
+		}
+	}
+	if strings.Contains(string(gotFirewallScript), "10000:60000") || strings.Contains(string(gotFirewallScript), "10000-60000") {
+		t.Fatal("host firewall script opened the broad randomized AWG or hopping port range")
+	}
+	if strings.Contains(string(gotFirewallScript), "ufw enable") || strings.Contains(string(gotFirewallScript), "systemctl enable firewalld") {
+		t.Fatal("host firewall script enabled a firewall that may have been inactive")
+	}
 	manager.mu.Lock()
 	if manager.enrollmentToken != token || !manager.connected {
 		t.Fatalf("node manager state = token %q, connected %v", manager.enrollmentToken, manager.connected)
@@ -229,21 +254,24 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	_ = verified.Close()
 
 	close(commands)
-	commandCount := 0
+	var remoteCommands []string
 	for command := range commands {
-		commandCount++
+		remoteCommands = append(remoteCommands, command)
 		if strings.Contains(command, password) || strings.Contains(command, token) {
 			t.Fatalf("credential appeared in SSH command: %q", command)
 		}
 	}
-	if commandCount != 6 {
-		t.Fatalf("remote command count = %d, want 6", commandCount)
+	if len(remoteCommands) != 7 {
+		t.Fatalf("remote command count = %d, want 7: %q", len(remoteCommands), remoteCommands)
+	}
+	if remoteCommands[1] != "sh -s -- 22" || remoteCommands[2] != "cat > /root/mistgate-node.new" {
+		t.Fatalf("firewall preparation must follow preflight and precede transfer: %q", remoteCommands)
 	}
 	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 8 || events[0].Code != "created" || events[len(events)-1].Code != "agent_connected" {
+	if len(events) != 9 || events[0].Code != "created" || events[len(events)-1].Code != "agent_connected" {
 		t.Fatalf("provisioning journal = %+v", events)
 	}
 	for _, event := range events {
@@ -258,6 +286,64 @@ type e2eNodeManager struct {
 	state           string
 	enrollmentToken string
 	connected       bool
+}
+
+func TestWaitOnlineStopsWhenNodeIsRetired(t *testing.T) {
+	manager := &e2eNodeManager{state: "retired"}
+	svc := &Service{cfg: Config{Nodes: manager, WaitOnline: time.Minute, RetryDelay: 10 * time.Millisecond}}
+	started := time.Now()
+	err := svc.waitOnline(context.Background(), "nod_retired")
+	if !errors.Is(err, store.ErrNodeRetired) {
+		t.Fatalf("waitOnline error = %v, want retired node", err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatalf("waitOnline took too long to notice retirement: %s", time.Since(started))
+	}
+}
+
+func TestRetiringProvisionNodeCancelsWorkerContext(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `
+		INSERT INTO node (id, name, address, state, created_at)
+		VALUES ('nod_cancel_watch', 'cancel-watch', 'edge.example.com', 'pending', ?)`, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	job := store.NodeProvisionJob{
+		ID: "prv_cancel_watch", NodeID: "nod_cancel_watch", Name: "cancel-watch", Address: "edge.example.com",
+		SSHHost: "192.0.2.1", SSHPort: 22, HostFingerprint: "SHA256:pin", Secret: []byte("encrypted"),
+		CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now,
+	}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
+		t.Fatalf("claim install: ok=%v err=%v", ok, err)
+	}
+
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stopWatcher, watcherDone := make(chan struct{}), make(chan struct{})
+	svc := &Service{st: st}
+	go func() {
+		defer close(watcherDone)
+		svc.watchWorkerCancellation(workerCtx, job.ID, stopWatcher, cancel)
+	}()
+	if err := st.RetireNode(ctx, job.NodeID, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-workerCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("retiring the node did not cancel its active worker context")
+	}
+	close(stopWatcher)
+	<-watcherDone
 }
 
 func (m *e2eNodeManager) CreateProvisionEnrollment(_ context.Context, _ NodeSpec, _ string, _, _ time.Time) (string, string, error) {

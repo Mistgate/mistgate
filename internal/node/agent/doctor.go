@@ -70,6 +70,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 			}
 			return info
 		}
+		e.RecheckWarp = func(ctx context.Context) (bool, bool, error) { return w.CheckNow(ctx) }
 		e.HostPath = func(ctx context.Context) []doctor.PathFinding {
 			var out []doctor.PathFinding
 			for _, f := range w.Preflight(ctx) {

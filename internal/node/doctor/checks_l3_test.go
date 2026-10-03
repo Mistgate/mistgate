@@ -104,9 +104,28 @@ func TestWarpPathCheck(t *testing.T) {
 		want(t, r, OK, "")
 		code(t, r, CodeWarpUp, "colo", "FRA", "backend", "kernel", "state", "up")
 	})
+	t.Run("up with a failed latest probe warns", func(t *testing.T) {
+		f := newFake(t)
+		r := run(t, f.doctor(withInbounds(via), warpEnv(WarpInfo{Configured: true, State: "up", Backend: "kernel", LastError: "probe_cloudflare_failed; ladder: reassert"})), CheckWarpPath)
+		want(t, r, Warn, FixReconnectWarp)
+		param(t, r, "error", "probe_cloudflare_failed; ladder: reassert")
+		code(t, r, CodeWarpCheckFailed, "state", "up", "backend", "kernel")
+	})
 	t.Run("starting is not an alarm", func(t *testing.T) {
 		f := newFake(t)
 		code(t, run(t, f.doctor(withInbounds(via), warpEnv(WarpInfo{Configured: true, State: "starting"})), CheckWarpPath), CodeWarpStarting)
+	})
+	t.Run("starting with a failed current check warns", func(t *testing.T) {
+		f := newFake(t)
+		r := run(t, f.doctor(withInbounds(via), warpEnv(WarpInfo{Configured: true, State: "starting", LastError: "probe_other_failed"})), CheckWarpPath)
+		want(t, r, Warn, FixReconnectWarp)
+		code(t, r, CodeWarpCheckFailed, "state", "starting")
+	})
+	t.Run("a ladder note alone is not a failed check", func(t *testing.T) {
+		f := newFake(t)
+		r := run(t, f.doctor(withInbounds(via), warpEnv(WarpInfo{Configured: true, State: "up", LastError: "ladder: reassert"})), CheckWarpPath)
+		want(t, r, OK, "")
+		code(t, r, CodeWarpUp)
 	})
 	t.Run("down carries the last error", func(t *testing.T) {
 		f := newFake(t)

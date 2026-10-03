@@ -32,7 +32,7 @@ type Options struct {
 	HandshakeWait time.Duration
 	// ProbeAURL and ProbeBURL override the probe targets (tests); see DefaultProbeA and DefaultProbeB.
 	ProbeAURL, ProbeBURL string
-	// ProbeTimeout bounds one probe, dial included (12 s).
+	// ProbeTimeout bounds one probe, dial included (20 s by default).
 	ProbeTimeout time.Duration
 	// AllowPrivate lets the tunnel egress dial private and documentation-range addresses (tests, dev).
 	AllowPrivate bool
@@ -52,8 +52,9 @@ type Manager struct {
 	probe prober
 
 	mu      sync.Mutex
-	gen     uint64 // bumped when the tunnel is (re)built, so a probe result that raced with it is dropped
-	guarded bool   // the preflight passed once: the routing table and rule preferences are ours to use
+	checkMu sync.Mutex // healthTick and Doctor's immediate recheck must not count one probe round twice
+	gen     uint64     // bumped when the tunnel is (re)built, so a probe result that raced with it is dropped
+	guarded bool       // the preflight passed once: the routing table and rule preferences are ours to use
 	spec    *plugin.WarpSpec
 	ps      parsed
 	subnets []netip.Prefix
@@ -116,7 +117,7 @@ func newManager(o Options, plane dataplane, pr prober) *Manager {
 	}
 	m := &Manager{o: o, s: o.Settings.withDefaults(), log: o.Log, plane: plane, probe: pr}
 	if m.probe == nil {
-		m.probe = &httpProber{dial: m.probeDial, aURL: o.ProbeAURL, bURL: o.ProbeBURL, timeout: o.ProbeTimeout}
+		m.probe = &httpProber{dial: m.probeDialContext, aURL: o.ProbeAURL, bURL: o.ProbeBURL, timeout: o.ProbeTimeout}
 	}
 	return m
 }
@@ -211,6 +212,30 @@ func (m *Manager) Reconnect(ctx context.Context) (bool, error) {
 		}
 	}
 	return true, m.upLocked(ctx)
+}
+
+// CheckNow reruns one bounded health check only when the configured tunnel is up/starting and its latest check
+// failed. thresholdDown reports whether the manager is Down at the failure threshold, including when a scheduled
+// check reached the threshold just before this call. It serializes with the periodic check and never resets a tunnel.
+func (m *Manager) CheckNow(ctx context.Context) (checked, thresholdDown bool, err error) {
+	m.checkMu.Lock()
+	defer m.checkMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return false, false, err
+	}
+	m.mu.Lock()
+	needed := m.spec != nil && m.spec.Enabled && (m.state == StateUp || m.state == StateStarting) && m.h.LastError != ""
+	thresholdDown = m.spec != nil && m.spec.Enabled && m.state == StateDown && m.fails >= failuresToDown
+	failuresBefore := m.fails
+	m.mu.Unlock()
+	if !needed {
+		return false, thresholdDown, nil
+	}
+	m.healthTick(ctx)
+	m.mu.Lock()
+	thresholdDown = ctx.Err() == nil && m.state == StateDown && failuresBefore < failuresToDown && m.fails >= failuresToDown
+	m.mu.Unlock()
+	return true, thresholdDown, nil
 }
 
 func (m *Manager) removeLocked(ctx context.Context) error {
@@ -442,6 +467,8 @@ func (m *Manager) untilWake() time.Duration {
 
 // poll runs whatever is due. Exposed to the tests, which drive a fake clock with it.
 func (m *Manager) poll(ctx context.Context) {
+	m.checkMu.Lock()
+	defer m.checkMu.Unlock()
 	m.mu.Lock()
 	now := m.now()
 	watch := !m.watchUntil.IsZero() && !now.Before(m.watchUntil)
@@ -504,11 +531,17 @@ func (m *Manager) rotateLocked(ctx context.Context, now time.Time, why string) b
 	return true
 }
 
-// mayRotate: the recovery ladder moves the endpoint only when the previous move had HandshakeWait to work and the
-// tunnel did not handshake since: a fresh handshake with failing probes is not a port problem.
-func (m *Manager) mayRotate(now time.Time) bool {
-	hs := m.h.LastHandshake
-	return now.Sub(m.rotatedAt) >= m.o.HandshakeWait && !(handshakeFresh(hs, now) && hs.After(m.rotatedAt))
+// latestProbesBothFailed reports whether both probe results belong to the most recent health check and failed.
+func (m *Manager) latestProbesBothFailed() bool {
+	a, b := m.h.ProbeCloudflare, m.h.ProbeOther
+	return a != nil && b != nil && !a.OK && !b.OK &&
+		!m.h.CheckedAt.IsZero() && a.At.Equal(m.h.CheckedAt) && b.At.Equal(m.h.CheckedAt)
+}
+
+// mayRotateAfterDualProbeFailure requires the latest completed check to fail both probes, then keeps HandshakeWait
+// while allowing those data-plane failures to override a fresh handshake. The ladder calls this after reassertion.
+func (m *Manager) mayRotateAfterDualProbeFailure(now time.Time) bool {
+	return now.Sub(m.rotatedAt) >= m.o.HandshakeWait && m.latestProbesBothFailed()
 }
 
 // healthTick is one health check: device, routing, handshake age and the two probes.
@@ -555,6 +588,16 @@ func (m *Manager) healthTick(ctx context.Context) {
 		go func() { defer wg.Done(); t0 := time.Now(); flag, colo, aErr = m.probe.A(ctx); aTook = time.Since(t0) }()
 		go func() { defer wg.Done(); t0 := time.Now(); bErr = m.probe.B(ctx); bTook = time.Since(t0) }()
 		wg.Wait()
+	}
+	if ctx.Err() != nil {
+		m.mu.Lock()
+		interval := m.o.Interval
+		if m.state == StateStarting {
+			interval = m.o.FastInterval
+		}
+		m.nextTick = m.now().Add(interval)
+		m.mu.Unlock()
+		return
 	}
 
 	m.mu.Lock()
@@ -646,7 +689,7 @@ func (m *Manager) ladderStepLocked(ctx context.Context, now time.Time) {
 			m.note = "reassert"
 		}
 	case m.ladder < n:
-		if !m.mayRotate(now) || !m.rotateLocked(ctx, now, "ladder") {
+		if !m.mayRotateAfterDualProbeFailure(now) || !m.rotateLocked(ctx, now, "ladder") {
 			return // the same step again at the next failed check
 		}
 	case m.ladder == n:
@@ -659,7 +702,7 @@ func (m *Manager) ladderStepLocked(ctx context.Context, now time.Time) {
 		if now.Sub(m.ladderAt) < ladderCooldown {
 			// resting: no events, no API calls, but keep walking the endpoints one per failed check, so a tunnel
 			// whose outage ended comes back on whichever endpoint answers
-			if m.mayRotate(now) {
+			if m.mayRotateAfterDualProbeFailure(now) {
 				m.rotateLocked(ctx, now, "cooldown")
 			}
 			return
@@ -734,13 +777,4 @@ func (m *Manager) egressOpts() []egress.Option {
 		opts = append(opts, egress.AllowPrivate())
 	}
 	return opts
-}
-
-// probeDial is the dialer of the probes: the tunnel egress without the ErrNotActive gate, so a DOWN tunnel is still
-// measured and can come back.
-func (m *Manager) probeDial(addr string) (net.Conn, error) {
-	m.mu.Lock()
-	eg := m.egressLocked()
-	m.mu.Unlock()
-	return eg.TCP(addr)
 }

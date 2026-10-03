@@ -77,17 +77,18 @@ const (
 	CodeAwgForwardDrop = "awg_backend.forward_drop"
 	CodeAwgUnavailable = "awg_backend.unavailable"
 	// warp_path: state, backend, colo, inbounds, hint, error
-	CodeWarpNoManager  = "warp_path.no_manager"
-	CodeWarpUnused     = "warp_path.unused"
-	CodeWarpNoAccount  = "warp_path.not_configured"
-	CodeWarpHostClash  = "warp_path.host_clash"
-	CodeWarpUp         = "warp_path.up"
-	CodeWarpStarting   = "warp_path.starting"
-	CodeWarpNoBackend  = "warp_path.no_backend"
-	CodeWarpPausedUsed = "warp_path.paused_used"
-	CodeWarpPaused     = "warp_path.paused"
-	CodeWarpDown       = "warp_path.down"
-	CodeWarpUnknown    = "warp_path.unknown_state"
+	CodeWarpNoManager   = "warp_path.no_manager"
+	CodeWarpUnused      = "warp_path.unused"
+	CodeWarpNoAccount   = "warp_path.not_configured"
+	CodeWarpHostClash   = "warp_path.host_clash"
+	CodeWarpUp          = "warp_path.up"
+	CodeWarpCheckFailed = "warp_path.check_failed"
+	CodeWarpStarting    = "warp_path.starting"
+	CodeWarpNoBackend   = "warp_path.no_backend"
+	CodeWarpPausedUsed  = "warp_path.paused_used"
+	CodeWarpPaused      = "warp_path.paused"
+	CodeWarpDown        = "warp_path.down"
+	CodeWarpUnknown     = "warp_path.unknown_state"
 	// Any check: why it did not run. skip.unsupported has reason (English, from the host probe).
 	CodeSkipUnsupported = "skip.unsupported"
 	CodeSkipTimeout     = "skip.timeout"
@@ -109,7 +110,7 @@ var Codes = []string{
 	CodeMemUsage, CodeMemNoInfo, CodeCPULoad, CodeCPUCollecting,
 	CodeHeadersNoAwg, CodeHeadersContainer, CodeHeadersReady, CodeHeadersUserspace, CodeHeadersOptional, CodeHeadersMissing,
 	CodeAwgNone, CodeAwgNoEngine, CodeAwgRunning, CodeAwgForwardDrop, CodeAwgUnavailable,
-	CodeWarpNoManager, CodeWarpUnused, CodeWarpNoAccount, CodeWarpHostClash, CodeWarpUp, CodeWarpStarting,
+	CodeWarpNoManager, CodeWarpUnused, CodeWarpNoAccount, CodeWarpHostClash, CodeWarpUp, CodeWarpCheckFailed, CodeWarpStarting,
 	CodeWarpNoBackend, CodeWarpPausedUsed, CodeWarpPaused, CodeWarpDown, CodeWarpUnknown,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

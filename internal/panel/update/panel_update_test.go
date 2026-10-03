@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -109,6 +110,51 @@ func TestGitHubPanelUpdaterChecksStableReleaseAndSchedulesInstall(t *testing.T) 
 	}
 }
 
+func TestGitHubPanelUpdaterRequestsFixedRootHelperForNonRootService(t *testing.T) {
+	binary := minimalELF(elf.EM_X86_64)
+	releaseBody := releaseFixture(t, binary, "v1.2.0")
+	var releaseRequests, assetRequests int
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.Host {
+		case "api.github.com":
+			releaseRequests++
+			return githubResponse(http.StatusOK, releaseBody), nil
+		case "github.com":
+			assetRequests++
+			return githubResponse(http.StatusOK, binary), nil
+		default:
+			return nil, errors.New("unexpected host " + r.URL.Host)
+		}
+	})}
+	dataDir := t.TempDir()
+	var commands [][]string
+	updater := NewGitHubPanelUpdater(PanelUpdateConfig{
+		CurrentVersion: "v1.1.0", DataDir: dataDir, ServiceUnit: "mistgate.service",
+		Executable: filepath.Join(dataDir, "mistgate"), Enabled: true, UseRootHelperService: true,
+		OS: "linux", Arch: "amd64", HTTPClient: client,
+		Runner: func(_ context.Context, name string, args ...string) error {
+			commands = append(commands, append([]string{name}, args...))
+			return nil
+		},
+	})
+
+	if err := updater.Install(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if releaseRequests != 1 || assetRequests != 0 {
+		t.Fatalf("panel process GitHub requests: release=%d asset=%d", releaseRequests, assetRequests)
+	}
+	if len(commands) != 1 || strings.Join(commands[0], " ") != "systemctl start --no-block "+panelUpdateHelperService {
+		t.Fatalf("helper request = %#v", commands)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "panel-update.new")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unprivileged panel staged a binary for the root helper: %v", err)
+	}
+	if !updater.Status().Installing {
+		t.Fatal("accepted helper request did not retain the installing state")
+	}
+}
+
 func TestGitHubPanelUpdaterHandlesNoStableRelease(t *testing.T) {
 	updater := NewGitHubPanelUpdater(PanelUpdateConfig{
 		CurrentVersion: "v1.1.0", DataDir: t.TempDir(), ServiceUnit: "mistgate.service", Executable: "mistgate",
@@ -186,6 +232,96 @@ func TestGitHubPanelUpdaterRejectsTamperedDownloadBeforeScheduling(t *testing.T)
 	}
 }
 
+func TestRootHelperFetchesAndVerifiesOfficialReleaseBeforeApply(t *testing.T) {
+	newBinary := minimalELF(elf.EM_X86_64)
+	releaseBody := releaseFixture(t, newBinary, "v1.2.0")
+	var assetRequests int
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.Host {
+		case "api.github.com":
+			return githubResponse(http.StatusOK, releaseBody), nil
+		case "github.com":
+			assetRequests++
+			return githubResponse(http.StatusOK, newBinary), nil
+		default:
+			return nil, errors.New("unexpected host " + r.URL.Host)
+		}
+	})}
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	if err := os.Mkdir(dataDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "mistgate")
+	if err := os.WriteFile(target, []byte("previous"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var calls [][]string
+	err := installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
+		CurrentVersion: "v1.1.0", DataDir: dataDir, ServiceUnit: "mistgate.service", Executable: target,
+		Enabled: true, OS: "linux", Arch: "amd64", HTTPClient: client,
+	}, func(args ...string) error {
+		calls = append(calls, append([]string(nil), args...))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assetRequests != 1 {
+		t.Fatalf("official asset requests = %d, want 1", assetRequests)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != string(newBinary) {
+		t.Fatalf("installed binary = %x, %v", got, err)
+	}
+	got, err = os.ReadFile(target + ".prev")
+	if err != nil || string(got) != "previous" {
+		t.Fatalf("previous binary = %q, %v", got, err)
+	}
+	if len(calls) != 5 || strings.Join(calls[0], " ") != "stop mistgate.service" {
+		t.Fatalf("systemctl calls = %#v", calls)
+	}
+}
+
+func TestRootHelperRejectsTamperedOfficialAssetBeforeStoppingPanel(t *testing.T) {
+	binary := minimalELF(elf.EM_X86_64)
+	tampered := append([]byte(nil), binary...)
+	tampered[0] = 'x'
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host == "api.github.com" {
+			return githubResponse(http.StatusOK, releaseFixture(t, binary, "v1.2.0")), nil
+		}
+		return githubResponse(http.StatusOK, tampered), nil
+	})}
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	if err := os.Mkdir(dataDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "mistgate")
+	if err := os.WriteFile(target, []byte("previous"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var calls [][]string
+	err := installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
+		CurrentVersion: "v1.1.0", DataDir: dataDir, ServiceUnit: "mistgate.service", Executable: target,
+		Enabled: true, OS: "linux", Arch: "amd64", HTTPClient: client,
+	}, func(args ...string) error {
+		calls = append(calls, append([]string(nil), args...))
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "SHA-256") {
+		t.Fatalf("tampered release error = %v", err)
+	}
+	if len(calls) != 0 {
+		t.Fatalf("systemctl ran before checksum verification: %#v", calls)
+	}
+	got, readErr := os.ReadFile(target)
+	if readErr != nil || string(got) != "previous" {
+		t.Fatalf("installed binary changed before checksum verification: %q, %v", got, readErr)
+	}
+}
+
 func TestApplyPanelUpdateReplacesBinaryAndKeepsPreviousCopy(t *testing.T) {
 	root := t.TempDir()
 	dataDir := filepath.Join(root, "data")
@@ -243,6 +379,8 @@ func TestApplyPanelUpdateRollsBackWhenNewServiceDoesNotStayActive(t *testing.T) 
 	if err := os.WriteFile(database, []byte("old database"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	dataDirOwner := snapshotFileOwner(t, dataDir)
+	databaseOwner := snapshotFileOwner(t, database)
 	newBinary := minimalELF(elf.EM_X86_64)
 	if err := os.WriteFile(filepath.Join(dataDir, "panel-update.new"), newBinary, 0o700); err != nil {
 		t.Fatal(err)
@@ -278,9 +416,47 @@ func TestApplyPanelUpdateRollsBackWhenNewServiceDoesNotStayActive(t *testing.T) 
 	if readErr != nil || string(got) != "old database" {
 		t.Fatalf("restored database = %q, %v", got, readErr)
 	}
+	assertFileOwner(t, dataDir, dataDirOwner)
+	assertFileOwner(t, database, databaseOwner)
 	failed, readErr := os.ReadFile(target + ".failed")
 	if readErr != nil || string(failed) != string(newBinary) {
 		t.Fatalf("failed executable = %x, %v", failed, readErr)
+	}
+}
+
+type fileOwner struct {
+	uid, gid uint64
+	known    bool
+}
+
+func snapshotFileOwner(t *testing.T, path string) fileOwner {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sys := reflect.ValueOf(info.Sys())
+	if sys.Kind() == reflect.Pointer {
+		sys = sys.Elem()
+	}
+	if !sys.IsValid() || sys.Kind() != reflect.Struct {
+		return fileOwner{}
+	}
+	uid, gid := sys.FieldByName("Uid"), sys.FieldByName("Gid")
+	if !uid.IsValid() || !gid.IsValid() || uid.Kind() < reflect.Uint || uid.Kind() > reflect.Uint64 || gid.Kind() < reflect.Uint || gid.Kind() > reflect.Uint64 {
+		return fileOwner{}
+	}
+	return fileOwner{uid: uid.Uint(), gid: gid.Uint(), known: true}
+}
+
+func assertFileOwner(t *testing.T, path string, want fileOwner) {
+	t.Helper()
+	if !want.known {
+		return
+	}
+	got := snapshotFileOwner(t, path)
+	if !got.known || got.uid != want.uid || got.gid != want.gid {
+		t.Fatalf("restored ownership for %s = %+v, want %+v", path, got, want)
 	}
 }
 

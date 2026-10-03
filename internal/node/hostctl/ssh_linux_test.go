@@ -18,6 +18,8 @@ func scriptedRun(h *linuxHost, sshd, socket *string) *[]call {
 	h.run = func(_ context.Context, stdin, name string, args ...string) ([]byte, error) {
 		calls = append(calls, call{stdin, name, strings.Join(args, " ")})
 		switch {
+		case name == "ufw" && len(args) == 1 && args[0] == "status":
+			return []byte("Status: inactive\n"), nil
 		case name == "sshd" || name == "/usr/sbin/sshd":
 			if sshd == nil {
 				return nil, &exec.Error{Name: name, Err: exec.ErrNotFound}

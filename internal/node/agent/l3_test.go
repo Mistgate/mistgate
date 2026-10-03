@@ -127,6 +127,8 @@ type fakeWarp struct {
 	cleaned      bool
 	reconnects   int
 	reconnectErr error
+	checks       int
+	checkErr     error
 	health       *warp.Health
 	findings     []warp.Finding
 	ran          chan struct{}
@@ -154,6 +156,13 @@ func (w *fakeWarp) Reconnect(context.Context) (bool, error) {
 	w.reconnects++
 	w.ord.add("warp.reconnect")
 	return w.reconnectErr == nil, w.reconnectErr
+}
+
+func (w *fakeWarp) CheckNow(context.Context) (bool, bool, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.checks++
+	return w.checkErr == nil, false, w.checkErr
 }
 
 func (w *fakeWarp) reconnectCount() int {

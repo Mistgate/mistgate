@@ -3,18 +3,18 @@ title: Add a node
 description: Enroll a Linux server with the node agent, watch it come online, and remove it cleanly later.
 ---
 
-A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two paths: **Install automatically over SSH** or **Get a manual install command**. This page covers both and explains how to remove a node later. If the dialog opens directly on the name, country and address fields, update the panel first through **Settings → System**. A commit-tagged early build may need one manual update from the v0.1.0 release before it has this chooser; see [panel updates](../operations/updates.md).
+A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two paths: **Install automatically over SSH** or **Get a manual install command**. This page covers both and explains how to remove a node later. If the dialog opens directly on the name, country and address fields, update the panel first through **Settings → System**. An early commit build may need one manual update to the current stable release before it has this chooser; see [panel updates](../operations/updates.md).
 
 ## Automatic SSH installation
 
 In **Nodes → Add node**, press **Install automatically over SSH**. The four-step, owner-only wizard stays in the panel modal.
 
-1. Enter the server's SSH address and port. The connection is checked from the panel server; no login or password is sent at this step.
+1. Enter the server's SSH address and port. The connection is checked from the panel server; no login or password is sent at this step. If a provider firewall or security group blocks SSH, allow inbound TCP on this port from the panel server's public egress IP in the provider controls first. The panel cannot change that rule before SSH connects.
 2. Compare and confirm the SSH host-key fingerprint. Then enter the node name, client-facing address, login and password. Use `root` or an account with non-interactive `sudo -n`.
 3. The panel checks the operating system, architecture, systemd, available memory and disk, and the connection back to the panel. Review the results, enter the password again and confirm the install. The server is unchanged until that confirmation.
-4. The modal shows the agent transfer, systemd setup and wait for the node to connect.
+4. After confirmation, the panel prepares the SSH TCP port, TCP 80/443 and UDP 443 in an already-active UFW or firewalld on the host, then shows agent transfer, systemd setup and the wait for the node to connect. An inactive host firewall stays inactive. After the agent applies an enabled UDP inbound, it syncs that exact listener port and any accepted Hysteria2 hop range into active UFW. Firewalld listener rules still need to be added manually to the active zone. Provider firewall rules must also be changed separately.
 
-If the SSH check times out, allow inbound TCP access to the SSH port from the panel server's egress address in the server or hosting firewall. Temporary SSH credentials are encrypted while a job runs and cleared when it ends. After the agent connects, the owner can reuse the saved SSH access for password rotation; the password is encrypted at rest and never shown in the UI or MCP reads. A node name is reserved while the node is live or an SSH install is active. Retiring a node keeps its history but releases its name.
+If the SSH check times out, verify that SSH is running and allow inbound TCP on that port from the panel server's egress address in the provider firewall/security group. If the host firewall blocks SSH, use the provider console or recovery access to open it first. The wizard can prepare host firewall rules only after SSH connects; provider rules must be changed in provider controls. Temporary SSH credentials are encrypted while a job runs and cleared when it ends. After the agent connects, the owner can rotate or reveal the saved SSH password in node Settings after step-up verification. It is encrypted at rest and is never returned by MCP tools or read APIs. A node name is reserved while the node is live or an SSH install is active. Retiring a node keeps its history but releases its name.
 
 Cancel jobs, recover access and rotate SSH passwords in the install manager at `<admin URL>nodes/install`.
 

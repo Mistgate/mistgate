@@ -64,8 +64,8 @@ describe("WARP's last_error in words", () => {
     const w = describeWarpError(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")!;
     expect(w.head).toBe("Проверка через WARP до Cloudflare завершилась ошибкой.");
     expect(w.more).toContain("Туннель поднят");
-    expect(w.ladder).toBe("Пробую восстановить: переподключение.");
-    expect(warpErrorLine(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")).toBe("Проверка через WARP до Cloudflare завершилась ошибкой. Пробую восстановить: переподключение.");
+    expect(w.ladder).toBe("Пробую восстановить: возвращаю маршруты и правила.");
+    expect(warpErrorLine(tOf("ru"), "probe_cloudflare_failed; ladder: reassert")).toBe("Проверка через WARP до Cloudflare завершилась ошибкой. Пробую восстановить: возвращаю маршруты и правила.");
     expect(describeWarpError(tOf("en"), "warp_flag_off")!.head).toBe("Cloudflare answered, but the traffic does not go through WARP (warp=off).");
     expect(describeWarpError(tOf("ru"), "ladder: rotated to 162.159.192.1:500")!.ladder).toContain("162.159.192.1:500");
   });
@@ -75,7 +75,7 @@ describe("WARP's last_error in words", () => {
     expect(describeWarpError(t, "")).toBeNull();
     expect(describeWarpError(t, "brand_new_failure")).toEqual({ head: "", more: "", ladder: "", raw: "brand_new_failure" });
     expect(describeWarpError(t, "link_down; ladder: dance")).toMatchObject({ ladder: "", raw: "dance" });
-    expect(warpErrorLine(t, "brand_new_failure; ladder: reassert")).toBe("brand_new_failure Пробую восстановить: переподключение.");
+    expect(warpErrorLine(t, "brand_new_failure; ladder: reassert")).toBe("brand_new_failure Пробую восстановить: возвращаю маршруты и правила.");
   });
 
   it("knows every code the manager can set (read from the Go source, so a new code cannot be forgotten)", () => {

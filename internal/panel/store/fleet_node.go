@@ -340,6 +340,9 @@ func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error 
 			return err
 		}
 	}
+	if err := cancelNodeProvisionForRetiredNode(ctx, tx, id, now); err != nil {
+		return err
+	}
 	// A retired node takes no inbounds any more: its parked AWG server keys are dead weight.
 	if _, err := tx.ExecContext(ctx, `DELETE FROM awg_retained_key WHERE node_id = ?`, id); err != nil {
 		return err

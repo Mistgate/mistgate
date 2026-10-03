@@ -1398,6 +1398,95 @@ func (x *RotateNodeServerPasswordResponse) GetRotated() bool {
 	return false
 }
 
+// Owner-only, step-up protected retrieval. This procedure is deliberately not exposed as an MCP tool.
+type RevealNodeServerPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevealNodeServerPasswordRequest) Reset() {
+	*x = RevealNodeServerPasswordRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevealNodeServerPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevealNodeServerPasswordRequest) ProtoMessage() {}
+
+func (x *RevealNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevealNodeServerPasswordRequest.ProtoReflect.Descriptor instead.
+func (*RevealNodeServerPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RevealNodeServerPasswordRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type RevealNodeServerPasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Password      string                 `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevealNodeServerPasswordResponse) Reset() {
+	*x = RevealNodeServerPasswordResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevealNodeServerPasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevealNodeServerPasswordResponse) ProtoMessage() {}
+
+func (x *RevealNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevealNodeServerPasswordResponse.ProtoReflect.Descriptor instead.
+func (*RevealNodeServerPasswordResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RevealNodeServerPasswordResponse) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
 var File_mistgate_admin_v1_provisioning_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
@@ -1501,7 +1590,11 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\x12\x18\n" +
 	"\aconfirm\x18\x03 \x01(\bR\aconfirm\"<\n" +
 	" RotateNodeServerPasswordResponse\x12\x18\n" +
-	"\arotated\x18\x01 \x01(\bR\arotated2\xa2\b\n" +
+	"\arotated\x18\x01 \x01(\bR\arotated\":\n" +
+	"\x1fRevealNodeServerPasswordRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\">\n" +
+	" RevealNodeServerPasswordResponse\x12\x1a\n" +
+	"\bpassword\x18\x01 \x01(\tR\bpassword2\xa8\t\n" +
 	"\x13ProvisioningService\x12n\n" +
 	"\x11GetSSHFingerprint\x12+.mistgate.admin.v1.GetSSHFingerprintRequest\x1a,.mistgate.admin.v1.GetSSHFingerprintResponse\x12S\n" +
 	"\bCheckSSH\x12\".mistgate.admin.v1.CheckSSHRequest\x1a#.mistgate.admin.v1.CheckSSHResponse\x12q\n" +
@@ -1511,7 +1604,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x12ListNodeProvisions\x12,.mistgate.admin.v1.ListNodeProvisionsRequest\x1a-.mistgate.admin.v1.ListNodeProvisionsResponse\x12\x80\x01\n" +
 	"\x17ListNodeProvisionEvents\x121.mistgate.admin.v1.ListNodeProvisionEventsRequest\x1a2.mistgate.admin.v1.ListNodeProvisionEventsResponse\x12w\n" +
 	"\x14ListNodeServerAccess\x12..mistgate.admin.v1.ListNodeServerAccessRequest\x1a/.mistgate.admin.v1.ListNodeServerAccessResponse\x12\x83\x01\n" +
-	"\x18RotateNodeServerPassword\x122.mistgate.admin.v1.RotateNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RotateNodeServerPasswordResponseB\xcc\x01\n" +
+	"\x18RotateNodeServerPassword\x122.mistgate.admin.v1.RotateNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RotateNodeServerPasswordResponse\x12\x83\x01\n" +
+	"\x18RevealNodeServerPassword\x122.mistgate.admin.v1.RevealNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RevealNodeServerPasswordResponseB\xcc\x01\n" +
 	"\x15com.mistgate.admin.v1B\x11ProvisioningProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -1526,7 +1620,7 @@ func file_mistgate_admin_v1_provisioning_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_provisioning_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
 	(*GetSSHFingerprintRequest)(nil),         // 0: mistgate.admin.v1.GetSSHFingerprintRequest
 	(*GetSSHFingerprintResponse)(nil),        // 1: mistgate.admin.v1.GetSSHFingerprintResponse
@@ -1550,6 +1644,8 @@ var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
 	(*ListNodeServerAccessResponse)(nil),     // 19: mistgate.admin.v1.ListNodeServerAccessResponse
 	(*RotateNodeServerPasswordRequest)(nil),  // 20: mistgate.admin.v1.RotateNodeServerPasswordRequest
 	(*RotateNodeServerPasswordResponse)(nil), // 21: mistgate.admin.v1.RotateNodeServerPasswordResponse
+	(*RevealNodeServerPasswordRequest)(nil),  // 22: mistgate.admin.v1.RevealNodeServerPasswordRequest
+	(*RevealNodeServerPasswordResponse)(nil), // 23: mistgate.admin.v1.RevealNodeServerPasswordResponse
 }
 var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	3,  // 0: mistgate.admin.v1.CheckSSHResponse.preflight:type_name -> mistgate.admin.v1.NodePreflight
@@ -1568,17 +1664,19 @@ var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	14, // 13: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
 	18, // 14: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
 	20, // 15: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
-	1,  // 16: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
-	4,  // 17: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
-	7,  // 18: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
-	8,  // 19: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
-	10, // 20: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
-	12, // 21: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
-	16, // 22: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
-	19, // 23: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
-	21, // 24: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
-	16, // [16:25] is the sub-list for method output_type
-	7,  // [7:16] is the sub-list for method input_type
+	22, // 16: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:input_type -> mistgate.admin.v1.RevealNodeServerPasswordRequest
+	1,  // 17: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
+	4,  // 18: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
+	7,  // 19: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
+	8,  // 20: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
+	10, // 21: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
+	12, // 22: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
+	16, // 23: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
+	19, // 24: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
+	21, // 25: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
+	23, // 26: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:output_type -> mistgate.admin.v1.RevealNodeServerPasswordResponse
+	17, // [17:27] is the sub-list for method output_type
+	7,  // [7:17] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1595,7 +1693,7 @@ func file_mistgate_admin_v1_provisioning_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_provisioning_proto_rawDesc), len(file_mistgate_admin_v1_provisioning_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

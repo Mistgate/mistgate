@@ -71,6 +71,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.ProvisioningServiceListNodeProvisionEventsProcedure:  levelOwner,
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:     levelOwner,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: levelOwner, // SSH credentials need approval and step-up
+	adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure: levelOwner, // credential reveal is owner-only and needs step-up
 
 	adminv1connect.ProfileServiceListProtocolsProcedure:  levelRead,
 	adminv1connect.ProfileServiceListProfilesProcedure:   levelRead,

@@ -30,12 +30,12 @@
 
 ## Status
 
-Mistgate is in an early release (`v0.1.0`). It runs in production for its author, but the API, stored settings and node protocol may still change before 1.0. Linux panel binaries for amd64 and arm64 are available in [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest); build from source for other targets.
+Mistgate is in an early release (`v0.1.1`). It runs in production for its author, but the API, stored settings and node protocol may still change before 1.0. Linux panel binaries for amd64 and arm64 are available in [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest); build from source for other targets.
 
 | Stage | What |
 |:--|:--|
 | **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · GitHub panel self-update with checksum verification and rollback · API tokens and MCP server · admin UI in ru / en |
-| **M2 — shipped in v0.1.0** | Owner UI and approved MCP SSH install · root or passwordless-sudo login · pinned host-key preflight · encrypted saved SSH access and verified password rotation · cancellation and retry-safe durable jobs · encrypted Cloudflare R2 backups and restore · [M2 details](docs/en/roadmap/m2-ssh-provisioning.md) |
+| **M2 — shipped in v0.1.1** | Owner UI and approved MCP SSH install · root or passwordless-sudo login · pinned host-key preflight · encrypted saved SSH access and verified password rotation · cancellation and retry-safe durable jobs · encrypted Cloudflare R2 backups and restore · [M2 details](docs/en/roadmap/m2-ssh-provisioning.md) |
 | **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 

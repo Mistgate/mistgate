@@ -3,7 +3,7 @@ title: Updates
 description: How node agents update themselves from bundles you sign, how a staged rollout checks and rolls back nodes, and how the panel installs GitHub releases.
 ---
 
-Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. On root systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases.
+Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
 
 ## How trust works
 
@@ -185,9 +185,27 @@ Older agents keep working with a newer panel: changes to the agent protocol are 
 
 The Updates page checks the latest stable release from `Mistgate/mistgate` at startup and every six hours. Use **Check GitHub** to check immediately. The panel only downloads the matching Linux amd64 or arm64 asset after confirming its GitHub SHA-256 digest and ELF architecture.
 
-Automatic installation is available when the panel runs as root under systemd. The default unit is `mistgate.service`; set `MISTGATE_UPDATE_SERVICE` or pass `--update-service` if yours has another name. The owner must confirm with a fresh step-up, and an active node rollout must finish first. A detached systemd helper stops the panel, makes a backup of its data directory, replaces the binary and starts the panel. If the service does not stay active, it restores both the previous binary and the database backup. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`.
+Automatic installation is available to a root panel under systemd. A panel running as an unprivileged service user such as `mistgate` can use the fixed root helper below; the HTTP panel stays unprivileged. In either case, the owner must confirm with a fresh step-up, and an active node rollout must finish first. The helper fetches the official release metadata and binary itself, verifies GitHub's SHA-256 digest and ELF architecture, then stops the panel, backs up its data directory, replaces the binary and starts the panel. If the service does not stay active, it restores the previous binary and the data backup, including the original file ownership. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`.
 
-Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. The first stable release, `v0.1.0`, is available now. Early commit builds such as `0.1.0-<commit>` predate the panel updater, so they can show the release but cannot install it from this page. Replace that binary once using the matching `v0.1.0` asset from [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) and the manual steps below. Later builds can update from **Settings → System**: press **Check GitHub**, then **Update panel** when a newer release appears. Automatic installation requires root under systemd; use the manual steps for other installations.
+### Enable updates for a non-root panel service
+
+For a systemd panel unit with `User=mistgate`, install the root-owned helper unit and its narrow PolicyKit rule. The rule allows that account to start only `mistgate-panel-update.service`; it does not grant general systemd control or a root shell. The panel unit can keep `NoNewPrivileges=yes`.
+
+```sh
+install -o root -g root -m 0644 deploy/systemd/mistgate-panel-update.service /etc/systemd/system/mistgate-panel-update.service
+install -o root -g root -m 0644 deploy/polkit/60-mistgate-panel-update.rules /etc/polkit-1/rules.d/60-mistgate-panel-update.rules
+```
+
+Review the helper unit before loading it. Its `ExecStart` must name the installed binary, data directory and panel unit. The default panel unit is `mistgate.service`; if yours differs, set `--update-service` on the panel and `--service` in the helper unit to the same value. Set `ReadWritePaths` to the data directory's parent and the binary's directory; the helper needs the parent to atomically rename the data directory during rollback. If the service user is not `mistgate`, change `subject.user` in the PolicyKit rule to that exact account. Keep both files owned by root and not writable by the panel user.
+
+```sh
+systemctl daemon-reload
+systemctl show --property=LoadState --value mistgate-panel-update.service
+```
+
+The last command should print `loaded`. The host also needs PolicyKit installed and its authorization service running for the panel user to start the helper. The helper is started on demand by the panel and should not be enabled or started manually. Check its result with `journalctl -u mistgate-panel-update.service` if the panel reports that an update could not be scheduled.
+
+Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. Early commit builds such as `0.1.0-<commit>` predate the panel updater, so they can show the release but cannot install it from this page. Replace that binary once using the matching asset for the current stable release from [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) and the manual steps below. Later builds can update from **Settings → System**: press **Check GitHub**, then **Update panel** when a newer release appears. A root systemd panel can update directly; a non-root panel needs the helper unit and PolicyKit rule above.
 
 For a non-systemd installation or a manual fallback:
 

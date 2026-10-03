@@ -28,7 +28,7 @@ The panel has no configuration file. `mistgate setup` stores the addresses of an
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | CIDR or IP of a reverse proxy whose `X-Forwarded-For` and `Forwarded` headers are believed. Repeatable. Without it the TCP peer is the client, whatever the headers say. |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | Directory with your own static decoy site (`index.html`, optional `404.html`, `429.html`, `robots.txt`). |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | The data directory. It must exist (run `mistgate setup` first); `serve` sets its mode to 0700 at every start. |
-| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` | systemd unit restarted by the panel's GitHub self-updater. Used only on supported root systemd installations. |
+| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` | systemd unit restarted by the panel updater. A non-root panel also needs the fixed root helper unit configured as described in [Panel updates](../operations/updates.md). |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | Where the source code of this build is published, linked as "Source code" next to the version in the admin (AGPL-3.0, section 13). A fork points it at its own repository; empty hides the link. |
 | `--dev` | `MISTGATE_DEV` | off | Development mode: data in `./.data` (created with a master key), plain HTTP with the decoy on `--listen` (`127.0.0.1:8080`) and the admin on `127.0.0.1:8081`, the agent endpoint on `127.0.0.1:8082`, WebAuthn on `localhost`, and a setup link printed at start while no admin exists. Nothing about the addresses is stored. Never on a public server. |
 

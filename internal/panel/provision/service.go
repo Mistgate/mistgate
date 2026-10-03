@@ -528,15 +528,18 @@ func (s *Service) openPendingPassword(nodeID string, ciphertext []byte) (string,
 	return string(plain), nil
 }
 
-func (s *Service) audit(ctx context.Context, action string, params map[string]string) {
+// audit writes one provisioning event and returns storage errors so sensitive responses can fail closed.
+func (s *Service) audit(ctx context.Context, action string, params map[string]string) error {
 	admin, ok := auth.AdminFrom(ctx)
 	if !ok {
-		return
+		return nil
 	}
 	b, _ := json.Marshal(params)
 	if err := s.st.Audit(ctx, s.cfg.Now(), store.AuditEntry{Actor: admin.ID, Action: action, Params: string(b), Result: "ok"}); err != nil {
 		s.cfg.Log.Warn("audit node provisioning", "action", action, "err", err)
+		return err
 	}
+	return nil
 }
 
 func (s *Service) signalWorker() {

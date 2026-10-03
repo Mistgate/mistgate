@@ -42,6 +42,8 @@ type WarpManager interface {
 	Apply(ctx context.Context, spec *plugin.WarpSpec) error
 	// Reconnect rebuilds a down tunnel without changing its account or routed subnets. False means it recovered already.
 	Reconnect(ctx context.Context) (bool, error)
+	// CheckNow retries one current failed check and reports whether WARP is down at its failure threshold.
+	CheckNow(ctx context.Context) (checked, thresholdDown bool, err error)
 	// SetRoutedSubnets sets the client subnets of the awg inbounds with egress "warp".
 	SetRoutedSubnets(ctx context.Context, subnets []netip.Prefix) error
 	// Configured says whether the node has a WARP configuration (paused included).

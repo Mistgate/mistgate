@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -147,7 +148,9 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	for _, id := range next.ids() {
 		results = append(results, a.applyInbound(ctx, next.inbounds[id], now, force[id]))
 	}
-	a.syncHops(ctx, next, results)
+	active := successfullyAppliedEnabledInbounds(results)
+	hops := a.syncHops(ctx, next, results, active)
+	a.syncInboundUDPPorts(ctx, next, results, active, hops)
 	a.noteCerts(results)
 	return results
 }
@@ -259,18 +262,22 @@ func (a *Agent) refreshState(res *pb.InboundResult) {
 
 // syncHops installs the port-hop redirects of the inbounds that are up. It changes the firewall only when
 // the set of hops changed. A failure is reported on the affected inbounds and retried on the next apply.
-func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.InboundResult) {
-	failed := map[string]bool{}
+func successfullyAppliedEnabledInbounds(results []*pb.InboundResult) map[string]bool {
+	active := make(map[string]bool, len(results))
 	for _, r := range results {
-		if r.Error != "" {
-			failed[r.InboundId] = true
+		if r.Error == "" && r.State == pb.InboundRunState_INBOUND_RUN_STATE_RUNNING {
+			active[r.InboundId] = true
 		}
 	}
+	return active
+}
+
+func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.InboundResult, active map[string]bool) []hostctl.Hop {
 	var hops []hostctl.Hop
 	rej := map[string]string{}
 	for _, id := range next.ids() {
 		s := next.inbounds[id].spec
-		if s.Enabled && s.Listen.HopFrom != 0 && !failed[id] {
+		if s.Enabled && active[id] && s.Listen.HopFrom != 0 {
 			h := hostctl.Hop{InboundID: id, Network: s.Listen.Network, From: s.Listen.HopFrom, To: s.Listen.HopTo, Port: s.Listen.Port}
 			// A range the node must not redirect is refused for THIS inbound only; the others still install.
 			if err := checkHop(h, hops, next, a.host.SSHPorts()); err != nil {
@@ -289,7 +296,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	a.hopRej = rej
 	overlayHopRej(results, rej)
 	if a.hopsSet && hopsEqual(hops, a.hops) {
-		return
+		return hops
 	}
 	if err := a.host.SetPortHops(ctx, hops); err != nil {
 		a.hopsSet = false
@@ -302,9 +309,82 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 			}
 		}
 		a.event(pb.Severity_SEVERITY_ERROR, "hop_failed", "", map[string]string{"error": err.Error()})
-		return
+		return nil
 	}
 	a.hops, a.hopsSet = hops, true
+	return hops
+}
+
+// syncInboundUDPPorts mirrors only enabled UDP listeners whose engine apply succeeded. Hop ranges are
+// included only after their exact nft redirect was accepted and installed.
+func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, results []*pb.InboundResult, active map[string]bool, hops []hostctl.Hop) {
+	byHop := make(map[string]hostctl.Hop, len(hops))
+	for _, h := range hops {
+		byHop[h.InboundID] = h
+	}
+	set := make(map[hostctl.UDPInboundPort]struct{})
+	affected := make(map[string]bool)
+	var errs []error
+	for _, id := range next.ids() {
+		s := next.inbounds[id].spec
+		if !s.Enabled || !active[id] || s.Listen.Network != "udp" {
+			continue
+		}
+		affected[id] = true
+		if s.Listen.Port == 0 || s.Listen.Port > 65535 {
+			errs = append(errs, fmt.Errorf("inbound %s has an invalid UDP listener port %d", id, s.Listen.Port))
+			continue
+		}
+		set[hostctl.UDPInboundPort{Port: uint16(s.Listen.Port)}] = struct{}{}
+		if h, ok := byHop[id]; ok && h.Network == "udp" {
+			set[hostctl.UDPInboundPort{From: h.From, To: h.To}] = struct{}{}
+		}
+	}
+	ports := make([]hostctl.UDPInboundPort, 0, len(set))
+	for port := range set {
+		ports = append(ports, port)
+	}
+	sort.Slice(ports, func(i, j int) bool {
+		if ports[i].Port != ports[j].Port {
+			return ports[i].Port < ports[j].Port
+		}
+		if ports[i].From != ports[j].From {
+			return ports[i].From < ports[j].From
+		}
+		return ports[i].To < ports[j].To
+	})
+	if err := a.host.SyncInboundUDPPorts(ctx, ports); err != nil {
+		errs = append(errs, err)
+	}
+	if err := errors.Join(errs...); err != nil {
+		a.markHostFirewallSyncFailure(results, affected, err)
+	} else {
+		a.clearHostFirewallSyncFailure()
+	}
+}
+
+func (a *Agent) markHostFirewallSyncFailure(results []*pb.InboundResult, affected map[string]bool, err error) {
+	errMsg := err.Error()
+	msg := "host firewall: " + errMsg
+	if a.hostFirewallErr != errMsg {
+		a.hostFirewallErr = errMsg
+		a.log.Error("host firewall UDP rules were not fully reconciled", "err", err)
+		a.event(pb.Severity_SEVERITY_ERROR, "host_firewall_sync_failed", "", map[string]string{"error": errMsg})
+	}
+	for _, r := range results {
+		if affected[r.InboundId] && r.State == pb.InboundRunState_INBOUND_RUN_STATE_RUNNING && r.Error == "" {
+			r.Error = msg
+		}
+	}
+}
+
+func (a *Agent) clearHostFirewallSyncFailure() {
+	if a.hostFirewallErr == "" {
+		return
+	}
+	resolved := a.hostFirewallErr
+	a.hostFirewallErr = ""
+	a.event(pb.Severity_SEVERITY_INFO, "host_firewall_sync_recovered", "", map[string]string{"resolved_error": resolved})
 }
 
 // checkHop is hostctl.ValidateHop plus what only the agent knows: the ports of the node's other inbounds

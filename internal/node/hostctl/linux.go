@@ -44,7 +44,7 @@ type linuxHost struct {
 	resolvedFile   string // /etc/systemd/resolved.conf.d/90-mistgate.conf
 	resolvConfFile string // /etc/resolv.conf
 
-	// fw serialises the agent's nft table: hops and the SSH guard are one table, replaced as a whole.
+	// fw serializes Mistgate-owned firewall changes: the nft table and exact tagged UFW inbound rules.
 	fw       sync.Mutex
 	hops     []Hop
 	sshPorts []uint16
@@ -278,7 +278,8 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 }
 
 func (h *linuxHost) Cleanup(ctx context.Context) error {
-	errs := []error{h.cleanupTunnels(ctx)} // the tunnel table and our mgawg*/mgwarp links
+	errs := []error{h.cleanupTunnels(ctx)}               // the tunnel table and our mgawg*/mgwarp links
+	errs = append(errs, h.SyncInboundUDPPorts(ctx, nil)) // only UFW rules with Mistgate's exact ownership tag
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()
 	h.hops, h.sshPorts = nil, nil

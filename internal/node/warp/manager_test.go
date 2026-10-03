@@ -381,7 +381,7 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	r.tick(5 * time.Second)
 	h, _ := r.m.Health()
 	if h.State != StateStarting || h.LastError != "probe_cloudflare_failed" || h.ProbeCloudflare == nil || h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "timeout" ||
-		h.ProbeOther == nil || !h.ProbeOther.OK || !h.ProbeCloudflare.At.Equal(r.clk.now()) || !h.CheckedAt.Equal(r.clk.now()) {
+		h.ProbeOther == nil || !h.ProbeOther.OK || h.ProbeOther.FailureCode != "" || !h.ProbeCloudflare.At.Equal(r.clk.now()) || !h.ProbeOther.At.Equal(r.clk.now()) || !h.CheckedAt.Equal(r.clk.now()) {
 		t.Fatalf("after a failed check: %+v", h)
 	}
 	r.pr.mu.Lock()
@@ -390,7 +390,8 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	r.healthy()
 	r.tick(5 * time.Second)
 	h, _ = r.m.Health()
-	if h.State != StateStarting || h.LastError != "" || !h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "" || h.Failures != 0 {
+	if h.State != StateStarting || h.LastError != "" || !h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "" ||
+		h.ProbeOther == nil || !h.ProbeOther.OK || h.ProbeOther.FailureCode != "" || h.Failures != 0 {
 		t.Fatalf("after a good check the failure of the previous one is stale: %+v", h)
 	}
 	// the link is down: nothing was probed, so no probe result (not a fake "failed")
@@ -401,6 +402,60 @@ func TestHealthDescribesTheLatestCheck(t *testing.T) {
 	h, _ = r.m.Health()
 	if h.ProbeCloudflare != nil || h.ProbeOther != nil || h.LastError == "" || h.CheckedAt.IsZero() {
 		t.Fatalf("without a link: %+v", h)
+	}
+}
+
+func TestCheckNowRetriesCurrentProbeFailureWithoutRebuildingTunnel(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pr.mu.Lock()
+	r.pr.a = context.DeadlineExceeded
+	r.pr.mu.Unlock()
+	r.healthy()
+	r.tick(30 * time.Second)
+	failed, _ := r.m.Health()
+	if failed.State != StateUp || failed.LastError != "probe_cloudflare_failed" || failed.Failures != 1 {
+		t.Fatalf("initial failed check: %+v", failed)
+	}
+
+	upsBefore := len(r.pl.ups)
+	r.pr.mu.Lock()
+	r.pr.a = nil
+	r.pr.mu.Unlock()
+	checked, thresholdDown, err := r.m.CheckNow(context.Background())
+	passed, _ := r.m.Health()
+	if err != nil || !checked || thresholdDown || len(r.pl.ups) != upsBefore || passed.State != StateUp || passed.LastError != "" || passed.Failures != 0 {
+		t.Fatalf("checked=%v thresholdDown=%v err=%v ups=%d->%d health=%+v", checked, thresholdDown, err, upsBefore, len(r.pl.ups), passed)
+	}
+	if checked, thresholdDown, err := r.m.CheckNow(context.Background()); err != nil || checked || thresholdDown {
+		t.Fatalf("a passing current check must not trigger a second retry: checked=%v thresholdDown=%v err=%v", checked, thresholdDown, err)
+	}
+}
+
+func TestCheckNowReportsFailureThresholdTransition(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pr.mu.Lock()
+	r.pr.a, r.pr.b = context.DeadlineExceeded, context.DeadlineExceeded
+	r.pr.mu.Unlock()
+	for failures := 1; failures <= failuresToDown-1; failures++ {
+		r.healthy()
+		r.tick(30 * time.Second)
+	}
+	before, _ := r.m.Health()
+	if before.State != StateUp || before.Failures != failuresToDown-1 {
+		t.Fatalf("before immediate recheck: %+v", before)
+	}
+
+	upsBefore := len(r.pl.ups)
+	r.healthy()
+	checked, thresholdDown, err := r.m.CheckNow(context.Background())
+	after, _ := r.m.Health()
+	if err != nil || !checked || !thresholdDown || after.State != StateDown || after.Failures != failuresToDown || len(r.pl.ups) != upsBefore {
+		t.Fatalf("checked=%v thresholdDown=%v err=%v ups=%d->%d health=%+v", checked, thresholdDown, err, upsBefore, len(r.pl.ups), after)
+	}
+	if checked, thresholdDown, err := r.m.CheckNow(context.Background()); err != nil || checked || !thresholdDown {
+		t.Fatalf("a scheduled check that already reached threshold should still be reported: checked=%v thresholdDown=%v err=%v", checked, thresholdDown, err)
 	}
 }
 
@@ -416,6 +471,9 @@ func TestProbeFailureCodesAreSafeAndSpecific(t *testing.T) {
 		{"dns", &net.DNSError{Err: "no such host", Name: "probe.example"}, "", "dns"},
 		{"connection", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("refused")}, "", "connection"},
 		{"invalid trace", errProbeTraceMissing, "", "invalid_trace"},
+		{"successful non-Cloudflare probe", nil, "", ""},
+		{"Cloudflare on", nil, "on", ""},
+		{"Cloudflare plus", nil, "plus", ""},
 		{"warp off", nil, "off", "warp_off"},
 		{"unexpected flag", nil, "unknown", "invalid_trace"},
 	} {
@@ -425,8 +483,8 @@ func TestProbeFailureCodesAreSafeAndSpecific(t *testing.T) {
 			}
 		})
 	}
-	if got := (&httpProber{}).limit(); got != 12*time.Second {
-		t.Fatalf("default probe timeout = %s, want 12s", got)
+	if got := (&httpProber{}).limit(); got != 20*time.Second {
+		t.Fatalf("default probe timeout = %s, want 20s", got)
 	}
 }
 
@@ -484,6 +542,75 @@ func TestThreeFailuresGoDownTwoSuccessesComeBack(t *testing.T) {
 	}
 }
 
+func TestDualProbeTimeoutsUseAutomaticThreeFailureThresholdWithoutRestart(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pr.mu.Lock()
+	r.pr.a = context.DeadlineExceeded
+	r.pr.b = context.DeadlineExceeded
+	r.pr.mu.Unlock()
+	upsBefore := len(r.pl.ups)
+
+	for failures := 1; failures <= failuresToDown; failures++ {
+		r.healthy()
+		r.tick(30 * time.Second)
+		h, _ := r.m.Health()
+		if h.Failures != uint32(failures) || h.ProbeCloudflare == nil || h.ProbeCloudflare.OK || h.ProbeCloudflare.FailureCode != "timeout" ||
+			h.ProbeOther == nil || h.ProbeOther.OK || h.ProbeOther.FailureCode != "timeout" || len(r.pl.ups) != upsBefore {
+			t.Fatalf("after %d dual-probe timeouts (ups %d->%d): %+v", failures, upsBefore, len(r.pl.ups), h)
+		}
+		if failures < failuresToDown && h.State != StateUp {
+			t.Fatalf("after only %d timeouts, state=%v, want UP", failures, h.State)
+		}
+	}
+
+	h, _ := r.m.Health()
+	if h.State != StateDown || h.LastError != "probe_cloudflare_failed; ladder: reassert" {
+		t.Fatalf("at the threshold, automatic recovery should reassert routes without rebuilding the tunnel: %+v", h)
+	}
+}
+
+func TestDualProbeFailuresRotateAfterReassertWithFreshHandshake(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pr.mu.Lock()
+	r.pr.a, r.pr.b = errors.New("timeout"), errors.New("timeout")
+	r.pr.mu.Unlock()
+	upsBefore := len(r.pl.ups)
+
+	for i := 0; i < failuresToDown; i++ {
+		r.healthy()
+		r.tick(30 * time.Second)
+	}
+	h, _ := r.m.Health()
+	if h.State != StateDown || !strings.Contains(h.LastError, "ladder: reassert") || len(r.pl.setEps) != 0 {
+		t.Fatalf("threshold check must reassert without rotating: %+v endpoints=%v", h, r.pl.setEps)
+	}
+
+	// A fourth failed check confirms the reassertion did not restore the data plane. A fresh handshake does not block
+	// moving to the next configured candidate once HandshakeWait has elapsed from the current endpoint.
+	r.m.o.Interval = 5 * time.Second
+	r.healthy()
+	r.tick(30 * time.Second)
+	if len(r.pl.setEps) != 1 || r.pl.setEps[0].String() != "198.51.100.7:500" || len(r.pl.ups) != upsBefore {
+		t.Fatalf("dual failure should rotate once without rebuilding: endpoints=%v ups=%d->%d", r.pl.setEps, upsBefore, len(r.pl.ups))
+	}
+
+	// A fresh handshake still gets the full HandshakeWait on the new candidate before another rotation.
+	for i := 0; i < 2; i++ {
+		r.healthy()
+		r.tick(5 * time.Second)
+		if len(r.pl.setEps) != 1 {
+			t.Fatalf("rotated before HandshakeWait elapsed on the new endpoint: %v", r.pl.setEps)
+		}
+	}
+	r.healthy()
+	r.tick(5 * time.Second)
+	if len(r.pl.setEps) != 2 || r.pl.setEps[1].String() != "198.51.100.7:1701" || len(r.pl.ups) != upsBefore {
+		t.Fatalf("dual failure should rotate to the next candidate after HandshakeWait: endpoints=%v ups=%d->%d", r.pl.setEps, upsBefore, len(r.pl.ups))
+	}
+}
+
 func TestWarpFlagOffAndStaleHandshakeAreFailures(t *testing.T) {
 	r := newRig(t)
 	bringUp(t, r)
@@ -508,12 +635,12 @@ func TestWarpFlagOffAndStaleHandshakeAreFailures(t *testing.T) {
 func TestLadderOrderAndCooldown(t *testing.T) {
 	r := newRig(t)
 	bringUp(t, r)
-	// the peer stopped answering: no handshake at all (a fresh one would make a rotation pointless)
+	// Neither data-plane probe works and there is no handshake.
 	r.pl.mu.Lock()
 	r.pl.hs = time.Time{}
 	r.pl.mu.Unlock()
 	r.pr.mu.Lock()
-	r.pr.a = errors.New("timeout")
+	r.pr.a, r.pr.b = errors.New("timeout"), errors.New("timeout")
 	r.pr.mu.Unlock()
 	reasserts := len(r.pl.reasserts)
 	fail := func() {
@@ -569,7 +696,7 @@ func TestLadderOrderAndCooldown(t *testing.T) {
 	}
 	// recovery resets the ladder
 	r.pr.mu.Lock()
-	r.pr.a = nil
+	r.pr.a, r.pr.b = nil, nil
 	r.pr.mu.Unlock()
 	r.healthy() // the peer answers again
 	r.tick(30 * time.Second)
@@ -590,14 +717,62 @@ func TestFreshHandshakeMeansNoRotation(t *testing.T) {
 		r.healthy() // the tunnel handshakes fine, the probes do not: a different port cannot help
 		r.tick(30 * time.Second)
 	}
-	if h, _ := r.m.Health(); h.State != StateDown {
-		t.Fatalf("%+v", h)
+	h, _ := r.m.Health()
+	if h.State != StateDown || h.ProbeCloudflare == nil || h.ProbeCloudflare.OK || h.ProbeOther == nil || !h.ProbeOther.OK {
+		t.Fatalf("the one-failed/one-passed check should stay down without rotation: %+v", h)
 	}
 	if len(r.pl.setEps) != 0 {
 		t.Fatalf("rotated although the handshake is fresh: %v", r.pl.setEps)
 	}
 	if len(r.events("warp_needs_attention")) != 0 {
 		t.Fatal("the ladder must not run past a step it cannot take")
+	}
+}
+
+func TestLadderDoesNotRotateWithoutProbeResults(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pl.mu.Lock()
+	r.pl.linkUp = false
+	r.pl.hs = time.Time{}
+	r.pl.mu.Unlock()
+	upsBefore := len(r.pl.ups)
+	for i := 0; i < failuresToDown+2; i++ {
+		r.tick(30 * time.Second)
+	}
+	h, _ := r.m.Health()
+	if h.State != StateDown || h.ProbeCloudflare != nil || h.ProbeOther != nil || len(r.pl.setEps) != 0 || len(r.pl.ups) != upsBefore {
+		t.Fatalf("missing probe results must not rotate or rebuild: health=%+v endpoints=%v ups=%d->%d", h, r.pl.setEps, upsBefore, len(r.pl.ups))
+	}
+}
+
+func TestRecoverySuccessStopsDualFailureRotationsWithoutRebuild(t *testing.T) {
+	r := newRig(t)
+	bringUp(t, r)
+	r.pr.mu.Lock()
+	r.pr.a, r.pr.b = errors.New("timeout"), errors.New("timeout")
+	r.pr.mu.Unlock()
+	for i := 0; i < failuresToDown+1; i++ {
+		r.healthy()
+		r.tick(30 * time.Second)
+	}
+	upsBefore := len(r.pl.ups)
+	if len(r.pl.setEps) != 1 || r.pl.setEps[0].String() != "198.51.100.7:500" {
+		t.Fatalf("expected one bounded candidate rotation before recovery: %v", r.pl.setEps)
+	}
+
+	r.pr.mu.Lock()
+	r.pr.a, r.pr.b = nil, nil
+	r.pr.mu.Unlock()
+	r.healthy()
+	r.tick(30 * time.Second)
+	r.healthy()
+	r.tick(30 * time.Second)
+	r.healthy()
+	r.tick(30 * time.Second)
+	h, _ := r.m.Health()
+	if h.State != StateUp || h.LastError != "" || len(r.pl.setEps) != 1 || len(r.pl.ups) != upsBefore {
+		t.Fatalf("successful checks should stop rotation and keep the tunnel: health=%+v endpoints=%v ups=%d->%d", h, r.pl.setEps, upsBefore, len(r.pl.ups))
 	}
 }
 

@@ -17,11 +17,12 @@ import (
 	"time"
 
 	"debug/elf"
+	"github.com/mistgate/mistgate/internal/buildinfo"
 )
 
-// RunPanelUpdateHelper is the hidden command started by systemd-run. It executes outside the panel service's
-// ProtectSystem sandbox, replaces only its own executable, restarts the configured unit and restores the backup if
-// the new service does not start.
+// RunPanelUpdateHelper is the hidden command started by a transient systemd unit or the fixed root-owned helper
+// service. It executes outside the panel service's ProtectSystem sandbox, replaces only its own executable,
+// restarts the configured unit and restores the backup if the new service does not start.
 func RunPanelUpdateHelper(args []string) error {
 	if !canRunPanelUpdateHelper() {
 		return ErrPanelUnsupported
@@ -30,11 +31,15 @@ func RunPanelUpdateHelper(args []string) error {
 	dataDir := fs.String("data-dir", "", "panel data directory")
 	service := fs.String("service", "", "systemd service unit")
 	digest := fs.String("sha256", "", "expected lowercase SHA-256 of the staged binary")
+	fetchLatest := fs.Bool("fetch-latest", false, "fetch and verify the official latest release before installing")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) || !digestPattern.MatchString(*digest) {
+	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) {
 		return errors.New("panel-update-helper: invalid arguments")
+	}
+	if *fetchLatest && *digest != "" {
+		return errors.New("panel-update-helper: --fetch-latest does not accept a caller-supplied digest")
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -43,9 +48,61 @@ func RunPanelUpdateHelper(args []string) error {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
-	return applyPanelUpdate(*dataDir, exe, *service, *digest, runtimeArch(), func(args ...string) error {
+	systemctl := func(args ...string) error {
 		return runCommandWithTimeout("systemctl", 90*time.Second, args...)
-	})
+	}
+	if *fetchLatest {
+		return installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
+			CurrentVersion: buildinfo.Version, DataDir: *dataDir, ServiceUnit: *service, Executable: exe, Enabled: true,
+		}, systemctl)
+	}
+	if !digestPattern.MatchString(*digest) {
+		return errors.New("panel-update-helper: invalid arguments")
+	}
+	return applyPanelUpdate(*dataDir, exe, *service, *digest, runtimeArch(), systemctl)
+}
+
+// installLatestPanelUpdate is the fixed privileged path used when the HTTP panel runs as an unprivileged account.
+// It obtains the release digest from GitHub itself, then downloads and verifies the official asset before handing it
+// to the same replacement, backup, health-check, and rollback routine used by root-run installations.
+func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, systemctl func(...string) error) error {
+	if cfg.OS == "" {
+		cfg.OS = runtime.GOOS
+	}
+	if cfg.OS != "linux" || cfg.DataDir == "" || !unitPattern.MatchString(strings.TrimSpace(cfg.ServiceUnit)) || systemctl == nil {
+		return ErrPanelUnsupported
+	}
+	if cfg.CurrentVersion == "" {
+		cfg.CurrentVersion = buildinfo.Version
+	}
+	if cfg.Executable == "" {
+		cfg.Executable, _ = os.Executable()
+	}
+	if cfg.Arch == "" {
+		cfg.Arch = runtime.GOARCH
+	}
+	cfg.Enabled = true
+	updater := NewGitHubPanelUpdater(cfg)
+	if !updater.supported {
+		return ErrPanelUnsupported
+	}
+	cfg = updater.cfg
+	checkCtx, cancelCheck := context.WithTimeout(ctx, panelUpdateCheckTimeout)
+	status, asset, err := updater.fetchStatus(checkCtx)
+	cancelCheck()
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: check latest release: %w", err)
+	}
+	if !status.Available {
+		return ErrNoPanelUpdate
+	}
+	downloadCtx, cancelDownload := context.WithTimeout(ctx, 2*time.Minute)
+	_, err = updater.downloadAndStage(downloadCtx, asset, status.Version)
+	cancelDownload()
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: download latest release: %w", err)
+	}
+	return applyPanelUpdate(cfg.DataDir, cfg.Executable, cfg.ServiceUnit, strings.TrimPrefix(asset.Digest, "sha256:"), cfg.Arch, systemctl)
 }
 
 func runtimeArch() string { return panelUpdateRuntimeArch() }
@@ -295,14 +352,15 @@ func backupDataDirectory(dataDir string) (string, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if current == dataDir {
-			return nil // the restore directory itself is recreated with mode 0700
+		rel := "."
+		if current != dataDir {
+			var err error
+			rel, err = filepath.Rel(dataDir, current)
+			if err != nil {
+				return err
+			}
 		}
-		rel, err := filepath.Rel(dataDir, current)
-		if err != nil {
-			return err
-		}
-		if filepath.Clean(rel) == "panel-update.new" {
+		if filepath.Clean(rel) == "panel-update.new" || filepath.Clean(rel) == "panel-update-backup.tar.gz" {
 			return nil
 		}
 		info, err := os.Lstat(current)
@@ -389,8 +447,11 @@ func extractDataBackup(backup, target string) error {
 	type dirMode struct {
 		path string
 		mode os.FileMode
+		uid  int
+		gid  int
 	}
 	var dirs []dirMode
+	var rootDir *tar.Header
 	for {
 		header, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -405,6 +466,10 @@ func extractDataBackup(backup, target string) error {
 			return fmt.Errorf("unsafe path in panel data backup: %q", header.Name)
 		}
 		if clean == "." {
+			if header.Typeflag != tar.TypeDir {
+				return errors.New("invalid panel data backup root entry")
+			}
+			rootDir = header
 			continue
 		}
 		path := filepath.Join(target, clean)
@@ -420,7 +485,7 @@ func extractDataBackup(backup, target string) error {
 			if err := os.MkdirAll(path, 0o700); err != nil {
 				return err
 			}
-			dirs = append(dirs, dirMode{path: path, mode: os.FileMode(header.Mode).Perm()})
+			dirs = append(dirs, dirMode{path: path, mode: os.FileMode(header.Mode).Perm(), uid: header.Uid, gid: header.Gid})
 		case tar.TypeReg, tar.TypeRegA:
 			if header.Size < 0 || header.Size > 1<<40 {
 				return errors.New("invalid file size in panel data backup")
@@ -435,12 +500,35 @@ func extractDataBackup(backup, target string) error {
 			if err := errors.Join(copyErr, syncErr, closeErr); err != nil {
 				return err
 			}
+			if runtime.GOOS != "windows" {
+				if err := os.Chown(path, header.Uid, header.Gid); err != nil {
+					return err
+				}
+			}
+			if err := os.Chmod(path, os.FileMode(header.Mode).Perm()); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unsupported file type in panel data backup: %q", header.Name)
 		}
 	}
 	for i := len(dirs) - 1; i >= 0; i-- {
+		if runtime.GOOS != "windows" {
+			if err := os.Chown(dirs[i].path, dirs[i].uid, dirs[i].gid); err != nil {
+				return err
+			}
+		}
 		if err := os.Chmod(dirs[i].path, dirs[i].mode); err != nil {
+			return err
+		}
+	}
+	if rootDir != nil {
+		if runtime.GOOS != "windows" {
+			if err := os.Chown(target, rootDir.Uid, rootDir.Gid); err != nil {
+				return err
+			}
+		}
+		if err := os.Chmod(target, os.FileMode(rootDir.Mode).Perm()); err != nil {
 			return err
 		}
 	}

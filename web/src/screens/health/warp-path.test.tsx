@@ -74,7 +74,7 @@ describe("warp_path in the doctor", () => {
   it("words the reason like the WARP card does, and never shows the raw code", async () => {
     getDoctor.mockResolvedValue(report([warpItem({ fixId: "reconnect_warp" })]));
     await mount();
-    expect(text()).toContain("WARP is down: The Cloudflare probe failed through WARP. Trying to recover: reconnecting.");
+    expect(text()).toContain("WARP is down: The Cloudflare probe failed through WARP. Trying to recover: restoring routes and rules.");
     expect(text()).not.toContain("probe_cloudflare_failed");
     // the explanation above it no longer claims that every WARP profile is dead
     expect(text()).toContain("if it is only slow they work slowly");
@@ -85,7 +85,7 @@ describe("warp_path in the doctor", () => {
     runDoctor.mockResolvedValue({ nowUnix: 2n, nodes: [] });
     await mount();
     expect(text()).not.toContain("Manual action");
-    expect(button("Reconnect WARP")).toBeDefined();
+    expect(button("Check WARP / reconnect if down")).toBeDefined();
     const open = [...document.querySelectorAll("a")].find((a) => a.textContent === "Open WARP");
     expect(open?.getAttribute("href")).toBe("/nodes/nod_1?tab=settings#warp");
     await act(async () => void button("Check again")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));

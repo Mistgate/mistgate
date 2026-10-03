@@ -56,6 +56,8 @@ function jobError(code: string, t: T): string {
   if (code === "panel_unreachable") return t("node.ssh.error.panelAddress");
   if (code === "node_name_taken" || code === "name_taken") return t("node.ssh.nameTaken");
   if (code === "remote_outcome_unknown") return t("node.ssh.error.remoteOutcome");
+  if (code === "host_firewall_configuration_failed") return t("node.ssh.error.firewall");
+  if (code === "node_retired") return t("node.ssh.error.retired");
   if (code === "node_not_connected") return t("node.ssh.error.notConnected");
   if (code === "systemd_install_failed" || code === "agent_install_failed") return t("node.ssh.error.systemd");
   return t("node.ssh.error.install");
@@ -67,6 +69,8 @@ function phaseLabel(phase: string, t: T): string {
       return t("node.ssh.phase.queued");
     case "checking_host":
       return t("node.ssh.phase.checking_host");
+    case "firewall":
+      return t("node.ssh.phase.firewall");
     case "uploading_agent":
       return t("node.ssh.phase.uploading_agent");
     case "enrolling_node":
@@ -207,7 +211,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
   const jobDone = jobState === "done";
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled" || jobState === "canceled";
-  const jobCanRetry = jobFailed && job.data?.errorCode !== "remote_outcome_unknown";
+  const jobCanRetry = jobFailed && !["remote_outcome_unknown", "node_retired"].includes(job.data?.errorCode ?? "");
   const jobTone = jobDone ? "tone-ok tint tone-text" : jobFailed ? "tone-bad tint tone-text" : jobCancelled ? "tone-off tint tone-text" : "tone-busy tint tone-text";
 
   useEffect(() => {
@@ -381,6 +385,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
               hint={t("node.ssh.portHint")}
               required
             />
+            <p className="text-xs leading-relaxed text-muted sm:col-span-2">{t("node.ssh.providerFirewallHint")}</p>
           </div>
           <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">
             <Button type="button" variant="ghost" size="md" onClick={onBack}>{t("common.cancel")}</Button>
@@ -490,6 +495,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
             <Fact label={t("node.ssh.systemd")} value={preflight.systemd ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.systemd ? "good" : "bad"} />
             <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
           </div>
+          <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
           <TextField
             label={t("node.ssh.password")}
             value={password}

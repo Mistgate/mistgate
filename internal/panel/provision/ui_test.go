@@ -99,6 +99,15 @@ func TestProvisionProgressLabelsAreStable(t *testing.T) {
 	if got := phaseLabel("waiting_node"); got != "Ожидание подключения" {
 		t.Fatalf("waiting phase label = %q", got)
 	}
+	if got := phaseLabel("firewall"); got != "Настройка firewall сервера" {
+		t.Fatalf("firewall phase label = %q", got)
+	}
+	if got := eventLabel("firewall", "preparing_host_firewall"); got != "Настройка активного firewall сервера" {
+		t.Fatalf("firewall event label = %q", got)
+	}
+	if got := errorLabel("host_firewall_configuration_failed"); !strings.Contains(got, "хостера") {
+		t.Fatalf("host firewall error label = %q", got)
+	}
 	if got := eventLabel("install", "starting_agent"); got != "Настройка и запуск systemd-службы" {
 		t.Fatalf("install event label = %q", got)
 	}

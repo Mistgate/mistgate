@@ -95,7 +95,7 @@ describe("the WARP card after a failed check", () => {
     await mount(data(slowEdge));
     expect(text()).toContain("The Cloudflare probe failed through WARP.");
     expect(text()).toContain("The tunnel is up, but WARP is slow or not passing traffic right now.");
-    expect(text()).toContain("Trying to recover: reconnecting.");
+    expect(text()).toContain("Trying to recover: restoring routes and rules.");
     expect(text()).not.toContain("probe_cloudflare_failed"); // never the raw code for a code it knows
   });
 

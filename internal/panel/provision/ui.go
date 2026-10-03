@@ -635,6 +635,8 @@ func phaseLabel(phase string) string {
 		return "Ожидает запуска"
 	case "preflight":
 		return "Проверка сервера"
+	case "firewall":
+		return "Настройка firewall сервера"
 	case "transfer":
 		return "Передача агента"
 	case "enrollment":
@@ -670,6 +672,8 @@ func eventLabel(phase, code string) string {
 		return "SSH-работа остановлена; состояние сервера нужно проверить"
 	case "checking_host":
 		return "Проверка сервера и SSH-ключа"
+	case "preparing_host_firewall":
+		return "Настройка активного firewall сервера"
 	case "uploading_agent":
 		return "Передача агента на сервер"
 	case "enrolling_node":
@@ -726,6 +730,8 @@ func errorLabel(code string) string {
 		return "Панели не удалось безопасно продолжить это задание. Проверьте журналы панели."
 	case "node_retired":
 		return "Эта нода была выведена из эксплуатации и не может быть зарегистрирована повторно."
+	case "host_firewall_configuration_failed":
+		return "Не удалось настроить активный firewall на сервере. Проверьте права SSH-пользователя и правила UFW/firewalld, затем повторите установку. Firewall хостера настраивается отдельно."
 	case "agent_bundle_unavailable":
 		return "В доверенном наборе релиза не найден агент для этой архитектуры."
 	case "agent_transfer_failed":

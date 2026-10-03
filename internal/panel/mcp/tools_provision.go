@@ -2,6 +2,8 @@ package mcp
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -189,7 +191,7 @@ func passwordRotatePlanTool() toolDef {
 		name: base + "_plan", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure,
 			adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure),
 		free: true, isPlan: true, danger: true,
-		desc: "Prepare to rotate one installed node's SSH password. This plan contains only the node id and public login metadata; the new password is supplied only to _apply.",
+		desc: "Prepare to generate and install a new random SSH password for one installed node. This plan contains only the node id and public login metadata; the panel generates the password only after owner approval.",
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in passwordRotatePlanArgs) (*mcp.CallToolResult, any, error) {
@@ -233,13 +235,12 @@ func passwordRotatePlanTool() toolDef {
 
 type passwordRotateApplyArgs struct {
 	ConfirmToken string `json:"confirm_token" jsonschema:"token returned by node_server_password_rotate_plan"`
-	NewPassword  string `json:"new_password" jsonschema:"new password of at least 12 characters; sent only in this call and never stored in the plan"`
 }
 
 func passwordRotateApplyTool() toolDef {
 	const base = "node_server_password_rotate"
 	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure), danger: true,
-		desc: "Apply an owner-approved SSH password rotation plan. Supply the new password only to this call; it is not stored in the MCP plan or returned in results.",
+		desc: "Apply an owner-approved SSH password rotation plan. The panel generates and installs a strong random password; it is never returned to the agent. The owner can reveal it later in node Settings after step-up verification.",
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in passwordRotateApplyArgs) (*mcp.CallToolResult, any, error) {
@@ -248,27 +249,36 @@ func passwordRotateApplyTool() toolDef {
 						return nil, nil, err
 					}
 					defer c.done()
-					if len(in.NewPassword) < 12 {
-						return nil, nil, errors.New("new_password must contain at least 12 characters")
-					}
 					out, err := e.apply(c, base, in.ConfirmToken, func(c *call, pl Plan) (done, error) {
 						var p passwordRotateParams
 						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
 							return done{}, failure("plan_unreadable", "make a new SSH password rotation plan")
 						}
-						_, err := c.cl.Provisioning.RotateNodeServerPassword(c.ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: p.NodeID, NewPassword: in.NewPassword, Confirm: true}))
-						if err != nil {
-							return done{}, apiError(err)
-						}
-						return doneWith("node_ssh_password_rotated", "The node SSH password changed and the new login was verified."), nil
+						return rotateGeneratedNodePassword(c.ctx, func(ctx context.Context, password string) error {
+							_, err := c.cl.Provisioning.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: p.NodeID, NewPassword: password, Confirm: true}))
+							return err
+						})
 					})
 					if err != nil {
 						return nil, nil, scrubError(err)
 					}
-					in.NewPassword = ""
 					return result(out)
 				})
 		}}
+}
+
+func rotateGeneratedNodePassword(ctx context.Context, rotate func(context.Context, string) error) (done, error) {
+	raw := make([]byte, 32)
+	defer clear(raw)
+	if _, err := rand.Read(raw); err != nil {
+		return done{}, errors.New("could not generate a node password")
+	}
+	password := hex.EncodeToString(raw)
+	defer func() { password = "" }()
+	if err := rotate(ctx, password); err != nil {
+		return done{}, apiError(err)
+	}
+	return doneWith("node_ssh_password_rotated", "The node SSH password was generated inside the panel, changed, and verified. The owner can reveal it in node Settings."), nil
 }
 
 func allASCIIAlpha(s string) bool {

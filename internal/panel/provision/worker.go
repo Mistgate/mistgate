@@ -46,6 +46,36 @@ printf 'already_enrolled=%s\n' "$enrolled"
 printf 'existing_node_id=%s\n' "$node_id"
 `
 
+// remoteFirewallPreparationScript adjusts only an already-active host firewall.
+// Provider firewalls cannot be reached through this SSH connection, and an
+// inactive firewall is deliberately left inactive.
+const remoteFirewallPreparationScript = `set -eu
+ssh_port="${1:-}"
+case "$ssh_port" in
+  ''|*[!0-9]*) exit 10 ;;
+esac
+if [ "$ssh_port" -lt 1 ] || [ "$ssh_port" -gt 65535 ]; then exit 10; fi
+
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+  ufw allow "$ssh_port/tcp" >/dev/null
+  ufw allow 80/tcp >/dev/null
+  ufw allow 443/tcp >/dev/null
+  ufw allow 443/udp >/dev/null
+fi
+
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+  zones="$(firewall-cmd --get-active-zones | awk '/^[^[:space:]]/ { print $1 }')"
+  if [ -z "$zones" ]; then zones="$(firewall-cmd --get-default-zone)"; fi
+  printf '%s\n' "$zones" | while IFS= read -r zone; do
+    [ -n "$zone" ] || continue
+    for rule in "$ssh_port/tcp" 80/tcp 443/tcp 443/udp; do
+      firewall-cmd --zone="$zone" --add-port="$rule" --permanent >/dev/null
+    done
+  done
+  firewall-cmd --reload >/dev/null
+fi
+`
+
 type preflightFailure string
 
 func (e preflightFailure) Error() string { return string(e) }
@@ -84,7 +114,14 @@ func (s *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("provision: claim job: %w", err)
 		}
 		if ok {
+			stopWatcher, watcherDone := make(chan struct{}), make(chan struct{})
+			go func() {
+				defer close(watcherDone)
+				s.watchWorkerCancellation(jobCtx, job.ID, stopWatcher, cancel)
+			}()
 			s.runJob(jobCtx, job)
+			close(stopWatcher)
+			<-watcherDone
 			cancel()
 			s.cancelMu.Lock()
 			delete(s.active, job.ID)
@@ -102,6 +139,9 @@ func (s *Service) Run(ctx context.Context) error {
 
 func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	defer s.finishCancellation(job.ID)
+	if !s.mayContinue(ctx, &job) {
+		return
+	}
 	secret, err := s.openCredentials(job.ID, job.Secret)
 	if err != nil {
 		s.failJob(ctx, job, "credentials_unavailable")
@@ -159,21 +199,38 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, "insufficient_disk_space")
 		return
 	}
+	nodeState, stateErr := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID)
+	if stateErr != nil && !errors.Is(stateErr, store.ErrNotFound) {
+		s.failJob(ctx, job, "node_state_unavailable")
+		return
+	}
+	if errors.Is(stateErr, store.ErrNotFound) && remote.facts.AlreadyEnrolled {
+		s.failJob(ctx, job, "node_state_unavailable")
+		return
+	}
+	if nodeState == "retired" {
+		s.failJob(ctx, job, "node_retired")
+		return
+	}
+
+	if err := s.setPhase(ctx, &job, "firewall", "preparing_host_firewall", secret); err != nil {
+		return
+	}
+	if !s.mayContinue(ctx, &job) {
+		return
+	}
+	if err := prepareHostFirewall(ctx, conn, job.SSHPort); err != nil {
+		if ctx.Err() == nil {
+			s.failJob(ctx, job, "host_firewall_configuration_failed")
+		}
+		return
+	}
 
 	if !remote.facts.AlreadyEnrolled {
-		state, err := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			s.failJob(ctx, job, "node_state_unavailable")
-			return
-		}
-		if state == "retired" {
-			s.failJob(ctx, job, "node_retired")
-			return
-		}
 		// A used token is replayable only briefly. If the panel recorded enrollment but the
 		// node did not finish writing its identity, rotate the token and retry with the same
 		// persisted CSR key.
-		if state == "active" || secret.EnrollmentToken == "" || secret.TokenExpiresUnix <= s.cfg.Now().Unix() || secret.CAFingerprint == "" {
+		if nodeState == "active" || secret.EnrollmentToken == "" || secret.TokenExpiresUnix <= s.cfg.Now().Unix() || secret.CAFingerprint == "" {
 			spec := NodeSpec{ID: job.NodeID, Name: job.Name, Address: job.Address, CountryCode: job.CountryCode, Location: job.Location, Provider: job.Provider}
 			now := s.cfg.Now().UTC()
 			expires := now.Add(defaultEnrollmentTTL)
@@ -198,10 +255,16 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if err := s.setPhase(ctx, &job, "transfer", "uploading_agent", secret); err != nil {
 		return
 	}
+	if !s.mayContinue(ctx, &job) {
+		return
+	}
 	if err := uploadBinary(ctx, conn, binary, size, digest); err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, "agent_transfer_failed")
 		}
+		return
+	}
+	if !s.mayContinue(ctx, &job) {
 		return
 	}
 	if err := runSSH(ctx, conn, "install -o root -g root -m 0755 /root/mistgate-node.new /root/mistgate-node", nil, 20*time.Second); err != nil {
@@ -215,6 +278,9 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if err := s.setPhase(ctx, &job, "enrollment", "enrolling_node", secret); err != nil {
 			return
 		}
+		if !s.mayContinue(ctx, &job) {
+			return
+		}
 		if err := runEnrollment(ctx, conn, s.cfg.PanelAddr, s.cfg.AgentSNI, secret.CAFingerprint, secret.EnrollmentToken); err != nil {
 			if ctx.Err() == nil {
 				s.failJob(ctx, job, "node_enrollment_failed")
@@ -224,6 +290,9 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	}
 
 	if err := s.setPhase(ctx, &job, "install", "starting_agent", secret); err != nil {
+		return
+	}
+	if !s.mayContinue(ctx, &job) {
 		return
 	}
 	if err := runSSH(ctx, conn, "/root/mistgate-node install", nil, 45*time.Second); err != nil {
@@ -237,11 +306,54 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	}
 	if err := s.waitOnline(ctx, job.NodeID); err != nil {
 		if ctx.Err() == nil {
-			s.failJob(ctx, job, "node_not_connected")
+			if errors.Is(err, store.ErrNodeRetired) {
+				s.failJob(ctx, job, "node_retired")
+			} else {
+				s.failJob(ctx, job, "node_not_connected")
+			}
 		}
 		return
 	}
 	s.finishJob(ctx, job, secret)
+}
+
+func (s *Service) watchWorkerCancellation(ctx context.Context, jobID string, stop <-chan struct{}, cancel context.CancelFunc) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-stop:
+			return
+		case <-ticker.C:
+			state, err := s.st.NodeProvisionJobState(ctx, jobID)
+			if errors.Is(err, store.ErrNotFound) {
+				cancel()
+				return
+			}
+			if err == nil && state != "running" {
+				cancel()
+				return
+			}
+		}
+	}
+}
+
+// mayContinue checks persisted state immediately before a remote mutation. The watcher cancels commands
+// already in flight; such a command can still have an unknown partial outcome on the remote host.
+func (s *Service) mayContinue(ctx context.Context, job *store.NodeProvisionJob) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	state, err := s.st.NodeProvisionJobState(ctx, job.ID)
+	if err == nil && state == "running" {
+		return true
+	}
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.failJob(ctx, *job, "job_state_unavailable")
+	}
+	return false
 }
 
 func (s *Service) setPhase(ctx context.Context, job *store.NodeProvisionJob, phase, code string, secret credentials) error {
@@ -326,6 +438,13 @@ func (s *Service) waitOnline(ctx context.Context, nodeID string) error {
 	ticker := time.NewTicker(s.cfg.RetryDelay)
 	defer ticker.Stop()
 	for {
+		state, err := s.cfg.Nodes.ProvisionNodeState(ctx, nodeID)
+		if err != nil {
+			return err
+		}
+		if state == "retired" {
+			return store.ErrNodeRetired
+		}
 		if s.cfg.Nodes.ProvisionNodeConnected(nodeID) {
 			return nil
 		}
@@ -349,6 +468,13 @@ func readPreflight(ctx context.Context, conn *Connection, panelAddr string) (*re
 		return nil, err
 	}
 	return parsePreflightOutput(output)
+}
+
+func prepareHostFirewall(ctx context.Context, conn *Connection, sshPort uint16) error {
+	if sshPort == 0 {
+		return errors.New("provision: invalid SSH port for firewall preparation")
+	}
+	return runSSH(ctx, conn, "sh -s -- "+strconv.Itoa(int(sshPort)), strings.NewReader(remoteFirewallPreparationScript), 30*time.Second)
 }
 
 func parsePreflightOutput(output []byte) (*remotePreflight, error) {
@@ -508,7 +634,7 @@ func uploadBinary(ctx context.Context, conn *Connection, binary io.Reader, size 
 	}
 	read := size + 1 - limited.N
 	if read != size || hex.EncodeToString(digest.Sum(nil)) != expected {
-		_ = runSSH(context.WithoutCancel(ctx), conn, "rm -f /root/mistgate-node.new", nil, 10*time.Second)
+		_ = runSSH(ctx, conn, "rm -f /root/mistgate-node.new", nil, 10*time.Second)
 		return errors.New("provision: agent digest mismatch")
 	}
 	return nil

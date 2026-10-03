@@ -19,11 +19,12 @@ func (stub) Facts(context.Context) Facts {
 	h, _ := os.Hostname()
 	return Facts{Hostname: h, OS: runtime.GOOS, Arch: runtime.GOARCH, CPUCount: runtime.NumCPU(), Virt: "unknown", HasIPv6: hasGlobalIPv6()}
 }
-func (stub) Metrics() Metrics                         { return Metrics{} }
-func (stub) ApplyBaseline(context.Context) error      { return nil }
-func (stub) SetPortHops(context.Context, []Hop) error { return nil }
-func (stub) Cleanup(context.Context) error            { return nil }
-func (stub) SSHPorts() []uint16                       { return []uint16{22} }
+func (stub) Metrics() Metrics                                            { return Metrics{} }
+func (stub) ApplyBaseline(context.Context) error                         { return nil }
+func (stub) SetPortHops(context.Context, []Hop) error                    { return nil }
+func (stub) SyncInboundUDPPorts(context.Context, []UDPInboundPort) error { return nil }
+func (stub) Cleanup(context.Context) error                               { return nil }
+func (stub) SSHPorts() []uint16                                          { return []uint16{22} }
 
 var _ Fixer = stub{}
 
