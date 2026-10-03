@@ -71,6 +71,88 @@ func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 	}
 }
 
+func TestCancelQueuedProvisionClearsCredentialsAndCannotBeClaimed(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	job := NodeProvisionJob{
+		ID: "prv_cancel_queued", NodeID: "nod_cancel_queued", Name: "cancel-queued", Address: "edge.example.com",
+		SSHHost: "198.51.100.9", SSHPort: 22, HostFingerprint: "SHA256:pin",
+		Secret: []byte("sealed-password"), CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now,
+	}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute))
+	if err != nil || state != "cancelled" || !changed {
+		t.Fatalf("cancel queued = %q, %v, %v", state, changed, err)
+	}
+	loaded, err := st.NodeProvisionJob(ctx, job.ID)
+	if err != nil || loaded.State != "cancelled" || loaded.ErrorCode != "cancelled_before_start" || len(loaded.Secret) != 0 {
+		t.Fatalf("cancelled queued job = %+v, err %v", loaded, err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(2*time.Minute)); err != nil || ok {
+		t.Fatalf("cancelled job was claimed: ok=%v err=%v", ok, err)
+	}
+	if _, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute)); err != nil || changed {
+		t.Fatalf("repeated cancel = changed %v, err %v", changed, err)
+	}
+	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 10)
+	if err != nil || len(events) != 2 || events[1].Code != "cancelled_before_start" {
+		t.Fatalf("cancellation journal = %+v, err %v", events, err)
+	}
+}
+
+func TestCancelRunningProvisionIsTerminalAndSurvivesRestart(t *testing.T) {
+	for _, finishByRestart := range []bool{false, true} {
+		name := "worker finalizes"
+		if finishByRestart {
+			name = "restart finalizes"
+		}
+		t.Run(name, func(t *testing.T) {
+			st := openTemp(t)
+			ctx := context.Background()
+			now := time.Unix(1_800_000_000, 0).UTC()
+			job := NodeProvisionJob{
+				ID: "prv_cancel_running", NodeID: "nod_cancel_running", Name: "cancel-running", Address: "edge.example.com",
+				SSHHost: "198.51.100.10", SSHPort: 22, HostFingerprint: "SHA256:pin",
+				Secret: []byte("sealed-password"), CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now,
+			}
+			if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
+				t.Fatalf("claim running job: ok=%v err=%v", ok, err)
+			}
+			state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute))
+			if err != nil || state != "cancel_requested" || !changed {
+				t.Fatalf("request cancellation = %q, %v, %v", state, changed, err)
+			}
+			if err := st.UpdateRunningNodeProvisionJob(ctx, job.ID, "running", "transfer", "", job.Secret, now.Add(2*time.Minute)); !errors.Is(err, ErrConflict) {
+				t.Fatalf("active worker reverted cancellation: %v", err)
+			}
+			if finishByRestart {
+				if err := st.RequeueNodeProvisionJobs(ctx, now.Add(3*time.Minute)); err != nil {
+					t.Fatal(err)
+				}
+			} else if changed, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute)); err != nil || !changed {
+				t.Fatalf("worker finalizes cancellation: changed=%v err=%v", changed, err)
+			}
+			loaded, err := st.NodeProvisionJob(ctx, job.ID)
+			if err != nil || loaded.State != "cancelled" || loaded.ErrorCode != "remote_outcome_unknown" || len(loaded.Secret) != 0 {
+				t.Fatalf("terminal cancelled job = %+v, err %v", loaded, err)
+			}
+			events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 10)
+			if err != nil || len(events) != 4 || events[3].Code != "remote_outcome_unknown" {
+				t.Fatalf("cancellation journal = %+v, err %v", events, err)
+			}
+			if err := st.CompleteNodeProvisionJob(ctx, job.ID, NodeServerAccess{NodeID: job.NodeID}, now.Add(4*time.Minute)); !errors.Is(err, ErrNotFound) {
+				t.Fatalf("cancelled job was completed: %v", err)
+			}
+		})
+	}
+}
+
 func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testing.T) {
 	st := openTemp(t)
 	ctx := context.Background()

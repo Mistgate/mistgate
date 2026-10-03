@@ -35,7 +35,7 @@ Mistgate is pre-release. It runs in production for its author, but the API, the 
 | Stage | What |
 |:--|:--|
 | **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · GitHub panel self-update with checksum verification and rollback · API tokens and MCP server · admin UI in ru / en |
-| **M2 — in progress** | Go SSH node installer and MCP plan/apply · root or passwordless-sudo login · pinned host-key preflight · encrypted persistent SSH access with verified password rotation · signed agent installation and online check · encrypted panel backups and restore are still planned · [M2 plan](docs/en/roadmap/m2-ssh-provisioning.md) |
+| **M2 — implementation complete, release pending** | Owner UI and approved MCP SSH install · root or passwordless-sudo login · pinned host-key preflight · encrypted saved SSH access and verified password rotation · cancellation and retry-safe durable jobs · encrypted Cloudflare R2 backups and restore · [M2 details](docs/en/roadmap/m2-ssh-provisioning.md) |
 | **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 
@@ -48,7 +48,7 @@ Read the full documentation at [mistgate.app](https://mistgate.app/) (Russian: [
 - [Overview](docs/en/getting-started/overview.md): the concepts (panel, node, profile, user, group, device, subscription).
 - [Install the panel](docs/en/getting-started/install-panel.md), [add a node](docs/en/getting-started/add-node.md), [first users](docs/en/getting-started/first-users.md).
 - [AI agent setup](docs/en/getting-started/ai-agents.md): owner-approved MCP node installation, password rotation and staged updates.
-- [Health](docs/en/operations/health.md), [updates](docs/en/operations/updates.md), [security](docs/en/operations/security.md), [troubleshooting](docs/en/operations/troubleshooting.md).
+- [Health](docs/en/operations/health.md), [updates](docs/en/operations/updates.md), [encrypted backups](docs/en/operations/backups.md), [security](docs/en/operations/security.md), [troubleshooting](docs/en/operations/troubleshooting.md).
 - [CLI](docs/en/reference/cli.md), [configuration](docs/en/reference/configuration.md), [API](docs/en/reference/api.md), [MCP](docs/en/reference/mcp.md).
 
 ## Requirements
@@ -80,7 +80,9 @@ Open the setup link and create the owner (a passkey, or a password with an authe
 - `setup --admin-host` or `--admin-listen` put the admin on a secret host or a separate listener instead of the path prefix.
 - Everything outside the admin answers with the decoy site; `--decoy-dir` serves your own.
 
-To add a node, open **Nodes → Add node** in the admin. It shows a one-time command. Put the agent binary on the server as `/root/mistgate-node` (the panel prints the `scp` line once it holds a signed bundle) and run the command as root:
+To install a node automatically, open **Nodes → Add node → Set up SSH installation**. Enter its address and SSH login, verify the host-key fingerprint and preflight checks, then confirm the install. The panel installs the trusted agent, starts its service and waits for the node to connect.
+
+For a manual install, choose **Get a manual install command**. Put the agent binary on the server as `/root/mistgate-node` (the panel prints the `scp` line once it holds a signed bundle) and run the command as root:
 
 ```sh
 chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example.com:443 --sni <secret name> \

@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/backup"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/health"
@@ -40,6 +41,7 @@ type panelOpts struct {
 	panelAddr     string // host:port agents dial (goes into the install command); "" = not configured
 	dataDir       string // holds dist/, the release bundle of the node-agent updates
 	updateService string // systemd unit restarted by the GitHub panel updater
+	masterKey     []byte // the effective key (including systemd credentials) used by this panel process
 	title         string // subscription title apps show (the brand name)
 }
 
@@ -52,6 +54,7 @@ type panel struct {
 	update    *update.Service
 	warp      *warp.Service
 	provision *nodeprovision.Service
+	backup    *backup.Service
 	st        *store.Store // for the sweep of MCP plans
 	log       *slog.Logger
 	// desired is the desired-state source of the fleet (tests read it).
@@ -141,6 +144,13 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if err != nil {
 		return nil, err
 	}
+	bkp, err := backup.New(backup.Config{
+		Store: st, Vault: vlt, DataDir: o.dataDir, MasterKey: o.masterKey,
+		StepUp: authSvc.RequireStepUp, Log: log,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// WARP: the account of a node, registered at the owner's click or imported. The fleet asks it for the node's
 	// WarpSpec (only for agents that list warp/1) and hands it what the node reports; it asks the fleet whether the node
@@ -180,6 +190,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		func() (string, http.Handler) { return prov.Handler() },
 		func() (string, http.Handler) { return hl.Handler() },
 		func() (string, http.Handler) { return upd.Handler() },
+		func() (string, http.Handler) { return bkp.Handler() },
 	} {
 		path, handler := h()
 		admin = append(admin, httpserver.AdminHandler{Path: path, Handler: handler})
@@ -208,19 +219,20 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if err != nil {
 		return nil, err
 	}
-	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, provision: prov, desired: desired, st: st, log: log}, nil
+	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, provision: prov, backup: bkp, desired: desired, st: st, log: log}, nil
 }
 
 // run starts the background loops of the modules and serves until ctx ends or a listener fails.
 func (p *panel) run(ctx context.Context, o httpserver.ServeOptions) error {
 	bg, stop := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	wg.Add(6)
+	wg.Add(7)
 	go func() { defer wg.Done(); sweepPlans(bg, p.st, p.log) }()
 	go func() { defer wg.Done(); p.fleet.Run(bg) }()
 	go func() { defer wg.Done(); p.access.Run(bg) }()
 	go func() { defer wg.Done(); p.health.Run(bg) }()
 	go func() { defer wg.Done(); p.update.Run(bg) }()
+	go func() { defer wg.Done(); p.backup.Run(bg) }()
 	go func() {
 		defer wg.Done()
 		for bg.Err() == nil {

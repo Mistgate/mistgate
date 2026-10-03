@@ -3,23 +3,33 @@ title: Add a node
 description: Enroll a Linux server with the node agent, watch it come online, and remove it cleanly later.
 ---
 
-A node joins the fleet with one command: the agent exchanges a one-time token for a certificate from the panel, installs itself as a systemd service and connects. This page walks through it, explains what happens on the server, and shows how to take a node out again.
+A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** now offers two paths: install automatically over SSH, or create a one-time command for a manual install. This page covers both and explains how to remove a node later.
 
-For automatic installation from the admin, open `<admin URL>nodes/install` or use the owner-approved MCP flow in the [AI agent guide](ai-agents.md). The Go wizard supports root or an SSH login with non-interactive `sudo -n`, verifies the SSH fingerprint first, installs the signed agent bundle and saves the SSH password encrypted after the new node connects. The manual steps below remain available.
+## Automatic SSH installation
 
-## Before you start
+In **Nodes → Add node**, choose **Set up SSH installation**. The owner-only Go wizard opens under the panel's admin prefix, so it works when the admin URL uses a secret path.
+
+1. Enter the node name and client-facing address, then the server's public SSH host, port, login and password. Use `root` or an account with non-interactive `sudo -n`.
+2. The panel fetches the SSH host-key fingerprint. Compare and confirm that fingerprint before entering the password. The panel then checks the operating system, architecture, systemd, available memory and disk, and the connection back to the panel.
+3. Review the preflight results and confirm the install. Until this confirmation, the wizard does not change the server. The panel then installs the matching trusted agent, enrolls it, starts its systemd service and waits for it to connect.
+
+The wizard shows live progress and stable errors. Temporary SSH credentials are encrypted while a job runs and cleared when it ends. After the agent connects, the owner can reuse the saved SSH access for password rotation; the password is encrypted at rest and never shown in the UI or MCP reads. A node name is reserved while the node is live or an SSH install is active. Retiring a node keeps its history but releases its name.
+
+For owner-approved agent operation, see the [AI agent guide](ai-agents.md). The manual path is useful when the panel cannot reach the SSH host or you prefer to run the commands yourself.
+
+## Before a manual install
 
 - A server that meets the [requirements](requirements.md), with root over SSH.
 - The agent binary from the same build as the panel: `bin/mistgate-node-linux-amd64` or `bin/mistgate-node-linux-arm64`.
 - The panel must be reachable from the server at its public address on TCP 443 (or at the address you gave `serve --agent-addr`). The panel never connects to the node.
 
-## 1. Create the install command
+## 1. Choose manual installation
 
-In the admin open **Nodes → Add node**. The same window opens from the **Add node** tile on the Overview, from the command palette and from the end of the setup wizard.
+In **Nodes → Add node**, choose **Get a manual install command**. The same window opens from the **Add node** tile on the Overview, the command palette and the end of the setup wizard.
 
 | Field | What to enter |
 |:--|:--|
-| Name | a–z, 0–9 and dash, 2 to 24 characters, for example `de1`. Names are unique, and a retired node keeps its name. |
+| Name | a–z, 0–9 and dash, 2 to 24 characters, for example `de1`. Names are unique among live nodes and active SSH installs; retiring a node releases its name while keeping its history. |
 | Country | Optional. It matters for DNS: on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS. |
 | Address | A domain or an IP, without `https://` and without a port. Clients connect to it, and it goes into every subscription. A Let's Encrypt certificate for Hysteria2 needs a domain whose A record points at the server. |
 
@@ -120,7 +130,7 @@ Open the node, **Settings → Danger zone → Retire from fleet**, and type the 
 
 - takes the node out of every user's access: users stop getting it in their subscription, their links stay the same;
 - revokes the node's certificate and cancels its unused install commands;
-- keeps the node's record and history (and its name) in the panel and the audit log.
+- keeps the node's record and history in the panel and the audit log; its name becomes available for a later install.
 
 If the agent is connected, it gets the order to retire and, on the server:
 

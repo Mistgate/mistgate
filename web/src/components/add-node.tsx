@@ -13,16 +13,14 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { CreateEnrollmentResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { plain, type Plain } from "@/lib/plain";
 import { useT } from "@/i18n";
-import { nodes as nodesApi } from "@/lib/api";
+import { basepath, nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { nodeKind, useNodeStatus } from "@/lib/node-status";
 
-// "Add node": the panel makes the node row (PENDING) and a
-// one-time enrollment; the admin puts the binary on the server, runs the one-line command, and the node flips to
-// ONLINE live.
+// New nodes can be installed automatically over SSH or enrolled with the manual one-time command below.
 
 export type AddNodeTarget = { id: string; name: string };
 type Open = (reenroll?: AddNodeTarget) => void;
@@ -64,6 +62,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   const [address, setAddress] = useState("");
   const [country, setCountry] = useState(none);
   const [touched, setTouched] = useState(false);
+  const [method, setMethod] = useState<"choose" | "manual">("choose");
   const [issued, setIssued] = useState<Plain<CreateEnrollmentResponse> | null>(null);
 
   // The token is single-use and shown once: once the modal is closed (after its exit animation) drop it from memory.
@@ -77,6 +76,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   const addressError = !reenroll && !addressPattern.test(address.trim()) ? t("node.add.addressError") : undefined;
   // said before the click: a node on an IP gets no Let's Encrypt certificate
   const ip = !reenroll && !addressError && isIPAddress(address.trim());
+  const installHref = `${basepath.replace(/\/+$/, "")}/nodes/install`;
 
   const countries = useMemo(
     () => [
@@ -117,12 +117,40 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={issued ? t("node.add.commandTitle", { name: issued.node?.name ?? "" }) : reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("node.add.title")}
-      description={issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : t("node.add.body")}
+      description={issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" ? t("node.add.manualBody") : t("node.add.body")}
     >
       {issued ? (
         <InstallSteps issued={issued} onClose={onClose} />
+      ) : !reenroll && method === "choose" ? (
+        <div className="flex flex-col gap-4">
+          <section className="rounded-card border border-accent/40 bg-accent/5 p-4">
+            <h3 className="text-base font-bold text-ink">{t("node.add.sshInstallTitle")}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">{t("node.add.sshInstallHint")}</p>
+            <a
+              href={installHref}
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-field bg-accent px-4 py-2 text-sm font-bold text-on-accent shadow-sm transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {t("node.add.sshInstall")}
+              <span aria-hidden="true">→</span>
+            </a>
+          </section>
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-center text-xs text-muted">{t("node.add.manualDivider")}</p>
+            <Button type="button" variant="outline" size="md" onClick={() => setMethod("manual")}>
+              {t("node.add.manualOption")}
+            </Button>
+          </div>
+        </div>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3.5">
+          {!reenroll && (
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-ink">{t("node.add.manualTitle")}</h3>
+              <Button type="button" variant="ghost" size="md" onClick={() => { create.reset(); setTouched(false); setMethod("choose"); }}>
+                {t("node.add.manualBack")}
+              </Button>
+            </div>
+          )}
           {!reenroll && (
             <>
               <TextField

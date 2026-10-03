@@ -157,7 +157,7 @@ func runServe(args []string) error {
 	}
 	p, err := newPanel(st, vlt, authSvc, panelOpts{
 		in: in, decoyDir: *decoyDir, title: brand.BrandName(), dataDir: *dataDir,
-		panelAddr: agentAddress(*agentAddr, *agentListen, in.PublicURL), updateService: *updateService,
+		panelAddr: agentAddress(*agentAddr, *agentListen, in.PublicURL), updateService: *updateService, masterKey: key,
 	}, log)
 	if err != nil {
 		return err

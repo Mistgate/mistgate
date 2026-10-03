@@ -9,6 +9,7 @@ import { AddNodeProvider, useAddNode } from "./add-node";
 const createEnrollment = vi.fn();
 const getNode = vi.fn();
 vi.mock("@/lib/api", () => ({
+  basepath: "/secret-panel/",
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: (...a: unknown[]) => getNode(...a) },
 }));
 const navigate = vi.fn();
@@ -68,6 +69,11 @@ async function open() {
   await settle();
 }
 
+async function manual() {
+  await click(button("Get a manual install command"));
+  await settle();
+}
+
 const issued = (over: Record<string, unknown> = {}) => ({
   node: { id: "nod_1", name: "de1", status: NodeStatus.PENDING, online: [], protocols: [] },
   installCommand: "chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel p:443 --sni s --ca-sha256 ab --token tok && /root/mistgate-node install",
@@ -80,6 +86,7 @@ const issued = (over: Record<string, unknown> = {}) => ({
 async function issue(over: Record<string, unknown> = {}) {
   createEnrollment.mockResolvedValue(issued(over));
   await open();
+  await manual();
   await type(input("de1"), "de1");
   await type(input("de1.example.com"), "de1.example.com");
   await click(button("Create install command"));
@@ -90,6 +97,12 @@ async function issue(over: Record<string, unknown> = {}) {
 describe("the add-node window", () => {
   it("says before the click that an IP gets no Let's Encrypt certificate, and what to do", async () => {
     await open();
+    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')?.textContent).toContain("Install automatically over SSH");
+    expect(text()).toContain("Automatic installation over SSH");
+    expect(input("de1")).toBeNull();
+    await manual();
+    expect(input("de1")).not.toBeNull();
+    expect(text()).toContain("run the one-time install command on the server yourself");
     expect(text()).toContain("A Let’s Encrypt certificate needs a domain with an A record");
     expect(text()).toContain("Needed for DNS: on nodes in Russia the panel checks Yandex DNS and Gosuslugi.");
     await type(input("de1.example.com"), "203.0.113.10");
@@ -102,6 +115,7 @@ describe("the add-node window", () => {
   it("keeps a refusal in the window, above its buttons", async () => {
     createEnrollment.mockRejectedValue(new ConnectError("name_taken", Code.AlreadyExists));
     await open();
+    await manual();
     await type(input("de1"), "de1");
     await type(input("de1.example.com"), "de1.example.com");
     await click(button("Create install command"));

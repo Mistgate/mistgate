@@ -13,20 +13,31 @@ function page(lang, key) {
   return readFileSync(join(dist, path), "utf8");
 }
 
-test("M2 roadmap pages report shipped SSH provisioning and remaining backup work", () => {
+test("M2 roadmap pages describe SSH provisioning and panel recovery", () => {
   const en = page("en", "roadmap/m2-ssh-provisioning");
   const ru = page("ru", "roadmap/m2-ssh-provisioning");
 
-  assert.ok(en.includes("M2: SSH provisioning and recovery"));
-  assert.ok(en.includes("Go SSH installer"));
+  assert.ok(en.includes("M2: SSH installation and recovery"));
+  assert.ok(en.includes("Go-rendered page"));
   assert.ok(en.includes("/nodes/install"));
-  assert.ok(en.includes("M2 is not complete"));
-  assert.ok(en.includes("password rotation"));
+  assert.ok(en.includes("M2 is complete when"));
+  assert.ok(en.includes("Password rotation"));
   assert.ok(ru.includes("M2: установка по SSH и восстановление"));
   assert.ok(ru.includes("Go-мастер"));
   assert.ok(ru.includes("/nodes/install"));
-  assert.ok(ru.includes("M2 не завершён"));
-  assert.ok(ru.includes("смена пароля"));
+  assert.ok(ru.includes("M2 завершён, когда"));
+  assert.ok(ru.includes("сменой пароля"));
+});
+
+test("encrypted panel backup guides are published in both languages", () => {
+  const en = page("en", "operations/backups");
+  const ru = page("ru", "operations/backups");
+  assert.ok(en.includes("Cloudflare R2"));
+  assert.ok(en.includes("age identity"));
+  assert.ok(en.includes("Restore into a "));
+  assert.ok(ru.includes("Cloudflare R2"));
+  assert.ok(ru.includes("закрытый age-ключ"));
+  assert.ok(ru.includes("каталог данных"));
 });
 
 test("AI agent install guide and llms.txt are published in both languages", () => {

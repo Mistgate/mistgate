@@ -119,17 +119,7 @@ The users' page passwords are not stored: they are derived from the master key. 
 
 ### Backups
 
-There are no automatic backups yet; encrypted panel backups are planned. Make a copy yourself, with the panel stopped:
-
-```sh
-systemctl stop mistgate     # the name of your unit
-tar czf mistgate-backup-$(date +%F).tgz -C /var/lib mistgate
-systemctl start mistgate
-```
-
-> **Warning:** The copy holds the master key: whoever has it can read every secret of the panel. Keep it encrypted and off the panel server.
-
-To restore, stop the panel, put the directory back in place (owned by the user that runs the panel, mode 0700) and start it.
+Owner-only encrypted backups to Cloudflare R2 are available under **Settings → Backups**. They are off until configured and require an offline age recovery identity. Read [Encrypted panel backups](backups.md) before enabling them; it covers token permissions, retention and restore into a fresh data directory.
 
 ## Recovering access
 

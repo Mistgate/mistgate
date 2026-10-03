@@ -70,6 +70,8 @@ type Service struct {
 	ssh      *Client
 	work     chan struct{}
 	accessMu sync.Mutex
+	cancelMu sync.Mutex
+	active   map[string]context.CancelFunc
 }
 
 type credentials struct {
@@ -110,7 +112,7 @@ func NewService(st *store.Store, vlt *vault.Vault, cfg Config) (*Service, error)
 	if cfg.RetryDelay <= 0 {
 		cfg.RetryDelay = 2 * time.Second
 	}
-	return &Service{st: st, vault: vlt, cfg: cfg, ssh: cfg.SSH, work: make(chan struct{}, 1)}, nil
+	return &Service{st: st, vault: vlt, cfg: cfg, ssh: cfg.SSH, work: make(chan struct{}, 1), active: make(map[string]context.CancelFunc)}, nil
 }
 
 // Handler mounts the owner-only ProvisioningService Connect handler.
@@ -254,6 +256,53 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 	s.audit(ctx, "node.ssh_provision_retry", map[string]string{"job_id": job.ID, "node_id": job.NodeID})
 	s.signalWorker()
 	return connect.NewResponse(&adminv1.RetryNodeProvisionResponse{Job: toProvisionJob(job)}), nil
+}
+
+// CancelNodeProvision stops a queued install immediately or asks the active SSH
+// worker to stop. An active cancellation is reported as uncertain because remote
+// commands may already have changed the host.
+func (s *Service) CancelNodeProvision(ctx context.Context, jobID string) (string, error) {
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return "", err
+	}
+	jobID = strings.TrimSpace(jobID)
+	if len(jobID) < 5 || len(jobID) > 64 {
+		return "", invalidArgument("invalid provisioning job id")
+	}
+	job, err := s.st.NodeProvisionJob(ctx, jobID)
+	if errors.Is(err, store.ErrNotFound) {
+		return "", connect.NewError(connect.CodeNotFound, errors.New("provision_job_not_found"))
+	}
+	if err != nil {
+		s.cfg.Log.Error("read node provisioning job before cancellation", "err", err)
+		return "", internalConnectError()
+	}
+	state, changed, err := s.st.RequestCancelNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC())
+	if errors.Is(err, store.ErrConflict) {
+		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("provision_job_not_cancellable"))
+	}
+	if err != nil {
+		s.cfg.Log.Error("request node provisioning cancellation", "job_id", jobID, "err", err)
+		return "", internalConnectError()
+	}
+	if state == "cancel_requested" {
+		s.cancelWorker(jobID)
+	}
+	if changed {
+		s.audit(ctx, "node.ssh_provision_cancel", map[string]string{
+			"job_id": jobID, "node_id": job.NodeID, "state": state,
+		})
+	}
+	return state, nil
+}
+
+func (s *Service) cancelWorker(jobID string) {
+	s.cancelMu.Lock()
+	cancel := s.active[jobID]
+	s.cancelMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 // GetNodeProvision returns public job status; its encrypted secret is omitted.

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+service BackupService {
+  rpc GetBackupSettings(GetBackupSettingsRequest) returns (GetBackupSettingsResponse);
+  rpc UpdateBackupSettings(UpdateBackupSettingsRequest) returns (UpdateBackupSettingsResponse);
+  rpc TestBackupStorage(TestBackupStorageRequest) returns (TestBackupStorageResponse);
+  rpc CreateBackup(CreateBackupRequest) returns (CreateBackupResponse);
+  rpc ListBackups(ListBackupsRequest) returns (ListBackupsResponse);
+}
+
+message GetBackupSettingsRequest {}
+
+message BackupSettings {
+  string account_id = 1;
+  string jurisdiction = 2;
+  string bucket = 3;
+  string access_key_id = 4;
+  bool has_secret = 5;
+  string age_recipient = 6;
+  bool enabled = 7;
+  int32 interval_hours = 8;
+  int32 retention_days = 9;
+  int64 last_success_unix = 10;
+  string last_error_code = 11;
+}
+
+message GetBackupSettingsResponse { BackupSettings settings = 1; }
+
+message UpdateBackupSettingsRequest {
+  string account_id = 1;
+  string jurisdiction = 2;
+  string bucket = 3;
+  string access_key_id = 4;
+  string secret_access_key = 5;
+  string age_recipient = 6;
+  bool enabled = 7;
+  int32 interval_hours = 8;
+  int32 retention_days = 9;
+  bool clear_secret = 10;
+}
+
+message UpdateBackupSettingsResponse { BackupSettings settings = 1; }
+
+message TestBackupStorageRequest {}
+message TestBackupStorageResponse { bool ok = 1; }
+
+message CreateBackupRequest {}
+message CreateBackupResponse {
+  Backup backup = 1;
+  string warning_code = 2;
+}
+
+message ListBackupsRequest {}
+message ListBackupsResponse { repeated Backup backups = 1; }
+
+message Backup {
+  string key = 1;
+  int64 size_bytes = 2;
+  int64 created_unix = 3;
+}

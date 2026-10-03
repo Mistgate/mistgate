@@ -65,7 +65,18 @@ func (s *Service) Run(ctx context.Context) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
+		// Keep the claim and active-cancel registration in one critical section.
+		// A cancellation request either wins before the claim or sees the cancel
+		// function after the row becomes running.
+		s.cancelMu.Lock()
 		job, ok, err := s.st.ClaimNodeProvisionJob(ctx, s.cfg.Now())
+		var jobCtx context.Context
+		var cancel context.CancelFunc
+		if ok {
+			jobCtx, cancel = context.WithCancel(ctx)
+			s.active[job.ID] = cancel
+		}
+		s.cancelMu.Unlock()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -73,7 +84,11 @@ func (s *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("provision: claim job: %w", err)
 		}
 		if ok {
-			s.runJob(ctx, job)
+			s.runJob(jobCtx, job)
+			cancel()
+			s.cancelMu.Lock()
+			delete(s.active, job.ID)
+			s.cancelMu.Unlock()
 			continue
 		}
 		select {
@@ -86,6 +101,7 @@ func (s *Service) Run(ctx context.Context) error {
 }
 
 func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
+	defer s.finishCancellation(job.ID)
 	secret, err := s.openCredentials(job.ID, job.Secret)
 	if err != nil {
 		s.failJob(ctx, job, "credentials_unavailable")
@@ -235,7 +251,7 @@ func (s *Service) setPhase(ctx context.Context, job *store.NodeProvisionJob, pha
 		return err
 	}
 	now := s.cfg.Now().UTC()
-	if err := s.st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "running", phase, "", sealed, code, now); err != nil {
+	if err := s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "running", phase, "", sealed, code, now); err != nil {
 		s.failJob(ctx, *job, "job_state_unavailable")
 		return err
 	}
@@ -248,7 +264,7 @@ func (s *Service) persistSecret(ctx context.Context, id string, job *store.NodeP
 	if err != nil {
 		return err
 	}
-	if err := s.st.UpdateNodeProvisionJob(ctx, id, "running", job.Phase, "", sealed, s.cfg.Now().UTC()); err != nil {
+	if err := s.st.UpdateRunningNodeProvisionJob(ctx, id, "running", job.Phase, "", sealed, s.cfg.Now().UTC()); err != nil {
 		return err
 	}
 	job.Secret = sealed
@@ -260,9 +276,12 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 		return
 	}
 	now := s.cfg.Now().UTC()
-	if err := s.st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "failed", "failed", code, []byte{}, code, now); err != nil {
+	if err := s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "failed", "failed", code, []byte{}, code, now); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return // A cancellation or another terminal transition won the race.
+		}
 		s.cfg.Log.Error("mark node provisioning failed", "job_id", job.ID, "error_code", code, "err", err)
-		if fallbackErr := s.st.UpdateNodeProvisionJob(ctx, job.ID, "failed", "failed", code, []byte{}, now); fallbackErr != nil {
+		if fallbackErr := s.st.UpdateRunningNodeProvisionJob(ctx, job.ID, "failed", "failed", code, []byte{}, now); fallbackErr != nil {
 			s.cfg.Log.Error("clear failed node provisioning job secret", "job_id", job.ID, "err", fallbackErr)
 		}
 		return
@@ -286,6 +305,19 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 	}
 	s.audit(context.WithoutCancel(ctx), "node.ssh_provision_complete", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
 	secret.Password, secret.EnrollmentToken = "", ""
+}
+
+func (s *Service) finishCancellation(jobID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	changed, err := s.st.FinishCancelledNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC())
+	if err != nil {
+		s.cfg.Log.Error("finish cancelled node provisioning job", "job_id", jobID, "err", err)
+		return
+	}
+	if changed {
+		s.cfg.Log.Warn("node provisioning cancelled; remote state may be partial", "job_id", jobID)
+	}
 }
 
 func (s *Service) waitOnline(ctx context.Context, nodeID string) error {

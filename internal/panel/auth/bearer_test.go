@@ -932,10 +932,10 @@ func TestTokenAllowList(t *testing.T) {
 	if !NeedsStepUp(pStartRollout) || NeedsStepUp(pApplyFix) || NeedsStepUp(pGetUser) {
 		t.Error("NeedsStepUp")
 	}
-	// step-up procedures that exist today, as the plan lists them (the handlers call RequireStepUp), plus the password
-	// change, the authenticator enrollment and the login captcha of Settings -> Security
-	if len(stepUpProcedures) != 24 {
-		t.Errorf("%d step-up procedures, want 24", len(stepUpProcedures))
+	// Step-up procedures include the protected handlers, password changes, authenticator enrollment, login captcha,
+	// and the three backup operations that reveal or write sensitive infrastructure data.
+	if len(stepUpProcedures) != 27 {
+		t.Errorf("%d step-up procedures, want 27", len(stepUpProcedures))
 	}
 }
 
