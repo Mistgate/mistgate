@@ -218,14 +218,14 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	h, cache := r.handler(nil)
 	_, tok := r.user("alice", nil)
 
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Germany" {
-		t.Fatalf("default name = %q, want flag and country", got)
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Germany · p" {
+		t.Fatalf("default name = %q, want flag, country, and profile", got)
 	}
 	ru := "ru"
 	if _, err := instance.Update(r.ctx, r.st, instance.Patch{Language: &ru}); err != nil {
 		t.Fatal(err)
 	}
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Германия" {
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Германия · p" {
 		t.Fatalf("a Russian instance: %q", got)
 	}
 	en := "en"
@@ -242,7 +242,7 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 		t.Errorf("edited template: %q", got)
 	}
 
-	// A second profile on the same node: the second name gets a number, the panel's profile names stay out of it.
+	// A second profile on the same node: both names follow the profile labels saved in the panel.
 	prof2 := must(r.svc.CreateProfile(r.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{Protocol: "hysteria2", Name: "second", SettingsJson: secondSettings(t, r)}))).Msg.Profile
 	must(r.svc.CreateInbound(r.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: prof2.Id, NodeId: "nod_1"})))
 	g := must(r.svc.CreateGroup(r.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "g2", ProfileIds: []string{prof2.Id, r.profile}}))).Msg.Group.Id
@@ -250,7 +250,9 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	if _, err := cache.Update(r.ctx, subsettings.Defaults()); err != nil {
 		t.Fatal(err)
 	}
-	if got := fragmentsOf(t, fetch(h, "/"+tok2, curlUA)); strings.Join(got, "|") != de+" Germany|"+de+" Germany 2" {
+	got := fragmentsOf(t, fetch(h, "/"+tok2, curlUA))
+	want := map[string]bool{de + " Germany · p": true, de + " Germany · second": true}
+	if len(got) != len(want) || !want[got[0]] || !want[got[1]] {
 		t.Errorf("two profiles on one node: %q", got)
 	}
 }
@@ -265,7 +267,7 @@ func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	}
 	h, _ := r.handler(nil)
 	_, tok := r.user("alice", nil)
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); strings.Join(got, "|") != de+" Germany" {
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); strings.Join(got, "|") != de+" Germany · p" {
 		t.Fatalf("before: %q", got)
 	}
 	for _, name := range []string{"ade0", "ade00"} {
@@ -276,7 +278,7 @@ func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	}
 	_, tok = r.user("bob", nil) // a token whose data is not cached yet
 	got := fragmentsOf(t, fetch(h, "/"+tok, curlUA))
-	if strings.Join(got, "|") != de+" Germany|"+de+" Germany 2|"+de+" Germany 3" {
+	if strings.Join(got, "|") != de+" Germany · p|"+de+" Germany · p 2|"+de+" Germany · p 3" {
 		t.Fatalf("after two servers were added: %q", got)
 	}
 	// in the order they came: the old one first, then the first of the two new ones

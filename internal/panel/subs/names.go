@@ -23,8 +23,8 @@ func flagEmoji(cc string) string {
 }
 
 // remarks renders the server name of every server of one user from the template, then makes them unique: a name that
-// is already taken gets a number, from 2 on ("🇩🇪 Germany", "🇩🇪 Germany 2"). The profile name shows only where the
-// template asks for it ({profile}): it is the panel's word, not the friend's. lang only matters for {country}.
+// is already taken gets a number, from 2 on ("🇩🇪 Germany · Hysteria2", "🇩🇪 Germany · Hysteria2 2"). The profile
+// name can distinguish protocols and WARP exits. lang only matters for {country}.
 // web/src/screens/subscriptions/model.ts serverNames draws the admin's preview by the same rules.
 func remarks(servers []access.SubServer, template, lang string) []string {
 	if template == "" {
@@ -60,7 +60,9 @@ func clean(s string) string {
 		}
 		return r
 	}, s)
-	return strings.Join(strings.Fields(s), " ")
+	// A template often puts separators between optional pieces. If {country} or {profile} is empty, remove a
+	// dangling middle dot as well as the surrounding space.
+	return strings.Trim(strings.Join(strings.Fields(s), " "), " ·")
 }
 
 // withRemark replaces the #fragment of a share link with the given remark, percent-encoded (UTF-8 included).

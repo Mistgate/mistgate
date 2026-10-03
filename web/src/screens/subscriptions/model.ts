@@ -135,10 +135,10 @@ export function flagOf(code: string): string {
   return [...code.toUpperCase()].map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join("");
 }
 
-/** The default server-name template (subsettings.DefaultNameTemplate): the country, as a friend knows it. */
-export const defaultNameTemplate = "{flag} {country}";
+/** The default server-name template (subsettings.DefaultNameTemplate): country and profile, including WARP twins. */
+export const defaultNameTemplate = "{flag} {country} · {profile}";
 
-/** The server name the subscription would carry: the template with its placeholders filled, spaces tidied. */
+/** The server name the subscription would carry: placeholders filled, spaces tidied, and dangling separators removed. */
 export function renderName(template: string, v: { flag: string; country: string; node: string; profile: string }): string {
   const tpl = template.trim() === "" ? defaultNameTemplate : template;
   return tpl
@@ -147,13 +147,15 @@ export function renderName(template: string, v: { flag: string; country: string;
     .replaceAll("{node}", v.node)
     .replaceAll("{profile}", v.profile)
     .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:·\s*)+|(?:\s*·)+$/g, "")
     .trim();
 }
 
 /**
  * The names of one person's servers, in order, by the rules of the subscription (internal/panel/subs/names.go remarks):
- * the template, the node when it renders to nothing, and a number from 2 on for a name that is already taken
- * ("🇩🇪 Германия", "🇩🇪 Германия 2"). `country` names a country code.
+ * the template, the node when it renders to nothing, and a number from 2 on for a rendered name that is already taken
+ * ("🇩🇪 Германия · Hysteria2", "🇩🇪 Германия · Hysteria2 2"). `countryCode` names a country code.
  */
 export function serverNames(template: string, servers: readonly { node: string; countryCode: string; profile: string }[], country: (code: string) => string): string[] {
   const taken = new Set<string>();

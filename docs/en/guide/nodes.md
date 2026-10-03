@@ -159,7 +159,7 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **AmneziaWG 
 
 #### Renaming a node
 
-Change **Name** and save. The name shows in the panel, in the file names of AmneziaWG configs, and in the server names of the apps only when the name template uses {node} (the default template uses the country). See [Subscriptions](subscriptions.md).
+Change **Name** and save. The name shows in the panel, in the file names of AmneziaWG configs, and in app server names only when the template uses `{node}`. The default uses the country and profile name. See [Subscriptions](subscriptions.md).
 
 ### Danger zone: retiring a node
 

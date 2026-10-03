@@ -153,7 +153,7 @@ On the profile page, under **Where it runs**, **WARP copy** (or **Copy without W
 - no port hopping (the two ranges would overlap);
 - the same nodes and the same groups. Nodes without a working WARP are listed and unticked for a WARP twin: it would carry nothing there.
 
-Save your changes first: the copy is made from the saved profile. People of those groups then see each node twice in the app. With the default server name template the second one gets a number ("🇩🇪 Germany 2"); add {profile} to the template to tell them apart by name, see [Subscriptions](subscriptions.md). For AmneziaWG every person who wants the twin needs a separate device (key) for it. WARP itself is on [WARP](warp.md).
+Save your changes first: the copy is made from the saved profile. People of those groups then see each node twice in the app. The default server name includes the profile name, so the WARP twin keeps its "· WARP" label; see [Subscriptions](subscriptions.md) to customize the names. For AmneziaWG every person who wants the twin needs a separate device (key) for it. WARP itself is on [WARP](warp.md).
 
 ## Deleting a profile
 

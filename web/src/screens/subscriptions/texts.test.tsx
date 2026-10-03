@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 const settings = (over: Partial<Settings> = {}): Settings =>
-  ({ title: "", announcement: "", supportUrl: "", updateIntervalHours: 12, serverNameTemplate: "{flag} {country}", rules: [], defaultDnsPresetId: "", apps: [], userPage: { showAnnouncement: true, showSupport: true, showQr: true }, ...over }) as Settings;
+  ({ title: "", announcement: "", supportUrl: "", updateIntervalHours: 12, serverNameTemplate: "{flag} {country} · {profile}", rules: [], defaultDnsPresetId: "", apps: [], userPage: { showAnnouncement: true, showSupport: true, showQr: true }, ...over }) as Settings;
 
 async function mount(data: Parameters<typeof TextsTab>[0]["data"]) {
   host = document.createElement("div");
@@ -51,7 +51,7 @@ describe("the preview of names and texts", () => {
 
   it("draws the busiest group's real servers by the subscription's rules, and says which group", async () => {
     await mount({ settings: settings(), effectiveTitle: "Mistgate", samples, sampleGroup: "Все", namesLanguage: "ru" });
-    expect(rows()).toEqual(["Германия", "Германия 2", "Нидерланды"]); // the flags are drawn, not text
+    expect(rows()).toEqual(["Германия · hy2", "Германия · hy2 · WARP", "Нидерланды · hy2"]); // the flags are drawn, not text
     expect(document.body.textContent).toContain("Серверы группы «Все» — так их видят в Happ её люди.");
     await type(document.querySelector<HTMLInputElement>("#subs-template")!, "{node} · {profile}");
     expect(rows()).toEqual(["de1 · hy2", "de1 · hy2 · WARP", "nl1 · hy2"]);

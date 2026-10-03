@@ -136,11 +136,9 @@ func TestMihomoSubscription(t *testing.T) {
 	body := gunzip(t, rec.Body.Bytes())
 	p := parseYAML(t, body)
 	hy, wg := byType(t, p)
-	// Both servers are on de1 (no country): the template gives the same name, so the second gets a number (as the base64
-	// list does), never the panel's profile name.
-	// (which of the two comes first is the order of the inbounds: made in the same second here, so by their ids)
+	// Both servers are on de1 (no country): the default uses their saved profile names, so the protocol variants stay clear.
 	nh, nw := hy["name"].(string), wg["name"].(string)
-	if !(nh == "de1" && nw == "de1 2" || nh == "de1 2" && nw == "de1") {
+	if nh != "p" || nw != "awg31" {
 		t.Errorf("names = %q %q", nh, nw)
 	}
 	if len(p.Groups) != 1 || p.Groups[0].Name != title || strings.Join(p.Groups[0].Proxies, "|") != p.Proxies[0]["name"].(string)+"|"+p.Proxies[1]["name"].(string)+"|DIRECT" {
@@ -273,8 +271,7 @@ var (
 	_ subs.Source       = (*access.Service)(nil)
 )
 
-// A WARP profile is a profile like any other: its server is one more entry of the profile, named apart from the direct
-// one of the same node by a number (the one made first keeps the plain name).
+// The default subscription names include the profile name, so a WARP profile stays visibly separate from the direct one.
 func TestWarpProfileIsASeparateServer(t *testing.T) {
 	m := newM3Rig(t)
 	w := must(m.svc.CreateProfile(m.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
@@ -292,11 +289,11 @@ func TestWarpProfileIsASeparateServer(t *testing.T) {
 	for _, px := range p.Proxies {
 		names = append(names, px["name"].(string))
 	}
-	if strings.Join(names, "|") != "de1|de1 2" {
+	if strings.Join(names, "|") != "p|WARP" {
 		t.Errorf("names = %q", names)
 	}
 	if got := decodeList(t, fetch(h, "/"+tok, happUA).Body.String()); len(got) != 2 ||
-		decodeQueryName(t, got[0])+"|"+decodeQueryName(t, got[1]) != "de1|de1 2" {
+		decodeQueryName(t, got[0])+"|"+decodeQueryName(t, got[1]) != "p|WARP" {
 		t.Errorf("list = %q", got)
 	}
 }

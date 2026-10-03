@@ -77,7 +77,7 @@ func TestDefaultsRecommendHappAndLinkTheStores(t *testing.T) {
 		amnezia[adminv1.Platform_PLATFORM_WINDOWS] != "https://amnezia.org/downloads" || amnezia[adminv1.Platform_PLATFORM_LINUX] != "https://amnezia.org/downloads" {
 		t.Errorf("AmneziaVPN links = %v", amnezia)
 	}
-	if s.ServerNameTemplate != "{flag} {country}" {
+	if s.ServerNameTemplate != DefaultNameTemplate {
 		t.Errorf("template = %q", s.ServerNameTemplate)
 	}
 }

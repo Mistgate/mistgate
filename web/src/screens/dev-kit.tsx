@@ -232,7 +232,7 @@ const demoSubSettings = {
   announcement: "В субботу с 02:00 до 03:00 обновляю серверы в Германии и Финляндии — может моргнуть на пару минут. Если после этого не подключается, обновите подписку в Happ: потяните список вниз. Спасибо, что терпите, и хороших выходных!",
   supportUrl: "https://t.me/example_support",
   updateIntervalHours: 12,
-  serverNameTemplate: "{flag} {country}",
+  serverNameTemplate: "{flag} {country} · {profile}",
   rules: [],
   defaultDnsPresetId: "",
   apps: [],

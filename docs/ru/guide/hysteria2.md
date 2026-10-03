@@ -87,7 +87,7 @@ hysteria2://<токен>@de1.example.com:443/?obfs=salamander&obfs-password=<п�
 **Mihomo YAML.** Приложения на ядре mihomo (Clash Verge, FlClash и другие) получают по прокси на каждый сервер:
 
 ```yaml
-- name: "🇩🇪 Германия"
+- name: "🇩🇪 Германия · Hysteria2"
   type: hysteria2
   server: "de1.example.com"
   port: 443
