@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { SSHNodeInstall } from "@/components/ssh-node-install";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -13,7 +14,7 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { CreateEnrollmentResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { plain, type Plain } from "@/lib/plain";
 import { useT } from "@/i18n";
-import { basepath, nodes as nodesApi } from "@/lib/api";
+import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
@@ -62,7 +63,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   const [address, setAddress] = useState("");
   const [country, setCountry] = useState(none);
   const [touched, setTouched] = useState(false);
-  const [method, setMethod] = useState<"choose" | "manual">("choose");
+  const [method, setMethod] = useState<"choose" | "manual" | "ssh">("choose");
   const [issued, setIssued] = useState<Plain<CreateEnrollmentResponse> | null>(null);
 
   // The token is single-use and shown once: once the modal is closed (after its exit animation) drop it from memory.
@@ -76,7 +77,10 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   const addressError = !reenroll && !addressPattern.test(address.trim()) ? t("node.add.addressError") : undefined;
   // said before the click: a node on an IP gets no Let's Encrypt certificate
   const ip = !reenroll && !addressError && isIPAddress(address.trim());
-  const installHref = `${basepath.replace(/\/+$/, "")}/nodes/install`;
+  const close = () => {
+    setMethod("choose");
+    onClose();
+  };
 
   const countries = useMemo(
     () => [
@@ -115,24 +119,24 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   return (
     <Modal
       open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={issued ? t("node.add.commandTitle", { name: issued.node?.name ?? "" }) : reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("node.add.title")}
-      description={issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" ? t("node.add.manualBody") : t("node.add.body")}
+      onOpenChange={(o) => !o && close()}
+      title={method === "ssh" ? t("node.ssh.title") : issued ? t("node.add.commandTitle", { name: issued.node?.name ?? "" }) : reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("node.add.title")}
+      description={method === "ssh" ? t("node.ssh.body") : issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" ? t("node.add.manualBody") : t("node.add.body")}
+      closeLabel={t("common.close")}
+      className={method === "ssh" ? "md:max-w-[760px] md:max-h-[90vh]" : undefined}
     >
       {issued ? (
         <InstallSteps issued={issued} onClose={onClose} />
+      ) : !reenroll && method === "ssh" ? (
+        <SSHNodeInstall onBack={() => setMethod("choose")} onClose={close} />
       ) : !reenroll && method === "choose" ? (
         <div className="flex flex-col gap-4">
           <section className="rounded-card border border-accent/40 bg-accent/5 p-4">
             <h3 className="text-base font-bold text-ink">{t("node.add.sshInstallTitle")}</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">{t("node.add.sshInstallHint")}</p>
-            <a
-              href={installHref}
-              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-field bg-accent px-4 py-2 text-sm font-bold text-on-accent shadow-sm transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
+            <Button type="button" variant="primary" size="lg" full className="mt-4" onClick={() => setMethod("ssh")}>
               {t("node.add.sshInstall")}
-              <span aria-hidden="true">→</span>
-            </a>
+            </Button>
           </section>
           <div className="flex flex-col gap-2 border-t border-line pt-3">
             <p className="text-center text-xs text-muted">{t("node.add.manualDivider")}</p>

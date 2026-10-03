@@ -7,13 +7,16 @@ A node joins the fleet when its agent gets a certificate from the panel, install
 
 ## Automatic SSH installation
 
-In **Nodes → Add node**, press **Install automatically over SSH**. The owner-only wizard opens under the panel's admin prefix, so it works when the admin URL uses a secret path.
+In **Nodes → Add node**, press **Install automatically over SSH**. The four-step, owner-only wizard stays in the panel modal.
 
-1. Enter the node name and client-facing address, then the server's public SSH host, port, login and password. Use `root` or an account with non-interactive `sudo -n`.
-2. The panel fetches the SSH host-key fingerprint. Compare and confirm that fingerprint before entering the password. The panel then checks the operating system, architecture, systemd, available memory and disk, and the connection back to the panel.
-3. Review the preflight results and confirm the install. Until this confirmation, the wizard does not change the server. The panel then installs the matching trusted agent, enrolls it, starts its systemd service and waits for it to connect.
+1. Enter the server's SSH address and port. The connection is checked from the panel server; no login or password is sent at this step.
+2. Compare and confirm the SSH host-key fingerprint. Then enter the node name, client-facing address, login and password. Use `root` or an account with non-interactive `sudo -n`.
+3. The panel checks the operating system, architecture, systemd, available memory and disk, and the connection back to the panel. Review the results, enter the password again and confirm the install. The server is unchanged until that confirmation.
+4. The modal shows the agent transfer, systemd setup and wait for the node to connect.
 
-The wizard shows live progress and stable errors. Temporary SSH credentials are encrypted while a job runs and cleared when it ends. After the agent connects, the owner can reuse the saved SSH access for password rotation; the password is encrypted at rest and never shown in the UI or MCP reads. A node name is reserved while the node is live or an SSH install is active. Retiring a node keeps its history but releases its name.
+If the SSH check times out, allow inbound TCP access to the SSH port from the panel server's egress address in the server or hosting firewall. Temporary SSH credentials are encrypted while a job runs and cleared when it ends. After the agent connects, the owner can reuse the saved SSH access for password rotation; the password is encrypted at rest and never shown in the UI or MCP reads. A node name is reserved while the node is live or an SSH install is active. Retiring a node keeps its history but releases its name.
+
+Cancel jobs, recover access and rotate SSH passwords in the install manager at `<admin URL>nodes/install`.
 
 For owner-approved agent operation, see the [AI agent guide](ai-agents.md). The manual path is useful when the panel cannot reach the SSH host or you prefer to run the commands yourself.
 

@@ -1,11 +1,14 @@
 package provision
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"connectrpc.com/connect"
 )
 
 func TestInstallPageEscapesUntrustedValues(t *testing.T) {
@@ -101,6 +104,16 @@ func TestProvisionProgressLabelsAreStable(t *testing.T) {
 	}
 	if got := errorLabel("ssh_host_key_changed"); !strings.Contains(got, "Ключ SSH изменился") {
 		t.Fatalf("host-key error label = %q", got)
+	}
+}
+
+func TestFingerprintTimeoutExplainsPanelNetworkPath(t *testing.T) {
+	err := connect.NewError(connect.CodeDeadlineExceeded, errors.New("ssh_fingerprint_timeout"))
+	got := userError(err, "fallback")
+	for _, want := range []string{"Панель не получила ответ", "firewall", "сервера панели"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("timeout message %q does not contain %q", got, want)
+		}
 	}
 }
 

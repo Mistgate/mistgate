@@ -18,12 +18,16 @@ test("M2 roadmap pages describe SSH provisioning and panel recovery", () => {
   const ru = page("ru", "roadmap/m2-ssh-provisioning");
 
   assert.ok(en.includes("M2: SSH installation and recovery"));
-  assert.ok(en.includes("Go-rendered page"));
+  assert.ok(en.includes("four-step panel modal"));
+  assert.ok(en.includes("Go-rendered"));
+  assert.ok(en.includes("page remains the job and server-access manager"));
   assert.ok(en.includes("/nodes/install"));
   assert.ok(en.includes("M2 is complete when"));
   assert.ok(en.includes("Password rotation"));
   assert.ok(ru.includes("M2: установка по SSH и восстановление"));
-  assert.ok(ru.includes("Go-мастер"));
+  assert.ok(ru.includes("Четырёхшаговый мастер работает внутри модалки панели"));
+  assert.ok(ru.includes("Go-страница"));
+  assert.ok(ru.includes("остаётся менеджером заданий"));
   assert.ok(ru.includes("/nodes/install"));
   assert.ok(ru.includes("M2 завершён, когда"));
   assert.ok(ru.includes("сменой пароля"));

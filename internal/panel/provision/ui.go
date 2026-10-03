@@ -752,7 +752,7 @@ func userError(err error, fallback string) string {
 	case connect.CodeAlreadyExists:
 		return "Имя ноды уже используется. Выберите другое имя."
 	case connect.CodeDeadlineExceeded:
-		return "Операция превысила время ожидания. Проверьте сервер и попробуйте снова."
+		return "Панель не получила ответ от SSH-сервера вовремя. Проверьте порт и firewall сервера или хостера, разрешив TCP-подключение с сервера панели."
 	case connect.CodeFailedPrecondition:
 		return "Сервер не подходит для установки или настройка панели не завершена. Проверьте требования к системе."
 	case connect.CodeInvalidArgument:

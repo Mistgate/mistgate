@@ -7,10 +7,10 @@ description: "M2 status and design for node installation over SSH, saved access,
 
 ## SSH node installation
 
-- The owner can choose SSH installation from **Nodes → Add node**. The Go-rendered page is at `/nodes/install` under the configured secret admin prefix. MCP exposes the same install through `node_install_plan` and owner-approved `node_install_apply`.
+- The owner starts SSH installation from **Nodes → Add node** in a four-step panel modal. The Go-rendered `/nodes/install` page remains the job and server-access manager for recovery, cancellation and password rotation. MCP exposes the same install through `node_install_plan` and owner-approved `node_install_apply`.
 - The first release supports root or password authentication for an account with non-interactive `sudo -n`, Ubuntu 22.04+ or Debian 12+, amd64 or arm64, and systemd.
 - The panel obtains the host-key fingerprint before asking for the password. The owner confirms the exact key, then reviews OS, architecture, systemd, resources and panel reachability before confirming any host changes.
-- The worker installs the matching agent from the trusted release bundle, enrolls with a one-time token over stdin, starts the systemd service and waits for the agent. The page reports progress and redacted errors.
+- The worker installs the matching agent from the trusted release bundle, enrolls with a one-time token over stdin, starts the systemd service and waits for the agent. The modal and the manager report progress and redacted errors.
 - Active installs reserve node names. Retired nodes and terminal jobs retain history without reserving their names. A job may enroll its own node, while conflicting manual or SSH installs are rejected.
 
 ## Credentials and recovery
