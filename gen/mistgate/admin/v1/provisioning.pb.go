@@ -139,6 +139,7 @@ type CheckSSHRequest struct {
 	Port          uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
 	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
 	Password      string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
+	Username      string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -197,6 +198,13 @@ func (x *CheckSSHRequest) GetFingerprint() string {
 func (x *CheckSSHRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
+	}
+	return ""
+}
+
+func (x *CheckSSHRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
 	}
 	return ""
 }
@@ -373,6 +381,7 @@ type StartNodeProvisionRequest struct {
 	SshPort        uint32                 `protobuf:"varint,8,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
 	Fingerprint    string                 `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
 	Password       string                 `protobuf:"bytes,10,opt,name=password,proto3" json:"password,omitempty"`
+	SshUsername    string                 `protobuf:"bytes,11,opt,name=ssh_username,json=sshUsername,proto3" json:"ssh_username,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -477,11 +486,19 @@ func (x *StartNodeProvisionRequest) GetPassword() string {
 	return ""
 }
 
+func (x *StartNodeProvisionRequest) GetSshUsername() string {
+	if x != nil {
+		return x.SshUsername
+	}
+	return ""
+}
+
 type RetryNodeProvisionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	JobId          string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
 	ConfirmInstall bool                   `protobuf:"varint,2,opt,name=confirm_install,json=confirmInstall,proto3" json:"confirm_install,omitempty"`
 	Password       string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	SshUsername    string                 `protobuf:"bytes,4,opt,name=ssh_username,json=sshUsername,proto3" json:"ssh_username,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -533,6 +550,13 @@ func (x *RetryNodeProvisionRequest) GetConfirmInstall() bool {
 func (x *RetryNodeProvisionRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
+	}
+	return ""
+}
+
+func (x *RetryNodeProvisionRequest) GetSshUsername() string {
+	if x != nil {
+		return x.SshUsername
 	}
 	return ""
 }
@@ -1089,6 +1113,291 @@ func (x *ListNodeProvisionEventsResponse) GetNextAfterId() uint64 {
 	return 0
 }
 
+// Public SSH access metadata. Passwords and their ciphertext never leave the panel.
+type NodeServerAccess struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	NodeId          string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName        string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	Host            string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Port            uint32                 `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
+	Username        string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
+	Fingerprint     string                 `protobuf:"bytes,6,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	ConfiguredUnix  int64                  `protobuf:"varint,7,opt,name=configured_unix,json=configuredUnix,proto3" json:"configured_unix,omitempty"`
+	RotationPending bool                   `protobuf:"varint,8,opt,name=rotation_pending,json=rotationPending,proto3" json:"rotation_pending,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *NodeServerAccess) Reset() {
+	*x = NodeServerAccess{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeServerAccess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeServerAccess) ProtoMessage() {}
+
+func (x *NodeServerAccess) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeServerAccess.ProtoReflect.Descriptor instead.
+func (*NodeServerAccess) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *NodeServerAccess) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeServerAccess) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *NodeServerAccess) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *NodeServerAccess) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *NodeServerAccess) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *NodeServerAccess) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *NodeServerAccess) GetConfiguredUnix() int64 {
+	if x != nil {
+		return x.ConfiguredUnix
+	}
+	return 0
+}
+
+func (x *NodeServerAccess) GetRotationPending() bool {
+	if x != nil {
+		return x.RotationPending
+	}
+	return false
+}
+
+type ListNodeServerAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeServerAccessRequest) Reset() {
+	*x = ListNodeServerAccessRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeServerAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeServerAccessRequest) ProtoMessage() {}
+
+func (x *ListNodeServerAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeServerAccessRequest.ProtoReflect.Descriptor instead.
+func (*ListNodeServerAccessRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{18}
+}
+
+type ListNodeServerAccessResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Access        []*NodeServerAccess    `protobuf:"bytes,1,rep,name=access,proto3" json:"access,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeServerAccessResponse) Reset() {
+	*x = ListNodeServerAccessResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeServerAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeServerAccessResponse) ProtoMessage() {}
+
+func (x *ListNodeServerAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeServerAccessResponse.ProtoReflect.Descriptor instead.
+func (*ListNodeServerAccessResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListNodeServerAccessResponse) GetAccess() []*NodeServerAccess {
+	if x != nil {
+		return x.Access
+	}
+	return nil
+}
+
+type RotateNodeServerPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NewPassword   string                 `protobuf:"bytes,2,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	Confirm       bool                   `protobuf:"varint,3,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateNodeServerPasswordRequest) Reset() {
+	*x = RotateNodeServerPasswordRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateNodeServerPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateNodeServerPasswordRequest) ProtoMessage() {}
+
+func (x *RotateNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateNodeServerPasswordRequest.ProtoReflect.Descriptor instead.
+func (*RotateNodeServerPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RotateNodeServerPasswordRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *RotateNodeServerPasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+func (x *RotateNodeServerPasswordRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+type RotateNodeServerPasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rotated       bool                   `protobuf:"varint,1,opt,name=rotated,proto3" json:"rotated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateNodeServerPasswordResponse) Reset() {
+	*x = RotateNodeServerPasswordResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateNodeServerPasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateNodeServerPasswordResponse) ProtoMessage() {}
+
+func (x *RotateNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateNodeServerPasswordResponse.ProtoReflect.Descriptor instead.
+func (*RotateNodeServerPasswordResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RotateNodeServerPasswordResponse) GetRotated() bool {
+	if x != nil {
+		return x.Rotated
+	}
+	return false
+}
+
 var File_mistgate_admin_v1_provisioning_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
@@ -1100,12 +1409,13 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x19GetSSHFingerprintResponse\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
-	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\"w\n" +
+	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\"\x93\x01\n" +
 	"\x0fCheckSSHRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
 	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1a\n" +
-	"\bpassword\x18\x04 \x01(\tR\bpassword\"\xf1\x02\n" +
+	"\bpassword\x18\x04 \x01(\tR\bpassword\x12\x1a\n" +
+	"\busername\x18\x05 \x01(\tR\busername\"\xf1\x02\n" +
 	"\rNodePreflight\x12\"\n" +
 	"\fdistribution\x18\x01 \x01(\tR\fdistribution\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
@@ -1119,7 +1429,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x0fpanel_reachable\x18\n" +
 	" \x01(\bR\x0epanelReachable\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xc1\x02\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xe4\x02\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -1131,11 +1441,13 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\bssh_port\x18\b \x01(\rR\asshPort\x12 \n" +
 	"\vfingerprint\x18\t \x01(\tR\vfingerprint\x12\x1a\n" +
 	"\bpassword\x18\n" +
-	" \x01(\tR\bpassword\"w\n" +
+	" \x01(\tR\bpassword\x12!\n" +
+	"\fssh_username\x18\v \x01(\tR\vsshUsername\"\x9a\x01\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +
-	"\bpassword\x18\x03 \x01(\tR\bpassword\"S\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\x12!\n" +
+	"\fssh_username\x18\x04 \x01(\tR\vsshUsername\"S\n" +
 	"\x1aStartNodeProvisionResponse\x125\n" +
 	"\x03job\x18\x01 \x01(\v2#.mistgate.admin.v1.NodeProvisionJobR\x03job\"S\n" +
 	"\x1aRetryNodeProvisionResponse\x125\n" +
@@ -1171,7 +1483,25 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\fcreated_unix\x18\x04 \x01(\x03B\x020\x02R\vcreatedUnix\"\x88\x01\n" +
 	"\x1fListNodeProvisionEventsResponse\x12=\n" +
 	"\x06events\x18\x01 \x03(\v2%.mistgate.admin.v1.NodeProvisionEventR\x06events\x12&\n" +
-	"\rnext_after_id\x18\x02 \x01(\x04B\x020\x02R\vnextAfterId2\xa3\x06\n" +
+	"\rnext_after_id\x18\x02 \x01(\x04B\x020\x02R\vnextAfterId\"\x86\x02\n" +
+	"\x10NodeServerAccess\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x12\n" +
+	"\x04host\x18\x03 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x04 \x01(\rR\x04port\x12\x1a\n" +
+	"\busername\x18\x05 \x01(\tR\busername\x12 \n" +
+	"\vfingerprint\x18\x06 \x01(\tR\vfingerprint\x12+\n" +
+	"\x0fconfigured_unix\x18\a \x01(\x03B\x020\x02R\x0econfiguredUnix\x12)\n" +
+	"\x10rotation_pending\x18\b \x01(\bR\x0frotationPending\"\x1d\n" +
+	"\x1bListNodeServerAccessRequest\"[\n" +
+	"\x1cListNodeServerAccessResponse\x12;\n" +
+	"\x06access\x18\x01 \x03(\v2#.mistgate.admin.v1.NodeServerAccessR\x06access\"w\n" +
+	"\x1fRotateNodeServerPasswordRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
+	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\x12\x18\n" +
+	"\aconfirm\x18\x03 \x01(\bR\aconfirm\"<\n" +
+	" RotateNodeServerPasswordResponse\x12\x18\n" +
+	"\arotated\x18\x01 \x01(\bR\arotated2\xa2\b\n" +
 	"\x13ProvisioningService\x12n\n" +
 	"\x11GetSSHFingerprint\x12+.mistgate.admin.v1.GetSSHFingerprintRequest\x1a,.mistgate.admin.v1.GetSSHFingerprintResponse\x12S\n" +
 	"\bCheckSSH\x12\".mistgate.admin.v1.CheckSSHRequest\x1a#.mistgate.admin.v1.CheckSSHResponse\x12q\n" +
@@ -1179,7 +1509,9 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x12RetryNodeProvision\x12,.mistgate.admin.v1.RetryNodeProvisionRequest\x1a-.mistgate.admin.v1.RetryNodeProvisionResponse\x12k\n" +
 	"\x10GetNodeProvision\x12*.mistgate.admin.v1.GetNodeProvisionRequest\x1a+.mistgate.admin.v1.GetNodeProvisionResponse\x12q\n" +
 	"\x12ListNodeProvisions\x12,.mistgate.admin.v1.ListNodeProvisionsRequest\x1a-.mistgate.admin.v1.ListNodeProvisionsResponse\x12\x80\x01\n" +
-	"\x17ListNodeProvisionEvents\x121.mistgate.admin.v1.ListNodeProvisionEventsRequest\x1a2.mistgate.admin.v1.ListNodeProvisionEventsResponseB\xcc\x01\n" +
+	"\x17ListNodeProvisionEvents\x121.mistgate.admin.v1.ListNodeProvisionEventsRequest\x1a2.mistgate.admin.v1.ListNodeProvisionEventsResponse\x12w\n" +
+	"\x14ListNodeServerAccess\x12..mistgate.admin.v1.ListNodeServerAccessRequest\x1a/.mistgate.admin.v1.ListNodeServerAccessResponse\x12\x83\x01\n" +
+	"\x18RotateNodeServerPassword\x122.mistgate.admin.v1.RotateNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RotateNodeServerPasswordResponseB\xcc\x01\n" +
 	"\x15com.mistgate.admin.v1B\x11ProvisioningProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -1194,25 +1526,30 @@ func file_mistgate_admin_v1_provisioning_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_provisioning_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
-	(*GetSSHFingerprintRequest)(nil),        // 0: mistgate.admin.v1.GetSSHFingerprintRequest
-	(*GetSSHFingerprintResponse)(nil),       // 1: mistgate.admin.v1.GetSSHFingerprintResponse
-	(*CheckSSHRequest)(nil),                 // 2: mistgate.admin.v1.CheckSSHRequest
-	(*NodePreflight)(nil),                   // 3: mistgate.admin.v1.NodePreflight
-	(*CheckSSHResponse)(nil),                // 4: mistgate.admin.v1.CheckSSHResponse
-	(*StartNodeProvisionRequest)(nil),       // 5: mistgate.admin.v1.StartNodeProvisionRequest
-	(*RetryNodeProvisionRequest)(nil),       // 6: mistgate.admin.v1.RetryNodeProvisionRequest
-	(*StartNodeProvisionResponse)(nil),      // 7: mistgate.admin.v1.StartNodeProvisionResponse
-	(*RetryNodeProvisionResponse)(nil),      // 8: mistgate.admin.v1.RetryNodeProvisionResponse
-	(*GetNodeProvisionRequest)(nil),         // 9: mistgate.admin.v1.GetNodeProvisionRequest
-	(*GetNodeProvisionResponse)(nil),        // 10: mistgate.admin.v1.GetNodeProvisionResponse
-	(*ListNodeProvisionsRequest)(nil),       // 11: mistgate.admin.v1.ListNodeProvisionsRequest
-	(*ListNodeProvisionsResponse)(nil),      // 12: mistgate.admin.v1.ListNodeProvisionsResponse
-	(*NodeProvisionJob)(nil),                // 13: mistgate.admin.v1.NodeProvisionJob
-	(*ListNodeProvisionEventsRequest)(nil),  // 14: mistgate.admin.v1.ListNodeProvisionEventsRequest
-	(*NodeProvisionEvent)(nil),              // 15: mistgate.admin.v1.NodeProvisionEvent
-	(*ListNodeProvisionEventsResponse)(nil), // 16: mistgate.admin.v1.ListNodeProvisionEventsResponse
+	(*GetSSHFingerprintRequest)(nil),         // 0: mistgate.admin.v1.GetSSHFingerprintRequest
+	(*GetSSHFingerprintResponse)(nil),        // 1: mistgate.admin.v1.GetSSHFingerprintResponse
+	(*CheckSSHRequest)(nil),                  // 2: mistgate.admin.v1.CheckSSHRequest
+	(*NodePreflight)(nil),                    // 3: mistgate.admin.v1.NodePreflight
+	(*CheckSSHResponse)(nil),                 // 4: mistgate.admin.v1.CheckSSHResponse
+	(*StartNodeProvisionRequest)(nil),        // 5: mistgate.admin.v1.StartNodeProvisionRequest
+	(*RetryNodeProvisionRequest)(nil),        // 6: mistgate.admin.v1.RetryNodeProvisionRequest
+	(*StartNodeProvisionResponse)(nil),       // 7: mistgate.admin.v1.StartNodeProvisionResponse
+	(*RetryNodeProvisionResponse)(nil),       // 8: mistgate.admin.v1.RetryNodeProvisionResponse
+	(*GetNodeProvisionRequest)(nil),          // 9: mistgate.admin.v1.GetNodeProvisionRequest
+	(*GetNodeProvisionResponse)(nil),         // 10: mistgate.admin.v1.GetNodeProvisionResponse
+	(*ListNodeProvisionsRequest)(nil),        // 11: mistgate.admin.v1.ListNodeProvisionsRequest
+	(*ListNodeProvisionsResponse)(nil),       // 12: mistgate.admin.v1.ListNodeProvisionsResponse
+	(*NodeProvisionJob)(nil),                 // 13: mistgate.admin.v1.NodeProvisionJob
+	(*ListNodeProvisionEventsRequest)(nil),   // 14: mistgate.admin.v1.ListNodeProvisionEventsRequest
+	(*NodeProvisionEvent)(nil),               // 15: mistgate.admin.v1.NodeProvisionEvent
+	(*ListNodeProvisionEventsResponse)(nil),  // 16: mistgate.admin.v1.ListNodeProvisionEventsResponse
+	(*NodeServerAccess)(nil),                 // 17: mistgate.admin.v1.NodeServerAccess
+	(*ListNodeServerAccessRequest)(nil),      // 18: mistgate.admin.v1.ListNodeServerAccessRequest
+	(*ListNodeServerAccessResponse)(nil),     // 19: mistgate.admin.v1.ListNodeServerAccessResponse
+	(*RotateNodeServerPasswordRequest)(nil),  // 20: mistgate.admin.v1.RotateNodeServerPasswordRequest
+	(*RotateNodeServerPasswordResponse)(nil), // 21: mistgate.admin.v1.RotateNodeServerPasswordResponse
 }
 var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	3,  // 0: mistgate.admin.v1.CheckSSHResponse.preflight:type_name -> mistgate.admin.v1.NodePreflight
@@ -1221,25 +1558,30 @@ var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	13, // 3: mistgate.admin.v1.GetNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
 	13, // 4: mistgate.admin.v1.ListNodeProvisionsResponse.jobs:type_name -> mistgate.admin.v1.NodeProvisionJob
 	15, // 5: mistgate.admin.v1.ListNodeProvisionEventsResponse.events:type_name -> mistgate.admin.v1.NodeProvisionEvent
-	0,  // 6: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
-	2,  // 7: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
-	5,  // 8: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
-	6,  // 9: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
-	9,  // 10: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
-	11, // 11: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
-	14, // 12: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
-	1,  // 13: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
-	4,  // 14: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
-	7,  // 15: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
-	8,  // 16: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
-	10, // 17: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
-	12, // 18: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
-	16, // 19: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
-	13, // [13:20] is the sub-list for method output_type
-	6,  // [6:13] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	17, // 6: mistgate.admin.v1.ListNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
+	0,  // 7: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
+	2,  // 8: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
+	5,  // 9: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
+	6,  // 10: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
+	9,  // 11: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
+	11, // 12: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
+	14, // 13: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
+	18, // 14: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
+	20, // 15: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
+	1,  // 16: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
+	4,  // 17: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
+	7,  // 18: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
+	8,  // 19: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
+	10, // 20: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
+	12, // 21: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
+	16, // 22: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
+	19, // 23: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
+	21, // 24: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
+	16, // [16:25] is the sub-list for method output_type
+	7,  // [7:16] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_provisioning_proto_init() }
@@ -1253,7 +1595,7 @@ func file_mistgate_admin_v1_provisioning_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_provisioning_proto_rawDesc), len(file_mistgate_admin_v1_provisioning_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

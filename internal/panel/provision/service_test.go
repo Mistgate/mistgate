@@ -71,7 +71,7 @@ func TestSealedCredentialsAreBoundToJobAndNeverReturnedInJobView(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &Service{vault: vlt}
-	secret := credentials{Password: "secret", EnrollmentToken: "one-time", CAFingerprint: "aa"}
+	secret := credentials{Username: "root", Password: "secret", EnrollmentToken: "one-time", CAFingerprint: "aa"}
 	sealed, err := svc.sealCredentials("prv_one", secret)
 	if err != nil {
 		t.Fatal(err)

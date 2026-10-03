@@ -27,6 +27,32 @@ func TestInstallPageEscapesUntrustedValues(t *testing.T) {
 	}
 }
 
+func TestInstallWizardOffersSudoLoginAndPasswordRotationWithoutReveal(t *testing.T) {
+	var out strings.Builder
+	data := installPageData{Step: "fingerprint", Form: installForm{Username: "deploy"}, Fingerprint: "SHA256:pin"}
+	if err := installPageTemplate.Execute(&out, data); err != nil {
+		t.Fatal(err)
+	}
+	page := out.String()
+	for _, want := range []string{`name="username"`, `value="deploy"`, "sudo -n", "Пароль SSH"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("install page lacks %q", want)
+		}
+	}
+	if strings.Contains(strings.ToLower(page), "reveal password") {
+		t.Fatal("install page must not reveal a saved SSH password")
+	}
+	out.Reset()
+	data = installPageData{Step: "host", Access: []serverAccessView{{ID: "nod_example", Name: "edge-1", Host: "node.example.com:22", Username: "deploy"}}}
+	if err := installPageTemplate.Execute(&out, data); err != nil {
+		t.Fatal(err)
+	}
+	accessPage := out.String()
+	if !strings.Contains(accessPage, `name="new_password"`) || !strings.Contains(accessPage, `name="confirm_rotation"`) || strings.Contains(accessPage, "saved-password-value") {
+		t.Fatalf("access page does not offer a confirmed password rotation safely: %s", accessPage)
+	}
+}
+
 func TestFormatBytes(t *testing.T) {
 	for _, tc := range []struct {
 		value uint64

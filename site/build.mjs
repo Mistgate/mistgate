@@ -123,6 +123,8 @@ out("404.html", render404({ assets }));
 
 // ---- sitemap, robots, headers ----
 const urls = Object.values(site).flatMap((s) => [...s.pages.values()]);
+const llmsPages = [...urls].sort((a, b) => a.url.localeCompare(b.url)).map((p) => `- [${p.title}](${SITE}${p.url}): ${p.description}`).join("\n");
+out("llms.txt", `# Mistgate documentation\n\n> Self-hosted VPN fleet panel and Go node agent. The panel and node agent are static Go binaries; no Docker runtime is required.\n\n## AI and installation\n\n- [AI agent guide](${SITE}/getting-started/ai-agents/): install nodes and rotate SSH passwords through owner-approved MCP tools.\n- [Repository agent instructions](https://github.com/Mistgate/mistgate/blob/main/AGENTS.md)\n- [MCP tool reference](${SITE}/reference/mcp/)\n\n## All pages\n\n${llmsPages}\n`);
 out("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls.map((p) => `<url><loc>${SITE}${p.url}</loc>${p.alternates.length > 1 ? "\n" + p.alternates.map((a) => `  <xhtml:link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}"/>`).join("\n") + "\n" : ""}</url>`).join("\n")}

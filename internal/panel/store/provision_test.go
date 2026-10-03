@@ -70,3 +70,55 @@ func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 		t.Fatalf("terminal event = %+v, err %v", terminalEvents, err)
 	}
 }
+
+func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	job := NodeProvisionJob{ID: "prv_access", NodeID: "nod_access", Name: "edge-access", Address: "edge.example.com",
+		SSHHost: "203.0.113.7", SSHPort: 22, HostFingerprint: "SHA256:pin", Secret: []byte("temporary"),
+		CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'pending', ?)`,
+		job.NodeID, job.Name, job.Address, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
+		t.Fatalf("claim job: ok=%v err=%v", ok, err)
+	}
+	access := NodeServerAccess{NodeID: job.NodeID, NodeName: job.Name, SSHHost: job.SSHHost, SSHPort: job.SSHPort,
+		SSHUser: "root", HostFingerprint: job.HostFingerprint, Password: []byte("encrypted-old")}
+	if err := st.CompleteNodeProvisionJob(ctx, job.ID, access, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	loadedJob, err := st.NodeProvisionJob(ctx, job.ID)
+	if err != nil || loadedJob.State != "completed" || len(loadedJob.Secret) != 0 {
+		t.Fatalf("completed job = %+v, err %v", loadedJob, err)
+	}
+	loaded, err := st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || string(loaded.Password) != "encrypted-old" || loaded.PendingPassword != nil {
+		t.Fatalf("saved access = %+v, err %v", loaded, err)
+	}
+	if err := st.SetPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new"), now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || string(loaded.Password) != "encrypted-old" || string(loaded.PendingPassword) != "encrypted-new" {
+		t.Fatalf("pending access = %+v, err %v", loaded, err)
+	}
+	if err := st.CommitPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new-current"), now.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || string(loaded.Password) != "encrypted-new-current" || loaded.PendingPassword != nil {
+		t.Fatalf("committed access = %+v, err %v", loaded, err)
+	}
+	if err := st.RetireNode(ctx, job.NodeID, now.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.NodeServerAccess(ctx, job.NodeID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("retired node retained SSH access: %v", err)
+	}
+}

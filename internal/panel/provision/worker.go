@@ -100,7 +100,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, "ssh_target_invalid")
 		return
 	}
-	conn, err := s.ssh.Dial(ctx, target, secret.Password, job.HostFingerprint)
+	conn, err := s.ssh.DialAs(ctx, target, secret.Username, secret.Password, job.HostFingerprint)
 	if err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, publicSSHCode(err))
@@ -272,7 +272,14 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 
 func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials) {
 	now := s.cfg.Now().UTC()
-	if err := s.st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "completed", "completed", "", []byte{}, "agent_connected", now); err != nil {
+	plain := []byte(secret.Password)
+	ciphertext := s.vault.Seal(plain, "node-access:"+job.NodeID)
+	clearBytes(plain)
+	access := store.NodeServerAccess{
+		NodeID: job.NodeID, NodeName: job.Name, SSHHost: job.SSHHost, SSHPort: job.SSHPort,
+		SSHUser: secret.Username, HostFingerprint: job.HostFingerprint, Password: ciphertext,
+	}
+	if err := s.st.CompleteNodeProvisionJob(ctx, job.ID, access, now); err != nil {
 		s.cfg.Log.Error("complete node provisioning job", "job_id", job.ID, "err", err)
 		s.failJob(ctx, job, "job_state_unavailable")
 		return
@@ -503,7 +510,7 @@ func runSSHCapture(ctx context.Context, conn *Connection, command string, input 
 	opCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	stop := context.AfterFunc(opCtx, func() { _ = session.Close() })
-	err = session.Run(command)
+	err = session.Run(conn.PrivilegedCommand(command))
 	stop()
 	if opCtx.Err() != nil {
 		return nil, opCtx.Err()

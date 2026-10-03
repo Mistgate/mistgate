@@ -102,6 +102,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
 | `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |
 | `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state, the active or last rollout. |
+| `node_server_access_list` | Admin | Saved node SSH endpoint, login and fingerprint, plus whether a password rotation needs recovery. Never a password. |
 | `audit_search` | Admin | The audit log, filtered by `source` (`panel`, `bot`, `mcp`, `api`), actor or action; paged with `before_id`. |
 
 ### Change tools
@@ -121,8 +122,10 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `rollout_start` | Admin | optionally `node_ids` (empty: every outdated node) and `batch_size` (0: the panel's default; the panel accepts at most 10) | always |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
+| `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token`, SSH `password`, exact `confirmed_fingerprint` | always |
+| `node_server_password_rotate` | Admin | Plan: `node` id or exact name; apply: `confirm_token`, `new_password` (at least 12 characters) | always |
 
-Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
+Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. Node passwords are supplied only to their `_apply` call; they are never stored in MCP plan parameters or returned by a tool. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 
 ## Plan and apply
 
@@ -142,7 +145,7 @@ Every `_plan` also takes `reason`: the agent's own words, at most 300 characters
    ```
 
 2. The agent shows the plan to the person it works for and waits for their go-ahead. If `needs_approval` is true, it also waits for the owner.
-3. The agent calls `<tool>_apply` with only the `confirm_token`. The panel runs exactly the stored arguments, once, and answers with `plan_id`, `status: "applied"` and a one-line result.
+3. The agent calls `<tool>_apply` with the `confirm_token`. Node installation and password rotation also take their secret as a separate apply-only argument; the panel never adds it to the saved plan. The panel runs exactly the stored non-secret arguments, once, and answers with `plan_id`, `status: "applied"` and a one-line result.
 
 The confirm token:
 
@@ -159,7 +162,7 @@ A plan needs the owner when one of these applies (the `danger` list):
 | Code | Meaning | Tools |
 |---|---|---|
 | `step_up` | The operation itself asks for a fresh confirmation in the admin. | rollout start, pause, resume and cancel, node rollback |
-| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback` |
+| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback`, `node_install`, `node_server_password_rotate` |
 | `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
 
 ### Where the owner approves
@@ -168,6 +171,8 @@ Such a plan appears in **Integrations → Waiting for you**, with a badge in the
 
 - **Approve**: asks for the owner's passkey or authenticator code once more. The agent's apply goes through after this, for this plan only.
 - **Reject**: the agent's apply fails with "rejected by the owner".
+
+For `node_install`, the approved plan shows the pinned SHA-256 SSH fingerprint. The agent must show it to the user, wait for explicit confirmation, then pass the exact value as `confirmed_fingerprint`; the SSH password is sent only in that apply call. Password rotation has the same owner-approval boundary and never returns the new password.
 
 A token can never confirm its own plan. Undecided plans expire 10 minutes after they were made. **Recent decisions** keeps the history with the outcome: done, error, expired, cancelled (the token was revoked) and so on. The agent should not poll more often than once every 30 seconds.
 

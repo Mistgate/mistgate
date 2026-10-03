@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"golang.org/x/crypto/ssh"
@@ -37,27 +39,44 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	digest := sha256.Sum256(program)
 	binaries := e2eBinarySource{path: binaryPath, digest: hex.EncodeToString(digest[:])}
 
-	password := "root-password-secret"
+	password := "deploy-password-secret"
+	rotatedPassword := "rotated-ssh-password-123"
+	username := "deploy"
 	token := "one-time-enrollment-secret"
 	commands := make(chan string, 8)
 	uploaded := make(chan []byte, 1)
 	enrolled := make(chan string, 1)
-	passwords := make(chan string, 1)
+	passwords := make(chan string, 8)
+	var serverPasswordMu sync.Mutex
+	serverPassword := password
 	signer := testSigner(t)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = listener.Close() })
-	serverConfig := &ssh.ServerConfig{PasswordCallback: func(_ ssh.ConnMetadata, got []byte) (*ssh.Permissions, error) {
-		passwords <- string(got)
-		if string(got) != password {
+	serverConfig := &ssh.ServerConfig{PasswordCallback: func(meta ssh.ConnMetadata, got []byte) (*ssh.Permissions, error) {
+		if meta.User() != username {
+			return nil, errors.New("bad test SSH user")
+		}
+		select {
+		case passwords <- string(got):
+		default:
+		}
+		serverPasswordMu.Lock()
+		valid := string(got) == serverPassword
+		serverPasswordMu.Unlock()
+		if !valid {
 			return nil, errors.New("bad test password")
 		}
 		return nil, nil
 	}}
 	serverConfig.AddHostKey(signer)
-	go acceptProvisionSSH(t, listener, serverConfig, func(command string, channel ssh.Channel) ([]byte, error) {
+	go acceptProvisionSSH(t, listener, serverConfig, func(wireCommand string, channel ssh.Channel) ([]byte, error) {
+		command, privileged := unwrapPrivilegedCommand(wireCommand)
+		if !privileged {
+			return nil, errors.New("remote command did not use noninteractive sudo")
+		}
 		commands <- command
 		switch {
 		case strings.Contains(command, "panel_reachable=%s"):
@@ -82,6 +101,19 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 			manager.setConnected()
 			return nil, nil
 		case strings.HasPrefix(command, "install -o root -g root -m 0755 "):
+			return nil, nil
+		case command == "chpasswd":
+			line, err := io.ReadAll(channel)
+			if err != nil {
+				return nil, err
+			}
+			login, next, ok := strings.Cut(strings.TrimSuffix(string(line), "\n"), ":")
+			if !ok || login != username || len(next) < 12 {
+				return nil, errors.New("invalid chpasswd input")
+			}
+			serverPasswordMu.Lock()
+			serverPassword = next
+			serverPasswordMu.Unlock()
 			return nil, nil
 		default:
 			return nil, errors.New("unexpected remote command")
@@ -112,11 +144,16 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 		HostFingerprint: ssh.FingerprintSHA256(signer.PublicKey()), CreatedBy: "adm_test",
 		CreatedAt: time.Unix(1_800_000_000, 0).UTC(), UpdatedAt: time.Unix(1_800_000_000, 0).UTC(),
 	}
-	job.Secret, err = svc.sealCredentials(job.ID, credentials{Password: password})
+	job.Secret, err = svc.sealCredentials(job.ID, credentials{Username: username, Password: password})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	// In production CreateProvisionEnrollment creates this fleet row before installation completes.
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'pending', ?)`,
+		job.NodeID, job.Name, job.Address, job.CreatedAt.Unix()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,6 +205,29 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	}
 	manager.mu.Unlock()
 
+	rotation, err := svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{
+		NodeId: job.NodeID, NewPassword: rotatedPassword, Confirm: true,
+	}))
+	if err != nil || !rotation.Msg.GetRotated() {
+		t.Fatalf("SSH password rotation = %v, err %v", rotation, err)
+	}
+	access, err := st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || access.PendingPassword != nil {
+		t.Fatalf("rotation did not commit access: %+v, err %v", access, err)
+	}
+	if access.SSHUser != username {
+		t.Fatalf("saved SSH login = %q, want %q", access.SSHUser, username)
+	}
+	gotPassword, err := svc.openAccessPassword(job.NodeID, access.Password)
+	if err != nil || gotPassword != rotatedPassword {
+		t.Fatalf("saved SSH password = %q, err %v", gotPassword, err)
+	}
+	verified, err := sshClient.DialAs(ctx, mustTarget(t), username, rotatedPassword, job.HostFingerprint)
+	if err != nil {
+		t.Fatalf("new SSH password was not usable: %v", err)
+	}
+	_ = verified.Close()
+
 	close(commands)
 	commandCount := 0
 	for command := range commands {
@@ -176,8 +236,8 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 			t.Fatalf("credential appeared in SSH command: %q", command)
 		}
 	}
-	if commandCount != 5 {
-		t.Fatalf("remote command count = %d, want 5", commandCount)
+	if commandCount != 6 {
+		t.Fatalf("remote command count = %d, want 6", commandCount)
 	}
 	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 20)
 	if err != nil {
@@ -247,53 +307,66 @@ func (b e2eBinarySource) OpenNodeBinary(_, _ string) (*os.File, int64, string, e
 
 type provisionSSHExecutor func(command string, channel ssh.Channel) ([]byte, error)
 
+func unwrapPrivilegedCommand(wireCommand string) (string, bool) {
+	const prefix = "sudo -n sh -c "
+	if !strings.HasPrefix(wireCommand, prefix) {
+		return wireCommand, false
+	}
+	quoted := strings.TrimPrefix(wireCommand, prefix)
+	if len(quoted) < 2 || quoted[0] != '\'' || quoted[len(quoted)-1] != '\'' {
+		return wireCommand, false
+	}
+	return strings.ReplaceAll(quoted[1:len(quoted)-1], "'\\''", "'"), true
+}
+
 func acceptProvisionSSH(t *testing.T, listener net.Listener, config *ssh.ServerConfig, execute provisionSSHExecutor) {
 	t.Helper()
-	conn, err := listener.Accept()
-	if err != nil {
-		t.Logf("test SSH listener ended: %v", err)
-		return
-	}
-	go func() {
-		server, channels, requests, err := ssh.NewServerConn(conn, config)
+	for {
+		conn, err := listener.Accept()
 		if err != nil {
-			t.Logf("test SSH handshake failed: %v", err)
-			conn.Close()
 			return
 		}
-		defer server.Close()
-		go ssh.DiscardRequests(requests)
-		for newChannel := range channels {
-			channel, channelRequests, err := newChannel.Accept()
+		go func(conn net.Conn) {
+			server, channels, requests, err := ssh.NewServerConn(conn, config)
 			if err != nil {
-				t.Logf("test SSH channel accept failed: %v", err)
-				continue
+				t.Logf("test SSH handshake failed: %v", err)
+				conn.Close()
+				return
 			}
-			go func() {
-				defer channel.Close()
-				for request := range channelRequests {
-					if request.Type != "exec" {
-						_ = request.Reply(false, nil)
-						continue
-					}
-					var execRequest struct{ Command string }
-					if err := ssh.Unmarshal(request.Payload, &execRequest); err != nil {
-						_ = request.Reply(false, nil)
+			defer server.Close()
+			go ssh.DiscardRequests(requests)
+			for newChannel := range channels {
+				channel, channelRequests, err := newChannel.Accept()
+				if err != nil {
+					t.Logf("test SSH channel accept failed: %v", err)
+					continue
+				}
+				go func() {
+					defer channel.Close()
+					for request := range channelRequests {
+						if request.Type != "exec" {
+							_ = request.Reply(false, nil)
+							continue
+						}
+						var execRequest struct{ Command string }
+						if err := ssh.Unmarshal(request.Payload, &execRequest); err != nil {
+							_ = request.Reply(false, nil)
+							return
+						}
+						_ = request.Reply(true, nil)
+						output, err := execute(execRequest.Command, channel)
+						if len(output) > 0 {
+							_, _ = channel.Write(output)
+						}
+						status := uint32(0)
+						if err != nil {
+							status = 1
+						}
+						_, _ = channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{status}))
 						return
 					}
-					_ = request.Reply(true, nil)
-					output, err := execute(execRequest.Command, channel)
-					if len(output) > 0 {
-						_, _ = channel.Write(output)
-					}
-					status := uint32(0)
-					if err != nil {
-						status = 1
-					}
-					_, _ = channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{status}))
-					return
-				}
-			}()
-		}
-	}()
+				}()
+			}
+		}(conn)
+	}
 }

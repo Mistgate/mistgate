@@ -5,6 +5,8 @@ description: Enroll a Linux server with the node agent, watch it come online, an
 
 A node joins the fleet with one command: the agent exchanges a one-time token for a certificate from the panel, installs itself as a systemd service and connects. This page walks through it, explains what happens on the server, and shows how to take a node out again.
 
+For automatic installation from the admin, open `<admin URL>nodes/install` or use the owner-approved MCP flow in the [AI agent guide](ai-agents.md). The Go wizard supports root or an SSH login with non-interactive `sudo -n`, verifies the SSH fingerprint first, installs the signed agent bundle and saves the SSH password encrypted after the new node connects. The manual steps below remain available.
+
 ## Before you start
 
 - A server that meets the [requirements](requirements.md), with root over SSH.

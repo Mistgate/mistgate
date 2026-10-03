@@ -25,6 +25,15 @@ type NodeProvisionEvent struct {
 	CreatedAt   time.Time
 }
 
+// NodeServerAccess contains public connection metadata and vault ciphertext. Callers must never return
+// Password or PendingPassword from an API response.
+type NodeServerAccess struct {
+	NodeID, NodeName, SSHHost, SSHUser, HostFingerprint string
+	SSHPort                                             uint16
+	Password, PendingPassword                           []byte
+	ConfiguredAt                                        time.Time
+}
+
 const nodeProvisionJobCols = `id, node_id, name, address, country_code, location, provider,
 	ssh_host, ssh_port, host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at`
 
@@ -209,6 +218,131 @@ func (s *Store) updateNodeProvisionJob(ctx context.Context, id, state, phase, er
 		}
 	}
 	return tx.Commit()
+}
+
+// CompleteNodeProvisionJob clears the temporary job secret and retains the verified SSH credential
+// in the encrypted access table in the same transaction as the completion event.
+func (s *Store) CompleteNodeProvisionJob(ctx context.Context, id string, access NodeServerAccess, now time.Time) error {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+		SET state = 'completed', phase = 'completed', error_code = '', secret = X'', updated_at = ?
+		WHERE id = ? AND state = 'running'`, unix(now), id)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrNotFound
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO node_server_access (
+		node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, pending_password, configured_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
+	ON CONFLICT(node_id) DO UPDATE SET node_name=excluded.node_name, ssh_host=excluded.ssh_host,
+		ssh_port=excluded.ssh_port, ssh_username=excluded.ssh_username,
+		host_fingerprint=excluded.host_fingerprint, password=excluded.password,
+		pending_password=NULL, configured_at=excluded.configured_at`,
+		access.NodeID, access.NodeName, access.SSHHost, access.SSHPort, access.SSHUser,
+		access.HostFingerprint, access.Password, unix(now))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'completed', 'agent_connected', ?)`, id, unix(now)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+const nodeServerAccessCols = `node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint,
+	password, pending_password, configured_at`
+
+func scanNodeServerAccess(row rowScanner) (NodeServerAccess, error) {
+	var out NodeServerAccess
+	var port int
+	var configured int64
+	err := row.Scan(&out.NodeID, &out.NodeName, &out.SSHHost, &port, &out.SSHUser, &out.HostFingerprint,
+		&out.Password, &out.PendingPassword, &configured)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NodeServerAccess{}, ErrNotFound
+	}
+	if err != nil {
+		return NodeServerAccess{}, err
+	}
+	out.SSHPort = uint16(port)
+	out.ConfiguredAt = fromUnix(configured)
+	return out, nil
+}
+
+// NodeServerAccess returns one node's encrypted SSH credential and public metadata.
+func (s *Store) NodeServerAccess(ctx context.Context, nodeID string) (NodeServerAccess, error) {
+	return scanNodeServerAccess(s.R.QueryRowContext(ctx,
+		`SELECT `+nodeServerAccessCols+` FROM node_server_access WHERE node_id = ?`, nodeID))
+}
+
+// NodeServerAccesses lists access metadata in stable name order.
+func (s *Store) NodeServerAccesses(ctx context.Context) ([]NodeServerAccess, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT `+nodeServerAccessCols+` FROM node_server_access ORDER BY node_name, node_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]NodeServerAccess, 0)
+	for rows.Next() {
+		v, err := scanNodeServerAccess(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+// SetPendingNodeServerPassword journals an encrypted replacement before it is sent to the server.
+func (s *Store) SetPendingNodeServerPassword(ctx context.Context, nodeID string, encrypted []byte, now time.Time) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET pending_password = ?, configured_at = ? WHERE node_id = ?`, encrypted, unix(now), nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CommitPendingNodeServerPassword promotes the verified node-bound ciphertext and removes its recovery copy.
+func (s *Store) CommitPendingNodeServerPassword(ctx context.Context, nodeID string, encryptedCurrent []byte, now time.Time) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET password = ?, pending_password = NULL, configured_at = ?
+		WHERE node_id = ? AND pending_password IS NOT NULL`, encryptedCurrent, unix(now), nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ClearPendingNodeServerPassword discards a replacement that could not be applied while the old login still works.
+func (s *Store) ClearPendingNodeServerPassword(ctx context.Context, nodeID string) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET pending_password = NULL WHERE node_id = ?`, nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // NodeProvisionEvents returns events after the given cursor and the final cursor.

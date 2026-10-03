@@ -18,7 +18,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 ## Reading order for a new admin
 
 1. [Overview](getting-started/overview.md) and [Requirements](getting-started/requirements.md): what a panel, a node and a profile are, and what servers you need.
-2. [Install the panel](getting-started/install-panel.md), then [Add a node](getting-started/add-node.md).
+2. [Install the panel](getting-started/install-panel.md), then [Add a node](getting-started/add-node.md) manually or with the [AI agent guide](getting-started/ai-agents.md).
 3. [First users](getting-started/first-users.md): a profile on the node, a group, a user, a subscription link.
 4. [Health](operations/health.md) and [Security](operations/security.md) before you give links to other people.
 5. The Guide pages as you need them; the Reference when you script or automate.
@@ -31,6 +31,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Requirements](getting-started/requirements.md): what the panel and the nodes need, and what you need to build from source.
 - [Install the panel](getting-started/install-panel.md): from a fresh Linux server to the owner account in the admin.
 - [Add a node](getting-started/add-node.md): enroll a server with the agent and see it come online.
+- [AI agent guide](getting-started/ai-agents.md): install nodes and rotate SSH passwords through the owner-approved MCP tools.
 - [First users](getting-started/first-users.md): put a profile on a node, give it to a group, create a user and send the link.
 
 ### Guide
@@ -54,7 +55,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 
 ### Roadmap
 
-- [M2: SSH provisioning and recovery](roadmap/m2-ssh-provisioning.md): planned scope and acceptance criteria; implementation has not started.
+- [M2: SSH provisioning and recovery](roadmap/m2-ssh-provisioning.md): SSH installation, encrypted access and password rotation are implemented; cancellation and backup/restore remain planned.
 
 ### Reference
 

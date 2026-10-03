@@ -1,56 +1,62 @@
 ---
 title: "M2: SSH provisioning and recovery"
-description: "M2 status and scope for SSH node provisioning, server access, and encrypted panel backups."
+description: "M2 implementation status for SSH node installation, saved server access, password rotation, backups and restore."
 ---
 
-**In progress: Go SSH provisioning.** The owner-only Connect API, durable SQLite jobs and events, SSH installer, and server-rendered Go wizard are implemented. Open the wizard by appending `/nodes/install` to the admin URL. It confirms the SSH host key before requesting a password, runs preflight, starts a job, refreshes progress, and supports retry. M2 remains incomplete: cancellation, persistent server-access cards, encrypted backup and restore, and node-removal integration are still planned.
+**In progress.** The Go SSH installer, MCP plan/apply workflow, encrypted server access and verified password rotation are implemented. Panel backups and restore, plus cancellation of queued or running installs, remain open. The supported install path is documented in [Add a node](../getting-started/add-node.md) and the [AI agent guide](../getting-started/ai-agents.md).
 
 ## Goal
 
-From the admin UI, take a supported, empty Linux server to an online Mistgate node in five minutes or less. The current manual flow is documented in [Add a node](../getting-started/add-node.md); M2 is intended to run that setup over SSH and make failures recoverable from the UI.
+From the admin UI or an approved AI-agent plan, take a supported Linux server to an online Mistgate node and make access recoverable without exposing a password in the UI, MCP plan, or logs.
 
-## Planned scope
+## Implemented
 
 ### SSH provisioning
 
-- The Go API exposes host-key discovery, SSH preflight, job creation, retry, job status, and redacted events. The Go-rendered admin page at `/nodes/install` provides the installation form, host-key confirmation, preflight summary, progress, and retry.
-- Use root password authentication only in this first backend slice. Show the SSH host-key fingerprint and require owner confirmation before sending the password. Pin that exact key for every connection and stop if it changes.
-- Run read-only preflight before modifying the server: Ubuntu 22.04+ or Debian 12+, amd64 or arm64, root access, systemd, disk and memory checks, and outbound connectivity to the panel.
-- Transfer the matching trusted node agent, verify its signed-bundle digest, enroll it with a one-time token over stdin, install and start its systemd service, then wait for the node to connect.
-- Store the root password and enrollment material sealed to the job while it is queued or running; clear them on success or failure. Retry asks for the password again. Durable status and event codes contain no command output or credentials.
-- Job retry, recovery after a panel restart, and the UI progress view are implemented. Cancellation remains planned.
+- Owner-only Connect API and Go-rendered `/nodes/install` wizard: public SSH host-key discovery, explicit fingerprint confirmation, preflight summary, durable SQLite job and redacted progress events.
+- Root login or an SSH account with non-interactive `sudo -n`; the pinned SSH host key is checked before password authentication and on every later connection.
+- Preflight supports Ubuntu 22.04+ or Debian 12+, amd64 or arm64, systemd, disk/memory checks and outbound reachability to the panel.
+- The worker transfers the matching binary from the currently trusted signed release bundle, verifies its digest, enrolls with a one-time token over stdin, installs the systemd agent and waits for the node to connect.
+- SSH credentials and enrollment material are sealed to the job while work is queued or running, then cleared on terminal completion. Failed jobs can be retried; interrupted jobs are recovered after a panel restart.
 
-### Server access details
+### Server access and password changes
 
-- Persistent server access records, password generation or rotation, password reveal, and the server access card are not implemented. The current worker accepts a root password for one job and clears its sealed copy at a terminal state.
-- Encrypted backups do not yet include server access records. Passwords, enrollment tokens, and private keys are excluded from job events and audit details.
+- After the agent is online, the verified SSH login is saved as vault ciphertext bound to the node ID. The browser and MCP can list endpoint, username and host-key fingerprint, never the password.
+- The owner can rotate the SSH password from `/nodes/install`; an admin-profile MCP agent can use `node_server_password_rotate_plan` and `_apply`. New passwords need at least 12 characters.
+- Rotation stores an encrypted pending value before changing the host, uses `chpasswd` over the pinned connection, opens a fresh SSH session with the new password, and only then promotes it. An interrupted rotation can reconcile the old and pending credentials on retry.
+- Retiring a node removes its saved SSH access in the same store transaction that retires its identity and revokes its certificates and enrollment tokens.
+- Node installation and password rotation through MCP require the owner's approval. MCP plan data and results contain no passwords; the password is accepted only by the corresponding apply call.
 
-### Backup and recovery
+### Signed rollout
+
+The node updater already supports canary-first batches, a health gate and automatic rollback. Use the existing rollout flow to update installed agents; SSH provisioning installs the panel's current trusted agent bundle on new nodes.
+
+## Still planned
+
+### Cancellation
+
+Allow an owner to cancel queued work and stop an active SSH worker cleanly. Cancellation must clear temporary credentials and leave a redacted terminal event; it must not claim success when the remote outcome is unknown.
+
+### Backup and restore
 
 - Create scheduled encrypted panel backups and store them in the owner's Cloudflare R2 bucket.
-- Keep the recovery key under the owner's control and outside the panel, so restoring a backup does not depend on the panel's own secrets.
-- Document and support restoring a backup to a clean panel installation.
-
-### Node removal
-
-Extend the existing node retirement flow so that removal also deletes saved SSH credentials, revokes the node identity, invalidates unused enrollment commands, and leaves an audit record. The current node removal behavior is described in [Add a node](../getting-started/add-node.md).
+- Keep the recovery key outside the panel and support restoring the database and encrypted server access records on a clean panel.
+- Define retention and backup-format compatibility before enabling unattended pruning.
 
 ## Acceptance criteria
 
-The M2 criteria remain unmet until cancellation, the persistent access card, backup and restore, and removal integration are implemented.
+The SSH installation and saved-access criteria are implemented. M2 is not complete until cancellation and tested backup/restore are available.
 
-- An owner can provision a supported, empty Ubuntu 22.04+ or Debian 12+ server and see it online from the UI within five minutes under normal network conditions.
-- Provisioning does not change the host until preflight checks pass and the SSH host key has been verified.
-- A failed or interrupted attempt shows the failed phase and useful redacted diagnostics; retry does not create duplicate nodes or leave conflicting agent state.
-- Server passwords are encrypted at rest, hidden by default, and absent from logs. An owner can reveal or change a saved password from the server access card.
-- A scheduled backup can be restored on a clean panel using the owner's recovery key, including the encrypted server access records.
-- Removing a node revokes its panel identity and unused enrollment commands, removes its saved SSH credentials, and preserves the audit history.
+- An owner can install a supported Ubuntu or Debian server from the panel or an approved MCP plan and see the node connect.
+- No host changes happen before host-key confirmation and successful preflight. The installer fails closed on a changed key or unsafe target.
+- Failed and interrupted jobs expose useful stable error codes without command output or credentials; retries do not duplicate the node identity.
+- Saved SSH passwords are encrypted at rest and never revealed by reads. Rotation is verified with a new SSH login before committing.
+- Retiring a node deletes its saved access, revokes its identity and invalidates unused enrollment tokens.
+- A backup restores the encrypted access records and panel state with the owner's recovery key.
 
-## Decisions and remaining work
+## Decisions
 
-- Initial provisioning uses root password authentication; SSH keys and sudo users are not supported by this backend slice.
-- The owner must confirm the displayed SHA-256 SSH host-key fingerprint. Every later connection pins the same fingerprint; a changed key fails closed.
-- The job password is not rotated or kept as a saved server credential. A failed job requires the owner to enter the password again.
-- Add cancellation for queued and running jobs.
-- Decide backup retention, recovery-key rotation, and backup-format compatibility; implement encrypted backup and restore.
-- Decide whether node removal retains redacted access metadata; implement removal cleanup and audit integration.
+- The first release supports password authentication for `root` or a non-root account with passwordless `sudo -n`; SSH private-key authentication is not part of this slice.
+- Every SSH connection pins the fingerprint confirmed by the owner. Public target validation blocks private, loopback and link-local addresses.
+- Password reveal is intentionally absent. The owner can rotate it and confirm that the replacement works.
+- New nodes receive the latest currently trusted signed agent bundle. Existing nodes use the staged rollout system rather than being reinstalled.

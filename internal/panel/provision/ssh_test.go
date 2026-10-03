@@ -143,6 +143,34 @@ func TestDialAuthenticatesOnlyAfterConfirmedHostKey(t *testing.T) {
 	}
 }
 
+func TestDialAsUsesTheRequestedLoginAndRequiresSafeUsername(t *testing.T) {
+	signer := testSigner(t)
+	passwords := make(chan string, 1)
+	users := make(chan string, 1)
+	client := testSSHClientWithUser(t, signer, passwords, users)
+	conn, err := client.DialAs(context.Background(), mustTarget(t), "mistgate-admin", "secret", ssh.FingerprintSHA256(signer.PublicKey()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	select {
+	case got := <-users:
+		if got != "mistgate-admin" {
+			t.Fatalf("SSH user = %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SSH server did not receive login")
+	}
+	if got := conn.PrivilegedCommand("printf '%s' safe"); got != "sudo -n sh -c 'printf '\\''%s'\\'' safe'" {
+		t.Fatalf("privileged command = %q", got)
+	}
+	for _, invalid := range []string{"", "1user", "user name", "user;id", "-option", "user\nroot"} {
+		if validSSHUsername(invalid) {
+			t.Errorf("accepted unsafe SSH username %q", invalid)
+		}
+	}
+}
+
 func TestDialConnectionClosesWhenCallerContextEnds(t *testing.T) {
 	signer := testSigner(t)
 	passwords := make(chan string, 1)
@@ -193,9 +221,16 @@ func (d testDialer) DialContext(ctx context.Context, network, address string) (n
 }
 
 func testSSHClient(t *testing.T, signer ssh.Signer, passwords chan<- string) *Client {
+	return testSSHClientWithUser(t, signer, passwords, nil)
+}
+
+func testSSHClientWithUser(t *testing.T, signer ssh.Signer, passwords chan<- string, users chan<- string) *Client {
 	t.Helper()
-	server := &ssh.ServerConfig{PasswordCallback: func(_ ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+	server := &ssh.ServerConfig{PasswordCallback: func(meta ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		passwords <- string(password)
+		if users != nil {
+			users <- meta.User()
+		}
 		return nil, nil
 	}}
 	server.AddHostKey(signer)

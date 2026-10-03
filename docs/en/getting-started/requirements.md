@@ -24,7 +24,7 @@ Mistgate needs one Linux server for the panel, one or more Linux servers for the
 | What | Requirement |
 |:--|:--|
 | System | Linux with systemd: Ubuntu 22.04 or newer, or Debian 12 or newer. amd64 or arm64. |
-| Access | root over SSH. `mistgate-node install` must run as root, and the agent runs as root with a narrowed set of capabilities. |
+| Access | For the SSH installer: root over SSH, or an SSH user with non-interactive `sudo -n`. The installer runs system changes as root. Manual `mistgate-node install` also runs as root; the agent runs as root with a narrowed set of capabilities. |
 | Address | A public IPv4 address. Clients connect to the node's address: a domain that points at the server, or the IP itself. |
 | nftables | The `nft` command (installed by default on Debian 12 and Ubuntu 22.04+). The agent drives its firewall rules through it. Port hopping needs `redirect` in the `inet` family, which kernels from 5.2 have. |
 | TUN device | `/dev/net/tun` for the userspace AmneziaWG backend and for WARP. On a container VPS (OpenVZ, LXC) enable TUN in the hoster's control panel. |

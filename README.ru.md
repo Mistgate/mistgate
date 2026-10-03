@@ -35,7 +35,7 @@ Mistgate ещё не вышел. Автор использует его в ра�
 | Этап | Что |
 |:--|:--|
 | **Готово** | Панель и агент ноды по mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · выход через WARP · подписки и страница пользователя · DNS-пресеты · доктор, проверки глазами клиента, алерты · подписанные обновления агента с канарейкой и откатом · самообновление панели через GitHub Releases с проверкой контрольной суммы и откатом · API-токены и MCP-сервер · админка на русском и английском |
-| **M2 — в работе** | Go-мастер установки ноды по SSH в админке, с предпроверкой и подтверждением SSH-ключа · временное шифрованное хранение SSH-пароля задания · зашифрованные бэкапы панели в R2 · [план M2](docs/ru/roadmap/m2-ssh-provisioning.md) |
+| **M2 — в работе** | Go-установщик ноды по SSH и plan/apply для MCP · root или логин с passwordless sudo · проверка и закрепление SSH host key · зашифрованный постоянный доступ с проверенной сменой пароля · установка подписанного агента с ожиданием подключения · резервное копирование и восстановление панели ещё в плане · [план M2](docs/ru/roadmap/m2-ssh-provisioning.md) |
 | **Дальше** | Telegram-бот на весь флот · новые форматы подписок (Xray JSON, sing-box) и зеркала подписок · установка одной командой |
 | **Потом** | VLESS REALITY как первый внешний плагин протокола |
 
@@ -43,10 +43,11 @@ Mistgate ещё не вышел. Автор использует его в ра�
 
 ## Документация
 
-Полная документация доступна на [mistgate.app/ru](https://mistgate.app/ru/) (английская версия: [mistgate.app](https://mistgate.app/)). Исходники лежат в [`docs/ru`](docs/ru/index.md) и [`docs/en`](docs/en/index.md). С чего начать:
+Полная документация доступна на [mistgate.app/ru](https://mistgate.app/ru/) (английская версия: [mistgate.app](https://mistgate.app/)). Исходники лежат в [`docs/ru`](docs/ru/index.md) и [`docs/en`](docs/en/index.md). Coding-агентам — [`AGENTS.md`](AGENTS.md), установка нод через MCP описана в [инструкции для AI-агента](docs/ru/getting-started/ai-agents.md), опубликованный сайт отдаёт [`llms.txt`](llms.txt). С чего начать:
 
 - [Обзор](docs/ru/getting-started/overview.md): основные понятия (панель, нода, профиль, пользователь, группа, устройство, подписка).
 - [Установка панели](docs/ru/getting-started/install-panel.md), [добавление ноды](docs/ru/getting-started/add-node.md), [первые пользователи](docs/ru/getting-started/first-users.md).
+- [Установка с AI-агентом](docs/ru/getting-started/ai-agents.md): подключение ноды, смена пароля и раскатка обновлений через MCP с одобрением владельца.
 - [Здоровье](docs/ru/operations/health.md), [обновления](docs/ru/operations/updates.md), [безопасность](docs/ru/operations/security.md), [решение проблем](docs/ru/operations/troubleshooting.md).
 - [CLI](docs/ru/reference/cli.md), [конфигурация](docs/ru/reference/configuration.md), [API](docs/ru/reference/api.md), [MCP](docs/ru/reference/mcp.md).
 
