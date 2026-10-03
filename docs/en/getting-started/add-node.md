@@ -3,7 +3,7 @@ title: Add a node
 description: Enroll a Linux server with the node agent, watch it come online, and remove it cleanly later.
 ---
 
-A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two paths: **Install automatically over SSH** or **Get a manual install command**. This page covers both and explains how to remove a node later. If the dialog opens directly on the name, country and address fields, update the panel first through **Settings → System**; the current chooser appears after that update.
+A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two paths: **Install automatically over SSH** or **Get a manual install command**. This page covers both and explains how to remove a node later. If the dialog opens directly on the name, country and address fields, update the panel first through **Settings → System**. A commit-tagged early build may need one manual update from the v0.1.0 release before it has this chooser; see [panel updates](../operations/updates.md).
 
 ## Automatic SSH installation
 

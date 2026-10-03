@@ -79,7 +79,9 @@ test("node guides show the SSH install choice and the published panel update pat
   assert.ok(addRu.includes("Запустить автоустановку по SSH"));
   assert.ok(addRu.includes("Настройки → Система"));
   assert.ok(updatesEn.includes("v0.1.0"));
+  assert.ok(updatesEn.includes("predate the panel updater"));
   assert.ok(updatesEn.includes("Check GitHub"));
   assert.ok(updatesRu.includes("v0.1.0"));
+  assert.ok(updatesRu.includes("появились до самообновления панели"));
   assert.ok(updatesRu.includes("Проверить GitHub"));
 });
