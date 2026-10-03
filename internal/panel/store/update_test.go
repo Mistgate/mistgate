@@ -204,6 +204,42 @@ func TestRolloutStore(t *testing.T) {
 	}
 }
 
+func TestRolloutAttemptedNodeIDsIgnoresOnlyOfflineSkips(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(10_000, 0)
+	for _, tc := range []struct {
+		rolloutID string
+		nodeID    string
+		state     string
+		errorKey  string
+	}{
+		{rolloutID: "rol_passed", nodeID: "nod_passed", state: StepPassed},
+		{rolloutID: "rol_offline", nodeID: "nod_offline", state: StepSkipped, errorKey: "offline"},
+		{rolloutID: "rol_failed", nodeID: "nod_failed", state: StepFailed, errorKey: "agent_failed"},
+	} {
+		status := RolloutDone
+		if tc.state == StepFailed {
+			status = RolloutFailed
+		}
+		if err := s.CreateRollout(ctx, RolloutRow{ID: tc.rolloutID, Status: status, ToVersion: "v1", ToBuilt: 100,
+			Manifest: []byte("m"), Signature: []byte("s"), BatchSize: 1, CreatedAt: now},
+			[]StepRow{{NodeID: tc.nodeID, NodeName: tc.nodeID, State: tc.state, ErrorKey: tc.errorKey}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	attempted, err := s.RolloutAttemptedNodeIDs(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attempted) != 2 || !attempted["nod_passed"] || !attempted["nod_failed"] || attempted["nod_offline"] {
+		t.Fatalf("attempted node ids: %#v", attempted)
+	}
+	if got, err := s.RolloutAttemptedNodeIDs(ctx, 101); err != nil || len(got) != 0 {
+		t.Fatalf("different build attempts: %#v, %v", got, err)
+	}
+}
+
 func TestPruneRollouts(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)

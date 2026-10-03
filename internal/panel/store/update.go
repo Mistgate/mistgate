@@ -156,6 +156,31 @@ func (s *Store) LatestRollout(ctx context.Context) (RolloutRow, error) {
 	return scanRollout(s.R.QueryRowContext(ctx, `SELECT `+rolloutCols+` FROM update_rollout ORDER BY created_at DESC, rowid DESC LIMIT 1`))
 }
 
+// RolloutAttemptedNodeIDs returns nodes that already had a step for this agent build. A node skipped because it was
+// offline is not considered attempted; the automatic updater may include it after it reconnects. Every other state
+// is retained as an attempt so a failed or cancelled rollout is not restarted in a loop.
+func (s *Store) RolloutAttemptedNodeIDs(ctx context.Context, built int64) (map[string]bool, error) {
+	rows, err := s.R.QueryContext(ctx, `
+		SELECT DISTINCT step.node_id
+		FROM update_step AS step
+		JOIN update_rollout AS rollout ON rollout.id = step.rollout_id
+		WHERE rollout.to_built = ?
+		  AND NOT (step.state = 'skipped' AND step.error_key = 'offline')`, built)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var nodeID string
+		if err := rows.Scan(&nodeID); err != nil {
+			return nil, err
+		}
+		out[nodeID] = true
+	}
+	return out, rows.Err()
+}
+
 // Rollout returns one rollout or ErrNotFound.
 func (s *Store) Rollout(ctx context.Context, id string) (RolloutRow, error) {
 	return scanRollout(s.R.QueryRowContext(ctx, `SELECT `+rolloutCols+` FROM update_rollout WHERE id = ?`, id))

@@ -3,11 +3,11 @@ title: Updates
 description: How node agents update themselves from bundles you sign, how a staged rollout checks and rolls back nodes, and how the panel installs GitHub releases.
 ---
 
-Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
+Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. After that bundle is published in the latest stable GitHub Release, the panel checks every 10 minutes, verifies the signature, saves it to `dist` and starts the safe canary rollout automatically. No rollout button is needed. Updating the panel binary and updating its agent are separate parts of one GitHub Release: a new panel version alone is not enough; the release must also include `manifest.json`, `manifest.sig` and the agent binaries. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
 
 ## How trust works
 
-- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. A keyed panel build stores the public key in `<data-dir>/release.pub`; node agents carry it in their binaries. Generic GitHub panel builds preserve and use the saved key.
+- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. The panel stores the public half in `<data-dir>/release.pub`; node agents carry it in their binaries. If `MISTGATE_RELEASE_PUBLIC_KEY` is set in GitHub, Actions stamps it into new builds. For an existing panel, it must match the saved key and the key in already installed agents.
 - For every release you sign a manifest: the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256.
 - The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
 - The panel is only a courier: a compromised panel cannot make a node run code you did not sign.
@@ -15,6 +15,29 @@ Node agents update themselves, but only to a build signed with your release key.
 - A node agent built without `RELEASE_KEY` cannot update itself. `mistgate-node version` prints its compiled key fingerprint. The panel uses `release.pub` for bundle verification, even after a generic GitHub panel update.
 
 ## Publish a release
+
+GitHub Actions builds the panel and, when the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` is set, publishes agent binaries with that version and key. The private key is never passed to Actions: the owner signs the binaries on a trusted machine and uploads `manifest.json` and `manifest.sig` to the same release. The panel picks up the package automatically within 10 minutes and starts its canary rollout. The GitHub public-key variable must match `<data-dir>/release.pub` and the key compiled into the already installed agents. A mismatched signature is refused.
+
+If `MISTGATE_RELEASE_PUBLIC_KEY` is not set, a GitHub release contains only the panel. A panel version such as `v0.1.5` therefore does not mean its agent bundle is also `v0.1.5`. Until both signature files are attached to the latest release, the panel considers no agent package available and does not start an automatic rollout.
+
+To sign offline, download `BUILDINFO`, the panel binary and both `mistgate-node-linux-*` binaries from the release. `BUILDINFO` contains the exact `version` and Unix `built` timestamp; the panel binary from the same release carries that version and public key:
+
+```sh
+VERSION=v0.1.6
+gh release download "$VERSION" --repo Mistgate/mistgate \
+  --pattern BUILDINFO --pattern mistgate-linux-amd64 \
+  --pattern mistgate-node-linux-amd64 --pattern mistgate-node-linux-arm64 \
+  --dir downloaded
+BUILT="$(sed -n 's/^built=//p' downloaded/BUILDINFO)"
+./downloaded/mistgate-linux-amd64 release sign --key ~/mistgate-release.key \
+  --version "$VERSION" --built "$BUILT" --expires 3650d \
+  downloaded/mistgate-node-linux-amd64 downloaded/mistgate-node-linux-arm64 \
+  --out signed
+gh release upload "$VERSION" signed/manifest.json signed/manifest.sig \
+  --repo Mistgate/mistgate --clobber
+```
+
+Run signing on a Linux machine that can access the offline key file. The binaries and signature must come from the same tag; the command checks the version and matching key.
 
 ### 1. Make the release key (once)
 
@@ -41,14 +64,14 @@ This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd
 ```sh
 mistgate release sign --key ~/mistgate-release.key \
   --version "$VERSION" \
-  --built "$BUILT" --expires 30d \
+  --built "$BUILT" --expires 3650d \
   bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
 ```
 
 - The binaries must be named `<name>-<os>-<arch>`, as `make build` names them.
 - `--version` must match the panel and agent versions. Signing refuses to create a bundle whose version differs from the panel binary used to sign it.
 - `--built` must be the build time stamped into the binaries: build and sign from the same commit. A new build whose own build time differs from the manifest rolls itself back after the update (`built_mismatch`).
-- `--expires` is a number of days (`30d`) or a Go duration (`720h`); the default is `30d`. After that the panel and the nodes refuse the manifest, so a captured old manifest cannot be replayed for long.
+- `--expires` is a number of days (`3650d`) or a Go duration (`87600h`); the default is `30d`. Use a long lifetime for a package in the latest GitHub release so a panel that has not updated in a while can still download it. If it expires, sign the same binaries again with a later expiry and replace the signature files in that release; the panel refreshes the manifest for the same build without repeating rollout to nodes already updated.
 - The command writes `dist/manifest.json` and `dist/manifest.sig`, copies the binaries next to them, reads the result back and verifies it, then prints the version, the expiry, every file with its size and the key fingerprint.
 
 ### 4. Put the bundle on the panel

@@ -56,6 +56,7 @@ type Health interface {
 type Timing struct {
 	Tick          time.Duration // worker period; default 5 s
 	Rescan        time.Duration // bundle directory poll; default 60 s
+	BundlePoll    time.Duration // GitHub agent bundle poll; default 10 min
 	AnswerWait    time.Duration // UpdateAgent: the agent's CommandResult, download included; default 10 min
 	ReconnectWait time.Duration // after the answer: the node is back with the new build; default 3 min
 	GateWait      time.Duration // after the reconnect: the gate passes or fails; default 5 min
@@ -66,7 +67,8 @@ type Timing struct {
 
 func (t *Timing) defaults() {
 	for p, d := range map[*time.Duration]time.Duration{
-		&t.Tick: 5 * time.Second, &t.Rescan: time.Minute, &t.AnswerWait: 10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
+		&t.Tick: 5 * time.Second, &t.Rescan: time.Minute, &t.BundlePoll: 10 * time.Minute,
+		&t.AnswerWait: 10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
 		&t.GateWait: 5 * time.Minute, &t.RollbackWait: time.Minute, &t.InboundGrace: 30 * time.Second, &t.Prune: 6 * time.Hour,
 	} {
 		if *p <= 0 {
@@ -93,6 +95,10 @@ type Config struct {
 	PanelBuilt   int64
 	// PanelUpdater checks official GitHub releases and schedules a checked panel binary replacement when available.
 	PanelUpdater PanelUpdater
+	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
+	// A trusted newer bundle is installed into dist and automatically starts the staged rollout. Only the bundle
+	// verified as the current GitHub release may start automatic rollout.
+	NodeBundleSource NodeBundleSource
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
 	StepUp func(context.Context) error
 	// Actor returns the admin id for audit rows and for the rollout's created_by. Default: the signed-in admin.
@@ -117,15 +123,18 @@ type Service struct {
 	hashes map[string]hashEntry
 	serves int // concurrent downloads, guarded by bmu
 
-	mu                     sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
-	panelInstalling        bool
-	panelInstallGeneration uint64
-	panelInstallTimer      *time.Timer
-	runCtx                 context.Context
-	wg                     sync.WaitGroup
-	inflight               map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
-	orphans                map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
-	failing                map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
+	mu                       sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
+	panelInstalling          bool
+	bundleSyncing            bool
+	githubBundleAvailable    bool
+	githubBundleManifestHash string
+	panelInstallGeneration   uint64
+	panelInstallTimer        *time.Timer
+	runCtx                   context.Context
+	wg                       sync.WaitGroup
+	inflight                 map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
+	orphans                  map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
+	failing                  map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
 
 	updMu    sync.RWMutex
 	updating map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
@@ -178,6 +187,8 @@ func (s *Service) Run(ctx context.Context) {
 	s.runCtx = ctx
 	s.mu.Unlock()
 	s.recover(ctx)
+	s.syncNodeBundle(ctx)
+	s.startAutomaticRollout(ctx)
 	if s.cfg.PanelUpdater != nil {
 		s.wg.Add(1)
 		go func() {
@@ -189,6 +200,8 @@ func (s *Service) Run(ctx context.Context) {
 	defer tick.Stop()
 	poll := time.NewTicker(s.cfg.Rescan)
 	defer poll.Stop()
+	bundlePoll := time.NewTicker(s.cfg.BundlePoll)
+	defer bundlePoll.Stop()
 	prune := time.NewTicker(s.cfg.Prune)
 	defer prune.Stop()
 	s.pruneOld(ctx)
@@ -203,6 +216,10 @@ func (s *Service) Run(ctx context.Context) {
 			s.tick(ctx)
 		case <-poll.C:
 			s.rescanIfChanged()
+			s.startAutomaticRollout(ctx)
+		case <-bundlePoll.C:
+			s.syncNodeBundle(ctx)
+			s.startAutomaticRollout(ctx)
 		case <-prune.C:
 			s.pruneOld(ctx)
 		}
@@ -227,8 +244,12 @@ func (s *Service) pruneOld(ctx context.Context) {
 }
 
 func (s *Service) audit(ctx context.Context, action string, params map[string]string) {
+	s.auditAs(ctx, s.cfg.Actor(ctx), action, params)
+}
+
+func (s *Service) auditAs(ctx context.Context, actor, action string, params map[string]string) {
 	b := jsonString(params)
-	if err := s.st.Audit(ctx, s.now(), store.AuditEntry{Actor: s.cfg.Actor(ctx), Action: action, Params: b, Result: "ok"}); err != nil {
+	if err := s.st.Audit(ctx, s.now(), store.AuditEntry{Actor: actor, Action: action, Params: b, Result: "ok"}); err != nil {
 		s.log.Warn("update: audit", "action", action, "err", err)
 	}
 }

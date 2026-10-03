@@ -26,26 +26,72 @@ jobs:
       - name: Build embedded admin panel
         run: cd web && pnpm install --frozen-lockfile && pnpm build
       - name: Build panel binaries
+        id: build
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
+          RELEASE_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
           if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "release tag must be semantic version vMAJOR.MINOR.PATCH" >&2
             exit 1
           fi
+          if [[ -n "$RELEASE_KEY" ]]; then
+            if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+              echo "MISTGATE_RELEASE_PUBLIC_KEY must be a base64-encoded Ed25519 public key" >&2
+              exit 1
+            fi
+            key_bytes="$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)"
+            if [[ "$key_bytes" -ne 32 ]]; then
+              echo "MISTGATE_RELEASE_PUBLIC_KEY must decode to 32 bytes" >&2
+              exit 1
+            fi
+          fi
           mkdir -p release
           built="$(git log -1 --format=%ct)"
+          printf 'version=%s\nbuilt=%s\n' "$TAG" "$built" > release/BUILDINFO
           bi="github.com/mistgate/mistgate/internal/buildinfo"
+          ldflags=(-s -w -X "${bi}.Version=${TAG}" -X "${bi}.Built=${built}")
+          if [[ -n "$RELEASE_KEY" ]]; then
+            ldflags+=( -X "${bi}.ReleaseKey=${RELEASE_KEY}" )
+          fi
           for arch in amd64 arm64; do
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-              -ldflags "-s -w -X ${bi}.Version=${TAG} -X ${bi}.Built=${built}" \
+              -ldflags "${ldflags[*]}" \
               -o "release/mistgate-linux-${arch}" ./cmd/mistgate
           done
-          (cd release && sha256sum mistgate-linux-* > SHA256SUMS)
+          node_bundle_mode=none
+          if [[ -n "$RELEASE_KEY" ]]; then
+            for arch in amd64 arm64; do
+              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+                -ldflags "${ldflags[*]}" \
+                -o "release/mistgate-node-linux-${arch}" ./cmd/mistgate-node
+            done
+            node_bundle_mode=unsigned
+            echo "::notice::Node binaries are built with the release key. Keep the private key offline, sign these binaries, then upload manifest.json and manifest.sig to this release."
+          else
+            echo "::notice::Set MISTGATE_RELEASE_PUBLIC_KEY to publish node agents that trust the release key."
+          fi
+          (
+            cd release
+            checksums=(mistgate-linux-amd64 mistgate-linux-arm64)
+            if [[ -f mistgate-node-linux-amd64 ]]; then
+              checksums+=(mistgate-node-linux-amd64 mistgate-node-linux-arm64)
+            fi
+            sha256sum "${checksums[@]}" > SHA256SUMS
+          )
+          echo "node_bundle_mode=${node_bundle_mode}" >> "$GITHUB_OUTPUT"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/SHA256SUMS --title "$TAG" --generate-notes
+        shell: bash
+        run: |
+          assets=(release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/SHA256SUMS release/BUILDINFO)
+          case "${{ steps.build.outputs.node_bundle_mode }}" in
+            unsigned)
+              assets+=(release/mistgate-node-linux-amd64 release/mistgate-node-linux-arm64)
+              ;;
+          esac
+          gh release create "$TAG" "${assets[@]}" --title "$TAG" --generate-notes

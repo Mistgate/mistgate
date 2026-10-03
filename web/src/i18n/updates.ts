@@ -154,6 +154,7 @@ export const en = {
 
   // ---- bundle card
   "up.bundle.title": "Release bundle",
+  "up.bundle.githubNote": "The panel checks GitHub every 10 minutes. When the latest release has a node bundle signed with this installation’s release key, the panel downloads it and starts the canary rollout automatically. A panel release without a signed node bundle does not update agents.",
   "up.bundle.status.trusted": "Signature verified",
   "up.bundle.status.untrusted": "Failed the check",
   "up.bundle.status.badSignature": "Signature does not match",
@@ -441,6 +442,7 @@ export const ru: Record<keyof typeof en, string> = {
 
   // ---- bundle card
   "up.bundle.title": "Пакет релиза",
+  "up.bundle.githubNote": "Панель проверяет GitHub раз в 10 минут. Когда в последнем релизе появится пакет нод, подписанный ключом этой установки, панель сама скачает его и запустит канареечную раскатку. Релиз панели без подписанного пакета агентов не обновляет.",
   "up.bundle.status.trusted": "Подпись проверена",
   "up.bundle.status.untrusted": "Не прошёл проверку",
   "up.bundle.status.badSignature": "Подпись не сходится",
