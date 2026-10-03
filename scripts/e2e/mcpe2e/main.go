@@ -596,7 +596,7 @@ func (e *env) scenario() {
 		ps2, err := e.stdio(adSecret, &b2)
 		if err == nil {
 			n, _, _ := toolNames(ps2)
-			e.check("stdio proxy with an admin token: 41 tools", len(n) == 41, "%d", len(n))
+			e.check("stdio proxy with an admin token: 46 tools", len(n) == 46, "%d", len(n))
 			ps2.Close()
 		} else {
 			e.check("stdio proxy with an admin token", false, "%v", err)

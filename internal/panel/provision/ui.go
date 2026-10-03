@@ -37,6 +37,7 @@ type installPageData struct {
 	Preflight   *preflightView
 	Job         *jobView
 	Jobs        []jobView
+	Access      []serverAccessView
 	Events      []eventView
 	Refresh     bool
 }
@@ -44,11 +45,17 @@ type installPageData struct {
 type installForm struct {
 	Host        string
 	Port        string
+	Username    string
 	Name        string
 	Address     string
 	CountryCode string
 	Location    string
 	Provider    string
+}
+
+type serverAccessView struct {
+	ID, Name, Host, Username, ConfiguredAt string
+	Pending                                bool
 }
 
 type preflightView struct {
@@ -178,16 +185,17 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 				<div class="field"><label for="country">Код страны</label><input id="country" name="country_code" maxlength="2" pattern="[a-zA-Z]{2}" value="{{.Form.CountryCode}}" placeholder="DE"></div>
 				<div class="field"><label for="location">Регион или город</label><input id="location" name="location" maxlength="100" value="{{.Form.Location}}" placeholder="Frankfurt"></div>
 				<div class="field full"><label for="provider">Провайдер</label><input id="provider" name="provider" maxlength="100" value="{{.Form.Provider}}" placeholder="Название хостинга"></div>
-				<div class="field full"><label for="password">Пароль root по SSH</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
+				<div class="field"><label for="username">SSH-логин</label><input id="username" name="username" required maxlength="32" pattern="[A-Za-z_][A-Za-z0-9_.-]*" value="{{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}" autocomplete="username"></div>
+				<div class="field"><label for="password">Пароль SSH</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
 			</div>
 			<div class="actions"><button class="button" type="submit">Проверить сервер</button><a class="button secondary" href="?">Начать заново</a></div>
 		</form>
-		<p class="foot">Пароль отправляется только в теле запроса: он не попадает в URL и список заданий.</p>
+		<p class="foot">Подойдут root или отдельный SSH-пользователь с настроенным <span class="mono">sudo -n</span>. Пароль передаётся только в теле запроса и шифруется перед сохранением задания.</p>
 	</section>
 	{{else if eq .Step "preflight"}}
 	<section class="card">
 		<ul class="steps"><li>1 · Сервер</li><li>2 · Ключ SSH</li><li class="current">3 · Проверка</li><li>4 · Установка</li></ul>
-		<h2>Требования выполнены</h2><p class="lead">SSH-аутентификация и предварительные проверки прошли. Для запуска установки введите пароль root ещё раз.</p>
+		<h2>Требования выполнены</h2><p class="lead">SSH-аутентификация и предварительные проверки прошли. Для запуска установки введите пароль ещё раз.</p>
 		{{with .Preflight}}<div class="facts">
 			<div class="fact"><span>Система</span><b>{{.Distribution}} {{.Version}}</b></div><div class="fact"><span>Архитектура</span><b>{{.Architecture}}</b></div><div class="fact"><span>Ядро</span><b>{{.Kernel}}</b></div>
 			<div class="fact"><span>Процессоры</span><b>{{.CPUCount}}</b></div><div class="fact"><span>Память</span><b>{{.Memory}}</b></div><div class="fact"><span>Свободное место</span><b>{{.Disk}}</b></div>
@@ -195,9 +203,9 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 		</div>{{end}}
 		<div class="divider"></div><h2>Подтверждение установки</h2>
 		<form method="post" action="" autocomplete="off">
-			<input type="hidden" name="action" value="start"><input type="hidden" name="host" value="{{.Form.Host}}"><input type="hidden" name="port" value="{{.Form.Port}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
+			<input type="hidden" name="action" value="start"><input type="hidden" name="host" value="{{.Form.Host}}"><input type="hidden" name="port" value="{{.Form.Port}}"><input type="hidden" name="username" value="{{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
 			<input type="hidden" name="name" value="{{.Form.Name}}"><input type="hidden" name="address" value="{{.Form.Address}}"><input type="hidden" name="country_code" value="{{.Form.CountryCode}}"><input type="hidden" name="location" value="{{.Form.Location}}"><input type="hidden" name="provider" value="{{.Form.Provider}}">
-			<div class="field"><label for="password">Пароль root по SSH</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
+			<div class="field"><label for="password">Пароль SSH пользователя {{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
 			<div class="check"><input id="confirm-key" name="confirm_key" type="checkbox" value="yes" required><label for="confirm-key">Подтверждаю отпечаток <span class="mono">{{.Fingerprint}}</span>.</label></div>
 			<div class="check"><input id="confirm-install" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-install">Установить агент Mistgate и создать новую ноду. Существующая система не будет переустановлена.</label></div>
 			<div class="actions"><button class="button" type="submit">Запустить установку</button><a class="button secondary" href="?">Отмена</a></div>
@@ -212,7 +220,7 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 		{{if .Events}}<ul class="events">{{range .Events}}<li><span>{{.Label}}</span><time>{{.CreatedAt}}</time></li>{{end}}</ul>{{else}}<p class="empty">События появятся после запуска задания.</p>{{end}}
 		{{if and .Job (eq .Job.State "failed")}}<div class="divider"></div><h2>Повторить установку</h2><p class="lead">Проверьте причину ошибки. Для повтора требуется пароль root.</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="retry"><input type="hidden" name="job_id" value="{{.Job.ID}}">
-			<div class="field" style="margin-top:14px"><label for="retry-password">Пароль root по SSH</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
+			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">SSH-логин</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">Пароль SSH</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div></div>
 			<div class="check"><input id="confirm-retry" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-retry">Повторно выполнить установку для этой ноды.</label></div>
 			<div class="actions"><button class="button" type="submit">Повторить</button><a class="button secondary" href="?">К списку заданий</a></div>
 		</form>{{end}}
@@ -222,15 +230,16 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 	{{else}}
 	<section class="card">
 		<ul class="steps"><li class="current">1 · Сервер</li><li>2 · Ключ SSH</li><li>3 · Проверка</li><li>4 · Установка</li></ul>
-		<h2>Новая нода</h2><p class="lead">Мастер установит Mistgate Agent на чистый Ubuntu 22.04+ или Debian 12+ сервер с root-доступом и systemd.</p>
+		<h2>Новая нода</h2><p class="lead">Мастер установит Mistgate Agent на Ubuntu 22.04+ или Debian 12+ с systemd. Можно войти как root или как SSH-пользователь с passwordless sudo.</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="fingerprint">
 			<div class="grid" style="margin-top:18px"><div class="field"><label for="host">Адрес SSH-сервера</label><input id="host" name="host" required maxlength="253" value="{{.Form.Host}}" placeholder="node.example.com или публичный IP" autocomplete="off"></div><div class="field"><label for="port">Порт SSH</label><input id="port" name="port" type="number" min="1" max="65535" value="{{if .Form.Port}}{{.Form.Port}}{{else}}22{{end}}" required></div></div>
 			<div class="actions"><button class="button" type="submit">Начать проверку</button></div>
 		</form>
-		<p class="foot">Используется учётная запись root. Пароль не запрашивается до подтверждения отпечатка SSH host key.</p>
+		<p class="foot">Пароль не запрашивается до подтверждения отпечатка SSH host key.</p>
 	</section>
 	{{end}}
 	{{if and (not .Job) .Jobs}}<section class="card"><h2>Последние задания</h2><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>Состояние</th><th>SSH-сервер</th><th></th></tr></thead><tbody>{{range .Jobs}}<tr><td>{{.Name}}</td><td><span class="status {{.State}}">{{.StateLabel}}</span></td><td class="mono">{{.Host}}</td><td><a href="?job={{.ID}}">Открыть</a></td></tr>{{end}}</tbody></table></div></section>{{end}}
+	{{if and (not .Job) .Access}}<section class="card"><h2>Доступ к серверам</h2><p class="lead">Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль.</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>SSH</th><th>Подключение</th><th>Сменить пароль</th></tr></thead><tbody>{{range .Access}}<tr><td>{{.Name}}{{if .Pending}}<div class="error">Смена ожидает проверки; повторите её для восстановления.</div>{{end}}</td><td class="mono">{{.Host}}</td><td class="mono">{{.Username}}</td><td><form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="rotate_password"><input type="hidden" name="node_id" value="{{.ID}}"><input name="new_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password" aria-label="Новый пароль SSH"><label class="check"><input name="confirm_rotation" type="checkbox" value="yes" required><span>Сменить пароль пользователя {{.Username}}</span></label><button class="button secondary" type="submit">Сменить</button></form></td></tr>{{end}}</tbody></table></div></section>{{end}}
 	<p class="foot">Изменения на сервере начинаются только после успешной проверки требований, подтверждения ключа и нажатия «Запустить установку».</p>
 </main>
 </body>
@@ -308,8 +317,23 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := installPageData{Step: "host"}
+	if r.URL.Query().Get("password_rotated") == "1" {
+		page.Message = "Пароль изменён, новый SSH-вход проверен."
+	}
 	for _, job := range jobs.Msg.Jobs {
 		page.Jobs = append(page.Jobs, makeJobView(job))
+	}
+	access, err := s.ListNodeServerAccess(r.Context(), connect.NewRequest(&adminv1.ListNodeServerAccessRequest{}))
+	if err != nil {
+		s.renderForRequest(w, r, http.StatusInternalServerError, installPageData{Step: "host", Message: "Не удалось загрузить список SSH-доступов."})
+		return
+	}
+	for _, item := range access.Msg.Access {
+		page.Access = append(page.Access, serverAccessView{
+			ID: item.NodeId, Name: item.NodeName, Host: net.JoinHostPort(item.Host, strconv.FormatUint(uint64(item.Port), 10)),
+			Username: item.Username, ConfiguredAt: time.Unix(item.ConfiguredUnix, 0).Local().Format("2006-01-02 15:04"),
+			Pending: item.RotationPending,
+		})
 	}
 	s.renderForRequest(w, r, http.StatusOK, page)
 }
@@ -344,7 +368,7 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 			s.renderForRequest(w, r, http.StatusBadRequest, installPageData{Step: "host", Message: "Данные SSH-сервера недействительны. Начните проверку заново."})
 			return
 		}
-		facts, err := s.checkSSH(r.Context(), host, port, fingerprint, values.Get("password"))
+		facts, err := s.checkSSH(r.Context(), host, port, fingerprint, form.Username, values.Get("password"))
 		if err != nil {
 			s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 				Step: "fingerprint", Form: form, Fingerprint: fingerprint,
@@ -357,6 +381,8 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 		s.startPageJob(w, r, values, form)
 	case "retry":
 		s.retryPageJob(w, r, values)
+	case "rotate_password":
+		s.rotatePagePassword(w, r, values)
 	default:
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{Step: "host", Message: "Неизвестное действие. Начните установку заново."})
 	}
@@ -374,7 +400,7 @@ func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values ur
 		return
 	}
 	password := values.Get("password")
-	facts, err := s.checkSSH(r.Context(), host, port, fingerprint, password)
+	facts, err := s.checkSSH(r.Context(), host, port, fingerprint, form.Username, password)
 	if err != nil {
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 			Step: "fingerprint", Form: form, Fingerprint: fingerprint,
@@ -384,7 +410,7 @@ func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values ur
 	}
 	result, err := s.StartNodeProvision(r.Context(), connect.NewRequest(&adminv1.StartNodeProvisionRequest{
 		ConfirmInstall: true, Name: form.Name, Address: form.Address, CountryCode: form.CountryCode,
-		Location: form.Location, Provider: form.Provider, SshHost: host, SshPort: port, Fingerprint: fingerprint, Password: password,
+		Location: form.Location, Provider: form.Provider, SshHost: host, SshPort: port, Fingerprint: fingerprint, Password: password, SshUsername: form.Username,
 	}))
 	if err != nil {
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
@@ -403,7 +429,7 @@ func (s *Service) retryPageJob(w http.ResponseWriter, r *http.Request, values ur
 		return
 	}
 	result, err := s.RetryNodeProvision(r.Context(), connect.NewRequest(&adminv1.RetryNodeProvisionRequest{
-		JobId: jobID, ConfirmInstall: true, Password: values.Get("password"),
+		JobId: jobID, ConfirmInstall: true, Password: values.Get("password"), SshUsername: sshUsername(values.Get("username")),
 	}))
 	if err != nil {
 		s.getPageWithMessage(w, r, jobID, userError(err, "Не удалось повторить установку. Проверьте пароль и состояние задания."))
@@ -433,14 +459,33 @@ func (s *Service) getPageWithMessage(w http.ResponseWriter, r *http.Request, job
 	s.renderForRequest(w, r, http.StatusBadRequest, page)
 }
 
-func (s *Service) checkSSH(ctx context.Context, host string, port uint32, fingerprint, password string) (*adminv1.NodePreflight, error) {
+func (s *Service) checkSSH(ctx context.Context, host string, port uint32, fingerprint, username, password string) (*adminv1.NodePreflight, error) {
 	result, err := s.CheckSSH(ctx, connect.NewRequest(&adminv1.CheckSSHRequest{
-		Host: host, Port: port, Fingerprint: fingerprint, Password: password,
+		Host: host, Port: port, Fingerprint: fingerprint, Password: password, Username: sshUsername(username),
 	}))
 	if err != nil {
 		return nil, err
 	}
 	return result.Msg.Preflight, nil
+}
+
+func (s *Service) rotatePagePassword(w http.ResponseWriter, r *http.Request, values url.Values) {
+	nodeID := strings.TrimSpace(values.Get("node_id"))
+	password := values.Get("new_password")
+	if !confirmed(values.Get("confirm_rotation")) || nodeID == "" || len(nodeID) > 64 || len(password) < 12 || !validPassword(password) {
+		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{Step: "host", Message: "Подтвердите смену пароля и укажите новый пароль не короче 12 символов."})
+		return
+	}
+	_, err := s.RotateNodeServerPassword(r.Context(), connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{
+		NodeId: nodeID, NewPassword: password, Confirm: true,
+	}))
+	if err != nil {
+		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
+			Step: "host", Message: userError(err, "Не удалось подтвердить смену пароля. Доступ сохранён для восстановления."),
+		})
+		return
+	}
+	http.Redirect(w, r, "?password_rotated=1", http.StatusSeeOther)
 }
 
 func redirectToJob(w http.ResponseWriter, jobID string) {
@@ -472,7 +517,8 @@ func pageLinks(path string) (home, nodes string) {
 func formValues(values url.Values) installForm {
 	return installForm{
 		Host: strings.TrimSpace(values.Get("host")), Port: strings.TrimSpace(values.Get("port")),
-		Name: strings.TrimSpace(values.Get("name")), Address: strings.TrimSpace(values.Get("address")),
+		Username: sshUsername(strings.TrimSpace(values.Get("username"))),
+		Name:     strings.TrimSpace(values.Get("name")), Address: strings.TrimSpace(values.Get("address")),
 		CountryCode: strings.TrimSpace(values.Get("country_code")), Location: strings.TrimSpace(values.Get("location")),
 		Provider: strings.TrimSpace(values.Get("provider")),
 	}

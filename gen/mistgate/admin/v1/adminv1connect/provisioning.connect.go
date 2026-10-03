@@ -54,6 +54,12 @@ const (
 	// ProvisioningServiceListNodeProvisionEventsProcedure is the fully-qualified name of the
 	// ProvisioningService's ListNodeProvisionEvents RPC.
 	ProvisioningServiceListNodeProvisionEventsProcedure = "/mistgate.admin.v1.ProvisioningService/ListNodeProvisionEvents"
+	// ProvisioningServiceListNodeServerAccessProcedure is the fully-qualified name of the
+	// ProvisioningService's ListNodeServerAccess RPC.
+	ProvisioningServiceListNodeServerAccessProcedure = "/mistgate.admin.v1.ProvisioningService/ListNodeServerAccess"
+	// ProvisioningServiceRotateNodeServerPasswordProcedure is the fully-qualified name of the
+	// ProvisioningService's RotateNodeServerPassword RPC.
+	ProvisioningServiceRotateNodeServerPasswordProcedure = "/mistgate.admin.v1.ProvisioningService/RotateNodeServerPassword"
 )
 
 // ProvisioningServiceClient is a client for the mistgate.admin.v1.ProvisioningService service.
@@ -65,6 +71,8 @@ type ProvisioningServiceClient interface {
 	GetNodeProvision(context.Context, *connect.Request[v1.GetNodeProvisionRequest]) (*connect.Response[v1.GetNodeProvisionResponse], error)
 	ListNodeProvisions(context.Context, *connect.Request[v1.ListNodeProvisionsRequest]) (*connect.Response[v1.ListNodeProvisionsResponse], error)
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
+	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
+	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 }
 
 // NewProvisioningServiceClient constructs a client for the mistgate.admin.v1.ProvisioningService
@@ -120,18 +128,32 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(provisioningServiceMethods.ByName("ListNodeProvisionEvents")),
 			connect.WithClientOptions(opts...),
 		),
+		listNodeServerAccess: connect.NewClient[v1.ListNodeServerAccessRequest, v1.ListNodeServerAccessResponse](
+			httpClient,
+			baseURL+ProvisioningServiceListNodeServerAccessProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerAccess")),
+			connect.WithClientOptions(opts...),
+		),
+		rotateNodeServerPassword: connect.NewClient[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse](
+			httpClient,
+			baseURL+ProvisioningServiceRotateNodeServerPasswordProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("RotateNodeServerPassword")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // provisioningServiceClient implements ProvisioningServiceClient.
 type provisioningServiceClient struct {
-	getSSHFingerprint       *connect.Client[v1.GetSSHFingerprintRequest, v1.GetSSHFingerprintResponse]
-	checkSSH                *connect.Client[v1.CheckSSHRequest, v1.CheckSSHResponse]
-	startNodeProvision      *connect.Client[v1.StartNodeProvisionRequest, v1.StartNodeProvisionResponse]
-	retryNodeProvision      *connect.Client[v1.RetryNodeProvisionRequest, v1.RetryNodeProvisionResponse]
-	getNodeProvision        *connect.Client[v1.GetNodeProvisionRequest, v1.GetNodeProvisionResponse]
-	listNodeProvisions      *connect.Client[v1.ListNodeProvisionsRequest, v1.ListNodeProvisionsResponse]
-	listNodeProvisionEvents *connect.Client[v1.ListNodeProvisionEventsRequest, v1.ListNodeProvisionEventsResponse]
+	getSSHFingerprint        *connect.Client[v1.GetSSHFingerprintRequest, v1.GetSSHFingerprintResponse]
+	checkSSH                 *connect.Client[v1.CheckSSHRequest, v1.CheckSSHResponse]
+	startNodeProvision       *connect.Client[v1.StartNodeProvisionRequest, v1.StartNodeProvisionResponse]
+	retryNodeProvision       *connect.Client[v1.RetryNodeProvisionRequest, v1.RetryNodeProvisionResponse]
+	getNodeProvision         *connect.Client[v1.GetNodeProvisionRequest, v1.GetNodeProvisionResponse]
+	listNodeProvisions       *connect.Client[v1.ListNodeProvisionsRequest, v1.ListNodeProvisionsResponse]
+	listNodeProvisionEvents  *connect.Client[v1.ListNodeProvisionEventsRequest, v1.ListNodeProvisionEventsResponse]
+	listNodeServerAccess     *connect.Client[v1.ListNodeServerAccessRequest, v1.ListNodeServerAccessResponse]
+	rotateNodeServerPassword *connect.Client[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse]
 }
 
 // GetSSHFingerprint calls mistgate.admin.v1.ProvisioningService.GetSSHFingerprint.
@@ -169,6 +191,16 @@ func (c *provisioningServiceClient) ListNodeProvisionEvents(ctx context.Context,
 	return c.listNodeProvisionEvents.CallUnary(ctx, req)
 }
 
+// ListNodeServerAccess calls mistgate.admin.v1.ProvisioningService.ListNodeServerAccess.
+func (c *provisioningServiceClient) ListNodeServerAccess(ctx context.Context, req *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error) {
+	return c.listNodeServerAccess.CallUnary(ctx, req)
+}
+
+// RotateNodeServerPassword calls mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword.
+func (c *provisioningServiceClient) RotateNodeServerPassword(ctx context.Context, req *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error) {
+	return c.rotateNodeServerPassword.CallUnary(ctx, req)
+}
+
 // ProvisioningServiceHandler is an implementation of the mistgate.admin.v1.ProvisioningService
 // service.
 type ProvisioningServiceHandler interface {
@@ -179,6 +211,8 @@ type ProvisioningServiceHandler interface {
 	GetNodeProvision(context.Context, *connect.Request[v1.GetNodeProvisionRequest]) (*connect.Response[v1.GetNodeProvisionResponse], error)
 	ListNodeProvisions(context.Context, *connect.Request[v1.ListNodeProvisionsRequest]) (*connect.Response[v1.ListNodeProvisionsResponse], error)
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
+	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
+	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 }
 
 // NewProvisioningServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -230,6 +264,18 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		connect.WithSchema(provisioningServiceMethods.ByName("ListNodeProvisionEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	provisioningServiceListNodeServerAccessHandler := connect.NewUnaryHandler(
+		ProvisioningServiceListNodeServerAccessProcedure,
+		svc.ListNodeServerAccess,
+		connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
+	provisioningServiceRotateNodeServerPasswordHandler := connect.NewUnaryHandler(
+		ProvisioningServiceRotateNodeServerPasswordProcedure,
+		svc.RotateNodeServerPassword,
+		connect.WithSchema(provisioningServiceMethods.ByName("RotateNodeServerPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.ProvisioningService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProvisioningServiceGetSSHFingerprintProcedure:
@@ -246,6 +292,10 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 			provisioningServiceListNodeProvisionsHandler.ServeHTTP(w, r)
 		case ProvisioningServiceListNodeProvisionEventsProcedure:
 			provisioningServiceListNodeProvisionEventsHandler.ServeHTTP(w, r)
+		case ProvisioningServiceListNodeServerAccessProcedure:
+			provisioningServiceListNodeServerAccessHandler.ServeHTTP(w, r)
+		case ProvisioningServiceRotateNodeServerPasswordProcedure:
+			provisioningServiceRotateNodeServerPasswordHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -281,4 +331,12 @@ func (UnimplementedProvisioningServiceHandler) ListNodeProvisions(context.Contex
 
 func (UnimplementedProvisioningServiceHandler) ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.ListNodeServerAccess is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword is not implemented"))
 }

@@ -62,13 +62,15 @@ var procedureLevels = map[string]level{
 	adminv1connect.NodeServiceStreamLogsProcedure:       levelOwner, // node logs carry client addresses
 
 	// ProvisioningService can install a root agent over SSH; every operation is owner-only.
-	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       levelOwner,
-	adminv1connect.ProvisioningServiceCheckSSHProcedure:                levelOwner, // sends a root password after host-key confirmation; also needs step-up
-	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      levelOwner, // installs a root service; also needs step-up
-	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:      levelOwner, // resumes a root installation; also needs step-up
-	adminv1connect.ProvisioningServiceGetNodeProvisionProcedure:        levelOwner,
-	adminv1connect.ProvisioningServiceListNodeProvisionsProcedure:      levelOwner,
-	adminv1connect.ProvisioningServiceListNodeProvisionEventsProcedure: levelOwner,
+	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        levelOwner,
+	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 levelOwner, // sends a root password after host-key confirmation; also needs step-up
+	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       levelOwner, // installs a root service; also needs step-up
+	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       levelOwner, // resumes a root installation; also needs step-up
+	adminv1connect.ProvisioningServiceGetNodeProvisionProcedure:         levelOwner,
+	adminv1connect.ProvisioningServiceListNodeProvisionsProcedure:       levelOwner,
+	adminv1connect.ProvisioningServiceListNodeProvisionEventsProcedure:  levelOwner,
+	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:     levelOwner,
+	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: levelOwner, // SSH credentials need approval and step-up
 
 	adminv1connect.ProfileServiceListProtocolsProcedure:  levelRead,
 	adminv1connect.ProfileServiceListProfilesProcedure:   levelRead,

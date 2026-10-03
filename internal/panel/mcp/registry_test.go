@@ -100,7 +100,7 @@ func TestRegistryShape(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 14, ProfileOperator: 28, ProfileAdmin: 41}
+	want := map[Profile]int{ProfileReadonly: 14, ProfileOperator: 28, ProfileAdmin: 46}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)
@@ -127,6 +127,29 @@ func TestToolsPerProfile(t *testing.T) {
 		if !slices.Contains(got[ProfileAdmin], n) {
 			t.Errorf("admin lacks %s", n)
 		}
+	}
+}
+
+func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	properties := map[string]map[string]any{}
+	for tool, err := range s.Tools(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tool.Name == "node_install_plan" || tool.Name == "node_install_apply" ||
+			tool.Name == "node_server_password_rotate_plan" || tool.Name == "node_server_password_rotate_apply" {
+			props, _ := tool.InputSchema.(map[string]any)["properties"].(map[string]any)
+			properties[tool.Name] = props
+		}
+	}
+	if properties["node_install_plan"]["password"] != nil || properties["node_server_password_rotate_plan"]["new_password"] != nil {
+		t.Fatal("password appeared in an MCP plan input")
+	}
+	if properties["node_install_apply"]["password"] == nil || properties["node_server_password_rotate_apply"]["new_password"] == nil {
+		t.Fatal("apply tools must accept their one-call secret inputs")
 	}
 }
 

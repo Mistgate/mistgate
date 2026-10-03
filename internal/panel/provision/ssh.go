@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	sshUser        = "root"
 	sshTimeout     = 8 * time.Second
 	maxTargetAddrs = 8
 )
@@ -78,6 +77,15 @@ func (c *Client) Fingerprint(ctx context.Context, target Target) (string, error)
 // owner confirmed in the UI. A changed or unexpected key never receives the
 // password.
 func (c *Client) Dial(ctx context.Context, target Target, password, confirmedFingerprint string) (*Connection, error) {
+	return c.DialAs(ctx, target, "root", password, confirmedFingerprint)
+}
+
+// DialAs authenticates with the supplied account after the server presents the confirmed host key.
+// Non-root accounts are accepted only when the remote preflight proves passwordless sudo works.
+func (c *Client) DialAs(ctx context.Context, target Target, username, password, confirmedFingerprint string) (*Connection, error) {
+	if !validSSHUsername(username) {
+		return nil, errors.New("provision: invalid SSH username")
+	}
 	if password == "" || !validFingerprint(confirmedFingerprint) {
 		return nil, errors.New("provision: password and confirmed SHA-256 fingerprint are required")
 	}
@@ -93,7 +101,7 @@ func (c *Client) Dial(ctx context.Context, target Target, password, confirmedFin
 
 	var lastErr error
 	for _, addr := range addrs {
-		conn, err := c.dialPinned(resolveCtx, ctx, target, addr, password, confirmedFingerprint)
+		conn, err := c.dialPinned(resolveCtx, ctx, target, addr, username, password, confirmedFingerprint)
 		if err == nil {
 			if err := ctx.Err(); err != nil {
 				_ = conn.Close()
@@ -122,6 +130,15 @@ type Connection struct {
 	mu     sync.Mutex
 	client *ssh.Client
 	stop   func() bool
+	user   string
+}
+
+// PrivilegedCommand runs a command with root privileges without prompting for a second password.
+func (c *Connection) PrivilegedCommand(command string) string {
+	if c == nil || c.user == "" || c.user == "root" {
+		return command
+	}
+	return "sudo -n sh -c " + shellQuote(command)
 }
 
 // NewSession opens one SSH session on the verified connection.
@@ -170,7 +187,7 @@ func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Ad
 
 	var fingerprint string
 	config := &ssh.ClientConfig{
-		User: sshUser,
+		User: "root",
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			fingerprint = ssh.FingerprintSHA256(key)
 			return errHostKeySeen
@@ -186,7 +203,7 @@ func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Ad
 	return "", err
 }
 
-func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Target, addr netip.Addr, password, expected string) (*Connection, error) {
+func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Target, addr netip.Addr, username, password, expected string) (*Connection, error) {
 	handshakeCtx, cancel := context.WithTimeout(handshakeParent, c.timeout)
 	defer cancel()
 	conn, err := c.dialer.DialContext(handshakeCtx, "tcp", net.JoinHostPort(addr.String(), strconv.Itoa(int(target.port))))
@@ -201,7 +218,7 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	defer stopHandshake()
 
 	config := &ssh.ClientConfig{
-		User: sshUser,
+		User: username,
 		Auth: []ssh.AuthMethod{ssh.Password(password)},
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			if ssh.FingerprintSHA256(key) != expected {
@@ -222,7 +239,20 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	}
 	client := ssh.NewClient(clientConn, chans, reqs)
 	stop := context.AfterFunc(lifetime, func() { _ = client.Close() })
-	return &Connection{client: client, stop: stop}, nil
+	return &Connection{client: client, stop: stop, user: username}, nil
+}
+
+func validSSHUsername(username string) bool {
+	if len(username) < 1 || len(username) > 32 {
+		return false
+	}
+	for i, r := range username {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r == '_' || i > 0 && (r >= '0' && r <= '9' || r == '-' || r == '.') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func setHandshakeDeadline(ctx context.Context, conn net.Conn, timeout time.Duration) (func() bool, error) {

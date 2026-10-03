@@ -44,28 +44,30 @@ func (t inprocTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // clients are the Connect clients of the services the tools call.
 type clients struct {
-	Fleet  adminv1connect.FleetServiceClient
-	Node   adminv1connect.NodeServiceClient
-	Health adminv1connect.HealthServiceClient
-	User   adminv1connect.UserServiceClient
-	Group  adminv1connect.GroupServiceClient
-	Subs   adminv1connect.SubscriptionServiceClient
-	Update adminv1connect.UpdateServiceClient
-	Auth   adminv1connect.AuthServiceClient
+	Fleet        adminv1connect.FleetServiceClient
+	Node         adminv1connect.NodeServiceClient
+	Health       adminv1connect.HealthServiceClient
+	User         adminv1connect.UserServiceClient
+	Group        adminv1connect.GroupServiceClient
+	Subs         adminv1connect.SubscriptionServiceClient
+	Update       adminv1connect.UpdateServiceClient
+	Auth         adminv1connect.AuthServiceClient
+	Provisioning adminv1connect.ProvisioningServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
 	hc := &http.Client{Transport: inprocTransport{h: h, header: header, remote: remote}}
 	const base = "http://panel.invalid"
 	return &clients{
-		Fleet:  adminv1connect.NewFleetServiceClient(hc, base),
-		Node:   adminv1connect.NewNodeServiceClient(hc, base),
-		Health: adminv1connect.NewHealthServiceClient(hc, base),
-		User:   adminv1connect.NewUserServiceClient(hc, base),
-		Group:  adminv1connect.NewGroupServiceClient(hc, base),
-		Subs:   adminv1connect.NewSubscriptionServiceClient(hc, base),
-		Update: adminv1connect.NewUpdateServiceClient(hc, base),
-		Auth:   adminv1connect.NewAuthServiceClient(hc, base),
+		Fleet:        adminv1connect.NewFleetServiceClient(hc, base),
+		Node:         adminv1connect.NewNodeServiceClient(hc, base),
+		Health:       adminv1connect.NewHealthServiceClient(hc, base),
+		User:         adminv1connect.NewUserServiceClient(hc, base),
+		Group:        adminv1connect.NewGroupServiceClient(hc, base),
+		Subs:         adminv1connect.NewSubscriptionServiceClient(hc, base),
+		Update:       adminv1connect.NewUpdateServiceClient(hc, base),
+		Auth:         adminv1connect.NewAuthServiceClient(hc, base),
+		Provisioning: adminv1connect.NewProvisioningServiceClient(hc, base),
 	}
 }
 

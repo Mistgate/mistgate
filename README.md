@@ -35,7 +35,7 @@ Mistgate is pre-release. It runs in production for its author, but the API, the 
 | Stage | What |
 |:--|:--|
 | **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the public user page · DNS presets · health doctor, client-eye checks, alerts · signed node-agent updates with canary and rollback · GitHub panel self-update with checksum verification and rollback · API tokens and MCP server · admin UI in ru / en |
-| **M2 — in progress** | Go-based SSH node installer in the admin, with preflight and host-key confirmation · encrypted storage for per-job SSH credentials · encrypted panel backups to R2 · [M2 plan](docs/en/roadmap/m2-ssh-provisioning.md) |
+| **M2 — in progress** | Go SSH node installer and MCP plan/apply · root or passwordless-sudo login · pinned host-key preflight · encrypted persistent SSH access with verified password rotation · signed agent installation and online check · encrypted panel backups and restore are still planned · [M2 plan](docs/en/roadmap/m2-ssh-provisioning.md) |
 | **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 
@@ -43,10 +43,11 @@ Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the 
 
 ## Documentation
 
-Read the full documentation at [mistgate.app](https://mistgate.app/) (Russian: [mistgate.app/ru](https://mistgate.app/ru/)). The source lives in [`docs/en`](docs/en/index.md) and [`docs/ru`](docs/ru/index.md). Good places to start:
+Read the full documentation at [mistgate.app](https://mistgate.app/) (Russian: [mistgate.app/ru](https://mistgate.app/ru/)). The source lives in [`docs/en`](docs/en/index.md) and [`docs/ru`](docs/ru/index.md). Coding agents should start with [`AGENTS.md`](AGENTS.md); MCP node setup is in the [AI agent guide](docs/en/getting-started/ai-agents.md). The published site also has [`llms.txt`](llms.txt). Good places to start:
 
 - [Overview](docs/en/getting-started/overview.md): the concepts (panel, node, profile, user, group, device, subscription).
 - [Install the panel](docs/en/getting-started/install-panel.md), [add a node](docs/en/getting-started/add-node.md), [first users](docs/en/getting-started/first-users.md).
+- [AI agent setup](docs/en/getting-started/ai-agents.md): owner-approved MCP node installation, password rotation and staged updates.
 - [Health](docs/en/operations/health.md), [updates](docs/en/operations/updates.md), [security](docs/en/operations/security.md), [troubleshooting](docs/en/operations/troubleshooting.md).
 - [CLI](docs/en/reference/cli.md), [configuration](docs/en/reference/configuration.md), [API](docs/en/reference/api.md), [MCP](docs/en/reference/mcp.md).
 

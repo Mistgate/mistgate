@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/provisioning.proto.
  */
 export const file_mistgate_admin_v1_provisioning: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9wcm92aXNpb25pbmcucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIjYKGEdldFNTSEZpbmdlcnByaW50UmVxdWVzdBIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0iTAoZR2V0U1NIRmluZ2VycHJpbnRSZXNwb25zZRIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0SEwoLZmluZ2VycHJpbnQYAyABKAkiVAoPQ2hlY2tTU0hSZXF1ZXN0EgwKBGhvc3QYASABKAkSDAoEcG9ydBgCIAEoDRITCgtmaW5nZXJwcmludBgDIAEoCRIQCghwYXNzd29yZBgEIAEoCSLvAQoNTm9kZVByZWZsaWdodBIUCgxkaXN0cmlidXRpb24YASABKAkSDwoHdmVyc2lvbhgCIAEoCRIOCgZrZXJuZWwYAyABKAkSFAoMYXJjaGl0ZWN0dXJlGAQgASgJEhEKCWNwdV9jb3VudBgFIAEoDRIYCgxtZW1vcnlfYnl0ZXMYBiABKARCAjACEiAKFGRpc2tfYXZhaWxhYmxlX2J5dGVzGAcgASgEQgIwAhIPCgdzeXN0ZW1kGAggASgIEhgKEGFscmVhZHlfZW5yb2xsZWQYCSABKAgSFwoPcGFuZWxfcmVhY2hhYmxlGAogASgIIkcKEENoZWNrU1NIUmVzcG9uc2USMwoJcHJlZmxpZ2h0GAEgASgLMiAubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByZWZsaWdodCLYAQoZU3RhcnROb2RlUHJvdmlzaW9uUmVxdWVzdBIXCg9jb25maXJtX2luc3RhbGwYASABKAgSDAoEbmFtZRgCIAEoCRIPCgdhZGRyZXNzGAMgASgJEhQKDGNvdW50cnlfY29kZRgEIAEoCRIQCghsb2NhdGlvbhgFIAEoCRIQCghwcm92aWRlchgGIAEoCRIQCghzc2hfaG9zdBgHIAEoCRIQCghzc2hfcG9ydBgIIAEoDRITCgtmaW5nZXJwcmludBgJIAEoCRIQCghwYXNzd29yZBgKIAEoCSJWChlSZXRyeU5vZGVQcm92aXNpb25SZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCRIXCg9jb25maXJtX2luc3RhbGwYAiABKAgSEAoIcGFzc3dvcmQYAyABKAkiTgoaU3RhcnROb2RlUHJvdmlzaW9uUmVzcG9uc2USMAoDam9iGAEgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByb3Zpc2lvbkpvYiJOChpSZXRyeU5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIikKF0dldE5vZGVQcm92aXNpb25SZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSJMChhHZXROb2RlUHJvdmlzaW9uUmVzcG9uc2USMAoDam9iGAEgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByb3Zpc2lvbkpvYiIbChlMaXN0Tm9kZVByb3Zpc2lvbnNSZXF1ZXN0Ik8KGkxpc3ROb2RlUHJvdmlzaW9uc1Jlc3BvbnNlEjEKBGpvYnMYASADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIscBChBOb2RlUHJvdmlzaW9uSm9iEgoKAmlkGAEgASgJEg8KB25vZGVfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRIQCghzc2hfaG9zdBgEIAEoCRIQCghzc2hfcG9ydBgFIAEoDRINCgVzdGF0ZRgGIAEoCRINCgVwaGFzZRgHIAEoCRISCgplcnJvcl9jb2RlGAggASgJEhgKDGNyZWF0ZWRfdW5peBgJIAEoA0ICMAISGAoMdXBkYXRlZF91bml4GAogASgDQgIwAiJVCh5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1JlcXVlc3QSDgoGam9iX2lkGAEgASgJEhQKCGFmdGVyX2lkGAIgASgEQgIwAhINCgVsaW1pdBgDIAEoDSJbChJOb2RlUHJvdmlzaW9uRXZlbnQSDgoCaWQYASABKARCAjACEg0KBXBoYXNlGAIgASgJEgwKBGNvZGUYAyABKAkSGAoMY3JlYXRlZF91bml4GAQgASgDQgIwAiJzCh9MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1Jlc3BvbnNlEjUKBmV2ZW50cxgBIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25FdmVudBIZCg1uZXh0X2FmdGVyX2lkGAIgASgEQgIwAjKjBgoTUHJvdmlzaW9uaW5nU2VydmljZRJuChFHZXRTU0hGaW5nZXJwcmludBIrLm1pc3RnYXRlLmFkbWluLnYxLkdldFNTSEZpbmdlcnByaW50UmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLkdldFNTSEZpbmdlcnByaW50UmVzcG9uc2USUwoIQ2hlY2tTU0gSIi5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlcXVlc3QaIy5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlc3BvbnNlEnEKElN0YXJ0Tm9kZVByb3Zpc2lvbhIsLm1pc3RnYXRlLmFkbWluLnYxLlN0YXJ0Tm9kZVByb3Zpc2lvblJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRJxChJSZXRyeU5vZGVQcm92aXNpb24SLC5taXN0Z2F0ZS5hZG1pbi52MS5SZXRyeU5vZGVQcm92aXNpb25SZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuUmV0cnlOb2RlUHJvdmlzaW9uUmVzcG9uc2USawoQR2V0Tm9kZVByb3Zpc2lvbhIqLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVQcm92aXNpb25SZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuR2V0Tm9kZVByb3Zpc2lvblJlc3BvbnNlEnEKEkxpc3ROb2RlUHJvdmlzaW9ucxIsLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbnNSZXNwb25zZRKAAQoXTGlzdE5vZGVQcm92aXNpb25FdmVudHMSMS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1JlcXVlc3QaMi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1Jlc3BvbnNlQswBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCEVByb3Zpc2lvbmluZ1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9wcm92aXNpb25pbmcucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIjYKGEdldFNTSEZpbmdlcnByaW50UmVxdWVzdBIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0iTAoZR2V0U1NIRmluZ2VycHJpbnRSZXNwb25zZRIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0SEwoLZmluZ2VycHJpbnQYAyABKAkiZgoPQ2hlY2tTU0hSZXF1ZXN0EgwKBGhvc3QYASABKAkSDAoEcG9ydBgCIAEoDRITCgtmaW5nZXJwcmludBgDIAEoCRIQCghwYXNzd29yZBgEIAEoCRIQCgh1c2VybmFtZRgFIAEoCSLvAQoNTm9kZVByZWZsaWdodBIUCgxkaXN0cmlidXRpb24YASABKAkSDwoHdmVyc2lvbhgCIAEoCRIOCgZrZXJuZWwYAyABKAkSFAoMYXJjaGl0ZWN0dXJlGAQgASgJEhEKCWNwdV9jb3VudBgFIAEoDRIYCgxtZW1vcnlfYnl0ZXMYBiABKARCAjACEiAKFGRpc2tfYXZhaWxhYmxlX2J5dGVzGAcgASgEQgIwAhIPCgdzeXN0ZW1kGAggASgIEhgKEGFscmVhZHlfZW5yb2xsZWQYCSABKAgSFwoPcGFuZWxfcmVhY2hhYmxlGAogASgIIkcKEENoZWNrU1NIUmVzcG9uc2USMwoJcHJlZmxpZ2h0GAEgASgLMiAubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByZWZsaWdodCLuAQoZU3RhcnROb2RlUHJvdmlzaW9uUmVxdWVzdBIXCg9jb25maXJtX2luc3RhbGwYASABKAgSDAoEbmFtZRgCIAEoCRIPCgdhZGRyZXNzGAMgASgJEhQKDGNvdW50cnlfY29kZRgEIAEoCRIQCghsb2NhdGlvbhgFIAEoCRIQCghwcm92aWRlchgGIAEoCRIQCghzc2hfaG9zdBgHIAEoCRIQCghzc2hfcG9ydBgIIAEoDRITCgtmaW5nZXJwcmludBgJIAEoCRIQCghwYXNzd29yZBgKIAEoCRIUCgxzc2hfdXNlcm5hbWUYCyABKAkibAoZUmV0cnlOb2RlUHJvdmlzaW9uUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSFwoPY29uZmlybV9pbnN0YWxsGAIgASgIEhAKCHBhc3N3b3JkGAMgASgJEhQKDHNzaF91c2VybmFtZRgEIAEoCSJOChpTdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIk4KGlJldHJ5Tm9kZVByb3Zpc2lvblJlc3BvbnNlEjAKA2pvYhgBIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IiKQoXR2V0Tm9kZVByb3Zpc2lvblJlcXVlc3QSDgoGam9iX2lkGAEgASgJIkwKGEdldE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIhsKGUxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QiTwoaTGlzdE5vZGVQcm92aXNpb25zUmVzcG9uc2USMQoEam9icxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IixwEKEE5vZGVQcm92aXNpb25Kb2ISCgoCaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhAKCHNzaF9ob3N0GAQgASgJEhAKCHNzaF9wb3J0GAUgASgNEg0KBXN0YXRlGAYgASgJEg0KBXBoYXNlGAcgASgJEhIKCmVycm9yX2NvZGUYCCABKAkSGAoMY3JlYXRlZF91bml4GAkgASgDQgIwAhIYCgx1cGRhdGVkX3VuaXgYCiABKANCAjACIlUKHkxpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSFAoIYWZ0ZXJfaWQYAiABKARCAjACEg0KBWxpbWl0GAMgASgNIlsKEk5vZGVQcm92aXNpb25FdmVudBIOCgJpZBgBIAEoBEICMAISDQoFcGhhc2UYAiABKAkSDAoEY29kZRgDIAEoCRIYCgxjcmVhdGVkX3VuaXgYBCABKANCAjACInMKH0xpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVzcG9uc2USNQoGZXZlbnRzGAEgAygLMiUubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByb3Zpc2lvbkV2ZW50EhkKDW5leHRfYWZ0ZXJfaWQYAiABKARCAjACIrABChBOb2RlU2VydmVyQWNjZXNzEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEgwKBGhvc3QYAyABKAkSDAoEcG9ydBgEIAEoDRIQCgh1c2VybmFtZRgFIAEoCRITCgtmaW5nZXJwcmludBgGIAEoCRIbCg9jb25maWd1cmVkX3VuaXgYByABKANCAjACEhgKEHJvdGF0aW9uX3BlbmRpbmcYCCABKAgiHQobTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0IlMKHExpc3ROb2RlU2VydmVyQWNjZXNzUmVzcG9uc2USMwoGYWNjZXNzGAEgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuTm9kZVNlcnZlckFjY2VzcyJZCh9Sb3RhdGVOb2RlU2VydmVyUGFzc3dvcmRSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJEg8KB2NvbmZpcm0YAyABKAgiMwogUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkUmVzcG9uc2USDwoHcm90YXRlZBgBIAEoCDKiCAoTUHJvdmlzaW9uaW5nU2VydmljZRJuChFHZXRTU0hGaW5nZXJwcmludBIrLm1pc3RnYXRlLmFkbWluLnYxLkdldFNTSEZpbmdlcnByaW50UmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLkdldFNTSEZpbmdlcnByaW50UmVzcG9uc2USUwoIQ2hlY2tTU0gSIi5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlcXVlc3QaIy5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlc3BvbnNlEnEKElN0YXJ0Tm9kZVByb3Zpc2lvbhIsLm1pc3RnYXRlLmFkbWluLnYxLlN0YXJ0Tm9kZVByb3Zpc2lvblJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRJxChJSZXRyeU5vZGVQcm92aXNpb24SLC5taXN0Z2F0ZS5hZG1pbi52MS5SZXRyeU5vZGVQcm92aXNpb25SZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuUmV0cnlOb2RlUHJvdmlzaW9uUmVzcG9uc2USawoQR2V0Tm9kZVByb3Zpc2lvbhIqLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVQcm92aXNpb25SZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuR2V0Tm9kZVByb3Zpc2lvblJlc3BvbnNlEnEKEkxpc3ROb2RlUHJvdmlzaW9ucxIsLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbnNSZXNwb25zZRKAAQoXTGlzdE5vZGVQcm92aXNpb25FdmVudHMSMS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1JlcXVlc3QaMi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1Jlc3BvbnNlEncKFExpc3ROb2RlU2VydmVyQWNjZXNzEi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0Gi8ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXNwb25zZRKDAQoYUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkEjIubWlzdGdhdGUuYWRtaW4udjEuUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkUmVxdWVzdBozLm1pc3RnYXRlLmFkbWluLnYxLlJvdGF0ZU5vZGVTZXJ2ZXJQYXNzd29yZFJlc3BvbnNlQswBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCEVByb3Zpc2lvbmluZ1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
 
 /**
  * @generated from message mistgate.admin.v1.GetSSHFingerprintRequest
@@ -84,6 +84,11 @@ export type CheckSSHRequest = Message<"mistgate.admin.v1.CheckSSHRequest"> & {
    * @generated from field: string password = 4;
    */
   password: string;
+
+  /**
+   * @generated from field: string username = 5;
+   */
+  username: string;
 };
 
 /**
@@ -225,6 +230,11 @@ export type StartNodeProvisionRequest = Message<"mistgate.admin.v1.StartNodeProv
    * @generated from field: string password = 10;
    */
   password: string;
+
+  /**
+   * @generated from field: string ssh_username = 11;
+   */
+  sshUsername: string;
 };
 
 /**
@@ -252,6 +262,11 @@ export type RetryNodeProvisionRequest = Message<"mistgate.admin.v1.RetryNodeProv
    * @generated from field: string password = 3;
    */
   password: string;
+
+  /**
+   * @generated from field: string ssh_username = 4;
+   */
+  sshUsername: string;
 };
 
 /**
@@ -503,6 +518,134 @@ export const ListNodeProvisionEventsResponseSchema: GenMessage<ListNodeProvision
   messageDesc(file_mistgate_admin_v1_provisioning, 16);
 
 /**
+ * Public SSH access metadata. Passwords and their ciphertext never leave the panel.
+ *
+ * @generated from message mistgate.admin.v1.NodeServerAccess
+ */
+export type NodeServerAccess = Message<"mistgate.admin.v1.NodeServerAccess"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: string host = 3;
+   */
+  host: string;
+
+  /**
+   * @generated from field: uint32 port = 4;
+   */
+  port: number;
+
+  /**
+   * @generated from field: string username = 5;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string fingerprint = 6;
+   */
+  fingerprint: string;
+
+  /**
+   * @generated from field: int64 configured_unix = 7 [jstype = JS_NUMBER];
+   */
+  configuredUnix: bigint;
+
+  /**
+   * @generated from field: bool rotation_pending = 8;
+   */
+  rotationPending: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.NodeServerAccess.
+ * Use `create(NodeServerAccessSchema)` to create a new message.
+ */
+export const NodeServerAccessSchema: GenMessage<NodeServerAccess> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 17);
+
+/**
+ * @generated from message mistgate.admin.v1.ListNodeServerAccessRequest
+ */
+export type ListNodeServerAccessRequest = Message<"mistgate.admin.v1.ListNodeServerAccessRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListNodeServerAccessRequest.
+ * Use `create(ListNodeServerAccessRequestSchema)` to create a new message.
+ */
+export const ListNodeServerAccessRequestSchema: GenMessage<ListNodeServerAccessRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 18);
+
+/**
+ * @generated from message mistgate.admin.v1.ListNodeServerAccessResponse
+ */
+export type ListNodeServerAccessResponse = Message<"mistgate.admin.v1.ListNodeServerAccessResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.NodeServerAccess access = 1;
+   */
+  access: NodeServerAccess[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListNodeServerAccessResponse.
+ * Use `create(ListNodeServerAccessResponseSchema)` to create a new message.
+ */
+export const ListNodeServerAccessResponseSchema: GenMessage<ListNodeServerAccessResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 19);
+
+/**
+ * @generated from message mistgate.admin.v1.RotateNodeServerPasswordRequest
+ */
+export type RotateNodeServerPasswordRequest = Message<"mistgate.admin.v1.RotateNodeServerPasswordRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string new_password = 2;
+   */
+  newPassword: string;
+
+  /**
+   * @generated from field: bool confirm = 3;
+   */
+  confirm: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RotateNodeServerPasswordRequest.
+ * Use `create(RotateNodeServerPasswordRequestSchema)` to create a new message.
+ */
+export const RotateNodeServerPasswordRequestSchema: GenMessage<RotateNodeServerPasswordRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 20);
+
+/**
+ * @generated from message mistgate.admin.v1.RotateNodeServerPasswordResponse
+ */
+export type RotateNodeServerPasswordResponse = Message<"mistgate.admin.v1.RotateNodeServerPasswordResponse"> & {
+  /**
+   * @generated from field: bool rotated = 1;
+   */
+  rotated: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RotateNodeServerPasswordResponse.
+ * Use `create(RotateNodeServerPasswordResponseSchema)` to create a new message.
+ */
+export const RotateNodeServerPasswordResponseSchema: GenMessage<RotateNodeServerPasswordResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 21);
+
+/**
  * Owner-only SSH installation of a Mistgate node. Credentials are accepted only after the
  * administrator has confirmed the SSH host-key fingerprint shown by GetSSHFingerprint.
  *
@@ -564,6 +707,22 @@ export const ProvisioningService: GenService<{
     methodKind: "unary";
     input: typeof ListNodeProvisionEventsRequestSchema;
     output: typeof ListNodeProvisionEventsResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.ProvisioningService.ListNodeServerAccess
+   */
+  listNodeServerAccess: {
+    methodKind: "unary";
+    input: typeof ListNodeServerAccessRequestSchema;
+    output: typeof ListNodeServerAccessResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword
+   */
+  rotateNodeServerPassword: {
+    methodKind: "unary";
+    input: typeof RotateNodeServerPasswordRequestSchema;
+    output: typeof RotateNodeServerPasswordResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_provisioning, 0);

@@ -12,6 +12,8 @@ service ProvisioningService {
   rpc GetNodeProvision(GetNodeProvisionRequest) returns (GetNodeProvisionResponse);
   rpc ListNodeProvisions(ListNodeProvisionsRequest) returns (ListNodeProvisionsResponse);
   rpc ListNodeProvisionEvents(ListNodeProvisionEventsRequest) returns (ListNodeProvisionEventsResponse);
+  rpc ListNodeServerAccess(ListNodeServerAccessRequest) returns (ListNodeServerAccessResponse);
+  rpc RotateNodeServerPassword(RotateNodeServerPasswordRequest) returns (RotateNodeServerPasswordResponse);
 }
 
 message GetSSHFingerprintRequest {
@@ -30,6 +32,7 @@ message CheckSSHRequest {
   uint32 port = 2;
   string fingerprint = 3;
   string password = 4;
+  string username = 5;
 }
 
 message NodePreflight {
@@ -60,12 +63,14 @@ message StartNodeProvisionRequest {
   uint32 ssh_port = 8;
   string fingerprint = 9;
   string password = 10;
+  string ssh_username = 11;
 }
 
 message RetryNodeProvisionRequest {
   string job_id = 1;
   bool confirm_install = 2;
   string password = 3;
+  string ssh_username = 4;
 }
 
 message StartNodeProvisionResponse {
@@ -120,3 +125,25 @@ message ListNodeProvisionEventsResponse {
   repeated NodeProvisionEvent events = 1;
   uint64 next_after_id = 2 [jstype = JS_NUMBER];
 }
+
+// Public SSH access metadata. Passwords and their ciphertext never leave the panel.
+message NodeServerAccess {
+  string node_id = 1;
+  string node_name = 2;
+  string host = 3;
+  uint32 port = 4;
+  string username = 5;
+  string fingerprint = 6;
+  int64 configured_unix = 7 [jstype = JS_NUMBER];
+  bool rotation_pending = 8;
+}
+
+message ListNodeServerAccessRequest {}
+message ListNodeServerAccessResponse { repeated NodeServerAccess access = 1; }
+
+message RotateNodeServerPasswordRequest {
+  string node_id = 1;
+  string new_password = 2;
+  bool confirm = 3;
+}
+message RotateNodeServerPasswordResponse { bool rotated = 1; }

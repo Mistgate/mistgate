@@ -334,6 +334,7 @@ func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error 
 		`UPDATE node SET state = 'retired', retired_at = ?1, desired_hash = '' WHERE id = ?2`,
 		`UPDATE node_cert SET revoked_at = ?1, revoke_reason = 'retired' WHERE node_id = ?2 AND (revoked_at IS NULL OR revoked_at > ?1)`,
 		`UPDATE enrollment_token SET expires_at = ?1 WHERE node_id = ?2 AND used_at IS NULL AND expires_at > ?1`,
+		`DELETE FROM node_server_access WHERE node_id = ?2`,
 	} {
 		if _, err := tx.ExecContext(ctx, q, unix(now), id); err != nil {
 			return err

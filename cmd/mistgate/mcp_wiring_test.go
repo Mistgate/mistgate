@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 14 || b != 28 || c != 41 {
+	if a, b, c := count(ro), count(op), count(ad); a != 14 || b != 28 || c != 46 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
