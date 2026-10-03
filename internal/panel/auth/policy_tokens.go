@@ -87,6 +87,9 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:               true,
 	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure:               true,
 	adminv1connect.ApprovalServiceApproveProcedure:                      true,
+	adminv1connect.BackupServiceUpdateBackupSettingsProcedure:           true,
+	adminv1connect.BackupServiceTestBackupStorageProcedure:              true,
+	adminv1connect.BackupServiceCreateBackupProcedure:                   true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,

@@ -148,7 +148,107 @@ func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time) err
 			return err
 		}
 	}
+	rows, err = tx.QueryContext(ctx, `SELECT id FROM node_provision_job WHERE state = 'cancel_requested'`)
+	if err != nil {
+		return err
+	}
+	ids = ids[:0]
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown',
+				secret = X'', updated_at = ? WHERE id = ? AND state = 'cancel_requested'`, unix(now), id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			VALUES (?, 'cancelled', 'remote_outcome_unknown', ?)`, id, unix(now)); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
+}
+
+// RequestCancelNodeProvisionJob atomically stops queued work or requests cancellation
+// of the active worker. The returned state is either cancelled or cancel_requested.
+func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, now time.Time) (state string, changed bool, err error) {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return "", false, err
+	}
+	defer tx.Rollback()
+	job, err := scanNodeProvisionJob(tx.QueryRowContext(ctx,
+		`SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE id = ?`, id))
+	if err != nil {
+		return "", false, err
+	}
+	phase, code := "cancelled", "cancelled_before_start"
+	switch job.State {
+	case "queued":
+		state = "cancelled"
+	case "running":
+		state, phase, code = "cancel_requested", "cancelling", "cancel_requested"
+	case "cancel_requested", "cancelled":
+		return job.State, false, nil
+	default:
+		return "", false, ErrConflict
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+		SET state = ?, phase = ?, error_code = ?, secret = CASE WHEN ? = 'cancelled' THEN X'' ELSE secret END, updated_at = ?
+		WHERE id = ? AND state = ?`, state, phase, code, state, unix(now), id, job.State)
+	if err != nil {
+		return "", false, err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return "", false, err
+	} else if n != 1 {
+		return "", false, ErrConflict
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, ?, ?, ?)`,
+		id, phase, code, unix(now)); err != nil {
+		return "", false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", false, err
+	}
+	return state, true, nil
+}
+
+// FinishCancelledNodeProvisionJob clears credentials after an active worker stops.
+// The remote host may already have received some installation commands.
+func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, now time.Time) (bool, error) {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+		SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown',
+			secret = X'', updated_at = ? WHERE id = ? AND state = 'cancel_requested'`, unix(now), id)
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	if err != nil || n == 0 {
+		return false, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+		VALUES (?, 'cancelled', 'remote_outcome_unknown', ?)`, id, unix(now)); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // ClaimNodeProvisionJob atomically claims the oldest queued job for the single panel worker.
@@ -193,6 +293,18 @@ func (s *Store) UpdateNodeProvisionJobWithEvent(ctx context.Context, id, state, 
 	return s.updateNodeProvisionJob(ctx, id, state, phase, errorCode, secret, eventCode, now)
 }
 
+// UpdateRunningNodeProvisionJob only changes a job that is still running, so it
+// cannot undo a concurrent owner cancellation or overwrite a terminal result.
+func (s *Store) UpdateRunningNodeProvisionJob(ctx context.Context, id, state, phase, errorCode string, secret []byte, now time.Time) error {
+	return s.updateNodeProvisionJobFromState(ctx, id, "running", state, phase, errorCode, secret, "", now)
+}
+
+// UpdateRunningNodeProvisionJobWithEvent updates an active job and its redacted
+// journal atomically, without reverting a cancel_requested state.
+func (s *Store) UpdateRunningNodeProvisionJobWithEvent(ctx context.Context, id, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
+	return s.updateNodeProvisionJobFromState(ctx, id, "running", state, phase, errorCode, secret, eventCode, now)
+}
+
 func (s *Store) updateNodeProvisionJob(ctx context.Context, id, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
 	tx, err := s.W.BeginTx(ctx, nil)
 	if err != nil {
@@ -209,6 +321,33 @@ func (s *Store) updateNodeProvisionJob(ctx context.Context, id, state, phase, er
 		return err
 	} else if n != 1 {
 		return ErrNotFound
+	}
+	if eventCode != "" {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, ?, ?, ?)`,
+			id, phase, eventCode, unix(now)); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) updateNodeProvisionJobFromState(ctx context.Context, id, expected, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+		SET state = ?, phase = ?, error_code = ?, secret = ?, updated_at = ? WHERE id = ? AND state = ?`,
+		state, phase, errorCode, secret, unix(now), id, expected)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrConflict
 	}
 	if eventCode != "" {
 		if _, err := tx.ExecContext(ctx,

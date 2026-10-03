@@ -33,10 +33,18 @@ const auth = vi.hoisted(() => ({
   endOtherSessions: vi.fn(),
 }));
 const getInstance = vi.hoisted(() => vi.fn());
+const backupApi = vi.hoisted(() => ({
+  getBackupSettings: vi.fn(),
+  listBackups: vi.fn(),
+  updateBackupSettings: vi.fn(),
+  testBackupStorage: vi.fn(),
+  createBackup: vi.fn(),
+}));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   auth,
   instance: { getInstance: (...a: unknown[]) => getInstance(...a) },
+  backups: backupApi,
   webauthnSupported: () => true,
 }));
 let section = "interface";
@@ -76,6 +84,11 @@ beforeEach(() => {
   auth.listPasskeys.mockResolvedValue({ passkeys: [] });
   auth.getPasswordLogin.mockResolvedValue({ enabled: true, login: "alice", available: true });
   auth.getSecuritySettings.mockResolvedValue({ turnstileEnabled: false, turnstileSiteKey: "", turnstileSecretSet: false });
+  backupApi.getBackupSettings.mockResolvedValue({ settings: {
+    accountId: "", jurisdiction: "default", bucket: "", accessKeyId: "", hasSecret: false, ageRecipient: "",
+    enabled: false, intervalHours: 24, retentionDays: 0, lastSuccessUnix: 0, lastErrorCode: "",
+  } });
+  backupApi.listBackups.mockResolvedValue({ backups: [] });
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -83,6 +96,7 @@ afterEach(() => {
   root = host = null;
   delete window.turnstile;
   Object.values(auth).forEach((m) => m.mockReset());
+  Object.values(backupApi).forEach((m) => m.mockReset());
   getInstance.mockReset();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -369,11 +383,30 @@ describe("Settings → Admins, Domains, Backups", () => {
     expect(getInstance).not.toHaveBeenCalled();
   });
 
-  it("says there are no backups yet and gives the command to copy", async () => {
+  it("shows encrypted restore commands before R2 is configured", async () => {
     await mount(<BackupsPage />);
     expect(text()).toContain(en["set.backups.title"]);
-    expect(text()).toContain("tar czf mistgate-backup-$(date +%F).tgz -C /var/lib mistgate");
+    expect(text()).toContain("mistgate backup keygen --identity-file ./mistgate-recovery.txt");
+    expect(text()).toContain("mistgate backup restore --identity-file ./mistgate-recovery.txt --file ./backup.tar.gz.age --data-dir /var/lib/mistgate-restored");
+    expect(text()).not.toContain("tar czf");
+    expect(text()).toContain(en["set.backups.configureFirst"]);
+    expect(backupApi.listBackups).not.toHaveBeenCalled();
     expect(button(en["common.copy"])).toBeDefined();
+  });
+
+  it("lists encrypted backups without returning the saved R2 secret", async () => {
+    backupApi.getBackupSettings.mockResolvedValue({ settings: {
+      accountId: "cf-account", jurisdiction: "eu", bucket: "mistgate-backups", accessKeyId: "access-id",
+      hasSecret: true, ageRecipient: "age1example", enabled: true, intervalHours: 12, retentionDays: 30,
+      lastSuccessUnix: 1_800_000_000, lastErrorCode: "",
+    } });
+    backupApi.listBackups.mockResolvedValue({ backups: [{ key: "mistgate/2026-10-03T00-00-00Z.tar.gz.age", sizeBytes: 4096, createdUnix: 1_800_000_000 }] });
+    await mount(<BackupsPage />);
+    expect([...document.querySelectorAll<HTMLInputElement>("input")].some((field) => field.value === "mistgate-backups")).toBe(true);
+    expect(text()).toContain("mistgate/2026-10-03T00-00-00Z.tar.gz.age");
+    expect(text()).toContain("mistgate-recovery.txt");
+    expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("");
+    expect(backupApi.listBackups).toHaveBeenCalledOnce();
   });
 });
 

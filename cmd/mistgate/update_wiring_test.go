@@ -43,7 +43,7 @@ func TestUpdateServiceWiring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := newPanel(st, vlt, authSvc, panelOpts{in: in, panelAddr: agentAddress("", "", in.PublicURL), title: "Test", dataDir: dir}, log)
+	p, err := newPanel(st, vlt, authSvc, panelOpts{in: in, panelAddr: agentAddress("", "", in.PublicURL), title: "Test", dataDir: dir, masterKey: key}, log)
 	if err != nil {
 		t.Fatal(err)
 	}

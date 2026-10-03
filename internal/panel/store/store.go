@@ -137,6 +137,26 @@ func (s *Store) Close() error {
 	return errors.Join(s.R.Close(), s.W.Close())
 }
 
+// SnapshotDatabase creates a consistent SQLite snapshot at a new path. VACUUM INTO
+// includes committed WAL data without copying live -wal/-shm files.
+func (s *Store) SnapshotDatabase(ctx context.Context, path string) error {
+	if strings.TrimSpace(path) == "" {
+		return errors.New("store: snapshot path is empty")
+	}
+	if _, err := os.Lstat(path); err == nil {
+		return ErrConflict
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if _, err := s.W.ExecContext(ctx, `VACUUM INTO ?`, path); err != nil {
+		return fmt.Errorf("snapshot database: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return fmt.Errorf("secure database snapshot: %w", err)
+	}
+	return nil
+}
+
 // NewID returns prefix + 128 random bits as lowercase base32 (e.g. "adm_…").
 func NewID(prefix string) string {
 	var b [16]byte

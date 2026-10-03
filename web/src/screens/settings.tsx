@@ -13,7 +13,7 @@ import { SessionsPage } from "./settings-pages/sessions";
 import { SystemPage } from "./settings-pages/system";
 
 // Interface first: it is where /settings lands, and it works for every role. The pages that only explain what is not
-// there yet (no second admin, no automatic backups) come last.
+// future settings pages with no controls yet come last.
 export const pages = [
   { id: "interface", label: "settings.interface" },
   { id: "system", label: "settings.system" },

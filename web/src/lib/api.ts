@@ -1,6 +1,7 @@
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AuthService } from "@/gen/mistgate/admin/v1/auth_pb";
+import { BackupService } from "@/gen/mistgate/admin/v1/backup_pb";
 import { AwgService } from "@/gen/mistgate/admin/v1/awg_pb";
 import { DeviceService } from "@/gen/mistgate/admin/v1/device_pb";
 import { DnsService } from "@/gen/mistgate/admin/v1/dns_pb";
@@ -27,6 +28,7 @@ const transport = createConnectTransport({
 });
 
 export const auth = createClient(AuthService, transport);
+export const backups = createClient(BackupService, transport);
 export const instance = createClient(InstanceService, transport);
 export const fleet = createClient(FleetService, transport);
 export const nodes = createClient(NodeService, transport);

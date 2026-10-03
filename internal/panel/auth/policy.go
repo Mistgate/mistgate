@@ -164,6 +164,13 @@ var procedureLevels = map[string]level{
 	adminv1connect.ApprovalServiceApproveProcedure:        levelOwner, // also needs a step-up
 	adminv1connect.ApprovalServiceRejectProcedure:         levelOwner,
 
+	// Backups hold the panel database and encrypted server credentials. Only the owner can manage them.
+	adminv1connect.BackupServiceGetBackupSettingsProcedure:    levelOwner,
+	adminv1connect.BackupServiceUpdateBackupSettingsProcedure: levelOwner, // also needs a step-up
+	adminv1connect.BackupServiceTestBackupStorageProcedure:    levelOwner, // writes and deletes a probe object; also needs a step-up
+	adminv1connect.BackupServiceCreateBackupProcedure:         levelOwner, // exports sensitive installation state; also needs a step-up
+	adminv1connect.BackupServiceListBackupsProcedure:          levelOwner,
+
 	adminv1connect.UserServiceListUsersProcedure:           levelRead,
 	adminv1connect.UserServiceGetUserProcedure:             levelRead,
 	adminv1connect.UserServiceCreateUserProcedure:          levelWrite,

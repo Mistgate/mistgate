@@ -79,6 +79,7 @@ type jobView struct {
 	PhaseLabel string
 	ErrorLabel string
 	UpdatedAt  string
+	CanCancel  bool
 }
 
 type eventView struct {
@@ -140,6 +141,8 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 		.status.failed { border-color: #e56d6d70; color: var(--red) }
 		.status.queued { border-color: #dbb44f70; color: var(--yellow) }
 		.status.running { border-color: #74b9ec70; color: var(--blue) }
+		.status.cancel_requested { border-color: #dbb44f70; color: var(--yellow) }
+		.status.cancelled { border-color: #858b9870; color: #b6bac3 }
 		.job-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px }
 		.job-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px }
 		.job-meta span { display: block; color: var(--muted); font-size: 12px }
@@ -216,6 +219,11 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 		<div class="job-head"><div><div class="eyebrow">Задание установки</div><h2 style="margin-top:4px">{{.Name}}</h2></div><span class="status {{.State}}">{{.StateLabel}}</span></div>
 		<div class="job-meta"><div><span>SSH-сервер</span><b class="mono">{{.Host}}</b></div><div><span>Этап</span><b>{{.PhaseLabel}}</b></div><div><span>Обновлено</span><b>{{.UpdatedAt}}</b></div></div>
 		{{if .ErrorLabel}}<p class="error">{{.ErrorLabel}}</p>{{end}}
+		{{if .CanCancel}}<div class="divider"></div><form method="post" action="" autocomplete="off">
+			<input type="hidden" name="action" value="cancel"><input type="hidden" name="job_id" value="{{.ID}}">
+			<div class="check"><input id="confirm-cancel" name="confirm_cancel" type="checkbox" value="yes" required><label for="confirm-cancel">Отменить установку. Если SSH-команды уже выполняются, сервер может быть изменён частично.</label></div>
+			<div class="actions"><button class="button secondary" type="submit">Отменить установку</button><a class="button secondary" href="?">К списку заданий</a></div>
+		</form>{{else if eq .State "cancel_requested"}}<p class="notice">Остановка запрошена. Панель завершит задание и удалит временные SSH-данные.</p>{{end}}
 		{{end}}
 		{{if .Events}}<ul class="events">{{range .Events}}<li><span>{{.Label}}</span><time>{{.CreatedAt}}</time></li>{{end}}</ul>{{else}}<p class="empty">События появятся после запуска задания.</p>{{end}}
 		{{if and .Job (eq .Job.State "failed")}}<div class="divider"></div><h2>Повторить установку</h2><p class="lead">Проверьте причину ошибки. Для повтора требуется пароль root.</p>
@@ -304,7 +312,14 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		view := makeJobView(job.Msg.Job)
-		page := installPageData{Step: "job", Job: &view, Refresh: view.State == "queued" || view.State == "running"}
+		page := installPageData{Step: "job", Job: &view, Refresh: view.State == "queued" || view.State == "running" || view.State == "cancel_requested"}
+		if r.URL.Query().Get("cancelled") == "1" {
+			if view.State == "cancelled" && job.Msg.Job.ErrorCode == "cancelled_before_start" {
+				page.Message = "Задание отменено до подключения к серверу; временные SSH-данные удалены."
+			} else {
+				page.Message = "Установка остановлена. Проверьте сервер: часть SSH-команд могла уже выполниться."
+			}
+		}
 		for _, event := range events.Msg.Events {
 			page.Events = append(page.Events, makeEventView(event))
 		}
@@ -381,11 +396,32 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 		s.startPageJob(w, r, values, form)
 	case "retry":
 		s.retryPageJob(w, r, values)
+	case "cancel":
+		s.cancelPageJob(w, r, values)
 	case "rotate_password":
 		s.rotatePagePassword(w, r, values)
 	default:
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{Step: "host", Message: "Неизвестное действие. Начните установку заново."})
 	}
+}
+
+func (s *Service) cancelPageJob(w http.ResponseWriter, r *http.Request, values url.Values) {
+	jobID := strings.TrimSpace(values.Get("job_id"))
+	if len(jobID) < 5 || len(jobID) > 64 || !confirmed(values.Get("confirm_cancel")) {
+		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{Step: "host", Message: "Выберите задание и подтвердите отмену."})
+		return
+	}
+	if _, err := s.CancelNodeProvision(r.Context(), jobID); err != nil {
+		status := http.StatusBadRequest
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			status = http.StatusNotFound
+		}
+		s.renderForRequest(w, r, status, installPageData{Step: "host", Message: userError(err, "Не удалось отменить установку. Обновите страницу и проверьте состояние задания.")})
+		return
+	}
+	query := url.Values{"job": []string{jobID}, "cancelled": []string{"1"}}
+	w.Header().Set("Location", "?"+query.Encode())
+	w.WriteHeader(http.StatusSeeOther)
 }
 
 func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values url.Values, form installForm) {
@@ -560,7 +596,7 @@ func makeJobView(job *adminv1.NodeProvisionJob) jobView {
 	return jobView{
 		ID: job.Id, Name: job.Name, Host: net.JoinHostPort(job.SshHost, strconv.FormatUint(uint64(job.SshPort), 10)),
 		State: job.State, StateLabel: stateLabel(job.State), PhaseLabel: phaseLabel(job.Phase),
-		ErrorLabel: errorLabel(job.ErrorCode), UpdatedAt: updated,
+		ErrorLabel: errorLabel(job.ErrorCode), UpdatedAt: updated, CanCancel: job.State == "queued" || job.State == "running",
 	}
 }
 
@@ -580,6 +616,10 @@ func stateLabel(state string) string {
 		return "В очереди"
 	case "running":
 		return "Установка"
+	case "cancel_requested":
+		return "Остановка"
+	case "cancelled":
+		return "Отменено"
 	case "completed":
 		return "Нода подключена"
 	case "failed":
@@ -605,6 +645,10 @@ func phaseLabel(phase string) string {
 		return "Ожидание подключения"
 	case "completed":
 		return "Завершено"
+	case "cancelling":
+		return "Остановка SSH-задания"
+	case "cancelled":
+		return "Отменено"
 	case "failed":
 		return "Завершилось с ошибкой"
 	default:
@@ -618,6 +662,12 @@ func eventLabel(phase, code string) string {
 		return "Задание поставлено в очередь"
 	case "retry_requested":
 		return "Запрошен повтор установки"
+	case "cancel_requested":
+		return "Владелец запросил отмену установки"
+	case "cancelled_before_start":
+		return "Задание отменено до подключения к серверу"
+	case "remote_outcome_unknown":
+		return "SSH-работа остановлена; состояние сервера нужно проверить"
 	case "checking_host":
 		return "Проверка сервера и SSH-ключа"
 	case "uploading_agent":
@@ -640,6 +690,8 @@ func eventLabel(phase, code string) string {
 
 func errorLabel(code string) string {
 	switch code {
+	case "remote_outcome_unknown":
+		return "SSH-задание остановлено. Проверьте сервер: часть команд установки могла уже выполниться."
 	case "ssh_target_invalid", "ssh_target_not_public":
 		return "Укажите публичный адрес сервера, доступный по SSH."
 	case "ssh_host_key_changed":

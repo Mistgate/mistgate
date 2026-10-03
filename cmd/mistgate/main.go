@@ -18,6 +18,7 @@ const usage = `usage: mistgate <command> [flags]
 commands:
   serve     run the panel (flags: -h for the list; env fallbacks MISTGATE_*)
   setup     create the data dir, master key and database; print the admin URL and a one-time setup link
+  backup    private recovery-key setup and offline restore of an encrypted panel backup
   auth      operator commands on the panel server: "auth turnstile off" is the captcha kill switch,
             "auth reset-login <login>" a new password and authenticator app after a lost phone
   mcp       stdio proxy to the panel's MCP endpoint for agent clients: --url <admin url> --token-file <file>
@@ -37,6 +38,8 @@ func main() {
 		err = runServe(os.Args[2:])
 	case "setup":
 		err = runSetup(os.Args[2:], os.Stdout)
+	case "backup":
+		err = runBackup(os.Args[2:], os.Stdout)
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdout)
 	case "release":

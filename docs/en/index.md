@@ -20,7 +20,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 1. [Overview](getting-started/overview.md) and [Requirements](getting-started/requirements.md): what a panel, a node and a profile are, and what servers you need.
 2. [Install the panel](getting-started/install-panel.md), then [Add a node](getting-started/add-node.md) manually or with the [AI agent guide](getting-started/ai-agents.md).
 3. [First users](getting-started/first-users.md): a profile on the node, a group, a user, a subscription link.
-4. [Health](operations/health.md) and [Security](operations/security.md) before you give links to other people.
+4. [Health](operations/health.md), [Security](operations/security.md) and [encrypted backups](operations/backups.md) before you give links to other people.
 5. The Guide pages as you need them; the Reference when you script or automate.
 
 ## All pages
@@ -50,12 +50,13 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 
 - [Health](operations/health.md): client-eye checks, the node doctor and alerts.
 - [Updates](operations/updates.md): node self-update, release keys, rollouts, and updating the panel.
+- [Encrypted backups](operations/backups.md): configure R2, protect the offline recovery identity and restore a panel.
 - [Security](operations/security.md): admin sign-in, roles, step-up, sessions, audit, the decoy site and the hidden admin, the data directory and backups, recovering access.
 - [Troubleshooting](operations/troubleshooting.md): common problems and how to find their cause.
 
 ### Roadmap
 
-- [M2: SSH provisioning and recovery](roadmap/m2-ssh-provisioning.md): SSH installation, encrypted access and password rotation are implemented; cancellation and backup/restore remain planned.
+- [M2: SSH provisioning and recovery](roadmap/m2-ssh-provisioning.md): SSH installation, encrypted access, password rotation, cancellation and encrypted backup/restore.
 
 ### Reference
 
