@@ -204,6 +204,53 @@ func TestRolloutStore(t *testing.T) {
 	}
 }
 
+func TestAddNodeToRunningRolloutInsertsStageAndClearsSchedule(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(10_000, 0)
+	addedNodeID, _ := fixtureInbound(t, s, "added")
+	ro := RolloutRow{ID: "rol_join", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20, Manifest: []byte("m"), Signature: []byte("s"), BatchSize: 1, CreatedAt: now}
+	steps := []StepRow{
+		{NodeID: "nod_canary", NodeName: "canary", Stage: 0, State: StepGating},
+		{NodeID: "nod_next", NodeName: "next", Stage: 1, State: StepPending},
+		{NodeID: "nod_last", NodeName: "last", Stage: 2, State: StepPending},
+	}
+	if err := s.CreateRollout(ctx, ro, steps); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetNodeUpdateSchedule(ctx, NodeUpdateScheduleRow{NodeID: addedNodeID, ToVersion: "v2", ToBuilt: 20, ScheduledAt: now.Add(time.Hour).Unix(), CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	added := StepRow{NodeID: addedNodeID, NodeName: "added", State: StepPending, FromVersion: "v1", FromBuilt: 10}
+	if err := s.AddNodeToRunningRollout(ctx, ro.ID, ro.ToVersion, ro.ToBuilt, 1, added); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]int{"nod_canary": 0, addedNodeID: 1, "nod_next": 2, "nod_last": 3}
+	for _, step := range got {
+		if stage, ok := want[step.NodeID]; !ok || step.Stage != stage {
+			t.Errorf("step stage after insert: %+v, want %v", step, want)
+		}
+	}
+	schedules, err := s.NodeUpdateSchedules(ctx)
+	if err != nil || len(schedules) != 0 {
+		t.Fatalf("joined node schedule was not consumed: %+v, %v", schedules, err)
+	}
+	if err := s.AddNodeToRunningRollout(ctx, ro.ID, ro.ToVersion, ro.ToBuilt, 1, added); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate node: %v", err)
+	}
+	if ok, err := s.SetRolloutStatus(ctx, ro.ID, []string{RolloutRunning}, RolloutPaused, "owner", nil, time.Time{}); err != nil || !ok {
+		t.Fatalf("pause rollout: %v, %v", ok, err)
+	}
+	if err := s.AddNodeToRunningRollout(ctx, ro.ID, ro.ToVersion, ro.ToBuilt, 1, StepRow{NodeID: "nod_other", NodeName: "other"}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("paused rollout accepted an added node: %v", err)
+	}
+}
+
 func TestRolloutAttemptedNodeIDsIgnoresOnlyOfflineSkips(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)

@@ -191,17 +191,27 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	if s.panelInstalling {
 		return store.RolloutRow{}, precondition("a panel update is being installed")
 	}
-	if _, err := s.st.ActiveRollout(ctx); err == nil {
-		return store.RolloutRow{}, precondition("a rollout is already active")
-	} else if !errors.Is(err, store.ErrNotFound) {
-		return store.RolloutRow{}, s.internal("active rollout", err)
-	}
 	b := s.rescan() // what is on disk now is what ships
 	if !b.trusted {
 		return store.RolloutRow{}, precondition("no trusted bundle")
 	}
 	if scheduled != nil && (scheduled.ToBuilt != b.manifest.Built || scheduled.ToVersion != b.manifest.Version) {
 		return store.RolloutRow{}, precondition("scheduled bundle is no longer available")
+	}
+	active, activeErr := s.st.ActiveRollout(ctx)
+	if activeErr == nil {
+		if scheduled != nil || len(nodeIDs) != 1 {
+			return store.RolloutRow{}, precondition("a rollout is already active")
+		}
+		if active.Status != store.RolloutRunning {
+			return store.RolloutRow{}, precondition("the active rollout is paused; resume or cancel it before adding a node")
+		}
+		if active.ToVersion != b.manifest.Version || active.ToBuilt != b.manifest.Built || !bytes.Equal(active.Manifest, b.raw) {
+			return store.RolloutRow{}, precondition("the active rollout uses a different release; finish it before updating this node")
+		}
+		return s.addNodeToRunningRollout(ctx, active, b, nodeIDs[0], actor)
+	} else if !errors.Is(activeErr, store.ErrNotFound) {
+		return store.RolloutRow{}, s.internal("active rollout", activeErr)
 	}
 	views, err := s.nodes(ctx, b, nil)
 	if err != nil {
@@ -282,6 +292,63 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	s.loadUpdating(ctx)
 	s.kick()
 	return ro, nil
+}
+
+// addNodeToRunningRollout lets an owner update a specific second node without waiting for the whole fleet rollout to
+// finish. The node gets a new stage directly after the stage in progress, so the canary and batch order stay intact.
+func (s *Service) addNodeToRunningRollout(ctx context.Context, ro store.RolloutRow, b *bundleState, nodeID, actor string) (store.RolloutRow, error) {
+	steps, err := s.st.RolloutSteps(ctx, ro.ID)
+	if err != nil {
+		return store.RolloutRow{}, s.internal("load active rollout steps", err)
+	}
+	for _, step := range steps {
+		if step.NodeID == nodeID {
+			return store.RolloutRow{}, precondition("this node is already included in the active rollout")
+		}
+	}
+	views, err := s.nodes(ctx, b, steps)
+	if err != nil {
+		return store.RolloutRow{}, s.internal("list nodes to add to rollout", err)
+	}
+	i := slices.IndexFunc(views, func(v nodeView) bool { return v.row.ID == nodeID })
+	if i < 0 {
+		return store.RolloutRow{}, notFound("node")
+	}
+	v := views[i]
+	if !updatable(v.state) {
+		return store.RolloutRow{}, precondition("no node to update")
+	}
+	stage := stageAfterCurrent(steps)
+	step := store.StepRow{NodeID: v.row.ID, NodeName: v.row.Name, Stage: stage, State: store.StepPending,
+		FromVersion: v.row.AgentVersion, FromBuilt: v.row.AgentBuilt}
+	if err := s.st.AddNodeToRunningRollout(ctx, ro.ID, ro.ToVersion, ro.ToBuilt, stage, step); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return store.RolloutRow{}, precondition("the active rollout changed; refresh the page and try again")
+		}
+		return store.RolloutRow{}, s.internal("add node to rollout", err)
+	}
+	s.auditAs(ctx, actor, "update_rollout_add_node", map[string]string{"rollout_id": ro.ID, "node_id": nodeID, "node": v.row.Name,
+		"version": ro.ToVersion, "stage": fmt.Sprint(stage)})
+	s.loadUpdating(ctx)
+	s.kick()
+	return ro, nil
+}
+
+// stageAfterCurrent inserts an explicit node update after the earliest unfinished stage and before later batches.
+func stageAfterCurrent(steps []store.StepRow) int {
+	current, last := -1, -1
+	for _, step := range steps {
+		if step.Stage > last {
+			last = step.Stage
+		}
+		if !step.Decided() && (current < 0 || step.Stage < current) {
+			current = step.Stage
+		}
+	}
+	if current < 0 {
+		current = last
+	}
+	return current + 1
 }
 
 // activeByID loads the rollout the caller named (empty id = the active one) and requires it to be active.

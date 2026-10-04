@@ -247,6 +247,25 @@ describe("the Updates screen", () => {
     expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0 });
   });
 
+  it("adds a different node after the active rollout stage instead of blocking it", async () => {
+    startRollout.mockResolvedValue({});
+    const active = rollout({ steps: [step({ state: StepState.GATING })] });
+    await mount(page({ nodes: outdated, rollout: active }));
+    await click(document.querySelector("button[aria-label='Update nl1']")!);
+    expect(dialog()!.textContent).toContain("added as the next stage");
+    expect(inDialog("Add to rollout")?.disabled).toBe(false);
+    await click(inDialog("Add to rollout"));
+    await settle();
+    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_2"], batchSize: 0 });
+  });
+
+  it("explains that a node already queued in the active rollout will update in its stage", async () => {
+    await mount(page({ nodes: outdated, rollout: rollout({ steps: [step({ nodeId: "nod_2", nodeName: "nl1" })] }) }));
+    await click(document.querySelector("button[aria-label='Update nl1']")!);
+    expect(dialog()!.textContent).toContain("already included in the active rollout");
+    expect(inDialog("Update now")?.disabled).toBe(true);
+  });
+
   it("schedules one offline node in the configured UTC+3 offset", async () => {
     scheduleNodeUpdate.mockResolvedValue({});
     const offline = node({ state: NodeUpdateState.OFFLINE });
