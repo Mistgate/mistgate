@@ -23,7 +23,7 @@ func flagEmoji(cc string) string {
 }
 
 // remarks renders the server name of every server of one user from the template, then makes them unique: a name that
-// is already taken gets a number, from 2 on ("🇩🇪 Germany · Hysteria2", "🇩🇪 Germany · Hysteria2 2"). The profile
+// is already taken gets a number, from 2 on ("🇩🇪 DE · Hysteria2", "🇩🇪 DE · Hysteria2 2"). The profile
 // name can distinguish protocols and WARP exits. lang only matters for {country}.
 // web/src/screens/subscriptions/model.ts serverNames draws the admin's preview by the same rules.
 func remarks(servers []access.SubServer, template, lang string) []string {
@@ -33,7 +33,11 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 	names := make([]string, len(servers))
 	taken := map[string]bool{}
 	for i, s := range servers {
-		rep := strings.NewReplacer("{flag}", flagEmoji(s.CountryCode), "{country}", access.CountryName(s.CountryCode, lang),
+		country := access.CountryName(s.CountryCode, lang)
+		if flagEmoji(s.CountryCode) != "" {
+			country = strings.ToUpper(strings.TrimSpace(s.CountryCode))
+		}
+		rep := strings.NewReplacer("{flag}", flagEmoji(s.CountryCode), "{country}", country,
 			"{node}", s.Node, "{profile}", s.Profile)
 		n := clean(rep.Replace(template))
 		if n == "" {
@@ -44,8 +48,6 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 		}
 		if s.LoadPercent != nil {
 			n += " · " + strconv.Itoa(*s.LoadPercent) + "%"
-		} else if !s.MetricsAt.IsZero() {
-			n += " · ↓" + rateMbps(s.NetworkRxBps) + " ↑" + rateMbps(s.NetworkTxBps) + " Mbps"
 		}
 		name := n
 		for k := 2; taken[name]; k++ {
@@ -55,12 +57,6 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 		names[i] = name
 	}
 	return names
-}
-
-func rateMbps(bps uint64) string {
-	n := strconv.FormatFloat(float64(bps)/1_000_000, 'f', 1, 64)
-	n = strings.TrimSuffix(strings.TrimSuffix(n, "0"), ".")
-	return n
 }
 
 // clean drops control characters and collapses runs of whitespace, so a node name cannot break the line.

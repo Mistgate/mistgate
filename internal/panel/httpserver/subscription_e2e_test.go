@@ -45,7 +45,7 @@ func subscriptionEnv(t *testing.T) (*testEnv, adminv1connect.SubscriptionService
 	})
 	cache := subsettings.NewCache(e.st, quietLog)
 	brand := func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, e.st) }
-	_, h := subs.NewService(e.st, cache, builtin.Registry(), brand, &fakeDNS{}, quietLog).Handler()
+	_, h := subs.NewService(e.st, cache, builtin.Registry(), brand, &fakeDNS{}, quietLog, nil).Handler()
 	inner.Store(&h)
 	client := func(cookie string) adminv1connect.SubscriptionServiceClient {
 		jar := &cookieJar{cookie: cookie}

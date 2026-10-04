@@ -19,7 +19,7 @@ const chips = [
   { ph: "{profile}", hint: "subs.ph.profile" },
 ] as const;
 
-type Sample = { node: string; countryCode: string; profile: string };
+type Sample = { node: string; countryCode: string; profile: string; loadPercent?: number };
 
 // Made-up servers for the preview of an install that runs none yet: two in one country, to show the number.
 const madeUp: Sample[] = [
@@ -175,11 +175,11 @@ function AnnounceHint({ t, text }: { t: Tx; text: string }) {
 /**
  * A mock of how the subscription looks in Happ, drawn from the form as it stands: title, the announcement as Happ cuts
  * it, update interval, expiry and traffic, and the servers of the busiest group named by the template (made-up ones on an
- * install that runs none yet).
+ * install that runs none yet). Country codes keep the load percentage visible in Happ's narrow server rows.
  */
 function SubscriptionPreview({ t, title, announcement, hours, support, template, samples, group, lang }: { t: Tx; title: string; announcement: string; hours: number; support: string; template: string; samples: Sample[]; group: string; lang: string }) {
   const regions = new Intl.DisplayNames([lang], { type: "region" });
-  const names = serverNames(template, samples, (code) => regions.of(code) ?? code);
+  const names = serverNames(template, samples, (code) => (/^[A-Z]{2}$/i.test(code) ? code.toUpperCase() : regions.of(code) ?? code));
   const [now] = useState(() => Date.now());
   const until = new Intl.DateTimeFormat(t.lang, { day: "numeric", month: "long" }).format(new Date(now + 76 * 86_400_000));
   return (

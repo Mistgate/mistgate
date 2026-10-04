@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/instance"
@@ -31,16 +32,22 @@ type Service struct {
 	reg      *protocols.Registry
 	brand    func(ctx context.Context) (instance.Settings, error)
 	dns      DefaultPresets // nil = no DNS module: default_dns_preset_id stays empty
+	network  NetworkUsageSource
 	log      *slog.Logger
+}
+
+// NetworkUsageSource supplies the latest host-level rates from connected agents.
+type NetworkUsageSource interface {
+	NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
 }
 
 // NewService builds the service; settings is the cache the public handler reads too, brand the loader of the
 // instance brand (for effective_title).
-func NewService(st *store.Store, settings *subsettings.Cache, reg *protocols.Registry, brand func(ctx context.Context) (instance.Settings, error), dns DefaultPresets, log *slog.Logger) *Service {
+func NewService(st *store.Store, settings *subsettings.Cache, reg *protocols.Registry, brand func(ctx context.Context) (instance.Settings, error), dns DefaultPresets, log *slog.Logger, network NetworkUsageSource) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{st: st, settings: settings, reg: reg, brand: brand, dns: dns, log: log}
+	return &Service{st: st, settings: settings, reg: reg, brand: brand, dns: dns, network: network, log: log}
 }
 
 // Handler returns the Connect path and handler of SubscriptionService.
@@ -118,12 +125,35 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 			(f.Inbound.State != "pending" && f.Inbound.State != "active") || !protocols.AllowedForApps(p, plugin.ClientHapp) {
 			continue
 		}
-		out = append(out, &adminv1.ServerSample{Node: f.Node.Name, CountryCode: f.Node.CountryCode, Profile: f.Profile.Name})
+		out = append(out, &adminv1.ServerSample{
+			Node: f.Node.Name, CountryCode: f.Node.CountryCode, Profile: f.Profile.Name,
+			LoadPercent: s.nodeLoadPercent(f.Node.ID, f.Node.BandwidthMbps),
+		})
 	}
 	if len(out) == 0 {
 		return "", nil, nil
 	}
 	return g.Name, out, nil
+}
+
+func (s *Service) nodeLoadPercent(nodeID string, capacityMbps int) *uint32 {
+	if s.network == nil || capacityMbps <= 0 {
+		return nil
+	}
+	rx, tx, sampledAt, ok := s.network.NetworkUsage(nodeID)
+	if !ok || sampledAt.IsZero() {
+		return nil
+	}
+	age := time.Since(sampledAt)
+	if age < 0 || age > 90*time.Second {
+		return nil
+	}
+	percent, valid := access.NodeLoadPercent(rx, tx, capacityMbps)
+	if !valid {
+		return nil
+	}
+	value := uint32(percent)
+	return &value
 }
 
 func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.Request[adminv1.UpdateSubscriptionSettingsRequest]) (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {

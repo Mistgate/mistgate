@@ -44,6 +44,9 @@ describe("serverNames", () => {
     expect(serverNames("", [s("de1", "DE", "")], country)).toEqual(["🇩🇪 Германия"]);
     expect(serverNames("{flag}", [s("de1", "")], country)).toEqual(["de1"]);
   });
+  it("keeps the load percentage as part of the app server name", () => {
+    expect(serverNames("", [{ ...s("de1", "DE", "hy2"), loadPercent: 64 }], country)).toEqual(["🇩🇪 Германия · hy2 · 64%"]);
+  });
 });
 
 // the same cases as internal/panel/subs/names_test.go TestCutAnnounce: the counter and the preview cut like Happ gets it

@@ -44,17 +44,17 @@ const type = (el: HTMLInputElement | HTMLTextAreaElement, v: string) =>
 
 describe("the preview of names and texts", () => {
   const samples = [
-    { node: "de1", countryCode: "DE", profile: "hy2" },
-    { node: "de1", countryCode: "DE", profile: "hy2 · WARP" },
-    { node: "nl1", countryCode: "NL", profile: "hy2" },
+    { node: "de1", countryCode: "DE", profile: "hy2", loadPercent: 64 },
+    { node: "de1", countryCode: "DE", profile: "hy2 · WARP", loadPercent: 64 },
+    { node: "nl1", countryCode: "NL", profile: "hy2", loadPercent: 22 },
   ];
 
   it("draws the busiest group's real servers by the subscription's rules, and says which group", async () => {
     await mount({ settings: settings(), effectiveTitle: "Mistgate", samples, sampleGroup: "Все", namesLanguage: "ru" });
-    expect(rows()).toEqual(["Германия · hy2", "Германия · hy2 · WARP", "Нидерланды · hy2"]); // the flags are drawn, not text
+    expect(rows()).toEqual(["DE · hy2 · 64%", "DE · hy2 · WARP · 64%", "NL · hy2 · 22%"]); // the flags are drawn, not text
     expect(document.body.textContent).toContain("Серверы группы «Все» — так их видят в Happ её люди.");
     await type(document.querySelector<HTMLInputElement>("#subs-template")!, "{node} · {profile}");
-    expect(rows()).toEqual(["de1 · hy2", "de1 · hy2 · WARP", "nl1 · hy2"]);
+    expect(rows()).toEqual(["de1 · hy2 · 64%", "de1 · hy2 · WARP · 64%", "nl1 · hy2 · 22%"]);
   });
 
   it("an install that runs no server yet gets made-up ones, said to be made up", async () => {

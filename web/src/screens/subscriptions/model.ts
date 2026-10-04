@@ -155,12 +155,13 @@ export function renderName(template: string, v: { flag: string; country: string;
 /**
  * The names of one person's servers, in order, by the rules of the subscription (internal/panel/subs/names.go remarks):
  * the template, the node when it renders to nothing, and a number from 2 on for a rendered name that is already taken
- * ("🇩🇪 Германия · Hysteria2", "🇩🇪 Германия · Hysteria2 2"). `countryCode` names a country code.
+ * ("🇩🇪 DE · Hysteria2", "🇩🇪 DE · Hysteria2 · 64%"). A load percentage is kept in the name before duplicates are numbered.
  */
-export function serverNames(template: string, servers: readonly { node: string; countryCode: string; profile: string }[], country: (code: string) => string): string[] {
+export function serverNames(template: string, servers: readonly { node: string; countryCode: string; profile: string; loadPercent?: number }[], country: (code: string) => string): string[] {
   const taken = new Set<string>();
   return servers.map((s) => {
-    const base = renderName(template, { flag: flagOf(s.countryCode), country: s.countryCode ? country(s.countryCode.toUpperCase()) : "", node: s.node, profile: s.profile }) || s.node.trim() || "server";
+    const baseName = renderName(template, { flag: flagOf(s.countryCode), country: s.countryCode ? country(s.countryCode.toUpperCase()) : "", node: s.node, profile: s.profile }) || s.node.trim() || "server";
+    const base = s.loadPercent === undefined ? baseName : `${baseName} · ${s.loadPercent}%`;
     let name = base;
     for (let k = 2; taken.has(name); k++) name = `${base} ${k}`;
     taken.add(name);

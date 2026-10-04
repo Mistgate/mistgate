@@ -15,3 +15,8 @@ func nodeLoadPercent(rxBps, txBps uint64, capacityMbps int) (int, bool) {
 	}
 	return int(math.Round(utilization * 100)), true
 }
+
+// NodeLoadPercent reports the current utilization of a symmetric link from the busier direction.
+func NodeLoadPercent(rxBps, txBps uint64, capacityMbps int) (int, bool) {
+	return nodeLoadPercent(rxBps, txBps, capacityMbps)
+}
