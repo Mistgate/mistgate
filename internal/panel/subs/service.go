@@ -118,42 +118,36 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 	if err != nil {
 		return "", nil, err
 	}
-	var out []*adminv1.ServerSample
+	type sample struct {
+		nodeID, node, countryCode, profile string
+	}
+	var candidates []sample
 	for _, f := range full {
 		p, ok := s.reg.Get(f.Profile.Protocol)
 		if !ok || !slices.Contains(g.ProfileIDs, f.Profile.ID) || !f.Inbound.Enabled || f.Node.State != "active" ||
 			(f.Inbound.State != "pending" && f.Inbound.State != "active") || !protocols.AllowedForApps(p, plugin.ClientHapp) {
 			continue
 		}
-		out = append(out, &adminv1.ServerSample{
-			Node: f.Node.Name, CountryCode: f.Node.CountryCode, Profile: f.Profile.Name,
-			LoadPercent: s.nodeLoadPercent(f.Node.ID, f.Node.BandwidthMbps),
-		})
+		candidates = append(candidates, sample{nodeID: f.Node.ID, node: f.Node.Name, countryCode: f.Node.CountryCode, profile: f.Profile.Name})
+	}
+	nodeIDs := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		nodeIDs = append(nodeIDs, candidate.nodeID)
+	}
+	shares := access.CurrentTrafficShares(nodeIDs, s.network, time.Now())
+	var out []*adminv1.ServerSample
+	for _, candidate := range candidates {
+		server := &adminv1.ServerSample{Node: candidate.node, CountryCode: candidate.countryCode, Profile: candidate.profile}
+		if share, ok := shares[candidate.nodeID]; ok {
+			percent := uint32(share.Percent)
+			server.LoadPercent = &percent
+		}
+		out = append(out, server)
 	}
 	if len(out) == 0 {
 		return "", nil, nil
 	}
 	return g.Name, out, nil
-}
-
-func (s *Service) nodeLoadPercent(nodeID string, capacityMbps int) *uint32 {
-	if s.network == nil || capacityMbps <= 0 {
-		return nil
-	}
-	rx, tx, sampledAt, ok := s.network.NetworkUsage(nodeID)
-	if !ok || sampledAt.IsZero() {
-		return nil
-	}
-	age := time.Since(sampledAt)
-	if age < 0 || age > 90*time.Second {
-		return nil
-	}
-	percent, valid := access.NodeLoadPercent(rx, tx, capacityMbps)
-	if !valid {
-		return nil
-	}
-	value := uint32(percent)
-	return &value
 }
 
 func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.Request[adminv1.UpdateSubscriptionSettingsRequest]) (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {

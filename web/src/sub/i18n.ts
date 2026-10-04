@@ -65,7 +65,7 @@ export type Dict = {
   serverLoadIntro: string;
   serverLoadBusy: string;
   serverLoadTry: (busy: string, busyPct: number, other: string, otherPct: number) => string;
-  serverLoadRates: (rx: string, tx: string, capacity: number) => string;
+  serverLoadRates: (rx: string, tx: string) => string;
   serverLoadUnknown: string;
   linkApps: string;
   linkAppsNote: string;
@@ -218,13 +218,11 @@ const ru: Dict = {
   qrPhoneT: "Подключить телефон",
   qrHow: (a) => (a ? `Наведите камеру телефона — откроется эта страница. Или в ${a}: «+» → «Сканировать QR»` : "Наведите камеру телефона — откроется эта страница."),
   viaLink: "Подключено через подписку",
-  serverLoadTitle: "Загрузка серверов",
-  serverLoadIntro: "Текущая скорость берётся автоматически с основного интерфейса узла. Процент показывается, если для него известен лимит канала.",
-  serverLoadBusy: "Высокая загрузка",
-  serverLoadTry: (busy, busyPct, other, otherPct) => `${busy} загружен на ${busyPct}%. Попробуйте ${other} (${otherPct}%).`,
-  serverLoadRates: (rx, tx, capacity) => capacity > 0
-    ? `Вход ${rx} · выход ${tx} / ${capacity} Мбит/с`
-    : `Сейчас ↓ ${rx} · ↑ ${tx} Мбит/с · лимит не указан`,
+  serverLoadTitle: "Трафик по серверам",
+  serverLoadIntro: "Процент — доля текущего трафика среди серверов подписки с актуальными данными, а не загрузка от лимита канала. Текущая скорость показана отдельно.",
+  serverLoadBusy: "Большая доля трафика",
+  serverLoadTry: (busy, busyPct, other, otherPct) => `Сейчас через ${busy} проходит ${busyPct}% измеренного трафика. Если соединение медленное, попробуйте ${other} (${otherPct}%).`,
+  serverLoadRates: (rx, tx) => `Сейчас ↓ ${rx} · ↑ ${tx} Мбит/с`,
   serverLoadUnknown: "—",
   linkApps: "Приложения по ссылке",
   linkAppsNote: "Все устройства с этой ссылкой занимают одно место",
@@ -394,13 +392,11 @@ const en: Dict = {
   qrPhoneT: "Connect a phone",
   qrHow: (a) => (a ? `Point the phone’s camera at it — this page opens. Or in ${a}: “+” → “Scan QR”` : "Point the phone’s camera at it — this page opens."),
   viaLink: "Connected with the subscription",
-  serverLoadTitle: "Server load",
-  serverLoadIntro: "Current speed is read automatically from the node's main interface. A percentage is shown when its channel capacity is known.",
-  serverLoadBusy: "High load",
-  serverLoadTry: (busy, busyPct, other, otherPct) => `${busy} is at ${busyPct}% load. Try ${other} (${otherPct}%).`,
-  serverLoadRates: (rx, tx, capacity) => capacity > 0
-    ? `In ${rx} · out ${tx} / ${capacity} Mbps`
-    : `Now ↓ ${rx} · ↑ ${tx} Mbps · capacity not set`,
+  serverLoadTitle: "Traffic by server",
+  serverLoadIntro: "The percentage is each server's share of current traffic among subscription servers with fresh data; it is not channel-capacity utilization. Current RX/TX rates are shown separately.",
+  serverLoadBusy: "Large traffic share",
+  serverLoadTry: (busy, busyPct, other, otherPct) => `${busy} currently carries ${busyPct}% of measured traffic. If your connection is slow, try ${other} (${otherPct}%).`,
+  serverLoadRates: (rx, tx) => `Now ↓ ${rx} · ↑ ${tx} Mbps`,
   serverLoadUnknown: "—",
   linkApps: "Apps on the link",
   linkAppsNote: "All devices on this link take one slot",

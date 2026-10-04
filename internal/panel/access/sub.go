@@ -61,7 +61,7 @@ type SubServer struct {
 	CountryCode string // node country, ISO 3166-1 alpha-2 or ""
 	Location    string
 	Profile     string // profile name
-	// LoadPercent is present only when this node has a configured capacity and a fresh metrics sample.
+	// LoadPercent is this node's share of current RX+TX traffic among nodes in the subscription with fresh samples.
 	LoadPercent   *int
 	NetworkRxBps  uint64
 	NetworkTxBps  uint64
@@ -262,6 +262,25 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		format = plugin.FormatURIList
 	}
 	v.Format = format
+	var networkNodeIDs []string
+	var networkSource NetworkUsageSource
+	if source, ok := s.online.(NetworkUsageSource); ok {
+		networkSource = source
+		for _, f := range full {
+			if !s.usable(f, g, u) {
+				continue
+			}
+			proto, exists := s.reg.Get(f.Profile.Protocol)
+			if !exists {
+				continue
+			}
+			happ, _, _ := clientApps(proto)
+			if u.AppHapp && happ {
+				networkNodeIDs = append(networkNodeIDs, f.Node.ID)
+			}
+		}
+	}
+	networkShares := CurrentTrafficShares(networkNodeIDs, networkSource, now)
 	var dnsServers []string
 	dnsDone := false
 	awgAt := map[string]int{} // profile id -> its index in v.AWGProfiles
@@ -306,16 +325,10 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
 			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, BandwidthMbps: f.Node.BandwidthMbps}
-		if source, ok := s.online.(NetworkUsageSource); ok {
-			if rx, tx, at, available := source.NetworkUsage(f.Node.ID); available && !at.IsZero() {
-				age := now.Sub(at)
-				if age >= 0 && age <= 90*time.Second {
-					srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = rx, tx, at
-					if load, valid := NodeLoadPercent(rx, tx, f.Node.BandwidthMbps); valid {
-						srv.LoadPercent = &load
-					}
-				}
-			}
+		if usage, ok := networkShares[f.Node.ID]; ok {
+			srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = usage.RxBps, usage.TxBps, usage.SampledAt
+			load := usage.Percent
+			srv.LoadPercent = &load
 		}
 		in := protocols.RenderInput{
 			Format: format, Settings: merged, Inbound: inboundView(nodeView(f.Node), spec, f.Inbound.CertPinSHA256),

@@ -94,9 +94,9 @@ export function normalize(raw: unknown): MgData {
     server_count: num(r.server_count),
     server_loads: list(r.server_loads).flatMap((s): ServerLoad[] => {
       const capacity = num(s.capacity_mbps);
-      const percent = num(s.load_percent);
+      const percent = typeof s.load_percent === "number" && Number.isFinite(s.load_percent) ? s.load_percent : undefined;
       if (typeof s.name !== "string" || !s.name.trim()) return [];
-      const loadPercent = capacity > 0 && percent >= 0 && percent <= 100 ? percent : undefined;
+      const loadPercent = percent !== undefined && percent >= 0 && percent <= 100 ? percent : undefined;
       return [{ name: str(s.name), load_percent: loadPercent, rx_bps: num(s.rx_bps), tx_bps: num(s.tx_bps), capacity_mbps: capacity }];
     }),
     user: {

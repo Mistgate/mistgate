@@ -218,8 +218,8 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	return d
 }
 
-// serverLoads returns one row per eligible node, not per protocol profile. Fresh rates are automatic; percentages are
-// included only when the panel owner has configured a link capacity.
+// serverLoads returns one row per eligible node, not per protocol profile. Fresh rates and each node's share of the
+// current traffic across measured subscription nodes are supplied by the access view.
 func serverLoads(servers []access.SubServer, lang string) []pageServer {
 	indexes := map[string]int{}
 	out := make([]pageServer, 0, len(servers))
