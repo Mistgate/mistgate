@@ -161,12 +161,41 @@ export function serverNames(template: string, servers: readonly { node: string; 
   const taken = new Set<string>();
   return servers.map((s) => {
     const baseName = renderName(template, { flag: flagOf(s.countryCode), country: s.countryCode ? country(s.countryCode.toUpperCase()) : "", node: s.node, profile: s.profile }) || s.node.trim() || "server";
-    const base = s.loadPercent === undefined ? baseName : `${baseName} · ${s.loadPercent}%`;
-    let name = base;
-    for (let k = 2; taken.has(name); k++) name = `${base} ${k}`;
+    const loadSuffix = s.loadPercent === undefined ? "" : ` · ${s.loadPercent}%`;
+    let name = fitHappRemark(baseName, loadSuffix, s.profile);
+    for (let k = 2; taken.has(name); k++) name = fitHappRemark(baseName, `${loadSuffix} ${k}`, s.profile);
     taken.add(name);
     return name;
   });
+}
+
+const happNameMaxLength = 30;
+
+function fitHappRemark(base: string, suffix: string, profile: string): string {
+  if (base.length + suffix.length <= happNameMaxLength) return base + suffix;
+
+  const compactProfile = compactProfileName(profile);
+  if (compactProfile !== profile) {
+    base = base.replaceAll(profile, compactProfile);
+    if (base.length + suffix.length <= happNameMaxLength) return base + suffix;
+  }
+
+  const budget = Math.max(0, happNameMaxLength - suffix.length);
+  let shortened = "";
+  for (const char of base) {
+    if (shortened.length + char.length > budget) break;
+    shortened += char;
+  }
+  shortened = shortened.replace(/[ ·]+$/u, "");
+  if (shortened === "") shortened = "server".slice(0, budget);
+  return shortened + suffix;
+}
+
+function compactProfileName(profile: string): string {
+  for (const [full, short] of [["Hysteria2", "HY2"], ["AmneziaWG", "AWG"], ["WireGuard", "WG"]] as const) {
+    if (profile.slice(0, full.length).toLowerCase() === full.toLowerCase()) return short + profile.slice(full.length);
+  }
+  return profile;
 }
 
 /** How much of the announcement Happ shows. */

@@ -47,6 +47,14 @@ describe("serverNames", () => {
   it("keeps the load percentage as part of the app server name", () => {
     expect(serverNames("", [{ ...s("de1", "DE", "hy2"), loadPercent: 64 }], country)).toEqual(["🇩🇪 Германия · hy2 · 64%"]);
   });
+  it("fits Happ's 30-character server-title limit without dropping the load percentage", () => {
+    const names = serverNames("", [
+      { ...s("de1", "EE", "Hysteria2 · 443"), loadPercent: 74 },
+      { ...s("de2", "EE", "Hysteria2 · 443"), loadPercent: 74 },
+    ], country);
+    expect(names).toEqual(["🇪🇪 EE · HY2 · 443 · 74%", "🇪🇪 EE · HY2 · 443 · 74% 2"]);
+    expect(names.every((name) => name.length <= 30)).toBe(true);
+  });
 });
 
 // the same cases as internal/panel/subs/names_test.go TestCutAnnounce: the counter and the preview cut like Happ gets it
