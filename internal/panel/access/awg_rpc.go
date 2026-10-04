@@ -218,11 +218,11 @@ func (s *Service) checkAWGNetworks(ctx context.Context, profileID string, merged
 	}
 	nets := networksOf(merged)
 	if old == nil {
-		var named map[string]json.RawMessage
-		_ = json.Unmarshal([]byte(input), &named)
-		_, has4 := named["subnet4"]
-		_, has6 := named["subnet6"]
-		if !has4 || !has6 {
+		if awgNetworkAllocationNeeded(input) {
+			var named map[string]json.RawMessage
+			_ = json.Unmarshal([]byte(input), &named)
+			_, has4 := named["subnet4"]
+			_, has6 := named["subnet6"]
 			slot := -1
 			for n := 1; n < 64 && slot < 0; n++ { // slot 0 is not used: the examples and DefaultSettings start at 10.66.4.0/22
 				v4, v6, err := awg.SubnetsFor(n)
@@ -295,4 +295,12 @@ func (s *Service) checkAWGNetworks(ctx context.Context, profileID string, merged
 		return nil, fieldErrors(errs)
 	}
 	return merged, nil
+}
+
+func awgNetworkAllocationNeeded(input string) bool {
+	var named map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(input), &named)
+	_, has4 := named["subnet4"]
+	_, has6 := named["subnet6"]
+	return !has4 || !has6
 }

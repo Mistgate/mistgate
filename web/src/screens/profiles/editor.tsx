@@ -56,8 +56,14 @@ function NewEditor({ info, choices, onProtocol, fromNode }: { info: ProtocolInfo
   const initial = useMemo(() => {
     const fields = allFields(parseSchema(info.settingsSchemaJson));
     const settings = withGeneratedSecrets(parseSettings(info.defaultSettingsJson), fields, makeSecret);
+    // Let the server choose a free client network for every new AmneziaWG profile.
+    // The defaults are useful for the first profile, but collide when reused by the next one.
+    if (info.id === "awg") {
+      delete settings.subnet4;
+      delete settings.subnet6;
+    }
     return { name: "", settingsJson: JSON.stringify(settings) };
-  }, [info.settingsSchemaJson, info.defaultSettingsJson]);
+  }, [info.id, info.settingsSchemaJson, info.defaultSettingsJson]);
   return <Editor info={info} initial={initial} choices={choices} onProtocol={onProtocol} fromNode={fromNode} />;
 }
 
@@ -248,6 +254,9 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const locked = isAwg && inbounds.length > 0;
   const readOnly = useMemo<ReadonlySet<string>>(() => (locked ? new Set(["subnet4", "subnet6"]) : new Set()), [locked]);
   const extra = (f: Field): ReactNode => {
+    if (isNew && isAwg && (f.id === "subnet4" || f.id === "subnet6") && !getAt(settings, f.path)) {
+      return <span className="text-[11px] leading-snug text-muted">{t("awg.subnet.auto")}</span>;
+    }
     if (isAwg && f.id === "port") {
       return (
         <button type="button" className="w-fit text-[11px] font-bold text-accent-text" onClick={() => edit(setAt(settings, ["port"], randomPort()))}>

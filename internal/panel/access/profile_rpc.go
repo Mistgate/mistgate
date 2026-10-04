@@ -424,10 +424,17 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 	for _, e := range errs {
 		resp.Errors = append(resp.Errors, &adminv1.FieldError{Pointer: e.Pointer, Code: e.Code, Message: e.Message})
 	}
-	resp.Summary = proto.Summary(merged)
 	if len(errs) > 0 {
 		return connect.NewResponse(resp), nil
 	}
+	if proto.ID() == awg.ID && awgNetworkAllocationNeeded(req.Msg.SettingsJson) {
+		// New AWG profiles leave their client networks unset so that the same free pair is used in the preview and on save.
+		merged, err = s.checkAWGNetworks(ctx, "", merged, req.Msg.SettingsJson, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	resp.Summary = proto.Summary(merged)
 	if proto.ID() == awg.ID {
 		resp.Warnings, resp.ObfuscationScore = awgAdvice(merged)
 	}

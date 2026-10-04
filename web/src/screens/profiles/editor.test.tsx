@@ -19,11 +19,24 @@ let search: Record<string, string> = {};
 // the plugin's schema with the domain field (the trimmed fixture has none)
 const schema = JSON.stringify({ ...JSON.parse(hy2), properties: { ...JSON.parse(hy2).properties, sni: { type: "string", title: "SNI", "x-group": "basics", "x-order": 30, "x-critical": true } } });
 const defaults = JSON.stringify({ port: 443, tls_mode: "acme_domain", sni: "", obfs: { type: "salamander", password: "••••" }, masquerade: { type: "decoy" }, up_mbps: 0, udp: true });
+const awgSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    version: { type: "string", enum: ["3.1", "2.0"], title: "Protocol version", "x-group": "basics", "x-order": 10 },
+    port: { type: "integer", title: "UDP port", "x-group": "basics", "x-order": 20 },
+    subnet4: { type: "string", title: "Client network (IPv4)", "x-group": "basics", "x-order": 50 },
+    subnet6: { type: "string", title: "Client network (IPv6)", "x-group": "basics", "x-order": 60 },
+  },
+});
+const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   profiles: {
-    listProtocols: () => Promise.resolve({ protocols: [{ id: "hysteria2", displayName: "Hysteria2", settingsSchemaJson: schema, defaultSettingsJson: defaults, apps: [App.HAPP] }] }),
+    listProtocols: () => Promise.resolve({ protocols: [
+      { id: "hysteria2", displayName: "Hysteria2", settingsSchemaJson: schema, defaultSettingsJson: defaults, apps: [App.HAPP] },
+      { id: "awg", displayName: "AmneziaWG", settingsSchemaJson: awgSchema, defaultSettingsJson: awgDefaults, apps: [App.AMNEZIA] },
+    ] }),
     listProfiles: () => Promise.resolve({ profiles: [{ id: "p_old", name: "hy2 · 443", protocol: "hysteria2" }] }),
     previewProfile: () => Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Happ · URI list" }),
     getProfile: () =>
@@ -58,6 +71,7 @@ vi.mock("@/lib/api", async (orig) => ({
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 6, apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }] }, effectiveTitle: "" }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: Role.OWNER } }) },
+  awgApi: { listMimicryPresets: () => Promise.resolve({ presets: [], domains: [] }) },
 }));
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => params,
@@ -108,6 +122,7 @@ const settle = async () => {
 };
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
+const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const type = (el: HTMLInputElement, value: string) =>
   act(async () => {
@@ -169,6 +184,24 @@ describe("a new profile", () => {
     await settle();
     expect(createInbound).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ to: "/nodes/$id", params: { id: "nod_1" }, search: { tab: "profiles" } }));
+  });
+
+  it("leaves default AmneziaWG networks unset so the server assigns a free pair", async () => {
+    createProfile.mockResolvedValue({ profile: { id: "prf_awg", name: "AmneziaWG · 10819", protocol: "awg" } });
+    updateGroup.mockResolvedValue({});
+    createInbound.mockResolvedValue({ inbound: {} });
+    await mount();
+    await click(radio("AmneziaWG"));
+    await settle();
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv4)"]')?.value).toBe("");
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv6)"]')?.value).toBe("");
+    await click(button("Create profile"));
+    await settle();
+    const request = createProfile.mock.calls[0]?.[0] as { protocol: string; settingsJson: string };
+    const settings = JSON.parse(request.settingsJson) as Record<string, unknown>;
+    expect(request.protocol).toBe("awg");
+    expect(settings).not.toHaveProperty("subnet4");
+    expect(settings).not.toHaveProperty("subnet6");
   });
 });
 

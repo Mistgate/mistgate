@@ -626,6 +626,19 @@ func TestAWGClientNetworks(t *testing.T) {
 	}
 }
 
+func TestAWGPreviewChoosesFreeClientNetworkWhenUnset(t *testing.T) {
+	e := newEnv(t)
+	e.awgProfile("first", "")
+
+	preview := must(e.s.PreviewProfile(e.ctx, req(&adminv1.PreviewProfileRequest{Protocol: "awg", SettingsJson: `{}`}))).Msg
+	if len(preview.Errors) != 0 {
+		t.Fatalf("preview errors: %+v", preview.Errors)
+	}
+	if !strings.Contains(preview.ClientPreview, "10.66.8.") || !strings.Contains(preview.ClientPreview, "fd66:66:0:2::") {
+		t.Fatalf("preview did not use the next free client network: %s", preview.ClientPreview)
+	}
+}
+
 func TestAWGClientNetworksFixedAfterDevices(t *testing.T) {
 	f := newAWGFixture(t)
 	e := f.e
