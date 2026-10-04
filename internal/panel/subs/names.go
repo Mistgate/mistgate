@@ -7,10 +7,13 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf16"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
+
+const happRemarkMaxUTF16 = 30
 
 // flagEmoji turns a two-letter country code into its flag (two regional indicator symbols); anything else
 // gives "". Happ shows a flag as the server icon only when the remark starts with one.
@@ -27,6 +30,16 @@ func flagEmoji(cc string) string {
 // name can distinguish protocols and WARP exits. lang only matters for {country}.
 // web/src/screens/subscriptions/model.ts serverNames draws the admin's preview by the same rules.
 func remarks(servers []access.SubServer, template, lang string) []string {
+	return renderRemarks(servers, template, lang, false)
+}
+
+// happRemarks keeps URI-list names within Happ's 30-character title limit. Happ counts supplementary
+// Unicode characters as two UTF-16 units, so use that stricter limit and compact protocol labels when needed.
+func happRemarks(servers []access.SubServer, template, lang string) []string {
+	return renderRemarks(servers, template, lang, true)
+}
+
+func renderRemarks(servers []access.SubServer, template, lang string, limitHapp bool) []string {
 	if template == "" {
 		template = subsettings.DefaultNameTemplate
 	}
@@ -46,17 +59,73 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 		if n == "" {
 			n = "server"
 		}
+		suffix := ""
 		if s.LoadPercent != nil {
-			n += " · " + strconv.Itoa(*s.LoadPercent) + "%"
+			suffix = " · " + strconv.Itoa(*s.LoadPercent) + "%"
 		}
-		name := n
+		name := namedRemark(n, suffix, s.Profile, limitHapp)
 		for k := 2; taken[name]; k++ {
-			name = n + " " + strconv.Itoa(k)
+			name = namedRemark(n, suffix+" "+strconv.Itoa(k), s.Profile, limitHapp)
 		}
 		taken[name] = true
 		names[i] = name
 	}
 	return names
+}
+
+func namedRemark(base, suffix, profile string, limitHapp bool) string {
+	if !limitHapp {
+		return base + suffix
+	}
+	return fitHappRemark(base, suffix, profile)
+}
+
+func fitHappRemark(base, suffix, profile string) string {
+	if utf16Length(suffix) > happRemarkMaxUTF16 {
+		suffix = truncateUTF16(suffix, happRemarkMaxUTF16)
+	}
+	if utf16Length(base)+utf16Length(suffix) <= happRemarkMaxUTF16 {
+		return base + suffix
+	}
+	if compact := compactProfile(profile); compact != profile {
+		base = strings.ReplaceAll(base, profile, compact)
+		if utf16Length(base)+utf16Length(suffix) <= happRemarkMaxUTF16 {
+			return base + suffix
+		}
+	}
+	room := max(0, happRemarkMaxUTF16-utf16Length(suffix))
+	base = truncateUTF16(base, room)
+	if base == "" {
+		base = truncateUTF16("server", room)
+	}
+	return base + suffix
+}
+
+func compactProfile(profile string) string {
+	for _, item := range []struct{ full, short string }{
+		{"Hysteria2", "HY2"}, {"AmneziaWG", "AWG"}, {"WireGuard", "WG"},
+	} {
+		if len(profile) >= len(item.full) && strings.EqualFold(profile[:len(item.full)], item.full) {
+			return item.short + profile[len(item.full):]
+		}
+	}
+	return profile
+}
+
+func utf16Length(s string) int { return len(utf16.Encode([]rune(s))) }
+
+func truncateUTF16(s string, maxUnits int) string {
+	var out strings.Builder
+	units := 0
+	for _, r := range s {
+		width := utf16.RuneLen(r)
+		if width < 0 || units+width > maxUnits {
+			break
+		}
+		out.WriteRune(r)
+		units += width
+	}
+	return strings.TrimRight(out.String(), " ·")
 }
 
 // clean drops control characters and collapses runs of whitespace, so a node name cannot break the line.

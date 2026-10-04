@@ -481,7 +481,7 @@ func (h *handler) lines(v access.SubView, set *adminv1.SubscriptionSettings, b i
 	if len(v.Servers) == 0 {
 		return v.Lines
 	}
-	names := remarks(v.Servers, set.GetServerNameTemplate(), b.Language)
+	names := happRemarks(v.Servers, set.GetServerNameTemplate(), b.Language)
 	out := make([]string, len(v.Servers))
 	for i, s := range v.Servers {
 		out[i] = withRemark(s.URI, names[i])

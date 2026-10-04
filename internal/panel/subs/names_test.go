@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
@@ -79,6 +80,45 @@ func TestRemarks(t *testing.T) {
 		if strings.Join(got, "|") != strings.Join(c.want, "|") {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, c.want)
 		}
+	}
+}
+
+func TestHappRemarksStayWithinTitleLimit(t *testing.T) {
+	load := 74
+	servers := []access.SubServer{
+		func() access.SubServer {
+			s := srv("de1", "DE", "Hysteria2 · 443")
+			s.LoadPercent = &load
+			return s
+		}(),
+		func() access.SubServer {
+			s := srv("de1", "DE", "Hysteria2 · 443")
+			s.LoadPercent = &load
+			return s
+		}(),
+	}
+	got := happRemarks(servers, "", "en")
+	want := []string{"\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74%", "\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74% 2"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("Happ names = %q, want %q", got, want)
+	}
+	for _, name := range got {
+		if n := len(utf16.Encode([]rune(name))); n > 30 {
+			t.Errorf("Happ name %q uses %d UTF-16 units, over the 30-unit limit", name, n)
+		}
+	}
+}
+
+func TestHappRemarkTruncatesCustomNamesButKeepsLoad(t *testing.T) {
+	load := 100
+	s := srv("de1", "DE", "Hysteria2 · A very long custom profile name")
+	s.LoadPercent = &load
+	name := happRemarks([]access.SubServer{s}, "", "en")[0]
+	if !strings.HasSuffix(name, " · 100%") {
+		t.Fatalf("Happ name %q lost the load percentage", name)
+	}
+	if n := len(utf16.Encode([]rune(name))); n > 30 {
+		t.Errorf("Happ name %q uses %d UTF-16 units, over the 30-unit limit", name, n)
 	}
 }
 
