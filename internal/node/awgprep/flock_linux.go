@@ -11,7 +11,7 @@ import (
 // locks (fcntl), not flock, so that is what is asked: F_GETLK for a write lock on the whole file reports a holder
 // without taking anything. The job runs as root and only looks.
 func aptBusy() bool {
-	for _, p := range []string{"/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/lib/apt/lists/lock"} {
+	for _, p := range []string{"/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/lib/apt/lists/lock", "/var/cache/apt/archives/lock"} {
 		f, err := os.OpenFile(p, os.O_RDWR, 0)
 		if err != nil {
 			continue // not there (not a dpkg host) or unreadable: apt itself will say

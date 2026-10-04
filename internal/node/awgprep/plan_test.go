@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func osr(id, like string) map[string]string {
@@ -18,7 +19,7 @@ func cmds(steps []Step) []string {
 	return out
 }
 
-const aptOpts = "apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends "
+const aptOpts = "apt-get -o DPkg::Lock::Timeout=1800 install -y --no-install-recommends "
 
 func TestPlanUbuntu(t *testing.T) {
 	steps, notes, err := Plan(Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", CPUs: 2})
@@ -27,7 +28,7 @@ func TestPlanUbuntu(t *testing.T) {
 	}
 	got := strings.Join(cmds(steps), "\n")
 	for _, want := range []string{
-		"apt-get update",
+		"apt-get -o DPkg::Lock::Timeout=1800 update",
 		aptOpts + "software-properties-common python3-launchpadlib gnupg2 linux-headers-6.8.0-142-generic",
 		"add-apt-repository -y ppa:amnezia/ppa",
 		aptOpts + "amneziawg",
@@ -75,10 +76,19 @@ func TestPlanInstallsNeverPullRecommends(t *testing.T) {
 	for _, id := range []string{"ubuntu", "debian"} {
 		steps, _, _ := Plan(Env{OSRelease: osr(id, ""), Kernel: "6.8.0", CPUs: 1})
 		for _, c := range cmds(steps) {
-			if strings.HasPrefix(c, "apt-get") && strings.Contains(c, " install ") && (!strings.Contains(c, "--no-install-recommends") || !strings.Contains(c, "DPkg::Lock::Timeout")) {
+			if strings.HasPrefix(c, "apt-get") && (!strings.Contains(c, "DPkg::Lock::Timeout=1800") || (strings.Contains(c, " install ") && !strings.Contains(c, "--no-install-recommends"))) {
 				t.Errorf("%s: %q", id, c)
 			}
 		}
+	}
+}
+
+func TestPackageManagerWaitIsBoundedAndSharedWithApt(t *testing.T) {
+	if LockWait != 30*time.Minute || JobTimeout < LockWait+15*time.Minute {
+		t.Fatalf("lock wait/job timeout = %s/%s, want a 30-minute lock wait plus build time", LockWait, JobTimeout)
+	}
+	if aptLockTimeoutSeconds != int(LockWait/time.Second) {
+		t.Fatalf("apt lock timeout = %d seconds, want %d", aptLockTimeoutSeconds, int(LockWait/time.Second))
 	}
 }
 

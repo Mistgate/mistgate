@@ -24,8 +24,8 @@ import (
 // capAwgPrepare is the Hello.capabilities entry of an agent that can prepare the module itself.
 const capAwgPrepare = "awg-prepare/1"
 
-// staleRunning is how long a "running" record is believed without news from the node (the job's hard timeout is 15 min).
-const staleRunning = 40 * time.Minute
+// staleRunning includes the job's 45-minute hard timeout and a 15-minute window for the node to report its result.
+const staleRunning = 60 * time.Minute
 
 const (
 	evPrepStarted = "awg_kernel_prepare_started"
@@ -36,7 +36,7 @@ const (
 // awgPrepareMsg is Node.awg_prepare: whether the agent can do it, and what the panel last learned.
 func awgPrepareMsg(n store.NodeRow, caps []string, now time.Time) *adminv1.AwgPrepare {
 	r := n.AwgPrepare()
-	// A run is over after at most 15 minutes (its hard timeout) and its end is an event the node queues until we have it.
+	// A run is over after at most 45 minutes (its hard timeout) and its end is an event the node queues until we have it.
 	// A record that still says "running" long after that lost its end (the node was wiped or re-enrolled): show it as what
 	// it is, not as a spinner that never stops. The stored record is left alone, a late "done" still counts.
 	if r.State == store.AwgPrepareRunning && now.Unix()-r.Since > int64(staleRunning/time.Second) {

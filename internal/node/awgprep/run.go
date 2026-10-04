@@ -121,7 +121,7 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 				Long:   fmt.Sprintf("step %d (%s) failed: %v (nothing is rolled back; fix the cause and run the command again)", i+1, strings.Join(cmd, " "), err)}
 			if lockBusy(out) {
 				f.Code = CodeAptLock
-				f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) held the lock for too long", i+1, len(steps))
+				f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
 			}
 			return f
 		}

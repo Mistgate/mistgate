@@ -19,11 +19,13 @@ const (
 )
 
 const (
-	// JobTimeout is the hard limit of one run. A build takes 1-5 minutes; a dpkg lock held by unattended-upgrades or a slow
-	// mirror may add some; nothing legitimate takes a quarter of an hour.
-	JobTimeout = 15 * time.Minute
-	// LockWait bounds the wait for a foreign dpkg lock before the first command.
-	LockWait = 5 * time.Minute
+	// JobTimeout is the hard limit of one run: up to 30 minutes for package-manager locks, then time to install and build.
+	JobTimeout = 45 * time.Minute
+	// LockWait bounds the wait for package-manager locks before the first command. Fresh VPS images can run unattended
+	// upgrades for several minutes after boot; five minutes made the panel fail while that normal work was still running.
+	LockWait = 30 * time.Minute
+	// aptLockTimeoutSeconds gives apt-get install the same bounded wait for the dpkg locks if one starts after our probe.
+	aptLockTimeoutSeconds = int(LockWait / time.Second)
 	// Stale is how long a "running" status may go without a heartbeat before the agent calls the job dead.
 	Stale = 2 * time.Minute
 

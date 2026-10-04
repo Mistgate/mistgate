@@ -112,7 +112,7 @@ describe("event lines", () => {
     expect(text("awg_kernel_prepare_started")).toEqual({ title: "building the AmneziaWG kernel module for 6.8.0-142-generic", sub: "" });
     expect(text("awg_kernel_prepare_failed")).toEqual({
       title: "AmneziaWG kernel module was not built",
-      sub: "another package manager (apt, unattended-upgrades) held the lock for too long",
+      sub: "apt or unattended-upgrades blocked a package lock; Mistgate waits up to 30 minutes before giving up",
     });
     expect(text("awg_kernel_prepare_done").title).toBe("AmneziaWG kernel module is ready (2 min)");
     expect(text("awg_kernel_switched").title).toBe("AmneziaWG switched to the kernel module");

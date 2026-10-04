@@ -257,9 +257,9 @@ mistgate-node awg prepare-kernel --yes    # runs it
 | `--yes` | off | Run the commands. Without it the plan is only printed. |
 | `--verify-only` | off | Only check a module that is already installed (loaded, the right interface version, loaded at boot). |
 | `--status-file` | none | Write progress and the result to this file (used by the agent when the panel asks it to prepare the module). |
-| `--timeout` | `15m` | Hard limit of the run. |
+| `--timeout` | `45m` | Hard limit of the run. |
 
-It installs packages with apt (non-interactive, waiting for another package manager's lock). Supported: Debian and Ubuntu, not a container, without Secure Boot, with systemd. See [AmneziaWG](../guide/amneziawg.md).
+It installs packages with apt (non-interactive, waiting up to 30 minutes for another package manager's lock). Supported: Debian and Ubuntu, not a container, without Secure Boot, with systemd. See [AmneziaWG](../guide/amneziawg.md).
 
 ### mistgate-node version
 

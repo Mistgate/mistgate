@@ -272,8 +272,8 @@ package mistgate.agent.v1;
 //     it; for any other agent the admin UI keeps showing the manual command (`mistgate-node awg prepare-kernel`).
 //     The agent never installs anything inside its own sandboxed unit (ProtectSystem=strict, a tiny capability
 //     set, MemoryMax): a real run starts `mistgate-node awg prepare-kernel --yes` as a separate transient systemd
-//     unit (systemd-run, name mistgate-awg-prepare) with a hard timeout of 15 minutes, apt non-interactive and a
-//     bounded wait for the dpkg lock; the job reports through a status file in the state directory and survives an
+//     unit (systemd-run, name mistgate-awg-prepare) with a hard timeout of 45 minutes, apt non-interactive and a
+//     bounded 30-minute wait for package-manager locks; the job reports through a status file in the state directory and survives an
 //     agent restart. Only Debian/Ubuntu (apt) hosts that are not containers, are not under Secure Boot and run
 //     systemd are supported; the rest answer state "unsupported" with a code.
 //     PrepareAwgKernel{request_id, dry_run} is answered with exactly one CommandResult (ok = true unless the job
