@@ -117,6 +117,40 @@ func TestTrustedGitHubBundleWaitsForExplicitNodeUpdate(t *testing.T) {
 	}
 }
 
+func TestManualNodeUpdateJoinsActiveRolloutAfterCurrentStage(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	first := e.addNode("first", nodeOpts{online: 0})
+	currentQueue := e.addNode("queued", nodeOpts{online: 1})
+	selected := e.addNode("selected", nodeOpts{online: 2})
+	ro := e.startRollout(first, currentQueue)
+
+	e.tick()
+	e.wantStep(first, store.StepSent, "")
+	joined, err := e.s.start(e.ctx, []string{selected}, 0)
+	if err != nil {
+		t.Fatalf("add a different node during the rollout: %v", err)
+	}
+	if joined.ID != ro.ID {
+		t.Fatalf("node created another rollout: got %s, want %s", joined.ID, ro.ID)
+	}
+
+	steps, err := e.st.RolloutSteps(e.ctx, ro.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantStages := map[string]int{first: 0, selected: 1, currentQueue: 2}
+	for _, step := range steps {
+		if stage := wantStages[step.NodeID]; step.Stage != stage {
+			t.Errorf("step %s stage %d, want %d", step.NodeID, step.Stage, stage)
+		}
+	}
+	e.wantStep(selected, store.StepPending, "")
+	if sent := e.fl.sent(); len(sent) != 1 || sent[0] != first {
+		t.Fatalf("added node started before the canary passed: %v", sent)
+	}
+}
+
 func TestRolloutSuccess(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()

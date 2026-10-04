@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { updateDateTimeAtOffset, updateDateTimeInputAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
 
@@ -9,6 +9,9 @@ export function UpdateNodeDialog({
   data,
   node,
   canUpdateNow,
+  queueAfterRollout,
+  nodeInActiveRollout,
+  blockedReason,
   busy,
   onUpdateNow,
   onSchedule,
@@ -18,6 +21,9 @@ export function UpdateNodeDialog({
   data: Updates;
   node: NodeUpdate;
   canUpdateNow: boolean;
+  queueAfterRollout: boolean;
+  nodeInActiveRollout: boolean;
+  blockedReason?: "offline" | "queued" | "paused" | "differentRelease" | "unavailable";
   busy: boolean;
   onUpdateNow: () => void;
   onSchedule: (localDatetime: string) => void;
@@ -29,7 +35,14 @@ export function UpdateNodeDialog({
   const version = bundle?.version ?? "";
   const offset = data.scheduleTimezoneOffsetMinutes;
   const hasSchedule = node.scheduledUnix > 0;
-  const canSchedule = !!bundle && bundle.status === BundleStatus.TRUSTED && node.supportsUpdate && node.built < bundle.built;
+  const canSchedule = !!bundle && bundle.status === BundleStatus.TRUSTED && node.supportsUpdate && node.built < bundle.built && !nodeInActiveRollout;
+  const blockedMessage = blockedReason ? t(({
+    offline: "up.schedule.offline",
+    queued: "up.schedule.alreadyQueued",
+    paused: "up.schedule.rolloutPaused",
+    differentRelease: "up.schedule.otherRelease",
+    unavailable: "up.schedule.busy",
+  } as const)[blockedReason]) : "";
   const [mode, setMode] = useState<"now" | "schedule">(hasSchedule ? "schedule" : "now");
   const [localDatetime, setLocalDatetime] = useState(() =>
     hasSchedule
@@ -61,7 +74,7 @@ export function UpdateNodeDialog({
             )}
             {mode === "now" ? (
               <Button variant="primary" size="md" disabled={busy || !canUpdateNow} onClick={onUpdateNow}>
-                {t("up.schedule.now")}
+                {t(queueAfterRollout ? "up.schedule.addToRollout" : "up.schedule.now")}
               </Button>
             ) : (
               <Button variant="primary" size="md" disabled={busy || !canSchedule || !localDatetime || localDatetime < min} onClick={() => onSchedule(localDatetime)}>
@@ -76,7 +89,7 @@ export function UpdateNodeDialog({
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
             <input type="radio" name="node-update-mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />
-            {t("up.schedule.nowChoice")}
+            {t(queueAfterRollout ? "up.schedule.queueChoice" : "up.schedule.nowChoice")}
           </label>
           <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
             <input type="radio" name="node-update-mode" value="schedule" checked={mode === "schedule"} onChange={() => setMode("schedule")} />
@@ -85,10 +98,9 @@ export function UpdateNodeDialog({
         </div>
         {mode === "now" ? (
           <div className="rounded-field border border-line bg-canvas p-3.5 text-[13px] leading-relaxed text-muted">
-            <p>{t("up.schedule.nowBody", { name: node.name, version })}</p>
+            <p>{t(queueAfterRollout ? "up.schedule.queueBody" : "up.schedule.nowBody", { name: node.name, version })}</p>
             <p className="mt-1">{t("up.schedule.safety")}</p>
-            {!canUpdateNow && node.state === NodeUpdateState.OFFLINE && <p className="mt-2 text-warn">{t("up.schedule.offline")}</p>}
-            {!canUpdateNow && node.state !== NodeUpdateState.OFFLINE && <p className="mt-2 text-warn">{t("up.schedule.busy")}</p>}
+            {!canUpdateNow && blockedMessage && <p className="mt-2 text-warn">{blockedMessage}</p>}
           </div>
         ) : (
           <div className="flex flex-col gap-2.5 rounded-field border border-line bg-canvas p-3.5">
@@ -104,7 +116,7 @@ export function UpdateNodeDialog({
                 })}
               </p>
             )}
-            {!canSchedule && <p className="text-xs text-warn">{t("up.schedule.unavailable")}</p>}
+            {!canSchedule && <p className="text-xs text-warn">{t(nodeInActiveRollout ? "up.schedule.alreadyQueued" : "up.schedule.unavailable")}</p>}
           </div>
         )}
       </div>

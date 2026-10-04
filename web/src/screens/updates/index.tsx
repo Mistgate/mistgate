@@ -58,10 +58,23 @@ export function UpdatesScreen() {
     );
   }
 
-  const allowUpdate = d.bundle?.status === BundleStatus.TRUSTED && !isActive(d.rollout);
   const close = () => setDialog(null);
   // the dialog closes once the call went through; a refusal leaves it open under the toast
   const go = (run: Promise<boolean>) => void run.then((ok) => ok && close());
+  const selectedUpdate = dialog?.kind === "update" ? dialog.node : undefined;
+  const activeRollout = d.rollout && isActive(d.rollout) ? d.rollout : null;
+  const currentBundle = d.bundle?.status === BundleStatus.TRUSTED ? d.bundle : null;
+  const updateStep = activeRollout?.steps.find((step) => step.nodeId === selectedUpdate?.nodeId);
+  const activeBundleMatches = !!activeRollout && !!currentBundle && activeRollout.toVersion === currentBundle.version && activeRollout.toBuilt === currentBundle.built;
+  const queueAfterRollout = !!selectedUpdate && activeRollout?.status === RolloutStatus.RUNNING && activeBundleMatches && !updateStep;
+  const canUpdateNow = !!selectedUpdate && !!currentBundle && selectedUpdate.state !== NodeUpdateState.OFFLINE &&
+    canUpdateNode(selectedUpdate, currentBundle.built) && (!activeRollout || queueAfterRollout);
+  const updateBlockReason = !selectedUpdate ? undefined
+    : selectedUpdate.state === NodeUpdateState.OFFLINE ? "offline"
+      : updateStep ? "queued"
+        : activeRollout?.status === RolloutStatus.PAUSED ? "paused"
+          : activeRollout && !activeBundleMatches ? "differentRelease"
+            : !canUpdateNow ? "unavailable" : undefined;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -88,7 +101,10 @@ export function UpdatesScreen() {
         <UpdateNodeDialog
           data={d}
           node={dialog.node}
-          canUpdateNow={allowUpdate && dialog.node.state !== NodeUpdateState.OFFLINE && !!d.bundle && canUpdateNode(dialog.node, d.bundle.built)}
+          canUpdateNow={canUpdateNow}
+          queueAfterRollout={queueAfterRollout}
+          nodeInActiveRollout={!!updateStep}
+          blockedReason={updateBlockReason}
           busy={actions.busy}
           onClose={close}
           onUpdateNow={() => go(actions.start([dialog.node.nodeId]))}

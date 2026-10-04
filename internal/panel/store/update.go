@@ -135,6 +135,43 @@ func (s *Store) CreateScheduledRollout(ctx context.Context, r RolloutRow, steps 
 	return s.createRollout(ctx, r, steps, &schedule, nil)
 }
 
+// AddNodeToRunningRollout inserts a manually selected node as its own stage after stage, shifting later stages down
+// the rollout plan. The update and its release must still be current, and consuming the node's schedule is atomic.
+func (s *Store) AddNodeToRunningRollout(ctx context.Context, rolloutID, version string, built int64, stage int, x StepRow) error {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `UPDATE update_rollout SET status = status
+		WHERE id = ? AND status = 'running' AND to_version = ? AND to_built = ?`, rolloutID, version, built)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrConflict
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE update_step SET stage = stage + 1 WHERE rollout_id = ? AND stage >= ?`, rolloutID, stage); err != nil {
+		return err
+	}
+	x.RolloutID = rolloutID
+	x.Stage = stage
+	x.State = StepPending
+	if err := insertStep(ctx, tx, x); err != nil {
+		if fleetIsUnique(err) {
+			return ErrConflict
+		}
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule WHERE node_id = ?`, x.NodeID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) createRollout(ctx context.Context, r RolloutRow, steps []StepRow, schedule *NodeUpdateScheduleRow, clearScheduleIDs []string) error {
 	tx, err := s.W.BeginTx(ctx, nil)
 	if err != nil {
