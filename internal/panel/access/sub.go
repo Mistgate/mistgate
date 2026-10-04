@@ -311,7 +311,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 				age := now.Sub(at)
 				if age >= 0 && age <= 90*time.Second {
 					srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = rx, tx, at
-					if load, valid := nodeLoadPercent(rx, tx, f.Node.BandwidthMbps); valid {
+					if load, valid := NodeLoadPercent(rx, tx, f.Node.BandwidthMbps); valid {
 						srv.LoadPercent = &load
 					}
 				}

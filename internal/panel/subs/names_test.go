@@ -41,17 +41,17 @@ func TestRemarks(t *testing.T) {
 		lang     string
 		want     []string
 	}{
-		{"default template includes country and profile", []access.SubServer{srv("de1", "DE", "Hysteria2"), srv("nl1", "NL", "AmneziaWG")}, "", "ru", []string{de + " Германия · Hysteria2", nl + " Нидерланды · AmneziaWG"}},
+		{"default template uses compact country codes and profile", []access.SubServer{srv("de1", "DE", "Hysteria2"), srv("nl1", "NL", "AmneziaWG")}, "", "ru", []string{de + " DE · Hysteria2", nl + " NL · AmneziaWG"}},
 		{"no country: profile, no stray separator", []access.SubServer{srv("de1", "", "Hysteria2")}, "", "en", []string{"Hysteria2"}},
-		{"empty profile: no trailing separator", []access.SubServer{srv("de1", "DE", "")}, "", "en", []string{de + " Germany"}},
+		{"empty profile: no trailing separator", []access.SubServer{srv("de1", "DE", "")}, "", "en", []string{de + " DE"}},
 		{"no country with the node template", []access.SubServer{srv("de1", "", "p")}, "{flag} {node}", "en", []string{"de1"}},
-		{"country name follows the language", []access.SubServer{srv("de1", "DE", "p")}, "{country} {node}", "ru", []string{"Германия de1"}},
+		{"country placeholder uses a compact code", []access.SubServer{srv("de1", "DE", "p")}, "{country} {node}", "ru", []string{"DE de1"}},
 		{"profile placeholder", []access.SubServer{srv("de1", "DE", "hy2")}, "{flag} {node} ({profile})", "en", []string{de + " de1 (hy2)"}},
 		// A custom template without {profile} still uses numeric suffixes when names collide.
 		{"one country twice gets a number", []access.SubServer{srv("de1", "DE", "fast"), srv("de2", "DE", "safe"), srv("nl1", "NL", "fast")},
-			"{flag} {country}", "ru", []string{de + " Германия", de + " Германия 2", nl + " Нидерланды"}},
+			"{flag} {country}", "ru", []string{de + " DE", de + " DE 2", nl + " NL"}},
 		{"default template distinguishes a WARP twin", []access.SubServer{srv("de1", "DE", "files"), srv("de1", "DE", "files · WARP")},
-			"", "en", []string{de + " Germany · files", de + " Germany · files · WARP"}},
+			"", "en", []string{de + " DE · files", de + " DE · files · WARP"}},
 		{"a profile and its WARP twin", []access.SubServer{srv("de1", "DE", "files"), srv("de1", "DE", "files · WARP"), srv("nl1", "NL", "files")},
 			"{flag} {node}", "en", []string{de + " de1", de + " de1 2", nl + " nl1"}},
 		{"three times", []access.SubServer{srv("de1", "DE", "p"), srv("de1", "DE", "p"), srv("de1", "DE", "q")},
@@ -60,6 +60,17 @@ func TestRemarks(t *testing.T) {
 			"{node}", "en", []string{"x", "x 2", "x 3"}},
 		{"template that names the profile needs no number", []access.SubServer{srv("de1", "DE", "a"), srv("de1", "DE", "b")},
 			"{node} {profile}", "en", []string{"de1 a", "de1 b"}},
+		{"load percentage is included without live speeds", []access.SubServer{func() access.SubServer {
+			s := srv("de1", "DE", "Hysteria2")
+			load := 64
+			s.LoadPercent, s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = &load, 64_000_000, 10_000_000, time.Now()
+			return s
+		}()}, "", "en", []string{de + " DE · Hysteria2 · 64%"}},
+		{"no load percentage does not add speed figures", []access.SubServer{func() access.SubServer {
+			s := srv("de1", "DE", "Hysteria2")
+			s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = 64_000_000, 10_000_000, time.Now()
+			return s
+		}()}, "", "en", []string{de + " DE · Hysteria2"}},
 		{"empty template result falls back to the node", []access.SubServer{srv("de1", "", "p")}, "{flag}", "en", []string{"de1"}},
 		{"control characters and runs of spaces are cleaned", []access.SubServer{srv("de\n1\t  x", "DE", "p")}, "{node}", "en", []string{"de 1 x"}},
 		{"a node name cannot smuggle a placeholder", []access.SubServer{srv("{profile}", "DE", "SECRET")}, "{node}", "en", []string{"{profile}"}},

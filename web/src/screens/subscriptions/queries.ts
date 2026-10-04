@@ -12,7 +12,7 @@ export const settingsQuery = queryOptions({
   queryFn: async ({ signal }) => {
     const r = await subscriptions.getSubscriptionSettings({}, { signal });
     // the servers of the busiest group, for the preview of the server names (empty: the preview makes some up)
-    const samples = (r.serverSamples ?? []).map((s) => ({ node: s.node, countryCode: s.countryCode, profile: s.profile }));
+    const samples = (r.serverSamples ?? []).map((s) => ({ node: s.node, countryCode: s.countryCode, profile: s.profile, loadPercent: s.loadPercent }));
     return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "" };
   },
   staleTime: 30_000,

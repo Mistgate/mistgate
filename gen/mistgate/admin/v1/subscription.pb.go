@@ -611,10 +611,12 @@ func (x *GetSubscriptionSettingsResponse) GetNamesLanguage() string {
 
 // One server of the preview: what a server name is built from.
 type ServerSample struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Node          string                 `protobuf:"bytes,1,opt,name=node,proto3" json:"node,omitempty"`
-	CountryCode   string                 `protobuf:"bytes,2,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
-	Profile       string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Node        string                 `protobuf:"bytes,1,opt,name=node,proto3" json:"node,omitempty"`
+	CountryCode string                 `protobuf:"bytes,2,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
+	Profile     string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	// Current node utilization, only when the panel has capacity and a fresh agent sample.
+	LoadPercent   *uint32 `protobuf:"varint,4,opt,name=load_percent,json=loadPercent,proto3,oneof" json:"load_percent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -668,6 +670,13 @@ func (x *ServerSample) GetProfile() string {
 		return x.Profile
 	}
 	return ""
+}
+
+func (x *ServerSample) GetLoadPercent() uint32 {
+	if x != nil && x.LoadPercent != nil {
+		return *x.LoadPercent
+	}
+	return 0
 }
 
 type UpdateSubscriptionSettingsRequest struct {
@@ -1058,11 +1067,13 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x0feffective_title\x18\x02 \x01(\tR\x0eeffectiveTitle\x12F\n" +
 	"\x0eserver_samples\x18\x03 \x03(\v2\x1f.mistgate.admin.v1.ServerSampleR\rserverSamples\x12!\n" +
 	"\fsample_group\x18\x04 \x01(\tR\vsampleGroup\x12%\n" +
-	"\x0enames_language\x18\x05 \x01(\tR\rnamesLanguage\"_\n" +
+	"\x0enames_language\x18\x05 \x01(\tR\rnamesLanguage\"\x98\x01\n" +
 	"\fServerSample\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12!\n" +
 	"\fcountry_code\x18\x02 \x01(\tR\vcountryCode\x12\x18\n" +
-	"\aprofile\x18\x03 \x01(\tR\aprofile\"h\n" +
+	"\aprofile\x18\x03 \x01(\tR\aprofile\x12&\n" +
+	"\fload_percent\x18\x04 \x01(\rH\x00R\vloadPercent\x88\x01\x01B\x0f\n" +
+	"\r_load_percent\"h\n" +
 	"!UpdateSubscriptionSettingsRequest\x12C\n" +
 	"\bsettings\x18\x01 \x01(\v2'.mistgate.admin.v1.SubscriptionSettingsR\bsettings\"i\n" +
 	"\"UpdateSubscriptionSettingsResponse\x12C\n" +
@@ -1173,6 +1184,7 @@ func file_mistgate_admin_v1_subscription_proto_init() {
 	}
 	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_subscription_proto_msgTypes[2].OneofWrappers = []any{}
+	file_mistgate_admin_v1_subscription_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

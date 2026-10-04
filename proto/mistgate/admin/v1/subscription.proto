@@ -119,6 +119,8 @@ message ServerSample {
   string node = 1;
   string country_code = 2;
   string profile = 3;
+  // Current node utilization, only when the panel has capacity and a fresh agent sample.
+  optional uint32 load_percent = 4;
 }
 
 message UpdateSubscriptionSettingsRequest {

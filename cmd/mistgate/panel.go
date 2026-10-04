@@ -186,7 +186,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	sub := http.NewServeMux()
 	sub.Handle("GET /brand/logo.svg", httpserver.NewLogoHandler(st, log))
 	sub.Handle("/", subs.Handler(acc, httpserver.NewDecoy(o.decoyDir), subCfg))
-	subSvc := subs.NewService(st, cache, reg, brand, dnsSvc, log)
+	subSvc := subs.NewService(st, cache, reg, brand, dnsSvc, log, fl)
 
 	var admin []httpserver.AdminHandler
 	for _, h := range []func() (string, http.Handler){

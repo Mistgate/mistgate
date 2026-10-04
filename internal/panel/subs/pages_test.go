@@ -207,8 +207,8 @@ func fragmentsOf(t *testing.T, rec *httptest.ResponseRecorder) []string {
 	return out
 }
 
-// Server names: flag and country by default, the template from the settings (an edit shows at once even though the
-// token's data is cached), a number for a name that repeats.
+// Server names: flag and compact country code by default, the template from the settings (an edit shows at once even
+// though the token's data is cached), a number for a name that repeats.
 func TestServerNamesInTheSubscription(t *testing.T) {
 	const de = "\U0001F1E9\U0001F1EA"
 	r := newRig(t, "/k3xq8")
@@ -218,14 +218,14 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	h, cache := r.handler(nil)
 	_, tok := r.user("alice", nil)
 
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Germany · p" {
-		t.Fatalf("default name = %q, want flag, country, and profile", got)
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" DE · p" {
+		t.Fatalf("default name = %q, want flag, compact country code, and profile", got)
 	}
 	ru := "ru"
 	if _, err := instance.Update(r.ctx, r.st, instance.Patch{Language: &ru}); err != nil {
 		t.Fatal(err)
 	}
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" Германия · p" {
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" DE · p" {
 		t.Fatalf("a Russian instance: %q", got)
 	}
 	en := "en"
@@ -238,7 +238,7 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	if _, err := cache.Update(r.ctx, set); err != nil {
 		t.Fatal(err)
 	}
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != "Germany · de1" {
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != "DE · de1" {
 		t.Errorf("edited template: %q", got)
 	}
 
@@ -251,7 +251,7 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := fragmentsOf(t, fetch(h, "/"+tok2, curlUA))
-	want := map[string]bool{de + " Germany · p": true, de + " Germany · second": true}
+	want := map[string]bool{de + " DE · p": true, de + " DE · second": true}
 	if len(got) != len(want) || !want[got[0]] || !want[got[1]] {
 		t.Errorf("two profiles on one node: %q", got)
 	}
@@ -267,7 +267,7 @@ func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	}
 	h, _ := r.handler(nil)
 	_, tok := r.user("alice", nil)
-	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); strings.Join(got, "|") != de+" Germany · p" {
+	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); strings.Join(got, "|") != de+" DE · p" {
 		t.Fatalf("before: %q", got)
 	}
 	for _, name := range []string{"ade0", "ade00"} {
@@ -278,7 +278,7 @@ func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	}
 	_, tok = r.user("bob", nil) // a token whose data is not cached yet
 	got := fragmentsOf(t, fetch(h, "/"+tok, curlUA))
-	if strings.Join(got, "|") != de+" Germany · p|"+de+" Germany · p 2|"+de+" Germany · p 3" {
+	if strings.Join(got, "|") != de+" DE · p|"+de+" DE · p 2|"+de+" DE · p 3" {
 		t.Fatalf("after two servers were added: %q", got)
 	}
 	// in the order they came: the old one first, then the first of the two new ones
