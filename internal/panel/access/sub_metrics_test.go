@@ -22,14 +22,20 @@ func (s subscriptionOnline) NetworkUsage(nodeID string) (uint64, uint64, time.Ti
 	return sample.rx, sample.tx, sample.at, ok
 }
 
-func TestSubscriptionReportsTrafficSharesWithoutConfiguredCapacity(t *testing.T) {
+func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
 	e.node("nod_nl1", "nl1", "nl1.example.com", "active")
 	e.inbound(f.profile, "nod_nl1")
+	if _, err := e.st.W.Exec(`UPDATE node SET bandwidth_mbps = 100 WHERE id = ?`, f.nodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.W.Exec(`UPDATE node SET bandwidth_mbps = 50 WHERE id = 'nod_nl1'`); err != nil {
+		t.Fatal(err)
+	}
 	e.s.online = subscriptionOnline{samples: map[string]subscriptionNetworkSample{
 		f.nodeID:  {rx: 80_000_000, at: e.clock.Add(-time.Second)},
-		"nod_nl1": {rx: 20_000_000, at: e.clock.Add(-time.Second)},
+		"nod_nl1": {rx: 20_000_000, tx: 30_000_000, at: e.clock.Add(-time.Second)},
 	}}
 	created := e.user("alice", f.group, nil).User
 	user := must(e.st.Access().User(e.ctx, created.Id))
@@ -44,15 +50,12 @@ func TestSubscriptionReportsTrafficSharesWithoutConfiguredCapacity(t *testing.T)
 	got := make(map[string]int, len(view.Servers))
 	for _, server := range view.Servers {
 		if server.LoadPercent == nil {
-			t.Errorf("%s has no traffic share", server.NodeID)
+			t.Errorf("%s has no capacity utilization", server.NodeID)
 			continue
 		}
 		got[server.NodeID] = *server.LoadPercent
-		if server.BandwidthMbps != 0 {
-			t.Errorf("%s unexpectedly needs a configured link capacity: %d", server.NodeID, server.BandwidthMbps)
-		}
 	}
-	if got[f.nodeID] != 80 || got["nod_nl1"] != 20 {
-		t.Errorf("traffic shares = %v, want de1=80 nl1=20", got)
+	if got[f.nodeID] != 80 || got["nod_nl1"] != 60 {
+		t.Errorf("capacity utilization = %v, want de1=80 nl1=60", got)
 	}
 }

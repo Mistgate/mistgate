@@ -61,7 +61,8 @@ type SubServer struct {
 	CountryCode string // node country, ISO 3166-1 alpha-2 or ""
 	Location    string
 	Profile     string // profile name
-	// LoadPercent is this node's share of current RX+TX traffic among nodes in the subscription with fresh samples.
+	// LoadPercent is the larger of this node's RX/TX rates as a percentage of its configured symmetric capacity.
+	// It is nil when capacity is unknown.
 	LoadPercent   *int
 	NetworkRxBps  uint64
 	NetworkTxBps  uint64
@@ -264,6 +265,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	v.Format = format
 	var networkNodeIDs []string
 	var networkSource NetworkUsageSource
+	capacityMbps := map[string]int{}
 	if source, ok := s.online.(NetworkUsageSource); ok {
 		networkSource = source
 		for _, f := range full {
@@ -277,10 +279,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			happ, _, _ := clientApps(proto)
 			if u.AppHapp && happ {
 				networkNodeIDs = append(networkNodeIDs, f.Node.ID)
+				capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
 			}
 		}
 	}
-	networkShares := CurrentTrafficShares(networkNodeIDs, networkSource, now)
+	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, networkSource, now)
 	var dnsServers []string
 	dnsDone := false
 	awgAt := map[string]int{} // profile id -> its index in v.AWGProfiles
@@ -325,10 +328,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
 			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, BandwidthMbps: f.Node.BandwidthMbps}
-		if usage, ok := networkShares[f.Node.ID]; ok {
+		if usage, ok := networkUsage[f.Node.ID]; ok {
 			srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = usage.RxBps, usage.TxBps, usage.SampledAt
-			load := usage.Percent
-			srv.LoadPercent = &load
+			srv.LoadPercent = usage.LoadPercent
 		}
 		in := protocols.RenderInput{
 			Format: format, Settings: merged, Inbound: inboundView(nodeView(f.Node), spec, f.Inbound.CertPinSHA256),

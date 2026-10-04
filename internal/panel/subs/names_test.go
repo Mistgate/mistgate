@@ -61,7 +61,7 @@ func TestRemarks(t *testing.T) {
 			"{node}", "en", []string{"x", "x 2", "x 3"}},
 		{"template that names the profile needs no number", []access.SubServer{srv("de1", "DE", "a"), srv("de1", "DE", "b")},
 			"{node} {profile}", "en", []string{"de1 a", "de1 b"}},
-		{"load percentage is included without live speeds", []access.SubServer{func() access.SubServer {
+		{"channel utilization is included in the name", []access.SubServer{func() access.SubServer {
 			s := srv("de1", "DE", "Hysteria2")
 			load := 64
 			s.LoadPercent, s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = &load, 64_000_000, 10_000_000, time.Now()
