@@ -214,8 +214,12 @@ func sameReleaseFiles(a, b []release.File) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i := range a {
-		if a[i] != b[i] {
+	byName := make(map[string]release.File, len(a))
+	for _, file := range a {
+		byName[file.Name] = file
+	}
+	for _, file := range b {
+		if byName[file.Name] != file {
 			return false
 		}
 	}
