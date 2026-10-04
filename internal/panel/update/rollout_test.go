@@ -93,86 +93,27 @@ func syncCurrentTestBundleFromGitHub(e *env) {
 	e.s.syncNodeBundle(e.ctx)
 }
 
-func TestTrustedBundleStartsAutomaticCanaryRollout(t *testing.T) {
-	e := newEnv(t)
-	e.defaultBundle()
-	syncCurrentTestBundleFromGitHub(e)
-	slow := e.addNode("slow", nodeOpts{online: 0})
-	busy := e.addNode("busy", nodeOpts{online: 8})
-
-	e.s.startAutomaticRollout(e.ctx)
-	ro := e.rollout()
-	if ro.Status != store.RolloutRunning || ro.CreatedBy != "system:auto" || ro.ToVersion != "0.2.0-new" {
-		t.Fatalf("automatic rollout: %+v", ro)
-	}
-	steps, err := e.st.RolloutSteps(e.ctx, ro.ID)
-	if err != nil || len(steps) != 2 {
-		t.Fatalf("automatic rollout steps: %+v, %v", steps, err)
-	}
-	wantStage := map[string]int{slow: 0, busy: 1}
-	for _, step := range steps {
-		if step.State != store.StepPending || step.Stage != wantStage[step.NodeID] {
-			t.Fatalf("automatic rollout did not preserve canary ordering: %+v", steps)
-		}
-	}
-	e.s.startAutomaticRollout(e.ctx)
-	if got := e.rollout(); got.ID != ro.ID {
-		t.Fatalf("poll started a duplicate rollout: old=%s new=%s", ro.ID, got.ID)
-	}
-}
-
-func TestTrustedLocalBundleDoesNotStartAutomaticRollout(t *testing.T) {
-	e := newEnv(t)
-	e.defaultBundle()
-	e.addNode("local-only", nodeOpts{})
-	e.s.startAutomaticRollout(e.ctx)
-	if _, err := e.st.LatestRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("a local-only bundle started an automatic rollout: %v", err)
-	}
-}
-
-func TestAutomaticRolloutPicksUpNewlyOnlineNodeOncePerBuild(t *testing.T) {
+func TestTrustedGitHubBundleWaitsForExplicitNodeUpdate(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
 	syncCurrentTestBundleFromGitHub(e)
 	first := e.addNode("first", nodeOpts{})
-	e.s.startAutomaticRollout(e.ctx)
-	e.tick()
-	e.upgrade(first)
-	e.tick()
-	e.commit(first)
-	e.tick()
-	e.wantRollout(store.RolloutDone, "")
-
-	late := e.addNode("late", nodeOpts{})
-	e.s.startAutomaticRollout(e.ctx)
-	ro := e.rollout()
-	if ro.CreatedBy != "system:auto" || ro.Status != store.RolloutRunning {
-		t.Fatalf("late-node rollout: %+v", ro)
+	second := e.addNode("second", nodeOpts{})
+	if _, err := e.st.LatestRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GitHub bundle sync started a rollout: %v", err)
+	}
+	ro, err := e.s.start(e.ctx, []string{first}, 0)
+	if err != nil {
+		t.Fatalf("explicit single-node update: %v", err)
 	}
 	steps, err := e.st.RolloutSteps(e.ctx, ro.ID)
-	if err != nil || len(steps) != 1 || steps[0].NodeID != late {
-		t.Fatalf("late-node rollout steps: %+v, %v", steps, err)
+	if err != nil || len(steps) != 1 || steps[0].NodeID != first {
+		t.Fatalf("explicit node rollout steps: %+v, %v", steps, err)
 	}
-	if first == late {
-		t.Fatal("test setup reused a node id")
-	}
-}
-
-func TestAutomaticRolloutDoesNotRetryCancelledNodeForSameBuild(t *testing.T) {
-	e := newEnv(t)
-	e.defaultBundle()
-	syncCurrentTestBundleFromGitHub(e)
-	e.addNode("node", nodeOpts{})
-	e.s.startAutomaticRollout(e.ctx)
-	first := e.rollout()
-	if _, err := e.s.cancel(e.ctx, first.ID); err != nil {
-		t.Fatal(err)
-	}
-	e.s.startAutomaticRollout(e.ctx)
-	got := e.rollout()
-	if got.ID != first.ID || got.Status != store.RolloutCancelled {
-		t.Fatalf("automatic poll restarted a cancelled rollout: first=%+v latest=%+v", first, got)
+	for _, step := range steps {
+		if step.NodeID == second {
+			t.Fatal("an unselected node was included in the rollout")
+		}
 	}
 }
 
@@ -1446,7 +1387,7 @@ func TestRetention(t *testing.T) {
 	}
 }
 
-// Run automatically starts the trusted bundle's canary and drives it to completion.
+// Run processes an explicitly started per-node update and drives it to completion.
 func TestRunLoop(t *testing.T) {
 	e := newEnv(t)
 	e.clk = &clock{t: time.Now()}
@@ -1464,6 +1405,9 @@ func TestRunLoop(t *testing.T) {
 			e.commit(id)
 		}()
 		return okResult(), nil
+	}
+	if _, err := e.s.start(e.ctx, []string{a}, 0); err != nil {
+		t.Fatalf("start selected node update: %v", err)
 	}
 	ctx, cancel := context.WithCancel(e.ctx)
 	done := make(chan struct{})

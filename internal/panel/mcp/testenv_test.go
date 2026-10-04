@@ -70,12 +70,15 @@ type fakeAuth struct {
 }
 
 var tokenApproved = map[string]bool{
-	adminv1connect.HealthServiceApplyFixProcedure:      true,
-	adminv1connect.UpdateServiceStartRolloutProcedure:  true,
-	adminv1connect.UpdateServicePauseRolloutProcedure:  true,
-	adminv1connect.UpdateServiceResumeRolloutProcedure: true,
-	adminv1connect.UpdateServiceCancelRolloutProcedure: true,
-	adminv1connect.UpdateServiceRollbackNodeProcedure:  true,
+	adminv1connect.HealthServiceApplyFixProcedure:                 true,
+	adminv1connect.UpdateServiceStartRolloutProcedure:             true,
+	adminv1connect.UpdateServicePauseRolloutProcedure:             true,
+	adminv1connect.UpdateServiceResumeRolloutProcedure:            true,
+	adminv1connect.UpdateServiceCancelRolloutProcedure:            true,
+	adminv1connect.UpdateServiceRollbackNodeProcedure:             true,
+	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:       true,
+	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure: true,
+	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:        true,
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -276,27 +279,32 @@ type world struct {
 	adminv1connect.UnimplementedUpdateServiceHandler
 	adminv1connect.UnimplementedAuthServiceHandler
 
-	mu          sync.Mutex
-	log         []callRec
-	fixReqs     []*adminv1.ApplyFixRequest
-	fixGrants   []callRec
-	updateReq   []*adminv1.UpdateUserRequest
-	disableReq  []*adminv1.SetUsersEnabledRequest
-	startReq    []*adminv1.StartRolloutRequest
-	pauseReq    []*adminv1.PauseRolloutRequest
-	revokeReq   []*adminv1.RevokeDeviceRequest
-	resetReq    []*adminv1.ResetUserTrafficRequest
-	createReq   []*adminv1.CreateUserRequest
-	muteReq     []*adminv1.MuteAlertRequest
-	rollbackReq []*adminv1.RollbackNodeRequest
+	mu                sync.Mutex
+	log               []callRec
+	fixReqs           []*adminv1.ApplyFixRequest
+	fixGrants         []callRec
+	updateReq         []*adminv1.UpdateUserRequest
+	disableReq        []*adminv1.SetUsersEnabledRequest
+	startReq          []*adminv1.StartRolloutRequest
+	scheduleReq       []*adminv1.ScheduleNodeUpdateRequest
+	cancelScheduleReq []*adminv1.CancelNodeUpdateScheduleRequest
+	timezoneReq       []*adminv1.SetUpdateTimezoneRequest
+	pauseReq          []*adminv1.PauseRolloutRequest
+	revokeReq         []*adminv1.RevokeDeviceRequest
+	resetReq          []*adminv1.ResetUserTrafficRequest
+	createReq         []*adminv1.CreateUserRequest
+	muteReq           []*adminv1.MuteAlertRequest
+	rollbackReq       []*adminv1.RollbackNodeRequest
 
-	users       map[string]*adminv1.GetUserResponse
-	rolloutStat adminv1.RolloutStatus
-	bundleStat  adminv1.BundleStatus
-	startErr    error // StartRollout refuses with it when set
-	manyEvents  int
-	block       chan struct{} // when set, ListUsers waits on it (concurrency test)
-	entered     chan struct{}
+	users                  map[string]*adminv1.GetUserResponse
+	rolloutStat            adminv1.RolloutStatus
+	bundleStat             adminv1.BundleStatus
+	scheduleTimezoneOffset int32
+	scheduledUnix          int64
+	startErr               error // StartRollout refuses with it when set
+	manyEvents             int
+	block                  chan struct{} // when set, ListUsers waits on it (concurrency test)
+	entered                chan struct{}
 }
 
 func (w *world) record(c callRec) {
@@ -323,7 +331,7 @@ const (
 )
 
 func newWorld() *world {
-	w := &world{users: map[string]*adminv1.GetUserResponse{}, rolloutStat: adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED}
+	w := &world{users: map[string]*adminv1.GetUserResponse{}, rolloutStat: adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED, scheduleTimezoneOffset: 180, scheduledUnix: 1700009000}
 	mk := func(id, name string, devs ...*adminv1.Device) {
 		w.users[id] = &adminv1.GetUserResponse{
 			User: &adminv1.User{
@@ -556,11 +564,11 @@ func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesR
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	r := &adminv1.GetUpdatesResponse{
-		NowUnix: 1700000000, Panel: &adminv1.PanelBuild{Version: "v1"},
-		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
+		NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: w.scheduleTimezoneOffset, Panel: &adminv1.PanelBuild{Version: "v1"},
+		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Built: 1700000200, Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
 		Nodes: []*adminv1.NodeUpdate{
-			{NodeId: nodeA, Name: "de1", Version: "v1", State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, SupportsUpdate: true, LastUpdate: &adminv1.LastUpdate{Outcome: "ok", FromVersion: "v0"}},
-			{NodeId: nodeB, Name: "nl1", Version: "v2", State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true},
+			{NodeId: nodeA, Name: "de1", Version: "v1", Built: 1700000100, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, SupportsUpdate: true, LastUpdate: &adminv1.LastUpdate{Outcome: "ok", FromVersion: "v0"}},
+			{NodeId: nodeB, Name: "nl1", Version: "v2", Built: 1700000200, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true},
 		},
 		Rollout: &adminv1.Rollout{Id: "rol_1", Status: w.rolloutStat, ToVersion: "v2", BatchSize: 1, Steps: []*adminv1.RolloutStep{{NodeId: nodeA, NodeName: "de1", State: adminv1.StepState_STEP_STATE_SENT}}},
 	}
@@ -576,6 +584,28 @@ func (w *world) StartRollout(_ context.Context, r *connect.Request[adminv1.Start
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.StartRolloutResponse{Rollout: &adminv1.Rollout{Id: "rol_2", Steps: []*adminv1.RolloutStep{{}}}}), nil
+}
+
+func (w *world) ScheduleNodeUpdate(_ context.Context, r *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {
+	w.mu.Lock()
+	w.scheduleReq = append(w.scheduleReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.ScheduleNodeUpdateResponse{ScheduledUnix: w.scheduledUnix, Version: "v2", Built: 1700000200, TimezoneOffsetMinutes: w.scheduleTimezoneOffset}), nil
+}
+
+func (w *world) CancelNodeUpdateSchedule(_ context.Context, r *connect.Request[adminv1.CancelNodeUpdateScheduleRequest]) (*connect.Response[adminv1.CancelNodeUpdateScheduleResponse], error) {
+	w.mu.Lock()
+	w.cancelScheduleReq = append(w.cancelScheduleReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.CancelNodeUpdateScheduleResponse{Cancelled: true}), nil
+}
+
+func (w *world) SetUpdateTimezone(_ context.Context, r *connect.Request[adminv1.SetUpdateTimezoneRequest]) (*connect.Response[adminv1.SetUpdateTimezoneResponse], error) {
+	w.mu.Lock()
+	w.timezoneReq = append(w.timezoneReq, r.Msg)
+	w.scheduleTimezoneOffset = r.Msg.GetTimezoneOffsetMinutes()
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.SetUpdateTimezoneResponse{TimezoneOffsetMinutes: r.Msg.GetTimezoneOffsetMinutes()}), nil
 }
 
 func (w *world) PauseRollout(_ context.Context, r *connect.Request[adminv1.PauseRolloutRequest]) (*connect.Response[adminv1.PauseRolloutResponse], error) {

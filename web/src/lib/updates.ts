@@ -68,9 +68,27 @@ const nodeStates: Record<NodeUpdateState, { kind: StatusKind; key: MessageKey }>
 export const nodeStateKind = (s: NodeUpdateState): StatusKind => nodeStates[s].kind;
 export const nodeStateKey = (s: NodeUpdateState): MessageKey => nodeStates[s].key;
 
-/** A node the owner may send an update to (a retry of a rolled back or failed one included). */
-export const canUpdateNode = (n: Pick<NodeUpdate, "state">) =>
-  n.state === NodeUpdateState.OUTDATED || n.state === NodeUpdateState.ROLLED_BACK || n.state === NodeUpdateState.FAILED;
+/** A node with an older supported agent; offline nodes can still be scheduled for later. */
+export const canUpdateNode = (n: Pick<NodeUpdate, "state" | "supportsUpdate" | "built">, targetBuilt: number) =>
+  n.supportsUpdate && n.built < targetBuilt &&
+  (n.state === NodeUpdateState.OUTDATED || n.state === NodeUpdateState.OFFLINE || n.state === NodeUpdateState.ROLLED_BACK || n.state === NodeUpdateState.FAILED);
+
+export function updateTimezoneName(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? "−" : "+";
+  const absolute = Math.abs(offsetMinutes);
+  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+}
+
+/** Format a UTC timestamp as the wall-clock time in its saved fixed offset, independent of the browser timezone. */
+export function updateDateTimeAtOffset(unixSeconds: number, offsetMinutes: number): string {
+  const date = new Date((unixSeconds + offsetMinutes * 60) * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
+export function updateDateTimeInputAtOffset(unixSeconds: number, offsetMinutes: number): string {
+  return updateDateTimeAtOffset(unixSeconds, offsetMinutes).replace(" ", "T");
+}
 
 /** A node that ran an update and is not busy: the agent still holds the previous binary (it says so when it does not). */
 export const canRollbackNode = (n: Pick<NodeUpdate, "state" | "supportsUpdate" | "lastUpdate">) =>
@@ -267,11 +285,6 @@ export function manualCommands(d: Pick<Updates, "distDir" | "bundle">, n: Pick<N
   };
 }
 
-/** Whether the start button is live: owner, a trusted bundle, nothing running, something to update. */
-export function canStart(d: Updates, owner: boolean): boolean {
-  return owner && d.bundle?.status === BundleStatus.TRUSTED && !isActive(d.rollout) && outdatedNodes(d.nodes).length > 0;
-}
-
 // ---------------------------------------------------------------------------------------------------
 // Rollout: stages and progress
 
@@ -362,6 +375,16 @@ export function useUpdateActions() {
   return {
     busy: call.isPending || checkPanel.isPending,
     start: (nodeIds: string[]) => run(() => updates.startRollout({ nodeIds, batchSize: 0 }), t("up.start.started")),
+    scheduleNode: (input: { nodeId: string; localDatetime: string; timezoneOffsetMinutes: number; expectedVersion: string; expectedBuilt: number }) =>
+      run(() => updates.scheduleNodeUpdate({
+        nodeId: input.nodeId,
+        localDatetime: input.localDatetime,
+        timezoneOffsetMinutes: input.timezoneOffsetMinutes,
+        expectedVersion: input.expectedVersion,
+        expectedBuilt: BigInt(input.expectedBuilt),
+      }), t("up.schedule.saved")),
+    cancelNodeSchedule: (nodeId: string) => run(() => updates.cancelNodeUpdateSchedule({ nodeId }), t("up.schedule.cancelled")),
+    setUpdateTimezone: (timezoneOffsetMinutes: number) => run(() => updates.setUpdateTimezone({ timezoneOffsetMinutes }), t("up.timezone.saved")),
     pause: (id: string) => run(() => updates.pauseRollout({ rolloutId: id }), t("up.toast.paused")),
     resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed")),
     cancel: (id: string) => run(() => updates.cancelRollout({ rolloutId: id }), t("up.toast.cancelled")),

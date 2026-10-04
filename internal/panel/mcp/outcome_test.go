@@ -136,12 +136,9 @@ func TestFactsAndOutcomesCarryCodes(t *testing.T) {
 
 	// a failure the panel refuses with a code keeps that code
 	e.w.startErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("no trusted bundle"))
-	p = planOf(t, sa, "rollout_start", map[string]any{})
-	if f := factOf(t, p, "effect"); f.Code != "canary" {
+	p = planOf(t, sa, "rollout_start", map[string]any{"node_ids": []any{nodeA}})
+	if f := factOf(t, p, "effect"); f.Code != "restart" {
 		t.Errorf("effect: %+v", f)
-	}
-	if f := factOf(t, p, "batch_size"); f.Code != "default" {
-		t.Errorf("batch: %+v", f)
 	}
 	e.plans.decide(p.PlanID, true)
 	if got := applyError(t, sa, "rollout_start", p.ConfirmToken); !strings.Contains(got, "no trusted bundle") {

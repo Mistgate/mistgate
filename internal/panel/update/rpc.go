@@ -79,6 +79,11 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 	b := s.current()
 	resp := &adminv1.GetUpdatesResponse{NowUnix: s.now().Unix(), Bundle: b.view, Panel: &adminv1.PanelBuild{
 		Version: s.cfg.PanelVersion, Built: s.cfg.PanelBuilt, HasReleaseKey: s.cfg.Key != nil}}
+	offset, err := s.scheduleTimezoneOffset(ctx)
+	if err != nil {
+		return nil, s.internal("load update timezone", err)
+	}
+	resp.ScheduleTimezoneOffsetMinutes = offset
 	if s.cfg.PanelUpdater != nil {
 		resp.Panel.Update = panelUpdateProto(s.cfg.PanelUpdater.Status())
 	}
@@ -106,6 +111,10 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 	if err != nil {
 		return nil, s.internal("list nodes", err)
 	}
+	schedules, err := s.st.NodeUpdateSchedules(ctx)
+	if err != nil {
+		return nil, s.internal("load node update schedules", err)
+	}
 	senders, err := s.rollbackSenders(ctx)
 	if err != nil {
 		return nil, s.internal("rollback senders", err)
@@ -113,6 +122,12 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 	sortNodeViews(views)
 	for _, v := range views {
 		m := v.proto()
+		if schedule, ok := schedules[v.row.ID]; ok {
+			m.ScheduledUnix = schedule.ScheduledAt
+			m.ScheduledVersion = schedule.ToVersion
+			m.ScheduledBuilt = schedule.ToBuilt
+			m.ScheduledTimezoneOffsetMinutes = schedule.TimezoneOffsetMinutes
+		}
 		if lu, ok := currentLastUpdate(v.row); ok && m.LastUpdate != nil {
 			m.LastUpdate.Reason = senders.reason(v.row.ID, lu)
 		}
@@ -246,6 +261,44 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 	b := r.s.rescan()
 	r.s.audit(ctx, "update_rescan", map[string]string{"status": b.view.Status.String()})
 	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: b.view}), nil
+}
+
+func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	row, err := r.s.scheduleNodeUpdate(ctx, req.Msg.NodeId, req.Msg.LocalDatetime, req.Msg.TimezoneOffsetMinutes, req.Msg.ExpectedVersion, req.Msg.ExpectedBuilt)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.ScheduleNodeUpdateResponse{
+		ScheduledUnix: row.ScheduledAt, Version: row.ToVersion, Built: row.ToBuilt, TimezoneOffsetMinutes: row.TimezoneOffsetMinutes,
+	}), nil
+}
+
+func (r rpc) CancelNodeUpdateSchedule(ctx context.Context, req *connect.Request[adminv1.CancelNodeUpdateScheduleRequest]) (*connect.Response[adminv1.CancelNodeUpdateScheduleResponse], error) {
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	cancelled, err := r.s.st.DeleteNodeUpdateSchedule(ctx, req.Msg.NodeId)
+	if err != nil {
+		return nil, r.s.internal("cancel node update schedule", err)
+	}
+	if cancelled {
+		r.s.audit(ctx, "node_update_schedule_cancel", map[string]string{"node_id": req.Msg.NodeId})
+		r.s.kick()
+	}
+	return connect.NewResponse(&adminv1.CancelNodeUpdateScheduleResponse{Cancelled: cancelled}), nil
+}
+
+func (r rpc) SetUpdateTimezone(ctx context.Context, req *connect.Request[adminv1.SetUpdateTimezoneRequest]) (*connect.Response[adminv1.SetUpdateTimezoneResponse], error) {
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.s.setScheduleTimezone(ctx, req.Msg.TimezoneOffsetMinutes); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.SetUpdateTimezoneResponse{TimezoneOffsetMinutes: req.Msg.TimezoneOffsetMinutes}), nil
 }
 
 // Conditions is the health condition source (health.Service.AddConditionSource): while the active rollout is paused

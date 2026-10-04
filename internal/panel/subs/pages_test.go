@@ -420,6 +420,54 @@ func TestUserPageForBrowsers(t *testing.T) {
 	}
 }
 
+func TestSubscriptionPageUsesSeparateNameAndKeepsAccountName(t *testing.T) {
+	r := newRig(t, "/k3xq8")
+	uid, tok := r.user("internal-alias", nil)
+	for _, invalidName := range []string{strings.Repeat("x", 65), "two\nlines"} {
+		if _, err := r.svc.UpdateUser(r.ctx, connect.NewRequest(&adminv1.UpdateUserRequest{
+			UserId: uid, SubscriptionName: &invalidName,
+		})); err == nil {
+			t.Errorf("accepted invalid subscription name %q", invalidName)
+		}
+	}
+	publicName := "Алина"
+	updated, err := r.svc.UpdateUser(r.ctx, connect.NewRequest(&adminv1.UpdateUserRequest{
+		UserId: uid, SubscriptionName: &publicName,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Msg.User.Name != "internal-alias" || updated.Msg.User.SubscriptionName != publicName {
+		t.Fatalf("admin user = (%q, %q), want internal and public names to stay separate", updated.Msg.User.Name, updated.Msg.User.SubscriptionName)
+	}
+
+	v, err := r.svc.Subscription(r.ctx, tok)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.UserName != "internal-alias" || v.SubscriptionName != publicName {
+		t.Fatalf("subscription view names = (%q, %q)", v.UserName, v.SubscriptionName)
+	}
+
+	h, _ := r.handler(nil)
+	d, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+	if got := d["user"].(map[string]any)["name"]; got != publicName {
+		t.Fatalf("public page name = %v, want %q", got, publicName)
+	}
+
+	// Clearing the custom name restores the current account name on the public page.
+	blank := ""
+	if _, err := r.svc.UpdateUser(r.ctx, connect.NewRequest(&adminv1.UpdateUserRequest{UserId: uid, SubscriptionName: &blank})); err != nil {
+		t.Fatal(err)
+	}
+	// Each handler caches a rendered subscription response briefly; a fresh handler models the next uncached page fetch.
+	h, _ = r.handler(nil)
+	d, _ = pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+	if got := d["user"].(map[string]any)["name"]; got != "internal-alias" {
+		t.Fatalf("fallback page name = %v, want internal account name", got)
+	}
+}
+
 // A name that tries to end the data block must stay data: no second script, JSON intact.
 func TestUserPageDataCannotBreakOut(t *testing.T) {
 	const evil = `</script><script>alert(1)</script><!-- & "quotes" ' \ ` + "  x"

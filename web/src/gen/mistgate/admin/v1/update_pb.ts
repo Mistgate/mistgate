@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/update.proto.
  */
 export const file_mistgate_admin_v1_update: GenFile = /*@__PURE__*/
-  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS91cGRhdGUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIpoBCgpQYW5lbEJ1aWxkEg8KB3ZlcnNpb24YASABKAkSEQoFYnVpbHQYAiABKANCAjACEhcKD2hhc19yZWxlYXNlX2tleRgDIAEoCBIfChdyZWxlYXNlX2tleV9maW5nZXJwcmludBgEIAEoCRIuCgZ1cGRhdGUYBSABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QYW5lbFVwZGF0ZSLDAQoLUGFuZWxVcGRhdGUSDwoHdmVyc2lvbhgBIAEoCRILCgN1cmwYAiABKAkSGgoOcHVibGlzaGVkX3VuaXgYAyABKANCAjACEhgKDGNoZWNrZWRfdW5peBgEIAEoA0ICMAISEQoJYXZhaWxhYmxlGAUgASgIEhEKCXN1cHBvcnRlZBgGIAEoCBITCgtpbnN0YWxsYWJsZRgHIAEoCBISCgppbnN0YWxsaW5nGAggASgIEhEKCWVycm9yX2tleRgJIAEoCSJWCgpCdW5kbGVGaWxlEgoKAm9zGAEgASgJEgwKBGFyY2gYAiABKAkSDAoEbmFtZRgDIAEoCRIQCgRzaXplGAQgASgEQgIwAhIOCgZzaGEyNTYYBSABKAkiuAIKBkJ1bmRsZRIvCgZzdGF0dXMYASABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGVTdGF0dXMSDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISGAoMZXhwaXJlc191bml4GAQgASgDQgIwAhIsCgVmaWxlcxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZUZpbGUSEQoJZXJyb3Jfa2V5GAYgASgJEjUKBnBhcmFtcxgHIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZS5QYXJhbXNFbnRyeRIYCgxzY2FubmVkX3VuaXgYCCABKANCAjACGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEimgEKCkxhc3RVcGRhdGUSDwoHb3V0Y29tZRgBIAEoCRIUCgxmcm9tX3ZlcnNpb24YAiABKAkSFgoKZnJvbV9idWlsdBgDIAEoA0ICMAISEgoKdG9fdmVyc2lvbhgEIAEoCRIUCgh0b19idWlsdBgFIAEoA0ICMAISDgoGcmVhc29uGAYgASgJEhMKB2F0X3VuaXgYByABKANCAjACIqsCCgpOb2RlVXBkYXRlEg8KB25vZGVfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKBWJ1aWx0GAQgASgDQgIwAhIXCg9zdXBwb3J0c191cGRhdGUYBSABKAgSEwoLY3Jhc2hfZ3VhcmQYBiABKAgSMQoFc3RhdGUYByABKA4yIi5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlU3RhdGUSMgoLbGFzdF91cGRhdGUYCCABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5MYXN0VXBkYXRlEhAKCGluYm91bmRzGAkgASgNEhQKDG9ubGluZV91c2VycxgKIAEoDRIPCgdhZGRyZXNzGAsgASgJEgwKBGFyY2gYDCABKAkizgIKC1JvbGxvdXRTdGVwEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEg0KBXN0YWdlGAMgASgNEisKBXN0YXRlGAQgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3RlcFN0YXRlEhQKDGZyb21fdmVyc2lvbhgFIAEoCRIWCgpmcm9tX2J1aWx0GAYgASgDQgIwAhIYCgxzdGFydGVkX3VuaXgYByABKANCAjACEhkKDWZpbmlzaGVkX3VuaXgYCCABKANCAjACEhEKCWVycm9yX2tleRgJIAEoCRI6CgZwYXJhbXMYCiADKAsyKi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0U3RlcC5QYXJhbXNFbnRyeRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIvMCCgdSb2xsb3V0EgoKAmlkGAEgASgJEjAKBnN0YXR1cxgCIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXRTdGF0dXMSEgoKdG9fdmVyc2lvbhgDIAEoCRIUCgh0b19idWlsdBgEIAEoA0ICMAISEgoKYmF0Y2hfc2l6ZRgFIAEoDRIYCgxjcmVhdGVkX3VuaXgYBiABKANCAjACEhkKDWZpbmlzaGVkX3VuaXgYByABKANCAjACEhEKCXBhdXNlX2tleRgIIAEoCRJBCgxwYXVzZV9wYXJhbXMYCSADKAsyKy5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0LlBhdXNlUGFyYW1zRW50cnkSLQoFc3RlcHMYCiADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0U3RlcBoyChBQYXVzZVBhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiEwoRR2V0VXBkYXRlc1JlcXVlc3Qi8AEKEkdldFVwZGF0ZXNSZXNwb25zZRIUCghub3dfdW5peBgBIAEoA0ICMAISLAoFcGFuZWwYAiABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5QYW5lbEJ1aWxkEikKBmJ1bmRsZRgDIAEoCzIZLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZRIsCgVub2RlcxgEIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGUSKwoHcm9sbG91dBgFIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXQSEAoIZGlzdF9kaXIYBiABKAkiGQoXQ2hlY2tQYW5lbFVwZGF0ZVJlcXVlc3QiSgoYQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEi4KBnVwZGF0ZRgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlBhbmVsVXBkYXRlIhsKGUluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QiTAoaSW5zdGFsbFBhbmVsVXBkYXRlUmVzcG9uc2USLgoGdXBkYXRlGAEgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxVcGRhdGUiOwoTU3RhcnRSb2xsb3V0UmVxdWVzdBIQCghub2RlX2lkcxgBIAMoCRISCgpiYXRjaF9zaXplGAIgASgNIkMKFFN0YXJ0Um9sbG91dFJlc3BvbnNlEisKB3JvbGxvdXQYASABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0IikKE1BhdXNlUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJDChRQYXVzZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRSZXN1bWVSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFVJlc3VtZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRDYW5jZWxSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFUNhbmNlbFJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCImChNSb2xsYmFja05vZGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiQwoUUm9sbGJhY2tOb2RlUmVzcG9uc2USKwoEbm9kZRgBIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGUiFQoTUmVzY2FuQnVuZGxlUmVxdWVzdCJBChRSZXNjYW5CdW5kbGVSZXNwb25zZRIpCgZidW5kbGUYASABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUqmgEKDEJ1bmRsZVN0YXR1cxIdChlCVU5ETEVfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVQlVORExFX1NUQVRVU19NSVNTSU5HEAESGQoVQlVORExFX1NUQVRVU19UUlVTVEVEEAISGwoXQlVORExFX1NUQVRVU19VTlRSVVNURUQQAxIYChRCVU5ETEVfU1RBVFVTX05PX0tFWRAEKpkCCg9Ob2RlVXBkYXRlU3RhdGUSIQodTk9ERV9VUERBVEVfU1RBVEVfVU5TUEVDSUZJRUQQABIgChxOT0RFX1VQREFURV9TVEFURV9VUF9UT19EQVRFEAESHgoaTk9ERV9VUERBVEVfU1RBVEVfT1VUREFURUQQAhIeChpOT0RFX1VQREFURV9TVEFURV9VUERBVElORxADEiEKHU5PREVfVVBEQVRFX1NUQVRFX1JPTExFRF9CQUNLEAQSHAoYTk9ERV9VUERBVEVfU1RBVEVfRkFJTEVEEAUSIQodTk9ERV9VUERBVEVfU1RBVEVfVU5TVVBQT1JURUQQBhIdChlOT0RFX1VQREFURV9TVEFURV9PRkZMSU5FEAcquAEKDVJvbGxvdXRTdGF0dXMSHgoaUk9MTE9VVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIaChZST0xMT1VUX1NUQVRVU19SVU5OSU5HEAESGQoVUk9MTE9VVF9TVEFUVVNfUEFVU0VEEAISFwoTUk9MTE9VVF9TVEFUVVNfRE9ORRADEhwKGFJPTExPVVRfU1RBVFVTX0NBTkNFTExFRBAEEhkKFVJPTExPVVRfU1RBVFVTX0ZBSUxFRBAFKs0BCglTdGVwU3RhdGUSGgoWU1RFUF9TVEFURV9VTlNQRUNJRklFRBAAEhYKElNURVBfU1RBVEVfUEVORElORxABEhMKD1NURVBfU1RBVEVfU0VOVBACEhUKEVNURVBfU1RBVEVfR0FUSU5HEAMSFQoRU1RFUF9TVEFURV9QQVNTRUQQBBIVChFTVEVQX1NUQVRFX0ZBSUxFRBAFEhoKFlNURVBfU1RBVEVfUk9MTEVEX0JBQ0sQBhIWChJTVEVQX1NUQVRFX1NLSVBQRUQQBzKWBwoNVXBkYXRlU2VydmljZRJZCgpHZXRVcGRhdGVzEiQubWlzdGdhdGUuYWRtaW4udjEuR2V0VXBkYXRlc1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVcGRhdGVzUmVzcG9uc2USawoQQ2hlY2tQYW5lbFVwZGF0ZRIqLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUGFuZWxVcGRhdGVSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEnEKEkluc3RhbGxQYW5lbFVwZGF0ZRIsLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YWxsUGFuZWxVcGRhdGVSZXNwb25zZRJfCgxTdGFydFJvbGxvdXQSJi5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydFJvbGxvdXRSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuU3RhcnRSb2xsb3V0UmVzcG9uc2USXwoMUGF1c2VSb2xsb3V0EiYubWlzdGdhdGUuYWRtaW4udjEuUGF1c2VSb2xsb3V0UmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlBhdXNlUm9sbG91dFJlc3BvbnNlEmIKDVJlc3VtZVJvbGxvdXQSJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXN1bWVSb2xsb3V0UmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlJlc3VtZVJvbGxvdXRSZXNwb25zZRJiCg1DYW5jZWxSb2xsb3V0EicubWlzdGdhdGUuYWRtaW4udjEuQ2FuY2VsUm9sbG91dFJlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxSb2xsb3V0UmVzcG9uc2USXwoMUm9sbGJhY2tOb2RlEiYubWlzdGdhdGUuYWRtaW4udjEuUm9sbGJhY2tOb2RlUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxiYWNrTm9kZVJlc3BvbnNlEl8KDFJlc2NhbkJ1bmRsZRImLm1pc3RnYXRlLmFkbWluLnYxLlJlc2NhbkJ1bmRsZVJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXNjYW5CdW5kbGVSZXNwb25zZULGAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgtVcGRhdGVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
+  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS91cGRhdGUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIpoBCgpQYW5lbEJ1aWxkEg8KB3ZlcnNpb24YASABKAkSEQoFYnVpbHQYAiABKANCAjACEhcKD2hhc19yZWxlYXNlX2tleRgDIAEoCBIfChdyZWxlYXNlX2tleV9maW5nZXJwcmludBgEIAEoCRIuCgZ1cGRhdGUYBSABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QYW5lbFVwZGF0ZSLDAQoLUGFuZWxVcGRhdGUSDwoHdmVyc2lvbhgBIAEoCRILCgN1cmwYAiABKAkSGgoOcHVibGlzaGVkX3VuaXgYAyABKANCAjACEhgKDGNoZWNrZWRfdW5peBgEIAEoA0ICMAISEQoJYXZhaWxhYmxlGAUgASgIEhEKCXN1cHBvcnRlZBgGIAEoCBITCgtpbnN0YWxsYWJsZRgHIAEoCBISCgppbnN0YWxsaW5nGAggASgIEhEKCWVycm9yX2tleRgJIAEoCSJWCgpCdW5kbGVGaWxlEgoKAm9zGAEgASgJEgwKBGFyY2gYAiABKAkSDAoEbmFtZRgDIAEoCRIQCgRzaXplGAQgASgEQgIwAhIOCgZzaGEyNTYYBSABKAkiuAIKBkJ1bmRsZRIvCgZzdGF0dXMYASABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGVTdGF0dXMSDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISGAoMZXhwaXJlc191bml4GAQgASgDQgIwAhIsCgVmaWxlcxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZUZpbGUSEQoJZXJyb3Jfa2V5GAYgASgJEjUKBnBhcmFtcxgHIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZS5QYXJhbXNFbnRyeRIYCgxzY2FubmVkX3VuaXgYCCABKANCAjACGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEimgEKCkxhc3RVcGRhdGUSDwoHb3V0Y29tZRgBIAEoCRIUCgxmcm9tX3ZlcnNpb24YAiABKAkSFgoKZnJvbV9idWlsdBgDIAEoA0ICMAISEgoKdG9fdmVyc2lvbhgEIAEoCRIUCgh0b19idWlsdBgFIAEoA0ICMAISDgoGcmVhc29uGAYgASgJEhMKB2F0X3VuaXgYByABKANCAjACIqoDCgpOb2RlVXBkYXRlEg8KB25vZGVfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKBWJ1aWx0GAQgASgDQgIwAhIXCg9zdXBwb3J0c191cGRhdGUYBSABKAgSEwoLY3Jhc2hfZ3VhcmQYBiABKAgSMQoFc3RhdGUYByABKA4yIi5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlU3RhdGUSMgoLbGFzdF91cGRhdGUYCCABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5MYXN0VXBkYXRlEhAKCGluYm91bmRzGAkgASgNEhQKDG9ubGluZV91c2VycxgKIAEoDRIPCgdhZGRyZXNzGAsgASgJEgwKBGFyY2gYDCABKAkSGgoOc2NoZWR1bGVkX3VuaXgYDSABKANCAjACEhkKEXNjaGVkdWxlZF92ZXJzaW9uGA4gASgJEhsKD3NjaGVkdWxlZF9idWlsdBgPIAEoA0ICMAISKQohc2NoZWR1bGVkX3RpbWV6b25lX29mZnNldF9taW51dGVzGBAgASgFIs4CCgtSb2xsb3V0U3RlcBIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRINCgVzdGFnZRgDIAEoDRIrCgVzdGF0ZRgEIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLlN0ZXBTdGF0ZRIUCgxmcm9tX3ZlcnNpb24YBSABKAkSFgoKZnJvbV9idWlsdBgGIAEoA0ICMAISGAoMc3RhcnRlZF91bml4GAcgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAggASgDQgIwAhIRCgllcnJvcl9rZXkYCSABKAkSOgoGcGFyYW1zGAogAygLMioubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dFN0ZXAuUGFyYW1zRW50cnkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLzAgoHUm9sbG91dBIKCgJpZBgBIAEoCRIwCgZzdGF0dXMYAiABKA4yIC5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0U3RhdHVzEhIKCnRvX3ZlcnNpb24YAyABKAkSFAoIdG9fYnVpbHQYBCABKANCAjACEhIKCmJhdGNoX3NpemUYBSABKA0SGAoMY3JlYXRlZF91bml4GAYgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAcgASgDQgIwAhIRCglwYXVzZV9rZXkYCCABKAkSQQoMcGF1c2VfcGFyYW1zGAkgAygLMisubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dC5QYXVzZVBhcmFtc0VudHJ5Ei0KBXN0ZXBzGAogAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dFN0ZXAaMgoQUGF1c2VQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhMKEUdldFVwZGF0ZXNSZXF1ZXN0IpoCChJHZXRVcGRhdGVzUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEiwKBXBhbmVsGAIgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxCdWlsZBIpCgZidW5kbGUYAyABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUSLAoFbm9kZXMYBCADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlEisKB3JvbGxvdXQYBSABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0EhAKCGRpc3RfZGlyGAYgASgJEigKIHNjaGVkdWxlX3RpbWV6b25lX29mZnNldF9taW51dGVzGAcgASgFIhkKF0NoZWNrUGFuZWxVcGRhdGVSZXF1ZXN0IkoKGENoZWNrUGFuZWxVcGRhdGVSZXNwb25zZRIuCgZ1cGRhdGUYASABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QYW5lbFVwZGF0ZSIbChlJbnN0YWxsUGFuZWxVcGRhdGVSZXF1ZXN0IkwKGkluc3RhbGxQYW5lbFVwZGF0ZVJlc3BvbnNlEi4KBnVwZGF0ZRgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlBhbmVsVXBkYXRlIjsKE1N0YXJ0Um9sbG91dFJlcXVlc3QSEAoIbm9kZV9pZHMYASADKAkSEgoKYmF0Y2hfc2l6ZRgCIAEoDSJDChRTdGFydFJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIpChNQYXVzZVJvbGxvdXRSZXF1ZXN0EhIKCnJvbGxvdXRfaWQYASABKAkiQwoUUGF1c2VSb2xsb3V0UmVzcG9uc2USKwoHcm9sbG91dBgBIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXQiKgoUUmVzdW1lUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJEChVSZXN1bWVSb2xsb3V0UmVzcG9uc2USKwoHcm9sbG91dBgBIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXQiKgoUQ2FuY2VsUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJEChVDYW5jZWxSb2xsb3V0UmVzcG9uc2USKwoHcm9sbG91dBgBIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXQiJgoTUm9sbGJhY2tOb2RlUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIkMKFFJvbGxiYWNrTm9kZVJlc3BvbnNlEisKBG5vZGUYASABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlIhUKE1Jlc2NhbkJ1bmRsZVJlcXVlc3QiQQoUUmVzY2FuQnVuZGxlUmVzcG9uc2USKQoGYnVuZGxlGAEgASgLMhkubWlzdGdhdGUuYWRtaW4udjEuQnVuZGxlIpsBChlTY2hlZHVsZU5vZGVVcGRhdGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFgoObG9jYWxfZGF0ZXRpbWUYAiABKAkSHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYAyABKAUSGAoQZXhwZWN0ZWRfdmVyc2lvbhgEIAEoCRIaCg5leHBlY3RlZF9idWlsdBgFIAEoA0ICMAIifQoaU2NoZWR1bGVOb2RlVXBkYXRlUmVzcG9uc2USGgoOc2NoZWR1bGVkX3VuaXgYASABKANCAjACEg8KB3ZlcnNpb24YAiABKAkSEQoFYnVpbHQYAyABKANCAjACEh8KF3RpbWV6b25lX29mZnNldF9taW51dGVzGAQgASgFIjIKH0NhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSI1CiBDYW5jZWxOb2RlVXBkYXRlU2NoZWR1bGVSZXNwb25zZRIRCgljYW5jZWxsZWQYASABKAgiOwoYU2V0VXBkYXRlVGltZXpvbmVSZXF1ZXN0Eh8KF3RpbWV6b25lX29mZnNldF9taW51dGVzGAEgASgFIjwKGVNldFVwZGF0ZVRpbWV6b25lUmVzcG9uc2USHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYASABKAUqmgEKDEJ1bmRsZVN0YXR1cxIdChlCVU5ETEVfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVQlVORExFX1NUQVRVU19NSVNTSU5HEAESGQoVQlVORExFX1NUQVRVU19UUlVTVEVEEAISGwoXQlVORExFX1NUQVRVU19VTlRSVVNURUQQAxIYChRCVU5ETEVfU1RBVFVTX05PX0tFWRAEKpkCCg9Ob2RlVXBkYXRlU3RhdGUSIQodTk9ERV9VUERBVEVfU1RBVEVfVU5TUEVDSUZJRUQQABIgChxOT0RFX1VQREFURV9TVEFURV9VUF9UT19EQVRFEAESHgoaTk9ERV9VUERBVEVfU1RBVEVfT1VUREFURUQQAhIeChpOT0RFX1VQREFURV9TVEFURV9VUERBVElORxADEiEKHU5PREVfVVBEQVRFX1NUQVRFX1JPTExFRF9CQUNLEAQSHAoYTk9ERV9VUERBVEVfU1RBVEVfRkFJTEVEEAUSIQodTk9ERV9VUERBVEVfU1RBVEVfVU5TVVBQT1JURUQQBhIdChlOT0RFX1VQREFURV9TVEFURV9PRkZMSU5FEAcquAEKDVJvbGxvdXRTdGF0dXMSHgoaUk9MTE9VVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIaChZST0xMT1VUX1NUQVRVU19SVU5OSU5HEAESGQoVUk9MTE9VVF9TVEFUVVNfUEFVU0VEEAISFwoTUk9MTE9VVF9TVEFUVVNfRE9ORRADEhwKGFJPTExPVVRfU1RBVFVTX0NBTkNFTExFRBAEEhkKFVJPTExPVVRfU1RBVFVTX0ZBSUxFRBAFKs0BCglTdGVwU3RhdGUSGgoWU1RFUF9TVEFURV9VTlNQRUNJRklFRBAAEhYKElNURVBfU1RBVEVfUEVORElORxABEhMKD1NURVBfU1RBVEVfU0VOVBACEhUKEVNURVBfU1RBVEVfR0FUSU5HEAMSFQoRU1RFUF9TVEFURV9QQVNTRUQQBBIVChFTVEVQX1NUQVRFX0ZBSUxFRBAFEhoKFlNURVBfU1RBVEVfUk9MTEVEX0JBQ0sQBhIWChJTVEVQX1NUQVRFX1NLSVBQRUQQBzL/CQoNVXBkYXRlU2VydmljZRJZCgpHZXRVcGRhdGVzEiQubWlzdGdhdGUuYWRtaW4udjEuR2V0VXBkYXRlc1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVcGRhdGVzUmVzcG9uc2USawoQQ2hlY2tQYW5lbFVwZGF0ZRIqLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUGFuZWxVcGRhdGVSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEnEKEkluc3RhbGxQYW5lbFVwZGF0ZRIsLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YWxsUGFuZWxVcGRhdGVSZXNwb25zZRJfCgxTdGFydFJvbGxvdXQSJi5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydFJvbGxvdXRSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuU3RhcnRSb2xsb3V0UmVzcG9uc2USXwoMUGF1c2VSb2xsb3V0EiYubWlzdGdhdGUuYWRtaW4udjEuUGF1c2VSb2xsb3V0UmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlBhdXNlUm9sbG91dFJlc3BvbnNlEmIKDVJlc3VtZVJvbGxvdXQSJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXN1bWVSb2xsb3V0UmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlJlc3VtZVJvbGxvdXRSZXNwb25zZRJiCg1DYW5jZWxSb2xsb3V0EicubWlzdGdhdGUuYWRtaW4udjEuQ2FuY2VsUm9sbG91dFJlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxSb2xsb3V0UmVzcG9uc2USXwoMUm9sbGJhY2tOb2RlEiYubWlzdGdhdGUuYWRtaW4udjEuUm9sbGJhY2tOb2RlUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxiYWNrTm9kZVJlc3BvbnNlEl8KDFJlc2NhbkJ1bmRsZRImLm1pc3RnYXRlLmFkbWluLnYxLlJlc2NhbkJ1bmRsZVJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXNjYW5CdW5kbGVSZXNwb25zZRJxChJTY2hlZHVsZU5vZGVVcGRhdGUSLC5taXN0Z2F0ZS5hZG1pbi52MS5TY2hlZHVsZU5vZGVVcGRhdGVSZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuU2NoZWR1bGVOb2RlVXBkYXRlUmVzcG9uc2USgwEKGENhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZRIyLm1pc3RnYXRlLmFkbWluLnYxLkNhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxOb2RlVXBkYXRlU2NoZWR1bGVSZXNwb25zZRJuChFTZXRVcGRhdGVUaW1lem9uZRIrLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVzcG9uc2VCxgEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUILVXBkYXRlUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.admin.v1.PanelBuild
@@ -351,6 +351,30 @@ export type NodeUpdate = Message<"mistgate.admin.v1.NodeUpdate"> & {
    * @generated from field: string arch = 12;
    */
   arch: string;
+
+  /**
+   * Non-zero when an update is scheduled for this node. The schedule is pinned to this exact signed bundle.
+   *
+   * @generated from field: int64 scheduled_unix = 13 [jstype = JS_NUMBER];
+   */
+  scheduledUnix: bigint;
+
+  /**
+   * @generated from field: string scheduled_version = 14;
+   */
+  scheduledVersion: string;
+
+  /**
+   * @generated from field: int64 scheduled_built = 15 [jstype = JS_NUMBER];
+   */
+  scheduledBuilt: bigint;
+
+  /**
+   * Fixed UTC offset used when the schedule was created (minutes east of UTC).
+   *
+   * @generated from field: int32 scheduled_timezone_offset_minutes = 16;
+   */
+  scheduledTimezoneOffsetMinutes: number;
 };
 
 /**
@@ -555,6 +579,13 @@ export type GetUpdatesResponse = Message<"mistgate.admin.v1.GetUpdatesResponse">
    * @generated from field: string dist_dir = 6;
    */
   distDir: string;
+
+  /**
+   * Fixed UTC offset used to enter new scheduled updates (minutes east of UTC).
+   *
+   * @generated from field: int32 schedule_timezone_offset_minutes = 7;
+   */
+  scheduleTimezoneOffsetMinutes: number;
 };
 
 /**
@@ -839,6 +870,145 @@ export const RescanBundleResponseSchema: GenMessage<RescanBundleResponse> = /*@_
   messageDesc(file_mistgate_admin_v1_update, 25);
 
 /**
+ * @generated from message mistgate.admin.v1.ScheduleNodeUpdateRequest
+ */
+export type ScheduleNodeUpdateRequest = Message<"mistgate.admin.v1.ScheduleNodeUpdateRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string local_datetime = 2;
+   */
+  localDatetime: string;
+
+  /**
+   * @generated from field: int32 timezone_offset_minutes = 3;
+   */
+  timezoneOffsetMinutes: number;
+
+  /**
+   * Guard against confirming a plan for a release that was replaced in the panel.
+   *
+   * @generated from field: string expected_version = 4;
+   */
+  expectedVersion: string;
+
+  /**
+   * @generated from field: int64 expected_built = 5 [jstype = JS_NUMBER];
+   */
+  expectedBuilt: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ScheduleNodeUpdateRequest.
+ * Use `create(ScheduleNodeUpdateRequestSchema)` to create a new message.
+ */
+export const ScheduleNodeUpdateRequestSchema: GenMessage<ScheduleNodeUpdateRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 26);
+
+/**
+ * @generated from message mistgate.admin.v1.ScheduleNodeUpdateResponse
+ */
+export type ScheduleNodeUpdateResponse = Message<"mistgate.admin.v1.ScheduleNodeUpdateResponse"> & {
+  /**
+   * @generated from field: int64 scheduled_unix = 1 [jstype = JS_NUMBER];
+   */
+  scheduledUnix: bigint;
+
+  /**
+   * @generated from field: string version = 2;
+   */
+  version: string;
+
+  /**
+   * @generated from field: int64 built = 3 [jstype = JS_NUMBER];
+   */
+  built: bigint;
+
+  /**
+   * @generated from field: int32 timezone_offset_minutes = 4;
+   */
+  timezoneOffsetMinutes: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ScheduleNodeUpdateResponse.
+ * Use `create(ScheduleNodeUpdateResponseSchema)` to create a new message.
+ */
+export const ScheduleNodeUpdateResponseSchema: GenMessage<ScheduleNodeUpdateResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 27);
+
+/**
+ * @generated from message mistgate.admin.v1.CancelNodeUpdateScheduleRequest
+ */
+export type CancelNodeUpdateScheduleRequest = Message<"mistgate.admin.v1.CancelNodeUpdateScheduleRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CancelNodeUpdateScheduleRequest.
+ * Use `create(CancelNodeUpdateScheduleRequestSchema)` to create a new message.
+ */
+export const CancelNodeUpdateScheduleRequestSchema: GenMessage<CancelNodeUpdateScheduleRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 28);
+
+/**
+ * @generated from message mistgate.admin.v1.CancelNodeUpdateScheduleResponse
+ */
+export type CancelNodeUpdateScheduleResponse = Message<"mistgate.admin.v1.CancelNodeUpdateScheduleResponse"> & {
+  /**
+   * @generated from field: bool cancelled = 1;
+   */
+  cancelled: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CancelNodeUpdateScheduleResponse.
+ * Use `create(CancelNodeUpdateScheduleResponseSchema)` to create a new message.
+ */
+export const CancelNodeUpdateScheduleResponseSchema: GenMessage<CancelNodeUpdateScheduleResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 29);
+
+/**
+ * @generated from message mistgate.admin.v1.SetUpdateTimezoneRequest
+ */
+export type SetUpdateTimezoneRequest = Message<"mistgate.admin.v1.SetUpdateTimezoneRequest"> & {
+  /**
+   * @generated from field: int32 timezone_offset_minutes = 1;
+   */
+  timezoneOffsetMinutes: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetUpdateTimezoneRequest.
+ * Use `create(SetUpdateTimezoneRequestSchema)` to create a new message.
+ */
+export const SetUpdateTimezoneRequestSchema: GenMessage<SetUpdateTimezoneRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 30);
+
+/**
+ * @generated from message mistgate.admin.v1.SetUpdateTimezoneResponse
+ */
+export type SetUpdateTimezoneResponse = Message<"mistgate.admin.v1.SetUpdateTimezoneResponse"> & {
+  /**
+   * @generated from field: int32 timezone_offset_minutes = 1;
+   */
+  timezoneOffsetMinutes: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetUpdateTimezoneResponse.
+ * Use `create(SetUpdateTimezoneResponseSchema)` to create a new message.
+ */
+export const SetUpdateTimezoneResponseSchema: GenMessage<SetUpdateTimezoneResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 31);
+
+/**
  * @generated from enum mistgate.admin.v1.BundleStatus
  */
 export enum BundleStatus {
@@ -1065,8 +1235,8 @@ export const StepStateSchema: GenEnum<StepState> = /*@__PURE__*/
   enumDesc(file_mistgate_admin_v1_update, 3);
 
 /**
- * Updates screen: the panel release, the release bundle it holds, what every node runs, and the
- * staged rollout of the node agent (canary, then batches, gate per node, automatic rollback of a failed node).
+ * Updates screen: the panel release, the release bundle it holds, what every node runs, and explicit
+ * per-node agent updates (with the rollout gate and automatic rollback of a failed node).
  * Conventions: common.proto.
  *
  * Roles (internal/panel/auth/policy.go): reads are open to every role; every change needs the owner AND a fresh
@@ -1180,6 +1350,37 @@ export const UpdateService: GenService<{
     methodKind: "unary";
     input: typeof RescanBundleRequestSchema;
     output: typeof RescanBundleResponseSchema;
+  },
+  /**
+   * Schedule the current trusted agent bundle for one node. local_datetime is YYYY-MM-DDTHH:mm in the supplied
+   * configured fixed UTC offset. The request is rejected if that offset is no longer the panel setting.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.ScheduleNodeUpdate
+   */
+  scheduleNodeUpdate: {
+    methodKind: "unary";
+    input: typeof ScheduleNodeUpdateRequestSchema;
+    output: typeof ScheduleNodeUpdateResponseSchema;
+  },
+  /**
+   * Cancel a pending schedule for one node. Does not affect an update already in progress.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule
+   */
+  cancelNodeUpdateSchedule: {
+    methodKind: "unary";
+    input: typeof CancelNodeUpdateScheduleRequestSchema;
+    output: typeof CancelNodeUpdateScheduleResponseSchema;
+  },
+  /**
+   * Change the fixed UTC offset used to enter new scheduled updates. Existing schedules keep their original offset.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.SetUpdateTimezone
+   */
+  setUpdateTimezone: {
+    methodKind: "unary";
+    input: typeof SetUpdateTimezoneRequestSchema;
+    output: typeof SetUpdateTimezoneResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_update, 0);

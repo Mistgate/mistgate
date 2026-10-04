@@ -12,6 +12,7 @@ import { Icon, IconChip } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { StatusDot } from "@/components/ui/status";
+import { TextField } from "@/components/ui/text-field";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
 import { users } from "@/lib/api";
@@ -36,6 +37,7 @@ const WIDE = "w-[130px]";
 /** A change to a user in plain numbers; `write` turns the 64-bit ones into bigints for the wire. */
 type Patch = Partial<{
   name: string;
+  subscriptionName: string;
   groupId: string;
   quotaBytes: number;
   expiresUnix: number;
@@ -224,6 +226,7 @@ function UserDetail({ data }: { data: DetailN }) {
           />
         </div>
         <div className="flex min-w-0 flex-col gap-3.5">
+          <SubscriptionNamePanel user={user} actions={actions} />
           <LimitsPanel user={user} actions={actions} />
           <AccessPanel data={data} actions={actions} />
           <DangerZone title={t("users.danger")}>
@@ -244,6 +247,49 @@ function UserDetail({ data }: { data: DetailN }) {
 }
 
 type Actions = ReturnType<typeof useUserActions>;
+
+function SubscriptionNamePanel({ user, actions }: { user: User; actions: Actions }) {
+  const t = useTx();
+  const toast = useToast();
+  const [draft, setDraft] = useState<{ server: string; value: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const name = draft?.server === user.subscriptionName ? draft.value : user.subscriptionName;
+  const trimmed = name.trim();
+  const unchanged = trimmed === user.subscriptionName;
+  async function save() {
+    setBusy(true);
+    try {
+      await actions.update({ subscriptionName: trimmed });
+      toast(t("users.subscriptionNameSaved"));
+    } catch {
+      // actions.update displays the server error and keeps the draft available for correction.
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("users.subscriptionPage")} icon="person" tone="lavender">
+      <TextField
+        aria-label={t("users.subscriptionName")}
+        label={t("users.subscriptionName")}
+        hint={t("users.subscriptionNameHint")}
+        value={name}
+        onChange={(event) => setDraft({ server: user.subscriptionName, value: event.target.value })}
+        maxLength={64}
+        autoComplete="off"
+        disabled={busy}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 text-xs text-muted">{t("users.subscriptionNamePreview", { name: trimmed || user.name })}</p>
+        <Button variant="secondary" disabled={busy || unchanged} onClick={() => void save()}>
+          {t("users.subscriptionNameSave")}
+        </Button>
+      </div>
+    </Panel>
+  );
+}
 
 function ResetTrafficButton({ user, actions }: { user: User; actions: Actions }) {
   const t = useTx();

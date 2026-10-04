@@ -120,6 +120,22 @@ func insertStep(ctx context.Context, tx *sql.Tx, x StepRow) error {
 // CreateRollout stores a rollout and its steps in one transaction. ErrConflict when another rollout is active
 // (the unique index 00013 allows one RUNNING or PAUSED rollout).
 func (s *Store) CreateRollout(ctx context.Context, r RolloutRow, steps []StepRow) error {
+	return s.createRollout(ctx, r, steps, nil, nil)
+}
+
+// CreateRolloutAndClearSchedules atomically starts an owner-triggered rollout and removes
+// any scheduled update for nodes that it will update. A later timer must not undo that choice.
+func (s *Store) CreateRolloutAndClearSchedules(ctx context.Context, r RolloutRow, steps []StepRow, nodeIDs []string) error {
+	return s.createRollout(ctx, r, steps, nil, nodeIDs)
+}
+
+// CreateScheduledRollout atomically starts a scheduled node update and consumes the exact
+// schedule it was based on. A concurrent reschedule or cancellation makes this fail safely.
+func (s *Store) CreateScheduledRollout(ctx context.Context, r RolloutRow, steps []StepRow, schedule NodeUpdateScheduleRow) error {
+	return s.createRollout(ctx, r, steps, &schedule, nil)
+}
+
+func (s *Store) createRollout(ctx context.Context, r RolloutRow, steps []StepRow, schedule *NodeUpdateScheduleRow, clearScheduleIDs []string) error {
 	tx, err := s.W.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -141,6 +157,25 @@ func (s *Store) CreateRollout(ctx context.Context, r RolloutRow, steps []StepRow
 		x.RolloutID = r.ID
 		if err := insertStep(ctx, tx, x); err != nil {
 			return err
+		}
+	}
+	if schedule != nil {
+		res, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule
+			WHERE node_id = ? AND to_version = ? AND to_built = ? AND scheduled_at = ? AND timezone_offset_minutes = ?`,
+			schedule.NodeID, schedule.ToVersion, schedule.ToBuilt, schedule.ScheduledAt, schedule.TimezoneOffsetMinutes)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n != 1 {
+			return ErrConflict
+		}
+	} else {
+		for _, nodeID := range clearScheduleIDs {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule WHERE node_id = ?`, nodeID); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()

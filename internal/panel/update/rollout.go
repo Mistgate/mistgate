@@ -173,6 +173,10 @@ func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store
 }
 
 func (s *Service) startWithActor(ctx context.Context, nodeIDs []string, batch int, actor string) (store.RolloutRow, error) {
+	return s.startWithActorAndSchedule(ctx, nodeIDs, batch, actor, nil)
+}
+
+func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []string, batch int, actor string, scheduled *store.NodeUpdateScheduleRow) (store.RolloutRow, error) {
 	if batch < 0 || batch > maxBatch {
 		return store.RolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("batch_size must be 0 to 10"))
 	}
@@ -195,6 +199,9 @@ func (s *Service) startWithActor(ctx context.Context, nodeIDs []string, batch in
 	b := s.rescan() // what is on disk now is what ships
 	if !b.trusted {
 		return store.RolloutRow{}, precondition("no trusted bundle")
+	}
+	if scheduled != nil && (scheduled.ToBuilt != b.manifest.Built || scheduled.ToVersion != b.manifest.Version) {
+		return store.RolloutRow{}, precondition("scheduled bundle is no longer available")
 	}
 	views, err := s.nodes(ctx, b, nil)
 	if err != nil {
@@ -251,11 +258,24 @@ func (s *Service) startWithActor(ctx context.Context, nodeIDs []string, batch in
 		steps = append(steps, store.StepRow{NodeID: v.row.ID, NodeName: v.row.Name, Stage: lastStage + 1, State: store.StepSkipped,
 			FromVersion: v.row.AgentVersion, FromBuilt: v.row.AgentBuilt, FinishedAt: now, ErrorKey: skipKey(v.state)})
 	}
-	if err := s.st.CreateRollout(ctx, ro, steps); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+	var createErr error
+	if scheduled != nil {
+		createErr = s.st.CreateScheduledRollout(ctx, ro, steps, *scheduled)
+	} else {
+		updateIDs := make([]string, 0, len(cands))
+		for _, v := range cands {
+			updateIDs = append(updateIDs, v.row.ID)
+		}
+		createErr = s.st.CreateRolloutAndClearSchedules(ctx, ro, steps, updateIDs)
+	}
+	if createErr != nil {
+		if errors.Is(createErr, store.ErrConflict) {
+			if scheduled != nil {
+				return store.RolloutRow{}, precondition("scheduled update changed or was cancelled")
+			}
 			return store.RolloutRow{}, precondition("a rollout is already active")
 		}
-		return store.RolloutRow{}, s.internal("create rollout", err)
+		return store.RolloutRow{}, s.internal("create rollout", createErr)
 	}
 	s.auditAs(ctx, actor, "update_rollout_start", map[string]string{"rollout_id": ro.ID, "version": ro.ToVersion, "nodes": fmt.Sprint(len(cands)),
 		"batch_size": fmt.Sprint(batch)})

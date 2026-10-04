@@ -167,6 +167,10 @@ var platformName = map[adminv1.Platform]string{
 // subscription title.
 // preview is the admin's framed preview: nothing on it can write.
 func buildPageData(v access.SubView, link, title, lang string, set *adminv1.SubscriptionSettings, b instance.Settings, now time.Time, preview bool) pageData {
+	pageName := v.SubscriptionName
+	if pageName == "" {
+		pageName = v.UserName
+	}
 	parts := []string{b.BrandHead}
 	if b.BrandTail != "" {
 		parts = append(parts, b.BrandTail)
@@ -176,7 +180,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines),
 		Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
 		User: pageUser{
-			Name: v.UserName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
+			Name: pageName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
 			QuotaReset: v.QuotaReset, NextResetUnix: unixOrZero(v.NextReset), DeviceLimit: v.DeviceLimit, DevicesUsed: len(v.Devices),
 		},
 		Announcement: set.GetAnnouncement(), SupportURL: set.GetSupportUrl(),

@@ -7,8 +7,6 @@ import (
 	"errors"
 	"time"
 
-	"connectrpc.com/connect"
-
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -96,64 +94,4 @@ func (s *Service) setGitHubBundleStatus(available bool, manifestSHA256 string) {
 	s.githubBundleAvailable = available
 	s.githubBundleManifestHash = manifestSHA256
 	s.mu.Unlock()
-}
-
-// startAutomaticRollout starts the trusted release for currently connected nodes that have not already had an
-// attempt for this build. Canary ordering, health gates, and rollback are the same as for an owner-started rollout.
-func (s *Service) startAutomaticRollout(ctx context.Context) {
-	if s.cfg.Key == nil {
-		return
-	}
-	b := s.current()
-	if b == nil || !b.trusted {
-		return
-	}
-
-	s.mu.Lock()
-	if !s.githubBundleAvailable || s.bundleSyncing || s.panelInstalling {
-		s.mu.Unlock()
-		return
-	}
-	githubManifestHash := s.githubBundleManifestHash
-	if _, err := s.st.ActiveRollout(ctx); err == nil {
-		s.mu.Unlock()
-		return
-	} else if !errors.Is(err, store.ErrNotFound) {
-		s.mu.Unlock()
-		s.log.Warn("update: check active rollout before automatic start", "err", err)
-		return
-	}
-	s.mu.Unlock()
-	manifestHash := sha256.Sum256(b.raw)
-	if githubManifestHash == "" || hex.EncodeToString(manifestHash[:]) != githubManifestHash {
-		return
-	}
-
-	attempted, err := s.st.RolloutAttemptedNodeIDs(ctx, b.manifest.Built)
-	if err != nil {
-		s.log.Warn("update: read previous automatic rollout attempts", "err", err)
-		return
-	}
-	views, err := s.nodes(ctx, b, nil)
-	if err != nil {
-		s.log.Warn("update: list nodes for automatic rollout", "err", err)
-		return
-	}
-	var nodeIDs []string
-	for _, v := range views {
-		if updatable(v.state) && !attempted[v.row.ID] {
-			nodeIDs = append(nodeIDs, v.row.ID)
-		}
-	}
-	if len(nodeIDs) == 0 {
-		return
-	}
-	ro, err := s.startWithActor(ctx, nodeIDs, 0, "system:auto")
-	if err != nil {
-		if connect.CodeOf(err) != connect.CodeFailedPrecondition {
-			s.log.Warn("update: start automatic node rollout", "err", err)
-		}
-		return
-	}
-	s.log.Info("update: automatic node rollout started", "rollout", ro.ID, "version", ro.ToVersion, "nodes", len(nodeIDs))
 }

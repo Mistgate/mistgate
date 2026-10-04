@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { PageTitle } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { BundleStatus, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
+import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
 import {
-  canStart,
   heroOf,
   isActive,
   outdatedNodes,
+  canUpdateNode,
   useIsOwner,
   useUpdateActions,
   useUpdates,
@@ -15,12 +15,12 @@ import {
   type Updates,
 } from "@/lib/updates";
 import { BundleCard, PanelCard } from "./cards";
-import { CancelDialog, RollbackDialog, StartDialog } from "./dialogs";
+import { CancelDialog, RollbackDialog, UpdateNodeDialog } from "./dialogs";
 import { HeroCard } from "./hero";
 import { NodeTable } from "./nodes";
 import { RolloutCard } from "./rollout";
 
-type Dialog = { kind: "start"; nodes: NodeUpdate[]; single: boolean } | { kind: "rollback"; node: NodeUpdate } | { kind: "cancel"; id: string } | null;
+type Dialog = { kind: "update"; node: NodeUpdate } | { kind: "rollback"; node: NodeUpdate } | { kind: "cancel"; id: string } | null;
 
 function subtitle(t: T, d?: Updates): string {
   if (!d) return t("up.sub.loading");
@@ -33,7 +33,7 @@ function subtitle(t: T, d?: Updates): string {
   return hero.id === "attention" ? t("up.hero.attention.title") : t("up.sub.current");
 }
 
-/** Updates: the release bundle the panel holds, what every node runs, and the staged rollout (canary, batches, rollback). */
+/** Updates: the trusted release bundle, each node's installed version, and its immediate or scheduled update. */
 export function UpdatesScreen() {
   const t = useT();
   const q = useUpdates();
@@ -58,9 +58,6 @@ export function UpdatesScreen() {
     );
   }
 
-  const version = d.bundle?.version ?? "";
-  const start = canStart(d, owner);
-  // a retry of one node needs a trusted bundle and no running rollout, same as "update all"
   const allowUpdate = d.bundle?.status === BundleStatus.TRUSTED && !isActive(d.rollout);
   const close = () => setDialog(null);
   // the dialog closes once the call went through; a refusal leaves it open under the toast
@@ -72,9 +69,7 @@ export function UpdatesScreen() {
       <HeroCard
         data={d}
         owner={owner}
-        canStart={start}
         actions={actions}
-        onStart={() => setDialog({ kind: "start", nodes: outdatedNodes(d.nodes), single: false })}
         onCancel={() => d.rollout && setDialog({ kind: "cancel", id: d.rollout.id })}
       />
       {d.rollout && <RolloutCard rollout={d.rollout} />}
@@ -82,22 +77,29 @@ export function UpdatesScreen() {
         nodes={d.nodes}
         data={d}
         owner={owner}
-        allowUpdate={allowUpdate}
-        onUpdate={(n) => setDialog({ kind: "start", nodes: [n], single: true })}
+        onUpdate={(n) => setDialog({ kind: "update", node: n })}
         onRollback={(n) => setDialog({ kind: "rollback", node: n })}
       />
       <div className="grid items-start gap-3.5 md:grid-cols-2">
         <BundleCard data={d} owner={owner} actions={actions} />
         <PanelCard data={d} owner={owner} actions={actions} />
       </div>
-      {dialog?.kind === "start" && (
-        <StartDialog
-          nodes={dialog.nodes}
-          version={version}
-          single={dialog.single}
+      {dialog?.kind === "update" && (
+        <UpdateNodeDialog
+          data={d}
+          node={dialog.node}
+          canUpdateNow={allowUpdate && dialog.node.state !== NodeUpdateState.OFFLINE && !!d.bundle && canUpdateNode(dialog.node, d.bundle.built)}
           busy={actions.busy}
           onClose={close}
-          onConfirm={() => go(actions.start(dialog.single ? dialog.nodes.map((n) => n.nodeId) : []))}
+          onUpdateNow={() => go(actions.start([dialog.node.nodeId]))}
+          onSchedule={(localDatetime) => go(actions.scheduleNode({
+            nodeId: dialog.node.nodeId,
+            localDatetime,
+            timezoneOffsetMinutes: d.scheduleTimezoneOffsetMinutes,
+            expectedVersion: d.bundle?.version ?? "",
+            expectedBuilt: d.bundle?.built ?? 0,
+          }))}
+          onCancelSchedule={() => go(actions.cancelNodeSchedule(dialog.node.nodeId))}
         />
       )}
       {dialog?.kind === "rollback" && (

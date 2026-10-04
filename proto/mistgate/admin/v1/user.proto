@@ -125,6 +125,8 @@ message User {
   // the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
   bool access_happ = 26;
   bool access_amnezia = 27;
+  // Optional name shown on the public subscription page; empty falls back to name.
+  string subscription_name = 28;
 }
 
 enum DnsSource {
@@ -281,6 +283,8 @@ message UpdateUserRequest {
   optional string dns_preset_id = 11;
   // Check the change and say what it does (UpdateUserResponse.impact); nothing is written, the nodes hear nothing.
   bool dry_run = 12;
+  // Empty clears the public name and falls back to the account name.
+  optional string subscription_name = 13;
 }
 
 message UpdateUserResponse {

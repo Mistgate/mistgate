@@ -49,7 +49,7 @@ function look(t: T, fmt: Fmt, d: Updates, hero: Hero): Look {
 }
 
 /** The top card: what is going on with updates, the progress of a running rollout, and the buttons that move it (owner only). */
-export function HeroCard({ data, owner, canStart, actions, onStart, onCancel }: { data: Updates; owner: boolean; canStart: boolean; actions: UpdateActions; onStart: () => void; onCancel: () => void }) {
+export function HeroCard({ data, owner, actions, onCancel }: { data: Updates; owner: boolean; actions: UpdateActions; onCancel: () => void }) {
   const t = useT();
   const fmt = useFmt();
   const hero = heroOf(data);
@@ -59,7 +59,7 @@ export function HeroCard({ data, owner, canStart, actions, onStart, onCancel }: 
   // a node failed and stopped the rollout: look at it first; going on is not the obvious next step then
   const failed = hero.id === "paused" && isFailurePause(hero.rollout.pauseKey);
   const culprit = failed ? pausedStep(hero.rollout) : undefined;
-  const hasButtons = (owner && (canStart || !!active)) || !!culprit;
+  const hasButtons = (owner && !!active) || !!culprit;
 
   return (
     <section
@@ -83,11 +83,6 @@ export function HeroCard({ data, owner, canStart, actions, onStart, onCancel }: 
               <Link to="/nodes/$id" params={{ id: culprit.nodeId }} search={{ tab: "events" }} className={buttonClass("secondary", "lg")}>
                 {t("up.openNode", { name: culprit.nodeName })}
               </Link>
-            )}
-            {owner && canStart && (
-              <Button variant="primary" size="lg" disabled={actions.busy} onClick={onStart}>
-                {t("up.startAll")}
-              </Button>
             )}
             {owner && active && hero.id === "running" && (
               <Button variant="secondary" size="lg" disabled={actions.busy} onClick={() => void actions.pause(active.id)}>

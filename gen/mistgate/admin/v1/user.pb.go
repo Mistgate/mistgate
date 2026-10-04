@@ -392,8 +392,10 @@ type User struct {
 	// the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
 	AccessHapp    bool `protobuf:"varint,26,opt,name=access_happ,json=accessHapp,proto3" json:"access_happ,omitempty"`
 	AccessAmnezia bool `protobuf:"varint,27,opt,name=access_amnezia,json=accessAmnezia,proto3" json:"access_amnezia,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Optional name shown on the public subscription page; empty falls back to name.
+	SubscriptionName string `protobuf:"bytes,28,opt,name=subscription_name,json=subscriptionName,proto3" json:"subscription_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -613,6 +615,13 @@ func (x *User) GetAccessAmnezia() bool {
 		return x.AccessAmnezia
 	}
 	return false
+}
+
+func (x *User) GetSubscriptionName() string {
+	if x != nil {
+		return x.SubscriptionName
+	}
+	return ""
 }
 
 type ListUsersRequest struct {
@@ -1591,9 +1600,11 @@ type UpdateUserRequest struct {
 	// "" = inherit.
 	DnsPresetId *string `protobuf:"bytes,11,opt,name=dns_preset_id,json=dnsPresetId,proto3,oneof" json:"dns_preset_id,omitempty"`
 	// Check the change and say what it does (UpdateUserResponse.impact); nothing is written, the nodes hear nothing.
-	DryRun        bool `protobuf:"varint,12,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DryRun bool `protobuf:"varint,12,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	// Empty clears the public name and falls back to the account name.
+	SubscriptionName *string `protobuf:"bytes,13,opt,name=subscription_name,json=subscriptionName,proto3,oneof" json:"subscription_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -1708,6 +1719,13 @@ func (x *UpdateUserRequest) GetDryRun() bool {
 		return x.DryRun
 	}
 	return false
+}
+
+func (x *UpdateUserRequest) GetSubscriptionName() string {
+	if x != nil && x.SubscriptionName != nil {
+		return *x.SubscriptionName
+	}
+	return ""
 }
 
 type UpdateUserResponse struct {
@@ -2462,7 +2480,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\aamnezia\x18\x02 \x01(\bR\aamnezia\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd5\b\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\x82\t\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -2497,7 +2515,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"dns_source\x18\x19 \x01(\x0e2\x1c.mistgate.admin.v1.DnsSourceR\tdnsSource\x12\x1f\n" +
 	"\vaccess_happ\x18\x1a \x01(\bR\n" +
 	"accessHapp\x12%\n" +
-	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\"\xb6\x01\n" +
+	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\x12+\n" +
+	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\"\xb6\x01\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -2583,7 +2602,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x12CreateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x12)\n" +
 	"\x10subscription_url\x18\x02 \x01(\tR\x0fsubscriptionUrl\x12#\n" +
-	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xa1\x05\n" +
+	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xe9\x05\n" +
 	"\x11UpdateUserRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1e\n" +
@@ -2599,7 +2618,9 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fspeed_limit_bps\x18\n" +
 	" \x01(\x04B\x020\x02H\bR\rspeedLimitBps\x88\x01\x01\x12'\n" +
 	"\rdns_preset_id\x18\v \x01(\tH\tR\vdnsPresetId\x88\x01\x01\x12\x17\n" +
-	"\adry_run\x18\f \x01(\bR\x06dryRunB\a\n" +
+	"\adry_run\x18\f \x01(\bR\x06dryRun\x120\n" +
+	"\x11subscription_name\x18\r \x01(\tH\n" +
+	"R\x10subscriptionName\x88\x01\x01B\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_group_idB\x0e\n" +
 	"\f_quota_bytesB\x0e\n" +
@@ -2609,7 +2630,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x05_appsB\b\n" +
 	"\x06_nodesB\x12\n" +
 	"\x10_speed_limit_bpsB\x10\n" +
-	"\x0e_dns_preset_id\"z\n" +
+	"\x0e_dns_preset_idB\x14\n" +
+	"\x12_subscription_name\"z\n" +
 	"\x12UpdateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x127\n" +
 	"\x06impact\x18\x02 \x01(\v2\x1f.mistgate.admin.v1.AccessImpactR\x06impact\"\x94\x01\n" +

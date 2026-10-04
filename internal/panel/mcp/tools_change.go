@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -28,7 +30,8 @@ func changeTools() []toolDef {
 	var out []toolDef
 	for _, g := range [][]toolDef{
 		change(userCreate), change(userUpdate), change(userDisable), change(userEnable), change(userResetTraffic), change(deviceRevoke), change(alertMute),
-		change(nodeFix), change(rolloutStart), change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
+		change(nodeFix), change(rolloutStart), change(nodeUpdateSchedule), change(nodeUpdateScheduleCancel), change(updateTimezone),
+		change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
 	} {
 		out = append(out, g...)
 	}
@@ -329,23 +332,32 @@ var userCreate = changeSpec[userCreateArgs]{
 
 type userUpdateArgs struct {
 	ReasonField
-	UserID        string    `json:"user_id"`
-	Name          *string   `json:"name,omitempty"`
-	GroupID       *string   `json:"group_id,omitempty" jsonschema:"a group id (users_search shows the group of each user)"`
-	QuotaBytes    *uint64   `json:"quota_bytes,omitempty" jsonschema:"0 = unlimited"`
-	QuotaReset    *string   `json:"quota_reset,omitempty" jsonschema:"none, day, week, month or rolling_month"`
-	ExpiresUnix   *int64    `json:"expires_unix,omitempty" jsonschema:"unix seconds; 0 = never. A future date lifts 'expired'"`
-	DeviceLimit   *uint32   `json:"device_limit,omitempty"`
-	Apps          *appsArg  `json:"apps,omitempty"`
-	Nodes         *nodesArg `json:"nodes,omitempty"`
-	SpeedLimitBps *uint64   `json:"speed_limit_bps,omitempty" jsonschema:"0 = remove the limit"`
-	DNSPresetID   *string   `json:"dns_preset_id,omitempty" jsonschema:"empty string = inherit"`
+	UserID           string    `json:"user_id"`
+	Name             *string   `json:"name,omitempty"`
+	SubscriptionName *string   `json:"subscription_name,omitempty" jsonschema:"name shown on the public subscription page; empty uses the account name"`
+	GroupID          *string   `json:"group_id,omitempty" jsonschema:"a group id (users_search shows the group of each user)"`
+	QuotaBytes       *uint64   `json:"quota_bytes,omitempty" jsonschema:"0 = unlimited"`
+	QuotaReset       *string   `json:"quota_reset,omitempty" jsonschema:"none, day, week, month or rolling_month"`
+	ExpiresUnix      *int64    `json:"expires_unix,omitempty" jsonschema:"unix seconds; 0 = never. A future date lifts 'expired'"`
+	DeviceLimit      *uint32   `json:"device_limit,omitempty"`
+	Apps             *appsArg  `json:"apps,omitempty"`
+	Nodes            *nodesArg `json:"nodes,omitempty"`
+	SpeedLimitBps    *uint64   `json:"speed_limit_bps,omitempty" jsonschema:"0 = remove the limit"`
+	DNSPresetID      *string   `json:"dns_preset_id,omitempty" jsonschema:"empty string = inherit"`
+}
+
+func checkSubscriptionName(name string) error {
+	name = strings.TrimSpace(name)
+	if !utf8.ValidString(name) || utf8.RuneCountInString(name) > 64 || strings.ContainsFunc(name, unicode.IsControl) {
+		return errors.New("subscription_name must be at most 64 characters without control characters")
+	}
+	return nil
 }
 
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure),
-	desc:  "Change a user's name, group, quota, expiry, device limit, apps, nodes, speed limit or DNS preset. Only the fields you give change.",
+	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps, nodes, speed limit or DNS preset. Only the fields you give change.",
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -364,6 +376,13 @@ var userUpdate = changeSpec[userUpdateArgs]{
 				return nil, err
 			}
 			add("name", nm(u.GetName())+" -> "+nm(*a.Name), true)
+			n++
+		}
+		if a.SubscriptionName != nil {
+			if err := checkSubscriptionName(*a.SubscriptionName); err != nil {
+				return nil, err
+			}
+			add("subscription_name", nm(u.GetSubscriptionName())+" -> "+nm(strings.TrimSpace(*a.SubscriptionName)), true)
 			n++
 		}
 		if a.GroupID != nil {
@@ -436,7 +455,7 @@ var userUpdate = changeSpec[userUpdateArgs]{
 	},
 	apply: func(c *call, a userUpdateArgs, _ Plan) (done, error) {
 		req := &adminv1.UpdateUserRequest{
-			UserId: a.UserID, Name: a.Name, GroupId: a.GroupID, QuotaBytes: a.QuotaBytes, ExpiresUnix: a.ExpiresUnix,
+			UserId: a.UserID, Name: a.Name, SubscriptionName: a.SubscriptionName, GroupId: a.GroupID, QuotaBytes: a.QuotaBytes, ExpiresUnix: a.ExpiresUnix,
 			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DnsPresetId: a.DNSPresetID,
 		}
 		if a.QuotaReset != nil {
@@ -784,23 +803,217 @@ func (c *call) updates() (*adminv1.GetUpdatesResponse, error) {
 
 var rolloutDanger = []string{dangerStepUp, dangerFleet}
 
+func updateTimezoneName(offset int32) string {
+	sign := "+"
+	n := int(offset)
+	if n < 0 {
+		sign = "-"
+		n = -n
+	}
+	return fmt.Sprintf("UTC%s%02d:%02d", sign, n/60, n%60)
+}
+
+func validUpdateTimezone(offset int32) bool {
+	return offset >= -12*60 && offset <= 14*60 && offset%15 == 0
+}
+
+func scheduleFactTime(local string, offset int32) (string, error) {
+	if !validUpdateTimezone(offset) || len(local) != len("2006-01-02T15:04") {
+		return "", errors.New("invalid local date, time or timezone")
+	}
+	zoneName := updateTimezoneName(offset)
+	t, err := time.ParseInLocation("2006-01-02T15:04", local, time.FixedZone(zoneName, int(offset)*60))
+	if err != nil || t.Format("2006-01-02T15:04") != local {
+		return "", errors.New("invalid local date or time")
+	}
+	return t.Format("2006-01-02 15:04") + " " + zoneName, nil
+}
+
+type nodeUpdateScheduleArgs struct {
+	ReasonField
+	NodeID                string `json:"node_id" jsonschema:"the node id from updates_status"`
+	LocalDatetime         string `json:"local_datetime" jsonschema:"the desired date and time in YYYY-MM-DDTHH:mm format, interpreted in the panel's configured UTC offset"`
+	TimezoneOffsetMinutes int32  `json:"timezone_offset_minutes,omitempty" jsonschema:"-"`
+	ExpectedVersion       string `json:"expected_version,omitempty" jsonschema:"-"`
+	ExpectedBuilt         int64  `json:"expected_built,omitempty" jsonschema:"-"`
+}
+
+var nodeUpdateSchedule = changeSpec[nodeUpdateScheduleArgs]{
+	name: "node_update_schedule", min: ProfileAdmin, danger: true,
+	procs: procs(adminv1connect.UpdateServiceGetUpdatesProcedure, adminv1connect.UpdateServiceScheduleNodeUpdateProcedure),
+	desc:  "Schedule the currently trusted signed agent bundle for one node. The update starts only after the selected time and the owner approves this exact plan.",
+	plan: func(c *call, a nodeUpdateScheduleArgs) (*planned, error) {
+		if err := validID("node_id", a.NodeID); err != nil {
+			return nil, err
+		}
+		u, err := c.updates()
+		if err != nil {
+			return nil, err
+		}
+		bundle := u.GetBundle()
+		if bundle.GetStatus() != adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED {
+			return nil, errors.New("the update bundle is not trusted: nothing can be scheduled")
+		}
+		var node *adminv1.NodeUpdate
+		for _, n := range u.GetNodes() {
+			if n.GetNodeId() == a.NodeID {
+				node = n
+				break
+			}
+		}
+		if node == nil {
+			return nil, errors.New("node_id is not a node of this panel")
+		}
+		if !node.GetSupportsUpdate() || node.GetBuilt() >= bundle.GetBuilt() ||
+			(node.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED &&
+				node.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK &&
+				node.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED &&
+				node.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OFFLINE) {
+			return nil, errors.New("this node does not have an eligible older agent")
+		}
+		offset := u.GetScheduleTimezoneOffsetMinutes()
+		at, err := scheduleFactTime(a.LocalDatetime, offset)
+		if err != nil {
+			return nil, err
+		}
+		scheduledAt, err := time.ParseInLocation("2006-01-02T15:04", a.LocalDatetime, time.FixedZone(updateTimezoneName(offset), int(offset)*60))
+		if err != nil || u.GetNowUnix() == 0 {
+			return nil, errors.New("the local date, time or panel clock is invalid")
+		}
+		panelNow := time.Unix(u.GetNowUnix(), 0)
+		if scheduledAt.Before(panelNow.Add(time.Minute)) || scheduledAt.After(panelNow.Add(365*24*time.Hour)) {
+			return nil, errors.New("schedule time must be at least one minute and at most one year in the future")
+		}
+		facts := []Fact{
+			{Key: "node", Value: nm(node.GetName()), Untrusted: true},
+			{Key: "version", Value: clean(bundle.GetVersion(), 60)},
+			{Key: "scheduled_at", Value: at},
+			codedFact("timezone", updateTimezoneName(offset), "utc_offset", "minutes", strconv.Itoa(int(offset))),
+			codedFact("effect", "the node restarts its agent; the panel runs the update health gate and automatic rollback", "restart"),
+		}
+		if node.GetScheduledUnix() > 0 {
+			facts = append(facts, codedFact("existing_schedule", "the node's previous schedule will be replaced", "replace"))
+		}
+		params := a
+		params.TimezoneOffsetMinutes = offset
+		params.ExpectedVersion = bundle.GetVersion()
+		params.ExpectedBuilt = bundle.GetBuilt()
+		return &planned{
+			Summary: "Schedule the signed agent update for one node at " + at + ". The exact version and time zone are pinned in the plan; the owner must approve before it is saved.",
+			Facts:   facts, Danger: rolloutDanger, Params: params,
+		}, nil
+	},
+	apply: func(c *call, a nodeUpdateScheduleArgs, _ Plan) (done, error) {
+		u, err := c.updates()
+		if err != nil {
+			return done{}, err
+		}
+		if u.GetBundle().GetVersion() != a.ExpectedVersion || u.GetBundle().GetBuilt() != a.ExpectedBuilt || u.GetScheduleTimezoneOffsetMinutes() != a.TimezoneOffsetMinutes {
+			return done{}, failure("changed_since_plan", "the release or schedule time zone changed after planning; make a new plan")
+		}
+		r, err := c.cl.Update.ScheduleNodeUpdate(c.ctx, connect.NewRequest(&adminv1.ScheduleNodeUpdateRequest{
+			NodeId: a.NodeID, LocalDatetime: a.LocalDatetime, TimezoneOffsetMinutes: a.TimezoneOffsetMinutes,
+			ExpectedVersion: a.ExpectedVersion, ExpectedBuilt: a.ExpectedBuilt,
+		}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		return doneWith("node_update_scheduled", "Node update scheduled for "+strconv.FormatInt(r.Msg.GetScheduledUnix(), 10)+".", "node_id", a.NodeID, "version", a.ExpectedVersion), nil
+	},
+}
+
+type nodeUpdateScheduleCancelArgs struct {
+	ReasonField
+	NodeID string `json:"node_id" jsonschema:"the node id from updates_status"`
+}
+
+var nodeUpdateScheduleCancel = changeSpec[nodeUpdateScheduleCancelArgs]{
+	name: "node_update_schedule_cancel", min: ProfileAdmin, danger: true,
+	procs: procs(adminv1connect.UpdateServiceGetUpdatesProcedure, adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure),
+	desc:  "Cancel one node's pending agent update schedule. An update already in progress is not interrupted.",
+	plan: func(c *call, a nodeUpdateScheduleCancelArgs) (*planned, error) {
+		if err := validID("node_id", a.NodeID); err != nil {
+			return nil, err
+		}
+		u, err := c.updates()
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range u.GetNodes() {
+			if n.GetNodeId() != a.NodeID {
+				continue
+			}
+			if n.GetScheduledUnix() == 0 {
+				return nil, errors.New("this node has no pending update schedule")
+			}
+			return &planned{Summary: "Cancel the pending update schedule for one node. The already installed agent stays unchanged.", Facts: []Fact{
+				{Key: "node", Value: nm(n.GetName()), Untrusted: true},
+				{Key: "scheduled_version", Value: clean(n.GetScheduledVersion(), 60)},
+				{Key: "scheduled_unix", Value: strconv.FormatInt(n.GetScheduledUnix(), 10)},
+			}, Danger: rolloutDanger, Params: a}, nil
+		}
+		return nil, errors.New("node_id is not a node of this panel")
+	},
+	apply: func(c *call, a nodeUpdateScheduleCancelArgs, _ Plan) (done, error) {
+		r, err := c.cl.Update.CancelNodeUpdateSchedule(c.ctx, connect.NewRequest(&adminv1.CancelNodeUpdateScheduleRequest{NodeId: a.NodeID}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		if !r.Msg.GetCancelled() {
+			return done{}, failure("changed_since_plan", "the schedule has already been removed; check the current update status")
+		}
+		return doneWith("node_update_schedule_cancelled", "Node update schedule cancelled.", "node_id", a.NodeID), nil
+	},
+}
+
+type updateTimezoneArgs struct {
+	ReasonField
+	TimezoneOffsetMinutes int32 `json:"timezone_offset_minutes" jsonschema:"fixed UTC offset for new node-update schedules, in minutes east of UTC; common values are -720 through 840"`
+}
+
+var updateTimezone = changeSpec[updateTimezoneArgs]{
+	name: "update_timezone", min: ProfileAdmin, danger: true,
+	procs: procs(adminv1connect.UpdateServiceGetUpdatesProcedure, adminv1connect.UpdateServiceSetUpdateTimezoneProcedure),
+	desc:  "Set the panel's fixed UTC offset for entering new node-update schedules. Existing scheduled instants keep their saved offset.",
+	plan: func(c *call, a updateTimezoneArgs) (*planned, error) {
+		if !validUpdateTimezone(a.TimezoneOffsetMinutes) {
+			return nil, errors.New("timezone_offset_minutes must be from -720 to 840 in 15-minute steps")
+		}
+		u, err := c.updates()
+		if err != nil {
+			return nil, err
+		}
+		return &planned{Summary: "Change the fixed UTC offset used to enter future node-update schedules. Existing schedules will keep their current instant and display offset.", Facts: []Fact{
+			codedFact("from", updateTimezoneName(u.GetScheduleTimezoneOffsetMinutes()), "utc_offset", "minutes", strconv.Itoa(int(u.GetScheduleTimezoneOffsetMinutes()))),
+			codedFact("to", updateTimezoneName(a.TimezoneOffsetMinutes), "utc_offset", "minutes", strconv.Itoa(int(a.TimezoneOffsetMinutes))),
+		}, Danger: []string{dangerStepUp}, Params: a}, nil
+	},
+	apply: func(c *call, a updateTimezoneArgs, _ Plan) (done, error) {
+		r, err := c.cl.Update.SetUpdateTimezone(c.ctx, connect.NewRequest(&adminv1.SetUpdateTimezoneRequest{TimezoneOffsetMinutes: a.TimezoneOffsetMinutes}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		return doneWith("update_timezone_changed", "Schedule time zone set to "+updateTimezoneName(r.Msg.GetTimezoneOffsetMinutes())+".", "offset_minutes", strconv.Itoa(int(r.Msg.GetTimezoneOffsetMinutes()))), nil
+	},
+}
+
 type rolloutStartArgs struct {
 	ReasonField
-	NodeIDs   []string `json:"node_ids,omitempty" jsonschema:"nodes to update; empty = every node that is outdated"`
+	NodeIDs   []string `json:"node_ids" jsonschema:"exactly one node id from updates_status to update now"`
 	BatchSize uint32   `json:"batch_size,omitempty" jsonschema:"nodes per batch after the canary; 0 = the panel's default"`
 }
 
 var rolloutStart = changeSpec[rolloutStartArgs]{
 	name: "rollout_start", min: ProfileAdmin, danger: true,
 	procs: procs(adminv1connect.UpdateServiceGetUpdatesProcedure, adminv1connect.UpdateServiceStartRolloutProcedure),
-	desc:  "Start a staged update of the nodes to the signed bundle: a canary first, then batches. Needs the owner's approval in the admin panel.",
+	desc:  "Update one selected node now to the signed bundle. For a future time use node_update_schedule. Needs the owner's approval in the admin panel.",
 	plan: func(c *call, a rolloutStartArgs) (*planned, error) {
-		if a.BatchSize > 50 {
-			return nil, errors.New("batch_size is at most 50")
-		}
 		ids, err := uniqueIDs("node_ids", a.NodeIDs, true)
 		if err != nil {
 			return nil, err
+		}
+		if len(ids) != 1 {
+			return nil, errors.New("node_ids must contain exactly one node; schedule or update nodes individually")
 		}
 		u, err := c.updates()
 		if err != nil {
@@ -812,43 +1025,30 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 		if r := u.GetRollout(); r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED {
 			return nil, errors.New("a rollout is already active: pause or cancel it first")
 		}
-		var chosen []*adminv1.NodeUpdate
+		var chosen *adminv1.NodeUpdate
 		for _, n := range u.GetNodes() {
-			if len(ids) == 0 && n.GetState() == adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED || slices.Contains(ids, n.GetNodeId()) {
-				chosen = append(chosen, n)
+			if n.GetNodeId() == ids[0] {
+				chosen = n
+				break
 			}
 		}
-		if len(ids) > 0 && len(chosen) != len(ids) {
-			return nil, errors.New("some node_ids are not nodes of this panel")
+		if chosen == nil {
+			return nil, errors.New("node_id is not a node of this panel")
 		}
-		if len(chosen) == 0 {
-			return nil, errors.New("nothing to update: no node is outdated")
-		}
-		var names, resolved []string
-		for i, n := range chosen {
-			resolved = append(resolved, n.GetNodeId())
-			if i < 10 {
-				names = append(names, nm(n.GetName()))
-			}
-		}
-		list := strings.Join(names, ", ")
-		if len(chosen) > len(names) {
-			list += fmt.Sprintf(" and %d more", len(chosen)-len(names))
-		}
-		batch := Fact{Key: "batch_size", Value: strconv.Itoa(int(a.BatchSize))}
-		if a.BatchSize == 0 {
-			batch = codedFact("batch_size", "the panel's default", "default")
+		if !chosen.GetSupportsUpdate() || chosen.GetBuilt() >= u.GetBundle().GetBuilt() ||
+			(chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED &&
+				chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK &&
+				chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED) {
+			return nil, errors.New("the selected node has no supported online agent older than this bundle")
 		}
 		return &planned{
-			Summary: "Start a staged rollout of the signed update bundle to " + plural(len(chosen), "node", "nodes") + ": one canary first, then batches. The owner has to approve it first.",
+			Summary: "Update node " + nm(chosen.GetName()) + " to the signed agent bundle now. The owner has to approve it first.",
 			Facts: []Fact{
 				{Key: "version", Value: clean(u.GetBundle().GetVersion(), 60)},
-				{Key: "nodes", Value: list, Untrusted: true},
-				{Key: "count", Value: strconv.Itoa(len(chosen))},
-				batch,
-				codedFact("effect", "canary first; each node restarts its agent", "canary"),
+				{Key: "node", Value: nm(chosen.GetName()), Untrusted: true},
+				codedFact("effect", "the selected node restarts its agent and passes the update health gate", "restart"),
 			},
-			Danger: rolloutDanger, Params: rolloutStartArgs{NodeIDs: resolved, BatchSize: a.BatchSize},
+			Danger: rolloutDanger, Params: rolloutStartArgs{NodeIDs: ids, BatchSize: 0},
 		}, nil
 	},
 	apply: func(c *call, a rolloutStartArgs, _ Plan) (done, error) {

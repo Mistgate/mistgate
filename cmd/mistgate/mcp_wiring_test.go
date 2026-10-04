@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 14 || b != 28 || c != 46 {
+	if a, b, c := count(ro), count(op), count(ad); a != 14 || b != 28 || c != 52 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -266,7 +266,7 @@ func TestMCPEndToEnd(t *testing.T) {
 
 	// -- a fleet change through the owner's grant. The real UpdateService answers 400 "no release key" in this test build, which
 	// is its own answer: it was reached, past the allow-list, the role check and its step-up, only because the plan is approved.
-	if out, isErr := tool(ad, "rollout_start_plan", map[string]any{}); !isErr || !strings.Contains(out, "not trusted") {
+	if out, isErr := tool(ad, "rollout_start_plan", map[string]any{"node_ids": []string{"de1"}}); !isErr || !strings.Contains(out, "not trusted") {
 		t.Errorf("rollout_start_plan: %v %s", isErr, out)
 	}
 	// Over /api the same procedure is closed to every token, whatever its profile.

@@ -5,12 +5,12 @@ import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { StatusPill, kindTextClass } from "@/components/ui/status";
-import { NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { Icon } from "@/components/ui/icons";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import { canRollbackNode, canUpdateNode, lastUpdateView, manualCommands, nodeStateKey, nodeStateKind, type NodeUpdate, type Updates } from "@/lib/updates";
+import { canRollbackNode, canUpdateNode, lastUpdateView, manualCommands, nodeStateKey, nodeStateKind, updateDateTimeAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
 
 const colsOwner = "md:grid-cols-[minmax(150px,1.1fr)_minmax(150px,1fr)_150px_minmax(200px,1.5fr)_170px]";
 const colsView = "md:grid-cols-[minmax(150px,1.1fr)_minmax(150px,1fr)_150px_minmax(200px,1.5fr)]";
@@ -32,8 +32,18 @@ function LastUpdate({ node, fmt }: { node: NodeUpdate; fmt: Fmt }) {
   const t = useT();
   const v = lastUpdateView(t, node.lastUpdate);
   const at = node.lastUpdate?.atUnix;
+  const scheduled = node.scheduledUnix > 0;
   return (
     <div className="flex min-w-0 flex-col gap-0.5 text-xs">
+      {scheduled && (
+        <span className="text-pretty text-accent">
+          {t("up.schedule.row", {
+            version: node.scheduledVersion,
+            at: updateDateTimeAtOffset(node.scheduledUnix, node.scheduledTimezoneOffsetMinutes),
+            timezone: updateTimezoneName(node.scheduledTimezoneOffsetMinutes),
+          })}
+        </span>
+      )}
       <span className={cx("text-pretty", v.kind === "off" || v.kind === "ok" ? "text-muted" : kindTextClass[v.kind])}>{v.head}</span>
       {v.detail && <span className="leading-snug text-pretty text-muted">{v.detail}</span>}
       {at ? <span className="text-[11px] text-faint">{fmt.ago(at)}</span> : null}
@@ -97,13 +107,15 @@ function HowTo({ data, node }: { data: Updates; node: NodeUpdate }) {
   );
 }
 
-function Actions({ node, allowUpdate, onUpdate, onRollback }: { node: NodeUpdate; allowUpdate: boolean; onUpdate: () => void; onRollback: () => void }) {
+function Actions({ node, data, onUpdate, onRollback }: { node: NodeUpdate; data: Updates; onUpdate: () => void; onRollback: () => void }) {
   const t = useT();
+  const hasSchedule = node.scheduledUnix > 0;
+  const canManageUpdate = hasSchedule || (data.bundle?.status === BundleStatus.TRUSTED && canUpdateNode(node, data.bundle.built));
   return (
     <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-      {canUpdateNode(node) && (
-        <Button variant="secondary" size="md" disabled={!allowUpdate} aria-label={t("up.action.updateAria", { name: node.name })} onClick={onUpdate}>
-          {t("up.action.update")}
+      {canManageUpdate && (
+        <Button variant="secondary" size="md" aria-label={t("up.action.updateAria", { name: node.name })} onClick={onUpdate}>
+          {hasSchedule ? t("up.action.manageUpdate") : t("up.action.update")}
         </Button>
       )}
       {canRollbackNode(node) && (
@@ -128,14 +140,12 @@ function Name({ node }: { node: NodeUpdate }) {
 }
 
 /**
- * Every node with its version, update state and the last thing that happened to it. The buttons are the owner's: "Update"
- * sends a rollout of that one node (a retry for a rolled back or failed one), "Roll back" asks the agent for its previous binary.
+ * Every node with its version, update state and the last thing that happened to it. The owner can update or schedule one node at a time.
  */
 export function NodeTable({
   nodes,
   data,
   owner,
-  allowUpdate,
   onUpdate,
   onRollback,
 }: {
@@ -143,8 +153,6 @@ export function NodeTable({
   /** The page's data: the bundle and the panel's dist folder the manual commands are built from. */
   data: Updates;
   owner: boolean;
-  /** False while a rollout runs or without a trusted bundle: the server would refuse, so the button is off. */
-  allowUpdate: boolean;
   onUpdate: (n: NodeUpdate) => void;
   onRollback: (n: NodeUpdate) => void;
 }) {
@@ -184,7 +192,7 @@ export function NodeTable({
                   <Version node={n} fmt={fmt} />
                   <State node={n} open={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
                   <LastUpdate node={n} fmt={fmt} />
-                  {owner && <Actions node={n} allowUpdate={allowUpdate} onUpdate={() => onUpdate(n)} onRollback={() => onRollback(n)} />}
+                  {owner && <Actions node={n} data={data} onUpdate={() => onUpdate(n)} onRollback={() => onRollback(n)} />}
                 </div>
                 {open.has(n.nodeId) && (
                   <div className="px-5 pb-4">
@@ -206,7 +214,7 @@ export function NodeTable({
                   <LastUpdate node={n} fmt={fmt} />
                 </div>
                 {open.has(n.nodeId) && <HowTo data={data} node={n} />}
-                {owner && (canUpdateNode(n) || canRollbackNode(n)) && <Actions node={n} allowUpdate={allowUpdate} onUpdate={() => onUpdate(n)} onRollback={() => onRollback(n)} />}
+                {owner && ((data.bundle?.status === BundleStatus.TRUSTED && canUpdateNode(n, data.bundle.built)) || n.scheduledUnix > 0 || canRollbackNode(n)) && <Actions node={n} data={data} onUpdate={() => onUpdate(n)} onRollback={() => onRollback(n)} />}
               </div>
             ))}
           </div>

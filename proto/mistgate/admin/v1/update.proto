@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
-// Updates screen: the panel release, the release bundle it holds, what every node runs, and the
-// staged rollout of the node agent (canary, then batches, gate per node, automatic rollback of a failed node).
+// Updates screen: the panel release, the release bundle it holds, what every node runs, and explicit
+// per-node agent updates (with the rollout gate and automatic rollback of a failed node).
 // Conventions: common.proto.
 //
 // Roles (internal/panel/auth/policy.go): reads are open to every role; every change needs the owner AND a fresh
@@ -43,6 +43,13 @@ service UpdateService {
   rpc RollbackNode(RollbackNodeRequest) returns (RollbackNodeResponse);
   // Re-read <data-dir>/dist now (the panel also notices a changed manifest by itself, within a minute).
   rpc RescanBundle(RescanBundleRequest) returns (RescanBundleResponse);
+  // Schedule the current trusted agent bundle for one node. local_datetime is YYYY-MM-DDTHH:mm in the supplied
+  // configured fixed UTC offset. The request is rejected if that offset is no longer the panel setting.
+  rpc ScheduleNodeUpdate(ScheduleNodeUpdateRequest) returns (ScheduleNodeUpdateResponse);
+  // Cancel a pending schedule for one node. Does not affect an update already in progress.
+  rpc CancelNodeUpdateSchedule(CancelNodeUpdateScheduleRequest) returns (CancelNodeUpdateScheduleResponse);
+  // Change the fixed UTC offset used to enter new scheduled updates. Existing schedules keep their original offset.
+  rpc SetUpdateTimezone(SetUpdateTimezoneRequest) returns (SetUpdateTimezoneResponse);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -174,6 +181,12 @@ message NodeUpdate {
   // unknown): the UI builds the manual update commands of an UNSUPPORTED node from them.
   string address = 11;
   string arch = 12;
+  // Non-zero when an update is scheduled for this node. The schedule is pinned to this exact signed bundle.
+  int64 scheduled_unix = 13 [jstype = JS_NUMBER];
+  string scheduled_version = 14;
+  int64 scheduled_built = 15 [jstype = JS_NUMBER];
+  // Fixed UTC offset used when the schedule was created (minutes east of UTC).
+  int32 scheduled_timezone_offset_minutes = 16;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -264,6 +277,8 @@ message GetUpdatesResponse {
   // Where the panel reads the bundle on its own server (<data-dir>/dist, absolute): the source of the scp line of a
   // manual update. Empty when the panel has no data directory.
   string dist_dir = 6;
+  // Fixed UTC offset used to enter new scheduled updates (minutes east of UTC).
+  int32 schedule_timezone_offset_minutes = 7;
 }
 
 message CheckPanelUpdateRequest {}
@@ -323,4 +338,36 @@ message RescanBundleRequest {}
 
 message RescanBundleResponse {
   Bundle bundle = 1;
+}
+
+message ScheduleNodeUpdateRequest {
+  string node_id = 1;
+  string local_datetime = 2;
+  int32 timezone_offset_minutes = 3;
+  // Guard against confirming a plan for a release that was replaced in the panel.
+  string expected_version = 4;
+  int64 expected_built = 5 [jstype = JS_NUMBER];
+}
+
+message ScheduleNodeUpdateResponse {
+  int64 scheduled_unix = 1 [jstype = JS_NUMBER];
+  string version = 2;
+  int64 built = 3 [jstype = JS_NUMBER];
+  int32 timezone_offset_minutes = 4;
+}
+
+message CancelNodeUpdateScheduleRequest {
+  string node_id = 1;
+}
+
+message CancelNodeUpdateScheduleResponse {
+  bool cancelled = 1;
+}
+
+message SetUpdateTimezoneRequest {
+  int32 timezone_offset_minutes = 1;
+}
+
+message SetUpdateTimezoneResponse {
+  int32 timezone_offset_minutes = 1;
 }

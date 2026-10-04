@@ -10,28 +10,28 @@ import (
 
 // AccessUser is a user row with its group name and explicit node list.
 type AccessUser struct {
-	ID, Name, GroupID, GroupName string
-	Disabled                     bool
-	Status                       string // active | disabled | expired | limited (derived, see access.ComputeStatus)
-	AppHapp, AppAmnezia          bool
-	AllNodes                     bool
-	QuotaBytes                   uint64 // 0 = unlimited
-	QuotaReset                   string // none | day | week | month | rolling_month
-	PeriodStart                  time.Time
-	UsedBytes                    uint64
-	ExpiresAt                    time.Time // zero = never
-	DeviceLimit                  int
-	SpeedLimitBps                uint64
-	SubTokenHash, SubTokenEnc    []byte
-	LastSeenAt                   time.Time
-	LastNodeID                   string
-	CreatedAt                    time.Time
-	NodeIDs                      []string // rows of user_node; meaningful while AllNodes is false
-	DNSPresetID                  string   // "" = inherit (group, then the instance default)
-	GroupDNSPresetID             string   // the user's group's preset, read-only here ("" = none)
+	ID, Name, SubscriptionName, GroupID, GroupName string
+	Disabled                                       bool
+	Status                                         string // active | disabled | expired | limited (derived, see access.ComputeStatus)
+	AppHapp, AppAmnezia                            bool
+	AllNodes                                       bool
+	QuotaBytes                                     uint64 // 0 = unlimited
+	QuotaReset                                     string // none | day | week | month | rolling_month
+	PeriodStart                                    time.Time
+	UsedBytes                                      uint64
+	ExpiresAt                                      time.Time // zero = never
+	DeviceLimit                                    int
+	SpeedLimitBps                                  uint64
+	SubTokenHash, SubTokenEnc                      []byte
+	LastSeenAt                                     time.Time
+	LastNodeID                                     string
+	CreatedAt                                      time.Time
+	NodeIDs                                        []string // rows of user_node; meaningful while AllNodes is false
+	DNSPresetID                                    string   // "" = inherit (group, then the instance default)
+	GroupDNSPresetID                               string   // the user's group's preset, read-only here ("" = none)
 }
 
-const accUserCols = `u.id, u.name, u.group_id, g.name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.all_nodes,
+const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.all_nodes,
 	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps,
 	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id`
 
@@ -43,7 +43,7 @@ func scanAccessUser(r interface{ Scan(...any) error }) (AccessUser, error) {
 	var quota, used, speed, period, seen, created int64
 	var expires sql.NullInt64
 	var lastNode, dns, gdns sql.NullString
-	err := r.Scan(&u.ID, &u.Name, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &all,
+	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &all,
 		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed,
 		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns)
 	u.DNSPresetID, u.GroupDNSPresetID = dns.String, gdns.String
@@ -82,10 +82,10 @@ type AccessCred struct {
 
 func (a Access) insertUser(ctx context.Context, tx *sql.Tx, u AccessUser) error {
 	_, err := tx.ExecContext(ctx,
-		`INSERT INTO user (id, name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
+		`INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
 		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Name, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Name, u.SubscriptionName, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
 		int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), u.DeviceLimit, int64(u.SpeedLimitBps),
 		u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID))
 	if err != nil {
@@ -323,11 +323,11 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) error {
 	err := a.tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
-			`UPDATE user SET name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
+			`UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
 			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?,
 			   dns_preset_id = ?
 			 WHERE id = ?`,
-			u.Name, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
+			u.Name, u.SubscriptionName, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
 			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), u.DeviceLimit, int64(u.SpeedLimitBps), accNullStr(u.DNSPresetID), u.ID)
 		if err != nil {
 			return err
