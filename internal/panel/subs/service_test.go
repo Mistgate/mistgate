@@ -26,7 +26,6 @@ func (f networkUsageFunc) NetworkUsage(nodeID string) (uint64, uint64, time.Time
 func TestSettingsCarryServerSamples(t *testing.T) {
 	m := newM3Rig(t) // de1 holds the hysteria2 profile "p" and the AmneziaWG one; group g has p, group g2 both
 	m.st.W.Exec(`UPDATE node SET country_code = 'DE' WHERE id = 'nod_1'`)
-	m.st.W.Exec(`UPDATE node SET bandwidth_mbps = 100 WHERE id = 'nod_1'`)
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_2', 'nl1', 'nl1.example.com', 'NL', 'active', 1)`)
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_3', 'aa-down', 'a.example.com', 'FI', 'pending', 1)`)
 	off := must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_2"}))).Msg.Inbound
@@ -34,8 +33,12 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
 		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil,
 		networkUsageFunc(func(nodeID string) (uint64, uint64, time.Time, bool) {
+			sampledAt := time.Now().Add(-time.Second)
 			if nodeID == "nod_1" {
-				return 64_000_000, 10_000_000, time.Now(), true
+				return 64_000_000, 10_000_000, sampledAt, true
+			}
+			if nodeID == "nod_2" {
+				return 20_000_000, 6_000_000, sampledAt, true
 			}
 			return 0, 0, time.Time{}, false
 		}))
@@ -48,7 +51,7 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	if r.SampleGroup != "g" || len(r.ServerSamples) != 2 || r.NamesLanguage != "en" {
 		t.Fatalf("samples = %q %v %q", r.SampleGroup, r.ServerSamples, r.NamesLanguage)
 	}
-	if s := r.ServerSamples; s[0].Node != "de1" || s[0].CountryCode != "DE" || s[0].Profile != "p" || s[0].GetLoadPercent() != 64 || s[1].Node != "nl1" || s[1].CountryCode != "NL" || s[1].LoadPercent != nil {
+	if s := r.ServerSamples; s[0].Node != "de1" || s[0].CountryCode != "DE" || s[0].Profile != "p" || s[0].GetLoadPercent() != 74 || s[1].Node != "nl1" || s[1].CountryCode != "NL" || s[1].GetLoadPercent() != 26 {
 		t.Errorf("samples = %v", s)
 	}
 	// The group most people are in; the switched-off inbound drops out.

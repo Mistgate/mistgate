@@ -53,6 +53,7 @@ describe("the preview of names and texts", () => {
     await mount({ settings: settings(), effectiveTitle: "Mistgate", samples, sampleGroup: "Все", namesLanguage: "ru" });
     expect(rows()).toEqual(["DE · hy2 · 64%", "DE · hy2 · WARP · 64%", "NL · hy2 · 22%"]); // the flags are drawn, not text
     expect(document.body.textContent).toContain("Серверы группы «Все» — так их видят в Happ её люди.");
+    expect(document.body.textContent).toContain("доля текущего трафика ноды среди нод подписки");
     await type(document.querySelector<HTMLInputElement>("#subs-template")!, "{node} · {profile}");
     expect(rows()).toEqual(["de1 · hy2 · 64%", "de1 · hy2 · WARP · 64%", "nl1 · hy2 · 22%"]);
   });

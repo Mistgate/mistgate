@@ -96,7 +96,7 @@ function serverLoadCard(d: MgData, lang: Lang, t: Dict): HTMLElement | null {
               server.load_percent === undefined ? t.serverLoadUnknown : `${server.load_percent}%`, high && h("small", null, t.serverLoadBusy)),
           ),
           server.load_percent !== undefined && h("div", { class: "server-load-bar" }, h("i", { class: high ? "high" : "", style: { width: `${server.load_percent}%` } })),
-          h("span", { class: "mut sm" }, t.serverLoadRates(mbps(server.rx_bps, lang), mbps(server.tx_bps, lang), server.capacity_mbps)),
+          h("span", { class: "mut sm" }, t.serverLoadRates(mbps(server.rx_bps, lang), mbps(server.tx_bps, lang))),
         );
       }),
     ),

@@ -52,6 +52,9 @@ describe("normalize", () => {
     expect(d.apps).toEqual([]);
     expect(d.amnezia).toBeNull();
     expect(d.server_count).toBe(0);
+    const loads = normalize({ server_loads: [{ name: "EE", load_percent: 74, capacity_mbps: 0 }, { name: "DE", rx_bps: 1 }] }).server_loads;
+    expect(loads[0]?.load_percent).toBe(74);
+    expect(loads[1]?.load_percent).toBeUndefined();
     expect(normalize(null).options.show_qr).toBe(true);
     expect(normalize({ brand: { accent: "javascript:1" } }).brand.accent).toBe("");
   });

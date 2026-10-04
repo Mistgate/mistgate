@@ -18,7 +18,7 @@ export type Device = {
   online: boolean;
 };
 
-/** Fresh network-interface rates; utilization is omitted when the channel capacity is unknown. */
+/** Fresh network-interface rates; load_percent is the node's traffic share across measured subscription nodes. */
 export type ServerLoad = { name: string; load_percent?: number; rx_bps: number; tx_bps: number; capacity_mbps: number };
 
 /**
@@ -71,7 +71,7 @@ export type MgData = {
   subscription_url: string;
   /** Servers the link gives Happ ("all your servers (3) appear in Happ"); 0 when unknown. */
   server_count: number;
-  /** Nodes with a fresh sample and a capacity configured by the admin. */
+  /** Nodes with a fresh sample; load_percent is their share of current traffic among measured subscription nodes. */
   server_loads: ServerLoad[];
   user: {
     name: string;
