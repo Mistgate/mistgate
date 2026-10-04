@@ -221,6 +221,9 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	if got := fragmentsOf(t, fetch(h, "/"+tok, curlUA)); len(got) != 1 || got[0] != de+" DE · p" {
 		t.Fatalf("default name = %q, want flag, compact country code, and profile", got)
 	}
+	if got := fragmentsOf(t, fetch(h, "/"+tok, happUA)); len(got) != 1 || got[0] != de+" DE · p" {
+		t.Fatalf("Happ name = %q, want flag, compact country code, and profile", got)
+	}
 	ru := "ru"
 	if _, err := instance.Update(r.ctx, r.st, instance.Patch{Language: &ru}); err != nil {
 		t.Fatal(err)

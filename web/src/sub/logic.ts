@@ -94,10 +94,15 @@ export function normalize(raw: unknown): MgData {
     server_count: num(r.server_count),
     server_loads: list(r.server_loads).flatMap((s): ServerLoad[] => {
       const capacity = num(s.capacity_mbps);
-      const percent = typeof s.load_percent === "number" && Number.isFinite(s.load_percent) ? s.load_percent : undefined;
       if (typeof s.name !== "string" || !s.name.trim()) return [];
-      const loadPercent = percent !== undefined && percent >= 0 && percent <= 100 ? percent : undefined;
-      return [{ name: str(s.name), load_percent: loadPercent, rx_bps: num(s.rx_bps), tx_bps: num(s.tx_bps), capacity_mbps: capacity }];
+      const rxBps = num(s.rx_bps);
+      const txBps = num(s.tx_bps);
+      // Recompute from the raw rates and node capacity so stale servers cannot send a traffic-share
+      // percentage that looks like channel utilization.
+      const loadPercent = capacity > 0
+        ? Math.min(100, Math.round(Math.max(rxBps, txBps) / (capacity * 1_000_000) * 1000) / 10)
+        : undefined;
+      return [{ name: str(s.name), load_percent: loadPercent, rx_bps: rxBps, tx_bps: txBps, capacity_mbps: capacity }];
     }),
     user: {
       name: str(u.name),

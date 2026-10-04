@@ -120,6 +120,7 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 	}
 	type sample struct {
 		nodeID, node, countryCode, profile string
+		bandwidthMbps                      int
 	}
 	var candidates []sample
 	for _, f := range full {
@@ -128,18 +129,23 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 			(f.Inbound.State != "pending" && f.Inbound.State != "active") || !protocols.AllowedForApps(p, plugin.ClientHapp) {
 			continue
 		}
-		candidates = append(candidates, sample{nodeID: f.Node.ID, node: f.Node.Name, countryCode: f.Node.CountryCode, profile: f.Profile.Name})
+		candidates = append(candidates, sample{
+			nodeID: f.Node.ID, node: f.Node.Name, countryCode: f.Node.CountryCode, profile: f.Profile.Name,
+			bandwidthMbps: f.Node.BandwidthMbps,
+		})
 	}
 	nodeIDs := make([]string, 0, len(candidates))
+	capacityMbps := make(map[string]int, len(candidates))
 	for _, candidate := range candidates {
 		nodeIDs = append(nodeIDs, candidate.nodeID)
+		capacityMbps[candidate.nodeID] = candidate.bandwidthMbps
 	}
-	shares := access.CurrentTrafficShares(nodeIDs, s.network, time.Now())
+	usage := access.CurrentNetworkUtilization(nodeIDs, capacityMbps, s.network, time.Now())
 	var out []*adminv1.ServerSample
 	for _, candidate := range candidates {
 		server := &adminv1.ServerSample{Node: candidate.node, CountryCode: candidate.countryCode, Profile: candidate.profile}
-		if share, ok := shares[candidate.nodeID]; ok {
-			percent := uint32(share.Percent)
+		if sample, ok := usage[candidate.nodeID]; ok && sample.LoadPercent != nil {
+			percent := uint32(*sample.LoadPercent)
 			server.LoadPercent = &percent
 		}
 		out = append(out, server)

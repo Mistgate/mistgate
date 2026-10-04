@@ -26,7 +26,13 @@ func (f networkUsageFunc) NetworkUsage(nodeID string) (uint64, uint64, time.Time
 func TestSettingsCarryServerSamples(t *testing.T) {
 	m := newM3Rig(t) // de1 holds the hysteria2 profile "p" and the AmneziaWG one; group g has p, group g2 both
 	m.st.W.Exec(`UPDATE node SET country_code = 'DE' WHERE id = 'nod_1'`)
+	if _, err := m.st.W.Exec(`UPDATE node SET bandwidth_mbps = 100 WHERE id = 'nod_1'`); err != nil {
+		t.Fatal(err)
+	}
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_2', 'nl1', 'nl1.example.com', 'NL', 'active', 1)`)
+	if _, err := m.st.W.Exec(`UPDATE node SET bandwidth_mbps = 50 WHERE id = 'nod_2'`); err != nil {
+		t.Fatal(err)
+	}
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_3', 'aa-down', 'a.example.com', 'FI', 'pending', 1)`)
 	off := must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_2"}))).Msg.Inbound
 	must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_3"})))
@@ -51,7 +57,7 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	if r.SampleGroup != "g" || len(r.ServerSamples) != 2 || r.NamesLanguage != "en" {
 		t.Fatalf("samples = %q %v %q", r.SampleGroup, r.ServerSamples, r.NamesLanguage)
 	}
-	if s := r.ServerSamples; s[0].Node != "de1" || s[0].CountryCode != "DE" || s[0].Profile != "p" || s[0].GetLoadPercent() != 74 || s[1].Node != "nl1" || s[1].CountryCode != "NL" || s[1].GetLoadPercent() != 26 {
+	if s := r.ServerSamples; s[0].Node != "de1" || s[0].CountryCode != "DE" || s[0].Profile != "p" || s[0].GetLoadPercent() != 64 || s[1].Node != "nl1" || s[1].CountryCode != "NL" || s[1].GetLoadPercent() != 40 {
 		t.Errorf("samples = %v", s)
 	}
 	// The group most people are in; the switched-off inbound drops out.
