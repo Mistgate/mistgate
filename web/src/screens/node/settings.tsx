@@ -57,6 +57,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
       country: node.countryCode || none,
       location: node.location,
       provider: node.provider,
+      bandwidth: node.bandwidthMbps ? String(node.bandwidthMbps) : "",
       notes: data.notes,
       dns: data.dnsResolvers.join(", "),
       liveness: data.timeouts?.livenessTimeoutS || timeoutDefs.liveness.def,
@@ -84,6 +85,9 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
     name: namePattern.test(f.name) ? undefined : t("node.add.nameError"),
     address: addressPattern.test(f.address.trim()) ? undefined : t("node.add.addressError"),
     dns: dnsMode !== "custom" || (resolvers.length > 0 && resolvers.every((r) => resolverPattern.test(r))) ? undefined : t("node.settings.dnsError"),
+    bandwidth: f.bandwidth.trim() === "" || (/^\d+$/.test(f.bandwidth.trim()) && Number(f.bandwidth) <= 1_000_000)
+      ? undefined
+      : t("node.settings.bandwidthError"),
   };
   const dirty = (Object.keys(start) as (keyof typeof start)[]).some((k) => f[k] !== start[k]);
 
@@ -99,6 +103,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
         countryCode: changed("country") ? (f.country === none ? "" : f.country) : undefined,
         location: changed("location") ? f.location.trim() : undefined,
         provider: changed("provider") ? f.provider.trim() : undefined,
+        bandwidthMbps: changed("bandwidth") ? Number(f.bandwidth || "0") : undefined,
         notes: changed("notes") ? f.notes : undefined,
         dnsResolvers: changed("dns") ? { values: resolvers } : undefined,
         timeouts: timeoutsChanged
@@ -118,7 +123,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (dirty && !errors.name && !errors.address && !errors.dns) save.mutate();
+    if (dirty && !errors.name && !errors.address && !errors.dns && !errors.bandwidth) save.mutate();
   }
 
   const steppers: { key: TimeoutKey; label: string; hint: string }[] = [
@@ -157,6 +162,22 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           <TextField icon="map" tone="sand" label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={64} disabled={retired} />
         </div>
         <TextField icon="server" tone="sky" label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={64} disabled={retired} />
+        <TextField
+          icon="network"
+          tone="sky"
+          label={t("node.settings.bandwidth")}
+          hint={t("node.settings.bandwidthHint")}
+          value={f.bandwidth}
+          onChange={(e) => set("bandwidth", e.target.value)}
+          type="number"
+          min={0}
+          max={1_000_000}
+          step={1}
+          placeholder="0"
+          inputMode="numeric"
+          error={errors.bandwidth}
+          disabled={retired}
+        />
         <TextField icon="text" tone="sand" label={t("node.settings.notes")} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("node.settings.notesPh")} maxLength={500} />
 
         <div className="rounded-card border border-line bg-surface px-3.5 py-1">
@@ -233,7 +254,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" variant="primary" size="md" disabled={!dirty || !!errors.name || !!errors.address || !!errors.dns || save.isPending}>
+          <Button type="submit" variant="primary" size="md" disabled={!dirty || !!errors.name || !!errors.address || !!errors.dns || !!errors.bandwidth || save.isPending}>
             {t("common.save")}
           </Button>
         </div>

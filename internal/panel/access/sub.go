@@ -56,9 +56,17 @@ type SubServer struct {
 	URI         string // the same string as the matching Lines entry (a proxy for the Mihomo format)
 	Protocol    string // plugin id
 	ProfileID   string
+	NodeID      string // internal grouping key; never emitted as user-facing text
 	Node        string // node name
 	CountryCode string // node country, ISO 3166-1 alpha-2 or ""
+	Location    string
 	Profile     string // profile name
+	// LoadPercent is present only when this node has a configured capacity and a fresh metrics sample.
+	LoadPercent   *int
+	NetworkRxBps  uint64
+	NetworkTxBps  uint64
+	BandwidthMbps int
+	MetricsAt     time.Time
 }
 
 // SubDevice is one device of the user as the public page lists it.
@@ -296,7 +304,19 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if _, pinOK := protocols.NormalizePin(f.Inbound.CertPinSHA256); spec.TLS.Mode == plugin.TLSSelfSigned && !pinOK {
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
-		srv := SubServer{Node: f.Node.Name, CountryCode: f.Node.CountryCode, Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID}
+		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
+			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, BandwidthMbps: f.Node.BandwidthMbps}
+		if source, ok := s.online.(NetworkUsageSource); ok {
+			if rx, tx, at, available := source.NetworkUsage(f.Node.ID); available && !at.IsZero() {
+				age := now.Sub(at)
+				if age >= 0 && age <= 90*time.Second {
+					srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = rx, tx, at
+					if load, valid := nodeLoadPercent(rx, tx, f.Node.BandwidthMbps); valid {
+						srv.LoadPercent = &load
+					}
+				}
+			}
+		}
 		in := protocols.RenderInput{
 			Format: format, Settings: merged, Inbound: inboundView(nodeView(f.Node), spec, f.Inbound.CertPinSHA256),
 			UserID: u.ID, UserName: u.Name, DeviceID: dev.ID, Secret: secret,

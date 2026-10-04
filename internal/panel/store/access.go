@@ -81,14 +81,15 @@ func (a Access) tx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 // AccessNode is the part of a node row the access module reads (the fleet module owns the table).
 type AccessNode struct {
 	ID, Name, Address, CountryCode, Location, Provider string
+	BandwidthMbps                                      int
 	State                                              string // pending | active | retired
 }
 
-const accNodeCols = `n.id, n.name, n.address, n.country_code, n.location, n.provider, n.state`
+const accNodeCols = `n.id, n.name, n.address, n.country_code, n.location, n.provider, n.bandwidth_mbps, n.state`
 
 func scanAccessNode(r interface{ Scan(...any) error }) (AccessNode, error) {
 	var n AccessNode
-	err := r.Scan(&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.State)
+	err := r.Scan(&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.BandwidthMbps, &n.State)
 	return n, err
 }
 

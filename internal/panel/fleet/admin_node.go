@@ -245,6 +245,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(n.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
+		BandwidthMbps: uint32(n.BandwidthMbps),
 	}
 	caps := n.AgentCaps
 	if s != nil {
@@ -621,6 +622,13 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 		p.TorrentBlockerEnabled = m.TorrentBlockerEnabled
+	}
+	if m.BandwidthMbps != nil {
+		if *m.BandwidthMbps > 1_000_000 {
+			return nil, invalid("bandwidth_mbps must be between 0 and 1000000")
+		}
+		bandwidth := int(*m.BandwidthMbps)
+		p.BandwidthMbps = &bandwidth
 	}
 	n, err := f.st.UpdateNode(ctx, m.NodeId, p)
 	switch {

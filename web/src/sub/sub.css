@@ -360,6 +360,26 @@ b { font-weight: 700; }
 .lock-none { margin-top: 4px; }
 .inp.pw { height: 54px; text-align: center; font-size: 22px; letter-spacing: 0.12em; }
 
+/* Live node network capacity, used to help users choose a less busy server. */
+.server-loads { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.server-load-head { display: flex; flex-direction: column; gap: 4px; }
+.server-load-head b { font-size: 16px; }
+.server-load-head p { margin: 0; line-height: 1.45; }
+.server-load-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 8px; }
+.server-load-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); }
+.server-load-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.server-load-top > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.server-load-pct { display: inline-flex; align-items: center; gap: 6px; flex: none; font-family: var(--mono); font-weight: 800; color: var(--accent-text); }
+.server-load-pct.high { color: color-mix(in oklch, var(--warning) var(--txt), #000); }
+.server-load-pct.unknown { color: var(--muted); }
+.server-load-pct small { font-family: inherit; font-size: 11px; font-weight: 700; }
+.server-load-bar { grid-column: 1 / -1; height: 7px; overflow: hidden; border-radius: 99px; background: var(--surface-2); }
+.server-load-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.server-load-bar i.high { background: var(--warning); }
+.server-load-row > .sm { grid-column: 1 / -1; }
+.server-load-notice { margin: 0; padding: 11px 13px; border: 1px solid var(--accent-line); border-radius: 13px; background: var(--accent-soft); font-size: 13px; line-height: 1.45; text-wrap: pretty; }
+.server-load-notice.high { border-color: var(--warning-line); background: var(--warning-soft); }
+
 @media (max-width: 719.98px) {
   .only-w { display: none !important; }
   .hero .btn { width: 100%; }

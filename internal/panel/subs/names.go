@@ -42,6 +42,11 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 		if n == "" {
 			n = "server"
 		}
+		if s.LoadPercent != nil {
+			n += " · " + strconv.Itoa(*s.LoadPercent) + "%"
+		} else if !s.MetricsAt.IsZero() {
+			n += " · ↓" + rateMbps(s.NetworkRxBps) + " ↑" + rateMbps(s.NetworkTxBps) + " Mbps"
+		}
 		name := n
 		for k := 2; taken[name]; k++ {
 			name = n + " " + strconv.Itoa(k)
@@ -50,6 +55,12 @@ func remarks(servers []access.SubServer, template, lang string) []string {
 		names[i] = name
 	}
 	return names
+}
+
+func rateMbps(bps uint64) string {
+	n := strconv.FormatFloat(float64(bps)/1_000_000, 'f', 1, 64)
+	n = strings.TrimSuffix(strings.TrimSuffix(n, "0"), ".")
+	return n
 }
 
 // clean drops control characters and collapses runs of whitespace, so a node name cannot break the line.

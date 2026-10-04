@@ -1,5 +1,5 @@
 import { dict, type Dict } from "./i18n";
-import type { AmneziaData, AppEntry, AwgConfig, AwgDevice, AwgProfile, Device, Kind, Lang, MgData, MinClient, Platform, Status } from "./types";
+import type { AmneziaData, AppEntry, AwgConfig, AwgDevice, AwgProfile, Device, Kind, Lang, MgData, MinClient, Platform, ServerLoad, Status } from "./types";
 
 // Pure functions of the page data: normalisation, platform detection, the numbers in the hero. No DOM here.
 
@@ -92,6 +92,13 @@ export function normalize(raw: unknown): MgData {
     title: str(r.title),
     subscription_url: str(r.subscription_url),
     server_count: num(r.server_count),
+    server_loads: list(r.server_loads).flatMap((s): ServerLoad[] => {
+      const capacity = num(s.capacity_mbps);
+      const percent = num(s.load_percent);
+      if (typeof s.name !== "string" || !s.name.trim()) return [];
+      const loadPercent = capacity > 0 && percent >= 0 && percent <= 100 ? percent : undefined;
+      return [{ name: str(s.name), load_percent: loadPercent, rx_bps: num(s.rx_bps), tx_bps: num(s.tx_bps), capacity_mbps: capacity }];
+    }),
     user: {
       name: str(u.name),
       status: statuses.includes(u.status as Status) ? (u.status as Status) : "active",

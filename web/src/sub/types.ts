@@ -18,6 +18,9 @@ export type Device = {
   online: boolean;
 };
 
+/** Fresh network-interface rates; utilization is omitted when the channel capacity is unknown. */
+export type ServerLoad = { name: string; load_percent?: number; rx_bps: number; tx_bps: number; capacity_mbps: number };
+
 /**
  * Amnezia part of the page (subs/devices.go pageAmnezia): the user's AmneziaWG devices and what
  * "add a device" can pick from. There is no key material in it: configs are asked for, one device at a time
@@ -68,6 +71,8 @@ export type MgData = {
   subscription_url: string;
   /** Servers the link gives Happ ("all your servers (3) appear in Happ"); 0 when unknown. */
   server_count: number;
+  /** Nodes with a fresh sample and a capacity configured by the admin. */
+  server_loads: ServerLoad[];
   user: {
     name: string;
     status: Status;
