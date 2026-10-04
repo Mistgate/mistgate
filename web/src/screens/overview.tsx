@@ -300,6 +300,11 @@ function TopCard({ data }: { data: OverviewResponse }) {
   const fmt = useFmt();
   const top = data.topConsumers;
   const best = Math.max(1, ...top.map((u) => u.downBps));
+  const rate = (bps: number) => {
+    if (bps >= 1_000_000) return fmt.mbit(bps);
+    if (bps >= 1_000) return `${fmt.num(bps / 1_000, bps >= 10_000 ? 0 : 1)} ${t("unit.kbit")}`;
+    return `${fmt.num(bps, 0)} ${t("unit.bit")}`;
+  };
   return (
     <section className="flex flex-col gap-2.5 rounded-card-lg border border-line bg-surface p-4">
       <SectionLabel as="h2" icon="traffic" tone="sky">
@@ -313,7 +318,7 @@ function TopCard({ data }: { data: OverviewResponse }) {
               <Link to="/users/$id" params={{ id: u.userId }} className="min-w-0 flex-1 truncate font-bold transition-colors hover:text-accent-text">
                 {u.userName}
               </Link>
-              <span className="font-mono text-xs">{fmt.mbit(u.downBps)}</span>
+              <span className="font-mono text-xs">{rate(u.downBps)}</span>
             </div>
             <div className="h-1 overflow-hidden rounded-[2px] bg-surface-2">
               <div className="h-full rounded-[2px] bg-accent" style={{ width: `${Math.max(3, Math.round((u.downBps / best) * 100))}%` }} />
@@ -328,4 +333,3 @@ function TopCard({ data }: { data: OverviewResponse }) {
     </section>
   );
 }
-
