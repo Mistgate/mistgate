@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"testing"
 	"time"
 
@@ -22,7 +23,13 @@ func signedNodeRelease(t *testing.T, priv ed25519.PrivateKey, tag string, built 
 	t.Helper()
 	manifest := &release.Manifest{Schema: release.Schema, Version: tag, Built: built, Expires: expires}
 	assets := make(map[string][]byte, len(files)+2)
-	for name, data := range files {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		data := files[name]
 		base, goos, arch, err := release.ParseBinaryName(name)
 		if err != nil || base != "mistgate-node" {
 			t.Fatalf("invalid test node binary name %q: %v", name, err)
@@ -134,6 +141,17 @@ func TestGitHubNodeBundleSourceDownloadsAndVerifiesRelease(t *testing.T) {
 	}
 	if requested["mistgate-node-linux-amd64"] != 1 || requested["mistgate-node-linux-arm64"] != 1 {
 		t.Fatalf("same-build poll re-downloaded binaries: %#v", requested)
+	}
+}
+
+func TestSameReleaseFilesIgnoresManifestOrder(t *testing.T) {
+	first := release.File{Name: "mistgate-node-linux-amd64"}
+	second := release.File{Name: "mistgate-node-linux-arm64"}
+	if !sameReleaseFiles([]release.File{first, second}, []release.File{second, first}) {
+		t.Fatal("the same signed files in a different manifest order must match")
+	}
+	if sameReleaseFiles([]release.File{first, second}, []release.File{first, {Name: "mistgate-node-linux-arm64", Size: 1}}) {
+		t.Fatal("files with different signed metadata must not match")
 	}
 }
 
