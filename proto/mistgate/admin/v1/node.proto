@@ -71,6 +71,8 @@ message Node {
   bool torrent_blocker_enabled = 21;
   // The connected or last-seen agent lists "torrentguard/1".
   bool torrent_blocker_supported = 22;
+  // Optional symmetric network capacity in Mbps; 0 means unknown and disables utilization percentages.
+  uint32 bandwidth_mbps = 23;
 }
 
 enum AwgPrepareState {
@@ -232,6 +234,8 @@ message UpdateNodeRequest {
   optional string awg_backend = 10;
   // Requires an agent with "torrentguard/1" when true. Disabling is always allowed.
   optional bool torrent_blocker_enabled = 11;
+  // Symmetric network capacity in Mbps. 0 disables utilization percentages; maximum 1,000,000.
+  optional uint32 bandwidth_mbps = 12;
 }
 
 message DnsResolvers {

@@ -63,18 +63,19 @@ type session struct {
 	driftResent  bool
 
 	// Live data shown in the UI. Guarded by liveMu.
-	liveMu   sync.Mutex
-	metrics  *agentv1.HostMetrics
-	health   []*agentv1.InboundHealth
-	online   []onlineSess
-	userDown map[string]uint64 // bits/s per user, from the newest batch
-	userUp   map[string]uint64
-	lastEnd  int64
-	lastSeen time.Time
-	drift    bool
-	cmds     map[string]chan *agentv1.CommandResult
-	docs     map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
-	logs     map[string]*logSub
+	liveMu    sync.Mutex
+	metrics   *agentv1.HostMetrics
+	metricsAt time.Time // panel receive time of the newest host metrics sample
+	health    []*agentv1.InboundHealth
+	online    []onlineSess
+	userDown  map[string]uint64 // bits/s per user, from the newest batch
+	userUp    map[string]uint64
+	lastEnd   int64
+	lastSeen  time.Time
+	drift     bool
+	cmds      map[string]chan *agentv1.CommandResult
+	docs      map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
+	logs      map[string]*logSub
 
 	// Only touched by the stream's own goroutine.
 	ackPending, ackSent uint64
@@ -451,6 +452,7 @@ func (s *session) applySnapshot(st *agentv1.StatsBatch, traffic []store.FleetTra
 	s.lastEnd = end
 	if st.Host != nil {
 		s.metrics = st.Host
+		s.metricsAt = now
 	}
 	s.health = st.Health
 	s.online = s.online[:0]

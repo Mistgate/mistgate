@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -96,6 +97,7 @@ type pageData struct {
 	Title           string       `json:"title"`
 	SubscriptionURL string       `json:"subscription_url"`
 	ServerCount     int          `json:"server_count"` // servers the link gives Happ ("all your servers (3) appear in Happ")
+	ServerLoads     []pageServer `json:"server_loads"`
 	User            pageUser     `json:"user"`
 	Announcement    string       `json:"announcement"`
 	SupportURL      string       `json:"support_url"`
@@ -108,6 +110,14 @@ type pageData struct {
 	// rest is empty, and UnlockURL is where the form posts the password.
 	Locked    bool   `json:"locked"`
 	UnlockURL string `json:"unlock_url"`
+}
+
+type pageServer struct {
+	Name         string `json:"name"`
+	LoadPercent  *int   `json:"load_percent,omitempty"`
+	RxBps        uint64 `json:"rx_bps"`
+	TxBps        uint64 `json:"tx_bps"`
+	CapacityMbps int    `json:"capacity_mbps"`
 }
 
 type pageBrand struct {
@@ -177,7 +187,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	}
 	opt := set.GetUserPage()
 	d := pageData{
-		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines),
+		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines), ServerLoads: serverLoads(v.Servers, lang),
 		Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
 		User: pageUser{
 			Name: pageName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
@@ -208,6 +218,57 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	return d
 }
 
+// serverLoads returns one row per eligible node, not per protocol profile. Fresh rates are automatic; percentages are
+// included only when the panel owner has configured a link capacity.
+func serverLoads(servers []access.SubServer, lang string) []pageServer {
+	indexes := map[string]int{}
+	out := make([]pageServer, 0, len(servers))
+	for _, server := range servers {
+		if server.MetricsAt.IsZero() {
+			continue
+		}
+		key := server.NodeID
+		if key == "" {
+			key = server.Node
+		}
+		if _, ok := indexes[key]; ok {
+			continue // multiple Hysteria/AWG profiles on one machine share its host-level measurement
+		}
+		name := access.CountryName(server.CountryCode, lang)
+		place := strings.TrimSpace(server.Location)
+		if place == "" {
+			place = server.Node
+		}
+		if place != "" && place != name {
+			if name == "" {
+				name = place
+			} else {
+				name += " · " + place
+			}
+		}
+		if name == "" {
+			name = "Server"
+		}
+		indexes[key] = len(out)
+		out = append(out, pageServer{Name: name, LoadPercent: server.LoadPercent, RxBps: server.NetworkRxBps,
+			TxBps: server.NetworkTxBps, CapacityMbps: server.BandwidthMbps})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.LoadPercent != nil && b.LoadPercent != nil {
+			return *a.LoadPercent > *b.LoadPercent
+		}
+		if a.LoadPercent != nil {
+			return true
+		}
+		if b.LoadPercent != nil {
+			return false
+		}
+		return max(a.RxBps, a.TxBps) > max(b.RxBps, b.TxBps)
+	})
+	return out
+}
+
 // lockedPageData is the page data of a locked page: the brand and the unlock address, no user, no apps, no link.
 func lockedPageData(link, title, lang string, b instance.Settings) pageData {
 	parts := []string{b.BrandHead}
@@ -216,7 +277,7 @@ func lockedPageData(link, title, lang string, b instance.Settings) pageData {
 	}
 	return pageData{
 		V: 1, Lang: lang, Title: title, Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
-		Apps: []pageApp{}, Devices: []pageDevice{}, Locked: true, UnlockURL: link + "/unlock",
+		Apps: []pageApp{}, Devices: []pageDevice{}, ServerLoads: []pageServer{}, Locked: true, UnlockURL: link + "/unlock",
 	}
 }
 

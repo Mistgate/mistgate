@@ -230,6 +230,21 @@ func (f *Fleet) OnlineUsers() map[string]string {
 	return out
 }
 
+// NetworkUsage returns the latest host-network sample received from a connected node. The timestamp is when the
+// panel received that sample, so callers can hide percentages when the agent stops reporting.
+func (f *Fleet) NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool) {
+	s := f.session(nodeID)
+	if s == nil {
+		return 0, 0, time.Time{}, false
+	}
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	if s.metrics == nil || s.metricsAt.IsZero() {
+		return 0, 0, time.Time{}, false
+	}
+	return s.metrics.NetRxBps, s.metrics.NetTxBps, s.metricsAt, true
+}
+
 func (f *Fleet) snapshotSessions() []*session {
 	f.mu.Lock()
 	defer f.mu.Unlock()

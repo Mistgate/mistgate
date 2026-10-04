@@ -61,6 +61,49 @@ const bar = (pct: number, cls = "") => h("div", { class: "bar" }, h("i", { class
 const dot = () => h("i", { class: "dot" });
 const chip = (text: string) => h("span", { class: "chip" }, dot(), text);
 
+function mbps(bps: number, lang: Lang): string {
+  return new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "en-US", { maximumFractionDigits: 1 }).format(bps / 1_000_000);
+}
+
+function serverLoadCard(d: MgData, lang: Lang, t: Dict): HTMLElement | null {
+  if (d.server_loads.length === 0) return null;
+  const measured = d.server_loads.filter((server) => server.load_percent !== undefined);
+  const busiest = measured[0];
+  const busiestPercent = busiest?.load_percent ?? 0;
+  const alternative = busiestPercent >= 80
+    ? measured.filter((server) => server !== busiest && (server.load_percent ?? 100) < 80).sort((a, b) => (a.load_percent ?? 100) - (b.load_percent ?? 100))[0]
+    : undefined;
+  const notice = busiestPercent >= 80
+    ? alternative
+      ? t.serverLoadTry(busiest!.name, busiestPercent, alternative.name, alternative.load_percent ?? 0)
+      : t.serverLoadBusy
+    : null;
+  return h(
+    "section",
+    { class: "card server-loads", "aria-label": t.serverLoadTitle },
+    h("div", { class: "server-load-head" }, h("b", null, t.serverLoadTitle), h("p", { class: "mut sm" }, t.serverLoadIntro)),
+    h(
+      "div",
+      { class: "server-load-list" },
+      ...d.server_loads.map((server) => {
+        const high = server.load_percent !== undefined && server.load_percent >= 80;
+        return h(
+          "div",
+          { class: "server-load-row" },
+          h("div", { class: "server-load-top" },
+            h("b", null, server.name),
+            h("span", { class: `server-load-pct${high ? " high" : server.load_percent === undefined ? " unknown" : ""}` },
+              server.load_percent === undefined ? t.serverLoadUnknown : `${server.load_percent}%`, high && h("small", null, t.serverLoadBusy)),
+          ),
+          server.load_percent !== undefined && h("div", { class: "server-load-bar" }, h("i", { class: high ? "high" : "", style: { width: `${server.load_percent}%` } })),
+          h("span", { class: "mut sm" }, t.serverLoadRates(mbps(server.rx_bps, lang), mbps(server.tx_bps, lang), server.capacity_mbps)),
+        );
+      }),
+    ),
+    notice && h("p", { class: `server-load-notice${alternative ? "" : " high"}`, role: "status" }, notice),
+  );
+}
+
 /** The top bar: logo, name and the language switch. Shared by the page and the password form. */
 export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
   const t = dict[lang];
@@ -122,7 +165,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     explain && h("div", { class: `note only-w tone-${d.user.status}` }, h("p", null, support ? `${why?.[0]} ${why?.[1]}` : why?.[0]), supportBtn("")),
   ];
 
-  if (active) children.push(staleCard({ d, s, a, t }), ...connect(d, s, a, t, support));
+  if (active) children.push(serverLoadCard(d, s.lang, t), staleCard({ d, s, a, t }), ...connect(d, s, a, t, support));
   // the support card on an active page; a page with a problem has the button in the hero already
   if (support && active) {
     children.push(

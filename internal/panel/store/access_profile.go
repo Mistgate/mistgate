@@ -400,7 +400,7 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 			&i.State, &i.LastError, &i.CertPinSHA256, &notAfter, &ic, &iu,
 			&i.PluginStateEnc, &i.PluginPublicJSON, &i.AwgHealthJSON, &healthAt,
 			&p.ID, &p.Protocol, &p.Name, &p.SettingsJSON, &p.SecretsEnc, &p.Version, &pc, &pu,
-			&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.State); err != nil {
+			&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.BandwidthMbps, &n.State); err != nil {
 			return nil, err
 		}
 		i.PortOverride = uint16(port.Int64)

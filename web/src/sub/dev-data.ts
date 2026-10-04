@@ -101,6 +101,11 @@ const base: MgData = {
   title: "Mistgate",
   subscription_url: url,
   server_count: 3,
+  server_loads: [
+    { name: "Эстония", load_percent: 86, rx_bps: 86_000_000, tx_bps: 72_000_000, capacity_mbps: 100 },
+    { name: "Германия", load_percent: 42, rx_bps: 42_000_000, tx_bps: 37_000_000, capacity_mbps: 100 },
+    { name: "Россия", load_percent: 18, rx_bps: 18_000_000, tx_bps: 14_000_000, capacity_mbps: 100 },
+  ],
   user: {
     name: "Лена",
     status: "active",
