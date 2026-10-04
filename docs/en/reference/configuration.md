@@ -108,7 +108,7 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `awg prepare-kernel --yes` | none | off | Run the plan; without it the plan is only printed. |
 | `awg prepare-kernel --verify-only` | none | off | Only check a module that is already installed. |
 | `awg prepare-kernel --status-file` | none | none | Where to report progress; used by the agent. |
-| `awg prepare-kernel --timeout` | none | `15m` | Hard limit of the run. |
+| `awg prepare-kernel --timeout` | none | `45m` | Hard limit of the run. |
 
 `cleanup-net` and `version` take no flags. Everything else about a node (its address, country, DNS, timeouts, AmneziaWG backend, WARP) is set in the admin and reaches the agent over its connection.
 

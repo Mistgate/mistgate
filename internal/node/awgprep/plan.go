@@ -23,10 +23,6 @@ const (
 	pinnedModuleCommit = "4569c4c"
 	moduleRepo         = "https://github.com/amnezia-vpn/amneziawg-linux-kernel-module"
 	modulesLoadFile    = "/etc/modules-load.d/amneziawg.conf"
-
-	// aptLockWait is how long apt may wait for another package manager (unattended-upgrades on a fresh VPS) before the
-	// install gives up; the job also waits for the lock before it starts (job.go) instead of failing at once.
-	aptLockWait = "300"
 )
 
 // Codes of Unsupported.Code and Failure.Code: a stable vocabulary (agent.proto "AWG AND WARP"), the UI words them.
@@ -77,7 +73,13 @@ type Step struct {
 // aptInstall is `apt-get install` that never asks, waits for the dpkg lock and does not pull recommended packages (dkms
 // recommends linux-headers-generic, which is neither the running kernel nor small).
 func aptInstall(pkgs ...string) []string {
-	return append([]string{"apt-get", "-o", "DPkg::Lock::Timeout=" + aptLockWait, "install", "-y", "--no-install-recommends"}, pkgs...)
+	return append([]string{"apt-get", "-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds), "install", "-y", "--no-install-recommends"}, pkgs...)
+}
+
+// aptUpdate sets the same timeout for any dpkg lock apt may acquire while refreshing its package index. The explicit
+// WaitAptLock check also covers the apt lists and archive locks, which DPkg::Lock::Timeout does not cover.
+func aptUpdate() []string {
+	return []string{"apt-get", "-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds), "update"}
 }
 
 // Plan returns the commands for this machine, or an *Unsupported that says why the module cannot be installed here.
@@ -97,7 +99,7 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 	switch {
 	case id == "ubuntu":
 		steps = []Step{
-			{Desc: "refresh the package index", Cmd: []string{"apt-get", "update"}},
+			{Desc: "refresh the package index", Cmd: aptUpdate()},
 			{Desc: "install the PPA tooling and the headers of the running kernel (the DKMS package does not depend on them)",
 				Cmd: aptInstall("software-properties-common", "python3-launchpadlib", "gnupg2", headers)},
 			{Desc: "add the Amnezia PPA", Cmd: []string{"add-apt-repository", "-y", "ppa:amnezia/ppa"}},
@@ -108,7 +110,7 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 	case id == "debian" || (strings.Contains(like, "debian") && id != ""):
 		cpus := max(e.CPUs, 1)
 		steps = []Step{
-			{Desc: "refresh the package index", Cmd: []string{"apt-get", "update"}},
+			{Desc: "refresh the package index", Cmd: aptUpdate()},
 			{Desc: "install the build tools and the headers of the running kernel", Cmd: aptInstall("git", "make", "gcc", headers)},
 			{Desc: "fetch the pinned source " + pinnedModuleTag, Cmd: []string{"git", "clone", "--depth", "1", "--branch", pinnedModuleTag, moduleRepo, "{src}"}},
 			{Desc: "check the commit of the clone", Cmd: []string{"git", "-C", "{src}", "rev-parse", "HEAD"}, Check: func(out string) error {

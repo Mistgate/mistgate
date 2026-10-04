@@ -22,11 +22,11 @@ import (
 // prepare the module (--status-file: the agent follows the run through that file; the agent itself never installs a package
 // inside its hardened unit).
 
-const awgUsage = `usage: mistgate-node awg prepare-kernel [--yes] [--verify-only] [--status-file FILE] [--timeout 15m]
+const awgUsage = `usage: mistgate-node awg prepare-kernel [--yes] [--verify-only] [--status-file FILE] [--timeout 45m]
 
   prepare-kernel   put the AmneziaWG kernel module on this node (root, Linux). Without --yes it only prints what it would
-                   run; --yes runs it, with a hard timeout (default 15m) and without questions (apt is non-interactive and
-                   waits for another package manager's lock). --verify-only checks a module that is already there (loaded,
+                   run; --yes runs it, with a hard timeout (default 45m) and without questions (apt is non-interactive and
+                   waits up to 30 minutes for package-manager locks). --verify-only checks a module that is already there (loaded,
                    genl v3, loaded at boot). --status-file is for the agent: it reports progress and the result there.
                    The userspace backend needs no module.
 `

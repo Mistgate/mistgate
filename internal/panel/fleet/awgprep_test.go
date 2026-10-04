@@ -278,6 +278,11 @@ func TestNodeViewSaysWhetherTheAgentCanPrepareAndDoesNotSpinForever(t *testing.T
 	if m := awgPrepareMsg(n, prepCaps, now); !m.Supported || m.State != adminv1.AwgPrepareState_AWG_PREPARE_STATE_RUNNING || m.SinceUnix != 99000 {
 		t.Errorf("a fresh run = %+v", m)
 	}
+	// The node's hard limit is now 45 minutes. A run at minute 44 can still be installing or building.
+	n.AwgPrepareJSON = `{"state":"running","since":97360,"want":true}`
+	if m := awgPrepareMsg(n, prepCaps, now); m.State != adminv1.AwgPrepareState_AWG_PREPARE_STATE_RUNNING {
+		t.Errorf("a run within the new hard timeout = %+v", m)
+	}
 	n.AwgPrepareJSON = `{"state":"running","since":1000,"want":true}`
 	if m := awgPrepareMsg(n, prepCaps, now); m.State != adminv1.AwgPrepareState_AWG_PREPARE_STATE_FAILED || m.ReasonCode != "interrupted" {
 		t.Errorf("a run nobody heard of for hours = %+v", m)

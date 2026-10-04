@@ -139,7 +139,8 @@ func TestRunReportsAFailedStep(t *testing.T) {
 }
 
 func TestRunNamesALockedPackageManager(t *testing.T) {
-	r := &recRun{fail: "apt-get -o", out: map[string]string{"apt-get -o": "E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 812 (unattended-upgr)\n"}}
+	lockedInstall := "apt-get -o DPkg::Lock::Timeout=1800 install"
+	r := &recRun{fail: lockedInstall, out: map[string]string{lockedInstall: "E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 812 (unattended-upgr)\n"}}
 	var wrote string
 	err := Run(context.Background(), io.Discard, debianPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
 	if codeOf(t, err) != CodeAptLock {
@@ -249,7 +250,8 @@ func TestJobWritesAStatusFromRunningToDone(t *testing.T) {
 }
 
 func TestJobAptFailureLeavesAShortFailedStatus(t *testing.T) {
-	r := &recRun{fail: "apt-get -o", out: map[string]string{"apt-get -o": "E: Unable to locate package linux-headers-6.1.0-18-amd64\n" + strings.Repeat("noise\n", 100)}}
+	failedInstall := "apt-get -o DPkg::Lock::Timeout=1800 install"
+	r := &recRun{fail: failedInstall, out: map[string]string{failedInstall: "E: Unable to locate package linux-headers-6.1.0-18-amd64\n" + strings.Repeat("noise\n", 100)}}
 	var wrote string
 	job, path := jobFor(t, okEnv, r, &wrote)
 	err := job.Do(context.Background())
@@ -330,6 +332,24 @@ func TestJobWaitsForAForeignAptLockBeforeTheFirstCommand(t *testing.T) {
 	}
 	if ranWhenBusy != 0 {
 		t.Errorf("%d commands ran while another package manager held the lock", ranWhenBusy)
+	}
+}
+
+func TestJobWaitsForAptLockLongerThanTheOldFiveMinuteLimit(t *testing.T) {
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	var wrote string
+	job, _ := jobFor(t, okEnv, r, &wrote)
+	var checks int
+	job.Sys.AptBusy = func() bool {
+		checks++
+		return checks <= 122 // more than five minutes at the three-second polling interval
+	}
+	job.Sys.Sleep = func(context.Context, time.Duration) {}
+	if err := job.Do(context.Background()); err != nil {
+		t.Fatalf("job failed while waiting for a lock that eventually clears: %v", err)
+	}
+	if len(r.ran) == 0 {
+		t.Fatal("the plan did not run after the lock cleared")
 	}
 }
 

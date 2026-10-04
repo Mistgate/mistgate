@@ -123,7 +123,7 @@ The module is built from source on the node, which installs packages as root. Th
 **From the panel** (agents that can do it). Pick **Kernel module** and **Save**. The panel asks the node first:
 
 - the module is already loaded: the setting just switches;
-- it can be built: the window **Build the kernel module on …?** explains what happens. The node installs what the build needs (dkms on Ubuntu, make, gcc and the headers of its running kernel: a few hundred MB), builds and loads the module. It usually takes 1–5 minutes, with a hard limit of 15. AmneziaWG keeps running as before the whole time. When the module is ready, the node switches to it and connected devices reconnect once;
+- it can be built: the window **Build the kernel module on …?** explains what happens. The node installs what the build needs (dkms on Ubuntu, make, gcc and the headers of its running kernel: a few hundred MB), builds and loads the module. The build usually takes 1–5 minutes. If a system package update is already running, Mistgate waits up to 30 minutes for apt to release its lock. The whole job has a 45-minute limit. AmneziaWG keeps running as before the whole time. When the module is ready, the node switches to it and connected devices reconnect once;
 - it cannot be built here: the card says why and shows the manual command.
 
 The card follows the build: "Preparing the module… (running N min)", then **Module ready**, or **Failed** with the reason and **Retry**. A failed build changes nothing: the node keeps the backend it had. The build's log is on the node:
@@ -136,7 +136,7 @@ journalctl -u mistgate-awg-prepare
 
 ```sh
 mistgate-node awg prepare-kernel          # print the plan, run nothing
-mistgate-node awg prepare-kernel --yes    # run it (hard limit 15 minutes)
+mistgate-node awg prepare-kernel --yes    # run it (waits up to 30 minutes for apt; 45-minute hard limit)
 mistgate-node awg prepare-kernel --verify-only   # check a module that is already there
 ```
 

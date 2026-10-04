@@ -108,7 +108,7 @@ description: Все флаги mistgate serve и mistgate setup с переме�
 | `awg prepare-kernel --yes` | нет | выключен | Выполнить план; без флага план только печатается. |
 | `awg prepare-kernel --verify-only` | нет | выключен | Только проверить уже установленный модуль. |
 | `awg prepare-kernel --status-file` | нет | нет | Куда писать ход работы; им пользуется агент. |
-| `awg prepare-kernel --timeout` | нет | `15m` | Жёсткий предел времени работы. |
+| `awg prepare-kernel --timeout` | нет | `45m` | Жёсткий предел времени работы. |
 
 У `cleanup-net` и `version` флагов нет. Всё остальное о ноде (адрес, страна, DNS, таймауты, бэкенд AmneziaWG, WARP) задаётся в админке и приходит к агенту по его соединению.
 

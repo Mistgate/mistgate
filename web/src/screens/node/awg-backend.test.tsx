@@ -218,9 +218,9 @@ describe("how the preparation is shown", () => {
   });
 
   it("failed with a timeout: only the sentence, there is no detail to add", async () => {
-    await mount(data({ supported: true, state: AwgPrepareState.FAILED, sinceUnix: nowS(), reasonCode: "timeout", reason: "it did not finish within 15 minutes and was stopped" }));
-    expect(text()).toContain("Failed: the build did not finish in 15 minutes and was stopped");
-    expect(text()).not.toContain("it did not finish within 15 minutes");
+    await mount(data({ supported: true, state: AwgPrepareState.FAILED, sinceUnix: nowS(), reasonCode: "timeout", reason: "it did not finish within 45 minutes and was stopped" }));
+    expect(text()).toContain("Failed: the build did not finish in 45 minutes and was stopped");
+    expect(text()).not.toContain("it did not finish within 45 minutes");
   });
 
   it("an old agent shows no preparation status at all", async () => {
