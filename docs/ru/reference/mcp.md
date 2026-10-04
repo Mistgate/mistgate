@@ -101,7 +101,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `alerts_list` | Только чтение | Активные алерты; с `include_history` ещё и закрытые (`window_s` до 30 дней). |
 | `events_search` | Только чтение | Лента событий по ноде, пользователю, `min_severity` (`info`, `warning`, `error`) или точному `code`; по страницам через `before_id`. |
 | `checks_results` | Только чтение | Проверки глазами клиента: ноды по профилям, последний результат, неудачи подряд и 24 часа истории. |
-| `updates_status` | Только чтение | Сборка панели, статус и версия пакета, состояние обновления каждой ноды, идущая или последняя раскатка. |
+| `updates_status` | Только чтение | Сборка панели, статус и версия пакета, состояние обновления и сохранённое расписание каждой ноды, идущая или последняя раскатка и фиксированное смещение UTC для новых расписаний. |
 | `node_server_access_list` | Админ | Сохранённый SSH-адрес ноды, логин, отпечаток и признак необходимости восстановления смены пароля. Без пароля. |
 | `audit_search` | Админ | Журнал аудита с фильтрами `source` (`panel`, `bot`, `mcp`, `api`), автор или действие; по страницам через `before_id`. |
 
@@ -112,20 +112,25 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | Инструмент | Профиль | Аргументы | Нужен владелец |
 |---|---|---|---|
 | `user_create` | Оператор | `name`, `group_id`, по желанию `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month`, `rolling_month`), `term_days`, `device_limit`, `apps` (`happ`, `amnezia`), `nodes` (`all` или `node_ids`), `speed_limit_bps`, `dns_preset_id` | нет |
-| `user_update` | Оператор | `user_id` и только меняемые поля (как выше, с `expires_unix` вместо `term_days`) | нет |
+| `user_update` | Оператор | `user_id`, при необходимости `subscription_name` (пустое значение использует `name`), и только меняемые поля (как выше, с `expires_unix` вместо `term_days`) | нет |
 | `user_disable` | Оператор | `user_ids` (от 1 до 50) | если пользователей больше 3 |
 | `user_enable` | Оператор | `user_ids` (от 1 до 50) | нет |
 | `user_reset_traffic` | Оператор | `user_ids` (от 1 до 50) | если пользователей больше 3 |
 | `device_revoke` | Оператор | `user_id`, `device_id` | нет |
 | `alert_mute` | Оператор | `alert_id`, `duration_s` (не больше 604800; 0 снимает заглушку) | нет |
 | `node_fix` | Админ | `node`, `fix_id` из отчёта доктора, `params`, если пункт их перечисляет | всегда |
-| `rollout_start` | Админ | по желанию `node_ids` (пусто — все устаревшие ноды) и `batch_size` (0 — значение панели по умолчанию; панель принимает не больше 10) | всегда |
+| `rollout_start` | Админ | ровно одна запись `node_ids` из `updates_status` (обновит эту ноду сейчас) | всегда |
+| `node_update_schedule` | Админ | План: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` в смещении из `updates_status`); доверенная версия и смещение закрепляются в плане | всегда |
+| `node_update_schedule_cancel` | Админ | `node_id` | всегда |
+| `update_timezone` | Админ | `timezone_offset_minutes` (фиксированное смещение UTC к востоку, шаг 15 минут; `180` — GMT+3) | всегда |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Админ | `rollout_id` из `updates_status` | всегда |
 | `node_rollback` | Админ | `node` | всегда |
 | `node_install` | Админ | План: `host`, `port`, `username`, имя ноды `name`, `address`, необязательно `country_code`, `location`, `provider`; применение: `confirm_token`, SSH-пароль `password`, точный подтверждённый `confirmed_fingerprint` | всегда |
 | `node_server_password_rotate` | Админ | План: ID ноды или точное имя `node`; применение: `confirm_token`, `new_password` (не короче 12 символов) | всегда |
 
 Каждый `_plan` принимает ещё `reason`: слова самого агента, не длиннее 300 символов, владелец видит их как цитату. Пароли нод передаются только отдельным аргументом в `_apply`: в MCP-план они не сохраняются и инструмент их не возвращает. `user_create` никогда не возвращает ссылку подписки нового пользователя: её копирует владелец в админке.
+
+`rollout_start_plan` запускает обновление только одной выбранной ноды; массовое обновление через этот инструмент недоступно. `node_update_schedule_plan` сохраняет будущее обновление одной ноды после одобрения владельцем. Задание закреплено за подписанным релизом и фиксированным смещением UTC. Если в назначенное время нода отключена, панель дождётся её подключения; если подписанный пакет сменился, задание останется видимым и панель не подменит версию. Для отмены используйте `node_update_schedule_cancel_plan`. `update_timezone` влияет только на новые задания; у существующих остаются прежние момент и смещение.
 
 ## План и применение
 

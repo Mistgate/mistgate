@@ -1,7 +1,7 @@
 // Package update is the panel side of the node-agent updates: it reads the
 // release bundle the owner signed and dropped into <data-dir>/dist, shows whether it is trusted, serves its files to
-// the node agents (only through the agent mTLS endpoint, see fleet.Updates), runs the staged rollout (canary,
-// batches, a health gate per node, automatic rollback) whose state lives in the database, and serves the admin
+// the node agents (only through the agent mTLS endpoint, see fleet.Updates), runs owner-triggered node updates (with a
+// health gate and automatic rollback) whose state lives in the database, and serves the admin
 // UpdateService.
 //
 // The panel is a courier, not an authority: the agents verify the signature with the release key compiled into
@@ -96,8 +96,7 @@ type Config struct {
 	// PanelUpdater checks official GitHub releases and schedules a checked panel binary replacement when available.
 	PanelUpdater PanelUpdater
 	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
-	// A trusted newer bundle is installed into dist and automatically starts the staged rollout. Only the bundle
-	// verified as the current GitHub release may start automatic rollout.
+	// A trusted newer bundle is installed into dist and made available for owner-triggered node updates.
 	NodeBundleSource NodeBundleSource
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
 	StepUp func(context.Context) error
@@ -188,7 +187,7 @@ func (s *Service) Run(ctx context.Context) {
 	s.mu.Unlock()
 	s.recover(ctx)
 	s.syncNodeBundle(ctx)
-	s.startAutomaticRollout(ctx)
+	s.processScheduledNodeUpdates(ctx)
 	if s.cfg.PanelUpdater != nil {
 		s.wg.Add(1)
 		go func() {
@@ -212,14 +211,16 @@ func (s *Service) Run(ctx context.Context) {
 			return
 		case <-tick.C:
 			s.tick(ctx)
+			s.processScheduledNodeUpdates(ctx)
 		case <-s.wake:
 			s.tick(ctx)
+			s.processScheduledNodeUpdates(ctx)
 		case <-poll.C:
 			s.rescanIfChanged()
-			s.startAutomaticRollout(ctx)
+			s.processScheduledNodeUpdates(ctx)
 		case <-bundlePoll.C:
 			s.syncNodeBundle(ctx)
-			s.startAutomaticRollout(ctx)
+			s.processScheduledNodeUpdates(ctx)
 		case <-prune.C:
 			s.pruneOld(ctx)
 		}

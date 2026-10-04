@@ -843,8 +843,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 8 {
-		t.Errorf("%d procedures need approval, want 8: %v", len(approved), approved)
+	if len(approved) != 11 {
+		t.Errorf("%d procedures need approval, want 11: %v", len(approved), approved)
 	}
 	// every grant is for a procedure that is on the list as approved
 	for tool, path := range grantProcedures {
@@ -934,8 +934,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// Step-up procedures include the protected handlers, credential reveal/rotation, password changes,
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
-	if len(stepUpProcedures) != 28 {
-		t.Errorf("%d step-up procedures, want 28", len(stepUpProcedures))
+	if len(stepUpProcedures) != 31 {
+		t.Errorf("%d step-up procedures, want 31", len(stepUpProcedures))
 	}
 }
 

@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -287,6 +289,19 @@ func cleanName(kind, name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 64 || strings.ContainsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
 		return "", invalid("%s name must be 1-64 characters without control characters", kind)
+	}
+	return name, nil
+}
+
+// cleanSubscriptionName validates the optional human-readable name shown on a user's public subscription page.
+// Empty means the page should use the user's internal account name.
+func cleanSubscriptionName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", nil
+	}
+	if !utf8.ValidString(name) || utf8.RuneCountInString(name) > 64 || strings.ContainsFunc(name, unicode.IsControl) {
+		return "", invalid("subscription name must be at most 64 characters without control characters")
 	}
 	return name, nil
 }

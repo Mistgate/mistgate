@@ -67,6 +67,7 @@ afterEach(() => {
 const user = {
   id: "usr_1",
   name: "Marina",
+  subscriptionName: "",
   groupId: "grp_all",
   groupName: "Everyone",
   status: UserStatus.ACTIVE,
@@ -127,6 +128,19 @@ const click = (b: Element | undefined | null) => act(async () => void b?.dispatc
 const anchor = (label: string) => [...document.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === label);
 
 describe("the user card", () => {
+  it("saves a separate public name while the account name stays unchanged", async () => {
+    await mount();
+    const field = document.querySelector<HTMLInputElement>('input[aria-label="Name shown on the subscription page"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Nastya");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(text()).toContain("Page greeting: Nastya");
+    await click(button("Save name"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", subscriptionName: "Nastya" });
+  });
+
   it("splits the devices into the subscription's apps and the AmneziaVPN keys, and lists both", async () => {
     await mount();
     expect(text()).toContain("Through the subscription");

@@ -19,9 +19,10 @@ var ErrUnknownToken = errors.New("access: unknown subscription token")
 
 // SubView is what the public subscription endpoint needs about one token.
 type SubView struct {
-	UserID   string
-	UserName string
-	Status   string // active | disabled | expired | limited
+	UserID           string
+	UserName         string
+	SubscriptionName string
+	Status           string // active | disabled | expired | limited
 	// Usage in the current quota period (Up + Down = the user's used bytes), quota and term end; zero = none.
 	Up, Down, Total uint64
 	Expires         time.Time
@@ -156,7 +157,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		u.UsedBytes, u.PeriodStart = 0, ps
 	}
 	v := SubView{
-		UserID: u.ID, UserName: u.Name, Status: ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now),
+		UserID: u.ID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now),
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit,
 	}

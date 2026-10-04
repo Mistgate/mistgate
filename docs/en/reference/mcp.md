@@ -101,7 +101,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
 | `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |
-| `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state, the active or last rollout. |
+| `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state and any saved schedule, the active or last rollout, and the fixed UTC offset used for new schedules. |
 | `node_server_access_list` | Admin | Saved node SSH endpoint, login and fingerprint, plus whether a password rotation needs recovery. Never a password. |
 | `audit_search` | Admin | The audit log, filtered by `source` (`panel`, `bot`, `mcp`, `api`), actor or action; paged with `before_id`. |
 
@@ -112,20 +112,25 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | Tool | Profile | Arguments | Needs the owner |
 |---|---|---|---|
 | `user_create` | Operator | `name`, `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month`, `rolling_month`), `term_days`, `device_limit`, `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps`, `dns_preset_id` | no |
-| `user_update` | Operator | `user_id` and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
+| `user_update` | Operator | `user_id`, optionally `subscription_name` (empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `device_revoke` | Operator | `user_id`, `device_id` | no |
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
-| `rollout_start` | Admin | optionally `node_ids` (empty: every outdated node) and `batch_size` (0: the panel's default; the panel accepts at most 10) | always |
+| `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now) | always |
+| `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`); the trusted version and offset are pinned in the plan | always |
+| `node_update_schedule_cancel` | Admin | `node_id` | always |
+| `update_timezone` | Admin | `timezone_offset_minutes` (fixed UTC offset east of UTC, in 15-minute steps; `180` is GMT+3) | always |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
 | `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token`, SSH `password`, exact `confirmed_fingerprint` | always |
 | `node_server_password_rotate` | Admin | Plan: `node` id or exact name; apply: `confirm_token`, `new_password` (at least 12 characters) | always |
 
 Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. Node passwords are supplied only to their `_apply` call; they are never stored in MCP plan parameters or returned by a tool. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
+
+`rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. `node_update_schedule_plan` saves a future update for one node after owner approval. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits for it to reconnect; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
 
 ## Plan and apply
 

@@ -130,7 +130,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 			next = NextReset(u.QuotaReset, u.PeriodStart).Unix()
 		}
 		out[i] = &adminv1.User{
-			Id: u.ID, Name: u.Name, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
+			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
 			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia}, Via: via,
 			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
@@ -504,6 +504,11 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
+	if m.SubscriptionName != nil {
+		if u.SubscriptionName, err = cleanSubscriptionName(*m.SubscriptionName); err != nil {
+			return nil, err
+		}
+	}
 	if m.GroupId != nil {
 		if *m.GroupId == "" {
 			return nil, invalid("group is required")
@@ -743,7 +748,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 	}{
 		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
 		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Nodes != nil, "nodes"},
-		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DnsPresetId != nil, "dns"},
+		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
 	} {
 		if x.set {
 			f = append(f, x.name)

@@ -1,9 +1,9 @@
 ---
 title: Updates
-description: How node agents update themselves from bundles you sign, how a staged rollout checks and rolls back nodes, and how the panel installs GitHub releases.
+description: How node agents update themselves from bundles you sign, how to update or schedule each node, and how the panel installs GitHub releases.
 ---
 
-Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. After that bundle is published in the latest stable GitHub Release, the panel checks every 10 minutes, verifies the signature, saves it to `dist` and starts the safe canary rollout automatically. No rollout button is needed. Updating the panel binary and updating its agent are separate parts of one GitHub Release: a new panel version alone is not enough; the release must also include `manifest.json`, `manifest.sig` and the agent binaries. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
+Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. After a bundle is published in the latest stable GitHub Release, the panel checks every 10 minutes, verifies the signature and saves it to `dist`. It never starts a node update automatically: use the **Update** button on each node to update it now, or choose a date and time to schedule that node. Updating the panel binary and updating its agent are separate parts of one GitHub Release: a new panel version alone is not enough; the release must also include `manifest.json`, `manifest.sig` and the agent binaries. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
 
 ## How trust works
 
@@ -16,7 +16,7 @@ Node agents update themselves, but only to a build signed with your release key.
 
 ## Publish a release
 
-For every stable tag, GitHub Actions requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and builds the panel and both Linux node agents with the same version and key. It creates a **draft** release containing the binaries, `BUILDINFO` and `SHA256SUMS`. A draft is not visible to panels as the latest release. The private key never goes to Actions: the owner signs the node binaries on a trusted machine, uploads `manifest.json` and `manifest.sig`, then publishes the draft. Within 10 minutes, the panel downloads and verifies the package and starts the canary rollout automatically. The public-key variable must match `<data-dir>/release.pub` and the key compiled into already installed agents; a mismatched signature is refused.
+For every stable tag, GitHub Actions requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and builds the panel and both Linux node agents with the same version and key. It creates a **draft** release containing the binaries, `BUILDINFO` and `SHA256SUMS`. A draft is not visible to panels as the latest release. The private key never goes to Actions: the owner signs the node binaries on a trusted machine, uploads `manifest.json` and `manifest.sig`, then publishes the draft. Within 10 minutes, the panel downloads and verifies the package; nodes remain on their current builds until you update or schedule them. The public-key variable must match `<data-dir>/release.pub` and the key compiled into already installed agents; a mismatched signature is refused.
 
 If the public-key variable is missing or invalid, the release workflow fails instead of publishing a panel-only release. This keeps the panel and agent package on one version and prevents an incomplete release from becoming visible to running panels.
 
@@ -131,12 +131,11 @@ Everyone can view the page. Starting, pausing, resuming and cancelling a rollout
 
 ### Start
 
-**Update all (canary first)** updates every node in the "Update available" state; **Update** in a node's row updates one node. The dialog says which node goes first and how big the batches are.
+Use **Update** in a node's row to start that node's update now. Choose **Schedule** to select a future date and time. The fixed UTC offset in **Settings → System → Update time zone** is used when entering the time; UTC+03:00 (GMT+3) is the default. Changing this setting does not move existing schedules: each one keeps the exact instant and offset shown when it was saved.
 
-- **Canary.** The first node is the one with the fewest people online, then the fewest profiles, then by name. It is updated alone.
-- **Batches.** After the canary the rest go in batches: 1 node at a time while fewer than 5 nodes are to be updated, otherwise 2. A batch starts only when every node of the earlier ones is decided.
-- One rollout runs at a time.
-- A rollout ships the bundle as it was at the start. A node that is offline, cannot update itself or is already up to date when its turn comes is skipped.
+- Only one node rollout can run at a time. Other due schedules wait until it finishes.
+- A scheduled update is pinned to the signed bundle version selected when the schedule was saved. If the node is offline at the chosen time, it waits until the node reconnects. If the bundle is replaced before then, the panel does not silently substitute the new version; review and schedule it again.
+- The panel checks the signed release bundle every 10 minutes, but downloading a bundle never updates a node by itself.
 
 ### One node's update
 

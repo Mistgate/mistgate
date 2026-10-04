@@ -60,6 +60,15 @@ const (
 	// UpdateServiceRescanBundleProcedure is the fully-qualified name of the UpdateService's
 	// RescanBundle RPC.
 	UpdateServiceRescanBundleProcedure = "/mistgate.admin.v1.UpdateService/RescanBundle"
+	// UpdateServiceScheduleNodeUpdateProcedure is the fully-qualified name of the UpdateService's
+	// ScheduleNodeUpdate RPC.
+	UpdateServiceScheduleNodeUpdateProcedure = "/mistgate.admin.v1.UpdateService/ScheduleNodeUpdate"
+	// UpdateServiceCancelNodeUpdateScheduleProcedure is the fully-qualified name of the UpdateService's
+	// CancelNodeUpdateSchedule RPC.
+	UpdateServiceCancelNodeUpdateScheduleProcedure = "/mistgate.admin.v1.UpdateService/CancelNodeUpdateSchedule"
+	// UpdateServiceSetUpdateTimezoneProcedure is the fully-qualified name of the UpdateService's
+	// SetUpdateTimezone RPC.
+	UpdateServiceSetUpdateTimezoneProcedure = "/mistgate.admin.v1.UpdateService/SetUpdateTimezone"
 )
 
 // UpdateServiceClient is a client for the mistgate.admin.v1.UpdateService service.
@@ -88,6 +97,13 @@ type UpdateServiceClient interface {
 	RollbackNode(context.Context, *connect.Request[v1.RollbackNodeRequest]) (*connect.Response[v1.RollbackNodeResponse], error)
 	// Re-read <data-dir>/dist now (the panel also notices a changed manifest by itself, within a minute).
 	RescanBundle(context.Context, *connect.Request[v1.RescanBundleRequest]) (*connect.Response[v1.RescanBundleResponse], error)
+	// Schedule the current trusted agent bundle for one node. local_datetime is YYYY-MM-DDTHH:mm in the supplied
+	// configured fixed UTC offset. The request is rejected if that offset is no longer the panel setting.
+	ScheduleNodeUpdate(context.Context, *connect.Request[v1.ScheduleNodeUpdateRequest]) (*connect.Response[v1.ScheduleNodeUpdateResponse], error)
+	// Cancel a pending schedule for one node. Does not affect an update already in progress.
+	CancelNodeUpdateSchedule(context.Context, *connect.Request[v1.CancelNodeUpdateScheduleRequest]) (*connect.Response[v1.CancelNodeUpdateScheduleResponse], error)
+	// Change the fixed UTC offset used to enter new scheduled updates. Existing schedules keep their original offset.
+	SetUpdateTimezone(context.Context, *connect.Request[v1.SetUpdateTimezoneRequest]) (*connect.Response[v1.SetUpdateTimezoneResponse], error)
 }
 
 // NewUpdateServiceClient constructs a client for the mistgate.admin.v1.UpdateService service. By
@@ -155,20 +171,41 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(updateServiceMethods.ByName("RescanBundle")),
 			connect.WithClientOptions(opts...),
 		),
+		scheduleNodeUpdate: connect.NewClient[v1.ScheduleNodeUpdateRequest, v1.ScheduleNodeUpdateResponse](
+			httpClient,
+			baseURL+UpdateServiceScheduleNodeUpdateProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("ScheduleNodeUpdate")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelNodeUpdateSchedule: connect.NewClient[v1.CancelNodeUpdateScheduleRequest, v1.CancelNodeUpdateScheduleResponse](
+			httpClient,
+			baseURL+UpdateServiceCancelNodeUpdateScheduleProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("CancelNodeUpdateSchedule")),
+			connect.WithClientOptions(opts...),
+		),
+		setUpdateTimezone: connect.NewClient[v1.SetUpdateTimezoneRequest, v1.SetUpdateTimezoneResponse](
+			httpClient,
+			baseURL+UpdateServiceSetUpdateTimezoneProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("SetUpdateTimezone")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // updateServiceClient implements UpdateServiceClient.
 type updateServiceClient struct {
-	getUpdates         *connect.Client[v1.GetUpdatesRequest, v1.GetUpdatesResponse]
-	checkPanelUpdate   *connect.Client[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse]
-	installPanelUpdate *connect.Client[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse]
-	startRollout       *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
-	pauseRollout       *connect.Client[v1.PauseRolloutRequest, v1.PauseRolloutResponse]
-	resumeRollout      *connect.Client[v1.ResumeRolloutRequest, v1.ResumeRolloutResponse]
-	cancelRollout      *connect.Client[v1.CancelRolloutRequest, v1.CancelRolloutResponse]
-	rollbackNode       *connect.Client[v1.RollbackNodeRequest, v1.RollbackNodeResponse]
-	rescanBundle       *connect.Client[v1.RescanBundleRequest, v1.RescanBundleResponse]
+	getUpdates               *connect.Client[v1.GetUpdatesRequest, v1.GetUpdatesResponse]
+	checkPanelUpdate         *connect.Client[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse]
+	installPanelUpdate       *connect.Client[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse]
+	startRollout             *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
+	pauseRollout             *connect.Client[v1.PauseRolloutRequest, v1.PauseRolloutResponse]
+	resumeRollout            *connect.Client[v1.ResumeRolloutRequest, v1.ResumeRolloutResponse]
+	cancelRollout            *connect.Client[v1.CancelRolloutRequest, v1.CancelRolloutResponse]
+	rollbackNode             *connect.Client[v1.RollbackNodeRequest, v1.RollbackNodeResponse]
+	rescanBundle             *connect.Client[v1.RescanBundleRequest, v1.RescanBundleResponse]
+	scheduleNodeUpdate       *connect.Client[v1.ScheduleNodeUpdateRequest, v1.ScheduleNodeUpdateResponse]
+	cancelNodeUpdateSchedule *connect.Client[v1.CancelNodeUpdateScheduleRequest, v1.CancelNodeUpdateScheduleResponse]
+	setUpdateTimezone        *connect.Client[v1.SetUpdateTimezoneRequest, v1.SetUpdateTimezoneResponse]
 }
 
 // GetUpdates calls mistgate.admin.v1.UpdateService.GetUpdates.
@@ -216,6 +253,21 @@ func (c *updateServiceClient) RescanBundle(ctx context.Context, req *connect.Req
 	return c.rescanBundle.CallUnary(ctx, req)
 }
 
+// ScheduleNodeUpdate calls mistgate.admin.v1.UpdateService.ScheduleNodeUpdate.
+func (c *updateServiceClient) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[v1.ScheduleNodeUpdateRequest]) (*connect.Response[v1.ScheduleNodeUpdateResponse], error) {
+	return c.scheduleNodeUpdate.CallUnary(ctx, req)
+}
+
+// CancelNodeUpdateSchedule calls mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule.
+func (c *updateServiceClient) CancelNodeUpdateSchedule(ctx context.Context, req *connect.Request[v1.CancelNodeUpdateScheduleRequest]) (*connect.Response[v1.CancelNodeUpdateScheduleResponse], error) {
+	return c.cancelNodeUpdateSchedule.CallUnary(ctx, req)
+}
+
+// SetUpdateTimezone calls mistgate.admin.v1.UpdateService.SetUpdateTimezone.
+func (c *updateServiceClient) SetUpdateTimezone(ctx context.Context, req *connect.Request[v1.SetUpdateTimezoneRequest]) (*connect.Response[v1.SetUpdateTimezoneResponse], error) {
+	return c.setUpdateTimezone.CallUnary(ctx, req)
+}
+
 // UpdateServiceHandler is an implementation of the mistgate.admin.v1.UpdateService service.
 type UpdateServiceHandler interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
@@ -242,6 +294,13 @@ type UpdateServiceHandler interface {
 	RollbackNode(context.Context, *connect.Request[v1.RollbackNodeRequest]) (*connect.Response[v1.RollbackNodeResponse], error)
 	// Re-read <data-dir>/dist now (the panel also notices a changed manifest by itself, within a minute).
 	RescanBundle(context.Context, *connect.Request[v1.RescanBundleRequest]) (*connect.Response[v1.RescanBundleResponse], error)
+	// Schedule the current trusted agent bundle for one node. local_datetime is YYYY-MM-DDTHH:mm in the supplied
+	// configured fixed UTC offset. The request is rejected if that offset is no longer the panel setting.
+	ScheduleNodeUpdate(context.Context, *connect.Request[v1.ScheduleNodeUpdateRequest]) (*connect.Response[v1.ScheduleNodeUpdateResponse], error)
+	// Cancel a pending schedule for one node. Does not affect an update already in progress.
+	CancelNodeUpdateSchedule(context.Context, *connect.Request[v1.CancelNodeUpdateScheduleRequest]) (*connect.Response[v1.CancelNodeUpdateScheduleResponse], error)
+	// Change the fixed UTC offset used to enter new scheduled updates. Existing schedules keep their original offset.
+	SetUpdateTimezone(context.Context, *connect.Request[v1.SetUpdateTimezoneRequest]) (*connect.Response[v1.SetUpdateTimezoneResponse], error)
 }
 
 // NewUpdateServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -305,6 +364,24 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(updateServiceMethods.ByName("RescanBundle")),
 		connect.WithHandlerOptions(opts...),
 	)
+	updateServiceScheduleNodeUpdateHandler := connect.NewUnaryHandler(
+		UpdateServiceScheduleNodeUpdateProcedure,
+		svc.ScheduleNodeUpdate,
+		connect.WithSchema(updateServiceMethods.ByName("ScheduleNodeUpdate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceCancelNodeUpdateScheduleHandler := connect.NewUnaryHandler(
+		UpdateServiceCancelNodeUpdateScheduleProcedure,
+		svc.CancelNodeUpdateSchedule,
+		connect.WithSchema(updateServiceMethods.ByName("CancelNodeUpdateSchedule")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceSetUpdateTimezoneHandler := connect.NewUnaryHandler(
+		UpdateServiceSetUpdateTimezoneProcedure,
+		svc.SetUpdateTimezone,
+		connect.WithSchema(updateServiceMethods.ByName("SetUpdateTimezone")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.UpdateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UpdateServiceGetUpdatesProcedure:
@@ -325,6 +402,12 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 			updateServiceRollbackNodeHandler.ServeHTTP(w, r)
 		case UpdateServiceRescanBundleProcedure:
 			updateServiceRescanBundleHandler.ServeHTTP(w, r)
+		case UpdateServiceScheduleNodeUpdateProcedure:
+			updateServiceScheduleNodeUpdateHandler.ServeHTTP(w, r)
+		case UpdateServiceCancelNodeUpdateScheduleProcedure:
+			updateServiceCancelNodeUpdateScheduleHandler.ServeHTTP(w, r)
+		case UpdateServiceSetUpdateTimezoneProcedure:
+			updateServiceSetUpdateTimezoneHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -368,4 +451,16 @@ func (UnimplementedUpdateServiceHandler) RollbackNode(context.Context, *connect.
 
 func (UnimplementedUpdateServiceHandler) RescanBundle(context.Context, *connect.Request[v1.RescanBundleRequest]) (*connect.Response[v1.RescanBundleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.RescanBundle is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) ScheduleNodeUpdate(context.Context, *connect.Request[v1.ScheduleNodeUpdateRequest]) (*connect.Response[v1.ScheduleNodeUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.ScheduleNodeUpdate is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) CancelNodeUpdateSchedule(context.Context, *connect.Request[v1.CancelNodeUpdateScheduleRequest]) (*connect.Response[v1.CancelNodeUpdateScheduleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) SetUpdateTimezone(context.Context, *connect.Request[v1.SetUpdateTimezoneRequest]) (*connect.Response[v1.SetUpdateTimezoneResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.SetUpdateTimezone is not implemented"))
 }

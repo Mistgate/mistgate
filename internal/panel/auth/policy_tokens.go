@@ -60,6 +60,9 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UpdateServiceResumeRolloutProcedure:                  TokenAccessApproved,
 	adminv1connect.UpdateServiceCancelRolloutProcedure:                  TokenAccessApproved,
 	adminv1connect.UpdateServiceRollbackNodeProcedure:                   TokenAccessApproved,
+	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             TokenAccessApproved,
+	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       TokenAccessApproved,
+	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              TokenAccessApproved,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: TokenAccessApproved,
 }
 
@@ -77,6 +80,9 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.UpdateServiceRollbackNodeProcedure:                   true,
 	adminv1connect.UpdateServiceRescanBundleProcedure:                   true,
 	adminv1connect.UpdateServiceInstallPanelUpdateProcedure:             true,
+	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             true,
+	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       true,
+	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
 	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 true,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       true,
@@ -108,6 +114,9 @@ var grantProcedures = map[string]string{
 	"rollout_resume":              adminv1connect.UpdateServiceResumeRolloutProcedure,
 	"rollout_cancel":              adminv1connect.UpdateServiceCancelRolloutProcedure,
 	"node_rollback":               adminv1connect.UpdateServiceRollbackNodeProcedure,
+	"node_update_schedule":        adminv1connect.UpdateServiceScheduleNodeUpdateProcedure,
+	"node_update_schedule_cancel": adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure,
+	"update_timezone":             adminv1connect.UpdateServiceSetUpdateTimezoneProcedure,
 	"node_install":                adminv1connect.ProvisioningServiceStartNodeProvisionProcedure,
 	"node_server_password_rotate": adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure,
 }

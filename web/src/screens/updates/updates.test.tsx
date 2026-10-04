@@ -10,6 +10,9 @@ import { UpdatesScreen } from "./index";
 
 const getUpdates = vi.fn();
 const startRollout = vi.fn();
+const scheduleNodeUpdate = vi.fn();
+const cancelNodeUpdateSchedule = vi.fn();
+const setUpdateTimezone = vi.fn();
 const pauseRollout = vi.fn();
 const resumeRollout = vi.fn();
 const cancelRollout = vi.fn();
@@ -22,6 +25,9 @@ vi.mock("@/lib/api", () => ({
   updates: {
     getUpdates: (...a: unknown[]) => getUpdates(...a),
     startRollout: (...a: unknown[]) => startRollout(...a),
+    scheduleNodeUpdate: (...a: unknown[]) => scheduleNodeUpdate(...a),
+    cancelNodeUpdateSchedule: (...a: unknown[]) => cancelNodeUpdateSchedule(...a),
+    setUpdateTimezone: (...a: unknown[]) => setUpdateTimezone(...a),
     pauseRollout: (...a: unknown[]) => pauseRollout(...a),
     resumeRollout: (...a: unknown[]) => resumeRollout(...a),
     cancelRollout: (...a: unknown[]) => cancelRollout(...a),
@@ -56,7 +62,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUpdates, startRollout, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
+  for (const m of [getUpdates, startRollout, scheduleNodeUpdate, cancelNodeUpdateSchedule, setUpdateTimezone, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
 });
 
 const node = (over: Record<string, unknown> = {}) => ({
@@ -67,6 +73,10 @@ const node = (over: Record<string, unknown> = {}) => ({
   supportsUpdate: true,
   crashGuard: true,
   state: NodeUpdateState.UP_TO_DATE,
+  scheduledUnix: 0,
+  scheduledVersion: "",
+  scheduledBuilt: 0,
+  scheduledTimezoneOffsetMinutes: 0,
   inbounds: 1,
   onlineUsers: 0,
   address: "de1.example.com",
@@ -112,6 +122,7 @@ const rollout = (over: Record<string, unknown> = {}) => ({
 });
 const page = (over: Record<string, unknown> = {}) => ({
   nowUnix: 1000,
+  scheduleTimezoneOffsetMinutes: 180,
   panel: {
     version: "0.2.0-bbb", built: 200, hasReleaseKey: true, releaseKeyFingerprint: "abcd1234abcd1234",
     update: { version: "0.2.0-bbb", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.2.0-bbb", publishedUnix: 0, checkedUnix: 1000, available: false, supported: true, installable: false, installing: false, errorKey: "" },
@@ -178,6 +189,15 @@ describe("panel self-update", () => {
     expect(text()).toContain("Panel version");
     expect(text()).toContain("Build date");
     expect(button("Update panel")).toBeTruthy();
+    expect(text()).toContain("Node update schedule time zone");
+    const timezone = document.querySelector<HTMLSelectElement>("select")!;
+    expect(timezone.value).toBe("180");
+    setUpdateTimezone.mockResolvedValue(true);
+    await act(async () => {
+      timezone.value = "240";
+      timezone.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(setUpdateTimezone).toHaveBeenCalledWith({ timezoneOffsetMinutes: 240 });
     expect(document.querySelector('a[href="https://mistgate.app/"]')).toBeTruthy();
     expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate"]')).toBeTruthy();
     expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate/blob/main/LICENSE"]')).toBeTruthy();
@@ -208,41 +228,60 @@ describe("the Updates screen", () => {
     expect(text()).toContain("Signature verified");
   });
 
-  it("confirms an update of all nodes in words, then starts it for every outdated node", async () => {
-    startRollout.mockResolvedValue({});
+  it("shows update actions per node and never starts a bulk update", async () => {
     await mount(page({ nodes: outdated }));
     expect(text()).toContain("Node agent 0.2.0-bbb");
-    await click(button("Update all (canary first)"));
-    const d = dialog()!;
-    expect(d.textContent).toContain("Update the fleet?");
-    expect(d.textContent).toContain("One node goes first: nl1"); // the one with the fewest people online
-    expect(d.textContent).toContain("(1)");
-    expect(d.textContent).toContain("batches of 1");
-    expect(d.textContent).toContain("de1");
-    expect(startRollout).not.toHaveBeenCalled();
-
-    await click(inDialog("Start the update"));
-    await settle();
-    expect(startRollout).toHaveBeenCalledWith({ nodeIds: [], batchSize: 0 });
-    expect(dialog()).toBeNull();
+    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(document.querySelector("button[aria-label='Update de1']")).toBeDefined();
+    expect(document.querySelector("button[aria-label='Update nl1']")).toBeDefined();
   });
 
   it("starts one node from its row with a dialog about that node only", async () => {
     startRollout.mockResolvedValue({});
     await mount(page({ nodes: outdated }));
     await click(document.querySelector("button[aria-label='Update de1']")!);
-    expect(dialog()!.textContent).toContain("Update de1?");
+    expect(dialog()!.textContent).toContain("Update de1");
     expect(dialog()!.textContent).not.toContain("batches of");
-    await click(inDialog("Start the update"));
+    await click(inDialog("Update now"));
     await settle();
     expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0 });
+  });
+
+  it("schedules one offline node in the configured UTC+3 offset", async () => {
+    scheduleNodeUpdate.mockResolvedValue({});
+    const offline = node({ state: NodeUpdateState.OFFLINE });
+    await mount(page({ nodes: [offline] }));
+    await click(document.querySelector("button[aria-label='Update de1']")!);
+    const modal = dialog()!;
+    expect(modal.textContent).toContain("This node is offline");
+    const later = modal.querySelector<HTMLInputElement>('input[name="node-update-mode"][value="schedule"]')!;
+    await act(async () => later.click());
+    const date = modal.querySelector<HTMLInputElement>("#node-update-at")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(date.constructor.prototype, "value")?.set;
+      setter?.call(date, "3000-01-01T12:00");
+      date.dispatchEvent(new Event("input", { bubbles: true }));
+      date.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(modal.textContent).toContain("UTC+03:00");
+    await click(inDialog("Save schedule"));
+    await settle();
+    expect(scheduleNodeUpdate).toHaveBeenCalledWith({
+      nodeId: "nod_1",
+      localDatetime: "3000-01-01T12:00",
+      timezoneOffsetMinutes: 180,
+      expectedVersion: "0.2.0-bbb",
+      expectedBuilt: 200n,
+    });
+    expect(dialog()).toBeNull();
+    expect(startRollout).not.toHaveBeenCalled();
   });
 
   it("keeps the dialog open when the panel refuses", async () => {
     startRollout.mockRejectedValue(new ConnectError("a rollout is already active", Code.FailedPrecondition));
     await mount(page({ nodes: outdated }));
-    await click(button("Update all (canary first)"));
-    await click(inDialog("Start the update"));
+    await click(document.querySelector("button[aria-label='Update de1']")!);
+    await click(inDialog("Update now"));
     await settle();
     expect(startRollout).toHaveBeenCalledTimes(1);
     expect(dialog()).not.toBeNull();
@@ -252,7 +291,7 @@ describe("the Updates screen", () => {
     role = Role.HELPER;
     await mount(page({ nodes: [...outdated, node({ nodeId: "nod_3", name: "fi1", lastUpdate: { outcome: "ok", fromVersion: "0.0.9", toVersion: "0.1.0", atUnix: 5 } })] }));
     expect(text()).toContain("Node agent 0.2.0-bbb");
-    expect(text()).toContain("Only the owner can start, pause or cancel updates");
+    expect(text()).toContain("Only the owner can update nodes, set schedules, and manage rollouts");
     expect(button("Update all (canary first)")).toBeUndefined();
     expect(button("Update")).toBeUndefined();
     expect(button("Roll back")).toBeUndefined();
@@ -405,8 +444,8 @@ describe("the Updates screen", () => {
     expect(text()).toContain("mistgate-node-linux-amd64 differs from the manifest");
     expect(text()).toContain("Failed the check");
     expect(button("Update all (canary first)")).toBeUndefined();
-    // a retry of a single node is off without a trusted bundle
-    expect(document.querySelector<HTMLButtonElement>("button[aria-label='Update de1']")?.hasAttribute("data-disabled")).toBe(true);
+    // There is no node action until a trusted newer bundle is available.
+    expect(document.querySelector("button[aria-label='Update de1']")).toBeNull();
   });
 
   it("names a bad signature in the bundle's pill", async () => {

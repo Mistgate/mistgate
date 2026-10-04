@@ -1,61 +1,113 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
-import { canaryOf, defaultBatch, type NodeUpdate } from "@/lib/updates";
+import { updateDateTimeAtOffset, updateDateTimeInputAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
 
-/**
- * "Update all" and the per-node "Update": says in plain words what will happen before anything is sent. `nodes` are the
- * ones that will be updated (every outdated node for "all"); the panel picks the canary by the same rule as canaryOf.
- */
-export function StartDialog({ nodes, version, single, busy, onConfirm, onClose }: { nodes: NodeUpdate[]; version: string; single: boolean; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+export function UpdateNodeDialog({
+  data,
+  node,
+  canUpdateNow,
+  busy,
+  onUpdateNow,
+  onSchedule,
+  onCancelSchedule,
+  onClose,
+}: {
+  data: Updates;
+  node: NodeUpdate;
+  canUpdateNow: boolean;
+  busy: boolean;
+  onUpdateNow: () => void;
+  onSchedule: (localDatetime: string) => void;
+  onCancelSchedule: () => void;
+  onClose: () => void;
+}) {
   const t = useT();
-  const canary = canaryOf(nodes);
-  const one = single || nodes.length === 1;
-  const name = nodes[0]?.name ?? "";
+  const bundle = data.bundle;
+  const version = bundle?.version ?? "";
+  const offset = data.scheduleTimezoneOffsetMinutes;
+  const hasSchedule = node.scheduledUnix > 0;
+  const canSchedule = !!bundle && bundle.status === BundleStatus.TRUSTED && node.supportsUpdate && node.built < bundle.built;
+  const [mode, setMode] = useState<"now" | "schedule">(hasSchedule ? "schedule" : "now");
+  const [localDatetime, setLocalDatetime] = useState(() =>
+    hasSchedule
+      ? updateDateTimeInputAtOffset(node.scheduledUnix, offset)
+      : updateDateTimeInputAtOffset(data.nowUnix + 3600, offset),
+  );
+  // datetime-local only has minute precision. Round up so the displayed minimum can never be rejected by
+  // the server's exact 60-second lead-time check when the current time has non-zero seconds.
+  const minUnix = Math.ceil((data.nowUnix + 60) / 60) * 60;
+  const min = updateDateTimeInputAtOffset(minUnix, offset);
+  const savedAt = hasSchedule ? updateDateTimeAtOffset(node.scheduledUnix, node.scheduledTimezoneOffsetMinutes) : "";
+  const scheduleIsCurrent = hasSchedule && node.scheduledBuilt === bundle?.built && node.scheduledVersion === version;
   return (
     <Modal
       open
       onOpenChange={(o) => !o && !busy && onClose()}
-      title={one ? t("up.start.titleOne", { name }) : t("up.start.title")}
-      description={one ? t("up.start.leadOne", { name, version }) : t("up.start.lead", { version })}
+      title={t("up.schedule.title", { name: node.name })}
+      description={t("up.schedule.lead", { version })}
       footer={
-        <>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" size="md" disabled={busy} onClick={onConfirm}>
-            {t("up.start.confirm")}
-          </Button>
-        </>
-      }
-    >
-      <ol className="flex list-decimal flex-col gap-2 pl-5 text-[13px] leading-normal text-pretty marker:font-bold marker:text-muted">
-        {one ? (
-          <>
-            <li>{t("up.start.step1One", { name })}</li>
-            <li>{t("up.start.step2")}</li>
-            <li>{t("up.start.step3One")}</li>
-          </>
-        ) : (
-          <>
-            <li>{t("up.start.step1", { name: canary?.name ?? "", users: canary?.onlineUsers ?? 0 })}</li>
-            <li>{t("up.start.step2")}</li>
-            <li>{t("up.start.step3", { batch: defaultBatch(nodes.length) })}</li>
-          </>
-        )}
-      </ol>
-      {!one && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("up.start.nodes")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {nodes.map((n) => (
-              <span key={n.nodeId} className="inline-flex h-[22px] items-center rounded-ctl bg-surface-2 px-2 font-mono text-[11px] font-semibold">
-                {n.name}
-              </span>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {hasSchedule && (
+              <Button variant="danger" size="md" disabled={busy} onClick={onCancelSchedule}>
+                {t("up.schedule.cancel")}
+              </Button>
+            )}
+            {mode === "now" ? (
+              <Button variant="primary" size="md" disabled={busy || !canUpdateNow} onClick={onUpdateNow}>
+                {t("up.schedule.now")}
+              </Button>
+            ) : (
+              <Button variant="primary" size="md" disabled={busy || !canSchedule || !localDatetime || localDatetime < min} onClick={() => onSchedule(localDatetime)}>
+                {t("up.schedule.save")}
+              </Button>
+            )}
           </div>
         </div>
-      )}
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
+            <input type="radio" name="node-update-mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />
+            {t("up.schedule.nowChoice")}
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
+            <input type="radio" name="node-update-mode" value="schedule" checked={mode === "schedule"} onChange={() => setMode("schedule")} />
+            {t("up.schedule.laterChoice")}
+          </label>
+        </div>
+        {mode === "now" ? (
+          <div className="rounded-field border border-line bg-canvas p-3.5 text-[13px] leading-relaxed text-muted">
+            <p>{t("up.schedule.nowBody", { name: node.name, version })}</p>
+            <p className="mt-1">{t("up.schedule.safety")}</p>
+            {!canUpdateNow && node.state === NodeUpdateState.OFFLINE && <p className="mt-2 text-warn">{t("up.schedule.offline")}</p>}
+            {!canUpdateNow && node.state !== NodeUpdateState.OFFLINE && <p className="mt-2 text-warn">{t("up.schedule.busy")}</p>}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5 rounded-field border border-line bg-canvas p-3.5">
+            <label htmlFor="node-update-at" className="text-xs font-semibold">{t("up.schedule.dateTime")}</label>
+            <input id="node-update-at" type="datetime-local" min={min} value={localDatetime} onChange={(event) => setLocalDatetime(event.target.value)} className="h-10 rounded-ctl border border-line bg-surface px-3 font-mono text-sm text-fg" />
+            <span className="text-xs text-muted">{t("up.schedule.timezone", { timezone: updateTimezoneName(offset) })}</span>
+            {hasSchedule && (
+              <p className="rounded-field border border-line bg-surface-2 px-3 py-2 text-xs leading-relaxed text-muted">
+                {t(scheduleIsCurrent ? "up.schedule.current" : "up.schedule.stale", {
+                  version: node.scheduledVersion,
+                  at: savedAt,
+                  timezone: updateTimezoneName(node.scheduledTimezoneOffsetMinutes),
+                })}
+              </p>
+            )}
+            {!canSchedule && <p className="text-xs text-warn">{t("up.schedule.unavailable")}</p>}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }

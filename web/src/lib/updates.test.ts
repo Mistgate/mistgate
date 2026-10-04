@@ -7,7 +7,6 @@ import { ru } from "@/i18n/ru";
 import {
   callErrorText,
   canRollbackNode,
-  canStart,
   canUpdateNode,
   canaryOf,
   defaultBatch,
@@ -24,6 +23,9 @@ import {
   slowPollMs,
   stagesOf,
   stepErrorText,
+  updateDateTimeAtOffset,
+  updateDateTimeInputAtOffset,
+  updateTimezoneName,
   updatesPollMs,
   type NodeUpdate,
   type Rollout,
@@ -43,6 +45,10 @@ const node = (over: Partial<NodeUpdate> = {}): NodeUpdate => ({
   supportsUpdate: true,
   crashGuard: true,
   state: NodeUpdateState.UP_TO_DATE,
+  scheduledUnix: 0,
+  scheduledVersion: "",
+  scheduledBuilt: 0,
+  scheduledTimezoneOffsetMinutes: 0,
   inbounds: 1,
   onlineUsers: 0,
   address: "de1.example.com",
@@ -88,6 +94,7 @@ const bundle = (status: BundleStatus, over: Partial<NonNullable<Updates["bundle"
 });
 const updates = (over: Partial<Updates> = {}): Updates => ({
   nowUnix: 1000,
+  scheduleTimezoneOffsetMinutes: 180,
   panel: { version: "0.2.0-bbb", built: 200, hasReleaseKey: true, releaseKeyFingerprint: "abcd" },
   bundle: bundle(BundleStatus.TRUSTED),
   nodes: [node({ state: NodeUpdateState.OUTDATED })],
@@ -119,12 +126,16 @@ describe("node states", () => {
     expect(nodeStateKind(NodeUpdateState.OFFLINE)).toBe("off");
   });
 
-  it("offers Update for outdated, rolled back and failed nodes only, and Roll back after a successful update", () => {
-    expect(canUpdateNode({ state: NodeUpdateState.OUTDATED })).toBe(true);
-    expect(canUpdateNode({ state: NodeUpdateState.ROLLED_BACK })).toBe(true);
-    expect(canUpdateNode({ state: NodeUpdateState.FAILED })).toBe(true);
-    expect(canUpdateNode({ state: NodeUpdateState.UNSUPPORTED })).toBe(false);
-    expect(canUpdateNode({ state: NodeUpdateState.UP_TO_DATE })).toBe(false);
+  it("offers updates only for supported old agents and keeps rollback separate", () => {
+    const old = { built: 100, supportsUpdate: true };
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.OUTDATED }, 200)).toBe(true);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.OFFLINE }, 200)).toBe(true);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.ROLLED_BACK }, 200)).toBe(true);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.FAILED }, 200)).toBe(true);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.UNSUPPORTED }, 200)).toBe(false);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.UP_TO_DATE }, 200)).toBe(false);
+    expect(canUpdateNode({ ...old, supportsUpdate: false, state: NodeUpdateState.OUTDATED }, 200)).toBe(false);
+    expect(canUpdateNode({ ...old, state: NodeUpdateState.OUTDATED }, 100)).toBe(false);
 
     const ok = { supportsUpdate: true, lastUpdate: { outcome: "ok" } } as NodeUpdate;
     expect(canRollbackNode({ ...ok, state: NodeUpdateState.UP_TO_DATE })).toBe(true);
@@ -184,12 +195,11 @@ describe("heroOf", () => {
     expect(heroOf(updates()).id).toBe("available");
   });
 
-  it("enables Start only for the owner with a trusted bundle, no active rollout and something to update", () => {
-    expect(canStart(updates(), true)).toBe(true);
-    expect(canStart(updates(), false)).toBe(false);
-    expect(canStart(updates({ bundle: bundle(BundleStatus.NO_KEY) }), true)).toBe(false);
-    expect(canStart(updates({ rollout: rollout({ status: RolloutStatus.PAUSED }) }), true)).toBe(false);
-    expect(canStart(updates({ nodes: [node()] }), true)).toBe(false);
+  it("formats timestamps with the saved fixed UTC offset, not the browser timezone", () => {
+    expect(updateTimezoneName(180)).toBe("UTC+03:00");
+    expect(updateTimezoneName(-210)).toBe("UTC−03:30");
+    expect(updateDateTimeAtOffset(Date.UTC(2026, 9, 4, 12, 30) / 1000, 180)).toBe("2026-10-04 15:30");
+    expect(updateDateTimeInputAtOffset(Date.UTC(2026, 9, 4, 12, 30) / 1000, 180)).toBe("2026-10-04T15:30");
   });
 });
 
