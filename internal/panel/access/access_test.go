@@ -783,7 +783,7 @@ func TestPreviewProfile(t *testing.T) {
 	}
 
 	r := prev(`{"obfs":{"password":"••••"}}`, "nod_de1")
-	if len(r.Errors) != 0 || r.ClientLabel != "Happ · URI list" || r.Summary != "UDP 443 · Salamander · Let's Encrypt" {
+	if len(r.Errors) != 0 || r.ClientLabel != "Subscription link · URI list" || r.Summary != "UDP 443 · Salamander · Let's Encrypt" {
 		t.Fatalf("preview = %+v", r)
 	}
 	if !strings.HasPrefix(r.ClientPreview, "hysteria2://••••@de1.example.com:443/?obfs=salamander&obfs-password=••••&sni=de1.example.com#") {

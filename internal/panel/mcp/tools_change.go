@@ -196,11 +196,11 @@ func (a *appsArg) text() string {
 	case a == nil:
 		return "default"
 	case a.Happ && a.Amnezia:
-		return "Happ and Amnezia"
+		return "Subscription link and AmneziaVPN keys"
 	case a.Happ:
-		return "Happ only"
+		return "Subscription link only"
 	}
-	return "Amnezia only"
+	return "AmneziaVPN keys only"
 }
 
 func (n *nodesArg) text() string {
@@ -211,7 +211,7 @@ func (n *nodesArg) text() string {
 	return plural(len(n.NodeIDs), "node", "nodes")
 }
 
-// code is the apps as the owner's UI words them: default, both, happ, amnezia.
+// code is the ways as the owner's UI words them: default, both, happ (the subscription link), amnezia (the keys).
 func (a *appsArg) code() string {
 	switch {
 	case a == nil:

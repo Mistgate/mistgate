@@ -203,7 +203,7 @@ const createFacts = approval({
     fact("name", "Марина", "", {}, true),
     fact("quota", "93.1 GiB, reset month", "quota", { bytes: "100000000000", reset: "month" }),
     fact("term", "never expires", "never"),
-    fact("apps", "Happ only", "happ"),
+    fact("apps", "Subscription link only", "happ"),
     fact("nodes", "all nodes", "all"),
   ],
 });

@@ -38,7 +38,7 @@ vi.mock("@/lib/api", async (orig) => ({
       { id: "awg", displayName: "AmneziaWG", settingsSchemaJson: awgSchema, defaultSettingsJson: awgDefaults, apps: [App.AMNEZIA] },
     ] }),
     listProfiles: () => Promise.resolve({ profiles: [{ id: "p_old", name: "hy2 · 443", protocol: "hysteria2" }] }),
-    previewProfile: () => Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Happ · URI list" }),
+    previewProfile: () => Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list" }),
     getProfile: () =>
       Promise.resolve({
         profile: { id: "p_old", name: "hy2 · 443", protocol: "hysteria2", version: 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },

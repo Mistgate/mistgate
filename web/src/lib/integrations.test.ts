@@ -186,7 +186,7 @@ describe("coded facts and outcomes, in Russian", () => {
     expect(said(fact("term", "days", { n: "30" }))).toBe("30 дней");
     expect(said(fact("nodes", "some", { n: "3" }))).toBe("3 ноды");
     expect(said(fact("nodes", "all"))).toBe("все ноды");
-    expect(said(fact("apps", "happ"))).toBe("только Happ");
+    expect(said(fact("apps", "happ"))).toBe("только ссылка подписки");
     expect(said(fact("quota", "change", { from: "0", to: "50000000000" }))).toBe("без лимита → 50 ГБ");
     expect(said(fact("quota_reset", "change", { from: "month", to: "rolling_month" }))).toBe("сброс 1-го числа → сброс каждые 30 дней");
     expect(said(fact("action", "pause"))).toBe("Пауза");

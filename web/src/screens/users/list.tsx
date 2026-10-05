@@ -345,7 +345,7 @@ function StatusCell({ u, t }: { u: User; t: Tx }) {
 }
 
 /**
- * The app column: what the person really used lately ("Happ", "Both", "—"). An active person whose page would give
+ * The app column: what the person really used lately ("Subscription link", "Both", "—"). An active person whose page would give
  * nothing gets a yellow "No access" instead, with the reason on hover (the group gives nothing, or not for their apps).
  */
 function AppCell({ u, group, t }: { u: User; group?: Group; t: Tx }) {

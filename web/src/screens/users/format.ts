@@ -99,7 +99,7 @@ export function viaText(u: User, t: Tx): string {
   return "—";
 }
 
-/** "Happ + Amnezia", "Happ" or "Amnezia": the apps the admin switched on. */
+/** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */
 export function appsText(u: User, t: Tx): string {
   if (u.apps?.happ && u.apps.amnezia) return t("users.appsBoth");
   return u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");

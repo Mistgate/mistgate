@@ -181,9 +181,9 @@ export const en = {
 
   "users.back": "Back to users",
   "users.until": "until",
-  "users.appsBoth": "Happ + Amnezia",
-  "users.appsHapp": "Happ",
-  "users.appsAwg": "Amnezia",
+  "users.appsBoth": "Link + AmneziaVPN keys",
+  "users.appsHapp": "Subscription link",
+  "users.appsAwg": "AmneziaVPN keys",
   "users.alert.expired": "The term ended {n} day ago — access is paused.|The term ended {n} days ago — access is paused.",
   "users.alert.expiredToday": "The term ended today — access is paused.",
   "users.alert.quota": "The {q} quota is used up — access is paused until it resets or you raise it.",
@@ -433,9 +433,9 @@ export const ru: typeof en = {
 
   "users.back": "К пользователям",
   "users.until": "до",
-  "users.appsBoth": "Happ + Amnezia",
-  "users.appsHapp": "Happ",
-  "users.appsAwg": "Amnezia",
+  "users.appsBoth": "Ссылка + ключи AmneziaVPN",
+  "users.appsHapp": "По ссылке подписки",
+  "users.appsAwg": "Ключи AmneziaVPN",
   "users.alert.expired":
     "Срок закончился {n} день назад — доступ приостановлен.|Срок закончился {n} дня назад — доступ приостановлен.|Срок закончился {n} дней назад — доступ приостановлен.",
   "users.alert.expiredToday": "Срок закончился сегодня — доступ приостановлен.",

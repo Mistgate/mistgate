@@ -420,7 +420,7 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 	if err != nil {
 		return nil, err
 	}
-	resp := &adminv1.PreviewProfileResponse{ClientLabel: "Happ · URI list"}
+	resp := &adminv1.PreviewProfileResponse{ClientLabel: "Subscription link · URI list"}
 	for _, e := range errs {
 		resp.Errors = append(resp.Errors, &adminv1.FieldError{Pointer: e.Pointer, Code: e.Code, Message: e.Message})
 	}

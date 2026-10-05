@@ -40,7 +40,7 @@ Every profile is a card: its name, the protocol, a short line of its settings ("
    - **Add it to groups**: the groups that have no profile of this protocol yet are ticked (without one, their people get nothing in that app); groups that already have one are not, because a second profile is usually a test or a variant. With no groups at all, the switch **Create the group "Everyone" with this profile** is offered.
 5. **Create profile**. The profile is created, added to the groups, then put on the nodes one by one in the same window. A node that refuses keeps the window open with the reason and a field to fix it (another port, a domain).
 
-The panel on the right, **What the client sees**, shows what a client would get for this profile, with secrets hidden: the share link for Hysteria2 ("Happ · URI list"), the `.conf` for AmneziaWG ("AmneziaVPN · .conf").
+The panel on the right, **What the client sees**, shows what a client would get for this profile, with secrets hidden: the share link for Hysteria2 ("Subscription link · URI list"), the `.conf` for AmneziaWG ("AmneziaVPN · .conf").
 
 ## Where it runs
 
