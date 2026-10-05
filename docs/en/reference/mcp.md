@@ -99,7 +99,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with platform, model, last seen, online, and for AmneziaWG the profile and tunnel address. Never a key or a config. |
 | `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
-| `subscription_settings_get` | Read only | The subscription page every user sees: the apps per platform in display order (name, kind, download link, add-link template, description, recommended), the page options, the server-name template, and the subscription title, announcement, support link and refresh interval. No user's link. |
+| `subscription_settings_get` | Read only | The subscription page every user sees: the apps per platform in display order (name, kind, download link, add-link template, description, recommended), the page options (including `dns_choice`, the switch for DNS choice on the page), the server-name template, and the subscription title, announcement, support link and refresh interval. No user's link. |
 | `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
 | `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |

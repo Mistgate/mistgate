@@ -11,8 +11,8 @@ The admin knows three roles. Every request is checked against the role per proce
 
 | Role | May |
 |---|---|
-| Owner | Everything: nodes (add, install over SSH, retire, logs, saved SSH access), profiles and where they run, DNS presets, doctor fixes, node and panel updates, WARP, backups, API tokens and approvals, the audit log, security and brand settings. |
-| Helper | Day-to-day work: users (create, change, enable and disable, extend, reset traffic, delete, devices, the subscription link), groups, subscription settings, node settings and restarting profiles on a node, muting alerts, Check now, running the doctor, accepting doctor warnings. |
+| Owner | Everything: nodes (add, install over SSH, retire, logs, saved SSH access), profiles and where they run, DNS presets and which of them a node offers to people, doctor fixes, node and panel updates, WARP, backups, API tokens and approvals, the audit log, security and brand settings. |
+| Helper | Day-to-day work: users (create, change, enable and disable, extend, reset traffic, delete, devices, the subscription link), groups, subscription settings, resetting a person's DNS choices by server, node settings and restarting profiles on a node, muting alerts, Check now, running the doctor, accepting doctor warnings. |
 | Read-only | Reads: the overview, nodes, profiles (secrets masked), groups, DNS presets, subscription settings, users, events, alerts, checks, doctor reports, the Updates page. And their own account: passkeys, password, sessions. |
 
 > **Note:** Today the panel has one admin, the owner created at setup: adding a helper or a read-only admin is not possible yet. The roles already matter for [API tokens](../reference/api.md), whose profiles act as these roles.
@@ -86,7 +86,7 @@ mistgate auth turnstile off
 - **What to show**: Everything, Sign-ins (setup, sign-in and out, lockouts, step-up, captcha, passkeys, passwords, sessions), Changes (users, groups, profiles, devices, DNS presets, nodes with their SSH installations and saved SSH access, WARP, updates, doctor fixes, tokens, approvals, settings), Failures (failed, refused or locked attempts of any kind). Backup actions are listed under Everything (and, when they fail, under Failures).
 - Each row has the actor, the action, its parameters, the result and the client address. Parameters never contain secrets.
 - A token is shown as "API token <name>" or "MCP token <name>". Successful reads by a token are written at most once a minute per procedure; changes and refusals every time.
-- Actions from the command line (`mistgate auth ...`) appear as "command line", work of the panel itself (a sign-in lockout, an automatic WARP re-registration) as "the panel itself", and a person working on their own user page as "a user on their page".
+- Actions from the command line (`mistgate auth ...`) appear as "command line", work of the panel itself (a sign-in lockout, an automatic WARP re-registration) as "the panel itself", and a person working on their own user page as "a user on their page". Among the DNS rows: `node_dns_options` (the owner changes the presets a node offers), `page_dns_choice` (a person picks a DNS for a server on their page: the person's name, the node's name and the preset, no link or address) and `user_dns_choices_reset` (an admin resets a person's choices). See [DNS](../guide/dns.md).
 
 The panel does not prune the audit log.
 

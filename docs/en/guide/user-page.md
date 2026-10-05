@@ -85,6 +85,35 @@ With **Devices on the page** on (the default), a person manages their own Amnezi
 
 Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one link may make 20 such requests an hour, showing a key included. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
 
+A person whose subscription is not active still sees their AmneziaVPN keys, and can rename and remove them; adding new ones is not possible.
+
+## DNS per server
+
+When the owner turns on **DNS choice on the page** (see below), a person picks the DNS for each server on their page, from the presets the owner offered on that node. The presets and the rule for which DNS applies are in [DNS](dns.md); this section covers what the page does with it.
+
+### What the page knows about a server
+
+For each of the person's servers the page gets:
+
+- the country and location, never the node's name in the panel;
+- whether the node is answering (a server that is not shows "not answering");
+- its load level: **Low**, **Medium** or **High**, without percentages (see **Channel utilization** above);
+- the name the server has in the apps on the link. When the **Server names** template (see [Subscriptions](subscriptions.md)) contains `{node}`, that name is not sent to the page, so the node's name does not leak through it.
+
+### Choosing and applying
+
+- The choice is made for one server at a time and written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address.
+- It counts against the same limit as the other actions on the page: 20 changes an hour per link.
+- Where it works differs by format:
+  - **AmneziaVPN and AmneziaWG keys** (`.conf`, `vpn://`, QR code): the DNS is written inside the key, so the person has to press **Get a new key** again. The key itself does not change; the device is marked "new key needed" with the reason DNS until they do.
+  - **The AmneziaWG proxies of a Mihomo profile** (Clash Verge Rev, FlClash and the like): the choice applies at the next subscription update.
+  - **Not per server**: Hysteria2 in Mihomo and Happ have one resolver for the whole subscription, so they use one DNS for all servers (the user's, the group's or the instance's preset). The person's choice does not reach them. Other apps on the base64 format (v2rayNG, Hiddify, Streisand, Shadowrocket) get no DNS from the panel at all.
+- In the owner's preview the choice cannot be changed, like every other action on the page.
+
+### The option
+
+**Subscriptions** → **User page** → **DNS choice on the page** (off by default; a panel set up before the option existed counts as off). Turning it off does not erase the choices people already made: they keep working until you reset them in the user card (see [Users and groups](users-and-groups.md)). The admin warns: "In Happ and for Hysteria2 in Mihomo the DNS is one for all nodes — it works per node only for AmneziaWG keys."
+
 ## The preview in the admin
 
 **Subscriptions** → **User page** shows the page in a phone frame next to the settings. **Preview as** picks the user (from the first 50); the reload button refreshes it.

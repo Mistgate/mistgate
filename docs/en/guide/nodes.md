@@ -158,6 +158,8 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 
 **DNS resolvers for this node** are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
 
+**DNS choice on the user page** is a separate block of the node, not to be confused with the resolvers above. Here the owner ticks the DNS presets that people may pick for this server on their page (the order is the order on the page) and marks one as the default for the node. Only the owner changes it, and the change is written to the audit log (`node_dns_options`). A node with no presets offered gives no choice. It matters only when **DNS choice on the page** is on in **Subscriptions** → **User page**, and it reaches AmneziaWG keys and the AmneziaWG proxies of a Mihomo profile; see [DNS](dns.md).
+
 > **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
 
 #### Renaming a node

@@ -110,6 +110,10 @@ The counter shows devices in use against the limit. Two lists:
 
 **Name shown on the subscription page**: the name the user page greets the person with, up to 64 characters. Empty uses the account name; the line under the field shows the greeting ("Page greeting: …"). **Save name** saves it. Anyone with the link sees this name; it changes nothing else about the user. See [User page](user-page.md).
 
+### DNS per server
+
+Once a person has picked a DNS for a server on their page (see **DNS choice on the page**), this section lists their choices per server (read only, for every admin). **Reset** removes all their choices, so the usual DNS applies again (their preset, the group's, the instance's, or the node's default). The owner and helpers can reset; it is written to the audit log as `user_dns_choices_reset`. Turning the option off does not remove choices already made: they work until you reset them here. See [DNS](dns.md).
+
 ### Limits
 
 | Setting | Steps and range |
@@ -176,4 +180,4 @@ Profiles can also be added to a group from the profile's page (**Add to a group*
 
 ## Who can do what
 
-Every admin sees users and groups. The owner and helpers create, change and delete users and groups, issue links and keys, and pick DNS presets for users and groups. See [Security](../operations/security.md).
+Every admin sees users and groups. The owner and helpers create, change and delete users and groups, issue links and keys, pick DNS presets for users and groups and reset a person's DNS choices by server. Only the owner chooses which presets a node offers to people. See [Security](../operations/security.md).

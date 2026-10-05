@@ -188,7 +188,7 @@ Opening a config marks the device as having the current one: an **outdated** bad
 
 On a computer, import the file, not the key: with the key the MTU can be wrong and the connection may not work.
 
-The config carries `AllowedIPs = 0.0.0.0/0, ::/0` (everything through the tunnel) and two DNS servers. They are the first two plain IPv4 servers of the person's DNS preset; when the preset has none, the built-in 1.1.1.1 and 8.8.8.8 are written and the window says so. AmneziaWG cannot split DNS: the main servers are used for every domain. See [DNS](dns.md).
+The config carries `AllowedIPs = 0.0.0.0/0, ::/0` (everything through the tunnel) and two DNS servers. They are the first two plain IPv4 servers of the DNS that applies to the person on that node (their per-server choice when the owner allows it, else the DNS preset); when it has none, the built-in 1.1.1.1 and 8.8.8.8 are written and the window says so. AmneziaWG cannot split DNS: the main servers are used for every domain. The DNS is written into the key: after the person picks another DNS for a server on their page, the key itself stays the same, but they have to press **Get a new key** to get the new DNS (until then the device says "new key needed"). See [DNS](dns.md).
 
 ## The AmneziaVPN app
 
