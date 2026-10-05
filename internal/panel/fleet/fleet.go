@@ -255,6 +255,10 @@ func (f *Fleet) snapshotSessions() []*session {
 	return out
 }
 
+// AgentConnected reports whether the node's agent holds a live session with the panel (access.AgentSessionSource: the
+// user page calls a server that answers "online").
+func (f *Fleet) AgentConnected(nodeID string) bool { return f.session(nodeID) != nil }
+
 func (f *Fleet) session(nodeID string) *session {
 	f.mu.Lock()
 	defer f.mu.Unlock()

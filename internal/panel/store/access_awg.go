@@ -271,6 +271,9 @@ type AccessAWGDevice struct {
 	SecretEnc                                   []byte // vault, AAD = CredID
 	Idx                                         int
 	ConfigEpoch, CriticalEpoch                  int64
+	// DNSStale lists the nodes where the person picked a DNS after the device last fetched its configs: its key holds the
+	// older one there (see dnsStaleKeys).
+	DNSStale []string
 }
 
 // Stale reports whether the profile changed in a way that breaks the config the device last received.
@@ -308,7 +311,21 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 		d.CreatedAt = fromUnix(created)
 		out = append(out, d)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	stale := map[string]map[string][]string{} // user -> credential -> nodes
+	for i := range out {
+		byCred, ok := stale[out[i].UserID]
+		if !ok {
+			if byCred, err = a.dnsStaleKeys(ctx, out[i].UserID); err != nil {
+				return nil, err
+			}
+			stale[out[i].UserID] = byCred
+		}
+		out[i].DNSStale = byCred[out[i].CredID]
+	}
+	return out, nil
 }
 
 // AWGDevices returns the live AWG devices of a user, oldest first. FirstSeenAt and LastSeenAt are zero while the
@@ -329,9 +346,10 @@ func (a Access) AWGDevice(ctx context.Context, deviceID string) (AccessAWGDevice
 	return ds[0], nil
 }
 
-// SetConfigEpoch records that the credential's device received a config of the given profile epoch (never lowers it).
-func (a Access) SetConfigEpoch(ctx context.Context, credID string, epoch int64) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential SET config_epoch = ? WHERE id = ? AND config_epoch < ?`, epoch, credID, epoch)
+// SetConfigEpoch records that the credential's device received a config of the given profile epoch (never lowers it)
+// at the given time (what a person's DNS pick is compared with: see dnsStaleKeys).
+func (a Access) SetConfigEpoch(ctx context.Context, credID string, epoch int64, now time.Time) error {
+	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential SET config_epoch = max(config_epoch, ?), configs_at = ? WHERE id = ?`, epoch, now.UnixMilli(), credID)
 	return err
 }
 

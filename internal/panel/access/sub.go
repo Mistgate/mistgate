@@ -47,8 +47,41 @@ type SubView struct {
 	// AccessHapp / AccessAmnezia: the user's app toggle AND a usable deployed inbound whose protocol that app
 	// can consume (the user page shows only what works).
 	AccessHapp, AccessAmnezia bool
+	// AppAmnezia is the user's AmneziaVPN toggle alone (AccessAmnezia also needs a live inbound and an active user): a person
+	// whose subscription ended still sees the keys they hold and can remove them.
+	AppAmnezia bool
+	// Nodes are the servers of the person, one per node, in subscription order: the ones a link carries and the ones a key
+	// can be made for. Empty unless Status is active.
+	Nodes []SubNode
+	// DNSLink is the preset that applies to the apps that take the link (Hysteria2 in Mihomo and in Happ have one resolver for the
+	// whole subscription): the person's own, the group's, the instance's. DNSPresets are the presets the page names: the ones
+	// the nodes offer and apply, and DNSLink when any node offers a choice. Both empty unless Status is active.
+	DNSLink    string
+	DNSPresets []SubDNSPreset
 	// Format is what Lines hold (FormatURIList unless the view was asked for another).
 	Format plugin.ClientFormat
+}
+
+// SubNode is one node as the page's server list shows it.
+type SubNode struct {
+	ID          string
+	Name        string // the panel's node name: never emitted as user-facing text
+	CountryCode string
+	Location    string
+	// Online: the node's agent is connected (a live session, or a network sample not older than 90 seconds).
+	Online bool
+	// LoadPercent is as in SubServer: nil when the capacity or a fresh sample is missing.
+	LoadPercent *int
+	Conns       []SubConn
+	DNS         *SubNodeDNS // nil: the owner offers no choice on this node
+}
+
+// SubConn is one way to use a node: by the link or by a key.
+type SubConn struct {
+	Way       string // "link" | "key"
+	Exit      string // "direct" | "warp"
+	ProfileID string // the AmneziaWG profile of a key
+	Server    int    // a link: the index into SubView.Servers
 }
 
 // SubServer is one Lines entry with the facts the remark (server name) is built from.
@@ -61,6 +94,7 @@ type SubServer struct {
 	CountryCode string // node country, ISO 3166-1 alpha-2 or ""
 	Location    string
 	Profile     string // profile name
+	Exit        string // "direct" | "warp"
 	// LoadPercent is the larger of this node's RX/TX rates as a percentage of its configured symmetric capacity.
 	// It is nil when capacity is unknown or the node has no fresh sample. The rates themselves stay out of the view:
 	// whatever reaches a user must not tell when the other person on a node streams.
@@ -83,8 +117,10 @@ type SubAWG struct {
 	Version                string // "3.1" | "2.0"
 	Address                string // "10.66.4.5, fd66:66:0:1::5"
 	Stale                  bool   // the profile changed in a way that breaks the config the device holds
-	LastHandshake          time.Time
-	MinClients             []protocols.ClientReq
+	// DNSStale lists the nodes where the person picked a DNS after this device fetched its configs: its key holds the older one.
+	DNSStale      []string
+	LastHandshake time.Time
+	MinClients    []protocols.ClientReq
 }
 
 // SubAWGProfile is an AmneziaWG profile a device can be added on. The page names it by what a person can tell apart:
@@ -165,7 +201,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	v := SubView{
 		UserID: u.ID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now),
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
-		DeviceLimit: u.DeviceLimit,
+		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia,
 	}
 	up, _, err := a.UserUsage(ctx, u.ID, u.PeriodStart)
 	if err != nil {
@@ -202,7 +238,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			sd.LastSeen = ad.LastSeenAt
 			sd.AWG = &SubAWG{
 				ProfileID: ad.ProfileID, ProfileName: ad.ProfileName, Version: awgVersion([]byte(ad.ProfileSettingsJSON)),
-				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), LastHandshake: ad.LastSeenAt,
+				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), DNSStale: ad.DNSStale, LastHandshake: ad.LastSeenAt,
 				MinClients: s.awgMinClients(ad.ProfileSettingsJSON),
 			}
 		}
@@ -269,21 +305,29 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if !s.usable(f, g, u) {
 				continue
 			}
-			proto, exists := s.reg.Get(f.Profile.Protocol)
-			if !exists {
-				continue
-			}
-			happ, _, _ := clientApps(proto)
-			if u.AppHapp && happ {
+			if _, exists := s.reg.Get(f.Profile.Protocol); exists {
 				networkNodeIDs = append(networkNodeIDs, f.Node.ID)
 				capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
 			}
 		}
 	}
 	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, networkSource, now)
-	var dnsServers []string
-	dnsDone := false
-	awgAt := map[string]int{} // profile id -> its index in v.AWGProfiles
+	nodeDNS := s.newNodeDNS(ctx, u.ID)
+	awgAt := map[string]int{}  // profile id -> its index in v.AWGProfiles
+	nodeAt := map[string]int{} // node id -> its index in v.Nodes
+	nodeOf := func(f store.AccessInboundFull) *SubNode {
+		i, ok := nodeAt[f.Node.ID]
+		if !ok {
+			i = len(v.Nodes)
+			nodeAt[f.Node.ID] = i
+			n := SubNode{ID: f.Node.ID, Name: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location}
+			if usage, ok := networkUsage[f.Node.ID]; ok {
+				n.LoadPercent = usage.LoadPercent
+			}
+			v.Nodes = append(v.Nodes, n)
+		}
+		return &v.Nodes[i]
+	}
 	for _, f := range full {
 		if !s.usable(f, g, u) {
 			continue
@@ -306,6 +350,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if cc := strings.ToUpper(f.Node.CountryCode); cc != "" && !slices.Contains(v.AWGProfiles[i].Countries, cc) {
 				v.AWGProfiles[i].Countries = append(v.AWGProfiles[i].Countries, cc)
 			}
+			n := nodeOf(f)
+			n.Conns = append(n.Conns, SubConn{Way: "key", Exit: egressOf(merged), ProfileID: f.Profile.ID})
 		}
 		key := f.Profile.Protocol
 		if protocols.IsPerDevice(proto) {
@@ -324,7 +370,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
 		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
-			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID}
+			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged)}
 		if usage, ok := networkUsage[f.Node.ID]; ok {
 			srv.LoadPercent = usage.LoadPercent
 		}
@@ -333,10 +379,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			UserID: u.ID, UserName: u.Name, DeviceID: dev.ID, Secret: secret,
 		}
 		if protocols.IsPerDevice(proto) {
-			if !dnsDone {
-				dnsServers, _ = s.awgDNS(ctx, u.ID)
-				dnsDone = true
-			}
+			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none.)
+			dnsServers, _ := nodeDNS.awg(f.Node.ID)
 			in.Peer, in.InboundPublic, in.DNS, in.NodeAddr = json.RawMessage(secret), json.RawMessage(f.Inbound.PluginPublicJSON), dnsServers, f.Node.Address
 		}
 		if opt.Name != nil {
@@ -347,9 +391,32 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			srv.URI = string(frag.Data)
 			v.Lines = append(v.Lines, srv.URI)
 			v.Servers = append(v.Servers, srv)
+			if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
+				n := nodeOf(f)
+				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1})
+			}
 		}
 	}
+	for i := range v.Nodes {
+		v.Nodes[i].Online = s.nodeOnline(v.Nodes[i].ID, networkUsage)
+	}
+	s.nodeDNSData(ctx, &v, nodeDNS, awgDevs)
 	return v, nil
+}
+
+// AgentSessionSource is an optional interface of the online source of New (the fleet module implements it): whether the
+// agent of a node holds a live session with the panel.
+type AgentSessionSource interface {
+	AgentConnected(nodeID string) bool
+}
+
+// nodeOnline: the agent of the node answers (a live session, or a network sample that is not older than 90 seconds).
+func (s *Service) nodeOnline(nodeID string, usage map[string]NodeNetworkUtilization) bool {
+	if _, ok := usage[nodeID]; ok {
+		return true
+	}
+	src, ok := s.online.(AgentSessionSource)
+	return ok && src.AgentConnected(nodeID)
 }
 
 // awgMinClients are the minimum client versions of an AWG profile, from its settings without secrets (the

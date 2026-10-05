@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/netip"
 	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/auth"
-	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -384,28 +382,6 @@ func (s *Service) RevokeOwnDevice(ctx context.Context, by, owner, deviceID strin
 	return nil
 }
 
-// awgDNS returns the plain IPv4 resolvers of the user's effective DNS preset that an AWG client can carry, and
-// whether the preset's split-direct rules are lost (a .conf carries one pair of addresses, no split).
-func (s *Service) awgDNS(ctx context.Context, userID string) (servers []string, splitLost bool) {
-	pre, _, err := s.dns.Effective(ctx, userID)
-	if err != nil {
-		s.log.Warn("access: cannot read the user's dns preset", "err", err)
-		return nil, false
-	}
-	eps, _ := pre.EndpointsFor(dns.ClientAmneziaWG)
-	for _, e := range eps {
-		if e.Kind != dns.KindPlain {
-			continue
-		}
-		if a, err := netip.ParseAddr(e.Address); err == nil {
-			servers = append(servers, a.String())
-		} else if ap, err := netip.ParseAddrPort(e.Address); err == nil {
-			servers = append(servers, ap.Addr().String())
-		}
-	}
-	return servers, pre.SplitDirect && len(pre.Split) > 0
-}
-
 // renderDeviceConfigs renders the .conf and the vpn:// key of the device for each usable inbound of its profile.
 // markReceived records the profile's current epoch on the credential (the user now holds current configs).
 func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, markReceived bool) ([]DeviceConfig, error) {
@@ -413,21 +389,13 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	if err != nil {
 		return nil, s.internal("open device key", err)
 	}
-	servers, splitLost := s.awgDNS(ctx, sc.user.ID)
-	_, dnsFallback := awg.PickDNS(servers)
+	nodeDNS := s.newNodeDNS(ctx, sc.user.ID)
 	version := awgVersion(sc.merged)
 	var reqs []protocols.ClientReq
 	for _, r := range protocols.MinClientsOf(sc.proto, sc.merged) {
 		if r.Client == plugin.ClientAmnezia {
 			reqs = append(reqs, r)
 		}
-	}
-	warnings := []string{"amnezia_desktop_mtu"}
-	if dnsFallback {
-		warnings = append(warnings, "dns_fallback")
-	}
-	if splitLost {
-		warnings = append(warnings, "dns_no_split")
 	}
 	nodes := make([]store.AccessNode, len(sc.ins))
 	for i, f := range sc.ins {
@@ -441,6 +409,17 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		if err != nil {
 			s.log.Error("access: cannot build inbound for a device config", "inbound", f.Inbound.ID, "err", err)
 			continue
+		}
+		// The DNS of this node (the person's pick, else the node's default, else their own rule): a key holds one resolver
+		// pair per server.
+		servers, splitLost := nodeDNS.awg(f.Node.ID)
+		_, dnsFallback := awg.PickDNS(servers)
+		warnings := []string{"amnezia_desktop_mtu"}
+		if dnsFallback {
+			warnings = append(warnings, "dns_fallback")
+		}
+		if splitLost {
+			warnings = append(warnings, "dns_no_split")
 		}
 		in := protocols.RenderInput{
 			Inbound: inboundView(nodeView(f.Node), spec, ""), Settings: sc.merged,
@@ -467,7 +446,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
 	}
 	if markReceived {
-		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch); err != nil {
+		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch, s.now()); err != nil {
 			return nil, s.internal("record the received config", err)
 		}
 	}
