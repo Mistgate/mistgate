@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"golang.org/x/crypto/ssh"
 )
@@ -49,6 +50,11 @@ printf 'existing_node_id=%s\n' "$node_id"
 // remoteFirewallPreparationScript adjusts only an already-active host firewall.
 // Provider firewalls cannot be reached through this SSH connection, and an
 // inactive firewall is deliberately left inactive.
+//
+// UFW: 80/tcp, 443/tcp and 443/udp carry hostctl.ProvisionUFWTag so the agent removes them when the node is retired
+// (hostctl.Cleanup); a rule the owner already had is left alone and untagged. The SSH rule is never tagged: removing
+// it could lock the owner out. firewalld: each port goes in at runtime and permanently, without --reload, which would
+// drop runtime-only rules such as fail2ban bans and Docker chains.
 const remoteFirewallPreparationScript = `set -eu
 ssh_port="${1:-}"
 case "$ssh_port" in
@@ -58,9 +64,10 @@ if [ "$ssh_port" -lt 1 ] || [ "$ssh_port" -gt 65535 ]; then exit 10; fi
 
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
   ufw allow "$ssh_port/tcp" >/dev/null
-  ufw allow 80/tcp >/dev/null
-  ufw allow 443/tcp >/dev/null
-  ufw allow 443/udp >/dev/null
+  for rule in 80/tcp 443/tcp 443/udp; do
+    if ufw show added 2>/dev/null | grep -qx "ufw allow $rule"; then continue; fi
+    ufw allow "$rule" comment ` + hostctl.ProvisionUFWTag + ` >/dev/null
+  done
 fi
 
 if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
@@ -69,10 +76,10 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
   printf '%s\n' "$zones" | while IFS= read -r zone; do
     [ -n "$zone" ] || continue
     for rule in "$ssh_port/tcp" 80/tcp 443/tcp 443/udp; do
+      firewall-cmd --zone="$zone" --add-port="$rule" >/dev/null
       firewall-cmd --zone="$zone" --add-port="$rule" --permanent >/dev/null
     done
   done
-  firewall-cmd --reload >/dev/null
 fi
 `
 
@@ -267,7 +274,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if !s.mayContinue(ctx, &job) {
 		return
 	}
-	if err := runSSH(ctx, conn, "install -o root -g root -m 0755 /root/mistgate-node.new /root/mistgate-node", nil, 20*time.Second); err != nil {
+	if err := runSSH(ctx, conn, "install -o root -g root -m 0755 /root/mistgate-node.new /root/mistgate-node && rm -f /root/mistgate-node.new", nil, 20*time.Second); err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, "agent_install_failed")
 		}
@@ -573,8 +580,12 @@ func preflightCommand(panelAddr string) (string, error) {
 	if err != nil || host == "" || port == "" {
 		return "", errors.New("provision: invalid panel address")
 	}
+	// The TCP probe gets 5 s of the 20 s preflight budget: an unanswered SYN would otherwise hang for about two minutes
+	// and the panel would report ssh_preflight_timeout instead of panel_unreachable.
 	return remotePreflightScript + `
-if command -v bash >/dev/null 2>&1 && bash -c 'exec 3<>/dev/tcp/$1/$2' mistgate-probe ` + shellQuote(host) + ` ` + shellQuote(port) + ` >/dev/null 2>&1; then
+probe_timeout=""
+if command -v timeout >/dev/null 2>&1; then probe_timeout="timeout 5"; fi
+if command -v bash >/dev/null 2>&1 && $probe_timeout bash -c 'exec 3<>/dev/tcp/$1/$2' mistgate-probe ` + shellQuote(host) + ` ` + shellQuote(port) + ` >/dev/null 2>&1; then
   panel_reachable=yes
 else
   panel_reachable=no

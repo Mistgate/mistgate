@@ -33,7 +33,8 @@ type Host interface {
 	// SSHPorts are the sshd ports found by the last ApplyBaseline (22 when detection found nothing):
 	// the SSH guard rate-limits them and no port-hop range may cover them.
 	SSHPorts() []uint16
-	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard and torrent queue, tagged UFW UDP rules, sysctl and journald drop-ins,
+	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard and torrent queue, tagged UFW UDP rules
+	// and the UFW rules the SSH install tagged with ProvisionUFWTag, sysctl and journald drop-ins,
 	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the tunnel table
 	// "mistgate_awg" and every link named mgawg* or mgwarp). The WARP routing rules and routes are the WARP
 	// manager's (warp.Cleanup).

@@ -297,6 +297,7 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 func (h *linuxHost) Cleanup(ctx context.Context) error {
 	errs := []error{h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx)} // torrent table, tunnel table and our links
 	errs = append(errs, h.SyncInboundUDPPorts(ctx, nil))                     // only UFW rules with Mistgate's exact ownership tag
+	errs = append(errs, h.removeProvisionUFWRules(ctx))                      // and the 80/443 rules the SSH install tagged
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()
 	h.hops, h.sshPorts = nil, nil

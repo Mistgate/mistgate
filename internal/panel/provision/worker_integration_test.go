@@ -211,12 +211,14 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 		t.Fatalf("host firewall script = %q", gotFirewallScript)
 	}
 	for _, rule := range []string{
-		`ufw allow "$ssh_port/tcp"`, "ufw allow 80/tcp", "ufw allow 443/tcp", "ufw allow 443/udp",
-		"80/tcp", "443/tcp", "443/udp", "firewall-cmd --reload",
+		`ufw allow "$ssh_port/tcp"`, "for rule in 80/tcp 443/tcp 443/udp", "80/tcp", "443/tcp", "443/udp",
 	} {
 		if !strings.Contains(string(gotFirewallScript), rule) {
 			t.Errorf("host firewall script does not include %q", rule)
 		}
+	}
+	if strings.Contains(string(gotFirewallScript), "--reload") {
+		t.Fatal("host firewall script reloads firewalld, which drops runtime-only rules")
 	}
 	if strings.Contains(string(gotFirewallScript), "10000:60000") || strings.Contains(string(gotFirewallScript), "10000-60000") {
 		t.Fatal("host firewall script opened the broad randomized AWG or hopping port range")
@@ -266,6 +268,9 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	}
 	if remoteCommands[1] != "sh -s -- 22" || remoteCommands[2] != "cat > /root/mistgate-node.new" {
 		t.Fatalf("firewall preparation must follow preflight and precede transfer: %q", remoteCommands)
+	}
+	if !strings.HasSuffix(remoteCommands[3], "&& rm -f /root/mistgate-node.new") {
+		t.Fatalf("the uploaded temporary agent is left on the host: %q", remoteCommands[3])
 	}
 	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 20)
 	if err != nil {
