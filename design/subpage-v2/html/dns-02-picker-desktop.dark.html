@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS · выбор на компьютере · тёмная</title>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="stylesheet" href="../mg-sub.css">
+<style>body{margin:0;background:#0c0c0e}</style>
+</head>
+<body>
+<div class="mg desk t-dark a-lavender" style="height:720px;overflow:hidden">
+
+  <div class="wrap" aria-hidden="true">
+    <header class="hd" style="height:72px">
+      <img class="logo" src="../assets/badge-lavender.svg" alt="" width="32" height="32">
+      <div class="wm">mist<b>gate</b></div>
+      <div class="lang"><button class="on">RU</button><button>EN</button></div>
+    </header>
+    <div class="sec-h" style="padding-top:8px">
+      <h2 class="h2">Серверы</h2>
+      <p class="hint">Все ваши серверы уже есть в приложении — переключайтесь между ними там</p>
+    </div>
+    <div class="srv-grid">
+      <article class="card srv">
+        <div class="srv-top">
+          <span class="flag de"></span>
+          <h3 class="srv-name">Германия <span>· Франкфурт</span></h3>
+          <span class="state"><span class="dot live"></span>работает</span>
+        </div>
+        <div class="load"><span class="k">Загрузка</span><span class="meter hi"><i class="f"></i><i class="f"></i><i class="f"></i></span><b class="warn-t">высокая</b></div>
+        <div class="chips">
+          <span class="chip sky">по ссылке</span>
+          <span class="chip mint">ключ</span>
+        </div>
+        <div class="srv-app">В приложении <span class="mono">DE · Hysteria2</span></div>
+        <div class="dns">
+          <span class="k">DNS</span>
+          <span class="v">AdGuard — без рекламы</span>
+          <button class="tlink">Изменить</button>
+        </div>
+      </article>
+      <article class="card srv">
+        <div class="srv-top">
+          <span class="flag nl"></span>
+          <h3 class="srv-name">Нидерланды</h3>
+          <span class="state"><span class="dot live"></span>работает</span>
+        </div>
+        <div class="load"><span class="k">Загрузка</span><span class="meter"><i class="f"></i><i></i><i></i></span><b>низкая</b></div>
+        <div class="chips"><span class="chip sky">по ссылке</span></div>
+        <div class="srv-app">В приложении <span class="mono">NL · Hysteria2</span></div>
+        <div class="dns" style="margin-top:auto">
+          <span class="k">DNS</span>
+          <span class="v">Обычный</span>
+          <button class="tlink">Изменить</button>
+        </div>
+      </article>
+      <article class="card srv off nodns">
+        <div class="srv-top">
+          <span class="flag fi"></span>
+          <h3 class="srv-name">Финляндия</h3>
+          <span class="state mut"><span class="dot off"></span>не отвечает</span>
+        </div>
+        <p class="sm mut">Выберите в приложении другой сервер</p>
+      </article>
+    </div>
+  </div>
+
+  <div class="scrim"></div>
+
+  <section class="dlg" role="dialog" aria-modal="true" aria-labelledby="dd-t" aria-describedby="dd-d" style="position:absolute;left:50%;top:88px;transform:translateX(-50%);width:500px;gap:16px">
+    <div class="dlg-h" style="align-items:center">
+      <span class="tile s36 sky"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></svg></span>
+      <div class="stack g4 grow">
+        <h3 id="dd-t" style="font-size:19px;line-height:1.25;font-weight:800;letter-spacing:-.03em">DNS для сервера</h3>
+        <p class="row g6 sm mut"><span class="flag de" style="width:18px;height:13px"></span>Германия · Франкфурт</p>
+      </div>
+      <button class="ibtn round" aria-label="Закрыть"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+
+    <p class="sm mut" id="dd-d">DNS решает, какие сайты открываются и как. Выбор действует только для этого сервера.</p>
+
+    <div class="stack g8" role="radiogroup" aria-labelledby="dd-t">
+      <button class="opt" role="radio" aria-checked="false">
+        <span class="radio"></span>
+        <span class="opt-b">
+          <span class="row g8" style="flex-wrap:wrap"><span class="opt-t">По умолчанию — AdGuard</span><span class="chip" style="height:22px;font-size:12px;padding:0 8px">сейчас</span></span>
+          <span class="opt-d">Блокирует рекламу и трекеры</span>
+        </span>
+      </button>
+      <button class="opt on" role="radio" aria-checked="true">
+        <span class="radio on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+        <span class="opt-b"><span class="opt-t">Обычный</span><span class="opt-d">Cloudflare и Google, без фильтров</span></span>
+      </button>
+      <button class="opt" role="radio" aria-checked="false">
+        <span class="radio"></span>
+        <span class="opt-b"><span class="opt-t">Семейный</span><span class="opt-d">Без рекламы и сайтов для взрослых</span></span>
+      </button>
+    </div>
+
+    <div class="note sm">
+      <svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/></svg>
+      <p>У ключа «Pixel 7» DNS записан внутри — после смены получите ключ заново. Приложения по ссылке обновятся сами.</p>
+    </div>
+
+    <div class="div" style="margin:0 -24px"></div>
+    <div class="row g8" style="justify-content:flex-end">
+      <button class="btn sec sm">Отмена</button>
+      <button class="btn pri sm" style="min-width:132px">Применить</button>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

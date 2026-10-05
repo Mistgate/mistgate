@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Статус подписки · варианты · тёмная</title>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="stylesheet" href="../mg-sub.css">
+<style>body{margin:0;background:#0c0c0e}</style>
+</head>
+<body>
+<div class="mg phone t-dark a-lavender" style="padding-top:8px">
+
+  <div class="spec">
+    <p class="eb">Активна · без срока и без лимита</p>
+    <section class="card hero">
+      <div class="hero-top"><h1 class="h1">Привет</h1><span class="pill"><span class="dot live"></span>Активна</span></div>
+      <div class="stats">
+        <div class="stat"><span class="eb">Срок</span><div class="num"><b>∞</b><span>без срока</span></div></div>
+        <div class="stat"><span class="eb">Трафик</span><div class="num"><b>312</b><span>МБ · без лимита</span></div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">Активна · трафик почти исчерпан (90 % и больше)</p>
+    <section class="card hero">
+      <div class="hero-top"><h1 class="h1">Привет, Alice</h1><span class="pill"><span class="dot live"></span>Активна</span></div>
+      <div class="stats">
+        <div class="stat"><span class="eb">Осталось</span><div class="num"><b>76</b><span>дней</span></div><span class="hint" style="margin-top:auto">до 20 декабря</span></div>
+        <div class="stat" style="box-shadow:inset 0 0 0 1px var(--warning-line);background:color-mix(in oklch,var(--warning) 8%,var(--surface-2))"><span class="eb">Трафик</span><div class="num"><b class="warn-t">92</b><span>из 100 ГБ</span></div><div class="bar"><i class="warn" style="width:92%"></i></div><span class="hint">обнулится 14 октября</span></div>
+      </div>
+      <p class="sm row g8" style="align-items:flex-start"><span class="dot warn" style="margin-top:6px"></span><span>Осталось 8 ГБ до 14 октября</span></p>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">Скоро закончится · 7 дней и меньше</p>
+    <section class="card hero warn">
+      <div class="stack g10"><span class="pill warn" style="align-self:flex-start"><span class="dot warn"></span>Скоро закончится</span><h1 class="h1">Привет, Alice</h1></div>
+      <p class="why">Осталось 3 дня — напишите, чтобы продлить.</p>
+      <a class="btn pri" href="https://t.me/example_support" target="_blank" rel="noopener">Написать</a>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">Закончилась · без поддержки — нет кнопки и второй фразы</p>
+    <section class="card hero bad">
+      <div class="stack g10"><span class="pill bad" style="align-self:flex-start"><span class="dot bad"></span>Закончилась</span><h1 class="h1">Привет, Alice</h1></div>
+      <p class="why"><b>Подписка закончилась 3 октября.</b> Интернет через Mistgate сейчас не работает.</p>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">Трафик исчерпан · без правила сброса</p>
+    <section class="card hero warn">
+      <div class="stack g10"><span class="pill warn" style="align-self:flex-start"><span class="dot warn"></span>Трафик исчерпан</span><h1 class="h1">Привет, Alice</h1></div>
+      <p class="why">Лимит трафика исчерпан. Напишите — увеличим.</p>
+      <a class="btn pri" href="https://t.me/example_support" target="_blank" rel="noopener">Написать в поддержку</a>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">Длинные тексты · переносы без поломки</p>
+    <header class="hd">
+      <img class="logo" src="../assets/badge-lavender.svg" alt="" width="32" height="32">
+      <div class="wm" style="font-size:15px;letter-spacing:-.02em">Мой очень длинный VPN для друзей и семьи</div>
+      <div class="lang" role="group" aria-label="Язык"><button class="on">RU</button><button>EN</button></div>
+    </header>
+    <div class="ann" role="note">
+      <span class="dot"></span>
+      <p>В субботу с 02:00 до 03:00 обновляю серверы в Германии и Нидерландах. Может моргнуть на пару минут — если не вернётся само, переключитесь в приложении на Финляндию.</p>
+      <button class="x" aria-label="Скрыть объявление"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <section class="card hero">
+      <div class="hero-top"><h1 class="h1">Привет, Александра-Мария Константиновна</h1><span class="pill"><span class="dot live"></span>Активна</span></div>
+    </section>
+  </div>
+
+  <div class="spec">
+    <p class="eb">English · проверка длины</p>
+    <section class="card hero">
+      <div class="hero-top"><h1 class="h1">Hi, Alice</h1><span class="pill"><span class="dot live"></span>Active</span></div>
+      <div class="stats">
+        <div class="stat"><span class="eb">Left</span><div class="num"><b>76</b><span>days</span></div><span class="hint" style="margin-top:auto">until December 20</span></div>
+        <div class="stat"><span class="eb">Traffic</span><div class="num"><b>12.5</b><span>of 100 GB</span></div><div class="bar"><i style="width:12.5%"></i></div><span class="hint">resets October 14</span></div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</body>
+</html>
