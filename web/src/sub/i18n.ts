@@ -97,8 +97,8 @@ export type Dict = {
   awgReadyH: string;
   renewT: (name: string) => string;
   renewH: (app: string) => string;
-  /** What to delete in the app: the names the old keys had there ("de1 · AWG 3.1"); none known = said in general. */
-  renewOld: (app: string, names: string[]) => string;
+  /** What to delete in the app: the device's old connection. */
+  renewOld: (app: string) => string;
   awgDone: string;
   profile: string;
   profileMain: string;
@@ -252,8 +252,7 @@ const ru: Dict = {
   awgReadyH: "Настройте устройство сейчас. Закроете окно — устройство останется в списке, ключ можно будет показать снова.",
   renewT: (n) => `Новый ключ для «${n}»`,
   renewH: (a) => `Добавьте этот ключ в ${a}, как в первый раз.`,
-  renewOld: (a, n) =>
-    n.length ? `Если в ${a} осталось подключение ${n.join(" или ")}, удалите его — оно больше не работает.` : `Старое подключение этого устройства в ${a} удалите — оно больше не работает.`,
+  renewOld: (a) => `Старое подключение этого устройства в ${a} удалите — оно больше не работает.`,
   awgDone: "Готово",
   profile: "Вариант подключения",
   profileMain: "Основной",
@@ -284,8 +283,7 @@ const ru: Dict = {
   awgHandshake: (w) => `подключалось ${w}`,
   awgNever: "ещё не подключалось",
   country: "Страна",
-  countryH: "Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.",
-  copyKey: "Скопировать ключ",
+  countryH: "Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.",  copyKey: "Скопировать ключ",
   keyCopied: "Ключ скопирован ✓",
   downloadFile: "Скачать файл",
   phoneSteps: (a) => [`Откройте ${a}`, "Нажмите «+» и вставьте ключ", "Нажмите «Продолжить»"],
@@ -425,7 +423,7 @@ const en: Dict = {
   awgReadyH: "Set the device up now. If you close this window the device stays in your list and the key can be shown again.",
   renewT: (n) => `New key for “${n}”`,
   renewH: (a) => `Add this key to ${a} like the first time.`,
-  renewOld: (a, n) => (n.length ? `If ${a} still has the connection ${n.join(" or ")}, delete it — it no longer works.` : `Delete this device’s old connection in ${a} — it no longer works.`),
+  renewOld: (a) => `Delete this device’s old connection in ${a} — it no longer works.`,
   awgDone: "Done",
   profile: "Connection option",
   profileMain: "Main",
@@ -456,8 +454,7 @@ const en: Dict = {
   awgHandshake: (w) => `connected ${w}`,
   awgNever: "not connected yet",
   country: "Country",
-  countryH: "Each country is a separate connection. Add one; if it stops working, add another.",
-  copyKey: "Copy key",
+  countryH: "Each country is a separate connection. Add one; if it stops working, add another.",  copyKey: "Copy key",
   keyCopied: "Key copied ✓",
   downloadFile: "Download file",
   phoneSteps: (a) => [`Open ${a}`, "Tap “+” and paste the key", "Tap “Continue”"],

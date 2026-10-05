@@ -43,11 +43,11 @@ Endpoint = ${name}.example.com:23456
 PersistentKeepalive = 25
 `;
 
-// the names the server gives keys and files (access/names.go): the brand and the country, "mistgate-de.conf"
+// the names the server gives servers, keys and files (access/names.go): the country, "mistgate-de.conf"
 const cfg = (node: string, cc: string, stale = false) =>
   awgConfig({
     node_id: `nod_${node}`,
-    node_name: node,
+    server: new Intl.DisplayNames(["en"], { type: "region" }).of(cc) ?? cc,
     country_code: cc,
     version: "3.1",
     conf: conf(node),

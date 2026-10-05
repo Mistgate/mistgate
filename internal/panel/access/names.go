@@ -14,7 +14,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
-// What a friend's apps call the things they get: a country, never the panel's node names (de1, nl1) or profile names.
+// What a friend's apps and page call the things they get: a country, never the panel's node names (de1, nl1) or profile names.
 
 // CountryName is the localised name of a country code in lang ("ru", "en"); the code itself when unknown.
 func CountryName(cc, lang string) string {
@@ -47,30 +47,48 @@ func (s *Service) keyNaming(ctx context.Context) (title, brand, lang string) {
 	return title, brand, lang
 }
 
-// keyNames names the configs of one device, one per node in the given order: the connection AmneziaVPN lists
-// ("Mistgate · Germany"; the node is added when the country has two: "Mistgate · Germany · de1") and the file
-// ("mistgate-de.conf"; the second of a country is "mistgate-de-2.conf"). A node without a country goes by its name.
-func keyNames(title, brand, lang string, nodes []store.AccessNode) (names, files []string) {
-	perCountry := map[string]int{}
-	for _, n := range nodes {
-		perCountry[strings.ToUpper(n.CountryCode)]++
+// ServerLabeler names servers for the people who use them, one call per node in order: the country and the location
+// ("Germany · Frankfurt"), "Server" for a node with neither, and a number where a name repeats ("Germany 2"). Never
+// the panel's node name. The user page's channel card and the AmneziaVPN keys name servers this way.
+func ServerLabeler(lang string) func(cc, location string) string {
+	taken := map[string]bool{}
+	return func(cc, location string) string {
+		name := CountryName(cc, lang)
+		if place := clean(location); place != "" && place != name {
+			name = strings.TrimPrefix(name+" · "+place, " · ")
+		}
+		if name == "" {
+			name = "Server"
+			if lang == "ru" {
+				name = "Сервер"
+			}
+		}
+		unique := name
+		for k := 2; taken[unique]; k++ {
+			unique = name + " " + strconv.Itoa(k)
+		}
+		taken[unique] = true
+		return unique
 	}
+}
+
+// keyNames names the configs of one device, one per node in the given order: the server (ServerLabeler: "Germany",
+// "Germany · Frankfurt", "Germany 2"), the connection AmneziaVPN lists ("Mistgate · Germany") and the file
+// ("mistgate-de.conf"; the second of a country is "mistgate-de-2.conf"; a node without a country is named by its
+// location, else "awg"). The panel's node name is in none of them: the user page shows these.
+func keyNames(title, brand, lang string, nodes []store.AccessNode) (servers, names, files []string) {
+	label := ServerLabeler(lang)
 	prefix := cmp.Or(slug(brand), "vpn")
 	used := map[string]bool{}
 	for _, n := range nodes {
-		cc := strings.ToUpper(n.CountryCode)
-		place, tag := CountryName(cc, lang), strings.ToLower(cc)
-		if cc == "" {
-			place, tag = n.Name, slug(n.Name)
-		} else if perCountry[cc] > 1 {
-			place += " · " + n.Name
-		}
-		name := clean(place)
+		server := label(n.CountryCode, n.Location)
+		servers = append(servers, server)
+		name := server
 		if t := clean(title); t != "" {
 			name = t + " · " + name
 		}
 		names = append(names, name)
-		base := prefix + "-" + cmp.Or(tag, "awg")
+		base := prefix + "-" + cmp.Or(strings.ToLower(strings.TrimSpace(n.CountryCode)), slug(n.Location), "awg")
 		file := base
 		for k := 2; used[file]; k++ {
 			file = base + "-" + strconv.Itoa(k)
@@ -78,7 +96,7 @@ func keyNames(title, brand, lang string, nodes []store.AccessNode) (names, files
 		used[file] = true
 		files = append(files, file+".conf")
 	}
-	return names, files
+	return servers, names, files
 }
 
 // clean drops control characters and collapses runs of whitespace: a node or brand name cannot break a line.

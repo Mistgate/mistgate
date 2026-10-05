@@ -475,8 +475,9 @@ func TestSelfServiceLifecycle(t *testing.T) {
 	}
 	cfg := add.Configs[0]
 	conf := cfg["conf"].(string)
-	if cfg["node_name"] != "de1" || !strings.Contains(conf, "[Interface]") || !strings.Contains(conf, "Endpoint = de1.example.com:") ||
-		!strings.HasPrefix(cfg["vpn_key"].(string), "vpn://") || cfg["filename"] != "mistgate-de1.conf" || cfg["version"] != "3.1" ||
+	// the server by its public name (de1 has no country or location), never the panel's node name
+	if _, leaked := cfg["node_name"]; leaked || cfg["server"] != "Server" || !strings.Contains(conf, "[Interface]") || !strings.Contains(conf, "Endpoint = de1.example.com:") ||
+		!strings.HasPrefix(cfg["vpn_key"].(string), "vpn://") || cfg["filename"] != "mistgate-awg.conf" || cfg["version"] != "3.1" ||
 		len(cfg["warnings"].([]any)) == 0 {
 		t.Errorf("config = %v", cfg)
 	}

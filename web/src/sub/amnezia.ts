@@ -171,13 +171,10 @@ export function addModal(c: Ctx): Kid[] {
 
   const renewing = s.amz.renew ? am.devices.find((x) => x.id === s.amz.renew) : undefined;
   if (renewing) {
-    // keys issued before the names said the country were named "<node> · AWG <version>": that is what to look for
-    const cfgs = s.amz.configs[renewing.id] ?? [];
-    const old = [...new Set(cfgs.map((x) => `«${x.node_name} · AWG ${x.version}»`))]; // one name never breaks across lines
     return [
       head(t.renewT(label(renewing, t))),
       h("p", { class: "mut sm mlead" }, t.renewH(app)),
-      h("p", { class: "hintbox calm" }, t.renewOld(app, old)),
+      h("p", { class: "hintbox calm" }, t.renewOld(app)),
       configBlock(renewing, c),
       done,
     ];
@@ -281,7 +278,7 @@ function configBlock(x: AwgDevice, c: Ctx): HTMLElement {
         "label",
         { class: "fld" },
         h("span", { class: "eyebrow" }, t.country.toUpperCase()),
-        select(`amz-node-${x.id}`, t.country, String(i), nodeLabels(list, s.lang, flags(s)).map((l, k) => [String(k), l]), (v) => a.amz.node(x.id, Number(v))),
+        select(`amz-node-${x.id}`, t.country, String(i), nodeLabels(list, flags(s)).map((l, k) => [String(k), l]), (v) => a.amz.node(x.id, Number(v))),
         h("span", { class: "hint" }, t.countryH),
       ),
     ...body,

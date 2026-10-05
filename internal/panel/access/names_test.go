@@ -12,28 +12,40 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
+// Keys are named like the page's server list: the country and the location, "Server", a number on a repeat. The panel's
+// node name (de1, "ノード") never shows: the user page and the user's apps get these names.
 func TestKeyNames(t *testing.T) {
-	n := func(name, cc string) store.AccessNode { return store.AccessNode{Name: name, CountryCode: cc} }
+	n := func(name, cc, location string) store.AccessNode {
+		return store.AccessNode{Name: name, CountryCode: cc, Location: location}
+	}
 	for _, c := range []struct {
 		name, title, brand, lang string
 		nodes                    []store.AccessNode
-		names, files             string
+		servers, names, files    string
 	}{
-		{"a country each", "Mistgate", "Mistgate", "ru", []store.AccessNode{n("de1", "DE"), n("fi1", "fi")},
-			"Mistgate · Германия|Mistgate · Финляндия", "mistgate-de.conf|mistgate-fi.conf"},
-		{"two nodes in one country: the node tells them apart, the file a number", "Mistgate", "Mistgate", "en", []store.AccessNode{n("de1", "DE"), n("de2", "DE")},
-			"Mistgate · Germany · de1|Mistgate · Germany · de2", "mistgate-de.conf|mistgate-de-2.conf"},
-		{"no country: the node", "Mistgate", "Mistgate", "en", []store.AccessNode{n("ee 1", "")}, "Mistgate · ee 1", "mistgate-ee-1.conf"},
-		{"the subscription title names the key, the brand the file", "Кот и туман", "Mistgate", "ru", []store.AccessNode{n("de1", "DE")},
-			"Кот и туман · Германия", "mistgate-de.conf"},
-		{"a Cyrillic brand is spelled in Latin", "Мой ВПН", "Мой ВПН", "ru", []store.AccessNode{n("de1", "DE")}, "Мой ВПН · Германия", "moy-vpn-de.conf"},
-		{"nothing Latin at all", "", "日本", "en", []store.AccessNode{n("ノード", "")}, "ノード", "vpn-awg.conf"},
-		{"hostile names stay one line and a safe file", "a\nb", "x/../y", "en", []store.AccessNode{n("de1\r\nEvil = 1", "")},
-			"a b · de1 Evil = 1", "x-y-de1-evil-1.conf"},
+		{"a country each", "Mistgate", "Mistgate", "ru", []store.AccessNode{n("de1", "DE", ""), n("fi1", "fi", "")},
+			"Германия|Финляндия", "Mistgate · Германия|Mistgate · Финляндия", "mistgate-de.conf|mistgate-fi.conf"},
+		{"two nodes in one country: a number, never the node", "Mistgate", "Mistgate", "en", []store.AccessNode{n("de1", "DE", ""), n("de2", "DE", "")},
+			"Germany|Germany 2", "Mistgate · Germany|Mistgate · Germany 2", "mistgate-de.conf|mistgate-de-2.conf"},
+		{"the location tells them apart", "Mistgate", "Mistgate", "en", []store.AccessNode{n("de1", "DE", "Frankfurt"), n("de2", "DE", "")},
+			"Germany · Frankfurt|Germany", "Mistgate · Germany · Frankfurt|Mistgate · Germany", "mistgate-de.conf|mistgate-de-2.conf"},
+		{"no country: the location, else Server", "Mistgate", "Mistgate", "ru", []store.AccessNode{n("ee 1", "", "Tallinn"), n("x1", "", ""), n("x2", "", "")},
+			"Tallinn|Сервер|Сервер 2", "Mistgate · Tallinn|Mistgate · Сервер|Mistgate · Сервер 2", "mistgate-tallinn.conf|mistgate-awg.conf|mistgate-awg-2.conf"},
+		{"the subscription title names the key, the brand the file", "Кот и туман", "Mistgate", "ru", []store.AccessNode{n("de1", "DE", "")},
+			"Германия", "Кот и туман · Германия", "mistgate-de.conf"},
+		{"a Cyrillic brand is spelled in Latin", "Мой ВПН", "Мой ВПН", "ru", []store.AccessNode{n("de1", "DE", "")}, "Германия", "Мой ВПН · Германия", "moy-vpn-de.conf"},
+		{"nothing Latin at all", "", "日本", "en", []store.AccessNode{n("ノード", "", "")}, "Server", "Server", "vpn-awg.conf"},
+		{"hostile names stay one line and a safe file", "a\nb", "x/../y", "en", []store.AccessNode{n("de1\r\nEvil = 1", "", "Evil\r\nPlace = 1")},
+			"Evil Place = 1", "a b · Evil Place = 1", "x-y-evil-place-1.conf"},
 	} {
-		names, files := keyNames(c.title, c.brand, c.lang, c.nodes)
-		if strings.Join(names, "|") != c.names || strings.Join(files, "|") != c.files {
-			t.Errorf("%s:\n names %q, want %q\n files %q, want %q", c.name, names, c.names, files, c.files)
+		servers, names, files := keyNames(c.title, c.brand, c.lang, c.nodes)
+		if strings.Join(servers, "|") != c.servers || strings.Join(names, "|") != c.names || strings.Join(files, "|") != c.files {
+			t.Errorf("%s:\n servers %q, want %q\n names %q, want %q\n files %q, want %q", c.name, servers, c.servers, names, c.names, files, c.files)
+		}
+		for _, nd := range c.nodes {
+			if all := strings.Join(append(append(servers, names...), files...), "|"); strings.Contains(all, nd.Name) {
+				t.Errorf("%s: the node name %q shows in %q", c.name, nd.Name, all)
+			}
 		}
 	}
 }
@@ -66,7 +78,7 @@ func TestAWGKeysAreNamedByCountry(t *testing.T) {
 	}
 	r := f.add(f.user, "")
 	names, files := described(r.Configs)
-	if strings.Join(names, "|") != "Mistgate · Германия · de1|Mistgate · Германия · de2|Mistgate · Финляндия" ||
+	if strings.Join(names, "|") != "Mistgate · Германия|Mistgate · Германия 2|Mistgate · Финляндия" ||
 		strings.Join(files, "|") != "mistgate-de.conf|mistgate-de-2.conf|mistgate-fi.conf" {
 		t.Errorf("names %q files %q", names, files)
 	}

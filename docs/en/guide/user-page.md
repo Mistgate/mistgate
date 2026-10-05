@@ -80,7 +80,7 @@ With **Devices on the page** on (the default), a person manages their own Amnezi
 
 - **Add a device**: "Connection option" (the main one is named by the countries of its nodes; a WARP profile is "Spare exit (if some site won't open)"; a 2.0 profile is "For old AmneziaVPN versions (before 5.0.1.5)"), "What kind of device", and "Name (optional)". The key opens at once.
 - For each device: **Show key**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once).
-- The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code.
+- The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code. A server is named as on the **Channel utilization** card and in the person's app: by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number ("Germany 2"). The key's connection in AmneziaVPN carries the same name after the subscription title ("Mistgate · Germany 2").
 - When an old key stops working (a critical change of the profile, a new port or address of a node), the device says "new key needed", and **Get a new key** walks the person through replacing it.
 
 Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one link may make 20 such requests an hour, showing a key included. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."

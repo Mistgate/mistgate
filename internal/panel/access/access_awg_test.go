@@ -109,7 +109,7 @@ func TestAWGDeviceCreateAndDesiredState(t *testing.T) {
 		t.Fatalf("configs = %d", len(r.Configs))
 	}
 	c := r.Configs[0]
-	if c.NodeId != "nod_de1" || c.NodeName != "de1" || c.AwgVersion != "3.1" || c.ProfileName != "awg31" || c.ConfFilename != "mistgate-de1.conf" ||
+	if c.NodeId != "nod_de1" || c.NodeName != "de1" || c.AwgVersion != "3.1" || c.ProfileName != "awg31" || c.ConfFilename != "mistgate-awg.conf" ||
 		c.Stale || !strings.HasPrefix(c.VpnKey, "vpn://") || !strings.Contains(c.Conf, "[Interface]") || !strings.Contains(c.Conf, "Endpoint = de1.example.com:") ||
 		!strings.Contains(c.Conf, "MTU = 1280") {
 		t.Errorf("config = %+v", c)
@@ -1006,13 +1006,14 @@ func TestAWGHostileNames(t *testing.T) {
 	e := newEnv(t)
 	hostile := "de1\r\nEvil = 1 </script> \"x\"; - name: y"
 	e.node("nod_bad", hostile, "de1.example.com", "active")
+	e.sql(`UPDATE node SET location = 'Evil = 1 </script> "x"; - name: y' WHERE id = 'nod_bad'`) // the key and its file are named after it
 	p := e.awgProfile("p", "")
 	e.inbound(p.Id, "nod_bad")
 	g := e.group("g", p.Id)
 	u := e.user("\U0001F600 u\"ser", g, amnOnly()).User
 	r := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: u.Id, ProfileId: p.Id, Platform: "ios", Label: "\U0001F4F1 my phone"}))).Msg
 	c := r.Configs[0]
-	if c.ConfFilename != "mistgate-de1-evil-1-script-x-name-y.conf" {
+	if c.ConfFilename != "mistgate-evil-1-script-x-name-y.conf" {
 		t.Errorf("filename = %q", c.ConfFilename)
 	}
 	for _, r := range c.ConfFilename {

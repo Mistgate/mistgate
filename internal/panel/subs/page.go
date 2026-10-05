@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -219,10 +218,10 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 }
 
 // serverLoads returns one row per node whose capacity the admin set (the view then has its load percentage), not per
-// protocol profile, in subscription order. A row says the level only. The name is the country and the location, never
-// the panel's node name; a node with neither is "Server", and a repeated name gets a number ("Server 2").
+// protocol profile, in subscription order. A row says the level only. The name is access.ServerLabeler's: the country
+// and the location, never the panel's node name; a node with neither is "Server", a repeated name gets a number.
 func serverLoads(servers []access.SubServer, lang string) []pageServer {
-	seen, taken := map[string]bool{}, map[string]bool{}
+	seen, label := map[string]bool{}, access.ServerLabeler(lang)
 	out := []pageServer{}
 	for _, server := range servers {
 		key := cmp.Or(server.NodeID, server.Node)
@@ -230,22 +229,7 @@ func serverLoads(servers []access.SubServer, lang string) []pageServer {
 			continue // several profiles on one machine share its host-level measurement
 		}
 		seen[key] = true
-		name := access.CountryName(server.CountryCode, lang)
-		if place := strings.TrimSpace(server.Location); place != "" && place != name {
-			name = strings.TrimPrefix(name+" · "+place, " · ")
-		}
-		if name == "" {
-			name = "Server"
-			if lang == "ru" {
-				name = "Сервер"
-			}
-		}
-		unique := name
-		for k := 2; taken[unique]; k++ {
-			unique = name + " " + strconv.Itoa(k)
-		}
-		taken[unique] = true
-		out = append(out, pageServer{Name: unique, Level: loadLevel(*server.LoadPercent)})
+		out = append(out, pageServer{Name: label(server.CountryCode, server.Location), Level: loadLevel(*server.LoadPercent)})
 	}
 	return out
 }

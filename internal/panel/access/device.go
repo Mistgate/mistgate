@@ -26,6 +26,7 @@ import (
 // DeviceConfig is the config of a device on one node.
 type DeviceConfig struct {
 	InboundID, NodeID, NodeName, CountryCode string
+	Server                                   string // the public name of the node ("Germany 2"): the user page shows this, never NodeName
 	ProfileName, AWGVersion                  string // "3.1" | "2.0"
 	Conf                                     string // WireGuard-style .conf (AmneziaVPN and AmneziaWG import it)
 	VPNKey                                   string // the vpn:// key for AmneziaVPN
@@ -433,7 +434,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		nodes[i] = f.Node
 	}
 	title, brand, lang := s.keyNaming(ctx)
-	names, files := keyNames(title, brand, lang, nodes)
+	public, names, files := keyNames(title, brand, lang, nodes)
 	var out []DeviceConfig
 	for i, f := range sc.ins {
 		spec, err := s.buildSpec(f, sc.merged)
@@ -456,7 +457,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			continue
 		}
 		out = append(out, DeviceConfig{
-			InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode,
+			InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
 			ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
 			ConfFilename: files[i], Stale: sc.dev.Stale(),
 			MinClients: reqs, Warnings: warnings,

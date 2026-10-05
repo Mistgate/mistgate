@@ -42,7 +42,7 @@ export function awgConfig(raw: unknown): AwgConfig {
   const c = rec(raw);
   return {
     node_id: str(c.node_id),
-    node_name: str(c.node_name),
+    server: str(c.server),
     country_code: str(c.country_code),
     version: str(c.version),
     conf: str(c.conf),
@@ -277,14 +277,16 @@ export function countryLabel(cc: string, lang: Lang, flags = true): string {
   return flags ? `${flagOf(code)} ${name}` : name;
 }
 
-/** The choices of a device's configs, one per node: the country, with the node's name only where a country repeats. */
-export function nodeLabels(configs: AwgConfig[], lang: Lang, flags = true): string[] {
-  const count = new Map<string, number>();
-  for (const c of configs) count.set(c.country_code.toUpperCase(), (count.get(c.country_code.toUpperCase()) ?? 0) + 1);
+/**
+ * The choices of a device's configs, one per node: the panel's public name of the server, as the server list and the
+ * user's app name it ("Germany 2", "Germany · Frankfurt", "Server"), with the country's flag where the system draws flags.
+ * The page never gets the panel's node name.
+ */
+export function nodeLabels(configs: AwgConfig[], flags = true): string[] {
   return configs.map((c, k) => {
-    const country = countryLabel(c.country_code, lang, flags);
-    if (!country) return c.node_name || String(k + 1);
-    return (count.get(c.country_code.toUpperCase()) ?? 0) > 1 && c.node_name ? `${country} · ${c.node_name}` : country;
+    const name = c.server || String(k + 1);
+    const cc = c.country_code.trim().toUpperCase();
+    return flags && /^[A-Z]{2}$/.test(cc) ? `${flagOf(cc)} ${name}` : name;
   });
 }
 

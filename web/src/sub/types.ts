@@ -53,7 +53,8 @@ export type AmneziaData = {
 /** One config of a device on one node, as the endpoints answer. */
 export type AwgConfig = {
   node_id: string;
-  node_name: string;
+  /** The server's public name ("Germany 2", "Server"), never the panel's node name. */
+  server: string;
   country_code: string;
   version: string;
   conf: string;

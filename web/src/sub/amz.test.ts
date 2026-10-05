@@ -9,8 +9,8 @@ import type { MgData } from "./types";
 import { view, type Actions, type State } from "./view";
 
 const t = dict.ru;
-const cfg = (node: string, cc = "DE") =>
-  awgConfig({ node_id: node, node_name: node, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: ["amnezia_desktop_mtu"] });
+const cfg = (node: string, cc = "DE", server = ({ DE: "Германия", FI: "Финляндия" } as Record<string, string>)[cc] ?? cc) =>
+  awgConfig({ node_id: node, server, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: ["amnezia_desktop_mtu"] });
 
 function fakeApi(over: Partial<Api> = {}): Api & { calls: string[] } {
   const calls: string[] = [];
@@ -115,9 +115,13 @@ describe("names and choices a friend can read", () => {
     expect(profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN", false)[0]!.label).toBe("Германия, Финляндия");
   });
 
-  it("a key's node choice is the country; the node's name only where a country repeats", () => {
-    expect(nodeLabels([cfg("de1"), cfg("fi1", "FI")], "ru")).toEqual(["🇩🇪 Германия", "🇫🇮 Финляндия"]);
-    expect(nodeLabels([cfg("de1"), cfg("de2"), cfg("x", "")], "en", false)).toEqual(["Germany · de1", "Germany · de2", "x"]);
+  it("a key's node choice is the server's public name with the flag, never the panel's node name", () => {
+    expect(nodeLabels([cfg("de1"), cfg("fi1", "FI", "Финляндия")])).toEqual(["🇩🇪 Германия", "🇫🇮 Финляндия"]);
+    const repeated = [cfg("de1", "DE", "Germany"), cfg("de2", "DE", "Germany 2"), cfg("x", "", "Server")];
+    expect(nodeLabels(repeated, false)).toEqual(["Germany", "Germany 2", "Server"]);
+    expect(nodeLabels(repeated).join(" ")).not.toMatch(/de1|de2/);
+    // a config the old panel sent has a node_name and no server: the name is not shown
+    expect(nodeLabels([awgConfig({ node_name: "de1", country_code: "" })], false)).toEqual(["1"]);
   });
 
   it("the app versions a key needs, for the device's platform only", () => {
@@ -411,7 +415,7 @@ describe("the key itself", () => {
     expect(one.querySelector("[data-k=amz-profile]")).toBeNull();
   });
 
-  it("the new key of a stale device: what to add, and the old connection's name to delete", () => {
+  it("the new key of a stale device: what to add, and that the old connection goes (never named by the panel's node)", () => {
     const d = normalize(cases.stale);
     const s = { lang: "ru" as const, amz: newAmzState("android", "p31", "android") };
     s.amz.renew = "d3";
@@ -419,7 +423,8 @@ describe("the key itself", () => {
     const box = document.createElement("div");
     box.append(...(addModal({ d, s, a: pageActs(quiet), t }) as Node[]));
     expect(text(box.querySelector(".mt"))).toBe("Новый ключ для «Pixel 7»");
-    expect(text(box.querySelector(".hintbox.calm")).replaceAll(" ", " ")).toBe("Если в AmneziaVPN осталось подключение «de1 · AWG 3.1» или «fi1 · AWG 3.1», удалите его — оно больше не работает.");
+    expect(text(box.querySelector(".hintbox.calm")).replace(/\s/g, " ")).toBe("Старое подключение этого устройства в AmneziaVPN удалите — оно больше не работает.");
+    expect(box.textContent).not.toMatch(/de1|fi1/);
     expect(text(box.querySelector(".cfg .btn.pri"))).toBe("Скопировать ключ");
     expect(box.querySelector(".cfg [data-autofocus]")).toBe(box.querySelector(".cfg .btn.pri"));
   });
