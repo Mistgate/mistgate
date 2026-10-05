@@ -688,20 +688,14 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 	}}})
 }
 
-// engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue.
-// The key is the user when it is known, then the AWG client address, and finally the destination. This keeps one
-// noisy client or flow from filling the durable queue with repeated detections.
+// engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue:
+// one per inbound and user every 5 minutes (one per inbound for detections without a known user), so a noisy client
+// cannot fill the durable queue. Only the fixed parameters leave the node: never a client address or a destination.
 func (a *Agent) engineEvent(ev engine.Event) {
 	if ev.Code != "torrent_attempt" {
 		return
 	}
 	keyPart := ev.Params["user_id"]
-	if keyPart == "" {
-		keyPart = ev.Params["client_ip"]
-	}
-	if keyPart == "" {
-		keyPart = ev.Params["destination"]
-	}
 	if keyPart == "" {
 		keyPart = "unknown"
 	}
@@ -718,7 +712,7 @@ func (a *Agent) engineEvent(ev engine.Event) {
 		return
 	}
 	if len(a.torrentEvents) >= 4096 {
-		// Keep the throttle map bounded even if a node sees many one-off destinations.
+		// Keep the throttle map bounded even on a node with very many users.
 		for k, last := range a.torrentEvents {
 			if now.Sub(last) >= 5*time.Minute {
 				delete(a.torrentEvents, k)
@@ -732,12 +726,11 @@ func (a *Agent) engineEvent(ev engine.Event) {
 	a.torrentEvents[key] = now
 	a.torrentEventsMu.Unlock()
 
-	params := make(map[string]string, len(ev.Params))
-	for k, v := range ev.Params {
-		if len(k) > 64 || len(v) > 256 {
-			continue
+	params := make(map[string]string, 3)
+	for _, k := range []string{"protocol", "torrent_protocol", "user_id"} {
+		if v := ev.Params[k]; v != "" && len(v) <= 256 {
+			params[k] = v
 		}
-		params[k] = v
 	}
 	sev := pb.Severity_SEVERITY_INFO
 	if ev.Warning {

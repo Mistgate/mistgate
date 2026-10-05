@@ -38,6 +38,20 @@ func TestEngineTorrentEventsAreRateLimitedPerUserAndInbound(t *testing.T) {
 		if event == nil || event.Code != "torrent_attempt" || event.Severity != pb.Severity_SEVERITY_WARNING {
 			t.Fatalf("unexpected queued event: %+v", msg)
 		}
+		// Who, never where to: an engine's destination or client address does not leave the node.
+		if _, ok := event.Params["destination"]; ok || event.Params["user_id"] == "" || event.Params["protocol"] == "" {
+			t.Fatalf("event params = %v", event.Params)
+		}
+	}
+
+	// Without a known user every detection of an inbound shares one key, whatever address or destination it came from.
+	b := &Agent{out: newOutbox(32, 1<<20), torrentEvents: map[string]time.Time{}}
+	for _, ip := range []string{"10.66.4.2", "10.66.4.3"} {
+		b.engineEvent(engine.Event{Code: "torrent_attempt", InboundID: "in-1", Warning: true,
+			Params: map[string]string{"protocol": "udp", "client_ip": ip, "destination": "198.51.100.1:6881"}})
+	}
+	if queued := b.out.after(0); len(queued) != 1 || len(queued[0].GetEvent().Params) != 1 {
+		t.Fatalf("unattributed events = %v", queued)
 	}
 }
 
@@ -97,7 +111,6 @@ func TestSyncTorrentGuardScopesAWGAndResolvesClient(t *testing.T) {
 			}
 			host.cb(hostctl.TorrentDetection{
 				TunnelIface: "mgawg51820", TunnelIP: netip.MustParseAddr("10.66.4.2"),
-				DestinationIP: netip.MustParseAddr("198.51.100.4"), DestinationPort: 6881,
 				L4Protocol: "tcp", Signature: torrentguard.ProtocolBitTorrentTCP,
 			})
 			queued := a.out.after(0)
@@ -105,8 +118,14 @@ func TestSyncTorrentGuardScopesAWGAndResolvesClient(t *testing.T) {
 				t.Fatalf("queued events = %d, want 1", len(queued))
 			}
 			event := queued[0].GetEvent()
-			if event.InboundId != "awg-1" || event.Params["client_ip"] != "10.66.4.2" {
+			if event.InboundId != "awg-1" || event.Params["protocol"] != "tcp" || event.Params["torrent_protocol"] != string(torrentguard.ProtocolBitTorrentTCP) {
 				t.Fatalf("event identity = inbound %q params %v", event.InboundId, event.Params)
+			}
+			// The client's tunnel address only finds the user; it never leaves the node.
+			for _, k := range []string{"client_ip", "destination"} {
+				if _, ok := event.Params[k]; ok {
+					t.Fatalf("event carries %s: %v", k, event.Params)
+				}
 			}
 			if got := event.Params["user_id"]; got != tc.wantUserID {
 				t.Fatalf("user_id = %q, want %q", got, tc.wantUserID)
