@@ -41,7 +41,7 @@ const settingsSchema = `{
         "type": {
           "type": "string", "enum": ["none", "salamander", "gecko"], "default": "salamander",
           "x-enum-labels": {"none": "None", "salamander": "Salamander", "gecko": "Gecko (experimental)"},
-          "title": "Type", "description": "Salamander hides the QUIC handshake.",
+          "title": "Type", "description": "Salamander hides the QUIC handshake. Gecko reaches only Mihomo apps (kl!ck, Clash Verge, FlClash): Happ and the other link-list apps do not speak it, so they do not get these servers.",
           "x-widget": "segmented", "x-critical": true
         },
         "password": {

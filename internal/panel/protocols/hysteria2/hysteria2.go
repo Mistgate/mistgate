@@ -389,6 +389,11 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if err := json.Unmarshal(in.Settings, &s); err != nil {
 		return plugin.Fragment{}, false
 	}
+	if s.Obfs.Type == "gecko" {
+		// No app that reads the URI list speaks Gecko (Happ, v2rayNG, Hiddify and the other Xray / sing-box apps know
+		// salamander only): the server would sit in their list and never connect. The Mihomo profile carries it.
+		return plugin.Fragment{}, false
+	}
 	host := in.Inbound.Node.Address
 	if !isIP(host) && !isHostname(host) {
 		return plugin.Fragment{}, false // never splice an address that is not a plain host into the authority

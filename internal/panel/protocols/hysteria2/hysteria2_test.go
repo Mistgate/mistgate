@@ -284,6 +284,18 @@ func inbound(mode plugin.TLSMode, sni, pin string) protocols.InboundView {
 	}
 }
 
+// Gecko is left out of the URI list (Happ and the other link-list apps cannot speak it) and kept in the Mihomo profile.
+func TestGeckoOnlyReachesMihomo(t *testing.T) {
+	p := New()
+	gecko := settings(t, func(s *Settings) { s.Obfs.Type = "gecko" })
+	if f, ok := p.Render(protocols.RenderInput{Format: plugin.FormatURIList, Settings: gecko, Inbound: inbound(plugin.TLSAcmeDomain, "de2.example.com", ""), Secret: "tok"}); ok {
+		t.Errorf("a Gecko server in the URI list: %s", f.Data)
+	}
+	if _, ok := p.Render(protocols.RenderInput{Format: plugin.FormatMihomo, Settings: gecko, Inbound: inbound(plugin.TLSAcmeDomain, "de2.example.com", ""), Secret: "tok"}); !ok {
+		t.Error("the Mihomo profile lost the Gecko server")
+	}
+}
+
 func TestRenderGolden(t *testing.T) {
 	p := New()
 	render := func(in protocols.RenderInput) string {
