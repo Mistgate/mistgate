@@ -150,6 +150,29 @@ describe("the update notice", () => {
     expect(text()).toContain("Version v0.1.18 is out");
   });
 
+  it("keeps the keyboard focus on the card: the pill after collapsing, the card after expanding, the page after closing", async () => {
+    await mount(status(release("v0.1.18")));
+    button("Collapse")!.focus();
+    await click(button("Collapse"));
+    expect(document.activeElement).toBe(button("Show the update notice"));
+    await click(button("Show the update notice"));
+    expect(host!.contains(document.activeElement) && document.activeElement !== document.body).toBe(true);
+    const main = document.body.appendChild(Object.assign(document.createElement("main"), { id: "main", tabIndex: -1 })); // the shell's
+    button("Hide until the next version")!.focus();
+    await click(button("Hide until the next version"));
+    expect(text()).toBe("");
+    expect(document.activeElement).toBe(main);
+    main.remove();
+  });
+
+  it("moves the focus to the next notice when closing one, so the keyboard stays in the card", async () => {
+    await mount(status(release("v0.1.18"), { nodes: [node("de1", NodeUpdateState.OUTDATED)] }));
+    button("Hide until the next version")!.focus();
+    await click(button("Hide until the next version"));
+    expect(text()).toContain("Nodes can be updated to");
+    expect(host!.contains(document.activeElement)).toBe(true);
+  });
+
   it("works without storage: it shows, closes and collapses for this page load", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");

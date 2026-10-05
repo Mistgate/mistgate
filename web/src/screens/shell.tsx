@@ -83,7 +83,7 @@ function ShellFrame() {
       {/* keyed by the section so every screen fades and rises in; sub-pages of one section do not */}
       {/* one width rule for every screen: a centred column of at most 1360px, side padding that grows with the window.
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
-      <main id="main" className="px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
+      <main id="main" tabIndex={-1} className="outline-none px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
         <div key={section} className="screen-enter mx-auto max-w-[1360px] has-[.app-wide]:max-w-none">
           <Outlet />
         </div>

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { useT } from "@/i18n";
 import { basepath } from "@/lib/api";
 import { cx } from "@/lib/cx";
@@ -30,15 +30,26 @@ export function UpdateToast() {
   const { data } = useQuery({ ...updatesQuery, enabled: active, refetchInterval: pollMs });
   const [dismissed, setDismissed] = useState(() => ({ panel: readPref(dismissedKey("panel")), nodes: readPref(dismissedKey("nodes")) }));
   const [collapsed, setCollapsed] = useState(() => readPref(collapsedKey) === "1");
+  // the button that was pressed unmounts (card <-> pill, or the card goes away), and the focus would fall to the page top
+  const pill = useRef<HTMLButtonElement>(null);
+  const card = useRef<HTMLElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    (pill.current ?? card.current ?? document.getElementById("main"))?.focus();
+  });
 
   if (!active) return null;
   const notice = updateNotices(data).find((n) => dismissed[n.kind] !== n.id);
 
   const collapse = (value: boolean) => {
+    refocus.current = true;
     setCollapsed(value);
     writePref(collapsedKey, value ? "1" : null);
   };
   const close = (n: UpdateNotice) => {
+    refocus.current = true;
     setDismissed((d) => ({ ...d, [n.kind]: n.id }));
     writePref(dismissedKey(n.kind), n.id);
   };
@@ -53,6 +64,7 @@ export function UpdateToast() {
       {notice &&
         (collapsed ? (
           <button
+            ref={pill}
             type="button"
             onClick={() => collapse(false)}
             aria-label={`${t("up.toast.expand")}: ${vee(notice.version)}`}
@@ -63,18 +75,20 @@ export function UpdateToast() {
             <span className="truncate">{vee(notice.version)}</span>
           </button>
         ) : (
-          <Card notice={notice} onCollapse={() => collapse(true)} onClose={() => close(notice)} />
+          <Card ref={card} notice={notice} onCollapse={() => collapse(true)} onClose={() => close(notice)} />
         ))}
     </div>
   );
 }
 
-function Card({ notice, onCollapse, onClose }: { notice: UpdateNotice; onCollapse: () => void; onClose: () => void }) {
+function Card({ ref, notice, onCollapse, onClose }: { ref: Ref<HTMLElement>; notice: UpdateNotice; onCollapse: () => void; onClose: () => void }) {
   const t = useT();
   const version = vee(notice.version);
   const panel = notice.kind === "panel";
   return (
     <section
+      ref={ref}
+      tabIndex={-1}
       aria-label={t("up.toast.label")}
       className="screen-enter pointer-events-auto flex w-full min-w-0 flex-col gap-3.5 rounded-card-lg border border-accent-line bg-surface p-4 shadow-(--shadow-toast) md:w-[360px]"
     >
