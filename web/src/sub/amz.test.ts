@@ -267,7 +267,7 @@ describe("actions", () => {
     a.ask(null);
     a.ask({ id: "d4", kind: "rotate" });
     a.ask(null);
-    expect(log).toEqual(["focus amz-no-d4", "focus amz-more-d4|amz-rend-d4|amz-deld-d4", "focus amz-no-d4", "focus amz-more-d4|amz-rend-d4|amz-deld-d4"]);
+    expect(log).toEqual(["focus amz-no-d4", "focus amz-more-d4|amz-deld-d4", "focus amz-no-d4", "focus amz-more-d4|amz-rotd-d4"]);
   });
 
   it("rotate replaces the key; remove drops the device and frees the slot", async () => {
@@ -320,7 +320,7 @@ describe("actions", () => {
     a.renameCancel();
     await settle();
     expect(api.calls).toHaveLength(1);
-    expect(log.at(-1)).toBe("focus amz-more-d3|amz-rend-d3|amz-deld-d3");
+    expect(log.at(-1)).toBe("focus amz-more-d3|amz-rend-d3");
   });
 
   it("a failed rename keeps the field open and says what happened under it", async () => {

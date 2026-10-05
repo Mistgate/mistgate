@@ -35,7 +35,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
   const endpoints = () => data.amnezia?.endpoints ?? "";
   const find = (id: string) => data.amnezia?.devices.find((x) => x.id === id);
   /** The control that opened a row's question or editor, on a phone and on a computer. */
-  const back = (id: string) => `amz-more-${id}|amz-rend-${id}|amz-deld-${id}`;
+  const back = (id: string, what: "rot" | "ren" | "del") => `amz-more-${id}|amz-${what}d-${id}`;
 
   const fail = (busy: string, e: unknown) => {
     if (e instanceof ApiError && e.code === "locked") return locked?.();
@@ -86,7 +86,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     am().error = "";
     am().errorAt = "";
     render();
-    if (r) focus?.(back(r.id));
+    if (r) focus?.(back(r.id, "ren"));
   }
 
   return {
@@ -167,7 +167,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       render();
       // the question takes the keyboard to its safe answer; cancelling gives it back to the control that asked
       if (c) focus?.(`amz-no-${c.id}`);
-      else if (was) focus?.(back(was.id));
+      else if (was) focus?.(back(was.id, was.kind === "remove" ? "del" : "rot"));
     },
     rotate(id) {
       void run(
@@ -231,7 +231,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
           else x.label = value;
           am().rename = null;
         },
-      ).then((ok) => ok && focus?.(back(r.id)));
+      ).then((ok) => ok && focus?.(back(r.id, "ren")));
     },
   };
 }
