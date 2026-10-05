@@ -183,6 +183,15 @@ func TestOurNftTablesAreNotForeign(t *testing.T) {
 {"table":{"family":"inet","name":"mistgate_awg","handle":2}},
 {"chain":{"family":"inet","table":"mistgate_awg","name":"post","handle":1,"type":"nat","hook":"postrouting","prio":100,"policy":"accept"}},
 {"table":{"family":"inet","name":"mistgate_warp","handle":3}},
-{"chain":{"family":"inet","table":"mistgate_warp","name":"post","handle":1,"type":"nat","hook":"postrouting","prio":100,"policy":"accept"}}]}`, nil)
+{"chain":{"family":"inet","table":"mistgate_warp","name":"post","handle":1,"type":"nat","hook":"postrouting","prio":100,"policy":"accept"}},
+{"table":{"family":"inet","name":"mistgate_torrentguard","handle":4}},
+{"chain":{"family":"inet","table":"mistgate_torrentguard","name":"forward","handle":1,"type":"filter","hook":"forward","prio":-150,"policy":"accept"}},
+{"rule":{"family":"inet","table":"mistgate_torrentguard","chain":"forward","handle":2,"expr":[{"queue":{"num":7,"flags":["bypass"]}}]}}]}`, nil)
 	code(t, run(t, f.doctor(), CheckForeignNft), CodeNftClean)
+
+	// the same name in another family is not ours
+	f2 := newFake(t)
+	f2.bin("nft")
+	f2.cmd("nft -j list ruleset", `{"nftables":[`+nftOurs+`,{"table":{"family":"ip","name":"mistgate_torrentguard","handle":5}}]}`, nil)
+	code(t, run(t, f2.doctor(), CheckForeignNft), CodeNftFound)
 }

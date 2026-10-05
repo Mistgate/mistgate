@@ -111,6 +111,19 @@ const (
 	nftFamily = "inet"
 )
 
+// OwnNftTable says whether an nft table is one the agent itself creates (all of them are inet): the firewall and
+// port hops, the AmneziaWG tunnels, WARP and the torrent guard. A new table goes here, or the doctor calls it foreign.
+func OwnNftTable(family, name string) bool {
+	if family != nftFamily {
+		return false
+	}
+	switch name {
+	case NftTable, NftTunnelTable, NftWarpTable, NftTorrentTable:
+		return true
+	}
+	return false
+}
+
 var idRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 const (

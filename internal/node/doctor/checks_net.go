@@ -417,9 +417,7 @@ func checkForeignNft(ctx context.Context, e *Env) Result {
 	if err := json.Unmarshal(out, &doc); err != nil {
 		return skip(CodeNftError, "nft output not parsable (too large?)")
 	}
-	own := func(family, name string) bool {
-		return family == "inet" && (name == hostctl.NftTable || name == hostctl.NftTunnelTable || name == hostctl.NftWarpTable)
-	}
+	own := hostctl.OwnNftTable
 
 	ours := portSpecs(e.Inbounds())
 	natTables := map[string]bool{}
