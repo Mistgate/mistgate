@@ -64,7 +64,7 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 		f.enrollLim.fail(peer, now)
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("enrollment token unknown, expired or used"))
 	}
-	if m.EnrollmentToken == "" || len(m.EnrollmentToken) > 512 { // real tokens are 43 characters
+	if m.EnrollmentToken == "" || len(m.EnrollmentToken) > 512 { // real tokens are 52 characters (randomToken)
 		return nil, deny()
 	}
 	pub, err := parseCSR(m.CsrDer)

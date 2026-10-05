@@ -177,8 +177,9 @@ package mistgate.agent.v1;
 //     warp_path         the node's WARP tunnel and its routes; SKIP while the node has no WARP account and no inbound with
 //                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
 //                       table_in_use | rule_pref_in_use | interface_in_use
-//   FIX IDS (stable; only these five exist; all are safe: no data loss, no package install, no ssh or
-//   firewall change). The check that offers a fix puts its id into DoctorResult.fix_id.
+//   FIX IDS (stable; only these five exist; all are safe: no data loss, no package install, no change to sshd or
+//   to firewall rules outside the agent's own nftables table, where apply_baseline puts the SSH guard back). The
+//   check that offers a fix puts its id into DoctorResult.fix_id.
 //     journald_vacuum   journalctl --vacuum-size=200M (+ --vacuum-time=7d)           offered by journald_size, disk_space
 //     apply_baseline    hostctl.ApplyBaseline: sysctl + journald drop-in + ssh guard  offered by net_baseline
 //     restart_inbound   restart one inbound (params{inbound_id}) or all failed ones   offered by port_conflicts, cert_expiry (self-signed only)

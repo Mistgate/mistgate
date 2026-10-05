@@ -795,7 +795,9 @@ export const UpdateWarpRegistrationParamsResponseSchema: GenMessage<UpdateWarpRe
  * require a fresh step-up (auth.Service.RequireStepUp), like showing a server password.
  *
  * The panel talks to Cloudflare only when the owner clicks (RegisterWarp, RefreshWarp, DeleteWarp of a
- * registered account) or when the stored setting auto_reregister is on (off by default). Registering creates an
+ * registered account), when a node whose recovery ladder ran out of endpoints asks it to read the account again
+ * (what RefreshWarp does, read only, at most once per 10 minutes per node), or when the stored setting
+ * auto_reregister is on (off by default). Registering creates an
  * anonymous device account, without e-mail or password, from the panel's address and accepts the Cloudflare
  * WARP terms on the owner's behalf: the UI links the terms and the request must say accept_tos. An imported
  * wgcf profile is the fallback when the registration endpoint answers 429.
