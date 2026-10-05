@@ -132,8 +132,9 @@ func (s nodeService) MeasureBandwidth(ctx context.Context, req *connect.Request[
 }
 
 // autoMeasureBandwidth measures a node that has just come up for the first time after its enrollment, once, and stores the
-// download figure if the capacity is still 0 by then. An agent without the capability is skipped without a word; a failure is
-// only logged: the admin can still press the button. The wait ends with the node's stream, so a node that drops is not asked later.
+// slower direction if the capacity is still 0 by then. A run without an upload figure stores nothing and leaves a warning
+// event (the download alone would overstate an asymmetric link). An agent without the capability is skipped without a word;
+// a failure is only logged: the admin can still press the button. The wait ends with the node's stream, so a node that drops is not asked later.
 func (f *Fleet) autoMeasureBandwidth(s *session) {
 	if !s.can(capBandwidth) {
 		return
@@ -162,6 +163,11 @@ func (f *Fleet) autoMeasureBandwidth(s *session) {
 		out, err := f.measureBandwidth(ctx, n)
 		if err != nil || out.ErrorCode != "" {
 			f.log.Info("first bandwidth measurement did not work", "node", n.ID, "err", err, "code", out.GetErrorCode())
+			return
+		}
+		if out.UpMbps == 0 { // only the download answered: on an asymmetric link that would be recorded too high, unseen
+			f.log.Info("first bandwidth measurement has no upload figure, nothing stored", "node", n.ID, "down_mbps", out.DownMbps)
+			f.event(ctx, 2, "bandwidth_upload_missing", n.ID, map[string]string{"down_mbps": strconv.Itoa(int(out.DownMbps)), "server": out.Server})
 			return
 		}
 		stored, err := f.st.SetBandwidthIfUnset(ctx, n.ID, capacityOf(out.DownMbps, out.UpMbps))

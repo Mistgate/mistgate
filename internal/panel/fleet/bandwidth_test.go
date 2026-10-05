@@ -248,6 +248,30 @@ func TestTheFirstStartMeasuresTheLinkOnceAndStoresItWhileItIsZero(t *testing.T) 
 	}
 }
 
+// Without an upload figure the download would stand for the capacity, and an asymmetric link would be recorded too
+// high without a word. The first start stores nothing then and tells the owner to measure by hand; the button still
+// returns what it got.
+func TestTheFirstStartStoresNothingWithoutAnUploadFigure(t *testing.T) {
+	x, a := newL3Env(t)
+	x.f.measureDelay = 10 * time.Millisecond
+	c, _, _ := connectCaps(a, "first", bwCaps...)
+	answerMeasure(c, measured("4984", "0"), nil)
+	within(t, "the warning", func() bool { return x.count(`SELECT count(*) FROM event WHERE code = 'bandwidth_upload_missing'`) == 1 })
+	if got := x.capacity(); got != 0 {
+		t.Errorf("capacity = %d, a download-only figure must not be stored", got)
+	}
+	if x.count(`SELECT count(*) FROM event WHERE code = 'bandwidth_measured'`) != 0 || x.count(`SELECT count(*) FROM audit WHERE action = 'node.bandwidth_auto'`) != 0 {
+		t.Error("recorded as measured")
+	}
+
+	// the owner's button keeps both numbers and writes nothing
+	c2, _, _ := connectCaps(a, "button", bwCaps...)
+	answerMeasure(c2, measured("4984", "0"), nil)
+	out, err := callMeasure(x, a.nodeID)
+	if err != nil || out.DownMbps != 4984 || out.UpMbps != 0 || x.capacity() != 0 {
+		t.Fatalf("button: %+v, %v, capacity %d", out, err, x.capacity())
+	}
+}
 func TestTheFirstStartNeverOverwritesWhatTheAdminTypedMeanwhile(t *testing.T) {
 	x, a := newL3Env(t)
 	x.f.measureDelay = 10 * time.Millisecond

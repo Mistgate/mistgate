@@ -734,6 +734,7 @@ export const en = {
   "event.awg_kernel_prepare_failed": "AmneziaWG kernel module was not built",
   "event.awg_kernel_switched": "AmneziaWG switched to the kernel module",
   "event.bandwidth_measured": "Network capacity measured at the first start: {down_mbps} Mbps",
+  "event.bandwidth_upload_missing": "The first measurement got {down_mbps} Mbps down but no upload figure, so Network capacity was left empty: press Measure on the node page or type the number",
 
   "sec.passkeys": "Passkeys",
   "sec.add": "Add passkey",
@@ -1715,6 +1716,7 @@ export const ru: typeof en = {
   "event.awg_kernel_prepare_failed": "модуль ядра AmneziaWG не собрался",
   "event.awg_kernel_switched": "AmneziaWG переключён на модуль ядра",
   "event.bandwidth_measured": "Пропускная способность измерена при первом запуске: {down_mbps} Мбит/с",
+  "event.bandwidth_upload_missing": "Первый замер дал {down_mbps} Мбит/с на загрузку, но без отдачи, поэтому пропускная способность не заполнена: нажми «Измерить» на странице ноды или впиши число",
 
   "sec.passkeys": "Passkeys",
   "sec.add": "Добавить passkey",
