@@ -98,7 +98,8 @@ For each of the person's servers the page gets:
 - the country and location, never the node's name in the panel;
 - whether the node is answering (a server that is not shows "not answering");
 - its load level: **Low**, **Medium** or **High**, without percentages (see **Channel utilization** above);
-- the name the server has in the apps on the link. When the **Server names** template (see [Subscriptions](subscriptions.md)) contains `{node}`, that name is not sent to the page, so the node's name does not leak through it.
+- the name the server has in the apps on the link. When the **Server names** template (see [Subscriptions](subscriptions.md)) contains `{node}`, that name is not sent to the page, so the node's name does not leak through it;
+- whether a link on the server is for the Mihomo apps only. Gecko obfuscation (see [Hysteria2](hysteria2.md)) is spoken only by kl!ck and the other apps on the Mihomo core, so Happ and the other link-list apps do not get such a connection. The page still lists the server and says "Only in kl!ck and other Mihomo apps" on its card. A person whose every server is like that gets one entry in the link-list apps that says the same, instead of an empty list.
 
 ### Choosing and applying
 

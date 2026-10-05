@@ -119,6 +119,8 @@ function card(c: Ctx, s: ServerEntry): HTMLElement {
   const dns = s.online ? dnsRow(c, s) : [];
   const names = appNamesOf(s);
   const warp = s.connections.some((x) => x.exit === "warp");
+  const links = s.connections.filter((x) => x.way === "link");
+  const mihomo = links.some((x) => x.mihomo_only);
   const name = serverName(s, st.lang);
   return h(
     "article",
@@ -133,6 +135,7 @@ function card(c: Ctx, s: ServerEntry): HTMLElement {
     s.online && s.load && h("div", { class: "load" }, h("span", { class: "k" }, t.loadK), h("span", { class: `meter${s.load === "high" ? " hi" : ""}`, "aria-hidden": "true" }, ...[1, 2, 3].map((n) => h("i", { class: n <= fills[s.load!] ? "f" : "" }))), h("b", { class: s.load === "high" ? "warn-t" : "" }, t.loadLevel[s.load])),
     s.online && s.connections.length > 0 && h("div", { class: "chips" }, hasLink(s) && h("span", { class: "chip sky" }, icon("link", 14), t.chipLink), hasKeys(s) && h("span", { class: "chip mint" }, icon("key", 14), t.chipKey), warp && h("span", { class: "chip warp", title: t.exitHint }, icon("exit", 14), t.chipExit)),
     s.online && names.length > 0 && h("div", { class: "srv-app" }, t.inApp, ...names.map((n) => h("span", { class: "mono" }, n))),
+    s.online && mihomo && h("p", { class: "sm mut srv-mihomo" }, t.mihomoOnly(links.every((x) => x.mihomo_only))),
     !s.online && h("p", { class: "sm mut" }, t.downS),
     ...dns,
   );

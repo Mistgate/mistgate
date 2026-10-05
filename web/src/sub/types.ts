@@ -24,7 +24,14 @@ export type LoadLevel = "low" | "medium" | "high";
 export type ServerLoad = { name: string; level: LoadLevel };
 
 /** One way a server is reachable: the subscription link (as an app names it) or a key (an AmneziaWG profile), direct or by the spare exit. */
-export type ServerConn = { way: "link" | "key"; exit: "direct" | "warp"; app_name: string; profile_id: string };
+export type ServerConn = {
+  way: "link" | "key";
+  exit: "direct" | "warp";
+  app_name: string;
+  profile_id: string;
+  /** A link only the Mihomo apps (kl!ck, Clash Verge, FlClash) can use: Happ and the other link-list apps do not get it. */
+  mihomo_only?: boolean;
+};
 /** The DNS choice of one server: what the person picked ("" = nothing), what applies, what the owner allows. */
 export type ServerDns = {
   choice: string;
@@ -108,7 +115,7 @@ export type MgData = {
   brand: { parts: [string, string]; logo_svg: string; accent: string };
   title: string;
   subscription_url: string;
-  /** Servers the link gives Happ ("all your servers (3) appear in Happ"); 0 when unknown. */
+  /** Servers (nodes) the link carries ("all your servers (3) are already there"); 0 when unknown. */
   server_count: number;
   /** Nodes with a set capacity and a fresh sample, in subscription order: the level only. The old way to list servers. */
   server_loads: ServerLoad[];

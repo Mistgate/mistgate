@@ -3,6 +3,7 @@ package subs
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -205,6 +206,21 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 		return pick("Доступ приостановлен", "Access paused")
 	}
 	return ""
+}
+
+// mihomoOnlyNote is what the link-list apps (Happ and the rest) show a person who has servers, none of which they can use:
+// every one is Gecko, which only the Mihomo apps speak. It is the entry that says so, instead of an empty list; "" when
+// anything else is the reason the list is empty.
+func mihomoOnlyNote(v access.SubView, lang string) string {
+	if v.Status != access.StatusActive || len(v.Lines) > 0 || !slices.ContainsFunc(v.Nodes, func(n access.SubNode) bool {
+		return slices.ContainsFunc(n.Conns, func(c access.SubConn) bool { return c.MihomoOnly })
+	}) {
+		return ""
+	}
+	if lang == "ru" {
+		return "Эти серверы работают только в kl!ck и других Mihomo-приложениях"
+	}
+	return "These servers work only in kl!ck and other Mihomo apps"
 }
 
 // cutAnnounce shortens an announcement to the max runes Happ shows: at the last word boundary in the second half when

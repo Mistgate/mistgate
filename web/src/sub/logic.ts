@@ -97,6 +97,7 @@ const conn = (c: Record<string, unknown>): ServerConn => ({
   exit: c.exit === "warp" ? "warp" : "direct",
   app_name: str(c.app_name),
   profile_id: str(c.profile_id),
+  mihomo_only: c.mihomo_only === true,
 });
 
 /** The DNS part of one server; null when the server has no choice. */

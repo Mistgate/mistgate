@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -95,7 +96,7 @@ type pageData struct {
 	Brand           pageBrand    `json:"brand"`
 	Title           string       `json:"title"`
 	SubscriptionURL string       `json:"subscription_url"`
-	ServerCount     int          `json:"server_count"` // servers the link gives Happ ("all your servers (3) appear in Happ")
+	ServerCount     int          `json:"server_count"` // servers (nodes) the link carries ("all your servers (3) are already there")
 	ServerLoads     []pageServer `json:"server_loads"` // kept for the old page; derived from Servers
 	User            pageUser     `json:"user"`
 	Announcement    string       `json:"announcement"`
@@ -189,7 +190,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	}
 	opt := set.GetUserPage()
 	d := pageData{
-		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines),
+		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: linkNodes(v),
 		Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
 		User: pageUser{
 			Name: pageName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
@@ -221,6 +222,17 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	d.ServerLoads = serverLoadsOf(d.Servers)
 	d.DNS, d.DNSPresets = pageDNSOf(v, set, link, preview), pageDNSPresets(v, lang)
 	return d
+}
+
+// linkNodes counts the nodes the subscription link carries, for any app (two profiles on one node are one server).
+func linkNodes(v access.SubView) int {
+	n := 0
+	for _, node := range v.Nodes {
+		if slices.ContainsFunc(node.Conns, func(c access.SubConn) bool { return c.Way == "link" }) {
+			n++
+		}
+	}
+	return n
 }
 
 // loadLevel is the level of a load percentage: high from 80 (where the page suggests another server), medium from 50.

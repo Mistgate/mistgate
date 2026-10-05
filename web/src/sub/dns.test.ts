@@ -56,6 +56,25 @@ describe("the servers", () => {
     expect(win.querySelector(".flag")).toBeNull();
   });
 
+  it("a link only Mihomo apps can use says so on the card (all of them, or some), in both languages", () => {
+    const only = { way: "link", exit: "direct", app_name: "", profile_id: "", mihomo_only: true } as const;
+    const f = (d: ReturnType<typeof data>) => {
+      d.servers[1]!.connections = [{ ...only }]; // nl: nothing but Mihomo
+      d.servers[1]!.app_names = [];
+      d.servers[0]!.connections.push({ ...only }); // de: its own link, and one for Mihomo apps
+    };
+    const byName = (el: HTMLElement, n: string) => cards(el).find((x) => text(x.querySelector(".srv-name")).startsWith(n))!;
+    const ru = page("first", state("android"), f);
+    expect(text(byName(ru, "Нидерланды").querySelector(".srv-mihomo"))).toBe("Только в kl!ck и других Mihomo-приложениях");
+    expect(text(byName(ru, "Германия").querySelector(".srv-mihomo"))).toBe("Часть подключений — только в kl!ck и других Mihomo-приложениях");
+    expect(byName(ru, "Финляндия").querySelector(".srv-mihomo")).toBeNull();
+    const en = view(data("first", f), state("android", {}, "en"), actions());
+    expect(text(byName(en, "Netherlands").querySelector(".srv-mihomo"))).toBe("Only in kl!ck and other Mihomo apps");
+    expect(text(byName(en, "Germany").querySelector(".srv-mihomo"))).toBe("Some connections are only in kl!ck and other Mihomo apps");
+    // the field survives reading the page data
+    expect(normalize({ servers: [{ id: "a", label: "x", connections: [{ way: "link", mihomo_only: true }, { way: "link" }] }] }).servers.map((s) => s.connections.map((c) => c.mihomo_only === true))).toEqual([[true, false]]);
+  });
+
   it("a busy server suggests the calmest other one; when every server is busy it says to wait", () => {
     expect(text(page("first").querySelector(".note[role=status]"))).toBe("Сервер Германия сильно загружен. Если соединение медленное, попробуйте Нидерланды.");
     const all = page("first", state("android"), (d) => d.servers.forEach((s) => (s.load = s.online ? "high" : null)));

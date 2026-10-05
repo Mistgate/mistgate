@@ -421,7 +421,11 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	hd.Set("Profile-Update-Interval", strconv.Itoa(hours))
 	hd.Set("Profile-Web-Page-Url", h.link(r, token))
 	ann := set.GetAnnouncement()
-	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
+	note := stateNote(v, b.Language, h.cfg.Now())
+	if note == "" {
+		note = mihomoOnlyNote(v, b.Language)
+	}
+	if note != "" {
 		ann = note // the reason the app stopped working is the announcement that matters now
 	}
 	if a := cutAnnounce(ann, announceMax); a != "" {
@@ -488,7 +492,11 @@ func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string
 // Servers (a fake source) keeps its Lines as they are. A person without access gets the one entry that says why.
 // happ: the client is Happ, whose names carry the load percentage.
 func (h *handler) lines(v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, happ bool) []string {
-	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
+	note := stateNote(v, b.Language, h.cfg.Now())
+	if note == "" {
+		note = mihomoOnlyNote(v, b.Language)
+	}
+	if note != "" {
 		return []string{withRemark(placeholderURI, note)}
 	}
 	if len(v.Servers) == 0 {

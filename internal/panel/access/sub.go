@@ -81,7 +81,9 @@ type SubConn struct {
 	Way       string // "link" | "key"
 	Exit      string // "direct" | "warp"
 	ProfileID string // the AmneziaWG profile of a key
-	Server    int    // a link: the index into SubView.Servers
+	Server    int    // a link: the index into SubView.Servers (unused when MihomoOnly)
+	// MihomoOnly: a link that only the Mihomo apps can use (Gecko). The URI list has no server for it, so Server means nothing.
+	MihomoOnly bool
 }
 
 // SubServer is one Lines entry with the facts the remark (server name) is built from.
@@ -396,6 +398,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1})
+			}
+		} else if format == plugin.FormatURIList && !protocols.IsPerDevice(proto) {
+			// The URI list leaves out what only the Mihomo apps can use (Gecko), but it is still the person's server: the page lists it.
+			in.Format = plugin.FormatMihomo
+			if _, ok := proto.Render(in); ok {
+				n := nodeOf(f)
+				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
 			}
 		}
 	}
