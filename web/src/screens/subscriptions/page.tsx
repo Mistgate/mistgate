@@ -16,6 +16,7 @@ import { useTx } from "@/screens/users/t";
 import { SwitchRow } from "@/screens/users/ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { kindKey, kinds, platformKey, platforms, previewUrl, validDownload, type PlatformApp, type Settings } from "./model";
+import { appOf, knownFor } from "./known-apps";
 import { pickerUsersQuery, useSaveSettings } from "./queries";
 import { inputCls, SaveBar } from "./ui";
 
@@ -104,7 +105,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
                     <AppRow key={i} app={a} t={t} onChange={(patch) => setApp(i, patch)} onShift={(by) => shift(i, by)} canShift={[canShift(i, -1), canShift(i, 1)]} onRemove={() => setD((x) => ({ ...x, apps: x.apps.filter((_, j) => j !== i) }))} />
                   ))}
                 </div>
-                <AddApp onAdd={(platform, kind) => setD((x) => ({ ...x, apps: [...x.apps, { platform, kind, name: "", downloadUrl: "", addLinkTemplate: "", description: "", recommended: false }] }))} />
+                <AddApp onAdd={(app) => setD((x) => ({ ...x, apps: [...x.apps, app] }))} />
               </>
             )}
           </Card>
@@ -174,24 +175,41 @@ function AppRow({ app, t, onChange, onShift, canShift, onRemove }: { app: Platfo
   );
 }
 
-function AddApp({ onAdd }: { onAdd: (platform: Platform, kind: App) => void }) {
+const custom = "custom"; // the "known app" choice that leaves the new card blank
+
+/** "Add app": a platform and either a known app (it fills the card) or a kind (a blank card). */
+function AddApp({ onAdd }: { onAdd: (app: PlatformApp) => void }) {
   const t = useTx();
   const [platform, setPlatform] = useState<Platform>(Platform.IOS);
   const [kind, setKind] = useState<App>(App.HAPP);
+  const [known, setKnown] = useState(custom);
+  const here = knownFor(platform);
+  const pick = here.some((k) => k.id === known) ? known : custom; // a known app without a build on this platform falls back to a blank card
+  const add = () => onAdd(appOf(pick, platform) ?? { platform, kind, name: "", downloadUrl: "", addLinkTemplate: "", description: "", recommended: false });
+  const mini = "text-[11px] font-bold tracking-[0.1em] text-muted uppercase";
   return (
-    <div className="flex flex-col gap-2 border-t border-line pt-3 sm:flex-row sm:items-end">
-      <div className="flex flex-1 flex-col gap-1.5">
-        <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.page.addPlatform")}</span>
-        <Select aria-label={t("subs.page.addPlatform")} value={String(platform)} onValueChange={(v) => setPlatform(Number(v) as Platform)} options={platforms.map((p) => ({ value: String(p), label: t(platformKey[p]!) }))} />
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <span className={mini}>{t("subs.page.addPlatform")}</span>
+          <Select aria-label={t("subs.page.addPlatform")} value={String(platform)} onValueChange={(v) => setPlatform(Number(v) as Platform)} options={platforms.map((p) => ({ value: String(p), label: t(platformKey[p]!) }))} />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <span className={mini}>{t("subs.page.addKnown")}</span>
+          <Select aria-label={t("subs.page.addKnown")} value={pick} onValueChange={setKnown} options={[{ value: custom, label: t("subs.page.knownCustom") }, ...here.map((k) => ({ value: k.id, label: k.name }))]} />
+        </div>
+        {pick === custom && (
+          <div className="flex flex-1 flex-col gap-1.5">
+            <span className={mini}>{t("subs.page.addKind")}</span>
+            <Select aria-label={t("subs.page.addKind")} value={String(kind)} onValueChange={(v) => setKind(Number(v) as App)} options={kinds.map((k) => ({ value: String(k), label: t(kindKey[k]!) }))} />
+          </div>
+        )}
+        <Button variant="secondary" size="lg" onClick={add}>
+          <Icon name="plus" size={14} />
+          {t("subs.page.add")}
+        </Button>
       </div>
-      <div className="flex flex-1 flex-col gap-1.5">
-        <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.page.addKind")}</span>
-        <Select aria-label={t("subs.page.addKind")} value={String(kind)} onValueChange={(v) => setKind(Number(v) as App)} options={kinds.map((k) => ({ value: String(k), label: t(kindKey[k]!) }))} />
-      </div>
-      <Button variant="secondary" size="lg" onClick={() => onAdd(platform, kind)}>
-        <Icon name="plus" size={14} />
-        {t("subs.page.add")}
-      </Button>
+      <p className="text-[11px] leading-snug text-muted">{t("subs.page.knownHint")}</p>
     </div>
   );
 }
