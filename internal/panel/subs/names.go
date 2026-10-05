@@ -27,19 +27,22 @@ func flagEmoji(cc string) string {
 
 // remarks renders the server name of every server of one user from the template, then makes them unique: a name that
 // is already taken gets a number, from 2 on ("🇩🇪 DE · Hysteria2", "🇩🇪 DE · Hysteria2 2"). The profile
-// name can distinguish protocols and WARP exits. lang only matters for {country}.
-// web/src/screens/subscriptions/model.ts serverNames draws the admin's preview by the same rules.
+// name can distinguish protocols and WARP exits. {country} is the two-letter code (a localised name only for a code
+// that is not one). These are the Mihomo names: no load percentage, because a select group remembers the chosen server
+// by its name and a name that follows the load would reset the choice on every refresh.
+// web/src/screens/subscriptions/model.ts serverNames draws the admin's (Happ) preview by the same rules.
 func remarks(servers []access.SubServer, template, lang string) []string {
-	return renderRemarks(servers, template, lang, false)
+	return renderRemarks(servers, template, lang, false, false)
 }
 
 // happRemarks keeps URI-list names within Happ's 30-character title limit. Happ counts supplementary
 // Unicode characters as two UTF-16 units, so use that stricter limit and compact protocol labels when needed.
-func happRemarks(servers []access.SubServer, template, lang string) []string {
-	return renderRemarks(servers, template, lang, true)
+// load adds the node's load percentage (" · 64%"): only for Happ, every other app of the list keeps stable names.
+func happRemarks(servers []access.SubServer, template, lang string, load bool) []string {
+	return renderRemarks(servers, template, lang, true, load)
 }
 
-func renderRemarks(servers []access.SubServer, template, lang string, limitHapp bool) []string {
+func renderRemarks(servers []access.SubServer, template, lang string, limitHapp, load bool) []string {
 	if template == "" {
 		template = subsettings.DefaultNameTemplate
 	}
@@ -60,7 +63,7 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp 
 			n = "server"
 		}
 		suffix := ""
-		if s.LoadPercent != nil {
+		if load && s.LoadPercent != nil {
 			suffix = " · " + strconv.Itoa(*s.LoadPercent) + "%"
 		}
 		name := namedRemark(n, suffix, s.Profile, limitHapp)

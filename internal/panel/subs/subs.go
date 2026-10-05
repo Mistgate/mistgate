@@ -428,7 +428,7 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 }
 
 // writeMihomo answers with the Mihomo YAML profile: the proxies of the view (named like the base64 list names its
-// servers), one select group, the dns section of the user's effective preset. gzip when the client accepts it.
+// servers, never with the load percentage: see remarks), one select group, the dns section of the user's effective preset. gzip when the client accepts it.
 func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	ctx := r.Context()
 	b := h.brand(ctx)
@@ -469,19 +469,20 @@ func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string
 	b := h.brand(r.Context())
 	h.headers(w, r, token, v, set, b)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b), "\n")))))
+	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b, isHapp(r.UserAgent())), "\n")))))
 }
 
 // lines are the share links with their remarks (server names) rendered from the template; a view without
 // Servers (a fake source) keeps its Lines as they are. A person without access gets the one entry that says why.
-func (h *handler) lines(v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings) []string {
+// happ: the client is Happ, whose names carry the load percentage.
+func (h *handler) lines(v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, happ bool) []string {
 	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
 		return []string{withRemark(placeholderURI, note)}
 	}
 	if len(v.Servers) == 0 {
 		return v.Lines
 	}
-	names := happRemarks(v.Servers, set.GetServerNameTemplate(), b.Language)
+	names := happRemarks(v.Servers, set.GetServerNameTemplate(), b.Language, happ)
 	out := make([]string, len(v.Servers))
 	for i, s := range v.Servers {
 		out[i] = withRemark(s.URI, names[i])

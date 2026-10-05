@@ -1,11 +1,16 @@
 package subs
 
 import (
+	"context"
+	"encoding/base64"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf16"
+
+	"gopkg.in/yaml.v3"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
@@ -61,12 +66,12 @@ func TestRemarks(t *testing.T) {
 			"{node}", "en", []string{"x", "x 2", "x 3"}},
 		{"template that names the profile needs no number", []access.SubServer{srv("de1", "DE", "a"), srv("de1", "DE", "b")},
 			"{node} {profile}", "en", []string{"de1 a", "de1 b"}},
-		{"channel utilization is included in the name", []access.SubServer{func() access.SubServer {
+		{"the Mihomo name has no load percentage", []access.SubServer{func() access.SubServer {
 			s := srv("de1", "DE", "Hysteria2")
 			load := 64
 			s.LoadPercent, s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = &load, 64_000_000, 10_000_000, time.Now()
 			return s
-		}()}, "", "en", []string{de + " DE · Hysteria2 · 64%"}},
+		}()}, "", "en", []string{de + " DE · Hysteria2"}},
 		{"no load percentage does not add speed figures", []access.SubServer{func() access.SubServer {
 			s := srv("de1", "DE", "Hysteria2")
 			s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = 64_000_000, 10_000_000, time.Now()
@@ -97,10 +102,14 @@ func TestHappRemarksStayWithinTitleLimit(t *testing.T) {
 			return s
 		}(),
 	}
-	got := happRemarks(servers, "", "en")
+	got := happRemarks(servers, "", "en", true)
 	want := []string{"\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74%", "\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74% 2"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("Happ names = %q, want %q", got, want)
+	}
+	// Any other app of the list keeps names that do not follow the load.
+	if other := happRemarks(servers, "", "en", false); strings.Join(other, "|") != "\U0001F1E9\U0001F1EA DE · Hysteria2 · 443|\U0001F1E9\U0001F1EA DE · Hysteria2 · 443 2" {
+		t.Errorf("names without the load = %q", other)
 	}
 	for _, name := range got {
 		if n := len(utf16.Encode([]rune(name))); n > 30 {
@@ -113,12 +122,71 @@ func TestHappRemarkTruncatesCustomNamesButKeepsLoad(t *testing.T) {
 	load := 100
 	s := srv("de1", "DE", "Hysteria2 · A very long custom profile name")
 	s.LoadPercent = &load
-	name := happRemarks([]access.SubServer{s}, "", "en")[0]
+	name := happRemarks([]access.SubServer{s}, "", "en", true)[0]
 	if !strings.HasSuffix(name, " · 100%") {
 		t.Fatalf("Happ name %q lost the load percentage", name)
 	}
 	if n := len(utf16.Encode([]rune(name))); n > 30 {
 		t.Errorf("Happ name %q uses %d UTF-16 units, over the 30-unit limit", name, n)
+	}
+}
+
+// loadSrc serves one view per format: hysteria2:// links for the list, a proxy for the Mihomo profile.
+type loadSrc struct{ load *int }
+
+func (f loadSrc) view(line string) access.SubView {
+	s := srv("de1", "DE", "Hysteria2")
+	s.URI, s.LoadPercent = line, f.load
+	return access.SubView{Status: access.StatusActive, Lines: []string{line}, Servers: []access.SubServer{s}}
+}
+
+func (f loadSrc) Subscription(context.Context, string) (access.SubView, error) {
+	return f.view("hysteria2://x@de1.example.com:443/"), nil
+}
+
+func (f loadSrc) SubscriptionWith(context.Context, string, access.SubOptions) (access.SubView, error) {
+	return f.view("- name: \"x\"\n  type: hysteria2\n  server: \"de1.example.com\"\n  port: 443\n  password: \"x\"\n"), nil
+}
+
+// Only Happ shows the load in the server name. A Mihomo select group (and other apps of the list) remember the chosen
+// server by its name, so their names must not change with the load.
+func TestLoadPercentOnlyInHappNames(t *testing.T) {
+	load := 64
+	fetchAs := func(src loadSrc, ua string) string {
+		h := Handler(src, decoyHandler, Config{MinInterval: -1})
+		req := httptest.NewRequest("GET", "/"+tokA, nil)
+		req.Header.Set("User-Agent", ua)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("%s: status %d", ua, rec.Code)
+		}
+		if strings.HasPrefix(rec.Header().Get("Content-Type"), "text/yaml") {
+			var p struct {
+				Proxies []struct{ Name string } `yaml:"proxies"`
+			}
+			if err := yaml.Unmarshal(rec.Body.Bytes(), &p); err != nil || len(p.Proxies) != 1 {
+				t.Fatalf("%s: profile %v %s", ua, err, rec.Body)
+			}
+			return p.Proxies[0].Name
+		}
+		raw, err := base64.StdEncoding.DecodeString(rec.Body.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		frag, _ := url.PathUnescape(string(raw[strings.Index(string(raw), "#")+1:]))
+		return frag
+	}
+	de := "\U0001F1E9\U0001F1EA"
+	with, without := loadSrc{&load}, loadSrc{}
+	if a, b := fetchAs(with, "mihomo/1.19.31"), fetchAs(without, "mihomo/1.19.31"); a != b || a != de+" DE · Hysteria2" {
+		t.Errorf("Mihomo proxy names with and without load: %q, %q", a, b)
+	}
+	if got := fetchAs(with, "Happ/2.1.0/ios"); got != de+" DE · Hysteria2 · 64%" {
+		t.Errorf("Happ name = %q", got)
+	}
+	if a, b := fetchAs(with, "v2rayNG/1.9.0"), fetchAs(without, "v2rayNG/1.9.0"); a != b || a != de+" DE · Hysteria2" {
+		t.Errorf("v2rayNG names with and without load: %q, %q", a, b)
 	}
 }
 
