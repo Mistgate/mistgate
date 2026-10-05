@@ -188,22 +188,22 @@ func TestLoadPercentOnlyInHappNames(t *testing.T) {
 }
 
 // The page says how busy a node is only as a level, only for a node with a set capacity, and never by the node's name.
+// server_loads is what the old page reads; it is derived from servers[], one row per node that has a level.
 func TestServerLoads(t *testing.T) {
 	pct := func(n int) *int { return &n }
-	at := func(node, cc, location string, load *int) access.SubServer {
-		s := srv(node, cc, "p")
-		s.NodeID, s.Location, s.LoadPercent = "id-"+node, location, load
-		return s
+	at := func(node, cc, location string, load *int) access.SubNode {
+		return access.SubNode{ID: "id-" + node, Name: node, CountryCode: cc, Location: location, LoadPercent: load}
 	}
-	got := serverLoads([]access.SubServer{
+	v := access.SubView{Nodes: []access.SubNode{
 		at("de1", "DE", "", pct(85)),
-		at("de1", "DE", "", pct(85)), // a second profile of the same node
 		at("de2", "DE", "Frankfurt", pct(79)),
 		at("de3", "DE", "", pct(49)),
 		at("nl1", "NL", "", nil), // no capacity set
 		at("x1", "", "", pct(50)),
 		at("x2", "", "", pct(0)),
-	}, "en")
+	}}
+	servers := pageServers(v, &adminv1.SubscriptionSettings{}, "en")
+	got := serverLoadsOf(servers)
 	want := []pageServer{{"Germany", "high"}, {"Germany · Frankfurt", "medium"}, {"Germany 2", "low"}, {"Server", "medium"}, {"Server 2", "low"}}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("serverLoads = %v, want %v", got, want)
@@ -212,8 +212,12 @@ func TestServerLoads(t *testing.T) {
 	if string(b) != `{"name":"Germany","level":"high"}` {
 		t.Errorf("page row = %s", b)
 	}
-	if ru := serverLoads([]access.SubServer{at("x1", "", "", pct(10))}, "ru"); ru[0].Name != "Сервер" {
+	if ru := serverLoadsOf(pageServers(access.SubView{Nodes: []access.SubNode{at("x1", "", "", pct(10))}}, &adminv1.SubscriptionSettings{}, "ru")); ru[0].Name != "Сервер" {
 		t.Errorf("ru name = %q", ru[0].Name)
+	}
+	// A node with no level is a server with load null, still listed.
+	if len(servers) != 6 || servers[3].Load != nil || servers[3].Label != "Netherlands" || *servers[0].Load != "high" {
+		t.Errorf("servers = %+v", servers)
 	}
 }
 

@@ -8,12 +8,14 @@ import (
 	"mime"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
@@ -61,17 +63,31 @@ type pageMinClient struct {
 }
 
 type pageAWGDevice struct {
-	ID                string          `json:"id"`
-	Platform          string          `json:"platform"`
-	Label             string          `json:"label"`
-	ProfileID         string          `json:"profile_id"`
-	ProfileName       string          `json:"profile_name"`
-	Version           string          `json:"version"` // "3.1" | "2.0"
-	Address           string          `json:"address"` // without masks: "10.66.4.5, fd66:66:0:1::5"
-	LastHandshakeUnix int64           `json:"last_handshake_unix"`
-	Online            bool            `json:"online"`
-	Stale             bool            `json:"stale"` // the profile changed: fetch the configs and re-import them
-	MinClients        []pageMinClient `json:"min_clients"`
+	ID                string `json:"id"`
+	Platform          string `json:"platform"`
+	Label             string `json:"label"`
+	ProfileID         string `json:"profile_id"`
+	ProfileName       string `json:"profile_name"`
+	Version           string `json:"version"` // "3.1" | "2.0"
+	Address           string `json:"address"` // without masks: "10.66.4.5, fd66:66:0:1::5"
+	LastHandshakeUnix int64  `json:"last_handshake_unix"`
+	Online            bool   `json:"online"`
+	Stale             bool   `json:"stale"` // the profile changed or the person picked another DNS: fetch the configs and re-import them
+	// StaleReason says why: "profile" (the servers changed: a new key is needed) or "dns" (the DNS of a server changed: the same
+	// key, fetched again, carries it); "" when the device is not stale.
+	StaleReason string          `json:"stale_reason"`
+	MinClients  []pageMinClient `json:"min_clients"`
+}
+
+// staleOf is whether a device needs its configs again and why. A changed profile outranks a changed DNS: it needs more.
+func staleOf(profileStale bool, dnsStale []string) (stale bool, reason string) {
+	switch {
+	case profileStale:
+		return true, "profile"
+	case len(dnsStale) > 0:
+		return true, "dns"
+	}
+	return false, ""
 }
 
 type pageAWGProfile struct {
@@ -105,8 +121,11 @@ func minClientsJSON(rs []protocols.ClientReq) []pageMinClient {
 
 // amneziaData is the section for the user's page: nil (JSON null) unless the user has the Amnezia app. selfService is the
 // admin's switch; the preview (the admin's look at the page) shows it as it is but has no endpoints: it cannot write.
+// A person whose subscription is not active still gets it when they have the app or keys: the keys are listed and can be
+// renamed and removed (the calls allow it), while nothing can be added (can_add false, no profiles to add on).
 func amneziaData(v access.SubView, link string, selfService, preview bool, now time.Time) *pageAmnezia {
-	if !v.AccessAmnezia {
+	hasKeys := slices.ContainsFunc(v.Devices, func(d access.SubDevice) bool { return d.AWG != nil })
+	if !v.AccessAmnezia && !(v.Status != access.StatusActive && (v.AppAmnezia || hasKeys)) {
 		return nil
 	}
 	a := &pageAmnezia{Devices: []pageAWGDevice{}, Profiles: []pageAWGProfile{}, SelfService: selfService}
@@ -114,10 +133,11 @@ func amneziaData(v access.SubView, link string, selfService, preview bool, now t
 		if d.AWG == nil {
 			continue
 		}
+		stale, reason := staleOf(d.AWG.Stale, d.AWG.DNSStale)
 		a.Devices = append(a.Devices, pageAWGDevice{
 			ID: d.ID, Platform: d.Platform, Label: d.Model, ProfileID: d.AWG.ProfileID, ProfileName: d.AWG.ProfileName,
 			Version: d.AWG.Version, Address: d.AWG.Address, LastHandshakeUnix: unixOrZero(d.AWG.LastHandshake),
-			Online: online(d.AWG.LastHandshake, now), Stale: d.AWG.Stale, MinClients: minClientsJSON(d.AWG.MinClients),
+			Online: online(d.AWG.LastHandshake, now), Stale: stale, StaleReason: reason, MinClients: minClientsJSON(d.AWG.MinClients),
 		})
 	}
 	for _, p := range v.AWGProfiles {
@@ -133,8 +153,14 @@ func amneziaData(v access.SubView, link string, selfService, preview bool, now t
 func online(last, now time.Time) bool { return !last.IsZero() && now.Sub(last) < awgOnlineWindow }
 
 type configJSON struct {
-	NodeID      string          `json:"node_id"`
-	Server      string          `json:"server"` // the public name ("Germany 2", "Server"), never the panel's node name
+	NodeID string `json:"node_id"`
+	// Label is the public name of the server, the same as servers[].label ("Germany · Frankfurt", "Germany 2", "Server").
+	Label string `json:"label"`
+	// LegacyName is the panel's name of the node. For one use only: naming an old connection that the person has to delete in the
+	// app. Keys issued before the names went by country were called "<node name> · AWG <version>" there. Never shown otherwise.
+	LegacyName string `json:"legacy_name"`
+	// Server is Label under its old name; the old page reads it. Removed with the old page.
+	Server      string          `json:"server"`
 	CountryCode string          `json:"country_code"`
 	Version     string          `json:"version"`
 	Conf        string          `json:"conf"`    // the .conf text (AmneziaVPN and the AmneziaWG apps import it; one QR)
@@ -156,8 +182,9 @@ func deviceOf(d store.AccessAWGDevice, cfgs []access.DeviceConfig, now time.Time
 	out := pageAWGDevice{
 		ID: d.ID, Platform: d.Platform, Label: d.Model, ProfileID: d.ProfileID, ProfileName: d.ProfileName,
 		Version: profileVersion(d.ProfileSettingsJSON), Address: addressOf(d.DataJSON),
-		LastHandshakeUnix: unixOrZero(d.LastSeenAt), Online: online(d.LastSeenAt, now), Stale: d.Stale(), MinClients: []pageMinClient{},
+		LastHandshakeUnix: unixOrZero(d.LastSeenAt), Online: online(d.LastSeenAt, now), MinClients: []pageMinClient{},
 	}
+	out.Stale, out.StaleReason = staleOf(d.Stale(), d.DNSStale)
 	if len(cfgs) > 0 {
 		out.Version = cfgs[0].AWGVersion
 		out.MinClients = minClientsJSON(cfgs[0].MinClients)
@@ -169,7 +196,7 @@ func configsOf(cfgs []access.DeviceConfig) []configJSON {
 	out := make([]configJSON, 0, len(cfgs))
 	for _, c := range cfgs {
 		out = append(out, configJSON{
-			NodeID: c.NodeID, Server: c.Server, CountryCode: c.CountryCode, Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
+			NodeID: c.NodeID, Label: c.Server, LegacyName: c.NodeName, Server: c.Server, CountryCode: c.CountryCode, Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
 			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients),
 		})
 	}
@@ -212,34 +239,8 @@ func addressOf(dataJSON string) string {
 // and a miss), the cross-origin check, the admin's switch, the user's status, the write budget, then the work.
 func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, sub, client string, now time.Time) {
 	ctx := r.Context()
-	set := h.settings(ctx)
-	// The page is locked: so is everything it calls. Answered before the database work, which only a cookie of
-	// this token (an HMAC, nothing to look up) earns; the answer is the same for a token that does not exist.
-	if h.dev != nil && h.gated(set) && !h.unlocked(r, token) {
-		jsonError(w, http.StatusUnauthorized, "locked", "")
-		return
-	}
-	v, st, err := h.identify(ctx, token, now)
-	if errors.Is(err, access.ErrUnknownToken) {
-		h.tokens.Delete(token)
-		h.miss(client, now)
-		h.decoy.ServeHTTP(w, r)
-		return
-	}
-	if err != nil { // the access module logged the cause (never the token)
-		jsonError(w, http.StatusInternalServerError, "internal", "")
-		return
-	}
-	if h.dev == nil {
-		h.decoy.ServeHTTP(w, r) // this Source cannot manage devices: the endpoints do not exist
-		return
-	}
-	if err := h.cop.Check(r); err != nil {
-		jsonError(w, http.StatusForbidden, "cross_origin", "")
-		return
-	}
-	if !subsettings.SelfService(set) {
-		jsonError(w, http.StatusForbidden, "self_service_disabled", "")
+	v, st, ok := h.enter(w, r, token, client, now, h.dev != nil, subsettings.SelfService, "self_service_disabled")
+	if !ok {
 		return
 	}
 
@@ -260,13 +261,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 		}
 	}
 	// The keys leave only for a user who can use them; removing a device and renaming one never hurt.
-	if (rest == "" || action == "configs" || action == "rotate") && v.Status != access.StatusActive {
-		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
-		return
-	}
-	if retry := st.writeAdmit(h.cfg.MaxWritesPerHour, now); retry > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int((retry+time.Second-1)/time.Second)))
-		jsonError(w, http.StatusTooManyRequests, "too_many_requests", "")
+	if !h.admitWrite(w, st, v, rest == "" || action == "configs" || action == "rotate", now) {
 		return
 	}
 
@@ -274,6 +269,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 	var (
 		dev  store.AccessAWGDevice
 		cfgs []access.DeviceConfig
+		err  error
 	)
 	switch {
 	case rest == "":
@@ -311,6 +307,61 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 	}
 	st.drop()
 	writeJSON(w, http.StatusOK, deviceAnswer{Device: deviceOf(dev, cfgs, now), Configs: configsOf(cfgs)})
+}
+
+// enter is the start every call under a link shares (the devices and the DNS pick), in this order: the page password (a
+// locked page locks what it calls: answered before the database work, which only a cookie of this token earns; the
+// answer is the same for a token that does not exist), the token (unknown = the decoy and a miss), the Source can do the
+// call (else the decoy: the endpoint does not exist), the cross-origin check, the owner's switch (403 off). It answers
+// and returns false when the call ends there. exists says whether the Source can do the call.
+func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client string, now time.Time, exists bool,
+	on func(*adminv1.SubscriptionSettings) bool, off string) (access.SubView, *tokenState, bool) {
+	ctx := r.Context()
+	set := h.settings(ctx)
+	if exists && h.gated(set) && !h.unlocked(r, token) {
+		jsonError(w, http.StatusUnauthorized, "locked", "")
+		return access.SubView{}, nil, false
+	}
+	v, st, err := h.identify(ctx, token, now)
+	if errors.Is(err, access.ErrUnknownToken) {
+		h.tokens.Delete(token)
+		h.miss(client, now)
+		h.decoy.ServeHTTP(w, r)
+		return access.SubView{}, nil, false
+	}
+	if err != nil { // the access module logged the cause (never the token)
+		jsonError(w, http.StatusInternalServerError, "internal", "")
+		return access.SubView{}, nil, false
+	}
+	if !exists {
+		h.decoy.ServeHTTP(w, r)
+		return access.SubView{}, nil, false
+	}
+	if err := h.cop.Check(r); err != nil {
+		jsonError(w, http.StatusForbidden, "cross_origin", "")
+		return access.SubView{}, nil, false
+	}
+	if !on(set) {
+		jsonError(w, http.StatusForbidden, off, "")
+		return access.SubView{}, nil, false
+	}
+	return v, st, true
+}
+
+// admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the
+// servers, 409 user_inactive otherwise) and the hourly budget of writes of the token (429), counted for the devices and
+// the DNS together. It answers and returns false when the call ends there.
+func (h *handler) admitWrite(w http.ResponseWriter, st *tokenState, v access.SubView, needActive bool, now time.Time) bool {
+	if needActive && v.Status != access.StatusActive {
+		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
+		return false
+	}
+	if retry := st.writeAdmit(h.cfg.MaxWritesPerHour, now); retry > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(int((retry+time.Second-1)/time.Second)))
+		jsonError(w, http.StatusTooManyRequests, "too_many_requests", "")
+		return false
+	}
+	return true
 }
 
 // identify resolves a token to the user's view for a self-service call. Always from the source, never from the cache a page

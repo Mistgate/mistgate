@@ -11,7 +11,7 @@
 //     database work), and more than MaxPerHour fetches an hour get a 429;
 //   - link sharing: distinct client networks (/24, /48) seen per token per day are counted (never stored
 //     as addresses), and above SharedNets one subscription_shared_suspect event is written for that day;
-//   - self-service writes (add, configs, rotate, revoke, rename a device): a separate per-token counter,
+//   - self-service writes (add, configs, rotate, revoke, rename a device, pick a DNS): a separate per-token counter,
 //     MaxWritesPerHour an hour, so that the fetch budget above is not shared with them.
 package subs
 
@@ -108,7 +108,7 @@ type Config struct {
 	MaxPerHour  int           // fetches per token per hour; default 60
 	SharedNets  int           // distinct client networks per token per day before the event; default 8
 	MaxKeys     int           // clients and tokens tracked per table (memory bound); default 10000
-	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename) per token an hour;
+	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename, pick a DNS) per token an hour;
 	// default 20, negative = no limit. Separate from MaxPerHour.
 	MaxWritesPerHour int
 	BrandTTL         time.Duration // how long a read of the brand is reused; default 5 seconds
@@ -219,6 +219,7 @@ type handler struct {
 	src    Source
 	fsrc   FormatSource // src when it can render a format, else nil
 	dev    Devices      // src when it manages devices, else nil
+	pdns   PageDNS      // src when it takes the DNS pick of the page, else nil
 	cop    *http.CrossOriginProtection
 	decoy  http.Handler
 	prefix string
@@ -244,6 +245,7 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 	}
 	h.fsrc, _ = src.(FormatSource)
 	h.dev, _ = src.(Devices)
+	h.pdns, _ = src.(PageDNS)
 	if o := originOf(cfg.BaseURL); o != "" {
 		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
 		if err := h.cop.AddTrustedOrigin(o); err != nil {
@@ -282,6 +284,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case sub == "unlock":
 		h.serveUnlock(w, r, token, client, now)
+		return
+	case sub == "dns":
+		h.serveDNS(w, r, token, client, now)
 		return
 	case sub != "":
 		h.serveDevices(w, r, token, sub, client, now)
@@ -612,7 +617,7 @@ func (h *handler) suspect(user string) {
 }
 
 // routeOf splits a request under the prefix into the token and what follows it: GET/HEAD <prefix>/<token> is the
-// subscription itself (sub ""), POST <prefix>/<token>/devices[/<id>/<action>] a self-service call (sub "devices...").
+// subscription itself (sub ""), POST <prefix>/<token>/devices[/<id>/<action>] a self-service call (sub "devices..."), POST <prefix>/<token>/dns the pick of a DNS (sub "dns"), POST <prefix>/<token>/unlock the page password.
 // Anything else is not ours (ok false).
 func routeOf(r *http.Request, prefix string) (token, sub string, ok bool) {
 	p := r.URL.Path
@@ -636,7 +641,7 @@ func routeOf(r *http.Request, prefix string) (token, sub string, ok bool) {
 	switch {
 	case sub == "" && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		return token, "", true
-	case r.Method == http.MethodPost && (sub == "unlock" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
+	case r.Method == http.MethodPost && (sub == "unlock" || sub == "dns" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
 		return token, sub, true
 	}
 	return "", "", false

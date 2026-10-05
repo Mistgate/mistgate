@@ -39,7 +39,10 @@ type rig struct {
 	clock   time.Time
 }
 
-func newRig(t *testing.T, prefix string) *rig {
+func newRig(t *testing.T, prefix string) *rig { return newRigOnline(t, prefix, nil) }
+
+// newRigOnline is newRig with the fleet's view of the nodes (which agents answer, the network samples): nil = none.
+func newRigOnline(t *testing.T, prefix string, online access.OnlineSource) *rig {
 	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "t.db"))
@@ -48,7 +51,7 @@ func newRig(t *testing.T, prefix string) *rig {
 	}
 	t.Cleanup(func() { st.Close() })
 	v, _ := vault.New(make([]byte, vault.KeySize))
-	svc, err := access.New(st, v, builtin.Registry(), nil, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com" + prefix})
+	svc, err := access.New(st, v, builtin.Registry(), nil, online, access.Config{SubscriptionBaseURL: "https://sub.example.com" + prefix})
 	if err != nil {
 		t.Fatal(err)
 	}

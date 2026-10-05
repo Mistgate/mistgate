@@ -35,9 +35,11 @@ type m3rig struct {
 	group2 string // a group with both profiles
 }
 
-func newM3Rig(t *testing.T) *m3rig {
+func newM3Rig(t *testing.T) *m3rig { return newM3RigOnline(t, nil) }
+
+func newM3RigOnline(t *testing.T, online access.OnlineSource) *m3rig {
 	t.Helper()
-	r := newRig(t, "/k3xq8")
+	r := newRigOnline(t, "/k3xq8", online)
 	p := must(r.svc.CreateProfile(r.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{Protocol: "awg", Name: "awg31"}))).Msg.Profile
 	must(r.svc.CreateInbound(r.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: p.Id, NodeId: "nod_1"})))
 	g := must(r.svc.CreateGroup(r.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "g2", ProfileIds: []string{r.profile, p.Id}}))).Msg.Group.Id

@@ -118,6 +118,12 @@ func PagePassword(s *adminv1.SubscriptionSettings) bool {
 	return o == nil || o.RequirePagePassword == nil || *o.RequirePagePassword
 }
 
+// DNSChoice reports whether people may pick the DNS of each server on the public page (DnsService.SetNodeDnsOptions says what
+// is offered). Settings stored before the key existed have none: absent means off, a new feature does not switch itself on.
+func DNSChoice(s *adminv1.SubscriptionSettings) bool {
+	return s.GetUserPage().GetAllowDnsChoice()
+}
+
 // m3RulesKey marks an installation whose stored settings were given the Mihomo format rules (see MigrateM3).
 const m3RulesKey = "sub_rules_m3"
 

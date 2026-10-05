@@ -1,7 +1,6 @@
 package subs
 
 import (
-	"cmp"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -97,7 +96,7 @@ type pageData struct {
 	Title           string       `json:"title"`
 	SubscriptionURL string       `json:"subscription_url"`
 	ServerCount     int          `json:"server_count"` // servers the link gives Happ ("all your servers (3) appear in Happ")
-	ServerLoads     []pageServer `json:"server_loads"`
+	ServerLoads     []pageServer `json:"server_loads"` // kept for the old page; derived from Servers
 	User            pageUser     `json:"user"`
 	Announcement    string       `json:"announcement"`
 	SupportURL      string       `json:"support_url"`
@@ -105,7 +104,11 @@ type pageData struct {
 	Apps            []pageApp    `json:"apps"`
 	Access          pageAccess   `json:"access"`
 	Devices         []pageDevice `json:"devices"`
-	Amnezia         *pageAmnezia `json:"amnezia"` // null unless the user has the Amnezia app and a usable AWG profile
+	Amnezia         *pageAmnezia `json:"amnezia"` // null unless the user has the Amnezia app and a usable AWG profile (or keys to remove)
+	// Servers are the person's servers, one per node; DNS and DNSPresets are the choice of DNS for each of them.
+	Servers    []pageNode      `json:"servers"`
+	DNS        pageDNS         `json:"dns"`
+	DNSPresets []pageDNSPreset `json:"dns_presets"`
 	// Locked is set on the page of a token whose password was not entered: only Lang, Brand and Title are real, the
 	// rest is empty, and UnlockURL is where the form posts the password.
 	Locked    bool   `json:"locked"`
@@ -186,7 +189,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	}
 	opt := set.GetUserPage()
 	d := pageData{
-		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines), ServerLoads: serverLoads(v.Servers, lang),
+		V: 1, Lang: lang, Title: title, SubscriptionURL: link, ServerCount: len(v.Lines),
 		Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
 		User: pageUser{
 			Name: pageName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
@@ -214,24 +217,10 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online})
 	}
 	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
+	d.Servers = pageServers(v, set, lang)
+	d.ServerLoads = serverLoadsOf(d.Servers)
+	d.DNS, d.DNSPresets = pageDNSOf(v, set, link, preview), pageDNSPresets(v, lang)
 	return d
-}
-
-// serverLoads returns one row per node whose capacity the admin set (the view then has its load percentage), not per
-// protocol profile, in subscription order. A row says the level only. The name is access.ServerLabeler's: the country
-// and the location, never the panel's node name; a node with neither is "Server", a repeated name gets a number.
-func serverLoads(servers []access.SubServer, lang string) []pageServer {
-	seen, label := map[string]bool{}, access.ServerLabeler(lang)
-	out := []pageServer{}
-	for _, server := range servers {
-		key := cmp.Or(server.NodeID, server.Node)
-		if server.LoadPercent == nil || seen[key] {
-			continue // several profiles on one machine share its host-level measurement
-		}
-		seen[key] = true
-		out = append(out, pageServer{Name: label(server.CountryCode, server.Location), Level: loadLevel(*server.LoadPercent)})
-	}
-	return out
 }
 
 // loadLevel is the level of a load percentage: high from 80 (where the page suggests another server), medium from 50.
@@ -253,7 +242,8 @@ func lockedPageData(link, title, lang string, b instance.Settings) pageData {
 	}
 	return pageData{
 		V: 1, Lang: lang, Title: title, Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
-		Apps: []pageApp{}, Devices: []pageDevice{}, ServerLoads: []pageServer{}, Locked: true, UnlockURL: link + "/unlock",
+		Apps: []pageApp{}, Devices: []pageDevice{}, ServerLoads: []pageServer{}, Servers: []pageNode{}, DNSPresets: []pageDNSPreset{},
+		DNS: pageDNS{RefreshHours: subsettings.DefaultUpdateHours}, Locked: true, UnlockURL: link + "/unlock",
 	}
 }
 

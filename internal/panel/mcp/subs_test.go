@@ -283,3 +283,43 @@ func TestSubscriptionAppValidation(t *testing.T) {
 		t.Error("a refused plan was stored or saved")
 	}
 }
+
+// The choice of DNS per server is a switch of the page like the others: the view shows it (off when the stored document has
+// none), an app change carries it through untouched, and the plan's hash covers it, so a switch the owner flips after the
+// plan is not overwritten by the plan's stale copy.
+func TestSubscriptionDNSChoiceRoundTrips(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+	get := func() SubsSettingsV {
+		return decode[SubsSettingsV](t, mustOK(t, s, "subscription_settings_get", map[string]any{}))
+	}
+	if get().UserPage.DNSChoice {
+		t.Fatal("a document without the key reads as on")
+	}
+	e.w.mu.Lock()
+	e.w.subs.UserPage.AllowDnsChoice = proto.Bool(true)
+	e.w.mu.Unlock()
+	if !get().UserPage.DNSChoice {
+		t.Fatal("the switch is not shown")
+	}
+
+	p := decode[PlanOut](t, mustOK(t, s, "subscription_app_upsert_plan", myClient))
+	e.plans.decide(p.PlanID, true)
+	mustOK(t, s, "subscription_app_upsert_apply", map[string]any{"confirm_token": p.ConfirmToken})
+	if !e.w.subs.UserPage.GetAllowDnsChoice() || !get().UserPage.DNSChoice || len(e.w.subsReq) != 1 || !e.w.subsReq[0].Settings.UserPage.GetAllowDnsChoice() {
+		t.Fatalf("the switch did not survive the app change: %v", e.w.subs.UserPage)
+	}
+
+	p = decode[PlanOut](t, mustOK(t, s, "subscription_app_remove_plan", map[string]any{"platform": "linux", "name": "AmneziaVPN"}))
+	e.plans.decide(p.PlanID, true)
+	e.w.mu.Lock()
+	e.w.subs.UserPage.AllowDnsChoice = proto.Bool(false) // the owner switches it off meanwhile
+	e.w.mu.Unlock()
+	if out := mustFail(t, s, "subscription_app_remove_apply", map[string]any{"confirm_token": p.ConfirmToken}); !strings.Contains(out, "changed after the plan") {
+		t.Errorf("apply over a flipped switch: %s", out)
+	}
+	if e.w.subs.UserPage.GetAllowDnsChoice() {
+		t.Error("the owner's switch was overwritten")
+	}
+}
