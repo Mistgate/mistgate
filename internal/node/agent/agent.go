@@ -38,6 +38,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/speedtest"
 	"github.com/mistgate/mistgate/internal/node/update"
 )
 
@@ -74,6 +75,9 @@ type Config struct {
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller
+	// SpeedTest runs one bandwidth measurement (MeasureBandwidth). Nil = the real one against the public test servers; tests
+	// give a fake, since they have no internet.
+	SpeedTest func(ctx context.Context) (speedtest.Result, error)
 
 	// MaxPending and MaxPendingBytes bound the queue of unacked reliable messages (defaults 2160 = 6 h of
 	// 10 s batches, and 32 MiB).
@@ -112,6 +116,8 @@ type Agent struct {
 	dsIn, dsDone atomic.Int64                  // DesiredState messages handed to the worker / finished by it
 	dsOK         atomic.Bool                   // the last DesiredState on this stream was not refused
 	exiting      atomic.Bool                   // a re-exec is under way: the worker takes no new jobs
+
+	measuring atomic.Bool // a bandwidth test is running (one at a time)
 
 	doc      *doctor.Doctor
 	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
@@ -656,6 +662,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		go a.applyFix(s, m.ApplyFix)
 	case *pb.ConnectResponse_PrepareAwgKernel:
 		go a.prepareAwgKernel(s, m.PrepareAwgKernel)
+	case *pb.ConnectResponse_MeasureBandwidth:
+		go a.measureBandwidth(s, m.MeasureBandwidth)
 	case *pb.ConnectResponse_UpdateAgent:
 		go a.applyUpdate(s, m.UpdateAgent)
 	case *pb.ConnectResponse_RollbackAgent:

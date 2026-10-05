@@ -178,6 +178,18 @@ func (s *Store) UpdateNode(ctx context.Context, id string, p NodePatch) (NodeRow
 	return s.Node(ctx, id)
 }
 
+// SetBandwidthIfUnset stores a measured capacity only while the field is still 0 (never measured, never typed): the one
+// automatic write of a value, and never over what an admin entered, even if they did it while the measurement ran.
+// It reports whether the value was stored.
+func (s *Store) SetBandwidthIfUnset(ctx context.Context, id string, mbps int) (bool, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE node SET bandwidth_mbps = ? WHERE id = ? AND bandwidth_mbps = 0 AND state <> 'retired'`, mbps, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // NodeFactsRow is the host facts block reported in Hello.
 type NodeFactsRow struct {
 	Hostname, OS, Kernel, Arch string

@@ -252,6 +252,9 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 	}()
 
 	f.connectEvents(ctx, id, prev, helloInfo(hello).BootAt, now)
+	if prev.State == "pending" && node.BandwidthMbps == 0 { // the first start after the enrollment: measure the link once
+		f.autoMeasureBandwidth(s)
+	}
 	s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
 		AckedSeq: acked, ServerTimeUnix: now.Unix(), Settings: nodeSettings(node, s.caps)}}})
 	if err := f.reconcile(sctx, s, reconcileConnect, hello); err != nil {

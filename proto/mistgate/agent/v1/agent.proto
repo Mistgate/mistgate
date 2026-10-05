@@ -109,7 +109,7 @@ package mistgate.agent.v1;
 //     (enabled "1"/"0", integers decimal, reserved lowercase hex, empty = "").
 //
 // COMMANDS
-//   Kick, RestartInbound, Retire, ApplyFix and PrepareAwgKernel carry a request_id and get exactly one CommandResult. Removing a
+//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel and MeasureBandwidth carry a request_id and get exactly one CommandResult. Removing a
 //   credential from the desired state implicitly kicks its sessions; the explicit Kick is for "kick now,
 //   keep access" and for diagnostics.
 //   Kick is best effort in Hysteria2: the core can only close a connection from inside a traffic callback,
@@ -296,6 +296,25 @@ package mistgate.agent.v1;
 //     A run that ended while the agent was down is reported when it starts again; a run whose job stopped writing its
 //     status (the host rebooted, the unit was killed) ends as failed / interrupted.
 //
+// BANDWIDTH TEST (additive, protocol api_version stays 1)
+//   The owner does not know a node's network capacity and a VPS's virtual NIC does not report the plan limit, so the
+//   panel can ask the node to measure how fast it reaches the internet.
+//   - CAPABILITY GATE. An agent lists "bandwidth/1" in Hello.capabilities. The panel sends MeasureBandwidth ONLY to a stream
+//     that listed it; an older agent is answered with FAILED_PRECONDITION ("agent too old") at the admin API and the
+//     panel's automatic first measurement skips it silently. A new agent with an old panel is never asked.
+//   - WHAT IT DOES. The agent downloads from public speed endpoints that need no account, in parallel (6 streams, about 6 s,
+//     at most 700 MB, the first second not counted: TCP slow start) and then uploads (4 streams, about 3 s, at most 300 MB):
+//     1 GB in total, a hard cap.
+//     The first endpoint is speed.cloudflare.com (__down / __up); when it cannot be reached the agent tries the next one
+//     (a plain file on proof.ovh.net, then one on cachefly.net; download only). Every phase has a deadline, and the whole
+//     measurement ends within 40 s. It binds to nothing and uses the host's default route, like any other process of the node.
+//     The result is an estimate from one short test: it depends on the route to the test server and on what the node is
+//     carrying at that moment.
+//   - ONE AT A TIME. A MeasureBandwidth that arrives while one runs is answered with CommandResult{ok: false, error: "busy"}.
+//   - ANSWER. Exactly one CommandResult carrying the request_id. ok = true: params{down_mbps, up_mbps, server, streams,
+//     down_bytes, up_bytes, seconds} (whole decimal numbers; up_mbps = "0" when the upload could not be measured). ok = false:
+//     error = unsupported | busy | unreachable (no endpoint gave a usable answer) | "failed: <short message>".
+//
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
@@ -399,8 +418,8 @@ message Hello {
   // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
   // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
-  // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp) and "awg-prepare/1" (PrepareAwgKernel; see
-  // "AWG AND WARP").
+  // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
+  // "AWG AND WARP") and "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -718,7 +737,15 @@ message ConnectResponse {
     RollbackAgent rollback_agent = 22;
     // Only sent to agents with "awg-prepare/1" in Hello.capabilities (see "AWG AND WARP").
     PrepareAwgKernel prepare_awg_kernel = 23;
+    // Only sent to agents with "bandwidth/1" in Hello.capabilities (see "BANDWIDTH TEST").
+    MeasureBandwidth measure_bandwidth = 24;
   }
+}
+
+// Ask the node to measure its download and upload speed to a public test server. Answered with one CommandResult; see
+// "BANDWIDTH TEST".
+message MeasureBandwidth {
+  string request_id = 1;
 }
 
 // Ask the node to put the AmneziaWG kernel module on itself (or, with dry_run, only say whether that is needed and

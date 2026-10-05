@@ -48,6 +48,9 @@ const (
 	// NodeServicePrepareAwgKernelProcedure is the fully-qualified name of the NodeService's
 	// PrepareAwgKernel RPC.
 	NodeServicePrepareAwgKernelProcedure = "/mistgate.admin.v1.NodeService/PrepareAwgKernel"
+	// NodeServiceMeasureBandwidthProcedure is the fully-qualified name of the NodeService's
+	// MeasureBandwidth RPC.
+	NodeServiceMeasureBandwidthProcedure = "/mistgate.admin.v1.NodeService/MeasureBandwidth"
 	// NodeServiceRetireNodeProcedure is the fully-qualified name of the NodeService's RetireNode RPC.
 	NodeServiceRetireNodeProcedure = "/mistgate.admin.v1.NodeService/RetireNode"
 	// NodeServiceStreamLogsProcedure is the fully-qualified name of the NodeService's StreamLogs RPC.
@@ -72,6 +75,12 @@ type NodeServiceClient interface {
 	// awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
 	// "agent too old" / "the node is not connected".
 	PrepareAwgKernel(context.Context, *connect.Request[v1.PrepareAwgKernelRequest]) (*connect.Response[v1.PrepareAwgKernelResponse], error)
+	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
+	// up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+	// chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
+	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
+	// in error_code. One measurement per node at a time.
+	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -127,6 +136,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("PrepareAwgKernel")),
 			connect.WithClientOptions(opts...),
 		),
+		measureBandwidth: connect.NewClient[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse](
+			httpClient,
+			baseURL+NodeServiceMeasureBandwidthProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("MeasureBandwidth")),
+			connect.WithClientOptions(opts...),
+		),
 		retireNode: connect.NewClient[v1.RetireNodeRequest, v1.RetireNodeResponse](
 			httpClient,
 			baseURL+NodeServiceRetireNodeProcedure,
@@ -150,6 +165,7 @@ type nodeServiceClient struct {
 	updateNode       *connect.Client[v1.UpdateNodeRequest, v1.UpdateNodeResponse]
 	restartInbounds  *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
 	prepareAwgKernel *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
+	measureBandwidth *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
 	retireNode       *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
 	streamLogs       *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
 }
@@ -184,6 +200,11 @@ func (c *nodeServiceClient) PrepareAwgKernel(ctx context.Context, req *connect.R
 	return c.prepareAwgKernel.CallUnary(ctx, req)
 }
 
+// MeasureBandwidth calls mistgate.admin.v1.NodeService.MeasureBandwidth.
+func (c *nodeServiceClient) MeasureBandwidth(ctx context.Context, req *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error) {
+	return c.measureBandwidth.CallUnary(ctx, req)
+}
+
 // RetireNode calls mistgate.admin.v1.NodeService.RetireNode.
 func (c *nodeServiceClient) RetireNode(ctx context.Context, req *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error) {
 	return c.retireNode.CallUnary(ctx, req)
@@ -212,6 +233,12 @@ type NodeServiceHandler interface {
 	// awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
 	// "agent too old" / "the node is not connected".
 	PrepareAwgKernel(context.Context, *connect.Request[v1.PrepareAwgKernelRequest]) (*connect.Response[v1.PrepareAwgKernelResponse], error)
+	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
+	// up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+	// chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
+	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
+	// in error_code. One measurement per node at a time.
+	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -263,6 +290,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("PrepareAwgKernel")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceMeasureBandwidthHandler := connect.NewUnaryHandler(
+		NodeServiceMeasureBandwidthProcedure,
+		svc.MeasureBandwidth,
+		connect.WithSchema(nodeServiceMethods.ByName("MeasureBandwidth")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceRetireNodeHandler := connect.NewUnaryHandler(
 		NodeServiceRetireNodeProcedure,
 		svc.RetireNode,
@@ -289,6 +322,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceRestartInboundsHandler.ServeHTTP(w, r)
 		case NodeServicePrepareAwgKernelProcedure:
 			nodeServicePrepareAwgKernelHandler.ServeHTTP(w, r)
+		case NodeServiceMeasureBandwidthProcedure:
+			nodeServiceMeasureBandwidthHandler.ServeHTTP(w, r)
 		case NodeServiceRetireNodeProcedure:
 			nodeServiceRetireNodeHandler.ServeHTTP(w, r)
 		case NodeServiceStreamLogsProcedure:
@@ -324,6 +359,10 @@ func (UnimplementedNodeServiceHandler) RestartInbounds(context.Context, *connect
 
 func (UnimplementedNodeServiceHandler) PrepareAwgKernel(context.Context, *connect.Request[v1.PrepareAwgKernelRequest]) (*connect.Response[v1.PrepareAwgKernelResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.PrepareAwgKernel is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.MeasureBandwidth is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error) {

@@ -88,6 +88,9 @@ type Fleet struct {
 	enrollLim *failLimiter
 	unit      time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck time.Duration // how often a running stream rechecks its client certificate
+	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
+	// start the automatic measurement waits. Test seams.
+	measureWait, measureDelay time.Duration
 }
 
 // New builds the module: it loads (or creates) the panel CA. Call Run to start the background work.
@@ -124,6 +127,10 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		enrollLim: newFailLimiter(10, time.Minute),
 		unit:      time.Second,
 		certCheck: 30 * time.Second,
+		// A measurement is about ten seconds and forty at most (the agent's own limit), and the admin's request must be
+		// answered within the panel's 60 s write timeout. The first measurement waits until the node has applied its first
+		// state and settled: it saturates the link for a moment.
+		measureWait: 50 * time.Second, measureDelay: 45 * time.Second,
 	}
 	c, err := loadCA(context.Background(), st, v, cfg.Now().UTC())
 	if err != nil {

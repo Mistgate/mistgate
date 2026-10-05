@@ -23,6 +23,12 @@ service NodeService {
   // awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
   // "agent too old" / "the node is not connected".
   rpc PrepareAwgKernel(PrepareAwgKernelRequest) returns (PrepareAwgKernelResponse);
+  // Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
+  // up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+  // chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
+  // FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
+  // in error_code. One measurement per node at a time.
+  rpc MeasureBandwidth(MeasureBandwidthRequest) returns (MeasureBandwidthResponse);
   // "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
   // every user's access. The row stays (audit, traffic history) with status RETIRED.
   rpc RetireNode(RetireNodeRequest) returns (RetireNodeResponse);
@@ -284,6 +290,24 @@ message PrepareAwgKernelResponse {
   string reason = 3;
   // The node as it is after the call (awg_prepare included).
   Node node = 4;
+}
+
+message MeasureBandwidthRequest {
+  string node_id = 1;
+}
+
+message MeasureBandwidthResponse {
+  // Mbps (megabits per second), measured from the node: what it downloaded from, and uploaded to, the test server. 0 up
+  // = the upload could not be measured (the server did not take it). Both are 0 when error_code is set.
+  uint32 down_mbps = 1;
+  uint32 up_mbps = 2;
+  // The test server that answered, e.g. "speed.cloudflare.com".
+  string server = 3;
+  // "" = measured. Otherwise what the node answered: busy (a measurement is already running), unreachable (no test server
+  // gave a usable answer), unsupported, failed.
+  string error_code = 4;
+  // How long the whole measurement took, in seconds.
+  uint32 seconds = 5;
 }
 
 message RetireNodeRequest {
