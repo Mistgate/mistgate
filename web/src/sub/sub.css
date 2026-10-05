@@ -518,6 +518,8 @@ a { color: inherit; }
   .dev-top { flex: 1 1 280px; align-items: center; min-width: 0; }
   .dev-n { font-size: 15px; }
   .dev-acts.only-m { display: none; }
+  .dev-acts { flex: 0 0 auto; align-items: center; }
+  .dev-acts .btn { flex: none; width: auto; min-height: 44px; padding: 9px 16px; border-radius: 12px; font-size: 14px; white-space: nowrap; }
   .dev-x { flex: 1 0 100%; }
   .dev .fld { flex: 1 1 280px; }
   .dev > .btn { width: auto; flex: none; min-height: 44px; padding: 9px 16px; border-radius: 12px; font-size: 14px; }
