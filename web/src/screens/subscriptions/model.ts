@@ -220,8 +220,11 @@ export function cutAnnounce(text: string, max = announceMax): string {
   return `${cut.join("").replace(/[\s,;:—–-]+$/u, "")}…`;
 }
 
-/** "", https://… , http://… and tg://… are links a support button can open; anything else is refused. */
-export const validSupportLink = (s: string) => s.trim() === "" || /^(https?:\/\/|tg:\/\/)\S+$/i.test(s.trim());
+/** "", https://… and tg://… are links a support button can open; anything else (plain http too) is refused, as by the panel. */
+export const validSupportLink = (s: string) => s.trim() === "" || /^(https:\/\/|tg:\/\/)\S+$/i.test(s.trim());
+
+/** "" or https://…: a download link, as the panel takes it (internal/panel/subsettings httpsURL). */
+export const validDownload = (u: string) => u.trim() === "" || /^https:\/\/\S+$/i.test(u.trim());
 
 /** Suffixes typed in one go: separated by commas, semicolons or spaces, lower-cased, without repeats. */
 export function parseSuffixes(text: string): string[] {

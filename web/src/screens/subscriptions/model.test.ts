@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validSupportLink, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -83,11 +83,18 @@ describe("flagOf", () => {
 });
 
 describe("validSupportLink", () => {
-  it("accepts empty, web and Telegram links", () => {
-    for (const ok of ["", "  ", "https://t.me/help", "http://example.com/x", "tg://resolve?domain=x"]) expect(validSupportLink(ok), ok).toBe(true);
+  it("accepts empty, https:// and Telegram links", () => {
+    for (const ok of ["", "  ", "https://t.me/help", "HTTPS://example.com/x", "tg://resolve?domain=x"]) expect(validSupportLink(ok), ok).toBe(true);
   });
-  it("refuses everything else", () => {
-    for (const bad of ["javascript:alert(1)", "t.me/help", "ftp://x", "https://", "https://a b"]) expect(validSupportLink(bad), bad).toBe(false);
+  it("refuses everything else, plain http included (the panel does too)", () => {
+    for (const bad of ["javascript:alert(1)", "t.me/help", "ftp://x", "https://", "https://a b", "http://example.com/x"]) expect(validSupportLink(bad), bad).toBe(false);
+  });
+});
+
+describe("validDownload", () => {
+  it("takes empty or an https:// link, as the panel does", () => {
+    for (const ok of ["", "https://example.com/app.apk"]) expect(validDownload(ok), ok).toBe(true);
+    for (const bad of ["http://example.com/app.apk", "tg://resolve?domain=x", "example.com/app.apk", "https://a b"]) expect(validDownload(bad), bad).toBe(false);
   });
 });
 

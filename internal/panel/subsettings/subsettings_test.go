@@ -49,12 +49,14 @@ func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 
 // An install that never saved settings (every existing instance at upgrade time) gets the defaults; a saved
 // document round-trips, and an unreadable one makes the cache fall back instead of failing a fetch.
-// The support link is a web link or a Telegram one (tg://, what the editor offers); a download link stays http(s).
+// The support link is an https:// link or a Telegram one (tg://, what the editor offers); a download link is https://.
+// Plain http is refused on both, as the admin's form says ("Start with https://").
 func TestSupportURL(t *testing.T) {
 	for link, ok := range map[string]bool{
 		"":                                    true,
 		"https://t.me/example_support":        true,
-		"http://example.com/help":             true,
+		"HTTPS://t.me/example_support":        true,
+		"http://example.com/help":             false,
 		"tg://resolve?domain=example_support": true,
 		"TG://resolve?domain=example_support": true,
 		"tg:resolve?domain=example_support":   false,
@@ -68,10 +70,23 @@ func TestSupportURL(t *testing.T) {
 			t.Errorf("support_url %q: %v, want ok=%v", link, err, ok)
 		}
 	}
-	s := Defaults()
-	s.Apps[0].DownloadUrl = "tg://resolve?domain=example_support"
-	if Validate(s) == nil {
-		t.Error("a tg:// download link was accepted")
+	for _, link := range []string{"tg://resolve?domain=example_support", "http://example.com/app.apk"} {
+		s := Defaults()
+		s.Apps[0].DownloadUrl = link
+		if Validate(s) == nil {
+			t.Errorf("download link %q was accepted", link)
+		}
+	}
+}
+
+// "Refresh every" takes 0 (the default, 12 h) to 72 hours, as the admin's field and the docs say.
+func TestUpdateInterval(t *testing.T) {
+	for h, ok := range map[uint32]bool{0: true, 1: true, 72: true, 73: false, 720: false} {
+		s := Defaults()
+		s.UpdateIntervalHours = h
+		if err := Validate(s); (err == nil) != ok {
+			t.Errorf("update_interval_hours %d: %v, want ok=%v", h, err, ok)
+		}
 	}
 }
 

@@ -15,7 +15,7 @@ import { useCan } from "@/lib/health";
 import { useTx } from "@/screens/users/t";
 import { SwitchRow } from "@/screens/users/ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { kindKey, kinds, platformKey, platforms, previewUrl, type PlatformApp, type Settings } from "./model";
+import { kindKey, kinds, platformKey, platforms, previewUrl, validDownload, type PlatformApp, type Settings } from "./model";
 import { pickerUsersQuery, useSaveSettings } from "./queries";
 import { inputCls, SaveBar } from "./ui";
 
@@ -26,7 +26,6 @@ const draftOf = (s: Settings): Draft => ({
   options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true },
 });
 const descMax = 80;
-const validDownload = (u: string) => u.trim() === "" || /^https?:\/\/\S+$/i.test(u.trim());
 
 /** "User page": the apps it recommends, what it shows, and a live preview in a phone frame. */
 export function PageTab({ settings }: { settings: Settings }) {

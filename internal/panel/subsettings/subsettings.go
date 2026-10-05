@@ -41,7 +41,7 @@ const (
 	maxName         = 100
 	maxDescription  = 80
 	maxUA           = 100
-	maxIntervalH    = 24 * 30
+	maxIntervalH    = 72 // the admin's "Refresh every" field and the docs: 1-72 hours (0 = DefaultUpdateHours)
 )
 
 // ErrInvalid wraps every validation failure (the RPC maps it to INVALID_ARGUMENT).
@@ -196,9 +196,10 @@ func noControl(s string) bool {
 	return !strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f })
 }
 
-// httpURL checks an optional link: empty, or an absolute http(s) URL without spaces or control characters. With tg
-// a tg:// link (a Telegram chat, the usual support link: tg://resolve?domain=...) passes too.
-func httpURL(what, s string, tg bool) error {
+// httpsURL checks an optional link: empty, or an absolute https URL without spaces or control characters (the user
+// page and the apps open it; plain http is refused, as the admin's form says). With tg a tg:// link (a Telegram chat,
+// the usual support link: tg://resolve?domain=...) passes too.
+func httpsURL(what, s string, tg bool) error {
 	if s == "" {
 		return nil
 	}
@@ -206,11 +207,11 @@ func httpURL(what, s string, tg bool) error {
 		return invalid("%s: not a valid link", what)
 	}
 	u, err := url.Parse(s)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https" && (!tg || u.Scheme != "tg")) {
+	if err != nil || u.Host == "" || (u.Scheme != "https" && (!tg || u.Scheme != "tg")) { // url.Parse lowercases the scheme
 		if tg {
-			return invalid("%s: must be an http(s) or tg:// link", what)
+			return invalid("%s: must be an https:// or tg:// link", what)
 		}
-		return invalid("%s: must be an http(s) link", what)
+		return invalid("%s: must be an https:// link", what)
 	}
 	return nil
 }
@@ -236,7 +237,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if err := text("announcement", s.Announcement, maxAnnouncement); err != nil {
 		return err
 	}
-	if err := httpURL("support_url", s.SupportUrl, true); err != nil {
+	if err := httpsURL("support_url", s.SupportUrl, true); err != nil {
 		return err
 	}
 	if s.UpdateIntervalHours > maxIntervalH {
@@ -269,7 +270,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 		if err := text(w+".name", a.Name, maxName); err != nil {
 			return err
 		}
-		if err := httpURL(w+".download_url", a.DownloadUrl, false); err != nil {
+		if err := httpsURL(w+".download_url", a.DownloadUrl, false); err != nil {
 			return err
 		}
 		// A card line of plain text (the page shows it as text, never as markup): no control characters, no newline.
