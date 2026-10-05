@@ -361,6 +361,12 @@ func get(ctx context.Context, cl *http.Client, url string, n *atomic.Int64, limi
 	buf := make([]byte, 64<<10)
 	var got int64
 	for {
+		// the cap reached, by this stream or another: stop reading now, or what the connection has buffered keeps coming
+		// after the cancel (a fast link overshot an 8 MB cap to 18 MB)
+		if n.Load() >= limit {
+			stop()
+			return got, nil
+		}
 		k, err := resp.Body.Read(buf)
 		if k > 0 {
 			got += int64(k)
