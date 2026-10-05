@@ -43,6 +43,9 @@
   --tone-lav-bg: light-dark(#eae8fc, #2d2b38);
   --tone-sand: light-dark(#5c4a12, #dcc68c);
   --tone-sand-bg: light-dark(#f5efdf, #332f25);
+  /* WARP: Cloudflare's orange */
+  --tone-warp: light-dark(#9a3d00, #ffa45e);
+  --tone-warp-bg: light-dark(#fdebdc, #3a2a1f);
   --tone-rose: light-dark(#67343e, #e6a6b0);
   --tone-rose-bg: light-dark(#f9e6e8, #362a2c);
   --backdrop: light-dark(rgb(22 22 26 / 0.36), rgb(0 0 0 / 0.62));
@@ -274,6 +277,7 @@ a { color: inherit; }
 /* chips: the tone names the way, not the state */
 .chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 9px; font-size: 13px; font-weight: 600; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
 .chip.sky { background: var(--tone-sky-bg); color: var(--tone-sky); } .chip.mint { background: var(--tone-mint-bg); color: var(--tone-mint); }
+.chip.warp { background: var(--tone-warp-bg); color: var(--tone-warp); box-shadow: inset 0 0 0 1px color-mix(in oklch, #f38020 30%, transparent); font-weight: 700; letter-spacing: 0.03em; }
 .chip.sm { height: 22px; font-size: 12px; padding: 0 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
