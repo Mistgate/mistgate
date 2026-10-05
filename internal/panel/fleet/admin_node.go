@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -55,8 +56,15 @@ func validResolver(r string) bool {
 	return err == nil && net.ParseIP(host) != nil && port != ""
 }
 
+// The limits of a node's free text, in characters; the admin's node settings and install forms allow the same.
+const (
+	maxNodeText  = 100 // location, provider
+	maxNodeNotes = 500
+)
+
+// validText: at most max characters (runes, like the admin's form fields count them), valid UTF-8, no control characters.
 func validText(s string, max int) bool {
-	if len(s) > max {
+	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > max {
 		return false
 	}
 	for _, r := range s {
@@ -480,8 +488,8 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 			return nil, invalid("address must be a host name or an IP")
 		case cc != "" && (len(cc) != 2 || cc[0] < 'A' || cc[0] > 'Z' || cc[1] < 'A' || cc[1] > 'Z'):
 			return nil, invalid("country_code must be two letters")
-		case !validText(m.Location, 100) || !validText(m.Provider, 100):
-			return nil, invalid("location and provider must be short plain text")
+		case !validText(m.Location, maxNodeText) || !validText(m.Provider, maxNodeText):
+			return nil, invalid("location and provider must be plain text up to 100 characters")
 		}
 		newNode = &store.NodeRow{ID: store.NewID("nod_"), Name: name, Address: m.Address, CountryCode: cc, Location: m.Location, Provider: m.Provider}
 	}
@@ -557,12 +565,12 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		p.CountryCode = &cc
 	}
 	for _, v := range []*string{m.Location, m.Provider} {
-		if v != nil && !validText(*v, 100) {
-			return nil, invalid("location and provider must be short plain text")
+		if v != nil && !validText(*v, maxNodeText) {
+			return nil, invalid("location and provider must be plain text up to 100 characters")
 		}
 	}
-	if m.Notes != nil && !validText(strings.NewReplacer("\n", "", "\r", "", "\t", "").Replace(*m.Notes), 2000) {
-		return nil, invalid("notes must be plain text up to 2000 bytes")
+	if m.Notes != nil && !validText(strings.NewReplacer("\n", "", "\r", "", "\t", "").Replace(*m.Notes), maxNodeNotes) {
+		return nil, invalid("notes must be plain text up to 500 characters")
 	}
 	if m.DnsResolvers != nil {
 		vals := m.DnsResolvers.Values

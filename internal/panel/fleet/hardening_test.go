@@ -375,3 +375,23 @@ func TestCertificatesAreProductNeutral(t *testing.T) {
 		t.Error("issuer is not the CA subject")
 	}
 }
+
+// A node's location, provider and notes are limited in characters, as the admin's forms count them, not in bytes.
+func TestNodeTextCountsCharacters(t *testing.T) {
+	for _, c := range []struct {
+		s   string
+		max int
+		ok  bool
+	}{
+		{strings.Repeat("я", maxNodeText), maxNodeText, true},
+		{strings.Repeat("я", maxNodeText+1), maxNodeText, false},
+		{strings.Repeat("ж", maxNodeNotes), maxNodeNotes, true},
+		{strings.Repeat("ж", maxNodeNotes+1), maxNodeNotes, false},
+		{"Франкфурт\x7f", maxNodeText, false},
+		{"bad\xff", maxNodeText, false},
+	} {
+		if got := validText(c.s, c.max); got != c.ok {
+			t.Errorf("validText(%d runes, %d) = %v, want %v", len([]rune(c.s)), c.max, got, c.ok)
+		}
+	}
+}

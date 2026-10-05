@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -94,7 +95,7 @@ func nodeInstallPlanTool() toolDef {
 						in.Port = 22
 					}
 					if in.Host == "" || len(in.Host) > 253 || in.Port > 65535 || !sshUserShape.MatchString(in.Username) ||
-						!nodeNameShape.MatchString(in.Name) || in.Address == "" || len(in.Address) > 253 || len(in.Location) > 100 || len(in.Provider) > 100 {
+						!nodeNameShape.MatchString(in.Name) || in.Address == "" || len(in.Address) > 253 || utf8.RuneCountInString(in.Location) > 100 || utf8.RuneCountInString(in.Provider) > 100 {
 						return nil, nil, errors.New("invalid SSH target, login or node metadata")
 					}
 					if in.CountryCode != "" && (len(in.CountryCode) != 2 || !allASCIIAlpha(in.CountryCode)) {

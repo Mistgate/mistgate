@@ -1014,3 +1014,23 @@ func TestListenOverlap(t *testing.T) {
 		}
 	}
 }
+
+// User, group and profile names are 1-64 characters, as the admin's form counts them: a Cyrillic letter is one, not two.
+func TestNamesCountCharactersNotBytes(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		ok   bool
+	}{
+		{strings.Repeat("я", 64), true},
+		{strings.Repeat("я", 40), true},
+		{strings.Repeat("я", 65), false},
+		{strings.Repeat("x", 65), false},
+		{"Алиса\x01", false},
+		{"bad\xffutf8", false},
+		{"  ", false},
+	} {
+		if _, err := cleanName("user", c.name); (err == nil) != c.ok {
+			t.Errorf("cleanName(%d runes): err=%v, want ok=%v", len([]rune(c.name)), err, c.ok)
+		}
+	}
+}

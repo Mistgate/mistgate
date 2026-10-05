@@ -293,7 +293,8 @@ func hashToken(token string) []byte {
 
 func cleanName(kind, name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 64 || strings.ContainsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+	// characters, not bytes: "Алексей" is 7 of the 64, as the admin's form counts it
+	if name == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 64 || strings.ContainsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
 		return "", invalid("%s name must be 1-64 characters without control characters", kind)
 	}
 	return name, nil

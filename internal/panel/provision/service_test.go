@@ -337,3 +337,10 @@ type testBinarySource struct{}
 func (testBinarySource) OpenNodeBinary(string, string) (*os.File, int64, string, error) {
 	return nil, 0, "", errors.New("unused")
 }
+
+// The install form's location and provider take 100 characters (its maxlength), Cyrillic included.
+func TestPlainTextCountsCharacters(t *testing.T) {
+	if !validPlainText(strings.Repeat("я", 100), 100) || validPlainText(strings.Repeat("я", 101), 100) || validPlainText("bad\xff", 100) {
+		t.Fatal("validPlainText must count characters, not bytes, and refuse invalid UTF-8")
+	}
+}

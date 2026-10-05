@@ -182,9 +182,9 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
             <Select value={f.country} onValueChange={(v) => set("country", v)} options={countries} aria-label={t("node.add.country")} />
             <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.countryHint")}</span>
           </div>
-          <TextField icon="map" tone="sand" label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={64} disabled={retired} />
+          <TextField icon="map" tone="sand" label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={100} disabled={retired} />
         </div>
-        <TextField icon="server" tone="sky" label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={64} disabled={retired} />
+        <TextField icon="server" tone="sky" label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={100} disabled={retired} />
         <TextField
           icon="network"
           tone="sky"

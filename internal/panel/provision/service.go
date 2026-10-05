@@ -654,7 +654,7 @@ func validCountryCode(value string) bool {
 }
 
 func validPlainText(value string, max int) bool {
-	if len(value) > max || !utf8.ValidString(value) {
+	if !utf8.ValidString(value) || utf8.RuneCountInString(value) > max {
 		return false
 	}
 	for _, r := range value {
