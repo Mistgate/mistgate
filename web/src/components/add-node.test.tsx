@@ -5,8 +5,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { StepUpRequiredSchema } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { fill, type T } from "@/i18n";
+import { en } from "@/i18n/en";
+import { ru } from "@/i18n/ru";
 import { StepUpProvider } from "./step-up";
 import { AddNodeProvider, useAddNode } from "./add-node";
+import { jobError, sshError } from "./ssh-node-install";
 
 const createEnrollment = vi.fn();
 const getNode = vi.fn();
@@ -269,6 +273,14 @@ describe("the add-node window", () => {
     expect(button("Retry installation")).toBeDefined();
   });
 
+  it("stacks the footer on a phone: every button full width and free to wrap its label", async () => {
+    getNodeProvision.mockReturnValue(new Promise(() => {}));
+    await startInstall();
+    const close = button("Close; keep running in background")!;
+    for (const cls of ["max-sm:w-full", "max-sm:whitespace-normal", "max-sm:h-auto"]) expect(close.className).toContain(cls);
+    expect(close.parentElement!.className).toContain("flex-col-reverse");
+  });
+
   it("words the worker's phases and shows a completed install with a way to the node", async () => {
     getNodeProvision.mockResolvedValueOnce({ job: { ...job, state: "running", phase: "transfer" } });
     await startInstall();
@@ -376,5 +388,27 @@ describe("the add-node window", () => {
     expect(text()).toContain("Connected");
     await click(button("Add a profile to de1"));
     expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" }, search: { tab: "profiles" } });
+  });
+});
+
+describe("why an SSH install failed", () => {
+  const tOf = (dict: Record<string, string>) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dict[key]!, vars), { n: () => "" }) as unknown as T;
+  const codes = ["panel_unreachable", "agent_bundle_unavailable", "insufficient_resources", "insufficient_disk_space", "node_identity_mismatch", "node_identity_unreadable", "systemd_required"];
+  it("names each preflight and job code in its own words, never as the generic error or the panel-address one", () => {
+    for (const dict of [en, ru] as Record<string, string>[]) {
+      const t = tOf(dict);
+      const generic = dict["node.ssh.error.install"];
+      const seen = new Set<string>();
+      for (const code of codes) {
+        const job = jobError(code, t);
+        expect(job, code).not.toBe(generic);
+        expect(job, code).not.toBe(dict["node.ssh.error.panelAddress"]);
+        expect(sshError(new ConnectError(code, Code.FailedPrecondition), t), code).toBe(job); // a code reads the same from CheckSSH and from a job
+        seen.add(job);
+      }
+      expect(seen.size).toBe(codes.length - 1); // the two identity codes share a message
+      expect(jobError("a_code_from_tomorrow", t)).toBe(generic);
+      expect(sshError(new ConnectError("panel_address_not_configured", Code.FailedPrecondition), t)).toBe(dict["node.ssh.error.panelAddress"]);
+    }
   });
 });

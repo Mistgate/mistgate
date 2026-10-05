@@ -254,6 +254,14 @@ export const en = {
   "node.ssh.error.unsupportedArch": "The server must use amd64 or arm64.",
   "node.ssh.error.sudo": "The SSH account needs root access or passwordless sudo.",
   "node.ssh.error.panelAddress": "The panel's public address is not configured, so the node cannot connect back.",
+  "node.ssh.error.panelUnreachable":
+    "The server could not open a TCP connection to the panel's agent address. Allow it in the firewall or security group in front of the panel, check that the server may connect out, then try again.",
+  "node.ssh.error.noSystemd": "The server has no systemd. Use Ubuntu 22.04+ or Debian 12+ with systemd.",
+  "node.ssh.error.resources": "The server has too little memory or CPU: the agent needs at least 256 MB of RAM. Pick a bigger server.",
+  "node.ssh.error.disk": "The server has too little free disk space for the agent (its size plus 64 MB). Free some space, then retry.",
+  "node.ssh.error.identity":
+    "The server already holds another or a damaged Mistgate node identity (/var/lib/mistgate-node). Remove that directory on the server only if that node is gone, then retry.",
+  "node.ssh.error.bundle": "The panel has no trusted agent for this server's architecture. Check “Release bundle” on the Updates page, then retry.",
   "node.ssh.error.preflight": "The server check did not finish. Check SSH access and try again.",
   "node.ssh.error.install": "Installation stopped. Open the install manager for details, or try the setup again.",
   "node.ssh.error.remoteOutcome": "SSH stopped after changing the server. Some install commands may have completed; inspect the server before retrying.",
@@ -1190,6 +1198,14 @@ export const ru: typeof en = {
   "node.ssh.error.unsupportedArch": "Поддерживаются архитектуры amd64 и arm64.",
   "node.ssh.error.sudo": "Для SSH-пользователя нужен root-доступ или беззапросный sudo.",
   "node.ssh.error.panelAddress": "Не настроен публичный адрес панели, поэтому нода не сможет подключиться обратно.",
+  "node.ssh.error.panelUnreachable":
+    "Сервер не смог открыть TCP-соединение с адресом панели для агентов. Разреши его в firewall или security group перед панелью, проверь, что серверу разрешены исходящие соединения, и попробуй снова.",
+  "node.ssh.error.noSystemd": "На сервере нет systemd. Нужна Ubuntu 22.04+ или Debian 12+ с systemd.",
+  "node.ssh.error.resources": "У сервера мало памяти или процессора: агенту нужно не меньше 256 МБ оперативной памяти. Возьми сервер побольше.",
+  "node.ssh.error.disk": "На сервере мало свободного места для агента (его размер плюс 64 МБ). Освободи место и повтори.",
+  "node.ssh.error.identity":
+    "На сервере уже есть данные другой или повреждённой ноды Mistgate (/var/lib/mistgate-node). Удали этот каталог на сервере, только если той ноды больше нет, и повтори.",
+  "node.ssh.error.bundle": "У панели нет проверенного агента для архитектуры этого сервера. Проверь «Пакет релиза» на странице «Обновления» и повтори.",
   "node.ssh.error.preflight": "Проверка сервера не завершилась. Проверь SSH-доступ и попробуй снова.",
   "node.ssh.error.install": "Установка остановилась. Открой менеджер установки для подробностей или начни настройку заново.",
   "node.ssh.error.remoteOutcome": "SSH прервался после изменений на сервере. Часть команд установки могла выполниться; сначала проверь сервер, потом повторяй.",

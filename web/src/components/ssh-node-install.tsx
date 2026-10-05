@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import type { NodePreflight } from "@/gen/mistgate/admin/v1/provisioning_pb";
 import { useT, type T } from "@/i18n";
+import type { MessageKey } from "@/i18n/en";
 import { provisioning } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
@@ -18,51 +19,61 @@ type Props = { onBack: () => void; onClose: () => void };
 type Step = 0 | 1 | 2 | 3;
 type Busy = "fingerprint" | "check" | "start" | "retry" | null;
 
+// The footer of a step: side by side from sm up; on a phone stacked, the main action on top, each button full width and
+// free to wrap its label ("Close; keep running in background" is wider than a 390 px sheet).
+const footerCls = "flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:flex-wrap";
+const footBtn = "max-sm:h-auto max-sm:min-h-9 max-sm:w-full max-sm:whitespace-normal max-sm:py-2";
+
 const nodeNamePattern = /^[a-z0-9-]{2,24}$/;
 const nodeAddressPattern = /^[A-Za-z0-9.:-]{1,253}$/;
 const noCountry = "none";
 // node_provision_job.state (migration 00031): queued, running, cancel_requested, then completed, failed or cancelled.
 const terminalStates = new Set(["completed", "failed", "cancelled"]);
 
-function sshError(error: unknown, t: T): string {
+// What a failure code of the provisioning calls (CheckSSH and the others) or of a job (provision/worker.go failJob) means
+// for the owner, and what to do about it. One table for both: a code means the same wherever it comes from.
+const codeText: Record<string, MessageKey> = {
+  ssh_fingerprint_timeout: "node.ssh.error.timeout",
+  ssh_connection_timeout: "node.ssh.error.timeout",
+  ssh_preflight_timeout: "node.ssh.error.timeout",
+  ssh_fingerprint_unavailable: "node.ssh.error.unavailable",
+  ssh_connection_refused: "node.ssh.error.unavailable",
+  ssh_connection_unavailable: "node.ssh.error.unavailable",
+  ssh_target_not_public: "node.ssh.error.notPublic",
+  ssh_target_invalid: "node.ssh.error.notPublic",
+  "invalid ssh target": "node.ssh.error.notPublic",
+  ssh_authentication_failed: "node.ssh.error.authentication",
+  ssh_host_key_changed: "node.ssh.error.hostKey",
+  unsupported_os: "node.ssh.error.unsupportedOS",
+  unsupported_os_version: "node.ssh.error.unsupportedOS",
+  unsupported_architecture: "node.ssh.error.unsupportedArch",
+  systemd_required: "node.ssh.error.noSystemd",
+  insufficient_resources: "node.ssh.error.resources",
+  insufficient_disk_space: "node.ssh.error.disk",
+  panel_address_not_configured: "node.ssh.error.panelAddress",
+  panel_unreachable: "node.ssh.error.panelUnreachable",
+  ssh_preflight_failed: "node.ssh.error.preflight",
+  name_taken: "node.ssh.nameTaken",
+  node_name_taken: "node.ssh.nameTaken",
+  node_retired: "node.ssh.error.retired",
+  node_identity_mismatch: "node.ssh.error.identity",
+  node_identity_unreadable: "node.ssh.error.identity",
+  agent_bundle_unavailable: "node.ssh.error.bundle",
+  remote_outcome_unknown: "node.ssh.error.remoteOutcome",
+  host_firewall_configuration_failed: "node.ssh.error.firewall",
+  node_not_connected: "node.ssh.error.notConnected",
+  systemd_install_failed: "node.ssh.error.systemd",
+  agent_install_failed: "node.ssh.error.systemd",
+};
+
+export function sshError(error: unknown, t: T): string {
   const raw = ConnectError.from(error).rawMessage.toLowerCase();
-  if (raw === "ssh_fingerprint_timeout" || raw === "ssh_connection_timeout" || raw === "ssh_preflight_timeout") {
-    return t("node.ssh.error.timeout");
-  }
-  if (raw === "ssh_fingerprint_unavailable" || raw === "ssh_connection_refused" || raw === "ssh_connection_unavailable") {
-    return t("node.ssh.error.unavailable");
-  }
-  if (raw === "ssh_target_not_public" || raw === "ssh_target_invalid" || raw === "invalid ssh target") {
-    return t("node.ssh.error.notPublic");
-  }
-  if (raw === "ssh_authentication_failed") return t("node.ssh.error.authentication");
-  if (raw === "ssh_host_key_changed") return t("node.ssh.error.hostKey");
-  if (raw === "unsupported_os" || raw === "unsupported_os_version") return t("node.ssh.error.unsupportedOS");
-  if (raw === "unsupported_architecture") return t("node.ssh.error.unsupportedArch");
-  if (raw.includes("sudo")) return t("node.ssh.error.sudo");
-  if (raw === "panel_address_not_configured") return t("node.ssh.error.panelAddress");
-  if (raw === "ssh_preflight_failed") return t("node.ssh.error.preflight");
-  if (raw === "name_taken" || raw === "node_name_taken") return t("node.ssh.nameTaken");
-  if (raw === "node_retired") return t("node.ssh.error.retired");
-  return errorText(error, t);
+  const key = Object.hasOwn(codeText, raw) ? codeText[raw] : raw.includes("sudo") ? "node.ssh.error.sudo" : undefined;
+  return key ? t(key) : errorText(error, t);
 }
 
-function jobError(code: string, t: T): string {
-  if (code === "ssh_authentication_failed") return t("node.ssh.error.authentication");
-  if (code === "ssh_connection_timeout" || code === "ssh_preflight_timeout") return t("node.ssh.error.timeout");
-  if (code === "ssh_connection_refused" || code === "ssh_connection_unavailable") return t("node.ssh.error.unavailable");
-  if (code === "ssh_host_key_changed") return t("node.ssh.error.hostKey");
-  if (code === "ssh_target_invalid" || code === "ssh_target_not_public") return t("node.ssh.error.notPublic");
-  if (code === "unsupported_os" || code === "unsupported_os_version") return t("node.ssh.error.unsupportedOS");
-  if (code === "unsupported_architecture") return t("node.ssh.error.unsupportedArch");
-  if (code === "panel_unreachable") return t("node.ssh.error.panelAddress");
-  if (code === "node_name_taken" || code === "name_taken") return t("node.ssh.nameTaken");
-  if (code === "remote_outcome_unknown") return t("node.ssh.error.remoteOutcome");
-  if (code === "host_firewall_configuration_failed") return t("node.ssh.error.firewall");
-  if (code === "node_retired") return t("node.ssh.error.retired");
-  if (code === "node_not_connected") return t("node.ssh.error.notConnected");
-  if (code === "systemd_install_failed" || code === "agent_install_failed") return t("node.ssh.error.systemd");
-  return t("node.ssh.error.install");
+export function jobError(code: string, t: T): string {
+  return t(Object.hasOwn(codeText, code) ? codeText[code]! : "node.ssh.error.install");
 }
 
 // The worker's phases (provision/worker.go setPhase); an unknown one reads as "Installing", never as a raw code.
@@ -399,9 +410,9 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
             />
             <p className="text-xs leading-relaxed text-muted sm:col-span-2">{t("node.ssh.providerFirewallHint")}</p>
           </div>
-          <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">
-            <Button type="button" variant="ghost" size="md" onClick={onBack}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" size="md" disabled={busy !== null || !host.trim() || !portValid}>
+          <div className={`${footerCls} sm:justify-between`}>
+            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onBack}>{t("common.cancel")}</Button>
+            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !host.trim() || !portValid}>
               {busy === "fingerprint" ? t("node.ssh.checkingFingerprint") : t("node.ssh.checkServer")}
             </Button>
           </div>
@@ -483,9 +494,9 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
             />
           </div>
           <p className="text-xs leading-relaxed text-muted">{t("node.ssh.passwordHint")}</p>
-          <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">
-            <Button type="button" variant="ghost" size="md" onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" disabled={busy !== null || !confirmedKey || !password}>
+          <div className={`${footerCls} sm:justify-between`}>
+            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
+            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedKey || !password}>
               {busy === "check" ? t("node.ssh.checking") : t("node.ssh.continue")}
             </Button>
           </div>
@@ -528,9 +539,9 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
             />
             <span>{t("node.ssh.confirmInstall")}</span>
           </label>
-          <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">
-            <Button type="button" variant="ghost" size="md" onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" disabled={busy !== null || !confirmedInstall || !password}>
+          <div className={`${footerCls} sm:justify-between`}>
+            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
+            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedInstall || !password}>
               {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
             </Button>
           </div>
@@ -579,18 +590,18 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
               )}
             </section>
           )}
-          <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+          <div className={`${footerCls} sm:justify-end`}>
             {jobDone && job.data?.nodeId ? (
-              <Button type="button" variant="primary" size="md" onClick={openNode}>{t("node.ssh.openNode")}</Button>
+              <Button type="button" variant="primary" size="md" className={footBtn} onClick={openNode}>{t("node.ssh.openNode")}</Button>
             ) : jobCanRetry ? (
               <>
-                <Button type="button" variant="ghost" size="md" onClick={onClose}>{t("common.close")}</Button>
-                <Button type="button" variant="primary" size="md" disabled={busy !== null || !password} onClick={() => void retryInstall()}>
+                <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onClose}>{t("common.close")}</Button>
+                <Button type="button" variant="primary" size="md" className={footBtn} disabled={busy !== null || !password} onClick={() => void retryInstall()}>
                   {busy === "retry" ? t("node.ssh.retrying") : t("node.ssh.retry")}
                 </Button>
               </>
             ) : (
-              <Button type="button" variant="secondary" size="md" onClick={onClose}>
+              <Button type="button" variant="secondary" size="md" className={footBtn} onClick={onClose}>
                 {jobFailed || jobCancelled ? t("common.close") : t("node.ssh.closeBackground")}
               </Button>
             )}

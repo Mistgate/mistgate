@@ -68,10 +68,16 @@ After a successful installation the panel keeps the SSH login and password, encr
 | The SSH key changed after confirmation | The server now shows another host key: find out why before you start again. |
 | Use Ubuntu 22.04 or newer, or Debian 12 or newer / The server must use amd64 or arm64 | The server is not supported; use the [manual install](add-node.md) only if you know the agent works there. |
 | The SSH account needs root access or passwordless sudo | Log in as root, or allow the account `sudo -n`. |
-| The panel's public address is not configured, so the node cannot connect back | Shown also when the server cannot reach the panel's agent address. Check `--public-url` or `--agent-addr`, DNS, and outbound TCP from the node to the panel. |
+| The panel's public address is not configured, so the node cannot connect back | Set `--public-url` or `--agent-addr`. |
+| The server could not open a TCP connection to the panel's agent address | Allow the agent port in the firewall or security group in front of the panel, check the DNS of the agent address and outbound TCP from the server, then try again. |
+| The server has no systemd | Use Ubuntu 22.04+ or Debian 12+ with systemd. |
+| The server has too little memory or CPU | The agent needs at least 256 MB of RAM. |
+| The server has too little free disk space for the agent | It needs the agent's size plus 64 MB. Free some space, then retry. |
+| The server already holds another or a damaged Mistgate node identity | Remove `/var/lib/mistgate-node` on the server only if that node is gone, then retry. |
+| The panel has no trusted agent for this server's architecture | Check **Release bundle** on the Updates page, then retry. |
 | This node name is already in use | Choose another name, or retire the old node first. |
 | The panel connected, but could not prepare the active UFW/firewalld rules | Check the account's root or `sudo -n` access and the host firewall, then retry. |
 | SSH stopped after changing the server | Some install commands may have run. Look at the server, then retry. |
 | The agent was installed but did not connect to the panel | On the server: `journalctl -u mistgate-node -n 50 --no-pager`. Usually the node cannot reach the panel's agent address. |
 | Mistgate could not install or start its systemd service | Look at the server's journal, then retry. |
-| Installation stopped. Open the install manager for details | The manager shows the exact reason, for example no trusted agent bundle (check **Release bundle** on the Updates page), too little memory or disk, or a server that holds another node's identity (remove `/var/lib/mistgate-node` there only if that node is gone). |
+| Installation stopped. Open the install manager for details | A reason the wizard has no words for; the manager shows the job's exact code. |
