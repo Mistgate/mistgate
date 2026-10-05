@@ -17,25 +17,6 @@ func TestTCPHandshakeDetection(t *testing.T) {
 	if HasBitTorrentHandshake([]byte("ordinary TCP data")) {
 		t.Fatal("ordinary TCP data was recognized")
 	}
-
-	var detector TCPHandshakeDetector
-	if detector.Feed([]byte(signature[:5])) {
-		t.Fatal("partial signature was recognized too early")
-	}
-	if !detector.Feed([]byte(signature[5:])) {
-		t.Fatal("split signature was not recognized")
-	}
-	if !detector.Feed([]byte("remaining handshake")) {
-		t.Fatal("matched stream lost its result")
-	}
-
-	var rejected TCPHandshakeDetector
-	if rejected.Feed([]byte("ordinary")) {
-		t.Fatal("mismatch was recognized")
-	}
-	if rejected.Feed([]byte(signature)) {
-		t.Fatal("rejected stream later matched")
-	}
 }
 
 func TestParseUDPTrackerRequest(t *testing.T) {

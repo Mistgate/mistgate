@@ -4,38 +4,10 @@ package linux
 
 import (
 	"encoding/binary"
-	"net/netip"
 	"testing"
-	"time"
 
 	"github.com/mdlayher/netlink"
 )
-
-func TestRuntimeRetriesUnreportedDetectionOnTimer(t *testing.T) {
-	runtime := &Runtime{
-		tracker:   newFlowTracker(),
-		events:    make(chan Detection, 1),
-		retryStop: make(chan struct{}),
-		retryDone: make(chan struct{}),
-	}
-	runtime.events <- Detection{} // hold the bounded queue full for first classification
-	request := makeUDP4("10.0.0.2", "198.51.100.7", 55000, 6969, trackerConnectRequest())
-	if !runtime.tracker.Process(request, "mgawg51820", netip.MustParseAddr("10.0.0.2"), time.Now(), runtime.enqueueEvent) {
-		t.Fatal("confirmed tracker flow was passed")
-	}
-
-	go runtime.retryReports()
-	defer runtime.stopReportRetries()
-	<-runtime.events // free capacity without sending another packet in this flow
-	select {
-	case detection := <-runtime.events:
-		if detection.Signature == "" {
-			t.Fatal("timer enqueued an empty detection")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timer did not retry the pending detection")
-	}
-}
 
 func TestDecodeQueuedPacketUsesNetworkOrderForInterfaceIndexes(t *testing.T) {
 	inIndex := make([]byte, 4)
@@ -58,35 +30,52 @@ func TestDecodeQueuedPacketUsesNetworkOrderForInterfaceIndexes(t *testing.T) {
 	}
 }
 
-func TestTunnelSideRequiresExactlyOneActiveAWGInterface(t *testing.T) {
+// Only what a client sends out through its AWG interface is classified; what comes back from the outside, or crosses
+// from one tunnel to another, is never evidence.
+func TestOnlyPacketsFromATunnelClientToTheOutsideAreClassified(t *testing.T) {
 	runtime := &Runtime{ifaceByIndex: map[int]string{10: "mgawg51820", 11: "mgawg51821"}}
-	packet, ok := parsePacket(makeTCP4("10.0.0.2", "198.51.100.7", 51000, 443, 1, 0x02, nil))
-	if !ok {
-		t.Fatal("test packet did not parse")
-	}
-
 	runtime.ifaceMu.RLock()
-	iface, tunnelIP, valid := runtime.tunnelSideLocked(10, 20, packet)
-	runtime.ifaceMu.RUnlock()
-	if !valid || iface != "mgawg51820" || tunnelIP.String() != "10.0.0.2" {
-		t.Fatalf("inbound tunnel side = %q %s %v", iface, tunnelIP, valid)
+	defer runtime.ifaceMu.RUnlock()
+	if iface, ok := runtime.clientIfaceLocked(10, 20); !ok || iface != "mgawg51820" {
+		t.Fatalf("client to the outside = %q, %v", iface, ok)
 	}
-
-	outPacket, ok := parsePacket(makeTCP4("198.51.100.7", "10.0.0.2", 443, 51000, 2, 0x02, nil))
-	if !ok {
-		t.Fatal("reverse test packet did not parse")
+	if _, ok := runtime.clientIfaceLocked(20, 10); ok {
+		t.Fatal("a packet from the outside to a client was selected")
 	}
-	runtime.ifaceMu.RLock()
-	iface, tunnelIP, valid = runtime.tunnelSideLocked(20, 10, outPacket)
-	runtime.ifaceMu.RUnlock()
-	if !valid || iface != "mgawg51820" || tunnelIP.String() != "10.0.0.2" {
-		t.Fatalf("outbound tunnel side = %q %s %v", iface, tunnelIP, valid)
-	}
-
-	runtime.ifaceMu.RLock()
-	_, _, valid = runtime.tunnelSideLocked(10, 11, packet)
-	runtime.ifaceMu.RUnlock()
-	if valid {
+	if _, ok := runtime.clientIfaceLocked(10, 11); ok {
 		t.Fatal("tunnel-to-tunnel packet was selected for inspection")
+	}
+}
+
+// A block is a repeat with the block mark (the nft chain turns it into the connection's ct mark); an accept has no mark.
+func TestVerdictMessages(t *testing.T) {
+	decode := func(verdict, mark uint32) (gotVerdict, gotID, gotMark uint32, hasMark bool) {
+		t.Helper()
+		message, err := verdictMessage(4242, 9, verdict, mark)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if binary.BigEndian.Uint16(message.Data[2:4]) != 4242 {
+			t.Fatalf("queue = %d", binary.BigEndian.Uint16(message.Data[2:4]))
+		}
+		attributes, err := netlink.UnmarshalAttributes(message.Data[4:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, a := range attributes {
+			switch a.Type {
+			case nfqAttributeVerdict:
+				gotVerdict, gotID = binary.BigEndian.Uint32(a.Data[:4]), binary.BigEndian.Uint32(a.Data[4:8])
+			case nfqAttributeMark:
+				gotMark, hasMark = binary.BigEndian.Uint32(a.Data), true
+			}
+		}
+		return
+	}
+	if v, id, m, ok := decode(nfqRepeat, BlockMark); v != 4 || id != 9 || !ok || m != BlockMark {
+		t.Fatalf("block verdict = %d id %d mark %#x (%v)", v, id, m, ok)
+	}
+	if v, id, _, ok := decode(nfqAccept, 0); v != 1 || id != 9 || ok {
+		t.Fatalf("accept verdict = %d id %d, mark present %v", v, id, ok)
 	}
 }

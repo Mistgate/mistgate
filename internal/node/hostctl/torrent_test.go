@@ -16,12 +16,18 @@ func TestRenderTorrentGuardScopesExactActiveAWGInterfaces(t *testing.T) {
 	for _, want := range []string{
 		"table inet " + NftTorrentTable,
 		"chain forward {",
-		`iifname { "mgawg51820", "mgawg51821" } oifname != { "mgawg51820", "mgawg51821" } meta l4proto { tcp, udp } queue num 4242 bypass`,
-		`oifname { "mgawg51820", "mgawg51821" } iifname != { "mgawg51820", "mgawg51821" } meta l4proto { tcp, udp } queue num 4242 bypass`,
+		// a block verdict becomes the connection's ct mark, and the kernel drops the rest of it in both directions
+		"meta mark 0x4d475442 ct mark set 0x4d475442 drop\n\t\tct mark 0x4d475442 drop\n",
+		// only what clients send out, and only the start of a flow
+		`iifname { "mgawg51820", "mgawg51821" } oifname != { "mgawg51820", "mgawg51821" } meta l4proto tcp ct direction original ct original packets <= 6 queue num 4242 bypass`,
+		`iifname { "mgawg51820", "mgawg51821" } oifname != { "mgawg51820", "mgawg51821" } meta l4proto udp ct state new queue num 4242 bypass`,
 	} {
 		if !strings.Contains(rules, want) {
 			t.Errorf("rules do not contain %q:\n%s", want, rules)
 		}
+	}
+	if strings.Contains(rules, "oifname {") || strings.Count(rules, "queue num") != 2 {
+		t.Fatalf("traffic towards the clients is queued:\n%s", rules)
 	}
 	if strings.Contains(rules, `iifname "mgawg*"`) || strings.Contains(rules, `oifname "mgawg*"`) {
 		t.Fatalf("rules use a wildcard instead of the active interface set:\n%s", rules)

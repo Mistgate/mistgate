@@ -2,6 +2,7 @@ package linux
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net/netip"
 	"testing"
 	"time"
@@ -65,240 +66,207 @@ func TestMalformedAndFragmentedPacketsPass(t *testing.T) {
 	}
 }
 
-func TestTrackerBlocksOnlyDetectedExactFlowAndReverse(t *testing.T) {
-	tracker := newFlowTracker()
-	now := time.Unix(1000, 0)
-	const (
-		clientIP   = "10.0.0.2"
-		peerIP     = "198.51.100.7"
-		clientPort = 51000
-		peerPort   = 51413
-	)
-	detections := 0
-	report := func(d Detection) bool {
-		detections++
-		if d.Signature != torrentguard.ProtocolBitTorrentTCP || d.L4Protocol != "tcp" || d.SourceIP.String() != clientIP || d.DestinationIP.String() != peerIP || d.SourcePort != clientPort || d.DestinationPort != peerPort || d.TunnelIface != "mgawg51820" || d.TunnelIP.String() != clientIP {
-			t.Errorf("detection = %#v", d)
-		}
-		return true
+// The queue copies only the start of a packet: a long TCP segment keeps its first payload bytes, a UDP datagram that
+// did not fit is not inspected at all.
+func TestParsePacketUsesTheStartOfACutPacket(t *testing.T) {
+	payload := append([]byte("\x13BitTorrent protocol"), make([]byte, 1300)...)
+	tcp, ok := parsePacket(makeTCP4("10.0.0.2", "198.51.100.7", 51000, 6881, 1, 0x18, payload)[:queueCopyRange])
+	if !ok || len(tcp.payload) != queueCopyRange-40 || string(tcp.payload[:20]) != "\x13BitTorrent protocol" {
+		t.Fatalf("cut TCP segment = %v, %d payload bytes", ok, len(tcp.payload))
 	}
-	process := func(raw []byte, at time.Time) bool {
-		return tracker.Process(raw, "mgawg51820", netip.MustParseAddr(clientIP), at, report)
-	}
-
-	if process(makeTCP4(clientIP, peerIP, clientPort, peerPort, 100, 0x02, nil), now) {
-		t.Fatal("SYN without signature was dropped")
-	}
-	if process(makeTCP4(peerIP, clientIP, peerPort, clientPort, 700, 0x12, nil), now) {
-		t.Fatal("SYN/ACK without signature was dropped")
-	}
-	signature := []byte("\x13BitTorrent protocol")
-	if process(makeTCP4(clientIP, peerIP, clientPort, peerPort, 101, 0x18, signature[:9]), now) {
-		t.Fatal("partial handshake was dropped")
-	}
-	if !process(makeTCP4(clientIP, peerIP, clientPort, peerPort, 110, 0x18, signature[9:]), now) {
-		t.Fatal("positive handshake was not dropped")
-	}
-	if got := detections; got != 1 {
-		t.Fatalf("detection count = %d, want one", got)
-	}
-	if !process(makeTCP4(peerIP, clientIP, peerPort, clientPort, 701, 0x10, []byte("reply")), now.Add(time.Second)) {
-		t.Fatal("reverse direction was not dropped")
-	}
-	if process(makeTCP4(clientIP, peerIP, clientPort, peerPort+1, 110, 0x18, signature), now.Add(2*time.Second)) {
-		t.Fatal("different destination port was collateral-blocked")
+	if _, ok := parsePacket(makeUDP4("10.0.0.2", "198.51.100.7", 51000, 443, make([]byte, 1200))[:queueCopyRange]); ok {
+		t.Fatal("a cut UDP datagram was parsed")
 	}
 }
 
-func TestTrackerPreservesBlocksAndSeparatesAWGTunnels(t *testing.T) {
+const (
+	clientIP   = "10.0.0.2"
+	peerIP     = "198.51.100.7"
+	clientPort = 51000
+	peerPort   = 51413
+)
+
+var handshake = []byte("\x13BitTorrent protocol")
+
+// classifyRaw is what the runtime does with a packet a client sent through iface.
+func classifyRaw(tracker *flowTracker, raw []byte, iface string, at time.Time) (Detection, bool) {
+	packet, ok := parsePacket(raw)
+	if !ok {
+		return Detection{}, false
+	}
+	return tracker.classify(packet, iface, packet.key.source, at)
+}
+
+func TestTrackerDetectsTheInitiatorsHandshakeAndForgetsTheFlow(t *testing.T) {
 	tracker := newFlowTracker()
-	now := time.Unix(1500, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	clientIP := netip.MustParseAddr(client)
-	const clientPort, peerPort = 51000, 51413
-	report := func(Detection) bool { return true }
-	process := func(raw []byte, iface string) bool {
-		return tracker.Process(raw, iface, clientIP, now, report)
+	now := time.Unix(1000, 0)
+	send := func(seq uint32, flags uint8, payload []byte) (Detection, bool) {
+		return classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, seq, flags, payload), "mgawg51820", now)
 	}
-	if process(makeTCP4(client, peer, clientPort, peerPort, 100, 0x02, nil), "mgawg51820") {
-		t.Fatal("SYN without signature was dropped")
+	if _, hit := send(100, 0x02, nil); hit {
+		t.Fatal("SYN without signature was classified")
 	}
-	signature := []byte("\x13BitTorrent protocol")
-	if process(makeTCP4(client, peer, clientPort, peerPort, 101, 0x18, signature), "mgawg51820") != true {
-		t.Fatal("torrent handshake was not blocked on the first tunnel")
+	if _, hit := send(101, 0x10, nil); hit {
+		t.Fatal("ACK was classified")
 	}
-	tracker.retainInterfaces(map[string]struct{}{"mgawg51820": {}, "mgawg51821": {}})
-	reverse := makeTCP4(peer, client, peerPort, clientPort, 700, 0x10, []byte("reply"))
-	if !process(reverse, "mgawg51820") {
-		t.Fatal("an active block was lost when another AWG interface was added")
+	if _, hit := send(101, 0x18, handshake[:9]); hit {
+		t.Fatal("partial handshake was classified")
+	}
+	d, hit := send(110, 0x18, handshake[9:])
+	if !hit || d.Signature != torrentguard.ProtocolBitTorrentTCP || d.L4Protocol != "tcp" || d.TunnelIface != "mgawg51820" || d.TunnelIP.String() != clientIP {
+		t.Fatalf("handshake = %#v, %v", d, hit)
+	}
+	// Decided: the kernel blocks the rest by the connection's ct mark, nothing stays in userspace.
+	if len(tracker.flows) != 0 {
+		t.Fatalf("decided flow kept: %d flows", len(tracker.flows))
 	}
 
-	// The same five-tuple on another AWG tunnel is a distinct flow and must not inherit the block.
-	if process(makeTCP4(client, peer, clientPort, peerPort, 100, 0x02, nil), "mgawg51821") {
-		t.Fatal("SYN on the second tunnel inherited the first tunnel's block")
+	// An ordinary stream is decided by its first bytes and forgotten as well.
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort+1, 443, 500, 0x02, nil), "mgawg51820", now); hit {
+		t.Fatal("SYN classified")
 	}
-	if process(makeTCP4(peer, client, peerPort, clientPort, 700, 0x10, []byte("ordinary")), "mgawg51821") {
-		t.Fatal("ordinary flow on the second tunnel inherited the first tunnel's block")
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort+1, 443, 501, 0x18, []byte("\x16\x03\x01 TLS")), "mgawg51820", now); hit {
+		t.Fatal("TLS classified")
+	}
+	if len(tracker.flows) != 0 {
+		t.Fatalf("ordinary flow kept after its first bytes: %d flows", len(tracker.flows))
+	}
+}
+
+// Only a connection the client opened is classified: one the client accepted (its first packet is a SYN/ACK), or one
+// joined in the middle, never is, so a remote peer cannot make the client look like a torrent client.
+func TestTrackerIgnoresConnectionsTheClientDidNotOpen(t *testing.T) {
+	tracker := newFlowTracker()
+	now := time.Unix(1100, 0)
+	for _, flags := range []uint8{0x12, 0x10, 0x18} {
+		if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 700, flags, nil), "mgawg51820", now); hit {
+			t.Fatalf("flags %#x classified", flags)
+		}
+		if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 701, 0x18, handshake), "mgawg51820", now); hit {
+			t.Fatalf("handshake after flags %#x classified", flags)
+		}
+	}
+	if len(tracker.flows) != 0 {
+		t.Fatalf("flows without a client SYN: %d", len(tracker.flows))
+	}
+}
+
+func TestTrackerSeparatesAWGTunnels(t *testing.T) {
+	tracker := newFlowTracker()
+	now := time.Unix(1500, 0)
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 100, 0x02, nil), "mgawg51820", now); hit {
+		t.Fatal("SYN classified")
+	}
+	// The same five-tuple on another AWG tunnel is a distinct flow without a SYN.
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 101, 0x18, handshake), "mgawg51821", now); hit {
+		t.Fatal("a flow on the second tunnel used the first tunnel's state")
+	}
+	tracker.retainInterfaces(map[string]struct{}{"mgawg51821": {}})
+	if len(tracker.flows) != 0 {
+		t.Fatal("state of a removed interface survived")
 	}
 }
 
 func TestTCPReassemblyHandlesOrderedAndBoundedOutOfOrderSegments(t *testing.T) {
 	tracker := newFlowTracker()
 	now := time.Unix(2000, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	const clientPort, peerPort = 52000, 51413
-	reported := false
-	report := func(Detection) bool { reported = true; return true }
-	process := func(raw []byte) bool {
-		return tracker.Process(raw, "mgawg10000", netip.MustParseAddr(client), now, report)
+	send := func(seq uint32, flags uint8, payload []byte) bool {
+		_, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, 52000, peerPort, seq, flags, payload), "mgawg10000", now)
+		return hit
 	}
-	if process(makeTCP4(client, peer, clientPort, peerPort, 300, 0x02, nil)) {
-		t.Fatal("SYN was dropped")
+	if send(300, 0x02, nil) {
+		t.Fatal("SYN was classified")
 	}
-	signature := []byte("\x13BitTorrent protocol")
-	if process(makeTCP4(client, peer, clientPort, peerPort, 301, 0x18, signature[:10])) {
-		t.Fatal("first handshake chunk was dropped")
+	if send(301, 0x18, handshake[:10]) {
+		t.Fatal("first handshake chunk was classified")
 	}
-	if process(makeTCP4(client, peer, clientPort, peerPort, 317, 0x18, signature[16:])) {
-		t.Fatal("out-of-order chunk was dropped before the gap arrived")
+	if send(317, 0x18, handshake[16:]) {
+		t.Fatal("out-of-order chunk was classified before the gap arrived")
 	}
-	if !process(makeTCP4(client, peer, clientPort, peerPort, 311, 0x18, signature[10:16])) {
+	if !send(311, 0x18, handshake[10:16]) {
 		t.Fatal("filling the gap did not complete the handshake")
-	}
-	if !reported {
-		t.Fatal("reassembled handshake did not report")
 	}
 }
 
 func TestTCPGapBeyondBoundPasses(t *testing.T) {
 	tracker := newFlowTracker()
 	now := time.Unix(3000, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	reports := 0
-	report := func(Detection) bool { reports++; return true }
-	process := func(raw []byte) bool {
-		return tracker.Process(raw, "mgawg10000", netip.MustParseAddr(client), now, report)
+	send := func(seq uint32, flags uint8, payload []byte) bool {
+		_, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, 53000, peerPort, seq, flags, payload), "mgawg10000", now)
+		return hit
 	}
-	_ = process(makeTCP4(client, peer, 53000, 51413, 500, 0x02, nil))
-	if process(makeTCP4(client, peer, 53000, 51413, 1000, 0x18, []byte("\x13BitTorrent protocol"))) {
-		t.Fatal("packet after a large TCP gap was dropped")
+	_ = send(500, 0x02, nil)
+	if send(1000, 0x18, handshake) {
+		t.Fatal("packet after a large TCP gap was classified")
 	}
-	if process(makeTCP4(client, peer, 53000, 51413, 501, 0x18, []byte("\x13BitTorrent protocol"))) {
+	if send(501, 0x18, handshake) {
 		t.Fatal("ambiguous stream was detected after a gap")
-	}
-	if reports != 0 {
-		t.Fatalf("reported %d ambiguous streams", reports)
 	}
 }
 
-func TestUDPTrackerDHTQueryAndUTPSynAreFlowScoped(t *testing.T) {
-	client, peer := "10.0.0.2", "198.51.100.7"
-	clientAddr := netip.MustParseAddr(client)
-	now := time.Unix(4000, 0)
-	tests := []struct {
+// At the flow limit the oldest state gives way: new connections are still inspected.
+func TestTrackerEvictsInsteadOfRefusingNewFlows(t *testing.T) {
+	tracker := newFlowTracker()
+	now := time.Unix(3500, 0)
+	for i := range maxTrackedFlows {
+		raw := makeTCP4(fmt.Sprintf("10.1.%d.%d", i/250, i%250+1), peerIP, 40000, 443, 1, 0x02, nil)
+		classifyRaw(tracker, raw, "mgawg51820", now)
+	}
+	if len(tracker.flows) != maxTrackedFlows {
+		t.Fatalf("flows = %d", len(tracker.flows))
+	}
+	classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 100, 0x02, nil), "mgawg51820", now)
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 101, 0x18, handshake), "mgawg51820", now); !hit {
+		t.Fatal("a new flow at the limit was not inspected")
+	}
+	if len(tracker.flows) > maxTrackedFlows {
+		t.Fatalf("flows = %d, above the limit", len(tracker.flows))
+	}
+}
+
+func TestTCPStateExpiresAfterIdleRetention(t *testing.T) {
+	tracker := newFlowTracker()
+	start := time.Unix(5000, 0)
+	classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 100, 0x02, nil), "mgawg51820", start)
+	if _, hit := classifyRaw(tracker, makeTCP4(clientIP, peerIP, clientPort, peerPort, 101, 0x18, handshake), "mgawg51820", start.Add(tcpStateIdle+time.Second)); hit {
+		t.Fatal("an expired flow was still classified")
+	}
+	if len(tracker.flows) != 0 {
+		t.Fatalf("expired flows = %d", len(tracker.flows))
+	}
+}
+
+func TestUDPClassificationIsPerDatagram(t *testing.T) {
+	quic := []byte{0x41, 0x00, 0x9c, 0x3e, 0x71, 0x0d, 0xa2, 0x55, 0x18, 0xe4, 0x6b, 0x30, 0xc7, 0x02, 0x8f, 0x99, 0x24, 0xd1, 0x6e, 0x0b}
+	wireguard := make([]byte, 148)
+	wireguard[0] = 1
+	for _, test := range []struct {
 		name      string
 		payload   []byte
 		signature torrentguard.Protocol
-		wantDrop  bool
 	}{
-		{name: "tracker", payload: trackerConnectRequest(), signature: torrentguard.ProtocolBitTorrentTracker, wantDrop: true},
-		{name: "DHT query", payload: []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), signature: torrentguard.ProtocolBitTorrentDHT, wantDrop: true},
-		{name: "DHT response", payload: []byte("d1:rd2:id20:01234567890123456789e1:t2:aa1:y1:re"), wantDrop: false},
-		{name: "uTP SYN", payload: utpPacket(torrentguard.UTPSyn), signature: torrentguard.ProtocolBitTorrentUTP, wantDrop: true},
-		{name: "uTP STATE", payload: utpPacket(torrentguard.UTPState), wantDrop: false},
-		{name: "unknown", payload: []byte("ordinary UDP data"), wantDrop: false},
-	}
-	for _, test := range tests {
+		{name: "tracker", payload: trackerConnectRequest(), signature: torrentguard.ProtocolBitTorrentTracker},
+		{name: "DHT query", payload: []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), signature: torrentguard.ProtocolBitTorrentDHT},
+		{name: "DHT response", payload: []byte("d1:rd2:id20:01234567890123456789e1:t2:aa1:y1:re")},
+		{name: "uTP SYN", payload: utpPacket(torrentguard.UTPSyn), signature: torrentguard.ProtocolBitTorrentUTP},
+		{name: "uTP STATE", payload: utpPacket(torrentguard.UTPState)},
+		{name: "QUIC short header", payload: quic},
+		{name: "WireGuard initiation", payload: wireguard},
+		{name: "unknown", payload: []byte("ordinary UDP data")},
+	} {
 		t.Run(test.name, func(t *testing.T) {
 			tracker := newFlowTracker()
-			var detected Detection
-			report := func(d Detection) bool { detected = d; return true }
-			packet := makeUDP4(client, peer, 55000, 51413, test.payload)
-			got := tracker.Process(packet, "mgawg51820", clientAddr, now, report)
-			if got != test.wantDrop {
-				t.Fatalf("first packet drop = %v, want %v", got, test.wantDrop)
+			d, hit := classifyRaw(tracker, makeUDP4(clientIP, peerIP, 55000, 51413, test.payload), "mgawg51820", time.Unix(4000, 0))
+			if hit != (test.signature != "") {
+				t.Fatalf("classified = %v, want %v", hit, test.signature != "")
 			}
-			if test.wantDrop {
-				if detected.Signature != test.signature || detected.TunnelIP != clientAddr {
-					t.Fatalf("detection = %#v", detected)
-				}
-				reverse := makeUDP4(peer, client, 51413, 55000, []byte("response"))
-				if !tracker.Process(reverse, "mgawg51820", clientAddr, now.Add(time.Second), report) {
-					t.Fatal("reverse UDP packet was not dropped")
-				}
+			if hit && (d.Signature != test.signature || d.L4Protocol != "udp" || d.TunnelIP.String() != clientIP) {
+				t.Fatalf("detection = %#v", d)
+			}
+			if len(tracker.flows) != 0 {
+				t.Fatal("UDP left flow state")
 			}
 		})
-	}
-}
-
-func TestFlowStateExpiresAfterIdleRetention(t *testing.T) {
-	tracker := newFlowTracker()
-	start := time.Unix(5000, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	report := func(Detection) bool { return true }
-	request := makeUDP4(client, peer, 55000, 6969, trackerConnectRequest())
-	if !tracker.Process(request, "mgawg51820", netip.MustParseAddr(client), start, report) {
-		t.Fatal("valid tracker request was not dropped")
-	}
-	if got := tracker.count; got != 1 {
-		t.Fatalf("active flow count = %d, want 1", got)
-	}
-	reverse := makeUDP4(peer, client, 6969, 55000, []byte("response"))
-	if tracker.Process(reverse, "mgawg51820", netip.MustParseAddr(client), start.Add(blockedFlowIdle+time.Second), report) {
-		t.Fatal("expired reverse flow remained blocked")
-	}
-	if got := tracker.count; got != 0 {
-		t.Fatalf("expired flow count = %d, want 0", got)
-	}
-}
-
-func TestConfirmedFlowStaysBlockedWhenEventQueueIsFull(t *testing.T) {
-	tracker := newFlowTracker()
-	start := time.Unix(6000, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	clientIP := netip.MustParseAddr(client)
-	calls := 0
-	report := func(Detection) bool {
-		calls++
-		return calls > 1
-	}
-	request := makeUDP4(client, peer, 55000, 6969, trackerConnectRequest())
-	if !tracker.Process(request, "mgawg51820", clientIP, start, report) {
-		t.Fatal("confirmed tracker flow was passed when its event queue was full")
-	}
-	reverse := makeUDP4(peer, client, 6969, 55000, []byte("response"))
-	if !tracker.Process(reverse, "mgawg51820", clientIP, start.Add(time.Second), report) {
-		t.Fatal("reverse packet was passed while retrying the event")
-	}
-	if !tracker.Process(reverse, "mgawg51820", clientIP, start.Add(2*time.Second), report) {
-		t.Fatal("reverse packet was passed after the event was enqueued")
-	}
-	if calls != 2 {
-		t.Fatalf("event attempts = %d, want the initial attempt and one retry", calls)
-	}
-}
-
-func TestUnreportedFlowIsRetriedWithoutAnotherPacket(t *testing.T) {
-	tracker := newFlowTracker()
-	start := time.Unix(7000, 0)
-	client, peer := "10.0.0.2", "198.51.100.7"
-	clientIP := netip.MustParseAddr(client)
-	attempts := 0
-	report := func(Detection) bool {
-		attempts++
-		return attempts > 1
-	}
-	request := makeUDP4(client, peer, 55000, 6969, trackerConnectRequest())
-	if !tracker.Process(request, "mgawg51820", clientIP, start, report) {
-		t.Fatal("confirmed tracker flow was passed")
-	}
-	if attempts != 1 || len(tracker.pendingReports) != 1 {
-		t.Fatalf("initial report attempts=%d pending=%d, want 1 and 1", attempts, len(tracker.pendingReports))
-	}
-
-	tracker.RetryPendingReports(report)
-	if attempts != 2 || len(tracker.pendingReports) != 0 {
-		t.Fatalf("retry attempts=%d pending=%d, want 2 and 0", attempts, len(tracker.pendingReports))
 	}
 }
 

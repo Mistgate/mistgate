@@ -1,6 +1,7 @@
 package linux
 
 import (
+	"bytes"
 	"net/netip"
 	"sync"
 	"time"
@@ -8,53 +9,51 @@ import (
 	"github.com/mistgate/mistgate/internal/node/torrentguard"
 )
 
+// BlockMark is the packet mark of the runtime's block verdict (NF_REPEAT): on the repeat the guard's nft chain stores it
+// as the connection's ct mark and drops the packet, and the kernel drops every later packet of that connection, in both
+// directions, without queueing it. An unusual constant, so no other software's marks match it.
+const BlockMark = 0x4d475442 // "MGTB"
+
 const (
 	maxTrackedFlows          = 8192
 	maxTCPOutOfOrderDistance = 64
 	maxTCPQueuedSegments     = 4
 	maxTCPQueuedBytes        = 64
 	tcpStateIdle             = 2 * time.Minute
-	blockedFlowIdle          = 15 * time.Minute
 	flowPruneInterval        = 5 * time.Second
+
+	tcpFlagSYN = 0x02
+	tcpFlagACK = 0x10
 )
 
 const tcpHandshakePrefix = "\x13BitTorrent protocol"
 
+// Detection is one BitTorrent request a tunnel client sent. It names who (the tunnel address, which the agent maps to a
+// user and does not report), never where to.
 type Detection struct {
-	SourceIP        netip.Addr
-	SourcePort      uint16
-	DestinationIP   netip.Addr
-	DestinationPort uint16
-	L4Protocol      string
-	Signature       torrentguard.Protocol
-	TunnelIface     string
-	TunnelIP        netip.Addr
+	L4Protocol  string
+	Signature   torrentguard.Protocol
+	TunnelIface string
+	TunnelIP    netip.Addr
 }
 
+// flowTracker holds the start of the TCP connections tunnel clients open, until their first payload bytes decide
+// them; a decided connection is forgotten (the kernel enforces a block by its ct mark). UDP needs no state: every
+// datagram the kernel queues (conntrack state new) is classified on its own.
 type flowTracker struct {
-	mu             sync.Mutex
-	byKey          map[flowKey]*flowState
-	pendingReports map[*flowState]struct{}
-	count          int
-	pruneAt        time.Time
+	mu      sync.Mutex
+	flows   map[flowKey]*tcpFlow
+	pruneAt time.Time
 }
 
-type flowState struct {
-	forward     flowKey
-	tunnelIface string
-	tunnelIP    netip.Addr
-	lastSeen    time.Time
-	blocked     bool
-	reported    bool
-	candidate   *Detection
-	tcp         [2]tcpDirection
+type tcpFlow struct {
+	lastSeen time.Time
+	dir      tcpDirection
 }
 
 type tcpDirection struct {
-	started      bool
 	nextSequence uint32
 	seen         int
-	detector     torrentguard.TCPHandshakeDetector
 	matched      bool
 	rejected     bool
 	pending      []tcpSegment
@@ -67,143 +66,58 @@ type tcpSegment struct {
 }
 
 func newFlowTracker() *flowTracker {
-	return &flowTracker{
-		byKey:          make(map[flowKey]*flowState),
-		pendingReports: make(map[*flowState]struct{}),
-	}
+	return &flowTracker{flows: make(map[flowKey]*tcpFlow)}
 }
 
-// Process inspects one complete network-layer packet and reports whether its
-// exact flow should be dropped. The report callback must be non-blocking and
-// returns false when the caller cannot enqueue an event. A confirmed flow is
-// still blocked; its event is retried by the runtime timer until accepted.
-func (t *flowTracker) Process(raw []byte, tunnelIface string, tunnelIP netip.Addr, now time.Time, report func(Detection) bool) bool {
-	packet, ok := parsePacket(raw)
-	if !ok {
-		return false
+// classify inspects one packet a tunnel client sent to the outside and reports whether it carries a BitTorrent request.
+// The caller must give it nothing else: a packet from the remote side is never evidence, so a remote server or peer
+// cannot frame a user with a crafted datagram or banner.
+func (t *flowTracker) classify(packet packetInfo, tunnelIface string, tunnelIP netip.Addr, now time.Time) (Detection, bool) {
+	d := Detection{TunnelIface: tunnelIface, TunnelIP: tunnelIP}
+	switch packet.key.protocol {
+	case protocolUDP:
+		protocol, ok := torrentguard.DetectClientUDPRequest(packet.payload)
+		d.L4Protocol, d.Signature = "udp", protocol
+		return d, ok
+	case protocolTCP:
+		packet.key.tunnelIface = tunnelIface
+		if t.feedTCP(packet, now) {
+			d.L4Protocol, d.Signature = "tcp", torrentguard.ProtocolBitTorrentTCP
+			return d, true
+		}
 	}
-	return t.processPacket(packet, tunnelIface, tunnelIP, now, report)
+	return Detection{}, false
 }
 
-func (t *flowTracker) processPacket(packet packetInfo, tunnelIface string, tunnelIP netip.Addr, now time.Time, report func(Detection) bool) bool {
-	packet.key.tunnelIface = tunnelIface
+// feedTCP follows the client's side of a connection the client opened: only its SYN starts a flow, so a stream joined
+// in the middle, or one the client accepted, is never classified.
+func (t *flowTracker) feedTCP(packet packetInfo, now time.Time) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.prune(now)
 
-	state := t.byKey[packet.key]
-	if state != nil && (state.tunnelIface != tunnelIface || state.tunnelIP != tunnelIP) {
-		// A tuple can repeat on separate AWG tunnels (or after a client address change).
-		// Never let state from one tunnel classify traffic from another.
-		t.delete(state)
-		state = nil
-	}
-	if state != nil && now.Sub(state.lastSeen) >= t.idleFor(state) {
-		t.delete(state)
-		state = nil
-	}
-
-	if state != nil {
-		state.lastSeen = now
-		if state.blocked {
-			t.tryReport(state, report)
-			return true
+	flow := t.flows[packet.key]
+	if flow == nil {
+		if packet.tcpFlags&(tcpFlagSYN|tcpFlagACK) != tcpFlagSYN {
+			return false
 		}
-		if state.candidate == nil && packet.key.protocol == protocolTCP {
-			index := directionIndex(state.forward, packet.key)
-			if state.tcp[index].feed(packet) {
-				candidate := detectionFor(packet.key, torrentguard.ProtocolBitTorrentTCP, tunnelIface, tunnelIP)
-				state.candidate = &candidate
-				state.blocked = true
-				t.pendingReports[state] = struct{}{}
-				t.tryReport(state, report)
-				return true
+		if len(t.flows) >= maxTrackedFlows {
+			// ponytail: evicts an arbitrary flow (map order), not the least recently used one; a flow lives here for a
+			// handful of packets at the start of a connection, so a real LRU would buy little.
+			for k := range t.flows {
+				delete(t.flows, k)
+				break
 			}
 		}
-		return false
+		flow = &tcpFlow{dir: tcpDirection{nextSequence: packet.seq + 1}}
+		t.flows[packet.key] = flow
 	}
-
-	if packet.key.protocol == protocolUDP {
-		if tunnelIface == "" || t.count >= maxTrackedFlows {
-			return false
-		}
-		protocol, ok := detectUDPRequest(packet.payload)
-		if !ok {
-			return false
-		}
-		candidate := detectionFor(packet.key, protocol, tunnelIface, tunnelIP)
-		state = &flowState{forward: packet.key, tunnelIface: tunnelIface, tunnelIP: tunnelIP, lastSeen: now, blocked: true, candidate: &candidate}
-		t.insert(state)
-		t.pendingReports[state] = struct{}{}
-		t.tryReport(state, report)
-		return true
+	flow.lastSeen = now
+	matched := flow.dir.feed(packet)
+	if matched || flow.dir.rejected {
+		delete(t.flows, packet.key)
 	}
-
-	// A TCP stream can be classified only when its initial SYN was observed.
-	// This avoids treating a coincidental string in the middle of a connection
-	// as a BitTorrent handshake.
-	if packet.key.protocol != protocolTCP || packet.tcpFlags&0x02 == 0 || t.count >= maxTrackedFlows {
-		return false
-	}
-	state = &flowState{forward: packet.key, tunnelIface: tunnelIface, tunnelIP: tunnelIP, lastSeen: now}
-	t.insert(state)
-	index := directionIndex(state.forward, packet.key)
-	if state.tcp[index].feed(packet) && tunnelIface != "" {
-		candidate := detectionFor(packet.key, torrentguard.ProtocolBitTorrentTCP, tunnelIface, tunnelIP)
-		state.candidate = &candidate
-		state.blocked = true
-		t.pendingReports[state] = struct{}{}
-		t.tryReport(state, report)
-		return true
-	}
-	return false
-}
-
-func (t *flowTracker) tryReport(state *flowState, report func(Detection) bool) bool {
-	if state.reported || state.candidate == nil {
-		return true
-	}
-	if report == nil || !report(*state.candidate) {
-		return false
-	}
-	state.reported = true
-	delete(t.pendingReports, state)
-	return true
-}
-
-// RetryPendingReports re-enqueues detections that could not fit in the
-// bounded event channel when the flow was first classified. Callers should
-// invoke it from a timer so a one-packet UDP flow still gets reported.
-func (t *flowTracker) RetryPendingReports(report func(Detection) bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for state := range t.pendingReports {
-		if !t.tryReport(state, report) {
-			// A full bounded channel cannot accept any later event in this pass.
-			break
-		}
-	}
-}
-
-func (t *flowTracker) insert(state *flowState) {
-	t.byKey[state.forward] = state
-	reverse := state.forward.reverse()
-	t.byKey[reverse] = state
-	t.count++
-}
-
-func (t *flowTracker) delete(state *flowState) {
-	delete(t.byKey, state.forward)
-	delete(t.byKey, state.forward.reverse())
-	delete(t.pendingReports, state)
-	t.count--
-}
-
-func (t *flowTracker) idleFor(state *flowState) time.Duration {
-	if state.blocked {
-		return blockedFlowIdle
-	}
-	return tcpStateIdle
+	return matched
 }
 
 func (t *flowTracker) prune(now time.Time) {
@@ -211,80 +125,29 @@ func (t *flowTracker) prune(now time.Time) {
 		return
 	}
 	t.pruneAt = now.Add(flowPruneInterval)
-	seen := make(map[*flowState]struct{}, t.count)
-	for _, state := range t.byKey {
-		if _, ok := seen[state]; ok {
-			continue
-		}
-		seen[state] = struct{}{}
-		if now.Sub(state.lastSeen) >= t.idleFor(state) {
-			t.delete(state)
+	for k, flow := range t.flows {
+		if now.Sub(flow.lastSeen) >= tcpStateIdle {
+			delete(t.flows, k)
 		}
 	}
 }
 
-// retainInterfaces removes flow state for AWG interfaces whose identity changed or was removed while
-// preserving active blocks on interfaces that remain. Call it under ifaceMu so packet scope and flow state
-// change atomically.
+// retainInterfaces removes flow state for AWG interfaces whose identity changed or was removed. Call it under ifaceMu
+// so packet scope and flow state change atomically.
 func (t *flowTracker) retainInterfaces(keep map[string]struct{}) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	seen := make(map[*flowState]struct{}, t.count)
-	for _, state := range t.byKey {
-		if _, ok := seen[state]; ok {
-			continue
-		}
-		seen[state] = struct{}{}
-		if _, ok := keep[state.tunnelIface]; !ok {
-			t.delete(state)
+	for k := range t.flows {
+		if _, ok := keep[k.tunnelIface]; !ok {
+			delete(t.flows, k)
 		}
 	}
-}
-
-func directionIndex(forward, current flowKey) int {
-	if current == forward {
-		return 0
-	}
-	return 1
-}
-
-func detectionFor(key flowKey, signature torrentguard.Protocol, tunnelIface string, tunnelIP netip.Addr) Detection {
-	protocol := "udp"
-	if key.protocol == protocolTCP {
-		protocol = "tcp"
-	}
-	return Detection{
-		SourceIP:        key.source,
-		SourcePort:      key.sourcePort,
-		DestinationIP:   key.destination,
-		DestinationPort: key.destPort,
-		L4Protocol:      protocol,
-		Signature:       signature,
-		TunnelIface:     tunnelIface,
-		TunnelIP:        tunnelIP,
-	}
-}
-
-func detectUDPRequest(payload []byte) (torrentguard.Protocol, bool) {
-	return torrentguard.DetectClientUDPRequest(payload)
 }
 
 func (d *tcpDirection) feed(packet packetInfo) bool {
-	if d.matched {
-		return true
-	}
-	if d.rejected {
-		return false
-	}
 	sequence := packet.seq
-	if packet.tcpFlags&0x02 != 0 {
-		if !d.started {
-			d.started = true
-			d.nextSequence = packet.seq + 1
-		}
-		sequence++ // SYN consumes one sequence number.
-	} else if !d.started {
-		return false
+	if packet.tcpFlags&tcpFlagSYN != 0 {
+		sequence++ // SYN consumes one sequence number (a Fast Open SYN carries data after it).
 	}
 	if len(packet.payload) == 0 {
 		return false
@@ -315,17 +178,11 @@ func (d *tcpDirection) consume(sequence uint32, payload []byte) bool {
 			d.reject()
 			return false
 		}
-		length := len(payload)
-		if length > remaining-int(delta) {
-			length = remaining - int(delta)
-		}
-		if length <= 0 {
-			return false
-		}
+		length := min(len(payload), remaining-int(delta))
 		segment := tcpSegment{sequence: sequence, data: append([]byte(nil), payload[:length]...)}
 		for _, old := range d.pending {
 			oldDelta := int32(segment.sequence - old.sequence)
-			if oldDelta == 0 && equalBytes(segment.data, old.data) {
+			if oldDelta == 0 && bytes.Equal(segment.data, old.data) {
 				return false // identical retransmission of a queued segment
 			}
 			if int64(oldDelta) < int64(len(old.data)) && int64(oldDelta)+int64(len(segment.data)) > 0 {
@@ -345,22 +202,19 @@ func (d *tcpDirection) consume(sequence uint32, payload []byte) bool {
 	return d.feedOrdered(payload)
 }
 
+// feedOrdered compares the next in-order bytes with the handshake prefix: a mismatch decides the stream at once. A
+// payload cut short by the queue's copy range still holds far more than the 20 prefix bytes.
 func (d *tcpDirection) feedOrdered(payload []byte) bool {
-	remaining := len(tcpHandshakePrefix) - d.seen
-	if remaining <= 0 {
-		return d.matched
+	remaining := tcpHandshakePrefix[d.seen:]
+	n := min(len(payload), len(remaining))
+	if string(payload[:n]) != remaining[:n] {
+		d.reject()
+		return false
 	}
-	length := len(payload)
-	if length > remaining {
-		length = remaining
-	}
-	if d.detector.Feed(payload[:length]) {
-		d.matched = true
-		return true
-	}
-	d.seen += length
+	d.seen += n
 	d.nextSequence += uint32(len(payload))
-	return false
+	d.matched = d.seen == len(tcpHandshakePrefix)
+	return d.matched
 }
 
 func (d *tcpDirection) drain() bool {
@@ -389,16 +243,4 @@ func (d *tcpDirection) reject() {
 	d.rejected = true
 	d.pending = nil
 	d.pendingBytes = 0
-}
-
-func equalBytes(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

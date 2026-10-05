@@ -43,23 +43,15 @@ func (h *linuxHost) SetTorrentGuard(ctx context.Context, ifaces []string, onAtte
 		h.torrent = nil
 	}
 
+	callback := func(d torrentlinux.Detection) {
+		if onAttempt != nil {
+			onAttempt(TorrentDetection{L4Protocol: d.L4Protocol, Signature: d.Signature, TunnelIface: d.TunnelIface, TunnelIP: d.TunnelIP})
+		}
+	}
 	newRuntime := h.torrent == nil
 	runtime := h.torrent
 	if newRuntime {
-		runtime, err = torrentlinux.Start(torrentQueueNum, ifaces, func(d torrentlinux.Detection) {
-			if onAttempt != nil {
-				onAttempt(TorrentDetection{
-					SourceIP:        d.SourceIP,
-					SourcePort:      d.SourcePort,
-					DestinationIP:   d.DestinationIP,
-					DestinationPort: d.DestinationPort,
-					L4Protocol:      d.L4Protocol,
-					Signature:       d.Signature,
-					TunnelIface:     d.TunnelIface,
-					TunnelIP:        d.TunnelIP,
-				})
-			}
-		})
+		runtime, err = torrentlinux.Start(torrentQueueNum, ifaces, callback)
 		if err != nil {
 			cleanup, _ := RenderTorrentGuard(nil)
 			cleanupErr := h.nft(ctx, cleanup, true)
@@ -75,20 +67,7 @@ func (h *linuxHost) SetTorrentGuard(ctx context.Context, ifaces []string, onAtte
 	}
 
 	if !newRuntime {
-		runtime.SetCallback(func(d torrentlinux.Detection) {
-			if onAttempt != nil {
-				onAttempt(TorrentDetection{
-					SourceIP:        d.SourceIP,
-					SourcePort:      d.SourcePort,
-					DestinationIP:   d.DestinationIP,
-					DestinationPort: d.DestinationPort,
-					L4Protocol:      d.L4Protocol,
-					Signature:       d.Signature,
-					TunnelIface:     d.TunnelIface,
-					TunnelIP:        d.TunnelIP,
-				})
-			}
-		})
+		runtime.SetCallback(callback)
 		if err := runtime.SetInterfaces(ifaces); err != nil {
 			// The rules use queue bypass, so an interface-index lookup failure
 			// must not interrupt ordinary traffic.

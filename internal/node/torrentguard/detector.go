@@ -33,40 +33,6 @@ func HasBitTorrentHandshake(data []byte) bool {
 		bytes.Equal(data[:len(bitTorrentHandshakeSignature)], []byte(bitTorrentHandshakeSignature))
 }
 
-// TCPHandshakeDetector incrementally checks the beginning of one reassembled
-// TCP byte stream for the plaintext BitTorrent handshake signature. Feed each
-// in-order, non-duplicate payload chunk once, starting at stream offset zero.
-// It retains no packet data. A mismatch permanently rejects that stream; a
-// match remains true on later calls. Use a fresh value for each TCP stream.
-type TCPHandshakeDetector struct {
-	seen     int
-	matched  bool
-	rejected bool
-}
-
-// Feed adds the next ordered TCP payload chunk and reports whether the stream
-// has begun with the exact plaintext BitTorrent handshake signature.
-func (d *TCPHandshakeDetector) Feed(chunk []byte) bool {
-	if d.matched {
-		return true
-	}
-	if d.rejected {
-		return false
-	}
-	for _, b := range chunk {
-		if b != bitTorrentHandshakeSignature[d.seen] {
-			d.rejected = true
-			return false
-		}
-		d.seen++
-		if d.seen == len(bitTorrentHandshakeSignature) {
-			d.matched = true
-			return true
-		}
-	}
-	return false
-}
-
 // UDPTrackerAction is a BEP 15 UDP tracker action code.
 type UDPTrackerAction uint32
 

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +25,7 @@ const (
 	nfqCommandUnbind      = 2
 	nfqAttributePacket    = 1
 	nfqAttributeVerdict   = 2
+	nfqAttributeMark      = 3
 	nfqAttributeInDevice  = 5
 	nfqAttributeOutDevice = 6
 	nfqAttributePayload   = 10
@@ -37,13 +37,11 @@ const (
 	nfqConfigFlags      = 5
 	nfqConfigFailOpen   = 1
 	nfqCopyPacket       = 2
-	nfqMaxPacketLength  = 65535
 	nfqAccept           = 1
-	nfqDrop             = 0
+	nfqRepeat           = 4
 	nfqMaxQueueLength   = 512
 	nfqReadBufferSize   = 4 << 20
 	nfqEventQueueLength = 256
-	nfqReportRetryDelay = 250 * time.Millisecond
 )
 
 // Runtime owns one kernel queue and a bounded userspace flow table. The nft
@@ -62,12 +60,9 @@ type Runtime struct {
 	events     chan Detection
 	eventsDone chan struct{}
 	loopDone   chan struct{}
-	retryStop  chan struct{}
-	retryDone  chan struct{}
 	stopping   atomic.Bool
 	closeOnce  sync.Once
 	eventsOnce sync.Once
-	retryOnce  sync.Once
 	closeErr   error
 	sequence   atomic.Uint32
 }
@@ -99,8 +94,6 @@ func Start(queue uint16, ifaces []string, callback func(Detection)) (*Runtime, e
 		events:       make(chan Detection, nfqEventQueueLength),
 		eventsDone:   make(chan struct{}),
 		loopDone:     make(chan struct{}),
-		retryStop:    make(chan struct{}),
-		retryDone:    make(chan struct{}),
 	}
 	if err := runtime.SetInterfaces(ifaces); err != nil {
 		_ = conn.Close()
@@ -117,7 +110,6 @@ func Start(queue uint16, ifaces []string, callback func(Detection)) (*Runtime, e
 	}
 	go runtime.dispatchEvents()
 	go runtime.receiveLoop()
-	go runtime.retryReports()
 	return runtime, nil
 }
 
@@ -193,7 +185,6 @@ func equalInterfaceMap(a, b map[int]string) bool {
 func (r *Runtime) Close() error {
 	r.closeOnce.Do(func() {
 		r.stopping.Store(true)
-		r.stopReportRetries()
 		// Expire the blocking Receive call without closing the socket so the
 		// owned queue can be cleanly unbound after its reader has stopped.
 		if err := r.conn.SetReadDeadline(time.Now()); err != nil {
@@ -228,7 +219,7 @@ func (r *Runtime) bind() error {
 	maxLen := make([]byte, 4)
 	binary.BigEndian.PutUint32(maxLen, nfqMaxQueueLength)
 	params := make([]byte, 5)
-	binary.BigEndian.PutUint32(params[:4], nfqMaxPacketLength)
+	binary.BigEndian.PutUint32(params[:4], queueCopyRange)
 	params[4] = nfqCopyPacket
 	if err := r.configure(r.queue, []netlink.Attribute{
 		{Type: nfqConfigParams, Data: params},
@@ -280,7 +271,6 @@ func (r *Runtime) receiveLoop() {
 			_ = r.conn.Close()
 		}
 		close(r.loopDone)
-		r.stopReportRetries()
 		r.stopEvents()
 	}()
 	backoff := time.Millisecond
@@ -319,55 +309,68 @@ func (r *Runtime) handleMessage(message netlink.Message) {
 	if !ok {
 		return
 	}
-	verdict := uint32(nfqAccept)
+	var detection Detection
+	block := false
 	if packet, parsed := parsePacket(queued.payload); parsed {
 		r.ifaceMu.RLock()
-		if iface, tunnelIP, validScope := r.tunnelSideLocked(queued.inIndex, queued.outIndex, packet); validScope {
-			drop := r.tracker.processPacket(packet, iface, tunnelIP, time.Now(), r.enqueueEvent)
-			if drop {
-				verdict = nfqDrop
-			}
+		if iface, fromClient := r.clientIfaceLocked(queued.inIndex, queued.outIndex); fromClient {
+			detection, block = r.tracker.classify(packet, iface, packet.key.source, time.Now())
 		}
 		r.ifaceMu.RUnlock()
 	}
-	if err := r.setVerdict(queued.id, verdict); err != nil && verdict == nfqDrop {
+	if !block {
+		_ = r.setVerdict(queued.id, nfqAccept, 0)
+		return
+	}
+	// Repeat with the block mark: the guard's chain stores it as the connection's ct mark and drops the packet; the rest
+	// of the connection never reaches userspace again.
+	if err := r.setVerdict(queued.id, nfqRepeat, BlockMark); err != nil {
 		// A lost verdict must not turn an identified flow into an accidental
 		// queue stall when an accept verdict can still be written.
-		_ = r.setVerdict(queued.id, nfqAccept)
+		_ = r.setVerdict(queued.id, nfqAccept, 0)
 	}
+	r.enqueueEvent(detection) // best effort: the agent reports one event per user every few minutes anyway
 }
 
-// tunnelSideLocked requires ifaceMu to be held for reading so interface
-// remapping and flow-state reset are atomic from the packet path's perspective.
-func (r *Runtime) tunnelSideLocked(inIndex, outIndex int, packet packetInfo) (string, netip.Addr, bool) {
-	inIface, outIface := r.ifaceByIndex[inIndex], r.ifaceByIndex[outIndex]
-	if (inIface == "") == (outIface == "") {
-		return "", netip.Addr{}, false
-	}
-	if inIface != "" {
-		return inIface, packet.key.source, true
-	}
-	return outIface, packet.key.destination, true
+// clientIfaceLocked returns the AWG interface a packet came in through when it leaves through another interface: only
+// what a tunnel client sends to the outside is classified. ifaceMu must be held for reading so interface remapping and
+// flow-state reset are atomic from the packet path's perspective.
+func (r *Runtime) clientIfaceLocked(inIndex, outIndex int) (string, bool) {
+	in := r.ifaceByIndex[inIndex]
+	return in, in != "" && r.ifaceByIndex[outIndex] == ""
 }
 
-func (r *Runtime) setVerdict(id uint32, verdict uint32) error {
+// setVerdict sends the verdict for one queued packet; a non-zero mark becomes the packet's mark.
+func (r *Runtime) setVerdict(id, verdict, mark uint32) error {
+	message, err := verdictMessage(r.queue, id, verdict, mark)
+	if err != nil {
+		return err
+	}
+	_, err = r.conn.Send(message)
+	return err
+}
+
+func verdictMessage(queue uint16, id, verdict, mark uint32) (netlink.Message, error) {
 	verdictData := make([]byte, 8)
 	binary.BigEndian.PutUint32(verdictData[:4], verdict)
 	binary.BigEndian.PutUint32(verdictData[4:], id)
-	attributes, err := netlink.MarshalAttributes([]netlink.Attribute{{Type: nfqAttributeVerdict, Data: verdictData}})
+	list := []netlink.Attribute{{Type: nfqAttributeVerdict, Data: verdictData}}
+	if mark != 0 {
+		list = append(list, netlink.Attribute{Type: nfqAttributeMark, Data: binary.BigEndian.AppendUint32(nil, mark)})
+	}
+	attributes, err := netlink.MarshalAttributes(list)
 	if err != nil {
-		return err
+		return netlink.Message{}, err
 	}
 	data := make([]byte, 4, 4+len(attributes))
 	data[0] = unix.AF_UNSPEC
 	data[1] = 0
-	binary.BigEndian.PutUint16(data[2:4], r.queue)
+	binary.BigEndian.PutUint16(data[2:4], queue)
 	data = append(data, attributes...)
-	_, err = r.conn.Send(netlink.Message{
+	return netlink.Message{
 		Header: netlink.Header{Type: netlink.HeaderType(nfnlSubsystemQueue<<8 | nfqMessageVerdict), Flags: netlink.Request},
 		Data:   data,
-	})
-	return err
+	}, nil
 }
 
 func decodeQueuedPacket(data []byte) (queuedPacket, bool) {
@@ -415,32 +418,11 @@ func (r *Runtime) dispatchEvents() {
 	}
 }
 
-func (r *Runtime) retryReports() {
-	defer close(r.retryDone)
-	ticker := time.NewTicker(nfqReportRetryDelay)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-r.retryStop:
-			return
-		case <-ticker.C:
-			r.tracker.RetryPendingReports(r.enqueueEvent)
-		}
-	}
-}
-
-func (r *Runtime) enqueueEvent(d Detection) bool {
+func (r *Runtime) enqueueEvent(d Detection) {
 	select {
 	case r.events <- d:
-		return true
 	default:
-		return false
 	}
-}
-
-func (r *Runtime) stopReportRetries() {
-	r.retryOnce.Do(func() { close(r.retryStop) })
-	<-r.retryDone
 }
 
 func (r *Runtime) stopEvents() {

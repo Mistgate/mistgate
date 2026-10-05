@@ -203,3 +203,33 @@ func TestRulesetLoadsInPrivateNetns(t *testing.T) {
 		t.Errorf("table survived cleanup:\n%s", after)
 	}
 }
+
+// TestTorrentGuardRulesetLoadsInPrivateNetns checks the torrent guard table (ct mark, ct original packets, queue bypass)
+// against a real nft and kernel the same way.
+func TestTorrentGuardRulesetLoadsInPrivateNetns(t *testing.T) {
+	for _, bin := range []string{"nft", "unshare"} {
+		if _, err := exec.LookPath(bin); err != nil {
+			t.Skipf("%s not installed", bin)
+		}
+	}
+	script, err := RenderTorrentGuard([]string{"mgawg51820", "mgawg51821"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	load := filepath.Join(t.TempDir(), "load.nft")
+	if err := os.WriteFile(load, []byte(script), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := execRunner(context.Background(), "", "unshare", "-Urn", "bash", "-c", "nft -f "+load+" && nft -f "+load+" && nft list table inet "+NftTorrentTable)
+	if err != nil {
+		if strings.Contains(string(out), "not permitted") || strings.Contains(string(out), "unshare failed") {
+			t.Skipf("no unprivileged namespaces: %s", out)
+		}
+		t.Fatalf("%v\n%s", err, out)
+	}
+	for _, want := range []string{"ct mark set 0x4d475442 drop", "ct original packets <= 6", "ct state new", "bypass to 4242"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("listed table lacks %q:\n%s", want, out)
+		}
+	}
+}

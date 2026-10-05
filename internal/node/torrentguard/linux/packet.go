@@ -51,15 +51,22 @@ func parsePacket(raw []byte) (packetInfo, bool) {
 	}
 }
 
+// queueCopyRange is how much of each packet the queue copies to userspace: the headers and the first payload bytes.
+// A packet longer than that is parsed from what arrived: a TCP payload keeps its first bytes (all the handshake check
+// needs), while a UDP datagram whose length runs past the copy is not parsed at all (every UDP signature is a short,
+// complete datagram: tracker requests, DHT queries, uTP SYN).
+const queueCopyRange = 512
+
 func parseIPv4(raw []byte) (packetInfo, bool) {
 	if len(raw) < 20 || raw[0]>>4 != 4 {
 		return packetInfo{}, false
 	}
 	headerLen := int(raw[0]&0x0f) * 4
 	totalLen := int(binary.BigEndian.Uint16(raw[2:4]))
-	if headerLen < 20 || headerLen > len(raw) || totalLen < headerLen || totalLen > len(raw) {
+	if headerLen < 20 || headerLen > len(raw) || totalLen < headerLen {
 		return packetInfo{}, false
 	}
+	totalLen = min(totalLen, len(raw))
 	// Any fragment needs packet-level reassembly before transport inspection.
 	// Unknown fragments pass unchanged rather than being inspected partially.
 	if binary.BigEndian.Uint16(raw[6:8])&0x3fff != 0 {
@@ -76,10 +83,7 @@ func parseIPv6(raw []byte) (packetInfo, bool) {
 		return packetInfo{}, false
 	}
 	payloadLen := int(binary.BigEndian.Uint16(raw[4:6]))
-	packetLen := 40 + payloadLen
-	if packetLen > len(raw) {
-		return packetInfo{}, false
-	}
+	packetLen := min(40+payloadLen, len(raw))
 	var sourceBytes, destinationBytes [16]byte
 	copy(sourceBytes[:], raw[8:24])
 	copy(destinationBytes[:], raw[24:40])
