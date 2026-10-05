@@ -15,7 +15,7 @@ journalctl -u mistgate-node -n 100 --no-pager
 
 **How it shows**
 
-- **Waiting for the agent** (pending): the node was added, but no agent has connected yet. The banner says until when the install command is valid, or that it has expired.
+- **Waiting for install**: the node was added, but no agent has connected yet. The banner ("Waiting for the agent") says until when the install command is valid, or that it has expired. For a node you install over SSH, see "An SSH installation fails" below.
 - **Host blip** (grey): no link for less than 10 minutes. Short drops are usually the hoster; nothing is alerted yet.
 - **Unreachable**: no link for 10 minutes or more. The alert "Node is unreachable" opens, the event "stopped answering" is written.
 
@@ -41,7 +41,7 @@ A pending node whose command has expired needs a **New install command**; the ol
 
 | Message | Cause | What to do |
 |---|---|---|
-| `--panel, --sni, --ca-sha256 and --token are required` | The command was cut when copying. | Copy the whole command again. |
+| `--panel, --sni, --ca-sha256 and a token source are required` | The command was cut when copying. | Copy the whole command again. |
 | `enrollment token unknown, expired or used` | An install command works once, for one hour. | Make a **New install command** on the node's page. |
 | `the CA returned by the panel does not match --ca-sha256`, or `no certificate in the chain matches the pinned CA fingerprint` | The agent reached something that is not this panel: a wrong address, or a proxy that ends TLS in between. | Check `--panel`. The agent needs a direct TLS path to the panel. |
 | `already enrolled; use --force to replace the identity` | The state directory already holds an identity. | Add `--force` to a fresh command, or remove the old node first. |
@@ -52,6 +52,18 @@ A pending node whose command has expired needs a **New install command**; the ol
 `install` needs root and an enrolled state directory: run `enroll` first, with the same `--state-dir` if you changed it.
 
 If **Create install command** in the admin fails with "panel address is not configured", the panel does not know the address agents should dial: run setup with `--public-url`, or serve with `--agent-addr` (see [CLI](../reference/cli.md)).
+
+## An SSH installation fails
+
+**Nodes → Add node → Install automatically over SSH** connects from the panel's server, so the node's SSH port must be reachable from there, and the node must reach the panel back. When a job fails, the wizard says why and offers **Retry installation** (with the SSH password again; it continues from where it stopped) and **Open install manager**, which shows the exact reason.
+
+The most common causes:
+
+- The hoster's firewall or security group does not let the panel's server in on the SSH port ("The panel could not reach this SSH address and port in time"). The panel cannot change the hoster's rules.
+- The server cannot reach the panel's agent address, or the panel has no public address: both show "The panel's public address is not configured, so the node cannot connect back". Check `--public-url` or `--agent-addr` and the node's outbound TCP to the panel (usually 443).
+- The panel holds no trusted node bundle yet ("Installation stopped"): see the **Release bundle** card on the [Updates](updates.md) page.
+
+Every message and what to do about it: "When it fails" in [Install a node over SSH](../getting-started/ssh-install.md).
 
 ## A profile does not start
 
@@ -100,12 +112,14 @@ Hysteria2 and AmneziaWG run over UDP, and some hosters drop UDP on some ports or
 - "“<profile>” does not answer on port N, while another profile of this node does: the hoster cuts UDP port N."
 - "Alive, but no traffic": "the hoster seems to cut this UDP port", or, on 443 or on several ports, "the hoster seems to cut incoming UDP altogether".
 - For AmneziaWG, the profile's status on the node's **Profiles** tab tells the two cases apart: "Not one packet reached the port: the hoster or a firewall blocks this UDP port", or "Packets arrive but no handshake completes: the obfuscation parameters on the node and in the config differ".
+- The node's **Events** show `host_firewall_sync_failed`: the server's own firewall does not let a profile's UDP port in.
 
 **What to do**
 
 1. Check the firewall or security group in the hoster's panel: the profile's UDP ports (and its hop range) must be open for incoming traffic.
-2. Move the profile to another port on this node: **Change port** on the node's **Profiles** tab.
-3. If every port is cut, write to the hoster's support or move the node.
+2. Check the server's own firewall. With an active UFW the agent adds allow rules for the UDP ports and hop ranges of the node's servers itself, but it never changes a rule it did not add: a `deny` or `reject` rule of yours for such a port stays, and the event names it. firewalld is never edited by the agent: add those UDP ports to its active zone by hand.
+3. Move the profile to another port on this node: **Change port** on the node's **Profiles** tab.
+4. If every port is cut, write to the hoster's support or move the node.
 
 The check uses the profile's main port, not the port-hopping range, so a blocked hop range does not show here.
 
@@ -180,11 +194,13 @@ A node without IPv6 is fine for WARP. See [WARP](../guide/warp.md).
 | Reason | What to do |
 |---|---|
 | The new version did not connect and apply its configuration within 5 minutes | Read the node's log of that time; fix the link or the configuration. |
-| The program is not the release the manifest describes | Sign with `--built` from the same commit the binaries were built from. |
+| The program is not the release the manifest describes | The bundle was signed for other binaries. Sign it again with `mistgate release sign` from a clean checkout of the same tag, without overriding `--built` (see [Releases](releases.md)). |
 | The new version crashed three times in a row | Read the node's log. |
+| The new version could not start a profile | Read the profile's error and the node's log. |
 | The new program could not start (is it built for this machine?) | Check the architecture of the binary for that node. |
 | The panel put the previous version back: the client-eye check failed after the update | See [Health](health.md) for the failing profile. |
-| The panel put the previous version back: a profile that worked before broke | Read the profile's error on the node. |
+| The panel put the previous version back: a profile that worked before broke after the update | Read the profile's error on the node. |
+| The panel put the previous version back: the node did not apply its configuration after the update | Read the node's log of that time. |
 
 After fixing the cause, resume or cancel the rollout and update the node again with a new rollout. See [Updates](updates.md).
 
