@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
@@ -120,6 +121,7 @@ type Config struct {
 
 	beforeRun   func(run int) // tests: called before each run, 0-based
 	ooklaScheme string        // tests: "http" for a local server; "" = https
+	ooklaLocal  bool          // tests: the listed servers are on this machine (loopback), not to be dropped
 }
 
 // Result is what the panel gets: the best run per direction.
@@ -332,6 +334,9 @@ func (c Config) ookla(ctx context.Context, cl *http.Client) []Endpoint {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if !c.ooklaLocal && !publicHost(ctx, s.Host) {
+				return
+			}
 			cands[i].rtt = latency(ctx, cl, base+s.Host+"/hello")
 		}()
 	}
@@ -672,4 +677,29 @@ func sleep(ctx context.Context, d time.Duration) {
 	case <-t.C:
 	case <-ctx.Done():
 	}
+}
+
+var cgnat = netip.MustParsePrefix("100.64.0.0/10")
+
+// publicAddr is an address the test may send bytes to: a global unicast one that is not private (RFC 1918, fc00::/7) or
+// shared address space. Loopback, link-local, unspecified, multicast and broadcast are not global unicast.
+func publicAddr(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsGlobalUnicast() && !a.IsPrivate() && !cgnat.Contains(a)
+}
+
+// publicHost says whether every address of a server's host:port is public. The list is a third party's answer: a tampered
+// one must not make the node POST up to 100 MB per run at its own network. A name that does not resolve is not public.
+// ponytail: the client resolves the name again when it connects; a rebinding answer in between is not covered (a dial-time check would be).
+func publicHost(ctx context.Context, hostport string) bool {
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = hostport
+	}
+	host = strings.Trim(host, "[]")
+	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil || len(addrs) == 0 {
+		return false
+	}
+	return !slices.ContainsFunc(addrs, func(a netip.Addr) bool { return !publicAddr(a.WithZone("")) })
 }

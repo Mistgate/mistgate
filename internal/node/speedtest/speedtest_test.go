@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -454,8 +455,45 @@ func entry(host, sponsor, city string) map[string]any {
 
 func ooklaCfg(listURL string, fallback ...Endpoint) Config {
 	cfg := small(fallback...)
-	cfg.OoklaList, cfg.ooklaScheme = listURL, "http"
+	cfg.OoklaList, cfg.ooklaScheme, cfg.ooklaLocal = listURL, "http", true
 	return cfg
+}
+
+// The list comes from a third party: a server that is not on a public address (a tampered answer pointing at the node's own
+// network) is never contacted, not even for latency, and the chain behind Ookla answers instead.
+func TestOoklaServersAtNonPublicAddressesAreNeverContacted(t *testing.T) {
+	local := newFakeOokla(t, 0, 0) // 127.0.0.1
+	s := paced(t, 0)
+	chain := Endpoint{Name: "local", DownURL: s.URL + "/down", UpURL: s.URL + "/up"}
+	var hosts []map[string]any
+	hosts = append(hosts, entry(local.host, "Loopback", "Here"))
+	for _, h := range []string{"10.1.2.3:8080", "192.168.0.7:8080", "172.16.5.5:8080", "100.64.1.1:8080", "169.254.169.254:80", "0.0.0.0:8080", "224.0.0.1:8080",
+		"[::1]:8080", "[fe80::1]:8080", "[fd00::1]:8080", "[::ffff:10.0.0.1]:8080", "[::]:8080", "localhost:8080"} {
+		hosts = append(hosts, entry(h, "Internal", "Nowhere"))
+	}
+	cfg := ooklaCfg(list(t, hosts...), chain)
+	cfg.ooklaLocal = false
+	cfg.DownFor, cfg.UpFor = 600*time.Millisecond, 300*time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Server != "local" {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if local.hello.Load() != 0 || local.down.Load() != 0 || local.up.Load() != 0 {
+		t.Errorf("a loopback server was contacted: %d hello, %d down, %d up", local.hello.Load(), local.down.Load(), local.up.Load())
+	}
+}
+
+func TestPublicAddr(t *testing.T) {
+	for addr, want := range map[string]bool{
+		"93.184.216.34": true, "2606:4700::1111": true, "8.8.8.8": true,
+		"127.0.0.1": false, "10.0.0.1": false, "172.31.255.255": false, "192.168.1.1": false, "100.127.0.1": false, "169.254.1.1": false,
+		"0.0.0.0": false, "224.0.0.251": false, "255.255.255.255": false, "::1": false, "::": false, "fe80::1": false, "fc00::1": false,
+		"ff02::1": false, "::ffff:127.0.0.1": false, "::ffff:8.8.8.8": true,
+	} {
+		if got := publicAddr(netip.MustParseAddr(addr)); got != want {
+			t.Errorf("publicAddr(%s) = %v, want %v", addr, got, want)
+		}
+	}
 }
 
 // The list is parsed and the servers are ranked by latency: the nearest answers, the others are only probed.
