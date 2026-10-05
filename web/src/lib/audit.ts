@@ -49,6 +49,9 @@ const keys: Record<string, MessageKey> = {
   preset_update: "audit.preset_update",
   preset_delete: "audit.preset_delete",
   preset_default: "audit.preset_default",
+  node_dns_options: "audit.node_dns_options",
+  page_dns_choice: "audit.page_dns_choice",
+  user_dns_choices_reset: "audit.user_dns_choices_reset",
   device_create: "audit.device_create",
   device_configs: "audit.device_configs",
   device_rotate: "audit.device_rotate",
@@ -142,6 +145,10 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.enabled === "false" ? variant("off") : { key: base, worded: false };
     case "preset_default":
       return p.name ? { key: base, worded: false } : variant("builtin");
+    case "node_dns_options":
+      return p.presets === "0" ? variant("off") : { key: base, worded: false };
+    case "page_dns_choice":
+      return p.preset ? { key: base, worded: false } : variant("default");
     case "reset_login":
       return p.created === "true" ? variant("added") : { key: base, worded: false };
     case "mcp_plan":

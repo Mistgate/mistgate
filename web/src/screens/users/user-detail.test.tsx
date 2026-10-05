@@ -10,6 +10,9 @@ import { UserScreen } from "./user-detail";
 const getUser = vi.fn();
 const updateUser = vi.fn();
 const setUsersEnabled = vi.fn();
+const getUserDnsChoices = vi.fn();
+const resetUserDnsChoices = vi.fn();
+const me = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   users: { getUser: (...a: unknown[]) => getUser(...a), updateUser: (...a: unknown[]) => updateUser(...a), setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a) },
@@ -23,7 +26,12 @@ vi.mock("@/lib/api", async (orig) => ({
       }),
   },
   profiles: { listProfiles: () => Promise.resolve({ profiles: [] }), listProtocols: () => Promise.resolve({ protocols: [{ id: "hysteria2", apps: [App.HAPP], displayName: "Hysteria2" }, { id: "awg", apps: [App.AMNEZIA], displayName: "AmneziaWG" }] }) },
-  dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
+  dns: {
+    listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }),
+    getUserDnsChoices: (...a: unknown[]) => getUserDnsChoices(...a),
+    resetUserDnsChoices: (...a: unknown[]) => resetUserDnsChoices(...a),
+  },
+  auth: { me: () => me() },
   subscriptions: {
     getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.HAPP, name: "FlClash" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }] }, effectiveTitle: "" }),
   },
@@ -61,7 +69,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me]) m.mockReset();
 });
 
 const user = {
@@ -102,7 +110,14 @@ const detail = {
   nodeAccess: [{ nodeId: "nod_1", nodeName: "de1", countryCode: "DE", location: "", provider: "", protocols: ["hysteria2", "awg"], nodeProtocols: ["hysteria2", "awg"], selected: true }],
 };
 
-async function mount() {
+const choice = (nodeName: string, presetName: string, over: object = {}) => ({
+  nodeId: `nod_${nodeName}`, nodeName, presetId: `dns_${presetName}`, presetName, offered: true, effectivePresetId: `dns_${presetName}`, effectivePresetName: presetName, updatedUnix: 0n, ...over,
+});
+
+async function mount(role = 1, choices: object[] = []) {
+  me.mockResolvedValue({ admin: { id: "adm_1", role } });
+  getUserDnsChoices.mockResolvedValue({ choices });
+  resetUserDnsChoices.mockResolvedValue({ removed: choices.length });
   getUser.mockResolvedValue(detail);
   host = document.createElement("div");
   document.body.append(host);
@@ -184,6 +199,46 @@ describe("the user card", () => {
     await click(button("Change group"));
     await settle();
     expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", groupId: "grp_f" });
+  });
+
+  describe("DNS per server", () => {
+    const picks = [choice("de1", "Family"), choice("nl1", "Family", { offered: false, effectivePresetId: "dns_Plain", effectivePresetName: "Plain" })];
+    // the card has another "Reset" (traffic): this one is inside the DNS panel
+    const resetButtons = () => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Reset" && b.closest("section, div")?.parentElement?.textContent?.includes("DNS per server"));
+
+    it("is not shown for a person who picked nothing", async () => {
+      await mount(1, []);
+      expect(text()).not.toContain("DNS per server");
+    });
+
+    it("lists the picks per server and says what applies when the node stopped offering one", async () => {
+      await mount(1, picks);
+      expect(getUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" }, expect.anything());
+      expect(text()).toContain("DNS per server");
+      expect(text()).toContain("de1");
+      expect(text()).toContain("nl1");
+      expect(text()).toContain("the node no longer offers it, Plain applies");
+      expect(text().match(/no longer offers it/g)).toHaveLength(1); // only the one that is not offered
+    });
+
+    it("resets after a confirmation and refreshes", async () => {
+      await mount(1, picks);
+      await click(resetButtons()[0]);
+      expect(resetUserDnsChoices).not.toHaveBeenCalled();
+      const dialog = document.querySelector("[role=dialog]")!;
+      expect(dialog.textContent).toContain("Reset the DNS choices");
+      getUserDnsChoices.mockResolvedValue({ choices: [] });
+      await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reset"));
+      await settle();
+      expect(resetUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" });
+      expect(text()).not.toContain("DNS per server"); // refetched: nothing picked any more
+    });
+
+    it("shows a read-only admin the picks but not the button", async () => {
+      await mount(3, picks);
+      expect(text()).toContain("DNS per server");
+      expect(resetButtons()).toHaveLength(0);
+    });
   });
 
   it("disables in red, and the toast can undo it", async () => {

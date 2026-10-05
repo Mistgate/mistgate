@@ -71,6 +71,11 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["preset_delete", { preset: "dns_1", name: "Дом" }],
   ["preset_default", { preset: "dns_1", name: "Дом" }],
   ["preset_default", { preset: "", name: "" }],
+  ["node_dns_options", { node: "nod_1", node_name: "de1", presets: 2, default: "dns_builtin_adblock" }],
+  ["node_dns_options", { node: "nod_1", node_name: "de1", presets: 0, default: "" }],
+  ["page_dns_choice", { user: "Марина", node: "de1", preset: "dns_builtin_family", preset_name: "AdGuard Family" }],
+  ["page_dns_choice", { user: "Марина", node: "de1", preset: "" }],
+  ["user_dns_choices_reset", { user: "usr_1", name: "Марина", removed: 2 }],
   ["device_create", { user: "usr_1", device: "dev_1", profile: "prf_1" }],
   ["device_configs", {}],
   ["device_rotate", {}],
@@ -134,6 +139,9 @@ describe("audit dictionary", () => {
     expect(describe2(tRu, "inbound_add", { profile: "hy2 · 443", node: "de1", port: 443 })).toBe("поставил(а) профиль hy2 · 443 на ноду de1, порт 443");
     expect(describe2(tRu, "inbound_update", { profile: "hy2", node: "de1", port: 443, enabled: false })).toBe("выключил(а) профиль hy2 на ноде de1");
     expect(describe2(tRu, "preset_default", { preset: "", name: "" })).toBe("вернул(а) встроенный основной DNS-пресет");
+    expect(describe2(tRu, "page_dns_choice", { user: "Марина", node: "de1", preset: "dns_builtin_family", preset_name: "AdGuard Family" })).toBe("Марина выбрал(а) DNS AdGuard Family для сервера de1");
+    expect(describe2(tEn, "page_dns_choice", { user: "Marina", node: "de1", preset: "" })).toBe("Marina went back to the default DNS for the server de1");
+    expect(describe2(tEn, "node_dns_options", { node_name: "de1", presets: 0 })).toBe("stopped offering a choice of DNS on the node de1");
     expect(describe2(tEn, "reset_login", { login: "owner", created: true })).toBe("gave an admin the password login “owner” on the panel server");
   });
   it("says what failed in the UI language, after the sentence, when the sentence itself does not", () => {

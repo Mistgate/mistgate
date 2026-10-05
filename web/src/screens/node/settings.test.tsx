@@ -21,6 +21,7 @@ const addNode = vi.fn();
 vi.mock("@/components/add-node", () => ({ useAddNode: () => addNode }));
 vi.mock("./warp", () => ({ WarpCard: () => null }));
 vi.mock("./awg-backend", () => ({ AwgBackendCard: () => null }));
+vi.mock("./dns-options", () => ({ DnsOptionsCard: () => null }));
 const serverAccess = vi.fn(() => ({ data: null as null | { passwordGenerated: boolean } }));
 vi.mock("./ssh-access", () => ({ SSHAccessCard: () => null, useServerAccess: () => serverAccess() }));
 

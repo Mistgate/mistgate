@@ -23,6 +23,7 @@ import { meQuery } from "@/lib/session";
 import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
 import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
+import { DnsOptionsCard } from "./dns-options";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
 import { WarpCard } from "./warp";
 
@@ -282,6 +283,8 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           </Button>
         </div>
       </form>
+
+      {!retired && <DnsOptionsCard nodeId={node.id} />}
 
       <SSHAccessCard nodeId={node.id} />
 

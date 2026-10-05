@@ -90,6 +90,30 @@ describe("the password setting", () => {
   });
 });
 
+describe("the DNS choice setting", () => {
+  it("is off for a document that has no such key (the upgrade) and saves an explicit on without losing the others", async () => {
+    await mount(settingsOf());
+    const sw = switchOf("DNS choice on the page");
+    expect(sw?.getAttribute("aria-checked")).toBe("false");
+    expect(text()).toContain("keeps the choices already made");
+    await click(sw);
+    await click(button("Save"));
+    expect(saved().userPage?.allowDnsChoice).toBe(true);
+    expect(saved().userPage?.allowDeviceSelfService).toBe(true);
+    expect(saved().userPage?.requirePagePassword).toBe(true);
+  });
+
+  it("an explicit on reads as on, an unchanged form has nothing to save, and off is saved as off", async () => {
+    await mount(settingsOf({ userPage: { showAnnouncement: true, showSupport: true, showQr: true, allowDeviceSelfService: true, allowDnsChoice: true } as Settings["userPage"] }));
+    const sw = switchOf("DNS choice on the page");
+    expect(sw?.getAttribute("aria-checked")).toBe("true");
+    expect(button("Save")).toBeUndefined();
+    await click(sw);
+    await click(button("Save"));
+    expect(saved().userPage?.allowDnsChoice).toBe(false);
+  });
+});
+
 describe("the apps list", () => {
   it("names the kinds by what they do, not by an app", async () => {
     await mount(settingsOf());

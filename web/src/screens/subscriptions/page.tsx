@@ -19,11 +19,11 @@ import { kindKey, kinds, platformKey, platforms, previewUrl, validDownload, type
 import { pickerUsersQuery, useSaveSettings } from "./queries";
 import { inputCls, SaveBar } from "./ui";
 
-type Options = { showAnnouncement: boolean; showSupport: boolean; showQr: boolean; allowDeviceSelfService: boolean; requirePagePassword: boolean };
+type Options = { showAnnouncement: boolean; showSupport: boolean; showQr: boolean; allowDeviceSelfService: boolean; requirePagePassword: boolean; allowDnsChoice: boolean };
 type Draft = { apps: PlatformApp[]; options: Options };
 const draftOf = (s: Settings): Draft => ({
   apps: s.apps,
-  options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true },
+  options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true, allowDnsChoice: s.userPage?.allowDnsChoice ?? false },
 });
 const descMax = 80;
 
@@ -81,6 +81,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
             <SwitchRow label={t("subs.page.opt.qr")} hint={t("subs.page.opt.qrHint")} checked={d.options.showQr} onCheckedChange={(on) => setOpt("showQr", on)} />
             <SwitchRow label={t("subs.page.opt.password")} hint={t("subs.page.opt.passwordHint")} checked={d.options.requirePagePassword} onCheckedChange={(on) => setOpt("requirePagePassword", on)} />
             <SwitchRow label={t("awg.page.selfService")} hint={t("awg.page.selfServiceHint")} checked={d.options.allowDeviceSelfService} onCheckedChange={(on) => setOpt("allowDeviceSelfService", on)} />
+            <SwitchRow label={t("subs.page.opt.dnsChoice")} hint={t("subs.page.opt.dnsChoiceHint")} checked={d.options.allowDnsChoice} onCheckedChange={(on) => setOpt("allowDnsChoice", on)} />
           </Card>
 
           <Card lg className="flex min-w-0 flex-col gap-3 p-4">

@@ -15,10 +15,12 @@ import { StatusDot } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
-import { users } from "@/lib/api";
+import { dns, users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
+import { useCan } from "@/lib/health";
+import { plain } from "@/lib/plain";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DAY, GB, agoText, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
@@ -229,6 +231,7 @@ function UserDetail({ data }: { data: DetailN }) {
           <SubscriptionNamePanel user={user} actions={actions} />
           <LimitsPanel user={user} actions={actions} />
           <AccessPanel data={data} actions={actions} />
+          <DnsChoicesPanel user={user} actions={actions} />
           <DangerZone title={t("users.danger")}>
             <SettingRow label={t("users.resetTrafficT")} hint={t("users.resetTrafficHint")}>
               <ResetTrafficButton user={user} actions={actions} />
@@ -334,6 +337,62 @@ function DeleteButton({ user, actions }: { user: User; actions: Actions }) {
         }}
       />
     </>
+  );
+}
+
+// ---- DNS picked on the user's page ----
+
+/**
+ * "DNS per server": what the person picked on their page, one line per node. Nothing picked, nothing shown. A pick the
+ * node does not offer any more does nothing: the line says what applies instead. "Reset" (helper and owner) removes them all.
+ */
+function DnsChoicesPanel({ user, actions }: { user: User; actions: Actions }) {
+  const t = useTx();
+  const toast = useToast();
+  const can = useCan();
+  const label = useDnsLabel();
+  const [open, setOpen] = useState(false);
+  const q = useQuery({
+    queryKey: ["users", "dns-choices", user.id],
+    queryFn: ({ signal }) => dns.getUserDnsChoices({ userId: user.id }, { signal }).then((r) => plain(r.choices)),
+  });
+  if (q.isError) return <QueryError compact error={q.error} onRetry={() => void q.refetch()} />;
+  if (!q.data || q.data.length === 0) return null;
+
+  async function reset() {
+    try {
+      await dns.resetUserDnsChoices({ userId: user.id });
+      await actions.refresh();
+      toast(t("subs.dnsChoice.resetDone", { name: user.name }));
+    } catch (e) {
+      toast.error(errorText(e, t));
+      throw e;
+    }
+  }
+
+  return (
+    <Panel title={t("subs.dnsChoice.title")} icon="dns" tone="sky">
+      <p className="-mt-1 text-xs leading-snug text-muted">{t("subs.dnsChoice.hint")}</p>
+      <ul className="flex flex-col">
+        {q.data.map((c) => (
+          <li key={c.nodeId} className="flex flex-col gap-0.5 border-t border-line py-2 text-[13px] first:border-t-0">
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="font-mono text-xs font-bold">{c.nodeName}</span>
+              <span className="min-w-0 flex-1 break-words">{label(c.presetId, c.presetName)}</span>
+            </span>
+            {!c.offered && <span className="text-[11px] leading-snug text-warn-text">{t("subs.dnsChoice.gone", { name: label(c.effectivePresetId, c.effectivePresetName) })}</span>}
+          </li>
+        ))}
+      </ul>
+      {can.run && (
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={() => setOpen(true)}>
+            {t("subs.dnsChoice.reset")}
+          </Button>
+        </div>
+      )}
+      <ConfirmModal open={open} onOpenChange={setOpen} title={t("subs.dnsChoice.resetT")} description={t("subs.dnsChoice.resetBody", { name: user.name })} confirmLabel={t("subs.dnsChoice.reset")} danger onConfirm={reset} />
+    </Panel>
   );
 }
 
