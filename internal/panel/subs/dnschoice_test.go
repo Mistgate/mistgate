@@ -657,40 +657,47 @@ func (r *dnsRig) userID(name string) string {
 	return id
 }
 
-// The key's server is named like servers[].label; the node's own name is for one case, the old connection to delete.
-func TestKeyConfigsNameTheServerByLabel(t *testing.T) {
+// The key's server is named like servers[].label. The panel's name of a node is nowhere in what the page gets: not in the
+// answers of the key calls (add, configs, rotate, rename), not in the keys, not in the page data.
+func TestKeyConfigsNameTheServerByLabelNeverByTheNode(t *testing.T) {
 	r := newDNSRig(t, nil)
 	_, tok := r.newUser("alice", nil)
 	c := call{r.h, t, tok}
-	add := decodeAnswer(t, c.post("/devices", r.addBody("phone")))
+	rec := c.post("/devices", r.addBody("phone"))
+	add := decodeAnswer(t, rec)
+	dev := add.Device["id"].(string)
 	if len(add.Configs) != 2 {
 		t.Fatalf("configs = %v", add.Configs)
 	}
 	for _, cfg := range add.Configs {
-		label, legacy := cfg["label"], cfg["legacy_name"]
 		switch cfg["node_id"] {
 		case "nod_1":
-			if label != "Germany · Frankfurt" || legacy != de1Name || cfg["filename"] != "mistgate-de.conf" {
+			if cfg["label"] != "Germany · Frankfurt" || cfg["filename"] != "mistgate-de.conf" {
 				t.Errorf("de1 config: %v", cfg)
 			}
 		case "nod_2":
-			if label != "Netherlands" || legacy != nl1Name {
+			if cfg["label"] != "Netherlands" {
 				t.Errorf("nl1 config: %v", cfg)
 			}
 		}
-		if cfg["server"] != label { // the old name of the field, kept for the old page
-			t.Errorf("server %v, label %v", cfg["server"], label)
-		}
-		if _, ok := cfg["node_name"]; ok {
-			t.Error("the old node_name is back")
-		}
-		if strings.Contains(cfg["conf"].(string), de1Name) || strings.Contains(cfg["vpn_key"].(string), "inner") {
-			t.Errorf("a node name in the key: %v", cfg["filename"])
+		for _, gone := range []string{"node_name", "legacy_name", "server"} {
+			if _, ok := cfg[gone]; ok {
+				t.Errorf("the config has %q", gone)
+			}
 		}
 	}
-	// The page data lists no legacy name: it is in the answers of the key calls only.
-	_, raw := r.page(tok)
-	if strings.Contains(raw, "legacy_name") || strings.Contains(raw, de1Name) {
-		t.Error("the page data holds the legacy name")
+	bodies := map[string]string{
+		"add": rec.Body.String(), "page": "",
+		"configs": c.post("/devices/"+dev+"/configs", "").Body.String(),
+		"rotate":  c.post("/devices/"+dev+"/rotate", "").Body.String(),
+		"rename":  c.post("/devices/"+dev+"/rename", `{"label":"x"}`).Body.String(),
+	}
+	_, bodies["page"] = r.page(tok)
+	for name, body := range bodies {
+		for _, leak := range []string{de1Name, nl1Name, "legacy_name", "node_name"} {
+			if strings.Contains(body, leak) {
+				t.Errorf("%s holds %q", name, leak)
+			}
+		}
 	}
 }

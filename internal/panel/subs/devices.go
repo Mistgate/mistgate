@@ -155,12 +155,7 @@ func online(last, now time.Time) bool { return !last.IsZero() && now.Sub(last) <
 type configJSON struct {
 	NodeID string `json:"node_id"`
 	// Label is the public name of the server, the same as servers[].label ("Germany · Frankfurt", "Germany 2", "Server").
-	Label string `json:"label"`
-	// LegacyName is the panel's name of the node. For one use only: naming an old connection that the person has to delete in the
-	// app. Keys issued before the names went by country were called "<node name> · AWG <version>" there. Never shown otherwise.
-	LegacyName string `json:"legacy_name"`
-	// Server is Label under its old name; the old page reads it. Removed with the old page.
-	Server      string          `json:"server"`
+	Label       string          `json:"label"`
 	CountryCode string          `json:"country_code"`
 	Version     string          `json:"version"`
 	Conf        string          `json:"conf"`    // the .conf text (AmneziaVPN and the AmneziaWG apps import it; one QR)
@@ -196,7 +191,7 @@ func configsOf(cfgs []access.DeviceConfig) []configJSON {
 	out := make([]configJSON, 0, len(cfgs))
 	for _, c := range cfgs {
 		out = append(out, configJSON{
-			NodeID: c.NodeID, Label: c.Server, LegacyName: c.NodeName, Server: c.Server, CountryCode: c.CountryCode, Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
+			NodeID: c.NodeID, Label: c.Server, CountryCode: c.CountryCode, Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
 			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients),
 		})
 	}
