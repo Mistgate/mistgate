@@ -30,7 +30,7 @@ const (
 	githubLatestReleaseURL     = "https://api.github.com/repos/Mistgate/mistgate/releases/latest"
 	githubReleasePageBase      = "https://github.com/Mistgate/mistgate/releases/tag/"
 	panelReleasePrefix         = "https://github.com/Mistgate/mistgate/releases/download/"
-	panelUpdateInterval        = 6 * time.Hour
+	panelUpdateInterval        = 10 * time.Minute // as often as the node bundle: 12 anonymous GitHub calls an hour together, the limit is 60
 	panelUpdateCheckTimeout    = 10 * time.Second
 	panelUpdateCheckCache      = 3 * time.Minute // CheckPanelUpdate answers from the last lookup this long
 	panelUpdateMaxSize         = 128 << 20
