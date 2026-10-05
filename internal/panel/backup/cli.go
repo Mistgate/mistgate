@@ -13,17 +13,30 @@ import (
 	"filippo.io/age"
 )
 
+const usage = `usage: mistgate backup <keygen|restore> [flags]
+
+  keygen  --identity-file FILE
+          make the private recovery identity (once, offline) and print its public recipient
+  restore --identity-file FILE --file BACKUP.tar.gz.age --data-dir NEW-DIR
+          decrypt a downloaded backup into a new data directory, offline
+
+"mistgate backup <command> -h" lists the command's flags.
+`
+
 // RunCLI runs the offline backup recovery commands. The private identity is read
 // only by restore and is never sent to the running panel or an object store.
 func RunCLI(args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: mistgate backup <keygen|restore> [flags]")
+		return errors.New(strings.TrimSpace(usage))
 	}
 	switch args[0] {
 	case "keygen":
 		return runKeygen(args[1:], out)
 	case "restore":
 		return runRestore(args[1:], out)
+	case "-h", "-help", "--help", "help":
+		_, err := io.WriteString(out, usage)
+		return err
 	default:
 		return fmt.Errorf("mistgate backup: unknown command %q (use keygen or restore)", args[0])
 	}

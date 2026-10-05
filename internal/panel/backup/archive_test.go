@@ -233,6 +233,19 @@ func TestBackupKeygenWritesPrivateIdentityOnlyOnce(t *testing.T) {
 	}
 }
 
+// "mistgate backup -h" prints the usage instead of "unknown command".
+func TestBackupHelp(t *testing.T) {
+	for _, arg := range []string{"-h", "--help", "help"} {
+		var out bytes.Buffer
+		if err := RunCLI([]string{arg}, &out); err != nil || !strings.Contains(out.String(), "keygen") || !strings.Contains(out.String(), "restore --identity-file") {
+			t.Errorf("%s: err=%v out=%q", arg, err, out.String())
+		}
+	}
+	if err := RunCLI([]string{"nope"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("unknown command: %v", err)
+	}
+}
+
 func makeMinimalArchive(t *testing.T, identity *age.HybridIdentity, name string, content []byte, trailing ...[]byte) []byte {
 	t.Helper()
 	var output bytes.Buffer
