@@ -60,8 +60,13 @@ type Service struct {
 	masterKey []byte
 	stepUp    func(context.Context) error
 	log       *slog.Logger
-	mu        sync.Mutex
+	mu        sync.Mutex // held while a backup runs
 	r2Factory func(context.Context, store.PanelBackupSettings) (s3API, error)
+	now       func() time.Time
+
+	retryMu  sync.Mutex
+	failures int       // backups that failed in a row
+	retryAt  time.Time // after a failure, no scheduled backup before this
 }
 
 func New(cfg Config) (*Service, error) {
@@ -71,7 +76,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, log: cfg.Log}
+	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, log: cfg.Log, now: time.Now}
 	s.r2Factory = s.newR2Client
 	return s, nil
 }
@@ -94,6 +99,8 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
+// runDue starts a scheduled backup once the interval has passed since the last success. After a failure it waits out
+// the backoff first (retryDelay): every attempt snapshots the database and reads the whole data directory.
 func (s *Service) runDue(ctx context.Context) {
 	settings, err := s.st.PanelBackupSettings(ctx)
 	if err != nil {
@@ -103,11 +110,13 @@ func (s *Service) runDue(ctx context.Context) {
 	if !settings.Enabled {
 		return
 	}
-	interval := settings.IntervalHours
-	if interval < 1 {
-		interval = defaultIntervalHour
+	if !settings.LastSuccess.IsZero() && s.now().Sub(settings.LastSuccess) < intervalOf(settings) {
+		return
 	}
-	if !settings.LastSuccess.IsZero() && time.Since(settings.LastSuccess) < time.Duration(interval)*time.Hour {
+	s.retryMu.Lock()
+	wait := s.now().Before(s.retryAt)
+	s.retryMu.Unlock()
+	if wait {
 		return
 	}
 	if _, warning, err := s.createBackup(ctx); err != nil {
@@ -115,6 +124,30 @@ func (s *Service) runDue(ctx context.Context) {
 	} else if warning != "" {
 		s.log.Warn("panel backup completed with a warning", "code", warning)
 	}
+}
+
+func intervalOf(settings store.PanelBackupSettings) time.Duration {
+	if settings.IntervalHours < 1 {
+		return defaultIntervalHour * time.Hour
+	}
+	return time.Duration(settings.IntervalHours) * time.Hour
+}
+
+// retryDelay is the wait after the n-th failure in a row: 2, 4, 8… minutes, never longer than the interval.
+func retryDelay(failures int, interval time.Duration) time.Duration {
+	return min(time.Minute<<min(failures, 16), interval)
+}
+
+// backoff remembers how the last backup went; a success (or new settings) lets the next scheduled one run when due.
+func (s *Service) backoff(failed bool, interval time.Duration) {
+	s.retryMu.Lock()
+	defer s.retryMu.Unlock()
+	if !failed {
+		s.failures, s.retryAt = 0, time.Time{}
+		return
+	}
+	s.failures++
+	s.retryAt = s.now().Add(retryDelay(s.failures, interval))
 }
 
 type rpc struct{ s *Service }
@@ -168,6 +201,7 @@ func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[admi
 	if err := r.s.st.SavePanelBackupSettings(ctx, settings, time.Now()); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errBackupInvalidSettings)
 	}
+	r.s.backoff(false, 0) // new settings: the next backup does not wait out the failures of the old ones
 	r.s.audit(ctx, "backup_settings_update", map[string]any{
 		"enabled": settings.Enabled, "interval_hours": settings.IntervalHours,
 		"retention_days": settings.RetentionDays, "jurisdiction": settings.Jurisdiction,
@@ -291,15 +325,18 @@ func validateSettings(settings store.PanelBackupSettings, enabled bool) error {
 	return nil
 }
 
-func (s *Service) createBackup(ctx context.Context) (backupObject, string, error) {
+func (s *Service) createBackup(ctx context.Context) (_ backupObject, _ string, err error) {
 	if !s.mu.TryLock() {
 		return backupObject{}, "", errBackupBusy
 	}
 	defer s.mu.Unlock()
+	interval := time.Duration(defaultIntervalHour) * time.Hour
+	defer func() { s.backoff(err != nil, interval) }()
 	settings, err := s.st.PanelBackupSettings(ctx)
 	if err != nil {
 		return backupObject{}, "", errBackupInvalidSettings
 	}
+	interval = intervalOf(settings)
 	if err := validateSettings(settings, true); err != nil {
 		return backupObject{}, "", errBackupNotConfigured
 	}
@@ -312,7 +349,16 @@ func (s *Service) createBackup(ctx context.Context) (backupObject, string, error
 		s.recordRun(ctx, false, errorCode(errBackupStorageFailed))
 		return backupObject{}, "", errBackupStorageFailed
 	}
-	workDir, err := os.MkdirTemp("", "mistgate-backup-")
+	// The work directory (the snapshot, the encrypted archive) lives in the data directory, on its disk: the only place
+	// the service may write, and not a tmpfs that counts against its memory. One a crash left behind goes first.
+	if entries, err := os.ReadDir(s.dataDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() && strings.HasPrefix(e.Name(), stagePrefix) {
+				os.RemoveAll(filepath.Join(s.dataDir, e.Name()))
+			}
+		}
+	}
+	workDir, err := os.MkdirTemp(s.dataDir, stagePrefix)
 	if err != nil {
 		s.recordRun(ctx, false, errorCode(errBackupArchiveFailed))
 		return backupObject{}, "", errBackupArchiveFailed
@@ -334,7 +380,7 @@ func (s *Service) createBackup(ctx context.Context) (backupObject, string, error
 		return backupObject{}, "", errBackupArchiveFailed
 	}
 	now := time.Now().UTC()
-	createErr := CreateEncryptedArchive(ctx, s.dataDir, snapshot, s.masterKey, buildinfo.Version, settings.AgeRecipient, now, workDir, archive)
+	createErr := CreateEncryptedArchive(ctx, s.dataDir, snapshot, s.masterKey, buildinfo.Version, settings.AgeRecipient, now, archive)
 	closeErr := archive.Close()
 	if createErr != nil || closeErr != nil {
 		s.recordRun(ctx, false, errorCode(errBackupArchiveFailed))

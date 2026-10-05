@@ -61,7 +61,7 @@ func TestEncryptedArchiveRoundTripIncludesCommittedWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var encrypted bytes.Buffer
-	if err := CreateEncryptedArchive(ctx, dataDir, snapshot, key, "test-version", identity.Recipient().String(), time.Now(), workDir, &encrypted); err != nil {
+	if err := CreateEncryptedArchive(ctx, dataDir, snapshot, key, "test-version", identity.Recipient().String(), time.Now(), &encrypted); err != nil {
 		t.Fatal(err)
 	}
 	if bytes.Contains(encrypted.Bytes(), []byte(marker)) || bytes.Contains(encrypted.Bytes(), key) {

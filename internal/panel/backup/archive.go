@@ -50,14 +50,24 @@ type backupFile struct {
 	SHA256 string `json:"sha256"`
 }
 
+// preparedFile is one file of the archive: read from source when it is written (its hash was taken first, for the
+// manifest, and must still match), or data held in memory (the master key).
 type preparedFile struct {
 	backupFile
-	Mode os.FileMode
+	Mode   os.FileMode
+	source string
+	data   []byte
 }
 
-// CreateEncryptedArchive snapshots the panel's durable data into an age-encrypted,
-// versioned tar.gz stream. workDir must be a private temporary directory owned by the caller.
-func CreateEncryptedArchive(ctx context.Context, dataDir, snapshotDB string, masterKey []byte, appVersion, recipientText string, created time.Time, workDir string, dst io.Writer) error {
+// stagePrefix names the private directory a backup works in (the snapshot and the encrypted archive), inside the data
+// directory: the service may write nowhere else on disk, and /tmp may be a tmpfs counted against the panel's memory.
+// The archive leaves such directories out.
+const stagePrefix = ".mistgate-backup-"
+
+// CreateEncryptedArchive snapshots the panel's durable data into an age-encrypted, versioned tar.gz stream. The files of
+// the data directory are streamed into it, not copied first: their hashes are taken in a first pass (the manifest leads
+// the archive), and a file that changes before it is written fails the backup.
+func CreateEncryptedArchive(ctx context.Context, dataDir, snapshotDB string, masterKey []byte, appVersion, recipientText string, created time.Time, dst io.Writer) error {
 	if len(masterKey) != vault.KeySize {
 		return errors.New("backup: invalid master key")
 	}
@@ -65,11 +75,7 @@ func CreateEncryptedArchive(ctx context.Context, dataDir, snapshotDB string, mas
 	if err != nil {
 		return fmt.Errorf("backup: invalid recovery recipient: %w", err)
 	}
-	payload := filepath.Join(workDir, "payload")
-	if err := os.Mkdir(payload, 0o700); err != nil {
-		return err
-	}
-	files, err := preparePayload(ctx, dataDir, snapshotDB, masterKey, payload)
+	files, err := preparePayload(ctx, dataDir, snapshotDB, masterKey)
 	if err != nil {
 		return err
 	}
@@ -88,7 +94,7 @@ func CreateEncryptedArchive(ctx context.Context, dataDir, snapshotDB string, mas
 	if len(encodedManifest) > maxManifestBytes {
 		return errors.New("backup: manifest is too large")
 	}
-	return writeEncryptedTar(ctx, dst, recipient, payload, files, encodedManifest, created)
+	return writeEncryptedTar(ctx, dst, recipient, files, encodedManifest, created)
 }
 
 func parseRecipient(text string) (age.Recipient, error) {
@@ -99,7 +105,7 @@ func parseRecipient(text string) (age.Recipient, error) {
 	return age.ParseX25519Recipient(text)
 }
 
-func preparePayload(ctx context.Context, dataDir, snapshotDB string, masterKey []byte, payload string) ([]preparedFile, error) {
+func preparePayload(ctx context.Context, dataDir, snapshotDB string, masterKey []byte) ([]preparedFile, error) {
 	root, err := filepath.Abs(dataDir)
 	if err != nil {
 		return nil, err
@@ -130,6 +136,9 @@ func preparePayload(ctx context.Context, dataDir, snapshotDB string, masterKey [
 			return fmt.Errorf("backup: refusing symlink %q", archivePath)
 		}
 		if entry.IsDir() {
+			if !strings.Contains(archivePath, "/") && strings.HasPrefix(archivePath, stagePrefix) {
+				return filepath.SkipDir // a backup's own work directory, this one's or one left by a crash
+			}
 			return nil
 		}
 		if skipDataFile(archivePath) {
@@ -148,7 +157,7 @@ func preparePayload(ctx context.Context, dataDir, snapshotDB string, masterKey [
 		if archivePath == manifestName {
 			return errors.New("backup: data directory contains a reserved archive path")
 		}
-		item, err := copyPayloadFile(ctx, source, filepath.Join(payload, filepath.FromSlash(archivePath)), archivePath, info.Mode())
+		item, err := hashFile(ctx, source, archivePath, info.Mode())
 		if err != nil {
 			return err
 		}
@@ -161,27 +170,12 @@ func preparePayload(ctx context.Context, dataDir, snapshotDB string, masterKey [
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range []struct{ src, name string }{{snapshotDB, databaseName}} {
-		f, err := copyPayloadFile(ctx, item.src, filepath.Join(payload, item.name), item.name, 0o600)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, f)
-	}
-	keyPath := filepath.Join(payload, masterKeyName)
-	keyFile, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	db, err := hashFile(ctx, snapshotDB, databaseName, 0o600)
 	if err != nil {
 		return nil, err
 	}
 	keyHash := sha256.Sum256(masterKey)
-	if _, err := keyFile.Write(masterKey); err != nil {
-		keyFile.Close()
-		return nil, err
-	}
-	if err := keyFile.Close(); err != nil {
-		return nil, err
-	}
-	files = append(files, preparedFile{backupFile: backupFile{Path: masterKeyName, Size: int64(len(masterKey)), SHA256: hex.EncodeToString(keyHash[:])}, Mode: 0o600})
+	files = append(files, db, preparedFile{backupFile: backupFile{Path: masterKeyName, Size: int64(len(masterKey)), SHA256: hex.EncodeToString(keyHash[:])}, Mode: 0o600, data: masterKey})
 	if len(files) > maxBackupFiles {
 		return nil, errors.New("backup: too many files")
 	}
@@ -209,44 +203,41 @@ func skipDataFile(name string) bool {
 	return strings.HasPrefix(name, databaseName+"-") || name == databaseName+"-journal"
 }
 
-func copyPayloadFile(ctx context.Context, source, destination, archivePath string, sourceMode os.FileMode) (preparedFile, error) {
+// openRegular opens a regular file that is not a symlink, and was not swapped for one between the check and the open.
+func openRegular(source, archivePath string) (*os.File, os.FileInfo, error) {
+	linkInfo, err := os.Lstat(source)
+	if err != nil || linkInfo.Mode()&os.ModeSymlink != 0 || !linkInfo.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("backup: refusing non-regular file %q", archivePath)
+	}
+	in, err := os.Open(source)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := in.Stat()
+	if err != nil || !info.Mode().IsRegular() || !os.SameFile(linkInfo, info) {
+		in.Close()
+		return nil, nil, fmt.Errorf("backup: source changed while opening %q", archivePath)
+	}
+	return in, info, nil
+}
+
+// hashFile reads a file once for the manifest: its size and SHA-256. writeEncryptedTar reads it again and checks both.
+func hashFile(ctx context.Context, source, archivePath string, sourceMode os.FileMode) (preparedFile, error) {
 	if err := validateArchivePath(archivePath); err != nil {
 		return preparedFile{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
-		return preparedFile{}, err
-	}
-	linkInfo, err := os.Lstat(source)
-	if err != nil || linkInfo.Mode()&os.ModeSymlink != 0 || !linkInfo.Mode().IsRegular() {
-		return preparedFile{}, fmt.Errorf("backup: refusing non-regular file %q", archivePath)
-	}
-	in, err := os.Open(source)
+	in, before, err := openRegular(source, archivePath)
 	if err != nil {
 		return preparedFile{}, err
 	}
 	defer in.Close()
-	before, err := in.Stat()
-	if err != nil {
-		return preparedFile{}, err
-	}
-	if !before.Mode().IsRegular() {
-		return preparedFile{}, fmt.Errorf("backup: refusing non-regular file %q", archivePath)
-	}
-	if !os.SameFile(linkInfo, before) {
-		return preparedFile{}, fmt.Errorf("backup: source changed while opening %q", archivePath)
-	}
 	if before.Size() > maxBackupBytes {
 		return preparedFile{}, errors.New("backup: file exceeds the size limit")
 	}
-	out, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	h := sha256.New()
+	n, err := copyContext(ctx, h, in)
 	if err != nil {
 		return preparedFile{}, err
-	}
-	h := sha256.New()
-	n, copyErr := copyContext(ctx, io.MultiWriter(out, h), in)
-	closeErr := out.Close()
-	if copyErr != nil || closeErr != nil {
-		return preparedFile{}, errors.Join(copyErr, closeErr)
 	}
 	after, err := in.Stat()
 	if err != nil {
@@ -259,13 +250,10 @@ func copyPayloadFile(ctx context.Context, source, destination, archivePath strin
 	if sourceMode.Perm()&0o111 != 0 {
 		mode |= 0o100 // restore executable files for the service owner only
 	}
-	if err := os.Chmod(destination, mode); err != nil {
-		return preparedFile{}, err
-	}
-	return preparedFile{backupFile: backupFile{Path: archivePath, Size: n, SHA256: hex.EncodeToString(h.Sum(nil))}, Mode: mode}, nil
+	return preparedFile{backupFile: backupFile{Path: archivePath, Size: n, SHA256: hex.EncodeToString(h.Sum(nil))}, Mode: mode, source: source}, nil
 }
 
-func writeEncryptedTar(ctx context.Context, dst io.Writer, recipient age.Recipient, payload string, files []preparedFile, manifest []byte, created time.Time) (retErr error) {
+func writeEncryptedTar(ctx context.Context, dst io.Writer, recipient age.Recipient, files []preparedFile, manifest []byte, created time.Time) (retErr error) {
 	encrypted, err := age.Encrypt(dst, recipient)
 	if err != nil {
 		return err
@@ -279,7 +267,13 @@ func writeEncryptedTar(ctx context.Context, dst io.Writer, recipient age.Recipie
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		in, err := os.Open(filepath.Join(payload, filepath.FromSlash(f.Path)))
+		if f.data != nil {
+			if err := writeTarFile(tw, f.Path, f.data, f.Mode, created); err != nil {
+				return err
+			}
+			continue
+		}
+		in, _, err := openRegular(f.source, f.Path)
 		if err != nil {
 			return err
 		}
@@ -292,10 +286,10 @@ func writeEncryptedTar(ctx context.Context, dst io.Writer, recipient age.Recipie
 		n, copyErr := copyContext(ctx, io.MultiWriter(tw, h), in)
 		closeErr := in.Close()
 		if copyErr != nil || closeErr != nil {
-			return errors.Join(copyErr, closeErr)
+			return errors.Join(copyErr, closeErr) // a file that grew: the tar writer refuses the bytes past its size
 		}
 		if n != f.Size || hex.EncodeToString(h.Sum(nil)) != f.SHA256 {
-			return fmt.Errorf("backup: staged file changed %q", f.Path)
+			return fmt.Errorf("backup: %q changed while it was archived", f.Path)
 		}
 	}
 	if err := tw.Close(); err != nil {

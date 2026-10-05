@@ -32,6 +32,8 @@ As the owner, open **Settings → Backups** and enter the Cloudflare account ID,
 
 The panel takes a consistent SQLite snapshot, includes the panel data files and the effective `master.key`, creates a manifest with file hashes, encrypts the archive to the public recipient, and uploads it to R2. The private recovery identity is never stored by Mistgate. Keep a copy of it even if R2 is available.
 
+The work happens in a temporary directory inside the data directory, so that disk needs free space for one more copy of the database plus the encrypted archive; the other files are read in place. After a failed scheduled run the next attempt waits 2 minutes, then 4, 8 and so on, never longer than the interval. Saving the settings ends the wait.
+
 ## Restore on a new panel
 
 Download the encrypted object from R2 and copy it, the recovery identity, and the `mistgate` binary to the new panel host. Stop Mistgate if it is already running. Restore into a **new, non-existing** data directory; the command refuses to overwrite files:
