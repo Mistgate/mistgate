@@ -139,6 +139,8 @@ type SubOptions struct {
 	Format plugin.ClientFormat
 	// Name is the server name a Mihomo proxy carries; nil = "<node> · <profile>".
 	Name func(SubServer) string
+	// NoTouch: the view is for the page, not for an app, so it does not mark the implicit device as having fetched the subscription.
+	NoTouch bool
 }
 
 // Subscription resolves a token. The lookup is by sha256(token), so the comparison never sees the token
@@ -156,7 +158,7 @@ func (s *Service) SubscriptionWith(ctx context.Context, token string, opt SubOpt
 	} else if err != nil {
 		return SubView{}, err
 	}
-	return s.subView(ctx, u, true, opt)
+	return s.subView(ctx, u, !opt.NoTouch, opt)
 }
 
 // PreviewSubscription is Subscription for the admin's preview of the user page: it looks the user up by id

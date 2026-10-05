@@ -42,6 +42,25 @@ func TestSubscriptionFetchIsReadOnly(t *testing.T) {
 	}
 }
 
+// A view for the page (SubOptions.NoTouch) is not an app's fetch: it leaves last_seen_at alone.
+func TestSubscriptionNoTouchLeavesTheDeviceAlone(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	r := e.user("sub", f.group, nil)
+	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
+	must(e.s.Subscription(e.ctx, token))
+	stale := e.clock.Add(-2 * time.Hour).Unix()
+	e.sql(`UPDATE device SET last_seen_at = ? WHERE user_id = ?`, stale, r.User.Id)
+
+	must(e.s.SubscriptionWith(e.ctx, token, SubOptions{NoTouch: true}))
+	time.Sleep(300 * time.Millisecond) // a touch is written off the request path
+	var seen int64
+	e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ?`, r.User.Id).Scan(&seen)
+	if seen != stale {
+		t.Errorf("last_seen_at = %d after a view for the page, want %d", seen, stale)
+	}
+}
+
 // last_seen_at of the device is refreshed, but only when stale and never on the request path.
 func TestSubscriptionFetchTouchesStaleDeviceOffTheRequestPath(t *testing.T) {
 	f := newFixture(t)

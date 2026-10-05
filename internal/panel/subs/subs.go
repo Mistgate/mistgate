@@ -202,8 +202,9 @@ type tokenState struct {
 
 // cachedView is one cached fetch.
 type cachedView struct {
-	v  *access.SubView
-	at time.Time
+	v       *access.SubView
+	at      time.Time
+	touched bool // an app's fetch made it: the device was marked as having received the subscription
 }
 
 // clientState is the token-guessing record of one client network.
@@ -302,10 +303,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		format = plugin.FormatMihomo
 	}
 
+	// Only an app counts as "the app received the subscription": a browser (the page, or the decoy) does not.
+	touch := sf != adminv1.SubFormat_SUB_FORMAT_USER_PAGE && sf != adminv1.SubFormat_SUB_FORMAT_DECOY
 	st, known := h.tokens.Get(token)
 	admitted := false
 	if known {
-		res, retry, suspect := st.admit(h, ip, now, format)
+		res, retry, suspect := st.admit(h, ip, now, format, touch)
 		if retry > 0 {
 			tooMany(w, retry)
 			return
@@ -320,7 +323,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		admitted = true
 	}
 
-	v, err := h.fetch(r.Context(), token, format)
+	v, err := h.fetch(r.Context(), token, format, touch)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
 		h.miss(client, now)
@@ -335,34 +338,38 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !admitted {
 		st = h.tokens.GetOrCreate(token, func() *tokenState { return &tokenState{} })
-		if _, retry, suspect := st.admit(h, ip, now, format); retry > 0 {
+		if _, retry, suspect := st.admit(h, ip, now, format, touch); retry > 0 {
 			tooMany(w, retry)
 			return
 		} else if suspect != "" {
 			h.suspect(suspect)
 		}
 	}
-	st.remember(v, format, now)
+	st.remember(v, format, now, touch)
 	h.respond(w, r, token, v, set, sf, format)
 }
 
-// fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list.
-func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat) (access.SubView, error) {
-	if format == plugin.FormatMihomo && h.fsrc != nil {
+// fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list. touch: an app
+// asked, so the device is marked as having received the subscription; the page view and its calls do not.
+func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, touch bool) (access.SubView, error) {
+	switch {
+	case format == plugin.FormatMihomo && h.fsrc != nil:
 		return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{Format: plugin.FormatMihomo})
+	case !touch && h.fsrc != nil:
+		return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{NoTouch: true})
 	}
 	return h.src.Subscription(ctx, token)
 }
 
-// remember keeps the user name and the data of a fetch (for MinInterval, per view format).
-func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now time.Time) {
+// remember keeps the user name and the data of a fetch (for MinInterval, per view format); touched: an app's fetch made it.
+func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now time.Time, touched bool) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.userName = v.UserName
 	if st.cached == nil {
 		st.cached = map[plugin.ClientFormat]cachedView{}
 	}
-	st.cached[format] = cachedView{v: &v, at: now}
+	st.cached[format] = cachedView{v: &v, at: now, touched: touched}
 }
 
 // respond renders the answer for a valid token from its data, the settings and the brand of this moment
@@ -547,7 +554,7 @@ func (h *handler) miss(client string, now time.Time) {
 // admit counts one fetch of the token: against the hourly cap (retry > 0: refused), towards the day's
 // distinct networks (suspect is the user name, non-empty once per day when the threshold is crossed), and
 // returns the cached response when it is younger than MinInterval.
-func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, format plugin.ClientFormat) (res *access.SubView, retry time.Duration, suspect string) {
+func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, format plugin.ClientFormat, touch bool) (res *access.SubView, retry time.Duration, suspect string) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if h.cfg.MaxPerHour > 0 {
@@ -579,7 +586,8 @@ func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, format plu
 			}
 		}
 	}
-	if c, ok := st.cached[format]; ok && h.cfg.MinInterval > 0 && now.Sub(c.at) < h.cfg.MinInterval {
+	// A view the page left does not stand in for an app's fetch: that one must reach the device.
+	if c, ok := st.cached[format]; ok && h.cfg.MinInterval > 0 && now.Sub(c.at) < h.cfg.MinInterval && (c.touched || !touch) {
 		res = c.v
 	}
 	return res, 0, suspect

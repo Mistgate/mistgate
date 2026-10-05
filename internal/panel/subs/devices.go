@@ -363,12 +363,12 @@ func (h *handler) admitWrite(w http.ResponseWriter, st *tokenState, v access.Sub
 // fetch left: these calls reveal keys and change devices, so a link that was just rotated or a user that was just disabled
 // must stop working at once (the cache is only for the read-only page view). It does not count against the fetch budget.
 func (h *handler) identify(ctx context.Context, token string, now time.Time) (access.SubView, *tokenState, error) {
-	v, err := h.src.Subscription(ctx, token)
+	v, err := h.fetch(ctx, token, plugin.FormatURIList, false) // the page asks, not an app
 	if err != nil {
 		return access.SubView{}, nil, err
 	}
 	st := h.tokens.GetOrCreate(token, func() *tokenState { return &tokenState{} })
-	st.remember(v, plugin.FormatURIList, now)
+	st.remember(v, plugin.FormatURIList, now, false)
 	return v, st, nil
 }
 
