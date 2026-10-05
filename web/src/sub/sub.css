@@ -133,8 +133,8 @@ a { color: inherit; }
 .div { height: 1px; background: var(--border); }
 
 /* a heading of a section: the title, what is beside it, and (below on a phone, at the right on a computer) one line */
-.sec { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; padding: 20px 4px 0; }
-.sec .h2 { flex: 1; min-width: 0; }
+.shead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; padding: 20px 4px 0; }
+.shead .h2 { flex: 1; min-width: 0; }
 .sec-sub { flex-basis: 100%; order: 3; }
 
 /* a dot and a pill: colour + dot + word */
@@ -301,7 +301,7 @@ a { color: inherit; }
 .xrow .s { font-size: 13px; line-height: 1.4; color: var(--muted); }
 .xrow .chev { margin-left: auto; color: var(--muted); transition: transform 0.25s var(--spring); }
 .xrow[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.qrbox { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 16px 18px; }
+.qrbox { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 16px; }
 
 /* servers */
 .srv { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
@@ -494,9 +494,9 @@ a { color: inherit; }
   .btn.dl { min-height: 52px; }
   .btn.dl.fit-w { width: auto; min-width: 240px; align-self: flex-start; }
   .dl-t b { font-size: 14px; }
-  .sec { padding-top: 30px; align-items: flex-end; }
+  .shead { padding-top: 30px; align-items: flex-end; }
   .sec-sub { flex-basis: auto; order: 0; margin-left: auto; text-align: right; }
-  .sec .slots { order: 1; }
+  .shead .slots { order: 1; }
   .step { padding: 22px 24px 24px; }
 
   /* the device: pills */

@@ -157,7 +157,7 @@ export function serversSection(c: Ctx): Kid[] {
   if (all.length === 0) return [];
   const linkName = d.dns && !d.dns.link.per_server ? dnsName(d, d.dns.link.effective) : "";
   const remark = linkName && all.some((x) => x.dns) ? note("", "info", t.dnsLinkNote(linkName.replace(/\s+—\s+/, ", "), keyAppName(d, null))) : null;
-  return [h("div", { class: "sec" }, h("h2", { class: "h2" }, t.serversT), h("p", { class: "hint sec-sub" }, t.serversS)), remark, h("div", { class: "srv-grid" }, ...all.map((x) => card(c, x))), busyNote(c, all)].filter((x): x is HTMLElement => !!x);
+  return [h("div", { class: "shead" }, h("h2", { class: "h2" }, t.serversT), h("p", { class: "hint sec-sub" }, t.serversS)), remark, h("div", { class: "srv-grid" }, ...all.map((x) => card(c, x))), busyNote(c, all)].filter((x): x is HTMLElement => !!x);
 }
 
 // ---- the DNS choice (a sheet on a phone, a window on a computer) ----

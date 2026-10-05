@@ -269,7 +269,7 @@ describe("view", () => {
   });
 
   it("first visit: steps, servers, devices; a returning visit: servers, devices, then the folded 'connect one more device'", () => {
-    const heads = (el: HTMLElement) => [...el.querySelectorAll(".sec .h2")].map(text);
+    const heads = (el: HTMLElement) => [...el.querySelectorAll(".shead .h2")].map(text);
     expect(heads(view(data("first"), state("ios"), actions()))).toEqual(["Подключите VPN", "Серверы", "Мои устройства"]);
     const back = view(data("return"), state("ios", { returning: true }), actions());
     expect(heads(back)).toEqual(["Серверы", "Мои устройства"]);

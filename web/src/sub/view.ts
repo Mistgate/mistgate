@@ -104,7 +104,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     } else {
       if (hasConnect) {
         children.push(
-          h("div", { class: "sec" }, h("h2", { class: "h2" }, t.connectT), h("p", { class: "hint sec-sub" }, t.connectH)),
+          h("div", { class: "shead" }, h("h2", { class: "h2" }, t.connectT), h("p", { class: "hint sec-sub" }, t.connectH)),
           h("div", { class: "cols" }, h("div", { class: "main" }, connectCard(c)), (qr || hasHelp) && h("aside", { class: "side only-w" }, qr, hasHelp && helpCard(c))),
         );
       }

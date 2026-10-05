@@ -250,7 +250,7 @@ export function devicesSection(c: Ctx): Kid[] {
   }
   if (rows.length === 0 || (inactive && rows.length === 1)) return [];
   return [
-    h("div", { class: "sec" }, h("h2", { class: "h2" }, t.devicesT), slots(c)),
+    h("div", { class: "shead" }, h("h2", { class: "h2" }, t.devicesT), slots(c)),
     h("section", { class: "card", "aria-label": t.devicesAria }, ...rows),
   ];
 }
