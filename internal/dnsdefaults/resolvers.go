@@ -1,5 +1,6 @@
-// Package dnsdefaults defines the node DNS resolvers selected when an administrator
-// leaves the per-node resolver setting empty.
+// Package dnsdefaults defines the resolvers the doctor checks and offers for the server's
+// own resolver when the node has none configured. An empty node list itself means the
+// server's own resolver; the panel never substitutes these.
 package dnsdefaults
 
 import "strings"

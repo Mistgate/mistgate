@@ -154,7 +154,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
     { key: "dial", label: t("node.settings.dial"), hint: t("node.settings.dialHint") },
   ];
   const dnsModes: { value: NodeDnsMode; label: string; hint: string }[] = [
-    { value: "auto", label: t("node.settings.dnsMode.auto"), hint: t("node.settings.dnsMode.autoHint") },
+    { value: "system", label: t("node.settings.dnsMode.system"), hint: t("node.settings.dnsMode.systemHint") },
     { value: "yandex", label: t("node.settings.dnsMode.yandex"), hint: "77.88.8.8 · 77.88.8.1" },
     { value: "cloudflareGoogle", label: t("node.settings.dnsMode.cloudflareGoogle"), hint: "1.1.1.1 · 8.8.8.8" },
     { value: "custom", label: t("node.settings.dnsMode.custom"), hint: t("node.settings.dnsMode.customHint") },

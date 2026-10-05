@@ -82,7 +82,7 @@ A port inside the port-hopping range of another profile, or held by Caddy or ano
 **What to check**
 
 1. The node's own resolver: the doctor's **Server resolver**. The check names are resolved by the node; if they fail, apply **Fix the resolver**.
-2. **DNS for user traffic** in the node's **Settings**: the resolvers your users' traffic uses. Empty means the server's own resolver.
+2. **DNS resolvers for this node** in the node's **Settings**: the resolvers your users' traffic uses. The default is the server's own resolver.
 3. WARP: if only the profiles with WARP egress fail, see "WARP does not work".
 4. AmneziaWG: the doctor's **AmneziaWG backend** warns when the host firewall drops forwarded traffic (often a Docker installation on the same server).
 5. The doctor's **Foreign firewall rules** and **Leftovers of other VPNs**: a foreign nat or redirect rule can swallow the traffic.

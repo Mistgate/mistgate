@@ -110,7 +110,7 @@ Some problems need you, not a button. The card names them:
 - The account stores Cloudflare's endpoint as IP addresses, never as a name. The node tries the IPv4 endpoint on every port first, then the IPv6 one, if the account has it.
 - New accounts often have no IPv6 address inside the tunnel. Then the WARP exit dials IPv4 only, and IPv6-only destinations are not reachable through WARP.
 - A node without IPv6 is fine for WARP: the doctor notes that WARP goes through its IPv4 address.
-- Names are resolved with the node's **DNS for user traffic**, the same as for the direct exit. See [DNS](dns.md).
+- Names are resolved with the node's **DNS resolvers for this node**, the same as for the direct exit. See [DNS](dns.md).
 
 ## What the host needs
 

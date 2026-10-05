@@ -320,7 +320,8 @@ func TestBlipIsHandedToHealthOnlyWhenTheHostDidNotReboot(t *testing.T) {
 	}
 }
 
-// The node's country reaches the agent (the doctor's resolver check needs it) and a change is re-sent.
+// The node's country reaches the agent (the doctor's resolver check needs it) and a change is re-sent. It never picks
+// the node's resolvers: an empty list means the server's own resolver, on old and new agents alike.
 func TestCountryCodeReachesTheAgent(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("nodea")
@@ -332,15 +333,15 @@ func TestCountryCodeReachesTheAgent(t *testing.T) {
 	if ack.Settings.CountryCode != "RU" {
 		t.Fatalf("settings in HelloAck: %+v", ack.Settings)
 	}
-	if got := strings.Join(ack.Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {
-		t.Fatalf("Russian DNS resolvers in HelloAck = %q", got)
+	if len(ack.Settings.DnsResolvers) != 0 {
+		t.Fatalf("DNS resolvers in HelloAck = %q, want none (the server's own resolver)", ack.Settings.DnsResolvers)
 	}
 	ds := c.desired()
 	if ds.Settings.CountryCode != "RU" {
 		t.Fatalf("settings in DesiredState: %+v", ds.Settings)
 	}
-	if got := strings.Join(ds.Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {
-		t.Fatalf("Russian DNS resolvers in DesiredState = %q", got)
+	if len(ds.Settings.DnsResolvers) != 0 {
+		t.Fatalf("DNS resolvers in DesiredState = %q, want none", ds.Settings.DnsResolvers)
 	}
 	m := newModel()
 	m.apply(ds)
@@ -356,8 +357,16 @@ func TestCountryCodeReachesTheAgent(t *testing.T) {
 	if next.Settings.CountryCode != "DE" {
 		t.Fatalf("a changed country was not re-sent: %+v", next.Settings)
 	}
-	if got := strings.Join(next.Settings.DnsResolvers, ","); got != "1.1.1.1,8.8.8.8" {
-		t.Fatalf("world DNS resolvers after country change = %q", got)
+	if len(next.Settings.DnsResolvers) != 0 {
+		t.Fatalf("DNS resolvers after country change = %q, want none", next.Settings.DnsResolvers)
+	}
+	// A preset the owner picked is sent as it is.
+	yandex := &adminv1.DnsResolvers{Values: []string{"77.88.8.8", "77.88.8.1"}}
+	if _, err := (nodeService{e.f}).UpdateNode(e.ctx, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: a.nodeID, DnsResolvers: yandex})); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(c.desired().Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {
+		t.Fatalf("picked DNS resolvers = %q", got)
 	}
 }
 

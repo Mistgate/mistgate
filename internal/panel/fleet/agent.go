@@ -13,7 +13,6 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/dnsdefaults"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -666,15 +665,11 @@ const (
 
 // nodeSettings is what the agent of a stream with these capabilities is told. The AWG and torrent blocker settings
 // are sent only to agents that advertise the capability, keeping old-agent settings signatures unchanged.
+// An empty resolver list stays empty: the node then uses the server's own resolver (some hosters allow only theirs);
+// country defaults are a preset the owner picks, never a silent substitute.
 func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
-	resolvers := n.DNSResolvers
-	if len(resolvers) == 0 {
-		resolvers = dnsdefaults.ForCountry(n.CountryCode)
-	} else {
-		resolvers = slices.Clone(resolvers)
-	}
 	s := &agentv1.NodeSettings{StatsIntervalS: defaultStatsIntervalS, KeepaliveIntervalS: defaultKeepaliveInterval,
-		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: resolvers,
+		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: slices.Clone(n.DNSResolvers),
 		CountryCode: n.CountryCode}
 	if slices.Contains(caps, capAWG) {
 		s.AwgBackend = n.AwgBackend

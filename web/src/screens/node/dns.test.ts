@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { nodeDnsMode, nodeDnsPresets, nodeDnsResolvers } from "./dns";
 
 describe("per-node DNS presets", () => {
-  it("uses country defaults when no explicit resolvers are stored", () => {
-    expect(nodeDnsMode([])).toBe("auto");
-    expect(nodeDnsResolvers("auto")).toEqual([]);
+  it("means the server's own resolver when no resolvers are stored", () => {
+    expect(nodeDnsMode([])).toBe("system");
+    expect(nodeDnsResolvers("system")).toEqual([]);
   });
 
   it("recognizes and applies the Yandex preset", () => {

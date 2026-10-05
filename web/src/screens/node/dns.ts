@@ -3,11 +3,12 @@ export const nodeDnsPresets = {
   cloudflareGoogle: ["1.1.1.1", "8.8.8.8"],
 } as const;
 
-export type NodeDnsMode = "auto" | "yandex" | "cloudflareGoogle" | "custom";
+/** "system" is an empty list: the node uses the server's own resolver. */
+export type NodeDnsMode = "system" | "yandex" | "cloudflareGoogle" | "custom";
 
 export function nodeDnsMode(resolvers: readonly string[]): NodeDnsMode {
   const normalized = resolvers.map((resolver) => resolver.trim()).filter(Boolean);
-  if (normalized.length === 0) return "auto";
+  if (normalized.length === 0) return "system";
   if (normalized.join(",") === nodeDnsPresets.yandex.join(",")) return "yandex";
   if (normalized.join(",") === nodeDnsPresets.cloudflareGoogle.join(",")) return "cloudflareGoogle";
   return "custom";

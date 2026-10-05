@@ -150,13 +150,13 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 | **Drop the agent connection after** | 30–600 s, default 90. If the agent stays silent longer, the panel closes the connection. The node turns grey (**Host blip**) first; **Unreachable** comes after 10 minutes without contact. |
 | **Wait for a command result** | 10–900 s, default 120: how long the panel waits before a command counts as unanswered. |
 | **Agent dial timeout** | 5–120 s, default 15: how long the agent waits when it connects to the panel. |
-| **DNS for user traffic** | IP addresses separated by commas, up to 8 (`1.1.1.1, 8.8.8.8`, an `ip:port` works too). The node resolves the names of its users' traffic with them. Empty means the server's own resolver. |
+| **DNS resolvers for this node** | **Server's own resolver** (the default), **Yandex DNS** or **Cloudflare + Google**; a list of your own (up to 8 IP addresses, `ip:port` works too) shows as **Custom DNS** and is edited there. The node and its VPN engines resolve names with them, the names in its users' traffic included. With **Server's own resolver** the node uses whatever the server uses. For a node in Russia pick **Yandex DNS**, so Russian services such as gosuslugi.ru resolve reliably. |
 
 **Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts Hysteria2 inbounds as described below.
 
 **Block recognized BitTorrent traffic** is an optional per-node setting, off by default, for Linux agents that advertise `torrentguard/1`. It inspects plaintext BitTorrent handshakes and validated DHT, UDP tracker and uTP requests, and only what clients send, never what comes back to them. On AmneziaWG the kernel hands the guard only the start of each flow a client opens through that node's AWG interface; an identified TCP connection is then dropped by the kernel for the rest of its life and an identified UDP datagram is dropped; in Hysteria2 it closes the matching outbound connection or drops the matching UDP datagram. Changing this setting restarts only the node's Hysteria2 inbounds so existing outbound connections cannot keep using the old policy. Detection is best effort: encrypted BitTorrent, traffic inside another proxy, HTTPS web seeds, fragmented packets and unknown formats can pass. A `torrent_guard_degraded` event appears if the Linux queue cannot start.
 
-**DNS for user traffic** is not the same as the server's own resolver that the doctor checks, and not the same as the DNS presets that apps receive: see [DNS](dns.md).
+**DNS resolvers for this node** are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
 
 > **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
 

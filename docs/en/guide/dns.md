@@ -103,9 +103,9 @@ The editor says the same under the DNS select: "When it arrives: the apps on the
 
 Two node settings also involve DNS, and neither is a preset:
 
-- **Node DNS resolvers** in **Settings**: the addresses used by the node and its VPN engines. When the list is empty, the panel chooses by country: RU uses Yandex DNS (`77.88.8.8`, `77.88.8.1`); other countries use Cloudflare and Google (`1.1.1.1`, `8.8.8.8`). Pick a preset or enter custom addresses. Doctor uses the same list when it offers to repair the system resolver. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
+- **DNS resolvers for this node** in **Settings**: the addresses used by the node and its VPN engines. The default, **Server's own resolver**, is an empty list: the node uses whatever the server uses (some hosters allow only their own resolvers). **Yandex DNS** (`77.88.8.8`, `77.88.8.1`) and **Cloudflare + Google** (`1.1.1.1`, `8.8.8.8`) are choices you make; pick Yandex DNS for a node in Russia, so Russian services such as gosuslugi.ru resolve reliably. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
 - **A user's or group's DNS preset** sets DNS in client subscriptions and applies across every node that user can access. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN; a user's own preset takes priority over the group.
-- **The server's system resolver** is the host DNS used by apt and certificate renewal. Doctor checks it and can offer to set it to the node's selected resolvers. See [Health](../operations/health.md).
+- **The server's system resolver** is the host DNS used by apt and certificate renewal. Doctor checks it and can offer to set it to the node's resolvers or, when the node has none, to Yandex DNS in Russia and Cloudflare + Google elsewhere. See [Health](../operations/health.md).
 
 ## Who can do what
 

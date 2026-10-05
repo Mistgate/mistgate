@@ -65,7 +65,7 @@ The domain, the certificate and how they interact with the node address are desc
 ## How the node handles the traffic
 
 - **Sniffing.** The node reads the destination name from the first bytes of a connection (the HTTP Host or the TLS server name) and uses that name instead of the IP the app sent. The app's own DNS answer is not trusted, so a poisoned or blocked lookup on the person's side does not matter.
-- **Per-node DNS.** The node resolves those names itself, with the resolvers in the node's **DNS for user traffic** setting; empty means the server's own resolver. IPv4 is preferred; IPv6 is used for a name without an A record. A WARP exit resolves the same way. See [Nodes](nodes.md) and [DNS](dns.md).
+- **Per-node DNS.** The node resolves those names itself, with the node's **DNS resolvers for this node** setting; the default is the server's own resolver. IPv4 is preferred; IPv6 is used for a name without an A record. A WARP exit resolves the same way. See [Nodes](nodes.md) and [DNS](dns.md).
 - **Closed destinations.** A user cannot reach private networks, loopback, link-local and cloud metadata addresses, or any address of the node itself through the tunnel.
 - **Users.** Adding, removing or disabling a person changes only the node's list of tokens: nobody else is disconnected. A removed or expired person is cut off at their next packet.
 
