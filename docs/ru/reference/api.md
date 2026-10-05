@@ -33,7 +33,7 @@ API описан в `proto/mistgate/admin/v1/`. Сгенерированный �
 | `UserService` | `user.proto` | Пользователи, их трафик, устройства и ссылка подписки |
 | `DeviceService` | `device.proto` | Устройства AmneziaWG и их ключи |
 | `SubscriptionService` | `subscription.proto` | Настройки подписок и правила для приложений |
-| `DnsService` | `dns.proto` | DNS-пресеты |
+| `DnsService` | `dns.proto` | DNS-пресеты, пресеты, которые нода предлагает на странице пользователя, и выборы людей |
 | `HealthService` | `health.proto` | Алерты, проверки глазами клиента, доктор и его исправления |
 | `UpdateService` | `update.proto` | Пакет релиза, обновления нод, расписания и раскатки, обновления панели |
 | `ProvisioningService` | `provisioning.proto` | Установка нод по SSH и сохранённый SSH-доступ к нодам |

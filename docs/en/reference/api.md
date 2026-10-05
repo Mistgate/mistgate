@@ -33,7 +33,7 @@ The API is defined in `proto/mistgate/admin/v1/`. Generated code is in the repos
 | `UserService` | `user.proto` | Users, their traffic, devices and subscription link |
 | `DeviceService` | `device.proto` | AmneziaWG devices and their keys |
 | `SubscriptionService` | `subscription.proto` | Subscription settings and app rules |
-| `DnsService` | `dns.proto` | DNS presets |
+| `DnsService` | `dns.proto` | DNS presets, the presets each node offers on the user page, and what people picked |
 | `HealthService` | `health.proto` | Alerts, client-eye checks, the doctor and its fixes |
 | `UpdateService` | `update.proto` | Release bundle, node updates, schedules and rollouts, panel updates |
 | `ProvisioningService` | `provisioning.proto` | Installing nodes over SSH and the saved SSH access of nodes |
