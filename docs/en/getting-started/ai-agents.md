@@ -169,7 +169,7 @@ The proxy reads the token only from the file, never prints it, refuses plain `ht
 |:--|:--|
 | Every read; creating and changing users; enabling users; disabling users or resetting their traffic for up to 3 users at once; removing a device; muting an alert | Installing a node over SSH, changing a node's SSH password, a doctor fix, updating, scheduling or rolling back a node, pausing, resuming or cancelling a rollout, the update time zone, adding, changing or removing an app on the user page, and disabling or resetting more than 3 users |
 
-An agent with Operator access or higher can also keep the subscription page's app list (`subscription_settings_get`, `subscription_app_upsert_plan`, `subscription_app_remove_plan`): every such change waits for your approval, and the card shows each field in full.
+An agent with Operator access or higher can also keep the subscription page's app list (`subscription_settings_get`, `subscription_app_upsert_plan`, `subscription_app_remove_plan`): every such change waits for your approval, and the card shows each field in full. The prompt below includes the step that puts [kl!ck](../guide/client-apps.md#klck), the app Mistgate recommends on Windows and macOS, on the page.
 
 **Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and type the server's SSH password there. The panel keeps the password sealed to that one plan; the agent's apply carries only the confirm token, so the password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
 
@@ -238,7 +238,16 @@ LANGUAGE:      English            # the language you talk to me in
 6. Health: checks_results and node_doctor for NODE_NAME (refresh: true), and alerts_list.
    Report the client-eye checks per profile, doctor items that need attention (with the
    fix you would propose) and open alerts.
-7. Final report: what you changed, what is still waiting for me, what failed.
+7. Apps on the user page, only if I say so: subscription_settings_get, then for kl!ck
+   (the desktop app Mistgate recommends; https://github.com/vbu00/klick) one
+   subscription_app_upsert_plan for platform windows and one for macos: name "kl!ck", kind
+   "happ", download_url https://github.com/vbu00/klick/releases/latest, add_link_template
+   klick://add?url={url_enc}&name={name_enc}, recommended true. Make the second plan only
+   after the first is applied. Then take recommended off Happ on both platforms with one
+   upsert plan each (platform, name "Happ", recommended false). Each plan waits for my
+   approval in the admin. Tell me that the one-tap button needs a kl!ck build newer than
+   0.4.0; older builds use "Copy link".
+8. Final report: what you changed, what is still waiting for me, what failed.
 ```
 
 ## Contribute with a coding agent

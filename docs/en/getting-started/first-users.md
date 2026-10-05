@@ -21,7 +21,7 @@ Each step ticks itself from what the panel already has; you never tick anything 
 Open **Profiles → New profile**. You can also start from the node's page: **Profiles → Add profile**.
 
 1. **Protocol.** Pick one:
-   - **Hysteria2** for the subscription apps: a subscription app such as Happ, or an app on the mihomo core such as Clash Verge or FlClash. One link carries every server.
+   - **Hysteria2** for the subscription apps: a subscription app such as Happ, or an app on the mihomo core such as kl!ck, Clash Verge or FlClash. One link carries every server.
    - **AmneziaWG** for AmneziaVPN. Every device gets a key of its own. Apps on the mihomo core get these servers through the subscription too, when the person has AmneziaVPN switched on.
 2. **Name.** Until you type one, it follows the port, for example "Hysteria2 · 443".
 3. **Settings.** The defaults work for a start. For Hysteria2 look at one field:

@@ -23,10 +23,10 @@ https://sub.example.com/<secret prefix>/<token>
 |:--|:--|:--|
 | **Link list (base64)** | One share link per server in a plain list. Happ, v2rayNG, Hiddify and most other apps read it. | Any app without a rule. |
 | **Web page** | The person's page: instructions, a QR code, their traffic. See [User page](user-page.md). | Anyone who opens the link in a browser. |
-| **Mihomo YAML** | A ready config for Mihomo and Clash Meta with every protocol the person has. | Apps on the mihomo core (Clash Meta, FlClash, Clash Verge), by the rules `mihomo` and `clash`. |
+| **Mihomo YAML** | A ready config for Mihomo and Clash Meta with every protocol the person has. | Apps on the mihomo core (kl!ck, Clash Meta, FlClash, Clash Verge), by the rules `mihomo` and `clash`. |
 | **Fake 404** | Pretends the link does not exist. Handy to shut out a scraper by its User-Agent. | Nobody, until you add a rule for it. |
 
-The **Apps & formats** tab lists the apps the protocols work with and what each reads: Happ reads the link list, Mihomo / Clash Meta reads the Mihomo YAML, and AmneziaVPN does not read the subscription at all (it takes a `vpn://` key from the person's page).
+The **Apps & formats** tab lists the apps the protocols work with and what each reads: Happ reads the link list, Mihomo / Clash Meta (kl!ck and the other apps on the mihomo core) reads the Mihomo YAML, and AmneziaVPN does not read the subscription at all (it takes a `vpn://` key from the person's page).
 
 **Planned:** more formats (Xray JSON, sing-box) and subscription mirrors.
 
@@ -119,9 +119,9 @@ The page shows one card per app on each platform, in the order of this list. Sev
 | **Description on the card** | Plain text, up to 80 characters. Empty: the card says how the app connects. |
 | **Recommended** | A badge on the card; the recommended app leads its platform. |
 
-**Add app** takes a platform and a kind (**Takes**). The arrows move an app among the apps of its platform. Up to 30 apps.
+**Add app** takes a platform and either a **Known app** (kl!ck, Happ, AmneziaVPN, Clash Verge Rev, FlClash, Clash Meta for Android, Hiddify, v2rayNG: it fills in the name, the kind, the download link and the "add" template of that platform) or a kind (**Takes**) for a blank card. Every field stays editable. The arrows move an app among the apps of its platform. Up to 30 apps.
 
-A fresh panel recommends Happ on iOS, Android, Windows and macOS with the template `happ://add/{url}`, and AmneziaVPN for keys on all five platforms (from the store on phones, from the AmneziaVPN site elsewhere).
+A fresh panel recommends kl!ck on Windows and macOS (Happ second) and Happ on iOS and Android, and offers AmneziaVPN for keys on all five platforms (from the store on phones, from the AmneziaVPN site elsewhere). Which app suits which platform, what each one receives and how the one-tap links work: [Client apps](client-apps.md).
 
 ### Options of the page
 

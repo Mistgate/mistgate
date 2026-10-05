@@ -16,10 +16,10 @@ Mistgate is two static Go binaries: the panel with an embedded SQLite database a
 
 Each person gets one subscription link, and each app gets the format it reads:
 
-- **Hysteria2**: a subscription app such as Happ (a list of URIs), or an app on the mihomo core, such as Clash Verge or FlClash (a Mihomo YAML profile). A browser that opens the link gets the person's page with instructions.
-- **AmneziaWG**: the AmneziaVPN app, with a key per device.
+- **Hysteria2**: a subscription app such as Happ (a list of URIs), or an app on the mihomo core, such as kl!ck, Clash Verge or FlClash (a Mihomo YAML profile). A browser that opens the link gets the person's page with instructions.
+- **AmneziaWG**: the AmneziaVPN app, with a key per device; kl!ck and the other apps on the mihomo core get it through the subscription.
 
-A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. More subscription formats (Xray JSON, sing-box) are **Planned**. See [Subscriptions](../guide/subscriptions.md).
+A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. More subscription formats (Xray JSON, sing-box) are **Planned**. See [Subscriptions](../guide/subscriptions.md) and [Client apps](../guide/client-apps.md): kl!ck is the app Mistgate recommends on Windows and macOS.
 
 ## How many users and nodes can it handle?
 

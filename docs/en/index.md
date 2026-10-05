@@ -10,7 +10,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 | Section | For |
 |:--|:--|
 | Getting started | The concepts, what you need, and the path from an empty server to the first user with a working subscription. |
-| Guide | Day-to-day work in the admin: nodes, profiles, protocols, WARP, users, subscriptions, the user page, DNS. |
+| Guide | Day-to-day work in the admin: nodes, profiles, protocols, WARP, users, subscriptions, client apps, the user page, DNS. |
 | Operations | Keeping the fleet healthy, updated and safe, and what to do when something breaks. |
 | Roadmap | What is done, what is being tested, what comes next, and the known limits. |
 | Reference | Exact commands, flags, environment variables, the API, the MCP server and how the parts fit together. |
@@ -45,6 +45,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [WARP](guide/warp.md): sending a profile's traffic out through Cloudflare WARP.
 - [Users and groups](guide/users-and-groups.md): users, groups, devices, traffic limits and terms.
 - [Subscriptions](guide/subscriptions.md): one link per person and which format each app gets.
+- [Client apps](guide/client-apps.md): which app on which platform, what each receives, one-tap add links, kl!ck, and setting the apps up in the admin and through MCP.
 - [User page](guide/user-page.md): the person's own page with instructions, a QR code and traffic.
 - [DNS](guide/dns.md): DNS presets for users and groups, and the DNS of the nodes.
 - [Torrent protection](guide/torrent-protection.md): the per-node BitTorrent blocker, what it catches and what its events show.
