@@ -207,7 +207,8 @@ Start-up errors of `mistgate serve` and what they mean:
 | Message | What to do |
 |---|---|
 | ``data dir: … (run `mistgate setup`)`` | The data directory does not exist: on a new server run `mistgate setup`; otherwise point `--data-dir` at the existing directory. |
-| ``master key: … (run `mistgate setup`)`` | `master.key` is missing from the data directory. On an existing installation restore it from a backup and do not run `setup`: it would create a new key, which cannot read the stored secrets. |
+| ``master key: … (run `mistgate setup`)`` | `master.key` is missing and there is no database yet: run `mistgate setup`. |
+| `master key: … is missing but the database exists: restore master.key from your backup …` | The installation lost its key. Put `master.key` back from a backup. `setup` refuses here: a new key cannot read the stored secrets. |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | Run `chmod 600` on the key file. |
 | `--admin-listen conflicts with the stored admin address …` | The installation was set up for a secret host or prefix; drop `--admin-listen`. |
 | `--tls-cert and --tls-key go together` | Give both or neither. |

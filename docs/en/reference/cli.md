@@ -50,7 +50,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 
 ### mistgate setup
 
-Prepares a new installation: creates the data directory (mode 0700), the master key and the database, stores where the admin is reached, and prints how to get there. It is safe to run again: an existing configuration is kept, and a new setup link is issued only while no admin exists (earlier unused links stop working).
+Prepares a new installation: creates the data directory (mode 0700), the master key and the database, stores where the admin is reached, and prints how to get there. It is safe to run again: an existing configuration is kept, and a new setup link is issued only while no admin exists (earlier unused links stop working). When the database exists but `master.key` is missing, it refuses and asks for the key from your backup instead of creating a new one.
 
 ```sh
 mistgate setup --public-url https://panel.example.com

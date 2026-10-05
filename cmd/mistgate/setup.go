@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/auth"
@@ -36,8 +37,9 @@ func setup(ctx context.Context, dataDir string, o setupOpts, out io.Writer, now 
 	if err := secureDataDir(dataDir); err != nil {
 		return err
 	}
-	if _, err := vault.LoadKey(dataDir, true); err != nil {
-		return err
+	// A key is made only for a new database: next to an existing one it would read none of its secrets.
+	if _, err := vault.LoadKey(dataDir, !dbExists(dataDir)); err != nil {
+		return keyErr(dataDir, err)
 	}
 	st, err := store.Open(ctx, dbPath(dataDir))
 	if err != nil {
@@ -73,4 +75,23 @@ func setup(ctx context.Context, dataDir string, o setupOpts, out io.Writer, now 
 	fmt.Fprintf(out, "Setup link: %ssetup#%s\n", in.adminURL(), tok)
 	fmt.Fprintf(out, "The link works once and expires in %d minutes. Open it in a browser and create your admin (a passkey, or a password with an authenticator code).\n", int(auth.SetupTokenTTL.Minutes()))
 	return nil
+}
+
+// dbExists: the data dir holds a database (or cannot tell: then it is treated as there).
+func dbExists(dataDir string) bool {
+	_, err := os.Stat(dbPath(dataDir))
+	return !errors.Is(err, os.ErrNotExist)
+}
+
+// keyErr explains a master key that could not be loaded (serve and setup). A missing key next to an existing database
+// has to come back from a backup: setup would make a new one, which reads none of the secrets sealed with the old.
+func keyErr(dataDir string, err error) error {
+	switch {
+	case !errors.Is(err, os.ErrNotExist):
+		return fmt.Errorf("master key: %w", err)
+	case dbExists(dataDir):
+		return fmt.Errorf("master key: %s is missing but the database exists: restore master.key from your backup (do not run setup: a new key cannot read the stored secrets)", filepath.Join(dataDir, "master.key"))
+	default:
+		return fmt.Errorf("master key: %w (run `mistgate setup`)", err)
+	}
 }

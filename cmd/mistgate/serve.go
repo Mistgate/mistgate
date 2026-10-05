@@ -101,7 +101,7 @@ func runServe(args []string) error {
 	// nodes' secrets). Dev creates it on the fly.
 	key, err := vault.LoadKey(*dataDir, *dev)
 	if err != nil {
-		return fmt.Errorf("master key: %w (run `mistgate setup`)", err)
+		return keyErr(*dataDir, err)
 	}
 	vlt, err := vault.New(key)
 	if err != nil {

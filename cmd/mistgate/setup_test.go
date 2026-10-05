@@ -115,6 +115,34 @@ func TestSetupLifecycle(t *testing.T) {
 	}
 }
 
+// A lost master.key next to a database: setup must not make a new key, and both setup and serve send the owner to the
+// backup instead of to setup.
+func TestMissingKeyOnExistingDatabase(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "data")
+	ctx := context.Background()
+	if err := setup(ctx, dir, setupOpts{publicURL: "https://example.com"}, &bytes.Buffer{}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	keyPath := filepath.Join(dir, "master.key")
+	if err := os.Remove(keyPath); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	err := setup(ctx, dir, setupOpts{}, &bytes.Buffer{}, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "restore master.key from your backup") || strings.Contains(err.Error(), "run `mistgate setup`") {
+		t.Fatalf("setup: %v", err)
+	}
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
+		t.Fatalf("setup made a new key over an existing database: %v", err)
+	}
+	if err := keyErr(dir, os.ErrNotExist); !strings.Contains(err.Error(), "restore master.key") {
+		t.Errorf("serve, existing database: %v", err)
+	}
+	if err := keyErr(t.TempDir(), os.ErrNotExist); !strings.Contains(err.Error(), "run `mistgate setup`") {
+		t.Errorf("serve, no database: %v", err)
+	}
+}
+
 func TestLoadInstanceNotConfigured(t *testing.T) {
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {

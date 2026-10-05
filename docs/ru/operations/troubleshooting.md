@@ -207,7 +207,8 @@ timedatectl
 | Сообщение | Что делать |
 |---|---|
 | ``data dir: … (run `mistgate setup`)`` | Каталога данных нет: на новом сервере выполните `mistgate setup`, иначе укажите существующий каталог в `--data-dir`. |
-| ``master key: … (run `mistgate setup`)`` | В каталоге данных нет `master.key`. На существующей установке восстановите его из копии и не запускайте `setup`: он создаст новый ключ, который не прочтёт хранимые секреты. |
+| ``master key: … (run `mistgate setup`)`` | Нет `master.key`, и базы ещё нет: выполните `mistgate setup`. |
+| `master key: … is missing but the database exists: restore master.key from your backup …` | Установка потеряла ключ. Верните `master.key` из резервной копии. `setup` здесь откажется: новый ключ не прочтёт хранимые секреты. |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | Выполните `chmod 600` для файла ключа. |
 | `--admin-listen conflicts with the stored admin address …` | Установка настроена на секретный хост или префикс; уберите `--admin-listen`. |
 | `--tls-cert and --tls-key go together` | Укажите оба флага или ни одного. |
