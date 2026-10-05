@@ -813,6 +813,23 @@ func TestPlanningGrantOpensOnlyTheDryRun(t *testing.T) {
 	}
 }
 
+// Reading an SSH host key makes the panel connect to an address the caller names: a token reaches it only while the MCP
+// layer makes a node_install plan, never as a free network probe over /api.
+func TestSSHFingerprintIsOpenOnlyToMCPPlanning(t *testing.T) {
+	e := newTokenEnv(t)
+	_, ad := e.mkToken("ad", store.ProfileAdmin, 600)
+	p := adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure
+	if got := e.code(p, ad); got != 403 || e.seen.calls != 0 {
+		t.Fatalf("GetSSHFingerprint over the API: %d (handler reached %d times)", got, e.seen.calls)
+	}
+	if got := e.code(p, ad, callOpts{ctx: WithChannel(context.Background(), ChannelMCP)}); got != 403 {
+		t.Fatalf("GetSSHFingerprint over MCP outside a plan: %d", got)
+	}
+	if got := e.code(p, ad, callOpts{ctx: WithPlanning(WithChannel(context.Background(), ChannelMCP))}); got != 200 || e.seen.calls != 1 {
+		t.Fatalf("GetSSHFingerprint while planning: %d", got)
+	}
+}
+
 // --- the allow-list itself ---
 
 func TestTokenAllowList(t *testing.T) {
@@ -820,7 +837,7 @@ func TestTokenAllowList(t *testing.T) {
 		if _, ok := procedureLevels[path]; !ok {
 			t.Errorf("the allow-list names %s, which has no level (not a procedure?)", path)
 		}
-		if access != TokenAccessDirect && access != TokenAccessApproved {
+		if access != TokenAccessDirect && access != TokenAccessApproved && access != TokenAccessPlanning {
 			t.Errorf("%s: access %d", path, access)
 		}
 		if got, ok := TokenAccess(path); !ok || got != access {

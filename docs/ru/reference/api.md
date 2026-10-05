@@ -76,7 +76,7 @@ Authorization: Bearer tk1_...
 | Статус | `code` в ответе | Сообщение |
 |---|---|---|
 | 401 | `unauthenticated` | `not signed in` (токена нет, он искажён или неизвестен), `token revoked`, `token expired` |
-| 403 | `permission_denied` | `this call is not available to API tokens`, `this token's profile cannot do this`, `this needs the owner's approval; it is not available over the API` |
+| 403 | `permission_denied` | `this call is not available to API tokens`, `this token's profile cannot do this`, `this needs the owner's approval; it is not available over the API`, `this is used only while the MCP server makes a plan; it is not available over the API` |
 | 429 | `resource_exhausted` | `too many requests for this token, slow down`, с `Retry-After` |
 
 ## Вызов API
@@ -181,6 +181,9 @@ func main() {
 | `AuthService.ListAudit` | нет | нет | да |
 | `HealthService.ApplyFix` | нет | нет | только через одобренный план MCP |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | нет | нет | только через одобренный план MCP |
+| `ProvisioningService.ListNodeServerAccess` (данные подключения, без пароля) | нет | нет | да |
+| `ProvisioningService.GetSSHFingerprint` | нет | нет | только пока MCP-сервер составляет план `node_install` |
+| `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | нет | нет | только через одобренный план MCP |
 
 Закрыто для любого токена: удаление пользователей, ссылка подписки, устройства и их ключи, подключение нод, их настройки, перезапуски, логи и вывод из флота, любые изменения профилей, групп, DNS-пресетов и настроек подписок, WARP, оформление, токены, одобрения, собственный аккаунт админа (passkey, пароль, сессии, повторное подтверждение) и настройки капчи.
 

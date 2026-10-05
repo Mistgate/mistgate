@@ -76,7 +76,7 @@ A request with a Bearer header is judged by the token alone; a cookie is never l
 | Status | Body `code` | Message |
 |---|---|---|
 | 401 | `unauthenticated` | `not signed in` (missing, malformed or unknown token), `token revoked`, `token expired` |
-| 403 | `permission_denied` | `this call is not available to API tokens`, `this token's profile cannot do this`, `this needs the owner's approval; it is not available over the API` |
+| 403 | `permission_denied` | `this call is not available to API tokens`, `this token's profile cannot do this`, `this needs the owner's approval; it is not available over the API`, `this is used only while the MCP server makes a plan; it is not available over the API` |
 | 429 | `resource_exhausted` | `too many requests for this token, slow down`, with `Retry-After` |
 
 ## Calling the API
@@ -181,6 +181,9 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `AuthService.ListAudit` | no | no | yes |
 | `HealthService.ApplyFix` | no | no | only through an approved MCP plan |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | no | no | only through an approved MCP plan |
+| `ProvisioningService.ListNodeServerAccess` (connection metadata, never a password) | no | no | yes |
+| `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
+| `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
 
 Closed to every token: deleting users, the subscription link, devices and their keys, node enrollment, settings, restarts, logs and retirement, every change to profiles, groups, DNS presets and subscription settings, WARP, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 

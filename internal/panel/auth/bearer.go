@@ -214,6 +214,7 @@ const (
 	msgNotForTokens = "this call is not available to API tokens"
 	msgProfile      = "this token's profile cannot do this"
 	msgApproval     = "this needs the owner's approval; it is not available over the API"
+	msgPlanning     = "this is used only while the MCP server makes a plan; it is not available over the API"
 )
 
 // tokenDenied is step 4: the allow-list, the role of the profile against the procedure's level, and, for a
@@ -226,10 +227,16 @@ func (s *Service) tokenDenied(r *http.Request, tok store.APIToken, path string) 
 	if !roleAllows(profileRole(tok.Profile), levelOf(path)) {
 		return msgProfile
 	}
-	if access != TokenAccessApproved {
+	if access == TokenAccessDirect {
 		return ""
 	}
 	ctx := context.WithValue(r.Context(), procedureKey{}, path)
+	if access == TokenAccessPlanning {
+		if planningAllows(ctx) {
+			return ""
+		}
+		return msgPlanning
+	}
 	if s.grantAllows(ctx, tok.ID, path) {
 		return ""
 	}

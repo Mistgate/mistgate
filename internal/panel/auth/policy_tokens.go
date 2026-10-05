@@ -16,6 +16,10 @@ const (
 	// TokenAccessApproved: only with a grant in the context (WithPlanning for a call that changes nothing,
 	// WithApprovedStepUp for the owner's approved plan), which only the MCP layer can create. Never over /api.
 	TokenAccessApproved = 2
+	// TokenAccessPlanning: only while the MCP layer makes a plan (WithPlanning on the MCP channel). The call changes
+	// nothing but must not be a free tool for a script: GetSSHFingerprint would let any admin token probe the network
+	// from the panel. Never over /api.
+	TokenAccessPlanning = 3
 )
 
 // tokenProcedures is the allow-list for tokens. Adding a line is a deliberate act with a test
@@ -38,7 +42,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.SubscriptionServiceListClientsProcedure:          TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:        TokenAccessDirect,
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                 TokenAccessDirect,
-	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:    TokenAccessDirect,
+	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:    TokenAccessPlanning, // node_install_plan only
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure: TokenAccessDirect,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:   TokenAccessApproved,
 	// Day-to-day changes (level write: the operator profile and up).
@@ -137,8 +141,8 @@ func ProcedureRole(path string) string {
 // NeedsStepUp reports whether the procedure's handler asks for a step-up.
 func NeedsStepUp(path string) bool { return stepUpProcedures[path] }
 
-// TokenAccess says how a token may reach a procedure: TokenAccessDirect or TokenAccessApproved; ok is false when
-// the procedure is closed to tokens.
+// TokenAccess says how a token may reach a procedure: TokenAccessDirect, TokenAccessApproved or TokenAccessPlanning; ok
+// is false when the procedure is closed to tokens.
 func TokenAccess(path string) (access int, ok bool) {
 	access, ok = tokenProcedures[path]
 	return access, ok

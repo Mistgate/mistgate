@@ -99,7 +99,8 @@ func nodeInstallPlanTool() toolDef {
 					if in.CountryCode != "" && (len(in.CountryCode) != 2 || !allASCIIAlpha(in.CountryCode)) {
 						return nil, nil, errors.New("country_code must be two letters")
 					}
-					fingerprint, err := c.cl.Provisioning.GetSSHFingerprint(c.ctx, connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: in.Host, Port: in.Port}))
+					// The host-key read is the plan's only call; it runs under the planning grant (a token cannot reach it otherwise).
+					fingerprint, err := c.cl.Provisioning.GetSSHFingerprint(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: in.Host, Port: in.Port}))
 					if err != nil {
 						return nil, nil, scrubError(apiError(err))
 					}
