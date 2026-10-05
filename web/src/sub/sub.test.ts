@@ -52,17 +52,15 @@ describe("normalize", () => {
     expect(d.apps).toEqual([]);
     expect(d.amnezia).toBeNull();
     expect(d.server_count).toBe(0);
+    // A level only: rates or a percentage from an older server are dropped, a row without a known level is left out.
     const loads = normalize({ server_loads: [
-      { name: "EE", load_percent: 71, rx_bps: 64_000_000, tx_bps: 10_000_000, capacity_mbps: 100 },
-      { name: "DE", load_percent: 27, rx_bps: 20_000_000, tx_bps: 30_000_000, capacity_mbps: 50 },
-      { name: "RU", load_percent: 2, rx_bps: 1_000_000, tx_bps: 0, capacity_mbps: 0 },
+      { name: "EE", level: "high", load_percent: 71, rx_bps: 64_000_000 },
+      { name: "DE", level: "low" },
+      { name: "RU", level: "busy" },
+      { name: "", level: "medium" },
       { name: "PL", load_percent: 2, rx_bps: 1_000_000, tx_bps: 0, capacity_mbps: 1000 },
     ] }).server_loads;
-    expect(loads[0]?.load_percent).toBe(64);
-    expect(loads[1]?.load_percent).toBe(60);
-    expect(loads[2]?.load_percent).toBeUndefined();
-    expect(loads[2]?.capacity_mbps).toBe(0);
-    expect(loads[3]?.load_percent).toBe(0.1);
+    expect(loads).toEqual([{ name: "EE", level: "high" }, { name: "DE", level: "low" }]);
     expect(normalize(null).options.show_qr).toBe(true);
     expect(normalize({ brand: { accent: "javascript:1" } }).brand.accent).toBe("");
   });

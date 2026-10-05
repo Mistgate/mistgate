@@ -1,4 +1,4 @@
-import type { Lang } from "./types";
+import type { Lang, LoadLevel } from "./types";
 
 // Copy of the user page: the end user is addressed formally («вы» / "you").
 // Functions take plain values; dates and plurals come from Intl, so this file is only words. No app is named here: names
@@ -64,9 +64,8 @@ export type Dict = {
   serverLoadTitle: string;
   serverLoadIntro: string;
   serverLoadBusy: string;
-  serverLoadTry: (busy: string, busyPct: number, other: string, otherPct: number) => string;
-  serverLoadRates: (rx: string, tx: string) => string;
-  serverLoadUnknown: string;
+  serverLoadTry: (busy: string, other: string) => string;
+  serverLoadLevel: Record<LoadLevel, string>;
   linkApps: string;
   linkAppsNote: string;
   fetched: (when: string) => string;
@@ -219,11 +218,10 @@ const ru: Dict = {
   qrHow: (a) => (a ? `Наведите камеру телефона — откроется эта страница. Или в ${a}: «+» → «Сканировать QR»` : "Наведите камеру телефона — откроется эта страница."),
   viaLink: "Подключено через подписку",
   serverLoadTitle: "Загрузка каналов",
-  serverLoadIntro: "Процент — большая из текущих скоростей входящего и исходящего трафика, делённая на заданную максимальную пропускную способность ноды. Если максимум неизвестен, процент не показывается. Скорости приведены отдельно.",
+  serverLoadIntro: "Насколько занят канал каждого сервера прямо сейчас. Показаны серверы, для которых известна пропускная способность.",
   serverLoadBusy: "Высокая загрузка канала",
-  serverLoadTry: (busy, busyPct, other, otherPct) => `Канал ноды ${busy} загружен на ${busyPct}% от заданного максимума. Если соединение медленное, попробуйте ${other} (${otherPct}%).`,
-  serverLoadRates: (rx, tx) => `Сейчас ↓ ${rx} · ↑ ${tx} Мбит/с`,
-  serverLoadUnknown: "Нет максимума",
+  serverLoadTry: (busy, other) => `Канал сервера ${busy} сильно загружен. Если соединение медленное, попробуйте ${other}.`,
+  serverLoadLevel: { low: "Низкая", medium: "Средняя", high: "Высокая" },
   linkApps: "Приложения по ссылке",
   linkAppsNote: "Все устройства с этой ссылкой занимают одно место",
   fetched: (w) => `обновлялись ${w}`,
@@ -393,11 +391,10 @@ const en: Dict = {
   qrHow: (a) => (a ? `Point the phone’s camera at it — this page opens. Or in ${a}: “+” → “Scan QR”` : "Point the phone’s camera at it — this page opens."),
   viaLink: "Connected with the subscription",
   serverLoadTitle: "Channel utilization",
-  serverLoadIntro: "The percentage is the higher of the current RX/TX rates divided by the node's configured maximum capacity. No percentage is shown when that maximum is unknown. Current rates are shown separately.",
+  serverLoadIntro: "How busy each server’s channel is right now. Only servers with a known capacity are shown.",
   serverLoadBusy: "High channel utilization",
-  serverLoadTry: (busy, busyPct, other, otherPct) => `${busy}'s channel is at ${busyPct}% of its configured maximum. If your connection is slow, try ${other} (${otherPct}%).`,
-  serverLoadRates: (rx, tx) => `Now ↓ ${rx} · ↑ ${tx} Mbps`,
-  serverLoadUnknown: "Not set",
+  serverLoadTry: (busy, other) => `The ${busy} server’s channel is very busy. If your connection is slow, try ${other}.`,
+  serverLoadLevel: { low: "Low", medium: "Medium", high: "High" },
   linkApps: "Apps on the link",
   linkAppsNote: "All devices on this link take one slot",
   fetched: (w) => `updated ${w}`,

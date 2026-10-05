@@ -1,6 +1,7 @@
 package subs
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -8,7 +9,7 @@ import (
 	"io/fs"
 	"net/url"
 	"regexp"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,12 +113,11 @@ type pageData struct {
 	UnlockURL string `json:"unlock_url"`
 }
 
+// pageServer is how busy one node is, as coarse as the page may say it: a person who shares a node with one other
+// sees nothing finer than the level, never the rates (they would tell when the other one streams).
 type pageServer struct {
-	Name         string `json:"name"`
-	LoadPercent  *int   `json:"load_percent,omitempty"`
-	RxBps        uint64 `json:"rx_bps"`
-	TxBps        uint64 `json:"tx_bps"`
-	CapacityMbps int    `json:"capacity_mbps"`
+	Name  string `json:"name"`
+	Level string `json:"level"` // "low" | "medium" | "high"
 }
 
 type pageBrand struct {
@@ -218,55 +218,47 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	return d
 }
 
-// serverLoads returns one row per eligible node, not per protocol profile. Fresh rates and capacity utilization are
-// supplied by the access view; the percentage is absent when the node's maximum capacity is unknown.
+// serverLoads returns one row per node whose capacity the admin set (the view then has its load percentage), not per
+// protocol profile, in subscription order. A row says the level only. The name is the country and the location, never
+// the panel's node name; a node with neither is "Server", and a repeated name gets a number ("Server 2").
 func serverLoads(servers []access.SubServer, lang string) []pageServer {
-	indexes := map[string]int{}
-	out := make([]pageServer, 0, len(servers))
+	seen, taken := map[string]bool{}, map[string]bool{}
+	out := []pageServer{}
 	for _, server := range servers {
-		if server.MetricsAt.IsZero() {
-			continue
+		key := cmp.Or(server.NodeID, server.Node)
+		if server.LoadPercent == nil || seen[key] {
+			continue // several profiles on one machine share its host-level measurement
 		}
-		key := server.NodeID
-		if key == "" {
-			key = server.Node
-		}
-		if _, ok := indexes[key]; ok {
-			continue // multiple Hysteria/AWG profiles on one machine share its host-level measurement
-		}
+		seen[key] = true
 		name := access.CountryName(server.CountryCode, lang)
-		place := strings.TrimSpace(server.Location)
-		if place == "" {
-			place = server.Node
-		}
-		if place != "" && place != name {
-			if name == "" {
-				name = place
-			} else {
-				name += " · " + place
-			}
+		if place := strings.TrimSpace(server.Location); place != "" && place != name {
+			name = strings.TrimPrefix(name+" · "+place, " · ")
 		}
 		if name == "" {
 			name = "Server"
+			if lang == "ru" {
+				name = "Сервер"
+			}
 		}
-		indexes[key] = len(out)
-		out = append(out, pageServer{Name: name, LoadPercent: server.LoadPercent, RxBps: server.NetworkRxBps,
-			TxBps: server.NetworkTxBps, CapacityMbps: server.BandwidthMbps})
+		unique := name
+		for k := 2; taken[unique]; k++ {
+			unique = name + " " + strconv.Itoa(k)
+		}
+		taken[unique] = true
+		out = append(out, pageServer{Name: unique, Level: loadLevel(*server.LoadPercent)})
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.LoadPercent != nil && b.LoadPercent != nil {
-			return *a.LoadPercent > *b.LoadPercent
-		}
-		if a.LoadPercent != nil {
-			return true
-		}
-		if b.LoadPercent != nil {
-			return false
-		}
-		return max(a.RxBps, a.TxBps) > max(b.RxBps, b.TxBps)
-	})
 	return out
+}
+
+// loadLevel is the level of a load percentage: high from 80 (where the page suggests another server), medium from 50.
+func loadLevel(percent int) string {
+	switch {
+	case percent >= 80:
+		return "high"
+	case percent >= 50:
+		return "medium"
+	}
+	return "low"
 }
 
 // lockedPageData is the page data of a locked page: the brand and the unlock address, no user, no apps, no link.

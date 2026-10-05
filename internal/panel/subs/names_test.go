@@ -3,6 +3,8 @@ package subs
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -69,12 +71,7 @@ func TestRemarks(t *testing.T) {
 		{"the Mihomo name has no load percentage", []access.SubServer{func() access.SubServer {
 			s := srv("de1", "DE", "Hysteria2")
 			load := 64
-			s.LoadPercent, s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = &load, 64_000_000, 10_000_000, time.Now()
-			return s
-		}()}, "", "en", []string{de + " DE · Hysteria2"}},
-		{"no load percentage does not add speed figures", []access.SubServer{func() access.SubServer {
-			s := srv("de1", "DE", "Hysteria2")
-			s.NetworkRxBps, s.NetworkTxBps, s.MetricsAt = 64_000_000, 10_000_000, time.Now()
+			s.LoadPercent = &load
 			return s
 		}()}, "", "en", []string{de + " DE · Hysteria2"}},
 		{"empty template result falls back to the node", []access.SubServer{srv("de1", "", "p")}, "{flag}", "en", []string{"de1"}},
@@ -187,6 +184,36 @@ func TestLoadPercentOnlyInHappNames(t *testing.T) {
 	}
 	if a, b := fetchAs(with, "v2rayNG/1.9.0"), fetchAs(without, "v2rayNG/1.9.0"); a != b || a != de+" DE · Hysteria2" {
 		t.Errorf("v2rayNG names with and without load: %q, %q", a, b)
+	}
+}
+
+// The page says how busy a node is only as a level, only for a node with a set capacity, and never by the node's name.
+func TestServerLoads(t *testing.T) {
+	pct := func(n int) *int { return &n }
+	at := func(node, cc, location string, load *int) access.SubServer {
+		s := srv(node, cc, "p")
+		s.NodeID, s.Location, s.LoadPercent = "id-"+node, location, load
+		return s
+	}
+	got := serverLoads([]access.SubServer{
+		at("de1", "DE", "", pct(85)),
+		at("de1", "DE", "", pct(85)), // a second profile of the same node
+		at("de2", "DE", "Frankfurt", pct(79)),
+		at("de3", "DE", "", pct(49)),
+		at("nl1", "NL", "", nil), // no capacity set
+		at("x1", "", "", pct(50)),
+		at("x2", "", "", pct(0)),
+	}, "en")
+	want := []pageServer{{"Germany", "high"}, {"Germany · Frankfurt", "medium"}, {"Germany 2", "low"}, {"Server", "medium"}, {"Server 2", "low"}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("serverLoads = %v, want %v", got, want)
+	}
+	b, _ := json.Marshal(got[0])
+	if string(b) != `{"name":"Germany","level":"high"}` {
+		t.Errorf("page row = %s", b)
+	}
+	if ru := serverLoads([]access.SubServer{at("x1", "", "", pct(10))}, "ru"); ru[0].Name != "Сервер" {
+		t.Errorf("ru name = %q", ru[0].Name)
 	}
 }
 

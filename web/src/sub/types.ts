@@ -18,8 +18,9 @@ export type Device = {
   online: boolean;
 };
 
-/** Fresh network-interface rates; utilization is based on the node's configured capacity when known. */
-export type ServerLoad = { name: string; load_percent?: number; rx_bps: number; tx_bps: number; capacity_mbps: number };
+/** How busy a node's channel is, coarsely (subs/page.go loadLevel); the page never gets the rates. */
+export type LoadLevel = "low" | "medium" | "high";
+export type ServerLoad = { name: string; level: LoadLevel };
 
 /**
  * Amnezia part of the page (subs/devices.go pageAmnezia): the user's AmneziaWG devices and what
@@ -71,7 +72,7 @@ export type MgData = {
   subscription_url: string;
   /** Servers the link gives Happ ("all your servers (3) appear in Happ"); 0 when unknown. */
   server_count: number;
-  /** Nodes with a fresh sample; load_percent is max(RX, TX) as a share of configured node capacity, when known. */
+  /** Nodes with a set capacity and a fresh sample, in subscription order: the level only. */
   server_loads: ServerLoad[];
   user: {
     name: string;

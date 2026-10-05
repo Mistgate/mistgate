@@ -62,12 +62,9 @@ type SubServer struct {
 	Location    string
 	Profile     string // profile name
 	// LoadPercent is the larger of this node's RX/TX rates as a percentage of its configured symmetric capacity.
-	// It is nil when capacity is unknown.
-	LoadPercent   *int
-	NetworkRxBps  uint64
-	NetworkTxBps  uint64
-	BandwidthMbps int
-	MetricsAt     time.Time
+	// It is nil when capacity is unknown or the node has no fresh sample. The rates themselves stay out of the view:
+	// whatever reaches a user must not tell when the other person on a node streams.
+	LoadPercent *int
 }
 
 // SubDevice is one device of the user as the public page lists it.
@@ -327,9 +324,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
 		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
-			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, BandwidthMbps: f.Node.BandwidthMbps}
+			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID}
 		if usage, ok := networkUsage[f.Node.ID]; ok {
-			srv.NetworkRxBps, srv.NetworkTxBps, srv.MetricsAt = usage.RxBps, usage.TxBps, usage.SampledAt
 			srv.LoadPercent = usage.LoadPercent
 		}
 		in := protocols.RenderInput{

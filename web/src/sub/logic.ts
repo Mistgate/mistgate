@@ -1,11 +1,12 @@
 import { dict, type Dict } from "./i18n";
-import type { AmneziaData, AppEntry, AwgConfig, AwgDevice, AwgProfile, Device, Kind, Lang, MgData, MinClient, Platform, ServerLoad, Status } from "./types";
+import type { AmneziaData, AppEntry, AwgConfig, AwgDevice, AwgProfile, Device, Kind, Lang, LoadLevel, MgData, MinClient, Platform, ServerLoad, Status } from "./types";
 
 // Pure functions of the page data: normalisation, platform detection, the numbers in the hero. No DOM here.
 
 export const platformOrder: Platform[] = ["ios", "android", "windows", "macos", "linux"];
 const kindOrder: Kind[] = ["happ", "amnezia"];
 const statuses: Status[] = ["active", "expired", "limited", "disabled"];
+const levels: LoadLevel[] = ["low", "medium", "high"];
 const resets = ["none", "day", "week", "month", "rolling_month"] as const;
 const day = 86400;
 
@@ -92,18 +93,9 @@ export function normalize(raw: unknown): MgData {
     title: str(r.title),
     subscription_url: str(r.subscription_url),
     server_count: num(r.server_count),
-    server_loads: list(r.server_loads).flatMap((s): ServerLoad[] => {
-      const capacity = num(s.capacity_mbps);
-      if (typeof s.name !== "string" || !s.name.trim()) return [];
-      const rxBps = num(s.rx_bps);
-      const txBps = num(s.tx_bps);
-      // Recompute from the raw rates and node capacity so stale servers cannot send a traffic-share
-      // percentage that looks like channel utilization.
-      const loadPercent = capacity > 0
-        ? Math.min(100, Math.round(Math.max(rxBps, txBps) / (capacity * 1_000_000) * 1000) / 10)
-        : undefined;
-      return [{ name: str(s.name), load_percent: loadPercent, rx_bps: rxBps, tx_bps: txBps, capacity_mbps: capacity }];
-    }),
+    server_loads: list(r.server_loads).flatMap((s): ServerLoad[] =>
+      typeof s.name === "string" && s.name.trim() && levels.includes(s.level as LoadLevel) ? [{ name: s.name, level: s.level as LoadLevel }] : [],
+    ),
     user: {
       name: str(u.name),
       status: statuses.includes(u.status as Status) ? (u.status as Status) : "active",

@@ -22,7 +22,7 @@ import {
   type Hero,
 } from "./logic";
 import { qrSvg } from "./qr";
-import type { AppEntry, Device, Lang, MgData, Platform } from "./types";
+import type { AppEntry, Device, Lang, LoadLevel, MgData, Platform } from "./types";
 
 // The user page as DOM. Two layouts from one tree: elements marked only-m / only-w are shown below / from
 // 720 px (sub.css); the rest is shared and restyled by the same media query.
@@ -61,23 +61,14 @@ const bar = (pct: number, cls = "") => h("div", { class: "bar" }, h("i", { class
 const dot = () => h("i", { class: "dot" });
 const chip = (text: string) => h("span", { class: "chip" }, dot(), text);
 
-function mbps(bps: number, lang: Lang): string {
-  return new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "en-US", { maximumFractionDigits: 1 }).format(bps / 1_000_000);
-}
+const levelBar: Record<LoadLevel, string> = { low: "33%", medium: "66%", high: "100%" };
 
-function serverLoadCard(d: MgData, lang: Lang, t: Dict): HTMLElement | null {
+/** How busy each server is, as a level only. A busy one suggests the calmest other server, if there is one. */
+function serverLoadCard(d: MgData, t: Dict): HTMLElement | null {
   if (d.server_loads.length === 0) return null;
-  const measured = d.server_loads.filter((server) => server.load_percent !== undefined);
-  const busiest = measured[0];
-  const busiestPercent = busiest?.load_percent ?? 0;
-  const alternative = busiestPercent >= 80
-    ? measured.filter((server) => server !== busiest && (server.load_percent ?? 100) < 80).sort((a, b) => (a.load_percent ?? 100) - (b.load_percent ?? 100))[0]
-    : undefined;
-  const notice = busiestPercent >= 80
-    ? alternative
-      ? t.serverLoadTry(busiest!.name, busiestPercent, alternative.name, alternative.load_percent ?? 0)
-      : t.serverLoadBusy
-    : null;
+  const busy = d.server_loads.find((s) => s.level === "high");
+  const calm = busy && (d.server_loads.find((s) => s.level === "low") ?? d.server_loads.find((s) => s.level === "medium"));
+  const notice = busy ? (calm ? t.serverLoadTry(busy.name, calm.name) : t.serverLoadBusy) : null;
   return h(
     "section",
     { class: "card server-loads", "aria-label": t.serverLoadTitle },
@@ -85,22 +76,17 @@ function serverLoadCard(d: MgData, lang: Lang, t: Dict): HTMLElement | null {
     h(
       "div",
       { class: "server-load-list" },
-      ...d.server_loads.map((server) => {
-        const high = server.load_percent !== undefined && server.load_percent >= 80;
+      ...d.server_loads.map((s) => {
+        const high = s.level === "high" ? "high" : "";
         return h(
           "div",
           { class: "server-load-row" },
-          h("div", { class: "server-load-top" },
-            h("b", null, server.name),
-            h("span", { class: `server-load-pct${high ? " high" : server.load_percent === undefined ? " unknown" : ""}` },
-              server.load_percent === undefined ? t.serverLoadUnknown : `${server.load_percent}%`, high && h("small", null, t.serverLoadBusy)),
-          ),
-          server.load_percent !== undefined && h("div", { class: "server-load-bar" }, h("i", { class: high ? "high" : "", style: { width: `${server.load_percent}%` } })),
-          h("span", { class: "mut sm" }, t.serverLoadRates(mbps(server.rx_bps, lang), mbps(server.tx_bps, lang))),
+          h("div", { class: "server-load-top" }, h("b", null, s.name), h("span", { class: `server-load-pct ${high}` }, t.serverLoadLevel[s.level])),
+          h("div", { class: "server-load-bar" }, h("i", { class: high, style: { width: levelBar[s.level] } })),
         );
       }),
     ),
-    notice && h("p", { class: `server-load-notice${alternative ? "" : " high"}`, role: "status" }, notice),
+    notice && h("p", { class: `server-load-notice${calm ? "" : " high"}`, role: "status" }, notice),
   );
 }
 
@@ -165,7 +151,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     explain && h("div", { class: `note only-w tone-${d.user.status}` }, h("p", null, support ? `${why?.[0]} ${why?.[1]}` : why?.[0]), supportBtn("")),
   ];
 
-  if (active) children.push(serverLoadCard(d, s.lang, t), staleCard({ d, s, a, t }), ...connect(d, s, a, t, support));
+  if (active) children.push(serverLoadCard(d, t), staleCard({ d, s, a, t }), ...connect(d, s, a, t, support));
   // the support card on an active page; a page with a problem has the button in the hero already
   if (support && active) {
     children.push(

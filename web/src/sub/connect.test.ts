@@ -38,6 +38,23 @@ const data = (name: keyof typeof cases, f: (d: MgData) => void = () => {}) => {
 const way = (el: HTMLElement, w: "link" | "key") => el.querySelector<HTMLElement>(`[data-way=${w}]`)!;
 const text = (el: Element | null | undefined) => el?.textContent ?? "";
 
+describe("server load", () => {
+  const loads = (server_loads: MgData["server_loads"]) => data("both", (d) => void (d.server_loads = server_loads));
+  it("says a level per server, never a rate, and points a busy server's users to the calmest other one", () => {
+    const el = view(loads([{ name: "Эстония", level: "high" }, { name: "Германия", level: "medium" }, { name: "Россия", level: "low" }]), state("ios"), actions());
+    const card = el.querySelector(".server-loads")!;
+    expect([...card.querySelectorAll(".server-load-pct")].map(text)).toEqual(["Высокая", "Средняя", "Низкая"]);
+    expect(text(card)).not.toMatch(/Мбит|Mbps|\d%/);
+    expect(text(card.querySelector(".server-load-notice"))).toBe(t.serverLoadTry("Эстония", "Россия"));
+  });
+
+  it("only warns when every server is busy, and is gone when no server has a known capacity", () => {
+    const busy = view(loads([{ name: "Эстония", level: "high" }]), state("ios"), actions());
+    expect(text(busy.querySelector(".server-load-notice.high"))).toBe(t.serverLoadBusy);
+    expect(view(loads([]), state("ios"), actions()).querySelector(".server-loads")).toBeNull();
+  });
+});
+
 describe("two ways, side by side", () => {
   it("both ways of a user who has both, each with its own name, line and icon; the platform is asked once above them", () => {
     const el = view(data("both"), state("ios"), actions());
