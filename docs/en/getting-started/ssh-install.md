@@ -40,7 +40,7 @@ From then on the agent keeps UFW in line with its own profiles: after it applies
 
 Every installation is a job the panel keeps. The install manager at `<admin URL>nodes/install` lists the last 100 jobs with their state (queued, installing, stopping, cancelled, node connected, failed) and the saved server access. A job's page shows its steps, refreshes every 4 seconds and never shows output from the server. Only the owner opens it.
 
-> **Note:** the install manager page is in Russian for now; the wizard in **Nodes → Add node** follows the admin's language.
+The install manager speaks English or Russian: the admin's language when opened from the wizard, otherwise the browser's.
 
 - **Cancel.** A queued job stops at once and its temporary SSH data is deleted. A running job is asked to stop; a command that is already running on the server may have changed it, so check the server before you retry.
 - **Retry.** A failed or cancelled job can run again with the SSH login and password. The checks see whether the server already holds the identity of this node and the job continues from there; a server that holds another node's identity is refused. A job whose node was retired cannot be retried: start a new installation.

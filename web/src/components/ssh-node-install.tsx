@@ -216,7 +216,8 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
   const portNumber = Number(port);
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535;
   const jobState = job.data?.state ?? "";
-  const installManagerHref = new URL("nodes/install?job=" + encodeURIComponent(jobId), document.baseURI).href;
+  // the install manager speaks the admin's language: it cannot read the SPA's choice by itself
+  const installManagerHref = new URL(`nodes/install?lang=${fmt.lang}&job=${encodeURIComponent(jobId)}`, document.baseURI).href;
   const jobDone = jobState === "completed";
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled";

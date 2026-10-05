@@ -52,7 +52,6 @@ Mistgate is in early releases; the current one is `v0.1.15`. It runs in producti
 
 - The SSH installation logs in with a password only; key login is not supported. Use the [manual install](../getting-started/add-node.md) for such servers.
 - API tokens and MCP cannot create profiles or groups, or put a profile on a node: the owner does that in the admin.
-- The install manager page (`<admin URL>nodes/install`) is in Russian only; the wizard follows the admin's language.
 - Backups go to Cloudflare R2 only, and a restore is a command-line step into a new data directory.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.
 - Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.

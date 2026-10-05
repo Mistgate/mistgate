@@ -28,6 +28,7 @@ const (
 )
 
 type installPageData struct {
+	Lang        pageLang
 	Step        string
 	Message     string
 	HomeHref    string
@@ -64,8 +65,8 @@ type preflightView struct {
 	Kernel         string
 	Architecture   string
 	CPUCount       uint32
-	Memory         string
-	Disk           string
+	Memory         uint64 // bytes
+	Disk           uint64 // bytes
 	Systemd        bool
 	PanelReachable bool
 }
@@ -88,14 +89,16 @@ type eventView struct {
 	CreatedAt string
 }
 
-var installPageTemplate = template.Must(template.New("node-install").Parse(`<!doctype html>
-<html lang="ru">
+// The page's words are written in Russian and pass through tr, which gives the English ones (pageEnglish) on an English
+// page. Values from data (names, hosts, fingerprints) never pass through tr.
+const installPageHTML = `<!doctype html>
+<html lang="{{.Lang}}">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="color-scheme" content="dark">
 	{{if .Refresh}}<meta http-equiv="refresh" content="4">{{end}}
-	<title>Установка ноды — Mistgate</title>
+	<title>{{tr "Установка ноды — Mistgate"}}</title>
 	<style>
 		:root {
 			color-scheme: dark;
@@ -171,88 +174,95 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 </head>
 <body>
 <main>
-	<header class="top"><a class="back" href="{{.HomeHref}}" aria-label="Назад в панель">‹</a><div><div class="eyebrow">Mistgate · Управление нодами</div><h1>Установка ноды по SSH</h1></div></header>
-	<p class="lead">Проверка сервера, подтверждение ключа SSH и установка агента Mistgate.</p>
-	{{if .Message}}<div class="notice" role="alert">{{.Message}}</div>{{end}}
+	<header class="top"><a class="back" href="{{.HomeHref}}" aria-label="{{tr "Назад в панель"}}">‹</a><div><div class="eyebrow">{{tr "Mistgate · Управление нодами"}}</div><h1>{{tr "Установка ноды по SSH"}}</h1></div></header>
+	<p class="lead">{{tr "Проверка сервера, подтверждение ключа SSH и установка агента Mistgate."}}</p>
+	{{if .Message}}<div class="notice" role="alert">{{tr .Message}}</div>{{end}}
 	{{if eq .Step "fingerprint"}}
 	<section class="card">
-		<ul class="steps"><li>1 · Сервер</li><li class="current">2 · Ключ SSH</li><li>3 · Проверка</li><li>4 · Установка</li></ul>
-		<h2>Сверьте ключ SSH</h2><p class="lead">Mistgate не отправит пароль, пока вы не подтвердите, что этот ключ принадлежит вашему серверу.</p>
-		<div class="key" aria-label="SHA-256 отпечаток SSH host key">{{.Fingerprint}}</div>
+		<ul class="steps"><li>{{tr "1 · Сервер"}}</li><li class="current">{{tr "2 · Ключ SSH"}}</li><li>{{tr "3 · Проверка"}}</li><li>{{tr "4 · Установка"}}</li></ul>
+		<h2>{{tr "Сверьте ключ SSH"}}</h2><p class="lead">{{tr "Mistgate не отправит пароль, пока вы не подтвердите, что этот ключ принадлежит вашему серверу."}}</p>
+		<div class="key" aria-label="{{tr "SHA-256 отпечаток SSH host key"}}">{{.Fingerprint}}</div>
 		<form method="post" action="" autocomplete="off">
 			<input type="hidden" name="action" value="check"><input type="hidden" name="host" value="{{.Form.Host}}"><input type="hidden" name="port" value="{{.Form.Port}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
-			<div class="check"><input id="confirm-key" name="confirm_key" type="checkbox" value="yes" required><label for="confirm-key">Я сверил отпечаток с ключом моего сервера и подтверждаю его.</label></div>
-			<div class="divider"></div><h2>Данные новой ноды</h2>
+			<div class="check"><input id="confirm-key" name="confirm_key" type="checkbox" value="yes" required><label for="confirm-key">{{tr "Я сверил отпечаток с ключом моего сервера и подтверждаю его."}}</label></div>
+			<div class="divider"></div><h2>{{tr "Данные новой ноды"}}</h2>
 			<div class="grid" style="margin-top:14px">
-				<div class="field"><label for="name">Имя ноды</label><input id="name" name="name" required minlength="2" maxlength="24" pattern="[a-zA-Z0-9-]+" value="{{.Form.Name}}" placeholder="edge-1"></div>
-				<div class="field"><label for="address">Адрес ноды</label><input id="address" name="address" required maxlength="253" value="{{.Form.Address}}" placeholder="edge.example.com"></div>
-				<div class="field"><label for="country">Код страны</label><input id="country" name="country_code" maxlength="2" pattern="[a-zA-Z]{2}" value="{{.Form.CountryCode}}" placeholder="DE"></div>
-				<div class="field"><label for="location">Регион или город</label><input id="location" name="location" maxlength="100" value="{{.Form.Location}}" placeholder="Frankfurt"></div>
-				<div class="field full"><label for="provider">Провайдер</label><input id="provider" name="provider" maxlength="100" value="{{.Form.Provider}}" placeholder="Название хостинга"></div>
-				<div class="field"><label for="username">SSH-логин</label><input id="username" name="username" required maxlength="32" pattern="[A-Za-z_][A-Za-z0-9_.-]*" value="{{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}" autocomplete="username"></div>
-				<div class="field"><label for="password">Пароль SSH</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
+				<div class="field"><label for="name">{{tr "Имя ноды"}}</label><input id="name" name="name" required minlength="2" maxlength="24" pattern="[a-zA-Z0-9-]+" value="{{.Form.Name}}" placeholder="edge-1"></div>
+				<div class="field"><label for="address">{{tr "Адрес ноды"}}</label><input id="address" name="address" required maxlength="253" value="{{.Form.Address}}" placeholder="edge.example.com"></div>
+				<div class="field"><label for="country">{{tr "Код страны"}}</label><input id="country" name="country_code" maxlength="2" pattern="[a-zA-Z]{2}" value="{{.Form.CountryCode}}" placeholder="DE"></div>
+				<div class="field"><label for="location">{{tr "Регион или город"}}</label><input id="location" name="location" maxlength="100" value="{{.Form.Location}}" placeholder="Frankfurt"></div>
+				<div class="field full"><label for="provider">{{tr "Провайдер"}}</label><input id="provider" name="provider" maxlength="100" value="{{.Form.Provider}}" placeholder="{{tr "Название хостинга"}}"></div>
+				<div class="field"><label for="username">{{tr "SSH-логин"}}</label><input id="username" name="username" required maxlength="32" pattern="[A-Za-z_][A-Za-z0-9_.-]*" value="{{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}" autocomplete="username"></div>
+				<div class="field"><label for="password">{{tr "Пароль SSH"}}</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
 			</div>
-			<div class="actions"><button class="button" type="submit">Проверить сервер</button><a class="button secondary" href="?">Начать заново</a></div>
+			<div class="actions"><button class="button" type="submit">{{tr "Проверить сервер"}}</button><a class="button secondary" href="?lang={{.Lang}}">{{tr "Начать заново"}}</a></div>
 		</form>
-		<p class="foot">Подойдут root или отдельный SSH-пользователь с настроенным <span class="mono">sudo -n</span>. Пароль передаётся только в теле запроса и шифруется перед сохранением задания.</p>
+		<p class="foot">{{tr "Подойдут root или отдельный SSH-пользователь с настроенным"}} <span class="mono">sudo -n</span>. {{tr "Пароль передаётся только в теле запроса и шифруется перед сохранением задания."}}</p>
 	</section>
 	{{else if eq .Step "preflight"}}
 	<section class="card">
-		<ul class="steps"><li>1 · Сервер</li><li>2 · Ключ SSH</li><li class="current">3 · Проверка</li><li>4 · Установка</li></ul>
-		<h2>Требования выполнены</h2><p class="lead">SSH-аутентификация и предварительные проверки прошли. Для запуска установки введите пароль ещё раз.</p>
+		<ul class="steps"><li>{{tr "1 · Сервер"}}</li><li>{{tr "2 · Ключ SSH"}}</li><li class="current">{{tr "3 · Проверка"}}</li><li>{{tr "4 · Установка"}}</li></ul>
+		<h2>{{tr "Требования выполнены"}}</h2><p class="lead">{{tr "SSH-аутентификация и предварительные проверки прошли. Для запуска установки введите пароль ещё раз."}}</p>
 		{{with .Preflight}}<div class="facts">
-			<div class="fact"><span>Система</span><b>{{.Distribution}} {{.Version}}</b></div><div class="fact"><span>Архитектура</span><b>{{.Architecture}}</b></div><div class="fact"><span>Ядро</span><b>{{.Kernel}}</b></div>
-			<div class="fact"><span>Процессоры</span><b>{{.CPUCount}}</b></div><div class="fact"><span>Память</span><b>{{.Memory}}</b></div><div class="fact"><span>Свободное место</span><b>{{.Disk}}</b></div>
-			<div class="fact"><span>Systemd</span><b>{{if .Systemd}}Доступен{{else}}Не найден{{end}}</b></div><div class="fact"><span>Связь с панелью</span><b>{{if .PanelReachable}}Есть{{else}}Нет{{end}}</b></div>
+			<div class="fact"><span>{{tr "Система"}}</span><b>{{.Distribution}} {{.Version}}</b></div><div class="fact"><span>{{tr "Архитектура"}}</span><b>{{.Architecture}}</b></div><div class="fact"><span>{{tr "Ядро"}}</span><b>{{.Kernel}}</b></div>
+			<div class="fact"><span>{{tr "Процессоры"}}</span><b>{{.CPUCount}}</b></div><div class="fact"><span>{{tr "Память"}}</span><b>{{bytes .Memory}}</b></div><div class="fact"><span>{{tr "Свободное место"}}</span><b>{{bytes .Disk}}</b></div>
+			<div class="fact"><span>Systemd</span><b>{{if .Systemd}}{{tr "Доступен"}}{{else}}{{tr "Не найден"}}{{end}}</b></div><div class="fact"><span>{{tr "Связь с панелью"}}</span><b>{{if .PanelReachable}}{{tr "Есть"}}{{else}}{{tr "Нет"}}{{end}}</b></div>
 		</div>{{end}}
-		<div class="divider"></div><h2>Подтверждение установки</h2>
+		<div class="divider"></div><h2>{{tr "Подтверждение установки"}}</h2>
 		<form method="post" action="" autocomplete="off">
 			<input type="hidden" name="action" value="start"><input type="hidden" name="host" value="{{.Form.Host}}"><input type="hidden" name="port" value="{{.Form.Port}}"><input type="hidden" name="username" value="{{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
 			<input type="hidden" name="name" value="{{.Form.Name}}"><input type="hidden" name="address" value="{{.Form.Address}}"><input type="hidden" name="country_code" value="{{.Form.CountryCode}}"><input type="hidden" name="location" value="{{.Form.Location}}"><input type="hidden" name="provider" value="{{.Form.Provider}}">
-			<div class="field"><label for="password">Пароль SSH пользователя {{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
-			<div class="check"><input id="confirm-key" name="confirm_key" type="checkbox" value="yes" required><label for="confirm-key">Подтверждаю отпечаток <span class="mono">{{.Fingerprint}}</span>.</label></div>
-			<div class="check"><input id="confirm-install" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-install">Установить агент Mistgate и создать новую ноду. Существующая система не будет переустановлена.</label></div>
-			<div class="actions"><button class="button" type="submit">Запустить установку</button><a class="button secondary" href="?">Отмена</a></div>
+			<div class="field"><label for="password">{{tr "Пароль SSH пользователя"}} {{if .Form.Username}}{{.Form.Username}}{{else}}root{{end}}</label><input id="password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div>
+			<div class="check"><input id="confirm-key" name="confirm_key" type="checkbox" value="yes" required><label for="confirm-key">{{tr "Подтверждаю отпечаток"}} <span class="mono">{{.Fingerprint}}</span>.</label></div>
+			<div class="check"><input id="confirm-install" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-install">{{tr "Установить агент Mistgate и создать новую ноду. Существующая система не будет переустановлена."}}</label></div>
+			<div class="actions"><button class="button" type="submit">{{tr "Запустить установку"}}</button><a class="button secondary" href="?lang={{.Lang}}">{{tr "Отмена"}}</a></div>
 		</form>
 	</section>
 	{{else if eq .Step "job"}}
 	{{with .Job}}<section class="card">
-		<div class="job-head"><div><div class="eyebrow">Задание установки</div><h2 style="margin-top:4px">{{.Name}}</h2></div><span class="status {{.State}}">{{.StateLabel}}</span></div>
-		<div class="job-meta"><div><span>SSH-сервер</span><b class="mono">{{.Host}}</b></div><div><span>Этап</span><b>{{.PhaseLabel}}</b></div><div><span>Обновлено</span><b>{{.UpdatedAt}}</b></div></div>
-		{{if .ErrorLabel}}<p class="error">{{.ErrorLabel}}</p>{{end}}
+		<div class="job-head"><div><div class="eyebrow">{{tr "Задание установки"}}</div><h2 style="margin-top:4px">{{.Name}}</h2></div><span class="status {{.State}}">{{tr .StateLabel}}</span></div>
+		<div class="job-meta"><div><span>{{tr "SSH-сервер"}}</span><b class="mono">{{.Host}}</b></div><div><span>{{tr "Этап"}}</span><b>{{tr .PhaseLabel}}</b></div><div><span>{{tr "Обновлено"}}</span><b>{{.UpdatedAt}}</b></div></div>
+		{{if .ErrorLabel}}<p class="error">{{tr .ErrorLabel}}</p>{{end}}
 		{{if .CanCancel}}<div class="divider"></div><form method="post" action="" autocomplete="off">
 			<input type="hidden" name="action" value="cancel"><input type="hidden" name="job_id" value="{{.ID}}">
-			<div class="check"><input id="confirm-cancel" name="confirm_cancel" type="checkbox" value="yes" required><label for="confirm-cancel">Отменить установку. Если SSH-команды уже выполняются, сервер может быть изменён частично.</label></div>
-			<div class="actions"><button class="button secondary" type="submit">Отменить установку</button><a class="button secondary" href="?">К списку заданий</a></div>
-		</form>{{else if eq .State "cancel_requested"}}<p class="notice">Остановка запрошена. Панель завершит задание и удалит временные SSH-данные.</p>{{end}}
+			<div class="check"><input id="confirm-cancel" name="confirm_cancel" type="checkbox" value="yes" required><label for="confirm-cancel">{{tr "Отменить установку. Если SSH-команды уже выполняются, сервер может быть изменён частично."}}</label></div>
+			<div class="actions"><button class="button secondary" type="submit">{{tr "Отменить установку"}}</button><a class="button secondary" href="?lang={{$.Lang}}">{{tr "К списку заданий"}}</a></div>
+		</form>{{else if eq .State "cancel_requested"}}<p class="notice">{{tr "Остановка запрошена. Панель завершит задание и удалит временные SSH-данные."}}</p>{{end}}
 		{{end}}
-		{{if .Events}}<ul class="events">{{range .Events}}<li><span>{{.Label}}</span><time>{{.CreatedAt}}</time></li>{{end}}</ul>{{else}}<p class="empty">События появятся после запуска задания.</p>{{end}}
-		{{if and .Job .Job.CanRetry}}<div class="divider"></div><h2>Повторить установку</h2><p class="lead">Проверьте причину ошибки. Для повтора требуется пароль root.</p>
+		{{if .Events}}<ul class="events">{{range .Events}}<li><span>{{tr .Label}}</span><time>{{.CreatedAt}}</time></li>{{end}}</ul>{{else}}<p class="empty">{{tr "События появятся после запуска задания."}}</p>{{end}}
+		{{if and .Job .Job.CanRetry}}<div class="divider"></div><h2>{{tr "Повторить установку"}}</h2><p class="lead">{{tr "Проверьте причину ошибки. Для повтора введите SSH-логин и его пароль: root или пользователь с passwordless sudo."}}</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="retry"><input type="hidden" name="job_id" value="{{.Job.ID}}">
-			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">SSH-логин</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">Пароль SSH</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div></div>
-			<div class="check"><input id="confirm-retry" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-retry">Повторно выполнить установку для этой ноды.</label></div>
-			<div class="actions"><button class="button" type="submit">Повторить</button><a class="button secondary" href="?">К списку заданий</a></div>
+			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">{{tr "SSH-логин"}}</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">{{tr "Пароль SSH"}}</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div></div>
+			<div class="check"><input id="confirm-retry" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-retry">{{tr "Повторно выполнить установку для этой ноды."}}</label></div>
+			<div class="actions"><button class="button" type="submit">{{tr "Повторить"}}</button><a class="button secondary" href="?lang={{.Lang}}">{{tr "К списку заданий"}}</a></div>
 		</form>{{end}}
-		{{if and .Job (eq .Job.State "completed")}}<div class="actions"><a class="button secondary" href="{{.NodesHref}}">Открыть ноды</a><a class="button secondary" href="?">К списку заданий</a></div>{{end}}
+		{{if and .Job (eq .Job.State "completed")}}<div class="actions"><a class="button secondary" href="{{.NodesHref}}">{{tr "Открыть ноды"}}</a><a class="button secondary" href="?lang={{.Lang}}">{{tr "К списку заданий"}}</a></div>{{end}}
 	</section>
-	{{if .Refresh}}<p class="foot">Статус обновляется автоматически каждые 4 секунды. <a href="?">Открыть список заданий</a></p>{{else}}<p class="foot"><a href="?">Вернуться к заданиям</a></p>{{end}}
+	{{if .Refresh}}<p class="foot">{{tr "Статус обновляется автоматически каждые 4 секунды."}} <a href="?lang={{.Lang}}">{{tr "Открыть список заданий"}}</a></p>{{else}}<p class="foot"><a href="?lang={{.Lang}}">{{tr "Вернуться к заданиям"}}</a></p>{{end}}
 	{{else}}
 	<section class="card">
-		<ul class="steps"><li class="current">1 · Сервер</li><li>2 · Ключ SSH</li><li>3 · Проверка</li><li>4 · Установка</li></ul>
-		<h2>Новая нода</h2><p class="lead">Мастер установит Mistgate Agent на Ubuntu 22.04+ или Debian 12+ с systemd. Можно войти как root или как SSH-пользователь с passwordless sudo.</p>
+		<ul class="steps"><li class="current">{{tr "1 · Сервер"}}</li><li>{{tr "2 · Ключ SSH"}}</li><li>{{tr "3 · Проверка"}}</li><li>{{tr "4 · Установка"}}</li></ul>
+		<h2>{{tr "Новая нода"}}</h2><p class="lead">{{tr "Мастер установит Mistgate Agent на Ubuntu 22.04+ или Debian 12+ с systemd. Можно войти как root или как SSH-пользователь с passwordless sudo."}}</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="fingerprint">
-			<div class="grid" style="margin-top:18px"><div class="field"><label for="host">Адрес SSH-сервера</label><input id="host" name="host" required maxlength="253" value="{{.Form.Host}}" placeholder="node.example.com или публичный IP" autocomplete="off"></div><div class="field"><label for="port">Порт SSH</label><input id="port" name="port" type="number" min="1" max="65535" value="{{if .Form.Port}}{{.Form.Port}}{{else}}22{{end}}" required></div></div>
-			<div class="actions"><button class="button" type="submit">Начать проверку</button></div>
+			<div class="grid" style="margin-top:18px"><div class="field"><label for="host">{{tr "Адрес SSH-сервера"}}</label><input id="host" name="host" required maxlength="253" value="{{.Form.Host}}" placeholder="{{tr "node.example.com или публичный IP"}}" autocomplete="off"></div><div class="field"><label for="port">{{tr "Порт SSH"}}</label><input id="port" name="port" type="number" min="1" max="65535" value="{{if .Form.Port}}{{.Form.Port}}{{else}}22{{end}}" required></div></div>
+			<div class="actions"><button class="button" type="submit">{{tr "Начать проверку"}}</button></div>
 		</form>
-		<p class="foot">Пароль не запрашивается до подтверждения отпечатка SSH host key.</p>
+		<p class="foot">{{tr "Пароль не запрашивается до подтверждения отпечатка SSH host key."}}</p>
 	</section>
 	{{end}}
-	{{if and (not .Job) .Jobs}}<section class="card"><h2>Последние задания</h2><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>Состояние</th><th>SSH-сервер</th><th></th></tr></thead><tbody>{{range .Jobs}}<tr><td>{{.Name}}</td><td><span class="status {{.State}}">{{.StateLabel}}</span></td><td class="mono">{{.Host}}</td><td><a href="?job={{.ID}}">Открыть</a></td></tr>{{end}}</tbody></table></div></section>{{end}}
-	{{if and (not .Job) .Access}}<section class="card"><h2>Доступ к серверам</h2><p class="lead">Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль.</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>SSH</th><th>Подключение</th><th>Сменить пароль</th></tr></thead><tbody>{{range .Access}}<tr><td>{{.Name}}{{if .Pending}}<div class="error">Смена ожидает проверки; повторите её для восстановления.</div>{{end}}</td><td class="mono">{{.Host}}</td><td class="mono">{{.Username}}</td><td>{{if .Retired}}Нода выведена из флота: панель больше не меняет этот сервер. Пароль можно показать или забыть в настройках ноды.{{else}}<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="rotate_password"><input type="hidden" name="node_id" value="{{.ID}}"><input name="new_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password" aria-label="Новый пароль SSH"><label class="check"><input name="confirm_rotation" type="checkbox" value="yes" required><span>Сменить пароль пользователя {{.Username}}</span></label><button class="button secondary" type="submit">Сменить</button></form>{{end}}</td></tr>{{end}}</tbody></table></div></section>{{end}}
-	<p class="foot">Изменения на сервере начинаются только после успешной проверки требований, подтверждения ключа и нажатия «Запустить установку».</p>
+	{{if and (not .Job) .Jobs}}<section class="card"><h2>{{tr "Последние задания"}}</h2><div style="overflow-x:auto"><table class="table"><thead><tr><th>{{tr "Нода"}}</th><th>{{tr "Состояние"}}</th><th>{{tr "SSH-сервер"}}</th><th></th></tr></thead><tbody>{{range .Jobs}}<tr><td>{{.Name}}</td><td><span class="status {{.State}}">{{tr .StateLabel}}</span></td><td class="mono">{{.Host}}</td><td><a href="?lang={{$.Lang}}&job={{.ID}}">{{tr "Открыть"}}</a></td></tr>{{end}}</tbody></table></div></section>{{end}}
+	{{if and (not .Job) .Access}}<section class="card"><h2>{{tr "Доступ к серверам"}}</h2><p class="lead">{{tr "Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль."}}</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>{{tr "Нода"}}</th><th>SSH</th><th>{{tr "Подключение"}}</th><th>{{tr "Сменить пароль"}}</th></tr></thead><tbody>{{range .Access}}<tr><td>{{.Name}}{{if .Pending}}<div class="error">{{tr "Смена ожидает проверки; повторите её для восстановления."}}</div>{{end}}</td><td class="mono">{{.Host}}</td><td class="mono">{{.Username}}</td><td>{{if .Retired}}{{tr "Нода выведена из флота: панель больше не меняет этот сервер. Пароль можно показать или забыть в настройках ноды."}}{{else}}<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="rotate_password"><input type="hidden" name="node_id" value="{{.ID}}"><input name="new_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password" aria-label="{{tr "Новый пароль SSH"}}"><label class="check"><input name="confirm_rotation" type="checkbox" value="yes" required><span>{{tr "Сменить пароль пользователя"}} {{.Username}}</span></label><button class="button secondary" type="submit">{{tr "Сменить"}}</button></form>{{end}}</td></tr>{{end}}</tbody></table></div></section>{{end}}
+	<p class="foot">{{tr "Изменения на сервере начинаются только после успешной проверки требований, подтверждения ключа и нажатия «Запустить установку»."}}</p>
 </main>
 </body>
-</html>`))
+</html>`
+
+func newInstallTemplate(l pageLang) *template.Template {
+	return template.Must(template.New("node-install").Funcs(template.FuncMap{"tr": l.tr, "bytes": l.bytes}).Parse(installPageHTML))
+}
+
+// installPageTemplates holds the page once per language: the words differ, the markup does not.
+var installPageTemplates = map[pageLang]*template.Template{pageRU: newInstallTemplate(pageRU), pageEN: newInstallTemplate(pageEN)}
 
 // PageHandler serves the Go-rendered SSH installation wizard. The HTTP server wraps it
 // in the same owner-only session and cross-origin protections as the admin API.
@@ -388,7 +398,7 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 				Step: "fingerprint", Form: form, Fingerprint: fingerprint,
-				Message: userError(err, "SSH-проверка не прошла. Проверьте пароль, ключ сервера и требования к системе."),
+				Message: userError(err, "SSH-проверка не прошла. Проверьте логин и пароль, ключ сервера и требования к системе."),
 			})
 			return
 		}
@@ -420,7 +430,7 @@ func (s *Service) cancelPageJob(w http.ResponseWriter, r *http.Request, values u
 		s.renderForRequest(w, r, status, installPageData{Step: "host", Message: userError(err, "Не удалось отменить установку. Обновите страницу и проверьте состояние задания.")})
 		return
 	}
-	query := url.Values{"job": []string{jobID}, "cancelled": []string{"1"}}
+	query := url.Values{"job": []string{jobID}, "cancelled": []string{"1"}, "lang": []string{string(pageLanguage(r))}}
 	w.Header().Set("Location", "?"+query.Encode())
 	w.WriteHeader(http.StatusSeeOther)
 }
@@ -456,7 +466,7 @@ func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values ur
 		})
 		return
 	}
-	redirectToJob(w, result.Msg.Job.Id)
+	redirectToJob(w, result.Msg.Job.Id, pageLanguage(r))
 }
 
 func (s *Service) retryPageJob(w http.ResponseWriter, r *http.Request, values url.Values) {
@@ -469,10 +479,10 @@ func (s *Service) retryPageJob(w http.ResponseWriter, r *http.Request, values ur
 		JobId: jobID, ConfirmInstall: true, Password: values.Get("password"), SshUsername: sshUsername(values.Get("username")),
 	}))
 	if err != nil {
-		s.getPageWithMessage(w, r, jobID, userError(err, "Не удалось повторить установку. Проверьте пароль и состояние задания."))
+		s.getPageWithMessage(w, r, jobID, userError(err, "Не удалось повторить установку. Проверьте логин, пароль и состояние задания."))
 		return
 	}
-	redirectToJob(w, result.Msg.Job.Id)
+	redirectToJob(w, result.Msg.Job.Id, pageLanguage(r))
 }
 
 func (s *Service) getPageWithMessage(w http.ResponseWriter, r *http.Request, jobID, message string) {
@@ -522,21 +532,23 @@ func (s *Service) rotatePagePassword(w http.ResponseWriter, r *http.Request, val
 		})
 		return
 	}
-	http.Redirect(w, r, "?password_rotated=1", http.StatusSeeOther)
+	http.Redirect(w, r, "?password_rotated=1&lang="+string(pageLanguage(r)), http.StatusSeeOther)
 }
 
-func redirectToJob(w http.ResponseWriter, jobID string) {
-	query := url.Values{"job": []string{jobID}}
+func redirectToJob(w http.ResponseWriter, jobID string, l pageLang) {
+	query := url.Values{"job": []string{jobID}, "lang": []string{string(l)}}
 	w.Header().Set("Location", "?"+query.Encode())
 	w.WriteHeader(http.StatusSeeOther)
 }
 
 func (s *Service) renderForRequest(w http.ResponseWriter, r *http.Request, status int, page installPageData) {
 	page.HomeHref, page.NodesHref = pageLinks(r.URL.Path)
+	page.Lang = pageLanguage(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Language", string(page.Lang))
 	w.WriteHeader(status)
-	if err := installPageTemplate.Execute(w, page); err != nil {
+	if err := installPageTemplates[page.Lang].Execute(w, page); err != nil {
 		if s.cfg.Log != nil {
 			s.cfg.Log.Error("render node provisioning page", "err", err)
 		}
@@ -584,7 +596,7 @@ func makePreflightView(facts *adminv1.NodePreflight) *preflightView {
 	}
 	return &preflightView{
 		Distribution: facts.Distribution, Version: facts.Version, Kernel: facts.Kernel, Architecture: facts.Architecture,
-		CPUCount: facts.CpuCount, Memory: formatBytes(facts.MemoryBytes), Disk: formatBytes(facts.DiskAvailableBytes),
+		CPUCount: facts.CpuCount, Memory: facts.MemoryBytes, Disk: facts.DiskAvailableBytes,
 		Systemd: facts.Systemd, PanelReachable: facts.PanelReachable,
 	}
 }
@@ -703,7 +715,8 @@ func errorLabel(code string) string {
 	case "ssh_host_key_changed":
 		return "Ключ SSH изменился после подтверждения. Установка остановлена."
 	case "ssh_authentication_failed":
-		return "Сервер отклонил пароль root. Проверьте пароль и повторите установку."
+		// root or a sudo user: the login is the owner's, so is the refusal
+		return "Сервер отклонил SSH-логин или пароль. Проверьте их и повторите установку."
 	case "ssh_connection_timeout", "ssh_preflight_timeout":
 		return "Сервер не ответил вовремя. Проверьте сеть и порт SSH."
 	case "unsupported_os", "unsupported_os_version":
@@ -764,22 +777,25 @@ func userError(err error, fallback string) string {
 	case connect.CodeFailedPrecondition:
 		return "Сервер не подходит для установки или настройка панели не завершена. Проверьте требования к системе."
 	case connect.CodeInvalidArgument:
-		return "Проверьте адрес, порт, пароль и данные новой ноды."
+		return "Проверьте адрес, порт, логин, пароль и данные новой ноды."
 	default:
 		return fallback
 	}
 }
 
-func formatBytes(value uint64) string {
+func (l pageLang) bytes(value uint64) string {
+	units := [...]string{"Б", "КБ", "МБ", "ГБ", "ТБ", "ПБ"}
+	if l == pageEN {
+		units = [...]string{"B", "KB", "MB", "GB", "TB", "PB"}
+	}
 	const unit = uint64(1024)
 	if value < unit {
-		return fmt.Sprintf("%d Б", value)
+		return fmt.Sprintf("%d %s", value, units[0])
 	}
 	div, exp := uint64(unit), 0
 	for n := value / unit; n >= unit && exp < 4; n /= unit {
 		div *= unit
 		exp++
 	}
-	units := [...]string{"КБ", "МБ", "ГБ", "ТБ", "ПБ"}
-	return fmt.Sprintf("%.1f %s", float64(value)/float64(div), units[exp])
+	return fmt.Sprintf("%.1f %s", float64(value)/float64(div), units[exp+1])
 }
