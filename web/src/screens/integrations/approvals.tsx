@@ -31,7 +31,8 @@ function FactRow({ fact }: { fact: Fact }) {
   return (
     <div className="flex flex-col gap-0.5 text-[13px] sm:flex-row sm:items-baseline sm:gap-3">
       <dt className="text-xs text-muted sm:w-36 sm:flex-none">{factLabel(t, fact.key)}</dt>
-      <dd className="min-w-0 flex-1 text-pretty">
+      {/* a host key fingerprint or an id has no spaces: it breaks anywhere instead of running off a phone's screen */}
+      <dd className="min-w-0 flex-1 text-pretty wrap-anywhere">
         {factWords(t, fmt, fact).map((p, i) =>
           typeof p === "string" ? (
             <span key={i}>{p}</span>
@@ -64,7 +65,7 @@ function NodeInstallFields({ a, password, setPassword, confirmed, setConfirmed }
       <p className="text-xs leading-snug text-pretty text-muted">{t("int.ap.ssh.body")}</p>
       <div className="flex flex-col gap-1">
         <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("int.ap.ssh.fingerprint", { algorithm: fact("host_key_algorithm") || "?" })}</span>
-        <code data-testid="host-key" className="block font-mono text-xs break-all select-all">{fact("host_key")}</code>
+        <code data-testid="host-key" className="block font-mono text-xs break-all wrap-anywhere select-all">{fact("host_key")}</code>
       </div>
       <label className="flex cursor-pointer items-start gap-2 text-[13px] leading-snug">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 size-4 flex-none accent-accent" />

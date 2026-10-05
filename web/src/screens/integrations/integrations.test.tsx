@@ -310,6 +310,10 @@ describe("the Integrations screen: approvals", () => {
     );
     const approveButton = () => document.querySelector("button[aria-label='Approve: Install a node over SSH']") as HTMLButtonElement;
     expect(document.querySelector("[data-testid=host-key]")?.textContent).toBe(fp);
+    // a fingerprint has no spaces: on a 390 px screen it must break anywhere, in the facts and in the box
+    const factValue = [...document.querySelectorAll("dd")].find((dd) => dd.textContent === fp);
+    expect(factValue?.className).toContain("wrap-anywhere");
+    expect(document.querySelector("[data-testid=host-key]")?.className).toContain("wrap-anywhere");
     expect(text()).toContain("Host key fingerprint · ssh-ed25519");
     expect(approveButton().hasAttribute("data-disabled")).toBe(true);
 
