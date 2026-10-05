@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AddNodeProvider } from "@/components/add-node";
 import { DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { ApprovalState, TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
+import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { approvalsQuery, tokensQuery } from "@/lib/integrations";
 import { meQuery } from "@/lib/session";
@@ -15,6 +17,8 @@ import { NodesScreen } from "@/screens/nodes";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
 import { SessionsPage } from "@/screens/settings-pages/sessions";
+import { UpdateToast } from "@/components/update-toast";
+import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
 import { SettingRow } from "@/screens/users/ui";
 
@@ -148,6 +152,28 @@ export function PolishKit() {
         <NodesScreen />
         <UpdatesScreen />
       </Shot>
+      {/* fixed in the corner of the window, so it only appears when asked for: /dev-kit?update-toast (its collapsed and closed states live in localStorage) */}
+      {new URLSearchParams(location.search).has("update-toast") && (
+        <Shot
+          id="polish-update-toast"
+          title="Update notice: a newer panel release, or with =nodes the nodes behind the bundle (fixed in the corner)"
+          seed={[
+            owner,
+            [
+              updatesQuery.queryKey,
+              {
+                nowUnix: now,
+                panel: { version: "v0.1.17", built: now, update: { version: "v0.1.18", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.18", available: new URLSearchParams(location.search).get("update-toast") !== "nodes", supported: true, installable: true, installing: false, errorKey: "" } },
+                bundle: { status: BundleStatus.TRUSTED, version: "v0.1.18", built: now },
+                nodes: ["de1", "nl1", "fi1"].map((name, i) => ({ nodeId: `nod_${i}`, name, state: i < 2 ? NodeUpdateState.OUTDATED : NodeUpdateState.UP_TO_DATE })),
+              },
+            ],
+          ]}
+        >
+          {/* the kit page centres its column with a transform, which would turn "fixed" into "inside the column" */}
+          {createPortal(<UpdateToast />, document.body)}
+        </Shot>
+      )}
       <Shot id="polish-errors" title="QueryError and Pending: full and compact">
         <QueryError error={new Error("x")} onRetry={() => {}} />
         <div className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">

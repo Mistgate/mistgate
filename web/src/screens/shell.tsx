@@ -7,6 +7,7 @@ import { StepUpProvider } from "@/components/step-up";
 import { Brand, Logo, Wordmark } from "@/components/brand";
 import { navKey, sections, type SectionId } from "@/components/nav";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
+import { UpdateToast } from "@/components/update-toast";
 import { Avatar, Kbd } from "@/components/ui/bits";
 import { Icon, NavIcon } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status";
@@ -89,6 +90,7 @@ function ShellFrame() {
       </main>
 
       <Dock />
+      <UpdateToast />
       {paletteLoaded && (
         <Suspense fallback={null}>
           <Palette open={palette} onOpenChange={setPalette} />

@@ -51,6 +51,30 @@ export function useIsOwner(): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------------
+// The notice on every page (components/update-toast.tsx)
+
+export type UpdateNotice =
+  | { kind: "panel"; id: string; version: string; url: string; installable: boolean }
+  | { kind: "nodes"; id: string; version: string; outdated: number; total: number };
+
+/**
+ * What the owner is told away from the Updates page, most important first: a newer signed panel release (the server sets
+ * `available` only for one whose manifest verifies), then nodes that run an older agent than the trusted bundle. `id` names
+ * the version, so a notice that was closed stays closed until another version shows up.
+ */
+export function updateNotices(d?: Updates): UpdateNotice[] {
+  if (!d) return [];
+  const out: UpdateNotice[] = [];
+  const u = d.panel?.update;
+  if (u?.available && u.version && !u.installing) out.push({ kind: "panel", id: u.version, version: u.version, url: u.url, installable: u.installable });
+  const outdated = outdatedNodes(d.nodes).length;
+  if (d.bundle?.status === BundleStatus.TRUSTED && !isActive(d.rollout) && outdated > 0) {
+    out.push({ kind: "nodes", id: `${d.bundle.version}@${d.bundle.built}`, version: d.bundle.version, outdated, total: d.nodes.length });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Node states
 
 const nodeStates: Record<NodeUpdateState, { kind: StatusKind; key: MessageKey }> = {

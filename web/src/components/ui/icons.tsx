@@ -6,6 +6,7 @@ const paths = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z M20 20l-4-4",
   back: "M15 5l-7 7 7 7",
   chevronRight: "M9 5l7 7-7 7",
+  chevronDown: "M6 9l6 6 6-6",
   plus: "M12 5v14M5 12h14",
   check: "M5 12.5l4.5 4.5L19 7.5",
   x: "M6 6l12 12M18 6L6 18",

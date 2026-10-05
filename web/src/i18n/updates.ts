@@ -223,6 +223,19 @@ export const en = {
   "up.panel.howBody": "This installation cannot update itself from here (that needs a systemd service). Build the new binary, copy it over the installed one and restart the service:",
   "up.panel.steps": "make build\nscp bin/mistgate-linux-amd64 <panel>:<path>/mistgate.new\n# on the panel server: replace the binary, then restart the service\nmv <path>/mistgate.new <path>/mistgate && systemctl restart <service>",
 
+  // ---- the notice on every page except Updates
+  "up.toast.label": "Update available",
+  "up.toast.panelTitle": "Version {version} is out",
+  "up.toast.panelText": "A signed release is ready to install. Nothing changes until you confirm it.",
+  "up.toast.panelManual": "A signed release is out, but this panel cannot install it by itself. The Updates page shows how to do it by hand.",
+  "up.toast.nodesTitle": "Nodes can be updated to {version}",
+  "up.toast.nodesText": "To update: {n} of {total}. A rollout starts only when you confirm it.",
+  "up.toast.update": "Update",
+  "up.toast.news": "What’s new",
+  "up.toast.collapse": "Collapse",
+  "up.toast.expand": "Show the update notice",
+  "up.toast.close": "Hide until the next version",
+
   // ---- errors of the calls
   "up.e.noBundle": "There is no trusted release bundle to roll out.",
   "up.e.noKey": "This panel was built without a release key.",
@@ -536,6 +549,19 @@ export const ru: Record<keyof typeof en, string> = {
   "up.panel.how": "Как обновить саму панель",
   "up.panel.howBody": "Эта установка не обновляется отсюда сама (для этого нужен сервис systemd). Собери новый бинарь, скопируй поверх установленного и перезапусти сервис:",
   "up.panel.steps": "make build\nscp bin/mistgate-linux-amd64 <панель>:<путь>/mistgate.new\n# на сервере панели: заменить бинарь и перезапустить сервис\nmv <путь>/mistgate.new <путь>/mistgate && systemctl restart <сервис>",
+
+  // ---- плашка на всех страницах, кроме «Обновлений»
+  "up.toast.label": "Доступно обновление",
+  "up.toast.panelTitle": "Вышла версия {version}",
+  "up.toast.panelText": "Подписанный релиз готов к установке. Пока ты не подтвердишь, ничего не изменится.",
+  "up.toast.panelManual": "Вышел подписанный релиз, но эта панель не умеет ставить его сама. Как сделать это вручную, написано на странице «Обновления».",
+  "up.toast.nodesTitle": "Ноды можно обновить до {version}",
+  "up.toast.nodesText": "Нужно обновить: {n} из {total}. Раскатка начнётся, только когда ты её подтвердишь.",
+  "up.toast.update": "Обновить",
+  "up.toast.news": "Что нового",
+  "up.toast.collapse": "Свернуть",
+  "up.toast.expand": "Показать уведомление об обновлении",
+  "up.toast.close": "Скрыть до следующей версии",
 
   // ---- errors of the calls
   "up.e.noBundle": "Нет пакета релиза, которому можно доверять.",
