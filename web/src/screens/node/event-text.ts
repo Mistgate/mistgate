@@ -128,11 +128,9 @@ function eventTitle(t: T, e: NodeEvent, stamp?: (unix: number) => string): strin
 function eventSub(t: T, e: NodeEvent): string {
   const p = e.params;
   if (e.code === "torrent_attempt") {
+    // No addresses: the panel stores neither the client's nor the destination (fleet onEvent).
     const protocol = [p.protocol, p.torrent_protocol].filter(Boolean).join(" / ");
-    return [
-      protocol ? t("node.ev.torrentProtocol", { protocol }) : "",
-      p.destination ? t("node.ev.torrentDestination", { destination: p.destination }) : "",
-    ].filter(Boolean).join("; ");
+    return protocol ? t("node.ev.torrentProtocol", { protocol }) : "";
   }
   if (e.code === "update_step_failed") return p.reason ? reasonText(t, p.reason) : "";
   if (e.code === "engine_started" || e.code === "engine_restarted") return p.reason && reasonKeys[p.reason] ? t(reasonKeys[p.reason]!) : "";

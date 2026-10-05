@@ -76,18 +76,18 @@ describe("the node's events tab", () => {
     expect(text()).not.toContain("reason=agent_start");
   });
 
-  it("shows a torrent attempt with the resolved user and destination detail", async () => {
+  it("shows a torrent attempt with the resolved user and the protocol, never an address", async () => {
     listEvents.mockResolvedValue({
       events: [ev(5, now, "torrent_attempt", {
         user_id: "usr_alice", user_name: "alice", protocol: "hysteria2", torrent_protocol: "bittorrent",
-        destination: "203.0.113.8:51413",
+        destination: "203.0.113.8:51413", // an event written before the panel stopped storing it
       })],
       hasMore: false,
     });
     await mount();
     expect(text()).toContain("Possible BitTorrent attempt by alice");
     expect(text()).toContain("protocol: hysteria2 / bittorrent");
-    expect(text()).toContain("destination: 203.0.113.8:51413");
+    expect(text()).not.toContain("203.0.113.8");
   });
 
   it("asks the server for the problems only when that filter is picked", async () => {

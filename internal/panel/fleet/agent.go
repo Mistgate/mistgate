@@ -503,7 +503,9 @@ func (f *Fleet) onEvent(ctx context.Context, s *session, seq uint64, ev *agentv1
 			}
 		}
 		// This event has a fixed, non-secret contract. Do not persist arbitrary params such as a credential by mistake.
-		for _, k := range []string{"protocol", "torrent_protocol", "destination", "client_ip"} {
+		// Nor any address: events reach helpers, API tokens and MCP, while a client's address is for the owner alone
+		// (live logs), and the destination would say where a person went. The user, the inbound and the protocol stay.
+		for _, k := range []string{"protocol", "torrent_protocol"} {
 			if v := ev.Params[k]; v != "" {
 				row.Params[k] = store.Clip(v, 256)
 			}

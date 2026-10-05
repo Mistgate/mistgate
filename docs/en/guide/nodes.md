@@ -126,7 +126,7 @@ The tab works while the agent is connected (**Healthy** or **No traffic**). If t
 
 ### Events
 
-The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the protocol and destination; the panel adds a user's name only when the node can identify that user reliably.
+The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the inbound and the protocol, never an address (neither the client's nor the destination); the panel adds a user's name only when the node can identify that user reliably.
 
 The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. **Show more** loads older events; when a filter finds nothing among the latest ones, **Search further** does the same.
 

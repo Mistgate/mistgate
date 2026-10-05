@@ -109,11 +109,13 @@ func TestTorrentAttemptEventResolvesDisplayName(t *testing.T) {
 		if row.Params["user_id"] != "usr_alice" || row.Params["user_name"] != "alice" {
 			t.Fatalf("event identity was not resolved from the user row: %+v", row.Params)
 		}
-		if row.Params["destination"] != "203.0.113.8:51413" || row.Params["torrent_protocol"] != "bittorrent" {
-			t.Fatalf("event details were lost: %+v", row.Params)
+		if row.Params["protocol"] != "fakehy" || row.Params["torrent_protocol"] != "bittorrent" || row.InboundID != "inb_1" {
+			t.Fatalf("event details were lost: %+v", row)
 		}
-		if _, exists := row.Params["password"]; exists {
-			t.Fatalf("an unrecognized param was persisted: %+v", row.Params)
+		for _, k := range []string{"password", "client_ip", "destination"} {
+			if _, exists := row.Params[k]; exists {
+				t.Fatalf("%s was persisted: %+v", k, row.Params)
+			}
 		}
 		return
 	}
