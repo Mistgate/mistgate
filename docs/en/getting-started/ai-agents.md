@@ -167,7 +167,9 @@ The proxy reads the token only from the file, never prints it, refuses plain `ht
 
 | The agent does it alone | Waits for your approval in **Integrations → Waiting for you** |
 |:--|:--|
-| Every read; creating and changing users; enabling users; disabling users or resetting their traffic for up to 3 users at once; removing a device; muting an alert | Installing a node over SSH, changing a node's SSH password, a doctor fix, updating, scheduling or rolling back a node, pausing, resuming or cancelling a rollout, the update time zone, and disabling or resetting more than 3 users |
+| Every read; creating and changing users; enabling users; disabling users or resetting their traffic for up to 3 users at once; removing a device; muting an alert | Installing a node over SSH, changing a node's SSH password, a doctor fix, updating, scheduling or rolling back a node, pausing, resuming or cancelling a rollout, the update time zone, adding, changing or removing an app on the user page, and disabling or resetting more than 3 users |
+
+An agent with Operator access or higher can also keep the subscription page's app list (`subscription_settings_get`, `subscription_app_upsert_plan`, `subscription_app_remove_plan`): every such change waits for your approval, and the card shows each field in full.
 
 **Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and type the server's SSH password there. The panel keeps the password sealed to that one plan; the agent's apply carries only the confirm token, so the password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
 

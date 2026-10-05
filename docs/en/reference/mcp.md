@@ -99,6 +99,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with platform, model, last seen, online, and for AmneziaWG the profile and tunnel address. Never a key or a config. |
 | `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
+| `subscription_settings_get` | Read only | The subscription page every user sees: the apps per platform in display order (name, kind, download link, add-link template, description, recommended), the page options, the server-name template, and the subscription title, announcement, support link and refresh interval. No user's link. |
 | `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
 | `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |
@@ -119,6 +120,8 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `device_revoke` | Operator | `user_id`, `device_id` | no |
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
+| `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
+| `subscription_app_remove` | Operator | `platform`, `name` | always |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
 | `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |
 | `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`, at least a minute and at most a year ahead); the trusted version and offset are pinned in the plan | always |
@@ -132,6 +135,8 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. No tool takes or returns a server password: the owner types the install password on the approval screen, and the panel generates rotated passwords itself. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 
 `rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. It takes only a node whose agent can update itself and is older than the bundle (outdated, failed or rolled back), and it is refused while another rollout is running or paused. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval; the node may be offline when it is planned, and a new schedule replaces the node's previous one. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
+
+`subscription_app_upsert` and `subscription_app_remove` change one app of the page every user sees, found by its platform and its name ignoring case (a name two apps of one platform share is refused: change those in the admin). A new app goes to the end of the list. The values are checked exactly like a save in **Subscriptions → User page**: an http(s) download link, an add-link template that starts with an app's own scheme (`happ://add/{url}`, `myclient://add?url={url_enc}&name={name_enc}`) or http(s) but never `javascript:`, `data:` and the like, the known placeholders only, at most 30 apps; on top of that the agent's text may not contain invisible formatting characters. The plan reads the whole settings and remembers their state; if anyone saves the subscription settings before the apply, the apply fails with "the subscription settings changed after the plan" and nothing is overwritten: make a new plan. In `subscription_settings_get` and in the agent's copy of a plan, link query strings and long path segments read `[redacted]`, like every result; the owner's approval card shows every value in full.
 
 ## Plan and apply
 
@@ -170,6 +175,7 @@ A plan needs the owner when one of these applies (the `danger` list):
 | `step_up` | The operation itself asks for a fresh confirmation in the admin. | the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `update_timezone`, `node_install`, `node_server_password_rotate` |
 | `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate` |
 | `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
+| `user_page` | Every user sees it on their subscription page. | `subscription_app_upsert`, `subscription_app_remove` |
 
 ### Where the owner approves
 
