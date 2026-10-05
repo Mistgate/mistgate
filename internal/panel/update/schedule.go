@@ -15,7 +15,7 @@ import (
 const (
 	updateScheduleTimezoneKey = "update_schedule_timezone_offset_minutes"
 	// defaultScheduleTimezoneOffsetMin is UTC. Installations made while the default was UTC+3 got that value stored
-	// by migration 00040, so their schedules are entered as before.
+	// by migration 00041, so their schedules are entered as before.
 	defaultScheduleTimezoneOffsetMin = 0
 	minimumScheduleLead              = time.Minute
 	maximumScheduleLead              = 365 * 24 * time.Hour

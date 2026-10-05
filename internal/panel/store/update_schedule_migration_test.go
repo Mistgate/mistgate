@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// 00040: the update time zone default became UTC. An existing installation (it has an admin) keeps entering schedules
+// 00041: the update time zone default became UTC. An existing installation (it has an admin) keeps entering schedules
 // in UTC+3, the old default; a new one starts at UTC; a stored choice is never changed.
 func TestUpdateTimezoneMigrationKeepsTheOldDefaultOfExistingInstallations(t *testing.T) {
 	ctx := context.Background()
@@ -22,7 +22,7 @@ func TestUpdateTimezoneMigrationKeepsTheOldDefaultOfExistingInstallations(t *tes
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, p := openProvider(t)
-			if _, err := p.UpTo(ctx, 39); err != nil {
+			if _, err := p.UpTo(ctx, 40); err != nil {
 				t.Fatal(err)
 			}
 			if tc.admin {
@@ -31,7 +31,7 @@ func TestUpdateTimezoneMigrationKeepsTheOldDefaultOfExistingInstallations(t *tes
 			if tc.stored != "" {
 				execT(t, s, `INSERT INTO setting (k, v) VALUES (?, ?)`, key, tc.stored)
 			}
-			if _, err := p.UpTo(ctx, 40); err != nil {
+			if _, err := p.UpTo(ctx, 41); err != nil {
 				t.Fatal(err)
 			}
 			got, err := s.Setting(ctx, key)
