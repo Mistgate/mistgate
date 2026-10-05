@@ -132,17 +132,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the conventions.
 
 ```sh
 mistgate release keygen --out ~/mistgate-release.key      # once; prints the public key, keep the file offline
-RELEASE_KEY=<public key> make build                       # stamps the key and the build time into both binaries
-mistgate release sign --key ~/mistgate-release.key --version "$(git describe --tags --always)" \
-  --built "$(git log -1 --format=%ct)" --expires 30d \
-  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
+git checkout v0.1.4                                       # sign only a clean checkout of a release tag
+RELEASE_KEY=<public key> VERSION=v0.1.4 make build        # stamps the key and the build time into both binaries
+mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --expires 30d \
+  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/   # rebuilds them first, refuses a mismatch
 scp dist/* panel.example.com:/var/lib/mistgate/dist/      # the panel picks it up within a minute
 ```
 
 Then start a rollout on the **Updates** page (owner only, with a step-up).
 
-- Node agents built without `RELEASE_KEY` cannot update themselves. The panel keeps this installation's bundle-verification key in `release.pub` while its own binary updates from GitHub.
-- The panel checks official GitHub Releases and can install a verified Linux release on root systemd installations. It keeps the previous binary and a stopped-service data backup for rollback.
+- Node agents built without `RELEASE_KEY` cannot update themselves. The panel keeps the installation's key in `release.pub`; a panel binary with another compiled-in key trusts nothing until `mistgate release trust-key`.
+- The panel checks official GitHub Releases and installs one on systemd installations only when its panel manifest is signed with the key compiled into the panel. It keeps the previous binary and a stopped-service data backup, and rolls back a panel that does not stay up for 45 seconds.
 - Nodes that predate self-update are updated once by hand (`mistgate-node install` with the new binary).
 
 ## Security notes

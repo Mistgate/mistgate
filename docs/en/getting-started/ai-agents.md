@@ -30,6 +30,6 @@ Connect to `<admin URL>mcp` with an API token whose profile is **Admin**. The to
 
 ### Update existing nodes
 
-Use `updates_status` to see the trusted signed bundle and stale nodes. Use `rollout_start_plan` to update exactly one selected node now, or `node_update_schedule_plan` to schedule that node for a future time in the panel's configured UTC offset. Both actions wait for owner approval. A scheduled task stays pinned to the exact signed release; an offline node is updated after it reconnects. The panel checks node health and rolls back a failed update. Do not reinstall a node just to update its agent.
+Use `updates_status` to see the trusted signed bundle and stale nodes. Use `rollout_start_plan` to update exactly one selected node now, or `node_update_schedule_plan` to schedule that node for a future time in the panel's configured UTC offset. Both actions wait for owner approval. A scheduled task stays pinned to the exact signed release; an offline node is updated if it reconnects within two hours of the scheduled time, otherwise the task is marked missed. The panel checks node health and rolls back a failed update. Do not reinstall a node just to update its agent.
 
 See [MCP server](../reference/mcp.md) for connection setup, token profiles, plan lifetime, approvals and all tools. See [Add a node](add-node.md) for the manual fallback.

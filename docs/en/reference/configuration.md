@@ -79,7 +79,7 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `--url` | `MISTGATE_URL` | none | The admin URL that setup printed, for example `https://panel.example.com/<secret>/`. Plain `http` is refused unless the host is localhost. |
 | `--token-file` | `MISTGATE_TOKEN_FILE` | none | A file whose first line is an API token. The token is never taken from the command line or the environment. |
 
-**`mistgate release keygen`** and **`mistgate release sign`** take only flags, no environment variables: see [CLI](cli.md) and [Updates](../operations/updates.md).
+**`mistgate release keygen`**, **`mistgate release build`** and **`mistgate release sign`** take only flags, no environment variables (`release trust-key` also reads `MISTGATE_DATA_DIR`): see [CLI](cli.md) and [Updates](../operations/updates.md).
 
 ## Other environment variables
 
@@ -121,7 +121,8 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `mistgate.db` | The SQLite database: settings and addresses, admins and sessions, nodes and their certificates, profiles, groups, users, devices, credentials, traffic, events, alerts, rollouts, API tokens and the audit log. Secrets inside (the panel CA key, authenticator secrets, subscription tokens, device keys, WARP keys and the like) are encrypted with the master key; passwords are stored as argon2id hashes, API and enrollment tokens as SHA-256 hashes. | yes |
 | `mistgate.db-wal`, `mistgate.db-shm` | SQLite's write-ahead log and its index. Part of the database: copy them together with it, or stop the panel first. | yes |
 | `master.key` | 32 random bytes, mode 0600. Encrypts every stored secret (XChaCha20-Poly1305) and derives the user page passwords, which are never stored. The panel refuses to start when the file is readable by group or others. | the most sensitive file |
-| `release.pub` | Public ed25519 key used to verify signed node-update bundles. The first keyed panel build saves it here; GitHub panel updates preserve it. | no |
+| `release.pub` | Public ed25519 key used to verify signed node-update bundles. The first keyed panel build saves it here. A panel binary with another compiled-in key trusts no bundle until `mistgate release trust-key` replaces it; panel releases are verified only with the compiled-in key. | no |
+| `panel-update.request` | The panel release the owner confirmed (version and SHA-256), left for the update helper, which removes it. | no |
 | `acme/` | Let's Encrypt account key and certificates, only with `--acme-domain`. Rebuilt by itself when lost. | yes |
 | `dist/` | The release bundle for node updates that you copy here: `manifest.json`, `manifest.sig` and `mistgate-node-linux-amd64` / `-arm64`. The panel rescans it every minute. | no |
 

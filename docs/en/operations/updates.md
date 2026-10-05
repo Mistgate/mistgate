@@ -3,44 +3,57 @@ title: Updates
 description: How node agents update themselves from bundles you sign, how to update or schedule each node, and how the panel installs GitHub releases.
 ---
 
-Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. After a bundle is published in the latest stable GitHub Release, the panel checks every 10 minutes, verifies the signature and saves it to `dist`. It never starts a node update automatically: use the **Update** button on each node to update it now, or choose a date and time to schedule that node. Updating the panel binary and updating its agent are separate parts of one GitHub Release: a new panel version alone is not enough; the release must also include `manifest.json`, `manifest.sig` and the agent binaries. On supported systemd installations, the Updates page can also install the latest stable panel binary from the official GitHub Releases, using the root-owned helper when the panel service runs as an unprivileged user.
+Node agents update themselves, but only to a build signed with your release key. The panel carries the signed bundle to the nodes; every agent checks the signature against the key compiled into its own binary before it replaces itself. After a bundle is published in the latest stable GitHub Release, the panel checks every 10 minutes, verifies the signature and saves it to `dist`. It never starts a node update automatically: use the **Update** button on each node to update it now, or choose a date and time to schedule that node. Updating the panel binary and updating its agent are separate parts of one GitHub Release: a new panel version alone is not enough; the release must also include `manifest.json`, `manifest.sig` and the agent binaries. On supported systemd installations, the Updates page can also install the latest stable panel release from the official GitHub Releases, but only one whose panel manifest (`panel-manifest.json`, `panel-manifest.sig`) is signed with the release key built into the panel. It uses the root-owned helper when the panel service runs as an unprivileged user.
 
 ## How trust works
 
-- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. The panel stores the public half in `<data-dir>/release.pub`; node agents carry it in their binaries. If `MISTGATE_RELEASE_PUBLIC_KEY` is set in GitHub, Actions stamps it into new builds. For an existing panel, it must match the saved key and the key in already installed agents.
-- For every release you sign a manifest: the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256.
+- There is one ed25519 key pair, the **release key**. The private half stays with you, offline. Both binaries carry the public half, stamped in at build time (the release workflow stamps the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` into every official build). The panel also saves it in `<data-dir>/release.pub` on its first start. If the key compiled into the panel and `release.pub` differ, the panel logs an error and trusts no bundle (no rollouts) until you confirm the new key with `mistgate release trust-key`; see [Rotate the release key](#rotate-the-release-key).
+- For every release you sign two manifests: the node bundle (`manifest.json`) and the panel manifest (`panel-manifest.json`). Each lists the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256. The panel manifest is signed in its own Ed25519 context, so an agent never accepts it as its update and the panel never installs a node binary as itself.
 - The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
 - The panel is only a courier: a compromised panel cannot make a node run code you did not sign.
 - Releases are ordered by their build time (the Unix time of the source commit), not by the version string. A release with the same build time as the node is "already current"; an older one is refused as a downgrade.
-- A node agent built without `RELEASE_KEY` cannot update itself. `mistgate-node version` prints its compiled key fingerprint. The panel uses `release.pub` for bundle verification, even after a generic GitHub panel update.
+- A node agent built without `RELEASE_KEY` cannot update itself. `mistgate-node version` prints its compiled key fingerprint. A panel built without a key judges bundles with `release.pub` but cannot install panel releases.
 
 ## Publish a release
 
-For every stable tag, GitHub Actions requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and builds the panel and both Linux node agents with the same version and key. It creates a **draft** release containing the binaries, `BUILDINFO` and `SHA256SUMS`. A draft is not visible to panels as the latest release. The private key never goes to Actions: the owner signs the node binaries on a trusted machine, uploads `manifest.json` and `manifest.sig`, then publishes the draft. Within 10 minutes, the panel downloads and verifies the package; nodes remain on their current builds until you update or schedule them. The public-key variable must match `<data-dir>/release.pub` and the key compiled into already installed agents; a mismatched signature is refused.
+For every stable tag, `.github/workflows/release.yml` runs three jobs. `node` builds both Linux node agents with Go only (no Node.js, no npm packages); `panel` builds the admin SPA with pnpm and then the two panel binaries. Both have read-only access to the repository. `publish`, the only job that may write and the only one that runs no build code, creates a **draft** release with the four binaries, `BUILDINFO` and `SHA256SUMS`. Every action is pinned to a commit SHA. A draft is not visible to panels as the latest release. The workflow requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and stamps it into all four binaries; it must be the public half of your key, the key in already installed agents and in `<data-dir>/release.pub`.
 
-If the public-key variable is missing or invalid, the release workflow fails instead of publishing a panel-only release. This keeps the panel and agent package on one version and prevents an incomplete release from becoming visible to running panels.
-
-To sign offline, download `BUILDINFO`, the panel binary and both `mistgate-node-linux-*` binaries from the release. `BUILDINFO` contains the exact `version` and Unix `built` timestamp; the panel binary from the same release carries that version and public key:
+The private key never goes to Actions, and you do not have to trust the CI's binaries: on a machine that holds the key, you build the release from the tag yourself, and `mistgate release sign` signs only binaries that your build reproduces byte for byte. Then you upload the four manifest and signature files and publish the draft. Within 10 minutes panels download and verify the node bundle (nodes stay on their builds until you update or schedule them), and **Check GitHub** offers the panel release.
 
 ```sh
 VERSION=v0.1.6
+git clone https://github.com/Mistgate/mistgate.git && cd mistgate   # or git fetch --tags in your clone
+git checkout "$VERSION"
+(cd web && pnpm install --frozen-lockfile && pnpm build)           # the panel binary embeds the SPA
+go build -o ../mistgate-signer ./cmd/mistgate                       # the signer; any version works
 gh release download "$VERSION" --repo Mistgate/mistgate \
-  --pattern BUILDINFO --pattern mistgate-linux-amd64 \
-  --pattern mistgate-node-linux-amd64 --pattern mistgate-node-linux-arm64 \
-  --dir downloaded
-BUILT="$(sed -n 's/^built=//p' downloaded/BUILDINFO)"
-./downloaded/mistgate-linux-amd64 release sign --key ~/mistgate-release.key \
-  --version "$VERSION" --built "$BUILT" --expires 3650d \
-  downloaded/mistgate-node-linux-amd64 downloaded/mistgate-node-linux-arm64 \
-  --out signed
-gh release upload "$VERSION" signed/manifest.json signed/manifest.sig \
-  --repo Mistgate/mistgate --clobber
+  --pattern 'mistgate-linux-*' --pattern 'mistgate-node-linux-*' --dir ../downloaded
+../mistgate-signer release sign --key ~/mistgate-release.key --version "$VERSION" --expires 90d \
+  ../downloaded/mistgate-node-linux-amd64 ../downloaded/mistgate-node-linux-arm64 \
+  ../downloaded/mistgate-linux-amd64 ../downloaded/mistgate-linux-arm64 --out ../signed
+gh release upload "$VERSION" ../signed/manifest.json ../signed/manifest.sig \
+  ../signed/panel-manifest.json ../signed/panel-manifest.sig --repo Mistgate/mistgate --clobber
 gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 ```
 
-The last command publishes the draft. Do not publish it before both signature files have uploaded successfully.
+`release sign` refuses unless the checkout is exactly the tag without local changes, then rebuilds every binary with `mistgate release build` and the public half of your key and compares it with the downloaded one. The last command publishes the draft: do not publish it before all four files have uploaded. If the public-key variable is missing or invalid, the workflow fails instead of publishing a release that cannot be signed.
 
-Run signing on a Linux machine that can access the offline key file. The binaries and signature must come from the same tag; the command checks the version and matching key.
+If signing refuses because a binary does not match its rebuild, do not sign: find out why first. The usual causes are a different key in `MISTGATE_RELEASE_PUBLIC_KEY`, a tag moved after the build, or a toolchain difference (below); an unexplained difference may mean a compromised runner.
+
+### Reproducible builds
+
+`mistgate release build` (used by the workflow, by `make build` and by the check in `release sign`) gives byte-identical binaries for the same tag and key; a Linux build and a Windows cross-build of one commit were checked to match. It holds when:
+
+- the Go toolchain is the one in the `toolchain` line of `go.mod`. `release build` asks for exactly that version, and a different local Go downloads it once from the Go module proxy;
+- the source is a clean checkout of the tag. Untracked files (the built SPA, `bin/`) are not stamped into the binary (`-buildvcs=false`); keep the repository's `.gitattributes`, which checks every file out with LF line endings on every system;
+- the flags are the fixed ones `release build` sets: `CGO_ENABLED=0`, `-trimpath`, `GOAMD64=v1`, `GOARM64=v8.0`, and `-ldflags "-s -w"` with only `Version` (the tag), `Built` (the commit time of the tag) and `ReleaseKey`;
+- for the panel binaries, the SPA is built with `pnpm install --frozen-lockfile && pnpm build` (Node.js 22, the pnpm version pinned in `web/package.json`).
+
+The check proves that the CI built what the tag says. It does not vet the tag's code or its locked dependencies: a malicious package in `go.sum` or `pnpm-lock.yaml` builds the same on your machine.
+
+### Keep the signature short-lived
+
+`--expires` (default `30d`) is how long both manifests can be installed; a captured old manifest stops working when it runs out. Use a short lifetime such as `90d` and renew it before it ends: run the same `release sign` command for the same tag with a new `--expires` and upload the four files again with `--clobber`. Panels refresh the node bundle of the same build without updating nodes again, and they read the panel manifest anew at every check. A panel that finds an expired panel manifest says so and does not install the release.
 
 ### 1. Make the release key (once)
 
@@ -55,26 +68,23 @@ It writes the private key to the file (mode 0600; an existing file is never over
 ### 2. Build with the public key
 
 ```sh
-VERSION="$(git describe --tags --always --dirty)"
-BUILT="$(git log -1 --format=%ct)"
-RELEASE_KEY=<public key> VERSION="$VERSION" BUILT="$BUILT" make build
+git checkout v0.1.4
+RELEASE_KEY=<public key> VERSION=v0.1.4 make build
 ```
 
-This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}`. The panel and agents receive the same `VERSION`, `BUILT` and release public key. If the panel tag is `v0.1.4`, the agent and signed bundle must also use `v0.1.4` (shown as `v0.1.4` in the UI). The first panel build for an installation must have the key so it can save the public half to `release.pub`; later GitHub panel releases intentionally omit installation-specific keys and reuse that saved file.
+This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd64,arm64}` with `mistgate release build`. The panel and agents receive the same version, build time (the commit time of the checkout) and release public key. Every binary that should update itself needs the key; the official GitHub builds carry the repository's key. A panel saves its key to `release.pub` on its first start.
 
 ### 3. Sign the node binaries
 
 ```sh
-mistgate release sign --key ~/mistgate-release.key \
-  --version "$VERSION" \
-  --built "$BUILT" --expires 3650d \
+mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --expires 90d \
   bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
 ```
 
-- The binaries must be named `<name>-<os>-<arch>`, as `make build` names them.
-- `--version` must match the panel and agent versions. Signing refuses to create a bundle whose version differs from the panel binary used to sign it.
-- `--built` must be the build time stamped into the binaries: build and sign from the same commit. A new build whose own build time differs from the manifest rolls itself back after the update (`built_mismatch`).
-- `--expires` is a number of days (`3650d`) or a Go duration (`87600h`); the default is `30d`. Use a long lifetime for a package in the latest GitHub release so a panel that has not updated in a while can still download it. If it expires, sign the same binaries again with a later expiry and replace the signature files in that release; the panel refreshes the manifest for the same build without repeating rollout to nodes already updated.
+- Run it in the checkout of the tag (or name it with `--source`): it refuses a checkout that is not exactly the tag or has local changes, rebuilds the binaries and refuses one that differs.
+- The binaries must be named `<name>-<os>-<arch>`, as `make build` names them. `mistgate-linux-*` binaries given too go into `panel-manifest.json`.
+- The build time comes from the tag's commit; a `--built` that differs is refused. A new build whose own build time differs from the manifest rolls itself back after the update (`built_mismatch`).
+- `--expires` is a number of days (`90d`) or a Go duration (`2160h`); the default is `30d`. Keep it short and renew it (see [above](#keep-the-signature-short-lived)).
 - The command writes `dist/manifest.json` and `dist/manifest.sig`, copies the binaries next to them, reads the result back and verifies it, then prints the version, the expiry, every file with its size and the key fingerprint.
 
 ### 4. Put the bundle on the panel
@@ -91,7 +101,7 @@ The **Release bundle** card shows the result:
 |---|---|
 | Signature verified | The signature matches this panel's release key, the manifest is valid and every file is present with the right size and checksum. Only such a bundle can be rolled out. |
 | Failed the check | Something is wrong; the card says what (see below). |
-| Not checked | This installation has no release key in its build or `release.pub`, so the panel cannot judge the bundle. The nodes still check it themselves. |
+| Not checked | This installation has no usable release key: none in its build or `release.pub`, or the two differ (see [Rotate the release key](#rotate-the-release-key)). The panel cannot judge the bundle; the nodes still check it themselves. |
 | No bundle | `<data-dir>/dist` has no `manifest.json`. |
 
 | Reason | What to do |
@@ -131,10 +141,11 @@ Everyone can view the page. Starting, pausing, resuming and cancelling a rollout
 
 ### Start
 
-Use **Update** in a node's row to start that node's update now. Choose **Schedule** to select a future date and time. The fixed UTC offset in **Settings → System → Update time zone** is used when entering the time; UTC+03:00 (GMT+3) is the default. Changing this setting does not move existing schedules: each one keeps the exact instant and offset shown when it was saved.
+Use **Update** in a node's row to start that node's update now. Choose **Schedule** to select a future date and time. The fixed UTC offset in **Settings → System → Update time zone** is used when entering the time; UTC is the default (installations made before this default keep UTC+03:00, which was the default then). Changing this setting does not move existing schedules: each one keeps the exact instant and offset shown when it was saved.
 
+- An update now is pinned to the bundle version the page showed (an MCP plan to the version of the plan): if the trusted bundle was replaced in between, the panel refuses and asks you to review the new version.
 - Only one node rollout can run at a time. Other due schedules wait until it finishes.
-- A scheduled update is pinned to the signed bundle version selected when the schedule was saved. If the node is offline at the chosen time, it waits until the node reconnects. If the bundle is replaced before then, the panel does not silently substitute the new version; review and schedule it again.
+- A scheduled update is pinned to the signed bundle version selected when the schedule was saved, and cannot be later than that bundle's expiry. If it cannot start at the chosen time (the node is offline, another update is running), the panel keeps trying for two hours; after that the schedule is shown as missed and never starts by itself, so an update meant for a quiet hour does not run whenever the node returns. Schedule it again or cancel it. If the bundle is replaced before then, the panel does not silently substitute the new version; review and schedule it again.
 - The panel checks the signed release bundle every 10 minutes, but downloading a bundle never updates a node by itself.
 
 ### One node's update
@@ -211,9 +222,15 @@ Older agents keep working with a newer panel: changes to the agent protocol are 
 
 ## Update the panel
 
-The Updates page checks the latest stable release from `Mistgate/mistgate` at startup and every six hours. Use **Check GitHub** to check immediately. The panel only downloads the matching Linux amd64 or arm64 asset after confirming its GitHub SHA-256 digest and ELF architecture.
+The Updates page checks the latest stable release from `Mistgate/mistgate` at startup and every six hours. Use **Check GitHub** to check immediately (a check made in the last three minutes is answered from memory, which keeps the unauthenticated GitHub quota for the bundle download).
 
-Automatic installation is available to a root panel under systemd. A panel running as an unprivileged service user such as `mistgate` can use the fixed root helper below; the HTTP panel stays unprivileged. In either case, the owner must confirm with a fresh step-up, and an active node rollout must finish first. The helper fetches the official release metadata and binary itself, verifies GitHub's SHA-256 digest and ELF architecture, then stops the panel, backs up its data directory, replaces the binary and starts the panel. If the service does not stay active, it restores the previous binary and the data backup, including the original file ownership. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`.
+A release can be installed only when it carries `panel-manifest.json` and `panel-manifest.sig`, the signature verifies under the release key compiled into this panel (`release.pub` does not count: the panel's service user can write it), the manifest has not expired, and its build time is newer than this panel's. Releases are ordered by that build time, not by the version string: a panel built from a commit after the tag (for example `v0.1.6-3-gabc1234`) never sees `v0.1.6` as an update, so it is never offered a downgrade onto a database it already migrated. A release without such a manifest is shown as "not signed with this panel’s release key: it cannot be installed"; one whose manifest expired, as expired until it is signed again. The card shows the release's build date and the SHA-256 of the binary for this server. **Update panel** sends exactly that version and SHA-256, and the panel refuses if the latest signed release is another one by then.
+
+Automatic installation is available to a root panel under systemd. A panel running as an unprivileged service user such as `mistgate` can use the fixed root helper below; the HTTP panel stays unprivileged. In either case, the owner must confirm with a fresh step-up, and an active node rollout must finish first. The panel writes the confirmed version and SHA-256 to `<data-dir>/panel-update.request` and starts the helper (a transient systemd unit `mistgate-panel-update-<time>.service` for a root panel, `mistgate-panel-update.service` otherwise). The request can only narrow what the helper installs. The helper verifies the release's panel manifest itself with the key compiled into the installed binary, requires it to name exactly the confirmed version and SHA-256 and a build newer than its own, downloads the binary and checks its size, SHA-256 and ELF architecture. Only then does it stop the panel, back up its data directory, replace the binary and start the panel.
+
+The new panel must stay active for 45 seconds without systemd restarting it (with `Restart=on-failure`, a crash a few seconds in shows only as a restart). Otherwise the helper stops it, puts back the previous binary and the data backup, including the original file ownership, and starts the previous panel. On success the previous binary is kept as `<binary>.prev`; the data snapshot is kept next to the data directory as `<data-dir>.panel-update-backup.tar.gz`. If the helper ends without replacing the panel (a failed check or download), the Updates page shows within seconds that the update did not finish, and a rollout or another update can start again; `journalctl -u 'mistgate-panel-update*'` says why.
+
+The data backup is taken while the panel is stopped, before the new binary first runs. If the new panel fails its 45-second check, the database it may already have migrated forward is replaced by that backup, so the previous binary never runs on a schema it does not know; whatever the new panel wrote in those seconds is lost. To go back later by hand, stop the panel, restore the data directory from `<data-dir>.panel-update-backup.tar.gz`, put `<binary>.prev` back and start it; everything changed since the update is lost.
 
 ### Enable updates for a non-root panel service
 
@@ -233,11 +250,11 @@ systemctl show --property=LoadState --value mistgate-panel-update.service
 
 The last command should print `loaded`. The host also needs PolicyKit installed and its authorization service running for the panel user to start the helper. The helper is started on demand by the panel and should not be enabled or started manually. Check its result with `journalctl -u mistgate-panel-update.service` if the panel reports that an update could not be scheduled.
 
-Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml` and publishes panel binaries for Linux amd64 and arm64. Early commit builds such as `0.1.0-<commit>` predate the panel updater, so they can show the release but cannot install it from this page. Replace that binary once using the matching asset for the current stable release from [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) and the manual steps below. Later builds can update from **Settings → System**: press **Check GitHub**, then **Update panel** when a newer release appears. A root systemd panel can update directly; a non-root panel needs the helper unit and PolicyKit rule above.
+Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml`, which prepares a draft release with panel binaries for Linux amd64 and arm64; panels see it after you sign and publish it (see [Publish a release](#publish-a-release)). Early commit builds such as `0.1.0-<commit>` predate the panel updater, so they can show the release but cannot install it from this page. Replace that binary once using the matching asset for the current stable release from [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) and the manual steps below. Later builds can update from **Settings → System**: press **Check GitHub**, then **Update panel** when a newer release appears. A root systemd panel can update directly; a non-root panel needs the helper unit and PolicyKit rule above.
 
 For a non-systemd installation or a manual fallback:
 
-1. Build the new version with the same `RELEASE_KEY` (see above), or keep the installation's existing `<data-dir>/release.pub`. Without either, the panel cannot check bundles or start rollouts.
+1. Build the new version with the same `RELEASE_KEY` (see above). A panel whose compiled-in key differs from `<data-dir>/release.pub` trusts no bundle until you run `mistgate release trust-key` (see [Rotate the release key](#rotate-the-release-key)); a build without a key keeps using `release.pub` for bundles but cannot install panel releases.
 2. Do not update the panel while a rollout is running: pause it or let it finish. A restart in the middle of a step pauses the rollout ("the panel restarted during a step").
 3. Copy the new binary next to the installed one, then stop the panel, back up the data directory, replace the binary and start it again. Here the binary is `/usr/local/bin/mistgate` and the systemd unit is `mistgate.service`, as in [Install the panel](../getting-started/install-panel.md); use your own names:
 
@@ -260,6 +277,15 @@ What happens around the restart:
 - Admin sessions survive the restart.
 
 > **Warning:** Migrations only go forward. An older panel binary is not guaranteed to work with a database a newer one has migrated. To go back, stop the panel, restore the data directory from the backup taken before the update, put the old binary back and start it. Changes made after the backup are lost.
+
+## Rotate the release key
+
+1. Make a new key with `mistgate release keygen` and set `MISTGATE_RELEASE_PUBLIC_KEY` (or your own `RELEASE_KEY`) to its public half.
+2. Every installed agent trusts only the old key: update each node by hand once with an agent built with the new key, as for an [old agent](#old-agents-update-by-hand-once).
+3. A panel installs panel releases only under its compiled-in key, which is still the old one: replace the panel binary by hand (see the manual steps above) with one built with the new key.
+4. The new panel logs `release key mismatch` and trusts no bundle. On the panel server run `mistgate release trust-key` (as root or the panel's service user, with `--data-dir` if yours is not `/var/lib/mistgate`); it writes the new key to `release.pub` and prints the old and new fingerprints. Restart the panel.
+
+A `release.pub` that differs from the compiled-in key is never accepted silently, in either direction: a key swapped in the data directory does not make the panel trust another signer.
 
 ## Updates through the API and MCP
 

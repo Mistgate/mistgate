@@ -119,7 +119,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `device_revoke` | Operator | `user_id`, `device_id` | no |
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
-| `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now) | always |
+| `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |
 | `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`); the trusted version and offset are pinned in the plan | always |
 | `node_update_schedule_cancel` | Admin | `node_id` | always |
 | `update_timezone` | Admin | `timezone_offset_minutes` (fixed UTC offset east of UTC, in 15-minute steps; `180` is GMT+3) | always |
@@ -130,7 +130,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 
 Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. Node passwords are supplied only to their `_apply` call; they are never stored in MCP plan parameters or returned by a tool. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 
-`rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. `node_update_schedule_plan` saves a future update for one node after owner approval. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits for it to reconnect; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
+`rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
 
 ## Plan and apply
 

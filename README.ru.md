@@ -132,17 +132,17 @@ make gen                              # buf lint + buf generate после пр�
 
 ```sh
 mistgate release keygen --out ~/mistgate-release.key      # один раз; печатает публичный ключ, файл храните офлайн
-RELEASE_KEY=<публичный ключ> make build                   # вшивает ключ и время сборки в оба бинарника
-mistgate release sign --key ~/mistgate-release.key --version "$(git describe --tags --always)" \
-  --built "$(git log -1 --format=%ct)" --expires 30d \
-  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
+git checkout v0.1.4                                       # подписывается только чистая копия тега релиза
+RELEASE_KEY=<публичный ключ> VERSION=v0.1.4 make build    # вшивает ключ и время сборки в оба бинарника
+mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --expires 30d \
+  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/   # сначала пересобирает и сверяет
 scp dist/* panel.example.com:/var/lib/mistgate/dist/      # панель заметит пакет в течение минуты
 ```
 
 Затем запустите раскатку на странице **Обновления** (только владелец, с повторным подтверждением входа).
 
-- Агенты нод, собранные без `RELEASE_KEY`, не обновляются сами. Панель сохраняет ключ проверки пакетов в `release.pub`, пока сама обновляется из GitHub.
-- Панель проверяет официальные GitHub Releases и устанавливает проверенный бинарник на root-установках под systemd. Для отката сохраняются предыдущий бинарник и копия данных, сделанная при остановленной панели.
+- Агенты нод, собранные без `RELEASE_KEY`, не обновляются сами. Панель хранит ключ установки в `release.pub`; бинарник панели с другим вшитым ключом ничему не доверяет до `mistgate release trust-key`.
+- Панель проверяет официальные GitHub Releases и устанавливает релиз на установках под systemd, только если его манифест панели подписан вшитым в неё ключом. Для отката сохраняются предыдущий бинарник и копия данных, сделанная при остановленной панели; панель, не проработавшая 45 секунд, откатывается.
 - Ноды, установленные до появления самообновления, один раз обновляются вручную (`mistgate-node install` с новым бинарём).
 
 ## Безопасность

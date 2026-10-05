@@ -17,7 +17,9 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `auth reset-login` | Gives an admin a new password and authenticator app, or adds a password login. |
 | `mcp` | A local stdio proxy to the panel's MCP endpoint, for agent clients that cannot speak HTTP. |
 | `release keygen` | Makes the owner's release key. |
-| `release sign` | Signs node binaries into a release bundle. |
+| `release build` | Builds release binaries the one reproducible way (CI and `make build` use it). |
+| `release sign` | Rebuilds the binaries from the release tag, then signs the node bundle and the panel manifest. |
+| `release trust-key` | On the panel server, after a key rotation: makes the binary's release key the installation's key. |
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
 `mistgate` exits with 0 on success, 1 on an error (printed as `mistgate: <error>`) and 2 for an unknown command or a missing one.
@@ -139,32 +141,54 @@ mistgate release keygen --out ~/mistgate-release.key
 
 Prints the public key and its fingerprint. Put the public key into the build: `RELEASE_KEY=<public key> make build`. Keep the key file offline and back it up. See [Updates](../operations/updates.md).
 
+### mistgate release build
+
+```text
+mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] NAME... --out DIR
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--version` | none | Version stamped into the binaries, for example `v0.1.4`. |
+| `--built` | commit time of `--source` | Unix time of the source commit; it orders releases. |
+| `--key` | none | The release public key (base64). Without it the binaries cannot update themselves. |
+| `--source` | `.` | The source checkout. |
+| `--out` | none | Directory for the binaries. |
+
+`NAME` is `mistgate-linux-amd64`, `mistgate-linux-arm64`, `mistgate-node-linux-amd64` or `mistgate-node-linux-arm64`. The build is reproducible: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, the Go toolchain named in `go.mod` (downloaded when the local Go is another version), `GOAMD64=v1`/`GOARM64=v8.0` and the version, build time and key as the only `-ldflags` values. The panel binary embeds `web/dist`: build the SPA first (`cd web && pnpm install --frozen-lockfile && pnpm build`). The release workflow and `make build` call this command; it prints the SHA-256 of every binary.
+
 ### mistgate release sign
 
 ```text
-mistgate release sign --key FILE --version V --built UNIX [--expires 30d] BINARY... --out DIR
+mistgate release sign --key FILE --version V [--built UNIX] [--expires 30d] [--source DIR] BINARY... --out DIR
 ```
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--key` | none | The release private key file made by `release keygen`. |
-| `--version` | none | Release version. It must match the panel binary used to sign the bundle and the built agents, for example `v0.1.4`. |
-| `--built` | none | Unix time of the source commit (`git log -1 --format=%ct`). It orders releases and must match the build time stamped into the binaries. |
-| `--expires` | `30d` | How long the manifest stays installable: days (`30d`) or a Go duration (`720h`). |
-| `--out` | none | Directory for `manifest.json`, `manifest.sig` and the copies of the binaries. |
+| `--version` | none | The release tag, for example `v0.1.4`. |
+| `--built` | commit time of the tag | When given, it must be the commit time of the tag. |
+| `--expires` | `30d` | How long the manifests stay installable: days (`30d`) or a Go duration (`720h`). |
+| `--source` | `.` | A clean checkout of the tag `--version` (local changes to tracked files are refused). |
+| `--out` | none | Directory for the manifests, their signatures and the copies of the binaries. |
 
-The binaries are named `<name>-<os>-<arch>`, for example `mistgate-node-linux-amd64`. Flags may come after the binaries. The command verifies what it wrote and prints every file with its size and the key fingerprint. Copy the directory to `<data-dir>/dist` on the panel.
+The binaries are named `<name>-<os>-<arch>`: `mistgate-node-linux-*` go into the node bundle (`manifest.json`, `manifest.sig`), `mistgate-linux-*` into the panel manifest (`panel-manifest.json`, `panel-manifest.sig`, signed in a separate Ed25519 context so neither verifies as the other). Before signing, the command rebuilds every binary from `--source` with `release build` and the public half of `--key`, and refuses any binary that differs byte for byte: you sign what the tag builds to, not what a CI runner uploaded. Flags may come after the binaries. The command verifies what it wrote and prints every file with its size and the key fingerprint. A signer built locally from any version works: `go build -o mistgate ./cmd/mistgate`.
 
 ```sh
-VERSION="$(git describe --tags --always --dirty)"
-BUILT="$(git log -1 --format=%ct)"
-mistgate release sign --key ~/mistgate-release.key \
-  --version "$VERSION" \
-  --built "$BUILT" --expires 30d \
-  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/
+mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --source ~/src/mistgate \
+  downloaded/mistgate-node-linux-amd64 downloaded/mistgate-node-linux-arm64 \
+  downloaded/mistgate-linux-amd64 downloaded/mistgate-linux-arm64 --out signed
 ```
 
-Signing refuses a bundle whose `--version` differs from the panel binary's version. Build the panel and agents from the same release tag; see [Updates](../operations/updates.md).
+See [Updates](../operations/updates.md) for the whole release.
+
+### mistgate release trust-key
+
+```text
+mistgate release trust-key [--data-dir DIR]
+```
+
+Run on the panel server, as the panel's service user or root, after you rotated the release key and installed a panel built with the new key. It writes the key compiled into this binary to `<data-dir>/release.pub` and prints the old and new fingerprints. Until then a panel whose compiled-in key differs from `release.pub` logs an error and trusts no bundle. Restart the panel afterwards. `--data-dir` falls back to `MISTGATE_DATA_DIR`, then `/var/lib/mistgate`.
 
 ### mistgate version
 

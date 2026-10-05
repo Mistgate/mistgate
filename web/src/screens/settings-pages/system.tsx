@@ -53,7 +53,7 @@ function UpdateTimezoneCard({ data, owner, busy, onChange }: { data: Updates; ow
           >
             {updateTimezoneOffsets.map((offset) => (
               <option key={offset} value={offset}>
-                {updateTimezoneName(offset)}{offset === 180 ? " (GMT+3)" : ""}
+                {updateTimezoneName(offset)}
               </option>
             ))}
           </select>
