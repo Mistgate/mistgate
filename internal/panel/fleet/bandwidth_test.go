@@ -174,7 +174,7 @@ func TestTheFirstStartMeasuresTheLinkOnceAndStoresItWhileItIsZero(t *testing.T) 
 	x.f.measureDelay = 10 * time.Millisecond
 	c, _, _ := connectCaps(a, "first", bwCaps...)
 	answerMeasure(c, measured("940", "871"), nil)
-	within(t, "the capacity", func() bool { return x.capacity() == 940 })
+	within(t, "the capacity", func() bool { return x.capacity() == 871 }) // the slower direction
 	within(t, "the event", func() bool { return x.count(`SELECT count(*) FROM event WHERE code = 'bandwidth_measured'`) == 1 })
 	if n := x.count(`SELECT count(*) FROM audit WHERE action = 'node.bandwidth_auto' AND actor = 'system'`); n != 1 {
 		t.Errorf("%d automatic audit rows, want 1", n)

@@ -130,7 +130,7 @@ func (f *Fleet) autoMeasureBandwidth(s *session) {
 			f.log.Info("first bandwidth measurement did not work", "node", n.ID, "err", err, "code", out.GetErrorCode())
 			return
 		}
-		stored, err := f.st.SetBandwidthIfUnset(ctx, n.ID, int(out.DownMbps))
+		stored, err := f.st.SetBandwidthIfUnset(ctx, n.ID, capacityOf(out.DownMbps, out.UpMbps))
 		if err != nil || !stored {
 			if err != nil {
 				f.log.Warn("store the measured bandwidth", "node", n.ID, "err", err)
@@ -144,4 +144,14 @@ func (f *Fleet) autoMeasureBandwidth(s *session) {
 			f.log.Warn("audit", "action", "node.bandwidth_auto", "err", err)
 		}
 	}()
+}
+
+// capacityOf is the capacity a measurement gives a VPN node: the slower direction. Every byte a person downloads comes
+// in from the internet and goes out to them, and providers often leave the inbound free while they cap the outbound
+// (a node measured 4984 Mbps down and 1080 up: its plan is 1 Gbit/s). Without an upload figure, the download.
+func capacityOf(down, up uint32) int {
+	if up > 0 && up < down {
+		return int(up)
+	}
+	return int(down)
 }

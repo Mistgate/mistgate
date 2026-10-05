@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { roundMbps } from "./bandwidth";
+import { capacityOf, roundMbps } from "./bandwidth";
+
+describe("capacityOf", () => {
+  it("is the slower direction: a node relays every byte both ways", () => {
+    expect(capacityOf(4984, 1080)).toBe(1080); // inbound free, outbound capped at the plan
+    expect(capacityOf(870, 940)).toBe(870);
+    expect(capacityOf(937, 0)).toBe(937); // no upload figure: the download
+  });
+});
 
 describe("roundMbps", () => {
   it("rounds the way a plan is written", () => {

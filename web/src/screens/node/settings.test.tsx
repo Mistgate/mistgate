@@ -143,11 +143,11 @@ describe("measuring the network capacity", () => {
     expect(field().value).toBe(""); // the measurement alone changes nothing
     const save = button(en["common.save"])!;
     expect(save.hasAttribute("disabled") || save.getAttribute("data-disabled") !== null).toBe(true);
-    await click(button("Use 940"));
-    expect(field().value).toBe("940");
+    await click(button("Use 870"));
+    expect(field().value).toBe("870"); // the slower direction
     const save2 = button(en["common.save"])!;
     expect(save2.hasAttribute("disabled") || save2.getAttribute("data-disabled") !== null).toBe(false);
-    expect(button("Use 940")!.hasAttribute("disabled") || button("Use 940")!.getAttribute("data-disabled") !== null).toBe(true); // it is in the field now
+    expect(button("Use 870")!.hasAttribute("disabled") || button("Use 870")!.getAttribute("data-disabled") !== null).toBe(true); // it is in the field now
   });
 
   it("says how much of the figure is the people already on the node, only when there is some", async () => {
@@ -177,7 +177,7 @@ describe("measuring the network capacity", () => {
     await mount(NodeStatus.ONLINE);
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).toContain("Measured: 937 Mbps ↓ · the upload could not be measured");
-    expect(button("Use 940")).toBeDefined();
+    expect(button("Use 940")).toBeDefined(); // no upload figure: the download
   });
 
   it("words what the node answered", async () => {

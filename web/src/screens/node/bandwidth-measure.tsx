@@ -5,18 +5,18 @@ import { Notice } from "@/components/ui/notice";
 import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { roundMbps } from "./bandwidth";
+import { capacityOf, roundMbps } from "./bandwidth";
 
 /**
  * "Measure" next to the capacity field. The node downloads from a public speed server for about ten seconds; the answer is
- * shown, and "Use" puts the rounded download figure into the field (it is saved with the rest of the form, never by the
+ * shown, and "Use" puts the rounded slower direction into the field (it is saved with the rest of the form, never by the
  * measurement itself). Owner only, like the API call.
  */
 export function BandwidthMeasure({ nodeId, current, onUse }: { nodeId: string; current: string; onUse: (value: string) => void }) {
   const t = useT();
   const measure = useMutation({ mutationFn: () => nodesApi.measureBandwidth({ nodeId }) });
   const r = measure.data;
-  const value = r && !r.errorCode && r.downMbps > 0 ? roundMbps(r.downMbps) : 0;
+  const value = r && !r.errorCode && r.downMbps > 0 ? roundMbps(capacityOf(r.downMbps, r.upMbps)) : 0;
 
   // what people already on the node carried during the test (it is inside the figures above, not added to them)
   const people = !r || !value ? "" : r.peopleDownMbps > 0 && r.peopleUpMbps > 0
