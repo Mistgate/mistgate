@@ -40,6 +40,7 @@ API описан в `proto/mistgate/admin/v1/`. Сгенерированный �
 | `WarpService` | `warp.proto` | Аккаунты WARP нод |
 | `AwgService` | `awg.proto` | Помощники редактора профиля AmneziaWG |
 | `BackupService` | `backup.proto` | Зашифрованные бэкапы панели |
+| `TelegramService` | `telegram.proto` | Telegram-бот и чат каждого админа (только владелец и вошедшие админы; закрыт для токенов API и MCP) |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API-токены и одобрения владельца |
 
 Справочник по каждому полю — комментарии в proto-файлах. Соглашения (`common.proto`):

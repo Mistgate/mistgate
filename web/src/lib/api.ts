@@ -14,6 +14,7 @@ import { NodeService } from "@/gen/mistgate/admin/v1/node_pb";
 import { ProfileService } from "@/gen/mistgate/admin/v1/profile_pb";
 import { ProvisioningService } from "@/gen/mistgate/admin/v1/provisioning_pb";
 import { SubscriptionService } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { TelegramService } from "@/gen/mistgate/admin/v1/telegram_pb";
 import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
 import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
@@ -46,6 +47,7 @@ export const awg = createClient(AwgService, transport);
 export const warp = createClient(WarpService, transport);
 export const apiTokens = createClient(ApiTokenService, transport);
 export const approvals = createClient(ApprovalService, transport);
+export const telegram = createClient(TelegramService, transport);
 
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
 export const assetUrl = (path: string) => new URL(path, document.baseURI).href;

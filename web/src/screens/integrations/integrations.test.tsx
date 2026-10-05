@@ -25,6 +25,8 @@ vi.mock("@/lib/api", () => ({
     approve: (...a: unknown[]) => approve(...a),
     reject: (...a: unknown[]) => reject(...a),
   },
+  // the Telegram card has its own tests (telegram.test.tsx); here it only has to render
+  telegram: { getTelegram: () => Promise.resolve({ status: { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false } }) },
   updates: {},
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
@@ -232,9 +234,10 @@ describe("the Integrations screen: tokens", () => {
     expect(listApprovals).not.toHaveBeenCalled();
   });
 
-  it("does not offer the Telegram bot or webhooks", async () => {
+  it("offers Telegram alerts (the card has its own tests) and no webhooks", async () => {
     await mount(tokens([]));
-    expect(text()).not.toMatch(/telegram|webhook/i);
+    expect(text()).toContain("Telegram alerts");
+    expect(text()).not.toMatch(/webhook/i);
   });
 
   it("opens the create form for the palette's “New API token” and takes ?new=token out of the address", async () => {

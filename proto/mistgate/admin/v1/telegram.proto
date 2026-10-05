@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Telegram alerts: the panel sends what needs a human to the admins who linked their chat. Conventions: common.proto.
+//
+// ONE BOT PER PANEL. The owner makes a bot with @BotFather and pastes its token here. The token is sealed in the panel
+// vault and never comes back: the screen shows "set" and the bot's @username (from getMe). Every admin links their own
+// private chat: BeginTelegramLink returns a one-time code and a t.me deep link, the admin sends "/start <code>" to the
+// bot, and the panel binds that chat to that admin. The panel only polls the Bot API (getUpdates) to hear those codes;
+// there is no webhook. A chat that sends anything else gets no reply.
+//
+// WHO MAY CALL WHAT. SetTelegramBot is OWNER-ONLY and needs a step-up. Everything else is the admin's own account, any
+// role (like passkeys): link or unlink their chat, switch their alerts on or off, send themselves a test. What reaches a
+// chat depends on the admin's role (docs: Telegram alerts). None of it is open to API tokens or MCP.
+//
+// ERRORS. INVALID_ARGUMENT: a token that is not shaped like a bot token ("token_invalid"). FAILED_PRECONDITION:
+// "telegram_not_configured" (no bot), "telegram_not_linked" (this admin has no chat), "telegram_unauthorized" (Telegram
+// refused the token). UNAVAILABLE: "telegram_unreachable" (api.telegram.org did not answer). RESOURCE_EXHAUSTED: asked
+// again too soon.
+service TelegramService {
+  // The bot, this admin's chat and (for the owner) everyone's. No secrets.
+  rpc GetTelegram(GetTelegramRequest) returns (GetTelegramResponse);
+  // Sets or clears the bot token. Owner only; needs a step-up. A new bot unlinks every chat (chats belong to a bot).
+  rpc SetTelegramBot(SetTelegramBotRequest) returns (SetTelegramBotResponse);
+  // Starts linking this admin's chat: a one-time code that lives 10 minutes. Needs a step-up.
+  rpc BeginTelegramLink(BeginTelegramLinkRequest) returns (BeginTelegramLinkResponse);
+  // Forgets this admin's chat. Idempotent.
+  rpc UnlinkTelegram(UnlinkTelegramRequest) returns (UnlinkTelegramResponse);
+  // Switches this admin's alerts on or off without unlinking.
+  rpc SetTelegramAlerts(SetTelegramAlertsRequest) returns (SetTelegramAlertsResponse);
+  // Sends one short message to this admin's chat, to prove the path works.
+  rpc SendTelegramTest(SendTelegramTestRequest) returns (SendTelegramTestResponse);
+}
+
+message TelegramBot {
+  // A token is stored.
+  bool configured = 1;
+  // The bot's @username without the "@"; empty until a token was accepted.
+  string username = 2;
+  // How the last conversation with Telegram went, a code the SPA words itself: "" (fine), "unauthorized" (the token was
+  // revoked or is wrong), "unreachable" (no answer), "conflict" (another process polls this bot or a webhook is set).
+  string error = 3;
+}
+
+message TelegramLink {
+  string admin_id = 1;
+  string admin_name = 2;
+  // owner, helper or readonly: what the admin receives follows it.
+  string role = 3;
+  // Alerts are on for this chat.
+  bool enabled = 4;
+  int64 linked_unix = 5 [jstype = JS_NUMBER];
+  // The Telegram chat id, only on the caller's own link (0 on the others): the id of a private chat is the person's own
+  // Telegram id, and it is what another sender of the same bot (the mirror Worker) needs to write to this chat.
+  int64 chat_id = 6 [jstype = JS_NUMBER];
+}
+
+message TelegramStatus {
+  TelegramBot bot = 1;
+  // This admin's chat; unset when none is linked.
+  TelegramLink mine = 2;
+  // Everyone who linked a chat. Filled for the owner only.
+  repeated TelegramLink links = 3;
+  // The panel knows its public admin address, so alerts carry a link to the admin. Without it they say what happened only.
+  bool admin_url_known = 4;
+}
+
+message GetTelegramRequest {}
+message GetTelegramResponse { TelegramStatus status = 1; }
+
+message SetTelegramBotRequest {
+  // The token from @BotFather ("123456:ABC..."). Empty with clear unset is an error.
+  string token = 1;
+  // Forget the bot and every link.
+  bool clear = 2;
+}
+message SetTelegramBotResponse { TelegramStatus status = 1; }
+
+message BeginTelegramLinkRequest {}
+message BeginTelegramLinkResponse {
+  // What the admin sends to the bot after /start; one use.
+  string code = 1;
+  // https://t.me/<bot>?start=<code>
+  string deep_link = 2;
+  int64 expires_unix = 3 [jstype = JS_NUMBER];
+}
+
+message UnlinkTelegramRequest {}
+message UnlinkTelegramResponse { TelegramStatus status = 1; }
+
+message SetTelegramAlertsRequest { bool enabled = 1; }
+message SetTelegramAlertsResponse { TelegramStatus status = 1; }
+
+message SendTelegramTestRequest {}
+message SendTelegramTestResponse {}

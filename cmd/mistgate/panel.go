@@ -28,6 +28,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
+	"github.com/mistgate/mistgate/internal/panel/telegram"
 	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/panel/warp"
@@ -55,6 +56,7 @@ type panel struct {
 	warp      *warp.Service
 	provision *nodeprovision.Service
 	backup    *backup.Service
+	telegram  *telegram.Service
 	st        *store.Store // for the sweep of MCP plans
 	log       *slog.Logger
 	// desired is the desired-state source of the fleet (tests read it).
@@ -65,6 +67,17 @@ type panel struct {
 // interfaces and callbacks below, this is the one place that connects them.
 func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelOpts, log *slog.Logger) (*panel, error) {
 	reg := builtin.Registry()
+	// Telegram alerts: everything below that has news reports it here; the admin links of the news carry the admin address
+	// only when it is a public one (a separate loopback admin listener is not).
+	alertsURL := ""
+	if o.in.AdminListen == "" && len(o.in.RPOrigins) > 0 {
+		alertsURL = o.in.adminURL()
+	}
+	tg, err := telegram.New(telegram.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, AdminURL: alertsURL, Log: log})
+	if err != nil {
+		return nil, err
+	}
+	authSvc.SetEventHook(tg.Security)
 	var acc *access.Service // set below; the fleet calls back into it only after serving started
 	var hl *health.Service  // likewise
 	// One source of truth for the access rule: access.Desired (adapter NodeInbound -> statehash.Inbound).
@@ -91,7 +104,8 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 				log.Warn("recompute user status after usage", "err", err)
 			}
 		},
-		Log: log,
+		OnAwgPrepareFailed: tg.AwgPrepareFailed,
+		Log:                log,
 	})
 	if err != nil {
 		return nil, err
@@ -106,7 +120,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
-	hcfg := health.Config{Log: log}
+	hcfg := health.Config{Log: log, OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	// Test hook: scripts/e2e-wsl.sh cannot wait ten minutes for NODE_DOWN.
 	if d, err := time.ParseDuration(os.Getenv("MISTGATE_HEALTH_BLIP_WINDOW")); err == nil && d > 0 {
 		hcfg.BlipWindow = d
@@ -150,6 +164,13 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	}
 	fl.SetUpdates(upd)
 	hl.AddConditionSource(upd.Conditions)
+	tg.SetSources(telegram.Sources{
+		PanelRelease: func() (string, bool) {
+			s := panelUpdater.Status()
+			return s.Version, s.Available && s.ErrorKey == ""
+		},
+		OutdatedAgents: upd.OutdatedAgents,
+	})
 	prov, err := nodeprovision.NewService(st, vlt, nodeprovision.Config{
 		StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
 		PanelAddr: o.panelAddr, AgentSNI: o.in.AgentSNI, Log: log,
@@ -159,7 +180,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	}
 	bkp, err := backup.New(backup.Config{
 		Store: st, Vault: vlt, DataDir: o.dataDir, MasterKey: o.masterKey,
-		StepUp: authSvc.RequireStepUp, Log: log,
+		StepUp: authSvc.RequireStepUp, OnResult: backupResult(tg), Log: log,
 	})
 	if err != nil {
 		return nil, err
@@ -204,6 +225,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		func() (string, http.Handler) { return hl.Handler() },
 		func() (string, http.Handler) { return upd.Handler() },
 		func() (string, http.Handler) { return bkp.Handler() },
+		func() (string, http.Handler) { return tg.Handler() },
 	} {
 		path, handler := h()
 		admin = append(admin, httpserver.AdminHandler{Path: path, Handler: handler})
@@ -219,7 +241,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		Log:            log,
 		AdminHandlers:  admin,
 		AdminPages:     []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: prov.PageHandler()}},
-		MCP:            mcpEndpoint(authSvc, st, log),
+		MCP:            mcpEndpoint(authSvc, st, log, tg.PlanWaiting),
 		PublicMounts:   map[string]http.Handler{o.in.SubPrefix: sub},
 		AgentSNI:       o.in.AgentSNI,
 		AgentTLS:       fl.AgentTLSConfig,
@@ -232,20 +254,21 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if err != nil {
 		return nil, err
 	}
-	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, provision: prov, backup: bkp, desired: desired, st: st, log: log}, nil
+	return &panel{srv: srv, fleet: fl, access: acc, health: hl, update: upd, warp: wsv, provision: prov, backup: bkp, telegram: tg, desired: desired, st: st, log: log}, nil
 }
 
 // run starts the background loops of the modules and serves until ctx ends or a listener fails.
 func (p *panel) run(ctx context.Context, o httpserver.ServeOptions) error {
 	bg, stop := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	wg.Add(7)
+	wg.Add(8)
 	go func() { defer wg.Done(); sweepPlans(bg, p.st, p.log) }()
 	go func() { defer wg.Done(); p.fleet.Run(bg) }()
 	go func() { defer wg.Done(); p.access.Run(bg) }()
 	go func() { defer wg.Done(); p.health.Run(bg) }()
 	go func() { defer wg.Done(); p.update.Run(bg) }()
 	go func() { defer wg.Done(); p.backup.Run(bg) }()
+	go func() { defer wg.Done(); p.telegram.Run(bg) }()
 	go func() {
 		defer wg.Done()
 		for bg.Err() == nil {
@@ -285,4 +308,15 @@ func agentAddress(flagAddr, agentListen, publicURL string) string {
 		port = "443" // the agent endpoint is TLS
 	}
 	return net.JoinHostPort(u.Hostname(), port)
+}
+
+// backupResult is backup.Config.OnResult: a failed backup is announced once, the next one that works resolves it.
+func backupResult(tg *telegram.Service) func(code string) {
+	return func(code string) {
+		if code == "" {
+			tg.BackupOK()
+			return
+		}
+		tg.BackupFailed(code)
+	}
 }

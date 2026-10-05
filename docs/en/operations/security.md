@@ -31,7 +31,7 @@ Limits on password sign-in:
 - 10 failed attempts from one address (an IPv4 address, or an IPv6 /64) within an hour, for any logins, lock that address for 15 minutes.
 - The answer is the same for a login that does not exist, so failures do not reveal which logins exist.
 - Sign-in, setup and step-up calls are also rate limited per address (a burst of 10, then one request every 3 seconds).
-- A lockout is written to the audit log with the address and the time. The panel sends no notification about it.
+- A lockout is written to the audit log with the address and the time. If you link Telegram, the owner is told at once: see [Telegram alerts](telegram-alerts.md), which also tells the owner about sign-ins from a new address and changes to a sign-in method.
 
 In **Settings → Security** an admin manages their own sign-in:
 

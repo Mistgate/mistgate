@@ -37,9 +37,9 @@ Mistgate is in early releases; the current one is [`v0.1.15`](https://github.com
 
 | Stage | What |
 |:--|:--|
-| **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the user page · DNS presets · health doctor, client-eye checks, alerts · per-node torrent protection · SSH installation from the admin and through MCP with owner approval · saved SSH access with verified password change · encrypted Cloudflare R2 backups and restore · signed node updates, now or scheduled, with health gate and rollback · panel self-update from signed releases · reproducible, offline-signed releases · API tokens and MCP server · admin UI in ru / en |
+| **Done** | Panel and node agent over mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · WARP egress · subscriptions and the user page · DNS presets · health doctor, client-eye checks, alerts, Telegram alerts · per-node torrent protection · SSH installation from the admin and through MCP with owner approval · saved SSH access with verified password change · encrypted Cloudflare R2 backups and restore · signed node updates, now or scheduled, with health gate and rollback · panel self-update from signed releases · reproducible, offline-signed releases · API tokens and MCP server · admin UI in ru / en |
 | **Now** | Field testing of `v0.1.15` in production: torrent protection, SSH installation and recovery, signed panel and node releases |
-| **Next** | Telegram bot for the whole fleet · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
+| **Next** | Telegram bot beyond alerts (fleet and users) · more subscription formats (Xray JSON, sing-box) and subscription mirrors · a one-line installer |
 | **Later** | VLESS REALITY as the first external protocol plugin |
 
 Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md). Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the control domains of the node doctor, split-DNS presets); all of them are settings.

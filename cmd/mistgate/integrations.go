@@ -29,10 +29,11 @@ func integrationHandlers(authSvc *auth.Service) []httpserver.AdminHandler {
 }
 
 // mcpEndpoint is httpserver.Config.MCP: the MCP handler behind the bearer middleware of auth.
-func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger) func(api http.Handler) http.Handler {
+// onWaiting (may be nil) is told when a plan starts waiting for the owner's approval (the Telegram alert).
+func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWaiting func(tool, tokenName string)) func(api http.Handler) http.Handler {
 	return func(api http.Handler) http.Handler {
 		h, err := mcp.New(mcp.Config{
-			Plans: planStore{st},
+			Plans: planStore{st: st, onWaiting: onWaiting},
 			Auth:  mcpAuth{authSvc},
 			API:   api,
 			Audit: func(ctx context.Context, e mcp.AuditEntry) {
@@ -101,7 +102,10 @@ func (a mcpAuth) WithApprovedStepUp(ctx context.Context, planID string) context.
 }
 
 // planStore is mcp.Plans over the store. mcp.Plan and store.MCPPlan have the same fields, so they convert.
-type planStore struct{ st *store.Store }
+type planStore struct {
+	st        *store.Store
+	onWaiting func(tool, tokenName string) // nil = nobody listens
+}
 
 func planErr(err error) error {
 	switch {
@@ -114,7 +118,17 @@ func planErr(err error) error {
 }
 
 func (p planStore) CreateMCPPlan(ctx context.Context, pl mcp.Plan, maxOpen, maxAwaiting int) error {
-	return planErr(p.st.CreateMCPPlan(ctx, store.MCPPlan(pl), maxOpen, maxAwaiting))
+	if err := p.st.CreateMCPPlan(ctx, store.MCPPlan(pl), maxOpen, maxAwaiting); err != nil {
+		return planErr(err)
+	}
+	if pl.NeedsApproval && p.onWaiting != nil {
+		name := ""
+		if t, err := p.st.GetAPIToken(ctx, pl.TokenID); err == nil {
+			name = t.Name
+		}
+		p.onWaiting(pl.Tool, name)
+	}
+	return nil
 }
 
 func (p planStore) MCPPlanByConfirm(ctx context.Context, tokenID string, h []byte) (mcp.Plan, error) {

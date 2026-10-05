@@ -238,7 +238,7 @@ Depending on what the alert says, its card offers:
 - If its severity rises, the mute ends and the alert counts again.
 - Muting is written to the audit log.
 
-> **Note:** The panel sends no notifications yet. A Telegram bot for the fleet is **Planned**. Today alerts are seen in the admin (the header badge, the Overview, the Health page) and through the [API](../reference/api.md) and [MCP](../reference/mcp.md).
+> **Note:** Alerts are seen in the admin (the header badge, the Overview, the Health page) and through the [API](../reference/api.md) and [MCP](../reference/mcp.md). The panel can also send them to Telegram when they open and when they resolve: see [Telegram alerts](telegram-alerts.md). A muted alert stays quiet there too.
 
 ### Events on the node page
 

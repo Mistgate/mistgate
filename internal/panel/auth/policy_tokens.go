@@ -105,6 +105,8 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.BackupServiceUpdateBackupSettingsProcedure:           true,
 	adminv1connect.BackupServiceTestBackupStorageProcedure:              true,
 	adminv1connect.BackupServiceCreateBackupProcedure:                   true,
+	adminv1connect.TelegramServiceSetTelegramBotProcedure:               true,
+	adminv1connect.TelegramServiceBeginTelegramLinkProcedure:            true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,

@@ -22,6 +22,7 @@ Mistgate is in early releases; the current one is `v0.1.15`. It runs in producti
 - Install jobs that can be cancelled, retried and resumed after an interruption.
 - Saved SSH access, encrypted, with a verified password change; the access outlives a retired node until the owner forgets it.
 - [Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention and back-off, and an offline restore.
+- [Telegram alerts](../operations/telegram-alerts.md): health alerts, releases, failed backups, plans waiting for approval and sign-in security, sent to the admins who link their chat.
 
 ### Updates
 
@@ -40,7 +41,7 @@ Mistgate is in early releases; the current one is `v0.1.15`. It runs in producti
 
 ## Next
 
-- A Telegram bot for the whole fleet.
+- A Telegram bot beyond alerts: for the fleet and for users.
 - More subscription formats (Xray JSON, sing-box) and subscription mirrors.
 - A one-line installer.
 

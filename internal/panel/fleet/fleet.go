@@ -56,6 +56,9 @@ type Config struct {
 	// OnUsage is called after a stats batch added usage to these users (new used_bytes are committed), e.g.
 	// access.Service.Recompute, so a quota overrun takes effect within one stats interval.
 	OnUsage func(ctx context.Context, userIDs []string)
+	// OnAwgPrepareFailed is called when a node reports that the build of its AmneziaWG kernel module failed (the Telegram
+	// alerts hang on it). at is the time the node gave; a replay of the same report carries the same value. Must not block.
+	OnAwgPrepareFailed func(nodeID, code string, at int64)
 	// Actor returns the admin id for audit rows. Default: the signed-in admin from the auth interceptor.
 	Actor func(context.Context) string
 	Log   *slog.Logger

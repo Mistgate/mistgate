@@ -163,6 +163,9 @@ func (f *Fleet) onAwgPrepareEvent(ctx context.Context, nodeID string, row store.
 	case evPrepDone, evPrepFailed:
 		var switched bool
 		switched, err = f.st.AwgPrepareFinish(ctx, nodeID, row.Code == evPrepDone, at, clip(row.Params["code"], 32), clip(row.Params["reason"], 200))
+		if err == nil && row.Code == evPrepFailed && f.cfg.OnAwgPrepareFailed != nil {
+			f.cfg.OnAwgPrepareFailed(nodeID, clip(row.Params["code"], 32), at)
+		}
 		if err == nil && switched {
 			f.event(ctx, 1, "awg_kernel_switched", nodeID, map[string]string{"backend": "kernel", "minutes": row.Params["minutes"]})
 			f.StateChanged() // pushes NodeSettings.awg_backend = "kernel" to the node

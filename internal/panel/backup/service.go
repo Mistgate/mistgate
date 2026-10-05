@@ -54,7 +54,10 @@ type Config struct {
 	DataDir   string
 	MasterKey []byte
 	StepUp    func(context.Context) error
-	Log       *slog.Logger
+	// OnResult is told how every backup ended: "" when it worked, else the error code (backup_storage_failed, ...). The
+	// Telegram alerts hang on it. It must not block.
+	OnResult func(code string)
+	Log      *slog.Logger
 }
 
 type Service struct {
@@ -63,6 +66,7 @@ type Service struct {
 	dataDir   string
 	masterKey []byte
 	stepUp    func(context.Context) error
+	onResult  func(code string)
 	log       *slog.Logger
 	mu        sync.Mutex  // held while a backup runs
 	running   atomic.Bool // the same, for the settings page to read
@@ -81,7 +85,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, log: cfg.Log, now: time.Now}
+	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, onResult: cfg.OnResult, log: cfg.Log, now: time.Now}
 	s.r2Factory = s.newR2Client
 	return s, nil
 }
@@ -370,7 +374,16 @@ func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error)
 	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
 	defer cancel()
 	interval := time.Duration(defaultIntervalHour) * time.Hour
-	defer func() { s.backoff(err != nil, interval) }()
+	defer func() {
+		s.backoff(err != nil, interval)
+		if s.onResult != nil {
+			code := ""
+			if err != nil {
+				code = errorCode(err)
+			}
+			s.onResult(code)
+		}
+	}()
 	settings, err := s.st.PanelBackupSettings(ctx)
 	if err != nil {
 		return backupObject{}, "", errBackupInvalidSettings

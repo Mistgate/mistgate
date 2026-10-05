@@ -8,11 +8,13 @@ import { approvalsQuery } from "@/lib/integrations";
 import { useIsOwner } from "@/lib/updates";
 import { ApprovalHistory, ApprovalQueue } from "./approvals";
 import { McpCard } from "./mcp";
+import { TelegramCard } from "./telegram";
 import { TokensCard } from "./tokens";
 
 /**
- * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, and the owner's inbox of
- * what an agent planned that needs a human. Tokens and approvals are owner-only on the server; anyone else gets a calm line.
+ * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, the Telegram alerts and the
+ * owner's inbox of what an agent planned that needs a human. Tokens and approvals are owner-only on the server; anyone else
+ * gets a calm line, and their own Telegram link (every admin links their own chat).
  */
 export function IntegrationsScreen() {
   const t = useT();
@@ -31,6 +33,7 @@ export function IntegrationsScreen() {
     return (
       <div className="flex flex-col gap-3.5">
         {header}
+        <TelegramCard owner={false} />
         <Card lg className="border-dashed">
           <EmptyState icon={<NavIcon name="integrations" size={20} />} title={t("int.ownerOnly.title")}>
             {t("int.ownerOnly.text")}
@@ -49,6 +52,7 @@ export function IntegrationsScreen() {
         <TokensCard />
         <McpCard />
       </div>
+      <TelegramCard owner />
       {q.data && <ApprovalHistory data={q.data} />}
     </div>
   );

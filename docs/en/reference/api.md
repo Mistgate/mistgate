@@ -40,6 +40,7 @@ The API is defined in `proto/mistgate/admin/v1/`. Generated code is in the repos
 | `WarpService` | `warp.proto` | WARP accounts of nodes |
 | `AwgService` | `awg.proto` | Helpers of the AmneziaWG profile editor |
 | `BackupService` | `backup.proto` | Encrypted panel backups |
+| `TelegramService` | `telegram.proto` | The Telegram bot and each admin's chat (owner and signed-in admins only; closed to API tokens and MCP) |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API tokens and the owner's approvals |
 
 The comments in the proto files are the reference for every field. Conventions (`common.proto`):

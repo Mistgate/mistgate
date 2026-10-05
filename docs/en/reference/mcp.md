@@ -179,7 +179,7 @@ A plan needs the owner when one of these applies (the `danger` list):
 
 ### Where the owner approves
 
-Such a plan appears in **Integrations → Waiting for you**, with a badge in the admin. The owner sees the change in the panel's own words, the danger notes, the agent's reason (marked "Written by the agent. The panel did not check it.") and the time left, then chooses:
+Such a plan appears in **Integrations → Waiting for you**, with a badge in the admin; if the owner linked Telegram, the panel also sends a message that a plan waits, with a link there (the decision is made in the admin only: see [Telegram alerts](../operations/telegram-alerts.md)). The owner sees the change in the panel's own words, the danger notes, the agent's reason (marked "Written by the agent. The panel did not check it.") and the time left, then chooses:
 
 - **Approve**: asks for the owner's passkey or authenticator code once more. The agent's apply goes through after this, for this plan only.
 - **Reject**: the agent's apply fails with "rejected by the owner".

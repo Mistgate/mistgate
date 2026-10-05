@@ -99,6 +99,27 @@ func (s *Service) nodes(ctx context.Context, b *bundleState, steps []store.StepR
 	return out, nil
 }
 
+// OutdatedAgents is the version of the release the nodes are compared with (the trusted bundle's, else this panel's own) and
+// the names of the connected nodes that run an older build and could be updated. The Telegram alerts tell it once per version.
+func (s *Service) OutdatedAgents(ctx context.Context) (version string, names []string) {
+	b := s.current()
+	version = s.cfg.PanelVersion
+	if b != nil && b.trusted && b.manifest != nil {
+		version = b.manifest.Version
+	}
+	views, err := s.nodes(ctx, b, nil)
+	if err != nil {
+		return "", nil
+	}
+	for _, v := range views {
+		if v.state == adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED {
+			names = append(names, v.row.Name)
+		}
+	}
+	sort.Strings(names)
+	return version, names
+}
+
 // view is the admin message of a node.
 func (v nodeView) proto() *adminv1.NodeUpdate {
 	m := &adminv1.NodeUpdate{

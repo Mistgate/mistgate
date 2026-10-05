@@ -52,3 +52,7 @@ Run the restore as the panel service account, or set the restored directory's ow
 If systemd supplies `master.key` through `CREDENTIALS_DIRECTORY`, replace that credential with the restored `master.key` before starting Mistgate. The service must use the restored key to read the restored database.
 
 Keep the old data directory until the restored panel starts and you verify sign-in, nodes and subscriptions. Never restore an archive over a live data directory. Losing the recovery identity makes the R2 archives unusable; losing the restored master key makes the panel's encrypted secrets unreadable.
+
+## Failures
+
+A backup that fails leaves its error code on the settings page. If the owner linked Telegram, the owner is also told once (however often the schedule retries) and again when the next backup works: see [Telegram alerts](telegram-alerts.md).

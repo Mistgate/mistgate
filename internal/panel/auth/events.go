@@ -2,8 +2,9 @@ package auth
 
 import "time"
 
-// Event kinds passed to the hook installed with SetEventHook. Nothing in the panel installs a hook today: there is no
-// Telegram or other notification of these events, and the audit log is the record (a lockout is its "lockout" row).
+// Event kinds passed to the hook installed with SetEventHook. The panel installs one (internal/panel/telegram) that tells the
+// owner of a lockout, a sign-in from a new address and a change to a sign-in method; the audit log stays the record (a
+// lockout is its "lockout" row).
 const (
 	EventSetup          = "setup"           // the first admin was created
 	EventSignIn         = "sign_in"         // a session was opened (Method says how)

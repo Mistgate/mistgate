@@ -184,6 +184,15 @@ var procedureLevels = map[string]level{
 	adminv1connect.BackupServiceCreateBackupProcedure:         levelOwner, // exports sensitive installation state; also needs a step-up
 	adminv1connect.BackupServiceListBackupsProcedure:          levelOwner,
 
+	// TelegramService: setting the bot is the owner's (it decides where alerts go; also needs a step-up); linking, unlinking and
+	// switching alerts is each admin's own account, any role, like passkeys (linking also needs a step-up). Not open to tokens.
+	adminv1connect.TelegramServiceGetTelegramProcedure:       levelRead,
+	adminv1connect.TelegramServiceSetTelegramBotProcedure:    levelOwner,
+	adminv1connect.TelegramServiceBeginTelegramLinkProcedure: levelRead,
+	adminv1connect.TelegramServiceUnlinkTelegramProcedure:    levelRead,
+	adminv1connect.TelegramServiceSetTelegramAlertsProcedure: levelRead,
+	adminv1connect.TelegramServiceSendTelegramTestProcedure:  levelRead,
+
 	adminv1connect.UserServiceListUsersProcedure:           levelRead,
 	adminv1connect.UserServiceGetUserProcedure:             levelRead,
 	adminv1connect.UserServiceCreateUserProcedure:          levelWrite,
