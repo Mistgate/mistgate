@@ -643,8 +643,9 @@ func TestInterfaceCountersNeverLowerTheResult(t *testing.T) {
 		"unreadable":                          func() (string, uint64, uint64, bool) { return "", 0, 0, false },
 		"the route moved":                     moving(),
 		"a counter went back": func() func() (string, uint64, uint64, bool) {
-			n := uint64(1e9)
-			return func() (string, uint64, uint64, bool) { n -= 1e6; return "eth0", n, n, true }
+			var n atomic.Uint64 // read from the warm-up timer and from the main goroutine
+			n.Store(1e9)
+			return func() (string, uint64, uint64, bool) { v := n.Add(^uint64(1e6 - 1)); return "eth0", v, v, true }
 		}(),
 		"none": nil,
 	} {
