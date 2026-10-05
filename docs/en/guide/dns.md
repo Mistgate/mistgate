@@ -86,7 +86,7 @@ The user card says which preset applies and where it comes from: "set on the use
 
 | App | How the preset arrives | What it can carry |
 |:--|:--|:--|
-| Happ | A routing profile in the `routing` header of the subscription, applied when the app refreshes it. | One resolver for the tunnel and one for direct traffic; plain DNS (port 53 only) and DoH, no DoT. Only the first main server is used. A split works only with **Split domains go direct** on, and then only the first split rule; the split's suffixes become direct sites. **IPv4 only** is ignored. |
+| Happ | A routing profile in the `routing` header of the subscription, applied when the app refreshes it. | One resolver for the tunnel and one for direct traffic; plain DNS (port 53 only) and DoH, no DoT. Only the first main server is used. A split works only with **Split domains go direct** on, and then only the split rules with the same servers as the first one (Happ has a single resolver for direct traffic); their suffixes become direct sites. **IPv4 only** is ignored. |
 | Apps on the mihomo core | The `dns:` section of the Mihomo YAML. | Plain, DoT and DoH, IPv6 addresses too. The main servers are asked through the tunnel; with **Split domains go direct** on, the split's suffixes are asked at their servers directly and their traffic goes direct. Some Mihomo-based apps ignore the section and use their own. |
 | AmneziaVPN and AmneziaWG apps | `DNS =` in the `.conf`, the two DNS fields of the `vpn://` key. | Exactly two plain IPv4 addresses: the first two of the main servers. No split. When the preset has no plain IPv4 server, 1.1.1.1 and 8.8.8.8 are written and the key window says so. |
 
@@ -97,15 +97,16 @@ Without a split, Happ's direct resolver is set to the main one too, so a site a 
 - **Apps on the link** (Happ, apps on the mihomo core) get it with their next subscription update: within the refresh interval, 12 hours by default. A person can refresh the subscription by hand.
 - **AmneziaVPN** only in new keys: the DNS is written into the key, so a person gets the new servers when they import their key again (or a new one).
 
-The editor says the same under the DNS select: "When it arrives: the apps on the link with the next subscription update; AmneziaVPN only in new keys."
+Every DNS select (the default, a group's, a user's) says the same under it: "When it arrives: the apps on the link (Happ) with the next subscription update; AmneziaVPN only in new keys." The brackets name the link apps of the **User page** tab.
 
 ## Node DNS is something else
 
-Two node settings also involve DNS, and neither is a preset:
+Two things on the node side also involve DNS, and neither is a preset:
 
-- **DNS resolvers for this node** in **Settings**: the addresses used by the node and its VPN engines. The default, **Server's own resolver**, is an empty list: the node uses whatever the server uses (some hosters allow only their own resolvers). **Yandex DNS** (`77.88.8.8`, `77.88.8.1`) and **Cloudflare + Google** (`1.1.1.1`, `8.8.8.8`) are choices you make; pick Yandex DNS for a node in Russia, so Russian services such as gosuslugi.ru resolve reliably. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
-- **A user's or group's DNS preset** sets DNS in client subscriptions and applies across every node that user can access. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN; a user's own preset takes priority over the group.
+- **DNS resolvers for this node** in the node's **Settings**: the addresses the node and its VPN engines resolve names with, the names in its users' traffic included. The default, **Server's own resolver**, is an empty list: the node uses whatever the server uses (some hosters allow only their own resolvers). **Yandex DNS** (`77.88.8.8`, `77.88.8.1`), **Cloudflare + Google** (`1.1.1.1`, `8.8.8.8`) and **Custom DNS** (IP addresses of your own, up to 8) are choices you make; pick Yandex DNS for a node in Russia, so Russian services such as gosuslugi.ru resolve reliably. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
 - **The server's system resolver** is the host DNS used by apt and certificate renewal. Doctor checks it and can offer to set it to the node's resolvers or, when the node has none, to Yandex DNS in Russia and Cloudflare + Google elsewhere. See [Health](../operations/health.md).
+
+A preset, on the other hand, goes to the apps in the subscription and is the same on every node the person can use: switching servers does not change it. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN, whichever node the person is on.
 
 ## Who can do what
 

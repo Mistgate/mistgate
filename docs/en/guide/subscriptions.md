@@ -65,12 +65,12 @@ The Mihomo YAML carries the same headers, one proxy group with every server, and
 
 | Setting | What it does |
 |:--|:--|
-| **Name in the app** | Shown at the top of the list in Happ. Empty means the panel's name (the brand). |
-| **Announcement** | One or two lines above the servers; the user page shows it too. The counter says how much Happ shows: 200 characters. A longer text is cut at a word with "…" for the apps. |
+| **Name in the app** | Shown at the top of the list in Happ. Up to 100 characters. Empty means the panel's name (the brand). |
+| **Announcement** | One or two lines above the servers, up to 1000 characters; the user page shows it too. The counter says how much Happ shows: 200 characters. A longer text is cut at a word with "…" for the apps. |
 | **Support link** | Opens from the "Message support" button. A Telegram link (`https://t.me/…` or `tg://resolve?domain=…`) or a web link (`https://…`). |
 | **Refresh every** | 1–72 hours, default 12: how often the app downloads the subscription again. |
 
-**Server names** is a template built from pieces:
+**Server names** is a template of up to 100 characters, built from pieces:
 
 | Piece | Becomes |
 |:--|:--|
@@ -81,9 +81,11 @@ The Mihomo YAML carries the same headers, one proxy group with every server, and
 
 The default is `{flag} {country} · {profile}`: "🇩🇪 DE · Hysteria2". Profile names come from the panel, so protocol variants and WARP twins stay easy to tell apart. A number is added only if the full name repeats. A node without a country keeps its profile name; if the name is empty too, it falls back to the node. Happ shows a flag as the server icon only when the name starts with one.
 
-In Happ, a node with a set network capacity also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64%". Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
+In the link list every name is kept within 30 characters, Happ's limit for a server name (a flag counts as four): a long name first shortens the protocol at the start of the profile name (Hysteria2 to HY2, AmneziaWG to AWG, WireGuard to WG), then is cut. The Mihomo YAML keeps the full names.
 
-**How it looks in the app** draws the list as Happ shows it, with the servers of the group most people are in, or with made-up servers when there is none.
+In Happ, a node with a set network capacity (**Network capacity** in the node's **Settings**) also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64%", the higher of its receive and send rates as a share of that capacity. Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
+
+**How it looks in the app** draws the list as Happ shows it, loads included, with the servers of the group most people are in, or with made-up servers when there is none.
 
 ## When a subscription does not work
 

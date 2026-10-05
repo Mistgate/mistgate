@@ -15,12 +15,13 @@ From top to bottom:
 
 1. **The announcement**, when **Show announcement** is on. The person can close it; a new text shows again.
 2. **The greeting and the status**: "Hi, Alice", the status ("Subscription active", "Subscription ended", "Traffic used up", "Subscription disabled"), the days left of the term and the traffic of the period against the quota, with the reset date.
-3. **What you'll use it on**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable when the panel has apps for several.
-4. **The ways to connect**, side by side when the person has both ("Either of the two ways will do — or both at once"):
+3. **Channel utilization**: how busy each server's channel is right now, as a level: **Low**, **Medium** or **High** (from 50% and 80% of the node's channel, the **Network capacity** field in its **Settings**). Only nodes whose capacity you set are listed, and the card is left out when there are none. A server is named by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number. The page never shows the rates themselves: someone who shares a node with one other person must not see when that person streams. When a server is at **High**, the card suggests a calmer one ("The … server's channel is very busy. If your connection is slow, try …").
+4. **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable when the panel has apps for several.
+5. **The ways to connect**, side by side when the person has both ("Either of the two ways will do — or both at once"):
    - **Subscription — Happ** (the names come from the apps list): install the app (with the store or download button and the card's description), then **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". Other apps of the platform are listed below. A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" lists the apps on the link and when they last updated.
    - **AmneziaVPN key**: the person's keys ("Your keys"), and **Add a device** when self-service is on (see below).
-5. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
-6. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
+6. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
+7. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
 
 A platform with no app gets "There's no app for … — pick another device above". A person who gets nothing yet sees "The server is still being set up — message the admin."
 
@@ -80,9 +81,9 @@ With **Devices on the page** on (the default), a person manages their own Amnezi
 - **Add a device**: "Connection option" (the main one is named by the countries of its nodes; a WARP profile is "Spare exit (if some site won't open)"; a 2.0 profile is "For old AmneziaVPN versions (before 5.0.1.5)"), "What kind of device", and "Name (optional)". The key opens at once.
 - For each device: **Show key**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once).
 - The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code.
-- When the admin changes a profile in a way that breaks old keys, the device says "new key needed", and **Get a new key** walks the person through replacing it.
+- When an old key stops working (a critical change of the profile, a new port or address of a node), the device says "new key needed", and **Get a new key** walks the person through replacing it.
 
-Limits: only an active person can add or re-key devices; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one link may make 20 such changes an hour. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
+Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one link may make 20 such requests an hour, showing a key included. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
 
 ## The preview in the admin
 

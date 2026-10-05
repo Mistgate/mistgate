@@ -29,7 +29,7 @@ A new profile always starts with a generated Salamander password and with the cl
 
 ## Obfuscation
 
-Salamander wraps every packet so that the QUIC handshake does not look like QUIC; the node and the app share the password. Gecko is another obfuscation of the same Hysteria2 core and is marked experimental. With **None** the traffic is plain QUIC.
+Salamander wraps every packet so that the QUIC handshake does not look like QUIC; the node and the app share the password. Gecko is another obfuscation of the same Hysteria2 core, which fragments long handshakes; it is marked experimental. With **None** the traffic is plain QUIC. The field's hint says that Happ supports only Salamander so far.
 
 Changing the type or the password breaks the server for everyone until their app updates the subscription. **Generate** makes a new password.
 
@@ -68,6 +68,7 @@ The domain, the certificate and how they interact with the node address are desc
 - **Per-node DNS.** The node resolves those names itself, with the node's **DNS resolvers for this node** setting; the default is the server's own resolver. IPv4 is preferred; IPv6 is used for a name without an A record. A WARP exit resolves the same way. See [Nodes](nodes.md) and [DNS](dns.md).
 - **Closed destinations.** A user cannot reach private networks, loopback, link-local and cloud metadata addresses, or any address of the node itself through the tunnel.
 - **Users.** Adding, removing or disabling a person changes only the node's list of tokens: nobody else is disconnected. A removed or expired person is cut off at their next packet.
+- **Torrents.** With the node's **Block recognized BitTorrent traffic** on, the node closes an outbound connection or drops a UDP datagram it recognizes as BitTorrent. Changing that setting restarts the node's Hysteria2 profiles. See [Torrent protection](torrent-protection.md).
 
 ## What the apps receive
 
@@ -82,7 +83,7 @@ hysteria2://<token>@de1.example.com:443/?obfs=salamander&obfs-password=<password
 - `obfs` and `obfs-password` are there when obfuscation is on;
 - `sni` is there when the server name is a domain;
 - for a self-signed certificate the link carries `insecure=1` together with `pinSHA256=<64 hex digits>`: the app accepts only the certificate with that fingerprint;
-- `#<server name>` is the name from the template, URL-encoded.
+- `#<server name>` is the name from the template, URL-encoded and kept within 30 characters; Happ's names also end with the node's load. See [Subscriptions](subscriptions.md).
 
 **Mihomo YAML.** Apps on the mihomo core (Clash Verge, FlClash and others) get one proxy per server:
 

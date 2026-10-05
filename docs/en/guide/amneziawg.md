@@ -82,7 +82,7 @@ Critical settings must match on the node and in every client; changing them make
 | **Init padding (S1)**, **Response padding (S2)** | 0–150 bytes | yes | Bytes added to the handshake messages. |
 | **Cookie padding (S3)**, **Data padding (S4)** | 0–64 bytes | yes | S4 is added to every data packet: keep it small. |
 | **Init header (H1)** … **Data header (H4)** | a number or a range lo-hi | yes | Message type values. 1, 2, 3, 4 are plain WireGuard. The four ranges must not overlap. |
-| **Signature packet 1 (I1)** … **(I5)** | up to 3500 characters each | no | Tags b, r, rc, rd, t. Filled by the look; typing here makes the look **Custom**. |
+| **Signature packet 1 (I1)** … **(I5)** | up to 3500 characters each | no | Tags b, r, rc, rd, t. Filled by the look; typing here makes the look **Custom**. I1 is here, I2–I5 are under **Advanced**. |
 
 **Advanced** (the 3.1 fields are ignored on 2.0)
 
@@ -174,7 +174,7 @@ In the user card, under **Devices** → **AmneziaVPN keys**, **Add device** open
 - **Replace key**: a new key pair for the same device and address. The old key stops working at once, and the new one has to be added to the app again;
 - **Delete**: removes the device; its key stops working on every node.
 
-Opening a config marks the device as having the current one: an **outdated** badge (after a critical change of the profile, or a port change on a node) goes away once the person has imported the new config.
+Opening a config marks the device as having the current one: an **outdated** badge (after a critical change of the profile, or a new port or address of a node) goes away once the person has imported the new config.
 
 > **Warning:** a config holds the device's private key. Send it only to its owner, and never paste it into a shared chat.
 

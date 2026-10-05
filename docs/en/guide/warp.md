@@ -69,7 +69,7 @@ Next to the title the card shows where the account came from (**Registered here*
 - **Handshake**: when the tunnel last completed a handshake with Cloudflare.
 - **Endpoint**: the Cloudflare address and port in use.
 - **Traffic**: bytes in and out through the tunnel.
-- **Cloudflare** and **Other site**: two probes through the tunnel, one to Cloudflare and one to a site outside it. Each reads **ok** with its time, **slow** (over 2 seconds), or **failed**. A probe times out after 12 seconds; HTTP failures show their status.
+- **Cloudflare** and **Other site**: two probes through the tunnel, one to Cloudflare and one to a site outside it. Each reads **ok** with its time, **slow** (over 2 seconds), or **failed**. A probe times out after 20 seconds; HTTP failures show their status.
 - "Checked N s ago". The node checks every 30 seconds, every 5 while the tunnel is starting. A run of failures shows as "3 failed checks in a row".
 - **Details**: the WireGuard backend, Cloudflare's own flag (`warp=on`, `warp=plus` or `warp=off`) and whether the account's reserved bytes are stamped on packets.
 

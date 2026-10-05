@@ -33,7 +33,7 @@ Every profile is a card: its name, the protocol, a short line of its settings ("
 ## Creating a profile
 
 1. **New profile**. If the panel has more than one protocol, pick it under **Protocol**. The form starts from the plugin's defaults, with every secret already generated.
-2. **Name**. Until you type one, it follows the port: "Hysteria2 · 443". Up to 64 characters, shown in the panel's lists.
+2. **Name**. Until you type one, it follows the port: "Hysteria2 · 443". Up to 64 characters, shown in the panel's lists and, through `{profile}` of the name template, in the server names people see (see [Subscriptions](subscriptions.md)).
 3. Change the settings you need. The panel checks them as you type; a field with a problem is marked, and the preview waits until it is fixed.
 4. **Right after it is created** decides what happens on the click:
    - **Put it on nodes**: every node is ticked, or only the node you came from. For a Let's Encrypt profile without a domain, the block warns about nodes whose address is an IP.
@@ -68,7 +68,7 @@ The first AmneziaWG profile on a node also asks which AmneziaWG backend the node
 
 ### Ports and the free-port suggestion
 
-Two profiles cannot listen on the same port of one node, and a port cannot sit inside another profile's port-hopping range. When the port is taken, the dialog puts in a free one at once and says so ("Port 443 is taken by "Main": the free port 8443 is filled in. You can type your own."), and **Take 8443** brings it back if you typed something else. The panel tries 8443, 4443, 2053, 2083, 2087 and 2096 first, then random ports between 10000 and 60000, and counts hop ranges as taken.
+Two profiles cannot listen on the same port of one node, and a port cannot sit inside another profile's port-hopping range. When the port is taken, the dialog puts in a free one at once and says so ("Port 443 is taken by "Main": the free port 8443 is filled in. You can type your own."), and **Take 8443** brings it back if you typed something else. For Hysteria2 the panel tries 8443, 4443, 2053, 2083, 2087 and 2096 first, then random ports between 10000 and 60000; for AmneziaWG only random ones. Hop ranges count as taken.
 
 A port can also be held by a program outside Mistgate. The panel cannot see that before the profile starts: the profile then fails with "Port 443 is taken by another program", the doctor names the process when it can, and **Change port** opens the dialog on a free port.
 
@@ -147,13 +147,13 @@ If someone else saved the profile while you were editing, saving says "This prof
 
 On the profile page, under **Where it runs**, **WARP copy** (or **Copy without WARP** for a profile that already exits through WARP) makes a twin of the profile with the other exit. The window lists exactly what will be made:
 
-- the name with " · WARP" added (or removed);
-- a port that is free on every node of the profile;
+- the name with " · WARP" added (or removed), and a number before it when that name is taken ("Main 2 · WARP");
+- a port that is free on every node of the profile (the same candidates as the free-port suggestion above);
 - new passwords and keys: nothing secret is copied; an AmneziaWG twin also gets its own client network;
 - no port hopping (the two ranges would overlap);
 - the same nodes and the same groups. Nodes without a working WARP are listed and unticked for a WARP twin: it would carry nothing there.
 
-Save your changes first: the copy is made from the saved profile. People of those groups then see each node twice in the app. The default server name includes the profile name, so the WARP twin keeps its "· WARP" label; see [Subscriptions](subscriptions.md) to customize the names. For AmneziaWG every person who wants the twin needs a separate device (key) for it. WARP itself is on [WARP](warp.md).
+Save your changes first: the copy is made from the saved profile. People of those groups then see each node twice in the app. The server names follow the template in **Subscriptions** → **Names & texts**: by default the country, then the profile name, so the twin reads "🇩🇪 DE · Main · WARP" next to "🇩🇪 DE · Main". With a template without `{profile}` the two differ only by a number; see [Subscriptions](subscriptions.md). For AmneziaWG every person who wants the twin needs a separate device (key) for it. WARP itself is on [WARP](warp.md).
 
 ## Deleting a profile
 

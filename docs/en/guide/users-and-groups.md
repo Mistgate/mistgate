@@ -106,6 +106,10 @@ The counter shows devices in use against the limit. Two lists:
 
 **Delete** disconnects the device and removes its key from every node.
 
+### Subscription page
+
+**Name shown on the subscription page**: the name the user page greets the person with, up to 64 characters. Empty uses the account name; the line under the field shows the greeting ("Page greeting: …"). **Save name** saves it. Anyone with the link sees this name; it changes nothing else about the user. See [User page](user-page.md).
+
 ### Limits
 
 | Setting | Steps and range |
