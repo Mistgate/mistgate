@@ -5,7 +5,7 @@
 //
 //   - Read-only by default. A check only reads /proc, /sys, a few config files and runs read-only commands
 //     (systemctl list-*, nft list, timedatectl show, dmesg, journalctl -k). Only Apply changes anything, only
-//     for the four compiled fix ids, never from a string the panel sends (params are validated), and a dry run
+//     for the five compiled fix ids, never from a string the panel sends (params are validated), and a dry run
 //     changes nothing.
 //   - A check that cannot run here (container, no systemd, not root, not Linux) is SKIP with a reason, never
 //     a false OK.

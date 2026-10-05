@@ -2,12 +2,13 @@ package auth
 
 import "time"
 
-// Event kinds passed to the hook installed with SetEventHook.
+// Event kinds passed to the hook installed with SetEventHook. Nothing in the panel installs a hook today: there is no
+// Telegram or other notification of these events, and the audit log is the record (a lockout is its "lockout" row).
 const (
 	EventSetup          = "setup"           // the first admin was created
 	EventSignIn         = "sign_in"         // a session was opened (Method says how)
 	EventSignInFailed   = "sign_in_failed"  // a wrong password or code
-	EventLockout        = "lockout"         // a login was locked after too many failures: the owner should hear about it
+	EventLockout        = "lockout"         // a login was locked after too many failures
 	EventPasskeyAdded   = "passkey_added"   // Settings -> Security
 	EventPasskeyRemoved = "passkey_removed" // Settings -> Security
 	// Settings -> Security -> "Password and code": a new password, a re-bound authenticator app, a new password login.
@@ -16,8 +17,7 @@ const (
 	EventPasswordAdded   = "password_added"
 )
 
-// Event is what the Telegram bot (or anything else) gets to react to. It carries no
-// secrets.
+// Event is what a hook gets to react to. It carries no secrets.
 type Event struct {
 	Kind    string
 	Time    time.Time
