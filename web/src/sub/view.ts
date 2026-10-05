@@ -1,43 +1,24 @@
 import badge from "../assets/mistgate-badge.svg?raw";
+import { connectCard, moreCard, qrSide } from "./connect";
+import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
 import { dict, type Dict } from "./i18n";
-import { alts, copyButton, downloadButton, keyWay, staleCard, steps, wayHead, type AmzActions, type AmzState, type Tools } from "./amnezia";
+import { staleCard } from "./amnezia";
 import { icon } from "./icons";
-import {
-  appNames,
-  appsFor,
-  deviceIcon,
-  fmtAgo,
-  hero,
-  isShared,
-  isTelegram,
-  otherDevices,
-  platformWord,
-  platformsOf,
-  qrApp,
-  safeAddUrl,
-  safeUrl,
-  stateText,
-  ways,
-  type Hero,
-} from "./logic";
-import { qrSvg } from "./qr";
-import type { AppEntry, Device, Lang, LoadLevel, MgData, Platform } from "./types";
+import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
+import { serversSection } from "./servers";
+import type { Actions, Ctx, State } from "./state";
+import { bar, dot } from "./ui";
+import type { Lang, MgData, Theme } from "./types";
 
-// The user page as DOM. Two layouts from one tree: elements marked only-m / only-w are shown below / from
-// 720 px (sub.css); the rest is shared and restyled by the same media query.
+// The user page as DOM. Two layouts from one tree: elements marked only-m / only-w are shown below / from 720 px
+// (sub.css); the rest is shared and restyled by the same media query.
 //
-// Under the hero the page has the two ways to connect, side by side and of equal weight:
-// the subscription (one link with every server, for Happ and the like) and the AmneziaVPN key (one per device). Each says
-// what it is in one line, shows its own steps, and lists the devices that use it. A user who has one way sees only that one.
+// Top to bottom: the status, then (a first visit) the three steps of connecting, the servers, the person's devices, help
+// and the footer; a returning visitor has the servers and devices first and the steps folded into "connect one more device".
+// A subscription that is not active shows the reason and "write to support", then the devices (they can be removed and renamed).
 
-export type State = { lang: Lang; platform: Platform | null; qrOpen: boolean; annClosed: boolean; amz: AmzState };
-export type Actions = {
-  lang(l: Lang): void;
-  platform(p: Platform): void;
-  qrOpen(open: boolean): void;
-  closeAnn(): void;
-} & Tools & { amz: AmzActions };
+export type { Actions, State } from "./state";
 
 export const brandName = (d: MgData) =>
   d.title.trim() || (d.brand.parts.join("") || "VPN").replace(/^./, (c) => c.toUpperCase());
@@ -57,56 +38,20 @@ export function logoSrc(d: MgData): string {
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
 
-const bar = (pct: number, cls = "") => h("div", { class: "bar" }, h("i", { class: cls, style: { width: `${pct}%` } }));
-const dot = () => h("i", { class: "dot" });
-const chip = (text: string) => h("span", { class: "chip" }, dot(), text);
-
-const levelBar: Record<LoadLevel, string> = { low: "33%", medium: "66%", high: "100%" };
-
-/** How busy each server is, as a level only. A busy one suggests the calmest other server, if there is one. */
-function serverLoadCard(d: MgData, t: Dict): HTMLElement | null {
-  if (d.server_loads.length === 0) return null;
-  const busy = d.server_loads.find((s) => s.level === "high");
-  const calm = busy && (d.server_loads.find((s) => s.level === "low") ?? d.server_loads.find((s) => s.level === "medium"));
-  const notice = busy ? (calm ? t.serverLoadTry(busy.name, calm.name) : t.serverLoadBusy) : null;
-  return h(
-    "section",
-    { class: "card server-loads", "aria-label": t.serverLoadTitle },
-    h("div", { class: "server-load-head" }, h("b", null, t.serverLoadTitle), h("p", { class: "mut sm" }, t.serverLoadIntro)),
-    h(
-      "div",
-      { class: "server-load-list" },
-      ...d.server_loads.map((s) => {
-        const high = s.level === "high" ? "high" : "";
-        return h(
-          "div",
-          { class: "server-load-row" },
-          h("div", { class: "server-load-top" }, h("b", null, s.name), h("span", { class: `server-load-pct ${high}` }, t.serverLoadLevel[s.level])),
-          h("div", { class: "server-load-bar" }, h("i", { class: high, style: { width: levelBar[s.level] } })),
-        );
-      }),
-    ),
-    notice && h("p", { class: `server-load-notice${calm ? "" : " high"}`, role: "status" }, notice),
-  );
-}
-
 /** The top bar: logo, name and the language switch. Shared by the page and the password form. */
 export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
   const t = dict[lang];
   const wordmark = d.title.trim().toLowerCase() === d.brand.parts.join("").toLowerCase() || !d.title.trim();
+  const btn = (l: Lang) =>
+    h("button", { class: lang === l ? "on" : "", type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: l, on: { click: () => lang !== l && setLang(l) } }, l.toUpperCase());
   return h(
     "header",
     { class: "hd" },
     h("img", { class: "logo", src: logoSrc(d), alt: "", width: 32, height: 32, draggable: "false" }),
     wordmark && d.brand.parts[0]
-      ? h("span", { class: "name wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1]))
-      : h("span", { class: "name" }, brandName(d)),
-    h(
-      "button",
-      { class: "lang", type: "button", "data-k": "lang", "aria-label": t.langLabel, on: { click: () => setLang(lang === "ru" ? "en" : "ru") } },
-      h("span", { class: lang === "ru" ? "on" : "" }, "RU"),
-      h("span", { class: lang === "en" ? "on" : "" }, "EN"),
-    ),
+      ? h("div", { class: "wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1]))
+      : h("div", { class: "wm plain" }, brandName(d)),
+    h("div", { class: "lang", role: "group", "aria-label": t.langGroup }, btn("ru"), btn("en")),
   );
 }
 
@@ -117,19 +62,13 @@ export function annKey(text: string): string {
   return `ann:${n.toString(36)}`;
 }
 
+const sendBtn = (href: string, label: string, cls = "pri") => h("a", { class: `btn ${cls}`, href, target: "_blank", rel: "noopener noreferrer" }, icon("send"), label);
+
 export function view(d: MgData, s: State, a: Actions): HTMLElement {
   const t = dict[s.lang];
-  const hr = hero(d, s.lang);
   const active = d.user.status === "active";
   const support = d.options.show_support ? safeUrl(d.support_url) : "";
-  const name = brandName(d);
-  const hello = d.user.name ? t.hi(d.user.name) : t.hiAnon;
-  const why = stateText(d, s.lang, name);
-
-  // the big "message support" button only where something is wrong; an active page has the support card
-  const supportBtn = (cls: string) =>
-    support && !active ? h("a", { class: `btn pri ${cls}`, href: support, target: "_blank", rel: "noopener noreferrer" }, t.writeSupport) : null;
-  const explain = why ? h("p", { class: "why" }, support ? `${why[0]} ${why[1]}` : why[0]) : null;
+  const c: Ctx = { d, s, a, t, support };
 
   const ann =
     d.options.show_announcement &&
@@ -138,227 +77,199 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     h(
       "div",
       { class: "ann", role: "note" },
-      h("i", { class: "dot" }),
-      h("span", null, d.announcement),
-      h("button", { class: "x", type: "button", "data-k": "ann-x", "aria-label": t.close, on: { click: () => a.closeAnn() } }, icon("close")),
+      h("span", { class: "dot" }),
+      h("p", null, d.announcement),
+      h("button", { class: "x", type: "button", "data-k": "ann-x", "aria-label": t.hideAnn, on: { click: () => a.closeAnn() } }, icon("close", 16)),
     );
 
-  const children: Kid[] = [
-    pageHeader(d, s.lang, a.lang),
-    ann,
-    heroMobile(hr, hello, t, explain, supportBtn("full")),
-    heroWeb(hr, hello, t),
-    explain && h("div", { class: `note only-w tone-${d.user.status}` }, h("p", null, support ? `${why?.[0]} ${why?.[1]}` : why?.[0]), supportBtn("")),
-  ];
+  const children: Kid[] = [pageHeader(d, s.lang, a.lang), ann, ...statusCards(c)];
 
-  if (active) children.push(serverLoadCard(d, t), staleCard({ d, s, a, t }), ...connect(d, s, a, t, support));
-  // the support card on an active page; a page with a problem has the button in the hero already
-  if (support && active) {
-    children.push(
-      h(
-        "section",
-        { class: "card sup only-m" },
-        h("div", { class: "supt" }, h("b", null, t.help), h("span", { class: "mut" }, isTelegram(support) ? t.helpTg : t.helpAny)),
-        h("a", { class: "btn sec sm", href: support, target: "_blank", rel: "noopener noreferrer" }, t.write),
-      ),
-    );
+  if (!active) {
+    // a state with a problem: the reason, the way to write, and the devices (they can still be removed and renamed)
+    children.push(...devicesSection(c));
+  } else {
+    const stale = staleCard({ d, s, a, t, support });
+    const servers = serversSection(c);
+    const devices = devicesSection(c);
+    // the help card stands in two places (beside the steps on a computer, at the end on a phone): one element each
+    const qr = qrSide(c);
+    const hasHelp = support !== "";
+    const hasConnect = connectNeeded(d);
+    if (stale) children.push(stale);
+    if (s.returning) {
+      children.push(...servers, ...devices);
+      if (hasConnect) {
+        children.push(h("div", { class: "cols" }, h("div", { class: "main" }, moreCard(c)), hasHelp && h("aside", { class: "side only-w" }, helpCard(c))));
+      }
+    } else {
+      if (hasConnect) {
+        children.push(
+          h("div", { class: "sec" }, h("h2", { class: "h2" }, t.connectT), h("p", { class: "hint sec-sub" }, t.connectH)),
+          h("div", { class: "cols" }, h("div", { class: "main" }, connectCard(c)), (qr || hasHelp) && h("aside", { class: "side only-w" }, qr, hasHelp && helpCard(c))),
+        );
+      }
+      children.push(...servers, ...devices);
+    }
+    if (hasHelp) children.push(h("div", { class: "only-m" }, helpCard(c)));
   }
-  children.push(
-    h(
-      "footer",
-      { class: "foot" },
-      h("span", { class: "privacy" }, t.privacy),
-      support && active && h("span", { class: "only-w mut" }, t.help),
-      support && active && h("a", { class: "flink only-w", href: support, target: "_blank", rel: "noopener noreferrer" }, t.writeWeb(isTelegram(support))),
-    ),
-  );
+  children.push(footer(c));
   return h("main", { class: "wrap" }, ...children);
 }
 
-function heroMobile(hr: Hero, hello: string, t: Dict, explain: HTMLElement | null, btn: HTMLElement | null) {
+/** There is something to connect with: a link or a key. */
+const connectNeeded = (d: MgData) => d.access.happ || (d.access.amnezia && d.amnezia !== null) || d.apps.length > 0;
+
+function helpCard({ t, support }: Ctx): HTMLElement | null {
+  if (!support) return null;
   return h(
     "section",
-    { class: `hero only-m tone-${hr.state}` },
-    h("div", { class: "r1" }, h("span", { class: "hello" }, hello), !hr.word && chip(t.chip[hr.state])),
-    h(
-      "div",
-      { class: `bigrow${hr.word ? " word" : ""}` },
-      h("span", { class: hr.word ? "big w" : "big mono" }, hr.big),
-      h("div", { class: "bigtxt" }, hr.unit && h("b", null, hr.unit), hr.sub && h("span", { class: "mut" }, hr.sub)),
-    ),
-    hr.showTraffic &&
-      h(
-        "div",
-        { class: "tr" },
-        h("div", { class: "trl" }, h("span", { class: "mut" }, t.traffic), h("span", { class: "mono" }, hr.line)),
-        hr.pct !== null && bar(hr.pct, hr.state === "limited" ? "warn" : ""),
-        hr.caption && h("span", { class: "mut sm" }, hr.caption),
-      ),
-    explain,
-    btn,
+    { class: "card row g12 help", "aria-label": t.helpT },
+    h("span", { class: "tile s36 lav only-m", "aria-hidden": "true" }, icon("chat")),
+    h("div", { class: "stack grow" }, h("p", { class: "b" }, t.helpT), h("p", { class: "hint" }, isTelegram(support) ? t.helpTg : t.helpAny)),
+    h("a", { class: "btn sec sm", href: support, target: "_blank", rel: "noopener noreferrer" }, t.write),
   );
 }
 
-function heroWeb(hr: Hero, hello: string, t: Dict) {
+function footer({ s, a, t }: Ctx): HTMLElement {
+  const themes: Theme[] = ["auto", "light", "dark"];
   return h(
-    "section",
-    { class: `herow only-w tone-${hr.state}${hr.state === "active" ? " calm" : ""}${hr.showTraffic ? "" : " one"}` },
-    h("div", { class: "hw-main" }, h("span", { class: "chipl" }, dot(), t.chipLong[hr.state]), h("span", { class: "hello34" }, hello)),
+    "footer",
+    { class: "foot" },
+    h("p", { class: "priv" }, icon("shield", 16), t.privacy),
     h(
       "div",
-      { class: "hw-cell" },
-      h("span", { class: "eyebrow" }, hr.word ? t.termL : t.leftL),
-      h("span", { class: `hw-num${hr.word ? " w" : ""}` }, h("b", { class: hr.word ? "" : "mono" }, hr.big), hr.unit && h("span", null, hr.unit)),
-      !hr.word && h("div", { class: "bar slim" }, h("i", { style: { width: `${hr.termPct}%` } })),
-      h("span", { class: "mut sm" }, hr.sub || " "),
-    ),
-    hr.showTraffic &&
+      { class: "foot-row" },
+      h("span", { class: "lbl" }, t.themeL),
       h(
         "div",
-        { class: "hw-cell" },
-        h("span", { class: "eyebrow" }, t.trafficL),
-        h("span", { class: "hw-num" }, h("b", { class: "mono" }, hr.usedN), h("span", null, hr.usedOf)),
-        hr.pct !== null ? h("div", { class: "bar slim" }, h("i", { class: hr.state === "limited" ? "warn" : "", style: { width: `${hr.pct}%` } })) : h("div", { class: "bar slim empty" }),
-        h("span", { class: "mut sm" }, hr.caption || " "),
-      ),
-  );
-}
-
-function qrBox(value: string, label: string, cls = "") {
-  const svg = qrSvg(value, label);
-  return svg ? h("div", { class: `qr${cls ? ` ${cls}` : ""}` }, svg) : null;
-}
-
-/** The platform the ways show apps for, and the two ways themselves. */
-function connect(d: MgData, s: State, a: Actions, t: Dict, support: string): Kid[] {
-  const plats = platformsOf(d);
-  const platform = s.platform && plats.includes(s.platform) ? s.platform : (plats[0] ?? null);
-  const order = ways(d, platform);
-  if (order.length === 0 || (plats.length === 0 && !d.amnezia)) {
-    return [h("section", { class: "card conn-none" }, h("p", { class: "mut" }, t.noApps))];
-  }
-  const picker =
-    plats.length > 1 &&
-    h(
-      "div",
-      { class: "plats-row" },
-      h("span", { class: "plats-l" }, t.yourDevice),
-      h(
-        "div",
-        { class: "plats", role: "group", "aria-label": t.pickDev },
-        ...plats.map((p) =>
-          h("button", { class: `plat${p === platform ? " on" : ""}`, type: "button", "data-k": `plat-${p}`, "aria-pressed": p === platform, on: { click: () => a.platform(p) } }, t.platforms[p]),
+        { class: "seg sm", role: "radiogroup", "aria-label": t.themeL },
+        ...themes.map((x) =>
+          h("button", { class: s.theme === x ? "on" : "", type: "button", role: "radio", "aria-checked": s.theme === x, "data-k": `theme-${x}`, on: { click: () => a.theme(x) } }, t.theme[x]),
         ),
       ),
-    );
-  const solo = order.length === 1;
-  return [
-    (picker || !solo) && h("div", { class: "pick" }, picker, !solo && h("p", { class: "two-ways mut" }, t.twoWays)),
-    h("div", { class: `ways${solo ? " solo" : ""}` }, ...order.map((w) => (w === "link" ? linkWay(d, s, a, t, platform, solo) : keyWay({ d, s, a, t }, platform, support)))),
-  ];
-}
-
-/**
- * The subscription way: install the app, add the subscription (the app's own add link, with "copy the link" right under it
- * for when the link does not open), the hint that every server shows up, the other apps of the platform, the QR code for
- * another device, and what is connected through the link.
- */
-function linkWay(d: MgData, s: State, a: Actions, t: Dict, platform: Platform | null, solo: boolean): HTMLElement {
-  const apps = appsFor(d, platform, "happ");
-  const main = apps[0];
-  const copyLink = (cls: string, label = t.copyLink, key?: string) => copyButton(a, { text: d.subscription_url, label, done: t.copiedShort, toast: t.copied, cls, key });
-  const items: { title: Kid; body: Kid[] }[] = [];
-  if (main) {
-    const download = safeUrl(main.download_url);
-    const addUrl = safeAddUrl(main.add_url);
-    if (download) {
-      items.push({
-        title: h("span", null, t.stepInstall(main.name), apps.length > 1 && main.recommended && h("span", { class: "badge" }, t.recommended)),
-        body: [main.description && h("p", { class: "step-d mut" }, main.description), downloadButton(download, t, "link-get")],
-      });
-    }
-    items.push({
-      title: t.stepAddSub,
-      body: addUrl
-        ? [
-            h("a", { class: "btn pri", href: addUrl, "data-k": "link-add" }, icon("plus"), h("span", null, t.addTo(main.name))),
-            h("div", { class: "fallback" }, copyLink("tlink", t.noOpen, "link-copy"), h("span", { class: "hint" }, t.pasteHow(main.name))),
-          ]
-        : [copyLink("pri", t.copyLink, "link-copy"), h("p", { class: "hint" }, t.copyHow(main.name))],
-    });
-  } else {
-    items.push({ title: t.stepAddSub, body: [h("p", { class: "mut step-d" }, t.noAppHere(platformWord(platform ?? "", t) || "")), copyLink("sec", t.copyLink, "link-copy")] });
-  }
-
-  const phoneApp = qrApp(d);
-  const q = d.options.show_qr && d.subscription_url ? qrBox(d.subscription_url, t.qrHow(phoneApp)) : null;
-  const q2 = q && qrBox(d.subscription_url, t.qrHow(phoneApp));
-  const devs = otherDevices(d);
-  const linkName = main?.name || d.apps.find((x) => x.kind === "happ")?.name || "";
-  return h(
-    "section",
-    { class: `card way${solo ? " solo" : ""}`, "aria-labelledby": "way-link-t", "data-way": "link" },
-    wayHead("way-link-t", "link", "sky", t.linkT(appNames(apps).join(", ")), t.linkD),
-    h(
-      "div",
-      { class: "way-body" },
-      h(
-        "div",
-        { class: "way-main" },
-        steps(items),
-        main && d.server_count > 1 && h("p", { class: "all-servers" }, icon("check"), h("span", null, t.allServers(main.name, d.server_count))),
-        apps.length > 1 && alts(apps.slice(1), t, (x) => altActions(x, t, copyLink)),
-      ),
-      // the QR code is for a phone that is not this device: beside the steps on a computer, folded away on a phone
-      q &&
-        h(
-          "aside",
-          { class: "qrside only-w" },
-          q,
-          h("div", { class: "qrside-t" }, h("b", null, t.qrPhoneT), h("p", { class: "mut" }, t.qrHow(phoneApp)), copyLink("tlink", t.copyLink, "qr-copy")),
-        ),
     ),
-    q2 &&
-      h(
-        "details",
-        { class: "qrx only-m", open: s.qrOpen, on: { toggle: (e) => a.qrOpen((e.target as HTMLDetailsElement).open) } },
-        h("summary", null, icon("qr"), h("span", null, t.qrOther), h("i", { class: "chev" }, "›")),
-        h("div", { class: "qrbox" }, q2, h("span", { class: "hint c" }, t.qrHow(phoneApp)), copyLink("tlink", t.copyLink, "qr-copy-m")),
-      ),
-    devs.length > 0 &&
-      h("div", { class: "sub-list" }, h("div", { class: "sub-h" }, h("b", { class: "sub-t" }, t.viaLink)), h("div", { class: "krows" }, ...devs.map((x) => linkRow(x, d, s, t, linkName)))),
   );
 }
 
-function altActions(x: AppEntry, t: Dict, copyLink: (cls: string, label?: string, key?: string) => HTMLElement): Kid[] {
-  const dl = safeUrl(x.download_url);
-  const add = safeAddUrl(x.add_url);
-  return [
-    dl && downloadButton(dl, t, `alt-get-${x.name}`),
-    add ? h("a", { class: "btn sec", href: add }, icon("plus"), h("span", null, t.addTo(x.name))) : copyLink("sec", t.copyLink, `alt-copy-${x.name}`),
-    !add && h("p", { class: "hint" }, t.copyHow(x.name)),
-  ];
-}
+// ---- the status ----
 
-/**
- * A device of the link apps. The apps share one device on the server (no platform, no model): the row says so, without
- * guessing which app it is; a device the server knows more about is named by its model or platform.
- */
-function linkRow(x: Device, d: MgData, s: State, t: Dict, app: string): HTMLElement {
-  const shared = isShared(x);
-  const when = x.online ? t.online : x.last_seen_unix ? (shared ? t.fetched(fmtAgo(x.last_seen_unix, s.lang)) : t.awgHandshake(fmtAgo(x.last_seen_unix, s.lang))) : t.awgNever;
-  const word = platformWord(x.platform, t);
-  const name = shared ? t.linkApps : x.model || word || (app ? t.devApp(app) : t.devGeneric);
+const pillOf = (hr: Hero, t: Dict) => {
+  const key = hr.soon ? "soon" : hr.state;
+  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
+  const live = hr.state === "active" && !hr.soon;
+  return h("span", { class: `pill${tone ? ` ${tone}` : ""}` }, dot(live ? "live" : tone === "off" ? "off" : tone || "ok"), t.chip[key]);
+};
+
+const termStat = (hr: Hero, cls = "stat") =>
+  h(
+    "div",
+    { class: cls },
+    h("span", { class: "eb" }, hr.termL),
+    h("div", { class: "num" }, h("b", { class: hr.soon ? "warn-t" : "" }, hr.big), h("span", null, hr.unit)),
+    hr.sub && h("span", { class: "hint", style: { "margin-top": "auto" } }, hr.sub),
+  );
+
+function trafficStat(hr: Hero, t: Dict, cls = "stat", headReset = false) {
+  const limited = hr.state === "limited";
+  const label = t.barAria(hr.usedN, hr.usedOf);
   return h(
     "div",
-    { class: "krow" },
-    h("span", { class: "kico", "aria-hidden": "true" }, icon(shared ? "link" : deviceIcon(x.platform))),
+    { class: `${cls}${hr.low && !limited && cls === "stat" ? " warn" : ""}` },
+    headReset
+      ? h("div", { class: "stat-h" }, h("span", { class: "eb" }, t.trafficL), hr.reset && h("span", { class: "hint" }, hr.reset))
+      : h("span", { class: "eb" }, t.trafficL),
+    h("div", { class: "num" }, h("b", { class: hr.low ? "warn-t" : "" }, hr.usedN), h("span", null, hr.usedOf)),
+    hr.pct !== null && bar(hr.pct, hr.low, label),
+    !headReset && hr.reset && h("span", { class: "hint" }, hr.reset),
+  );
+}
+
+/** The one sentence under the status card: what happened (the date bold), what to do (only with support). */
+function whyText(c: Ctx, hr: Hero): { lead: string; rest: string } | null {
+  const { d, s, t, support } = c;
+  if (hr.soon) {
+    const [a, b] = t.soon(hr.days);
+    return { lead: "", rest: support ? `${a} — ${b}.` : `${a}.` };
+  }
+  const why = stateText(d, s.lang, brandName(d));
+  if (!why) return null;
+  return { lead: why.head, rest: [why.body, support ? why.call : ""].filter(Boolean).join(" ") };
+}
+
+function gotSub(c: Ctx, cls = "row g8 sm"): HTMLElement | null {
+  const at = fetchedUnix(c.d);
+  if (!at || c.d.user.status !== "active") return null;
+  return h("p", { class: `${cls}` }, icon("check", 16), h("span", null, c.t.appGot, " ", h("b", null, fmtAgo(at, c.s.lang))));
+}
+
+function whyEl(w: { lead: string; rest: string }): HTMLElement {
+  return h("p", { class: "why" }, w.lead && h("b", null, w.lead), w.lead && " ", w.rest);
+}
+
+function statusCards(c: Ctx): Kid[] {
+  return [heroMobile(c), heroWeb(c)];
+}
+
+function heroMobile(c: Ctx): HTMLElement {
+  const { d, s, t, support } = c;
+  const hr = hero(d, s.lang);
+  const active = hr.state === "active";
+  const hello = d.user.name ? t.hi(d.user.name) : t.hiAnon;
+  const w = whyText(c, hr);
+  const problem = !active || hr.soon;
+  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
+  const sup = support ? sendBtn(support, active ? t.write : t.writeSupport) : null;
+  const left = hr.left && h("p", { class: "sm row g8", style: { "align-items": "flex-start" } }, h("span", { class: "dot warn", style: { "margin-top": "6px" } }), h("span", null, hr.left));
+  const got = gotSub(c);
+  return h(
+    "section",
+    { class: `card hero only-m${tone ? ` ${tone}` : ""}`, "aria-label": t.statusAria },
+    problem
+      ? h("div", { class: "hero-top stackd" }, pillOf(hr, t), h("h1", { class: "h1" }, hello))
+      : h("div", { class: "hero-top" }, h("h1", { class: "h1" }, hello), pillOf(hr, t)),
+    hr.showTerm && hr.showTraffic && h("div", { class: "stats" }, termStat(hr), trafficStat(hr, t)),
+    hr.state === "limited" && trafficStat(hr, t, "stat", true),
+    left,
+    got && h("div", { class: "div", style: { margin: "0 -18px" } }),
+    got,
+    w && whyEl(w),
+    problem && sup,
+    !active && h("p", { class: "hint row g8" }, icon("info", 16), t.sameInApp),
+  );
+}
+
+function heroWeb(c: Ctx): HTMLElement {
+  const { d, s, t, support } = c;
+  const hr = hero(d, s.lang);
+  const active = hr.state === "active";
+  const hello = d.user.name ? t.hi(d.user.name) : t.hiAnon;
+  const w = whyText(c, hr);
+  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
+  const sup = support ? sendBtn(support, active ? t.write : t.writeSupport) : null;
+  const got = gotSub(c, "row g8 sm mut");
+  const two = !hr.showTraffic;
+  const cells: Kid[] = [];
+  if (hr.showTerm) cells.push(termStat(hr, "hw-cell"));
+  if (hr.showTraffic) {
+    const cell = trafficStat(hr, t, "hw-cell", hr.state === "limited");
+    if (hr.left) cell.append(h("p", { class: "sm row g8", style: { "align-items": "flex-start" } }, h("span", { class: "dot warn", style: { "margin-top": "6px" } }), h("span", null, hr.left)));
+    cells.push(cell);
+  }
+  if (!active) {
+    cells.push(h("div", { class: "hw-cell", style: { gap: "12px" } }, sup, h("p", { class: "hint row g8", style: { "align-items": "flex-start" } }, icon("info", 16), t.sameInApp)));
+  }
+  return h(
+    "section",
+    { class: `card hero-w only-w${two ? " two" : ""}${tone ? ` ${tone}` : ""}`, "aria-label": t.statusAria },
     h(
       "div",
-      { class: "ktxt" },
-      h("b", null, h("span", { class: "kname" }, name)),
-      h("span", { class: x.online ? "meta on" : "meta" }, [!shared && x.model && word, when].filter(Boolean).join(" · ")),
-      shared && d.user.device_limit > 0 && h("span", { class: "meta" }, t.linkAppsNote),
+      { class: "hw-main" },
+      pillOf(hr, t),
+      h("h1", { class: "h1" }, hello),
+      got && h("p", { class: "row g8 sm mut" }, icon("check", 16), h("span", null, t.appGot, " ", h("b", { style: { color: "var(--text)" } }, fmtAgo(fetchedUnix(d), s.lang)))),
+      w && whyEl(w),
+      active && hr.soon && sup && h("div", null, sup),
     ),
+    ...cells,
   );
 }

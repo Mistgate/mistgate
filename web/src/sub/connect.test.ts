@@ -1,357 +1,246 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addModal, copyButton, newAmzState } from "./amnezia";
-import { amzActions, type Api } from "./amz-actions";
+import { describe, expect, it } from "vitest";
 import { cases } from "./dev-data";
 import { dict } from "./i18n";
-import { appsFor, awgConfig, awgDevice, normalize, platformsOf, qrApp, ways } from "./logic";
-import { createModal } from "./modal";
-import type { MgData } from "./types";
-import { view, type Actions, type State } from "./view";
+import { appList, appKey, appNames, chosenApp, keyAppName, normalize, qrApp } from "./logic";
+import { actions, data, plain, state, text } from "./test-kit";
+import { view } from "./view";
 
 const t = dict.ru;
+const tiles = (el: HTMLElement) => [...el.querySelectorAll(".plats .plat")];
 
-function actions(over: Partial<Actions> = {}): Actions & { log: string[] } {
-  const log: string[] = [];
-  const noop = () => {};
-  return {
-    log,
-    lang: noop,
-    platform: (p) => log.push(`platform ${p}`),
-    qrOpen: noop,
-    closeAnn: noop,
-    copy: (text, _m, done) => {
-      log.push(`copy ${text}`);
-      done?.();
-    },
-    download: (f) => log.push(`download ${f}`),
-    amz: { add: (o) => log.push(`add ${o}`), form: noop, create: noop, show: noop, renew: noop, node: noop, ask: noop, rotate: noop, remove: noop },
-    ...over,
-  };
-}
-
-const state = (platform: State["platform"], lang: "ru" | "en" = "ru"): State => ({ lang, platform, qrOpen: false, annClosed: false, amz: newAmzState("windows", "p31", "windows") });
-const data = (name: keyof typeof cases, f: (d: MgData) => void = () => {}) => {
-  const d = normalize(structuredClone(cases[name]!));
-  f(d);
-  return d;
-};
-const way = (el: HTMLElement, w: "link" | "key") => el.querySelector<HTMLElement>(`[data-way=${w}]`)!;
-const text = (el: Element | null | undefined) => el?.textContent ?? "";
-
-describe("server load", () => {
-  const loads = (server_loads: MgData["server_loads"]) => data("both", (d) => void (d.server_loads = server_loads));
-  it("says a level per server, never a rate, and points a busy server's users to the calmest other one", () => {
-    const el = view(loads([{ name: "Эстония", level: "high" }, { name: "Германия", level: "medium" }, { name: "Россия", level: "low" }]), state("ios"), actions());
-    const card = el.querySelector(".server-loads")!;
-    expect([...card.querySelectorAll(".server-load-pct")].map(text)).toEqual(["Высокая", "Средняя", "Низкая"]);
-    expect(text(card)).not.toMatch(/Мбит|Mbps|\d%/);
-    expect(text(card.querySelector(".server-load-notice"))).toBe(t.serverLoadTry("Эстония", "Россия"));
+describe("step 1: the device", () => {
+  it("lists all five devices, platforms without an app included, and marks the chosen one", () => {
+    const el = view(data("nolinux"), state("linux"), actions());
+    expect(tiles(el).map(text)).toEqual(["iPhone", "Android", "Windows", "Mac", "Linux"]);
+    expect(tiles(el).map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "false", "false", "false", "true"]);
+    expect(el.querySelector(".plats")?.getAttribute("role")).toBe("radiogroup");
   });
 
-  it("only warns when every server is busy, and is gone when no server has a known capacity", () => {
-    const busy = view(loads([{ name: "Эстония", level: "high" }]), state("ios"), actions());
-    expect(text(busy.querySelector(".server-load-notice.high"))).toBe(t.serverLoadBusy);
-    expect(view(loads([]), state("ios"), actions()).querySelector(".server-loads")).toBeNull();
-  });
-});
-
-describe("two ways, side by side", () => {
-  it("both ways of a user who has both, each with its own name, line and icon; the platform is asked once above them", () => {
-    const el = view(data("both"), state("ios"), actions());
-    expect([...el.querySelectorAll(".ways > .way")].map((w) => (w as HTMLElement).dataset.way)).toEqual(["link", "key"]);
-    expect(text(way(el, "link").querySelector(".way-t"))).toBe("Подписка — Happ");
-    expect(text(way(el, "link").querySelector(".way-ht .mut"))).toBe(t.linkD);
-    expect(text(way(el, "key").querySelector(".way-t"))).toBe("Ключ AmneziaVPN");
-    expect(text(way(el, "key").querySelector(".way-ht .mut"))).toBe(t.keyD);
-    expect(el.querySelectorAll(".plats")).toHaveLength(1);
-    expect(text(el.querySelector(".two-ways"))).toBe(t.twoWays);
-    expect(el.querySelector(".ways")?.classList.contains("solo")).toBe(false);
-  });
-
-  it("a user with one way sees only that one, the whole width, without the 'either way' line", () => {
-    const happ = view(data("happ"), state("ios"), actions());
-    expect(happ.querySelectorAll(".way")).toHaveLength(1);
-    expect(happ.querySelector(".ways")?.classList.contains("solo")).toBe(true);
-    expect(happ.querySelector(".two-ways")).toBeNull();
-    const keys = view(data("keys-only"), state("windows"), actions());
-    expect([...keys.querySelectorAll(".way")].map((w) => (w as HTMLElement).dataset.way)).toEqual(["key"]);
-  });
-
-  it("the way of the platform's recommended app leads; with nothing recommended the subscription does", () => {
-    const d = data("both", (x) => x.apps.forEach((a) => (a.recommended = false)));
-    expect(ways(d, "ios")).toEqual(["link", "key"]);
-    d.apps.find((a) => a.platform === "ios" && a.kind === "amnezia")!.recommended = true;
-    expect(ways(d, "ios")).toEqual(["key", "link"]);
-    expect(ways(d, "android")).toEqual(["link", "key"]);
-  });
-
-  it("the platform buttons switch both ways", () => {
+  it("a tap chooses the device", () => {
     const a = actions();
-    const d = data("multi");
-    expect(platformsOf(d)).toEqual(["ios", "android", "windows", "macos"]);
-    const el = view(d, state("ios"), a);
-    expect([...el.querySelectorAll(".plat")].map((b) => b.textContent)).toEqual(["iPhone", "Android", "Windows", "Mac"]);
+    const el = view(data("first"), state("ios"), a);
     el.querySelector<HTMLButtonElement>("[data-k=plat-windows]")!.click();
     expect(a.log).toEqual(["platform windows"]);
-    expect(text(way(view(d, state("windows"), a), "link").querySelector(".way-t"))).toBe("Подписка — Happ, Example Client");
+  });
+
+  it("says it was detected; when the choice differs, offers the way back to the detected device", () => {
+    const same = view(data("first"), state("ios"), actions());
+    expect(text(same.querySelector(".only-m.hint"))).toBe("Определили по браузеру — если не так, выберите своё");
+    const a = actions();
+    const other = view(data("first"), state("linux", { detected: "ios" }), a);
+    expect(text(other.querySelector(".step .hint:not(.only-m):not(.only-w)"))).toBe("Это не ваш телефон? Вернуть iPhone");
+    other.querySelector<HTMLButtonElement>("[data-k=plat-back]")!.click();
+    expect(a.log).toEqual(["platform ios"]);
+    const pc = view(data("first"), state("macos", { detected: "windows" }), actions());
+    expect(text(pc.querySelector("[data-k=plat-back]"))).toBe("Вернуть Windows");
+    expect(view(data("first"), state("ios", { detected: null }), actions()).querySelector("[data-k=plat-back]")).toBeNull();
   });
 });
 
-describe("the subscription way", () => {
-  it("two numbered steps: install (Download, the store under it) and add (the app's add link)", () => {
-    const el = way(view(data("happ"), state("ios"), actions()), "link");
-    const steps = [...el.querySelectorAll(".steps .step")];
-    expect(steps.map((s) => text(s.querySelector(".step-t")))).toEqual(["Установите Happ", "Добавьте подписку"]);
-    expect(steps.map((s) => text(s.querySelector(".n")))).toEqual(["1", "2"]);
-    const dl = steps[0]!.querySelector<HTMLAnchorElement>("a.btn.dl")!;
+describe("step 2: the app", () => {
+  it("the recommended app big, the others under 'Other apps', never folded; each says how it connects", () => {
+    const el = view(data("first"), state("ios"), actions());
+    const cards = [...el.querySelectorAll(".app")];
+    expect(cards.map((c) => text(c.querySelector(".app-n")))).toEqual(["HappРекомендуем", "AmneziaVPN"]);
+    expect(cards.map((c) => text(c.querySelector(".way")))).toEqual(["по ссылке подписки", "ключ AmneziaVPN"]);
+    expect(cards.map((c) => c.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(cards[0]!.classList.contains("min")).toBe(false);
+    expect(cards[1]!.classList.contains("min")).toBe(true);
+    expect(text(el.querySelector(".step .lbl"))).toBe("Другие приложения");
+    expect(cards[1]!.closest("details")).toBeNull();
+    expect(text(el.querySelector(".only-m.hint[style]"))).toBe("Подойдёт любой способ — или оба сразу");
+    expect(text(cards[0]!.querySelector(".desc"))).toBe(plain(t.linkD));
+    expect(text(cards[1]!.querySelector(".desc"))).toBe(plain(t.keyD));
+  });
+
+  it("a computer's recommended app leads, the link app and the key app wait under 'Other apps'", () => {
+    const d = data("first");
+    expect(appList(d, "windows").map((x) => x.name)).toEqual(["kl!ck", "Happ", "AmneziaVPN"]);
+    const el = view(d, state("windows"), actions());
+    const cards = [...el.querySelectorAll(".app")];
+    expect(cards.map((c) => text(c.querySelector(".app-n")))).toEqual(["kl!ckРекомендуем", "Happ", "AmneziaVPN"]);
+    expect(el.querySelectorAll(".app-grid .app")).toHaveLength(2);
+    expect(text(cards[0]!.querySelector(".desc"))).toBe("Все ваши серверы в одном приложении, подписка обновляется сама");
+    expect(el.querySelector("a[href^='klick://add?url=']")).not.toBeNull();
+  });
+
+  it("choosing another app tells the page; choosing the chosen one does nothing", () => {
+    const a = actions();
+    const el = view(data("first"), state("ios"), a);
+    el.querySelector<HTMLButtonElement>("[data-k='app-amnezia|AmneziaVPN']")!.click();
+    el.querySelector<HTMLButtonElement>("[data-k='app-happ|Happ']")!.click(); // the default: already chosen
+    expect(a.log).toEqual(["app amnezia|AmneziaVPN"]);
+    expect(chosenApp(data("first"), "ios", "amnezia|AmneziaVPN")?.name).toBe("AmneziaVPN");
+    expect(chosenApp(data("first"), "ios", "gone|X")?.name).toBe("Happ");
+    expect(appKey(appList(data("first"), "ios")[0]!)).toBe("happ|Happ");
+  });
+
+  it("a platform without an app says so, still offers the link and the way to write", () => {
+    const a = actions();
+    const el = view(data("nolinux"), state("linux"), a);
+    const box = el.querySelector(".noapps")!;
+    expect(text(box.querySelector(".h3"))).toBe("Для Linux приложений пока нет");
+    expect(text(box.querySelector(".sm"))).toBe("Скопируйте ссылку — она подойдёт любому приложению с подписками — или выберите другое устройство.");
+    box.querySelector<HTMLButtonElement>("[data-k=link-copy]")!.click();
+    expect(a.log).toEqual([`copy ${data("nolinux").subscription_url}`, "mark"]);
+    expect(text(box.querySelector("a.btn"))).toBe("Написать");
+    expect(el.querySelectorAll(".step")).toHaveLength(2); // no third step: nothing to do with an app that does not exist
+  });
+
+  it("nothing to connect with at all", () => {
+    const el = view(data("noapps"), state("ios"), actions());
+    expect(el.querySelector(".card[aria-label=Подключение]")).toBeNull();
+  });
+
+  it("the names of an app list, and the phone's QR app", () => {
+    const d = data("multi");
+    expect(appNames(appList(d, "windows"))).toEqual(["kl!ck", "AmneziaVPN", "Example Client"]);
+    expect(qrApp(d)).toBe("Happ");
+    expect(keyAppName(d, "windows")).toBe("AmneziaVPN");
+  });
+});
+
+describe("step 3: a link app", () => {
+  it("install (Download, the store under it), add with one tap, turn the VPN on; every server is there", () => {
+    const el = view(data("first"), state("ios"), actions());
+    const how = [...el.querySelectorAll(".how-i")];
+    expect(how.map((i) => text(i.querySelector(".how-t")))).toEqual(["Установите Happ", "Добавьте подписку", "Включите VPN в Happ"]);
+    const dl = how[0]!.querySelector<HTMLAnchorElement>("a.btn.dl")!;
     expect([text(dl.querySelector("b")), text(dl.querySelector("small"))]).toEqual(["Скачать", "App Store"]); // never "Скачать Happ · с са…"
     expect(dl.getAttribute("href")).toMatch(/^https:\/\/apps\.apple\.com\//);
-    const add = steps[1]!.querySelector<HTMLAnchorElement>("a.btn.pri")!;
+    const add = how[1]!.querySelector<HTMLAnchorElement>("a.btn.pri")!;
     expect(add.getAttribute("href")).toMatch(/^happ:\/\/add\//);
-    expect(text(add)).toBe("Добавить в Happ");
+    expect(text(add)).toBe("Добавить одним нажатием");
+    expect(text(how[1]!.querySelector(".how-sub"))).toBe("Happ откроется уже с вашей подпиской");
+    expect(text(how[2]!.querySelector(".hint"))).toBe("Все ваши серверы (3) уже там — выберите любой");
+    expect(text(el.querySelector(".step:nth-of-type(3) .step-t, .step .step-t:last-of-type"))).not.toBe("");
   });
 
-  it("right under the add button: 'won't open? copy the link' and where to paste it, whatever the QR option says", () => {
+  it("'won't open?': copy the link and where to paste it, right under the add button; pressing add or copy marks this device", () => {
     const a = actions();
-    const d = data("plain"); // show_qr off
-    const el = way(view(d, state("ios"), a), "link");
-    const copy = el.querySelector<HTMLButtonElement>(".fallback .tlink")!;
-    expect(text(copy)).toBe("Не открывается? Скопировать ссылку");
-    expect(text(el.querySelector(".fallback .hint"))).toBe("В Happ: «+» → «Вставить из буфера»");
+    const d = data("first");
+    const el = view(d, state("ios"), a);
+    const fb = el.querySelector(".fb")!;
+    expect(text(fb.querySelector("b"))).toBe("Не открывается?");
+    expect(text(fb.querySelector(".hint"))).toBe("Вставьте ссылку в Happ: «+» → «Вставить из буфера»");
+    expect(fb.querySelector(".hint .q")).not.toBeNull(); // the buttons the person must find stay on one line
+    const copy = fb.querySelector<HTMLButtonElement>(".tlink")!;
+    expect(text(copy)).toBe("Скопировать");
     copy.click();
-    expect(a.log).toEqual([`copy ${d.subscription_url}`]);
+    expect(a.log).toEqual([`copy ${d.subscription_url}`, "mark"]);
     expect(text(copy)).toBe("Скопировано"); // it says so on itself
-    expect(el.querySelector(".qr")).toBeNull();
+    el.querySelector<HTMLAnchorElement>("[data-k=link-add]")!.addEventListener("click", (e) => e.preventDefault());
+    el.querySelector<HTMLAnchorElement>("[data-k=link-add]")!.click();
+    expect(a.log.at(-1)).toBe("mark");
   });
 
-  it("says that every server shows up in the app, only when there is more than one", () => {
-    expect(text(way(view(data("happ"), state("ios"), actions()), "link").querySelector(".all-servers"))).toBe("В Happ появятся все ваши серверы (3) — выберите любой");
-    expect(way(view(data("plain"), state("ios"), actions()), "link").querySelector(".all-servers")).toBeNull();
+  it("without an add scheme the copy button leads and the line says where to paste", () => {
+    const el = view(data("custom"), state("ios"), actions());
+    const how = [...el.querySelectorAll(".how-i")];
+    expect(how.map((i) => text(i.querySelector(".how-t")))).toEqual(["Установите Happ", "Скопируйте ссылку и вставьте её в приложение", "Включите VPN"]);
+    expect(text(how[1]!.querySelector("button.btn.pri"))).toBe("Скопировать ссылку");
+    expect(text(how[1]!.querySelector(".how-sub"))).toBe("В Happ: добавить подписку → вставить ссылку");
+    expect(el.querySelector("a[href^='happ://']")).toBeNull();
   });
 
-  it("the QR code is for another device: beside the steps on a computer, folded on a phone, with what it does", () => {
-    const el = way(view(data("happ"), state("ios"), actions()), "link");
-    expect(el.querySelector(".qrside.only-w svg")).not.toBeNull();
-    expect(text(el.querySelector(".qrside b"))).toBe("Подключить телефон");
-    expect(text(el.querySelector(".qrside p"))).toBe("Наведите камеру телефона — откроется эта страница. Или в Happ: «+» → «Сканировать QR»");
-    expect(text(el.querySelector("details.qrx.only-m summary"))).toContain("Подключить другое устройство (QR‑код)");
-    expect(qrApp(data("happ"))).toBe("Happ");
+  it("an app of the instance without a download link has no install step", () => {
+    const el = view(data("first", (d) => d.apps.forEach((x) => (x.download_url = ""))), state("ios"), actions());
+    expect([...el.querySelectorAll(".how-i .how-t")].map(text)).toEqual(["Добавьте подписку", "Включите VPN в Happ"]);
   });
 
-  it("other link apps of the platform are listed with their own buttons, never folded; the recommended one leads", () => {
+  it("one server: no 'every server' line", () => {
+    expect(view(data("plain"), state("ios"), actions()).querySelector(".how-i:last-child .hint")).toBeNull();
+  });
+
+  it("after the app fetched the subscription (and this device set it up) the step says so, and can show the steps again", () => {
     const a = actions();
-    const d = data("multi");
-    expect(appsFor(d, "windows", "happ").map((x) => x.name)).toEqual(["Happ", "Example Client"]);
-    const el = way(view(d, state("windows"), a), "link");
-    expect(text(el.querySelector(".step .badge"))).toBe("рекомендуем");
-    const alt = el.querySelector(".alts .alt")!;
-    expect(text(alt.querySelector(".alt-t b"))).toBe("Example Client");
-    expect(alt.closest("details")).toBeNull();
-    const copy = [...alt.querySelectorAll("button")].find((b) => text(b) === "Скопировать ссылку")!;
-    copy.click();
-    expect(a.log).toEqual([`copy ${d.subscription_url}`]);
-    expect(text(alt.querySelector(".hint"))).toBe("В Example Client: добавить подписку → вставить ссылку");
+    const el = view(data("return"), state("ios", { returning: true, more: true, marked: true }), a);
+    const s3 = el.querySelectorAll(".step")[2]!;
+    expect(s3.querySelector(".sn.done")).not.toBeNull();
+    expect(text(s3.querySelector(".note.ok"))).toBe("Готово — приложение получило подписку 3 часа назад. Включите VPN и выберите любой сервер.");
+    expect(s3.querySelector(".how")).toBeNull();
+    s3.querySelector<HTMLButtonElement>("[data-k=steps-again]")!.click();
+    expect(a.log).toEqual(["steps-again"]);
+    const again = view(data("return"), state("ios", { returning: true, more: true, marked: true, stepsAgain: true }), actions());
+    expect(again.querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
+    // not done when this device never set it up
+    expect(view(data("return"), state("ios", { returning: true, more: true }), actions()).querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
+  });
+});
+
+describe("step 3: a key app", () => {
+  const key = { app: "amnezia|AmneziaVPN" };
+  it("install, add this device (its key is made), paste the key; the phone copies, the computer downloads the file", () => {
+    const a = actions();
+    const el = view(data("first"), state("ios", key), a);
+    const how = [...el.querySelectorAll(".how-i")];
+    expect(how.map((i) => text(i.querySelector(".how-t")))).toEqual(["Установите AmneziaVPN", "Добавьте это устройство", "Вставьте ключ в AmneziaVPN"]);
+    expect(text(how[1]!.querySelector(".how-sub"))).toBe("Для него появится свой ключ");
+    expect(text(how[2]!.querySelector(".how-sub"))).toBe("Скопируйте ключ → AmneziaVPN → «+» → вставьте → «Продолжить»");
+    const add = how[1]!.querySelector<HTMLButtonElement>("[data-k=amz-add]")!;
+    expect(text(add)).toBe("Добавить устройство");
+    add.click();
+    expect(a.log).toEqual(["add true"]);
+    const pc = view(data("first"), state("windows", key), actions());
+    expect(text(pc.querySelectorAll(".how-i")[2]!.querySelector(".how-sub"))).toBe("Скачайте файл → AmneziaVPN → «+» → «Файл с настройками подключения»");
+    expect(el.querySelector("a[href^='happ://']")).toBeNull(); // a key app has no add link
   });
 
-  it("a platform without a link app says so and still gives the link", () => {
-    const el = way(view(data("both"), state("linux"), actions()), "link");
-    expect(text(el.querySelector(".step-d"))).toBe("Для Linux приложения нет — выберите другое устройство выше.");
-    expect(el.querySelector("button.btn.sec")).not.toBeNull();
+  it("the button waits at the limit, with the words; the owner issues keys: ask; no profile: not yet", () => {
+    const limit = view(data("limit"), state("ios", key), actions());
+    expect(limit.querySelector<HTMLButtonElement>(".how-i [data-k=amz-add]")?.disabled).toBe(true);
+    expect(text(limit.querySelector(".how-i .note.warn"))).toBe("Занято 3 из 3. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.");
+    const admin = view(data("amnezia-off"), state("ios", key), actions());
+    const s = [...admin.querySelectorAll(".how-i")].map((i) => text(i.querySelector(".how-t")));
+    expect(s[1]).toBe("Попросите ключ");
+    expect(text(admin.querySelectorAll(".how-i")[1]!.querySelector(".how-sub"))).toBe("Ключи AmneziaVPN выдаёт владелец — напишите, для какого устройства нужен.");
+    const none = view(data("amnezia-none"), state("ios", key), actions());
+    expect(text([...none.querySelectorAll(".how-i")][1]!.querySelector(".how-sub"))).toBe("Сервер ещё настраивается — напишите администратору.");
+    expect(none.querySelector(".how-i [data-k=amz-add]")).toBeNull();
   });
 
-  it("what uses the link: the one shared device, named for what it is, not guessed as one app", () => {
-    const el = way(view(data("happ"), state("ios"), actions()), "link");
-    expect(text(el.querySelector(".sub-list .sub-t"))).toBe("Подключено через подписку");
-    const row = el.querySelector(".sub-list .krow")!;
-    expect(text(row.querySelector(".kname"))).toBe("Приложения по ссылке");
-    expect([...row.querySelectorAll(".meta")].map(text)).toEqual(["в сети", "Все устройства с этой ссылкой занимают одно место"]);
-    // a device the server knows (a model) is named by it; one without anything else by the app
-    const named = data("happ", (d) => (d.devices = [{ id: "h1", platform: "ios", model: "iPhone 15", app: "happ", last_seen_unix: 0, online: false }, { id: "h2", platform: "", model: "", app: "happ", last_seen_unix: 0, online: false }]));
-    const rows = [...way(view(named, state("ios"), actions()), "link").querySelectorAll(".sub-list .krow .kname")].map(text);
-    expect(rows).toEqual(["iPhone 15", "Приложения по ссылке"]);
+  it("the admin's preview has no address: the button waits and nothing says 'ask the admin'", () => {
+    const d = data("first", (x) => (x.amnezia!.endpoints = ""));
+    const el = view(d, state("ios", key), actions());
+    expect(el.querySelector<HTMLButtonElement>(".how-i [data-k=amz-add]")?.disabled).toBe(true);
+    expect(el.textContent).not.toContain("Попросите ключ");
+  });
+});
+
+describe("another device: the QR code of the link", () => {
+  it("a phone folds it under 'Connect another device'; opened, it says what it does and copies the link", () => {
+    const a = actions();
+    const closed = view(data("first"), state("ios"), a);
+    const row = closed.querySelector<HTMLButtonElement>("[data-k=qr-row]")!;
+    expect(text(row)).toBe("Подключить другое устройствоQR-код откроет эту страницу на нём");
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(closed.querySelector(".qrbox")).toBeNull();
+    row.click();
+    expect(a.log).toEqual(["qr true"]);
+    const open = view(data("first"), state("ios", { qrOpen: true }), actions());
+    expect(open.querySelector(".qrbox .qr svg")).not.toBeNull();
+    expect(text(open.querySelector(".qrbox .hint"))).toBe("Наведите камеру — откроется эта страница. Или в Happ: «+» → «Сканировать QR»");
+    expect(text(open.querySelector(".qrbox .tlink"))).toBe("Скопировать ссылку");
   });
 
-  it("the page copy speaks of what an app does; the names come from the settings", () => {
-    for (const lang of ["ru", "en"] as const) {
-      const dd = dict[lang];
-      for (const s of [dd.linkD, dd.keyD, dd.twoWays, dd.noOpen, dd.copyLink, dd.qrHow(""), dd.noProfile, dd.staleD, dd.keysByAdmin, dd.stepAddSub, dd.stepAddDev]) {
-        expect(s).not.toMatch(/Happ|Amnezia|Mihomo/i);
-      }
+  it("a computer shows it beside the steps, dark on white", () => {
+    const el = view(data("first"), state("windows"), actions());
+    const side = el.querySelector(".side .qrcard")!;
+    expect(text(side.querySelector(".h3"))).toBe("Откройте на телефоне");
+    expect(side.querySelector(".qr svg[role=img]")?.getAttribute("aria-label")).toBe("QR-код со ссылкой на эту страницу");
+    expect(text(side.querySelector("button"))).toBe("Скопировать ссылку");
+  });
+
+  it("the option off, or no link app: no QR code at all", () => {
+    for (const el of [view(data("plain"), state("ios"), actions()), view(data("first", (d) => (d.options.show_qr = false)), state("windows"), actions())]) {
+      expect(el.querySelector(".qr")).toBeNull();
+      expect(el.querySelector("[data-k=qr-row]")).toBeNull();
     }
   });
-
-  it("with no usable app the page says so", () => {
-    const el = view(normalize({ ...cases.happ!, apps: [] }), state(null), actions());
-    expect(text(el.querySelector(".conn-none"))).toBe(t.noApps);
-    expect(el.querySelector(".way")).toBeNull();
-  });
 });
 
-describe("the add-a-device entry", () => {
-  it("one button, 'Add a device', opens the dialog", () => {
-    const a = actions();
-    const el = view(data("many"), state("windows"), a);
-    const btns = [...el.querySelectorAll("button")].filter((b) => text(b) === "Добавить устройство");
-    expect(btns).toHaveLength(1);
-    btns[0]!.click();
-    expect(a.log).toEqual(["add true"]);
-  });
-
-  it("after Create the dialog shows the new device's key, and closing leaves the device listed", async () => {
-    const d = data("many");
-    const st = { lang: "ru" as const, amz: newAmzState("android", "p31", "android") };
-    const api: Api = {
-      addDevice: async (_e, b) => ({
-        device: awgDevice({ id: "dev_new", platform: b.platform, label: b.label, profile_id: b.profile_id, profile_name: "Main", version: "3.1" }),
-        configs: [awgConfig({ node_name: "de1", country_code: "DE", version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: "mistgate-de.conf" })],
-      }),
-      getConfigs: async () => ({ configs: [] }),
-      rotateKey: async () => ({ configs: [] }),
-      revokeDevice: async () => {},
-    };
-    const amz = amzActions({ data: d, st, render: () => {}, api, reveal: () => {} });
-    const tools = actions({ amz });
-    amz.add(true);
-    amz.form({ platform: "windows", label: "Work PC" });
-    amz.create();
-    await new Promise((r) => setTimeout(r, 0));
-
-    const box = document.createElement("div");
-    box.append(...(addModal({ d, s: st, a: tools, t }) as Node[]));
-    expect(text(box.querySelector(".mt"))).toBe("Ключ для «Work PC»");
-    expect(box.querySelector("form")).toBeNull();
-    // a key for a computer looked at from a phone: open the page there; the file and the key are still at hand
-    expect(text(box.querySelector(".hintbox.calm"))).toBe(t.openThere);
-    const btns = [...box.querySelectorAll(".cfg-actions button")];
-    expect(btns.map(text)).toEqual(["Скачать файл", "Скопировать ключ"]);
-    btns[0]!.dispatchEvent(new MouseEvent("click"));
-    btns[1]!.dispatchEvent(new MouseEvent("click"));
-    expect(tools.log).toEqual(["download mistgate-de.conf", "copy vpn://k"]);
-    // the dialog has one accent button at most: "Done" is not it
-    expect(box.querySelector("[data-k=modal-done]")?.classList.contains("sec")).toBe(true);
-
-    box.querySelector<HTMLButtonElement>("[data-k=modal-done]")!.click();
-    expect(st.amz).toMatchObject({ adding: false, created: null });
-    expect(view(d, state("windows"), actions()).querySelectorAll("[data-way=key] .krow")).toHaveLength(d.amnezia!.devices.length);
-    expect(d.amnezia!.devices.map((x) => x.label)).toContain("Work PC");
-  });
-});
-
-describe("the copy button", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it("turns into 'Скопировано' for a moment and goes back; a failed copy changes nothing", () => {
-    let ok = true;
-    const tools = { copy: (_x: string, _m: string, done?: () => void) => ok && done?.(), download: () => {} };
-    const b = copyButton(tools, { text: "k", label: "Скопировать ключ", done: "Скопировано", toast: "x" });
-    b.click();
-    expect(b.textContent).toBe("Скопировано");
-    expect(b.classList.contains("ok")).toBe(true);
-    vi.advanceTimersByTime(1900);
-    expect(b.textContent).toBe("Скопировать ключ");
-    expect(b.classList.contains("ok")).toBe(false);
-    ok = false;
-    b.click();
-    expect(b.textContent).toBe("Скопировать ключ");
-  });
-});
-
-describe("the dialog", () => {
-  // jsdom has no showModal: a stand-in that tracks `open` and fires "close" like the browser
-  beforeEach(() => {
-    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-      this.setAttribute("open", "");
-    };
-    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
-      if (!this.open) return;
-      this.removeAttribute("open");
-      this.dispatchEvent(new Event("close"));
-    };
-  });
-  afterEach(() => document.body.replaceChildren());
-
-  function setup() {
-    const root = document.createElement("div");
-    const opener = document.createElement("button");
-    opener.dataset.k = "opener";
-    root.append(opener);
-    document.body.append(root);
-    const closed: number[] = [];
-    const m = createModal({ onClose: () => closed.push(1), refocus: (k) => root.querySelector<HTMLElement>(`[data-k="${k}"]`)?.focus(), label: () => "Новое устройство" });
-    const btn = (k: string) => {
-      const b = document.createElement("button");
-      b.dataset.k = k;
-      return b;
-    };
-    return { root, opener, m, closed, btn };
-  }
-
-  it("opens modally from the opener, labels itself, and focus goes to the dialog", () => {
-    const { opener, m, btn } = setup();
-    opener.focus();
-    m.sync(true, [btn("first"), btn("second")]);
-    expect(m.el.open).toBe(true);
-    expect(m.el.getAttribute("aria-label")).toBe("Новое устройство");
-    expect(document.activeElement).toBe(m.el.querySelector("[data-k=first]"));
-  });
-
-  it("a redraw keeps the focus on the same control; the content is replaced, the dialog is not", () => {
-    const { m, btn } = setup();
-    m.sync(true, [btn("first"), btn("second")]);
-    m.el.querySelector<HTMLElement>("[data-k=second]")!.focus();
-    const el = m.el;
-    m.sync(true, [btn("first"), btn("second")]);
-    expect(m.el).toBe(el);
-    expect(document.activeElement).toBe(m.el.querySelector("[data-k=second]"));
-  });
-
-  it("Esc (the close event) tells the page and gives the focus back to the opener's new copy", () => {
-    const { root, opener, m, closed, btn } = setup();
-    opener.focus();
-    m.sync(true, [btn("first")]);
-    const again = document.createElement("button");
-    again.dataset.k = "opener";
-    root.replaceChildren(again); // the page was drawn again
-    m.el.dispatchEvent(new Event("cancel", { cancelable: true }));
-    m.el.close();
-    expect(closed).toEqual([1]);
-    expect(document.activeElement).toBe(root.querySelector("[data-k=opener]"));
-  });
-
-  it("a tap that did not focus the opener (Safari) still gives the focus back to the control that was used", () => {
-    const { root, m, btn } = setup();
-    const again = document.createElement("button");
-    again.dataset.k = "used";
-    root.append(again);
-    const el = createModal({ onClose: () => {}, refocus: (k) => root.querySelector<HTMLElement>(`[data-k="${k}"]`)?.focus(), label: () => "x", lastUsed: () => "used" });
-    (document.activeElement as HTMLElement | null)?.blur();
-    el.sync(true, [btn("first")]);
-    el.el.close();
-    expect(document.activeElement).toBe(again);
-    expect(m.el.open).toBe(false);
-  });
-
-  it("a click on the backdrop closes it, a click inside or a drag that ends on it does not", () => {
-    const { m, closed, btn } = setup();
-    m.sync(true, [btn("first")]);
-    const inside = m.el.querySelector("[data-k=first]")!;
-    inside.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
-    inside.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(m.el.open).toBe(true);
-    inside.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })); // selection started in the box...
-    m.el.dispatchEvent(new MouseEvent("click")); // ...and released on the backdrop
-    expect(m.el.open).toBe(true);
-    m.el.dispatchEvent(new MouseEvent("pointerdown"));
-    m.el.dispatchEvent(new MouseEvent("click"));
-    expect(m.el.open).toBe(false);
-    expect(closed).toEqual([1]);
-  });
-
-  it("the page's own state closes it too", () => {
-    const { m, btn } = setup();
-    m.sync(true, [btn("first")]);
-    m.sync(false, []);
-    expect(m.el.open).toBe(false);
+describe("the data of the cases", () => {
+  it("every case is data the page can read", () => {
+    for (const raw of Object.values(cases)) expect(normalize(raw).v).toBe(1);
   });
 });

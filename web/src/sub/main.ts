@@ -1,19 +1,23 @@
 import "./sub.css";
-import { h } from "./dom";
-import { addModal, label, newAmzState } from "./amnezia";
+import { addModal, modalLabel } from "./amnezia";
 import { amzActions } from "./amz-actions";
 import * as api from "./api";
+import { dnsActions } from "./dns-actions";
+import { h } from "./dom";
 import { dict } from "./i18n";
+import { icon } from "./icons";
 import { lockActions, lockView, type LockState } from "./lock";
-import { addPlatforms, detectPlatform, isHex, mainProfile, normalize, pickPlatform } from "./logic";
+import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
 import { createModal } from "./modal";
-import type { Lang } from "./types";
-import { annKey, brandName, logoSrc, view, type Actions, type State } from "./view";
+import { dnsLabel, dnsModal } from "./servers";
+import { newAmzState, newDnsState, type Actions, type Ctx, type State } from "./state";
+import type { Lang, Theme } from "./types";
+import { annKey, brandName, logoSrc, view } from "./view";
 
-// Entry of the public user page. All state is here: the language (remembered on this device), the picked platform,
-// whether the QR code is open and whether the announcement was closed. The page data is embedded by the server, there is
-// no network I/O except the self-service calls (and the password form's one). A page whose password was not entered is
-// the form and nothing else.
+// Entry of the public user page. All state is here: the language, the theme and the picked device (remembered on this
+// device), the chosen app, whether the QR code is open and whether the announcement was closed. The page data is embedded by
+// the server, there is no network I/O except the self-service calls (and the password form's one). A page whose password was
+// not entered is the form and nothing else.
 
 function readData() {
   try {
@@ -45,10 +49,20 @@ function savedLang(): Lang | null {
 }
 const saveLang = (l: Lang) => store(langKey, l);
 
+/** "auto" follows the system; a chosen theme is written on <html> where sub.css reads it. */
+function applyTheme(theme: Theme) {
+  if (theme === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+}
+// `vite -c vite.sub.config.ts` only: &as=<platform> pretends the page is open on that device, &theme=light|dark picks the theme
+const devQuery = import.meta.env.DEV ? new URLSearchParams(location.search) : new URLSearchParams();
+const startTheme = asTheme(devQuery.get("theme") ?? stored("theme"));
+applyTheme(startTheme);
+
 const data = readData();
 // `vite -c vite.sub.config.ts` only: the sample cases answer the self-service calls themselves (dev-api.ts); a build drops this
 const devApi = import.meta.env.DEV ? (await import("./dev-api")).devApi : (undefined as never);
-const want = detectPlatform(navigator.userAgent, navigator.maxTouchPoints);
+const want = asPlatform(devQuery.get("as")) ?? detectPlatform(navigator.userAgent, navigator.maxTouchPoints);
 if (isHex(data.brand.accent)) document.documentElement.style.setProperty("--accent", data.brand.accent);
 
 const root = document.getElementById("root") as HTMLElement;
@@ -56,7 +70,7 @@ const toast = h("div", { class: "toast", role: "status", "aria-live": "polite" }
 document.body.append(toast);
 let toastTimer = 0;
 function flash(message: string) {
-  toast.textContent = message;
+  toast.replaceChildren(icon("check", 16), message);
   toast.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => toast.classList.remove("show"), 1800);
@@ -123,12 +137,28 @@ if (data.locked) {
   const here = want && (addPlatforms as readonly string[]).includes(want) ? want : "";
   const st: State = {
     lang: savedLang() ?? data.lang,
-    platform: pickPlatform(data, want),
+    platform: pickPlatform(data, asPlatform(stored("platform")), want),
+    detected: want,
+    app: "",
+    theme: startTheme,
     qrOpen: false,
+    more: false,
+    stepsAgain: false,
     annClosed: stored(ann) === "1",
+    returning: isReturning(data, stored("setup") === "1"),
+    marked: stored("setup") === "1",
     amz: newAmzState(here || "other", mainProfile(data.amnezia?.profiles ?? []), here),
+    dns: newDnsState(),
   };
-  const focusKey = (key: string) => requestAnimationFrame(() => root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true }));
+  // the first of the controls (a|b) that is on screen: a row has one for a phone and one for a computer
+  const focusKey = (keys: string) =>
+    requestAnimationFrame(() => {
+      for (const key of keys.split("|")) {
+        const el = [...root.querySelectorAll<HTMLElement>(`[data-k="${key}"]`)].find((x) => x.offsetParent !== null || x.getClientRects().length > 0);
+        if (el) return el.focus({ preventScroll: true });
+      }
+    });
+  const lockedPage = () => location.reload(); // the cookie is gone or the link was renewed: the reload shows the password form
 
   const actions: Actions = {
     lang(l) {
@@ -138,15 +168,40 @@ if (data.locked) {
     },
     platform(p) {
       st.platform = p;
+      st.app = "";
+      store("platform", p);
+      render();
+    },
+    app(key) {
+      st.app = key;
+      render();
+    },
+    theme(t) {
+      st.theme = t;
+      store("theme", t);
+      applyTheme(t);
       render();
     },
     qrOpen(open) {
-      st.qrOpen = open; // no re-render: <details> already shows it
+      st.qrOpen = open;
+      render();
+    },
+    more(open) {
+      st.more = open;
+      render();
+    },
+    stepsAgain() {
+      st.stepsAgain = true;
+      render();
     },
     closeAnn() {
       st.annClosed = true;
       store(ann, "1");
       render();
+    },
+    mark() {
+      st.marked = true;
+      store("setup", "1");
     },
     copy,
     download,
@@ -159,28 +214,46 @@ if (data.locked) {
         requestAnimationFrame(() => {
           const el = document.getElementById(id);
           el?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-          el?.querySelector<HTMLElement>("button, select, input")?.focus({ preventScroll: true });
         });
       },
       focus: focusKey,
-      locked: () => location.reload(), // the cookie is gone or the link was renewed: the reload shows the password form
+      locked: lockedPage,
+      marked: () => actions.mark(),
     }),
+    dns: dnsActions({ data, st, render: () => render(), api: import.meta.env.DEV && data.dns?.endpoint === "dev:" ? devApi : api, focus: focusKey, locked: lockedPage }),
   };
 
   // the control used last (a tap does not focus a button in Safari): where the dialog gives the focus back
   let lastKey = "";
-  document.addEventListener("click", (e) => (lastKey = (e.target as Element).closest?.("[data-k]")?.getAttribute("data-k") ?? ""), true);
+  document.addEventListener(
+    "click",
+    (e) => {
+      const el = e.target as Element;
+      lastKey = el.closest?.("[data-k]")?.getAttribute("data-k") ?? "";
+      // a click anywhere but the open menu (or the button that opens it) closes the menu
+      if (st.amz.menu && !el.closest?.(".menu") && !el.closest?.('[data-k^="amz-more-"]')) actions.amz.menu(null);
+    },
+    true,
+  );
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && st.amz.menu) {
+      const id = st.amz.menu;
+      actions.amz.menu(null);
+      focusKey(`amz-more-${id}`);
+    }
+  });
+
+  const ctx = (): Ctx => ({ d: data, s: st, a: actions, t: dict[st.lang], support: data.options.show_support ? safeUrl(data.support_url) : "" });
+  const dialogOpen = () => (st.dns.open !== null || st.amz.adding || st.amz.renew !== null || st.amz.open !== null) && (st.dns.open !== null || data.amnezia !== null);
 
   // the dialog lives outside the tree the page rebuilds
   const modal = createModal({
-    label: () => {
-      const t = dict[st.lang];
-      const x = st.amz.renew ? data.amnezia?.devices.find((d) => d.id === st.amz.renew) : undefined;
-      return x ? t.renewT(label(x, t)) : t.awgAddT;
-    },
+    label: () => (st.dns.open ? dnsLabel(ctx()) : modalLabel(ctx())),
     lastUsed: () => lastKey,
     onClose: () => {
-      if (st.amz.adding || st.amz.renew) actions.amz.add(false); // Esc or the backdrop: the state follows the dialog
+      // Esc or the backdrop: the state follows the dialog
+      if (st.dns.open) actions.dns.open(null);
+      else if (st.amz.adding || st.amz.renew || st.amz.open) actions.amz.add(false);
     },
     refocus: (key) => root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true }),
   });
@@ -193,8 +266,8 @@ if (data.locked) {
     root.replaceChildren(tree);
     setDocument(st.lang);
     if (key) root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true });
-    const open = (st.amz.adding || st.amz.renew !== null) && data.amnezia !== null;
-    modal.sync(open, open ? addModal({ d: data, s: st, a: actions, t: dict[st.lang] }) : []);
+    const open = dialogOpen();
+    modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : addModal(ctx())) : []);
   };
 
   render(true);

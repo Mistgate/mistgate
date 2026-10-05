@@ -16,6 +16,11 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props ?? {})) {
+    // aria-pressed / aria-checked / aria-expanded mean something as "false": the state is written, not left out
+    if (typeof v === "boolean" && /^aria-(pressed|checked|expanded|selected|busy)$/.test(k)) {
+      el.setAttribute(k, String(v));
+      continue;
+    }
     if (v === false || v == null) continue;
     if (k === "class") el.className = String(v);
     else if (k === "on") for (const [ev, fn] of Object.entries(v as Record<string, (e: Event) => void>)) el.addEventListener(ev, fn);

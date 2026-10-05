@@ -5,9 +5,9 @@ import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 // the <!--MG_DATA--> marker and hashes the single inline module script for its CSP. Nothing else is emitted.
 //
 //   build:  pnpm exec vite build -c vite.sub.config.ts    (`pnpm build` runs it after the admin build)
-//   dev:    pnpm exec vite -c vite.sub.config.ts          then open /sub.html?case=happ|both|amnezia|keys-only|amnezia-empty|
-//                                                         amnezia-off|amnezia-none|stale|devices|many|multi|expired|quota|
-//                                                         disabled|plain|long|custom|locked&lang=en   (self-service answers itself)
+//   dev:    pnpm exec vite -c vite.sub.config.ts          then open /sub.html?case=<name>&lang=en&as=windows&theme=light  (the cases are in
+//                                                         src/sub/dev-data.ts: first, return, soon, expired, quota, disabled, nolinux, locked,
+//                                                         limit, stale-dns, per-server, old, ...; the self-service and DNS calls answer themselves)
 
 const marker = "<!--MG_DATA-->";
 

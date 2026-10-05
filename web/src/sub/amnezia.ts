@@ -1,129 +1,62 @@
 import { h, type Kid } from "./dom";
 import type { Dict } from "./i18n";
-import { icon } from "./icons";
+import { icon, type IconName } from "./icons";
 import {
   addPlatforms,
-  appsFor,
-  atDeviceLimit,
-  canAddDevice,
+  countryName,
   deviceIcon,
-  fmtAgo,
   isDesktop,
   isPhone,
   keyAppName,
   nodeLabels,
   platformWord,
   profileChoices,
-  safeUrl,
   selfServe,
   storeLabel,
   versionsFor,
 } from "./logic";
 import { qrSvg } from "./qr";
-import type { AwgConfig, AwgDevice, Lang, MgData, Platform } from "./types";
+import type { AmzActions, AmzState, Tools } from "./state";
+import { dot, note, rich, tile } from "./ui";
+import type { AwgDevice, Lang, MgData, Platform } from "./types";
 
-// The AmneziaVPN way of the user page: the key devices (one key pair each), the "add a device" dialog, the key of a device
-// (its QR code, file and vpn:// text) and the "new key needed" card. State and actions are the page's (view.ts, main.ts);
-// nothing here talks to the network. Keys hold a private key: they exist only in `AmzState.configs`, in memory, and are
-// asked for one device at a time.
+export { newAmzState } from "./state";
+export type { AmzActions, AmzState, Tools } from "./state";
 
-export type AmzState = {
-  /** The device whose key is open in its row. */
-  open: string | null;
-  /** The "add a device" dialog is open. */
-  adding: boolean;
-  /** The device this dialog just created: the dialog then shows its key instead of the form. */
-  created: string | null;
-  /** The stale device whose new key the dialog shows ("new key needed"). */
-  renew: string | null;
-  /** "add", a device id, or "renew:<id>" while a call is in flight; "" otherwise. */
-  busy: string;
-  /** The last failure, as the panel's code; "" when none. `errorAt` is the busy key of the call that failed. */
-  error: string;
-  errorAt: string;
-  retryMin: number;
-  confirm: { id: string; kind: "remove" | "rotate" } | null;
-  configs: Record<string, AwgConfig[]>;
-  node: Record<string, number>;
-  form: { profile: string; platform: string; label: string };
-  /** The platform this page is open on ("" unknown): a key for this very device is copied or downloaded, not scanned. */
-  here: string;
-};
+// The AmneziaVPN way of the user page, the parts that are dialogs and cards of their own: the "add a device" sheet, the
+// key of a device (its QR code, file and vpn:// text), the "new key needed" card. The list of devices is devices.ts. State
+// and actions are the page's (view.ts, main.ts); nothing here talks to the network. Keys hold a private key: they exist
+// only in `AmzState.configs`, in memory, and are asked for one device at a time.
 
-export const newAmzState = (platform: string, profile: string, here = ""): AmzState => ({
-  open: null,
-  adding: false,
-  created: null,
-  renew: null,
-  busy: "",
-  error: "",
-  errorAt: "",
-  retryMin: 0,
-  confirm: null,
-  configs: {},
-  node: {},
-  form: { profile, platform, label: "" },
-  here,
-});
+/** What these parts need of the page: the data, the state they read, what they may do, the words, the support link. */
+export type AmzCtx = { d: MgData; s: { lang: Lang; amz: AmzState }; a: { amz: AmzActions } & Tools; t: Dict; support?: string };
 
-export type AmzActions = {
-  /** Opens (true) the "add a device" dialog or closes (false) whichever dialog is open. */
-  add(open: boolean): void;
-  /** Form fields change without a re-render: the page would drop what is being typed. */
-  form(patch: Partial<AmzState["form"]>): void;
-  create(): void;
-  show(id: string | null): void;
-  /** "New key needed": fetches the key of a stale device and shows it in the dialog. */
-  renew(id: string): void;
-  node(id: string, i: number): void;
-  ask(c: AmzState["confirm"]): void;
-  rotate(id: string): void;
-  remove(id: string): void;
-};
-
-/** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
-export type Tools = { copy(text: string, message: string, done?: () => void): void; download(filename: string, text: string): void };
-type Ctx = { d: MgData; s: { lang: Lang; amz: AmzState }; a: { amz: AmzActions } & Tools; t: Dict };
-
-const dot = () => h("i", { class: "dot" });
-const chev = () => h("i", { class: "chev" }, "›");
 /** Windows has no flag emoji (it draws "DE"): the choices there are the country's name alone. */
-const flags = (s: { amz: AmzState }) => s.amz.here !== "windows";
+export const flagsOn = (s: { amz: AmzState }) => s.amz.here !== "windows";
 
 /** The name of a device: its label, else its platform's word, else "Device". */
 export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platform, t) || t.devGeneric;
 
-function whenText(x: AwgDevice, c: Ctx): string {
-  const { t, s } = c;
-  return x.online ? t.online : x.last_handshake_unix ? t.awgHandshake(fmtAgo(x.last_handshake_unix, s.lang)) : t.awgNever;
-}
-
-function select(key: string, aria: string, value: string, options: [string, string][], onChange: (v: string) => void, first = false) {
-  return h(
-    "select",
-    { class: "sel", "data-k": key, "data-autofocus": first, "aria-label": aria, on: { change: (e) => onChange((e.target as HTMLSelectElement).value) } },
-    ...options.map(([v, text]) => h("option", { value: v, selected: v === value }, text)),
-  );
-}
-
 /**
  * A button that copies `text` and says so on itself: its label turns into `done` with a tick for a moment. `toast` is the
- * page's toast text. The page's copy() calls back only when the clipboard took the text.
+ * page's toast text. The page's copy() calls back only when the clipboard took the text. `after` runs when it did.
  */
-export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string }): HTMLButtonElement {
+export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName }): HTMLButtonElement {
   const text = h("span", null, o.label);
   const own = o.cls?.split(" ") ?? [];
-  const look = own.includes("pri") || own.includes("tlink") ? "" : "sec ";
-  const btn = h("button", { class: `${own.includes("tlink") ? "" : "btn "}${look}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon("copy"), text);
+  const link = own.includes("tlink");
+  const ico = o.ico ?? "copy";
+  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
   let timer = 0;
   function flash() {
+    o.after?.();
     btn.classList.add("ok");
-    btn.replaceChildren(icon("check"), text);
+    btn.replaceChildren(icon("check", link ? 16 : 18), text);
     text.textContent = o.done;
     clearTimeout(timer);
     timer = window.setTimeout(() => {
       btn.classList.remove("ok");
-      btn.replaceChildren(icon("copy"), text);
+      btn.replaceChildren(icon(ico, link ? 16 : 18), text);
       text.textContent = o.label;
     }, 1800);
   }
@@ -131,67 +64,79 @@ export function copyButton(a: Tools, o: { text: string; label: string; done: str
 }
 
 /** A download link with the store under the word: "Download / App Store". Never cut short. */
-export function downloadButton(url: string, t: Dict, key: string): HTMLAnchorElement {
+export function downloadButton(url: string, t: Dict, key: string, cls = ""): HTMLAnchorElement {
   return h(
     "a",
-    { class: "btn sec dl", href: url, target: "_blank", rel: "noopener noreferrer", "data-k": key },
+    { class: `btn sec dl${cls ? ` ${cls}` : ""}`, href: url, target: "_blank", rel: "noopener noreferrer", "data-k": key },
     icon("download"),
     h("span", { class: "dl-t" }, h("b", null, t.download), h("small", null, storeLabel(url, t))),
+    icon("external", 16),
   );
 }
 
-/** Numbered steps of a way ("1 Install…", "2 Add…"); the number is left out when there is only one. */
-export function steps(items: { title: Kid; body: Kid[] }[]): HTMLElement {
-  const numbered = items.length > 1;
+/** The head of a sheet: a tinted icon, the title, one line under it, the cross. */
+export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean }, close: () => void): HTMLElement {
   return h(
-    "ol",
-    { class: `steps${numbered ? "" : " single"}` },
-    ...items.map((it, i) =>
-      h("li", { class: "step" }, numbered && h("span", { class: "n mono", "aria-hidden": "true" }, String(i + 1)), h("div", { class: "step-b" }, h("b", { class: "step-t" }, it.title), ...it.body)),
-    ),
+    "div",
+    { class: "sh-head" },
+    tile(o.tone, o.ico),
+    h("div", { class: "grow" }, h("h3", { id: o.id }, o.title), o.sub && h("p", { class: `sub${o.flagRow ? " flagrow" : ""}` }, ...(Array.isArray(o.sub) ? o.sub : [o.sub]))),
+    h("button", { class: "ibtn round", type: "button", "data-k": "modal-x", "aria-label": t.close, on: { click: close } }, icon("close", 16)),
   );
 }
 
-// ---- the "add a device" dialog (and the new key of a stale device) ----
+export const grab = () => h("div", { class: "grab" });
 
-/** What the dialog holds: the form, then (after "Create") the new device's key; or the new key of a stale device. */
-export function addModal(c: Ctx): Kid[] {
-  const { d, s, a, t } = c;
+// ---- the "add a device" dialog (and the key of a device) ----
+
+/** What the dialog holds: the new device's form, then (after "Create") its key; the key of a device that is shown; or the new key of a stale one. */
+export function addModal(c: AmzCtx): Kid[] {
+  const { d, s } = c;
   const am = d.amnezia;
   if (!am) return [];
+  const find = (id: string | null) => (id ? am.devices.find((x) => x.id === id) : undefined);
+  const renewing = find(s.amz.renew);
+  if (renewing) return keySheet(c, renewing, "renew");
+  const made = find(s.amz.created);
+  if (made) return keySheet(c, made, "created");
+  const shown = find(s.amz.open);
+  if (shown) return keySheet(c, shown, "shown");
+  return [grab(), ...addForm(c)];
+}
+
+/** The accessible name of the dialog. */
+export function modalLabel(c: AmzCtx): string {
+  const { d, s, t } = c;
+  const x = (id: string | null) => (id ? d.amnezia?.devices.find((y) => y.id === id) : undefined);
+  const r = x(s.amz.renew);
+  if (r) return t.renewT(label(r, t));
+  const k = x(s.amz.created) ?? x(s.amz.open);
+  return k ? t.keyFor(label(k, t)) : t.newDevT;
+}
+
+function addForm(c: AmzCtx): Kid[] {
+  const { d, s, a, t, support } = c;
+  const am = d.amnezia!;
   const app = keyAppName(d, null);
-  const head = (title: string) =>
-    h(
-      "div",
-      { class: "mhead" },
-      h("b", { class: "mt" }, title),
-      h("button", { class: "mx", type: "button", "data-k": "modal-x", "aria-label": t.close, on: { click: () => a.amz.add(false) } }, icon("close")),
-    );
-  const done = h("div", { class: "mfoot" }, h("button", { class: "btn sec", type: "button", "data-k": "modal-done", on: { click: () => a.amz.add(false) } }, t.awgDone));
-
-  const renewing = s.amz.renew ? am.devices.find((x) => x.id === s.amz.renew) : undefined;
-  if (renewing) {
-    return [
-      head(t.renewT(label(renewing, t))),
-      h("p", { class: "mut sm mlead" }, t.renewH(app)),
-      h("p", { class: "hintbox calm" }, t.renewOld(app)),
-      configBlock(renewing, c),
-      done,
-    ];
-  }
-  const made = s.amz.created ? am.devices.find((x) => x.id === s.amz.created) : undefined;
-  const err = s.amz.error && s.amz.errorAt === "add" && h("p", { class: "err", role: "alert" }, t.err(s.amz.error, s.amz.retryMin));
-  if (made) return [head(t.awgReadyT(label(made, t))), h("p", { class: "mut sm mlead" }, t.awgReadyH), configBlock(made, c), done];
-
   const f = s.amz.form;
   const busy = s.amz.busy === "add";
-  const choices = profileChoices(am.profiles, t, s.lang, app, flags(s));
+  const choices = profileChoices(am.profiles, t, s.lang, app, flagsOn(s));
+  const chosen = choices.find((p) => p.id === f.profile) ?? choices[0];
+  const err = s.amz.error && s.amz.errorAt === "add" && s.amz.error !== "device_limit";
+  const full = s.amz.error === "device_limit" && s.amz.errorAt === "add";
+  const plat = (p: (typeof addPlatforms)[number]) =>
+    h(
+      "button",
+      { class: `plat${f.platform === p ? " on" : ""}`, type: "button", role: "radio", "aria-checked": f.platform === p, "data-k": `amz-platform-${p}`, "data-autofocus": f.platform === p, on: { click: () => a.amz.form({ platform: p }, true) } },
+      icon(p === "other" ? "other" : deviceIcon(p), 20),
+      t.platforms[p],
+    );
   return [
-    head(t.awgAddT),
+    sheetHead(t, { tone: "mint", ico: "plus", id: "dlg-t", title: t.newDevT, sub: t.newDevS(app) }, () => a.amz.add(false)),
     h(
       "form",
       {
-        class: "addf",
+        class: "stack g20",
         on: {
           submit: (e) => {
             e.preventDefault();
@@ -199,211 +144,177 @@ export function addModal(c: Ctx): Kid[] {
           },
         },
       },
-      h("p", { class: "mut sm" }, t.awgAddH),
-      choices.length > 1 &&
-        h("label", { class: "fld" }, h("span", { class: "eyebrow" }, t.profile.toUpperCase()), select("amz-profile", t.profile, f.profile, choices.map((p) => [p.id, p.label]), (v) => a.amz.form({ profile: v }), true)),
-      h("label", { class: "fld" }, h("span", { class: "eyebrow" }, t.awgPlatform.toUpperCase()), select("amz-platform", t.awgPlatform, f.platform, addPlatforms.map((p) => [p, t.platforms[p]]), (v) => a.amz.form({ platform: v }), choices.length <= 1)),
-      h(
-        "label",
-        { class: "fld" },
-        h("span", { class: "eyebrow" }, t.awgName.toUpperCase()),
-        h("input", { class: "inp", "data-k": "amz-label", type: "text", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
-      ),
-      err,
+      h("div", { class: "fld" }, h("label", { id: "nd-p" }, t.awgPlatform), h("div", { class: "plats six compact", role: "radiogroup", "aria-labelledby": "nd-p" }, ...addPlatforms.map(plat))),
       h(
         "div",
-        { class: "mfoot split" },
-        h("button", { class: "btn sec", type: "button", "data-k": "modal-cancel", disabled: busy, on: { click: () => a.amz.add(false) } }, t.awgCancel),
-        h("button", { class: "btn pri", type: "submit", "data-k": "modal-create", disabled: busy }, busy ? t.awgBusy : t.awgCreate),
+        { class: "fld" },
+        h("div", { class: "fl-h" }, h("label", { for: "nd-n" }, t.awgName), h("span", { class: "hint" }, t.optional)),
+        h("input", { class: "inp", id: "nd-n", "data-k": "amz-label", type: "text", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
       ),
+      choices.length > 1 &&
+        chosen &&
+        h(
+          "div",
+          { class: "fld" },
+          h("label", { id: "nd-v" }, t.profile),
+          h(
+            "div",
+            { class: "pick" },
+            h("span", { class: "stack g4 grow" }, h("span", { class: "t" }, chosen.label), h("span", { class: "s" }, t.profileSub[chosen.kind])),
+            icon("chev", 16),
+            h(
+              "select",
+              { "data-k": "amz-profile", "aria-labelledby": "nd-v", on: { change: (e) => a.amz.form({ profile: (e.target as HTMLSelectElement).value }, true) } },
+              ...choices.map((p) => h("option", { value: p.id, selected: p.id === chosen.id }, p.label)),
+            ),
+          ),
+        ),
+      err && note("bad", "warn", t.err(s.amz.error, s.amz.retryMin)),
+      full &&
+        h(
+          "div",
+          { class: "note bad sm", role: "alert" },
+          icon("warn", 16),
+          h("div", { class: "stack g8" }, h("p", null, h("b", null, t.fullT), " ", t.fullD), support && h("a", { class: "tlink", href: support, target: "_blank", rel: "noopener noreferrer", style: { "min-height": "28px" } }, t.writeInTg)),
+        ),
+      h("button", { class: "btn pri", type: "submit", "data-k": "modal-create", disabled: busy }, busy ? t.awgBusy : t.awgCreate),
     ),
   ];
 }
 
-// ---- the key of one device (in its row, and in the dialog) ----
+// ---- the key of one device (in the dialog) ----
 
-/** How a key is set up: on this very phone it is copied, on this very computer the file is downloaded, else scanned. */
-export function keyMode(platform: string, here: string): "phone" | "desktop" | "other" {
-  if (!here || platform !== here) return "other";
-  return isPhone(here) ? "phone" : isDesktop(here) ? "desktop" : "other";
+export type KeyView = "this-phone" | "this-desktop" | "phone-qr" | "other-desktop";
+export type Where = "this" | "phone" | "other";
+
+/** What "where to add it" offers: on a phone this phone or another device; on a computer this computer, a phone or another computer. */
+export function whereOptions(here: string, t: Dict): { id: Where; label: string }[] {
+  if (isPhone(here)) return [{ id: "this", label: t.whereThisPhone }, { id: "other", label: t.whereOther }];
+  if (isDesktop(here)) return [{ id: "this", label: t.whereThisPc }, { id: "phone", label: t.wherePhone }, { id: "other", label: t.whereOtherPc }];
+  return [{ id: "phone", label: t.wherePhone }, { id: "other", label: t.whereOtherPc }];
 }
 
-function configBlock(x: AwgDevice, c: Ctx): HTMLElement {
+/** Where a key is added by default: on this very device when the key is for it, on a phone when it is a phone's key, else on another computer. */
+export function defaultWhere(platform: string, here: string): Where {
+  if (here && platform === here) return "this";
+  if (isPhone(here)) return "other";
+  return isPhone(platform) ? "phone" : "other";
+}
+
+/** How a key is set up: on this very phone it is copied, on this very computer the file is downloaded, a phone scans a code, another computer is told to open the page there. */
+export function keyView(platform: string, here: string, where: Where): KeyView {
+  if (where === "this") return isPhone(here) ? "this-phone" : "this-desktop";
+  if (where === "phone") return "phone-qr";
+  return isPhone(here) ? (isDesktop(platform) ? "other-desktop" : "phone-qr") : "other-desktop";
+}
+
+function keySheet(c: AmzCtx, x: AwgDevice, mode: "shown" | "created" | "renew"): Kid[] {
   const { d, s, a, t } = c;
+  const name = label(x, t);
+  const app = keyAppName(d, x.platform as Platform);
+  const renew = mode === "renew";
+  const head = sheetHead(
+    t,
+    { tone: renew ? "sand" : "mint", ico: renew ? "refresh" : "key", id: "dlg-t", title: renew ? t.renewT(name) : t.keyFor(name), sub: renew ? t.renewS : mode === "created" ? t.awgReadyH : t.keyAgain },
+    () => a.amz.add(false),
+  );
   const list = s.amz.configs[x.id];
-  if (!list) return h("div", { class: "cfg" }, h("p", { class: "mut sm" }, t.awgBusy));
-  if (list.length === 0) return h("div", { class: "cfg" }, h("p", { class: "mut sm" }, t.noProfile));
+  if (!list || list.length === 0) return [grab(), head, h("p", { class: "hint cfg-wait" }, list ? t.noProfile : t.awgBusy)];
+
+  const flags = flagsOn(s);
   const i = Math.min(s.amz.node[x.id] ?? 0, list.length - 1);
   const cfg = list[i]!;
-  const app = keyAppName(d, x.platform as Platform);
   const filename = cfg.filename || "amnezia.conf";
-  const dl = (cls: string) => h("button", { class: `btn ${cls}`, type: "button", "data-k": `amz-dl-${x.id}`, on: { click: () => a.download(filename, cfg.conf) } }, icon("download"), h("span", null, t.downloadFile));
-  const cp = (cls: string) => copyButton(a, { text: cfg.vpn_key, label: t.copyKey, done: t.copiedShort, toast: t.keyCopied, cls, key: `amz-key-${x.id}` });
-  const qr = (big: boolean) => {
-    const svg = qrSvg(cfg.conf, t.qrScan(app));
-    return svg ? h("div", { class: `qr${big ? " big" : ""}` }, svg) : h("p", { class: "mut sm" }, t.qrTooBig);
-  };
-  const qrFold = (extra: HTMLElement) =>
-    h("details", { class: "qrx" }, h("summary", null, h("span", null, t.qrOtherDev), chev()), h("div", { class: "qrbox" }, qr(false), h("span", { class: "hint c" }, t.qrHowKey(app)), extra));
-  const fileOnly = cfg.warnings.includes("amnezia_desktop_mtu") && h("p", { class: "hintbox" }, t.desktopFileOnly(app));
+  const opts = whereOptions(s.amz.here, t);
+  const want = (s.amz.where[x.id] as Where | undefined) ?? defaultWhere(x.platform, s.amz.here);
+  const where: Where = opts.some((o) => o.id === want) ? want : (opts[0]?.id ?? "other");
+  const view = keyView(x.platform, s.amz.here, where);
 
-  // the one accent button of the key; a dialog that opens on it puts the keyboard there
   const first = <T extends HTMLElement>(el: T): T => {
     el.dataset.autofocus = "";
     return el;
   };
-  let body: Kid[];
-  switch (keyMode(x.platform, s.amz.here)) {
-    case "phone":
-      body = [first(cp("pri")), h("ol", { class: "ksteps" }, ...t.phoneSteps(app).map((step) => h("li", null, step))), qrFold(dl("sec sm"))];
-      break;
-    case "desktop":
-      body = [first(dl("pri")), h("p", { class: "how" }, t.desktopSteps(app)), fileOnly, qrFold(cp("sec sm"))];
-      break;
-    default:
-      // a computer cannot scan a code: open the page there; a phone (or anything else) scans it
-      body = isDesktop(x.platform)
-        ? [h("p", { class: "hintbox calm" }, t.openThere), h("div", { class: "cfg-actions" }, dl("sec"), cp("sec")), fileOnly]
-        : [
-            h("div", { class: "cfg-main" }, qr(true), h("div", { class: "cfg-side" }, h("b", null, t.qrScan(app)), h("p", { class: "mut sm" }, t.qrHowKey(app)))),
-            h("div", { class: "cfg-actions" }, dl("sec"), cp("sec")),
-          ];
-  }
-  const versions = versionsFor(x.platform, cfg.min_clients.length ? cfg.min_clients : x.min_clients);
-  return h(
-    "div",
-    { class: "cfg" },
-    list.length > 1 &&
-      h(
-        "label",
-        { class: "fld" },
-        h("span", { class: "eyebrow" }, t.country.toUpperCase()),
-        select(`amz-node-${x.id}`, t.country, String(i), nodeLabels(list, flags(s)).map((l, k) => [String(k), l]), (v) => a.amz.node(x.id, Number(v))),
-        h("span", { class: "hint" }, t.countryH),
-      ),
-    ...body,
-    versions.length > 0 && h("p", { class: "vers mut" }, t.needApp(versions)),
-    h("p", { class: "secret", role: "note" }, icon("shield"), h("span", null, t.awgSecret)),
-  );
-}
+  const dl = (cls: string, k = "") => h("button", { class: `btn ${cls}`, type: "button", "data-k": `amz-dl-${x.id}${k}`, on: { click: () => a.download(filename, cfg.conf) } }, icon("file"), h("span", null, t.downloadFile));
+  const cp = (cls: string) => copyButton(a, { text: cfg.vpn_key, label: t.copyKey, done: t.copiedShort, toast: t.keyCopied, cls, key: `amz-key-${x.id}` });
+  const qr = () => {
+    const svg = qrSvg(cfg.conf, t.qrKeyAlt(app));
+    return svg ? h("div", { class: "qr l" }, svg) : note("", "qr", t.qrTooBig);
+  };
+  const fileOnly = cfg.warnings.includes("amnezia_desktop_mtu") && note("warn", "warn", t.desktopFileOnly);
+  // the old connection in the app is called by the country (the mockup: "Germany"), as the new keys are named
+  const oldConn = countryName(cfg.country_code, s.lang) || cfg.label;
+  const [pasteStep, deleteStep] = t.renewSteps(app, oldConn);
 
-// ---- one key device ----
-
-function row(x: AwgDevice, c: Ctx, canAct: boolean): HTMLElement {
-  const { d, s, a, t } = c;
-  const open = s.amz.open === x.id;
-  const busy = s.amz.busy === x.id;
-  const ask = s.amz.confirm?.id === x.id ? s.amz.confirm : null;
-  const name = label(x, t);
-  const word = platformWord(x.platform, t);
-  const meta = [word && word !== name ? word : "", whenText(x, c)].filter(Boolean).join(" · ");
-  const lnk = (key: string, text: string, onClick: () => void, cls = "") =>
-    h("button", { class: `lnk${cls ? ` ${cls}` : ""}`, type: "button", "data-k": key, disabled: busy, on: { click: onClick } }, text);
-  const removing = ask?.kind === "remove";
-  return h(
-    "div",
-    { class: `krow${open ? " open" : ""}${x.stale ? " stale-row" : ""}`, id: `amz-row-${x.id}` },
-    h("span", { class: "kico", "aria-hidden": "true" }, icon(deviceIcon(x.platform))),
-    h("div", { class: "ktxt" }, h("b", null, h("span", { class: "kname" }, name), x.stale && h("span", { class: "tag" }, t.awgStale)), h("span", { class: x.online ? "meta on" : "meta" }, meta)),
-    canAct &&
+  const body: Kid[] = [];
+  if (view === "this-phone") {
+    body.push(
+      first(cp("pri")),
+      h("ol", { class: "steps-box", "aria-label": t.stepsAria(app) }, ...(renew ? [pasteStep, deleteStep] : t.phoneSteps(app)).map((step, k) => h("li", null, h("span", { class: "n" }, String(k + 1)), h("span", null, ...rich(step))))),
+    );
+  } else if (view === "this-desktop") {
+    body.push(
+      h("div", { class: "row g16", style: { "flex-wrap": "wrap" } }, first(dl("pri fit")), h("span", { class: "mono keyfile" }, filename)),
+      h("p", { class: "sm" }, ...rich(t.desktopSteps(app))),
+      fileOnly,
+    );
+  } else if (view === "phone-qr") {
+    body.push(
       h(
         "div",
-        { class: "kact" },
-        lnk(`amz-show-${x.id}`, open ? t.hideKey : t.showKey, () => a.amz.show(open ? null : x.id), "pri"),
-        lnk(`amz-rot-${x.id}`, t.rotateKey, () => a.amz.ask({ id: x.id, kind: "rotate" })),
-        lnk(`amz-del-${x.id}`, t.removeKey, () => a.amz.ask({ id: x.id, kind: "remove" }), "bad"),
+        { class: "keyq" },
+        qr(),
+        h("div", { class: "keyq-t stack g12" }, h("p", { class: "b" }, t.qrScan(app)), h("p", { class: "sm mut" }, ...rich(t.qrScanHow)), h("p", { class: "lbl" }, t.orElse), first(dl("sec")), cp("sec")),
       ),
-    ask &&
-      h(
-        "div",
-        { class: `ask${removing ? " bad" : ""}`, role: "alertdialog", "aria-label": name },
-        h("p", null, removing ? t.removeQ(name) : t.rotateQ(name, keyAppName(d, x.platform as Platform))),
-        h(
-          "div",
-          { class: "btnrow" },
-          h("button", { class: "btn sec sm", type: "button", "data-k": `amz-no-${x.id}`, disabled: busy, on: { click: () => a.amz.ask(null) } }, t.awgCancel),
-          h(
-            "button",
-            { class: `btn sm ${removing ? "bad" : "pri"}`, type: "button", "data-k": `amz-yes-${x.id}`, disabled: busy, on: { click: () => (removing ? a.amz.remove(x.id) : a.amz.rotate(x.id)) } },
-            busy ? t.awgBusy : removing ? t.removeYes : t.rotateYes,
-          ),
-        ),
-      ),
-    open && configBlock(x, c),
-  );
-}
-
-// ---- the AmneziaVPN way ----
-
-/**
- * The key way, a card of its own beside the subscription: install the app, add a device
- * (it gets its own key), then the user's keys with their actions. Without self-service the rows have no buttons and the
- * card says the admin issues keys; the admin's preview has no address to call and shows no buttons either.
- */
-export function keyWay(c: Ctx, platform: Platform | null, support: string): HTMLElement {
-  const { d, s, a, t } = c;
-  const am = d.amnezia!;
-  const apps = appsFor(d, platform, "amnezia");
-  const app = keyAppName(d, platform);
-  const main = apps[0];
-  const download = main ? safeUrl(main.download_url) : "";
-  const serve = selfServe(d);
-  const full = atDeviceLimit(d);
-  const used = d.user.devices_used;
-  const items: { title: Kid; body: Kid[] }[] = [];
-  if (main && download) items.push({ title: t.stepInstall(main.name), body: [main.description && h("p", { class: "step-d mut" }, main.description), downloadButton(download, t, "key-get")] });
-
-  if (!am.self_service) {
-    // keys come from the admin: the step says whom to ask, and the rows below have no buttons
-    items.push({ title: t.stepAskKey, body: [h("p", { class: "mut step-d" }, t.keysByAdmin), support && h("a", { class: "btn sec", href: support, target: "_blank", rel: "noopener noreferrer" }, t.write)] });
-  } else if (am.profiles.length === 0) {
-    items.push({ title: t.stepAddDev, body: [h("p", { class: "mut step-d" }, t.noProfile)] });
+    );
   } else {
-    items.push({
-      title: t.stepAddDev,
-      body: [
-        h("button", { class: "btn pri", type: "button", "data-k": "amz-add", disabled: !canAddDevice(d), on: { click: () => a.amz.add(true) } }, icon("plus"), h("span", null, t.awgAdd)),
-        full && h("p", { class: "limit", role: "note" }, t.limit(used, d.user.device_limit, serve && am.devices.length > 0)),
-      ],
-    });
+    body.push(
+      h("div", { class: "stack g14", style: { "align-items": "flex-start", padding: "8px 0" } }, tile("lav", "laptop"), h("p", { class: "h3" }, t.openThereT), h("p", { class: "sm mut" }, t.openThereD)),
+      h("div", { class: "div" }),
+      h("div", { class: "stack g8" }, h("p", { class: "lbl" }, t.orFile), first(dl("sec"))),
+    );
   }
+  if (renew && view !== "this-phone") body.push(note("", "info", deleteStep));
 
-  const rowErr = s.amz.error && !s.amz.adding && !s.amz.renew && s.amz.errorAt !== "add" && !s.amz.errorAt.startsWith("renew:");
-  const counter = d.user.device_limit > 0 ? t.used(used, d.user.device_limit) : String(am.devices.length);
-  return h(
-    "section",
-    { class: "card way", "aria-labelledby": "way-key-t", "data-way": "key" },
-    wayHead("way-key-t", "key", "mint", t.keyT(app), t.keyD),
-    steps(items),
-    apps.length > 1 && alts(apps.slice(1), t, (x) => [safeUrl(x.download_url) && downloadButton(safeUrl(x.download_url), t, `key-get-${x.name}`)]),
+  const labels = nodeLabels(list, flags);
+  const versions = versionsFor(x.platform, cfg.min_clients.length ? cfg.min_clients : x.min_clients);
+  return [
+    grab(),
+    head,
     h(
       "div",
-      { class: "sub-list" },
-      h("div", { class: "sub-h" }, h("b", { class: "sub-t" }, t.yourKeys), am.devices.length > 0 && h("span", { class: `cnt${full ? " warn" : ""}` }, counter)),
-      rowErr && h("p", { class: "err", role: "alert" }, t.err(s.amz.error, s.amz.retryMin)),
-      am.devices.length > 0 ? h("div", { class: "krows" }, ...am.devices.map((x) => row(x, c, serve))) : h("p", { class: "mut pad" }, t.keysNone),
+      { class: "cfg" },
+      h("div", { class: "seg", role: "radiogroup", "aria-label": t.where }, ...opts.map((o) => h("button", { class: where === o.id ? "on" : "", type: "button", role: "radio", "aria-checked": where === o.id, "data-k": `amz-where-${o.id}`, on: { click: () => a.amz.where(x.id, o.id) } }, o.label))),
+      list.length > 1 &&
+        h(
+          "div",
+          { class: "fld" },
+          h("label", { id: `k-c-${x.id}` }, t.country),
+          h(
+            "div",
+            { class: "pick one only-m" },
+            h("span", { class: "t grow" }, labels[i]),
+            h("span", { class: "hint" }, t.moreCountries(list.length - 1)),
+            icon("chev", 16),
+            h("select", { "data-k": `amz-node-${x.id}`, "aria-labelledby": `k-c-${x.id}`, on: { change: (e) => a.amz.node(x.id, Number((e.target as HTMLSelectElement).value)) } }, ...labels.map((l, k) => h("option", { value: String(k), selected: k === i }, l))),
+          ),
+          h("div", { class: "seg pills only-w", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...labels.map((l, k) => h("button", { class: i === k ? "on" : "", type: "button", role: "radio", "aria-checked": i === k, "data-k": `amz-node-${x.id}-${k}`, on: { click: () => a.amz.node(x.id, k) } }, l))),
+          h("p", { class: "hint only-w" }, t.countryH),
+        ),
+      ...body,
+      h("div", { class: "div" }),
+      h(
+        "div",
+        { class: "row g16", style: { "justify-content": "space-between", "align-items": "flex-end" } },
+        h(
+          "div",
+          { class: "foot-note grow" },
+          versions.length > 0 && h("p", { class: "hint row g8" }, icon("info", 16), t.needApp(versions)),
+          h("p", { class: "priv" }, icon("shield", 16), t.awgSecret),
+        ),
+        h("button", { class: "btn sec sm only-w", type: "button", "data-k": "modal-done", on: { click: () => a.amz.add(false) } }, t.awgDone),
+      ),
     ),
-  );
-}
-
-/** The head of a way: its tinted icon, its name and the one line that says what it is. */
-export function wayHead(id: string, glyph: "link" | "key", tone: string, title: string, line: string): HTMLElement {
-  return h(
-    "header",
-    { class: "way-h" },
-    h("span", { class: "way-ico", "data-tone": tone, "aria-hidden": "true" }, icon(glyph)),
-    h("div", { class: "way-ht" }, h("b", { class: "way-t", id }, title), h("span", { class: "mut" }, line)),
-  );
-}
-
-/** The other apps of a way on the platform: compact, with their own (secondary) buttons, never folded away. */
-export function alts(apps: MgData["apps"], t: Dict, actions: (a: MgData["apps"][number]) => Kid[]): HTMLElement {
-  return h(
-    "div",
-    { class: "alts" },
-    h("b", { class: "sub-t" }, t.otherApps),
-    ...apps.map((x) => h("div", { class: "alt" }, h("div", { class: "alt-t" }, h("b", null, x.name), x.description && h("span", { class: "mut" }, x.description)), h("div", { class: "alt-a" }, ...actions(x)))),
-  );
+  ];
 }
 
 // ---- "new key needed" ----
@@ -411,36 +322,31 @@ export function alts(apps: MgData["apps"], t: Dict, actions: (a: MgData["apps"][
 /** The devices that need a new key: the card has a button for each. */
 export const staleDevices = (d: MgData): AwgDevice[] => d.amnezia?.devices.filter((x) => x.stale) ?? [];
 
-export function staleCard(c: Ctx): HTMLElement | null {
+export function staleCard(c: AmzCtx): HTMLElement | null {
   const { d, s, a, t } = c;
   const stale = staleDevices(d);
-  if (stale.length === 0 || !d.access.amnezia) return null;
+  if (stale.length === 0 || !d.access.amnezia || d.user.status !== "active") return null;
   const app = keyAppName(d, null);
   const one = stale.length === 1;
   const serve = selfServe(d);
-  const err = s.amz.error && s.amz.errorAt.startsWith("renew:") && h("p", { class: "err", role: "alert" }, t.err(s.amz.error, s.amz.retryMin));
+  const dnsOnly = stale.every((x) => x.stale_reason === "dns");
+  const err = s.amz.error && s.amz.errorAt.startsWith("renew:") && note("bad", "warn", t.err(s.amz.error, s.amz.retryMin));
   return h(
     "section",
-    { class: "card stale" },
-    h(
-      "div",
-      { class: "stale-main" },
-      h("div", { class: "stale-t" }, dot(), h("b", null, one ? t.staleT(label(stale[0]!, t)) : t.staleTs)),
-      h("p", { class: "mut" }, serve ? t.staleD : t.keysByAdmin),
-      serve && h("ol", { class: "steps3" }, ...t.staleSteps(app).map((step, i) => h("li", null, h("span", { class: "n mono" }, String(i + 1)), h("span", null, step)))),
-      err,
-    ),
+    { class: "card stack g14 stale", style: { padding: "18px", "border-color": "var(--warning-line)" }, "aria-labelledby": "stale-t" },
+    h("div", { class: "row g10" }, dot("warn"), h("p", { class: "h3 grow", id: "stale-t" }, one ? t.staleT(label(stale[0]!, t)) : t.staleTs)),
+    h("p", { class: "sm mut", style: { "margin-top": "-6px" } }, serve ? (dnsOnly ? t.staleDns : t.staleD) : t.keysByAdmin),
     serve &&
       h(
-        "div",
-        { class: "stale-act" },
-        ...stale.map((x) =>
-          h(
-            "button",
-            { class: "btn pri", type: "button", "data-k": `amz-stale-${x.id}`, disabled: s.amz.busy !== "", on: { click: () => a.amz.renew(x.id) } },
-            s.amz.busy === `renew:${x.id}` ? t.awgBusy : one ? t.newKey : t.newKeyFor(label(x, t)),
-          ),
-        ),
+        "ol",
+        { class: "stack g10" },
+        ...t.staleSteps(app).map((step, i) => h("li", { class: "row g10 sm", style: { "align-items": "flex-start" } }, h("span", { class: "stepno" }, String(i + 1)), h("span", null, ...rich(step)))),
       ),
+    err,
+    ...(serve
+      ? stale.map((x) =>
+          h("button", { class: "btn pri", type: "button", "data-k": `amz-stale-${x.id}`, disabled: s.amz.busy !== "", on: { click: () => a.amz.renew(x.id) } }, icon("refresh"), s.amz.busy === `renew:${x.id}` ? t.awgBusy : one ? t.newKey : t.newKeyFor(label(x, t))),
+        )
+      : []),
   );
 }

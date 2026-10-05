@@ -1,265 +1,212 @@
-import type { Lang, LoadLevel } from "./types";
+import type { Lang } from "./types";
 
 // Copy of the user page: the end user is addressed formally («вы» / "you").
 // Functions take plain values; dates and plurals come from Intl, so this file is only words. No app is named here: names
 // come from the settings (the cards) and the page speaks of what an app does, not of which one it is.
 //
-// The two ways to connect have one vocabulary on the page and in the admin: «Подписка» (subscription apps: one link
-// with every server) and «Ключ» (AmneziaVPN: one per device).
+// The two ways to connect have one vocabulary on the page and in the admin: «по ссылке подписки» (subscription apps: one
+// link with every server) and «ключ» (AmneziaVPN: one per device). Text in «…» is set unbreakable by the view (view.ts rich()).
 
 type Period = "none" | "day" | "week" | "month" | "rolling_month";
-
-export type Dict = {
-  hi: (n: string) => string;
-  hiAnon: string;
-  traffic: string;
-  leftL: string;
-  termL: string;
-  trafficL: string;
-  resets: (d: string) => string;
-  unlimited: string;
-  noExpiry: string;
-  of: (n: string) => string;
-  until: (d: string) => string;
-  chip: Record<"active" | "expired" | "limited" | "disabled", string>;
-  chipLong: Record<"active" | "expired" | "limited" | "disabled", string>;
-  /** [what happened, what to do]: the second sentence is dropped when there is no support link. */
-  txt: {
-    expired: (brand: string) => [string, string];
-    limitedReset: (date: string, period: Period) => [string, string];
-    limited: () => [string, string];
-    disabled: () => [string, string];
-  };
-  recommended: string;
-  noApps: string;
-  // the two ways and the platform they are for
-  pickDev: string;
-  yourDevice: string;
-  twoWays: string;
-  linkT: (apps: string) => string;
-  linkD: string;
-  keyT: (app: string) => string;
-  keyD: string;
-  stepInstall: (app: string) => string;
-  stepAddSub: string;
-  stepAddDev: string;
-  stepAskKey: string;
-  download: string;
-  store: { appStore: string; play: string; site: string };
-  addTo: (app: string) => string;
-  noOpen: string;
-  pasteHow: (app: string) => string;
-  copyHow: (app: string) => string;
-  allServers: (app: string, n: number) => string;
-  otherApps: string;
-  noAppHere: (platform: string) => string;
-  copyLink: string;
-  copied: string;
-  copiedShort: string;
-  qrOther: string;
-  qrPhoneT: string;
-  /** "Point the phone's camera…"; the argument is "" when the settings name no phone app. */
-  qrHow: (app: string) => string;
-  viaLink: string;
-  serverLoadTitle: string;
-  serverLoadIntro: string;
-  serverLoadBusy: string;
-  serverLoadTry: (busy: string, other: string) => string;
-  serverLoadLevel: Record<LoadLevel, string>;
-  linkApps: string;
-  linkAppsNote: string;
-  fetched: (when: string) => string;
-  devApp: (app: string) => string;
-  yourKeys: string;
-  keysNone: string;
-  used: (a: number, b: number) => string;
-  limit: (a: number, b: number, canRemove: boolean) => string;
-  keysByAdmin: string;
-  noProfile: string;
-  // the password of the page
-  lockT: string;
-  lockH: string;
-  lockLabel: string;
-  lockGo: string;
-  lockBusy: string;
-  lockWrong: (left: number) => string;
-  lockLater: (min: number) => string;
-  lockNet: string;
-  lockFail: string;
-  lockLatin: string;
-  lockShort: (n: number) => string;
-  lockNone: string;
-  // the key devices (self-service)
-  awgAdd: string;
-  awgAddT: string;
-  awgAddH: string;
-  awgReadyT: (name: string) => string;
-  awgReadyH: string;
-  renewT: (name: string) => string;
-  renewH: (app: string) => string;
-  /** What to delete in the app: the device's old connection. */
-  renewOld: (app: string) => string;
-  awgDone: string;
-  profile: string;
-  profileMain: string;
-  profileOld: (app: string) => string;
-  profileWarp: string;
-  awgPlatform: string;
-  awgName: string;
-  /** An example name per device kind, the placeholder of the name field. */
-  awgNamePh: Record<"ios" | "android" | "windows" | "macos" | "linux" | "other", string>;
-  awgCreate: string;
-  awgCancel: string;
-  awgBusy: string;
-  showKey: string;
-  hideKey: string;
-  rotateKey: string;
-  removeKey: string;
-  removeQ: (name: string) => string;
-  rotateQ: (name: string, app: string) => string;
-  removeYes: string;
-  rotateYes: string;
-  awgStale: string;
-  awgHandshake: (when: string) => string;
-  awgNever: string;
-  // the key itself
-  country: string;
-  countryH: string;
-  copyKey: string;
-  keyCopied: string;
-  downloadFile: string;
-  phoneSteps: (app: string) => string[];
-  desktopSteps: (app: string) => string;
-  desktopFileOnly: (app: string) => string;
-  qrOtherDev: string;
-  qrScan: (app: string) => string;
-  qrHowKey: (app: string) => string;
-  openThere: string;
-  qrTooBig: string;
-  needApp: (list: { app: string; min: string }[]) => string;
-  awgSecret: string;
-  err: (code: string, retryMin: number) => string;
-  // "new key needed"
-  staleT: (name: string) => string;
-  staleTs: string;
-  staleD: string;
-  staleSteps: (app: string) => string[];
-  newKey: string;
-  newKeyFor: (name: string) => string;
-  devGeneric: string;
-  online: string;
-  help: string;
-  helpTg: string;
-  helpAny: string;
-  write: string;
-  writeSupport: string;
-  writeWeb: (tg: boolean) => string;
-  privacy: string;
-  langLabel: string;
-  close: string;
-  platforms: Record<"ios" | "android" | "windows" | "macos" | "linux" | "other", string>;
-};
 
 const ruPeriod: Record<Period, string> = { none: "", day: "на сегодня", week: "на эту неделю", month: "на этот месяц", rolling_month: "на этот месяц" };
 const enPeriod: Record<Period, string> = { none: "", day: "for today", week: "for this week", month: "for this month", rolling_month: "for this month" };
 
-const ru: Dict = {
-  hi: (n) => `Привет, ${n}`,
+const pluralRu = (n: number, forms: [one: string, few: string, many: string]) => {
+  const r = new Intl.PluralRules("ru").select(n);
+  return r === "one" ? forms[0] : r === "few" ? forms[1] : forms[2];
+};
+
+const ru = {
+  // status
+  hi: (n: string) => `Привет, ${n}`,
   hiAnon: "Привет",
-  traffic: "Трафик",
-  leftL: "ОСТАЛОСЬ",
-  termL: "СРОК",
-  trafficL: "ТРАФИК",
-  resets: (d) => `обнулится ${d}`,
+  statusAria: "Подписка",
+  leftL: "Осталось",
+  termL: "Срок",
+  trafficL: "Трафик",
+  resets: (d: string) => `обнулится ${d}`,
   unlimited: "без лимита",
   noExpiry: "без срока",
-  of: (n) => `из ${n}`,
-  until: (d) => `до ${d}`,
-  chip: { active: "Активна", expired: "Закончилась", limited: "Трафик исчерпан", disabled: "Отключена" },
-  chipLong: {
-    active: "Подписка активна",
-    expired: "Подписка закончилась",
-    limited: "Трафик закончился",
-    disabled: "Подписка отключена",
-  },
+  of: (n: string) => `из ${n}`,
+  until: (d: string) => `до ${d}`,
+  barAria: (used: string, of: string) => `Использовано ${used} ${of}`,
+  chip: { active: "Активна", soon: "Скоро закончится", expired: "Закончилась", limited: "Трафик исчерпан", disabled: "Отключена" },
+  leftUntil: (rest: string, date: string) => `Осталось ${rest} до ${date}`,
+  leftOnly: (rest: string) => `Осталось ${rest}`,
+  /** [what is left, what to do]: the second part is dropped when there is no support link. */
+  soon: (days: number): [string, string] => [`Осталось ${days} ${pluralRu(days, ["день", "дня", "дней"])}`, "напишите, чтобы продлить"],
   txt: {
-    expired: (b) => [`Интернет через ${b} сейчас не работает.`, "Напишите — продлим."],
-    limitedReset: (d, p) => [`Трафик ${ruPeriod[p]} закончился — до ${d} VPN не работает.`.replace("  ", " "), "Нужно раньше — напишите."],
-    limited: () => ["Лимит трафика исчерпан.", "Напишите — увеличим."],
-    disabled: () => ["Администратор приостановил доступ.", "Если это ошибка — напишите."],
+    expiredOn: (d: string) => `Подписка закончилась ${d}.`,
+    expired: (brand: string) => ({ body: `Интернет через ${brand} сейчас не работает.`, call: "Напишите — продлим." }),
+    limitedReset: (d: string, p: Period) => ({ body: `Трафик ${ruPeriod[p]} закончился — до ${d} VPN не работает.`.replace("  ", " "), call: "Нужно раньше — напишите." }),
+    limited: () => ({ body: "Лимит трафика исчерпан.", call: "Напишите — увеличим." }),
+    disabled: () => ({ body: "Администратор приостановил доступ.", call: "Если это ошибка — напишите." }),
   },
-  recommended: "рекомендуем",
-  noApps: "Сервер ещё настраивается — напишите администратору.",
-  pickDev: "На чём будете пользоваться",
+  sameInApp: "В приложении вы увидите то же сообщение",
+  appGot: "Приложение получило подписку",
+  // connect: the three steps
+  connectT: "Подключите VPN",
+  connectH: "Делайте это на том устройстве, где нужен VPN",
+  connectAria: "Подключение",
+  moreT: "Подключить ещё устройство",
+  moreS: "Устройство, приложение — и одно нажатие",
+  moreSQr: "Устройство, приложение — и одно нажатие. Или откройте страницу на телефоне по QR-коду",
   yourDevice: "Ваше устройство",
-  twoWays: "Подойдёт любой из двух способов — или оба сразу.",
-  linkT: (a) => (a ? `Подписка — ${a}` : "Подписка"),
+  pickDev: "На чём будете пользоваться",
+  detected: "Определили по браузеру — если не так, выберите своё",
+  detectedShort: "Определили по браузеру",
+  notYours: (phone: boolean, name: string): [string, string] => [phone ? "Это не ваш телефон?" : "Это не ваш компьютер?", `Вернуть ${name}`],
+  appT: "Приложение",
+  appAria: "Приложение",
+  anyWay: "Подойдёт любой способ — или оба сразу",
+  otherApps: "Другие приложения",
+  recommended: "Рекомендуем",
+  wayLink: "по ссылке подписки",
+  wayKey: (app: string) => `ключ ${app}`,
   linkD: "Одна личная ссылка со всеми вашими серверами — обновляется сама",
-  keyT: (a) => `Ключ ${a}`,
   keyD: "Отдельный ключ для каждого телефона и компьютера",
-  stepInstall: (a) => `Установите ${a}`,
-  stepAddSub: "Добавьте подписку",
-  stepAddDev: "Добавьте устройство — для него появится ключ",
-  stepAskKey: "Попросите ключ",
+  noAppsT: (p: string) => `Для ${p} приложений пока нет`,
+  noAppsD: "Скопируйте ссылку — она подойдёт любому приложению с подписками — или выберите другое устройство.",
+  noApps: "Сервер ещё настраивается — напишите администратору.",
+  howT: "Как подключиться",
+  stepInstall: (a: string) => `Установите ${a}`,
   download: "Скачать",
   store: { appStore: "App Store", play: "Google Play", site: "с сайта" },
-  addTo: (a) => `Добавить в ${a}`,
-  noOpen: "Не открывается? Скопировать ссылку",
-  pasteHow: (a) => `В ${a}: «+» → «Вставить из буфера»`,
-  copyHow: (a) => `В ${a}: добавить подписку → вставить ссылку`,
-  allServers: (a, n) => `В ${a} появятся все ваши серверы (${n}) — выберите любой`,
-  otherApps: "Другие приложения",
-  noAppHere: (p) => `Для ${p} приложения нет — выберите другое устройство выше.`,
+  stepAddSub: "Добавьте подписку",
+  addHint: (a: string) => `${a} откроется уже с вашей подпиской`,
+  addOne: "Добавить одним нажатием",
+  noOpenQ: "Не открывается?",
+  copyShort: "Скопировать",
   copyLink: "Скопировать ссылку",
-  copied: "Ссылка скопирована ✓",
-  copiedShort: "Скопировано",
-  qrOther: "Подключить другое устройство (QR‑код)",
-  qrPhoneT: "Подключить телефон",
-  qrHow: (a) => (a ? `Наведите камеру телефона — откроется эта страница. Или в ${a}: «+» → «Сканировать QR»` : "Наведите камеру телефона — откроется эта страница."),
-  viaLink: "Подключено через подписку",
-  serverLoadTitle: "Загрузка каналов",
-  serverLoadIntro: "Насколько занят канал каждого сервера прямо сейчас. Показаны серверы, для которых известна пропускная способность.",
-  serverLoadBusy: "Высокая загрузка канала",
-  serverLoadTry: (busy, other) => `Канал сервера ${busy} сильно загружен. Если соединение медленное, попробуйте ${other}.`,
-  serverLoadLevel: { low: "Низкая", medium: "Средняя", high: "Высокая" },
+  pasteHow: (a: string) => `Вставьте ссылку в ${a}: «+» → «Вставить из буфера»`,
+  copyPasteT: "Скопируйте ссылку и вставьте её в приложение",
+  copyHow: (a: string) => `В ${a}: добавить подписку → вставить ссылку`,
+  stepVpn: (a: string) => `Включите VPN в ${a}`,
+  stepVpnPlain: "Включите VPN",
+  allServers: (n: number) => `Все ваши серверы (${n}) уже там — выберите любой`,
+  stepAddDevT: "Добавьте это устройство",
+  stepAddDevS: "Для него появится свой ключ",
+  stepKeyT: (a: string) => `Вставьте ключ в ${a}`,
+  stepKeyPhone: (a: string) => `Скопируйте ключ → ${a} → «+» → вставьте → «Продолжить»`,
+  stepKeyDesktop: (a: string) => `Скачайте файл → ${a} → «+» → «Файл с настройками подключения»`,
+  doneT: "Готово",
+  doneD: (when: string) => `— приложение получило подписку ${when}. Включите VPN и выберите любой сервер.`,
+  showSteps: "Показать шаги",
+  qrOtherT: "Подключить другое устройство",
+  qrOtherS: "QR-код откроет эту страницу на нём",
+  qrPhoneT: "Откройте на телефоне",
+  qrHow: (a: string) => `Наведите камеру — откроется эта страница. Или в ${a || "приложении по ссылке"}: «+» → «Сканировать QR»`,
+  qrAlt: "QR-код со ссылкой на эту страницу",
+  // servers
+  serversT: "Серверы",
+  serversS: "Все ваши серверы уже есть в приложении — переключайтесь между ними там",
+  loadK: "Загрузка",
+  loadLevel: { low: "низкая", medium: "средняя", high: "высокая" },
+  up: "работает",
+  down: "не отвечает",
+  downS: "Выберите в приложении другой сервер",
+  chipLink: "по ссылке",
+  chipKey: "ключ",
+  chipExit: "запасной выход",
+  exitHint: "Запасной выход — если какой-то сайт не открывается",
+  inApp: "В приложении",
+  flagOf: (c: string) => `Флаг: ${c}`,
+  busyTry: (busy: string, other: string) => `Сервер ${busy} сильно загружен. Если соединение медленное, попробуйте ${other}.`,
+  busyAll: (busy: string) => `Сервер ${busy} сильно загружен. Если соединение медленное, попробуйте позже.`,
+  // dns
+  dnsK: "DNS",
+  dnsChange: "Изменить",
+  dnsLinkNote: (name: string, app: string) => `В приложениях по ссылке DNS пока один на все серверы — ${name}. Выбор ниже действует для ключей ${app}.`,
+  dnsT: "DNS для сервера",
+  dnsIntro: "DNS решает, какие сайты открываются и как. Выбор действует только для этого сервера.",
+  dnsDefault: (name: string) => `По умолчанию — ${name}`,
+  dnsDefaultPlain: "По умолчанию",
+  dnsNow: "сейчас",
+  dnsApply: "Применить",
+  dnsKeys: (names: string[], auto: boolean) =>
+    `${names.length === 1 ? `У ключа «${names[0]}»` : `У ключей ${names.map((n) => `«${n}»`).join(", ")}`} DNS записан внутри — после смены получите ${names.length === 1 ? "ключ" : "ключи"} заново.${auto ? " Приложения по ссылке обновятся сами." : ""}`,
+  dnsDoneLink: (h: number): [string, string] => ["Готово.", `Приложения по ссылке получат новый DNS при обновлении подписки (до ${h} ч). Чтобы сразу — обновите подписку в приложении.`],
+  dnsDoneSaved: (): [string, string] => ["Готово.", "DNS сохранён — его получат новые ключи этого сервера."],
+  dnsRefreshT: (n: number) => `Обновите ключи на ${n} ${pluralRu(n, ["устройстве", "устройствах", "устройствах"])}`,
+  dnsRefreshD: (app: string) => `Новый DNS записывается внутрь ключа. Ключ останется тем же — просто добавьте его в ${app} ещё раз.`,
+  dnsRefresh: "Обновить",
+  dnsAuto: "Приложения по ссылке получат новый DNS сами",
+  dnsRetry: "Повторить",
+  dnsSaving: "Секунду…",
+  dnsErr: (c: string, m: number) =>
+    (
+      {
+        dns_disabled: "Выбор DNS выключен администратором.",
+        not_allowed: "Этот вариант DNS больше недоступен — выберите другой.",
+        too_many_requests: m > 0 ? `Слишком много изменений подряд. Попробуйте через ${m} мин.` : "Слишком много изменений подряд. Попробуйте позже.",
+        user_inactive: "Подписка сейчас не активна — DNS не меняется.",
+        not_found: "Такого сервера уже нет. Обновите страницу.",
+        network: "Нет связи. Проверьте интернет и повторите.",
+        locked: "Нужен пароль. Обновите страницу.",
+      } as Record<string, string>
+    )[c] ?? "Не получилось. Попробуйте ещё раз.",
+  // devices
+  devicesT: "Мои устройства",
+  devicesAria: "Мои устройства",
+  slots: (a: number, b: number) => `${a} из ${b}`,
+  slotsAria: (a: number, b: number) => `Занято ${a} из ${b}`,
+  slotsWord: (a: number, b: number) => `занято ${a} из ${b}`,
   linkApps: "Приложения по ссылке",
   linkAppsNote: "Все устройства с этой ссылкой занимают одно место",
-  fetched: (w) => `обновлялись ${w}`,
-  devApp: (a) => `Устройство ${a}`,
-  yourKeys: "Ваши ключи",
-  keysNone: "Пока ни одного — добавьте первое устройство.",
-  used: (a, b) => `занято ${a} из ${b}`,
-  limit: (a, b, rm) =>
-    rm ? `Занято ${a} из ${b}. Удалите устройство, которым больше не пользуетесь (кнопка «Удалить» в списке ниже), или напишите — добавим место.` : `Занято ${a} из ${b}. Напишите — добавим место.`,
+  fetched: (w: string) => `обновлялись ${w}`,
+  linkNever: "ещё не подключались",
+  devApp: (app: string) => `Устройство ${app}`,
+  keysT: (app: string) => `Ключи ${app}`,
+  keysNone: "Пока ни одного. Ключ выдаётся на каждое устройство отдельно",
+  freeSlots: (n: number) => (n === 1 ? "Свободно ещё одно место" : `Свободно ещё ${n} ${pluralRu(n, ["место", "места", "мест"])}`),
+  keysOne: "Ключ выдаётся на каждое устройство отдельно",
+  devOff: "Подписка сейчас не активна — ключи не выдаются. Удалить или переименовать устройство можно.",
+  devOffDisabled: "Подписка отключена, ключи не выдаются. Удалить или переименовать устройство можно.",
+  whyOff: "Подписка сейчас не активна",
+  limit: (a: number, b: number, support: boolean) =>
+    `Занято ${a} из ${b}. Удалите устройство, которым больше не пользуетесь${support ? ", или напишите — добавим место." : "."}`,
   keysByAdmin: "Ключи выдаёт администратор — напишите, если нужен новый.",
+  keysByAdminT: "Попросите ключ",
+  keysByAdminD: (app: string) => `Ключи ${app} выдаёт владелец — напишите, для какого устройства нужен.`,
   noProfile: "Сервер ещё настраивается — напишите администратору.",
-  lockT: "Введите пароль",
-  lockH: "Его прислали вместе со ссылкой. Спросим один раз — в этом браузере запомним.",
-  lockLabel: "Пароль",
-  lockGo: "Открыть",
-  lockBusy: "Проверяем…",
-  lockWrong: (n) => (n > 0 ? `Пароль не подошёл. Осталось попыток: ${n}.` : "Пароль не подошёл."),
-  lockLater: (m) => (m > 0 ? `Слишком много попыток. Попробуйте через ${m} мин.` : "Слишком много попыток. Попробуйте позже."),
-  lockNet: "Нет связи. Проверьте интернет и повторите.",
-  lockFail: "Не получилось. Попробуйте ещё раз.",
-  lockLatin: "Пароль набирается латиницей — переключите клавиатуру на English (кнопка 🌐).",
-  lockShort: (n) => `В пароле 8 знаков, вы ввели ${n}.`,
-  lockNone: "Нет пароля? Спросите у того, кто прислал ссылку.",
+  noProfileT: "Ключи пока недоступны",
+  showKey: "Показать ключ",
+  hideKey: "Скрыть ключ",
+  rename: "Переименовать",
+  rotateKey: "Заменить ключ",
+  removeKey: "Удалить",
+  moreAria: (rotate: boolean) => `Ещё: ${rotate ? "переименовать, заменить ключ, удалить" : "переименовать, удалить"}`,
+  moreShort: "Ещё",
+  renameT: "Название устройства",
+  renameH: (p: string) => (p ? `До 40 символов · ${p}` : "До 40 символов"),
+  save: "Сохранить",
+  removeT: (n: string) => `Удалить «${n}»?`,
+  removeD: "VPN на нём сразу перестанет работать.",
+  rotateT: (n: string) => `Заменить ключ «${n}»?`,
+  rotateD: (a: string) => `Старый перестанет работать сразу — новый нужно будет добавить в ${a} заново.`,
+  removeYes: "Удалить",
+  rotateYes: "Заменить",
+  awgStale: "нужен новый ключ",
+  awgHandshake: (w: string) => `подключалось ${w}`,
+  awgNever: "ещё не подключалось",
+  online: "в сети",
+  devGeneric: "Устройство",
+  // "new key needed"
+  staleT: (n: string) => `Нужен новый ключ для «${n}»`,
+  staleTs: "Нужны новые ключи",
+  staleD: "Серверы обновились — старый ключ этого устройства больше не работает.",
+  staleDns: "DNS сервера изменился — получите ключ заново. Сам ключ останется прежним.",
+  staleSteps: (a: string) => ["Нажмите «Получить новый ключ»", `Добавьте его в ${a}, как в первый раз`, "Удалите старое подключение этого устройства — оно больше не работает"],
+  newKey: "Получить новый ключ",
+  newKeyFor: (n: string) => `Новый ключ для «${n}»`,
+  // sheets
   awgAdd: "Добавить устройство",
-  awgAddT: "Новое устройство",
-  awgAddH: "Для каждого телефона и компьютера нужен свой ключ. Он появится сразу после создания.",
-  awgReadyT: (n) => `Ключ для «${n}»`,
-  awgReadyH: "Настройте устройство сейчас. Закроете окно — устройство останется в списке, ключ можно будет показать снова.",
-  renewT: (n) => `Новый ключ для «${n}»`,
-  renewH: (a) => `Добавьте этот ключ в ${a}, как в первый раз.`,
-  renewOld: (a) => `Старое подключение этого устройства в ${a} удалите — оно больше не работает.`,
-  awgDone: "Готово",
-  profile: "Вариант подключения",
-  profileMain: "Основной",
-  profileOld: (a) => `Для старых версий ${a} (до 5.0.1.5)`,
-  profileWarp: "Запасной выход (если какой-то сайт не открывается)",
+  newDevT: "Новое устройство",
+  newDevS: (app: string) => `Для него появится свой ключ ${app}`,
   awgPlatform: "Что за устройство",
-  awgName: "Название (необязательно)",
+  awgName: "Название",
+  optional: "необязательно",
   awgNamePh: {
     ios: "Например, телефон мамы",
     android: "Например, рабочий телефон",
@@ -268,35 +215,55 @@ const ru: Dict = {
     linux: "Например, ноутбук",
     other: "Например, планшет",
   },
-  awgCreate: "Создать",
+  profile: "Вариант подключения",
+  profileMain: "Основной",
+  profileOld: (a: string) => `Для старых версий ${a} (до 5.0.1.5)`,
+  profileWarp: "Запасной выход (если какой-то сайт не открывается)",
+  profileSub: { main: "Обычное — подходит почти всегда", warp: "Если какой-то сайт не открывается", old: "Только для старых версий приложения" },
+  awgCreate: "Создать ключ",
   awgCancel: "Отмена",
   awgBusy: "Секунду…",
-  showKey: "Показать ключ",
-  hideKey: "Скрыть ключ",
-  rotateKey: "Заменить ключ",
-  removeKey: "Удалить",
-  removeQ: (n) => `Удалить «${n}»? VPN на нём сразу перестанет работать.`,
-  rotateQ: (n, a) => `Заменить ключ «${n}»? Старый перестанет работать сразу — новый нужно будет добавить в ${a} заново.`,
-  removeYes: "Удалить",
-  rotateYes: "Заменить",
-  awgStale: "нужен новый ключ",
-  awgHandshake: (w) => `подключалось ${w}`,
-  awgNever: "ещё не подключалось",
+  keyFor: (n: string) => `Ключ для «${n}»`,
+  keyAgain: "Устройство уже в списке — ключ можно показать снова",
+  awgReadyH: "Настройте устройство сейчас. Закроете окно — устройство останется в списке, ключ можно будет показать снова.",
+  renewT: (n: string) => `Новый ключ для «${n}»`,
+  renewS: "Старый ключ больше не работает",
+  renewSteps: (app: string, old: string): [string, string] => [
+    `В ${app} нажмите «+», вставьте ключ и «Продолжить»`,
+    old ? `Удалите старое подключение «${old}» — оно больше не подключается` : "Удалите старое подключение этого устройства — оно больше не подключается",
+  ],
+  awgDone: "Готово",
+  where: "Куда добавить",
+  whereThisPhone: "Этот телефон",
+  whereOther: "Другое устройство",
+  whereThisPc: "Этот компьютер",
+  wherePhone: "Телефон",
+  whereOtherPc: "Другой компьютер",
   country: "Страна",
-  countryH: "Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.",  copyKey: "Скопировать ключ",
-  keyCopied: "Ключ скопирован ✓",
+  moreCountries: (n: number) => `ещё ${n}`,
+  countryH: "Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.",
+  copyKey: "Скопировать ключ",
+  keyCopied: "Ключ скопирован",
   downloadFile: "Скачать файл",
-  phoneSteps: (a) => [`Откройте ${a}`, "Нажмите «+» и вставьте ключ", "Нажмите «Продолжить»"],
-  desktopSteps: (a) => `${a} → «+» → «Файл с настройками подключения» → выберите скачанный файл`,
-  desktopFileOnly: (a) => `На компьютере добавляйте в ${a} файл, а не ключ: с ключом соединение может не заработать.`,
-  qrOtherDev: "QR‑код для другого устройства",
-  qrScan: (a) => `Отсканируйте в ${a}`,
-  qrHowKey: (a) => `В ${a}: «+» → «QR-код»`,
-  openThere: "Проще всего открыть эту страницу на том компьютере и нажать «Показать ключ» там.",
+  stepsAria: (a: string) => `Дальше в ${a}`,
+  phoneSteps: (a: string) => [`Откройте ${a}`, "Нажмите «+» и вставьте ключ", "Нажмите «Продолжить»"],
+  desktopSteps: (a: string) => `Затем: ${a} → «+» → «Файл с настройками подключения»`,
+  desktopFileOnly: "На компьютере добавляйте файл, а не ключ — иначе соединение может не заработать.",
+  qrScan: (a: string) => `Отсканируйте в ${a}`,
+  qrScanHow: "«+» → «QR-код» и наведите камеру телефона на код",
+  qrKeyAlt: (a: string) => `QR-код ключа для ${a}`,
+  qrShow: "Показать QR-код для другого устройства",
+  orElse: "Или перенесите иначе",
+  orFile: "Или перенесите файл сами",
+  openThereT: "Откройте эту страницу на том компьютере",
+  openThereD: "Проще всего так: на нужном компьютере откройте вашу ссылку и нажмите «Показать ключ» у этого устройства — файл скачается сразу туда.",
   qrTooBig: "Ключ слишком длинный для QR-кода. Скачайте файл или скопируйте ключ.",
-  needApp: (l) => `Нужна ${l.map((m, i) => `${m.app} ${m.min} ${i === 0 ? "или новее" : "и новее"}`).join(" — или ")}`,
+  needApp: (l: { app: string; min: string }[]) => `Нужна ${l.map((m, i) => `${m.app} ${m.min} ${i === 0 ? "или новее" : "и новее"}`).join(" — или ")}`,
   awgSecret: "В ключе личные данные устройства — не пересылайте его.",
-  err: (c, m) =>
+  writeInTg: "Написать в Telegram",
+  fullT: "Все места заняты.",
+  fullD: "Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.",
+  err: (c: string, m: number) =>
     (
       {
         device_limit: "Все места заняты. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.",
@@ -314,159 +281,276 @@ const ru: Dict = {
         locked: "Нужен пароль. Обновите страницу.",
       } as Record<string, string>
     )[c] ?? "Не получилось. Попробуйте ещё раз.",
-  staleT: (n) => `Нужен новый ключ для «${n}»`,
-  staleTs: "Нужны новые ключи",
-  staleD: "Серверы обновились, и старое подключение перестало работать. Займёт минуту:",
-  staleSteps: (a) => ["Нажмите «Получить новый ключ».", `Добавьте его в ${a}, как в первый раз.`, "Удалите старое подключение этого устройства — оно больше не работает."],
-  newKey: "Получить новый ключ",
-  newKeyFor: (n) => `Новый ключ для «${n}»`,
-  devGeneric: "Устройство",
-  online: "в сети",
-  help: "Что-то не работает?",
+  // the password of the page
+  lockT: "Введите пароль",
+  lockH: "Его прислали вместе со ссылкой. Спросим один раз — в этом браузере запомним.",
+  lockLabel: "Пароль",
+  lockGo: "Открыть",
+  lockBusy: "Проверяем…",
+  lockWrong: (n: number) => (n > 0 ? `Пароль не подошёл. Осталось попыток: ${n}.` : "Пароль не подошёл."),
+  lockLater: (m: number) => (m > 0 ? `Слишком много попыток. Попробуйте через ${m} мин.` : "Слишком много попыток. Попробуйте позже."),
+  lockNet: "Нет связи. Проверьте интернет и повторите.",
+  lockFail: "Не получилось. Попробуйте ещё раз.",
+  lockLatin: "Пароль набирается латиницей — переключите клавиатуру на English (кнопка 🌐).",
+  lockShort: (n: number) => `В пароле 8 знаков, вы ввели ${n}.`,
+  lockNone: "Нет пароля? Спросите у того, кто прислал ссылку.",
+  // help, footer
+  helpT: "Что-то не работает?",
   helpTg: "Ответим в Telegram",
   helpAny: "Поможем",
   write: "Написать",
   writeSupport: "Написать в поддержку",
-  writeWeb: (tg) => (tg ? "Написать в Telegram →" : "Написать в поддержку →"),
   privacy: "Ссылка личная — не пересылайте её. Работает, пока подписка активна.",
+  themeL: "Тема",
+  theme: { auto: "Авто", light: "Светлая", dark: "Тёмная" },
   langLabel: "Язык: русский. Переключить на English",
+  langGroup: "Язык",
   close: "Закрыть",
+  hideAnn: "Скрыть объявление",
+  copied: "Ссылка скопирована",
+  copiedShort: "Скопировано",
   platforms: { ios: "iPhone", android: "Android", windows: "Windows", macos: "Mac", linux: "Linux", other: "Другое" },
 };
+
+export type Dict = typeof ru;
 
 const en: Dict = {
   hi: (n) => `Hi, ${n}`,
   hiAnon: "Hi",
-  traffic: "Traffic",
-  leftL: "LEFT",
-  termL: "TERM",
-  trafficL: "TRAFFIC",
-  resets: (d) => `resets on ${d}`,
+  statusAria: "Subscription",
+  leftL: "Left",
+  termL: "Term",
+  trafficL: "Traffic",
+  resets: (d) => `resets ${d}`,
   unlimited: "unlimited",
   noExpiry: "no expiry",
   of: (n) => `of ${n}`,
   until: (d) => `until ${d}`,
-  chip: { active: "Active", expired: "Ended", limited: "Traffic used up", disabled: "Disabled" },
-  chipLong: {
-    active: "Subscription active",
-    expired: "Subscription ended",
-    limited: "Traffic used up",
-    disabled: "Subscription disabled",
-  },
+  barAria: (used, of) => `Used ${used} ${of}`,
+  chip: { active: "Active", soon: "Ends soon", expired: "Ended", limited: "Traffic used up", disabled: "Disabled" },
+  leftUntil: (rest, date) => `${rest} left until ${date}`,
+  leftOnly: (rest) => `${rest} left`,
+  soon: (days) => [`${days} ${days === 1 ? "day" : "days"} left`, "message us to renew"],
   txt: {
-    expired: (b) => [`Internet via ${b} is off right now.`, "Message us to renew."],
-    limitedReset: (d, p) => [`The traffic ${enPeriod[p]} is used up — the VPN is off until ${d}.`.replace("  ", " "), "Need it sooner — message us."],
-    limited: () => ["The traffic limit is used up.", "Message us to raise it."],
-    disabled: () => ["The admin paused access.", "If that’s a mistake — message us."],
+    expiredOn: (d) => `The subscription ended on ${d}.`,
+    expired: (b) => ({ body: `Internet via ${b} is off right now.`, call: "Message us to renew." }),
+    limitedReset: (d, p) => ({ body: `The traffic ${enPeriod[p]} is used up — the VPN is off until ${d}.`.replace("  ", " "), call: "Need it sooner — message us." }),
+    limited: () => ({ body: "The traffic limit is used up.", call: "Message us to raise it." }),
+    disabled: () => ({ body: "The admin paused access.", call: "If that’s a mistake — message us." }),
   },
-  recommended: "recommended",
-  noApps: "The server is still being set up — message the admin.",
-  pickDev: "What you’ll use it on",
+  sameInApp: "The app shows you the same message",
+  appGot: "The app fetched the subscription",
+  connectT: "Connect the VPN",
+  connectH: "Do this on the device where you need the VPN",
+  connectAria: "Connect",
+  moreT: "Connect another device",
+  moreS: "Device, app — and one tap",
+  moreSQr: "Device, app — and one tap. Or open this page on a phone with the QR code",
   yourDevice: "Your device",
-  twoWays: "Either of the two ways will do — or both at once.",
-  linkT: (a) => (a ? `Subscription — ${a}` : "Subscription"),
+  pickDev: "What you’ll use it on",
+  detected: "Detected from your browser — if that’s wrong, pick yours",
+  detectedShort: "Detected from your browser",
+  notYours: (phone, name) => [phone ? "Not your phone?" : "Not your computer?", `Back to ${name}`],
+  appT: "App",
+  appAria: "App",
+  anyWay: "Either way will do — or both at once",
+  otherApps: "Other apps",
+  recommended: "Recommended",
+  wayLink: "by subscription link",
+  wayKey: (app) => `${app} key`,
   linkD: "One personal link with all your servers — it updates itself",
-  keyT: (a) => `${a} key`,
   keyD: "A separate key for each phone and computer",
+  noAppsT: (p) => `No apps for ${p} yet`,
+  noAppsD: "Copy the link — it works in any app that takes subscriptions — or pick another device.",
+  noApps: "The server is still being set up — message the admin.",
+  howT: "How to connect",
   stepInstall: (a) => `Install ${a}`,
-  stepAddSub: "Add the subscription",
-  stepAddDev: "Add the device — it gets its own key",
-  stepAskKey: "Ask for a key",
   download: "Download",
   store: { appStore: "App Store", play: "Google Play", site: "website" },
-  addTo: (a) => `Add to ${a}`,
-  noOpen: "Won’t open? Copy the link",
-  pasteHow: (a) => `In ${a}: “+” → “Paste from clipboard”`,
-  copyHow: (a) => `In ${a}: add a subscription → paste the link`,
-  allServers: (a, n) => `All your servers (${n}) appear in ${a} — pick any`,
-  otherApps: "Other apps",
-  noAppHere: (p) => `There’s no app for ${p} — pick another device above.`,
+  stepAddSub: "Add the subscription",
+  addHint: (a) => `${a} opens with your subscription already in it`,
+  addOne: "Add with one tap",
+  noOpenQ: "Won’t open?",
+  copyShort: "Copy",
   copyLink: "Copy link",
-  copied: "Link copied ✓",
-  copiedShort: "Copied",
-  qrOther: "Connect another device (QR code)",
-  qrPhoneT: "Connect a phone",
-  qrHow: (a) => (a ? `Point the phone’s camera at it — this page opens. Or in ${a}: “+” → “Scan QR”` : "Point the phone’s camera at it — this page opens."),
-  viaLink: "Connected with the subscription",
-  serverLoadTitle: "Channel utilization",
-  serverLoadIntro: "How busy each server’s channel is right now. Only servers with a known capacity are shown.",
-  serverLoadBusy: "High channel utilization",
-  serverLoadTry: (busy, other) => `The ${busy} server’s channel is very busy. If your connection is slow, try ${other}.`,
-  serverLoadLevel: { low: "Low", medium: "Medium", high: "High" },
+  pasteHow: (a) => `Paste the link in ${a}: “+” → “Paste from clipboard”`,
+  copyPasteT: "Copy the link and paste it into the app",
+  copyHow: (a) => `In ${a}: add a subscription → paste the link`,
+  stepVpn: (a) => `Turn the VPN on in ${a}`,
+  stepVpnPlain: "Turn the VPN on",
+  allServers: (n) => `All your servers (${n}) are already there — pick any`,
+  stepAddDevT: "Add this device",
+  stepAddDevS: "It gets a key of its own",
+  stepKeyT: (a) => `Paste the key into ${a}`,
+  stepKeyPhone: (a) => `Copy the key → ${a} → “+” → paste → “Continue”`,
+  stepKeyDesktop: (a) => `Download the file → ${a} → “+” → “Connection settings file”`,
+  doneT: "Done",
+  doneD: (when) => `— the app fetched the subscription ${when}. Turn the VPN on and pick any server.`,
+  showSteps: "Show the steps",
+  qrOtherT: "Connect another device",
+  qrOtherS: "The QR code opens this page on it",
+  qrPhoneT: "Open on your phone",
+  qrHow: (a) => `Point the camera at it — this page opens. Or in ${a || "a link app"}: “+” → “Scan QR”`,
+  qrAlt: "QR code with the link to this page",
+  serversT: "Servers",
+  serversS: "All your servers are already in the app — switch between them there",
+  loadK: "Load",
+  loadLevel: { low: "low", medium: "medium", high: "high" },
+  up: "working",
+  down: "not responding",
+  downS: "Pick another server in the app",
+  chipLink: "link",
+  chipKey: "key",
+  chipExit: "spare exit",
+  exitHint: "The spare exit is for when some site won’t open",
+  inApp: "In the app",
+  flagOf: (c) => `Flag: ${c}`,
+  busyTry: (busy, other) => `The ${busy} server is very busy. If your connection is slow, try ${other}.`,
+  busyAll: (busy) => `The ${busy} server is very busy. If your connection is slow, try again later.`,
+  dnsK: "DNS",
+  dnsChange: "Change",
+  dnsLinkNote: (name, app) => `In apps that use the link there is one DNS for all servers for now — ${name}. The choice below applies to ${app} keys.`,
+  dnsT: "DNS for the server",
+  dnsIntro: "DNS decides which sites open and how. The choice applies to this server only.",
+  dnsDefault: (name) => `Default — ${name}`,
+  dnsDefaultPlain: "Default",
+  dnsNow: "now",
+  dnsApply: "Apply",
+  dnsKeys: (names, auto) =>
+    `${names.length === 1 ? `The key “${names[0]}”` : `The keys ${names.map((n) => `“${n}”`).join(", ")}`} hold the DNS inside — after a change, get ${names.length === 1 ? "the key" : "the keys"} again.${auto ? " Apps that use the link update by themselves." : ""}`,
+  dnsDoneLink: (h) => ["Done.", `Apps that use the link get the new DNS when they update the subscription (within ${h} h). To get it now, update the subscription in the app.`],
+  dnsDoneSaved: () => ["Done.", "DNS saved — new keys on this server get it."],
+  dnsRefreshT: (n) => `Refresh the keys on ${n} ${n === 1 ? "device" : "devices"}`,
+  dnsRefreshD: (app) => `The new DNS is written inside the key. The key stays the same — just add it to ${app} once more.`,
+  dnsRefresh: "Refresh",
+  dnsAuto: "Apps that use the link get the new DNS by themselves",
+  dnsRetry: "Retry",
+  dnsSaving: "One moment…",
+  dnsErr: (c, m) =>
+    (
+      {
+        dns_disabled: "The admin turned the DNS choice off.",
+        not_allowed: "That DNS option is no longer available — pick another.",
+        too_many_requests: m > 0 ? `Too many changes in a row. Try again in ${m} min.` : "Too many changes in a row. Try again later.",
+        user_inactive: "The subscription isn’t active — DNS can’t be changed.",
+        not_found: "That server is gone. Refresh the page.",
+        network: "No connection. Check the internet and try again.",
+        locked: "A password is needed. Refresh the page.",
+      } as Record<string, string>
+    )[c] ?? "That didn’t work. Try again.",
+  devicesT: "My devices",
+  devicesAria: "My devices",
+  slots: (a, b) => `${a} of ${b}`,
+  slotsAria: (a, b) => `${a} of ${b} used`,
+  slotsWord: (a, b) => `${a} of ${b} used`,
   linkApps: "Apps on the link",
   linkAppsNote: "All devices on this link take one slot",
   fetched: (w) => `updated ${w}`,
-  devApp: (a) => `${a} device`,
-  yourKeys: "Your keys",
-  keysNone: "None yet — add your first device.",
-  used: (a, b) => `${a} of ${b} used`,
-  limit: (a, b, rm) =>
-    rm ? `${a} of ${b} used. Remove a device you no longer use (the “Remove” button in the list below), or message us — we’ll add a slot.` : `${a} of ${b} used. Message us — we’ll add a slot.`,
+  linkNever: "not connected yet",
+  devApp: (app) => `${app} device`,
+  keysT: (app) => `${app} keys`,
+  keysNone: "None yet. A key is issued for each device separately",
+  freeSlots: (n) => (n === 1 ? "One more slot is free" : `${n} more slots are free`),
+  keysOne: "A key is issued for each device separately",
+  devOff: "The subscription isn’t active — no keys are issued. You can still remove or rename a device.",
+  devOffDisabled: "The subscription is disabled — no keys are issued. You can still remove or rename a device.",
+  whyOff: "The subscription isn’t active",
+  limit: (a, b, support) => `${a} of ${b} used. Remove a device you no longer use${support ? ", or message us — we’ll add a slot." : "."}`,
   keysByAdmin: "Keys come from the admin — message us if you need a new one.",
+  keysByAdminT: "Ask for a key",
+  keysByAdminD: (app) => `${app} keys are issued by the owner — message us and say which device it’s for.`,
   noProfile: "The server is still being set up — message the admin.",
-  lockT: "Enter the password",
-  lockH: "It came with your link. We ask once — this browser remembers it.",
-  lockLabel: "Password",
-  lockGo: "Open",
-  lockBusy: "Checking…",
-  lockWrong: (n) => (n > 0 ? `That password didn’t match. Tries left: ${n}.` : "That password didn’t match."),
-  lockLater: (m) => (m > 0 ? `Too many tries. Try again in ${m} min.` : "Too many tries. Try again later."),
-  lockNet: "No connection. Check the internet and try again.",
-  lockFail: "That didn’t work. Try again.",
-  lockLatin: "The password is in Latin letters — switch the keyboard to English (the 🌐 key).",
-  lockShort: (n) => `The password has 8 characters, you typed ${n}.`,
-  lockNone: "No password? Ask the person who sent you the link.",
+  noProfileT: "Keys aren’t available yet",
+  showKey: "Show key",
+  hideKey: "Hide key",
+  rename: "Rename",
+  rotateKey: "Replace key",
+  removeKey: "Remove",
+  moreAria: (rotate) => `More: ${rotate ? "rename, replace key, remove" : "rename, remove"}`,
+  moreShort: "More",
+  renameT: "Device name",
+  renameH: (p) => (p ? `Up to 40 characters · ${p}` : "Up to 40 characters"),
+  save: "Save",
+  removeT: (n) => `Remove “${n}”?`,
+  removeD: "The VPN on it stops working at once.",
+  rotateT: (n) => `Replace the key of “${n}”?`,
+  rotateD: (a) => `The old one stops working at once — you’ll add the new one to ${a} again.`,
+  removeYes: "Remove",
+  rotateYes: "Replace",
+  awgStale: "new key needed",
+  awgHandshake: (w) => `connected ${w}`,
+  awgNever: "not connected yet",
+  online: "online",
+  devGeneric: "Device",
+  staleT: (n) => `New key needed for “${n}”`,
+  staleTs: "New keys needed",
+  staleD: "The servers were updated — this device’s old key no longer works.",
+  staleDns: "A server’s DNS changed — get the key again. The key itself stays the same.",
+  staleSteps: (a) => ["Press “Get a new key”", `Add it to ${a} like the first time`, "Delete this device’s old connection — it no longer works"],
+  newKey: "Get a new key",
+  newKeyFor: (n) => `New key for “${n}”`,
   awgAdd: "Add a device",
-  awgAddT: "New device",
-  awgAddH: "Each phone and computer needs its own key. It appears right after you create the device.",
-  awgReadyT: (n) => `Key for “${n}”`,
-  awgReadyH: "Set the device up now. If you close this window the device stays in your list and the key can be shown again.",
-  renewT: (n) => `New key for “${n}”`,
-  renewH: (a) => `Add this key to ${a} like the first time.`,
-  renewOld: (a) => `Delete this device’s old connection in ${a} — it no longer works.`,
-  awgDone: "Done",
-  profile: "Connection option",
-  profileMain: "Main",
-  profileOld: (a) => `For old ${a} versions (before 5.0.1.5)`,
-  profileWarp: "Spare exit (if some site won’t open)",
+  newDevT: "New device",
+  newDevS: (app) => `It gets a ${app} key of its own`,
   awgPlatform: "What kind of device",
-  awgName: "Name (optional)",
+  awgName: "Name",
+  optional: "optional",
   awgNamePh: {
-    ios: "e.g. Mum's phone",
+    ios: "e.g. Mum’s phone",
     android: "e.g. work phone",
     windows: "e.g. home PC",
     macos: "e.g. MacBook Air",
     linux: "e.g. laptop",
     other: "e.g. tablet",
   },
-  awgCreate: "Create",
+  profile: "Connection option",
+  profileMain: "Main",
+  profileOld: (a) => `For old ${a} versions (before 5.0.1.5)`,
+  profileWarp: "Spare exit (if some site won’t open)",
+  profileSub: { main: "The usual one — fits almost always", warp: "For when some site won’t open", old: "Only for old versions of the app" },
+  awgCreate: "Create key",
   awgCancel: "Cancel",
   awgBusy: "One moment…",
-  showKey: "Show key",
-  hideKey: "Hide key",
-  rotateKey: "Replace key",
-  removeKey: "Remove",
-  removeQ: (n) => `Remove “${n}”? The VPN on it stops working at once.`,
-  rotateQ: (n, a) => `Replace the key of “${n}”? The old one stops working at once — you’ll add the new one to ${a} again.`,
-  removeYes: "Remove",
-  rotateYes: "Replace",
-  awgStale: "new key needed",
-  awgHandshake: (w) => `connected ${w}`,
-  awgNever: "not connected yet",
+  keyFor: (n) => `Key for “${n}”`,
+  keyAgain: "The device is already in the list — the key can be shown again",
+  awgReadyH: "Set the device up now. If you close this window the device stays in your list and the key can be shown again.",
+  renewT: (n) => `New key for “${n}”`,
+  renewS: "The old key no longer works",
+  renewSteps: (app, old) => [
+    `In ${app} tap “+”, paste the key and “Continue”`,
+    old ? `Delete the old connection “${old}” — it no longer connects` : "Delete this device’s old connection — it no longer connects",
+  ],
+  awgDone: "Done",
+  where: "Where to add it",
+  whereThisPhone: "This phone",
+  whereOther: "Another device",
+  whereThisPc: "This computer",
+  wherePhone: "Phone",
+  whereOtherPc: "Another computer",
   country: "Country",
-  countryH: "Each country is a separate connection. Add one; if it stops working, add another.",  copyKey: "Copy key",
-  keyCopied: "Key copied ✓",
+  moreCountries: (n) => `${n} more`,
+  countryH: "Each country is a separate connection. Add one; if it stops working, add another.",
+  copyKey: "Copy key",
+  keyCopied: "Key copied",
   downloadFile: "Download file",
+  stepsAria: (a) => `Next in ${a}`,
   phoneSteps: (a) => [`Open ${a}`, "Tap “+” and paste the key", "Tap “Continue”"],
-  desktopSteps: (a) => `${a} → “+” → “Connection settings file” → pick the downloaded file`,
-  desktopFileOnly: (a) => `On a computer, add the file to ${a}, not the key: with the key the connection may not work.`,
-  qrOtherDev: "QR code for another device",
+  desktopSteps: (a) => `Then: ${a} → “+” → “Connection settings file”`,
+  desktopFileOnly: "On a computer, add the file, not the key — otherwise the connection may not work.",
   qrScan: (a) => `Scan it in ${a}`,
-  qrHowKey: (a) => `In ${a}: “+” → “QR code”`,
-  openThere: "Easiest: open this page on that computer and press “Show key” there.",
+  qrScanHow: "“+” → “QR code”, then point the phone’s camera at the code",
+  qrKeyAlt: (a) => `QR code of the key for ${a}`,
+  qrShow: "Show the QR code for another device",
+  orElse: "Or move it another way",
+  orFile: "Or move the file yourself",
+  openThereT: "Open this page on that computer",
+  openThereD: "Easiest: on that computer open your link and press “Show key” on this device — the file downloads right there.",
   qrTooBig: "The key is too long for a QR code. Download the file or copy the key.",
   needApp: (l) => `Needs ${l.map((m, i) => `${m.app} ${m.min} ${i === 0 ? "or newer" : "and newer"}`).join(" — or ")}`,
   awgSecret: "The key holds this device’s private data — don’t share it.",
+  writeInTg: "Message on Telegram",
+  fullT: "All slots are used.",
+  fullD: "Remove a device you no longer use, or message us — we’ll add a slot.",
   err: (c, m) =>
     (
       {
@@ -485,23 +569,32 @@ const en: Dict = {
         locked: "A password is needed. Refresh the page.",
       } as Record<string, string>
     )[c] ?? "That didn’t work. Try again.",
-  staleT: (n) => `New key needed for “${n}”`,
-  staleTs: "New keys needed",
-  staleD: "The servers were updated and the old connection stopped working. Takes a minute:",
-  staleSteps: (a) => ["Press “Get a new key”.", `Add it to ${a} like the first time.`, "Delete this device’s old connection — it no longer works."],
-  newKey: "Get a new key",
-  newKeyFor: (n) => `New key for “${n}”`,
-  devGeneric: "Device",
-  online: "online",
-  help: "Something not working?",
+  lockT: "Enter the password",
+  lockH: "It came with your link. We ask once — this browser remembers it.",
+  lockLabel: "Password",
+  lockGo: "Open",
+  lockBusy: "Checking…",
+  lockWrong: (n) => (n > 0 ? `That password didn’t match. Tries left: ${n}.` : "That password didn’t match."),
+  lockLater: (m) => (m > 0 ? `Too many tries. Try again in ${m} min.` : "Too many tries. Try again later."),
+  lockNet: "No connection. Check the internet and try again.",
+  lockFail: "That didn’t work. Try again.",
+  lockLatin: "The password is in Latin letters — switch the keyboard to English (the 🌐 key).",
+  lockShort: (n) => `The password has 8 characters, you typed ${n}.`,
+  lockNone: "No password? Ask the person who sent you the link.",
+  helpT: "Something not working?",
   helpTg: "We reply in Telegram",
   helpAny: "We can help",
   write: "Message",
   writeSupport: "Message support",
-  writeWeb: (tg) => (tg ? "Message on Telegram →" : "Message support →"),
   privacy: "This link is personal — don’t share it. Works while the subscription is active.",
+  themeL: "Theme",
+  theme: { auto: "Auto", light: "Light", dark: "Dark" },
   langLabel: "Language: English. Switch to Russian",
+  langGroup: "Language",
   close: "Close",
+  hideAnn: "Hide the announcement",
+  copied: "Link copied",
+  copiedShort: "Copied",
   platforms: { ios: "iPhone", android: "Android", windows: "Windows", macos: "Mac", linux: "Linux", other: "Other" },
 };
 

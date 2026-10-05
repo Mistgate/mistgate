@@ -1,5 +1,5 @@
-import { awgConfig, awgDevice } from "./logic";
-import type { AwgConfig, AwgDevice } from "./types";
+import { awgConfig, awgDevice, serverEntry } from "./logic";
+import type { AwgConfig, AwgDevice, ServerEntry } from "./types";
 
 // The self-service calls of the Amnezia section (subs/devices.go): POST, JSON in and out, under the subscription link.
 // The page only ever talks to its own origin (CSP connect-src 'self'): the address in the page data is reduced to its
@@ -74,4 +74,14 @@ export const getConfigs = async (endpoints: string, id: string) => answer(await 
 export const rotateKey = async (endpoints: string, id: string) => answer(await post(endpoints, `/${encodeURIComponent(id)}/rotate`, {}));
 export const revokeDevice = async (endpoints: string, id: string) => {
   await post(endpoints, `/${encodeURIComponent(id)}/revoke`, {});
+};
+export const renameDevice = async (endpoints: string, id: string, label: string) => answer(await post(endpoints, `/${encodeURIComponent(id)}/rename`, { label }));
+
+/** What the DNS call answers: the server as it is now, and the key devices that need a key with the new DNS. */
+export type DnsAnswer = { server: ServerEntry | undefined; stale_devices: string[] };
+
+/** `endpoint` is the page's ".../dns" address; `preset` "" brings back the server's default. */
+export const setDns = async (url: string, body: { server: string; preset: string }): Promise<DnsAnswer> => {
+  const j = await post(url, "", body);
+  return { server: j.server && typeof j.server === "object" ? serverEntry(j.server) : undefined, stale_devices: Array.isArray(j.stale_devices) ? j.stale_devices.filter((x): x is string => typeof x === "string") : [] };
 };

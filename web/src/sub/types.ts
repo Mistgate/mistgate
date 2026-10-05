@@ -1,10 +1,11 @@
 // The page data the server embeds as <script type="application/json" id="mg-data">.
-// data.ts reads it defensively: a field the server forgot must not blank the page.
+// logic.ts reads it defensively: a field the server forgot must not blank the page.
 
 export type Lang = "ru" | "en";
 export type Platform = "ios" | "android" | "windows" | "macos" | "linux";
 export type Kind = "happ" | "amnezia";
 export type Status = "active" | "expired" | "limited" | "disabled";
+export type Theme = "auto" | "light" | "dark";
 
 /** One app of the settings. Several may share a platform and a kind; the page lists them in the settings' order. */
 export type AppEntry = { platform: Platform; kind: Kind; name: string; download_url: string; add_url: string; description: string; recommended: boolean };
@@ -22,6 +23,40 @@ export type Device = {
 export type LoadLevel = "low" | "medium" | "high";
 export type ServerLoad = { name: string; level: LoadLevel };
 
+/** One way a server is reachable: the subscription link (as an app names it) or a key (an AmneziaWG profile), direct or by the spare exit. */
+export type ServerConn = { way: "link" | "key"; exit: "direct" | "warp"; app_name: string; profile_id: string };
+/** The DNS choice of one server: what the person picked ("" = nothing), what applies, what the owner allows. */
+export type ServerDns = {
+  choice: string;
+  effective: string;
+  options: string[];
+  /** The owner's default for the server, when the page data says it ("" = not told). */
+  default: string;
+  /** Key devices on this server that still need a key with the new DNS. */
+  keys_to_refresh: string[];
+};
+/** A server of the person, as the page may name it: never the panel's node name. `id` is only what the DNS call needs. */
+export type ServerEntry = {
+  id: string;
+  country_code: string;
+  place: string;
+  label: string;
+  app_names: string[];
+  connections: ServerConn[];
+  online: boolean;
+  load: LoadLevel | null;
+  dns: ServerDns | null;
+};
+export type DnsPreset = { id: string; name: string; description: string; category: string };
+export type DnsInfo = {
+  enabled: boolean;
+  /** Where the choice is posted ("" in the admin's preview and when the choice is off). */
+  endpoint: string;
+  refresh_hours: number;
+  /** `per_server` false: the apps that use the link have one DNS for all servers; `effective` is that preset. */
+  link: { per_server: boolean; effective: string };
+};
+
 /**
  * Amnezia part of the page (subs/devices.go pageAmnezia): the user's AmneziaWG devices and what
  * "add a device" can pick from. There is no key material in it: configs are asked for, one device at a time
@@ -38,7 +73,9 @@ export type AwgDevice = {
   address: string;
   last_handshake_unix: number;
   online: boolean;
-  stale: boolean; // the profile changed: fetch the config again and re-import it
+  stale: boolean; // fetch the config again and re-import it
+  /** Why: the profile changed, or the DNS of one of its servers did (the key itself stays the same). */
+  stale_reason: "profile" | "dns";
   min_clients: MinClient[];
 };
 /** An AmneziaWG profile a device can be added on; the page names it by its countries and exit, never by `name`. */
@@ -53,8 +90,8 @@ export type AmneziaData = {
 /** One config of a device on one node, as the endpoints answer. */
 export type AwgConfig = {
   node_id: string;
-  /** The server's public name ("Germany 2", "Server"), never the panel's node name. */
-  server: string;
+  /** The server as the page names it ("Germany · Frankfurt", "Server"), never the panel's node name. It is also what the connection is called in the app. */
+  label: string;
   country_code: string;
   version: string;
   conf: string;
@@ -73,8 +110,13 @@ export type MgData = {
   subscription_url: string;
   /** Servers the link gives Happ ("all your servers (3) appear in Happ"); 0 when unknown. */
   server_count: number;
-  /** Nodes with a set capacity and a fresh sample, in subscription order: the level only. */
+  /** Nodes with a set capacity and a fresh sample, in subscription order: the level only. The old way to list servers. */
   server_loads: ServerLoad[];
+  /** Every server of the person, in subscription order. Empty on an older panel: the cards then come from `server_loads`. */
+  servers: ServerEntry[];
+  /** The DNS choice; null on an older panel (no DNS part on the page at all). */
+  dns: DnsInfo | null;
+  dns_presets: DnsPreset[];
   user: {
     name: string;
     status: Status;

@@ -1,6 +1,8 @@
 import type { Api } from "./amz-actions";
-import { ApiError, type Answer } from "./api";
-import { awgConfig, awgDevice } from "./logic";
+import { ApiError, type Answer, type DnsAnswer } from "./api";
+import type { DnsApi } from "./dns-actions";
+import { awgConfig, awgDevice, serverEntry } from "./logic";
+import type { ServerEntry } from "./types";
 
 // DEV SERVER ONLY (main.ts reaches this through `import.meta.env.DEV`, a build drops it): answers the self-service calls
 // of the sample cases ("dev:" endpoints) with made-up data, so the Amnezia section can be worked on without a panel.
@@ -47,7 +49,7 @@ PersistentKeepalive = 25
 const cfg = (node: string, cc: string, stale = false) =>
   awgConfig({
     node_id: `nod_${node}`,
-    server: new Intl.DisplayNames(["en"], { type: "region" }).of(cc) ?? cc,
+    label: new Intl.DisplayNames(["ru"], { type: "region" }).of(cc) ?? cc,
     country_code: cc,
     version: "3.1",
     conf: conf(node),
@@ -71,7 +73,29 @@ export async function devUnlock(_url: string, password: string): Promise<void> {
   throw new ApiError(401, "wrong_password", 0, 3 - wrong);
 }
 
-export const devApi: Api = {
+// the page's own data, to answer a DNS choice with the server as it would be afterwards
+const pageServers = (): ServerEntry[] => {
+  try {
+    const raw = JSON.parse(document.getElementById("mg-data")?.textContent ?? "{}") as { servers?: unknown };
+    return Array.isArray(raw.servers) ? raw.servers.map(serverEntry) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const devApi: Api & DnsApi = {
+  async renameDevice(_e, id, label): Promise<Answer> {
+    await pause();
+    return { device: awgDevice({ id, label, platform: "android", profile_id: "p31", version: "3.1" }), configs: [] };
+  },
+  async setDns(_e, body): Promise<DnsAnswer> {
+    await pause();
+    const srv = pageServers().find((x) => x.id === body.server);
+    if (!srv?.dns) throw new ApiError(404, "not_found");
+    if (body.preset && !srv.dns.options.includes(body.preset)) throw new ApiError(409, "not_allowed");
+    const stale = srv.connections.some((c) => c.way === "key") ? ["d3"] : [];
+    return { server: { ...srv, dns: { ...srv.dns, choice: body.preset, effective: body.preset || srv.dns.options[0] || srv.dns.effective, keys_to_refresh: stale } }, stale_devices: stale };
+  },
   async addDevice(_e, body): Promise<Answer> {
     await pause();
     n += 1;

@@ -1,10 +1,10 @@
-import type { AmzActions, AmzState } from "./amnezia";
 import { ApiError, type Answer } from "./api";
 import { dict } from "./i18n";
 import { defaultLabel, mainProfile } from "./logic";
+import type { AmzActions, AmzState } from "./state";
 import type { AwgDevice, Lang, MgData } from "./types";
 
-// What the buttons of the AmneziaVPN way do: call the panel, then change the page's own copy of the data (the device
+// What the buttons of the key devices do: call the panel, then change the page's own copy of the data (the device
 // list, the count) and the section's state, and draw again. The calls are injected so a test can use a fake.
 
 export type Api = {
@@ -12,6 +12,7 @@ export type Api = {
   getConfigs(endpoints: string, id: string): Promise<Answer>;
   rotateKey(endpoints: string, id: string): Promise<Answer>;
   revokeDevice(endpoints: string, id: string): Promise<void>;
+  renameDevice(endpoints: string, id: string, label: string): Promise<Answer>;
 };
 
 type Deps = {
@@ -21,16 +22,20 @@ type Deps = {
   api: Api;
   /** Scrolls the element with this id into view (after a draw). */
   reveal: (id: string) => void;
-  /** Puts the keyboard on the control with this data-k (after a draw). */
+  /** Puts the keyboard on the control with this data-k (after a draw); "a|b" tries each, the first one that is on screen wins. */
   focus?: (key: string) => void;
   /** The server wants the page password (the cookie is gone or the link was renewed): the page reloads into the lock. */
   locked?: () => void;
+  /** A key was fetched or a device added: this device has set something up (the "returning visitor" mark). */
+  marked?: () => void;
 };
 
-export function amzActions({ data, st, render, api, reveal, focus, locked }: Deps): AmzActions {
+export function amzActions({ data, st, render, api, reveal, focus, locked, marked }: Deps): AmzActions {
   const am = () => st.amz;
   const endpoints = () => data.amnezia?.endpoints ?? "";
   const find = (id: string) => data.amnezia?.devices.find((x) => x.id === id);
+  /** The control that opened a row's question or editor, on a phone and on a computer. */
+  const back = (id: string) => `amz-more-${id}|amz-rend-${id}|amz-deld-${id}`;
 
   const fail = (busy: string, e: unknown) => {
     if (e instanceof ApiError && e.code === "locked") return locked?.();
@@ -72,16 +77,27 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
     const x = find(id);
     if (x) x.stale = false;
     merge(id, r.device && { ...r.device, stale: false });
+    marked?.();
   };
 
+  function cancelRename() {
+    const r = am().rename;
+    am().rename = null;
+    am().error = "";
+    am().errorAt = "";
+    render();
+    if (r) focus?.(back(r.id));
+  }
+
   return {
-    // the dialog: it shows the form, after "Create" the new device's key, or the new key of a stale device; closing it
-    // leaves the device in the list and scrolls to it
+    // the dialog: it shows the form, after "Create" the new device's key, a device's key, or the new key of a stale device;
+    // closing it leaves the device in the list and scrolls to it
     add(open) {
-      const was = am().created ?? am().renew;
+      const was = am().created ?? am().renew ?? am().open;
       am().adding = open;
       am().created = null;
       am().renew = null;
+      am().open = null;
       am().error = "";
       am().errorAt = "";
       const profiles = data.amnezia?.profiles ?? [];
@@ -89,8 +105,9 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
       render();
       if (!open && was) reveal(`amz-row-${was}`);
     },
-    form(patch) {
-      Object.assign(am().form, patch); // no draw: it would drop what is being typed
+    form(patch, draw = false) {
+      Object.assign(am().form, patch); // no draw unless asked: it would drop what is being typed
+      if (draw) render();
     },
     create() {
       const f = am().form;
@@ -107,6 +124,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
           am().configs[r.device.id] = r.configs;
           am().created = r.device.id; // the dialog turns into the key of this device
           f.label = "";
+          marked?.();
         },
       );
     },
@@ -114,10 +132,13 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
       am().error = "";
       am().errorAt = "";
       am().confirm = null;
-      am().open = id;
-      if (id === null || am().configs[id]) return render();
-      void run(id, () => api.getConfigs(endpoints(), id), (r) => received(id, r)).then(() => {
-        if (!am().configs[id]) am().open = null; // the call failed: nothing to show
+      am().menu = null;
+      if (id === null || am().configs[id]) {
+        am().open = id;
+        return render();
+      }
+      void run(id, () => api.getConfigs(endpoints(), id), (r) => received(id, r)).then((ok) => {
+        if (ok) am().open = id; // the call failed: nothing to show
         render();
       });
     },
@@ -134,13 +155,19 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
       am().node[id] = i;
       render();
     },
+    where(id, w) {
+      am().where[id] = w;
+      render();
+    },
     ask(c) {
       const was = am().confirm;
       am().confirm = c;
+      am().menu = null;
+      am().rename = null;
       render();
-      // the question takes the keyboard to its safe answer; cancelling gives it back to the button that asked
+      // the question takes the keyboard to its safe answer; cancelling gives it back to the control that asked
       if (c) focus?.(`amz-no-${c.id}`);
-      else if (was) focus?.(`amz-${was.kind === "remove" ? "del" : "rot"}-${was.id}`);
+      else if (was) focus?.(back(was.id));
     },
     rotate(id) {
       void run(
@@ -168,6 +195,43 @@ export function amzActions({ data, st, render, api, reveal, focus, locked }: Dep
           if (am().open === id) am().open = null;
         },
       );
+    },
+    menu(id) {
+      am().menu = id;
+      render();
+      if (id) focus?.(`amz-m-ren-${id}`);
+    },
+    renameStart(id) {
+      const x = find(id);
+      if (!x) return;
+      am().menu = null;
+      am().confirm = null;
+      am().error = "";
+      am().errorAt = "";
+      am().rename = { id, value: x.label };
+      render();
+      focus?.(`amz-ren-${id}`);
+    },
+    renameInput(value) {
+      const r = am().rename;
+      if (r) r.value = value; // no draw: it would drop the cursor
+    },
+    renameCancel: cancelRename,
+    renameSave() {
+      const r = am().rename;
+      if (!r) return;
+      const value = r.value.trim();
+      const x = find(r.id);
+      if (!value || !x || value === x.label) return cancelRename();
+      void run(
+        `rename:${r.id}`,
+        () => api.renameDevice(endpoints(), r.id, value),
+        (ans) => {
+          if (ans.device) merge(r.id, { ...ans.device, stale: x.stale, stale_reason: x.stale_reason, min_clients: x.min_clients.length ? x.min_clients : ans.device.min_clients });
+          else x.label = value;
+          am().rename = null;
+        },
+      ).then((ok) => ok && focus?.(back(r.id)));
     },
   };
 }

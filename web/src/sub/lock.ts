@@ -3,6 +3,7 @@ import { dict } from "./i18n";
 import { icon } from "./icons";
 import { logoMark } from "./mark";
 import { ApiError } from "./api";
+import { note as noteBox } from "./ui";
 import { pageHeader } from "./view";
 import type { Lang, MgData } from "./types";
 
@@ -39,10 +40,10 @@ export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
   const mark = h("span", { class: "lock-mark" }, logoMark(d, 72, !introPlayed), h("span", { class: "lock-ico" }, icon("lock")));
   introPlayed = true;
   // never disabled: a button that does nothing and says nothing is the dead end this form must not have
-  const go = h("button", { class: "btn pri", type: "submit", "data-k": "pw-go", disabled: s.busy }, s.busy ? t.lockBusy : t.lockGo);
+  const go = h("button", { class: `btn pri${s.busy ? " busy" : ""}`, type: "submit", "data-k": "pw-go", disabled: s.busy }, s.busy ? t.lockBusy : t.lockGo);
   const note = h("p", { class: "pw-note", id: "pw-note", role: "status" }, s.note);
   const input = h("input", {
-    class: "inp pw mono",
+    class: `inp pw${s.error ? " err" : ""}`,
     id: "pw",
     "data-k": "pw",
     "data-autofocus": "",
@@ -78,10 +79,9 @@ export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
     pageHeader(d, s.lang, a.lang),
     h(
       "section",
-      { class: "card lock" },
+      { class: "card lock", "aria-labelledby": "pw-t" },
       mark,
-      h("b", { class: "ct" }, t.lockT),
-      h("p", { class: "mut" }, t.lockH),
+      h("div", { class: "lock-head" }, h("h1", { class: "h1 ct", id: "pw-t" }, t.lockT), h("p", { class: "txt mut" }, t.lockH)),
       h(
         "form",
         {
@@ -93,12 +93,10 @@ export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
             },
           },
         },
-        h("label", { class: "fld", for: "pw" }, h("span", { class: "eyebrow" }, t.lockLabel.toUpperCase()), input),
-        note,
-        s.error && h("p", { class: "err", id: "pw-err", role: "alert" }, s.error),
+        h("div", { class: "fld" }, h("label", { for: "pw" }, t.lockLabel), input, note, s.error && noteBox("bad", "warn", s.error, { id: "pw-err" })),
         go,
       ),
-      h("p", { class: "mut sm lock-none" }, t.lockNone),
+      h("p", { class: "hint lock-none" }, t.lockNone),
     ),
   );
 }
@@ -125,6 +123,7 @@ export function lockActions({ st, endpoint, unlock, render, reload, save }: Deps
       if (st.error) {
         st.error = "";
         document.getElementById("pw-err")?.remove();
+        document.getElementById("pw")?.classList.remove("err");
       }
     },
     async submit() {

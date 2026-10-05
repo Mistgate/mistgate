@@ -82,7 +82,7 @@ describe("the password form", () => {
 
   it("says where the password comes from, once per browser, and what to do without one", () => {
     const { root } = setup();
-    expect(root.querySelector(".lock > p.mut")?.textContent).toBe("Его прислали вместе со ссылкой. Спросим один раз — в этом браузере запомним.");
+    expect(root.querySelector(".lock-head p.mut")?.textContent).toBe("Его прислали вместе со ссылкой. Спросим один раз — в этом браузере запомним.");
     expect(root.querySelector(".lock-none")?.textContent).toBe("Нет пароля? Спросите у того, кто прислал ссылку.");
   });
 
@@ -140,7 +140,7 @@ describe("the password form", () => {
 
   it("the language switch works on the form too", () => {
     const { root, log } = setup();
-    root.querySelector<HTMLButtonElement>(".lang")!.click();
+    root.querySelector<HTMLButtonElement>("[data-k=lang-en]")!.click();
     expect(log).toEqual(["lang en"]);
     expect(root.querySelector(".ct")?.textContent).toBe("Enter the password");
   });
