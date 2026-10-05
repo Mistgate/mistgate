@@ -20,8 +20,11 @@ const modes = ["auto", "kernel", "userspace"] as const;
 export type AwgMode = (typeof modes)[number];
 export const asMode = (v: string): AwgMode => (v === "kernel" || v === "userspace" ? v : "auto");
 
-/** The command that loads the AmneziaWG kernel module on the node: what an agent that cannot do it by itself needs, and the fallback for the rest. */
-export const prepareKernelCommand = "mistgate-node awg prepare-kernel";
+/**
+ * The command that builds and loads the AmneziaWG kernel module on the node: what an agent that cannot do it by itself needs,
+ * and the fallback for the rest. Without --yes it would only print the plan (cmd/mistgate-node/awgprep_linux.go).
+ */
+export const prepareKernelCommand = "mistgate-node awg prepare-kernel --yes";
 
 /** What the node last reported as running AmneziaWG: the first AmneziaWG inbound that said anything. */
 export function awgRunning(inbounds: readonly Plain<Inbound>[]) {

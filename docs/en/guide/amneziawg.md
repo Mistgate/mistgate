@@ -132,7 +132,7 @@ The card follows the build: "Preparing the module… (running N min)", then **Mo
 journalctl -u mistgate-awg-prepare
 ```
 
-**By hand**, on the node as root. Without `--yes` the command only prints its plan:
+**By hand**, on the node as root. The card shows the command with `--yes`: for an agent too old to build the module by itself, and under **Do it by hand** for the rest. Without `--yes` the command only prints its plan:
 
 ```sh
 mistgate-node awg prepare-kernel          # print the plan, run nothing

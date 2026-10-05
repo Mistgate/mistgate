@@ -232,7 +232,7 @@ export const en = {
   "awg.backend.autoHint": "The kernel module when it is already loaded, else userspace. The node installs nothing.",
   "awg.backend.kernelHint": "Faster. Needs the module on the host; without it the AmneziaWG profiles of this node do not start.",
   "awg.backend.userspaceHint": "amneziawg-go inside the agent. Works anywhere with /dev/net/tun, a bit slower.",
-  "awg.backend.kernelPrepare": "Run this on the node as root to build and load the module. It installs packages, so the panel never does it for you.",
+  "awg.backend.kernelPrepare": "This node’s agent is too old to build the module by itself. Run this on the node as root: it installs packages, then builds and loads the module (without --yes it only prints the plan).",
   "awg.backend.running": "Running now",
   "awg.backend.noInbounds": "no AmneziaWG profile on this node",
   "awg.backend.notReported": "the node has not reported yet",
@@ -293,7 +293,7 @@ export const en = {
   "health.doctor.awg_backend.why.unit_outdated":
     "The node’s service unit is old (generation {unit_gen}) and hides /dev/net/tun from the agent. Run mistgate-node install on the node once with the current binary: it rewrites the unit.",
   "health.doctor.awg_backend.why.no_module":
-    "The backend is set to the kernel module, but it is not loaded. An up-to-date agent builds it itself from the node’s settings (“AmneziaWG backend”); otherwise run mistgate-node awg prepare-kernel on the node (it installs packages). Or switch the backend to userspace in the node’s settings.",
+    "The backend is set to the kernel module, but it is not loaded. An up-to-date agent builds it itself from the node’s settings (“AmneziaWG backend”); otherwise run mistgate-node awg prepare-kernel --yes on the node (it installs packages). Or switch the backend to userspace in the node’s settings.",
   "health.doctor.awg_backend.why.docker_forward_drop":
     "AmneziaWG runs ({backend}), but the host’s firewall (usually Docker’s FORWARD policy) drops what clients forward to the internet: they connect and get nothing. Allow forwarding from the mgawg interfaces or stop Docker from setting a DROP policy.",
 };
@@ -522,7 +522,7 @@ export const ru: typeof en = {
   "awg.backend.autoHint": "Модуль ядра, если он уже загружен, иначе userspace. Нода ничего не устанавливает.",
   "awg.backend.kernelHint": "Быстрее. Нужен модуль на хосте; без него профили AmneziaWG этой ноды не запустятся.",
   "awg.backend.userspaceHint": "amneziawg-go внутри агента. Работает везде, где есть /dev/net/tun, чуть медленнее.",
-  "awg.backend.kernelPrepare": "Выполни это на ноде от root: соберётся и загрузится модуль. Команда ставит пакеты, поэтому панель сама её никогда не запускает.",
+  "awg.backend.kernelPrepare": "Агент этой ноды слишком старый, чтобы собрать модуль сам. Выполни это на ноде от root: команда поставит пакеты, соберёт и загрузит модуль (без --yes она только печатает план).",
   "awg.backend.running": "Работает сейчас",
   "awg.backend.noInbounds": "на этой ноде нет профиля AmneziaWG",
   "awg.backend.notReported": "нода ещё не сообщила",
@@ -580,7 +580,7 @@ export const ru: typeof en = {
   "health.doctor.awg_backend.why.unit_outdated":
     "Юнит службы на ноде старый (поколение {unit_gen}) и прячет /dev/net/tun от агента. Один раз выполни на ноде mistgate-node install текущим бинарником: он перепишет юнит.",
   "health.doctor.awg_backend.why.no_module":
-    "Бэкенд задан как модуль ядра, но он не загружен. Свежий агент соберёт его сам из настроек ноды («Бэкенд AmneziaWG»); иначе выполни на ноде mistgate-node awg prepare-kernel (команда ставит пакеты). Или переключи бэкенд на userspace в настройках ноды.",
+    "Бэкенд задан как модуль ядра, но он не загружен. Свежий агент соберёт его сам из настроек ноды («Бэкенд AmneziaWG»); иначе выполни на ноде mistgate-node awg prepare-kernel --yes (команда ставит пакеты). Или переключи бэкенд на userspace в настройках ноды.",
   "health.doctor.awg_backend.why.docker_forward_drop":
     "AmneziaWG работает ({backend}), но фаервол хоста (чаще всего политика FORWARD у Docker) отбрасывает то, что клиенты пересылают в интернет: они подключаются и ничего не получают. Разреши пересылку с интерфейсов mgawg или не давай Docker ставить политику DROP.",
 };

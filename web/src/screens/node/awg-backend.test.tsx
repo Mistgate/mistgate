@@ -71,7 +71,7 @@ const click = (b: Element | undefined) => act(async () => void b?.dispatchEvent(
 const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === label);
 // the toast is a role=dialog too (a non-modal one): the confirm window is the modal one
 const dialog = () => document.querySelector('[role=dialog]:not([aria-modal="false"])');
-const manualCommand = "mistgate-node awg prepare-kernel";
+const manualCommand = "mistgate-node awg prepare-kernel --yes";
 
 async function pickKernelAndSave() {
   await click(radio("Kernel module"));

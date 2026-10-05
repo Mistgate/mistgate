@@ -327,7 +327,7 @@ export function itemWhy(t: T, i: DoctorItem, params: Params = i.params): string 
  * installing packages is not in the agent's safe set, so kernel_headers points at the explicit owner step.
  */
 export function itemCommand(i: DoctorItem): string | null {
-  return i.id === "kernel_headers" && isIssue(i) ? "mistgate-node awg prepare-kernel" : null;
+  return i.id === "kernel_headers" && isIssue(i) ? "mistgate-node awg prepare-kernel --yes" : null;
 }
 
 /** One step of "Manual ▾": what to do, the exact command to copy, or the node's tab where it is done (with its button). */

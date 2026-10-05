@@ -261,7 +261,7 @@ describe("the node's Doctor tab", () => {
       ],
     });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
-    expect(document.querySelector("code")?.textContent).toBe("mistgate-node awg prepare-kernel");
+    expect(document.querySelector("code")?.textContent).toBe("mistgate-node awg prepare-kernel --yes");
     expect([...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Copy")).toBe(true);
     expect(text()).toContain("Kernel mode is requested, but missing: kernel headers, dkms (kernel 6.8.0-142-generic)");
     expect(text()).not.toContain("Manual action");

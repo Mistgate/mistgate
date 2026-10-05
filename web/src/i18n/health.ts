@@ -289,7 +289,7 @@ export const en = {
   "health.doctor.cpu_softirq.why":
     "Network interrupts take {softirq_pct}% of the CPU (all CPU {cpu_pct}%) over 10 minutes. A busy VPN node on a small virtual server looks like this at its ceiling: speeds drop first. Spread the people over other nodes.",
   "health.doctor.kernel_headers.why":
-    "The AmneziaWG kernel mode is requested, but kernel {kernel} lacks what the module needs: {missing}. Install them and run the command below, or set the node’s AmneziaWG backend to auto: the user-space one needs none of this.",
+    "The AmneziaWG kernel mode is requested, but kernel {kernel} lacks what the module needs: {missing}. The command below installs them and builds the module; or set the node’s AmneziaWG backend to auto: the user-space one needs none of this.",
   "hl.doctor.runCommand": "Run on the node as root:",
 
   // ---- the node’s fact lines (doctor.detail.<code>, agent.proto detail_code); numbers and sizes arrive formatted
@@ -707,7 +707,7 @@ export const ru: typeof en = {
   "health.doctor.cpu_softirq.why":
     "Сетевые прерывания занимают {softirq_pct}% процессора (весь CPU {cpu_pct}%) за 10 минут. Так выглядит загруженная VPN-нода на маленькой виртуалке у потолка: первой падает скорость. Распредели людей по другим нодам.",
   "health.doctor.kernel_headers.why":
-    "Запрошен режим ядра для AmneziaWG, но для ядра {kernel} не хватает того, что нужно модулю: {missing}. Поставь недостающее и выполни команду ниже либо верни бэкенд AmneziaWG ноды в «авто»: userspace-режиму всё это не нужно.",
+    "Запрошен режим ядра для AmneziaWG, но для ядра {kernel} не хватает того, что нужно модулю: {missing}. Команда ниже поставит недостающее и соберёт модуль; либо верни бэкенд AmneziaWG ноды в «авто»: userspace-режиму всё это не нужно.",
   "hl.doctor.runCommand": "Выполни на ноде от root:",
 
   // ---- строки фактов от ноды (doctor.detail.<код>)
