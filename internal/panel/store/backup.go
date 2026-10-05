@@ -47,6 +47,9 @@ func (s *Store) PanelBackupSettings(ctx context.Context) (PanelBackupSettings, e
 // SavePanelBackupSettings replaces owner-editable settings while retaining the
 // last successful run and status.
 func (s *Store) SavePanelBackupSettings(ctx context.Context, v PanelBackupSettings, now time.Time) error {
+	if v.SecretAccessKey == nil {
+		v.SecretAccessKey = []byte{} // no secret (forgotten, or never set) is empty: a nil slice would be NULL
+	}
 	_, err := s.W.ExecContext(ctx, `INSERT INTO panel_backup_settings
 		(id, account_id, jurisdiction, bucket, access_key_id, secret_access_key, age_recipient, enabled,
 		 interval_hours, retention_days, updated_at)

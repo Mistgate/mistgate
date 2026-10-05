@@ -54,6 +54,15 @@ func TestPanelBackupSettingsPersistenceAndRunStatus(t *testing.T) {
 	if err != nil || got.RetentionDays != 0 || !got.LastSuccess.Equal(firstSuccess) || got.LastErrorCode != "backup_storage_failed" {
 		t.Fatalf("settings edit lost run status: %+v, %v", got, err)
 	}
+
+	// "Forget the saved secret access key" saves settings without one.
+	saved.SecretAccessKey = nil
+	if err := s.SavePanelBackupSettings(ctx, saved, failedLater); err != nil {
+		t.Fatalf("settings without a secret: %v", err)
+	}
+	if got, err = s.PanelBackupSettings(ctx); err != nil || len(got.SecretAccessKey) != 0 {
+		t.Fatalf("the secret was not forgotten: %x, %v", got.SecretAccessKey, err)
+	}
 }
 
 func TestSnapshotDatabaseIsPrivateAndRefusesOverwrite(t *testing.T) {
