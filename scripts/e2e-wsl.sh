@@ -14,7 +14,8 @@
 #
 # Self-update (step 2d): both binaries are built with a throwaway release key (made by `mistgate release
 # keygen` into the work directory, never the owner's) and distinct build times. The node starts as v1; the script signs
-# bundles with `mistgate release sign` into <data-dir>/dist and rolls them out through the admin API: v2 (must commit),
+# bundles with scripts/e2e/signbundle (release sign without its rebuild check: these builds are not reproducible from a
+# tag on purpose) into <data-dir>/dist and rolls them out through the admin API: v2 (must commit),
 # a manual RollbackNode and a second rollout, v3a (stamped older than its manifest: the agent rolls itself back at
 # once), v3b (cannot reach the panel: the agent rolls itself back when its commit window ends; built from a temporary
 # Go overlay of this tree with a dead dialer and a 20 s window, the tree itself has no test switch) and v5 (signed by
@@ -416,7 +417,8 @@ cd "$REPO"
 BI=github.com/mistgate/mistgate/internal/buildinfo
 ARCH=$(go env GOARCH)
 B1=1780000000 B2=1781000000 B3A=1782000000 B3A_MANIFEST=1782500000 B3B=1783000000 B5=1784000000
-go build -trimpath -o "$BIN/mistgate-tool" ./cmd/mistgate # keygen and sign only
+go build -trimpath -o "$BIN/mistgate-tool" ./cmd/mistgate # keygen only
+go build -trimpath -o "$BIN/signbundle" ./scripts/e2e/signbundle
 keygen() { "$BIN/mistgate-tool" release keygen --out "$1" | sed -n 's/^public key: //p'; }
 KEY_A=$(keygen "$WORK/release-a.key") KEY_B=$(keygen "$WORK/release-b.key")
 [ -n "$KEY_A" ] && [ -n "$KEY_B" ] || die "release keygen printed no public key"
@@ -668,7 +670,7 @@ node_events_since() { # <event id>: event codes of this node newer than that id,
   api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":200}" | jq -r --argjson m "$1" '(.events // [])[] | select((.id | tonumber) > $m) | .code'
 }
 # publish_bundle <dir> <key file> <version> <built> <binary>: sign into $WORK/bundles/<dir>
-publish_bundle() { "$BIN/mistgate-tool" release sign --key "$2" --version "$3" --built "$4" --expires 30d "$5" --out "$WORK/bundles/$1" >>"$WORK/release.log"; }
+publish_bundle() { "$BIN/signbundle" --key "$2" --version "$3" --built "$4" --out "$WORK/bundles/$1" "$5" >>"$WORK/release.log"; }
 # install_bundle <dir>: make it the panel's <data-dir>/dist and have the panel read it now
 install_bundle() {
   rm -rf "$DATA/dist.new" "$DATA/dist"
@@ -821,6 +823,8 @@ else
   # rollout; the node, which trusts key A only, refuses the manifest.
   mutate UpdateService/CancelRollout "{\"rolloutId\":\"$(ro_id)\"}" >/dev/null 2>&1 || true
   stop_pid "$PANEL_PID"
+  # the data directory still holds key A: the key-B binary trusts nothing until its key is confirmed explicitly
+  "$BIN/mistgate-b" release trust-key --data-dir "$DATA" >>"$WORK/release.log" || die "release trust-key (key B) failed"
   PANEL_BIN=$BIN/mistgate-b start_panel
   wait_for 90 "node ONLINE at the key-B panel" node_online || die "node did not connect to the second panel binary"
   publish_bundle v5 "$WORK/release-b.key" 0.1.0-e2e-v5 "$B5" "$WORK/rel/v5/mistgate-node-linux-$ARCH"
@@ -841,6 +845,7 @@ else
 
   # ---- back to the panel under test and the v2 bundle for the rest of the run
   stop_pid "$PANEL_PID"
+  "$BIN/mistgate" release trust-key --data-dir "$DATA" >>"$WORK/release.log" || die "release trust-key (key A) failed"
   start_panel
   wait_for 90 "node ONLINE at the panel under test" node_online || die "node did not come back to the panel under test"
   install_bundle v2
