@@ -28,6 +28,9 @@ func execRunner(ctx context.Context, stdin, name string, args ...string) ([]byte
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
+	// After a timeout kill, a child that still holds the output pipe (systemd-run --pipe hands it to its transient unit)
+	// must not keep the caller waiting.
+	cmd.WaitDelay = 5 * time.Second
 	return cmd.CombinedOutput()
 }
 
@@ -50,6 +53,12 @@ type linuxHost struct {
 	fw       sync.Mutex
 	hops     []Hop
 	sshPorts []uint16
+	// UFW inbound sync (firewall_linux.go): ufw.conf ("" = UFW is never run), and the last sync's key, result and time.
+	ufwConf   string
+	udpSynced bool
+	udpKey    string
+	udpErr    error
+	udpAt     time.Time
 
 	// The tunnel table of the L3 protocols (tunnel_linux.go) and the deletion of our links; nil links = none (tests).
 	tun   tunnelState
@@ -85,6 +94,7 @@ func New(log *slog.Logger) Host {
 		procSys:      "/proc/sys",
 		procRoot:     "/proc",
 		sshdConfDir:  "/etc/ssh",
+		ufwConf:      defaultUFWConf,
 		links:        deleteOwnLinks,
 
 		resolvedFile:   defaultResolvedFile,

@@ -153,7 +153,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.syncTorrentGuardApplied(ctx, next, results)
 	active := successfullyAppliedEnabledInbounds(results)
 	hops := a.syncHops(ctx, next, results, active)
-	a.syncInboundUDPPorts(ctx, next, results, active, hops)
+	a.syncInboundUDPPorts(ctx, next, active, hops)
 	a.noteCerts(results)
 	return results
 }
@@ -319,21 +319,20 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 }
 
 // syncInboundUDPPorts mirrors only enabled UDP listeners whose engine apply succeeded. Hop ranges are
-// included only after their exact nft redirect was accepted and installed.
-func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, results []*pb.InboundResult, active map[string]bool, hops []hostctl.Hop) {
+// included only after their exact nft redirect was accepted and installed. A failure is a node-level warning, not an
+// inbound error: the listener runs, and the host firewall may well be open by the owner's own rules.
+func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) {
 	byHop := make(map[string]hostctl.Hop, len(hops))
 	for _, h := range hops {
 		byHop[h.InboundID] = h
 	}
 	set := make(map[hostctl.UDPInboundPort]struct{})
-	affected := make(map[string]bool)
 	var errs []error
 	for _, id := range next.ids() {
 		s := next.inbounds[id].spec
 		if !s.Enabled || !active[id] || s.Listen.Network != "udp" {
 			continue
 		}
-		affected[id] = true
 		if s.Listen.Port == 0 || s.Listen.Port > 65535 {
 			errs = append(errs, fmt.Errorf("inbound %s has an invalid UDP listener port %d", id, s.Listen.Port))
 			continue
@@ -360,24 +359,19 @@ func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, results []
 		errs = append(errs, err)
 	}
 	if err := errors.Join(errs...); err != nil {
-		a.markHostFirewallSyncFailure(results, affected, err)
+		a.markHostFirewallSyncFailure(err)
 	} else {
 		a.clearHostFirewallSyncFailure()
 	}
 }
 
-func (a *Agent) markHostFirewallSyncFailure(results []*pb.InboundResult, affected map[string]bool, err error) {
+// markHostFirewallSyncFailure reports one warning per distinct failure; the same failure on later reconciles is quiet.
+func (a *Agent) markHostFirewallSyncFailure(err error) {
 	errMsg := err.Error()
-	msg := "host firewall: " + errMsg
 	if a.hostFirewallErr != errMsg {
 		a.hostFirewallErr = errMsg
-		a.log.Error("host firewall UDP rules were not fully reconciled", "err", err)
-		a.event(pb.Severity_SEVERITY_ERROR, "host_firewall_sync_failed", "", map[string]string{"error": errMsg})
-	}
-	for _, r := range results {
-		if affected[r.InboundId] && r.State == pb.InboundRunState_INBOUND_RUN_STATE_RUNNING && r.Error == "" {
-			r.Error = msg
-		}
+		a.log.Warn("host firewall UDP rules were not fully reconciled", "err", err)
+		a.event(pb.Severity_SEVERITY_WARNING, "host_firewall_sync_failed", "", map[string]string{"error": errMsg})
 	}
 }
 

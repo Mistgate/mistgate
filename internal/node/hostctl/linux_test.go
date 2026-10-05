@@ -28,9 +28,6 @@ func testHost(t *testing.T) (*linuxHost, *[]call) {
 		procRoot:     "/proc",
 		run: func(_ context.Context, stdin, name string, args ...string) ([]byte, error) {
 			calls = append(calls, call{stdin, name, strings.Join(args, " ")})
-			if name == "ufw" && len(args) == 1 && args[0] == "status" {
-				return []byte("Status: inactive\n"), nil
-			}
 			return nil, nil
 		},
 	}
