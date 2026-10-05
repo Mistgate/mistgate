@@ -231,6 +231,10 @@ func TestSubViewNodes(t *testing.T) {
 	if nl.DNS == nil || nl.DNS.Choice != "" || nl.DNS.Effective != "dns_builtin_ru_split" || len(nl.DNS.Options) != 2 {
 		t.Errorf("nl1 dns: %+v", nl.DNS)
 	}
+	// The default the page names: the node's own, else what applies without one (the person's usual DNS).
+	if de.DNS.Default != "dns_builtin_adblock" || nl.DNS.Default != "dns_builtin_ru_split" {
+		t.Errorf("defaults: de1 %q, nl1 %q", de.DNS.Default, nl.DNS.Default)
+	}
 	if v.Nodes[2].DNS != nil {
 		t.Errorf("a node that offers nothing has a DNS row: %+v", v.Nodes[2].DNS)
 	}

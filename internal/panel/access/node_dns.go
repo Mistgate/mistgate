@@ -108,6 +108,7 @@ type SubNodeDNS struct {
 	Choice    string   // what the person picked ("" = nothing, or a pick the node no longer offers)
 	Effective string   // the preset id that applies on this server
 	Options   []string // what the owner offers, in order
+	Default   string   // what applies without a pick: the node's default, else the person's usual DNS (rule 3)
 	// KeysToRefresh are the AmneziaWG devices of the person with a key on this server that was fetched before the person's
 	// pick: it holds the older DNS.
 	KeysToRefresh []string
@@ -131,9 +132,14 @@ func (s *Service) nodeDNSData(ctx context.Context, v *SubView, n *nodeDNS, awgs 
 			continue
 		}
 		eff, ok := n.on(node.ID)
-		d := &SubNodeDNS{Choice: n.choices.Pick(node.ID), Options: opts, KeysToRefresh: []string{}}
+		d := &SubNodeDNS{Choice: n.choices.Pick(node.ID), Options: opts, Default: n.choices.Default(node.ID), KeysToRefresh: []string{}}
 		if ok {
 			d.Effective = eff.ID
+		}
+		if d.Default == "" {
+			if p, ok := n.withoutNode(); ok {
+				d.Default = p.ID
+			}
 		}
 		for _, dev := range awgs {
 			if slices.Contains(dev.DNSStale, node.ID) {
@@ -145,6 +151,7 @@ func (s *Service) nodeDNSData(ctx context.Context, v *SubView, n *nodeDNS, awgs 
 			add(id)
 		}
 		add(d.Effective)
+		add(d.Default)
 	}
 	if link, ok := n.withoutNode(); ok {
 		v.DNSLink = link.ID

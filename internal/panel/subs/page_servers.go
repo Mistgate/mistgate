@@ -45,6 +45,7 @@ type pageNodeDNS struct {
 	Choice        string   `json:"choice"`
 	Effective     string   `json:"effective"`
 	Options       []string `json:"options"`
+	Default       string   `json:"default"` // what applies without a pick (the page names the "default" option by it)
 	KeysToRefresh []string `json:"keys_to_refresh"`
 }
 
@@ -108,7 +109,7 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 			p.Connections = append(p.Connections, pc)
 		}
 		if d := n.DNS; d != nil {
-			p.DNS = &pageNodeDNS{Choice: d.Choice, Effective: d.Effective, Options: d.Options, KeysToRefresh: nonNil(d.KeysToRefresh)}
+			p.DNS = &pageNodeDNS{Choice: d.Choice, Effective: d.Effective, Options: d.Options, Default: d.Default, KeysToRefresh: nonNil(d.KeysToRefresh)}
 		}
 		out = append(out, p)
 	}
