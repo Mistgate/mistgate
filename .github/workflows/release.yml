@@ -4,29 +4,25 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+# Nothing may write by default: only the publish job, which runs no project or third-party build code, gets
+# contents: write. Actions are pinned to commit SHAs (the tag in the comment is what the SHA was).
+permissions: {}
 
 jobs:
-  panel:
+  # The node agents: Go only, no Node.js and no npm packages in this job.
+  node:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: web/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-      - name: Build embedded admin panel
-        run: cd web && pnpm install --frozen-lockfile && pnpm build
-      - name: Build panel binaries
-        id: build
+          cache: false
+      - name: Check the tag and the release key
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
@@ -37,48 +33,84 @@ jobs:
             echo "release tag must be semantic version vMAJOR.MINOR.PATCH" >&2
             exit 1
           fi
-          if [[ -z "$RELEASE_KEY" ]]; then
-            echo "Set the repository variable MISTGATE_RELEASE_PUBLIC_KEY before creating a release" >&2
+          if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] || [[ "$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)" -ne 32 ]]; then
+            echo "Set the repository variable MISTGATE_RELEASE_PUBLIC_KEY (a base64 Ed25519 public key) before creating a release" >&2
             exit 1
           fi
-          if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
-            echo "MISTGATE_RELEASE_PUBLIC_KEY must be a base64-encoded Ed25519 public key" >&2
-            exit 1
-          fi
-          key_bytes="$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)"
-          if [[ "$key_bytes" -ne 32 ]]; then
-            echo "MISTGATE_RELEASE_PUBLIC_KEY must decode to 32 bytes" >&2
-            exit 1
-          fi
+      - name: Build node binaries
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          RELEASE_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
           mkdir -p release
-          built="$(git log -1 --format=%ct)"
-          printf 'version=%s\nbuilt=%s\n' "$TAG" "$built" > release/BUILDINFO
-          bi="github.com/mistgate/mistgate/internal/buildinfo"
-          ldflags=(-s -w -X "${bi}.Version=${TAG}" -X "${bi}.Built=${built}")
-          if [[ -n "$RELEASE_KEY" ]]; then
-            ldflags+=( -X "${bi}.ReleaseKey=${RELEASE_KEY}" )
-          fi
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-              -ldflags "${ldflags[*]}" \
-              -o "release/mistgate-linux-${arch}" ./cmd/mistgate
-          done
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-              -ldflags "${ldflags[*]}" \
-              -o "release/mistgate-node-linux-${arch}" ./cmd/mistgate-node
-          done
-          (
-            cd release
-            checksums=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64)
-            sha256sum "${checksums[@]}" > SHA256SUMS
-          )
-      - name: Publish GitHub release
+          printf 'version=%s\nbuilt=%s\ncommit=%s\n' "$TAG" "$(git log -1 --format=%ct)" "$(git rev-parse HEAD)" > release/BUILDINFO
+          go run ./cmd/mistgate release build --version "$TAG" --key "$RELEASE_KEY" --out release \
+            mistgate-node-linux-amd64 mistgate-node-linux-arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: node
+          path: release/
+          if-no-files-found: error
+
+  # The panel embeds the admin SPA, so this job runs pnpm (third-party code) — with read-only permissions.
+  panel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Build embedded admin panel
+        run: cd web && pnpm install --frozen-lockfile && pnpm build
+      - name: Build panel binaries
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          RELEASE_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          go run ./cmd/mistgate release build --version "$TAG" --key "$RELEASE_KEY" --out release \
+            mistgate-linux-amd64 mistgate-linux-arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: panel
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    needs: [node, panel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish the draft release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        shell: bash
         run: |
-          assets=(release/mistgate-linux-amd64 release/mistgate-linux-arm64 release/mistgate-node-linux-amd64 release/mistgate-node-linux-arm64 release/SHA256SUMS release/BUILDINFO)
-          gh release create "$TAG" "${assets[@]}" --draft --title "$TAG" --generate-notes
-          echo "::notice::Release is a draft until the owner signs the node bundle and uploads manifest.json and manifest.sig. Publish it only after both signature files are attached."
+          set -euo pipefail
+          cd release
+          bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64)
+          sha256sum "${bins[@]}" > SHA256SUMS
+          gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --draft --title "$TAG" --generate-notes
+          echo "::notice::The release stays a draft until the owner rebuilds the binaries from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json and panel-manifest.sig. Publish it only after all four are attached."

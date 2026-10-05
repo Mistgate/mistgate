@@ -34,6 +34,10 @@ const (
 	// ManifestName and SignatureName are the file names inside the bundle directory.
 	ManifestName  = "manifest.json"
 	SignatureName = "manifest.sig"
+	// PanelManifestName and PanelSignatureName are the panel's own signed release (the mistgate-linux-* binaries),
+	// uploaded to the GitHub release next to the node bundle. Same format, signed in its own context (SignPanel).
+	PanelManifestName  = "panel-manifest.json"
+	PanelSignatureName = "panel-manifest.sig"
 	// MaxManifestBytes bounds what a parser will read (the panel sends it inside a command).
 	MaxManifestBytes = 64 << 10
 )
@@ -102,6 +106,9 @@ var (
 	platRe    = regexp.MustCompile(`^[a-z0-9_]{2,16}$`)
 	hexRe     = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
+
+// ValidVersion reports whether v may be a manifest's version.
+func ValidVersion(v string) bool { return versionRe.MatchString(v) }
 
 // Validate checks the manifest is well formed. It says nothing about time or about the running build (see Check).
 func (m *Manifest) Validate() error {
@@ -194,6 +201,28 @@ func Sign(priv ed25519.PrivateKey, manifest []byte) []byte { return ed25519.Sign
 // fails is never parsed.
 func Verify(pub ed25519.PublicKey, manifest, sig []byte) (*Manifest, error) {
 	if len(pub) != ed25519.PublicKeySize || len(sig) != ed25519.SignatureSize || !ed25519.Verify(pub, manifest, sig) {
+		return nil, ErrBadSignature
+	}
+	return Parse(manifest)
+}
+
+// panelContext is the Ed25519ctx context of a panel manifest. The one release key signs both manifests; the context
+// keeps them apart, so an agent never accepts the panel's manifest as its own update and the panel never installs a
+// node binary as itself.
+var panelContext = &ed25519.Options{Context: "mistgate panel manifest v1"}
+
+// SignPanel returns the detached signature of a panel manifest.
+func SignPanel(priv ed25519.PrivateKey, manifest []byte) []byte {
+	sig, err := priv.Sign(nil, manifest, panelContext)
+	if err != nil {
+		panic(err) // only for invalid options, which panelContext is not
+	}
+	return sig
+}
+
+// VerifyPanel is Verify for a panel manifest.
+func VerifyPanel(pub ed25519.PublicKey, manifest, sig []byte) (*Manifest, error) {
+	if len(pub) != ed25519.PublicKeySize || len(sig) != ed25519.SignatureSize || ed25519.VerifyWithOptions(pub, manifest, sig, panelContext) != nil {
 		return nil, ErrBadSignature
 	}
 	return Parse(manifest)

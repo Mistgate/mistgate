@@ -76,6 +76,22 @@ func TestVerifyRejects(t *testing.T) {
 	}
 }
 
+// The one key signs both manifests; neither signature may pass as the other.
+func TestPanelSignatureIsSeparateFromNodeSignature(t *testing.T) {
+	pub, priv := testKey(t, 1)
+	m := sampleManifest()
+	b, _ := m.Marshal()
+	if _, err := VerifyPanel(pub, b, SignPanel(priv, b)); err != nil {
+		t.Fatalf("panel round trip: %v", err)
+	}
+	if _, err := Verify(pub, b, SignPanel(priv, b)); !errors.Is(err, ErrBadSignature) {
+		t.Errorf("a panel signature verified as a node bundle: %v", err)
+	}
+	if _, err := VerifyPanel(pub, b, Sign(priv, b)); !errors.Is(err, ErrBadSignature) {
+		t.Errorf("a node signature verified as a panel manifest: %v", err)
+	}
+}
+
 func TestParseIsStrict(t *testing.T) {
 	m := sampleManifest()
 	b, _ := m.Marshal()
