@@ -171,6 +171,14 @@ func newPanelUpdater(t *testing.T, f *panelFixture, rec *recorder, mutate func(*
 	return NewGitHubPanelUpdater(cfg), counts, dataDir
 }
 
+// rootLayoutAt makes the fixed root unit's layout the test panel's own (its data directory, executable and service).
+func rootLayoutAt(t *testing.T, dataDir string) {
+	t.Helper()
+	exe, data, service := rootHelperExecutable, rootHelperDataDir, rootHelperService
+	rootHelperExecutable, rootHelperDataDir, rootHelperService = filepath.Join(dataDir, "mistgate"), dataDir, "mistgate.service"
+	t.Cleanup(func() { rootHelperExecutable, rootHelperDataDir, rootHelperService = exe, data, service })
+}
+
 func readRequest(t *testing.T, dataDir string) panelUpdateRequest {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(dataDir, panelUpdateRequestName))
@@ -219,6 +227,7 @@ func TestPanelUpdaterRequestsFixedRootHelperForNonRootService(t *testing.T) {
 		return "LoadState=loaded\nActiveState=inactive\nInactiveExitTimestampMonotonic=5\n"
 	}}
 	updater, counts, dataDir := newPanelUpdater(t, f, rec, func(c *PanelUpdateConfig) { c.UseRootHelperService = true })
+	rootLayoutAt(t, dataDir)
 	if err := updater.Install(context.Background(), "v1.2.0", f.digest()); err != nil {
 		t.Fatal(err)
 	}
@@ -237,6 +246,41 @@ func TestPanelUpdaterRequestsFixedRootHelperForNonRootService(t *testing.T) {
 	}
 	if !updater.Status().Installing {
 		t.Fatal("accepted helper request did not retain the installing state")
+	}
+}
+
+// The fixed root unit names its paths: a non-root panel elsewhere gets an error that names them, and nothing is requested.
+func TestPanelUpdaterRootHelperNeedsItsLayout(t *testing.T) {
+	f := newPanelFixture()
+	for name, mutate := range map[string]func(*PanelUpdateConfig){
+		"another data directory": func(c *PanelUpdateConfig) { c.DataDir = filepath.Join(c.DataDir, "elsewhere") },
+		"another executable":     func(c *PanelUpdateConfig) { c.Executable = filepath.Join(c.DataDir, "bin", "mistgate") },
+		"another service":        func(c *PanelUpdateConfig) { c.ServiceUnit = "vpn-panel.service" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := &recorder{}
+			var dataDir string
+			updater, _, _ := newPanelUpdater(t, f, rec, func(c *PanelUpdateConfig) {
+				c.UseRootHelperService, dataDir = true, c.DataDir
+				mutate(c)
+			})
+			rootLayoutAt(t, dataDir)
+			err := updater.Install(context.Background(), "v1.2.0", f.digest())
+			if !errors.Is(err, ErrPanelUnsupported) || !strings.Contains(err.Error(), panelUpdateHelperService) ||
+				!strings.Contains(err.Error(), rootHelperExecutable) || !strings.Contains(err.Error(), rootHelperDataDir) || !strings.Contains(err.Error(), rootHelperService) {
+				t.Errorf("error: %v", err)
+			}
+			if len(rec.launched()) != 0 || updater.Status().Installing {
+				t.Errorf("launched %v, installing %v", rec.launched(), updater.Status().Installing)
+			}
+			if _, err := os.Stat(filepath.Join(dataDir, panelUpdateRequestName)); err == nil {
+				t.Error("wrote a request the helper never reads")
+			}
+		})
+	}
+	// production names the unit's own paths
+	if rootHelperExecutable != "/usr/local/bin/mistgate" || rootHelperDataDir != "/var/lib/mistgate" || rootHelperService != "mistgate.service" {
+		t.Errorf("layout %s %s %s", rootHelperExecutable, rootHelperDataDir, rootHelperService)
 	}
 }
 
@@ -350,7 +394,8 @@ func TestPanelUpdaterNoticesAFailedHelper(t *testing.T) {
 	var mu sync.Mutex
 	state := "LoadState=loaded\nActiveState=failed\nInactiveExitTimestampMonotonic=5\n" // a previous failed attempt
 	rec := &recorder{show: func(string) string { mu.Lock(); defer mu.Unlock(); return state }}
-	updater, _, _ := newPanelUpdater(t, f, rec, func(c *PanelUpdateConfig) { c.UseRootHelperService = true })
+	updater, _, dataDir := newPanelUpdater(t, f, rec, func(c *PanelUpdateConfig) { c.UseRootHelperService = true })
+	rootLayoutAt(t, dataDir)
 	if err := updater.Install(context.Background(), "v1.2.0", f.digest()); err != nil {
 		t.Fatal(err)
 	}

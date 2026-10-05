@@ -167,7 +167,7 @@ The data backup is taken while the panel is stopped, before the new binary first
 
 ### Enable updates for a non-root panel service
 
-For a systemd panel unit with `User=mistgate`, install the root-owned helper unit and its narrow PolicyKit rule. The rule allows that account to start only `mistgate-panel-update.service`; it does not grant general systemd control or a root shell. The panel unit can keep `NoNewPrivileges=yes`.
+For a systemd panel unit with `User=mistgate`, install the root-owned helper unit and its narrow PolicyKit rule. The rule allows that account to start only `mistgate-panel-update.service`; it does not grant general systemd control or a root shell. The panel unit can keep `NoNewPrivileges=yes`. The helper unit updates only the standard layout: the binary `/usr/local/bin/mistgate`, the data directory `/var/lib/mistgate` and the service `mistgate.service`. A non-root panel installed elsewhere refuses **Update panel** with an error that names these paths; update it by hand.
 
 ```sh
 install -o root -g root -m 0644 deploy/systemd/mistgate-panel-update.service /etc/systemd/system/mistgate-panel-update.service

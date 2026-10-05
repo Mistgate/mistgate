@@ -167,7 +167,7 @@ ssh root@de1.example.com 'chmod +x /root/mistgate-node && /root/mistgate-node in
 
 ### Включить обновления для непривилегированной службы панели
 
-Для systemd-службы панели с `User=mistgate` установите root-owned unit helper и узкое правило PolicyKit. Правило разрешает этой учётной записи запускать только `mistgate-panel-update.service`; оно не даёт общего доступа к systemd и не открывает root shell. В unit панели можно оставить `NoNewPrivileges=yes`.
+Для systemd-службы панели с `User=mistgate` установите root-owned unit helper и узкое правило PolicyKit. Правило разрешает этой учётной записи запускать только `mistgate-panel-update.service`; оно не даёт общего доступа к systemd и не открывает root shell. В unit панели можно оставить `NoNewPrivileges=yes`. Unit helper обновляет только стандартную раскладку: бинарь `/usr/local/bin/mistgate`, каталог данных `/var/lib/mistgate` и служба `mistgate.service`. Панель без root, установленная иначе, откажет в **Обновить панель** с ошибкой, где названы эти пути; обновляйте её вручную.
 
 ```sh
 install -o root -g root -m 0644 deploy/systemd/mistgate-panel-update.service /etc/systemd/system/mistgate-panel-update.service

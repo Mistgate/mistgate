@@ -312,6 +312,12 @@ func (u *GitHubPanelUpdater) Install(ctx context.Context, version, digest string
 	if !unitPattern.MatchString(strings.TrimSpace(u.cfg.ServiceUnit)) {
 		return ErrPanelUnsupported
 	}
+	if u.cfg.UseRootHelperService {
+		if err := u.rootHelperLayoutError(); err != nil {
+			u.setStatus(status, false, "")
+			return err
+		}
+	}
 	if err := writePanelUpdateRequest(u.cfg.DataDir, panelUpdateRequest{Version: status.Version, SHA256: status.SHA256}); err != nil {
 		u.setStatus(status, false, "schedule_failed")
 		return fmt.Errorf("record panel update request: %w", err)
@@ -345,6 +351,26 @@ func (u *GitHubPanelUpdater) Install(ctx context.Context, version, digest string
 	u.mu.Unlock()
 	go u.watchHelper(unit, started, seq)
 	return nil
+}
+
+// The layout the fixed root unit (deploy/systemd/mistgate-panel-update.service) updates: its ExecStart names these
+// paths, so a non-root panel elsewhere would hand it a request it never reads. Variables only so tests can point them
+// at a temporary directory.
+var (
+	rootHelperExecutable = "/usr/local/bin/mistgate"
+	rootHelperDataDir    = "/var/lib/mistgate"
+	rootHelperService    = "mistgate.service"
+)
+
+// rootHelperLayoutError says, naming the expected paths, why the fixed root unit cannot update this panel; nil when it can.
+func (u *GitHubPanelUpdater) rootHelperLayoutError() error {
+	exe, data, service := filepath.Clean(u.cfg.Executable), filepath.Clean(u.cfg.DataDir), strings.TrimSpace(u.cfg.ServiceUnit)
+	if exe == filepath.Clean(rootHelperExecutable) && data == filepath.Clean(rootHelperDataDir) && service == rootHelperService {
+		return nil
+	}
+	return fmt.Errorf("%w: %s updates only %s with the data directory %s and the service %s, but this panel runs %s with %s and %s; "+
+		"move the panel to that layout or run it as root, or update it by hand", ErrPanelUnsupported,
+		panelUpdateHelperService, rootHelperExecutable, rootHelperDataDir, rootHelperService, exe, data, service)
 }
 
 // watchHelper ends the "installing" state when the helper unit finished without restarting this process: a helper
