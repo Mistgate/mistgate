@@ -420,9 +420,12 @@ func TestRolloutFlow(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 	e.w.bundleStat = 2 // trusted
-	e.w.rolloutStat = 1
-	if got := mustFail(t, s, "rollout_start_plan", args); !strings.Contains(got, "already active") {
-		t.Errorf("got %q", got)
+	// running or paused alike: pausing does not free the way, so the advice is to wait or cancel
+	for _, st := range []adminv1.RolloutStatus{adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING, adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED} {
+		e.w.rolloutStat = st
+		if got := mustFail(t, s, "rollout_start_plan", args); !strings.Contains(got, "already active") || !strings.Contains(got, "wait for it to finish or cancel it") || strings.Contains(got, "pause or") {
+			t.Errorf("%v: got %q", st, got)
+		}
 	}
 	e.w.rolloutStat = 3 // done
 	// one node, no batches: a batch size is not an argument (StartRollout alone limits it)

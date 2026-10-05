@@ -1026,7 +1026,7 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 			return nil, errors.New("the update bundle is not trusted (status " + enumName("BUNDLE_STATUS_", b.GetStatus().String()) + "): nothing to roll out")
 		}
 		if r := u.GetRollout(); r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED {
-			return nil, errors.New("a rollout is already active: pause or cancel it first")
+			return nil, errors.New("a rollout is already active (running or paused): wait for it to finish or cancel it first")
 		}
 		var chosen *adminv1.NodeUpdate
 		for _, n := range u.GetNodes() {
