@@ -379,4 +379,56 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("Error: no trusted update bundle");
     expect(text()).not.toContain("failed_precondition");
   });
+
+  it("shows a change of the user page's apps in full: every field of a new app, before → after of an update, the agent's values on plates", async () => {
+    const tmpl = "myclient://add?url={url_enc}&name={name_enc}";
+    await mount(
+      tokens([]),
+      inbox([
+        approval({
+          tool: "subscription_app_upsert",
+          danger: ["user_page"],
+          facts: [
+            { key: "platform", value: "macOS", untrusted: false },
+            { key: "app", value: "My Client", untrusted: true },
+            { key: "effect", value: "a new app card on every user's subscription page", untrusted: false, code: "app_add" },
+            { key: "kind", value: "by subscription link", untrusted: false, code: "happ" },
+            { key: "download_url", value: "https://example.com/myclient.pkg", untrusted: true },
+            { key: "add_link_template", value: tmpl, untrusted: true },
+            { key: "description", value: "Hysteria2 in one tap", untrusted: true },
+            { key: "recommended", value: "true", untrusted: false },
+          ],
+        }),
+        approval({
+          id: "pln_2",
+          tool: "subscription_app_upsert",
+          danger: ["user_page"],
+          facts: [
+            { key: "platform", value: "iOS", untrusted: false },
+            { key: "app", value: "Happ", untrusted: true },
+            { key: "effect", value: "the app's card changes on every user's subscription page", untrusted: false, code: "app_update" },
+            { key: "kind", value: "by subscription link -> AmneziaWG key", untrusted: false, code: "change", params: { from: "happ", to: "amnezia" } },
+            { key: "download_url", value: "…", untrusted: false, code: "change", params: { from: "https://example.com/old", to: "https://example.com/new" }, untrustedParams: ["from", "to"] },
+            { key: "recommended", value: "true -> false", untrusted: false, code: "change", params: { from: "true", to: "false" } },
+          ],
+        }),
+        approval({ id: "pln_3", tool: "subscription_app_remove", state: ApprovalState.APPLIED, result: "App removed from the subscription page.", outcomeCode: "subscription_app_removed" }),
+      ]),
+    );
+    expect(text()).toContain("Add or change an app on the user page");
+    expect(text()).toContain("Every user sees it on their subscription page.");
+    expect(text()).toMatch(/Platform\s*macOS/);
+    expect(text()).toContain("A new app card on every user’s page.");
+    expect(text()).toMatch(/Takes\s*By subscription link/);
+    expect(text()).toMatch(/Recommended\s*yes/);
+    const plates = [...document.querySelectorAll("dd span[title]")].map((s) => s.textContent);
+    // what came from the agent is quoted in full, apart from the panel's words
+    for (const v of ["My Client", "https://example.com/myclient.pkg", tmpl, "Hysteria2 in one tap", "https://example.com/old", "https://example.com/new"]) {
+      expect(plates).toContain(`“${v}”`);
+    }
+    expect(text()).toContain("The app’s card changes on every user’s page.");
+    expect(text()).toContain("By subscription link → AmneziaWG key");
+    expect(text()).toMatch(/Recommended\s*yes → no/);
+    expect(text()).toContain("App removed from the user page");
+  });
 });

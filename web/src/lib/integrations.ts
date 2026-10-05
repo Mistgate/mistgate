@@ -187,10 +187,12 @@ const knownValues: Record<string, MessageKey> = {
   cancel: "approval.value.cancel",
 };
 
+const yesNo = (t: T, v: string) => (v === "true" ? t("int.ap.yes") : v === "false" ? t("int.ap.no") : v);
+
 /** What a fact says, in the UI language where the panel's own wording is known. */
 export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">): string {
   if (f.untrusted) return f.value;
-  if (f.key === "drops_sessions") return f.value === "true" ? t("int.ap.yes") : f.value === "false" ? t("int.ap.no") : f.value;
+  if (f.key === "drops_sessions" || f.key === "recommended") return yesNo(t, f.value);
   if (f.key === "progress") {
     const m = /^(\d+) of (\d+) nodes finished$/.exec(f.value);
     if (m) return t("approval.value.progress", { done: m[1]!, total: m[2]! });
@@ -232,6 +234,10 @@ function changeSide(t: T, fmt: Fmt, key: string, v: string): string {
       return appsKey[v] ? t(appsKey[v]) : v;
     case "nodes":
       return v === "all" ? t("approval.value.allNodes") : /^\d+$/.test(v) ? t.n("approval.value.nodes", n) : v;
+    case "kind": // an app of the subscription page: happ, amnezia
+      return lookup(t, `subs.kind.${v}`) ?? v;
+    case "recommended":
+      return yesNo(t, v);
   }
   return v;
 }
@@ -268,6 +274,8 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
     case "":
       return [factText(t, f)];
     case "change":
+      // both sides from data (an app's link or description): each on a plate of its own
+      if (f.untrustedParams?.length) return withPlates("{from} → {to}", p, f.untrustedParams);
       return [`${changeSide(t, fmt, f.key, p.from ?? "")} → ${changeSide(t, fmt, f.key, p.to ?? "")}`];
     case "quota":
       return [num("bytes") === 0 ? t("approval.value.unlimited") : `${fmt.bytes(num("bytes"))}, ${changeSide(t, fmt, "quota_reset", p.reset ?? "")}`];
@@ -292,6 +300,7 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
   }
   const apps = f.key === "apps" ? appsKey[f.code] : undefined;
   if (apps) return [t(apps)];
+  if (f.key === "kind") return [changeSide(t, fmt, "kind", f.code)];
   if (f.key === "fix") {
     // the code is the doctor's fix id; restart_inbound names its profile, a name from data
     const full = `approval.value.fix.${f.code}`;
