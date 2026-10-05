@@ -36,8 +36,8 @@ function LastUpdate({ node, fmt }: { node: NodeUpdate; fmt: Fmt }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5 text-xs">
       {scheduled && (
-        <span className="text-pretty text-accent">
-          {t("up.schedule.row", {
+        <span className={cx("text-pretty", node.scheduledMissed ? kindTextClass.warn : "text-accent")}>
+          {t(node.scheduledMissed ? "up.schedule.missedRow" : "up.schedule.row", {
             version: node.scheduledVersion,
             at: updateDateTimeAtOffset(node.scheduledUnix, node.scheduledTimezoneOffsetMinutes),
             timezone: updateTimezoneName(node.scheduledTimezoneOffsetMinutes),

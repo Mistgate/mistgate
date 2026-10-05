@@ -127,6 +127,7 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 			m.ScheduledVersion = schedule.ToVersion
 			m.ScheduledBuilt = schedule.ToBuilt
 			m.ScheduledTimezoneOffsetMinutes = schedule.TimezoneOffsetMinutes
+			m.ScheduledMissed = schedule.MissedAt > 0
 		}
 		if lu, ok := currentLastUpdate(v.row); ok && m.LastUpdate != nil {
 			m.LastUpdate.Reason = senders.reason(v.row.ID, lu)

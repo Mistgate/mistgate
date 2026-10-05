@@ -13,10 +13,15 @@ import (
 )
 
 const (
-	updateScheduleTimezoneKey        = "update_schedule_timezone_offset_minutes"
-	defaultScheduleTimezoneOffsetMin = 180
+	updateScheduleTimezoneKey = "update_schedule_timezone_offset_minutes"
+	// defaultScheduleTimezoneOffsetMin is UTC. Installations made while the default was UTC+3 got that value stored
+	// by migration 00040, so their schedules are entered as before.
+	defaultScheduleTimezoneOffsetMin = 0
 	minimumScheduleLead              = time.Minute
 	maximumScheduleLead              = 365 * 24 * time.Hour
+	// scheduleMissAfter: a schedule that has not started this long after its time is marked missed and never starts
+	// by itself (an update meant for a quiet hour must not run whenever the node comes back).
+	scheduleMissAfter = 2 * time.Hour
 )
 
 func validScheduleTimezoneOffset(offset int32) bool {
@@ -106,6 +111,10 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 	if expectedVersion == "" || expectedBuilt <= 0 || expectedVersion != b.manifest.Version || expectedBuilt != b.manifest.Built {
 		return store.NodeUpdateScheduleRow{}, precondition("the update bundle changed; review the new version")
 	}
+	if scheduledAt.Unix() > b.manifest.Expires {
+		return store.NodeUpdateScheduleRow{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("the signed bundle expires at %s, before the scheduled time",
+			time.Unix(b.manifest.Expires, 0).In(scheduledAt.Location()).Format("2006-01-02 15:04 MST")))
+	}
 	views, err := s.nodes(ctx, b, nil)
 	if err != nil {
 		return store.NodeUpdateScheduleRow{}, s.internal("list nodes to schedule update", err)
@@ -143,6 +152,11 @@ func updatableWhenOffline(n nodeView) bool {
 func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 	if s.cfg.Key == nil {
 		return
+	}
+	if n, err := s.st.MarkNodeUpdateSchedulesMissed(ctx, s.now().Add(-scheduleMissAfter), s.now()); err != nil {
+		s.log.Warn("update: mark missed node update schedules", "err", err)
+	} else if n > 0 {
+		s.log.Info("update: node update schedules missed their window", "count", n)
 	}
 	s.mu.Lock()
 	blocked := s.bundleSyncing || s.panelBusy()

@@ -12,24 +12,26 @@ type NodeUpdateScheduleRow struct {
 	ToBuilt, ScheduledAt         int64
 	TimezoneOffsetMinutes        int32
 	CreatedAt                    time.Time
+	// MissedAt is when the schedule was marked missed (Unix seconds), 0 while it may still start.
+	MissedAt int64
 }
 
-// SetNodeUpdateSchedule creates or replaces the pending schedule for a node.
+// SetNodeUpdateSchedule creates or replaces the pending schedule for a node (a replaced schedule is no longer missed).
 func (s *Store) SetNodeUpdateSchedule(ctx context.Context, r NodeUpdateScheduleRow) error {
 	_, err := s.W.ExecContext(ctx, `
 		INSERT INTO node_update_schedule (node_id, to_version, to_built, scheduled_at, timezone_offset_minutes, created_by, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(node_id) DO UPDATE SET to_version = excluded.to_version, to_built = excluded.to_built,
 			scheduled_at = excluded.scheduled_at, timezone_offset_minutes = excluded.timezone_offset_minutes,
-			created_by = excluded.created_by, created_at = excluded.created_at`,
+			created_by = excluded.created_by, created_at = excluded.created_at, missed_at = 0`,
 		r.NodeID, r.ToVersion, r.ToBuilt, r.ScheduledAt, r.TimezoneOffsetMinutes, r.CreatedBy, unix(r.CreatedAt))
 	return err
 }
 
-// NodeUpdateSchedules returns all pending schedules indexed by node id.
+// NodeUpdateSchedules returns all pending schedules indexed by node id, missed ones included.
 func (s *Store) NodeUpdateSchedules(ctx context.Context) (map[string]NodeUpdateScheduleRow, error) {
 	rows, err := s.R.QueryContext(ctx, `
-		SELECT node_id, to_version, to_built, scheduled_at, timezone_offset_minutes, created_by, created_at
+		SELECT node_id, to_version, to_built, scheduled_at, timezone_offset_minutes, created_by, created_at, missed_at
 		FROM node_update_schedule ORDER BY scheduled_at, node_id`)
 	if err != nil {
 		return nil, err
@@ -39,7 +41,7 @@ func (s *Store) NodeUpdateSchedules(ctx context.Context) (map[string]NodeUpdateS
 	for rows.Next() {
 		var r NodeUpdateScheduleRow
 		var created int64
-		if err := rows.Scan(&r.NodeID, &r.ToVersion, &r.ToBuilt, &r.ScheduledAt, &r.TimezoneOffsetMinutes, &r.CreatedBy, &created); err != nil {
+		if err := rows.Scan(&r.NodeID, &r.ToVersion, &r.ToBuilt, &r.ScheduledAt, &r.TimezoneOffsetMinutes, &r.CreatedBy, &created, &r.MissedAt); err != nil {
 			return nil, err
 		}
 		r.CreatedAt = fromUnix(created)
@@ -48,11 +50,21 @@ func (s *Store) NodeUpdateSchedules(ctx context.Context) (map[string]NodeUpdateS
 	return out, rows.Err()
 }
 
-// DueNodeUpdateSchedules returns the earliest schedules whose requested time has arrived.
+// MarkNodeUpdateSchedulesMissed marks the schedules whose time was before cutoff and that have not started: they
+// never start by themselves afterwards. It returns how many it marked.
+func (s *Store) MarkNodeUpdateSchedulesMissed(ctx context.Context, cutoff, now time.Time) (int64, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE node_update_schedule SET missed_at = ? WHERE missed_at = 0 AND scheduled_at < ?`, unix(now), unix(cutoff))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// DueNodeUpdateSchedules returns the earliest schedules whose requested time has arrived and that were not missed.
 func (s *Store) DueNodeUpdateSchedules(ctx context.Context, now time.Time) ([]NodeUpdateScheduleRow, error) {
 	rows, err := s.R.QueryContext(ctx, `
 		SELECT node_id, to_version, to_built, scheduled_at, timezone_offset_minutes, created_by, created_at
-		FROM node_update_schedule WHERE scheduled_at <= ? ORDER BY scheduled_at, node_id LIMIT 100`, unix(now))
+		FROM node_update_schedule WHERE scheduled_at <= ? AND missed_at = 0 ORDER BY scheduled_at, node_id LIMIT 100`, unix(now))
 	if err != nil {
 		return nil, err
 	}

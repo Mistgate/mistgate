@@ -153,6 +153,12 @@ func TestBundleRescanIfChanged(t *testing.T) {
 	if e.s.current() != again {
 		t.Fatal("unchanged again")
 	}
+	// an unchanged directory whose trusted manifest has expired is read again: it is no longer trusted
+	e.clk.Advance(1001 * time.Second)
+	e.s.rescanIfChanged()
+	if v := e.s.current().view; v.Status != adminv1.BundleStatus_BUNDLE_STATUS_UNTRUSTED || v.ErrorKey != "updates.bundle.err.expired" {
+		t.Fatalf("an expired bundle stays trusted: %+v", v)
+	}
 }
 
 type chunkSink struct {

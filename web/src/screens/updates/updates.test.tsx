@@ -264,6 +264,12 @@ describe("the Updates screen", () => {
     expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
   });
 
+  it("marks a schedule that missed its window", async () => {
+    await mount(page({ nodes: [node({ state: NodeUpdateState.OFFLINE, scheduledUnix: 1_800_000_000, scheduledVersion: "0.2.0-bbb", scheduledBuilt: 200, scheduledMissed: true })] }));
+    expect(text()).toContain("Missed 0.2.0-bbb · 2027-01-15 08:00 UTC+00:00");
+    expect(text()).toContain("will not start by itself");
+  });
+
   it("adds a different node after the active rollout stage instead of blocking it", async () => {
     startRollout.mockResolvedValue({});
     const active = rollout({ steps: [step({ state: StepState.GATING })] });

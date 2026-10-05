@@ -2,6 +2,7 @@ package update
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,7 +49,7 @@ func TestScheduledNodeUpdateSurvivesRestartAndRunsOnlyForSelectedNode(t *testing
 		t.Fatal(err)
 	}
 	wantTime, _ := parseScheduleLocalTime(local, defaultScheduleTimezoneOffsetMin)
-	if schedule.ScheduledAt != wantTime.Unix() || schedule.TimezoneOffsetMinutes != 180 {
+	if schedule.ScheduledAt != wantTime.Unix() || schedule.TimezoneOffsetMinutes != defaultScheduleTimezoneOffsetMin {
 		t.Fatalf("saved fixed-offset schedule: %+v, want unix %d", schedule, wantTime.Unix())
 	}
 	read := func() *adminv1.GetUpdatesResponse {
@@ -62,12 +63,12 @@ func TestScheduledNodeUpdateSurvivesRestartAndRunsOnlyForSelectedNode(t *testing
 	assertScheduled := func() {
 		e.t.Helper()
 		resp := read()
-		if resp.GetScheduleTimezoneOffsetMinutes() != 180 {
-			e.t.Fatalf("default schedule timezone = %d, want UTC+03:00", resp.GetScheduleTimezoneOffsetMinutes())
+		if resp.GetScheduleTimezoneOffsetMinutes() != defaultScheduleTimezoneOffsetMin {
+			e.t.Fatalf("default schedule timezone = %d, want UTC", resp.GetScheduleTimezoneOffsetMinutes())
 		}
 		for _, node := range resp.GetNodes() {
 			if node.GetNodeId() == selected {
-				if node.GetScheduledUnix() != schedule.ScheduledAt || node.GetScheduledVersion() != b.manifest.Version || node.GetScheduledTimezoneOffsetMinutes() != 180 {
+				if node.GetScheduledUnix() != schedule.ScheduledAt || node.GetScheduledVersion() != b.manifest.Version || node.GetScheduledTimezoneOffsetMinutes() != defaultScheduleTimezoneOffsetMin {
 					e.t.Fatalf("scheduled node view = %+v", node)
 				}
 				return
@@ -150,7 +151,7 @@ func TestScheduleNodeUpdateRejectsChangedTimezoneAndRelease(t *testing.T) {
 	e.defaultBundle()
 	id := e.addNode("node", nodeOpts{})
 	b := e.s.current()
-	local := scheduleLocalAfter(e, 2*time.Hour, defaultScheduleTimezoneOffsetMin)
+	local := scheduleLocalAfter(e, 6*time.Hour, defaultScheduleTimezoneOffsetMin)
 	if err := e.st.SetSettings(e.ctx, map[string]string{updateScheduleTimezoneKey: "240"}); err != nil {
 		t.Fatal(err)
 	}
@@ -159,5 +160,88 @@ func TestScheduleNodeUpdateRejectsChangedTimezoneAndRelease(t *testing.T) {
 	}
 	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, 240, "old-version", b.manifest.Built); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("changed release: %v", err)
+	}
+}
+
+// A schedule cannot outlive its signed bundle: the agent would refuse an expired manifest at that time anyway.
+func TestScheduleNodeUpdateRejectsATimeAfterTheBundleExpires(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle() // expires in 30 days
+	id := e.addNode("node", nodeOpts{})
+	b := e.s.current()
+	late := scheduleLocalAfter(e, 31*24*time.Hour, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, late, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); connect.CodeOf(err) != connect.CodeInvalidArgument ||
+		!strings.Contains(err.Error(), "expires") {
+		t.Fatalf("a schedule after the bundle expires: %v", err)
+	}
+	ok := scheduleLocalAfter(e, 29*24*time.Hour, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, ok, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+		t.Fatalf("a schedule before the bundle expires: %v", err)
+	}
+}
+
+// A schedule that could not start near its time (the node was offline, another update was running) is marked missed
+// instead of starting at any hour later; scheduling again clears the mark.
+func TestScheduledNodeUpdateIsMarkedMissedAfterItsWindow(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	id := e.addNode("offline", nodeOpts{offline: true})
+	b := e.s.current()
+	local := scheduleLocalAfter(e, 2*time.Minute, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+		t.Fatal(err)
+	}
+	missed := func() bool {
+		t.Helper()
+		resp, err := (rpc{e.s}).GetUpdates(e.ctx, connect.NewRequest(&adminv1.GetUpdatesRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, n := range resp.Msg.GetNodes() {
+			if n.GetNodeId() == id {
+				if n.GetScheduledUnix() == 0 {
+					t.Fatal("the schedule is gone")
+				}
+				return n.GetScheduledMissed()
+			}
+		}
+		t.Fatal("node missing")
+		return false
+	}
+	e.clk.Advance(scheduleMissAfter) // still inside the window: it waits for the node
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if missed() {
+		t.Fatal("marked missed inside its window")
+	}
+	e.clk.Advance(5 * time.Minute)
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if !missed() {
+		t.Fatal("not marked missed after its window")
+	}
+	e.fl.mu.Lock()
+	e.fl.live[id] = true // the node comes back hours late: nothing starts by itself
+	e.fl.mu.Unlock()
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if _, err := e.st.ActiveRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a missed schedule started: %v", err)
+	}
+	again := scheduleLocalAfter(e, time.Hour, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, again, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+		t.Fatal(err)
+	}
+	if missed() {
+		t.Fatal("scheduling again kept the missed mark")
+	}
+	e.clk.Advance(time.Hour)
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if _, err := e.st.ActiveRollout(e.ctx); err != nil {
+		t.Fatalf("the new schedule did not start: %v", err)
+	}
+}
+
+func TestUpdateTimezoneDefaultsToUTC(t *testing.T) {
+	e := newEnv(t)
+	if got, err := e.s.scheduleTimezoneOffset(e.ctx); err != nil || got != 0 {
+		t.Fatalf("default offset of a new installation = %d, %v", got, err)
 	}
 }

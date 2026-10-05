@@ -67,11 +67,13 @@ func (s *Service) rescan() *bundleState {
 	return bs
 }
 
-// rescanIfChanged is the periodic poll: a scan only when the directory listing (names, sizes, mtimes) changed.
+// rescanIfChanged is the periodic poll: a scan only when the directory listing (names, sizes, mtimes) changed, or
+// when the trusted manifest has expired since the last scan (an expired bundle must not stay trusted in memory).
 func (s *Service) rescanIfChanged() {
 	stamp := dirStamp(s.dist)
 	s.bmu.Lock()
-	same := s.bundle != nil && s.bundle.stamp == stamp
+	b := s.bundle
+	same := b != nil && b.stamp == stamp && !(b.trusted && s.now().Unix() > b.manifest.Expires)
 	s.bmu.Unlock()
 	if !same {
 		s.rescan()

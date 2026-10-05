@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -162,7 +163,7 @@ func newPanelUpdater(t *testing.T, f *panelFixture, rec *recorder, mutate func(*
 	cfg := PanelUpdateConfig{
 		CurrentBuilt: panelOwnBuilt, Key: panelTestPub, DataDir: dataDir, ServiceUnit: "mistgate.service",
 		Executable: filepath.Join(dataDir, "mistgate"), Enabled: true, OS: "linux", Arch: "amd64", HTTPClient: client,
-		Runner: rec.run, Now: func() time.Time { return panelTestNow },
+		Runner: rec.run, Now: func() time.Time { return panelTestNow }, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -486,7 +487,7 @@ func helperEnv(t *testing.T) (dataDir, target string) {
 func helperConfig(t *testing.T, f *panelFixture, dataDir, target string) PanelUpdateConfig {
 	client, _ := f.client(t)
 	return PanelUpdateConfig{CurrentBuilt: panelOwnBuilt, Key: panelTestPub, DataDir: dataDir, ServiceUnit: "mistgate.service", Executable: target,
-		OS: "linux", Arch: "amd64", HTTPClient: client, Now: func() time.Time { return panelTestNow }}
+		OS: "linux", Arch: "amd64", HTTPClient: client, Now: func() time.Time { return panelTestNow }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 }
 
 func TestRootHelperInstallsTheConfirmedSignedRelease(t *testing.T) {
