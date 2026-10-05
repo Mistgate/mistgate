@@ -27,24 +27,25 @@ const (
 // field that looks like one must be listed in TestTokenReachableResponsesCarryNoSecret with the reason it is safe.
 var tokenProcedures = map[string]int{
 	// Reads.
-	adminv1connect.FleetServiceOverviewProcedure:                    TokenAccessDirect,
-	adminv1connect.FleetServiceListEventsProcedure:                  TokenAccessDirect,
-	adminv1connect.NodeServiceListNodesProcedure:                    TokenAccessDirect,
-	adminv1connect.NodeServiceGetNodeProcedure:                      TokenAccessDirect,
-	adminv1connect.HealthServiceListAlertsProcedure:                 TokenAccessDirect,
-	adminv1connect.HealthServiceGetChecksProcedure:                  TokenAccessDirect,
-	adminv1connect.HealthServiceGetDoctorProcedure:                  TokenAccessDirect,
-	adminv1connect.UserServiceListUsersProcedure:                    TokenAccessDirect,
-	adminv1connect.UserServiceGetUserProcedure:                      TokenAccessDirect,
-	adminv1connect.GroupServiceListGroupsProcedure:                  TokenAccessDirect,
-	adminv1connect.ProfileServiceListProfilesProcedure:              TokenAccessDirect,
-	adminv1connect.ProfileServiceGetProfileProcedure:                TokenAccessDirect,
-	adminv1connect.SubscriptionServiceListClientsProcedure:          TokenAccessDirect,
-	adminv1connect.SubscriptionServiceTestUserAgentProcedure:        TokenAccessDirect,
-	adminv1connect.UpdateServiceGetUpdatesProcedure:                 TokenAccessDirect,
-	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:    TokenAccessPlanning, // node_install_plan only
-	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure: TokenAccessDirect,
-	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:   TokenAccessApproved,
+	adminv1connect.FleetServiceOverviewProcedure:                       TokenAccessDirect,
+	adminv1connect.FleetServiceListEventsProcedure:                     TokenAccessDirect,
+	adminv1connect.NodeServiceListNodesProcedure:                       TokenAccessDirect,
+	adminv1connect.NodeServiceGetNodeProcedure:                         TokenAccessDirect,
+	adminv1connect.HealthServiceListAlertsProcedure:                    TokenAccessDirect,
+	adminv1connect.HealthServiceGetChecksProcedure:                     TokenAccessDirect,
+	adminv1connect.HealthServiceGetDoctorProcedure:                     TokenAccessDirect,
+	adminv1connect.UserServiceListUsersProcedure:                       TokenAccessDirect,
+	adminv1connect.UserServiceGetUserProcedure:                         TokenAccessDirect,
+	adminv1connect.GroupServiceListGroupsProcedure:                     TokenAccessDirect,
+	adminv1connect.ProfileServiceListProfilesProcedure:                 TokenAccessDirect,
+	adminv1connect.ProfileServiceGetProfileProcedure:                   TokenAccessDirect,
+	adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure: TokenAccessDirect, // the shared page: names, texts, public app links
+	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
+	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
+	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
+	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
+	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
+	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,
@@ -68,6 +69,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       TokenAccessApproved,
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              TokenAccessApproved,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: TokenAccessApproved,
+	// What every user's page shows: one app at a time, through subscription_app_upsert / _remove (level write).
+	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: TokenAccessApproved,
 }
 
 // stepUpProcedures lists exactly the procedures whose handlers call RequireStepUp. A token cannot call them
@@ -124,6 +127,8 @@ var grantProcedures = map[string]string{
 	"update_timezone":             adminv1connect.UpdateServiceSetUpdateTimezoneProcedure,
 	NodeInstallTool:               adminv1connect.ProvisioningServiceStartNodeProvisionProcedure,
 	"node_server_password_rotate": adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure,
+	"subscription_app_upsert":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
+	"subscription_app_remove":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
 }
 
 // ProcedureRole is the lowest role that may call a procedure: "readonly", "helper" or "owner". Unknown
