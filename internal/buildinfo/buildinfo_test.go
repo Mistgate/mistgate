@@ -64,6 +64,37 @@ func TestLoadReleasePublicKeyPersistsAndKeepsInstallationKey(t *testing.T) {
 	}
 }
 
+// A release.pub that differs from the compiled-in key is never trusted silently, in either direction: nothing is
+// trusted until the owner confirms the binary's key with TrustCompiledReleaseKey.
+func TestLoadReleasePublicKeyRefusesAMismatchUntilTheKeyIsTrusted(t *testing.T) {
+	defer func(old string) { ReleaseKey = old }(ReleaseKey)
+	dir := t.TempDir()
+	stored := make(ed25519.PublicKey, ed25519.PublicKeySize)
+	stored[0] = 1
+	compiled := make(ed25519.PublicKey, ed25519.PublicKeySize)
+	compiled[0] = 2
+	if err := os.WriteFile(filepath.Join(dir, "release.pub"), []byte(base64.StdEncoding.EncodeToString(stored)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ReleaseKey = base64.StdEncoding.EncodeToString(compiled)
+	if got, err := LoadReleasePublicKey(dir); !errors.Is(err, ErrReleaseKeyMismatch) || got != nil {
+		t.Fatalf("mismatch = %x, %v", got, err)
+	}
+
+	previous, current, err := TrustCompiledReleaseKey(dir)
+	if err != nil || !previous.Equal(stored) || !current.Equal(compiled) {
+		t.Fatalf("trust = %x %x %v", previous, current, err)
+	}
+	if got, err := LoadReleasePublicKey(dir); err != nil || !got.Equal(compiled) {
+		t.Fatalf("after the rotation = %x, %v", got, err)
+	}
+
+	ReleaseKey = ""
+	if _, _, err := TrustCompiledReleaseKey(dir); !errors.Is(err, ErrUnsignedBuild) {
+		t.Fatalf("an unsigned build trusted its (missing) key: %v", err)
+	}
+}
+
 func TestLoadReleasePublicKeyRejectsInvalidStoredKey(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "release.pub"), []byte("broken\n"), 0o600); err != nil {
@@ -88,10 +119,10 @@ func TestWriteReleaseKeyDoesNotReplaceExistingTrustRoot(t *testing.T) {
 	other := make(ed25519.PublicKey, ed25519.PublicKeySize)
 	other[0] = 99
 
-	if err := writeReleaseKey(path, want); err != nil {
+	if err := writeReleaseKey(path, want, os.Link); err != nil {
 		t.Fatalf("write initial trust root: %v", err)
 	}
-	if err := writeReleaseKey(path, other); !errors.Is(err, os.ErrExist) {
+	if err := writeReleaseKey(path, other, os.Link); !errors.Is(err, os.ErrExist) {
 		t.Fatalf("second write error = %v, want %v", err, os.ErrExist)
 	}
 

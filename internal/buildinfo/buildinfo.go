@@ -52,26 +52,44 @@ func ReleasePublicKey() (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(b), nil
 }
 
-// LoadReleasePublicKey keeps the release trust root stable when a panel binary is replaced by a generic GitHub
-// release build. The first keyed build stores its public key in the data directory; subsequent builds use that
-// installation key even when the downloaded binary was built without a per-installation key.
+// ErrReleaseKeyMismatch is LoadReleasePublicKey's answer when <data-dir>/release.pub and the compiled-in key differ.
+var ErrReleaseKeyMismatch = errors.New("buildinfo: <data-dir>/release.pub is not the release key compiled into this binary; " +
+	"nothing is trusted until you confirm the new key with `mistgate release trust-key`")
+
+// LoadReleasePublicKey is the installation's release trust root. The first keyed build stores its public key in the
+// data directory. A later build with the same key uses it; one with another compiled-in key gets
+// ErrReleaseKeyMismatch (a key rotation is an explicit step, TrustCompiledReleaseKey, never a side effect of a file
+// in the data directory or of a new binary); a build without a key keeps using the stored one.
 func LoadReleasePublicKey(dataDir string) (ed25519.PublicKey, error) {
 	if dataDir == "" {
 		return nil, errors.New("buildinfo: data directory is empty")
 	}
 	path := filepath.Join(dataDir, "release.pub")
+	compiled, compiledErr := ReleasePublicKey()
+	if compiledErr != nil && !errors.Is(compiledErr, ErrUnsignedBuild) {
+		return nil, compiledErr
+	}
 	b, err := os.ReadFile(path)
 	if err == nil {
-		return decodeReleaseKey(strings.TrimSpace(string(b)))
+		stored, err := decodeReleaseKey(strings.TrimSpace(string(b)))
+		if err != nil {
+			return nil, err
+		}
+		if compiledErr == nil && !compiled.Equal(stored) {
+			return nil, ErrReleaseKeyMismatch
+		}
+		return stored, nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("buildinfo: read release public key: %w", err)
 	}
-	pub, err := ReleasePublicKey()
+	pub, err := compiled, compiledErr
 	if err != nil {
 		return nil, err
 	}
-	if err := writeReleaseKey(path, pub); err != nil {
+	// os.Link publishes the fully written key atomically without replacing an existing trust root: two simultaneous
+	// first starts could otherwise disagree about which installation key won.
+	if err := writeReleaseKey(path, pub, os.Link); err != nil {
 		// A concurrent panel start may have created the file. Its contents are authoritative.
 		if b, readErr := os.ReadFile(path); readErr == nil {
 			return decodeReleaseKey(strings.TrimSpace(string(b)))
@@ -79,6 +97,28 @@ func LoadReleasePublicKey(dataDir string) (ed25519.PublicKey, error) {
 		return nil, fmt.Errorf("buildinfo: persist release public key: %w", err)
 	}
 	return pub, nil
+}
+
+// TrustCompiledReleaseKey makes the key compiled into this binary the installation's release key: the explicit step
+// of a key rotation. It returns the key it replaced (nil when there was none).
+func TrustCompiledReleaseKey(dataDir string) (previous, current ed25519.PublicKey, err error) {
+	current, err = ReleasePublicKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	if dataDir == "" {
+		return nil, nil, errors.New("buildinfo: data directory is empty")
+	}
+	path := filepath.Join(dataDir, "release.pub")
+	if b, err := os.ReadFile(path); err == nil {
+		previous, _ = decodeReleaseKey(strings.TrimSpace(string(b)))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, nil, err
+	}
+	if err := writeReleaseKey(path, current, os.Rename); err != nil {
+		return nil, nil, err
+	}
+	return previous, current, nil
 }
 
 func decodeReleaseKey(s string) (ed25519.PublicKey, error) {
@@ -89,7 +129,9 @@ func decodeReleaseKey(s string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(b), nil
 }
 
-func writeReleaseKey(path string, pub ed25519.PublicKey) error {
+// writeReleaseKey writes the key to a temporary file and publishes it at path with publish (os.Link: never over an
+// existing key; os.Rename: replace it).
+func writeReleaseKey(path string, pub ed25519.PublicKey, publish func(oldname, newname string) error) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".release.pub-*")
 	if err != nil {
 		return err
@@ -111,10 +153,7 @@ func writeReleaseKey(path string, pub ed25519.PublicKey) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	// Publish the fully written key atomically without replacing an existing trust root. os.Rename
-	// replaces the destination on Unix, so two simultaneous first starts could otherwise disagree
-	// about which installation key won.
-	return os.Link(name, path)
+	return publish(name, path)
 }
 
 // KeyFingerprint is the first 16 hex characters of SHA-256 of a public key: what `mistgate release keygen`

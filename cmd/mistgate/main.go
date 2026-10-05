@@ -22,7 +22,8 @@ commands:
   auth      operator commands on the panel server: "auth turnstile off" is the captcha kill switch,
             "auth reset-login <login>" a new password and authenticator app after a lost phone
   mcp       stdio proxy to the panel's MCP endpoint for agent clients: --url <admin url> --token-file <file>
-  release   the owner's release key and signed bundles for node updates: "release keygen", "release sign"
+  release   the owner's release key and signed releases: "release keygen", "release build", "release sign";
+            on the panel server "release trust-key" after a key rotation
   version   print the version, build time and the release key fingerprint
 `
 

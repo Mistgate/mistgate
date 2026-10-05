@@ -434,6 +434,34 @@ func TestGoBuildReleaseIsReproducible(t *testing.T) {
 	}
 }
 
+// trust-key is the explicit step of a key rotation: release.pub becomes this binary's compiled-in key.
+func TestReleaseTrustKey(t *testing.T) {
+	_, oldPub := newKeyFile(t)
+	_, newPub := newKeyFile(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "release.pub"), []byte(oldPub+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previous := buildinfo.ReleaseKey
+	buildinfo.ReleaseKey = newPub
+	t.Cleanup(func() { buildinfo.ReleaseKey = previous })
+	if _, err := buildinfo.LoadReleasePublicKey(dir); !errors.Is(err, buildinfo.ErrReleaseKeyMismatch) {
+		t.Fatalf("before: %v", err)
+	}
+	var out bytes.Buffer
+	if err := runRelease([]string{"trust-key", "--data-dir", dir}, &out); err != nil {
+		t.Fatal(err)
+	}
+	oldKey, _ := decodeTestKey(oldPub)
+	newKey, _ := decodeTestKey(newPub)
+	if !strings.Contains(out.String(), buildinfo.KeyFingerprint(oldKey)+" -> "+buildinfo.KeyFingerprint(newKey)) {
+		t.Fatalf("output %q", out.String())
+	}
+	if got, err := buildinfo.LoadReleasePublicKey(dir); err != nil || !got.Equal(newKey) {
+		t.Fatalf("after: %x %v", got, err)
+	}
+}
+
 func TestVersionCommandPrintsTheBuild(t *testing.T) {
 	var out bytes.Buffer
 	printBuild(&out)

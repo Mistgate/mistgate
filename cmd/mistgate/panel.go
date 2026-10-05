@@ -115,13 +115,16 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	fl.SetHealth(hl)
 
 	// Node-agent updates: the signed bundle in <data-dir>/dist, its distribution through the agent endpoint and
-	// the staged rollout. Keep the installation's release key in dataDir so a generic GitHub panel build does not
-	// lose the key that its nodes already trust.
+	// the staged rollout. The installation's release key is kept in dataDir; a binary with another compiled-in key
+	// trusts nothing until the owner runs `mistgate release trust-key`.
 	relKey, err := buildinfo.ReleasePublicKey()
 	if o.dataDir != "" {
 		relKey, err = buildinfo.LoadReleasePublicKey(o.dataDir)
 	}
-	if err != nil && !errors.Is(err, buildinfo.ErrUnsignedBuild) {
+	switch {
+	case errors.Is(err, buildinfo.ErrReleaseKeyMismatch):
+		log.Error("release key mismatch: node bundles are not trusted and rollouts are off", "err", err)
+	case err != nil && !errors.Is(err, buildinfo.ErrUnsignedBuild):
 		log.Warn("release key is unusable, node updates are off", "err", err)
 	}
 	// A panel release is verified with the compiled-in key only, as the root helper does: release.pub is writable by

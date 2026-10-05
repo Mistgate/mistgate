@@ -25,6 +25,7 @@ const releaseUsage = `usage:
   mistgate release keygen --out FILE
   mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] NAME... --out DIR
   mistgate release sign --key FILE --version V [--built UNIX] [--expires 30d] [--source DIR] BINARY... --out DIR
+  mistgate release trust-key [--data-dir DIR]
 
   keygen  make the owner's release key: the private key goes to FILE (mode 0600, never overwritten), the public key and
           its fingerprint are printed. Put the public key into the build (RELEASE_KEY=<public key> make build).
@@ -35,6 +36,9 @@ const releaseUsage = `usage:
           binaries, DIR/panel-manifest.json and DIR/panel-manifest.sig for the panel binaries, and copy the binaries
           into DIR. Signing a panel binary needs the SPA built in --source first (cd web && pnpm install
           --frozen-lockfile && pnpm build).
+  trust-key  after a key rotation: make the release key compiled into this binary the installation's key
+          (<data-dir>/release.pub). Until then a panel whose compiled key differs from release.pub trusts no bundle.
+          Restart the panel afterwards.
 `
 
 // runRelease implements `mistgate release ...`, the owner's commands on the machine that holds the release key.
@@ -49,8 +53,31 @@ func runRelease(args []string, out io.Writer) error {
 		return releaseBuild(args[1:], out)
 	case "sign":
 		return releaseSign(args[1:], out, time.Now())
+	case "trust-key":
+		return releaseTrustKey(args[1:], out)
 	}
 	return errors.New(releaseUsage)
+}
+
+// releaseTrustKey implements `release trust-key`: the explicit step of a release key rotation on the panel server.
+func releaseTrustKey(args []string, out io.Writer) error {
+	dataDir, pos, err := authFlags("release trust-key", args, nil)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 0 {
+		return errors.New(releaseUsage)
+	}
+	previous, current, err := buildinfo.TrustCompiledReleaseKey(dataDir)
+	if err != nil {
+		return err
+	}
+	from := "none"
+	if previous != nil {
+		from = buildinfo.KeyFingerprint(previous)
+	}
+	fmt.Fprintf(out, "release key of %s: %s -> %s\nRestart the panel to use it.\n", dataDir, from, buildinfo.KeyFingerprint(current))
+	return nil
 }
 
 func releaseKeygen(args []string, out io.Writer) error {
