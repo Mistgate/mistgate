@@ -43,7 +43,7 @@ func TestSeveralAppsOnOnePlatformAndKind(t *testing.T) {
 			win = append(win, a.Name)
 		}
 	}
-	if strings.Join(win, ",") != "Happ,Example Client,Another Client" {
+	if strings.Join(win, ",") != "kl!ck,Happ,Example Client,Another Client" {
 		t.Errorf("order or content lost on save: %v", win)
 	}
 	if a := got.Apps[len(s.Apps)-3]; a.Description != "Hysteria2 и AmneziaWG в одном приложении" || !a.Recommended {
@@ -51,25 +51,43 @@ func TestSeveralAppsOnOnePlatformAndKind(t *testing.T) {
 	}
 }
 
-// A fresh install: Happ leads every platform it is on, AmneziaVPN comes from the store on a phone and from the site on a
-// computer, and servers are named by country.
-func TestDefaultsRecommendHappAndLinkTheStores(t *testing.T) {
+// A fresh install: kl!ck leads Windows and macOS (Happ stays there, second), Happ leads the phones, AmneziaVPN comes
+// from the store on a phone and from the site on a computer, and servers are named by country.
+func TestDefaultsRecommendKlickOnDesktopHappOnPhones(t *testing.T) {
 	s := Defaults()
 	if err := Validate(s); err != nil {
 		t.Fatal(err)
 	}
+	const klickTmpl = "klick://add?url={url_enc}&name={name_enc}"
 	amnezia := map[adminv1.Platform]string{}
+	byPlatform := map[adminv1.Platform][]*adminv1.PlatformApp{} // the apps of the subscription-link kind, in page order
 	for _, a := range s.Apps {
 		switch a.Kind {
 		case adminv1.App_APP_HAPP:
-			if !a.Recommended {
-				t.Errorf("Happ on %v is not recommended", a.Platform)
-			}
+			byPlatform[a.Platform] = append(byPlatform[a.Platform], a)
 		case adminv1.App_APP_AMNEZIA:
 			if a.Recommended {
 				t.Errorf("AmneziaVPN on %v is recommended", a.Platform)
 			}
 			amnezia[a.Platform] = a.DownloadUrl
+		}
+	}
+	for _, p := range []adminv1.Platform{adminv1.Platform_PLATFORM_WINDOWS, adminv1.Platform_PLATFORM_MACOS} {
+		got := byPlatform[p]
+		if len(got) != 2 {
+			t.Fatalf("%v: %d apps, want kl!ck and Happ", p, len(got))
+		}
+		k, h := got[0], got[1]
+		if k.Name != "kl!ck" || !k.Recommended || k.AddLinkTemplate != klickTmpl || k.DownloadUrl != "https://github.com/vbu00/klick/releases/latest" {
+			t.Errorf("%v: first app = %+v, want the recommended kl!ck", p, k)
+		}
+		if h.Name != "Happ" || h.Recommended || h.AddLinkTemplate != "happ://add/{url}" {
+			t.Errorf("%v: second app = %+v, want Happ, not recommended", p, h)
+		}
+	}
+	for _, p := range []adminv1.Platform{adminv1.Platform_PLATFORM_IOS, adminv1.Platform_PLATFORM_ANDROID} {
+		if got := byPlatform[p]; len(got) != 1 || got[0].Name != "Happ" || !got[0].Recommended {
+			t.Errorf("%v: apps = %+v, want only the recommended Happ", p, got)
 		}
 	}
 	if amnezia[adminv1.Platform_PLATFORM_IOS] != "https://apps.apple.com/us/app/amneziavpn/id1600529900" ||
@@ -79,6 +97,25 @@ func TestDefaultsRecommendHappAndLinkTheStores(t *testing.T) {
 	}
 	if s.ServerNameTemplate != DefaultNameTemplate {
 		t.Errorf("template = %q", s.ServerNameTemplate)
+	}
+}
+
+// Defaults seed only an install that never saved its subscription settings: a stored document is read as it is, so an
+// install that saved Happ-only apps keeps them (nothing rewrites stored settings).
+func TestStoredAppsAreNotReplacedByDefaults(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	stored := `{"apps":[{"platform":"PLATFORM_WINDOWS","kind":"APP_HAPP","name":"Happ","download_url":"https://example.com/h","add_link_template":"happ://add/{url}","recommended":true}],"user_page":{"show_qr":true}}`
+	if err := st.SetSettings(ctx, map[string]string{Key: stored}); err != nil {
+		t.Fatal(err)
+	}
+	NewCache(st, nil) // runs the start-up migration
+	s, err := Load(ctx, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Apps) != 1 || s.Apps[0].Name != "Happ" || !s.Apps[0].Recommended {
+		t.Errorf("stored apps changed: %+v", s.Apps)
 	}
 }
 

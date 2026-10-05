@@ -69,7 +69,7 @@ func TestSubscriptionServiceRolesAndValidation(t *testing.T) {
 		t.Fatalf("readonly read: %v", err)
 	}
 	s := got.Msg.Settings
-	if got.Msg.EffectiveTitle != "Mistgate" || s.ServerNameTemplate != subsettings.DefaultNameTemplate || s.UpdateIntervalHours != 12 || len(s.Apps) != 9 {
+	if got.Msg.EffectiveTitle != "Mistgate" || s.ServerNameTemplate != subsettings.DefaultNameTemplate || s.UpdateIntervalHours != 12 || len(s.Apps) != 11 {
 		t.Errorf("fresh install: title %q template %q interval %d apps %d", got.Msg.EffectiveTitle, s.ServerNameTemplate, s.UpdateIntervalHours, len(s.Apps))
 	}
 	if _, err := readonly.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: s})); code(err) != connect.CodePermissionDenied {

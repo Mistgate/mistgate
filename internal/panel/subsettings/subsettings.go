@@ -70,12 +70,20 @@ const DefaultUpdateHours = 12
 // and Clash Meta apps) and the Clash family `clash...`; both get the Mihomo YAML.
 var m3Rules = []string{"mihomo", "clash"}
 
-// Defaults are the settings of a fresh install: Happ on iOS, Android, Windows and macOS with
-// the happ://add link, recommended (it leads the page); AmneziaVPN for the Amnezia kind on every platform, from the
-// store on a phone; Mihomo clients get the YAML profile; users may manage their own AmneziaWG devices on the page.
+// klickRelease is the release page of kl!ck (github.com/vbu00/klick): the asset names carry the version and the
+// Windows and macOS builds are released separately, so the page, not a file, is the stable link.
+const klickRelease = "https://github.com/vbu00/klick/releases/latest"
+
+// Defaults are the settings of a fresh install: on Windows and macOS kl!ck leads the page (recommended, with its
+// klick://add link) and Happ follows; on iOS and Android Happ is recommended with the happ://add link; AmneziaVPN for
+// the Amnezia kind on every platform, from the store on a phone; Mihomo clients (kl!ck is one) get the YAML profile;
+// users may manage their own AmneziaWG devices on the page.
 func Defaults() *adminv1.SubscriptionSettings {
-	happ := func(p adminv1.Platform, dl string) *adminv1.PlatformApp {
-		return &adminv1.PlatformApp{Platform: p, Kind: adminv1.App_APP_HAPP, Name: "Happ", DownloadUrl: dl, AddLinkTemplate: "happ://add/{url}", Recommended: true}
+	happ := func(p adminv1.Platform, dl string, rec bool) *adminv1.PlatformApp {
+		return &adminv1.PlatformApp{Platform: p, Kind: adminv1.App_APP_HAPP, Name: "Happ", DownloadUrl: dl, AddLinkTemplate: "happ://add/{url}", Recommended: rec}
+	}
+	klick := func(p adminv1.Platform) *adminv1.PlatformApp {
+		return &adminv1.PlatformApp{Platform: p, Kind: adminv1.App_APP_HAPP, Name: "kl!ck", DownloadUrl: klickRelease, AddLinkTemplate: "klick://add?url={url_enc}&name={name_enc}", Recommended: true}
 	}
 	amnezia := func(p adminv1.Platform) *adminv1.PlatformApp {
 		dl := map[adminv1.Platform]string{adminv1.Platform_PLATFORM_IOS: amneziaIOS, adminv1.Platform_PLATFORM_ANDROID: amneziaAndroid}[p]
@@ -93,10 +101,12 @@ func Defaults() *adminv1.SubscriptionSettings {
 		UpdateIntervalHours: DefaultUpdateHours,
 		ServerNameTemplate:  DefaultNameTemplate,
 		Apps: []*adminv1.PlatformApp{
-			happ(adminv1.Platform_PLATFORM_IOS, "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215"),
-			happ(adminv1.Platform_PLATFORM_ANDROID, "https://play.google.com/store/apps/details?id=com.happproxy"),
-			happ(adminv1.Platform_PLATFORM_WINDOWS, "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe"),
-			happ(adminv1.Platform_PLATFORM_MACOS, "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/Happ.macOS.universal.dmg"),
+			happ(adminv1.Platform_PLATFORM_IOS, "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215", true),
+			happ(adminv1.Platform_PLATFORM_ANDROID, "https://play.google.com/store/apps/details?id=com.happproxy", true),
+			klick(adminv1.Platform_PLATFORM_WINDOWS),
+			happ(adminv1.Platform_PLATFORM_WINDOWS, "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe", false),
+			klick(adminv1.Platform_PLATFORM_MACOS),
+			happ(adminv1.Platform_PLATFORM_MACOS, "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/Happ.macOS.universal.dmg", false),
 			amnezia(adminv1.Platform_PLATFORM_IOS), amnezia(adminv1.Platform_PLATFORM_ANDROID), amnezia(adminv1.Platform_PLATFORM_WINDOWS),
 			amnezia(adminv1.Platform_PLATFORM_MACOS), amnezia(adminv1.Platform_PLATFORM_LINUX),
 		},
