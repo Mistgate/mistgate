@@ -70,6 +70,7 @@ The panel is one process. `cmd/mistgate` wires the modules together; they know e
 | `certs` | Let's Encrypt and self-signed certificates for the servers on the node. |
 | `doctor` | Host checks and the four safe fixes. |
 | `update`, `awgprep` | Self-update from signed bundles; building the AmneziaWG kernel module on request. |
+| `speedtest` | The bandwidth test: parallel downloads and uploads against a public speed server, with byte and time limits. |
 
 Engines never touch nftables, sysctl, the resolver or certificates themselves: they get what they need from the agent.
 
@@ -113,7 +114,7 @@ The panel owns the truth. For every node it computes the desired state: every se
 
 Stats batches (traffic per credential, open sessions, host metrics, the health of each server) and events are **reliable messages**: each has a sequence number, and the agent keeps it until the panel acknowledges it. The panel stores each one in a single transaction together with the last sequence number, so a batch resent after a reconnect is never counted twice. While the panel is unreachable the agent queues up to 6 hours of batches (merging batches of the same hour when more than 360 are waiting), and reports a `stats_dropped` event if it had to drop older ones. Traffic is counted in hourly buckets. A user who crosses a quota is cut off right after the batch that crossed it.
 
-Doctor reports are snapshots, not reliable messages: the newest one wins. The agent also answers commands (restart a server, kick sessions, retire, run the doctor, apply a fix, update, roll back, prepare the AmneziaWG kernel module, stream its log) with exactly one result each.
+Doctor reports are snapshots, not reliable messages: the newest one wins. The agent also answers commands (restart a server, kick sessions, retire, run the doctor, apply a fix, update, roll back, prepare the AmneziaWG kernel module, measure its bandwidth, stream its log) with exactly one result each.
 
 ## Updates, SSH installs and backups
 

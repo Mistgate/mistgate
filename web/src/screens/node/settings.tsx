@@ -22,6 +22,7 @@ import { useFmt } from "@/lib/format";
 import { meQuery } from "@/lib/session";
 import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
+import { BandwidthMeasure } from "./bandwidth-measure";
 import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
 import { DnsOptionsCard } from "./dns-options";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
@@ -202,6 +203,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           error={errors.bandwidth}
           disabled={retired}
         />
+        {!retired && owner && <BandwidthMeasure nodeId={node.id} current={f.bandwidth} onUse={(v) => set("bandwidth", v)} />}
         <TextField icon="text" tone="sand" label={t("node.settings.notes")} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("node.settings.notesPh")} maxLength={500} />
 
         <div className="rounded-card border border-line bg-surface px-3.5 py-1">

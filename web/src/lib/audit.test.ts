@@ -46,6 +46,8 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["node.restart_inbounds", { node_id: "nod_1" }],
   ["node.retire", { node_id: "nod_1", name: "de1" }],
   ["node.awg_prepare", { node_id: "nod_1", node: "de1" }],
+  ["node.bandwidth_measure", { node_id: "nod_1", node: "de1", down_mbps: "940", up_mbps: "870", server: "speed.cloudflare.com" }],
+  ["node.bandwidth_auto", { down_mbps: "940", up_mbps: "870", server: "speed.cloudflare.com", auto: "1" }],
   ["user_create", { user: "usr_1", name: "Марина" }],
   ["user_update", { user: "usr_1", name: "Марина", fields: "quota" }],
   ["user_delete", { count: 1, names: "Марина" }],

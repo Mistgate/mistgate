@@ -30,7 +30,7 @@ Mistgate needs one Linux server for the panel, one or more Linux servers for the
 | TUN device | `/dev/net/tun` for the userspace AmneziaWG backend and for WARP. On a container VPS (OpenVZ, LXC) enable TUN in the hoster's control panel. |
 | Clock | Synchronised with NTP. The agent reports a clock that differs from the panel's by more than 30 seconds, and the doctor's `time_sync` check looks at it too. |
 | Inbound ports | The UDP port of each server on the node: Hysteria2 starts at 443, an AmneziaWG profile gets a random port between 10000 and 60000. The port-hopping range of a Hysteria2 profile when you turn it on (from 1024 up, at most 20000 ports). TCP 443 for the HTTPS site Hysteria2 shows to everyone who is not a client, and for Let's Encrypt. TCP 80 for Let's Encrypt when nothing else holds it. |
-| Outbound | TCP to the panel (usually 443). Let's Encrypt, DNS, and Cloudflare's WARP endpoints when the node uses WARP. |
+| Outbound | TCP to the panel (usually 443). Let's Encrypt, DNS, and Cloudflare's WARP endpoints when the node uses WARP. HTTPS to `speed.cloudflare.com` (or, as fallbacks, `proof.ovh.net` and `cachefly.net`) only while the owner measures the node's network capacity, and once for a new node: see [Nodes](../guide/nodes.md). |
 | No management port | The agent dials the panel. Nothing on the node has to accept connections from the panel. |
 
 Good to know:

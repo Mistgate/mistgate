@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,12 +8,13 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
 import { SettingsTab } from "./settings";
 
-// Node → Settings: a new install command for an enrolled node, and what retiring says when the node could not be told.
+// Node → Settings: a new install command for an enrolled node, measuring the network capacity, and what retiring says when the node could not be told.
 
 const retireNode = vi.fn();
+const measureBandwidth = vi.fn();
 const me = vi.fn();
 vi.mock("@/lib/api", () => ({
-  nodes: { retireNode: (...a: unknown[]) => retireNode(...a), updateNode: vi.fn() },
+  nodes: { retireNode: (...a: unknown[]) => retireNode(...a), measureBandwidth: (...a: unknown[]) => measureBandwidth(...a), updateNode: vi.fn() },
   auth: { me: (...a: unknown[]) => me(...a) },
 }));
 const navigate = vi.fn();
@@ -38,7 +40,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [retireNode, me, navigate, addNode]) m.mockReset();
+  for (const m of [retireNode, measureBandwidth, me, navigate, addNode]) m.mockReset();
   serverAccess.mockReset();
   serverAccess.mockReturnValue({ data: null });
 });
@@ -106,6 +108,91 @@ describe("a new install command", () => {
   it("is not offered for a retired node", async () => {
     await mount(NodeStatus.RETIRED);
     expect(button(en["node.banner.newCommand"])).toBeUndefined();
+  });
+});
+
+describe("measuring the network capacity", () => {
+  const field = () => document.querySelector<HTMLInputElement>('input[type="number"]')!;
+  const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 9, ...over });
+
+  it("starts as a button with what it does, and a click shows it is busy until the node answers", async () => {
+    let answer!: (v: unknown) => void;
+    measureBandwidth.mockReturnValue(new Promise((r) => (answer = r)));
+    await mount(NodeStatus.ONLINE);
+    expect(text()).toContain(en["node.settings.bandwidthMeasureHint"]);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(measureBandwidth).toHaveBeenCalledWith({ nodeId: "nod_1" });
+    const busy = button(en["node.settings.bandwidthMeasuring"]);
+    expect(busy).toBeDefined();
+    expect(busy!.hasAttribute("disabled") || busy!.getAttribute("data-disabled") !== null).toBe(true);
+    expect(text()).toContain(en["node.settings.bandwidthMeasureBusy"]);
+    expect(text()).toContain("1 GB");
+    await act(async () => answer(measured()));
+    for (let i = 0; i < 3; i++) await settle();
+    expect(button(en["node.settings.bandwidthMeasuring"])).toBeUndefined();
+    expect(button(en["node.settings.bandwidthMeasure"])).toBeDefined();
+  });
+
+  it("shows the result and fills the field with the rounded download figure only when asked, leaving the saving to the form", async () => {
+    measureBandwidth.mockResolvedValue(measured());
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(text()).toContain("Measured: 937 Mbps ↓ · 871 ↑");
+    expect(text()).toContain("speed.cloudflare.com");
+    expect(field().value).toBe(""); // the measurement alone changes nothing
+    const save = button(en["common.save"])!;
+    expect(save.hasAttribute("disabled") || save.getAttribute("data-disabled") !== null).toBe(true);
+    await click(button("Use 940"));
+    expect(field().value).toBe("940");
+    const save2 = button(en["common.save"])!;
+    expect(save2.hasAttribute("disabled") || save2.getAttribute("data-disabled") !== null).toBe(false);
+    expect(button("Use 940")!.hasAttribute("disabled") || button("Use 940")!.getAttribute("data-disabled") !== null).toBe(true); // it is in the field now
+  });
+
+  it("says so when only the download could be measured", async () => {
+    measureBandwidth.mockResolvedValue(measured({ upMbps: 0 }));
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(text()).toContain("Measured: 937 Mbps ↓ · the upload could not be measured");
+    expect(button("Use 940")).toBeDefined();
+  });
+
+  it("words what the node answered", async () => {
+    for (const code of ["busy", "unreachable", "unsupported", "failed"] as const) {
+      measureBandwidth.mockResolvedValue({ downMbps: 0, upMbps: 0, server: "", errorCode: code, seconds: 0 });
+      await mount(NodeStatus.ONLINE);
+      await click(button(en["node.settings.bandwidthMeasure"]));
+      expect(document.querySelector("[role=alert]")?.textContent, code).toBe(en[`node.settings.bandwidthErr.${code}`]);
+      expect(button("Use 0")).toBeUndefined();
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+
+  it("words an offline node, an old agent and a node that did not answer", async () => {
+    for (const [err, want] of [
+      [new ConnectError("node_offline", Code.FailedPrecondition), en["err.node_offline"]],
+      [new ConnectError("agent too old", Code.FailedPrecondition), en["err.agent_too_old"]],
+      [new ConnectError("the node did not answer in time", Code.DeadlineExceeded), en["node.settings.bandwidthErr.noAnswer"]],
+    ] as const) {
+      measureBandwidth.mockRejectedValue(err);
+      await mount(NodeStatus.ONLINE);
+      await click(button(en["node.settings.bandwidthMeasure"]));
+      expect(document.querySelector("[role=alert]")?.textContent).toBe(want);
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+
+  it("is for the owner of a node that is not retired", async () => {
+    me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
+    await mount(NodeStatus.ONLINE);
+    expect(button(en["node.settings.bandwidthMeasure"])).toBeUndefined();
+    act(() => root?.unmount());
+    host?.remove();
+    me.mockResolvedValue({ admin: { id: "adm_1", role: 1 } });
+    await mount(NodeStatus.RETIRED);
+    expect(button(en["node.settings.bandwidthMeasure"])).toBeUndefined();
   });
 });
 

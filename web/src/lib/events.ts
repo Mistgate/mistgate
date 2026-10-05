@@ -56,6 +56,7 @@ const textKeys: Record<string, MessageKey> = {
   awg_kernel_prepare_done: "event.awg_kernel_prepare_done",
   awg_kernel_prepare_failed: "event.awg_kernel_prepare_failed",
   awg_kernel_switched: "event.awg_kernel_switched",
+  bandwidth_measured: "event.bandwidth_measured",
 };
 
 // Dot colour by code first (a blip is grey-blue, never red), else by severity. A restart that happened is a fact, not a

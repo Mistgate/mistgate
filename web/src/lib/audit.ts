@@ -24,6 +24,8 @@ const keys: Record<string, MessageKey> = {
   "node.restart_inbounds": "audit.node.restart_inbounds",
   "node.retire": "audit.node.retire",
   "node.awg_prepare": "audit.node.awg_prepare",
+  "node.bandwidth_measure": "audit.node.bandwidth_measure",
+  "node.bandwidth_auto": "audit.node.bandwidth_auto",
   stepup: "audit.stepup",
   captcha: "audit.captcha",
   turnstile_off: "audit.turnstile_off",

@@ -145,7 +145,7 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 | **Country** | Two-letter country, or **Not set**. Server names in the apps use it ({flag} {country}), and on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS. |
 | **Location** | Free text next to the name ("Frankfurt"). Empty shows the country name. |
 | **Provider** | The hoster, for you. |
-| **Network capacity** | Mbps, optional: the provider's symmetric limit. The node's load is its CPU use, or the busier direction of its link as a share of this capacity when that is higher; without it the load is the CPU alone (on a one-core VPS the CPU usually runs out first). The server names in Happ end with the load (" · 64%"), and the user page shows a level: low, medium or high (from 50% and 80%). Never the rates themselves, and nothing in other apps, whose names must stay stable. 0 means unknown. |
+| **Network capacity** | Mbps, optional: the provider's symmetric limit. The node's load is its CPU use, or the busier direction of its link as a share of this capacity when that is higher; without it the load is the CPU alone (on a one-core VPS the CPU usually runs out first). The server names in Happ end with the load (" · 64%"), and the user page shows a level: low, medium or high (from 50% and 80%). Never the rates themselves, and nothing in other apps, whose names must stay stable. 0 means unknown. **Measure** can fill it in: see below. |
 | **Notes** | Free text, up to 500 characters. |
 | **Drop the agent connection after** | 30–600 s, default 90. If the agent stays silent longer, the panel closes the connection. The node turns grey (**Host blip**) first; **Unreachable** comes after 10 minutes without contact. |
 | **Wait for a command result** | 10–900 s, default 120: how long the panel waits before a command counts as unanswered. |
@@ -153,6 +153,23 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 | **DNS resolvers for this node** | **Server's own resolver** (the default), **Yandex DNS** or **Cloudflare + Google**; a list of your own (up to 8 IP addresses, `ip:port` works too) shows as **Custom DNS** and is edited there. The node and its VPN engines resolve names with them, the names in its users' traffic included. With **Server's own resolver** the node uses whatever the server uses. For a node in Russia pick **Yandex DNS**, so Russian services such as gosuslugi.ru resolve reliably. |
 
 **Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts the node's Hysteria2 profiles.
+
+#### Measuring the network capacity
+
+Providers often do not state the real channel, and a virtual server's network card does not report the plan's limit, so the node can measure how fast it reaches the internet. Next to **Network capacity** the owner presses **Measure**. The agent on the node downloads for about 6 seconds over 6 parallel connections from a public speed server that needs no account (`speed.cloudflare.com`; if the node cannot reach it, a file on `proof.ovh.net`, then on `cachefly.net`), leaves out the first second (TCP is still speeding up), and then uploads for about 3 seconds over 4 connections to Cloudflare. The whole test takes about 10 seconds, moves at most 1 GB (up to 700 MB down and 300 MB up), and ends within 40 seconds whatever the servers do. Only one measurement runs on a node at a time.
+
+The panel shows "Measured: 940 Mbps ↓ · 870 ↑" and, next to it, **Use 940**. It puts the **download** figure, rounded (to 5 below 100, to 10 below 1000, to 50 above), into the field; nothing is saved until you press **Save**, and the measurement never overwrites a value you typed by itself. Uploads are measured only against Cloudflare: if the node fell back to another server, the upload is not measured.
+
+Take the number as an estimate, not as the provider's limit:
+
+- It is one short test. It depends on the route from the node to that test server, which can be slower or faster than the route to your users.
+- It measures what the node can use **now**. Whatever the node carries for its users at that moment is part of the link, and the users feel the test too: their speed may dip for those 10 seconds.
+- A very fast link (above a few Gbit/s) hits the 1 GB limit within a second or two and the result is a lower bound.
+- The result says which server answered. If your provider states the limit, keep their figure.
+
+Only the owner can measure (the API refuses tokens and MCP), and each measurement is written to the audit log (`node.bandwidth_measure`). It needs a node with the agent from this release or newer: for an older agent the panel says "agent too old" and sends nothing, and the node must be connected. The node needs outbound HTTPS to the test servers.
+
+A **new node** is measured once automatically: about 45 seconds after its agent connects for the first time after the installation, if **Network capacity** is still 0. That is the only value the panel writes by itself, and only when the field is 0; the result is in the node's events ("Network capacity measured at the first start") and in the audit log (`node.bandwidth_auto`). A node whose agent is too old, or whose test fails, is skipped without a message: press **Measure** yourself or type the number.
 
 **Block recognized BitTorrent traffic** is off by default. It blocks plaintext BitTorrent that the node's users start, on AmneziaWG in the kernel and on Hysteria2 in its engine, and writes a `torrent_attempt` event without any address. It needs an agent that supports it. See [Torrent protection](torrent-protection.md).
 
