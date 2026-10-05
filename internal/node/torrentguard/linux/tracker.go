@@ -266,25 +266,7 @@ func detectionFor(key flowKey, signature torrentguard.Protocol, tunnelIface stri
 }
 
 func detectUDPRequest(payload []byte) (torrentguard.Protocol, bool) {
-	protocol, ok := torrentguard.DetectUDP(payload)
-	if !ok {
-		return "", false
-	}
-	switch protocol {
-	case torrentguard.ProtocolBitTorrentTracker:
-		// DetectUDP recognizes only complete BEP 15 client requests.
-		return protocol, true
-	case torrentguard.ProtocolBitTorrentDHT:
-		message, valid := torrentguard.ParseKRPCMessage(payload)
-		return protocol, valid && message.Type == torrentguard.KRPCQuery
-	case torrentguard.ProtocolBitTorrentUTP:
-		header, valid := torrentguard.ParseUTPHeader(payload)
-		// A valid uTP SYN is stronger flow-start evidence than an arbitrary
-		// structurally valid DATA/STATE packet on an unrelated UDP flow.
-		return protocol, valid && header.Type == torrentguard.UTPSyn
-	default:
-		return "", false
-	}
+	return torrentguard.DetectClientUDPRequest(payload)
 }
 
 func (d *tcpDirection) feed(packet packetInfo) bool {

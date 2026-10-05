@@ -4,8 +4,10 @@
 //
 // These parsers do not identify MSE/PE-encrypted BitTorrent, BitTorrent inside
 // another VPN or proxy, or HTTPS web seeds. Unknown and malformed traffic must
-// be allowed by callers. A validated uTP header is structural evidence only
-// and should be considered in flow context when a false positive matters.
+// be allowed by callers. A validated uTP header alone is structural evidence
+// only: DetectClientUDPRequest accepts nothing but a standalone SYN, and only
+// what the client sends may be classified (a remote peer must not be able to
+// frame a user with a crafted packet).
 package torrentguard
 
 import (
@@ -86,26 +88,11 @@ const (
 	ProtocolBitTorrentTracker Protocol = "bittorrent_tracker"
 )
 
-// DetectUDP returns the protocol whose strict parser accepts packet. Tracker
-// detection covers structurally valid client requests; standalone tracker
-// responses need ParseUDPTrackerResponse and a matching observed transaction.
-// A uTP result validates the header shape and should be used in flow context.
-func DetectUDP(packet []byte) (Protocol, bool) {
-	if _, ok := ParseUDPTrackerRequest(packet); ok {
-		return ProtocolBitTorrentTracker, true
-	}
-	if _, ok := ParseKRPCMessage(packet); ok {
-		return ProtocolBitTorrentDHT, true
-	}
-	if _, ok := ParseUTPHeader(packet); ok {
-		return ProtocolBitTorrentUTP, true
-	}
-	return "", false
-}
-
-// DetectClientUDPRequest recognizes client-to-network BitTorrent requests for use at a proxy's outbound
-// UDP write point. It avoids treating ordinary DHT replies or arbitrary uTP DATA/STATE packets as proof.
-// A new uTP flow is recognized only by its standalone SYN packet.
+// DetectClientUDPRequest recognizes client-to-network BitTorrent requests: call it only on datagrams the
+// client sent. It avoids treating ordinary DHT replies or arbitrary uTP DATA/STATE packets as proof (every
+// WireGuard handshake initiation, "01 00 00 00", is a structurally valid uTP DATA header). A new uTP flow
+// is recognized only by its standalone SYN, whose timestamp_difference is zero (nothing was received yet):
+// four zero bytes a QUIC short header or other random-looking datagram almost never has.
 func DetectClientUDPRequest(packet []byte) (Protocol, bool) {
 	if _, ok := ParseUDPTrackerRequest(packet); ok {
 		return ProtocolBitTorrentTracker, true
@@ -113,7 +100,7 @@ func DetectClientUDPRequest(packet []byte) (Protocol, bool) {
 	if message, ok := ParseKRPCMessage(packet); ok && message.Type == KRPCQuery {
 		return ProtocolBitTorrentDHT, true
 	}
-	if header, ok := ParseUTPHeader(packet); ok && header.Type == UTPSyn {
+	if header, ok := ParseUTPHeader(packet); ok && header.Type == UTPSyn && header.TimestampDiff == 0 {
 		return ProtocolBitTorrentUTP, true
 	}
 	return "", false
@@ -565,6 +552,9 @@ type UTPHeader struct {
 // records. DATA may have payload after the parsed header; FIN, STATE, RESET and
 // SYN packets may not. This validates wire structure, not peer identity, so
 // callers should use the result in flow context where false positives matter.
+//
+// The layout is BEP 29's (and libutp's): type|ver, extension, connection_id,
+// timestamp_microseconds, timestamp_difference_microseconds, wnd_size, seq_nr, ack_nr.
 func ParseUTPHeader(packet []byte) (UTPHeader, bool) {
 	if len(packet) < 20 || len(packet) > maxUDPDatagramSize {
 		return UTPHeader{}, false
@@ -577,11 +567,11 @@ func ParseUTPHeader(packet []byte) (UTPHeader, bool) {
 	header := UTPHeader{
 		Type:           typ,
 		ConnectionID:   binary.BigEndian.Uint16(packet[2:4]),
-		SequenceNumber: binary.BigEndian.Uint16(packet[4:6]),
-		AckNumber:      binary.BigEndian.Uint16(packet[6:8]),
-		Timestamp:      binary.BigEndian.Uint32(packet[8:12]),
-		TimestampDiff:  binary.BigEndian.Uint32(packet[12:16]),
-		WindowSize:     binary.BigEndian.Uint32(packet[16:20]),
+		Timestamp:      binary.BigEndian.Uint32(packet[4:8]),
+		TimestampDiff:  binary.BigEndian.Uint32(packet[8:12]),
+		WindowSize:     binary.BigEndian.Uint32(packet[12:16]),
+		SequenceNumber: binary.BigEndian.Uint16(packet[16:18]),
+		AckNumber:      binary.BigEndian.Uint16(packet[18:20]),
 		HeaderLength:   20,
 	}
 	extension := packet[1]

@@ -168,10 +168,15 @@ func TestParseUTPHeader(t *testing.T) {
 	packet := make([]byte, 21)
 	packet[0] = byte(UTPData<<4) | 1
 	packet[2], packet[3] = 0x12, 0x34
-	packet[4], packet[5] = 0x00, 0x09
-	packet[20] = 0xaa // DATA payload
+	binary.BigEndian.PutUint32(packet[4:8], 1000)    // timestamp_microseconds
+	binary.BigEndian.PutUint32(packet[8:12], 77)     // timestamp_difference_microseconds
+	binary.BigEndian.PutUint32(packet[12:16], 65536) // wnd_size
+	packet[16], packet[17] = 0x00, 0x09              // seq_nr
+	packet[18], packet[19] = 0x00, 0x05              // ack_nr
+	packet[20] = 0xaa                                // DATA payload
 	header, ok := ParseUTPHeader(packet)
-	if !ok || header.Type != UTPData || header.ConnectionID != 0x1234 || header.SequenceNumber != 9 || header.HeaderLength != 20 {
+	if !ok || header.Type != UTPData || header.ConnectionID != 0x1234 || header.Timestamp != 1000 || header.TimestampDiff != 77 ||
+		header.WindowSize != 65536 || header.SequenceNumber != 9 || header.AckNumber != 5 || header.HeaderLength != 20 {
 		t.Fatalf("DATA header parse = %#v, %v", header, ok)
 	}
 
@@ -212,52 +217,52 @@ func TestParseUTPHeader(t *testing.T) {
 	}
 }
 
-func TestDetectUDPReturnsStableProtocolLabels(t *testing.T) {
+func TestDetectClientUDPRequestRequiresOutboundSignatures(t *testing.T) {
 	tracker := make([]byte, 16)
 	binary.BigEndian.PutUint64(tracker[:8], udpTrackerConnectionMagic)
-
-	krpc := []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe")
-	utp := make([]byte, 20)
-	utp[0] = byte(UTPState<<4) | 1
-
-	for _, test := range []struct {
-		name     string
-		packet   []byte
-		protocol Protocol
-	}{
-		{name: "tracker", packet: tracker, protocol: ProtocolBitTorrentTracker},
-		{name: "dht", packet: krpc, protocol: ProtocolBitTorrentDHT},
-		{name: "utp", packet: utp, protocol: ProtocolBitTorrentUTP},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			got, ok := DetectUDP(test.packet)
-			if !ok || got != test.protocol {
-				t.Fatalf("DetectUDP() = %q, %v; want %q", got, ok, test.protocol)
-			}
-		})
-	}
-	if got, ok := DetectUDP([]byte("ordinary UDP payload")); ok || got != "" {
-		t.Fatalf("unknown UDP payload classified as %q", got)
-	}
-}
-
-func TestDetectClientUDPRequestRequiresOutboundSignatures(t *testing.T) {
 	query := []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe")
 	response := []byte("d1:rd2:id20:01234567890123456789e1:t2:aa1:y1:re")
 	state := make([]byte, 20)
 	state[0] = byte(UTPState<<4) | 1
+	// A SYN as libutp sends it: a timestamp and a window, nothing received yet (timestamp_difference 0), ack_nr 0.
 	syn := make([]byte, 20)
 	syn[0] = byte(UTPSyn<<4) | 1
+	binary.BigEndian.PutUint16(syn[2:4], 0x5a5a)
+	binary.BigEndian.PutUint32(syn[4:8], 0x01020304)
+	binary.BigEndian.PutUint32(syn[12:16], 1<<20)
+	binary.BigEndian.PutUint16(syn[16:18], 0x4242)
 
-	if got, ok := DetectClientUDPRequest(query); !ok || got != ProtocolBitTorrentDHT {
-		t.Fatalf("outbound DHT query = %q, %v", got, ok)
-	}
-	for name, packet := range map[string][]byte{"DHT response": response, "uTP state": state} {
-		if got, ok := DetectClientUDPRequest(packet); ok {
-			t.Errorf("%s was classified as outbound torrent request %q", name, got)
+	for name, want := range map[string]struct {
+		packet   []byte
+		protocol Protocol
+	}{
+		"tracker":   {tracker, ProtocolBitTorrentTracker},
+		"DHT query": {query, ProtocolBitTorrentDHT},
+		"uTP SYN":   {syn, ProtocolBitTorrentUTP},
+	} {
+		if got, ok := DetectClientUDPRequest(want.packet); !ok || got != want.protocol {
+			t.Errorf("%s = %q, %v; want %q", name, got, ok, want.protocol)
 		}
 	}
-	if got, ok := DetectClientUDPRequest(syn); !ok || got != ProtocolBitTorrentUTP {
-		t.Fatalf("uTP SYN = %q, %v", got, ok)
+
+	// A QUIC short header (0b01xxxxxx, a random connection ID) that happens to read as "SYN, version 1, no extension".
+	quic := []byte{0x41, 0x00, 0x9c, 0x3e, 0x71, 0x0d, 0xa2, 0x55, 0x18, 0xe4, 0x6b, 0x30, 0xc7, 0x02, 0x8f, 0x99, 0x24, 0xd1, 0x6e, 0x0b}
+	// A WireGuard handshake initiation: type 1 and three zero bytes, a structurally valid uTP DATA header.
+	wireguard := make([]byte, 148)
+	wireguard[0] = 1
+	binary.BigEndian.PutUint32(wireguard[4:8], 0xdeadbeef)
+	synAfterReply := append([]byte(nil), syn...)
+	binary.BigEndian.PutUint32(synAfterReply[8:12], 1500)
+	for name, packet := range map[string][]byte{
+		"DHT response":                    response,
+		"uTP state":                       state,
+		"QUIC short header":               quic,
+		"WireGuard initiation":            wireguard,
+		"SYN with a timestamp difference": synAfterReply,
+		"ordinary":                        []byte("ordinary UDP payload"),
+	} {
+		if got, ok := DetectClientUDPRequest(packet); ok {
+			t.Errorf("%s was classified as an outbound torrent request %q", name, got)
+		}
 	}
 }
