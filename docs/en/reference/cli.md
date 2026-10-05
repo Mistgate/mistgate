@@ -13,6 +13,8 @@ Many flags fall back to an environment variable. A flag given on the command lin
 |---|---|
 | `serve` | Runs the panel. |
 | `setup` | Creates the data directory, the master key and the database; prints the admin URL and a one-time setup link. |
+| `backup keygen` | Makes the private recovery identity for encrypted panel backups and prints its public recipient. |
+| `backup restore` | Decrypts a downloaded panel backup into a new data directory, offline. |
 | `auth turnstile off` | Switches the Cloudflare captcha off on the sign-in and setup pages. |
 | `auth reset-login` | Gives an admin a new password and authenticator app, or adds a password login. |
 | `mcp` | A local stdio proxy to the panel's MCP endpoint, for agent clients that cannot speak HTTP. |
@@ -23,6 +25,8 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
 `mistgate` exits with 0 on success, 1 on an error (printed as `mistgate: <error>`) and 2 for an unknown command or a missing one.
+
+There is also a hidden command, `panel-update-helper`. Only the panel's updater starts it, as root: as a transient systemd unit when the panel itself runs as root, otherwise through the fixed root unit `mistgate-panel-update.service`. It is not meant to be run by hand; see [Updates](../operations/updates.md).
 
 ### mistgate serve
 
@@ -45,6 +49,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | `--agent-listen` when it names a host, else the public URL's host and port (443 when none) | The `host:port` agents dial; it goes into the install command. |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | A directory with your own decoy site. `404.html` and `429.html` in it replace the built-in error pages. |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | CIDR or IP of a reverse proxy whose `X-Forwarded-For` and `Forwarded` headers are believed. Repeatable. Without it the TCP peer is the client. |
+| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | The panel's own systemd unit, which the panel updater stops and starts again around the binary swap. Used when the panel runs as root; a panel running as another user starts the fixed root helper unit, whose command line names the unit itself. |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | Where the source code of this build is published, linked next to the version in the admin (AGPL-3.0 section 13). A fork points it at its own repository; an empty value hides the link. |
 | `--dev` | `MISTGATE_DEV` (`1`, `true`, `yes`, `on`) | off | Development mode, see below. |
 
@@ -83,6 +88,31 @@ One of `--public-url`, `--admin-host` or `--admin-listen` is required. Where the
 | `--admin-listen 127.0.0.1:8081` | `http://localhost:8081/` | `localhost` |
 
 Setup also generates the secret TLS name of the agent endpoint and the secret prefix of the subscription links. These settings cannot be changed by running `setup` again.
+
+### mistgate backup
+
+The two offline commands of [encrypted panel backups](../operations/backups.md). The backups themselves are made by the running panel (**Settings → Backups**); these commands never talk to it or to the bucket.
+
+```text
+mistgate backup keygen --identity-file FILE
+mistgate backup restore --identity-file FILE --file BACKUP.tar.gz.age --data-dir NEW-DIR
+```
+
+| Flag | Meaning |
+|---|---|
+| `keygen --identity-file` | Where to write the private age recovery identity. The file must not exist: an existing one is never overwritten. Missing parent directories are created with mode 0700, the file gets mode 0600. |
+| `restore --identity-file` | The private identity made by `backup keygen`. |
+| `restore --file` | The encrypted backup downloaded from the bucket (`.tar.gz.age`). |
+| `restore --data-dir` | A new directory for the restored data; it must not exist yet. |
+
+All flags are required; there are no environment variables. **`backup keygen`** runs once, on a trusted computer that is not the panel server. It prints the path and the public recipient (`age1…`) that goes into **Settings → Backups**; keep the identity file offline.
+
+**`backup restore`** needs no network and no running panel. It decrypts the archive, checks every file against the archive's manifest, checks the master key and the database (an archive from a newer Mistgate, whose database this binary does not know, is refused with the version that made it; the database must pass an integrity check), unpacks into a temporary directory next to the target and renames it into place only when everything passed. Point `serve --data-dir` at the new directory; when systemd hands the panel `master.key` through `LoadCredential=`, replace that credential with the restored key first.
+
+```sh
+mistgate backup restore --identity-file ./mistgate-recovery.txt \
+  --file ./backup.tar.gz.age --data-dir /var/lib/mistgate-restored
+```
 
 ### mistgate auth
 
@@ -139,7 +169,7 @@ mistgate release keygen --out ~/mistgate-release.key
 |---|---|
 | `--out` | File for the private key. It must not exist: an existing key is never overwritten. The file gets mode 0600. |
 
-Prints the public key and its fingerprint. Put the public key into the build: `RELEASE_KEY=<public key> make build`. Keep the key file offline and back it up. See [Updates](../operations/updates.md).
+Prints the public key and its fingerprint. Put the public key into the build: `RELEASE_KEY=<public key> make build`. Keep the key file offline and back it up. See [Releases and signing](../operations/releases.md).
 
 ### mistgate release build
 
@@ -180,15 +210,15 @@ mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --source ~/s
   downloaded/mistgate-linux-amd64 downloaded/mistgate-linux-arm64 --out signed
 ```
 
-See [Updates](../operations/updates.md) for the whole release.
+See [Releases and signing](../operations/releases.md) for the whole release.
 
 ### mistgate release trust-key
 
 ```text
-mistgate release trust-key [--data-dir DIR]
+mistgate release trust-key [--data-dir DIR] [--dev]
 ```
 
-Run on the panel server, as the panel's service user or root, after you rotated the release key and installed a panel built with the new key. It writes the key compiled into this binary to `<data-dir>/release.pub` and prints the old and new fingerprints. Until then a panel whose compiled-in key differs from `release.pub` logs an error and trusts no bundle. Restart the panel afterwards. `--data-dir` falls back to `MISTGATE_DATA_DIR`, then `/var/lib/mistgate`.
+Run on the panel server, as the panel's service user or root, after you rotated the release key and installed a panel built with the new key. It writes the key compiled into this binary to `<data-dir>/release.pub` and prints the old and new fingerprints. Until then a panel whose compiled-in key differs from `release.pub` logs an error and trusts no bundle. Restart the panel afterwards. `--data-dir` falls back to `MISTGATE_DATA_DIR`, then `/var/lib/mistgate`; `--dev` (or `MISTGATE_DEV`) means `./.data`. A binary built without a release key refuses.
 
 ### mistgate version
 
@@ -222,10 +252,12 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--sni` | `MISTGATE_AGENT_SNI` | none | The secret TLS name of the panel's agent endpoint. |
 | `--ca-sha256` | `MISTGATE_CA_SHA256` | none | SHA-256 fingerprint of the panel's CA certificate (64 hex digits). The agent trusts the panel only by it. |
 | `--token` | `MISTGATE_ENROLL_TOKEN` | none | The one-time enrollment token. The variable keeps it out of the process list. |
+| `--token-stdin` | none | off | Read the token from stdin instead (one line, at most 256 bytes): it stays out of the process list and the shell history. Cannot be combined with `--token` or `MISTGATE_ENROLL_TOKEN`. |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 | `--force` | none | off | Replace an existing identity. |
+| `--resume-key` | none | off | Keep the new private key in `enroll-pending.pem` in the state directory until enrollment succeeds and use it again on the next try, so an interrupted enrollment can be retried: the panel answers a repeat with the same token and key within 10 minutes with the same certificate. With `--force` a new key is made. |
 
-The first four are required. A token works once, within the time the panel showed (an hour by default). On success it prints the node id and the next step:
+`--panel`, `--sni`, `--ca-sha256` and a token (`--token`, `MISTGATE_ENROLL_TOKEN` or `--token-stdin`) are required; without them `enroll` exits with 2. A token works once, within the time the panel showed (an hour by default). The panel's [SSH install](../getting-started/ssh-install.md) runs the same `enroll` and `install` over SSH, with the token on stdin and `--token-stdin --resume-key`. On success it prints the node id and the next step:
 
 ```text
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node

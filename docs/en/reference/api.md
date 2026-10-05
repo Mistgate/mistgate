@@ -35,9 +35,11 @@ The API is defined in `proto/mistgate/admin/v1/`. Generated code is in the repos
 | `SubscriptionService` | `subscription.proto` | Subscription settings and app rules |
 | `DnsService` | `dns.proto` | DNS presets |
 | `HealthService` | `health.proto` | Alerts, client-eye checks, the doctor and its fixes |
-| `UpdateService` | `update.proto` | Release bundle, node updates and rollouts |
+| `UpdateService` | `update.proto` | Release bundle, node updates, schedules and rollouts, panel updates |
+| `ProvisioningService` | `provisioning.proto` | Installing nodes over SSH and the saved SSH access of nodes |
 | `WarpService` | `warp.proto` | WARP accounts of nodes |
 | `AwgService` | `awg.proto` | Helpers of the AmneziaWG profile editor |
+| `BackupService` | `backup.proto` | Encrypted panel backups |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API tokens and the owner's approvals |
 
 The comments in the proto files are the reference for every field. Conventions (`common.proto`):
@@ -110,7 +112,7 @@ An error comes back as JSON with an HTTP error status:
 
 ### With a generated client
 
-The Go packages are importable from the module `github.com/mistgate/mistgate` (there are no tagged releases yet: pin a commit). The client's base URL is the admin URL plus `api`:
+The Go packages are importable from the module `github.com/mistgate/mistgate`; pin a release tag or a commit, since the API may still change before 1.0. The client's base URL is the admin URL plus `api`:
 
 ```go
 package main
@@ -181,11 +183,12 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `AuthService.ListAudit` | no | no | yes |
 | `HealthService.ApplyFix` | no | no | only through an approved MCP plan |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | no | no | only through an approved MCP plan |
+| `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone` | no | no | only through an approved MCP plan |
 | `ProvisioningService.ListNodeServerAccess` (connection metadata, never a password) | no | no | yes |
 | `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
 
-Closed to every token: deleting users, the subscription link, devices and their keys, node enrollment, settings, restarts, logs and retirement, every change to profiles, groups, DNS presets and subscription settings, WARP, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
+Closed to every token: deleting users, the subscription link, devices and their keys, node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), every change to profiles, groups, DNS presets and subscription settings, WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 
 ## Changes that need the owner
 

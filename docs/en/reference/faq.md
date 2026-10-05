@@ -19,7 +19,7 @@ Each person gets one subscription link, and each app gets the format it reads:
 - **Hysteria2**: a subscription app such as Happ (a list of URIs), or an app on the mihomo core, such as Clash Verge or FlClash (a Mihomo YAML profile). A browser that opens the link gets the person's page with instructions.
 - **AmneziaWG**: the AmneziaVPN app, with a key per device.
 
-A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. More subscription formats (Xray JSON, sing-box) are planned. See [Subscriptions](../guide/subscriptions.md).
+A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. More subscription formats (Xray JSON, sing-box) are **Planned**. See [Subscriptions](../guide/subscriptions.md).
 
 ## How many users and nodes can it handle?
 
@@ -48,7 +48,7 @@ There is no migration tool. Set up the panel, add the servers as nodes and creat
 
 ## Is there a release I can download?
 
-Not yet: build from source with `make build`. The API, the stored settings and the node protocol may still change before 1.0.
+Yes. Every release on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) carries Linux binaries of the panel and the node agent for amd64 and arm64, with the signed manifests that let a panel fetch node agents and update itself; see [Install the panel](../getting-started/install-panel.md). For anything else build from source with `make build`. Mistgate is still before 1.0: the API, the stored settings and the node protocol may change.
 
 ## What does the AGPL mean for me?
 

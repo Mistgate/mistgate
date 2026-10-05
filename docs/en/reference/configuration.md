@@ -28,7 +28,7 @@ The panel has no configuration file. `mistgate setup` stores the addresses of an
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | CIDR or IP of a reverse proxy whose `X-Forwarded-For` and `Forwarded` headers are believed. Repeatable. Without it the TCP peer is the client, whatever the headers say. |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | Directory with your own static decoy site (`index.html`, optional `404.html`, `429.html`, `robots.txt`). |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | The data directory. It must exist (run `mistgate setup` first); `serve` sets its mode to 0700 at every start. |
-| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` | systemd unit restarted by the panel updater. A non-root panel also needs the fixed root helper unit configured as described in [Panel updates](../operations/updates.md). |
+| `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | The panel's own systemd unit, which the panel updater stops and starts again around the binary swap. It matters when the panel runs as root: the updater then starts its helper as a transient unit with this name. A panel running as another user starts the fixed root helper unit `mistgate-panel-update.service` instead, whose command line names the unit and the data directory itself (edit that unit if yours differ); see [Updates](../operations/updates.md). With `--dev` the panel does not update itself. |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | Where the source code of this build is published, linked as "Source code" next to the version in the admin (AGPL-3.0, section 13). A fork points it at its own repository; empty hides the link. |
 | `--dev` | `MISTGATE_DEV` | off | Development mode: data in `./.data` (created with a master key), plain HTTP with the decoy on `--listen` (`127.0.0.1:8080`) and the admin on `127.0.0.1:8081`, the agent endpoint on `127.0.0.1:8082`, WebAuthn on `localhost`, and a setup link printed at start while no admin exists. Nothing about the addresses is stored. Never on a public server. |
 
@@ -79,7 +79,18 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `--url` | `MISTGATE_URL` | none | The admin URL that setup printed, for example `https://panel.example.com/<secret>/`. Plain `http` is refused unless the host is localhost. |
 | `--token-file` | `MISTGATE_TOKEN_FILE` | none | A file whose first line is an API token. The token is never taken from the command line or the environment. |
 
-**`mistgate release keygen`**, **`mistgate release build`** and **`mistgate release sign`** take only flags, no environment variables (`release trust-key` also reads `MISTGATE_DATA_DIR`): see [CLI](cli.md) and [Updates](../operations/updates.md).
+**`mistgate backup keygen`** and **`mistgate backup restore`**, the offline side of [encrypted backups](../operations/backups.md), take only flags, all required, no environment variables:
+
+| Flag | Meaning |
+|:--|:--|
+| `keygen --identity-file` | Where to create the private age recovery identity (mode 0600, never overwritten). |
+| `restore --identity-file` | That identity. |
+| `restore --file` | The downloaded encrypted backup (`.tar.gz.age`). |
+| `restore --data-dir` | A new directory that does not exist yet. `MISTGATE_DATA_DIR` is not read. |
+
+**`mistgate release keygen`**, **`mistgate release build`** and **`mistgate release sign`** take only flags, no environment variables (`release trust-key` also reads `MISTGATE_DATA_DIR` and `MISTGATE_DEV`, and takes `--data-dir` and `--dev`): see [CLI](cli.md) and [Releases and signing](../operations/releases.md).
+
+The hidden **`mistgate panel-update-helper`** takes `--fetch-latest` (required), `--data-dir` and `--service`. Only the panel updater starts it, as root; the fixed unit `mistgate-panel-update.service` runs it with `--data-dir /var/lib/mistgate --service mistgate.service`.
 
 ## Other environment variables
 
@@ -99,6 +110,8 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 | `enroll --sni` | `MISTGATE_AGENT_SNI` | none | The panel's secret TLS name for agents. |
 | `enroll --ca-sha256` | `MISTGATE_CA_SHA256` | none | SHA-256 fingerprint of the panel CA certificate, 64 hex digits (colons and case are ignored). |
 | `enroll --token` | `MISTGATE_ENROLL_TOKEN` | none | The one-time enrollment token. The variable keeps it out of the process list. |
+| `enroll --token-stdin` | none | off | Read the token from stdin (one line, at most 256 bytes). Not together with `--token` or `MISTGATE_ENROLL_TOKEN`. |
+| `enroll --resume-key` | none | off | Keep the new key in `enroll-pending.pem` until enrollment succeeds and reuse it on a retry. Used by the SSH install. |
 | `enroll --force` | none | off | Replace an identity that is already there. |
 | `enroll`, `install`, `run --state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | The agent's state directory. Use the same one for all three. |
 | `install --bin` | none | `/usr/local/bin/mistgate-node` | Where the binary lives; the running executable is copied there when it is elsewhere. Its directory becomes writable for the agent (self-update). |
@@ -118,17 +131,21 @@ Setup also generates two secrets in every mode: the secret TLS name of the agent
 
 | Path | What it is | Secret |
 |:--|:--|:--|
-| `mistgate.db` | The SQLite database: settings and addresses, admins and sessions, nodes and their certificates, profiles, groups, users, devices, credentials, traffic, events, alerts, rollouts, API tokens and the audit log. Secrets inside (the panel CA key, authenticator secrets, subscription tokens, device keys, WARP keys and the like) are encrypted with the master key; passwords are stored as argon2id hashes, API and enrollment tokens as SHA-256 hashes. | yes |
+| `mistgate.db` | The SQLite database: settings and addresses, admins and sessions, nodes and their certificates, saved SSH access of nodes, profiles, groups, users, devices, credentials, traffic, events, alerts, rollouts and update schedules, backup settings, API tokens and the audit log. Secrets inside (the panel CA key, authenticator secrets, subscription tokens, device keys, WARP keys, SSH passwords, the backup bucket's secret key and the like) are encrypted with the master key; passwords are stored as argon2id hashes, API and enrollment tokens as SHA-256 hashes. | yes |
 | `mistgate.db-wal`, `mistgate.db-shm` | SQLite's write-ahead log and its index. Part of the database: copy them together with it, or stop the panel first. | yes |
 | `master.key` | 32 random bytes, mode 0600. Encrypts every stored secret (XChaCha20-Poly1305) and derives the user page passwords, which are never stored. The panel refuses to start when the file is readable by group or others. | the most sensitive file |
-| `release.pub` | Public ed25519 key used to verify signed node-update bundles. The first keyed panel build saves it here. A panel binary with another compiled-in key trusts no bundle until `mistgate release trust-key` replaces it; panel releases are verified only with the compiled-in key. | no |
+| `release.pub` | The installation's release public key (ed25519); it verifies the node bundles in `dist/`. The first panel build with a key writes it; a later build with the same key uses it, a build without a key keeps using it, and a build with another compiled-in key trusts no bundle until `mistgate release trust-key` replaces the file. Panel releases are verified only with the key compiled into the binary, never with this file. | no |
+| `dist/` | The signed bundle for node updates: `manifest.json`, `manifest.sig` and `mistgate-node-linux-amd64` / `-arm64`. You copy it here, or the panel puts it here itself: every 10 minutes it looks at the latest stable GitHub release and installs a newer bundle that `release.pub` verifies (not while a rollout runs). The panel rescans the directory every minute. | no |
 | `panel-update.request` | The panel release the owner confirmed (version and SHA-256), left for the update helper, which removes it. | no |
+| `panel-update.new` | The new panel binary, downloaded by the update helper and checked against the signed panel manifest; removed after a successful update. | no |
+| `.mistgate-backup-*/` | The work directory of a running backup: a snapshot of the database and the encrypted archive. Removed when the backup ends (one left by a crash goes at the next backup), and never part of a backup. | yes |
 | `acme/` | Let's Encrypt account key and certificates, only with `--acme-domain`. Rebuilt by itself when lost. | yes |
-| `dist/` | The release bundle for node updates that you copy here: `manifest.json`, `manifest.sig` and `mistgate-node-linux-amd64` / `-arm64`. The panel rescans it every minute. | no |
 
-The database is migrated forward automatically whenever `serve`, `setup` or an `auth` command opens it.
+The panel updater also writes next to the data directory and the binary: `<data-dir>.panel-update-backup.tar.gz` (for example `/var/lib/mistgate.panel-update-backup.tar.gz`, mode 0600) is the whole data directory, archived with the panel stopped just before the binary was replaced; a failed update puts it back, and only the latest one is kept. It holds `master.key` and the database, so protect it like the directory. The previous binary stays as `<binary>.prev` (for example `/usr/local/bin/mistgate.prev`), and a binary that was rolled back as `<binary>.failed`.
 
-> **Warning:** losing `master.key` makes every encrypted secret unreadable, the panel CA's key included; losing the whole directory means enrolling every node again. Back it up as described in [Install the panel](../getting-started/install-panel.md), step 9.
+The database is migrated forward automatically whenever `serve`, `setup`, an `auth` command or `backup restore` opens it.
+
+> **Warning:** losing `master.key` makes every encrypted secret unreadable, the panel CA's key and the saved SSH passwords of nodes included; losing the whole directory means enrolling every node again. Back it up as described in [Install the panel](../getting-started/install-panel.md), step 9, and set up [encrypted backups](../operations/backups.md).
 
 ## The node's state directory
 
@@ -137,6 +154,7 @@ The database is migrated forward automatically whenever `serve`, `setup` or an `
 | Path | What it is |
 |:--|:--|
 | `identity.pem` | The node's private key and its certificate from the panel CA, in one file. Its presence means "enrolled". |
+| `enroll-pending.pem` | The private key of an enrollment started with `--resume-key` (the SSH install), kept only until it succeeds. |
 | `ca.pem` | The panel CA: the only certificate authority the agent trusts. |
 | `agent.json` | The panel address, the secret TLS name and the node id. |
 | `state.json` | The last applied state, so servers come back after a restart without the panel. It holds profile secrets (obfuscation passwords, server keys, the WARP key) and what the node needs to verify users (hashes of Hysteria2 tokens, AmneziaWG public keys and preshared keys), never a client's private key or raw token. |

@@ -62,7 +62,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 `mistgate mcp --url <admin URL> --token-file <file>` runs a local MCP server on stdin and stdout and forwards every message to the panel's endpoint. It decides nothing, caches nothing and knows no tool: the panel answers.
 
-- The token is read only from the file's first line, never from the command line or the environment, and never printed. A warning is printed when others can read the file.
+- The token is read only from the file's first line, never from the command line or the environment, and never printed. A warning is printed when others can read the file (not checked on Windows).
 - `--url` must be `https`, except for `localhost` or a loopback address. Redirects are not followed, so the token goes nowhere else.
 - When the panel refuses the token (expired, revoked or the wrong profile) the proxy stops with that message.
 - `--url` and `--token-file` fall back to `MISTGATE_URL` and `MISTGATE_TOKEN_FILE`.
@@ -79,6 +79,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | A tool result | 32 KiB; long lists are halved until they fit and marked as truncated |
 | Time per call | 30 s for reads and plans, 90 s for an apply |
 | Open plans | 20 per token; 50 waiting for the owner across the panel |
+| Stored arguments of a plan | 8 KiB |
 
 ## Tools
 
@@ -111,8 +112,8 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 
 | Tool | Profile | Arguments | Needs the owner |
 |---|---|---|---|
-| `user_create` | Operator | `name`, `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month`, `rolling_month`), `term_days`, `device_limit`, `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps`, `dns_preset_id` | no |
-| `user_update` | Operator | `user_id`, optionally `subscription_name` (empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
+| `user_create` | Operator | `name` (1 to 64 characters, unique ignoring case), `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month` (default), `rolling_month`), `term_days` (at most 3650), `device_limit` (at most 100), `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps`, `dns_preset_id` | no |
+| `user_update` | Operator | `user_id`, optionally `subscription_name` (at most 64 characters; empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
@@ -120,17 +121,17 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
 | `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |
-| `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`); the trusted version and offset are pinned in the plan | always |
+| `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`, at least a minute and at most a year ahead); the trusted version and offset are pinned in the plan | always |
 | `node_update_schedule_cancel` | Admin | `node_id` | always |
-| `update_timezone` | Admin | `timezone_offset_minutes` (fixed UTC offset east of UTC, in 15-minute steps; `180` is GMT+3) | always |
+| `update_timezone` | Admin | `timezone_offset_minutes` (fixed UTC offset east of UTC, from -720 to 840 in 15-minute steps; `180` is GMT+3) | always |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
-| `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token` only. The owner enters the SSH password and confirms the host key on the approval screen | always |
+| `node_install` | Admin | Plan: `host`, `port` (default 22), `username` (root or a user with passwordless sudo), node `name` (2 to 24 letters, digits or hyphens), `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token` only. The plan reads only the server's public host key. The owner enters the SSH password and confirms the host key on the approval screen | always |
 | `node_server_password_rotate` | Admin | Plan: `node` id or the exact name of a live node (a retired node is refused); apply: `confirm_token` only. The panel generates the new password itself and never returns it; the owner can reveal it in the node's settings | always |
 
 Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. No tool takes or returns a server password: the owner types the install password on the approval screen, and the panel generates rotated passwords itself. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 
-`rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
+`rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. It takes only a node whose agent can update itself and is older than the bundle (outdated, failed or rolled back), and it is refused while another rollout is running or paused. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval; the node may be offline when it is planned, and a new schedule replaces the node's previous one. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
 
 ## Plan and apply
 
@@ -166,8 +167,8 @@ A plan needs the owner when one of these applies (the `danger` list):
 
 | Code | Meaning | Tools |
 |---|---|---|
-| `step_up` | The operation itself asks for a fresh confirmation in the admin. | rollout start, pause, resume and cancel, node rollback |
-| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback`, `node_install`, `node_server_password_rotate` |
+| `step_up` | The operation itself asks for a fresh confirmation in the admin. | the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `update_timezone`, `node_install`, `node_server_password_rotate` |
+| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate` |
 | `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
 
 ### Where the owner approves
@@ -195,7 +196,8 @@ The panel also protects the agent and you:
 
 - Subscription links and user page passwords.
 - Device keys and configurations, WARP accounts and keys, profile secrets.
-- Node addresses and certificate pins.
+- Server passwords: neither the SSH password of an install nor a rotated one.
+- Node addresses and certificate pins. The exception is the saved SSH endpoint and login that `node_server_access_list` and the `node_install` and rotation plans show an Admin token.
 - Anything of the tokens, approvals, sessions and passkeys.
 - The audit log, unless the token has the Admin profile.
 

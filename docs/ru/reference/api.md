@@ -35,9 +35,11 @@ API описан в `proto/mistgate/admin/v1/`. Сгенерированный �
 | `SubscriptionService` | `subscription.proto` | Настройки подписок и правила для приложений |
 | `DnsService` | `dns.proto` | DNS-пресеты |
 | `HealthService` | `health.proto` | Алерты, проверки глазами клиента, доктор и его исправления |
-| `UpdateService` | `update.proto` | Пакет релиза, обновления нод и раскатки |
+| `UpdateService` | `update.proto` | Пакет релиза, обновления нод, расписания и раскатки, обновления панели |
+| `ProvisioningService` | `provisioning.proto` | Установка нод по SSH и сохранённый SSH-доступ к нодам |
 | `WarpService` | `warp.proto` | Аккаунты WARP нод |
 | `AwgService` | `awg.proto` | Помощники редактора профиля AmneziaWG |
+| `BackupService` | `backup.proto` | Зашифрованные бэкапы панели |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API-токены и одобрения владельца |
 
 Справочник по каждому полю — комментарии в proto-файлах. Соглашения (`common.proto`):
@@ -110,7 +112,7 @@ curl -sS "${ADMIN}api/mistgate.admin.v1.UserService/ExtendUsers" \
 
 ### Через сгенерированный клиент
 
-Пакеты Go импортируются из модуля `github.com/mistgate/mistgate` (релизов с тегами пока нет: закрепите коммит). Базовый адрес клиента — адрес админки плюс `api`:
+Пакеты Go импортируются из модуля `github.com/mistgate/mistgate`; закрепите тег релиза или коммит, потому что до 1.0 API ещё может меняться. Базовый адрес клиента — адрес админки плюс `api`:
 
 ```go
 package main
@@ -181,11 +183,12 @@ func main() {
 | `AuthService.ListAudit` | нет | нет | да |
 | `HealthService.ApplyFix` | нет | нет | только через одобренный план MCP |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | нет | нет | только через одобренный план MCP |
+| `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone` | нет | нет | только через одобренный план MCP |
 | `ProvisioningService.ListNodeServerAccess` (данные подключения, без пароля) | нет | нет | да |
 | `ProvisioningService.GetSSHFingerprint` | нет | нет | только пока MCP-сервер составляет план `node_install` |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | нет | нет | только через одобренный план MCP |
 
-Закрыто для любого токена: удаление пользователей, ссылка подписки, устройства и их ключи, подключение нод, их настройки, перезапуски, логи и вывод из флота, любые изменения профилей, групп, DNS-пресетов и настроек подписок, WARP, оформление, токены, одобрения, собственный аккаунт админа (passkey, пароль, сессии, повторное подтверждение) и настройки капчи.
+Закрыто для любого токена: удаление пользователей, ссылка подписки, устройства и их ключи, подключение нод, их настройки, перезапуски, логи и вывод из флота, подготовка модуля ядра AmneziaWG, шаги установки по SSH из админки (проверка сервера, повтор задания, показ и удаление сохранённого доступа), любые изменения профилей, групп, DNS-пресетов и настроек подписок, WARP, бэкапы, обновления панели и пересмотр пакета, оформление, токены, одобрения, собственный аккаунт админа (passkey, пароль, сессии, повторное подтверждение) и настройки капчи.
 
 ## Изменения, которым нужен владелец
 
