@@ -425,6 +425,10 @@ func TestRolloutFlow(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 	e.w.rolloutStat = 3 // done
+	// one node, no batches: a batch size is not an argument (StartRollout alone limits it)
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"node_ids": []any{nodeA}, "batch_size": 50}); !strings.Contains(got, "batch_size") {
+		t.Errorf("got %q", got)
+	}
 	p := planOf(t, s, "rollout_start", args)
 	if !p.NeedsApproval || len(p.Danger) != 2 {
 		t.Errorf("plan: %+v", p)
@@ -432,7 +436,7 @@ func TestRolloutFlow(t *testing.T) {
 	applyError(t, s, "rollout_start", p.ConfirmToken)
 	e.plans.decide(p.PlanID, true)
 	applyOf(t, s, "rollout_start", p.ConfirmToken)
-	if len(e.w.startReq) != 1 || len(e.w.startReq[0].GetNodeIds()) != 1 || e.w.startReq[0].GetNodeIds()[0] != nodeA {
+	if len(e.w.startReq) != 1 || len(e.w.startReq[0].GetNodeIds()) != 1 || e.w.startReq[0].GetNodeIds()[0] != nodeA || e.w.startReq[0].GetBatchSize() != 0 {
 		t.Errorf("StartRollout: %+v", e.w.startReq)
 	}
 	// the call that changed something ran under the owner's grant for this plan

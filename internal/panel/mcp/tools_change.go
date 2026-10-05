@@ -999,8 +999,8 @@ var updateTimezone = changeSpec[updateTimezoneArgs]{
 
 type rolloutStartArgs struct {
 	ReasonField
-	NodeIDs   []string `json:"node_ids" jsonschema:"exactly one node id from updates_status to update now"`
-	BatchSize uint32   `json:"batch_size,omitempty" jsonschema:"nodes per batch after the canary; 0 = the panel's default"`
+	// No batch size: one node is its own canary, and StartRollout's batch limit has nothing to split.
+	NodeIDs []string `json:"node_ids" jsonschema:"exactly one node id from updates_status to update now"`
 }
 
 var rolloutStart = changeSpec[rolloutStartArgs]{
@@ -1048,7 +1048,7 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 				{Key: "node", Value: nm(chosen.GetName()), Untrusted: true},
 				codedFact("effect", "the selected node restarts its agent and passes the update health gate", "restart"),
 			},
-			Danger: rolloutDanger, Params: rolloutStartArgs{NodeIDs: ids, BatchSize: 0},
+			Danger: rolloutDanger, Params: rolloutStartArgs{NodeIDs: ids},
 		}, nil
 	},
 	apply: func(c *call, a rolloutStartArgs, _ Plan) (done, error) {
@@ -1059,7 +1059,7 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 		if r := u.GetRollout(); r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED {
 			return done{}, failure("changed_since_plan", "changed since the plan (a rollout is active now): make a new plan")
 		}
-		r, err := c.cl.Update.StartRollout(c.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{NodeIds: a.NodeIDs, BatchSize: a.BatchSize}))
+		r, err := c.cl.Update.StartRollout(c.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{NodeIds: a.NodeIDs}))
 		if err != nil {
 			return done{}, apiError(err)
 		}
