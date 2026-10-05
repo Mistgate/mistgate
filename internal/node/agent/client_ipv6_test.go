@@ -2,6 +2,7 @@ package agent
 
 import (
 	"testing"
+	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
@@ -42,4 +43,24 @@ func TestClientIPv6OffReachesTheTunnelFirewallAndBack(t *testing.T) {
 	if ts := x.tun.lastSet(); len(ts) != 1 || ts[0].RejectV6 {
 		t.Fatalf("switch back on: %+v", ts)
 	}
+}
+
+// The switch was changed while the node was offline: the panel sends nothing on reconnect when the inbound hashes match
+// (the settings are not in the hash), so the HelloAck is the only news. The tunnel firewall follows at once, not at
+// the next sweep.
+func TestClientIPv6SwitchChangedWhileOfflineReachesTheFirewallAtOnce(t *testing.T) {
+	x := newL3Tuned(t, 3, false, func(a *Agent) { a.sweepEvery = time.Hour })
+	x.waitConnected()
+	ds := fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1")))
+	ds.Settings = &pb.NodeSettings{}
+	mustApply(t, x.panel, ds)
+	if ts := x.tun.lastSet(); len(ts) != 1 || ts[0].RejectV6 {
+		t.Fatalf("default settings: %+v", ts)
+	}
+
+	n, conns := x.tun.setCount(), x.panel.connCount()
+	x.panel.settings.Store(&pb.NodeSettings{ClientIpv6Disabled: true}) // changed while the node is away
+	x.panel.dropConn()
+	eventually(t, func() bool { return x.panel.connCount() > conns }, "the agent reconnects")
+	eventually(t, func() bool { return x.tun.setCount() > n && len(x.tun.lastSet()) == 1 && x.tun.lastSet()[0].RejectV6 }, "the tunnel table follows the new HelloAck settings")
 }

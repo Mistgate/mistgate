@@ -628,7 +628,16 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 	}
 	a.offset.Store(off)
 	if ack.Settings != nil {
+		// A switch changed while the node was offline reaches it only here: the panel sends no desired state when the
+		// inbound hashes match, and the sweep is up to 30 s away. The tunnel firewall follows the switch at once.
+		changed := ack.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled()
 		a.settings.Store(ack.Settings)
+		if changed {
+			select {
+			case a.jobs <- job{sweep: true}:
+			default: // the worker is busy and its queue is full: the next sweep will do
+			}
+		}
 	}
 	a.out.ack(ack.AckedSeq)
 	a.upd.AckOutcome(a.helloOutcome.Swap(nil)) // the panel has this outcome now; stop repeating it

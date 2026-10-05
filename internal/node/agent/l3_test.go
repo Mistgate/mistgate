@@ -311,6 +311,10 @@ type l3 struct {
 }
 
 func newL3(t *testing.T, unitGen int, withWarp bool) *l3 {
+	return newL3Tuned(t, unitGen, withWarp, nil)
+}
+
+func newL3Tuned(t *testing.T, unitGen int, withWarp bool, tune func(*Agent)) *l3 {
 	t.Helper()
 	x := &l3{ord: &order{}}
 	x.awg = newFakeAwg(x.ord)
@@ -327,6 +331,7 @@ func newL3(t *testing.T, unitGen int, withWarp bool) *l3 {
 				c.Warp = x.warp
 			}
 		},
+		tune: tune,
 	})
 	return x
 }
