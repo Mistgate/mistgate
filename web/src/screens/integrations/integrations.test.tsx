@@ -291,6 +291,38 @@ describe("the Integrations screen: approvals", () => {
     expect(reject).toHaveBeenCalledWith({ id: "pln_2" });
   });
 
+  it("takes the server password and a host key confirmation on a node install, never through the agent", async () => {
+    approve.mockResolvedValue({});
+    const fp = "SHA256:" + "A".repeat(43);
+    await mount(
+      tokens([]),
+      inbox([
+        approval({
+          tool: "node_install",
+          facts: [
+            { key: "node", value: "edge-1", untrusted: true },
+            { key: "username", value: "root", untrusted: true },
+            { key: "host_key", value: fp, untrusted: false },
+            { key: "host_key_algorithm", value: "ssh-ed25519", untrusted: false },
+          ],
+        }),
+      ]),
+    );
+    const approveButton = () => document.querySelector("button[aria-label='Approve: Install a node over SSH']") as HTMLButtonElement;
+    expect(document.querySelector("[data-testid=host-key]")?.textContent).toBe(fp);
+    expect(text()).toContain("Host key fingerprint · ssh-ed25519");
+    expect(approveButton().hasAttribute("data-disabled")).toBe(true);
+
+    await type(document.querySelector("input[type=password]"), "root-secret");
+    expect(approveButton().hasAttribute("data-disabled")).toBe(true); // the key is not confirmed yet
+    await act(async () => void document.querySelector<HTMLInputElement>("input[type=checkbox]")!.click());
+    expect(approveButton().hasAttribute("data-disabled")).toBe(false);
+    await click(approveButton());
+    await settle();
+    expect(approve).toHaveBeenCalledWith({ id: "pln_1", sshPassword: "root-secret", confirmedFingerprint: fp });
+    expect(document.querySelector<HTMLInputElement>("input[type=password]")?.value ?? "").toBe("");
+  });
+
   it("refuses to approve what has run out of time", async () => {
     await mount(tokens([]), inbox([approval({ expiresUnix: NOW - 1 })]));
     expect(text()).toContain("expired");

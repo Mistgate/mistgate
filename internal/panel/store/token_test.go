@@ -276,6 +276,72 @@ func TestPlanApplyStateMachine(t *testing.T) {
 	}
 }
 
+// What the owner entered when approving (the node_install password) goes to that plan's apply once, and never outlives
+// a plan that can no longer be applied.
+func TestOwnerSecretIsTakenOnceAndNeverOutlivesThePlan(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	mkAdmin(t, s, "adm_a", "Ada")
+	tok := newTok(t, s, "ops", ProfileAdmin)
+	other := newTok(t, s, "other", ProfileAdmin)
+	secretOf := func(id string) []byte {
+		var b []byte
+		if err := s.R.QueryRow(`SELECT owner_secret FROM mcp_plan WHERE id = ?`, id).Scan(&b); err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	p := newPlan(t, s, tok.ID, "node_install", true, t0)
+	if _, err := s.ApproveMCPPlanWithSecret(ctx, p.ID, "adm_a", []byte("sealed"), t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TakeMCPPlanOwnerSecret(ctx, p.ID, tok.ID, "node_install"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("taken before the apply began: %v", err)
+	}
+	if _, err := s.BeginApply(ctx, p.ID, tok.ID, p.Tool, p.ParamsHash, p.ConfirmHash, t0.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ tok, tool string }{{other.ID, "node_install"}, {tok.ID, "node_fix"}} {
+		if _, err := s.TakeMCPPlanOwnerSecret(ctx, p.ID, c.tok, c.tool); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("taken by %s/%s: %v", c.tok, c.tool, err)
+		}
+	}
+	if got, err := s.TakeMCPPlanOwnerSecret(ctx, p.ID, tok.ID, "node_install"); err != nil || string(got) != "sealed" {
+		t.Fatalf("take = %q, %v", got, err)
+	}
+	if _, err := s.TakeMCPPlanOwnerSecret(ctx, p.ID, tok.ID, "node_install"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("taken twice: %v", err)
+	}
+
+	// an apply that never took it clears it when it finishes
+	f := newPlan(t, s, tok.ID, "node_install", true, t0)
+	if _, err := s.ApproveMCPPlanWithSecret(ctx, f.ID, "adm_a", []byte("sealed"), t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.BeginApply(ctx, f.ID, tok.ID, f.Tool, f.ParamsHash, f.ConfirmHash, t0.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FinishApply(ctx, f.ID, false, "", "boom", "", "", t0.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if secretOf(f.ID) != nil {
+		t.Fatal("a finished apply kept the owner secret")
+	}
+
+	// an approved plan nobody applied: the sweep clears it once it expires
+	x := newPlan(t, s, tok.ID, "node_install", true, t0)
+	if _, err := s.ApproveMCPPlanWithSecret(ctx, x.ID, "adm_a", []byte("sealed"), t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ExpireMCPPlans(ctx, t0.Add(5*time.Minute)); err != nil || secretOf(x.ID) == nil {
+		t.Fatalf("the sweep cleared a plan still open: %v", err)
+	}
+	if _, err := s.ExpireMCPPlans(ctx, t0.Add(PlanTTL+time.Second)); err != nil || secretOf(x.ID) != nil {
+		t.Fatalf("an expired plan kept the owner secret: %v", err)
+	}
+}
+
 func TestDangerousPlanNeedsTheOwner(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)

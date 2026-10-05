@@ -128,7 +128,7 @@ func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[ad
 	if err != nil {
 		return nil, invalidArgument("invalid SSH target")
 	}
-	fingerprint, err := s.ssh.Fingerprint(ctx, target)
+	fingerprint, algorithm, err := s.ssh.Fingerprint(ctx, target)
 	if err != nil {
 		if errors.Is(err, ErrUnsafeTarget) || errors.Is(err, ErrNoAddress) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("ssh_target_not_public"))
@@ -142,7 +142,7 @@ func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[ad
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_fingerprint_unavailable"))
 	}
 	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{
-		Host: target.Host(), Port: uint32(target.Port()), Fingerprint: fingerprint,
+		Host: target.Host(), Port: uint32(target.Port()), Fingerprint: fingerprint, Algorithm: algorithm,
 	}), nil
 }
 
@@ -174,7 +174,8 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 	return connect.NewResponse(&adminv1.CheckSSHResponse{Preflight: remote.facts}), nil
 }
 
-// StartNodeProvision stores the SSH credential sealed to this job and queues installation.
+// StartNodeProvision stores the SSH credential sealed to this job and queues installation. The owner's UI sends the
+// password; the MCP apply sends plan_id instead and the password comes from that plan's approval (ownerPassword).
 func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
@@ -185,9 +186,11 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if s.cfg.PanelAddr == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
+	fromPlan := req.Msg.PlanId != ""
 	target, err := NewTarget(req.Msg.SshHost, req.Msg.SshPort)
 	username := sshUsername(req.Msg.SshUsername)
-	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validSSHUsername(username) || !validPassword(req.Msg.Password) {
+	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validSSHUsername(username) ||
+		fromPlan && (req.Msg.Password != "" || len(req.Msg.PlanId) > 64) || !fromPlan && !validPassword(req.Msg.Password) {
 		return nil, invalidArgument("invalid SSH credentials or target")
 	}
 	name := strings.ToLower(req.Msg.Name)
@@ -200,6 +203,13 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if !ok || admin.ID == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
+	password := req.Msg.Password
+	if fromPlan {
+		if password, err = s.ownerPassword(ctx, req.Msg.PlanId, req.Msg.Fingerprint); err != nil {
+			return nil, err
+		}
+	}
+	defer func() { password = "" }()
 	now := s.cfg.Now().UTC()
 	job := store.NodeProvisionJob{
 		ID: store.NewID("prv_"), NodeID: store.NewID("nod_"), Name: name, Address: req.Msg.Address,
@@ -207,7 +217,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		SSHHost: target.Host(), SSHPort: target.Port(), HostFingerprint: req.Msg.Fingerprint,
 		CreatedBy: admin.ID, CreatedAt: now, UpdatedAt: now,
 	}
-	secret, err := s.sealCredentials(job.ID, credentials{Username: username, Password: req.Msg.Password})
+	secret, err := s.sealCredentials(job.ID, credentials{Username: username, Password: password})
 	if err != nil {
 		return nil, internalConnectError()
 	}
@@ -222,6 +232,35 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	s.audit(ctx, "node.ssh_provision_start", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
 	s.signalWorker()
 	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: toProvisionJob(job)}), nil
+}
+
+// ownerPassword takes, once, the SSH password the owner entered when approving node_install plan planID: only for the
+// MCP token applying that plan, and only with the host key the owner confirmed there.
+func (s *Service) ownerPassword(ctx context.Context, planID, fingerprint string) (string, error) {
+	p := auth.PrincipalFrom(ctx)
+	if !p.Token || p.Channel != auth.ChannelMCP {
+		return "", invalidArgument("plan_id is used only by the MCP server")
+	}
+	sealed, err := s.st.TakeMCPPlanOwnerSecret(ctx, planID, p.TokenID, auth.NodeInstallTool)
+	if errors.Is(err, store.ErrNotFound) {
+		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("owner_password_missing"))
+	}
+	if err != nil {
+		s.cfg.Log.Error("read the owner's node install password", "err", err)
+		return "", internalConnectError()
+	}
+	secret, err := auth.OpenNodeInstallSecret(s.vault, planID, sealed)
+	if err != nil {
+		return "", internalConnectError()
+	}
+	if secret.Fingerprint != fingerprint {
+		secret.Password = ""
+		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("host_key_not_confirmed_by_owner"))
+	}
+	if !validPassword(secret.Password) {
+		return "", invalidArgument("invalid SSH credentials or target")
+	}
+	return secret.Password, nil
 }
 
 // RetryNodeProvision requeues a failed or cancelled job with freshly supplied SSH login credentials. A cancelled job

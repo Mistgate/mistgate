@@ -125,10 +125,10 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `update_timezone` | Admin | `timezone_offset_minutes` (fixed UTC offset east of UTC, in 15-minute steps; `180` is GMT+3) | always |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
-| `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token`, SSH `password`, exact `confirmed_fingerprint` | always |
+| `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token` only. The owner enters the SSH password and confirms the host key on the approval screen | always |
 | `node_server_password_rotate` | Admin | Plan: `node` id or the exact name of a live node (a retired node is refused); apply: `confirm_token` only. The panel generates the new password itself and never returns it; the owner can reveal it in the node's settings | always |
 
-Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. Node passwords are supplied only to their `_apply` call; they are never stored in MCP plan parameters or returned by a tool. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
+Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. No tool takes or returns a server password: the owner types the install password on the approval screen, and the panel generates rotated passwords itself. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 
 `rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
 
@@ -150,7 +150,7 @@ Every `_plan` also takes `reason`: the agent's own words, at most 300 characters
    ```
 
 2. The agent shows the plan to the person it works for and waits for their go-ahead. If `needs_approval` is true, it also waits for the owner.
-3. The agent calls `<tool>_apply` with the `confirm_token`. Node installation and password rotation also take their secret as a separate apply-only argument; the panel never adds it to the saved plan. The panel runs exactly the stored non-secret arguments, once, and answers with `plan_id`, `status: "applied"` and a one-line result.
+3. The agent calls `<tool>_apply` with the `confirm_token`, its only argument. The panel runs exactly the stored arguments, once, and answers with `plan_id`, `status: "applied"` and a one-line result.
 
 The confirm token:
 
@@ -177,7 +177,7 @@ Such a plan appears in **Integrations → Waiting for you**, with a badge in the
 - **Approve**: asks for the owner's passkey or authenticator code once more. The agent's apply goes through after this, for this plan only.
 - **Reject**: the agent's apply fails with "rejected by the owner".
 
-For `node_install`, the approved plan shows the pinned SHA-256 SSH fingerprint. The agent must show it to the user, wait for explicit confirmation, then pass the exact value as `confirmed_fingerprint`; the SSH password is sent only in that apply call. Password rotation has the same owner-approval boundary and never returns the new password.
+For `node_install`, the approval card shows the SHA-256 host key fingerprint the panel read and its key type (the agent's copy of the plan has the fingerprint redacted, like any key-shaped value). The owner compares it with a trusted copy, ticks the confirmation and types the server's SSH password there; **Approve** stays disabled until both are done. The panel seals the password to that plan, and the agent's apply, which carries only the confirm token, installs with it and with exactly the confirmed host key, once. The password never passes through the agent, its transcript or the model provider. Password rotation has the same owner-approval boundary: the panel generates the new password and never returns it.
 
 A token can never confirm its own plan. Undecided plans expire 10 minutes after they were made. **Recent decisions** keeps the history with the outcome: done, error, expired, cancelled (the token was revoked) and so on. The agent should not poll more often than once every 30 seconds.
 

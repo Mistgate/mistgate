@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
 // ApprovalService: the owner's inbox for the dangerous changes an MCP agent planned.
@@ -102,13 +105,86 @@ func (r *approvalRPC) ListApprovals(ctx context.Context, req *connect.Request[ad
 	return connect.NewResponse(resp), nil
 }
 
-// decide is Approve and Reject: the compare-and-swap, the errors, the audit row.
-func (r *approvalRPC) decide(ctx context.Context, admin store.Admin, req connect.AnyRequest, id string, approve bool) (*adminv1.Approval, error) {
+// NodeInstallTool is the MCP tool whose approval carries the owner's SSH password (ApproveRequest.ssh_password).
+const NodeInstallTool = "node_install"
+
+// NodeInstallSecret is what the owner enters when approving a node_install plan. The approval seals it to the plan;
+// ProvisioningService.StartNodeProvision opens it once, for that plan's apply, and uses the password only with this
+// fingerprint. The agent never sees it.
+type NodeInstallSecret struct {
+	Password    string `json:"password"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+func nodeInstallSecretAAD(planID string) string { return "mcp-plan-node-install:" + planID }
+
+// SealNodeInstallSecret seals what the owner entered to plan planID (the approval does it; tests too).
+func SealNodeInstallSecret(v *vault.Vault, planID string, s NodeInstallSecret) []byte {
+	plain, _ := json.Marshal(s)
+	defer clear(plain)
+	return v.Seal(plain, nodeInstallSecretAAD(planID))
+}
+
+// OpenNodeInstallSecret opens what ApproveMCPPlanWithSecret stored for plan planID.
+func OpenNodeInstallSecret(v *vault.Vault, planID string, sealed []byte) (NodeInstallSecret, error) {
+	var out NodeInstallSecret
+	if v == nil {
+		return out, errors.New("auth: no vault")
+	}
+	plain, err := v.Open(sealed, nodeInstallSecretAAD(planID))
+	if err != nil {
+		return out, err
+	}
+	defer clear(plain)
+	err = json.Unmarshal(plain, &out)
+	return out, err
+}
+
+// nodeInstallSecret checks what the owner entered on a node_install approval and seals it to the plan. Any other tool
+// takes nothing (nil). The fingerprint must be the one the panel read and showed in the plan ("host_key" fact).
+func (r *approvalRPC) nodeInstallSecret(ctx context.Context, m *adminv1.ApproveRequest) ([]byte, error) {
+	s := r.s
+	p, err := s.st.GetMCPPlan(ctx, m.Id)
+	if err != nil || p.Tool != NodeInstallTool {
+		if m.SshPassword != "" || m.ConfirmedFingerprint != "" {
+			return nil, invalid("only a node installation takes a password")
+		}
+		return nil, nil // an unknown id: decide answers it
+	}
+	if m.SshPassword == "" || len(m.SshPassword) > 1024 || !utf8.ValidString(m.SshPassword) || strings.ContainsAny(m.SshPassword, "\x00\r\n") {
+		return nil, invalid("enter the server's SSH password")
+	}
+	var facts []struct{ Key, Value string }
+	_ = json.Unmarshal([]byte(p.FactsJSON), &facts)
+	shown := ""
+	for _, f := range facts {
+		if f.Key == "host_key" {
+			shown = f.Value
+		}
+	}
+	if shown == "" || m.ConfirmedFingerprint != shown {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("confirm the exact host key fingerprint shown in the approval"))
+	}
+	if s.vault == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the panel has no master key"))
+	}
+	return SealNodeInstallSecret(s.vault, p.ID, NodeInstallSecret{Password: m.SshPassword, Fingerprint: shown}), nil
+}
+
+// decide is Approve and Reject: the compare-and-swap, the errors, the audit row. secret, for an approval, is what the
+// owner entered for the apply (sealed), stored in the same compare-and-swap.
+func (r *approvalRPC) decide(ctx context.Context, admin store.Admin, req connect.AnyRequest, id string, approve bool, secret []byte) (*adminv1.Approval, error) {
 	s := r.s
 	if id == "" || len(id) > maxApprovalIDLen {
 		return nil, invalid("which approval?")
 	}
-	p, err := s.st.DecideMCPPlan(ctx, id, admin.ID, approve, s.now())
+	var p store.MCPPlan
+	var err error
+	if secret != nil {
+		p, err = s.st.ApproveMCPPlanWithSecret(ctx, id, admin.ID, secret, s.now())
+	} else {
+		p, err = s.st.DecideMCPPlan(ctx, id, admin.ID, approve, s.now())
+	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such approval"))
@@ -135,7 +211,14 @@ func (r *approvalRPC) Approve(ctx context.Context, req *connect.Request[adminv1.
 	if err := r.s.RequireStepUp(ctx); err != nil {
 		return nil, err
 	}
-	a, err := r.decide(ctx, admin, req, req.Msg.Id, true)
+	if req.Msg.Id == "" || len(req.Msg.Id) > maxApprovalIDLen {
+		return nil, invalid("which approval?")
+	}
+	secret, err := r.nodeInstallSecret(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	a, err := r.decide(ctx, admin, req, req.Msg.Id, true, secret)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +231,7 @@ func (r *approvalRPC) Reject(ctx context.Context, req *connect.Request[adminv1.R
 	if err != nil {
 		return nil, err
 	}
-	a, err := r.decide(ctx, admin, req, req.Msg.Id, false)
+	a, err := r.decide(ctx, admin, req, req.Msg.Id, false, nil)
 	if err != nil {
 		return nil, err
 	}

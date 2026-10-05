@@ -218,6 +218,11 @@ message ListApprovalsResponse {
 
 message ApproveRequest {
   string id = 1;
+  // node_install only, required there: the SSH password the owner types on the approval screen (the agent never sees
+  // it), and the host key fingerprint the owner compared and confirmed there. The panel seals the password to the plan
+  // until the agent's apply uses it, once.
+  string ssh_password = 2;
+  string confirmed_fingerprint = 3;
 }
 
 message ApproveResponse {

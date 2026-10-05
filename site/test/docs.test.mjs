@@ -49,7 +49,8 @@ test("AI agent install guide and llms.txt are published in both languages", () =
   const ru = page("ru", "getting-started/ai-agents");
   const llms = readFileSync(join(dist, "llms.txt"), "utf8");
   assert.ok(en.includes("node_install_plan"));
-  assert.ok(en.includes("confirmed_fingerprint"));
+  assert.ok(!en.includes("confirmed_fingerprint")); // the owner confirms the host key on the approval screen
+  assert.ok(en.includes("approval card"));
   assert.ok(ru.includes("node_server_password_rotate_apply"));
   assert.ok(llms.includes("AI agent guide"));
   assert.ok(llms.includes("/ru/getting-started/ai-agents/"));

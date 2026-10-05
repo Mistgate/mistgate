@@ -171,6 +171,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
   const [fingerprint, setFingerprint] = useState("");
+  const [algorithm, setAlgorithm] = useState("");
   const [confirmedKey, setConfirmedKey] = useState(false);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -240,6 +241,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
     try {
       const response = await provisioning.getSSHFingerprint({ host: host.trim(), port: portNumber });
       setFingerprint(response.fingerprint);
+      setAlgorithm(response.algorithm);
       setConfirmedKey(false);
       setName(suggestNodeName(host));
       setAddress(host.trim());
@@ -412,6 +414,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
             <p className="text-sm leading-relaxed text-muted">{t("node.ssh.fingerprintBody")}</p>
           </div>
           <code className="block overflow-x-auto rounded-field border border-accent-line bg-accent-soft p-3 font-mono text-xs leading-relaxed text-accent-text select-all">{fingerprint}</code>
+          {algorithm && <span className="-mt-2 text-xs text-muted">{t("node.ssh.keyType", { algorithm })}</span>}
           <label className="flex cursor-pointer items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-fg">
             <input
               type="checkbox"

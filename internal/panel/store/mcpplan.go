@@ -248,9 +248,26 @@ func (s *Store) ListApprovals(ctx context.Context, now time.Time, awaitingOnly b
 // rejected that also needs the plan unexpired and its token unrevoked. ErrNotFound for an unknown id,
 // *PlanStateError (ErrPlanState) with the status found when the plan is not awaiting any more.
 func (s *Store) DecideMCPPlan(ctx context.Context, id, adminID string, approve bool, now time.Time) (MCPPlan, error) {
+	return s.decideMCPPlan(ctx, id, adminID, approve, nil, now)
+}
+
+// ApproveMCPPlanWithSecret is DecideMCPPlan's approval that also stores what the owner entered for the apply (vault
+// ciphertext: the node_install SSH password), in the same compare-and-swap. TakeMCPPlanOwnerSecret hands it out once.
+func (s *Store) ApproveMCPPlanWithSecret(ctx context.Context, id, adminID string, secret []byte, now time.Time) (MCPPlan, error) {
+	if len(secret) == 0 {
+		return MCPPlan{}, errors.New("store: an owner secret is required")
+	}
+	return s.decideMCPPlan(ctx, id, adminID, true, secret, now)
+}
+
+func (s *Store) decideMCPPlan(ctx context.Context, id, adminID string, approve bool, secret []byte, now time.Time) (MCPPlan, error) {
 	to := PlanRejected
 	if approve {
 		to = PlanApproved
+	}
+	var sealed any // NULL without a secret
+	if len(secret) > 0 {
+		sealed = secret
 	}
 	tx, err := s.W.BeginTx(ctx, nil)
 	if err != nil {
@@ -258,10 +275,10 @@ func (s *Store) DecideMCPPlan(ctx context.Context, id, adminID string, approve b
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `
-		UPDATE mcp_plan SET status = ?, decided_by = ?, decided_at = ?
+		UPDATE mcp_plan SET status = ?, decided_by = ?, decided_at = ?, owner_secret = ?
 		WHERE id = ? AND status = 'awaiting' AND needs_approval = 1 AND expires_at > ?
 		  AND EXISTS (SELECT 1 FROM api_token t WHERE t.id = mcp_plan.token_id AND t.revoked_at = 0)`,
-		to, adminID, unix(now), id, unix(now))
+		to, adminID, unix(now), sealed, id, unix(now))
 	if err != nil {
 		return MCPPlan{}, err
 	}
@@ -312,9 +329,34 @@ func (s *Store) BeginApply(ctx context.Context, id, tokenID, tool string, params
 	return p, tx.Commit()
 }
 
+// TakeMCPPlanOwnerSecret hands out, once, what the owner entered when approving plan id of tool for tokenID, and clears
+// it: only while that plan is applying with a recorded human decision. ErrNotFound otherwise (nothing stored, already
+// taken, another token or tool, or a plan in another state).
+func (s *Store) TakeMCPPlanOwnerSecret(ctx context.Context, id, tokenID, tool string) ([]byte, error) {
+	tx, err := s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var secret []byte
+	err = tx.QueryRowContext(ctx, `SELECT owner_secret FROM mcp_plan
+		WHERE id = ? AND token_id = ? AND tool = ? AND status = 'applying' AND needs_approval = 1 AND decided_by <> ''
+		  AND owner_secret IS NOT NULL`, id, tokenID, tool).Scan(&secret)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && len(secret) == 0 {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE mcp_plan SET owner_secret = NULL WHERE id = ?`, id); err != nil {
+		return nil, err
+	}
+	return secret, tx.Commit()
+}
+
 // FinishApply ends an apply: applying -> applied (ok, with result) or failed (errText), with the outcome as a code and
-// its values (a JSON object of strings, "" = none). *PlanStateError if the plan is not applying (the sweep may have
-// given up on it).
+// its values (a JSON object of strings, "" = none). An owner secret still there is cleared. *PlanStateError if the plan
+// is not applying (the sweep may have given up on it).
 func (s *Store) FinishApply(ctx context.Context, id string, ok bool, result, errText, outcomeCode, outcomeParams string, now time.Time) error {
 	to := PlanFailed
 	if ok {
@@ -323,7 +365,7 @@ func (s *Store) FinishApply(ctx context.Context, id string, ok bool, result, err
 	if outcomeParams == "" {
 		outcomeParams = "{}"
 	}
-	res, err := s.W.ExecContext(ctx, `UPDATE mcp_plan SET status = ?, applied_at = ?, result = ?, error = ?, outcome_code = ?, outcome_params = ? WHERE id = ? AND status = 'applying'`,
+	res, err := s.W.ExecContext(ctx, `UPDATE mcp_plan SET status = ?, applied_at = ?, result = ?, error = ?, outcome_code = ?, outcome_params = ?, owner_secret = NULL WHERE id = ? AND status = 'applying'`,
 		to, unix(now), Clip(result, 500), Clip(errText, 300), Clip(outcomeCode, 64), Clip(outcomeParams, 1000), id)
 	if err != nil {
 		return err
@@ -340,7 +382,8 @@ func (s *Store) FinishApply(ctx context.Context, id string, ok bool, result, err
 
 // ExpireMCPPlans is the once-a-minute sweep: unapplied plans past their expiry become expired; plans stuck in
 // applying for ApplyStuckAfter (the panel restarted mid-call: the outcome is unknown and an apply is never
-// resumed) become failed; finished plans older than PlanKeep are deleted. It returns how many rows it touched.
+// resumed) become failed; finished plans older than PlanKeep are deleted; an owner secret left on a plan that can no
+// longer be applied is cleared. It returns how many rows it touched.
 func (s *Store) ExpireMCPPlans(ctx context.Context, now time.Time) (int, error) {
 	total := 0
 	for _, q := range []struct {
@@ -351,6 +394,8 @@ func (s *Store) ExpireMCPPlans(ctx context.Context, now time.Time) (int, error) 
 		{`UPDATE mcp_plan SET status = 'failed', error = 'interrupted: check the result before retrying', outcome_code = 'interrupted' WHERE status = 'applying' AND applied_at <= ?`,
 			[]any{unix(now.Add(-ApplyStuckAfter))}},
 		{`DELETE FROM mcp_plan WHERE status IN ('rejected', 'expired', 'applied', 'failed', 'cancelled') AND created_at < ?`, []any{unix(now.Add(-PlanKeep))}},
+		// an owner secret lives only while its plan can still be applied
+		{`UPDATE mcp_plan SET owner_secret = NULL WHERE owner_secret IS NOT NULL AND status NOT IN ('approved', 'applying')`, nil},
 	} {
 		res, err := s.W.ExecContext(ctx, q.sql, q.args...)
 		if err != nil {

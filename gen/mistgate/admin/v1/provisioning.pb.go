@@ -74,10 +74,13 @@ func (x *GetSSHFingerprintRequest) GetPort() uint32 {
 }
 
 type GetSSHFingerprintResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
-	Port          uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
-	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Host        string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Port        uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	Fingerprint string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	// The key type the fingerprint belongs to ("ssh-ed25519", "ecdsa-sha2-nistp256", "ssh-rsa"): a provider's console
+	// lists one fingerprint per type, so the owner needs it to compare the right one.
+	Algorithm     string `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,6 +132,13 @@ func (x *GetSSHFingerprintResponse) GetPort() uint32 {
 func (x *GetSSHFingerprintResponse) GetFingerprint() string {
 	if x != nil {
 		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *GetSSHFingerprintResponse) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
 	}
 	return ""
 }
@@ -382,8 +392,11 @@ type StartNodeProvisionRequest struct {
 	Fingerprint    string                 `protobuf:"bytes,9,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
 	Password       string                 `protobuf:"bytes,10,opt,name=password,proto3" json:"password,omitempty"`
 	SshUsername    string                 `protobuf:"bytes,11,opt,name=ssh_username,json=sshUsername,proto3" json:"ssh_username,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// MCP only: the approved node_install plan being applied. password stays empty: the panel uses the password the owner
+	// entered on that plan's approval screen, and only with the fingerprint the owner confirmed there.
+	PlanId        string `protobuf:"bytes,12,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartNodeProvisionRequest) Reset() {
@@ -489,6 +502,13 @@ func (x *StartNodeProvisionRequest) GetPassword() string {
 func (x *StartNodeProvisionRequest) GetSshUsername() string {
 	if x != nil {
 		return x.SshUsername
+	}
+	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetPlanId() string {
+	if x != nil {
+		return x.PlanId
 	}
 	return ""
 }
@@ -1622,11 +1642,12 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"$mistgate/admin/v1/provisioning.proto\x12\x11mistgate.admin.v1\"B\n" +
 	"\x18GetSSHFingerprintRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
-	"\x04port\x18\x02 \x01(\rR\x04port\"e\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\"\x83\x01\n" +
 	"\x19GetSSHFingerprintResponse\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
-	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\"\x93\x01\n" +
+	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1c\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\x93\x01\n" +
 	"\x0fCheckSSHRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
@@ -1646,7 +1667,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x0fpanel_reachable\x18\n" +
 	" \x01(\bR\x0epanelReachable\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xe4\x02\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xfd\x02\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -1659,7 +1680,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\vfingerprint\x18\t \x01(\tR\vfingerprint\x12\x1a\n" +
 	"\bpassword\x18\n" +
 	" \x01(\tR\bpassword\x12!\n" +
-	"\fssh_username\x18\v \x01(\tR\vsshUsername\"\x9a\x01\n" +
+	"\fssh_username\x18\v \x01(\tR\vsshUsername\x12\x17\n" +
+	"\aplan_id\x18\f \x01(\tR\x06planId\"\x9a\x01\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +

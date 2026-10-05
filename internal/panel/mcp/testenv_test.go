@@ -81,6 +81,7 @@ var tokenApproved = map[string]bool{
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: true,
+	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        true, // planning only, in the real policy
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -652,7 +653,7 @@ func (w *world) RotateNodeServerPassword(_ context.Context, r *connect.Request[a
 }
 
 func (w *world) GetSSHFingerprint(_ context.Context, r *connect.Request[adminv1.GetSSHFingerprintRequest]) (*connect.Response[adminv1.GetSSHFingerprintResponse], error) {
-	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{Host: r.Msg.GetHost(), Port: r.Msg.GetPort(), Fingerprint: testHostKey}), nil
+	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{Host: r.Msg.GetHost(), Port: r.Msg.GetPort(), Fingerprint: testHostKey, Algorithm: "ssh-ed25519"}), nil
 }
 
 func (w *world) StartNodeProvision(_ context.Context, r *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {

@@ -122,7 +122,7 @@ var grantProcedures = map[string]string{
 	"node_update_schedule":        adminv1connect.UpdateServiceScheduleNodeUpdateProcedure,
 	"node_update_schedule_cancel": adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure,
 	"update_timezone":             adminv1connect.UpdateServiceSetUpdateTimezoneProcedure,
-	"node_install":                adminv1connect.ProvisioningServiceStartNodeProvisionProcedure,
+	NodeInstallTool:               adminv1connect.ProvisioningServiceStartNodeProvisionProcedure,
 	"node_server_password_rotate": adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure,
 }
 

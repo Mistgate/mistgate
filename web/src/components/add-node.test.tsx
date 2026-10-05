@@ -140,7 +140,7 @@ describe("the add-node window", () => {
   });
 
   it("opens the SSH setup as a panel modal and confirms the server fingerprint before credentials", async () => {
-    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key", algorithm: "ssh-ed25519" });
     await open();
     await click(button("Install automatically over SSH"));
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
@@ -154,6 +154,7 @@ describe("the add-node window", () => {
     expect(getSSHFingerprint).toHaveBeenCalledWith({ host: "de1.example.com", port: 22 });
     expect(text()).toContain("Confirm the SSH host key");
     expect(text()).toContain("SHA256:server-key");
+    expect(text()).toContain("Key type: ssh-ed25519"); // a provider lists one fingerprint per key type
     expect(button("Continue")?.disabled).toBe(true);
   });
 

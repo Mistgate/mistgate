@@ -1047,10 +1047,15 @@ func (x *ListApprovalsResponse) GetNowUnix() int64 {
 }
 
 type ApproveRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// node_install only, required there: the SSH password the owner types on the approval screen (the agent never sees
+	// it), and the host key fingerprint the owner compared and confirmed there. The panel seals the password to the plan
+	// until the agent's apply uses it, once.
+	SshPassword          string `protobuf:"bytes,2,opt,name=ssh_password,json=sshPassword,proto3" json:"ssh_password,omitempty"`
+	ConfirmedFingerprint string `protobuf:"bytes,3,opt,name=confirmed_fingerprint,json=confirmedFingerprint,proto3" json:"confirmed_fingerprint,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ApproveRequest) Reset() {
@@ -1086,6 +1091,20 @@ func (*ApproveRequest) Descriptor() ([]byte, []int) {
 func (x *ApproveRequest) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *ApproveRequest) GetSshPassword() string {
+	if x != nil {
+		return x.SshPassword
+	}
+	return ""
+}
+
+func (x *ApproveRequest) GetConfirmedFingerprint() string {
+	if x != nil {
+		return x.ConfirmedFingerprint
 	}
 	return ""
 }
@@ -1298,9 +1317,11 @@ const file_mistgate_admin_v1_integrations_proto_rawDesc = "" +
 	"\x15ListApprovalsResponse\x129\n" +
 	"\tapprovals\x18\x01 \x03(\v2\x1b.mistgate.admin.v1.ApprovalR\tapprovals\x12\x1a\n" +
 	"\bawaiting\x18\x02 \x01(\rR\bawaiting\x12\x1d\n" +
-	"\bnow_unix\x18\x03 \x01(\x03B\x020\x02R\anowUnix\" \n" +
+	"\bnow_unix\x18\x03 \x01(\x03B\x020\x02R\anowUnix\"x\n" +
 	"\x0eApproveRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"J\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fssh_password\x18\x02 \x01(\tR\vsshPassword\x123\n" +
+	"\x15confirmed_fingerprint\x18\x03 \x01(\tR\x14confirmedFingerprint\"J\n" +
 	"\x0fApproveResponse\x127\n" +
 	"\bapproval\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.ApprovalR\bapproval\"\x1f\n" +
 	"\rRejectRequest\x12\x0e\n" +

@@ -43,34 +43,34 @@ func NewClient() *Client {
 	return &Client{resolver: net.DefaultResolver, dialer: &net.Dialer{Timeout: sshTimeout}, timeout: sshTimeout}
 }
 
-// Fingerprint reads one reachable server key without authenticating. The SSH
-// handshake is stopped as soon as the key is received, before an auth request.
-func (c *Client) Fingerprint(ctx context.Context, target Target) (string, error) {
+// Fingerprint reads one reachable server key without authenticating and returns its SHA-256 fingerprint and key type.
+// The SSH handshake is stopped as soon as the key is received, before an auth request.
+func (c *Client) Fingerprint(ctx context.Context, target Target) (fingerprint, algorithm string, err error) {
 	resolveCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	addrs, err := target.publicAddresses(resolveCtx, c.resolver)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(addrs) > maxTargetAddrs {
-		return "", ErrUnsafeTarget
+		return "", "", ErrUnsafeTarget
 	}
 
 	var lastErr error
 	for _, addr := range addrs {
-		fingerprint, err := c.fingerprintAt(resolveCtx, target, addr)
+		fingerprint, algorithm, err := c.fingerprintAt(resolveCtx, target, addr)
 		if err == nil {
-			return fingerprint, nil
+			return fingerprint, algorithm, nil
 		}
 		if resolveCtx.Err() != nil {
-			return "", resolveCtx.Err()
+			return "", "", resolveCtx.Err()
 		}
 		lastErr = err
 	}
 	if lastErr == nil {
 		lastErr = ErrNoAddress
 	}
-	return "", fmt.Errorf("provision: read SSH host key: %w", lastErr)
+	return "", "", fmt.Errorf("provision: read SSH host key: %w", lastErr)
 }
 
 // Dial authenticates as root only after the host presents the fingerprint the
@@ -173,35 +173,35 @@ func (c *Connection) Close() error {
 	return client.Close()
 }
 
-func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Addr) (string, error) {
+func (c *Client) fingerprintAt(ctx context.Context, target Target, addr netip.Addr) (string, string, error) {
 	conn, err := c.dialer.DialContext(ctx, "tcp", net.JoinHostPort(addr.String(), strconv.Itoa(int(target.port))))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer conn.Close()
 	stopHandshake, err := setHandshakeDeadline(ctx, conn, c.timeout)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer stopHandshake()
 
-	var fingerprint string
+	var fingerprint, algorithm string
 	config := &ssh.ClientConfig{
 		User:              "root",
 		HostKeyAlgorithms: preferredHostKeyAlgorithms(),
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
-			fingerprint = ssh.FingerprintSHA256(key)
+			fingerprint, algorithm = ssh.FingerprintSHA256(key), key.Type()
 			return errHostKeySeen
 		},
 	}
 	_, _, _, err = ssh.NewClientConn(conn, target.Address(), config)
 	if errors.Is(err, errHostKeySeen) && fingerprint != "" {
-		return fingerprint, nil
+		return fingerprint, algorithm, nil
 	}
 	if err == nil {
-		return "", errors.New("provision: SSH handshake unexpectedly continued past host-key discovery")
+		return "", "", errors.New("provision: SSH handshake unexpectedly continued past host-key discovery")
 	}
-	return "", err
+	return "", "", err
 }
 
 // preferredHostKeyAlgorithms moves Ed25519 to the front of the supported SSH

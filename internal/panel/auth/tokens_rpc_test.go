@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -305,6 +306,63 @@ func (e *rpcEnv) approvals(awaitingOnly bool) *adminv1.ListApprovalsResponse {
 		e.t.Fatal(err)
 	}
 	return r.Msg
+}
+
+// The agent never carries the root password of a node install: the owner types it on the approval screen, together with
+// a confirmation of the exact host key the panel read. The panel seals both to that plan.
+func TestApproveNodeInstallTakesTheOwnersPasswordAndHostKey(t *testing.T) {
+	e := newRPCEnv(t)
+	tok, _ := e.mkToken("ops", store.ProfileAdmin, 600)
+	fp := "SHA256:" + strings.Repeat("A", 43)
+	p := store.MCPPlan{TokenID: tok.ID, Tool: NodeInstallTool, ParamsJSON: `{}`, ConfirmHash: hashToken(store.NewID("cf_")),
+		FactsJSON: `[{"key":"host_key","value":"` + fp + `"},{"key":"host_key_algorithm","value":"ssh-ed25519"}]`,
+		Summary:   "s", Danger: `["fleet"]`, NeedsApproval: true, Status: store.PlanAwaiting, CreatedAt: e.s.now()}
+	if err := e.st.CreateMCPPlan(context.Background(), p, 20, 50); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := e.st.MCPPlanByConfirm(context.Background(), tok.ID, p.ConfirmHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := e.s.newSession(context.Background(), e.owner.ID, "", "")
+	fresh := authed(t, e.s, c.Value)
+	approve := func(id, password, fingerprint string) error {
+		_, err := e.apr.Approve(fresh, connect.NewRequest(&adminv1.ApproveRequest{Id: id, SshPassword: password, ConfirmedFingerprint: fingerprint}))
+		return err
+	}
+	if err := approve(plan.ID, "", fp); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("approve without the password: %v", err)
+	}
+	if err := approve(plan.ID, "root-secret", "SHA256:"+strings.Repeat("B", 43)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("approve with another host key: %v", err)
+	}
+	if got, _ := e.st.GetMCPPlan(context.Background(), plan.ID); got.Status != store.PlanAwaiting {
+		t.Fatalf("a refused approval moved the plan: %s", got.Status)
+	}
+	if err := approve(plan.ID, "root-secret", fp); err != nil {
+		t.Fatal(err)
+	}
+	var sealed []byte
+	if err := e.st.R.QueryRow(`SELECT owner_secret FROM mcp_plan WHERE id = ?`, plan.ID).Scan(&sealed); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(sealed, []byte("root-secret")) {
+		t.Fatal("the password is stored in the clear")
+	}
+	if got, err := OpenNodeInstallSecret(e.s.vault, plan.ID, sealed); err != nil || got.Password != "root-secret" || got.Fingerprint != fp {
+		t.Fatalf("sealed secret = %+v, err %v", got, err)
+	}
+	if _, err := OpenNodeInstallSecret(e.s.vault, "pln_other", sealed); err == nil {
+		t.Fatal("the secret opens for another plan")
+	}
+	if rows := e.audits("approval_approve"); len(rows) != 1 || strings.Contains(rows[0].Params, "root-secret") {
+		t.Fatalf("approval audit: %+v", rows)
+	}
+	// any other tool takes no password
+	other := e.planFor(tok, "rollout_start", true, "awaiting")
+	if err := approve(other.ID, "root-secret", ""); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("a password on another tool's approval: %v", err)
+	}
 }
 
 func TestApprovals(t *testing.T) {

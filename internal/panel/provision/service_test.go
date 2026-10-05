@@ -1,10 +1,14 @@
 package provision
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -14,6 +18,8 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -206,6 +212,113 @@ func TestRetiredNodeAccessIsKeptUntilTheOwnerForgetsIt(t *testing.T) {
 	}
 	if err := forget(); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("forget twice = %v", err)
+	}
+}
+
+// The MCP apply of node_install carries no password: the panel takes, once, the one the owner entered when approving
+// that plan, and only with the host key the owner confirmed there. The call goes through the real token middleware.
+func TestStartNodeProvisionTakesTheOwnersPasswordFromTheApprovedPlan(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminAuth, err := auth.New(st, auth.Config{RPID: "localhost", Origins: []string{"http://localhost"}, Vault: vlt}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	const ownerID = "adm_owner"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES (?, 'Owner', ?, ?, ?)`,
+		ownerID, store.RoleOwner, []byte{1}, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	secret := auth.NewTokenSecret()
+	hash := sha256.Sum256([]byte(secret))
+	tok := store.APIToken{ID: store.NewID("tok_"), Name: "agent", Profile: store.ProfileAdmin, Hint: secret[len(secret)-4:], RatePerMin: 600,
+		CreatedBy: ownerID, CreatedAt: now, ExpiresAt: now.Add(24 * time.Hour)}
+	if err := st.CreateAPIToken(ctx, tok, hash[:]); err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))
+	// an approved node_install plan whose apply has begun, with what the owner entered sealed to it
+	approvedPlan := func(confirmed string) string {
+		confirm := sha256.Sum256([]byte(store.NewID("cf_")))
+		p := store.MCPPlan{TokenID: tok.ID, Tool: auth.NodeInstallTool, ParamsJSON: `{}`, ConfirmHash: confirm[:], FactsJSON: `[]`,
+			Summary: "s", Danger: `["fleet"]`, NeedsApproval: true, Status: store.PlanAwaiting, CreatedAt: now}
+		if err := st.CreateMCPPlan(ctx, p, 20, 50); err != nil {
+			t.Fatal(err)
+		}
+		p, err := st.MCPPlanByConfirm(ctx, tok.ID, confirm[:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		sealed := auth.SealNodeInstallSecret(vlt, p.ID, auth.NodeInstallSecret{Password: "owner-typed-secret", Fingerprint: confirmed})
+		if _, err := st.ApproveMCPPlanWithSecret(ctx, p.ID, ownerID, sealed, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.BeginApply(ctx, p.ID, tok.ID, p.Tool, p.ParamsHash, p.ConfirmHash, now); err != nil {
+			t.Fatal(err)
+		}
+		return p.ID
+	}
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{},
+		StepUp: adminAuth.RequireStepUp,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// start is the MCP layer's in-process call: the token, the MCP channel and the plan's approved grant
+	start := func(planID, name string) (*adminv1.NodeProvisionJob, error) {
+		var job *adminv1.NodeProvisionJob
+		var callErr error
+		reached := false
+		h := adminAuth.RequireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			resp, err := svc.StartNodeProvision(r.Context(), connect.NewRequest(&adminv1.StartNodeProvisionRequest{
+				ConfirmInstall: true, Name: name, Address: "edge.example.com", SshHost: "203.0.113.30", SshPort: 22,
+				Fingerprint: fingerprint, PlanId: planID,
+			}))
+			if err == nil {
+				job = resp.Msg.GetJob()
+			}
+			callErr = err
+		}))
+		callCtx := adminAuth.WithApprovedStepUp(auth.WithChannel(ctx, auth.ChannelMCP), planID)
+		r := httptest.NewRequest(http.MethodPost, adminv1connect.ProvisioningServiceStartNodeProvisionProcedure, nil).WithContext(callCtx)
+		r.Header.Set("Authorization", "Bearer "+secret)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if !reached {
+			t.Fatalf("the MCP call was refused at the door: %d %s", w.Code, w.Body.String())
+		}
+		return job, callErr
+	}
+
+	planID := approvedPlan(fingerprint)
+	job, err := start(planID, "edge-1")
+	if err != nil {
+		t.Fatalf("install from the approved plan: %v", err)
+	}
+	stored, err := st.NodeProvisionJob(ctx, job.GetId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds, err := svc.openCredentials(stored.ID, stored.Secret); err != nil || creds.Password != "owner-typed-secret" {
+		t.Fatalf("job credentials: err %v", err)
+	}
+	if _, err := start(planID, "edge-2"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "owner_password_missing") {
+		t.Fatalf("a second install from one approval = %v", err)
+	}
+	other := approvedPlan("SHA256:" + base64.RawStdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)))
+	if _, err := start(other, "edge-3"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "host_key_not_confirmed_by_owner") {
+		t.Fatalf("install with a host key the owner did not confirm = %v", err)
 	}
 }
 

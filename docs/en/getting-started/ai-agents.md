@@ -18,8 +18,8 @@ Connect to `<admin URL>mcp` with an API token whose profile is **Admin**. The to
 ### Install a node
 
 1. Call `node_install_plan` with a public SSH host, port, login, node name, client-facing address, and optional location/provider. The login must be `root` or have non-interactive `sudo -n`.
-2. Show the returned SHA-256 host-key fingerprint and node metadata. Ask the user to confirm that exact host key and the install. Wait for the owner to approve the plan in the panel.
-3. After explicit confirmation and approval, call `node_install_apply` with the returned `confirm_token`, the exact `confirmed_fingerprint`, and the SSH password. The password is a one-call input: it is not written into the saved plan or tool result.
+2. Show the node metadata from the plan and ask the user to approve it in the panel. Never ask the user for the server password and never pass it to a tool. On the approval card the owner compares the host key fingerprint the panel read (and its key type), confirms it, and types the SSH password; the panel seals the password to that plan. The agent's copy of the plan shows the fingerprint redacted.
+3. After the owner approved, call `node_install_apply` with the returned `confirm_token` only. The panel installs with the owner's password and exactly the confirmed host key; the password never reaches the agent.
 4. The panel pins the key, installs its currently trusted signed agent bundle, enrolls the node, and waits for the agent connection. Check `node_server_access_list` for public login metadata; it never returns a password.
 
 ### Rotate an SSH password

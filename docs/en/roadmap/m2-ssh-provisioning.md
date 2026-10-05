@@ -7,7 +7,7 @@ description: "M2 status and design for node installation over SSH, saved access,
 
 ## SSH node installation
 
-- The owner starts SSH installation from **Nodes → Add node** in a four-step panel modal. The Go-rendered `/nodes/install` page remains the job and server-access manager for recovery, cancellation and password rotation. MCP exposes the same install through `node_install_plan` and owner-approved `node_install_apply`.
+- The owner starts SSH installation from **Nodes → Add node** in a four-step panel modal. The Go-rendered `/nodes/install` page remains the job and server-access manager for recovery, cancellation and password rotation. MCP exposes the same install through `node_install_plan` and owner-approved `node_install_apply`: the owner compares the host key (fingerprint and key type) and types the SSH password on the approval screen, the panel seals it to that plan, and the apply carries only the confirm token. Agents can read the host key only while making that plan, never as a free network probe.
 - The first release supports root or password authentication for an account with non-interactive `sudo -n`, Ubuntu 22.04+ or Debian 12+, amd64 or arm64, and systemd.
 - The panel obtains the host-key fingerprint before asking for the password. The owner confirms the exact key, then reviews OS, architecture, systemd, resources and panel reachability before confirming any host changes.
 - The worker installs the matching agent from the trusted release bundle, enrolls with a one-time token over stdin, starts the systemd service and waits for the agent. The modal and the manager report progress and redacted errors.
@@ -32,7 +32,7 @@ description: "M2 status and design for node installation over SSH, saved access,
 M2 is complete when these paths are available in the panel release and pass the repository test suite:
 
 - An owner can install a supported server from the UI and see its agent connect; the manual enrollment command remains available.
-- An MCP agent must show the host key and install plan, receive explicit confirmation and owner approval, and send the SSH password only in the apply call.
+- An MCP install needs the owner's approval, on which the owner confirms the host key and enters the SSH password; the agent never handles the password.
 - Host changes start only after key confirmation, successful preflight and install confirmation. Saved credentials never appear in reads, plans or logs.
 - Cancellation, worker restart recovery, failed retries and duplicate names preserve durable history and do not create conflicting live nodes.
 - Encrypted backups upload to R2, scheduled runs and retention respect saved settings, and restore validates the archive without overwriting an existing directory.

@@ -28,6 +28,9 @@ message GetSSHFingerprintResponse {
   string host = 1;
   uint32 port = 2;
   string fingerprint = 3;
+  // The key type the fingerprint belongs to ("ssh-ed25519", "ecdsa-sha2-nistp256", "ssh-rsa"): a provider's console
+  // lists one fingerprint per type, so the owner needs it to compare the right one.
+  string algorithm = 4;
 }
 
 message CheckSSHRequest {
@@ -67,6 +70,9 @@ message StartNodeProvisionRequest {
   string fingerprint = 9;
   string password = 10;
   string ssh_username = 11;
+  // MCP only: the approved node_install plan being applied. password stays empty: the panel uses the password the owner
+  // entered on that plan's approval screen, and only with the fingerprint the owner confirmed there.
+  string plan_id = 12;
 }
 
 message RetryNodeProvisionRequest {

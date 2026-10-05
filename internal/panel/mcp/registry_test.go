@@ -148,8 +148,10 @@ func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
 	if properties["node_install_plan"]["password"] != nil || properties["node_server_password_rotate_plan"]["new_password"] != nil {
 		t.Fatal("password appeared in an MCP plan input")
 	}
-	if properties["node_install_apply"]["password"] == nil {
-		t.Fatal("node installation must accept its one-call SSH credential")
+	// the owner enters the root password and confirms the host key on the approval screen: the agent carries neither
+	if properties["node_install_apply"]["password"] != nil || properties["node_install_apply"]["confirmed_fingerprint"] != nil ||
+		properties["node_install_apply"]["confirm_token"] == nil || len(properties["node_install_apply"]) != 1 {
+		t.Fatalf("node_install_apply takes only the confirm token: %v", properties["node_install_apply"])
 	}
 	if properties["node_server_password_rotate_apply"]["new_password"] != nil {
 		t.Fatal("the generated node password must never be an MCP input")

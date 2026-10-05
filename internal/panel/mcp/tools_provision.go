@@ -79,7 +79,8 @@ func nodeInstallPlanTool() toolDef {
 	return toolDef{
 		name: base + "_plan", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure),
 		free: true, isPlan: true, danger: true,
-		desc: "Prepare installation of a Mistgate node over SSH. This only reads the public SSH host key. The agent must show the fingerprint and wait for explicit confirmation before applying.",
+		desc: "Prepare installation of a Mistgate node over SSH. This only reads the public SSH host key. Never ask for or pass the server password: " +
+			"the owner compares the host key fingerprint and enters the password on the approval screen in the admin panel. Tell the user to approve the plan there.",
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in nodeInstallArgs) (*mcp.CallToolResult, any, error) {
@@ -111,10 +112,13 @@ func nodeInstallPlanTool() toolDef {
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
 					}
+					// host_key and host_key_algorithm are what the panel itself read: the owner compares them on the
+					// approval screen and enters the password there (ApproveRequest), never through the agent.
 					planned := &planned{
-						Summary: "Install a new Mistgate agent on one server after the owner approves the SSH host key and preflight checks.",
+						Summary: "Install a new Mistgate agent on one server. The owner confirms the SSH host key and enters the server password on the approval screen; the agent never sees the password.",
 						Facts: []Fact{{Key: "node", Value: nm(resolved.Name), Untrusted: true}, {Key: "ssh", Value: net.JoinHostPort(resolved.Host, strconv.FormatUint(uint64(resolved.Port), 10)), Untrusted: true},
 							{Key: "username", Value: nm(resolved.Username), Untrusted: true}, {Key: "host_key", Value: resolved.Fingerprint},
+							{Key: "host_key_algorithm", Value: clean(fingerprint.Msg.GetAlgorithm(), 64)},
 							{Key: "address", Value: nm(resolved.Address), Untrusted: true}, {Key: "installation", Value: "signed current agent bundle; waits for the new node to connect"}},
 						Danger: []string{dangerStepUp, dangerFleet}, Params: resolved,
 					}
@@ -128,39 +132,28 @@ func nodeInstallPlanTool() toolDef {
 	}
 }
 
-type nodeInstallApplyArgs struct {
-	ConfirmToken         string `json:"confirm_token" jsonschema:"token returned by node_install_plan"`
-	Password             string `json:"password" jsonschema:"SSH password; supplied only to this call and never added to the plan"`
-	ConfirmedFingerprint string `json:"confirmed_fingerprint" jsonschema:"the exact SHA-256 host key shown by node_install_plan, after the owner confirms it"`
-}
-
 func nodeInstallApplyTool() toolDef {
 	const base = "node_install"
 	return toolDef{
 		name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceStartNodeProvisionProcedure),
-		danger: true, desc: "Apply an owner-approved node_install plan. Provide the SSH password only here, after the owner confirmed the exact host fingerprint in the plan.",
+		danger: true, desc: "Apply an owner-approved node_install plan. Takes only the confirm_token: the owner entered the SSH password and confirmed the host key on the approval screen, and the panel uses them from there.",
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
-				func(ctx context.Context, req *mcp.CallToolRequest, in nodeInstallApplyArgs) (*mcp.CallToolResult, any, error) {
+				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {
 						return nil, nil, err
 					}
 					defer c.done()
-					if in.Password == "" || in.ConfirmedFingerprint == "" {
-						return nil, nil, errors.New("password and confirmed_fingerprint are required")
-					}
 					out, err := e.apply(c, base, in.ConfirmToken, func(c *call, pl Plan) (done, error) {
 						var p nodeInstallParams
 						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
 							return done{}, failure("plan_unreadable", "make a new node installation plan")
 						}
-						if in.ConfirmedFingerprint != p.Fingerprint {
-							return done{}, errors.New("confirmed_fingerprint does not match the plan; stop and review the host key")
-						}
+						// No password here: plan_id lets the panel take the one the owner entered when approving this plan.
 						started, err := c.cl.Provisioning.StartNodeProvision(c.ctx, connect.NewRequest(&adminv1.StartNodeProvisionRequest{
 							ConfirmInstall: true, Name: p.Name, Address: p.Address, CountryCode: p.CountryCode, Location: p.Location, Provider: p.Provider,
-							SshHost: p.Host, SshPort: p.Port, SshUsername: p.Username, Fingerprint: p.Fingerprint, Password: in.Password,
+							SshHost: p.Host, SshPort: p.Port, SshUsername: p.Username, Fingerprint: p.Fingerprint, PlanId: pl.ID,
 						}))
 						if err != nil {
 							return done{}, apiError(err)
@@ -171,7 +164,6 @@ func nodeInstallApplyTool() toolDef {
 					if err != nil {
 						return nil, nil, scrubError(err)
 					}
-					in.Password = ""
 					return result(out)
 				})
 		},

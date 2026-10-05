@@ -90,12 +90,12 @@ func TestFingerprintDoesNotSendAuthentication(t *testing.T) {
 	signer := testSigner(t)
 	passwords := make(chan string, 1)
 	client := testSSHClient(t, signer, passwords)
-	got, err := client.Fingerprint(context.Background(), mustTarget(t))
+	got, algorithm, err := client.Fingerprint(context.Background(), mustTarget(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := ssh.FingerprintSHA256(signer.PublicKey()); got != want {
-		t.Fatalf("fingerprint = %q, want %q", got, want)
+	if want := ssh.FingerprintSHA256(signer.PublicKey()); got != want || algorithm != signer.PublicKey().Type() {
+		t.Fatalf("fingerprint = %q %q, want %q %q", got, algorithm, want, signer.PublicKey().Type())
 	}
 	select {
 	case got := <-passwords:
@@ -147,12 +147,12 @@ func TestFingerprintPrefersEd25519AndDialUsesSamePreference(t *testing.T) {
 	client := testSSHClientWithHostKeys(t, []ssh.Signer{ecdsaSigner, rsaSigner, ed25519Signer}, passwords, nil)
 	want := ssh.FingerprintSHA256(ed25519Signer.PublicKey())
 
-	got, err := client.Fingerprint(context.Background(), mustTarget(t))
+	got, algorithm, err := client.Fingerprint(context.Background(), mustTarget(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
-		t.Fatalf("fingerprint = %q, want preferred Ed25519 key %q", got, want)
+	if got != want || algorithm != ssh.KeyAlgoED25519 {
+		t.Fatalf("fingerprint = %q %q, want preferred Ed25519 key %q", got, algorithm, want)
 	}
 
 	conn, err := client.Dial(context.Background(), mustTarget(t), "ssh-secret", got)
@@ -183,12 +183,12 @@ func TestFingerprintFallsBackToECDSAAndRSA(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := testSSHClientWithHostKeys(t, tc.signers, make(chan string, 1), nil)
-			got, err := client.Fingerprint(context.Background(), mustTarget(t))
+			got, algorithm, err := client.Fingerprint(context.Background(), mustTarget(t))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := ssh.FingerprintSHA256(tc.want.PublicKey()); got != want {
-				t.Fatalf("fingerprint = %q, want %q", got, want)
+			if want := ssh.FingerprintSHA256(tc.want.PublicKey()); got != want || algorithm != tc.want.PublicKey().Type() {
+				t.Fatalf("fingerprint = %q %q, want %q %q", got, algorithm, want, tc.want.PublicKey().Type())
 			}
 		})
 	}
