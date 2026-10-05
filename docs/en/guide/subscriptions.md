@@ -75,11 +75,13 @@ The Mihomo YAML carries the same headers, one proxy group with every server, and
 | Piece | Becomes |
 |:--|:--|
 | `{flag}` | The flag emoji of the node's country. |
-| `{country}` | The country name, in the panel's default language. |
+| `{country}` | The two-letter code of the node's country (`DE`). |
 | `{node}` | The node name. |
 | `{profile}` | The profile name. |
 
-The default is `{flag} {country} · {profile}`: "🇩🇪 Germany · Hysteria2". Profile names come from the panel, so protocol variants and WARP twins stay easy to tell apart. A number is added only if the full name repeats. A node without a country keeps its profile name; if the name is empty too, it falls back to the node. Happ shows a flag as the server icon only when the name starts with one.
+The default is `{flag} {country} · {profile}`: "🇩🇪 DE · Hysteria2". Profile names come from the panel, so protocol variants and WARP twins stay easy to tell apart. A number is added only if the full name repeats. A node without a country keeps its profile name; if the name is empty too, it falls back to the node. Happ shows a flag as the server icon only when the name starts with one.
+
+In Happ, a node with a set network capacity also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64%". Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
 
 **How it looks in the app** draws the list as Happ shows it, with the servers of the group most people are in, or with made-up servers when there is none.
 

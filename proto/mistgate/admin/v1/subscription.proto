@@ -26,9 +26,9 @@ message SubscriptionSettings {
   string support_url = 3;
   // Hours between app refreshes (profile-update-interval). 0 = 12.
   uint32 update_interval_hours = 4;
-  // Server name template. Placeholders: {flag} (emoji from the node country), {country} (localised
-  // country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
-  // of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany · Hysteria2 2").
+  // Server name template. Placeholders: {flag} (emoji from the node country), {country} (the two-letter
+  // country code), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
+  // of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 DE · Hysteria2 2").
   string server_name_template = 5;
   // What the user page recommends, per platform and access kind. Order = display order.
   repeated PlatformApp apps = 6;
@@ -110,7 +110,7 @@ message GetSubscriptionSettingsResponse {
   repeated ServerSample server_samples = 3;
   // That group's name ("" with no samples).
   string sample_group = 4;
-  // The language {country} is written in (the instance language).
+  // The instance language. {country} itself is the two-letter code whatever the language.
   string names_language = 5;
 }
 

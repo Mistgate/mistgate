@@ -47,9 +47,9 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
   updateIntervalHours: number;
 
   /**
-   * Server name template. Placeholders: {flag} (emoji from the node country), {country} (localised
-   * country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
-   * of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany · Hysteria2 2").
+   * Server name template. Placeholders: {flag} (emoji from the node country), {country} (the two-letter
+   * country code), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
+   * of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 DE · Hysteria2 2").
    *
    * @generated from field: string server_name_template = 5;
    */
@@ -264,7 +264,7 @@ export type GetSubscriptionSettingsResponse = Message<"mistgate.admin.v1.GetSubs
   sampleGroup: string;
 
   /**
-   * The language {country} is written in (the instance language).
+   * The instance language. {country} itself is the two-letter code whatever the language.
    *
    * @generated from field: string names_language = 5;
    */

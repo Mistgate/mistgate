@@ -87,7 +87,7 @@ hysteria2://<token>@de1.example.com:443/?obfs=salamander&obfs-password=<password
 **Mihomo YAML.** Apps on the mihomo core (Clash Verge, FlClash and others) get one proxy per server:
 
 ```yaml
-- name: "🇩🇪 Germany · Hysteria2"
+- name: "🇩🇪 DE · Hysteria2"
   type: hysteria2
   server: "de1.example.com"
   port: 443

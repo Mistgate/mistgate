@@ -148,9 +148,9 @@ type SubscriptionSettings struct {
 	SupportUrl string `protobuf:"bytes,3,opt,name=support_url,json=supportUrl,proto3" json:"support_url,omitempty"`
 	// Hours between app refreshes (profile-update-interval). 0 = 12.
 	UpdateIntervalHours uint32 `protobuf:"varint,4,opt,name=update_interval_hours,json=updateIntervalHours,proto3" json:"update_interval_hours,omitempty"`
-	// Server name template. Placeholders: {flag} (emoji from the node country), {country} (localised
-	// country name), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
-	// of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 Germany · Hysteria2 2").
+	// Server name template. Placeholders: {flag} (emoji from the node country), {country} (the two-letter
+	// country code), {node} (node name), {profile} (profile name). Empty = "{flag} {country} · {profile}". When servers
+	// of one user render to the same name, the second gets " 2", the third " 3" ("🇩🇪 DE · Hysteria2 2").
 	ServerNameTemplate string `protobuf:"bytes,5,opt,name=server_name_template,json=serverNameTemplate,proto3" json:"server_name_template,omitempty"`
 	// What the user page recommends, per platform and access kind. Order = display order.
 	Apps     []*PlatformApp   `protobuf:"bytes,6,rep,name=apps,proto3" json:"apps,omitempty"`
@@ -538,7 +538,7 @@ type GetSubscriptionSettingsResponse struct {
 	ServerSamples []*ServerSample `protobuf:"bytes,3,rep,name=server_samples,json=serverSamples,proto3" json:"server_samples,omitempty"`
 	// That group's name ("" with no samples).
 	SampleGroup string `protobuf:"bytes,4,opt,name=sample_group,json=sampleGroup,proto3" json:"sample_group,omitempty"`
-	// The language {country} is written in (the instance language).
+	// The instance language. {country} itself is the two-letter code whatever the language.
 	NamesLanguage string `protobuf:"bytes,5,opt,name=names_language,json=namesLanguage,proto3" json:"names_language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
