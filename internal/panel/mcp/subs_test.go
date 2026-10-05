@@ -247,7 +247,7 @@ func TestSubscriptionAppValidation(t *testing.T) {
 		"kind":             {with("kind", "vless"), "kind: happ"},
 		"no kind for new":  {with("kind", nil), "kind is required"},
 		"no name":          {with("name", "  "), "name is required"},
-		"ftp download":     {with("download_url", "ftp://example.com/x"), "must be an http(s) link"},
+		"ftp download":     {with("download_url", "ftp://example.com/x"), "must be an https:// link"},
 		"javascript link":  {with("add_link_template", "javascript:alert(1)"), "scheme is not allowed"},
 		"data link":        {with("add_link_template", "data:text/html,x"), "scheme is not allowed"},
 		"no scheme":        {with("add_link_template", "{url}"), "must start with a scheme"},
