@@ -118,8 +118,10 @@ describe("DNS for user traffic", () => {
       trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
       trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    for (let i = 0; i < 3; i++) await settle();
-    const custom = [...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes(en["node.settings.dnsMode.custom"]));
+    // the popup opens asynchronously; a slow CI runner needs more than a few ticks
+    const option = () => [...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes(en["node.settings.dnsMode.custom"]));
+    for (let i = 0; i < 100 && !option(); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    const custom = option();
     expect(custom).toBeDefined();
     await click(custom);
     expect(text()).toContain(en["node.settings.dnsCustom"]);
