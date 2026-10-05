@@ -120,7 +120,10 @@ describe("the countdown", () => {
 
 describe("words of an approval", () => {
   it("titles every tool that can plan a change, in both languages", () => {
-    const tools = ["user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "node_fix", "rollout_start", "rollout_pause", "rollout_resume", "rollout_cancel", "node_rollback"];
+    const tools = [
+      "user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "node_fix", "rollout_start", "rollout_pause", "rollout_resume",
+      "rollout_cancel", "node_update_schedule", "node_update_schedule_cancel", "update_timezone", "node_rollback", "node_install", "node_server_password_rotate",
+    ];
     for (const tool of tools) {
       expect(toolTitle(t, tool), tool).not.toBe(tool);
       expect(ru[`approval.tool.${tool}` as keyof typeof ru], tool).toBeTruthy();
@@ -128,9 +131,20 @@ describe("words of an approval", () => {
     expect(toolTitle(t, "something_new")).toBe("something_new");
   });
   it("labels every fact key the panel writes, and shows an unknown key as it came", () => {
-    const keys = ["name", "quota", "term", "apps", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail", "drops_sessions", "version", "batch_size", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit", "dns_preset", "used"];
-    for (const k of keys) expect(factLabel(t, k), k).not.toBe(k);
+    const keys = [
+      "name", "subscription_name", "quota", "term", "apps", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
+      "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit",
+      "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
+      "ssh", "username", "host_key", "host_key_algorithm", "address", "installation", "recovery",
+    ];
+    for (const k of keys) {
+      expect(factLabel(t, k), k).not.toBe(k);
+      expect(ru[`approval.fact.${k}` as keyof typeof ru], k).toBeTruthy();
+    }
     expect(factLabel(t, "brand_new")).toBe("brand_new");
+    // rollout_start updates one node now: no batches, no canary, so no words for them
+    expect(factLabel(t, "batch_size")).toBe("batch_size");
+    expect(Object.keys(en).filter((k) => /^approval\.(fact\.batch_size|value\.canary|value\.default)$/.test(k))).toEqual([]);
   });
   it("knows the three danger codes", () => {
     for (const c of ["step_up", "fleet", "bulk"]) expect(dangerText(t, c)).not.toBe(c);
@@ -176,7 +190,10 @@ describe("coded facts and outcomes, in Russian", () => {
     expect(said(fact("quota", "change", { from: "0", to: "50000000000" }))).toBe("без лимита → 50 ГБ");
     expect(said(fact("quota_reset", "change", { from: "month", to: "rolling_month" }))).toBe("сброс 1-го числа → сброс каждые 30 дней");
     expect(said(fact("action", "pause"))).toBe("Пауза");
-    expect(said(fact("batch_size", "default"))).toBe("По умолчанию панели");
+    expect(said(fact("effect", "restart"))).toBe("Нода перезапустит свой агент.");
+    expect(said(fact("existing_schedule", "replace"))).toBe("Заменит текущее расписание ноды.");
+    expect(said({ ...fact("timezone", "utc_offset", { minutes: "180" }), value: "UTC+03:00" })).toBe("UTC+03:00");
+    expect(said(fact("scheduled_at", "time", { unix: "1700009000" }))).toBe(fmt.dateTime(1700009000));
     expect(said(fact("alert", "alert", { kind: "node_down", severity: "critical" }))).toBe("Нода недоступна · Критично");
     expect(said(fact("alert", "alert", { kind: "check_failed", severity: "warning" }))).toBe("Профиль не проходит проверку глазами клиента · Внимание");
     expect(said(fact("progress", "progress", { done: "2", total: "5" }))).toBe("завершено 2 из 5 нод");
@@ -197,6 +214,11 @@ describe("coded facts and outcomes, in Russian", () => {
     expect(out(ApprovalState.APPLIED, "users_disabled", { n: "1" })).toBe("Отключён 1 пользователь");
     expect(out(ApprovalState.APPLIED, "alert_muted", { seconds: "3600" })).toBe("Алерт заглушён на 1 ч");
     expect(out(ApprovalState.APPLIED, "rollback_started")).toBe("Откат запущен");
+    expect(out(ApprovalState.APPLIED, "node_update_scheduled", { node_id: "nod_1", version: "v2" })).toBe("Обновление ноды запланировано");
+    expect(out(ApprovalState.APPLIED, "node_update_schedule_cancelled", { node_id: "nod_1" })).toBe("Запланированное обновление отменено");
+    expect(out(ApprovalState.APPLIED, "update_timezone_changed", { offset_minutes: "180" })).toBe("Часовой пояс расписания изменён");
+    expect(out(ApprovalState.APPLIED, "node_install_queued", { job_id: "job_1" })).toBe("Установка поставлена в очередь");
+    expect(out(ApprovalState.APPLIED, "node_ssh_password_rotated")).toBe("SSH-пароль сменён");
     expect(out(ApprovalState.FAILED, "no_trusted_bundle", { detail: "x" })).toBe("Ошибка: нет проверенного пакета обновлений");
     expect(out(ApprovalState.FAILED, "something_else")).toBeNull();
     expect(out(ApprovalState.APPLIED, "")).toBeNull();

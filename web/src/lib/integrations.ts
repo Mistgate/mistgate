@@ -178,10 +178,8 @@ export const dangerText = (t: T, code: string) => lookup(t, `approval.danger.${c
 const knownValues: Record<string, MessageKey> = {
   "their connections end and their devices are dropped from the nodes": "approval.value.disable",
   "they can connect again": "approval.value.enable",
-  "canary first; each node restarts its agent": "approval.value.canary",
   "the node restarts its agent": "approval.value.restart",
   "the device is disconnected and must be set up again": "approval.value.device",
-  "the panel's default": "approval.value.default",
   pause: "approval.value.pause",
   resume: "approval.value.resume",
   cancel: "approval.value.cancel",

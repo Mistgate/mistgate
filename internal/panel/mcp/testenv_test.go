@@ -602,7 +602,7 @@ func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesR
 		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Built: built, Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
 		Nodes: []*adminv1.NodeUpdate{
 			{NodeId: nodeA, Name: "de1", Version: "v1", Built: 1700000100, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, SupportsUpdate: true, LastUpdate: &adminv1.LastUpdate{Outcome: "ok", FromVersion: "v0"}},
-			{NodeId: nodeB, Name: "nl1", Version: "v2", Built: 1700000200, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true},
+			{NodeId: nodeB, Name: "nl1", Version: "v2", Built: 1700000200, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true, ScheduledUnix: 1700009000, ScheduledVersion: "v2"},
 		},
 		Rollout: &adminv1.Rollout{Id: "rol_1", Status: w.rolloutStat, ToVersion: "v2", BatchSize: 1, Steps: []*adminv1.RolloutStep{{NodeId: nodeA, NodeName: "de1", State: adminv1.StepState_STEP_STATE_SENT}}},
 	}

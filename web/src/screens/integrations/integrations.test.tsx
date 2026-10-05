@@ -286,7 +286,7 @@ describe("the Integrations screen: approvals", () => {
     await click(document.querySelector("button[aria-label='Approve: Fix a node']"));
     await settle();
     expect(approve).toHaveBeenCalledWith({ id: "pln_1" });
-    await click(document.querySelector("button[aria-label='Reject: Start an update rollout']"));
+    await click(document.querySelector("button[aria-label='Reject: Update a node now']"));
     await settle();
     expect(reject).toHaveBeenCalledWith({ id: "pln_2" });
   });

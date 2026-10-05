@@ -490,6 +490,25 @@ func TestNodeUpdateScheduleFlowRequiresApprovalAndPinsTimezone(t *testing.T) {
 	}
 }
 
+// The owner's approval card words the planned time itself: the fact is coded as a time, not a raw unix number.
+func TestNodeUpdateScheduleCancelNamesTheTime(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	if got := mustFail(t, s, "node_update_schedule_cancel_plan", map[string]any{"node_id": nodeA}); !strings.Contains(got, "no pending") {
+		t.Errorf("a node without a schedule: %q", got)
+	}
+	p := planOf(t, s, "node_update_schedule_cancel", map[string]any{"node_id": nodeB})
+	if f := factOf(t, p, "scheduled_at"); f.Code != "time" || f.Params["unix"] != "1700009000" || f.Value != "2023-11-15 00:43 UTC" {
+		t.Errorf("scheduled_at fact: %+v", f)
+	}
+	e.plans.decide(p.PlanID, true)
+	applyOf(t, s, "node_update_schedule_cancel", p.ConfirmToken)
+	if len(e.w.cancelScheduleReq) != 1 || e.w.cancelScheduleReq[0].GetNodeId() != nodeB {
+		t.Errorf("CancelNodeUpdateSchedule calls: %+v", e.w.cancelScheduleReq)
+	}
+}
+
 func TestUpdateTimezoneChangeUsesOwnerApproval(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)

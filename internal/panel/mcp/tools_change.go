@@ -949,7 +949,7 @@ var nodeUpdateScheduleCancel = changeSpec[nodeUpdateScheduleCancelArgs]{
 			return &planned{Summary: "Cancel the pending update schedule for one node. The already installed agent stays unchanged.", Facts: []Fact{
 				{Key: "node", Value: nm(n.GetName()), Untrusted: true},
 				{Key: "scheduled_version", Value: clean(n.GetScheduledVersion(), 60)},
-				{Key: "scheduled_unix", Value: strconv.FormatInt(n.GetScheduledUnix(), 10)},
+				timeFact("scheduled_at", n.GetScheduledUnix()),
 			}, Danger: rolloutDanger, Params: a}, nil
 		}
 		return nil, errors.New("node_id is not a node of this panel")
