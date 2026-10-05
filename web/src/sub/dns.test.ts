@@ -28,7 +28,10 @@ describe("the servers", () => {
     expect(de.querySelectorAll(".meter i.f")).toHaveLength(3);
     expect(de.querySelector(".meter")?.classList.contains("hi")).toBe(true);
     expect([...de.querySelectorAll(".chips .chip")].map(text)).toEqual(["по ссылке", "ключ", "запасной выход"]);
-    expect(text(de.querySelector(".chips + .hint"))).toBe("Запасной выход — если какой-то сайт не открывается");
+    // the spare exit says what it is and which entry of the app it is
+    expect(text(de.querySelector(".chips + .hint"))).toBe(
+      "Запасной выход — тот же сервер, но сайты видят адрес Cloudflare, а не сервера. Если какой-то сайт не открывается, выберите в приложении «DE · Hysteria2 WARP».",
+    );
     expect([...de.querySelectorAll(".srv-app .mono")].map(text)).toEqual(["DE · Hysteria2", "DE · Hysteria2 WARP"]);
     expect(c[1]!.querySelectorAll(".meter i.f")).toHaveLength(2);
     expect(text(c[2]!.querySelector("p.sm"))).toBe("Выберите в приложении другой сервер");

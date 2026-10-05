@@ -107,7 +107,7 @@ describe("names and choices a friend can read", () => {
     const choices = profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN");
     expect(choices.map((c) => [c.id, c.label, c.kind])).toEqual([
       ["p31", "🇩🇪 Германия, 🇫🇮 Финляндия", "main"],
-      ["pw", "Запасной выход (если какой-то сайт не открывается)", "warp"],
+      ["pw", "Запасной выход через Cloudflare (если какой-то сайт не открывается)", "warp"],
       ["p20", "Для старых версий AmneziaVPN (до 5.0.1.5)", "old"],
     ]);
     expect(mainProfile(d.amnezia!.profiles)).toBe("p31");
