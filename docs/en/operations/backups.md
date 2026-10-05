@@ -27,7 +27,7 @@ As the owner, open **Settings → Backups** and enter the Cloudflare account ID,
 
 1. Save the settings.
 2. Choose **Test R2 access**. It lists the bucket, then writes a temporary object, reads it back and deletes it.
-3. Set the interval from 1 to 168 hours and retention. `0` means never prune; otherwise retention must be at least 7 days.
+3. Set the interval from 1 to 168 hours and retention. `0` means never prune; otherwise retention must be at least 7 days. Pruning never deletes the three newest backups, however old they are, so a retention as long as the interval still leaves more than one copy.
 4. Enable automatic backups and save. The first scheduled run starts within about a minute, then follows the interval. **Create backup now** starts an owner-confirmed backup immediately.
 
 The panel takes a consistent SQLite snapshot, includes the panel data files and the effective `master.key`, creates a manifest with file hashes, encrypts the archive to the public recipient, and uploads it to R2. The private recovery identity is never stored by Mistgate. Keep a copy of it even if R2 is available.

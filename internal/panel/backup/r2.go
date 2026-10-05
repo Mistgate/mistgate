@@ -245,17 +245,21 @@ func listBackupObjects(ctx context.Context, api s3API, bucket string) ([]backupO
 	return objects, nil
 }
 
+// minKeptBackups is how many of the newest backups retention never deletes, however old they are. A retention as long
+// as the interval (7 days, 168 hours) would otherwise catch the previous backup at every run and leave one copy.
+const minKeptBackups = 3
+
 func pruneBackups(ctx context.Context, api s3API, bucket, keepKey string, retentionDays int, now time.Time) error {
 	if retentionDays == 0 {
 		return nil
 	}
-	objects, err := listBackupObjects(ctx, api, bucket)
+	objects, err := listBackupObjects(ctx, api, bucket) // newest first
 	if err != nil {
 		return err
 	}
 	cutoff := now.Add(-time.Duration(retentionDays) * 24 * time.Hour)
-	for _, item := range objects {
-		if item.Key == keepKey || item.LastModified.IsZero() || !item.LastModified.Before(cutoff) {
+	for i, item := range objects {
+		if i < minKeptBackups || item.Key == keepKey || item.LastModified.IsZero() || !item.LastModified.Before(cutoff) {
 			continue
 		}
 		if _, err := api.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(item.Key)}); err != nil {

@@ -183,8 +183,10 @@ func TestBackupRetentionOnlyDeletesObjectsOutsidePolicy(t *testing.T) {
 	recent := now.Add(-6 * 24 * time.Hour)
 	api := &fakeS3{objects: []s3types.Object{
 		{Key: aws.String(r2BackupPrefix + "keep.tar.gz.age"), LastModified: aws.Time(old)},
-		{Key: aws.String(r2BackupPrefix + "old.tar.gz.age"), LastModified: aws.Time(old)},
+		{Key: aws.String(r2BackupPrefix + "old.tar.gz.age"), LastModified: aws.Time(old.Add(-time.Hour))},
 		{Key: aws.String(r2BackupPrefix + "recent.tar.gz.age"), LastModified: aws.Time(recent)},
+		{Key: aws.String(r2BackupPrefix + "recent2.tar.gz.age"), LastModified: aws.Time(recent)},
+		{Key: aws.String(r2BackupPrefix + "recent3.tar.gz.age"), LastModified: aws.Time(recent)},
 		{Key: aws.String("unrelated/object.tar.gz.age"), LastModified: aws.Time(old)},
 	}}
 	if err := pruneBackups(context.Background(), api, "bucket", r2BackupPrefix+"keep.tar.gz.age", 7, now); err != nil {
@@ -198,5 +200,23 @@ func TestBackupRetentionOnlyDeletesObjectsOutsidePolicy(t *testing.T) {
 	}
 	if api.listCalls != 1 {
 		t.Fatalf("retention=0 listed objects %d times, want no additional read", api.listCalls)
+	}
+}
+
+// A retention as long as the interval (7 days, every 168 hours) finds the previous backup just past the cutoff at every
+// run. The newest backups stay anyway, so the bucket never holds a single copy.
+func TestBackupRetentionKeepsTheNewestBackups(t *testing.T) {
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	week := 7 * 24 * time.Hour
+	var objects []s3types.Object
+	for i := range 5 {
+		objects = append(objects, s3types.Object{Key: aws.String(fmt.Sprintf("%sb%d.tar.gz.age", r2BackupPrefix, i)), LastModified: aws.Time(now.Add(-time.Duration(i) * (week + time.Minute)))})
+	}
+	api := &fakeS3{objects: objects}
+	if err := pruneBackups(context.Background(), api, "bucket", r2BackupPrefix+"b0.tar.gz.age", 7, now); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(api.deleted, []string{r2BackupPrefix + "b3.tar.gz.age", r2BackupPrefix + "b4.tar.gz.age"}) {
+		t.Fatalf("deleted objects = %v, want only those beyond the %d newest", api.deleted, minKeptBackups)
 	}
 }
