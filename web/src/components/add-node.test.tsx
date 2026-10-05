@@ -237,6 +237,46 @@ describe("the add-node window", () => {
     expect(text()).toContain("Waiting to start");
   });
 
+  it("words the worker's phases and shows a completed install with a way to the node", async () => {
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    checkSSH.mockResolvedValue({
+      preflight: { distribution: "Ubuntu", version: "22.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true },
+    });
+    const job = { id: "prv_1", nodeId: "nod_1", name: "de1", errorCode: "" };
+    startNodeProvision.mockResolvedValue({ job: { ...job, state: "queued", phase: "queued" } });
+    getNodeProvision.mockResolvedValueOnce({ job: { ...job, state: "running", phase: "transfer" } });
+
+    await open();
+    await click(button("Install automatically over SSH"));
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    const password = () => document.querySelector<HTMLInputElement>('input[type="password"]')!;
+    await type(password(), "check-only-secret");
+    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button("Continue"));
+    await settle();
+    await type(password(), "install-secret");
+    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button("Start installation"));
+    await settle();
+    await settle();
+    expect(text()).toContain("Sending the agent");
+    expect(text()).not.toContain("transfer");
+
+    // the backend's terminal state is "completed" (store.CompleteNodeProvisionJob)
+    getNodeProvision.mockResolvedValue({ job: { ...job, state: "completed", phase: "completed" } });
+    await act(async () => void (await new Promise((r) => setTimeout(r, 2_600))));
+    await settle();
+    expect(text()).toContain("Node installed and connected");
+    expect(text()).not.toContain("Installing");
+    const calls = getNodeProvision.mock.calls.length;
+    await act(async () => void (await new Promise((r) => setTimeout(r, 2_600))));
+    expect(getNodeProvision.mock.calls.length).toBe(calls); // no more polling once it is done
+    await click(button("Open node"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" } });
+  }, 10_000);
+
   it("opens step-up for the SSH modal and retries the credential check after confirmation", async () => {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
     checkSSH

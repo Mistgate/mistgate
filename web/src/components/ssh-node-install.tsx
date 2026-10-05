@@ -21,7 +21,8 @@ type Busy = "fingerprint" | "check" | "start" | "retry" | null;
 const nodeNamePattern = /^[a-z0-9-]{2,24}$/;
 const nodeAddressPattern = /^[A-Za-z0-9.:-]{1,253}$/;
 const noCountry = "none";
-const terminalStates = new Set(["done", "failed", "cancelled", "canceled"]);
+// node_provision_job.state (migration 00031): queued, running, cancel_requested, then completed, failed or cancelled.
+const terminalStates = new Set(["completed", "failed", "cancelled"]);
 
 function sshError(error: unknown, t: T): string {
   const raw = ConnectError.from(error).rawMessage.toLowerCase();
@@ -63,36 +64,42 @@ function jobError(code: string, t: T): string {
   return t("node.ssh.error.install");
 }
 
+// The worker's phases (provision/worker.go setPhase); an unknown one reads as "Installing", never as a raw code.
 function phaseLabel(phase: string, t: T): string {
   switch (phase) {
     case "queued":
       return t("node.ssh.phase.queued");
-    case "checking_host":
-      return t("node.ssh.phase.checking_host");
+    case "connecting":
+      return t("node.ssh.phase.connecting");
+    case "preflight":
+      return t("node.ssh.phase.preflight");
     case "firewall":
       return t("node.ssh.phase.firewall");
-    case "uploading_agent":
-      return t("node.ssh.phase.uploading_agent");
-    case "enrolling_node":
-      return t("node.ssh.phase.enrolling_node");
-    case "starting_agent":
-      return t("node.ssh.phase.starting_agent");
-    case "waiting_for_agent":
-      return t("node.ssh.phase.waiting_for_agent");
+    case "transfer":
+      return t("node.ssh.phase.transfer");
+    case "enrollment":
+      return t("node.ssh.phase.enrollment");
+    case "install":
+      return t("node.ssh.phase.install");
+    case "waiting_node":
+      return t("node.ssh.phase.waiting_node");
+    case "cancelling":
+      return t("node.ssh.phase.cancelling");
     default:
-      return phase ? phase.replaceAll("_", " ") : t("node.ssh.state.running");
+      return t("node.ssh.state.running");
   }
 }
 
 function stateLabel(state: string, t: T): string {
   switch (state) {
-    case "done":
+    case "completed":
       return t("node.ssh.done");
     case "failed":
       return t("node.ssh.state.failed");
     case "cancelled":
-    case "canceled":
       return t("node.ssh.state.cancelled");
+    case "cancel_requested":
+      return t("node.ssh.state.cancelling");
     case "queued":
       return t("node.ssh.state.queued");
     default:
@@ -208,9 +215,9 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535;
   const jobState = job.data?.state ?? "";
   const installManagerHref = new URL("nodes/install?job=" + encodeURIComponent(jobId), document.baseURI).href;
-  const jobDone = jobState === "done";
+  const jobDone = jobState === "completed";
   const jobFailed = jobState === "failed";
-  const jobCancelled = jobState === "cancelled" || jobState === "canceled";
+  const jobCancelled = jobState === "cancelled";
   const jobCanRetry = jobFailed && !["remote_outcome_unknown", "node_retired"].includes(job.data?.errorCode ?? "");
   const jobTone = jobDone ? "tone-ok tint tone-text" : jobFailed ? "tone-bad tint tone-text" : jobCancelled ? "tone-off tint tone-text" : "tone-busy tint tone-text";
 
