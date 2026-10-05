@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -19,23 +20,40 @@ import (
 type fakeS3 struct {
 	putCalls     int
 	listCalls    int
+	getCalls     int
 	deleted      []string
 	partSizes    []int64
 	completed    *s3types.CompletedMultipartUpload
 	aborted      bool
 	failPart     int32
 	failComplete bool
+	failGet      bool
 	objects      []s3types.Object
+	lastPut      []byte
+	onPut        func() // called while the body of a PutObject is read
 }
 
 func (f *fakeS3) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	f.putCalls++
+	if f.onPut != nil {
+		f.onPut()
+	}
 	if input.Body != nil {
-		if _, err := io.Copy(io.Discard, input.Body); err != nil {
+		b, err := io.ReadAll(input.Body)
+		if err != nil {
 			return nil, err
 		}
+		f.lastPut = b
 	}
 	return &s3.PutObjectOutput{}, nil
+}
+
+func (f *fakeS3) GetObject(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	f.getCalls++
+	if f.failGet {
+		return nil, errors.New("injected read failure")
+	}
+	return &s3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(f.lastPut))}, nil
 }
 
 func (f *fakeS3) CreateMultipartUpload(_ context.Context, _ *s3.CreateMultipartUploadInput, _ ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error) {
@@ -96,6 +114,22 @@ func TestS3EndpointJurisdictions(t *testing.T) {
 	}
 	if _, err := s3Endpoint(account, "unknown"); err == nil {
 		t.Error("unknown jurisdiction was accepted")
+	}
+}
+
+// The storage test proves what a restore needs too: the probe it wrote reads back. A token that cannot read fails the
+// test, and the probe is deleted either way.
+func TestStorageTestReadsTheProbeBack(t *testing.T) {
+	ok := &fakeS3{}
+	if err := testStorage(context.Background(), ok, "bucket"); err != nil || ok.getCalls != 1 || len(ok.deleted) != 1 {
+		t.Fatalf("test = %v, reads %d, deleted %v", err, ok.getCalls, ok.deleted)
+	}
+	noRead := &fakeS3{failGet: true}
+	if err := testStorage(context.Background(), noRead, "bucket"); !errors.Is(err, errBackupStorageFailed) {
+		t.Errorf("a bucket that cannot be read passed the test: %v", err)
+	}
+	if len(noRead.deleted) != 1 {
+		t.Errorf("the probe was left behind: deleted %v", noRead.deleted)
 	}
 }
 

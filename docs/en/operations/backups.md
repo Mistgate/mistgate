@@ -19,14 +19,14 @@ The command creates a private age identity without overwriting an existing file,
 
 ### Create the R2 bucket and token
 
-Create a bucket in Cloudflare R2 and an S3 API token limited to that bucket. Mistgate needs object **read, write and delete** access: the storage test writes, reads and removes a temporary object, and configured retention deletes expired backups. Use a dedicated token rather than an account-wide API key.
+Create a bucket in Cloudflare R2 and an S3 API token limited to that bucket. Mistgate needs object **read, write and delete** access: the storage test lists the backups, writes a temporary object, reads it back (a restore downloads) and deletes it, and configured retention deletes expired backups. Use a dedicated token rather than an account-wide API key.
 
 ## Configure the panel
 
 As the owner, open **Settings → Backups** and enter the Cloudflare account ID, bucket jurisdiction, bucket name, R2 access key ID and secret, plus the age recipient. The secret access key is encrypted with the panel master key and never returned by the API. A saved secret stays in place when its field is left blank.
 
 1. Save the settings.
-2. Choose **Test R2 access**. It verifies the bucket can be read, written and cleaned up.
+2. Choose **Test R2 access**. It lists the bucket, then writes a temporary object, reads it back and deletes it.
 3. Set the interval from 1 to 168 hours and retention. `0` means never prune; otherwise retention must be at least 7 days.
 4. Enable automatic backups and save. The first scheduled run starts within about a minute, then follows the interval. **Create backup now** starts an owner-confirmed backup immediately.
 

@@ -121,6 +121,18 @@ The users' page passwords are not stored: they are derived from the master key. 
 
 Owner-only encrypted backups to Cloudflare R2 are available under **Settings → Backups**. They are off until configured and require an offline age recovery identity. Read [Encrypted panel backups](backups.md) before enabling them; it covers token permissions, retention and restore into a fresh data directory.
 
+A copy by hand needs no R2. Make it with the panel stopped:
+
+```sh
+systemctl stop mistgate     # the name of your unit
+tar czf mistgate-backup-$(date +%F).tgz -C /var/lib mistgate
+systemctl start mistgate
+```
+
+> **Warning:** The copy holds `master.key`: whoever has it can read every secret of the panel. Keep it encrypted and off the panel server. If systemd gives the panel its key as a credential, the key is not in the directory: keep that credential with the copy, or the copy cannot be read.
+
+To restore, stop the panel, put the directory back in place (owned by the user that runs the panel, mode 0700) and start it.
+
 ## Recovering access
 
 All of these run on the panel server, as the user that can read the data directory (normally root). They work with the panel running or stopped. Add `--data-dir <dir>` when the data is not in `/var/lib/mistgate`. `reset-login` needs the master key: if it is not in the data directory but given to the panel as a systemd credential, set `CREDENTIALS_DIRECTORY` to the directory that holds `master.key`.

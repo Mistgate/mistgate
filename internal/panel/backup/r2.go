@@ -37,6 +37,7 @@ type s3API interface {
 	CompleteMultipartUpload(context.Context, *s3.CompleteMultipartUploadInput, ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
 	AbortMultipartUpload(context.Context, *s3.AbortMultipartUploadInput, ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
 	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	DeleteObject(context.Context, *s3.DeleteObjectInput, ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 }
 
@@ -89,6 +90,8 @@ func newS3API(ctx context.Context, cfg store.PanelBackupSettings, decryptSecret 
 	}), nil
 }
 
+// testStorage checks what backups need of the bucket: it lists the backups, writes a probe object, reads it back (a
+// restore downloads, so a token that can only write is not enough) and deletes it (retention deletes).
 func testStorage(ctx context.Context, api s3API, bucket string) error {
 	if _, err := api.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(r2BackupPrefix), MaxKeys: aws.Int32(1)}); err != nil {
 		return errBackupStorageFailed
@@ -97,16 +100,25 @@ func testStorage(ctx context.Context, api s3API, bucket string) error {
 	if err != nil {
 		return errBackupStorageFailed
 	}
+	const content = "mistgate r2 test\n"
 	probe := r2ProbePrefix + id
-	if _, err := api.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(probe), Body: strings.NewReader("mistgate r2 test\n"), ContentType: aws.String("text/plain")}); err != nil {
+	if _, err := api.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(probe), Body: strings.NewReader(content), ContentType: aws.String("text/plain")}); err != nil {
 		return errBackupStorageFailed
+	}
+	readErr := errBackupStorageFailed
+	if out, err := api.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(probe)}); err == nil {
+		got, err := io.ReadAll(io.LimitReader(out.Body, int64(len(content))+1))
+		out.Body.Close()
+		if err == nil && string(got) == content {
+			readErr = nil
+		}
 	}
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if _, err := api.DeleteObject(cleanupCtx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(probe)}); err != nil {
 		return errBackupStorageDeleteFailed
 	}
-	return nil
+	return readErr
 }
 
 func uploadBackup(ctx context.Context, api s3API, bucket, key, filePath string) (int64, error) {
