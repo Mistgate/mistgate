@@ -9,11 +9,12 @@ Mistgate is a self-hosted panel for a small VPN fleet that you run on your own s
 
 - **Two programs, no Docker.** `mistgate` is the panel. `mistgate-node` is the agent that runs on every VPN server. Both are single Go binaries for Linux (amd64 and arm64).
 - **One admin for the whole fleet.** The panel keeps people, protocol setups and servers in one SQLite database and shows them in a web admin in English and Russian.
-- **Agents do the work on the servers.** The agent runs the protocols and keeps the host in the state the panel asks for. It dials the panel; the panel never logs in to your servers and needs no management port on them.
+- **Agents do the work on the servers.** The agent runs the protocols and keeps the host in the state the panel asks for. It dials the panel, so the panel needs no management port on your servers. The panel logs in to a server over SSH only to install a node (from the admin, or for an AI agent with your approval) and, while that SSH access stays saved, to change or check the server's password at your request.
 - **Protocols.** Hysteria2 (the official core, built into the agent) and AmneziaWG 2.0 and 3.1 (userspace by default, the kernel module per node on request). Cloudflare WARP can be the exit for both.
 - **One link per person.** A subscription app that opens the link gets the server list in a format it reads (a list of `hysteria2://` links or a Mihomo YAML profile, chosen by User-Agent rules). A browser gets the person's own page with instructions. AmneziaVPN users get a key per device.
 - **Hidden by default.** A stranger who opens the panel's address sees a decoy site. The admin lives behind a secret path, a secret host name or a separate listener, and an unknown subscription link gets the same decoy.
-- **Health and updates.** The panel checks every server as a real client would, each node runs a doctor of host checks with a few safe fixes, and alerts say what is wrong in plain words. Node agents update themselves only from bundles signed with your own release key.
+- **Health and updates.** The panel checks every server as a real client would, each node runs a doctor of host checks with a few safe fixes, and alerts say what is wrong in plain words. Node agents and the panel update only to releases signed with the release key built into the panel: the project's key for the official GitHub releases, your own for your own builds.
+- **Backups.** Encrypted backups of the panel to your Cloudflare R2 bucket, on a schedule or on demand.
 - **Automation.** Scripts use the same Connect API as the admin with scoped API tokens; AI agents use the built-in MCP server, and risky changes wait for the owner's approval.
 
 ## What it is not
@@ -21,8 +22,8 @@ Mistgate is a self-hosted panel for a small VPN fleet that you run on your own s
 - **Not a VPN service.** You bring the servers and the domain names and you run everything. Mistgate does not rent servers or sell access.
 - **Not a billing system.** There are no payments, tariffs or invoices. Traffic quotas, terms and device limits are limits you set yourself.
 - **Not a client app.** People connect with existing apps: a subscription app such as Happ, or an app on the mihomo core such as Clash Verge or FlClash, and AmneziaVPN for AmneziaWG keys.
-- **Not finished.** There are no binary releases yet, so you build from source, and the API, the stored settings and the node protocol may still change before 1.0. The data model is sized for about 5000 users and 50 nodes.
-- **Not a one-click installer.** You install the panel by hand and enroll each node with one command. A one-line installer and node provisioning over SSH from the admin are **Planned**.
+- **Not finished.** This is an early release: the API, the stored settings and the node protocol may still change before 1.0. The data model is sized for about 5000 users and 50 nodes.
+- **Not a one-click installer.** You install the panel by hand, from the Linux binaries of a GitHub release or built from source. A node is added from the admin, either automatically over SSH or with a one-time install command you run on the server. A one-line installer for the panel is **Planned**.
 
 ## Who it is for
 
@@ -45,7 +46,7 @@ Mistgate is for a person or a small team that runs a few VPN servers for themsel
 
 How they relate:
 
-- A **user** gets a **server on a node** when the profile is in the user's **group**, the node is one of the user's nodes, the server is enabled, the user is Active, and one of the user's apps can use the protocol (Hysteria2 for the subscription apps, AmneziaWG for AmneziaVPN).
+- A **user** gets a **server on a node** when the profile is in the user's **group**, the node is one of the user's nodes, the server is enabled, the user is Active, and one of the user's apps can use the protocol (Hysteria2 for the subscription apps; AmneziaWG for AmneziaVPN, and for apps on the mihomo core when the user has AmneziaVPN switched on).
 - Every change to any of these is pushed to the affected nodes at once. Nobody has to restart anything.
 
 ## How a person's app reaches a node
@@ -74,5 +75,5 @@ The app talks to the panel only to fetch the link. VPN traffic goes straight fro
 ## Next
 
 - [Requirements](requirements.md): what the panel and the nodes need.
-- [Install the panel](install-panel.md), then [Add a node](add-node.md) and [First users](first-users.md).
+- [Install the panel](install-panel.md), then [Add a node](add-node.md) (or [Install a node over SSH](ssh-install.md)) and [First users](first-users.md).
 - [Architecture](../reference/architecture.md): how the parts talk to each other, in more detail.

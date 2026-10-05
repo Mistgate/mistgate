@@ -1,30 +1,53 @@
 ---
 title: Install the panel
-description: Build Mistgate, prepare the panel with mistgate setup, run it under systemd and sign in for the first time.
+description: Download or build Mistgate, prepare the panel with mistgate setup, run it under systemd and sign in for the first time.
 ---
 
-This page takes a fresh Linux server to a running panel with an owner account. The examples use `panel.example.com`; check [Requirements](requirements.md) first. Commands on the panel server run as root.
+This page takes a fresh Linux server to a running panel with an owner account. The examples use `panel.example.com`; check [Requirements](requirements.md) first. Commands on the panel server run as root. An AI agent with SSH access to the server can do the same steps for you: see the install prompt in the [AI agent guide](ai-agents.md).
 
-## 1. Build the binaries
+## 1. Get the binary
 
-On a build machine with Go, Node.js, pnpm, make and git:
+The panel is one static Linux binary for amd64 or arm64, with the admin web app built in. Use the official release unless you have a reason to build your own.
+
+### From GitHub Releases (recommended)
+
+Every release on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) carries the panel (`mistgate-linux-amd64`, `mistgate-linux-arm64`), the node agent (`mistgate-node-linux-amd64`, `mistgate-node-linux-arm64`), `SHA256SUMS`, `BUILDINFO` and two signed manifests: `manifest.json` with `manifest.sig` for the node agents and `panel-manifest.json` with `panel-manifest.sig` for the panel. The official binaries carry the project's release key, so a panel installed from them downloads the signed node agents by itself and can update itself from later releases (see [Updates](../operations/updates.md)).
+
+On the panel server, as root (`uname -m` prints `x86_64` for amd64 and `aarch64` for arm64):
+
+```sh
+ARCH=amd64    # arm64 on an ARM server
+cd /root
+for f in "mistgate-linux-$ARCH" SHA256SUMS panel-manifest.json; do
+  curl -fsSLO "https://github.com/Mistgate/mistgate/releases/latest/download/$f"
+done
+sha256sum --check --ignore-missing SHA256SUMS
+grep -q "$(sha256sum "mistgate-linux-$ARCH" | cut -d' ' -f1)" panel-manifest.json && echo "listed in panel-manifest.json"
+install -m 0755 "mistgate-linux-$ARCH" /usr/local/bin/mistgate
+mistgate version
+```
+
+What these checks prove, and what they do not:
+
+- `sha256sum --check` proves the file arrived intact and matches the checksums published with the release. `SHA256SUMS` is written by the release workflow and is not signed, so it does not prove who built the binary.
+- The same SHA-256 is listed in `panel-manifest.json`, which the maintainer signs offline with the release key after rebuilding every binary from the tag. Mistgate has no command that checks this signature for you, and common tools cannot check its Ed25519ctx signature, so the `grep` is a consistency check only.
+- From then on the panel checks signatures itself: it installs a panel release, and hands a node bundle to the agents, only when the signature verifies with the release key compiled into it. `mistgate version` prints the version and that key's fingerprint.
+
+### From source
+
+On a build machine with the tools listed in [Requirements](requirements.md):
 
 ```sh
 git clone https://github.com/Mistgate/mistgate.git
 cd mistgate
 make build
-```
-
-`bin/` now holds the panel (`mistgate-linux-amd64`, `mistgate-linux-arm64`) and the node agent (`mistgate-node-linux-amd64`, `mistgate-node-linux-arm64`). The admin web app is built into the panel binary. Keep the agent binaries: you need them when you [add a node](add-node.md).
-
-> **Warning:** if you want nodes to update themselves later, make your release key now and build with it (`RELEASE_KEY=<public key> make build`). Agents built without a key never update themselves. See [Updates](../operations/updates.md).
-
-Copy the panel binary to the server and install it:
-
-```sh
 scp bin/mistgate-linux-amd64 root@panel.example.com:/root/
 ssh root@panel.example.com 'install -m 0755 /root/mistgate-linux-amd64 /usr/local/bin/mistgate'
 ```
+
+`bin/` also holds the node agents (`mistgate-node-linux-amd64`, `mistgate-node-linux-arm64`); keep them for the [manual node install](add-node.md).
+
+> **Warning:** a build without `RELEASE_KEY` has no release key: its node agents never update themselves, the panel cannot install panel releases, and the SSH installation has no trusted agent bundle to install. A build with your own key trusts only releases you sign. Make the key before the first build: see [Releases and signing](../operations/releases.md).
 
 ## 2. Choose how the admin is reached
 
@@ -201,7 +224,7 @@ Everything the panel knows lives in the data directory:
 | `master.key` | The key that encrypts the stored secrets, including the key of the panel CA that every node trusts. |
 | `acme/` | Let's Encrypt account and certificates (with `--acme-domain` only). |
 
-Make a copy now and after every important change. **Settings → Backups** in the admin shows the same command:
+Make a copy now, with the panel stopped so the database is consistent:
 
 ```sh
 systemctl stop mistgate
@@ -211,8 +234,8 @@ systemctl start mistgate
 
 > **Warning:** the copy holds the master key: whoever has it can read every secret of the panel. Keep it encrypted and off the server. Without the data directory every node has to be enrolled again and every user, link and key is gone.
 
-Automatic encrypted backups are **Planned**. If you made a release key in step 1, keep that file offline and backed up as well.
+For regular copies, turn on [encrypted backups](../operations/backups.md) in **Settings → Backups**: the panel encrypts a consistent snapshot to your offline recovery key and uploads it to your Cloudflare R2 bucket on a schedule. If you built the panel with your own release key, keep that key file offline and backed up as well.
 
 ## Next
 
-[Add a node](add-node.md).
+[Add a node](add-node.md): automatically over SSH or with a command you run yourself.
