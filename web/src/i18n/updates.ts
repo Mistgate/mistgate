@@ -40,7 +40,7 @@ export const en = {
   "up.hero.noKey": "NO RELEASE KEY IN THIS BUILD",
   "up.hero.available.title": "Node agent {version}",
   "up.hero.available.text":
-    "{n} node will be updated: one first, then a health check, then the rest in batches. Each node is offline for a few seconds while its agent restarts.|{n} nodes will be updated: one first, then a health check, then the rest in batches. Each node is offline for a few seconds while its agent restarts.",
+    "{n} node can be updated. Start the update in its row below, now or at a time you choose; the node is offline for a few seconds while its agent restarts.|{n} nodes can be updated. Start each update in the node’s row below, now or at a time you choose; a node is offline for a few seconds while its agent restarts.",
   "up.hero.running.title": "Updating the fleet to {version}",
   "up.hero.running.text": "You can close the page: the panel carries on by itself and stops if a node fails its check.",
   "up.hero.paused.title": "The update is paused",
@@ -366,7 +366,7 @@ export const ru: Record<keyof typeof en, string> = {
   "up.hero.noKey": "В СБОРКЕ НЕТ КЛЮЧА РЕЛИЗА",
   "up.hero.available.title": "Агент ноды {version}",
   "up.hero.available.text":
-    "Будет обновлена {n} нода: сначала одна, потом проверка, затем остальные пачками. Пока агент перезапускается, нода недоступна несколько секунд.|Будут обновлены {n} ноды: сначала одна, потом проверка, затем остальные пачками. Пока агент перезапускается, нода недоступна несколько секунд.|Будет обновлено {n} нод: сначала одна, потом проверка, затем остальные пачками. Пока агент перезапускается, нода недоступна несколько секунд.",
+    "Можно обновить {n} ноду. Обновление запускается в строке ноды ниже — сразу или в выбранное время; пока агент перезапускается, нода недоступна несколько секунд.|Можно обновить {n} ноды. Обновление запускается в строке ноды ниже — сразу или в выбранное время; пока агент перезапускается, нода недоступна несколько секунд.|Можно обновить {n} нод. Обновление запускается в строке ноды ниже — сразу или в выбранное время; пока агент перезапускается, нода недоступна несколько секунд.",
   "up.hero.running.title": "Флот обновляется до {version}",
   "up.hero.running.text": "Страницу можно закрыть: панель продолжит сама и остановится, если нода не пройдёт проверку.",
   "up.hero.paused.title": "Обновление остановлено",
