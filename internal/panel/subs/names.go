@@ -62,6 +62,9 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 		if n == "" {
 			n = "server"
 		}
+		if limitHapp {
+			n = strings.ReplaceAll(n, "%", "％") // U+FF05, see the load suffix below
+		}
 		suffix := ""
 		if load && s.LoadPercent != nil {
 			// U+FF05, not "%": Happ decodes the name a second time, and a bare "%" makes that fail, so Happ drops the

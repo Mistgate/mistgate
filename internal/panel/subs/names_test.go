@@ -128,6 +128,19 @@ func TestHappRemarkTruncatesCustomNamesButKeepsLoad(t *testing.T) {
 	}
 }
 
+// Happ decodes the name a second time, so a bare "%" from the template, the profile or the node breaks it, not only the one
+// of the load suffix. The Mihomo names keep the sign: nothing decodes them twice.
+func TestHappRemarksReplaceBarePercent(t *testing.T) {
+	s := srv("de1", "DE", "100% fast")
+	got := happRemarks([]access.SubServer{s}, "{node} {profile} 5%", "en", false)[0]
+	if strings.Contains(got, "%") || got != "de1 100％ fast 5％" {
+		t.Errorf("Happ name = %q, want no bare %%", got)
+	}
+	if got := remarks([]access.SubServer{s}, "{node} {profile}", "en")[0]; got != "de1 100% fast" {
+		t.Errorf("Mihomo name = %q", got)
+	}
+}
+
 // loadSrc serves one view per format: hysteria2:// links for the list, a proxy for the Mihomo profile.
 type loadSrc struct{ load *int }
 
