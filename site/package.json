@@ -10,7 +10,8 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "node serve.mjs",
-    "test": "node --test test/docs.test.mjs"
+    "wiki": "node wiki.mjs",
+    "test": "node --test test/docs.test.mjs wiki.test.mjs"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",
