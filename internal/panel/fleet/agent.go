@@ -26,6 +26,7 @@ const (
 	maxEventParam   = 16
 	maxEngines      = 32 // engines listed in one Hello
 	capTorrentGuard = "torrentguard/1"
+	capClientIPv6   = "client-ipv6/1" // NodeSettings.client_ipv6_disabled
 )
 
 type agentService struct{ f *Fleet }
@@ -666,7 +667,7 @@ const (
 	reconcileFull                         // resend everything (base mismatch, drift)
 )
 
-// nodeSettings is what the agent of a stream with these capabilities is told. The AWG and torrent blocker settings
+// nodeSettings is what the agent of a stream with these capabilities is told. The AWG, torrent blocker and client IPv6 settings
 // are sent only to agents that advertise the capability, keeping old-agent settings signatures unchanged.
 // An empty resolver list stays empty: the node then uses the server's own resolver (some hosters allow only theirs);
 // country defaults are a preset the owner picks, never a silent substitute.
@@ -680,13 +681,19 @@ func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	if slices.Contains(caps, capTorrentGuard) {
 		s.TorrentBlockerEnabled = n.TorrentBlockerEnabled
 	}
+	if slices.Contains(caps, capClientIPv6) {
+		s.ClientIpv6Disabled = !n.ClientIPv6
+	}
 	return s
 }
 
 func settingsSig(s *agentv1.NodeSettings) string {
 	sig := fmt.Sprint(s.StatsIntervalS, s.KeepaliveIntervalS, s.KeepaliveTimeoutS, s.DialTimeoutS, s.DnsResolvers, s.CountryCode, s.AwgBackend)
 	if s.TorrentBlockerEnabled {
-		return sig + "|torrentguard=enabled"
+		sig += "|torrentguard=enabled"
+	}
+	if s.ClientIpv6Disabled {
+		sig += "|client-ipv6=off"
 	}
 	return sig
 }

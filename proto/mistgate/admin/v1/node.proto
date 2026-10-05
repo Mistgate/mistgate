@@ -79,6 +79,11 @@ message Node {
   bool torrent_blocker_supported = 22;
   // Optional symmetric network capacity in Mbps; 0 means unknown and disables utilization percentages.
   uint32 bandwidth_mbps = 23;
+  // "IPv6 for clients": true (the default) lets people leave the node over IPv6; false makes the node refuse client
+  // IPv6 that would leave through its own uplink, so apps fall back to IPv4 at once.
+  bool client_ipv6 = 24;
+  // The connected or last-seen agent lists "client-ipv6/1", so it follows client_ipv6 = false.
+  bool client_ipv6_supported = 25;
 }
 
 enum AwgPrepareState {
@@ -242,6 +247,9 @@ message UpdateNodeRequest {
   optional bool torrent_blocker_enabled = 11;
   // Symmetric network capacity in Mbps. 0 disables utilization percentages; maximum 1,000,000.
   optional uint32 bandwidth_mbps = 12;
+  // "IPv6 for clients". Owner only (PERMISSION_DENIED for a helper). Requires an agent with "client-ipv6/1" when false
+  // (FAILED_PRECONDITION "agent too old" otherwise); turning it back on is always allowed.
+  optional bool client_ipv6 = 13;
 }
 
 message DnsResolvers {

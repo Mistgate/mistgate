@@ -119,6 +119,6 @@ func newAgent(stateDir string, log *slog.Logger) (*agent.Agent, error) {
 		return nil, err
 	}
 	// The engines and the WARP manager were built before the agent existed; from here on they can ask it.
-	hooks.dns, hooks.awgMode, hooks.warpEmit = a.DNS, a.AwgBackend, a.WarpEvent
+	hooks.dns, hooks.awgMode, hooks.warpEmit, hooks.noClientV6 = a.DNS, a.AwgBackend, a.WarpEvent, a.ClientIPv6Disabled
 	return a, nil
 }

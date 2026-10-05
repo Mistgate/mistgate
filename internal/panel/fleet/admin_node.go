@@ -254,13 +254,14 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(n.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
-		BandwidthMbps: uint32(n.BandwidthMbps),
+		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
 	}
 	caps := n.AgentCaps
 	if s != nil {
 		caps = s.caps
 	}
 	out.TorrentBlockerSupported = capabilityPresent(caps, capTorrentGuard)
+	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	if s != nil {
 		out.Online = protocolCounts(s.onlineByProtocol())
@@ -632,6 +633,29 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		}
 		p.TorrentBlockerEnabled = m.TorrentBlockerEnabled
 	}
+	if m.ClientIpv6 != nil {
+		// Where people appear to come from is the owner's call (UpdateNode itself is open to helpers).
+		if a, ok := auth.AdminFrom(ctx); !ok || a.Role != store.RoleOwner {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the owner can change IPv6 for clients"))
+		}
+		if !*m.ClientIpv6 { // an agent that does not know the setting would keep letting IPv6 out; turning it back on is always fine
+			cur, err := f.st.Node(ctx, m.NodeId)
+			if errors.Is(err, store.ErrNotFound) {
+				return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+			}
+			if err != nil {
+				return nil, internalErr(f.log.Error, "update node", err)
+			}
+			caps := cur.AgentCaps
+			if sess := f.session(cur.ID); sess != nil {
+				caps = sess.caps
+			}
+			if !capabilityPresent(caps, capClientIPv6) {
+				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
+			}
+		}
+		p.ClientIPv6 = m.ClientIpv6
+	}
 	if m.BandwidthMbps != nil {
 		if *m.BandwidthMbps > 1_000_000 {
 			return nil, invalid("bandwidth_mbps must be between 0 and 1000000")
@@ -659,7 +683,11 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			return nil, internalErr(f.log.Error, "mark devices stale", err)
 		}
 	}
-	f.audit(ctx, "node.update", map[string]string{"node_id": n.ID})
+	audit := map[string]string{"node_id": n.ID}
+	if m.ClientIpv6 != nil {
+		audit["client_ipv6"] = map[bool]string{true: "on", false: "off"}[n.ClientIPv6]
+	}
+	f.audit(ctx, "node.update", audit)
 	f.StateChanged() // address, DNS, timeouts and node settings feed the desired state
 	now := f.now().UTC()
 	protos, _ := f.st.FleetNodeProtocols(ctx)

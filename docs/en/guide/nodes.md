@@ -175,6 +175,14 @@ A **new node** is measured once automatically: about 45 seconds after its agent 
 
 **Block recognized BitTorrent traffic** is off by default. It blocks plaintext BitTorrent that the node's users start, on AmneziaWG in the kernel and on Hysteria2 in its engine, and writes a `torrent_attempt` event without any address. It needs an agent that supports it. See [Torrent protection](torrent-protection.md).
 
+**IPv6 for clients** is on by default (the way every node worked before), and only the owner changes it. Turn it off when the provider's IPv6 addresses are located in a different country than the node: an app picks IPv4 or IPv6 per site, so people would appear to come from two countries at random (over IPv4 the exit reads as the node's country, over IPv6 as the other one, and Google or YouTube then show the wrong region). With it off, the node answers client IPv6 that would leave through its own uplink with an ICMPv6 "administratively prohibited" instead of dropping it silently, so apps move to IPv4 at once instead of waiting for a timeout.
+
+- **AmneziaWG.** The agent adds one reject rule to its own firewall table (`mistgate_awg`) and removes it when you turn the setting back on. The clients' configs do not change: their IPv6 address and the `::/0` route stay in the tunnel, so a person's real IPv6 never leaves outside the VPN. IPv6 addressed to the tunnel's own address is untouched. IPv6 DNS servers of a preset are rejected too, so the device moves on to the IPv4 ones.
+- **Hysteria2.** The node's direct outbound connects over IPv4 only, and a name that has only an IPv6 address does not open. Connections that are already open keep the address family they have; new ones go over IPv4. The node's own name resolving (**DNS resolvers for this node**) works as before.
+- **Exit through WARP is not touched.** Its exit is Cloudflare's, not the node's uplink, so the geolocation of the node's range does not matter there.
+
+The setting needs an agent that reports `client-ipv6/1`. An older agent shows the switch greyed out with "Update this node agent to turn this off", and the panel never sends it the setting; turning IPv6 back on always works. Each change is written to the audit log (`node.update` with `client_ipv6` on or off).
+
 **DNS resolvers for this node** are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
 
 **DNS choice on the user page** is a separate block of the node, not to be confused with the resolvers above. Here the owner ticks the DNS presets that people may pick for this server on their page (the order is the order on the page) and marks one as the default for the node. Only the owner changes it, and the change is written to the audit log (`node_dns_options`). A node with no presets offered gives no choice. It matters only when **DNS choice on the page** is on in **Subscriptions** → **User page**, and it reaches AmneziaWG keys and the AmneziaWG proxies of a Mihomo profile; see [DNS](dns.md).
@@ -217,4 +225,4 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 for clients** off or on and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).

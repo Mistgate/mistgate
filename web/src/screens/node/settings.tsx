@@ -89,6 +89,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
       apply: data.timeouts?.applyTimeoutS || timeoutDefs.apply.def,
       dial: data.timeouts?.dialTimeoutS || timeoutDefs.dial.def,
       torrentBlockerEnabled: node.torrentBlockerEnabled,
+      clientIpv6: node.clientIpv6,
   }));
   const [f, setF] = useState(start);
   const [dnsMode, setDnsMode] = useState<NodeDnsMode>(() => nodeDnsMode(data.dnsResolvers));
@@ -114,6 +115,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
       ? undefined
       : t("node.settings.bandwidthError"),
   };
+  const clientIpv6Locked = retired || !owner || (!node.clientIpv6Supported && f.clientIpv6);
   const dirty = (Object.keys(start) as (keyof typeof start)[]).some((k) => f[k] !== start[k]);
 
   const save = useMutation({
@@ -135,6 +137,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           ? { livenessTimeoutS: tv("liveness"), applyTimeoutS: tv("apply"), dialTimeoutS: tv("dial") }
           : undefined,
         torrentBlockerEnabled: changed("torrentBlockerEnabled") ? f.torrentBlockerEnabled : undefined,
+        clientIpv6: changed("clientIpv6") ? f.clientIpv6 : undefined,
       });
     },
     onSuccess: () => {
@@ -274,6 +277,29 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
               <span className="text-xs leading-snug text-muted">{t("node.settings.torrentBlockerHint")}</span>
               {!node.torrentBlockerSupported && (
                 <span className="text-xs leading-snug text-muted">{t("node.settings.torrentBlockerUnsupported")}</span>
+              )}
+            </span>
+          </label>
+        </div>
+
+        {/* owner only (the API refuses a helper); switching it off needs an agent that follows it, switching it on never does */}
+        <div className="rounded-card border border-line bg-surface px-3.5 py-3">
+          <label className={`flex items-start gap-3 ${clientIpv6Locked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-accent"
+              checked={f.clientIpv6}
+              onChange={(e) => set("clientIpv6", e.target.checked)}
+              disabled={clientIpv6Locked}
+            />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="text-[13px] font-bold">{t("node.settings.clientIpv6")}</span>
+              <span className="text-xs leading-snug text-muted">{t("node.settings.clientIpv6Hint")}</span>
+              {!owner && <span className="text-xs leading-snug text-muted">{t("node.settings.clientIpv6Owner")}</span>}
+              {!node.clientIpv6Supported && (
+                <span className="text-xs leading-snug text-muted">
+                  {t(node.clientIpv6 ? "node.settings.clientIpv6Unsupported" : "node.settings.clientIpv6Stale")}
+                </span>
               )}
             </span>
           </label>

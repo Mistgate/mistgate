@@ -20,6 +20,8 @@ import (
 //   - an input policy for packets that arrive on a tunnel interface and are for the node itself: only an echo
 //     request to the tunnel's own address is answered, everything else is dropped. A client must not reach sshd, the
 //     decoy site or a management port through the tunnel, nor the node address of another profile;
+//   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected with ICMPv6
+//     admin-prohibited (chain nov6), not dropped, so apps move to IPv4 immediately;
 //   - one named counter per UDP port, AwgHealth.udp_rx_packets: 0 = the provider or a firewall, > 0 without a
 //     handshake = the obfuscation parameters.
 
@@ -47,6 +49,11 @@ type Tunnel struct {
 	UDPPort          uint16
 	// ViaWarp: the egress of this tunnel is WARP. No masquerade here, the WARP table does it.
 	ViaWarp bool
+	// RejectV6: "IPv6 for clients" is off on this node. IPv6 forwarded from this tunnel to anything but a tunnel
+	// interface is answered with ICMPv6 admin-prohibited, so the app falls back to IPv4 at once. The client keeps its
+	// IPv6 address and ::/0 route (without them its real IPv6 would leave outside the tunnel). Not rendered for a ViaWarp
+	// tunnel (the exit is Cloudflare's, not this node's uplink) or one without an IPv6 subnet.
+	RejectV6 bool
 }
 
 // TunnelHost is the part of the host that the L3 protocols need beyond Host. The Linux host implements it, the stub
@@ -132,6 +139,17 @@ func RenderTunnels(ts []Tunnel) (string, error) {
 
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
 	fmt.Fprintf(&b, "\tchain isolate {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tiifname %s oifname %s drop\n\t}\n", wild, wild)
+	// "IPv6 for clients" off: reject (not drop) what a tunnel sends to the uplink over IPv6. icmpx maps to ICMPv6
+	// "communication administratively prohibited" for IPv6 packets.
+	var noV6 strings.Builder
+	for _, t := range sorted {
+		if t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp {
+			fmt.Fprintf(&noV6, "\t\tiifname %q oifname != %s meta nfproto ipv6 reject with icmpx type admin-prohibited\n", t.Iface, wild)
+		}
+	}
+	if noV6.Len() > 0 {
+		fmt.Fprintf(&b, "\tchain nov6 {\n\t\ttype filter hook forward priority filter; policy accept;\n%s\t}\n", noV6.String())
+	}
 	fmt.Fprintf(&b, "\tchain clamp {\n\t\ttype filter hook forward priority mangle; policy accept;\n"+
 		"\t\toifname %s tcp flags syn tcp option maxseg size set rt mtu\n"+
 		"\t\tiifname %s tcp flags syn tcp option maxseg size set rt mtu\n\t}\n", wild, wild)

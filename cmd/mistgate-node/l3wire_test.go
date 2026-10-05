@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/awg"
+	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/warp"
@@ -150,5 +153,34 @@ func TestWireHasTheL3PartsAndNoSilentDirectExit(t *testing.T) {
 	}
 	if e.(*awgEngine).peek() != nil {
 		t.Error("the awg factory probed for a backend")
+	}
+}
+
+// The direct egress of the Hysteria2 engine follows "IPv6 for clients" (NodeSettings.client_ipv6_disabled, through the
+// agent hook): off makes an IPv6 destination fail with ErrNoIPv4 before anything is dialed. [::1] is refused as a
+// non-public address when the switch is on, so nothing leaves this machine. WARP's egress does not follow it.
+func TestWireDirectEgressFollowsTheClientIPv6Switch(t *testing.T) {
+	var off atomic.Bool
+	cfg, _, err := wire(t.TempDir(), slog.New(slog.DiscardHandler), &agentHooks{noClientV6: off.Load})
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct, err := cfg.Egress("direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := direct.TCP("[::1]:443"); !errors.Is(err, egress.ErrBlocked) {
+		t.Fatalf("IPv6 on: %v", err)
+	}
+	off.Store(true)
+	if _, err := direct.TCP("[::1]:443"); !errors.Is(err, egress.ErrNoIPv4) {
+		t.Fatalf("IPv6 off: %v", err)
+	}
+	if err := direct.CheckUDP("[::1]:443"); !errors.Is(err, egress.ErrNoIPv4) {
+		t.Fatalf("IPv6 off, UDP: %v", err)
+	}
+	off.Store(false)
+	if _, err := direct.TCP("[::1]:443"); !errors.Is(err, egress.ErrBlocked) {
+		t.Fatalf("IPv6 back on: %v", err)
 	}
 }

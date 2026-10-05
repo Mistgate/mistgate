@@ -12,9 +12,10 @@ import { SettingsTab } from "./settings";
 
 const retireNode = vi.fn();
 const measureBandwidth = vi.fn();
+const updateNode = vi.fn();
 const me = vi.fn();
 vi.mock("@/lib/api", () => ({
-  nodes: { retireNode: (...a: unknown[]) => retireNode(...a), measureBandwidth: (...a: unknown[]) => measureBandwidth(...a), updateNode: vi.fn() },
+  nodes: { retireNode: (...a: unknown[]) => retireNode(...a), measureBandwidth: (...a: unknown[]) => measureBandwidth(...a), updateNode: (...a: unknown[]) => updateNode(...a) },
   auth: { me: (...a: unknown[]) => me(...a) },
 }));
 const navigate = vi.fn();
@@ -40,20 +41,20 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [retireNode, measureBandwidth, me, navigate, addNode]) m.mockReset();
+  for (const m of [retireNode, measureBandwidth, updateNode, me, navigate, addNode]) m.mockReset();
   serverAccess.mockReset();
   serverAccess.mockReturnValue({ data: null });
 });
 
-const data = (status = NodeStatus.DOWN) =>
+const data = (status = NodeStatus.DOWN, node: Record<string, unknown> = {}) =>
   ({
-    node: { id: "nod_1", name: "de1", address: "de1.example.com", countryCode: "DE", status, location: "", provider: "" },
+    node: { id: "nod_1", name: "de1", address: "de1.example.com", countryCode: "DE", status, location: "", provider: "", ...node },
     notes: "",
     dnsResolvers: [],
     inbounds: [],
   }) as never;
 
-async function mount(status?: NodeStatus) {
+async function mount(status?: NodeStatus, node?: Record<string, unknown>) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -62,7 +63,7 @@ async function mount(status?: NodeStatus) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <SettingsTab data={data(status)} />
+          <SettingsTab data={data(status, node)} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -236,6 +237,51 @@ describe("DNS for user traffic", () => {
     expect(custom).toBeDefined();
     await click(custom);
     expect(text()).toContain(en["node.settings.dnsCustom"]);
+  });
+});
+
+describe("IPv6 for clients", () => {
+  const box = () => {
+    const label = [...document.querySelectorAll("label")].find((l) => l.textContent?.includes(en["node.settings.clientIpv6"]));
+    return label!.querySelector<HTMLInputElement>("input")!;
+  };
+  const online = { clientIpv6: true, clientIpv6Supported: true };
+
+  it("is on by default, and the owner turns it off and saves only that field", async () => {
+    updateNode.mockResolvedValue({});
+    await mount(NodeStatus.ONLINE, online);
+    expect(box().checked).toBe(true);
+    expect(box().disabled).toBe(false);
+    expect(text()).toContain(en["node.settings.clientIpv6Hint"]);
+    expect(text()).not.toContain(en["node.settings.clientIpv6Unsupported"]);
+    await click(box());
+    expect(box().checked).toBe(false);
+    await click(button(en["common.save"]));
+    expect(updateNode).toHaveBeenCalledTimes(1);
+    expect(updateNode.mock.calls[0]![0]).toEqual({
+      nodeId: "nod_1", name: undefined, address: undefined, countryCode: undefined, location: undefined, provider: undefined,
+      bandwidthMbps: undefined, notes: undefined, dnsResolvers: undefined, timeouts: undefined, torrentBlockerEnabled: undefined, clientIpv6: false,
+    });
+  });
+
+  it("cannot be turned off for an agent that does not know it, and says to update it", async () => {
+    await mount(NodeStatus.ONLINE, { clientIpv6: true, clientIpv6Supported: false });
+    expect(box().disabled).toBe(true);
+    expect(text()).toContain(en["node.settings.clientIpv6Unsupported"]);
+  });
+
+  it("can be turned back on when the agent lost the capability, and warns that it does not follow the setting", async () => {
+    await mount(NodeStatus.ONLINE, { clientIpv6: false, clientIpv6Supported: false });
+    expect(box().checked).toBe(false);
+    expect(box().disabled).toBe(false);
+    expect(text()).toContain(en["node.settings.clientIpv6Stale"]);
+  });
+
+  it("is read-only for a helper, whom the API refuses", async () => {
+    me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
+    await mount(NodeStatus.ONLINE, online);
+    expect(box().disabled).toBe(true);
+    expect(text()).toContain(en["node.settings.clientIpv6Owner"]);
   });
 });
 

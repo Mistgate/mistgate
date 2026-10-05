@@ -24,6 +24,8 @@ const (
 	capAWG          = "awg/1"
 	capWarp         = "warp/1"
 	capTorrentGuard = "torrentguard/1"
+	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
+	capClientIPv6 = "client-ipv6/1"
 	// capUnit3 says the node runs from a systemd unit of generation 3: /dev/net/tun is reachable (the userspace AWG
 	// and WARP backends need it) and ExecStopPost cleans the tunnel interfaces. A node without it keeps working with
 	// the kernel backends and shows the hint "unit_outdated" on the awg_backend doctor check.
@@ -70,6 +72,10 @@ type SettingsAware interface {
 // backend, like the engines ask for DNS.
 func (a *Agent) AwgBackend() string { return a.settings.Load().AwgBackend }
 
+// ClientIPv6Disabled returns NodeSettings.client_ipv6_disabled: "IPv6 for clients" is off. The direct egress of the
+// protocol engines asks for it on every dial, like the engines ask for DNS.
+func (a *Agent) ClientIPv6Disabled() bool { return a.settings.Load().GetClientIpv6Disabled() }
+
 // WarpEvent turns an event of the WARP manager into an agent Event (warp_state, warp_needs_attention). The manager
 // is built before the agent, so its Emit option calls this through a closure.
 func (a *Agent) WarpEvent(ev warp.Event) {
@@ -111,7 +117,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}
@@ -218,6 +224,7 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 		if err != nil {
 			continue // the engine reports the bad spec itself
 		}
+		t.RejectV6 = a.settings.Load().GetClientIpv6Disabled() // "IPv6 for clients" off (renders only for a direct tunnel with IPv6)
 		// Two tunnels may not share an interface or overlap in client subnets (the firewall could not tell their clients
 		// apart, and one would reach the other). The panel prevents it; if it happens anyway only the later inbound (ids
 		// are visited in order) is blocked, not every tunnel of the node.

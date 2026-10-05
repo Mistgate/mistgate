@@ -425,7 +425,8 @@ message Hello {
   // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
-  // "AWG AND WARP") and "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST").
+  // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST") and "client-ipv6/1"
+  // (NodeSettings.client_ipv6_disabled).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -794,6 +795,11 @@ message NodeSettings {
   string awg_backend = 7;
   // Blocks recognized BitTorrent protocols. Read only by agents with "torrentguard/1".
   bool torrent_blocker_enabled = 8;
+  // true = "IPv6 for clients" is off on this node: IPv6 that comes out of a tunnel interface and would leave through the
+  // node's own uplink is refused (ICMPv6 admin-prohibited), and the direct outbound of protocol engines dials IPv4 only.
+  // Egress "warp" is not touched. Inverted so that the default (false, also what an old panel sends) keeps IPv6 on.
+  // Read only by agents with "client-ipv6/1".
+  bool client_ipv6_disabled = 9;
 }
 
 message DesiredState {

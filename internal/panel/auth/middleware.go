@@ -49,6 +49,12 @@ func (s *Service) WithClientIP(r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), clientIPKey{}, s.ClientIP(r)))
 }
 
+// WithAdmin returns ctx carrying a as RequireSession would put it, for tests of modules that read AdminFrom. A request
+// cannot reach it: only the middleware sets the admin of a real call.
+func WithAdmin(ctx context.Context, a store.Admin) context.Context {
+	return context.WithValue(ctx, adminKey{}, a)
+}
+
 // AdminFrom returns the signed-in admin placed in ctx by RequireSession.
 func AdminFrom(ctx context.Context) (store.Admin, bool) {
 	a, ok := ctx.Value(adminKey{}).(store.Admin)

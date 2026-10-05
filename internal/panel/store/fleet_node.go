@@ -50,6 +50,9 @@ type NodeRow struct {
 	AwgPrepareJSON string
 	// TorrentBlockerEnabled is the per-node recognized BitTorrent traffic setting (migration 00036).
 	TorrentBlockerEnabled bool
+	// ClientIPv6 is the per-node "IPv6 for clients" switch (migration 00046); true (the default, what every node did
+	// before) lets clients leave over IPv6.
+	ClientIPv6 bool
 	// BandwidthMbps is the optional symmetric network capacity used to report node utilization (migration 00039).
 	BandwidthMbps int
 }
@@ -58,7 +61,7 @@ const nodeCols = `id, name, address, country_code, location, provider, notes, dn
 	liveness_timeout_s, apply_timeout_s, dial_timeout_s, state, cert_serial, agent_version, api_version,
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
-	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps`
+	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -74,7 +77,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&n.LivenessTimeoutS, &n.ApplyTimeoutS, &n.DialTimeoutS, &n.State, &serial, &n.AgentVersion, &n.APIVersion,
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
-		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps)
+		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -126,6 +129,7 @@ type NodePatch struct {
 	AwgBackend                                            *string // "auto" | "kernel" | "userspace"
 	TorrentBlockerEnabled                                 *bool
 	BandwidthMbps                                         *int
+	ClientIPv6                                            *bool
 }
 
 // UpdateNode applies the patch and returns the new row. ErrConflict on a name clash.
@@ -147,6 +151,9 @@ func (s *Store) UpdateNode(ctx context.Context, id string, p NodePatch) (NodeRow
 	}
 	if p.BandwidthMbps != nil {
 		add("bandwidth_mbps", *p.BandwidthMbps)
+	}
+	if p.ClientIPv6 != nil {
+		add("client_ipv6", *p.ClientIPv6)
 	}
 	if p.AwgBackend != nil {
 		// A backend chosen by hand ends the wish of an unfinished kernel-module build: it must not switch the node later.

@@ -23,6 +23,8 @@ type agentHooks struct {
 	dns      func() []string
 	awgMode  func() string
 	warpEmit func(warp.Event)
+	// noClientV6 says "IPv6 for clients" is off (NodeSettings.client_ipv6_disabled): the direct egress dials IPv4 only.
+	noClientV6 func() bool
 }
 
 // wire is the one place that knows which engines and host-side services this build contains. The agent core
@@ -34,7 +36,8 @@ func wire(stateDir string, log *slog.Logger, hooks *agentHooks) (agent.Config, m
 		}
 		return hooks.dns()
 	}
-	direct := egress.New(dns)
+	// Only the direct egress follows the switch: WARP's exit is Cloudflare's, not this node's uplink.
+	direct := egress.New(dns, egress.IPv4OnlyWhen(func() bool { return hooks.noClientV6 != nil && hooks.noClientV6() }))
 	cs := certs.New(filepath.Join(stateDir, "certs"))
 	cs.Log = log.With("source", "certs")
 

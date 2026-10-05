@@ -236,8 +236,13 @@ type Node struct {
 	TorrentBlockerSupported bool `protobuf:"varint,22,opt,name=torrent_blocker_supported,json=torrentBlockerSupported,proto3" json:"torrent_blocker_supported,omitempty"`
 	// Optional symmetric network capacity in Mbps; 0 means unknown and disables utilization percentages.
 	BandwidthMbps uint32 `protobuf:"varint,23,opt,name=bandwidth_mbps,json=bandwidthMbps,proto3" json:"bandwidth_mbps,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// "IPv6 for clients": true (the default) lets people leave the node over IPv6; false makes the node refuse client
+	// IPv6 that would leave through its own uplink, so apps fall back to IPv4 at once.
+	ClientIpv6 bool `protobuf:"varint,24,opt,name=client_ipv6,json=clientIpv6,proto3" json:"client_ipv6,omitempty"`
+	// The connected or last-seen agent lists "client-ipv6/1", so it follows client_ipv6 = false.
+	ClientIpv6Supported bool `protobuf:"varint,25,opt,name=client_ipv6_supported,json=clientIpv6Supported,proto3" json:"client_ipv6_supported,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Node) Reset() {
@@ -429,6 +434,20 @@ func (x *Node) GetBandwidthMbps() uint32 {
 		return x.BandwidthMbps
 	}
 	return 0
+}
+
+func (x *Node) GetClientIpv6() bool {
+	if x != nil {
+		return x.ClientIpv6
+	}
+	return false
+}
+
+func (x *Node) GetClientIpv6Supported() bool {
+	if x != nil {
+		return x.ClientIpv6Supported
+	}
+	return false
 }
 
 // The automatic preparation of the kernel module, as the panel last learned it from the node.
@@ -1433,6 +1452,9 @@ type UpdateNodeRequest struct {
 	TorrentBlockerEnabled *bool `protobuf:"varint,11,opt,name=torrent_blocker_enabled,json=torrentBlockerEnabled,proto3,oneof" json:"torrent_blocker_enabled,omitempty"`
 	// Symmetric network capacity in Mbps. 0 disables utilization percentages; maximum 1,000,000.
 	BandwidthMbps *uint32 `protobuf:"varint,12,opt,name=bandwidth_mbps,json=bandwidthMbps,proto3,oneof" json:"bandwidth_mbps,omitempty"`
+	// "IPv6 for clients". Owner only (PERMISSION_DENIED for a helper). Requires an agent with "client-ipv6/1" when false
+	// (FAILED_PRECONDITION "agent too old" otherwise); turning it back on is always allowed.
+	ClientIpv6    *bool `protobuf:"varint,13,opt,name=client_ipv6,json=clientIpv6,proto3,oneof" json:"client_ipv6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1549,6 +1571,13 @@ func (x *UpdateNodeRequest) GetBandwidthMbps() uint32 {
 		return *x.BandwidthMbps
 	}
 	return 0
+}
+
+func (x *UpdateNodeRequest) GetClientIpv6() bool {
+	if x != nil && x.ClientIpv6 != nil {
+		return *x.ClientIpv6
+	}
+	return false
 }
 
 type DnsResolvers struct {
@@ -2329,7 +2358,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x8c\a\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xe1\a\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -2357,7 +2386,10 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"awgPrepare\x126\n" +
 	"\x17torrent_blocker_enabled\x18\x15 \x01(\bR\x15torrentBlockerEnabled\x12:\n" +
 	"\x19torrent_blocker_supported\x18\x16 \x01(\bR\x17torrentBlockerSupported\x12%\n" +
-	"\x0ebandwidth_mbps\x18\x17 \x01(\rR\rbandwidthMbps\"\xc0\x01\n" +
+	"\x0ebandwidth_mbps\x18\x17 \x01(\rR\rbandwidthMbps\x12\x1f\n" +
+	"\vclient_ipv6\x18\x18 \x01(\bR\n" +
+	"clientIpv6\x122\n" +
+	"\x15client_ipv6_supported\x18\x19 \x01(\bR\x13clientIpv6Supported\"\xc0\x01\n" +
 	"\n" +
 	"AwgPrepare\x12\x1c\n" +
 	"\tsupported\x18\x01 \x01(\bR\tsupported\x128\n" +
@@ -2445,7 +2477,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0finstall_command\x18\x02 \x01(\tR\x0einstallCommand\x12%\n" +
 	"\x0eca_fingerprint\x18\x03 \x01(\tR\rcaFingerprint\x12%\n" +
 	"\fexpires_unix\x18\x04 \x01(\x03B\x020\x02R\vexpiresUnix\x12!\n" +
-	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\xad\x05\n" +
+	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\xe3\x05\n" +
 	"\x11UpdateNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
@@ -2461,7 +2493,9 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"awgBackend\x88\x01\x01\x12;\n" +
 	"\x17torrent_blocker_enabled\x18\v \x01(\bH\tR\x15torrentBlockerEnabled\x88\x01\x01\x12*\n" +
 	"\x0ebandwidth_mbps\x18\f \x01(\rH\n" +
-	"R\rbandwidthMbps\x88\x01\x01B\a\n" +
+	"R\rbandwidthMbps\x88\x01\x01\x12$\n" +
+	"\vclient_ipv6\x18\r \x01(\bH\vR\n" +
+	"clientIpv6\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_addressB\x0f\n" +
@@ -2473,7 +2507,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\t_timeoutsB\x0e\n" +
 	"\f_awg_backendB\x1a\n" +
 	"\x18_torrent_blocker_enabledB\x11\n" +
-	"\x0f_bandwidth_mbps\"&\n" +
+	"\x0f_bandwidth_mbpsB\x0e\n" +
+	"\f_client_ipv6\"&\n" +
 	"\fDnsResolvers\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\"A\n" +
 	"\x12UpdateNodeResponse\x12+\n" +

@@ -120,7 +120,50 @@ func TestTunnelsEqual(t *testing.T) {
 	if TunnelsEqual([]Tunnel{a}, []Tunnel{c}) {
 		t.Error("ViaWarp is part of the rules")
 	}
+	c = a
+	c.RejectV6 = true
+	if TunnelsEqual([]Tunnel{a}, []Tunnel{c}) {
+		t.Error("RejectV6 is part of the rules")
+	}
 	if !TunnelsEqual(nil, nil) || TunnelsEqual([]Tunnel{a}, nil) {
 		t.Error("empty")
+	}
+}
+
+// "IPv6 for clients" off: a tunnel with an IPv6 subnet that exits directly gets one reject rule for IPv6 towards
+// anything that is not a tunnel interface; nothing else in the table moves.
+func TestRenderTunnelsRejectV6(t *testing.T) {
+	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
+	a.RejectV6 = true
+	got, err := RenderTunnels([]Tunnel{a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `	chain nov6 {
+		type filter hook forward priority filter; policy accept;
+		iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 reject with icmpx type admin-prohibited
+	}
+`
+	if !strings.Contains(got, want) {
+		t.Fatalf("no reject rule:\n%s", got)
+	}
+	// The client keeps its IPv6 inside the tunnel: the masquerade and the input policy are those of the "on" table.
+	a.RejectV6 = false
+	on, _ := RenderTunnels([]Tunnel{a})
+	if strings.Contains(on, "nov6") || strings.Replace(got, want, "", 1) != on {
+		t.Errorf("the switch changes more than the reject chain:\n%s\n---\n%s", got, on)
+	}
+	// Only the tunnel that asked gets a rule.
+	b := tun(40001, "10.66.8.0/22", "fd66:66:0:2::/64")
+	a.RejectV6 = true
+	two, _ := RenderTunnels([]Tunnel{a, b})
+	if strings.Count(two, "reject with") != 1 || !strings.Contains(two, `iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 reject`) {
+		t.Errorf("two tunnels, one off:\n%s", two)
+	}
+	// Not for a WARP tunnel (the exit is Cloudflare's), not for one without IPv6.
+	w, v4 := a, tun(40002, "10.66.12.0/22", "")
+	w.ViaWarp, v4.RejectV6 = true, true
+	if s, _ := RenderTunnels([]Tunnel{w, v4}); strings.Contains(s, "reject") || strings.Contains(s, "nov6") {
+		t.Errorf("a WARP or IPv4-only tunnel got the rule:\n%s", s)
 	}
 }

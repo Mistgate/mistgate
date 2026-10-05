@@ -23,6 +23,11 @@ func WithDevice(name string) Option { return func(s *stage) { s.device = name } 
 // the account has no IPv6 address: new accounts often have none, and a v6 dial would only hang or fail.
 func IPv4Only() Option { return func(s *stage) { s.ipv4Only = true } }
 
+// IPv4OnlyWhen makes the egress use IPv4 only while on() returns true, asked on every dial and every datagram
+// ("IPv6 for clients" off on the node: a hoster's IPv6 range may be geolocated in another country). A destination
+// that has only IPv6 addresses is refused with ErrNoIPv4. Connections that are already open keep their address family.
+func IPv4OnlyWhen(on func() bool) Option { return func(s *stage) { s.v4When = on } }
+
 // deviceOutbound builds the device-bound hysteria dialer lazily and re-tries the build after a failure.
 type deviceOutbound struct {
 	name string

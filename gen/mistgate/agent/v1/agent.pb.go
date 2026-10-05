@@ -879,7 +879,8 @@ type Hello struct {
 	// "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
 	// crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
 	// InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
-	// "AWG AND WARP") and "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST").
+	// "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST") and "client-ipv6/1"
+	// (NodeSettings.client_ipv6_disabled).
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -3184,8 +3185,13 @@ type NodeSettings struct {
 	AwgBackend string `protobuf:"bytes,7,opt,name=awg_backend,json=awgBackend,proto3" json:"awg_backend,omitempty"`
 	// Blocks recognized BitTorrent protocols. Read only by agents with "torrentguard/1".
 	TorrentBlockerEnabled bool `protobuf:"varint,8,opt,name=torrent_blocker_enabled,json=torrentBlockerEnabled,proto3" json:"torrent_blocker_enabled,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// true = "IPv6 for clients" is off on this node: IPv6 that comes out of a tunnel interface and would leave through the
+	// node's own uplink is refused (ICMPv6 admin-prohibited), and the direct outbound of protocol engines dials IPv4 only.
+	// Egress "warp" is not touched. Inverted so that the default (false, also what an old panel sends) keeps IPv6 on.
+	// Read only by agents with "client-ipv6/1".
+	ClientIpv6Disabled bool `protobuf:"varint,9,opt,name=client_ipv6_disabled,json=clientIpv6Disabled,proto3" json:"client_ipv6_disabled,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *NodeSettings) Reset() {
@@ -3270,6 +3276,13 @@ func (x *NodeSettings) GetAwgBackend() string {
 func (x *NodeSettings) GetTorrentBlockerEnabled() bool {
 	if x != nil {
 		return x.TorrentBlockerEnabled
+	}
+	return false
+}
+
+func (x *NodeSettings) GetClientIpv6Disabled() bool {
+	if x != nil {
+		return x.ClientIpv6Disabled
 	}
 	return false
 }
@@ -5115,7 +5128,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x10server_time_unix\x18\x02 \x01(\x03R\x0eserverTimeUnix\x12;\n" +
 	"\bsettings\x18\x03 \x01(\v2\x1f.mistgate.agent.v1.NodeSettingsR\bsettings\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xe1\x02\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\x93\x03\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -5125,7 +5138,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\fcountry_code\x18\x06 \x01(\tR\vcountryCode\x12\x1f\n" +
 	"\vawg_backend\x18\a \x01(\tR\n" +
 	"awgBackend\x126\n" +
-	"\x17torrent_blocker_enabled\x18\b \x01(\bR\x15torrentBlockerEnabled\"\xc9\x02\n" +
+	"\x17torrent_blocker_enabled\x18\b \x01(\bR\x15torrentBlockerEnabled\x120\n" +
+	"\x14client_ipv6_disabled\x18\t \x01(\bR\x12clientIpv6Disabled\"\xc9\x02\n" +
 	"\fDesiredState\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12\x1d\n" +

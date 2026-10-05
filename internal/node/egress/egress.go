@@ -43,6 +43,9 @@ const (
 // ErrBlocked is returned for destinations that are not public unicast addresses.
 var ErrBlocked = errors.New("egress: destination address not allowed")
 
+// ErrNoIPv4 is returned for a destination that has no IPv4 address while the egress is IPv4-only (IPv4OnlyWhen).
+var ErrNoIPv4 = errors.New("egress: no IPv4 address (IPv6 for clients is off on this node)")
+
 // BindIP4 is the local IPv4 address of the outgoing UDP sockets; nil, the production value, lets the system choose
 // (all interfaces). Tests set it to loopback in TestMain: a test binary with a wildcard UDP socket makes Windows ask for a
 // firewall rule on each run.
@@ -116,8 +119,9 @@ type stage struct {
 	res          *resolver
 	self         *selfAddrs
 	allowPrivate bool
-	device       string // WithDevice
-	ipv4Only     bool   // IPv4Only
+	device       string      // WithDevice
+	ipv4Only     bool        // IPv4Only
+	v4When       func() bool // IPv4OnlyWhen
 }
 
 func (s *stage) TCP(a *outbounds.AddrEx) (net.Conn, error) {
@@ -175,6 +179,12 @@ func (s *stage) prepare(a *outbounds.AddrEx) error {
 		if v4, v6, err = s.res.lookup(a.Host); err != nil {
 			return fmt.Errorf("resolve %s: %w", a.Host, err)
 		}
+	}
+	if s.v4When != nil && s.v4When() { // checked per dial and per datagram, so a running UDP session obeys it too
+		if v4 == nil {
+			return ErrNoIPv4
+		}
+		v6 = nil
 	}
 	if !s.allowPrivate {
 		v4, v6 = s.self.vet(v4), s.self.vet(v6)
