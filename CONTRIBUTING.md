@@ -12,6 +12,13 @@ gofmt -l .                             # must print nothing
 cd web && pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
+For a change to `docs/`, also build the documentation site; it fails on a broken internal link (see
+[docs/README.md](docs/README.md) for the page conventions):
+
+```sh
+pnpm --dir site install --frozen-lockfile && pnpm --dir site build && pnpm --dir site test
+```
+
 `make test` runs the same Go and web checks. Tests that need root (`MG_ROOT_TESTS=1`) and the scripts in `scripts/`
 change network state: run them in WSL or on a disposable VM, never on a production host.
 

@@ -4,13 +4,16 @@
 
 ## Start here
 
-- [AI agent guide](https://mistgate.app/getting-started/ai-agents/): install and operate Mistgate with MCP agents.
+- [AI agent guide](https://mistgate.app/getting-started/ai-agents/): ready prompts to install the panel over SSH, run the fleet through owner-approved MCP tools, and contribute.
 - [Documentation map](https://mistgate.app/): English docs; `/ru/` is Russian.
 - [Install the panel](https://mistgate.app/getting-started/install-panel/)
-- [Add a node](https://mistgate.app/getting-started/add-node/)
+- [Install a node over SSH](https://mistgate.app/getting-started/ssh-install/)
+- [Add a node manually](https://mistgate.app/getting-started/add-node/)
 - [MCP server and tool contracts](https://mistgate.app/reference/mcp/)
 - [API reference](https://mistgate.app/reference/api/)
-- [Operations and updates](https://mistgate.app/operations/updates/)
+- [Updates](https://mistgate.app/operations/updates/) and [releases and signing](https://mistgate.app/operations/releases/)
+- [Status and roadmap](https://mistgate.app/roadmap/status/)
+- [Repository agent instructions](https://github.com/Mistgate/mistgate/blob/main/AGENTS.md)
 - [Source code](https://github.com/Mistgate/mistgate)
 
 ## Language
