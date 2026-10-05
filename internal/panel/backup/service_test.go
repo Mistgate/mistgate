@@ -3,6 +3,7 @@ package backup
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -52,6 +53,51 @@ func newTestService(t *testing.T) (*Service, *fakeS3, *age.HybridIdentity) {
 	api := &fakeS3{}
 	s.r2Factory = func(context.Context, store.PanelBackupSettings) (s3API, error) { return api, nil }
 	return s, api, identity
+}
+
+// "Create backup now" answers at once; the backup goes on after the request is gone and reports through the settings.
+func TestManualBackupOutlivesTheRequest(t *testing.T) {
+	s, api, _ := newTestService(t)
+	release := make(chan struct{})
+	api.onPut = func() { <-release }
+	request, cancel := context.WithCancel(context.Background())
+	if err := s.startBackup(context.WithoutCancel(request)); err != nil {
+		t.Fatal(err)
+	}
+	cancel() // the request ends while the archive is still uploading
+	if !s.settingsProto(store.PanelBackupSettings{}).Running {
+		t.Error("the settings do not say a backup is running")
+	}
+	if err := s.startBackup(context.Background()); !errors.Is(err, errBackupBusy) {
+		t.Errorf("a second backup while one runs: %v", err)
+	}
+	close(release)
+	for deadline := time.Now().Add(10 * time.Second); s.running.Load(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the backup did not finish")
+		}
+	}
+	settings, err := s.st.PanelBackupSettings(context.Background())
+	if err != nil || settings.LastSuccess.IsZero() || settings.LastErrorCode != "" {
+		t.Fatalf("after the backup: success %v, code %q, %v", settings.LastSuccess, settings.LastErrorCode, err)
+	}
+	if api.putCalls != 1 || len(api.lastPut) == 0 {
+		t.Errorf("uploads: %d", api.putCalls)
+	}
+}
+
+// Without valid settings nothing starts, and the owner hears it at once.
+func TestManualBackupNeedsSettings(t *testing.T) {
+	s, _, _ := newTestService(t)
+	if err := s.st.SavePanelBackupSettings(context.Background(), store.PanelBackupSettings{Jurisdiction: "default", IntervalHours: 24}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.startBackup(context.Background()); !errors.Is(err, errBackupNotConfigured) || s.running.Load() {
+		t.Errorf("start without settings = %v, running %v", err, s.running.Load())
+	}
+	if !s.mu.TryLock() {
+		t.Fatal("a refused start kept the lock")
+	}
 }
 
 // A failing backup is not retried every minute: each failure doubles the wait, and new settings end it.

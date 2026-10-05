@@ -1,6 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -60,17 +60,17 @@ function hasConfiguration(stored?: Stored) {
   return !!stored?.accountId && !!stored.bucket && !!stored.accessKeyId && !!stored.ageRecipient && stored.hasSecret;
 }
 
+const codeKeys: Record<string, MessageKey> = {
+  backup_not_configured: "set.backups.error.notConfigured",
+  backup_settings_invalid: "set.backups.error.invalid",
+  backup_storage_failed: "set.backups.error.storage",
+  backup_storage_delete_failed: "set.backups.error.delete",
+  backup_create_failed: "set.backups.error.create",
+  backup_already_running: "set.backups.error.busy",
+};
+
 function backupErrorKey(error: unknown): MessageKey | null {
-  const raw = ConnectError.from(error).rawMessage;
-  const keys: Record<string, MessageKey> = {
-    backup_not_configured: "set.backups.error.notConfigured",
-    backup_settings_invalid: "set.backups.error.invalid",
-    backup_storage_failed: "set.backups.error.storage",
-    backup_storage_delete_failed: "set.backups.error.delete",
-    backup_create_failed: "set.backups.error.create",
-    backup_already_running: "set.backups.error.busy",
-  };
-  return keys[raw] ?? null;
+  return codeKeys[ConnectError.from(error).rawMessage] ?? null;
 }
 
 function formatBytes(size: number) {
@@ -98,6 +98,7 @@ export function BackupsPage() {
     queryKey: settingsKey,
     queryFn: async ({ signal }) => plain(await backups.getBackupSettings({}, { signal })).settings,
     enabled: owner,
+    refetchInterval: (q) => (q.state.data?.running ? 3000 : false), // a running backup reports through the settings
   });
   const stored = settingsQuery.data;
   if (!owner) {
@@ -166,12 +167,16 @@ function BackupsForm({ stored }: { stored: Stored }) {
     },
   });
 
+  // The backup runs in the panel after the request returns (it can take longer than a request may): the settings say
+  // when it is over, and how it went.
+  const started = useRef<{ lastSuccess: number } | null>(null);
   const create = useMutation({
     mutationFn: () => guard(() => backups.createBackup({})),
-    onSuccess: (result) => {
-      void qc.invalidateQueries({ queryKey: backupsKey });
+    onSuccess: () => {
+      started.current = { lastSuccess: stored.lastSuccessUnix };
+      qc.setQueryData(settingsKey, (s: Stored | undefined) => s && { ...s, running: true });
       void qc.invalidateQueries({ queryKey: settingsKey });
-      toast(result.warningCode ? t("set.backups.createdWarning") : t("set.backups.created"));
+      toast(t("set.backups.started"));
     },
     onError: (error) => {
       if (isStepUpCancelled(error)) return;
@@ -180,6 +185,14 @@ function BackupsForm({ stored }: { stored: Stored }) {
       else toast.error(errorText(error, t));
     },
   });
+  useEffect(() => {
+    const mine = started.current;
+    if (stored.running || !mine) return;
+    started.current = null;
+    void qc.invalidateQueries({ queryKey: backupsKey });
+    if (stored.lastSuccessUnix !== mine.lastSuccess) toast(stored.lastErrorCode ? t("set.backups.createdWarning") : t("set.backups.created"));
+    else toast.error(t(codeKeys[stored.lastErrorCode] ?? "set.backups.error.create"));
+  }, [stored.running, stored.lastSuccessUnix, stored.lastErrorCode, qc, t, toast]);
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -294,8 +307,8 @@ function BackupsForm({ stored }: { stored: Stored }) {
             <Button type="button" disabled={!configured || dirty || test.isPending} onClick={() => test.mutate()}>
               {test.isPending ? t("set.backups.testing") : t("set.backups.test")}
             </Button>
-            <Button type="button" disabled={!configured || dirty || create.isPending} onClick={() => create.mutate()}>
-              {create.isPending ? t("set.backups.creating") : t("set.backups.create")}
+            <Button type="button" disabled={!configured || dirty || create.isPending || stored.running} onClick={() => create.mutate()}>
+              {create.isPending || stored.running ? t("set.backups.creating") : t("set.backups.create")}
             </Button>
           </div>
         </form>

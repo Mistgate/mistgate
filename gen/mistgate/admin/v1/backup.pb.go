@@ -70,8 +70,11 @@ type BackupSettings struct {
 	RetentionDays   int32                  `protobuf:"varint,9,opt,name=retention_days,json=retentionDays,proto3" json:"retention_days,omitempty"`
 	LastSuccessUnix int64                  `protobuf:"varint,10,opt,name=last_success_unix,json=lastSuccessUnix,proto3" json:"last_success_unix,omitempty"`
 	LastErrorCode   string                 `protobuf:"bytes,11,opt,name=last_error_code,json=lastErrorCode,proto3" json:"last_error_code,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// A backup is being made right now (scheduled, or started with CreateBackup); its outcome then shows in
+	// last_success_unix and last_error_code.
+	Running       bool `protobuf:"varint,12,opt,name=running,proto3" json:"running,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BackupSettings) Reset() {
@@ -179,6 +182,13 @@ func (x *BackupSettings) GetLastErrorCode() string {
 		return x.LastErrorCode
 	}
 	return ""
+}
+
+func (x *BackupSettings) GetRunning() bool {
+	if x != nil {
+		return x.Running
+	}
+	return false
 }
 
 type GetBackupSettingsResponse struct {
@@ -501,10 +511,10 @@ func (*CreateBackupRequest) Descriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{7}
 }
 
+// CreateBackup only starts the backup: it outlives the request (a big database or a slow bucket takes longer than any
+// request may), and BackupSettings.running says when it is done.
 type CreateBackupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Backup        *Backup                `protobuf:"bytes,1,opt,name=backup,proto3" json:"backup,omitempty"`
-	WarningCode   string                 `protobuf:"bytes,2,opt,name=warning_code,json=warningCode,proto3" json:"warning_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -537,20 +547,6 @@ func (x *CreateBackupResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateBackupResponse.ProtoReflect.Descriptor instead.
 func (*CreateBackupResponse) Descriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *CreateBackupResponse) GetBackup() *Backup {
-	if x != nil {
-		return x.Backup
-	}
-	return nil
-}
-
-func (x *CreateBackupResponse) GetWarningCode() string {
-	if x != nil {
-		return x.WarningCode
-	}
-	return ""
 }
 
 type ListBackupsRequest struct {
@@ -698,7 +694,7 @@ var File_mistgate_admin_v1_backup_proto protoreflect.FileDescriptor
 const file_mistgate_admin_v1_backup_proto_rawDesc = "" +
 	"\n" +
 	"\x1emistgate/admin/v1/backup.proto\x12\x11mistgate.admin.v1\"\x1a\n" +
-	"\x18GetBackupSettingsRequest\"\x8f\x03\n" +
+	"\x18GetBackupSettingsRequest\"\xa9\x03\n" +
 	"\x0eBackupSettings\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\"\n" +
@@ -713,7 +709,8 @@ const file_mistgate_admin_v1_backup_proto_rawDesc = "" +
 	"\x0eretention_days\x18\t \x01(\x05R\rretentionDays\x12*\n" +
 	"\x11last_success_unix\x18\n" +
 	" \x01(\x03R\x0flastSuccessUnix\x12&\n" +
-	"\x0flast_error_code\x18\v \x01(\tR\rlastErrorCode\"Z\n" +
+	"\x0flast_error_code\x18\v \x01(\tR\rlastErrorCode\x12\x18\n" +
+	"\arunning\x18\f \x01(\bR\arunning\"Z\n" +
 	"\x19GetBackupSettingsResponse\x12=\n" +
 	"\bsettings\x18\x01 \x01(\v2!.mistgate.admin.v1.BackupSettingsR\bsettings\"\xf8\x02\n" +
 	"\x1bUpdateBackupSettingsRequest\x12\x1d\n" +
@@ -734,10 +731,8 @@ const file_mistgate_admin_v1_backup_proto_rawDesc = "" +
 	"\x18TestBackupStorageRequest\"+\n" +
 	"\x19TestBackupStorageResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\"\x15\n" +
-	"\x13CreateBackupRequest\"l\n" +
-	"\x14CreateBackupResponse\x121\n" +
-	"\x06backup\x18\x01 \x01(\v2\x19.mistgate.admin.v1.BackupR\x06backup\x12!\n" +
-	"\fwarning_code\x18\x02 \x01(\tR\vwarningCode\"\x14\n" +
+	"\x13CreateBackupRequest\"8\n" +
+	"\x14CreateBackupResponseJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x06backupR\fwarning_code\"\x14\n" +
 	"\x12ListBackupsRequest\"J\n" +
 	"\x13ListBackupsResponse\x123\n" +
 	"\abackups\x18\x01 \x03(\v2\x19.mistgate.admin.v1.BackupR\abackups\"\\\n" +
@@ -784,23 +779,22 @@ var file_mistgate_admin_v1_backup_proto_goTypes = []any{
 var file_mistgate_admin_v1_backup_proto_depIdxs = []int32{
 	1,  // 0: mistgate.admin.v1.GetBackupSettingsResponse.settings:type_name -> mistgate.admin.v1.BackupSettings
 	1,  // 1: mistgate.admin.v1.UpdateBackupSettingsResponse.settings:type_name -> mistgate.admin.v1.BackupSettings
-	11, // 2: mistgate.admin.v1.CreateBackupResponse.backup:type_name -> mistgate.admin.v1.Backup
-	11, // 3: mistgate.admin.v1.ListBackupsResponse.backups:type_name -> mistgate.admin.v1.Backup
-	0,  // 4: mistgate.admin.v1.BackupService.GetBackupSettings:input_type -> mistgate.admin.v1.GetBackupSettingsRequest
-	3,  // 5: mistgate.admin.v1.BackupService.UpdateBackupSettings:input_type -> mistgate.admin.v1.UpdateBackupSettingsRequest
-	5,  // 6: mistgate.admin.v1.BackupService.TestBackupStorage:input_type -> mistgate.admin.v1.TestBackupStorageRequest
-	7,  // 7: mistgate.admin.v1.BackupService.CreateBackup:input_type -> mistgate.admin.v1.CreateBackupRequest
-	9,  // 8: mistgate.admin.v1.BackupService.ListBackups:input_type -> mistgate.admin.v1.ListBackupsRequest
-	2,  // 9: mistgate.admin.v1.BackupService.GetBackupSettings:output_type -> mistgate.admin.v1.GetBackupSettingsResponse
-	4,  // 10: mistgate.admin.v1.BackupService.UpdateBackupSettings:output_type -> mistgate.admin.v1.UpdateBackupSettingsResponse
-	6,  // 11: mistgate.admin.v1.BackupService.TestBackupStorage:output_type -> mistgate.admin.v1.TestBackupStorageResponse
-	8,  // 12: mistgate.admin.v1.BackupService.CreateBackup:output_type -> mistgate.admin.v1.CreateBackupResponse
-	10, // 13: mistgate.admin.v1.BackupService.ListBackups:output_type -> mistgate.admin.v1.ListBackupsResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	11, // 2: mistgate.admin.v1.ListBackupsResponse.backups:type_name -> mistgate.admin.v1.Backup
+	0,  // 3: mistgate.admin.v1.BackupService.GetBackupSettings:input_type -> mistgate.admin.v1.GetBackupSettingsRequest
+	3,  // 4: mistgate.admin.v1.BackupService.UpdateBackupSettings:input_type -> mistgate.admin.v1.UpdateBackupSettingsRequest
+	5,  // 5: mistgate.admin.v1.BackupService.TestBackupStorage:input_type -> mistgate.admin.v1.TestBackupStorageRequest
+	7,  // 6: mistgate.admin.v1.BackupService.CreateBackup:input_type -> mistgate.admin.v1.CreateBackupRequest
+	9,  // 7: mistgate.admin.v1.BackupService.ListBackups:input_type -> mistgate.admin.v1.ListBackupsRequest
+	2,  // 8: mistgate.admin.v1.BackupService.GetBackupSettings:output_type -> mistgate.admin.v1.GetBackupSettingsResponse
+	4,  // 9: mistgate.admin.v1.BackupService.UpdateBackupSettings:output_type -> mistgate.admin.v1.UpdateBackupSettingsResponse
+	6,  // 10: mistgate.admin.v1.BackupService.TestBackupStorage:output_type -> mistgate.admin.v1.TestBackupStorageResponse
+	8,  // 11: mistgate.admin.v1.BackupService.CreateBackup:output_type -> mistgate.admin.v1.CreateBackupResponse
+	10, // 12: mistgate.admin.v1.BackupService.ListBackups:output_type -> mistgate.admin.v1.ListBackupsResponse
+	8,  // [8:13] is the sub-list for method output_type
+	3,  // [3:8] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_backup_proto_init() }

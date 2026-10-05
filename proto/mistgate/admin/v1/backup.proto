@@ -24,6 +24,9 @@ message BackupSettings {
   int32 retention_days = 9;
   int64 last_success_unix = 10;
   string last_error_code = 11;
+  // A backup is being made right now (scheduled, or started with CreateBackup); its outcome then shows in
+  // last_success_unix and last_error_code.
+  bool running = 12;
 }
 
 message GetBackupSettingsResponse { BackupSettings settings = 1; }
@@ -47,9 +50,11 @@ message TestBackupStorageRequest {}
 message TestBackupStorageResponse { bool ok = 1; }
 
 message CreateBackupRequest {}
+// CreateBackup only starts the backup: it outlives the request (a big database or a slow bucket takes longer than any
+// request may), and BackupSettings.running says when it is done.
 message CreateBackupResponse {
-  Backup backup = 1;
-  string warning_code = 2;
+  reserved 1, 2;
+  reserved "backup", "warning_code";
 }
 
 message ListBackupsRequest {}

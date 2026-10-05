@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -31,6 +32,9 @@ const (
 	secretRecordID      = "panel_backup_settings.secret_access_key"
 	defaultIntervalHour = 24
 	listResponseLimit   = 100
+	// backupTimeout bounds one backup, scheduled or started by hand: a snapshot and an upload of up to the 50 GiB the
+	// archive may hold, to a slow bucket.
+	backupTimeout = 4 * time.Hour
 )
 
 var (
@@ -60,7 +64,8 @@ type Service struct {
 	masterKey []byte
 	stepUp    func(context.Context) error
 	log       *slog.Logger
-	mu        sync.Mutex // held while a backup runs
+	mu        sync.Mutex  // held while a backup runs
+	running   atomic.Bool // the same, for the settings page to read
 	r2Factory func(context.Context, store.PanelBackupSettings) (s3API, error)
 	now       func() time.Time
 
@@ -160,7 +165,7 @@ func (r rpc) GetBackupSettings(ctx context.Context, _ *connect.Request[adminv1.G
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errBackupInvalidSettings)
 	}
-	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: backupSettingsProto(settings)}), nil
+	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: r.s.settingsProto(settings)}), nil
 }
 
 func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[adminv1.UpdateBackupSettingsRequest]) (*connect.Response[adminv1.UpdateBackupSettingsResponse], error) {
@@ -207,7 +212,7 @@ func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[admi
 		"retention_days": settings.RetentionDays, "jurisdiction": settings.Jurisdiction,
 		"has_secret": len(settings.SecretAccessKey) > 0,
 	})
-	return connect.NewResponse(&adminv1.UpdateBackupSettingsResponse{Settings: backupSettingsProto(settings)}), nil
+	return connect.NewResponse(&adminv1.UpdateBackupSettingsResponse{Settings: r.s.settingsProto(settings)}), nil
 }
 
 func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.TestBackupStorageRequest]) (*connect.Response[adminv1.TestBackupStorageResponse], error) {
@@ -234,12 +239,36 @@ func (r rpc) CreateBackup(ctx context.Context, _ *connect.Request[adminv1.Create
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
 		return nil, err
 	}
-	object, warning, err := r.s.createBackup(ctx)
-	if err != nil {
+	if err := r.s.startBackup(context.WithoutCancel(ctx)); err != nil {
 		return nil, connect.NewError(connectCodeForBackupError(err), errors.New(errorCode(err)))
 	}
-	r.s.audit(ctx, "backup_create", map[string]any{"key": object.Key, "size_bytes": object.Size})
-	return connect.NewResponse(&adminv1.CreateBackupResponse{Backup: backupProto(object), WarningCode: warning}), nil
+	return connect.NewResponse(&adminv1.CreateBackupResponse{}), nil
+}
+
+// startBackup starts a backup that outlives the request: the server's write timeout is a minute, and a big database or
+// a slow bucket takes longer. A busy or unconfigured service is refused at once; the outcome lands in the settings (last
+// success, last error) and the audit log. ctx carries the owner for the audit and must not end with the request.
+func (s *Service) startBackup(ctx context.Context) error {
+	if !s.mu.TryLock() {
+		return errBackupBusy
+	}
+	settings, err := s.st.PanelBackupSettings(ctx)
+	if err != nil || validateSettings(settings, true) != nil {
+		s.mu.Unlock()
+		return errBackupNotConfigured
+	}
+	s.running.Store(true)
+	go func() {
+		defer s.mu.Unlock()
+		defer s.running.Store(false)
+		object, warning, err := s.run(ctx)
+		if err != nil {
+			s.audit(ctx, "backup_create", map[string]any{"error": errorCode(err)})
+			return
+		}
+		s.audit(ctx, "backup_create", map[string]any{"key": object.Key, "size_bytes": object.Size, "warning": warning})
+	}()
+	return nil
 }
 
 func (r rpc) ListBackups(ctx context.Context, _ *connect.Request[adminv1.ListBackupsRequest]) (*connect.Response[adminv1.ListBackupsResponse], error) {
@@ -325,11 +354,21 @@ func validateSettings(settings store.PanelBackupSettings, enabled bool) error {
 	return nil
 }
 
-func (s *Service) createBackup(ctx context.Context) (_ backupObject, _ string, err error) {
+// createBackup makes one backup unless one is already running (the scheduler's way).
+func (s *Service) createBackup(ctx context.Context) (backupObject, string, error) {
 	if !s.mu.TryLock() {
 		return backupObject{}, "", errBackupBusy
 	}
 	defer s.mu.Unlock()
+	s.running.Store(true)
+	defer s.running.Store(false)
+	return s.run(ctx)
+}
+
+// run makes one backup, within backupTimeout; s.mu is held.
+func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
+	defer cancel()
 	interval := time.Duration(defaultIntervalHour) * time.Hour
 	defer func() { s.backoff(err != nil, interval) }()
 	settings, err := s.st.PanelBackupSettings(ctx)
@@ -435,13 +474,13 @@ func (s *Service) audit(ctx context.Context, action string, params any) {
 	}
 }
 
-func backupSettingsProto(value store.PanelBackupSettings) *adminv1.BackupSettings {
+func (s *Service) settingsProto(value store.PanelBackupSettings) *adminv1.BackupSettings {
 	result := &adminv1.BackupSettings{
 		AccountId: value.AccountID, Jurisdiction: value.Jurisdiction, Bucket: value.Bucket,
 		AccessKeyId: value.AccessKeyID, HasSecret: len(value.SecretAccessKey) > 0,
 		AgeRecipient: value.AgeRecipient, Enabled: value.Enabled,
 		IntervalHours: int32(value.IntervalHours), RetentionDays: int32(value.RetentionDays),
-		LastErrorCode: value.LastErrorCode,
+		LastErrorCode: value.LastErrorCode, Running: s.running.Load(),
 	}
 	if !value.LastSuccess.IsZero() {
 		result.LastSuccessUnix = value.LastSuccess.UTC().Unix()

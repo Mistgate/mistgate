@@ -394,6 +394,39 @@ describe("Settings → Admins, Domains, Backups", () => {
     expect(button(en["common.copy"])).toBeDefined();
   });
 
+  describe("Create backup now", () => {
+    const configured = {
+      accountId: "cf-account", jurisdiction: "default", bucket: "mistgate-backups", accessKeyId: "access-id", hasSecret: true,
+      ageRecipient: "age1example", enabled: true, intervalHours: 24, retentionDays: 0, lastSuccessUnix: 1_800_000_000, lastErrorCode: "", running: false,
+    };
+    async function create(after: Partial<typeof configured>) {
+      backupApi.getBackupSettings.mockResolvedValueOnce({ settings: configured }).mockResolvedValue({ settings: { ...configured, ...after } });
+      backupApi.createBackup.mockResolvedValue({});
+      await mount(<BackupsPage />);
+      await click(button(en["set.backups.create"]));
+      for (let i = 0; i < 4; i++) await settle();
+      expect(backupApi.createBackup).toHaveBeenCalledOnce();
+    }
+
+    it("says the backup started and keeps the button busy while the panel makes it", async () => {
+      await create({ running: true });
+      expect(text()).toContain(en["set.backups.started"]);
+      expect(button(en["set.backups.creating"])?.disabled).toBe(true);
+      expect(text()).not.toContain(en["set.backups.created"]);
+    });
+
+    it("says it worked once the panel reports a new success", async () => {
+      await create({ lastSuccessUnix: 1_800_000_100 });
+      expect(text()).toContain(en["set.backups.created"]);
+    });
+
+    it("says why it failed when the panel reports the error instead", async () => {
+      await create({ lastErrorCode: "backup_storage_failed" });
+      expect(text()).toContain(en["set.backups.error.storage"]);
+      expect(text()).not.toContain(en["set.backups.created"]);
+    });
+  });
+
   it("lists encrypted backups without returning the saved R2 secret", async () => {
     backupApi.getBackupSettings.mockResolvedValue({ settings: {
       accountId: "cf-account", jurisdiction: "eu", bucket: "mistgate-backups", accessKeyId: "access-id",
