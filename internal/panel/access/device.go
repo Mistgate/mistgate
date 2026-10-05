@@ -310,6 +310,7 @@ func (s *Service) DeviceConfigs(ctx context.Context, by, owner, deviceID string)
 	}
 	s.audit(ctx, by, "device_configs", map[string]any{"user": sc.user.ID, "device": deviceID, "profile": sc.profile.ID})
 	sc.dev.ConfigEpoch = max(sc.dev.ConfigEpoch, sc.dev.CriticalEpoch)
+	sc.dev.DNSStale = nil // it holds the DNS of every server now
 	return sc.dev, cfgs, nil
 }
 
