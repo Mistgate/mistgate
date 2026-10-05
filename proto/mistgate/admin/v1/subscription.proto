@@ -79,6 +79,9 @@ message UserPageOptions {
   // self-service call. The subscription itself, which apps fetch from the same address, is never gated. Absent = true:
   // settings stored before this key existed turn it on, which is the default.
   optional bool require_page_password = 5;
+  // People may pick, on their page, one of the DNS presets the owner offers on each server (DnsService.SetNodeDnsOptions).
+  // Absent = false: a new feature does not switch itself on for settings stored before it existed.
+  optional bool allow_dns_choice = 6;
 }
 
 enum SubFormat {

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/dns.proto.
  */
 export const file_mistgate_admin_v1_dns: GenFile = /*@__PURE__*/
-  fileDesc("ChttaXN0Z2F0ZS9hZG1pbi92MS9kbnMucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxImYKCURuc1NlcnZlchIuCgRraW5kGAEgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuRG5zU2VydmVyS2luZBIPCgdhZGRyZXNzGAIgASgJEhgKEHByb3ZpZGVyX3ZhcmlhbnQYAyABKAki9gEKEkRuc1Byb3ZpZGVyVmFyaWFudBIKCgJpZBgBIAEoCRIPCgduYW1lX3J1GAIgASgJEg8KB25hbWVfZW4YAyABKAkSMAoIY2F0ZWdvcnkYBCABKA4yHi5taXN0Z2F0ZS5hZG1pbi52MS5EbnNDYXRlZ29yeRIMCgRpcHY0GAUgAygJEgwKBGlwdjYYBiADKAkSDQoFcGxhaW4YByABKAgSEAoIZG90X2hvc3QYCCABKAkSEAoIZG90X3BvcnQYCSABKA0SDwoHZG9oX3VybBgKIAEoCRIPCgdub3RlX3J1GAsgASgJEg8KB25vdGVfZW4YDCABKAkiYAoLRG5zUHJvdmlkZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRI3Cgh2YXJpYW50cxgDIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkRuc1Byb3ZpZGVyVmFyaWFudCKDAQoQQ2xpZW50RG5zU3VwcG9ydBIsCgZjbGllbnQYASABKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNDbGllbnQSMwoKdHJhbnNwb3J0cxgCIAMoDjIfLm1pc3RnYXRlLmFkbWluLnYxLkRuc1RyYW5zcG9ydBIMCgRpcHY2GAMgASgIIk8KDERuc1NwbGl0UnVsZRIQCghzdWZmaXhlcxgBIAMoCRItCgdzZXJ2ZXJzGAIgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuRG5zU2VydmVyIusCCglEbnNQcmVzZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIPCgdidWlsdGluGAQgASgIEi0KB3NlcnZlcnMYBSADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBiADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAcgASgIEhIKCnVzZXJfY291bnQYCCABKA0SEgoKaXNfZGVmYXVsdBgJIAEoCBIUCgxzcGxpdF9kaXJlY3QYCiABKAgSPAoTcHJlZmVycmVkX3RyYW5zcG9ydBgLIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLkRuc1RyYW5zcG9ydBIwCghjYXRlZ29yeRgMIAEoDjIeLm1pc3RnYXRlLmFkbWluLnYxLkRuc0NhdGVnb3J5IhcKFUxpc3REbnNQcmVzZXRzUmVxdWVzdCK3AQoWTGlzdERuc1ByZXNldHNSZXNwb25zZRItCgdwcmVzZXRzGAEgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuRG5zUHJlc2V0EjEKCXByb3ZpZGVycxgCIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLkRuc1Byb3ZpZGVyEjsKDmNsaWVudF9zdXBwb3J0GAMgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50RG5zU3VwcG9ydCKBAgoWQ3JlYXRlRG5zUHJlc2V0UmVxdWVzdBIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEi0KB3NlcnZlcnMYAyADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBCADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAUgASgIEhQKDHNwbGl0X2RpcmVjdBgGIAEoCBI8ChNwcmVmZXJyZWRfdHJhbnNwb3J0GAcgASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuRG5zVHJhbnNwb3J0IkcKF0NyZWF0ZURuc1ByZXNldFJlc3BvbnNlEiwKBnByZXNldBgBIAEoCzIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1ByZXNldCKNAgoWVXBkYXRlRG5zUHJlc2V0UmVxdWVzdBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEi0KB3NlcnZlcnMYBCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBSADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAYgASgIEhQKDHNwbGl0X2RpcmVjdBgHIAEoCBI8ChNwcmVmZXJyZWRfdHJhbnNwb3J0GAggASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuRG5zVHJhbnNwb3J0IkcKF1VwZGF0ZURuc1ByZXNldFJlc3BvbnNlEiwKBnByZXNldBgBIAEoCzIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1ByZXNldCIkChZEZWxldGVEbnNQcmVzZXRSZXF1ZXN0EgoKAmlkGAEgASgJIhkKF0RlbGV0ZURuc1ByZXNldFJlc3BvbnNlKn0KDURuc1NlcnZlcktpbmQSHwobRE5TX1NFUlZFUl9LSU5EX1VOU1BFQ0lGSUVEEAASGQoVRE5TX1NFUlZFUl9LSU5EX1BMQUlOEAESFwoTRE5TX1NFUlZFUl9LSU5EX0RPSBACEhcKE0ROU19TRVJWRVJfS0lORF9ET1QQAyp0CgxEbnNUcmFuc3BvcnQSHQoZRE5TX1RSQU5TUE9SVF9VTlNQRUNJRklFRBAAEhcKE0ROU19UUkFOU1BPUlRfUExBSU4QARIVChFETlNfVFJBTlNQT1JUX0RPVBACEhUKEUROU19UUkFOU1BPUlRfRE9IEAMqqwEKC0Ruc0NhdGVnb3J5EhwKGEROU19DQVRFR09SWV9VTlNQRUNJRklFRBAAEhcKE0ROU19DQVRFR09SWV9SVVNTSUEQARIYChRETlNfQ0FURUdPUllfUkVHVUxBUhACEhcKE0ROU19DQVRFR09SWV9OT19BRFMQAxIXChNETlNfQ0FURUdPUllfRkFNSUxZEAQSGQoVRE5TX0NBVEVHT1JZX1NFQ1VSSVRZEAUqbQoJRG5zQ2xpZW50EhoKFkROU19DTElFTlRfVU5TUEVDSUZJRUQQABITCg9ETlNfQ0xJRU5UX0hBUFAQARIVChFETlNfQ0xJRU5UX01JSE9NTxACEhgKFEROU19DTElFTlRfQU1ORVpJQVdHEAMysQMKCkRuc1NlcnZpY2USZQoOTGlzdERuc1ByZXNldHMSKC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0RG5zUHJlc2V0c1JlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0RG5zUHJlc2V0c1Jlc3BvbnNlEmgKD0NyZWF0ZURuc1ByZXNldBIpLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZURuc1ByZXNldFJlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVEbnNQcmVzZXRSZXNwb25zZRJoCg9VcGRhdGVEbnNQcmVzZXQSKS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVEbnNQcmVzZXRSZXF1ZXN0GioubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlRG5zUHJlc2V0UmVzcG9uc2USaAoPRGVsZXRlRG5zUHJlc2V0EikubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlRG5zUHJlc2V0UmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZURuc1ByZXNldFJlc3BvbnNlQsMBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCCERuc1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
+  fileDesc("ChttaXN0Z2F0ZS9hZG1pbi92MS9kbnMucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxImYKCURuc1NlcnZlchIuCgRraW5kGAEgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuRG5zU2VydmVyS2luZBIPCgdhZGRyZXNzGAIgASgJEhgKEHByb3ZpZGVyX3ZhcmlhbnQYAyABKAki9gEKEkRuc1Byb3ZpZGVyVmFyaWFudBIKCgJpZBgBIAEoCRIPCgduYW1lX3J1GAIgASgJEg8KB25hbWVfZW4YAyABKAkSMAoIY2F0ZWdvcnkYBCABKA4yHi5taXN0Z2F0ZS5hZG1pbi52MS5EbnNDYXRlZ29yeRIMCgRpcHY0GAUgAygJEgwKBGlwdjYYBiADKAkSDQoFcGxhaW4YByABKAgSEAoIZG90X2hvc3QYCCABKAkSEAoIZG90X3BvcnQYCSABKA0SDwoHZG9oX3VybBgKIAEoCRIPCgdub3RlX3J1GAsgASgJEg8KB25vdGVfZW4YDCABKAkiYAoLRG5zUHJvdmlkZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRI3Cgh2YXJpYW50cxgDIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkRuc1Byb3ZpZGVyVmFyaWFudCKDAQoQQ2xpZW50RG5zU3VwcG9ydBIsCgZjbGllbnQYASABKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNDbGllbnQSMwoKdHJhbnNwb3J0cxgCIAMoDjIfLm1pc3RnYXRlLmFkbWluLnYxLkRuc1RyYW5zcG9ydBIMCgRpcHY2GAMgASgIIk8KDERuc1NwbGl0UnVsZRIQCghzdWZmaXhlcxgBIAMoCRItCgdzZXJ2ZXJzGAIgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuRG5zU2VydmVyIusCCglEbnNQcmVzZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIPCgdidWlsdGluGAQgASgIEi0KB3NlcnZlcnMYBSADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBiADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAcgASgIEhIKCnVzZXJfY291bnQYCCABKA0SEgoKaXNfZGVmYXVsdBgJIAEoCBIUCgxzcGxpdF9kaXJlY3QYCiABKAgSPAoTcHJlZmVycmVkX3RyYW5zcG9ydBgLIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLkRuc1RyYW5zcG9ydBIwCghjYXRlZ29yeRgMIAEoDjIeLm1pc3RnYXRlLmFkbWluLnYxLkRuc0NhdGVnb3J5IhcKFUxpc3REbnNQcmVzZXRzUmVxdWVzdCK3AQoWTGlzdERuc1ByZXNldHNSZXNwb25zZRItCgdwcmVzZXRzGAEgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuRG5zUHJlc2V0EjEKCXByb3ZpZGVycxgCIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLkRuc1Byb3ZpZGVyEjsKDmNsaWVudF9zdXBwb3J0GAMgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50RG5zU3VwcG9ydCKBAgoWQ3JlYXRlRG5zUHJlc2V0UmVxdWVzdBIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEi0KB3NlcnZlcnMYAyADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBCADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAUgASgIEhQKDHNwbGl0X2RpcmVjdBgGIAEoCBI8ChNwcmVmZXJyZWRfdHJhbnNwb3J0GAcgASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuRG5zVHJhbnNwb3J0IkcKF0NyZWF0ZURuc1ByZXNldFJlc3BvbnNlEiwKBnByZXNldBgBIAEoCzIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1ByZXNldCKNAgoWVXBkYXRlRG5zUHJlc2V0UmVxdWVzdBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEi0KB3NlcnZlcnMYBCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTZXJ2ZXISLgoFc3BsaXQYBSADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNTcGxpdFJ1bGUSEQoJaXB2NF9vbmx5GAYgASgIEhQKDHNwbGl0X2RpcmVjdBgHIAEoCBI8ChNwcmVmZXJyZWRfdHJhbnNwb3J0GAggASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuRG5zVHJhbnNwb3J0IkcKF1VwZGF0ZURuc1ByZXNldFJlc3BvbnNlEiwKBnByZXNldBgBIAEoCzIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1ByZXNldCIkChZEZWxldGVEbnNQcmVzZXRSZXF1ZXN0EgoKAmlkGAEgASgJIhkKF0RlbGV0ZURuc1ByZXNldFJlc3BvbnNlIlAKDk5vZGVEbnNPcHRpb25zEg8KB25vZGVfaWQYASABKAkSEgoKcHJlc2V0X2lkcxgCIAMoCRIZChFkZWZhdWx0X3ByZXNldF9pZBgDIAEoCSIbChlMaXN0Tm9kZURuc09wdGlvbnNSZXF1ZXN0Ik4KGkxpc3ROb2RlRG5zT3B0aW9uc1Jlc3BvbnNlEjAKBW5vZGVzGAEgAygLMiEubWlzdGdhdGUuYWRtaW4udjEuTm9kZURuc09wdGlvbnMiWgoYU2V0Tm9kZURuc09wdGlvbnNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSEgoKcHJlc2V0X2lkcxgCIAMoCRIZChFkZWZhdWx0X3ByZXNldF9pZBgDIAEoCSJPChlTZXROb2RlRG5zT3B0aW9uc1Jlc3BvbnNlEjIKB29wdGlvbnMYASABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlRG5zT3B0aW9ucyK+AQoNVXNlckRuc0Nob2ljZRIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRIRCglwcmVzZXRfaWQYAyABKAkSEwoLcHJlc2V0X25hbWUYBCABKAkSDwoHb2ZmZXJlZBgFIAEoCBIbChNlZmZlY3RpdmVfcHJlc2V0X2lkGAYgASgJEh0KFWVmZmVjdGl2ZV9wcmVzZXRfbmFtZRgHIAEoCRIUCgx1cGRhdGVkX3VuaXgYCCABKAMiKwoYR2V0VXNlckRuc0Nob2ljZXNSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkiTgoZR2V0VXNlckRuc0Nob2ljZXNSZXNwb25zZRIxCgdjaG9pY2VzGAEgAygLMiAubWlzdGdhdGUuYWRtaW4udjEuVXNlckRuc0Nob2ljZSItChpSZXNldFVzZXJEbnNDaG9pY2VzUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJIi4KG1Jlc2V0VXNlckRuc0Nob2ljZXNSZXNwb25zZRIPCgdyZW1vdmVkGAEgASgNKn0KDURuc1NlcnZlcktpbmQSHwobRE5TX1NFUlZFUl9LSU5EX1VOU1BFQ0lGSUVEEAASGQoVRE5TX1NFUlZFUl9LSU5EX1BMQUlOEAESFwoTRE5TX1NFUlZFUl9LSU5EX0RPSBACEhcKE0ROU19TRVJWRVJfS0lORF9ET1QQAyp0CgxEbnNUcmFuc3BvcnQSHQoZRE5TX1RSQU5TUE9SVF9VTlNQRUNJRklFRBAAEhcKE0ROU19UUkFOU1BPUlRfUExBSU4QARIVChFETlNfVFJBTlNQT1JUX0RPVBACEhUKEUROU19UUkFOU1BPUlRfRE9IEAMqqwEKC0Ruc0NhdGVnb3J5EhwKGEROU19DQVRFR09SWV9VTlNQRUNJRklFRBAAEhcKE0ROU19DQVRFR09SWV9SVVNTSUEQARIYChRETlNfQ0FURUdPUllfUkVHVUxBUhACEhcKE0ROU19DQVRFR09SWV9OT19BRFMQAxIXChNETlNfQ0FURUdPUllfRkFNSUxZEAQSGQoVRE5TX0NBVEVHT1JZX1NFQ1VSSVRZEAUqbQoJRG5zQ2xpZW50EhoKFkROU19DTElFTlRfVU5TUEVDSUZJRUQQABITCg9ETlNfQ0xJRU5UX0hBUFAQARIVChFETlNfQ0xJRU5UX01JSE9NTxACEhgKFEROU19DTElFTlRfQU1ORVpJQVdHEAMy+gYKCkRuc1NlcnZpY2USZQoOTGlzdERuc1ByZXNldHMSKC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0RG5zUHJlc2V0c1JlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0RG5zUHJlc2V0c1Jlc3BvbnNlEmgKD0NyZWF0ZURuc1ByZXNldBIpLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZURuc1ByZXNldFJlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVEbnNQcmVzZXRSZXNwb25zZRJoCg9VcGRhdGVEbnNQcmVzZXQSKS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVEbnNQcmVzZXRSZXF1ZXN0GioubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlRG5zUHJlc2V0UmVzcG9uc2USaAoPRGVsZXRlRG5zUHJlc2V0EikubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlRG5zUHJlc2V0UmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZURuc1ByZXNldFJlc3BvbnNlEnEKEkxpc3ROb2RlRG5zT3B0aW9ucxIsLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlRG5zT3B0aW9uc1JlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZURuc09wdGlvbnNSZXNwb25zZRJuChFTZXROb2RlRG5zT3B0aW9ucxIrLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVEbnNPcHRpb25zUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVEbnNPcHRpb25zUmVzcG9uc2USbgoRR2V0VXNlckRuc0Nob2ljZXMSKy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVc2VyRG5zQ2hvaWNlc1JlcXVlc3QaLC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVc2VyRG5zQ2hvaWNlc1Jlc3BvbnNlEnQKE1Jlc2V0VXNlckRuc0Nob2ljZXMSLS5taXN0Z2F0ZS5hZG1pbi52MS5SZXNldFVzZXJEbnNDaG9pY2VzUmVxdWVzdBouLm1pc3RnYXRlLmFkbWluLnYxLlJlc2V0VXNlckRuc0Nob2ljZXNSZXNwb25zZULDAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQghEbnNQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
 
 /**
  * A resolver of a preset: a catalog variant (provider_variant set; kind and address are then filled with a plain
@@ -524,6 +524,243 @@ export const DeleteDnsPresetResponseSchema: GenMessage<DeleteDnsPresetResponse> 
   messageDesc(file_mistgate_admin_v1_dns, 13);
 
 /**
+ * What one node offers on the user page.
+ *
+ * @generated from message mistgate.admin.v1.NodeDnsOptions
+ */
+export type NodeDnsOptions = Message<"mistgate.admin.v1.NodeDnsOptions"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * Offered presets in the owner's order (the page lists them so).
+   *
+   * @generated from field: repeated string preset_ids = 2;
+   */
+  presetIds: string[];
+
+  /**
+   * One of preset_ids, or empty: then people who picked nothing get the preset of their user, group or instance.
+   *
+   * @generated from field: string default_preset_id = 3;
+   */
+  defaultPresetId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.NodeDnsOptions.
+ * Use `create(NodeDnsOptionsSchema)` to create a new message.
+ */
+export const NodeDnsOptionsSchema: GenMessage<NodeDnsOptions> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 14);
+
+/**
+ * @generated from message mistgate.admin.v1.ListNodeDnsOptionsRequest
+ */
+export type ListNodeDnsOptionsRequest = Message<"mistgate.admin.v1.ListNodeDnsOptionsRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListNodeDnsOptionsRequest.
+ * Use `create(ListNodeDnsOptionsRequestSchema)` to create a new message.
+ */
+export const ListNodeDnsOptionsRequestSchema: GenMessage<ListNodeDnsOptionsRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 15);
+
+/**
+ * @generated from message mistgate.admin.v1.ListNodeDnsOptionsResponse
+ */
+export type ListNodeDnsOptionsResponse = Message<"mistgate.admin.v1.ListNodeDnsOptionsResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.NodeDnsOptions nodes = 1;
+   */
+  nodes: NodeDnsOptions[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListNodeDnsOptionsResponse.
+ * Use `create(ListNodeDnsOptionsResponseSchema)` to create a new message.
+ */
+export const ListNodeDnsOptionsResponseSchema: GenMessage<ListNodeDnsOptionsResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 16);
+
+/**
+ * @generated from message mistgate.admin.v1.SetNodeDnsOptionsRequest
+ */
+export type SetNodeDnsOptionsRequest = Message<"mistgate.admin.v1.SetNodeDnsOptionsRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: repeated string preset_ids = 2;
+   */
+  presetIds: string[];
+
+  /**
+   * @generated from field: string default_preset_id = 3;
+   */
+  defaultPresetId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodeDnsOptionsRequest.
+ * Use `create(SetNodeDnsOptionsRequestSchema)` to create a new message.
+ */
+export const SetNodeDnsOptionsRequestSchema: GenMessage<SetNodeDnsOptionsRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 17);
+
+/**
+ * @generated from message mistgate.admin.v1.SetNodeDnsOptionsResponse
+ */
+export type SetNodeDnsOptionsResponse = Message<"mistgate.admin.v1.SetNodeDnsOptionsResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.NodeDnsOptions options = 1;
+   */
+  options?: NodeDnsOptions | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodeDnsOptionsResponse.
+ * Use `create(SetNodeDnsOptionsResponseSchema)` to create a new message.
+ */
+export const SetNodeDnsOptionsResponseSchema: GenMessage<SetNodeDnsOptionsResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 18);
+
+/**
+ * One pick of a person on one node.
+ *
+ * @generated from message mistgate.admin.v1.UserDnsChoice
+ */
+export type UserDnsChoice = Message<"mistgate.admin.v1.UserDnsChoice"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * What they picked and, for the UI language, its stored name (built-ins are named by id there).
+   *
+   * @generated from field: string preset_id = 3;
+   */
+  presetId: string;
+
+  /**
+   * @generated from field: string preset_name = 4;
+   */
+  presetName: string;
+
+  /**
+   * False when the node no longer offers it: the pick does nothing and the node default applies.
+   *
+   * @generated from field: bool offered = 5;
+   */
+  offered: boolean;
+
+  /**
+   * What applies to the person on this node now.
+   *
+   * @generated from field: string effective_preset_id = 6;
+   */
+  effectivePresetId: string;
+
+  /**
+   * @generated from field: string effective_preset_name = 7;
+   */
+  effectivePresetName: string;
+
+  /**
+   * @generated from field: int64 updated_unix = 8;
+   */
+  updatedUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UserDnsChoice.
+ * Use `create(UserDnsChoiceSchema)` to create a new message.
+ */
+export const UserDnsChoiceSchema: GenMessage<UserDnsChoice> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 19);
+
+/**
+ * @generated from message mistgate.admin.v1.GetUserDnsChoicesRequest
+ */
+export type GetUserDnsChoicesRequest = Message<"mistgate.admin.v1.GetUserDnsChoicesRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetUserDnsChoicesRequest.
+ * Use `create(GetUserDnsChoicesRequestSchema)` to create a new message.
+ */
+export const GetUserDnsChoicesRequestSchema: GenMessage<GetUserDnsChoicesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 20);
+
+/**
+ * @generated from message mistgate.admin.v1.GetUserDnsChoicesResponse
+ */
+export type GetUserDnsChoicesResponse = Message<"mistgate.admin.v1.GetUserDnsChoicesResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.UserDnsChoice choices = 1;
+   */
+  choices: UserDnsChoice[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetUserDnsChoicesResponse.
+ * Use `create(GetUserDnsChoicesResponseSchema)` to create a new message.
+ */
+export const GetUserDnsChoicesResponseSchema: GenMessage<GetUserDnsChoicesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 21);
+
+/**
+ * @generated from message mistgate.admin.v1.ResetUserDnsChoicesRequest
+ */
+export type ResetUserDnsChoicesRequest = Message<"mistgate.admin.v1.ResetUserDnsChoicesRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ResetUserDnsChoicesRequest.
+ * Use `create(ResetUserDnsChoicesRequestSchema)` to create a new message.
+ */
+export const ResetUserDnsChoicesRequestSchema: GenMessage<ResetUserDnsChoicesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 22);
+
+/**
+ * @generated from message mistgate.admin.v1.ResetUserDnsChoicesResponse
+ */
+export type ResetUserDnsChoicesResponse = Message<"mistgate.admin.v1.ResetUserDnsChoicesResponse"> & {
+  /**
+   * How many picks were removed.
+   *
+   * @generated from field: uint32 removed = 1;
+   */
+  removed: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ResetUserDnsChoicesResponse.
+ * Use `create(ResetUserDnsChoicesResponseSchema)` to create a new message.
+ */
+export const ResetUserDnsChoicesResponseSchema: GenMessage<ResetUserDnsChoicesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_dns, 23);
+
+/**
  * @generated from enum mistgate.admin.v1.DnsServerKind
  */
 export enum DnsServerKind {
@@ -725,6 +962,52 @@ export const DnsService: GenService<{
     methodKind: "unary";
     input: typeof DeleteDnsPresetRequestSchema;
     output: typeof DeleteDnsPresetResponseSchema;
+  },
+  /**
+   * DNS for the person, per server. The owner offers presets on a node and marks one as the default; a person picks one of
+   * them on the public page (SubscriptionSettings.user_page.allow_dns_choice). Not the node's own resolver
+   * ("DNS for user traffic", Node.dns_resolvers): this is only what the page offers. A node that offers nothing has no
+   * choice and keeps the rule the preset of a user and group follow.
+   *
+   * The nodes that offer something. A node that is not listed offers nothing.
+   *
+   * @generated from rpc mistgate.admin.v1.DnsService.ListNodeDnsOptions
+   */
+  listNodeDnsOptions: {
+    methodKind: "unary";
+    input: typeof ListNodeDnsOptionsRequestSchema;
+    output: typeof ListNodeDnsOptionsResponseSchema;
+  },
+  /**
+   * Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
+   * repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
+   *
+   * @generated from rpc mistgate.admin.v1.DnsService.SetNodeDnsOptions
+   */
+  setNodeDnsOptions: {
+    methodKind: "unary";
+    input: typeof SetNodeDnsOptionsRequestSchema;
+    output: typeof SetNodeDnsOptionsResponseSchema;
+  },
+  /**
+   * What a person picked on their page, per node (read only).
+   *
+   * @generated from rpc mistgate.admin.v1.DnsService.GetUserDnsChoices
+   */
+  getUserDnsChoices: {
+    methodKind: "unary";
+    input: typeof GetUserDnsChoicesRequestSchema;
+    output: typeof GetUserDnsChoicesResponseSchema;
+  },
+  /**
+   * Removes every pick of a person: their servers go back to the node defaults.
+   *
+   * @generated from rpc mistgate.admin.v1.DnsService.ResetUserDnsChoices
+   */
+  resetUserDnsChoices: {
+    methodKind: "unary";
+    input: typeof ResetUserDnsChoicesRequestSchema;
+    output: typeof ResetUserDnsChoicesResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_dns, 0);

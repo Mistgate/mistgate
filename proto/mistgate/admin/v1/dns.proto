@@ -14,6 +14,21 @@ service DnsService {
   // Users and groups that used it fall back to the default. FAILED_PRECONDITION for a built-in preset
   // or for the instance default.
   rpc DeleteDnsPreset(DeleteDnsPresetRequest) returns (DeleteDnsPresetResponse);
+
+  // DNS for the person, per server. The owner offers presets on a node and marks one as the default; a person picks one of
+  // them on the public page (SubscriptionSettings.user_page.allow_dns_choice). Not the node's own resolver
+  // ("DNS for user traffic", Node.dns_resolvers): this is only what the page offers. A node that offers nothing has no
+  // choice and keeps the rule the preset of a user and group follow.
+  //
+  // The nodes that offer something. A node that is not listed offers nothing.
+  rpc ListNodeDnsOptions(ListNodeDnsOptionsRequest) returns (ListNodeDnsOptionsResponse);
+  // Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
+  // repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
+  rpc SetNodeDnsOptions(SetNodeDnsOptionsRequest) returns (SetNodeDnsOptionsResponse);
+  // What a person picked on their page, per node (read only).
+  rpc GetUserDnsChoices(GetUserDnsChoicesRequest) returns (GetUserDnsChoicesResponse);
+  // Removes every pick of a person: their servers go back to the node defaults.
+  rpc ResetUserDnsChoices(ResetUserDnsChoicesRequest) returns (ResetUserDnsChoicesResponse);
 }
 
 enum DnsServerKind {
@@ -188,3 +203,60 @@ message DeleteDnsPresetRequest {
 }
 
 message DeleteDnsPresetResponse {}
+
+// What one node offers on the user page.
+message NodeDnsOptions {
+  string node_id = 1;
+  // Offered presets in the owner's order (the page lists them so).
+  repeated string preset_ids = 2;
+  // One of preset_ids, or empty: then people who picked nothing get the preset of their user, group or instance.
+  string default_preset_id = 3;
+}
+
+message ListNodeDnsOptionsRequest {}
+
+message ListNodeDnsOptionsResponse {
+  repeated NodeDnsOptions nodes = 1;
+}
+
+message SetNodeDnsOptionsRequest {
+  string node_id = 1;
+  repeated string preset_ids = 2;
+  string default_preset_id = 3;
+}
+
+message SetNodeDnsOptionsResponse {
+  NodeDnsOptions options = 1;
+}
+
+// One pick of a person on one node.
+message UserDnsChoice {
+  string node_id = 1;
+  string node_name = 2;
+  // What they picked and, for the UI language, its stored name (built-ins are named by id there).
+  string preset_id = 3;
+  string preset_name = 4;
+  // False when the node no longer offers it: the pick does nothing and the node default applies.
+  bool offered = 5;
+  // What applies to the person on this node now.
+  string effective_preset_id = 6;
+  string effective_preset_name = 7;
+  int64 updated_unix = 8;
+}
+
+message GetUserDnsChoicesRequest {
+  string user_id = 1;
+}
+
+message GetUserDnsChoicesResponse {
+  repeated UserDnsChoice choices = 1;
+}
+
+message ResetUserDnsChoicesRequest {
+  string user_id = 1;
+}
+
+message ResetUserDnsChoicesResponse {
+  // How many picks were removed.
+  uint32 removed = 1;
+}

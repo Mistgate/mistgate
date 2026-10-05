@@ -97,6 +97,13 @@ var procedureLevels = map[string]level{
 	adminv1connect.DnsServiceCreateDnsPresetProcedure: levelOwner,
 	adminv1connect.DnsServiceUpdateDnsPresetProcedure: levelOwner,
 	adminv1connect.DnsServiceDeleteDnsPresetProcedure: levelOwner,
+	// DNS per server for the person (what the user page offers on a node, and what people picked): which resolvers a node
+	// offers is the owner's call like the presets themselves; reading is for everyone, and removing a person's picks is a
+	// user edit (levelWrite). None of it is open to tokens (policy_tokens.go).
+	adminv1connect.DnsServiceListNodeDnsOptionsProcedure:  levelRead,
+	adminv1connect.DnsServiceSetNodeDnsOptionsProcedure:   levelOwner,
+	adminv1connect.DnsServiceGetUserDnsChoicesProcedure:   levelRead,
+	adminv1connect.DnsServiceResetUserDnsChoicesProcedure: levelWrite,
 
 	// SubscriptionService: readonly may read; owner and helper change how subscriptions look.
 	adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure:    levelRead,

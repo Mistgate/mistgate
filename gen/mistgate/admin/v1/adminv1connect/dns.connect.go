@@ -45,6 +45,18 @@ const (
 	// DnsServiceDeleteDnsPresetProcedure is the fully-qualified name of the DnsService's
 	// DeleteDnsPreset RPC.
 	DnsServiceDeleteDnsPresetProcedure = "/mistgate.admin.v1.DnsService/DeleteDnsPreset"
+	// DnsServiceListNodeDnsOptionsProcedure is the fully-qualified name of the DnsService's
+	// ListNodeDnsOptions RPC.
+	DnsServiceListNodeDnsOptionsProcedure = "/mistgate.admin.v1.DnsService/ListNodeDnsOptions"
+	// DnsServiceSetNodeDnsOptionsProcedure is the fully-qualified name of the DnsService's
+	// SetNodeDnsOptions RPC.
+	DnsServiceSetNodeDnsOptionsProcedure = "/mistgate.admin.v1.DnsService/SetNodeDnsOptions"
+	// DnsServiceGetUserDnsChoicesProcedure is the fully-qualified name of the DnsService's
+	// GetUserDnsChoices RPC.
+	DnsServiceGetUserDnsChoicesProcedure = "/mistgate.admin.v1.DnsService/GetUserDnsChoices"
+	// DnsServiceResetUserDnsChoicesProcedure is the fully-qualified name of the DnsService's
+	// ResetUserDnsChoices RPC.
+	DnsServiceResetUserDnsChoicesProcedure = "/mistgate.admin.v1.DnsService/ResetUserDnsChoices"
 )
 
 // DnsServiceClient is a client for the mistgate.admin.v1.DnsService service.
@@ -55,6 +67,20 @@ type DnsServiceClient interface {
 	// Users and groups that used it fall back to the default. FAILED_PRECONDITION for a built-in preset
 	// or for the instance default.
 	DeleteDnsPreset(context.Context, *connect.Request[v1.DeleteDnsPresetRequest]) (*connect.Response[v1.DeleteDnsPresetResponse], error)
+	// DNS for the person, per server. The owner offers presets on a node and marks one as the default; a person picks one of
+	// them on the public page (SubscriptionSettings.user_page.allow_dns_choice). Not the node's own resolver
+	// ("DNS for user traffic", Node.dns_resolvers): this is only what the page offers. A node that offers nothing has no
+	// choice and keeps the rule the preset of a user and group follow.
+	//
+	// The nodes that offer something. A node that is not listed offers nothing.
+	ListNodeDnsOptions(context.Context, *connect.Request[v1.ListNodeDnsOptionsRequest]) (*connect.Response[v1.ListNodeDnsOptionsResponse], error)
+	// Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
+	// repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
+	SetNodeDnsOptions(context.Context, *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error)
+	// What a person picked on their page, per node (read only).
+	GetUserDnsChoices(context.Context, *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error)
+	// Removes every pick of a person: their servers go back to the node defaults.
+	ResetUserDnsChoices(context.Context, *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error)
 }
 
 // NewDnsServiceClient constructs a client for the mistgate.admin.v1.DnsService service. By default,
@@ -92,15 +118,43 @@ func NewDnsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(dnsServiceMethods.ByName("DeleteDnsPreset")),
 			connect.WithClientOptions(opts...),
 		),
+		listNodeDnsOptions: connect.NewClient[v1.ListNodeDnsOptionsRequest, v1.ListNodeDnsOptionsResponse](
+			httpClient,
+			baseURL+DnsServiceListNodeDnsOptionsProcedure,
+			connect.WithSchema(dnsServiceMethods.ByName("ListNodeDnsOptions")),
+			connect.WithClientOptions(opts...),
+		),
+		setNodeDnsOptions: connect.NewClient[v1.SetNodeDnsOptionsRequest, v1.SetNodeDnsOptionsResponse](
+			httpClient,
+			baseURL+DnsServiceSetNodeDnsOptionsProcedure,
+			connect.WithSchema(dnsServiceMethods.ByName("SetNodeDnsOptions")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserDnsChoices: connect.NewClient[v1.GetUserDnsChoicesRequest, v1.GetUserDnsChoicesResponse](
+			httpClient,
+			baseURL+DnsServiceGetUserDnsChoicesProcedure,
+			connect.WithSchema(dnsServiceMethods.ByName("GetUserDnsChoices")),
+			connect.WithClientOptions(opts...),
+		),
+		resetUserDnsChoices: connect.NewClient[v1.ResetUserDnsChoicesRequest, v1.ResetUserDnsChoicesResponse](
+			httpClient,
+			baseURL+DnsServiceResetUserDnsChoicesProcedure,
+			connect.WithSchema(dnsServiceMethods.ByName("ResetUserDnsChoices")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // dnsServiceClient implements DnsServiceClient.
 type dnsServiceClient struct {
-	listDnsPresets  *connect.Client[v1.ListDnsPresetsRequest, v1.ListDnsPresetsResponse]
-	createDnsPreset *connect.Client[v1.CreateDnsPresetRequest, v1.CreateDnsPresetResponse]
-	updateDnsPreset *connect.Client[v1.UpdateDnsPresetRequest, v1.UpdateDnsPresetResponse]
-	deleteDnsPreset *connect.Client[v1.DeleteDnsPresetRequest, v1.DeleteDnsPresetResponse]
+	listDnsPresets      *connect.Client[v1.ListDnsPresetsRequest, v1.ListDnsPresetsResponse]
+	createDnsPreset     *connect.Client[v1.CreateDnsPresetRequest, v1.CreateDnsPresetResponse]
+	updateDnsPreset     *connect.Client[v1.UpdateDnsPresetRequest, v1.UpdateDnsPresetResponse]
+	deleteDnsPreset     *connect.Client[v1.DeleteDnsPresetRequest, v1.DeleteDnsPresetResponse]
+	listNodeDnsOptions  *connect.Client[v1.ListNodeDnsOptionsRequest, v1.ListNodeDnsOptionsResponse]
+	setNodeDnsOptions   *connect.Client[v1.SetNodeDnsOptionsRequest, v1.SetNodeDnsOptionsResponse]
+	getUserDnsChoices   *connect.Client[v1.GetUserDnsChoicesRequest, v1.GetUserDnsChoicesResponse]
+	resetUserDnsChoices *connect.Client[v1.ResetUserDnsChoicesRequest, v1.ResetUserDnsChoicesResponse]
 }
 
 // ListDnsPresets calls mistgate.admin.v1.DnsService.ListDnsPresets.
@@ -123,6 +177,26 @@ func (c *dnsServiceClient) DeleteDnsPreset(ctx context.Context, req *connect.Req
 	return c.deleteDnsPreset.CallUnary(ctx, req)
 }
 
+// ListNodeDnsOptions calls mistgate.admin.v1.DnsService.ListNodeDnsOptions.
+func (c *dnsServiceClient) ListNodeDnsOptions(ctx context.Context, req *connect.Request[v1.ListNodeDnsOptionsRequest]) (*connect.Response[v1.ListNodeDnsOptionsResponse], error) {
+	return c.listNodeDnsOptions.CallUnary(ctx, req)
+}
+
+// SetNodeDnsOptions calls mistgate.admin.v1.DnsService.SetNodeDnsOptions.
+func (c *dnsServiceClient) SetNodeDnsOptions(ctx context.Context, req *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error) {
+	return c.setNodeDnsOptions.CallUnary(ctx, req)
+}
+
+// GetUserDnsChoices calls mistgate.admin.v1.DnsService.GetUserDnsChoices.
+func (c *dnsServiceClient) GetUserDnsChoices(ctx context.Context, req *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error) {
+	return c.getUserDnsChoices.CallUnary(ctx, req)
+}
+
+// ResetUserDnsChoices calls mistgate.admin.v1.DnsService.ResetUserDnsChoices.
+func (c *dnsServiceClient) ResetUserDnsChoices(ctx context.Context, req *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error) {
+	return c.resetUserDnsChoices.CallUnary(ctx, req)
+}
+
 // DnsServiceHandler is an implementation of the mistgate.admin.v1.DnsService service.
 type DnsServiceHandler interface {
 	ListDnsPresets(context.Context, *connect.Request[v1.ListDnsPresetsRequest]) (*connect.Response[v1.ListDnsPresetsResponse], error)
@@ -131,6 +205,20 @@ type DnsServiceHandler interface {
 	// Users and groups that used it fall back to the default. FAILED_PRECONDITION for a built-in preset
 	// or for the instance default.
 	DeleteDnsPreset(context.Context, *connect.Request[v1.DeleteDnsPresetRequest]) (*connect.Response[v1.DeleteDnsPresetResponse], error)
+	// DNS for the person, per server. The owner offers presets on a node and marks one as the default; a person picks one of
+	// them on the public page (SubscriptionSettings.user_page.allow_dns_choice). Not the node's own resolver
+	// ("DNS for user traffic", Node.dns_resolvers): this is only what the page offers. A node that offers nothing has no
+	// choice and keeps the rule the preset of a user and group follow.
+	//
+	// The nodes that offer something. A node that is not listed offers nothing.
+	ListNodeDnsOptions(context.Context, *connect.Request[v1.ListNodeDnsOptionsRequest]) (*connect.Response[v1.ListNodeDnsOptionsResponse], error)
+	// Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
+	// repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
+	SetNodeDnsOptions(context.Context, *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error)
+	// What a person picked on their page, per node (read only).
+	GetUserDnsChoices(context.Context, *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error)
+	// Removes every pick of a person: their servers go back to the node defaults.
+	ResetUserDnsChoices(context.Context, *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error)
 }
 
 // NewDnsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -164,6 +252,30 @@ func NewDnsServiceHandler(svc DnsServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(dnsServiceMethods.ByName("DeleteDnsPreset")),
 		connect.WithHandlerOptions(opts...),
 	)
+	dnsServiceListNodeDnsOptionsHandler := connect.NewUnaryHandler(
+		DnsServiceListNodeDnsOptionsProcedure,
+		svc.ListNodeDnsOptions,
+		connect.WithSchema(dnsServiceMethods.ByName("ListNodeDnsOptions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	dnsServiceSetNodeDnsOptionsHandler := connect.NewUnaryHandler(
+		DnsServiceSetNodeDnsOptionsProcedure,
+		svc.SetNodeDnsOptions,
+		connect.WithSchema(dnsServiceMethods.ByName("SetNodeDnsOptions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	dnsServiceGetUserDnsChoicesHandler := connect.NewUnaryHandler(
+		DnsServiceGetUserDnsChoicesProcedure,
+		svc.GetUserDnsChoices,
+		connect.WithSchema(dnsServiceMethods.ByName("GetUserDnsChoices")),
+		connect.WithHandlerOptions(opts...),
+	)
+	dnsServiceResetUserDnsChoicesHandler := connect.NewUnaryHandler(
+		DnsServiceResetUserDnsChoicesProcedure,
+		svc.ResetUserDnsChoices,
+		connect.WithSchema(dnsServiceMethods.ByName("ResetUserDnsChoices")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.DnsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DnsServiceListDnsPresetsProcedure:
@@ -174,6 +286,14 @@ func NewDnsServiceHandler(svc DnsServiceHandler, opts ...connect.HandlerOption) 
 			dnsServiceUpdateDnsPresetHandler.ServeHTTP(w, r)
 		case DnsServiceDeleteDnsPresetProcedure:
 			dnsServiceDeleteDnsPresetHandler.ServeHTTP(w, r)
+		case DnsServiceListNodeDnsOptionsProcedure:
+			dnsServiceListNodeDnsOptionsHandler.ServeHTTP(w, r)
+		case DnsServiceSetNodeDnsOptionsProcedure:
+			dnsServiceSetNodeDnsOptionsHandler.ServeHTTP(w, r)
+		case DnsServiceGetUserDnsChoicesProcedure:
+			dnsServiceGetUserDnsChoicesHandler.ServeHTTP(w, r)
+		case DnsServiceResetUserDnsChoicesProcedure:
+			dnsServiceResetUserDnsChoicesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -197,4 +317,20 @@ func (UnimplementedDnsServiceHandler) UpdateDnsPreset(context.Context, *connect.
 
 func (UnimplementedDnsServiceHandler) DeleteDnsPreset(context.Context, *connect.Request[v1.DeleteDnsPresetRequest]) (*connect.Response[v1.DeleteDnsPresetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.DnsService.DeleteDnsPreset is not implemented"))
+}
+
+func (UnimplementedDnsServiceHandler) ListNodeDnsOptions(context.Context, *connect.Request[v1.ListNodeDnsOptionsRequest]) (*connect.Response[v1.ListNodeDnsOptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.DnsService.ListNodeDnsOptions is not implemented"))
+}
+
+func (UnimplementedDnsServiceHandler) SetNodeDnsOptions(context.Context, *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.DnsService.SetNodeDnsOptions is not implemented"))
+}
+
+func (UnimplementedDnsServiceHandler) GetUserDnsChoices(context.Context, *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.DnsService.GetUserDnsChoices is not implemented"))
+}
+
+func (UnimplementedDnsServiceHandler) ResetUserDnsChoices(context.Context, *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.DnsService.ResetUserDnsChoices is not implemented"))
 }

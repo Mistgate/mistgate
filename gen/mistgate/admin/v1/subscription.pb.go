@@ -370,8 +370,11 @@ type UserPageOptions struct {
 	// self-service call. The subscription itself, which apps fetch from the same address, is never gated. Absent = true:
 	// settings stored before this key existed turn it on, which is the default.
 	RequirePagePassword *bool `protobuf:"varint,5,opt,name=require_page_password,json=requirePagePassword,proto3,oneof" json:"require_page_password,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// People may pick, on their page, one of the DNS presets the owner offers on each server (DnsService.SetNodeDnsOptions).
+	// Absent = false: a new feature does not switch itself on for settings stored before it existed.
+	AllowDnsChoice *bool `protobuf:"varint,6,opt,name=allow_dns_choice,json=allowDnsChoice,proto3,oneof" json:"allow_dns_choice,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UserPageOptions) Reset() {
@@ -435,6 +438,13 @@ func (x *UserPageOptions) GetAllowDeviceSelfService() bool {
 func (x *UserPageOptions) GetRequirePagePassword() bool {
 	if x != nil && x.RequirePagePassword != nil {
 		return *x.RequirePagePassword
+	}
+	return false
+}
+
+func (x *UserPageOptions) GetAllowDnsChoice() bool {
+	if x != nil && x.AllowDnsChoice != nil {
+		return *x.AllowDnsChoice
 	}
 	return false
 }
@@ -1048,15 +1058,17 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\fdownload_url\x18\x04 \x01(\tR\vdownloadUrl\x12*\n" +
 	"\x11add_link_template\x18\x05 \x01(\tR\x0faddLinkTemplate\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12 \n" +
-	"\vrecommended\x18\a \x01(\bR\vrecommended\"\xab\x02\n" +
+	"\vrecommended\x18\a \x01(\bR\vrecommended\"\xef\x02\n" +
 	"\x0fUserPageOptions\x12+\n" +
 	"\x11show_announcement\x18\x01 \x01(\bR\x10showAnnouncement\x12!\n" +
 	"\fshow_support\x18\x02 \x01(\bR\vshowSupport\x12\x17\n" +
 	"\ashow_qr\x18\x03 \x01(\bR\x06showQr\x12>\n" +
 	"\x19allow_device_self_service\x18\x04 \x01(\bH\x00R\x16allowDeviceSelfService\x88\x01\x01\x127\n" +
-	"\x15require_page_password\x18\x05 \x01(\bH\x01R\x13requirePagePassword\x88\x01\x01B\x1c\n" +
+	"\x15require_page_password\x18\x05 \x01(\bH\x01R\x13requirePagePassword\x88\x01\x01\x12-\n" +
+	"\x10allow_dns_choice\x18\x06 \x01(\bH\x02R\x0eallowDnsChoice\x88\x01\x01B\x1c\n" +
 	"\x1a_allow_device_self_serviceB\x18\n" +
-	"\x16_require_page_password\"b\n" +
+	"\x16_require_page_passwordB\x13\n" +
+	"\x11_allow_dns_choice\"b\n" +
 	"\tServeRule\x12\x1f\n" +
 	"\vua_contains\x18\x01 \x01(\tR\n" +
 	"uaContains\x124\n" +

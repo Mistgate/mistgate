@@ -1234,6 +1234,534 @@ func (*DeleteDnsPresetResponse) Descriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{13}
 }
 
+// What one node offers on the user page.
+type NodeDnsOptions struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// Offered presets in the owner's order (the page lists them so).
+	PresetIds []string `protobuf:"bytes,2,rep,name=preset_ids,json=presetIds,proto3" json:"preset_ids,omitempty"`
+	// One of preset_ids, or empty: then people who picked nothing get the preset of their user, group or instance.
+	DefaultPresetId string `protobuf:"bytes,3,opt,name=default_preset_id,json=defaultPresetId,proto3" json:"default_preset_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *NodeDnsOptions) Reset() {
+	*x = NodeDnsOptions{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeDnsOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeDnsOptions) ProtoMessage() {}
+
+func (x *NodeDnsOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeDnsOptions.ProtoReflect.Descriptor instead.
+func (*NodeDnsOptions) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *NodeDnsOptions) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeDnsOptions) GetPresetIds() []string {
+	if x != nil {
+		return x.PresetIds
+	}
+	return nil
+}
+
+func (x *NodeDnsOptions) GetDefaultPresetId() string {
+	if x != nil {
+		return x.DefaultPresetId
+	}
+	return ""
+}
+
+type ListNodeDnsOptionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeDnsOptionsRequest) Reset() {
+	*x = ListNodeDnsOptionsRequest{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeDnsOptionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeDnsOptionsRequest) ProtoMessage() {}
+
+func (x *ListNodeDnsOptionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeDnsOptionsRequest.ProtoReflect.Descriptor instead.
+func (*ListNodeDnsOptionsRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{15}
+}
+
+type ListNodeDnsOptionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Nodes         []*NodeDnsOptions      `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeDnsOptionsResponse) Reset() {
+	*x = ListNodeDnsOptionsResponse{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeDnsOptionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeDnsOptionsResponse) ProtoMessage() {}
+
+func (x *ListNodeDnsOptionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeDnsOptionsResponse.ProtoReflect.Descriptor instead.
+func (*ListNodeDnsOptionsResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListNodeDnsOptionsResponse) GetNodes() []*NodeDnsOptions {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+type SetNodeDnsOptionsRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	NodeId          string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	PresetIds       []string               `protobuf:"bytes,2,rep,name=preset_ids,json=presetIds,proto3" json:"preset_ids,omitempty"`
+	DefaultPresetId string                 `protobuf:"bytes,3,opt,name=default_preset_id,json=defaultPresetId,proto3" json:"default_preset_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SetNodeDnsOptionsRequest) Reset() {
+	*x = SetNodeDnsOptionsRequest{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeDnsOptionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeDnsOptionsRequest) ProtoMessage() {}
+
+func (x *SetNodeDnsOptionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeDnsOptionsRequest.ProtoReflect.Descriptor instead.
+func (*SetNodeDnsOptionsRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SetNodeDnsOptionsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *SetNodeDnsOptionsRequest) GetPresetIds() []string {
+	if x != nil {
+		return x.PresetIds
+	}
+	return nil
+}
+
+func (x *SetNodeDnsOptionsRequest) GetDefaultPresetId() string {
+	if x != nil {
+		return x.DefaultPresetId
+	}
+	return ""
+}
+
+type SetNodeDnsOptionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Options       *NodeDnsOptions        `protobuf:"bytes,1,opt,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNodeDnsOptionsResponse) Reset() {
+	*x = SetNodeDnsOptionsResponse{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeDnsOptionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeDnsOptionsResponse) ProtoMessage() {}
+
+func (x *SetNodeDnsOptionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeDnsOptionsResponse.ProtoReflect.Descriptor instead.
+func (*SetNodeDnsOptionsResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SetNodeDnsOptionsResponse) GetOptions() *NodeDnsOptions {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
+// One pick of a person on one node.
+type UserDnsChoice struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	NodeId   string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	// What they picked and, for the UI language, its stored name (built-ins are named by id there).
+	PresetId   string `protobuf:"bytes,3,opt,name=preset_id,json=presetId,proto3" json:"preset_id,omitempty"`
+	PresetName string `protobuf:"bytes,4,opt,name=preset_name,json=presetName,proto3" json:"preset_name,omitempty"`
+	// False when the node no longer offers it: the pick does nothing and the node default applies.
+	Offered bool `protobuf:"varint,5,opt,name=offered,proto3" json:"offered,omitempty"`
+	// What applies to the person on this node now.
+	EffectivePresetId   string `protobuf:"bytes,6,opt,name=effective_preset_id,json=effectivePresetId,proto3" json:"effective_preset_id,omitempty"`
+	EffectivePresetName string `protobuf:"bytes,7,opt,name=effective_preset_name,json=effectivePresetName,proto3" json:"effective_preset_name,omitempty"`
+	UpdatedUnix         int64  `protobuf:"varint,8,opt,name=updated_unix,json=updatedUnix,proto3" json:"updated_unix,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *UserDnsChoice) Reset() {
+	*x = UserDnsChoice{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDnsChoice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDnsChoice) ProtoMessage() {}
+
+func (x *UserDnsChoice) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDnsChoice.ProtoReflect.Descriptor instead.
+func (*UserDnsChoice) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *UserDnsChoice) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetPresetId() string {
+	if x != nil {
+		return x.PresetId
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetPresetName() string {
+	if x != nil {
+		return x.PresetName
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetOffered() bool {
+	if x != nil {
+		return x.Offered
+	}
+	return false
+}
+
+func (x *UserDnsChoice) GetEffectivePresetId() string {
+	if x != nil {
+		return x.EffectivePresetId
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetEffectivePresetName() string {
+	if x != nil {
+		return x.EffectivePresetName
+	}
+	return ""
+}
+
+func (x *UserDnsChoice) GetUpdatedUnix() int64 {
+	if x != nil {
+		return x.UpdatedUnix
+	}
+	return 0
+}
+
+type GetUserDnsChoicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserDnsChoicesRequest) Reset() {
+	*x = GetUserDnsChoicesRequest{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserDnsChoicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserDnsChoicesRequest) ProtoMessage() {}
+
+func (x *GetUserDnsChoicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserDnsChoicesRequest.ProtoReflect.Descriptor instead.
+func (*GetUserDnsChoicesRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetUserDnsChoicesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUserDnsChoicesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Choices       []*UserDnsChoice       `protobuf:"bytes,1,rep,name=choices,proto3" json:"choices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserDnsChoicesResponse) Reset() {
+	*x = GetUserDnsChoicesResponse{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserDnsChoicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserDnsChoicesResponse) ProtoMessage() {}
+
+func (x *GetUserDnsChoicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserDnsChoicesResponse.ProtoReflect.Descriptor instead.
+func (*GetUserDnsChoicesResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetUserDnsChoicesResponse) GetChoices() []*UserDnsChoice {
+	if x != nil {
+		return x.Choices
+	}
+	return nil
+}
+
+type ResetUserDnsChoicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetUserDnsChoicesRequest) Reset() {
+	*x = ResetUserDnsChoicesRequest{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetUserDnsChoicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetUserDnsChoicesRequest) ProtoMessage() {}
+
+func (x *ResetUserDnsChoicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetUserDnsChoicesRequest.ProtoReflect.Descriptor instead.
+func (*ResetUserDnsChoicesRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ResetUserDnsChoicesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ResetUserDnsChoicesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many picks were removed.
+	Removed       uint32 `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetUserDnsChoicesResponse) Reset() {
+	*x = ResetUserDnsChoicesResponse{}
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetUserDnsChoicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetUserDnsChoicesResponse) ProtoMessage() {}
+
+func (x *ResetUserDnsChoicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_dns_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetUserDnsChoicesResponse.ProtoReflect.Descriptor instead.
+func (*ResetUserDnsChoicesResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_dns_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ResetUserDnsChoicesResponse) GetRemoved() uint32 {
+	if x != nil {
+		return x.Removed
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_dns_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
@@ -1314,7 +1842,40 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"(\n" +
 	"\x16DeleteDnsPresetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x19\n" +
-	"\x17DeleteDnsPresetResponse*}\n" +
+	"\x17DeleteDnsPresetResponse\"t\n" +
+	"\x0eNodeDnsOptions\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1d\n" +
+	"\n" +
+	"preset_ids\x18\x02 \x03(\tR\tpresetIds\x12*\n" +
+	"\x11default_preset_id\x18\x03 \x01(\tR\x0fdefaultPresetId\"\x1b\n" +
+	"\x19ListNodeDnsOptionsRequest\"U\n" +
+	"\x1aListNodeDnsOptionsResponse\x127\n" +
+	"\x05nodes\x18\x01 \x03(\v2!.mistgate.admin.v1.NodeDnsOptionsR\x05nodes\"~\n" +
+	"\x18SetNodeDnsOptionsRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1d\n" +
+	"\n" +
+	"preset_ids\x18\x02 \x03(\tR\tpresetIds\x12*\n" +
+	"\x11default_preset_id\x18\x03 \x01(\tR\x0fdefaultPresetId\"X\n" +
+	"\x19SetNodeDnsOptionsResponse\x12;\n" +
+	"\aoptions\x18\x01 \x01(\v2!.mistgate.admin.v1.NodeDnsOptionsR\aoptions\"\xa4\x02\n" +
+	"\rUserDnsChoice\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1b\n" +
+	"\tpreset_id\x18\x03 \x01(\tR\bpresetId\x12\x1f\n" +
+	"\vpreset_name\x18\x04 \x01(\tR\n" +
+	"presetName\x12\x18\n" +
+	"\aoffered\x18\x05 \x01(\bR\aoffered\x12.\n" +
+	"\x13effective_preset_id\x18\x06 \x01(\tR\x11effectivePresetId\x122\n" +
+	"\x15effective_preset_name\x18\a \x01(\tR\x13effectivePresetName\x12!\n" +
+	"\fupdated_unix\x18\b \x01(\x03R\vupdatedUnix\"3\n" +
+	"\x18GetUserDnsChoicesRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"W\n" +
+	"\x19GetUserDnsChoicesResponse\x12:\n" +
+	"\achoices\x18\x01 \x03(\v2 .mistgate.admin.v1.UserDnsChoiceR\achoices\"5\n" +
+	"\x1aResetUserDnsChoicesRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"7\n" +
+	"\x1bResetUserDnsChoicesResponse\x12\x18\n" +
+	"\aremoved\x18\x01 \x01(\rR\aremoved*}\n" +
 	"\rDnsServerKind\x12\x1f\n" +
 	"\x1bDNS_SERVER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DNS_SERVER_KIND_PLAIN\x10\x01\x12\x17\n" +
@@ -1336,13 +1897,17 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x16DNS_CLIENT_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDNS_CLIENT_HAPP\x10\x01\x12\x15\n" +
 	"\x11DNS_CLIENT_MIHOMO\x10\x02\x12\x18\n" +
-	"\x14DNS_CLIENT_AMNEZIAWG\x10\x032\xb1\x03\n" +
+	"\x14DNS_CLIENT_AMNEZIAWG\x10\x032\xfa\x06\n" +
 	"\n" +
 	"DnsService\x12e\n" +
 	"\x0eListDnsPresets\x12(.mistgate.admin.v1.ListDnsPresetsRequest\x1a).mistgate.admin.v1.ListDnsPresetsResponse\x12h\n" +
 	"\x0fCreateDnsPreset\x12).mistgate.admin.v1.CreateDnsPresetRequest\x1a*.mistgate.admin.v1.CreateDnsPresetResponse\x12h\n" +
 	"\x0fUpdateDnsPreset\x12).mistgate.admin.v1.UpdateDnsPresetRequest\x1a*.mistgate.admin.v1.UpdateDnsPresetResponse\x12h\n" +
-	"\x0fDeleteDnsPreset\x12).mistgate.admin.v1.DeleteDnsPresetRequest\x1a*.mistgate.admin.v1.DeleteDnsPresetResponseB\xc3\x01\n" +
+	"\x0fDeleteDnsPreset\x12).mistgate.admin.v1.DeleteDnsPresetRequest\x1a*.mistgate.admin.v1.DeleteDnsPresetResponse\x12q\n" +
+	"\x12ListNodeDnsOptions\x12,.mistgate.admin.v1.ListNodeDnsOptionsRequest\x1a-.mistgate.admin.v1.ListNodeDnsOptionsResponse\x12n\n" +
+	"\x11SetNodeDnsOptions\x12+.mistgate.admin.v1.SetNodeDnsOptionsRequest\x1a,.mistgate.admin.v1.SetNodeDnsOptionsResponse\x12n\n" +
+	"\x11GetUserDnsChoices\x12+.mistgate.admin.v1.GetUserDnsChoicesRequest\x1a,.mistgate.admin.v1.GetUserDnsChoicesResponse\x12t\n" +
+	"\x13ResetUserDnsChoices\x12-.mistgate.admin.v1.ResetUserDnsChoicesRequest\x1a..mistgate.admin.v1.ResetUserDnsChoicesResponseB\xc3\x01\n" +
 	"\x15com.mistgate.admin.v1B\bDnsProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -1358,26 +1923,36 @@ func file_mistgate_admin_v1_dns_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_dns_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_mistgate_admin_v1_dns_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_mistgate_admin_v1_dns_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_mistgate_admin_v1_dns_proto_goTypes = []any{
-	(DnsServerKind)(0),              // 0: mistgate.admin.v1.DnsServerKind
-	(DnsTransport)(0),               // 1: mistgate.admin.v1.DnsTransport
-	(DnsCategory)(0),                // 2: mistgate.admin.v1.DnsCategory
-	(DnsClient)(0),                  // 3: mistgate.admin.v1.DnsClient
-	(*DnsServer)(nil),               // 4: mistgate.admin.v1.DnsServer
-	(*DnsProviderVariant)(nil),      // 5: mistgate.admin.v1.DnsProviderVariant
-	(*DnsProvider)(nil),             // 6: mistgate.admin.v1.DnsProvider
-	(*ClientDnsSupport)(nil),        // 7: mistgate.admin.v1.ClientDnsSupport
-	(*DnsSplitRule)(nil),            // 8: mistgate.admin.v1.DnsSplitRule
-	(*DnsPreset)(nil),               // 9: mistgate.admin.v1.DnsPreset
-	(*ListDnsPresetsRequest)(nil),   // 10: mistgate.admin.v1.ListDnsPresetsRequest
-	(*ListDnsPresetsResponse)(nil),  // 11: mistgate.admin.v1.ListDnsPresetsResponse
-	(*CreateDnsPresetRequest)(nil),  // 12: mistgate.admin.v1.CreateDnsPresetRequest
-	(*CreateDnsPresetResponse)(nil), // 13: mistgate.admin.v1.CreateDnsPresetResponse
-	(*UpdateDnsPresetRequest)(nil),  // 14: mistgate.admin.v1.UpdateDnsPresetRequest
-	(*UpdateDnsPresetResponse)(nil), // 15: mistgate.admin.v1.UpdateDnsPresetResponse
-	(*DeleteDnsPresetRequest)(nil),  // 16: mistgate.admin.v1.DeleteDnsPresetRequest
-	(*DeleteDnsPresetResponse)(nil), // 17: mistgate.admin.v1.DeleteDnsPresetResponse
+	(DnsServerKind)(0),                  // 0: mistgate.admin.v1.DnsServerKind
+	(DnsTransport)(0),                   // 1: mistgate.admin.v1.DnsTransport
+	(DnsCategory)(0),                    // 2: mistgate.admin.v1.DnsCategory
+	(DnsClient)(0),                      // 3: mistgate.admin.v1.DnsClient
+	(*DnsServer)(nil),                   // 4: mistgate.admin.v1.DnsServer
+	(*DnsProviderVariant)(nil),          // 5: mistgate.admin.v1.DnsProviderVariant
+	(*DnsProvider)(nil),                 // 6: mistgate.admin.v1.DnsProvider
+	(*ClientDnsSupport)(nil),            // 7: mistgate.admin.v1.ClientDnsSupport
+	(*DnsSplitRule)(nil),                // 8: mistgate.admin.v1.DnsSplitRule
+	(*DnsPreset)(nil),                   // 9: mistgate.admin.v1.DnsPreset
+	(*ListDnsPresetsRequest)(nil),       // 10: mistgate.admin.v1.ListDnsPresetsRequest
+	(*ListDnsPresetsResponse)(nil),      // 11: mistgate.admin.v1.ListDnsPresetsResponse
+	(*CreateDnsPresetRequest)(nil),      // 12: mistgate.admin.v1.CreateDnsPresetRequest
+	(*CreateDnsPresetResponse)(nil),     // 13: mistgate.admin.v1.CreateDnsPresetResponse
+	(*UpdateDnsPresetRequest)(nil),      // 14: mistgate.admin.v1.UpdateDnsPresetRequest
+	(*UpdateDnsPresetResponse)(nil),     // 15: mistgate.admin.v1.UpdateDnsPresetResponse
+	(*DeleteDnsPresetRequest)(nil),      // 16: mistgate.admin.v1.DeleteDnsPresetRequest
+	(*DeleteDnsPresetResponse)(nil),     // 17: mistgate.admin.v1.DeleteDnsPresetResponse
+	(*NodeDnsOptions)(nil),              // 18: mistgate.admin.v1.NodeDnsOptions
+	(*ListNodeDnsOptionsRequest)(nil),   // 19: mistgate.admin.v1.ListNodeDnsOptionsRequest
+	(*ListNodeDnsOptionsResponse)(nil),  // 20: mistgate.admin.v1.ListNodeDnsOptionsResponse
+	(*SetNodeDnsOptionsRequest)(nil),    // 21: mistgate.admin.v1.SetNodeDnsOptionsRequest
+	(*SetNodeDnsOptionsResponse)(nil),   // 22: mistgate.admin.v1.SetNodeDnsOptionsResponse
+	(*UserDnsChoice)(nil),               // 23: mistgate.admin.v1.UserDnsChoice
+	(*GetUserDnsChoicesRequest)(nil),    // 24: mistgate.admin.v1.GetUserDnsChoicesRequest
+	(*GetUserDnsChoicesResponse)(nil),   // 25: mistgate.admin.v1.GetUserDnsChoicesResponse
+	(*ResetUserDnsChoicesRequest)(nil),  // 26: mistgate.admin.v1.ResetUserDnsChoicesRequest
+	(*ResetUserDnsChoicesResponse)(nil), // 27: mistgate.admin.v1.ResetUserDnsChoicesResponse
 }
 var file_mistgate_admin_v1_dns_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.DnsServer.kind:type_name -> mistgate.admin.v1.DnsServerKind
@@ -1401,19 +1976,30 @@ var file_mistgate_admin_v1_dns_proto_depIdxs = []int32{
 	8,  // 18: mistgate.admin.v1.UpdateDnsPresetRequest.split:type_name -> mistgate.admin.v1.DnsSplitRule
 	1,  // 19: mistgate.admin.v1.UpdateDnsPresetRequest.preferred_transport:type_name -> mistgate.admin.v1.DnsTransport
 	9,  // 20: mistgate.admin.v1.UpdateDnsPresetResponse.preset:type_name -> mistgate.admin.v1.DnsPreset
-	10, // 21: mistgate.admin.v1.DnsService.ListDnsPresets:input_type -> mistgate.admin.v1.ListDnsPresetsRequest
-	12, // 22: mistgate.admin.v1.DnsService.CreateDnsPreset:input_type -> mistgate.admin.v1.CreateDnsPresetRequest
-	14, // 23: mistgate.admin.v1.DnsService.UpdateDnsPreset:input_type -> mistgate.admin.v1.UpdateDnsPresetRequest
-	16, // 24: mistgate.admin.v1.DnsService.DeleteDnsPreset:input_type -> mistgate.admin.v1.DeleteDnsPresetRequest
-	11, // 25: mistgate.admin.v1.DnsService.ListDnsPresets:output_type -> mistgate.admin.v1.ListDnsPresetsResponse
-	13, // 26: mistgate.admin.v1.DnsService.CreateDnsPreset:output_type -> mistgate.admin.v1.CreateDnsPresetResponse
-	15, // 27: mistgate.admin.v1.DnsService.UpdateDnsPreset:output_type -> mistgate.admin.v1.UpdateDnsPresetResponse
-	17, // 28: mistgate.admin.v1.DnsService.DeleteDnsPreset:output_type -> mistgate.admin.v1.DeleteDnsPresetResponse
-	25, // [25:29] is the sub-list for method output_type
-	21, // [21:25] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	18, // 21: mistgate.admin.v1.ListNodeDnsOptionsResponse.nodes:type_name -> mistgate.admin.v1.NodeDnsOptions
+	18, // 22: mistgate.admin.v1.SetNodeDnsOptionsResponse.options:type_name -> mistgate.admin.v1.NodeDnsOptions
+	23, // 23: mistgate.admin.v1.GetUserDnsChoicesResponse.choices:type_name -> mistgate.admin.v1.UserDnsChoice
+	10, // 24: mistgate.admin.v1.DnsService.ListDnsPresets:input_type -> mistgate.admin.v1.ListDnsPresetsRequest
+	12, // 25: mistgate.admin.v1.DnsService.CreateDnsPreset:input_type -> mistgate.admin.v1.CreateDnsPresetRequest
+	14, // 26: mistgate.admin.v1.DnsService.UpdateDnsPreset:input_type -> mistgate.admin.v1.UpdateDnsPresetRequest
+	16, // 27: mistgate.admin.v1.DnsService.DeleteDnsPreset:input_type -> mistgate.admin.v1.DeleteDnsPresetRequest
+	19, // 28: mistgate.admin.v1.DnsService.ListNodeDnsOptions:input_type -> mistgate.admin.v1.ListNodeDnsOptionsRequest
+	21, // 29: mistgate.admin.v1.DnsService.SetNodeDnsOptions:input_type -> mistgate.admin.v1.SetNodeDnsOptionsRequest
+	24, // 30: mistgate.admin.v1.DnsService.GetUserDnsChoices:input_type -> mistgate.admin.v1.GetUserDnsChoicesRequest
+	26, // 31: mistgate.admin.v1.DnsService.ResetUserDnsChoices:input_type -> mistgate.admin.v1.ResetUserDnsChoicesRequest
+	11, // 32: mistgate.admin.v1.DnsService.ListDnsPresets:output_type -> mistgate.admin.v1.ListDnsPresetsResponse
+	13, // 33: mistgate.admin.v1.DnsService.CreateDnsPreset:output_type -> mistgate.admin.v1.CreateDnsPresetResponse
+	15, // 34: mistgate.admin.v1.DnsService.UpdateDnsPreset:output_type -> mistgate.admin.v1.UpdateDnsPresetResponse
+	17, // 35: mistgate.admin.v1.DnsService.DeleteDnsPreset:output_type -> mistgate.admin.v1.DeleteDnsPresetResponse
+	20, // 36: mistgate.admin.v1.DnsService.ListNodeDnsOptions:output_type -> mistgate.admin.v1.ListNodeDnsOptionsResponse
+	22, // 37: mistgate.admin.v1.DnsService.SetNodeDnsOptions:output_type -> mistgate.admin.v1.SetNodeDnsOptionsResponse
+	25, // 38: mistgate.admin.v1.DnsService.GetUserDnsChoices:output_type -> mistgate.admin.v1.GetUserDnsChoicesResponse
+	27, // 39: mistgate.admin.v1.DnsService.ResetUserDnsChoices:output_type -> mistgate.admin.v1.ResetUserDnsChoicesResponse
+	32, // [32:40] is the sub-list for method output_type
+	24, // [24:32] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_dns_proto_init() }
@@ -1427,7 +2013,7 @@ func file_mistgate_admin_v1_dns_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_dns_proto_rawDesc), len(file_mistgate_admin_v1_dns_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   14,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
