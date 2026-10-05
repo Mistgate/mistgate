@@ -60,6 +60,8 @@ The check uses a hidden system account on each profile of each node: it belongs 
 | no link | The node is offline. |
 | not checked | The panel has no test client for this protocol. |
 | starting | The profile is starting. |
+| upd. | The node is updating its agent. |
+| … | No result yet: the first round comes within a few minutes. |
 | — | The profile is not deployed on this node. |
 
 Only "fails" counts as a failure. The other states are skipped rounds: they are not stored and do not touch the failure streak.
@@ -114,7 +116,7 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | CPU softirq (`cpu_softirq`) | Mean softirq share and total CPU over 10 minutes. Skipped until 30 samples are collected. | Softirq 50% or more | Softirq 90% or more, or CPU 97% or more | None |
 | Kernel headers (`kernel_headers`) | Headers, `dkms`, `make` and `gcc` for the AmneziaWG kernel module. Skipped without an AmneziaWG profile; only a fact while AmneziaWG runs in userspace. | Kernel mode is requested and the module does not run while tools are missing | None | None: see [AmneziaWG](../guide/amneziawg.md) |
 | AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | None |
-| WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Reconnect WARP, only while the tunnel is down |
+| WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it, or the tunnel is up but its latest check failed | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Check WARP / reconnect if down, when the tunnel is down or its latest check failed |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 
@@ -130,7 +132,7 @@ There are exactly five fixes. They are compiled into the agent: the panel sends 
 | Restore the base settings | Writes Mistgate's sysctl file (`/etc/sysctl.d/90-mistgate.conf`: fq and BBR) and journald drop-in (`/etc/systemd/journald.conf.d/90-mistgate.conf`: the 200 MB cap) again, and the SSH guard (a per-address rate limit on new SSH connections). | Base network settings |
 | Restart profile | Restarts one profile on the node, or every profile that failed to start. Connections through it drop for a couple of seconds and come back by themselves. | Ports in use, Certificates (self-signed) |
 | Fix the resolver | Points the host resolver at the node's **DNS resolvers for this node** (node settings) or, when that is the server's own resolver, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
-| Reconnect WARP | Rebuilds the configured tunnel and its routes while keeping the same account. Profiles using WARP may briefly lose traffic. The plan is refused if the tunnel recovered before Apply. | WARP exit, only when the tunnel is down |
+| Check WARP / reconnect if down | Runs the WARP checks again at once. Only when the tunnel is down, or this check takes it to its failure threshold, it rebuilds the configured tunnel and its routes with the same account; otherwise nothing changes. During a reconnect, profiles using WARP may briefly lose traffic. If the tunnel recovered before Apply, nothing is changed. | WARP exit |
 
 A fix always takes two steps:
 
@@ -236,7 +238,7 @@ Depending on what the alert says, its card offers:
 - If its severity rises, the mute ends and the alert counts again.
 - Muting is written to the audit log.
 
-> **Note:** The panel sends no notifications yet. A Telegram bot for the fleet is planned. Today alerts are seen in the admin (the header badge, the Overview, the Health page) and through the [API](../reference/api.md) and [MCP](../reference/mcp.md).
+> **Note:** The panel sends no notifications yet. A Telegram bot for the fleet is **Planned**. Today alerts are seen in the admin (the header badge, the Overview, the Health page) and through the [API](../reference/api.md) and [MCP](../reference/mcp.md).
 
 ### Events on the node page
 
@@ -252,8 +254,15 @@ The node's **Events** tab and the Overview's event feed keep a timeline that ans
 | traffic flows again (…) | It closed as cleared or fixed, with how long it lasted. |
 | "<profile>" fails the client-eye check | A per-profile check alert opened. |
 | "<profile>" passes the check again (…) | It closed as cleared or fixed. |
-| BitTorrent attempt detected | The node blocked a recognized torrent request. Details include the protocol, plus the user when attribution is reliable; no address is stored. A degraded-guard event means the protection could not be enabled on this node. |
+| Possible BitTorrent attempt by … | The node's torrent protection blocked a flow that a client started and that it recognised as BitTorrent. The line under it names the protocol. The user is named only when the client's tunnel address belongs to exactly one account, otherwise it says "an unknown user". Neither the client's address nor the destination is stored. See [Torrent protection](../guide/torrent-protection.md). |
 | updated to … / update failed / update rolled back | A rollout step ended. |
+
+A few warnings of the agent have no sentence of their own yet and are shown by their code, with the error text under it:
+
+| Code | Written when |
+|---|---|
+| `torrent_guard_degraded` | Torrent protection is on, but the node could not set up the packet queue that inspects AmneziaWG traffic (for example a build without it). AmneziaWG traffic is then not inspected; Hysteria2 is checked inside its engine and is not affected. |
+| `host_firewall_sync_failed` | The agent could not bring the UFW rules for the servers' UDP ports in line, a UFW rule of yours denies one of these ports, or an active firewalld does not open them. `host_firewall_sync_recovered` follows when it works again. See "The hoster blocks UDP" in [Troubleshooting](troubleshooting.md). |
 
 Events of severity info are kept for 90 days, warnings and errors for 400 days. Raw check rounds are kept for 25 hours after the day is summarised; the daily summaries for 90 days.
 

@@ -7,7 +7,7 @@ A node is a server that runs the Mistgate agent, `mistgate-node`. The panel tell
 
 ## The Nodes list
 
-The header says how many nodes there are, how many people are online and how many nodes have problems ("3 nodes · 12 online · 1 with problems"). **Add node** opens the dialog that makes the install command.
+The header says how many nodes there are, how many people are online and how many nodes have problems ("3 nodes · 12 online · 1 with problems"). **Add node** opens the dialog that installs a node over SSH or makes a manual install command: see [Add a node](../getting-started/add-node.md).
 
 Above the table:
 
@@ -136,7 +136,7 @@ The node's own host checks, grouped into **Needs attention**, **Accepted as norm
 
 ### Settings
 
-The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access** card (a node installed over SSH), the **AmneziaWG backend** card, **New install command** (the owner only) and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md). **New install command** is for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md).
+The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access** card (a node installed over SSH), the **AmneziaWG backend** card, **New install command** (the owner only) and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md). **New install command** is for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md). The **SSH access** card shows the saved SSH server and login, and **Reveal password** shows the password after a fresh sign-in confirmation; how the password is kept and changed is in [Install a node over SSH](../getting-started/ssh-install.md).
 
 | Field | What it does |
 |:--|:--|
@@ -152,9 +152,9 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 | **Agent dial timeout** | 5–120 s, default 15: how long the agent waits when it connects to the panel. |
 | **DNS resolvers for this node** | **Server's own resolver** (the default), **Yandex DNS** or **Cloudflare + Google**; a list of your own (up to 8 IP addresses, `ip:port` works too) shows as **Custom DNS** and is edited there. The node and its VPN engines resolve names with them, the names in its users' traffic included. With **Server's own resolver** the node uses whatever the server uses. For a node in Russia pick **Yandex DNS**, so Russian services such as gosuslugi.ru resolve reliably. |
 
-**Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts Hysteria2 inbounds as described below.
+**Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts the node's Hysteria2 profiles.
 
-**Block recognized BitTorrent traffic** is an optional per-node setting, off by default, for Linux agents that advertise `torrentguard/1`. It inspects plaintext BitTorrent handshakes and validated DHT, UDP tracker and uTP requests, and only what clients send, never what comes back to them. On AmneziaWG the kernel hands the guard only the start of each flow a client opens through that node's AWG interface; an identified TCP connection is then dropped by the kernel for the rest of its life and an identified UDP datagram is dropped; in Hysteria2 it closes the matching outbound connection or drops the matching UDP datagram. Changing this setting restarts only the node's Hysteria2 inbounds so existing outbound connections cannot keep using the old policy. Detection is best effort: encrypted BitTorrent, traffic inside another proxy, HTTPS web seeds, fragmented packets and unknown formats can pass. A `torrent_guard_degraded` event appears if the Linux queue cannot start.
+**Block recognized BitTorrent traffic** is off by default. It blocks plaintext BitTorrent that the node's users start, on AmneziaWG in the kernel and on Hysteria2 in its engine, and writes a `torrent_attempt` event without any address. It needs an agent that supports it. See [Torrent protection](torrent-protection.md).
 
 **DNS resolvers for this node** are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
 
@@ -196,4 +196,4 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Making install commands, retiring nodes, reading logs, putting profiles on nodes and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).
