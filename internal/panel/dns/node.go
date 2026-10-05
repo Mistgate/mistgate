@@ -315,7 +315,11 @@ func (s *Service) ResetUserDnsChoices(ctx context.Context, req *connect.Request[
 		return nil, s.internal("reset user choices", err)
 	}
 	if n > 0 {
-		s.audit(ctx, "user_dns_choices_reset", map[string]any{"user": req.Msg.UserId, "removed": n})
+		params := map[string]any{"user": req.Msg.UserId, "removed": n}
+		if u, err := s.st.Access().User(ctx, req.Msg.UserId); err == nil {
+			params["name"] = u.Name
+		}
+		s.audit(ctx, "user_dns_choices_reset", params)
 	}
 	return connect.NewResponse(&adminv1.ResetUserDnsChoicesResponse{Removed: uint32(n)}), nil
 }

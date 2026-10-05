@@ -231,6 +231,9 @@ func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice
 		return s.internal("set dns choice", err)
 	}
 	params := map[string]any{"user": u.Name, "node": node.Name, "preset": c.PresetID}
+	if row, err := s.st.DNS().Get(ctx, c.PresetID); err == nil {
+		params["preset_name"] = row.Name
+	}
 	s.auditNoAddress(ctx, "user:"+u.ID, "page_dns_choice", params)
 	return nil
 }
