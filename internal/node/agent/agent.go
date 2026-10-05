@@ -140,6 +140,7 @@ type Agent struct {
 	// distinct message), and whether the tunnel table and the WARP subnet rules were ever installed (their removal is sent once).
 	blocked             map[string]string
 	warpErr, tunErr     string
+	tunV6               string // the IPv6 fallback of the tunnel table last reported (hostctl.V6FallbackHost)
 	warpRouteErr        string
 	warpNoted           bool
 	tunUsed, warpRouted bool

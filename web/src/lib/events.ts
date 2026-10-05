@@ -33,6 +33,7 @@ const textKeys: Record<string, MessageKey> = {
   hop_failed: "event.hop_failed",
   hop_rejected: "event.hop_rejected",
   tunnel_failed: "event.tunnel_failed",
+  tunnel_v6_fallback: "event.tunnel_v6_fallback",
   warp_needs_attention: "event.warp_needs_attention",
   torrent_guard_degraded: "event.torrent_guard_degraded",
   host_firewall_sync_failed: "event.host_firewall_sync_failed",
@@ -103,6 +104,8 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       return { text: t(key, { span }), detail };
     case "engine_failed":
       return { text: profile ? t("event.engine_failed.named", { profile }) : t(key), detail };
+    case "tunnel_v6_fallback":
+      return { text: t(p.mode === "none" ? "event.tunnel_v6_fallback.none" : key), detail };
     case "host_firewall_sync_failed":
       // an older agent does not list the ports
       return { text: p.ports ? t(key, { ports: p.ports }) : t("event.host_firewall_sync_failed.plain"), detail };

@@ -4,6 +4,7 @@ package hostctl
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -173,6 +174,96 @@ func TestSetTunnelsRetriesAfterSysctlFailure(t *testing.T) {
 	}
 }
 
+// failNft makes `nft -f -` fail for a script that contains any of words, like a kernel without that part of nftables.
+func failNft(h *linuxHost, calls *[]call, words ...string) {
+	base := h.run
+	h.run = func(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
+		if name == "nft" && len(args) > 0 && args[0] == "-f" {
+			for _, w := range words {
+				if strings.Contains(stdin, w) {
+					*calls = append(*calls, call{stdin, name, strings.Join(args, " ")})
+					return []byte("Error: Could not process rule: No such file or directory"), errors.New("exit status 1")
+				}
+			}
+		}
+		return base(ctx, stdin, name, args...)
+	}
+}
+
+func lastNft(calls []call) string {
+	for i := len(calls) - 1; i >= 0; i-- {
+		if calls[i].name == "nft" && calls[i].args == "-f -" {
+			return calls[i].stdin
+		}
+	}
+	return ""
+}
+
+// A kernel without nft reject must not take every tunnel of the node down: the IPv6 rule falls back to drop (it
+// still keeps IPv6 off, only the app waits for a timeout), and if even that is refused, to no rule; the rest of the
+// table (masquerade, isolation, input policy) is installed either way.
+func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
+	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
+	a.RejectV6 = true
+	for name, tc := range map[string]struct {
+		fail     []string
+		want     string // a line the installed script has
+		wantNot  string
+		fallback string
+	}{
+		"no reject":        {fail: []string{"reject"}, want: "meta nfproto ipv6 drop", wantNot: "reject", fallback: "drop"},
+		"no ipv6 verdicts": {fail: []string{"reject", "nfproto ipv6 drop"}, want: "masquerade", wantNot: "nov6", fallback: "none"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h, calls, _ := tunHost(t)
+			failNft(h, calls, tc.fail...)
+			ctx := context.Background()
+			if err := h.SetTunnels(ctx, []Tunnel{a}); err != nil {
+				t.Fatalf("a missing IPv6 verdict dropped the whole tunnel table: %v", err)
+			}
+			got := lastNft(*calls)
+			if !strings.Contains(got, tc.want) || strings.Contains(got, tc.wantNot) || !strings.Contains(got, "ip saddr 10.66.4.0/22") {
+				t.Errorf("installed script:\n%s", got)
+			}
+			if readSys(t, h, "net/ipv4/ip_forward") != "1" {
+				t.Error("forwarding is not on")
+			}
+			if got := h.TunnelV6Fallback(); got != tc.fallback {
+				t.Errorf("fallback = %q, want %q", got, tc.fallback)
+			}
+			n := len(*calls)
+			if err := h.SetTunnels(ctx, []Tunnel{a}); err != nil || len(*calls) != n {
+				t.Errorf("the same set was applied again: err=%v calls=%d->%d", err, n, len(*calls))
+			}
+			// the verdict that works is tried first again for the next set: reject is not remembered as broken
+			b := tun(40001, "10.66.8.0/22", "")
+			if err := h.SetTunnels(ctx, []Tunnel{a, b}); err != nil || h.TunnelV6Fallback() != tc.fallback {
+				t.Errorf("a changed set: err=%v fallback=%q", err, h.TunnelV6Fallback())
+			}
+		})
+	}
+	t.Run("a table nft refuses for another reason is still an error", func(t *testing.T) {
+		h, calls, _ := tunHost(t)
+		failNft(h, calls, "table inet")
+		if err := h.SetTunnels(context.Background(), []Tunnel{a}); err == nil {
+			t.Fatal("not reported")
+		}
+		if h.TunnelV6Fallback() != "" {
+			t.Errorf("fallback = %q", h.TunnelV6Fallback())
+		}
+	})
+	t.Run("without the IPv6 rule nothing is retried", func(t *testing.T) {
+		h, calls, _ := tunHost(t)
+		failNft(h, calls, "table inet")
+		plain := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
+		if err := h.SetTunnels(context.Background(), []Tunnel{plain}); err == nil {
+			t.Fatal("not reported")
+		}
+		if n := len(*calls); n != 1 {
+			t.Errorf("%d nft calls, want 1", n)
+		}
+	})
+}
 func TestCleanupRemovesTunnelTableAndLinks(t *testing.T) {
 	h, calls, _ := tunHost(t)
 	linksDeleted := 0

@@ -22,8 +22,9 @@ import (
 type tunnelState struct {
 	mu        sync.Mutex
 	set       []Tunnel
-	applied   bool // set was handed to nft (an empty set means the table is gone)
-	forwardOK bool // and forwarding is on; false retries the sysctls with the next call
+	applied   bool   // set was handed to nft (an empty set means the table is gone)
+	forwardOK bool   // and forwarding is on; false retries the sysctls with the next call
+	v6verdict string // "" the IPv6 rule is as asked; "drop" or "none" when the kernel refused reject (TunnelV6Fallback)
 	carry     map[uint16]uint64
 }
 
@@ -65,10 +66,16 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 		}
 	}
 	st.applied, st.forwardOK = false, false
+	verdict := ""
 	if err := h.nft(ctx, script, len(ts) == 0); err != nil {
-		st.set = nil
-		return err
+		// A kernel without nft reject refuses the whole table, and with it every tunnel. The IPv6 rule is the only
+		// part that needs it: try the table with drop, then without the rule, and say so (TunnelV6Fallback).
+		if verdict = h.tunnelsWithoutReject(ctx, ts); verdict == "" {
+			st.set, st.v6verdict = nil, ""
+			return err
+		}
 	}
+	st.v6verdict = verdict
 	st.set, st.applied = append([]Tunnel(nil), ts...), true
 	if len(ts) > 0 {
 		if err := h.enableForwarding(NeedsV6(ts)); err != nil {
@@ -77,6 +84,38 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 	}
 	st.forwardOK = true
 	return nil
+}
+
+// tunnelsWithoutReject installs ts with the IPv6 verdict "drop" (apps wait for a timeout instead of an instant ICMP error,
+// but IPv6 stays off), and failing that with no IPv6 rule at all. It returns "drop", "none", or "" when ts has no such rule
+// or nft refuses the table for another reason too.
+func (h *linuxHost) tunnelsWithoutReject(ctx context.Context, ts []Tunnel) string {
+	asked := false
+	for _, t := range ts {
+		asked = asked || (t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp)
+	}
+	if !asked {
+		return ""
+	}
+	if script, err := renderTunnels(ts, v6Drop); err == nil && h.nft(ctx, script, false) == nil {
+		return "drop"
+	}
+	off := append([]Tunnel(nil), ts...)
+	for i := range off {
+		off[i].RejectV6 = false
+	}
+	if script, err := RenderTunnels(off); err == nil && h.nft(ctx, script, false) == nil {
+		return "none"
+	}
+	return ""
+}
+
+// TunnelV6Fallback tells how the installed table differs from the one asked for because the kernel refused reject: "drop"
+// (IPv6 from the tunnels is dropped instead of rejected), "none" (no IPv6 rule at all), "" when it is as asked.
+func (h *linuxHost) TunnelV6Fallback() string {
+	h.tun.mu.Lock()
+	defer h.tun.mu.Unlock()
+	return h.tun.v6verdict
 }
 
 func (h *linuxHost) TunnelCounters(ctx context.Context) (map[uint16]uint64, error) {

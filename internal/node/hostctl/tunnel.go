@@ -68,6 +68,12 @@ type TunnelHost interface {
 	TunnelCounters(ctx context.Context) (map[uint16]uint64, error)
 }
 
+// V6FallbackHost is implemented by a host that can tell the IPv6 rule of the tunnel table is not the one asked for:
+// the kernel refused nft reject, so IPv6 from the tunnels is dropped ("drop") or not filtered at all ("none"); "" = as asked.
+type V6FallbackHost interface {
+	TunnelV6Fallback() string
+}
+
 // ValidateTunnel checks one tunnel before it reaches nft. The strings that get into the script are interface names and
 // address literals rendered by the netip package; the name is additionally restricted.
 func ValidateTunnel(t Tunnel) error {
@@ -95,9 +101,17 @@ func ifaceNameOK(s string) bool {
 	return true
 }
 
+// The verdict of the nov6 chain: reject answers at once, drop is the fallback for a kernel without nft reject.
+const (
+	v6Reject = "reject with icmpx type admin-prohibited"
+	v6Drop   = "drop"
+)
+
 // RenderTunnels returns the nft script that atomically replaces the tunnel table. `add` + `delete` first makes it work
 // whether or not the table exists; nft applies a whole -f file as one transaction. No tunnels renders the delete only.
-func RenderTunnels(ts []Tunnel) (string, error) {
+func RenderTunnels(ts []Tunnel) (string, error) { return renderTunnels(ts, v6Reject) }
+
+func renderTunnels(ts []Tunnel, v6verdict string) (string, error) {
 	sorted := append([]Tunnel(nil), ts...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Iface < sorted[j].Iface })
 	for i, t := range sorted {
@@ -144,7 +158,7 @@ func RenderTunnels(ts []Tunnel) (string, error) {
 	var noV6 strings.Builder
 	for _, t := range sorted {
 		if t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp {
-			fmt.Fprintf(&noV6, "\t\tiifname %q oifname != %s meta nfproto ipv6 reject with icmpx type admin-prohibited\n", t.Iface, wild)
+			fmt.Fprintf(&noV6, "\t\tiifname %q oifname != %s meta nfproto ipv6 %s\n", t.Iface, wild, v6verdict)
 		}
 	}
 	if noV6.Len() > 0 {

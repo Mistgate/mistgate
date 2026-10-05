@@ -248,7 +248,14 @@ type tunHost struct {
 	tmu      sync.Mutex
 	sets     [][]hostctl.Tunnel
 	err      error
+	v6       string // TunnelV6Fallback
 	counters map[uint16]uint64
+}
+
+func (h *tunHost) TunnelV6Fallback() string {
+	h.tmu.Lock()
+	defer h.tmu.Unlock()
+	return h.v6
 }
 
 func (h *tunHost) SetTunnels(_ context.Context, ts []hostctl.Tunnel) error {
@@ -649,6 +656,27 @@ func TestTunnelFirewallFailureBlocksTheInterface(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	if x.tun.setCount() != n+1 {
 		t.Errorf("the empty set is sent again and again: %d calls", x.tun.setCount()-n)
+	}
+}
+
+// A kernel without nft reject makes the host fall back to drop (or no IPv6 rule): the tunnels keep serving and the owner
+// gets one warning event, not one per sweep.
+func TestTunnelV6FallbackIsReportedOnceAndTheTunnelsKeepServing(t *testing.T) {
+	x := newL3(t, 3, false)
+	x.waitConnected()
+	x.tun.tmu.Lock()
+	x.tun.v6 = "drop"
+	x.tun.tmu.Unlock()
+	r := mustApply(t, x.panel, fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1"))))
+	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || !x.awg.has("inb_a") {
+		t.Fatalf("a degraded IPv6 rule stopped the tunnel: has=%v %v", x.awg.has("inb_a"), r)
+	}
+	if !x.panel.hasEventEventually("tunnel_v6_fallback") {
+		t.Fatal("no tunnel_v6_fallback event")
+	}
+	time.Sleep(150 * time.Millisecond)
+	if n := len(x.panel.eventsByCode("tunnel_v6_fallback")); n != 1 {
+		t.Errorf("%d events, want 1", n)
 	}
 }
 

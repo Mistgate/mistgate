@@ -286,6 +286,15 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 		return
 	}
 	a.tunErr = ""
+	if h, ok := a.host.(hostctl.V6FallbackHost); ok {
+		if mode := h.TunnelV6Fallback(); mode != a.tunV6 {
+			a.tunV6 = mode
+			if mode != "" {
+				a.log.Warn("the kernel refused nft reject: IPv6 from the tunnels is not rejected", "fallback", mode)
+				a.event(pb.Severity_SEVERITY_WARNING, "tunnel_v6_fallback", "", map[string]string{"mode": mode})
+			}
+		}
+	}
 	a.tunUsed = len(ts) > 0
 	a.syncTorrentGuard(ctx, next, ts, true)
 }

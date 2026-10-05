@@ -35,6 +35,11 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "node_recovered", params: { minutes: "2880" } }).text).toBe("back online after 2 d");
     expect(describeEvent(t as never, { code: "clock_skew", params: { offset_s: "4" } }).text).toBe("the server clock differs from the panel’s by 4 s");
   });
+  it("words the bandwidth and tunnel-firewall fallbacks, the second one by how far it fell back", () => {
+    expect(describeEvent(t as never, { code: "bandwidth_upload_missing", params: { down_mbps: "4984" } }).text).toContain("4984 Mbps down but no upload figure");
+    expect(describeEvent(t as never, { code: "tunnel_v6_fallback", params: { mode: "drop" } }).text).toBe(en["event.tunnel_v6_fallback"]);
+    expect(describeEvent(t as never, { code: "tunnel_v6_fallback", params: { mode: "none" } }).text).toBe(en["event.tunnel_v6_fallback.none"]);
+  });
   it("says what the torrent guard and the host firewall need, with the ports the agent listed", () => {
     expect(describeEvent(t as never, { code: "torrent_guard_degraded", params: { error: "nfqueue: operation not supported" } })).toEqual({
       text: en["event.torrent_guard_degraded"],
