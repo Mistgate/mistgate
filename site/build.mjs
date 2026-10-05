@@ -124,13 +124,19 @@ out("404.html", render404({ assets }));
 // ---- sitemap, robots, headers ----
 const urls = Object.values(site).flatMap((s) => [...s.pages.values()]);
 const llmsPages = [...urls].sort((a, b) => a.url.localeCompare(b.url)).map((p) => `- [${p.title}](${SITE}${p.url}): ${p.description}`).join("\n");
-out("llms.txt", `# Mistgate documentation\n\n> Self-hosted VPN fleet panel and Go node agent. The panel and node agent are static Go binaries; no Docker runtime is required.\n\n## AI and installation\n\n- [AI agent guide](${SITE}/getting-started/ai-agents/): install nodes and rotate SSH passwords through owner-approved MCP tools.\n- [Repository agent instructions](https://github.com/Mistgate/mistgate/blob/main/AGENTS.md)\n- [MCP tool reference](${SITE}/reference/mcp/)\n\n## All pages\n\n${llmsPages}\n`);
+out("llms.txt", `# Mistgate documentation\n\n> Self-hosted VPN fleet panel and Go node agent. The panel and node agent are static Go binaries; no Docker runtime is required.\n\n## AI and installation\n\n- [AI agent guide](${SITE}/getting-started/ai-agents/): ready prompts to install the panel over SSH, run the fleet through owner-approved MCP tools, and contribute to the code.\n- [Install the panel](${SITE}/getting-started/install-panel/): the official release binaries, mistgate setup and the systemd unit.\n- [Install a node over SSH](${SITE}/getting-started/ssh-install/)\n- [Repository agent instructions](https://github.com/Mistgate/mistgate/blob/main/AGENTS.md)\n- [MCP tool reference](${SITE}/reference/mcp/)\n\n## All pages\n\n${llmsPages}\n`);
 out("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls.map((p) => `<url><loc>${SITE}${p.url}</loc>${p.alternates.length > 1 ? "\n" + p.alternates.map((a) => `  <xhtml:link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}"/>`).join("\n") + "\n" : ""}</url>`).join("\n")}
 </urlset>
 `);
 out("robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
+// pages that moved: old address -> new page key (Cloudflare Pages reads _redirects)
+const MOVED = { "roadmap/m2-ssh-provisioning": "roadmap/status" };
+out("_redirects", Object.entries(MOVED).flatMap(([from, to]) => LANGS.flatMap((l) => {
+  const src = pageUrl(l, from), dst = pageUrl(l, to);
+  return [`${src} ${dst} 301`, `${src.slice(0, -1)} ${dst} 301`];
+})).join("\n") + "\n");
 const initHash = createHash("sha256").update(THEME_INIT).digest("base64");
 out("_headers", `/*
   X-Content-Type-Options: nosniff
@@ -157,7 +163,8 @@ for (const f of files) {
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const h = m[1];
     if (/^(https?:|mailto:|data:)/.test(h)) continue;
-    const [path, frag] = h.split("#");
+    const [path, rawFrag] = h.split("#");
+    const frag = rawFrag && decodeURIComponent(rawFrag); // markdown-it percent-encodes a Cyrillic anchor; the id is raw
     const target = path === "" ? self : path;
     const ok = written.has(target) ? (!frag || written.get(target).has(frag) || (frag === "content" || frag === "nav")) : files.has(target);
     if (!ok) broken.push(`${f}: ${h}`);

@@ -13,24 +13,23 @@ function page(lang, key) {
   return readFileSync(join(dist, path), "utf8");
 }
 
-test("M2 roadmap pages describe SSH provisioning and panel recovery", () => {
-  const en = page("en", "roadmap/m2-ssh-provisioning");
-  const ru = page("ru", "roadmap/m2-ssh-provisioning");
+test("the status page replaces the M2 roadmap page in both languages", () => {
+  const en = page("en", "roadmap/status");
+  const ru = page("ru", "roadmap/status");
+  assert.ok(en.includes("Status and roadmap"));
+  assert.ok(en.includes("Known limits"));
+  assert.ok(en.includes('href="/getting-started/ssh-install/"'));
+  assert.ok(ru.includes("Статус и план развития"));
+  assert.ok(ru.includes("Известные ограничения"));
+  assert.ok(ru.includes('href="/ru/getting-started/ssh-install/"'));
+  assert.ok(en.includes("github.com/Mistgate/mistgate/edit/main/docs/en/roadmap/status.md"));
+  assert.ok(ru.includes("github.com/Mistgate/mistgate/edit/main/docs/ru/roadmap/status.md"));
+});
 
-  assert.ok(en.includes("M2: SSH installation and recovery"));
-  assert.ok(en.includes("four-step panel modal"));
-  assert.ok(en.includes("Go-rendered"));
-  assert.ok(en.includes("page remains the job and server-access manager"));
-  assert.ok(en.includes("/nodes/install"));
-  assert.ok(en.includes("M2 is complete when"));
-  assert.ok(en.includes("Password rotation"));
-  assert.ok(ru.includes("M2: установка по SSH и восстановление"));
-  assert.ok(ru.includes("Четырёхшаговый мастер работает внутри модалки панели"));
-  assert.ok(ru.includes("Go-страница"));
-  assert.ok(ru.includes("остаётся менеджером заданий"));
-  assert.ok(ru.includes("/nodes/install"));
-  assert.ok(ru.includes("M2 завершён, когда"));
-  assert.ok(ru.includes("сменой пароля"));
+test("the old M2 address redirects to the status page", () => {
+  const redirects = readFileSync(join(dist, "_redirects"), "utf8");
+  assert.ok(redirects.includes("/roadmap/m2-ssh-provisioning/ /roadmap/status/ 301"));
+  assert.ok(redirects.includes("/ru/roadmap/m2-ssh-provisioning/ /ru/roadmap/status/ 301"));
 });
 
 test("encrypted panel backup guides are published in both languages", () => {
@@ -44,45 +43,48 @@ test("encrypted panel backup guides are published in both languages", () => {
   assert.ok(ru.includes("каталог данных"));
 });
 
-test("AI agent install guide and llms.txt are published in both languages", () => {
+test("the AI agent guide carries the three prompts in both languages, and llms.txt points to it", () => {
   const en = page("en", "getting-started/ai-agents");
   const ru = page("ru", "getting-started/ai-agents");
   const llms = readFileSync(join(dist, "llms.txt"), "utf8");
+  assert.ok(en.includes("Install Mistgate with an AI agent"));
+  assert.ok(en.includes("mistgate setup --public-url"));
   assert.ok(en.includes("node_install_plan"));
   assert.ok(!en.includes("confirmed_fingerprint")); // the owner confirms the host key on the approval screen
   assert.ok(en.includes("approval card"));
+  assert.ok(en.includes("AGENTS.md"));
+  assert.ok(ru.includes("Установка Mistgate с AI-агентом"));
   assert.ok(ru.includes("node_server_password_rotate_apply"));
+  assert.ok(ru.includes("Ты устанавливаешь VPN-панель Mistgate"));
   assert.ok(llms.includes("AI agent guide"));
   assert.ok(llms.includes("/ru/getting-started/ai-agents/"));
 });
 
-test("M2 roadmap pages appear in both documentation sidebars", () => {
-  assert.ok(page("en", "index").includes("/roadmap/m2-ssh-provisioning/"));
-  assert.ok(page("ru", "index").includes("/ru/roadmap/m2-ssh-provisioning/"));
-  assert.ok(page("en", "index").includes("/getting-started/ai-agents/"));
-  assert.ok(page("ru", "index").includes("/ru/getting-started/ai-agents/"));
+test("the new pages appear in both documentation sidebars", () => {
+  for (const [lang, base] of [["en", ""], ["ru", "/ru"]]) {
+    const index = page(lang, "index");
+    for (const key of ["getting-started/ai-agents", "getting-started/ssh-install", "guide/torrent-protection", "operations/releases", "roadmap/status"]) {
+      assert.ok(index.includes(`${base}/${key}/`), `${lang} sidebar lists ${key}`);
+    }
+    assert.ok(!index.includes("m2-ssh-provisioning"), `${lang} sidebar has no M2 page`);
+  }
 });
 
-test("M2 pages link to the matching add-node guide and GitHub source", () => {
-  const en = page("en", "roadmap/m2-ssh-provisioning");
-  const ru = page("ru", "roadmap/m2-ssh-provisioning");
-
-  assert.ok(en.includes('href="/getting-started/add-node/"'));
-  assert.ok(ru.includes('href="/ru/getting-started/add-node/"'));
-  assert.ok(en.includes("github.com/Mistgate/mistgate/edit/main/docs/en/roadmap/m2-ssh-provisioning.md"));
-  assert.ok(ru.includes("github.com/Mistgate/mistgate/edit/main/docs/ru/roadmap/m2-ssh-provisioning.md"));
-});
-
-test("node guides show the SSH install choice and the published panel update path", () => {
+test("node guides show the SSH install choice, and updates show the published panel update path", () => {
   const addEn = page("en", "getting-started/add-node");
   const addRu = page("ru", "getting-started/add-node");
+  const sshEn = page("en", "getting-started/ssh-install");
+  const sshRu = page("ru", "getting-started/ssh-install");
   const updatesEn = page("en", "operations/updates");
   const updatesRu = page("ru", "operations/updates");
 
   assert.ok(addEn.includes("Install automatically over SSH"));
-  assert.ok(addEn.includes("Settings → System"));
+  assert.ok(addEn.includes('href="/getting-started/ssh-install/"'));
   assert.ok(addRu.includes("Запустить автоустановку по SSH"));
-  assert.ok(addRu.includes("Настройки → Система"));
+  assert.ok(addRu.includes('href="/ru/getting-started/ssh-install/"'));
+  assert.ok(sshEn.includes("Saved SSH access"));
+  assert.ok(sshEn.includes("--token-stdin"));
+  assert.ok(sshRu.includes("Сохранённый SSH-доступ"));
   assert.ok(updatesEn.includes("current stable release"));
   assert.ok(updatesEn.includes("predate the panel updater"));
   assert.ok(updatesEn.includes("Check GitHub"));
