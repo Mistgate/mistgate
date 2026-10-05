@@ -111,6 +111,34 @@ func TestDescriptionRules(t *testing.T) {
 	}
 }
 
+// The add link of an app is its own scheme (happ://, an instance's own desktop client's) or a web link, with the known
+// placeholders; never a scheme that runs or embeds content.
+func TestAddLinkTemplateRules(t *testing.T) {
+	for tmpl, ok := range map[string]bool{
+		"":                 true,
+		"happ://add/{url}": true,
+		"myclient://add?url={url_enc}&name={name_enc}": true,
+		"my-client+v2.x://import/{url_enc}":            true,
+		"https://example.com/import?u={url_enc}":       true,
+		"javascript:alert(1)":                          false,
+		"JavaScript://x/{url}":                         false,
+		"data:text/html,{url}":                         false,
+		"vbscript:x":                                   false,
+		"file:///{url}":                                false,
+		"{url}":                                        false,
+		"x://add/{url}":                                false, // a one-letter scheme reads as a Windows drive
+		"myclient://add?u={token}":                     false,
+		"myclient://add/{url":                          false,
+		"myclient://add {url}":                         false,
+	} {
+		s := Defaults()
+		s.Apps[0].AddLinkTemplate = tmpl
+		if err := Validate(s); (err == nil) != ok {
+			t.Errorf("add_link_template %q: %v, want ok=%v", tmpl, err, ok)
+		}
+	}
+}
+
 // Documents stored before description and recommended existed load unchanged.
 func TestOldAppsDocumentLoadsUnchanged(t *testing.T) {
 	ctx := context.Background()
