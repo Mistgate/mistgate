@@ -105,6 +105,24 @@ describe("a new install command", () => {
   });
 });
 
+describe("DNS for user traffic", () => {
+  it("offers custom servers to a node that uses a preset or the server's resolver", async () => {
+    await mount(NodeStatus.ONLINE);
+    expect(text()).not.toContain(en["node.settings.dnsCustom"]);
+    const trigger = document.querySelector<HTMLElement>(`[aria-label="${en["node.settings.dns"]}"]`)!;
+    await act(async () => {
+      trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+      trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    for (let i = 0; i < 3; i++) await settle();
+    const custom = [...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes(en["node.settings.dnsMode.custom"]));
+    expect(custom).toBeDefined();
+    await click(custom);
+    expect(text()).toContain(en["node.settings.dnsCustom"]);
+  });
+});
+
 describe("retiring a node", () => {
   it("goes back to the list when the agent got the order", async () => {
     retireNode.mockResolvedValue({ agentNotified: true });

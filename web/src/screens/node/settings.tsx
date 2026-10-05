@@ -157,7 +157,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
     { value: "auto", label: t("node.settings.dnsMode.auto"), hint: t("node.settings.dnsMode.autoHint") },
     { value: "yandex", label: t("node.settings.dnsMode.yandex"), hint: "77.88.8.8 · 77.88.8.1" },
     { value: "cloudflareGoogle", label: t("node.settings.dnsMode.cloudflareGoogle"), hint: "1.1.1.1 · 8.8.8.8" },
-    ...(dnsMode === "custom" ? [{ value: "custom" as const, label: t("node.settings.dnsMode.custom"), hint: t("node.settings.dnsMode.customHint") }] : []),
+    { value: "custom", label: t("node.settings.dnsMode.custom"), hint: t("node.settings.dnsMode.customHint") },
   ];
 
   function chooseDnsMode(value: string) {
