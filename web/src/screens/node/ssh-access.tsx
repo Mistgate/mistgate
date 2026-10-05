@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,18 @@ import { useT } from "@/i18n";
 import { errorText } from "@/lib/errors";
 import { provisioning } from "@/lib/api";
 
+/** The node's saved SSH access (public metadata only), or null when the panel keeps none. */
+export function useServerAccess(nodeId: string) {
+  return useQuery({
+    queryKey: ["node-server-access", nodeId],
+    queryFn: async ({ signal }) => {
+      const response = await provisioning.listNodeServerAccess({}, { signal });
+      return response.access.find((item) => item.nodeId === nodeId) ?? null;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function SSHAccessCard({ nodeId }: { nodeId: string }) {
   return <SSHAccessCardContent key={nodeId} nodeId={nodeId} />;
 }
@@ -16,22 +28,17 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
   const t = useT();
   const toast = useToast();
   const guard = useStepUp();
+  const qc = useQueryClient();
   const [password, setPassword] = useState("");
   const [passwordNodeId, setPasswordNodeId] = useState("");
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmForget, setConfirmForget] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
   const expiryTimer = useRef<number | undefined>(undefined);
   const revealEpoch = useRef(0);
   const showingPassword = visible && passwordNodeId === nodeId;
-  const access = useQuery({
-    queryKey: ["node-server-access", nodeId],
-    queryFn: async ({ signal }) => {
-      const response = await provisioning.listNodeServerAccess({}, { signal });
-      return response.access.find((item) => item.nodeId === nodeId) ?? null;
-    },
-    staleTime: 60_000,
-  });
+  const access = useServerAccess(nodeId);
 
   const clearSecret = useCallback(() => {
     revealEpoch.current += 1;
@@ -98,6 +105,22 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
     }
   }
 
+  // Retiring keeps the access (the password may be one only the panel knows); forgetting it is the owner's explicit step.
+  async function forget() {
+    setBusy(true);
+    try {
+      await guard(() => provisioning.forgetNodeServerAccess({ nodeId }));
+      clearSecret();
+      toast(t("node.sshAccess.forgotten"));
+      await qc.invalidateQueries({ queryKey: ["node-server-access", nodeId] });
+    } catch (error) {
+      if (!isStepUpCancelled(error)) toast.error(errorText(error, t));
+    } finally {
+      setBusy(false);
+      setConfirmForget(false);
+    }
+  }
+
   if (!access.data && !access.isError) return null;
 
   return (
@@ -119,6 +142,7 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
       ) : access.data ? (
         <>
           <p className="mt-2 text-[13px] leading-snug text-muted">{t("node.sshAccess.body")}</p>
+          {access.data.passwordGenerated && <p className="mt-2 text-[13px] leading-snug text-muted">{t("node.sshAccess.generated")}</p>}
           <dl className="mt-3 grid gap-2 text-[13px] sm:grid-cols-2">
             <div>
               <dt className="text-xs text-muted">{t("node.sshAccess.host")}</dt>
@@ -144,6 +168,22 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
                 className="min-h-11 rounded-xl border border-line bg-inset px-3 font-mono text-sm text-main outline-none focus-visible:ring-2 focus-visible:ring-accent"
               />
               <p className="text-xs leading-snug text-muted">{t("node.sshAccess.revealHint")}</p>
+            </div>
+          )}
+          {access.data.nodeRetired && (
+            <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
+              <p className="text-[13px] leading-snug text-muted">{t("node.sshAccess.retired")}</p>
+              {confirmForget && <p className="text-[13px] leading-snug text-danger">{t("node.sshAccess.forgetConfirm")}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="danger" size="md" disabled={busy} onClick={() => (confirmForget ? void forget() : setConfirmForget(true))}>
+                  {confirmForget ? t("node.sshAccess.forgetNow") : t("node.sshAccess.forget")}
+                </Button>
+                {confirmForget && (
+                  <Button variant="ghost" size="md" disabled={busy} onClick={() => setConfirmForget(false)}>
+                    {t("common.cancel")}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </>

@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -424,12 +425,19 @@ func (s *Service) ListNodeServerAccess(ctx context.Context, _ *connect.Request[a
 }
 
 // RotateNodeServerPassword changes the OS login password over the pinned SSH connection and verifies it
-// with a fresh authentication before the panel promotes the encrypted credential.
+// with a fresh authentication before the panel promotes the encrypted credential. With generate the panel makes the
+// password itself (the MCP rotation): it is never returned, the owner can reveal it after step-up.
 func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Request[adminv1.RotateNodeServerPasswordRequest]) (*connect.Response[adminv1.RotateNodeServerPasswordResponse], error) {
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	if !req.Msg.Confirm || len(req.Msg.NewPassword) < 12 || !validPassword(req.Msg.NewPassword) || len(req.Msg.NodeId) > 64 || req.Msg.NodeId == "" {
+	newPassword := req.Msg.NewPassword
+	if req.Msg.Generate && newPassword == "" {
+		newPassword = rand.Text()
+	}
+	defer func() { newPassword = "" }()
+	if !req.Msg.Confirm || req.Msg.Generate && req.Msg.NewPassword != "" || len(newPassword) < 12 || !validPassword(newPassword) ||
+		len(req.Msg.NodeId) > 64 || req.Msg.NodeId == "" {
 		return nil, invalidArgument("confirmation and a strong SSH password are required")
 	}
 	s.accessMu.Lock()
@@ -441,6 +449,9 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 	if err != nil {
 		s.cfg.Log.Error("read node server access", "err", err)
 		return nil, internalConnectError()
+	}
+	if access.NodeRetired {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
 	}
 	target, err := NewTarget(access.SSHHost, uint32(access.SSHPort))
 	if err != nil {
@@ -460,7 +471,7 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 		if conn, dialErr := s.ssh.DialAs(ctx, target, access.SSHUser, pending, access.HostFingerprint); dialErr == nil {
 			_ = conn.Close()
 			promoted := s.sealAccessPassword(access.NodeID, pending)
-			if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, s.cfg.Now().UTC()); err != nil {
+			if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, s.cfg.Now().UTC()); err != nil {
 				return nil, internalConnectError()
 			}
 			current, access.Password, access.PendingPassword = pending, access.PendingPassword, nil
@@ -475,7 +486,7 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 			}
 		}
 	}
-	if req.Msg.NewPassword == current {
+	if newPassword == current {
 		return nil, invalidArgument("new password must differ from the current password")
 	}
 	conn, err := s.ssh.DialAs(ctx, target, access.SSHUser, current, access.HostFingerprint)
@@ -483,32 +494,58 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
 	}
 	defer conn.Close()
-	pendingPlain := []byte(req.Msg.NewPassword)
+	pendingPlain := []byte(newPassword)
 	pendingCiphertext := s.vault.Seal(pendingPlain, "node-access-pending:"+access.NodeID)
 	clearBytes(pendingPlain)
-	if err := s.st.SetPendingNodeServerPassword(ctx, access.NodeID, pendingCiphertext, s.cfg.Now().UTC()); err != nil {
+	if err := s.st.SetPendingNodeServerPassword(ctx, access.NodeID, pendingCiphertext, req.Msg.Generate, s.cfg.Now().UTC()); err != nil {
 		return nil, internalConnectError()
 	}
-	if err := runSSH(ctx, conn, "chpasswd", strings.NewReader(access.SSHUser+":"+req.Msg.NewPassword+"\n"), 20*time.Second); err != nil {
+	if err := runSSH(ctx, conn, "chpasswd", strings.NewReader(access.SSHUser+":"+newPassword+"\n"), 20*time.Second); err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_password_change_unverified"))
 	}
-	verified, err := s.ssh.DialAs(ctx, target, access.SSHUser, req.Msg.NewPassword, access.HostFingerprint)
+	verified, err := s.ssh.DialAs(ctx, target, access.SSHUser, newPassword, access.HostFingerprint)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_password_change_unverified"))
 	}
 	_ = verified.Close()
-	promoted := s.sealAccessPassword(access.NodeID, req.Msg.NewPassword)
-	if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, s.cfg.Now().UTC()); err != nil {
+	promoted := s.sealAccessPassword(access.NodeID, newPassword)
+	if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, !req.Msg.Generate, s.cfg.Now().UTC()); err != nil {
 		return nil, internalConnectError()
 	}
-	s.audit(ctx, "node.ssh_password_rotate", map[string]string{"node_id": access.NodeID})
+	s.audit(ctx, "node.ssh_password_rotate", map[string]string{"node_id": access.NodeID, "generated": strconv.FormatBool(req.Msg.Generate)})
 	return connect.NewResponse(&adminv1.RotateNodeServerPasswordResponse{Rotated: true}), nil
+}
+
+// ForgetNodeServerAccess deletes the saved access of a retired node, sealed password included. Retiring keeps it on
+// purpose (the password may be one only the panel knows), so forgetting is the owner's own step-up protected decision.
+func (s *Service) ForgetNodeServerAccess(ctx context.Context, req *connect.Request[adminv1.ForgetNodeServerAccessRequest]) (*connect.Response[adminv1.ForgetNodeServerAccessResponse], error) {
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	nodeID := req.Msg.GetNodeId()
+	if nodeID == "" || len(nodeID) > 64 {
+		return nil, invalidArgument("invalid node id")
+	}
+	s.accessMu.Lock()
+	defer s.accessMu.Unlock()
+	switch err := s.st.ForgetNodeServerAccess(ctx, nodeID); {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("node_server_access_not_found"))
+	case errors.Is(err, store.ErrConflict):
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_not_retired"))
+	case err != nil:
+		s.cfg.Log.Error("forget node server access", "err", err)
+		return nil, internalConnectError()
+	}
+	s.audit(ctx, "node.ssh_access_forget", map[string]string{"node_id": nodeID})
+	return connect.NewResponse(&adminv1.ForgetNodeServerAccessResponse{}), nil
 }
 
 func nodeServerAccessView(item store.NodeServerAccess) *adminv1.NodeServerAccess {
 	return &adminv1.NodeServerAccess{NodeId: item.NodeID, NodeName: item.NodeName, Host: item.SSHHost,
 		Port: uint32(item.SSHPort), Username: item.SSHUser, Fingerprint: item.HostFingerprint,
-		ConfiguredUnix: item.ConfiguredAt.Unix(), RotationPending: item.PendingPassword != nil}
+		ConfiguredUnix: item.ConfiguredAt.Unix(), RotationPending: item.PendingPassword != nil,
+		PasswordGenerated: item.PasswordGenerated, NodeRetired: item.NodeRetired}
 }
 
 func (s *Service) openAccessPassword(nodeID string, ciphertext []byte) (string, error) {

@@ -174,6 +174,8 @@ Change **Name** and save. The name shows in the panel, in the file names of Amne
 
 To confirm, type the node name. After that the node disappears from the list; its page, if you open it, says "This node is retired". A retired agent cannot connect again. Only the owner can retire a node.
 
+A node installed over SSH keeps its **SSH access** card after retiring: the panel no longer changes that server, but you can still reveal the saved password, and **Forget saved access** (asked twice, with a step-up) deletes it for good. When the panel generated the saved password itself, the retire dialog warns you first, since only the panel knows it.
+
 If the node was offline, its agent never got the order and keeps serving the users it had. The panel then stays on the node's page and says "{name} did not get the order", with the commands that clean the server by hand: the same as in "Remove a node" in [Add a node](../getting-started/add-node.md).
 
 There is no other way to delete a node: retiring is the removal. To clean the server afterwards, as root:

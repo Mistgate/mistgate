@@ -326,7 +326,8 @@ func (s *Store) SetInboundCert(ctx context.Context, nodeID, inboundID, pin strin
 }
 
 // RetireNode marks the node retired, revokes every certificate and kills unused enrollment tokens.
-// The row, its traffic and its events stay. ErrNotFound / ErrNodeRetired as appropriate.
+// The row, its traffic and its events stay, and so does its saved server access: the sealed password may be the only
+// copy (a generated one), so only the owner's ForgetNodeServerAccess deletes it. ErrNotFound / ErrNodeRetired as appropriate.
 func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error {
 	tx, err := s.W.BeginTx(ctx, nil)
 	if err != nil {
@@ -346,7 +347,6 @@ func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error 
 		`UPDATE node SET state = 'retired', retired_at = ?1, desired_hash = '' WHERE id = ?2`,
 		`UPDATE node_cert SET revoked_at = ?1, revoke_reason = 'retired' WHERE node_id = ?2 AND (revoked_at IS NULL OR revoked_at > ?1)`,
 		`UPDATE enrollment_token SET expires_at = ?1 WHERE node_id = ?2 AND used_at IS NULL AND expires_at > ?1`,
-		`DELETE FROM node_server_access WHERE node_id = ?2`,
 	} {
 		if _, err := tx.ExecContext(ctx, q, unix(now), id); err != nil {
 			return err

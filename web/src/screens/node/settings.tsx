@@ -5,6 +5,7 @@ import { useAddNode } from "@/components/add-node";
 import { DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { Stepper } from "@/components/ui/stepper";
 import { TextField } from "@/components/ui/text-field";
@@ -22,7 +23,7 @@ import { meQuery } from "@/lib/session";
 import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
 import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
-import { SSHAccessCard } from "./ssh-access";
+import { SSHAccessCard, useServerAccess } from "./ssh-access";
 import { WarpCard } from "./warp";
 
 // Defaults the panel uses when a timeout is 0 (node.proto, NodeTimeouts).
@@ -331,12 +332,14 @@ function RetireModal({ nodeId, name, onClose, onUnreached }: { nodeId: string; n
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
+  const generatedPassword = useServerAccess(nodeId).data?.passwordGenerated ?? false;
   const retire = useMutation({
     mutationFn: () => nodesApi.retireNode({ nodeId, confirmName: typed.trim() }),
     onSuccess: (r) => {
       onClose();
       toast(t("node.retired", { name }));
       void qc.invalidateQueries({ queryKey: ["nodes"] });
+      void qc.invalidateQueries({ queryKey: ["node-server-access", nodeId] });
       void qc.invalidateQueries({ queryKey: ["overview"] });
       // an agent that was not on the line keeps serving: the admin has to clean the server, so stay and say how
       if (r.agentNotified) void navigate({ to: "/nodes" });
@@ -371,6 +374,7 @@ function RetireModal({ nodeId, name, onClose, onUnreached }: { nodeId: string; n
           </li>
         ))}
       </ul>
+      {generatedPassword && <Notice>{t("node.retireGeneratedPassword")}</Notice>}
       <p className="text-xs text-muted">{t("node.retireConfirm", { name })}</p>
       <TextField
         aria-label={t("node.retireConfirm", { name })}

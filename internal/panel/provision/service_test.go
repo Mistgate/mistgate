@@ -140,6 +140,75 @@ func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
 	}
 }
 
+// Retiring keeps the saved access: the panel no longer changes that server, the owner can still reveal the password,
+// and only the owner's own step-up protected Forget deletes it.
+func TestRetiredNodeAccessIsKeptUntilTheOwnerForgetsIt(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const nodeID, password = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "0123456789abcdef"
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, 'edge-1', 'edge.example.com', 'active', ?)`, nodeID, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node_server_access (node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, configured_at)
+		VALUES (?, 'edge-1', 'node.example.com', 22, 'root', 'SHA256:test', ?, ?)`, nodeID, vlt.Seal([]byte(password), "node-access:"+nodeID), now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	ssh := NewClient()
+	ssh.resolver = testResolver{netip.MustParseAddr("8.8.8.8")}
+	ssh.dialer = testDialer(func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("no SSH for a retired node")
+	})
+	var stepUpErr error
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{}, SSH: ssh,
+		StepUp: func(context.Context) error { return stepUpErr }, Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forget := func() error {
+		_, err := svc.ForgetNodeServerAccess(ctx, connect.NewRequest(&adminv1.ForgetNodeServerAccessRequest{NodeId: nodeID}))
+		return err
+	}
+	if err := forget(); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("forgetting a live node's access = %v", err)
+	}
+	if err := st.RetireNode(ctx, nodeID, now); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := svc.ListNodeServerAccess(ctx, connect.NewRequest(&adminv1.ListNodeServerAccessRequest{}))
+	if err != nil || len(listed.Msg.GetAccess()) != 1 || !listed.Msg.GetAccess()[0].GetNodeRetired() {
+		t.Fatalf("access after retire = %v, err %v", listed, err)
+	}
+	revealed, err := svc.RevealNodeServerPassword(ctx, connect.NewRequest(&adminv1.RevealNodeServerPasswordRequest{NodeId: nodeID}))
+	if err != nil || revealed.Msg.GetPassword() != password {
+		t.Fatalf("reveal after retire: err %v", err)
+	}
+	if _, err := svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: nodeID, Generate: true, Confirm: true})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("rotation on a retired node = %v", err)
+	}
+	stepUpErr = connect.NewError(connect.CodePermissionDenied, errors.New("step-up required"))
+	if err := forget(); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("forget without step-up = %v", err)
+	}
+	stepUpErr = nil
+	if err := forget(); err != nil {
+		t.Fatal(err)
+	}
+	if err := forget(); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("forget twice = %v", err)
+	}
+}
+
 type testNodeManager struct{}
 
 func (testNodeManager) CreateProvisionEnrollment(context.Context, NodeSpec, string, time.Time, time.Time) (string, string, error) {

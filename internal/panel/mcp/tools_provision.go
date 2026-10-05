@@ -2,8 +2,6 @@ package mcp
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,12 +32,13 @@ type serverAccessView struct {
 	Fingerprint     string `json:"fingerprint"`
 	ConfiguredUnix  int64  `json:"configured_unix"`
 	RotationPending bool   `json:"rotation_pending"`
+	Retired         bool   `json:"retired,omitempty"`
 }
 
 func nodeProvisionTools() []toolDef {
 	list := readTool("node_server_access_list", ProfileAdmin,
 		procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure),
-		"List SSH connection metadata for installed nodes. Passwords are never returned or revealed.",
+		"List SSH connection metadata for installed nodes, retired ones marked (their access stays until the owner forgets it). Passwords are never returned or revealed.",
 		func(c *call, _ accessListArgs) (any, error) {
 			r, err := c.cl.Provisioning.ListNodeServerAccess(c.ctx, connect.NewRequest(&adminv1.ListNodeServerAccessRequest{}))
 			if err != nil {
@@ -50,7 +49,7 @@ func nodeProvisionTools() []toolDef {
 				out = append(out, serverAccessView{
 					NodeID: a.GetNodeId(), Name: a.GetNodeName(), Host: net.JoinHostPort(a.GetHost(), strconv.FormatUint(uint64(a.GetPort()), 10)),
 					Username: a.GetUsername(), Fingerprint: a.GetFingerprint(), ConfiguredUnix: a.GetConfiguredUnix(),
-					RotationPending: a.GetRotationPending(),
+					RotationPending: a.GetRotationPending(), Retired: a.GetNodeRetired(),
 				})
 			}
 			return out, nil
@@ -205,9 +204,10 @@ func passwordRotatePlanTool() toolDef {
 					if err != nil {
 						return nil, nil, scrubError(apiError(err))
 					}
+					// A name means the live node of that name (retired nodes keep their access, and names are reused).
 					var found *adminv1.NodeServerAccess
 					for _, item := range r.Msg.GetAccess() {
-						if item.GetNodeId() == in.Node || item.GetNodeName() == in.Node {
+						if item.GetNodeId() == in.Node || item.GetNodeName() == in.Node && !item.GetNodeRetired() {
 							if found != nil {
 								return nil, nil, errors.New("several nodes match; use the node id")
 							}
@@ -216,6 +216,9 @@ func passwordRotatePlanTool() toolDef {
 					}
 					if found == nil {
 						return nil, nil, errors.New("node has no saved SSH access")
+					}
+					if found.GetNodeRetired() {
+						return nil, nil, errors.New("the node is retired: the panel no longer changes its server")
 					}
 					p := passwordRotateParams{NodeID: found.GetNodeId(), Name: found.GetNodeName(), Host: net.JoinHostPort(found.GetHost(), strconv.FormatUint(uint64(found.GetPort()), 10)), Username: found.GetUsername()}
 					params, err := json.Marshal(p)
@@ -254,10 +257,11 @@ func passwordRotateApplyTool() toolDef {
 						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
 							return done{}, failure("plan_unreadable", "make a new SSH password rotation plan")
 						}
-						return rotateGeneratedNodePassword(c.ctx, func(ctx context.Context, password string) error {
-							_, err := c.cl.Provisioning.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: p.NodeID, NewPassword: password, Confirm: true}))
-							return err
-						})
+						// The panel generates the password itself (generate): it never passes through this layer.
+						if _, err := c.cl.Provisioning.RotateNodeServerPassword(c.ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: p.NodeID, Generate: true, Confirm: true})); err != nil {
+							return done{}, apiError(err)
+						}
+						return doneWith("node_ssh_password_rotated", "The node SSH password was generated inside the panel, changed, and verified. The owner can reveal it in node Settings."), nil
 					})
 					if err != nil {
 						return nil, nil, scrubError(err)
@@ -265,20 +269,6 @@ func passwordRotateApplyTool() toolDef {
 					return result(out)
 				})
 		}}
-}
-
-func rotateGeneratedNodePassword(ctx context.Context, rotate func(context.Context, string) error) (done, error) {
-	raw := make([]byte, 32)
-	defer clear(raw)
-	if _, err := rand.Read(raw); err != nil {
-		return done{}, errors.New("could not generate a node password")
-	}
-	password := hex.EncodeToString(raw)
-	defer func() { password = "" }()
-	if err := rotate(ctx, password); err != nil {
-		return done{}, apiError(err)
-	}
-	return doneWith("node_ssh_password_rotated", "The node SSH password was generated inside the panel, changed, and verified. The owner can reveal it in node Settings."), nil
 }
 
 func allASCIIAlpha(s string) bool {

@@ -7,11 +7,13 @@ import { SSHAccessCard } from "./ssh-access";
 
 const listNodeServerAccess = vi.fn();
 const revealNodeServerPassword = vi.fn();
+const forgetNodeServerAccess = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   provisioning: {
     listNodeServerAccess: (...args: unknown[]) => listNodeServerAccess(...args),
     revealNodeServerPassword: (...args: unknown[]) => revealNodeServerPassword(...args),
+    forgetNodeServerAccess: (...args: unknown[]) => forgetNodeServerAccess(...args),
   },
 }));
 
@@ -35,6 +37,7 @@ afterEach(() => {
   client = null;
   listNodeServerAccess.mockReset();
   revealNodeServerPassword.mockReset();
+  forgetNodeServerAccess.mockReset();
 });
 
 function tree(nodeId: string) {
@@ -169,6 +172,35 @@ describe("node SSH access", () => {
     });
     await flush();
     expect(document.querySelector("#ssh-password-nod_1")).toBeNull();
+  });
+
+  it("keeps a retired node's access until the owner forgets it, after a second click", async () => {
+    await mount();
+    expect(document.body.textContent).not.toContain("Forget saved access");
+    act(() => root?.unmount());
+    host?.remove();
+
+    const retired = { nodeId: "nod_1", nodeName: "de1", host: "node.example.com", port: 22, username: "root", nodeRetired: true, passwordGenerated: true };
+    listNodeServerAccess.mockReset();
+    listNodeServerAccess.mockResolvedValueOnce({ access: [retired] }).mockResolvedValue({ access: [] });
+    forgetNodeServerAccess.mockResolvedValue({});
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(tree("nod_1")));
+    await flush();
+    expect(document.body.textContent).toContain("only the panel knows it");
+    expect(document.body.textContent).toContain("This node is retired");
+
+    const forget = () => [...document.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Forget"))!;
+    await act(async () => forget().click());
+    expect(forgetNodeServerAccess).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("deleted for good");
+    await act(async () => forget().click());
+    await flush();
+    expect(forgetNodeServerAccess).toHaveBeenCalledWith({ nodeId: "nod_1" });
+    expect(document.querySelector("section")).toBeNull(); // nothing saved any more: the card goes
   });
 
   it("does not show a previous node's password after nodeId changes during reveal", async () => {

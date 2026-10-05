@@ -15,6 +15,8 @@ service ProvisioningService {
   rpc ListNodeServerAccess(ListNodeServerAccessRequest) returns (ListNodeServerAccessResponse);
   rpc RotateNodeServerPassword(RotateNodeServerPasswordRequest) returns (RotateNodeServerPasswordResponse);
   rpc RevealNodeServerPassword(RevealNodeServerPasswordRequest) returns (RevealNodeServerPasswordResponse);
+  // Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
+  rpc ForgetNodeServerAccess(ForgetNodeServerAccessRequest) returns (ForgetNodeServerAccessResponse);
 }
 
 message GetSSHFingerprintRequest {
@@ -130,6 +132,7 @@ message ListNodeProvisionEventsResponse {
 // Public SSH access metadata. Passwords and their ciphertext never leave the panel.
 message NodeServerAccess {
   string node_id = 1;
+  // The node's current name.
   string node_name = 2;
   string host = 3;
   uint32 port = 4;
@@ -137,6 +140,10 @@ message NodeServerAccess {
   string fingerprint = 6;
   int64 configured_unix = 7 [jstype = JS_NUMBER];
   bool rotation_pending = 8;
+  // The panel generated the saved password (a rotation through MCP): only the panel knows it.
+  bool password_generated = 9;
+  // The node is retired. Its access stays, so the owner can still reveal the password, until it is forgotten.
+  bool node_retired = 10;
 }
 
 message ListNodeServerAccessRequest {}
@@ -144,11 +151,17 @@ message ListNodeServerAccessResponse { repeated NodeServerAccess access = 1; }
 
 message RotateNodeServerPasswordRequest {
   string node_id = 1;
+  // The owner's new password (at least 12 characters); empty when generate is set.
   string new_password = 2;
   bool confirm = 3;
+  // The panel generates a strong random password itself; it is never returned (the owner can reveal it).
+  bool generate = 4;
 }
 message RotateNodeServerPasswordResponse { bool rotated = 1; }
 
 // Owner-only, step-up protected retrieval. This procedure is deliberately not exposed as an MCP tool.
 message RevealNodeServerPasswordRequest { string node_id = 1; }
 message RevealNodeServerPasswordResponse { string password = 1; }
+
+message ForgetNodeServerAccessRequest { string node_id = 1; }
+message ForgetNodeServerAccessResponse {}

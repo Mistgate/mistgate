@@ -63,6 +63,9 @@ const (
 	// ProvisioningServiceRevealNodeServerPasswordProcedure is the fully-qualified name of the
 	// ProvisioningService's RevealNodeServerPassword RPC.
 	ProvisioningServiceRevealNodeServerPasswordProcedure = "/mistgate.admin.v1.ProvisioningService/RevealNodeServerPassword"
+	// ProvisioningServiceForgetNodeServerAccessProcedure is the fully-qualified name of the
+	// ProvisioningService's ForgetNodeServerAccess RPC.
+	ProvisioningServiceForgetNodeServerAccessProcedure = "/mistgate.admin.v1.ProvisioningService/ForgetNodeServerAccess"
 )
 
 // ProvisioningServiceClient is a client for the mistgate.admin.v1.ProvisioningService service.
@@ -77,6 +80,8 @@ type ProvisioningServiceClient interface {
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
+	// Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
+	ForgetNodeServerAccess(context.Context, *connect.Request[v1.ForgetNodeServerAccessRequest]) (*connect.Response[v1.ForgetNodeServerAccessResponse], error)
 }
 
 // NewProvisioningServiceClient constructs a client for the mistgate.admin.v1.ProvisioningService
@@ -150,6 +155,12 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(provisioningServiceMethods.ByName("RevealNodeServerPassword")),
 			connect.WithClientOptions(opts...),
 		),
+		forgetNodeServerAccess: connect.NewClient[v1.ForgetNodeServerAccessRequest, v1.ForgetNodeServerAccessResponse](
+			httpClient,
+			baseURL+ProvisioningServiceForgetNodeServerAccessProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("ForgetNodeServerAccess")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -165,6 +176,7 @@ type provisioningServiceClient struct {
 	listNodeServerAccess     *connect.Client[v1.ListNodeServerAccessRequest, v1.ListNodeServerAccessResponse]
 	rotateNodeServerPassword *connect.Client[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse]
 	revealNodeServerPassword *connect.Client[v1.RevealNodeServerPasswordRequest, v1.RevealNodeServerPasswordResponse]
+	forgetNodeServerAccess   *connect.Client[v1.ForgetNodeServerAccessRequest, v1.ForgetNodeServerAccessResponse]
 }
 
 // GetSSHFingerprint calls mistgate.admin.v1.ProvisioningService.GetSSHFingerprint.
@@ -217,6 +229,11 @@ func (c *provisioningServiceClient) RevealNodeServerPassword(ctx context.Context
 	return c.revealNodeServerPassword.CallUnary(ctx, req)
 }
 
+// ForgetNodeServerAccess calls mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess.
+func (c *provisioningServiceClient) ForgetNodeServerAccess(ctx context.Context, req *connect.Request[v1.ForgetNodeServerAccessRequest]) (*connect.Response[v1.ForgetNodeServerAccessResponse], error) {
+	return c.forgetNodeServerAccess.CallUnary(ctx, req)
+}
+
 // ProvisioningServiceHandler is an implementation of the mistgate.admin.v1.ProvisioningService
 // service.
 type ProvisioningServiceHandler interface {
@@ -230,6 +247,8 @@ type ProvisioningServiceHandler interface {
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
+	// Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
+	ForgetNodeServerAccess(context.Context, *connect.Request[v1.ForgetNodeServerAccessRequest]) (*connect.Response[v1.ForgetNodeServerAccessResponse], error)
 }
 
 // NewProvisioningServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -299,6 +318,12 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		connect.WithSchema(provisioningServiceMethods.ByName("RevealNodeServerPassword")),
 		connect.WithHandlerOptions(opts...),
 	)
+	provisioningServiceForgetNodeServerAccessHandler := connect.NewUnaryHandler(
+		ProvisioningServiceForgetNodeServerAccessProcedure,
+		svc.ForgetNodeServerAccess,
+		connect.WithSchema(provisioningServiceMethods.ByName("ForgetNodeServerAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.ProvisioningService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProvisioningServiceGetSSHFingerprintProcedure:
@@ -321,6 +346,8 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 			provisioningServiceRotateNodeServerPasswordHandler.ServeHTTP(w, r)
 		case ProvisioningServiceRevealNodeServerPasswordProcedure:
 			provisioningServiceRevealNodeServerPasswordHandler.ServeHTTP(w, r)
+		case ProvisioningServiceForgetNodeServerAccessProcedure:
+			provisioningServiceForgetNodeServerAccessHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -368,4 +395,8 @@ func (UnimplementedProvisioningServiceHandler) RotateNodeServerPassword(context.
 
 func (UnimplementedProvisioningServiceHandler) RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) ForgetNodeServerAccess(context.Context, *connect.Request[v1.ForgetNodeServerAccessRequest]) (*connect.Response[v1.ForgetNodeServerAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess is not implemented"))
 }

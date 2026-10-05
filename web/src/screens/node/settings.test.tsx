@@ -21,7 +21,8 @@ const addNode = vi.fn();
 vi.mock("@/components/add-node", () => ({ useAddNode: () => addNode }));
 vi.mock("./warp", () => ({ WarpCard: () => null }));
 vi.mock("./awg-backend", () => ({ AwgBackendCard: () => null }));
-vi.mock("./ssh-access", () => ({ SSHAccessCard: () => null }));
+const serverAccess = vi.fn(() => ({ data: null as null | { passwordGenerated: boolean } }));
+vi.mock("./ssh-access", () => ({ SSHAccessCard: () => null, useServerAccess: () => serverAccess() }));
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -37,6 +38,8 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   for (const m of [retireNode, me, navigate, addNode]) m.mockReset();
+  serverAccess.mockReset();
+  serverAccess.mockReturnValue({ data: null });
 });
 
 const data = (status = NodeStatus.DOWN) =>
@@ -131,6 +134,17 @@ describe("retiring a node", () => {
     expect(retireNode).toHaveBeenCalledWith({ nodeId: "nod_1", confirmName: "de1" });
     expect(navigate).toHaveBeenCalledWith({ to: "/nodes" });
     expect(text()).not.toContain("did not get the order");
+  });
+
+  it("warns when the panel generated the server password, which only the panel knows", async () => {
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.retire"]));
+    expect(dialog()?.textContent).not.toContain(en["node.retireGeneratedPassword"]);
+    await click(inDialog(en["common.cancel"]));
+
+    serverAccess.mockReturnValue({ data: { passwordGenerated: true } });
+    await click(button(en["node.retire"]));
+    expect(dialog()?.textContent).toContain(en["node.retireGeneratedPassword"]);
   });
 
   it("says an offline node was not reached and gives the cleanup to run on the server", async () => {

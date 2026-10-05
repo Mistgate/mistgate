@@ -70,15 +70,17 @@ type fakeAuth struct {
 }
 
 var tokenApproved = map[string]bool{
-	adminv1connect.HealthServiceApplyFixProcedure:                 true,
-	adminv1connect.UpdateServiceStartRolloutProcedure:             true,
-	adminv1connect.UpdateServicePauseRolloutProcedure:             true,
-	adminv1connect.UpdateServiceResumeRolloutProcedure:            true,
-	adminv1connect.UpdateServiceCancelRolloutProcedure:            true,
-	adminv1connect.UpdateServiceRollbackNodeProcedure:             true,
-	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:       true,
-	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure: true,
-	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:        true,
+	adminv1connect.HealthServiceApplyFixProcedure:                       true,
+	adminv1connect.UpdateServiceStartRolloutProcedure:                   true,
+	adminv1connect.UpdateServicePauseRolloutProcedure:                   true,
+	adminv1connect.UpdateServiceResumeRolloutProcedure:                  true,
+	adminv1connect.UpdateServiceCancelRolloutProcedure:                  true,
+	adminv1connect.UpdateServiceRollbackNodeProcedure:                   true,
+	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             true,
+	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       true,
+	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
+	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
+	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: true,
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -278,7 +280,10 @@ type world struct {
 	adminv1connect.UnimplementedSubscriptionServiceHandler
 	adminv1connect.UnimplementedUpdateServiceHandler
 	adminv1connect.UnimplementedAuthServiceHandler
+	adminv1connect.UnimplementedProvisioningServiceHandler
 
+	rotateReq         []*adminv1.RotateNodeServerPasswordRequest
+	installReq        []*adminv1.StartNodeProvisionRequest
 	mu                sync.Mutex
 	log               []callRec
 	fixReqs           []*adminv1.ApplyFixRequest
@@ -627,6 +632,36 @@ func (w *world) RollbackNode(_ context.Context, r *connect.Request[adminv1.Rollb
 	return connect.NewResponse(&adminv1.RollbackNodeResponse{}), nil
 }
 
+// nodeRetired is a retired node whose saved server access stays; its name, de1, went to nodeA since.
+const nodeRetired = "nod_rrrrrrrrrrrrrrrrrrrrrrrrrr"
+
+const testHostKey = "SHA256:Vo3wK7ZGgCw1JmQxMZzh3H6pBvO3xuB2Dn8WqzZQyU8"
+
+func (w *world) ListNodeServerAccess(context.Context, *connect.Request[adminv1.ListNodeServerAccessRequest]) (*connect.Response[adminv1.ListNodeServerAccessResponse], error) {
+	return connect.NewResponse(&adminv1.ListNodeServerAccessResponse{Access: []*adminv1.NodeServerAccess{
+		{NodeId: nodeA, NodeName: "de1", Host: "203.0.113.10", Port: 22, Username: "root", Fingerprint: testHostKey},
+		{NodeId: nodeRetired, NodeName: "de1", Host: "203.0.113.20", Port: 22, Username: "root", Fingerprint: testHostKey, NodeRetired: true, PasswordGenerated: true},
+	}}), nil
+}
+
+func (w *world) RotateNodeServerPassword(_ context.Context, r *connect.Request[adminv1.RotateNodeServerPasswordRequest]) (*connect.Response[adminv1.RotateNodeServerPasswordResponse], error) {
+	w.mu.Lock()
+	w.rotateReq = append(w.rotateReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.RotateNodeServerPasswordResponse{Rotated: true}), nil
+}
+
+func (w *world) GetSSHFingerprint(_ context.Context, r *connect.Request[adminv1.GetSSHFingerprintRequest]) (*connect.Response[adminv1.GetSSHFingerprintResponse], error) {
+	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{Host: r.Msg.GetHost(), Port: r.Msg.GetPort(), Fingerprint: testHostKey}), nil
+}
+
+func (w *world) StartNodeProvision(_ context.Context, r *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {
+	w.mu.Lock()
+	w.installReq = append(w.installReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: &adminv1.NodeProvisionJob{Id: "prv_1", Name: r.Msg.GetName(), State: "queued"}}), nil
+}
+
 // api builds the fake admin API handler: the generated services behind fakeAuth.requireSession.
 func (w *world) api(a *fakeAuth) http.Handler {
 	mux := http.NewServeMux()
@@ -639,6 +674,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return adminv1connect.NewSubscriptionServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewUpdateServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewAuthServiceHandler(w) },
+		func() (string, http.Handler) { return adminv1connect.NewProvisioningServiceHandler(w) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)

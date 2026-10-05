@@ -24,8 +24,8 @@ Connect to `<admin URL>mcp` with an API token whose profile is **Admin**. The to
 
 ### Rotate an SSH password
 
-1. Call `node_server_password_rotate_plan` with the node ID or exact name; show the server and login from the plan and wait for user confirmation and owner approval.
-2. Call `node_server_password_rotate_apply` with the one-time confirm token and a new password of at least 12 characters. Do not put that password in a plan, reason, issue, chat transcript, or follow-up read.
+1. Call `node_server_password_rotate_plan` with the node ID or the exact name of a live node; show the server and login from the plan and wait for user confirmation and owner approval.
+2. Call `node_server_password_rotate_apply` with the one-time confirm token only. The panel generates a strong random password, changes it on the server and never returns it to the agent; the owner can reveal it in the node's **Settings → SSH access** after a step-up confirmation.
 3. The panel records an encrypted recovery value before changing the host, tests a fresh SSH login with the new password, then commits it. If connectivity is interrupted, repeat the rotation flow; it reconciles the pending login before replacing it.
 
 ### Update existing nodes

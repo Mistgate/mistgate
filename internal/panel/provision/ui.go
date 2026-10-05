@@ -55,7 +55,7 @@ type installForm struct {
 
 type serverAccessView struct {
 	ID, Name, Host, Username, ConfiguredAt string
-	Pending                                bool
+	Pending, Retired                       bool
 }
 
 type preflightView struct {
@@ -248,7 +248,7 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 	</section>
 	{{end}}
 	{{if and (not .Job) .Jobs}}<section class="card"><h2>Последние задания</h2><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>Состояние</th><th>SSH-сервер</th><th></th></tr></thead><tbody>{{range .Jobs}}<tr><td>{{.Name}}</td><td><span class="status {{.State}}">{{.StateLabel}}</span></td><td class="mono">{{.Host}}</td><td><a href="?job={{.ID}}">Открыть</a></td></tr>{{end}}</tbody></table></div></section>{{end}}
-	{{if and (not .Job) .Access}}<section class="card"><h2>Доступ к серверам</h2><p class="lead">Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль.</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>SSH</th><th>Подключение</th><th>Сменить пароль</th></tr></thead><tbody>{{range .Access}}<tr><td>{{.Name}}{{if .Pending}}<div class="error">Смена ожидает проверки; повторите её для восстановления.</div>{{end}}</td><td class="mono">{{.Host}}</td><td class="mono">{{.Username}}</td><td><form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="rotate_password"><input type="hidden" name="node_id" value="{{.ID}}"><input name="new_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password" aria-label="Новый пароль SSH"><label class="check"><input name="confirm_rotation" type="checkbox" value="yes" required><span>Сменить пароль пользователя {{.Username}}</span></label><button class="button secondary" type="submit">Сменить</button></form></td></tr>{{end}}</tbody></table></div></section>{{end}}
+	{{if and (not .Job) .Access}}<section class="card"><h2>Доступ к серверам</h2><p class="lead">Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль.</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>Нода</th><th>SSH</th><th>Подключение</th><th>Сменить пароль</th></tr></thead><tbody>{{range .Access}}<tr><td>{{.Name}}{{if .Pending}}<div class="error">Смена ожидает проверки; повторите её для восстановления.</div>{{end}}</td><td class="mono">{{.Host}}</td><td class="mono">{{.Username}}</td><td>{{if .Retired}}Нода выведена из флота: панель больше не меняет этот сервер. Пароль можно показать или забыть в настройках ноды.{{else}}<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="rotate_password"><input type="hidden" name="node_id" value="{{.ID}}"><input name="new_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password" aria-label="Новый пароль SSH"><label class="check"><input name="confirm_rotation" type="checkbox" value="yes" required><span>Сменить пароль пользователя {{.Username}}</span></label><button class="button secondary" type="submit">Сменить</button></form>{{end}}</td></tr>{{end}}</tbody></table></div></section>{{end}}
 	<p class="foot">Изменения на сервере начинаются только после успешной проверки требований, подтверждения ключа и нажатия «Запустить установку».</p>
 </main>
 </body>
@@ -348,7 +348,7 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 		page.Access = append(page.Access, serverAccessView{
 			ID: item.NodeId, Name: item.NodeName, Host: net.JoinHostPort(item.Host, strconv.FormatUint(uint64(item.Port), 10)),
 			Username: item.Username, ConfiguredAt: time.Unix(item.ConfiguredUnix, 0).Local().Format("2006-01-02 15:04"),
-			Pending: item.RotationPending,
+			Pending: item.RotationPending, Retired: item.NodeRetired,
 		})
 	}
 	s.renderForRequest(w, r, http.StatusOK, page)

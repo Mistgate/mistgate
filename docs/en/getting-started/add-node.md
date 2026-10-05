@@ -133,7 +133,8 @@ Open the node, **Settings → Danger zone → Retire from fleet**, and type the 
 
 - takes the node out of every user's access: users stop getting it in their subscription, their links stay the same;
 - revokes the node's certificate and cancels its unused install commands;
-- keeps the node's record and history in the panel and the audit log; its name becomes available for a later install.
+- keeps the node's record and history in the panel and the audit log; its name becomes available for a later install;
+- keeps the saved SSH access of a node installed over SSH: you can still reveal the password under the retired node's **Settings → SSH access**, and only **Forget saved access** deletes it. If the panel generated that password (a rotation through MCP), the retire dialog warns you: reveal it and keep a copy.
 
 If the agent is connected, it gets the order to retire and, on the server:
 

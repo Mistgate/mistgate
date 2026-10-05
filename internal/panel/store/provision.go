@@ -26,12 +26,14 @@ type NodeProvisionEvent struct {
 }
 
 // NodeServerAccess contains public connection metadata and vault ciphertext. Callers must never return
-// Password or PendingPassword from an API response.
+// Password or PendingPassword from an API response. NodeName is the node's current name and NodeRetired its state
+// (both read from node); PasswordGenerated says the panel generated the saved password.
 type NodeServerAccess struct {
 	NodeID, NodeName, SSHHost, SSHUser, HostFingerprint string
 	SSHPort                                             uint16
 	Password, PendingPassword                           []byte
 	ConfiguredAt                                        time.Time
+	PasswordGenerated, NodeRetired                      bool
 }
 
 const nodeProvisionJobCols = `id, node_id, name, address, country_code, location, provider,
@@ -396,13 +398,14 @@ func (s *Store) CompleteNodeProvisionJob(ctx context.Context, id string, access 
 	} else if n != 1 {
 		return ErrNotFound
 	}
+	// node_name is kept only because the column is NOT NULL: readers take the node's current name from node.
 	_, err = tx.ExecContext(ctx, `INSERT INTO node_server_access (
 		node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, pending_password, configured_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
 	ON CONFLICT(node_id) DO UPDATE SET node_name=excluded.node_name, ssh_host=excluded.ssh_host,
 		ssh_port=excluded.ssh_port, ssh_username=excluded.ssh_username,
 		host_fingerprint=excluded.host_fingerprint, password=excluded.password,
-		pending_password=NULL, configured_at=excluded.configured_at`,
+		pending_password=NULL, configured_at=excluded.configured_at, password_generated=0`,
 		access.NodeID, access.NodeName, access.SSHHost, access.SSHPort, access.SSHUser,
 		access.HostFingerprint, access.Password, unix(now))
 	if err != nil {
@@ -415,15 +418,17 @@ func (s *Store) CompleteNodeProvisionJob(ctx context.Context, id string, access 
 	return tx.Commit()
 }
 
-const nodeServerAccessCols = `node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint,
-	password, pending_password, configured_at`
+// nodeServerAccessFrom joins the node: its name changes with a rename, and a retired node's access is marked.
+const nodeServerAccessFrom = `SELECT a.node_id, n.name, a.ssh_host, a.ssh_port, a.ssh_username, a.host_fingerprint,
+	a.password, a.pending_password, a.configured_at, a.password_generated, n.state = 'retired'
+	FROM node_server_access a JOIN node n ON n.id = a.node_id `
 
 func scanNodeServerAccess(row rowScanner) (NodeServerAccess, error) {
 	var out NodeServerAccess
 	var port int
 	var configured int64
 	err := row.Scan(&out.NodeID, &out.NodeName, &out.SSHHost, &port, &out.SSHUser, &out.HostFingerprint,
-		&out.Password, &out.PendingPassword, &configured)
+		&out.Password, &out.PendingPassword, &configured, &out.PasswordGenerated, &out.NodeRetired)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeServerAccess{}, ErrNotFound
 	}
@@ -437,13 +442,12 @@ func scanNodeServerAccess(row rowScanner) (NodeServerAccess, error) {
 
 // NodeServerAccess returns one node's encrypted SSH credential and public metadata.
 func (s *Store) NodeServerAccess(ctx context.Context, nodeID string) (NodeServerAccess, error) {
-	return scanNodeServerAccess(s.R.QueryRowContext(ctx,
-		`SELECT `+nodeServerAccessCols+` FROM node_server_access WHERE node_id = ?`, nodeID))
+	return scanNodeServerAccess(s.R.QueryRowContext(ctx, nodeServerAccessFrom+`WHERE a.node_id = ?`, nodeID))
 }
 
-// NodeServerAccesses lists access metadata in stable name order.
+// NodeServerAccesses lists access metadata in stable name order, live nodes before retired ones of the same name.
 func (s *Store) NodeServerAccesses(ctx context.Context) ([]NodeServerAccess, error) {
-	rows, err := s.R.QueryContext(ctx, `SELECT `+nodeServerAccessCols+` FROM node_server_access ORDER BY node_name, node_id`)
+	rows, err := s.R.QueryContext(ctx, nodeServerAccessFrom+`ORDER BY n.name COLLATE NOCASE, n.state = 'retired', a.node_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -459,9 +463,11 @@ func (s *Store) NodeServerAccesses(ctx context.Context) ([]NodeServerAccess, err
 	return out, rows.Err()
 }
 
-// SetPendingNodeServerPassword journals an encrypted replacement before it is sent to the server.
-func (s *Store) SetPendingNodeServerPassword(ctx context.Context, nodeID string, encrypted []byte, now time.Time) error {
-	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET pending_password = ?, configured_at = ? WHERE node_id = ?`, encrypted, unix(now), nodeID)
+// SetPendingNodeServerPassword journals an encrypted replacement before it is sent to the server. A generated one marks
+// the access as holding a panel-generated password at once: from here on the server may already use it.
+func (s *Store) SetPendingNodeServerPassword(ctx context.Context, nodeID string, encrypted []byte, generated bool, now time.Time) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET pending_password = ?, configured_at = ?,
+		password_generated = CASE WHEN ? THEN 1 ELSE password_generated END WHERE node_id = ?`, encrypted, unix(now), generated, nodeID)
 	if err != nil {
 		return err
 	}
@@ -473,10 +479,12 @@ func (s *Store) SetPendingNodeServerPassword(ctx context.Context, nodeID string,
 	return nil
 }
 
-// CommitPendingNodeServerPassword promotes the verified node-bound ciphertext and removes its recovery copy.
-func (s *Store) CommitPendingNodeServerPassword(ctx context.Context, nodeID string, encryptedCurrent []byte, now time.Time) error {
-	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET password = ?, pending_password = NULL, configured_at = ?
-		WHERE node_id = ? AND pending_password IS NOT NULL`, encryptedCurrent, unix(now), nodeID)
+// CommitPendingNodeServerPassword promotes the verified node-bound ciphertext and removes its recovery copy. ownerChosen
+// says the owner typed the promoted password (it clears the generated mark); a recovered pending value leaves it.
+func (s *Store) CommitPendingNodeServerPassword(ctx context.Context, nodeID string, encryptedCurrent []byte, ownerChosen bool, now time.Time) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET password = ?, pending_password = NULL, configured_at = ?,
+		password_generated = CASE WHEN ? THEN 0 ELSE password_generated END
+		WHERE node_id = ? AND pending_password IS NOT NULL`, encryptedCurrent, unix(now), ownerChosen, nodeID)
 	if err != nil {
 		return err
 	}
@@ -500,6 +508,25 @@ func (s *Store) ClearPendingNodeServerPassword(ctx context.Context, nodeID strin
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ForgetNodeServerAccess deletes the saved access of a retired node, its sealed password included: the owner's explicit
+// decision, since retiring keeps it. ErrNotFound: no saved access; ErrConflict: the node is not retired.
+func (s *Store) ForgetNodeServerAccess(ctx context.Context, nodeID string) error {
+	result, err := s.W.ExecContext(ctx, `DELETE FROM node_server_access WHERE node_id = ?
+		AND EXISTS (SELECT 1 FROM node WHERE id = node_server_access.node_id AND state = 'retired')`, nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 1 {
+		return nil
+	}
+	if _, err := s.NodeServerAccess(ctx, nodeID); err != nil {
+		return err
+	}
+	return ErrConflict
 }
 
 // NodeProvisionEvents returns events after the given cursor and the final cursor.

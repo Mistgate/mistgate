@@ -43,7 +43,7 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	rotatedPassword := "rotated-ssh-password-123"
 	username := "deploy"
 	token := "one-time-enrollment-secret"
-	commands := make(chan string, 8)
+	commands := make(chan string, 10)
 	uploaded := make(chan []byte, 1)
 	enrolled := make(chan string, 1)
 	firewallScript := make(chan []byte, 1)
@@ -259,6 +259,29 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 		t.Fatalf("new SSH password was not usable: %v", err)
 	}
 	_ = verified.Close()
+	if access.PasswordGenerated {
+		t.Fatal("an owner-chosen password is marked as generated")
+	}
+
+	// the MCP rotation: the panel generates the password, marks it, and it works
+	if _, err := svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{
+		NodeId: job.NodeID, Generate: true, Confirm: true,
+	})); err != nil {
+		t.Fatalf("generated rotation: %v", err)
+	}
+	access, err = st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || !access.PasswordGenerated || access.PendingPassword != nil {
+		t.Fatalf("generated rotation access = %+v, err %v", access, err)
+	}
+	generated, err := svc.openAccessPassword(job.NodeID, access.Password)
+	if err != nil || len(generated) < 20 || generated == rotatedPassword {
+		t.Fatalf("generated password = %q, err %v", generated, err)
+	}
+	verified, err = sshClient.DialAs(ctx, mustTarget(t), username, generated, job.HostFingerprint)
+	if err != nil {
+		t.Fatalf("generated SSH password was not usable: %v", err)
+	}
+	_ = verified.Close()
 
 	close(commands)
 	var remoteCommands []string
@@ -268,8 +291,8 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 			t.Fatalf("credential appeared in SSH command: %q", command)
 		}
 	}
-	if len(remoteCommands) != 7 {
-		t.Fatalf("remote command count = %d, want 7: %q", len(remoteCommands), remoteCommands)
+	if len(remoteCommands) != 8 {
+		t.Fatalf("remote command count = %d, want 8: %q", len(remoteCommands), remoteCommands)
 	}
 	if remoteCommands[1] != "sh -s -- 22" || remoteCommands[2] != "cat > /root/mistgate-node.new" {
 		t.Fatalf("firewall preparation must follow preflight and precede transfer: %q", remoteCommands)

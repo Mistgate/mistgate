@@ -243,24 +243,51 @@ func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testi
 	if err != nil || string(loaded.Password) != "encrypted-old" || loaded.PendingPassword != nil {
 		t.Fatalf("saved access = %+v, err %v", loaded, err)
 	}
-	if err := st.SetPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new"), now.Add(2*time.Minute)); err != nil {
+	if loaded.PasswordGenerated || loaded.NodeRetired || loaded.NodeName != job.Name {
+		t.Fatalf("fresh access flags = %+v", loaded)
+	}
+	// a generated rotation marks the access at once: the server may use the new password before the commit
+	if err := st.SetPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new"), true, now.Add(2*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = st.NodeServerAccess(ctx, job.NodeID)
-	if err != nil || string(loaded.Password) != "encrypted-old" || string(loaded.PendingPassword) != "encrypted-new" {
+	if err != nil || string(loaded.Password) != "encrypted-old" || string(loaded.PendingPassword) != "encrypted-new" || !loaded.PasswordGenerated {
 		t.Fatalf("pending access = %+v, err %v", loaded, err)
 	}
-	if err := st.CommitPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new-current"), now.Add(3*time.Minute)); err != nil {
+	if err := st.CommitPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new-current"), false, now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = st.NodeServerAccess(ctx, job.NodeID)
-	if err != nil || string(loaded.Password) != "encrypted-new-current" || loaded.PendingPassword != nil {
+	if err != nil || string(loaded.Password) != "encrypted-new-current" || loaded.PendingPassword != nil || !loaded.PasswordGenerated {
 		t.Fatalf("committed access = %+v, err %v", loaded, err)
 	}
+
+	// the name comes from the node, so a rename shows at once (the stored copy is never updated)
+	if _, err := st.W.ExecContext(ctx, `UPDATE node SET name = 'edge-renamed' WHERE id = ?`, job.NodeID); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _ = st.NodeServerAccess(ctx, job.NodeID); loaded.NodeName != "edge-renamed" {
+		t.Fatalf("access after rename = %q", loaded.NodeName)
+	}
+	if err := st.ForgetNodeServerAccess(ctx, job.NodeID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("forgetting a live node's access = %v, want ErrConflict", err)
+	}
+
+	// retiring keeps the access, sealed password included: it may be the only copy
 	if err := st.RetireNode(ctx, job.NodeID, now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
+	loaded, err = st.NodeServerAccess(ctx, job.NodeID)
+	if err != nil || string(loaded.Password) != "encrypted-new-current" || !loaded.NodeRetired {
+		t.Fatalf("retired node's access = %+v, err %v", loaded, err)
+	}
+	if err := st.ForgetNodeServerAccess(ctx, job.NodeID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := st.NodeServerAccess(ctx, job.NodeID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("retired node retained SSH access: %v", err)
+		t.Fatalf("forgotten access is still there: %v", err)
+	}
+	if err := st.ForgetNodeServerAccess(ctx, job.NodeID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("forgetting twice = %v, want ErrNotFound", err)
 	}
 }

@@ -102,7 +102,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
 | `checks_results` | Read only | The client-eye checks: nodes by profiles, the last result, the failure streak and 24 hours of history. |
 | `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state and any saved schedule, the active or last rollout, and the fixed UTC offset used for new schedules. |
-| `node_server_access_list` | Admin | Saved node SSH endpoint, login and fingerprint, plus whether a password rotation needs recovery. Never a password. |
+| `node_server_access_list` | Admin | Saved node SSH endpoint, login and fingerprint, plus whether a password rotation needs recovery and whether the node is retired (its access stays until the owner forgets it). Never a password. |
 | `audit_search` | Admin | The audit log, filtered by `source` (`panel`, `bot`, `mcp`, `api`), actor or action; paged with `before_id`. |
 
 ### Change tools
@@ -126,7 +126,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
 | `node_install` | Admin | Plan: `host`, `port`, `username`, node `name`, `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token`, SSH `password`, exact `confirmed_fingerprint` | always |
-| `node_server_password_rotate` | Admin | Plan: `node` id or exact name; apply: `confirm_token`, `new_password` (at least 12 characters) | always |
+| `node_server_password_rotate` | Admin | Plan: `node` id or the exact name of a live node (a retired node is refused); apply: `confirm_token` only. The panel generates the new password itself and never returns it; the owner can reveal it in the node's settings | always |
 
 Every `_plan` also takes `reason`: the agent's own words, at most 300 characters, shown to the owner as a quote. Node passwords are supplied only to their `_apply` call; they are never stored in MCP plan parameters or returned by a tool. `user_create` never returns the new user's subscription link: the owner copies it in the admin.
 

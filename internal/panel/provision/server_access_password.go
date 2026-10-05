@@ -71,7 +71,7 @@ func (s *Service) resolvePendingAccessPassword(ctx context.Context, access store
 	if conn, dialErr := s.ssh.DialAs(ctx, target, access.SSHUser, pending, access.HostFingerprint); dialErr == nil {
 		_ = conn.Close()
 		promoted := s.sealAccessPassword(access.NodeID, pending)
-		if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, s.cfg.Now().UTC()); err != nil {
+		if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, s.cfg.Now().UTC()); err != nil {
 			return "", internalConnectError()
 		}
 		return pending, nil
