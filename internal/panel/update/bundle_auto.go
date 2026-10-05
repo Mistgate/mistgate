@@ -27,7 +27,7 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 	}
 
 	s.mu.Lock()
-	if s.bundleSyncing || s.panelInstalling {
+	if s.bundleSyncing || s.panelBusy() {
 		s.mu.Unlock()
 		return false
 	}
@@ -61,7 +61,6 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 		} else {
 			s.log.Warn("update: sync signed node bundle from GitHub", "err", err)
 		}
-		s.setGitHubBundleStatus(false, "")
 		return false
 	}
 	available, remoteManifestHash := s.cfg.NodeBundleSource.BundleStatus()
@@ -70,7 +69,6 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 		bs = s.rescan()
 	}
 	if !available || bs == nil || !bs.trusted || remoteManifestHash == "" {
-		s.setGitHubBundleStatus(false, "")
 		if changed && bs != nil {
 			s.log.Error("update: downloaded GitHub node bundle did not pass local verification", "status", bs.view.Status.String(), "error_key", bs.view.ErrorKey)
 		}
@@ -78,20 +76,11 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 	}
 	manifestHash := sha256.Sum256(bs.raw)
 	if hex.EncodeToString(manifestHash[:]) != remoteManifestHash {
-		s.setGitHubBundleStatus(false, "")
 		s.log.Error("update: installed node bundle does not match the GitHub release manifest")
 		return false
 	}
-	s.setGitHubBundleStatus(true, remoteManifestHash)
 	if changed {
 		s.log.Info("update: trusted node bundle downloaded from GitHub", "version", bs.manifest.Version, "built", bs.manifest.Built)
 	}
 	return changed
-}
-
-func (s *Service) setGitHubBundleStatus(available bool, manifestSHA256 string) {
-	s.mu.Lock()
-	s.githubBundleAvailable = available
-	s.githubBundleManifestHash = manifestSHA256
-	s.mu.Unlock()
 }

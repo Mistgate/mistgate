@@ -20,9 +20,19 @@ import (
 	"github.com/mistgate/mistgate/internal/buildinfo"
 )
 
+// systemctlFunc runs systemctl with the arguments and returns its trimmed standard output.
+type systemctlFunc func(args ...string) (string, error)
+
+// Health check of a replaced panel (test seams): it must stay active, without systemd restarting it, this long.
+var (
+	panelHealthWindow = 45 * time.Second
+	panelHealthPoll   = time.Second
+)
+
 // RunPanelUpdateHelper is the hidden command started by a transient systemd unit or the fixed root-owned helper
-// service. It executes outside the panel service's ProtectSystem sandbox, replaces only its own executable,
-// restarts the configured unit and restores the backup if the new service does not start.
+// service. It executes outside the panel service's ProtectSystem sandbox, fetches and verifies the release the owner
+// confirmed, replaces only its own executable, restarts the configured unit and restores the backup if the new
+// service does not stay healthy.
 func RunPanelUpdateHelper(args []string) error {
 	if !canRunPanelUpdateHelper() {
 		return ErrPanelUnsupported
@@ -30,16 +40,17 @@ func RunPanelUpdateHelper(args []string) error {
 	fs := flag.NewFlagSet("panel-update-helper", flag.ContinueOnError)
 	dataDir := fs.String("data-dir", "", "panel data directory")
 	service := fs.String("service", "", "systemd service unit")
-	digest := fs.String("sha256", "", "expected lowercase SHA-256 of the staged binary")
-	fetchLatest := fs.Bool("fetch-latest", false, "fetch and verify the official latest release before installing")
+	fetchLatest := fs.Bool("fetch-latest", false, "fetch and verify the confirmed signed release before installing (required)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) {
+	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) || !*fetchLatest {
 		return errors.New("panel-update-helper: invalid arguments")
 	}
-	if *fetchLatest && *digest != "" {
-		return errors.New("panel-update-helper: --fetch-latest does not accept a caller-supplied digest")
+	// Only the key compiled into this root-owned binary: the data directory belongs to the panel's service user.
+	key, err := buildinfo.ReleasePublicKey()
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: %w", err)
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -48,32 +59,24 @@ func RunPanelUpdateHelper(args []string) error {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
-	systemctl := func(args ...string) error {
+	systemctl := func(args ...string) (string, error) {
 		return runCommandWithTimeout("systemctl", 90*time.Second, args...)
 	}
-	if *fetchLatest {
-		return installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
-			CurrentVersion: buildinfo.Version, DataDir: *dataDir, ServiceUnit: *service, Executable: exe, Enabled: true,
-		}, systemctl)
-	}
-	if !digestPattern.MatchString(*digest) {
-		return errors.New("panel-update-helper: invalid arguments")
-	}
-	return applyPanelUpdate(*dataDir, exe, *service, *digest, runtimeArch(), systemctl)
+	return installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
+		CurrentBuilt: buildinfo.BuiltUnix(), Key: key, DataDir: *dataDir, ServiceUnit: *service, Executable: exe, Enabled: true,
+	}, systemctl)
 }
 
-// installLatestPanelUpdate is the fixed privileged path used when the HTTP panel runs as an unprivileged account.
-// It obtains the release digest from GitHub itself, then downloads and verifies the official asset before handing it
-// to the same replacement, backup, health-check, and rollback routine used by root-run installations.
-func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, systemctl func(...string) error) error {
+// installLatestPanelUpdate is the privileged path. It takes the version and digest the owner confirmed from the
+// request file, verifies the release's signed panel manifest itself, requires it to name exactly that release and to
+// be newer than this build, then downloads and checks the binary before handing it to the replacement, backup,
+// health-check and rollback routine.
+func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, systemctl systemctlFunc) error {
 	if cfg.OS == "" {
 		cfg.OS = runtime.GOOS
 	}
 	if cfg.OS != "linux" || cfg.DataDir == "" || !unitPattern.MatchString(strings.TrimSpace(cfg.ServiceUnit)) || systemctl == nil {
 		return ErrPanelUnsupported
-	}
-	if cfg.CurrentVersion == "" {
-		cfg.CurrentVersion = buildinfo.Version
 	}
 	if cfg.Executable == "" {
 		cfg.Executable, _ = os.Executable()
@@ -87,8 +90,12 @@ func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, system
 		return ErrPanelUnsupported
 	}
 	cfg = updater.cfg
+	want, err := takePanelUpdateRequest(cfg.DataDir)
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: %w", err)
+	}
 	checkCtx, cancelCheck := context.WithTimeout(ctx, panelUpdateCheckTimeout)
-	status, asset, err := updater.fetchStatus(checkCtx)
+	status, rel, err := updater.fetchStatus(checkCtx)
 	cancelCheck()
 	if err != nil {
 		return fmt.Errorf("panel-update-helper: check latest release: %w", err)
@@ -96,20 +103,25 @@ func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, system
 	if !status.Available {
 		return ErrNoPanelUpdate
 	}
+	if status.Version != want.Version || status.SHA256 != want.SHA256 {
+		return fmt.Errorf("panel-update-helper: %w", ErrPanelChanged)
+	}
 	downloadCtx, cancelDownload := context.WithTimeout(ctx, 2*time.Minute)
-	_, err = updater.downloadAndStage(downloadCtx, asset, status.Version)
+	_, err = updater.downloadAndStage(downloadCtx, rel)
 	cancelDownload()
 	if err != nil {
 		return fmt.Errorf("panel-update-helper: download latest release: %w", err)
 	}
-	return applyPanelUpdate(cfg.DataDir, cfg.Executable, cfg.ServiceUnit, strings.TrimPrefix(asset.Digest, "sha256:"), cfg.Arch, systemctl)
+	return applyPanelUpdate(cfg.DataDir, cfg.Executable, cfg.ServiceUnit, rel.file.SHA256, cfg.Arch, systemctl)
 }
 
-func runtimeArch() string { return panelUpdateRuntimeArch() }
-
-func applyPanelUpdate(dataDir, target, service, expectedSHA, arch string, systemctl func(...string) error) error {
-	if !unitPattern.MatchString(service) || !digestPattern.MatchString(expectedSHA) || systemctl == nil {
+func applyPanelUpdate(dataDir, target, service, expectedSHA, arch string, systemctlOut systemctlFunc) error {
+	if !unitPattern.MatchString(service) || !digestPattern.MatchString(expectedSHA) || systemctlOut == nil {
 		return errors.New("panel-update-helper: invalid update parameters")
+	}
+	systemctl := func(args ...string) error {
+		_, err := systemctlOut(args...)
+		return err
 	}
 	dataDir, err := filepath.Abs(dataDir)
 	if err != nil || dataDir == "." || filepath.Clean(dataDir) == string(filepath.Separator) {
@@ -191,7 +203,7 @@ func applyPanelUpdate(dataDir, target, service, expectedSHA, arch string, system
 	}
 	syncDirectory(filepath.Dir(target))
 
-	if err := startPanelService(service, systemctl); err != nil {
+	if err := startPanelService(service, systemctlOut); err != nil {
 		if stopErr := systemctl("stop", service); stopErr != nil {
 			backupErr := promotePanelBackup(dataDir, backup)
 			syncDirectory(filepath.Dir(target))
@@ -305,21 +317,35 @@ func verifyPanelELF(path, arch string) error {
 	return nil
 }
 
-func startPanelService(service string, systemctl func(...string) error) error {
-	if err := systemctl("start", service); err != nil {
+// startPanelService starts the replaced panel and waits for it to prove itself before the rollback path is deleted. A
+// Type=simple unit counts as started once execve succeeds, and with Restart=on-failure a crash a few seconds in shows
+// only as a restart: the unit must stay active for panelHealthWindow with systemd's restart counter unchanged (an
+// explicit start resets it).
+func startPanelService(service string, systemctl systemctlFunc) error {
+	if _, err := systemctl("start", service); err != nil {
 		return err
 	}
-	// Type=simple units are considered started once execve succeeds. Check that the process remains active briefly
-	// before deleting the rollback path.
-	for i := 0; i < 3; i++ {
-		if err := systemctl("is-active", "--quiet", service); err != nil {
+	restarts, err := systemctl("show", "--property=NRestarts", "--value", service)
+	if err != nil {
+		return err
+	}
+	deadline := time.Now().Add(panelHealthWindow)
+	for {
+		if _, err := systemctl("is-active", "--quiet", service); err != nil {
 			return fmt.Errorf("systemd did not keep %s active: %w", service, err)
 		}
-		if i < 2 {
-			time.Sleep(500 * time.Millisecond)
+		now, err := systemctl("show", "--property=NRestarts", "--value", service)
+		if err != nil {
+			return err
 		}
+		if now != restarts {
+			return fmt.Errorf("systemd restarted %s after the update (restarts %s, then %s)", service, restarts, now)
+		}
+		if !time.Now().Before(deadline) {
+			return nil
+		}
+		time.Sleep(panelHealthPoll)
 	}
-	return nil
 }
 
 func backupDataDirectory(dataDir string) (string, error) {
@@ -550,8 +576,9 @@ func syncDirectory(path string) {
 	}
 }
 
-func runCommandWithTimeout(name string, timeout time.Duration, args ...string) error {
+func runCommandWithTimeout(name string, timeout time.Duration, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	return runCommand(ctx, name, args...)
+	out, err := runCommand(ctx, name, args...)
+	return strings.TrimSpace(string(out)), err
 }

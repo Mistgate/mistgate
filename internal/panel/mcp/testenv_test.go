@@ -299,6 +299,7 @@ type world struct {
 	users                  map[string]*adminv1.GetUserResponse
 	rolloutStat            adminv1.RolloutStatus
 	bundleStat             adminv1.BundleStatus
+	bundleBuilt            int64 // 0 = the default bundle's 1700000200
 	scheduleTimezoneOffset int32
 	scheduledUnix          int64
 	startErr               error // StartRollout refuses with it when set
@@ -563,9 +564,13 @@ func (w *world) TestUserAgent(_ context.Context, r *connect.Request[adminv1.Test
 func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesRequest]) (*connect.Response[adminv1.GetUpdatesResponse], error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	built := w.bundleBuilt
+	if built == 0 {
+		built = 1700000200
+	}
 	r := &adminv1.GetUpdatesResponse{
 		NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: w.scheduleTimezoneOffset, Panel: &adminv1.PanelBuild{Version: "v1"},
-		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Built: 1700000200, Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
+		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Built: built, Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
 		Nodes: []*adminv1.NodeUpdate{
 			{NodeId: nodeA, Name: "de1", Version: "v1", Built: 1700000100, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, SupportsUpdate: true, LastUpdate: &adminv1.LastUpdate{Outcome: "ok", FromVersion: "v0"}},
 			{NodeId: nodeB, Name: "nl1", Version: "v2", Built: 1700000200, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true},

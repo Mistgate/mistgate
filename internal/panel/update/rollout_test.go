@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -383,6 +384,15 @@ func TestStartPreconditions(t *testing.T) {
 	check("second rollout", err, connect.CodeFailedPrecondition, "a rollout is already active")
 }
 
+type fakePanelUpdater struct{ installing atomic.Bool }
+
+func (f *fakePanelUpdater) Status() PanelUpdateStatus {
+	return PanelUpdateStatus{Installing: f.installing.Load()}
+}
+func (f *fakePanelUpdater) Check(context.Context) PanelUpdateStatus       { return f.Status() }
+func (f *fakePanelUpdater) Install(context.Context, string, string) error { return nil }
+func (f *fakePanelUpdater) Run(context.Context)                           {}
+
 func TestPanelUpdateAndRolloutAreMutuallyExclusive(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
@@ -394,8 +404,19 @@ func TestPanelUpdateAndRolloutAreMutuallyExclusive(t *testing.T) {
 	if _, err := e.s.start(e.ctx, []string{node}, 0); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "panel update") {
 		t.Fatalf("rollout during panel update: %v", err)
 	}
-	e.s.finishPanelUpdate(false)
+	e.s.finishPanelUpdate()
 
+	// After the call, the updater's own state holds the reservation while its helper runs, and only that long.
+	helper := &fakePanelUpdater{}
+	helper.installing.Store(true)
+	e.s.cfg.PanelUpdater = helper
+	if _, err := e.s.start(e.ctx, []string{node}, 0); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "panel update") {
+		t.Fatalf("rollout while the panel update helper runs: %v", err)
+	}
+	if err := e.s.beginPanelUpdate(e.ctx); err == nil {
+		t.Fatal("a second panel update while the helper runs")
+	}
+	helper.installing.Store(false) // the helper failed and ended
 	e.startRollout(node)
 	if err := e.s.beginPanelUpdate(e.ctx); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "active node rollout") {
 		t.Fatalf("panel update during rollout: %v", err)
@@ -1302,12 +1323,23 @@ func TestStepUpIsRequiredForEveryChange(t *testing.T) {
 		t.Fatalf("audit rows without a step-up: %+v", rows)
 	}
 	// the page itself never asks
-	if resp, err := r.GetUpdates(e.ctx, connect.NewRequest(&adminv1.GetUpdatesRequest{})); err != nil || len(resp.Msg.Nodes) != 1 {
+	page, err := r.GetUpdates(e.ctx, connect.NewRequest(&adminv1.GetUpdatesRequest{}))
+	if err != nil || len(page.Msg.Nodes) != 1 {
 		t.Fatalf("GetUpdates: %v", err)
 	}
-	// with a fresh step-up the same calls work
+	// with a fresh step-up the same calls work, for the bundle the owner saw only
 	e.stepUp = func(context.Context) error { return nil }
-	if _, err := r.StartRollout(e.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{NodeIds: []string{a}})); err != nil {
+	bundle := page.Msg.Bundle
+	for _, stale := range []*adminv1.StartRolloutRequest{
+		{NodeIds: []string{a}},
+		{NodeIds: []string{a}, ExpectedVersion: bundle.Version, ExpectedBuilt: bundle.Built - 1},
+		{NodeIds: []string{a}, ExpectedVersion: "v0.0.1", ExpectedBuilt: bundle.Built},
+	} {
+		if _, err := r.StartRollout(e.ctx, connect.NewRequest(stale)); connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "bundle changed") {
+			t.Fatalf("a rollout of another bundle than approved (%+v): %v", stale, err)
+		}
+	}
+	if _, err := r.StartRollout(e.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{NodeIds: []string{a}, ExpectedVersion: bundle.Version, ExpectedBuilt: bundle.Built})); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := r.PauseRollout(e.ctx, connect.NewRequest(&adminv1.PauseRolloutRequest{}))

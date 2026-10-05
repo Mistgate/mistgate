@@ -146,6 +146,7 @@ func panelUpdateProto(s PanelUpdateStatus) *adminv1.PanelUpdate {
 	return &adminv1.PanelUpdate{
 		Version: s.Version, Url: s.URL, PublishedUnix: s.PublishedUnix, CheckedUnix: s.CheckedUnix,
 		Available: s.Available, Supported: s.Supported, Installable: s.Installable, Installing: s.Installing, ErrorKey: s.ErrorKey,
+		Built: s.Built, Sha256: s.SHA256,
 	}
 }
 
@@ -157,7 +158,7 @@ func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.Ch
 	return connect.NewResponse(&adminv1.CheckPanelUpdateResponse{Update: panelUpdateProto(status)}), nil
 }
 
-func (r rpc) InstallPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
+func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -167,18 +168,19 @@ func (r rpc) InstallPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.
 	if err := r.s.beginPanelUpdate(ctx); err != nil {
 		return nil, err
 	}
-	if err := r.s.cfg.PanelUpdater.Install(ctx); err != nil {
-		r.s.finishPanelUpdate(false)
+	err := r.s.cfg.PanelUpdater.Install(ctx, req.Msg.ExpectedVersion, req.Msg.ExpectedSha256)
+	r.s.finishPanelUpdate() // from here the updater's own "installing" state holds the reservation
+	if err != nil {
 		switch {
-		case errors.Is(err, ErrPanelUnsupported), errors.Is(err, ErrNoPanelRelease), errors.Is(err, ErrNoPanelUpdate), errors.Is(err, ErrPanelAssetMissing):
+		case errors.Is(err, ErrPanelUnsupported), errors.Is(err, ErrNoPanelRelease), errors.Is(err, ErrNoPanelUpdate), errors.Is(err, ErrPanelAssetMissing),
+			errors.Is(err, ErrPanelUnsigned), errors.Is(err, ErrPanelExpired), errors.Is(err, ErrPanelNoKey), errors.Is(err, ErrPanelChanged):
 			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 		default:
 			return nil, connect.NewError(connect.CodeUnavailable, err)
 		}
 	}
-	r.s.finishPanelUpdate(true)
 	status := r.s.cfg.PanelUpdater.Status()
-	r.s.audit(ctx, "panel_update", map[string]string{"version": status.Version})
+	r.s.audit(ctx, "panel_update", map[string]string{"version": status.Version, "sha256": status.SHA256})
 	status.Installing = true // The helper is detached; this process will exit when systemd restarts the panel.
 	return connect.NewResponse(&adminv1.InstallPanelUpdateResponse{Update: panelUpdateProto(status)}), nil
 }
@@ -187,7 +189,7 @@ func (r rpc) StartRollout(ctx context.Context, req *connect.Request[adminv1.Star
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	ro, err := r.s.start(ctx, req.Msg.NodeIds, int(req.Msg.BatchSize))
+	ro, err := r.s.startPinned(ctx, req.Msg.NodeIds, int(req.Msg.BatchSize), req.Msg.ExpectedVersion, req.Msg.ExpectedBuilt)
 	if err != nil {
 		return nil, err
 	}

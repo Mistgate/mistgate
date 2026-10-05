@@ -24,8 +24,9 @@ service UpdateService {
   rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
   // Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
   rpc CheckPanelUpdate(CheckPanelUpdateRequest) returns (CheckPanelUpdateResponse);
-  // Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
-  // Owner-only with a fresh step-up; refused while a node rollout is active.
+  // Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
+  // mistgate-panel-update.service), which verifies the signed panel manifest again, replaces the binary and restarts
+  // this panel. Owner-only with a fresh step-up; refused while a node rollout is active.
   rpc InstallPanelUpdate(InstallPanelUpdateRequest) returns (InstallPanelUpdateResponse);
   // Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
   // that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
@@ -73,12 +74,20 @@ message PanelUpdate {
   string url = 2;
   int64 published_unix = 3 [jstype = JS_NUMBER];
   int64 checked_unix = 4 [jstype = JS_NUMBER];
+  // A release is available only when its signed panel manifest verifies under this binary's compiled-in release key,
+  // has not expired and is newer by build time than this panel.
   bool available = 5;
   bool supported = 6;
   bool installable = 7;
   bool installing = 8;
-  // Stable UI key: no_release, check_failed, asset_missing, download_failed, schedule_failed, or empty.
+  // Stable UI key: no_release, check_failed, asset_missing, unsigned (no panel manifest signed with this panel's
+  // key: the release cannot be installed), expired, no_key (this build has no compiled-in release key),
+  // schedule_failed, install_failed (the helper ended without replacing the panel), unsupported, or empty.
   string error_key = 9;
+  // From the release's signed panel manifest (0 / empty without one): its build time, which orders releases, and the
+  // SHA-256 of this architecture's binary. InstallPanelUpdate names both back.
+  int64 built = 10 [jstype = JS_NUMBER];
+  string sha256 = 11;
 }
 
 enum BundleStatus {
@@ -187,6 +196,9 @@ message NodeUpdate {
   int64 scheduled_built = 15 [jstype = JS_NUMBER];
   // Fixed UTC offset used when the schedule was created (minutes east of UTC).
   int32 scheduled_timezone_offset_minutes = 16;
+  // The schedule could not start within 2 hours of its time (the node was offline, another update was running, the
+  // bundle changed): it is kept, marked missed, and never starts by itself. Schedule again or cancel it.
+  bool scheduled_missed = 17;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -284,7 +296,12 @@ message GetUpdatesResponse {
 message CheckPanelUpdateRequest {}
 message CheckPanelUpdateResponse { PanelUpdate update = 1; }
 
-message InstallPanelUpdateRequest {}
+message InstallPanelUpdateRequest {
+  // The release the owner confirmed (PanelUpdate.version and .sha256). FAILED_PRECONDITION when the latest signed
+  // release is another one; the root helper checks them again before it installs.
+  string expected_version = 1;
+  string expected_sha256 = 2;
+}
 message InstallPanelUpdateResponse { PanelUpdate update = 1; }
 
 message StartRolloutRequest {
@@ -293,6 +310,10 @@ message StartRolloutRequest {
   // Nodes updated at the same time after the canary. 0 = default: 1 while the fleet has fewer than 5 nodes to
   // update, else 2. Maximum 10. The canary is always one node.
   uint32 batch_size = 2;
+  // The bundle the owner approved (GetUpdates bundle.version and .built). FAILED_PRECONDITION "the update bundle
+  // changed; review the new version" when the trusted bundle is another one by the time the rollout starts.
+  string expected_version = 3;
+  int64 expected_built = 4 [jstype = JS_NUMBER];
 }
 
 message StartRolloutResponse {

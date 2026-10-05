@@ -125,24 +125,33 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
   const fmt = useFmt();
   const p = data.panel;
   const update = p?.update;
+  const errorLabels: Record<string, string> = {
+    no_release: t("up.panel.noRelease"),
+    asset_missing: t("up.panel.noAsset"),
+    check_failed: t("up.panel.checkFailed"),
+    unsupported: t("up.panel.unsupported"),
+    unsigned: t("up.panel.unsigned", { version: update?.version ?? "" }),
+    expired: t("up.panel.expired", { version: update?.version ?? "" }),
+    no_key: t("up.panel.noKeyUpdate"),
+    install_failed: t("up.panel.installFailed"),
+  };
   const updateLabel = update?.installing
     ? t("up.panel.installing")
-    : update?.errorKey === "no_release"
-      ? t("up.panel.noRelease")
-      : update?.errorKey === "asset_missing"
-        ? t("up.panel.noAsset")
-      : update?.errorKey === "check_failed"
-        ? t("up.panel.checkFailed")
-        : update?.errorKey === "unsupported"
-          ? t("up.panel.unsupported")
-        : update?.available && !update.supported
-            ? t("up.panel.unsupported")
-            : update?.available
-              ? t("up.panel.available", { version: update.version })
-              : update?.checkedUnix
-                ? t("up.panel.current")
-                : t("up.panel.checking");
-  const updateKind: StatusKind = update?.installing ? "busy" : update?.errorKey === "check_failed" ? "bad" : update?.available || update?.errorKey === "unsupported" || update?.errorKey === "asset_missing" ? "warn" : "ok";
+    : (update?.errorKey && errorLabels[update.errorKey]) ||
+      (update?.available && !update.supported
+        ? t("up.panel.unsupported")
+        : update?.available
+          ? t("up.panel.available", { version: update.version })
+          : update?.checkedUnix
+            ? t("up.panel.current")
+            : t("up.panel.checking"));
+  const updateKind: StatusKind = update?.installing
+    ? "busy"
+    : update?.errorKey === "check_failed" || update?.errorKey === "install_failed"
+      ? "bad"
+      : update?.available || (update?.errorKey && update.errorKey !== "no_release")
+        ? "warn"
+        : "ok";
   return (
     <section className={card}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -170,6 +179,20 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
               </a>
             ) : updateLabel}
           </dd>
+          {update?.built ? (
+            <p className="mt-1 text-xs text-muted">
+              {t("up.panel.built")}: {fmt.dateTime(update.built)}
+              {update.sha256 && (
+                <>
+                  {" · "}
+                  {t("up.panel.sha")}{" "}
+                  <span className="font-mono text-fg" title={update.sha256}>
+                    {shortHash(update.sha256)}
+                  </span>
+                </>
+              )}
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-muted">
             {t("up.panel.key")}: {p?.hasReleaseKey ? <span className="font-mono text-fg">{p.releaseKeyFingerprint}</span> : <span className="font-semibold text-warn-text">{t("up.panel.noKey")}</span>}
           </p>
@@ -183,7 +206,7 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
             {t("up.panel.check")}
           </Button>
           {owner && update?.available && update.installable && (
-            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel()}>
+            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel({ version: update.version, sha256: update.sha256 })}>
               {t("up.panel.install")}
             </Button>
           )}

@@ -100,7 +100,7 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 		return false, errors.New("node bundle source has no data directory")
 	}
 
-	r, err := u.latestRelease(ctx)
+	r, err := fetchLatestRelease(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater")
 	if err != nil {
 		return false, err
 	}
@@ -226,15 +226,16 @@ func sameReleaseFiles(a, b []release.File) bool {
 	return true
 }
 
-func (u *GitHubNodeBundleSource) latestRelease(ctx context.Context) (githubRelease, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.apiURL, nil)
+// fetchLatestRelease reads the latest stable release of the official repository and checks its tag and page URL.
+func fetchLatestRelease(ctx context.Context, client *http.Client, apiURL, userAgent string) (githubRelease, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return githubRelease{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Mistgate-node-bundle-updater")
-	resp, err := u.client.Do(req)
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := client.Do(req)
 	if err != nil {
 		return githubRelease{}, err
 	}
@@ -250,25 +251,25 @@ func (u *GitHubNodeBundleSource) latestRelease(ctx context.Context) (githubRelea
 		return githubRelease{}, fmt.Errorf("decode GitHub release: %w", err)
 	}
 	if r.Draft || r.Prerelease || !validReleaseTag(r.TagName) || !validReleasePage(r.HTMLURL, r.TagName) {
-		return githubRelease{}, errors.New("GitHub returned an invalid stable node release")
+		return githubRelease{}, errors.New("GitHub returned an invalid stable release")
 	}
 	return r, nil
 }
 
 func validateGitHubBundleAsset(asset githubAsset, tag string, maxSize int64) error {
 	if asset.Size <= 0 || asset.Size > maxSize {
-		return fmt.Errorf("GitHub node asset %q has an invalid size", asset.Name)
+		return fmt.Errorf("GitHub asset %q has an invalid size", asset.Name)
 	}
 	if asset.Digest != "" && (!strings.HasPrefix(asset.Digest, "sha256:") || !digestPattern.MatchString(strings.TrimPrefix(asset.Digest, "sha256:"))) {
-		return fmt.Errorf("GitHub node asset %q has an invalid SHA-256 digest", asset.Name)
+		return fmt.Errorf("GitHub asset %q has an invalid SHA-256 digest", asset.Name)
 	}
 	u, err := url.Parse(asset.BrowserDownloadURL)
 	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return fmt.Errorf("GitHub node asset %q URL is not official", asset.Name)
+		return fmt.Errorf("GitHub asset %q URL is not official", asset.Name)
 	}
 	expected := "/Mistgate/mistgate/releases/download/" + url.PathEscape(tag) + "/" + url.PathEscape(asset.Name)
 	if u.EscapedPath() != expected {
-		return fmt.Errorf("GitHub node asset %q URL does not match release %q", asset.Name, tag)
+		return fmt.Errorf("GitHub asset %q URL does not match release %q", asset.Name, tag)
 	}
 	return nil
 }

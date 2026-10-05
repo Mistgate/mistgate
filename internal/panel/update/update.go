@@ -122,18 +122,14 @@ type Service struct {
 	hashes map[string]hashEntry
 	serves int // concurrent downloads, guarded by bmu
 
-	mu                       sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
-	panelInstalling          bool
-	bundleSyncing            bool
-	githubBundleAvailable    bool
-	githubBundleManifestHash string
-	panelInstallGeneration   uint64
-	panelInstallTimer        *time.Timer
-	runCtx                   context.Context
-	wg                       sync.WaitGroup
-	inflight                 map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
-	orphans                  map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
-	failing                  map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
+	mu              sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
+	panelInstalling bool       // an InstallPanelUpdate call is running (afterwards PanelUpdater.Status().Installing holds)
+	bundleSyncing   bool
+	runCtx          context.Context
+	wg              sync.WaitGroup
+	inflight        map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
+	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
+	failing         map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
 
 	updMu    sync.RWMutex
 	updating map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)

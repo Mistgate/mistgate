@@ -78,8 +78,9 @@ type UpdateServiceClient interface {
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
 	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
 	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
-	// Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
-	// Owner-only with a fresh step-up; refused while a node rollout is active.
+	// Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
+	// mistgate-panel-update.service), which verifies the signed panel manifest again, replaces the binary and restarts
+	// this panel. Owner-only with a fresh step-up; refused while a node rollout is active.
 	InstallPanelUpdate(context.Context, *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error)
 	// Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
 	// that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the
@@ -275,8 +276,9 @@ type UpdateServiceHandler interface {
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
 	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
 	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
-	// Download and verify the latest Linux panel binary, then restart this panel through a transient systemd unit.
-	// Owner-only with a fresh step-up; refused while a node rollout is active.
+	// Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
+	// mistgate-panel-update.service), which verifies the signed panel manifest again, replaces the binary and restarts
+	// this panel. Owner-only with a fresh step-up; refused while a node rollout is active.
 	InstallPanelUpdate(context.Context, *connect.Request[v1.InstallPanelUpdateRequest]) (*connect.Response[v1.InstallPanelUpdateResponse], error)
 	// Start a rollout of the current (trusted) bundle. node_ids empty = every node whose state is OUTDATED (and
 	// that can update); a listed node that is up to date, offline or unsupported is skipped and shows as such in the

@@ -111,7 +111,7 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 		t.Fatalf("before the rollout: %+v", got.Msg)
 	}
 
-	started, err := api.StartRollout(e.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{}))
+	started, err := api.StartRollout(e.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{ExpectedVersion: got.Msg.Bundle.Version, ExpectedBuilt: got.Msg.Bundle.Built}))
 	if err != nil || started.Msg.Rollout.Status != adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || len(started.Msg.Rollout.Steps) != 1 {
 		t.Fatalf("start: %+v %v", started, err)
 	}

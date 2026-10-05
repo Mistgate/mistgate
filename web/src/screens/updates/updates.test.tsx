@@ -77,6 +77,7 @@ const node = (over: Record<string, unknown> = {}) => ({
   scheduledVersion: "",
   scheduledBuilt: 0,
   scheduledTimezoneOffsetMinutes: 0,
+  scheduledMissed: false,
   inbounds: 1,
   onlineUsers: 0,
   address: "de1.example.com",
@@ -168,6 +169,22 @@ describe("panel self-update", () => {
     expect(checkPanelUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it("installs exactly the signed release the owner sees", async () => {
+    installPanelUpdate.mockResolvedValue({ update: {} });
+    const sha = "ab".repeat(32);
+    await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 1500, sha256: sha, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
+    expect(text()).toContain("abababababab");
+    await click(button("Update panel"));
+    await settle();
+    expect(installPanelUpdate).toHaveBeenCalledWith({ expectedVersion: "v0.3.0", expectedSha256: sha });
+  });
+
+  it("says a release without a valid panel signature cannot be installed", async () => {
+    await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 0, sha256: "", available: false, supported: true, installable: false, installing: false, errorKey: "unsigned" } } }));
+    expect(text()).toContain("v0.3.0 is not signed with this panel’s release key: it cannot be installed");
+    expect(button("Update panel")).toBeUndefined();
+  });
+
   it("does not show the panel install action to a non-owner", async () => {
     role = Role.READONLY;
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
@@ -244,7 +261,7 @@ describe("the Updates screen", () => {
     expect(dialog()!.textContent).not.toContain("batches of");
     await click(inDialog("Update now"));
     await settle();
-    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0 });
+    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
   });
 
   it("adds a different node after the active rollout stage instead of blocking it", async () => {
@@ -256,7 +273,7 @@ describe("the Updates screen", () => {
     expect(inDialog("Add to rollout")?.disabled).toBe(false);
     await click(inDialog("Add to rollout"));
     await settle();
-    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_2"], batchSize: 0 });
+    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_2"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
   });
 
   it("explains that a node already queued in the active rollout will update in its stage", async () => {

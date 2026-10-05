@@ -5,7 +5,6 @@ package update
 import (
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 )
 
@@ -29,4 +28,3 @@ func panelUpdateHostSupported() bool {
 
 func canRunPanelUpdateHelper() bool          { return os.Geteuid() == 0 }
 func panelUpdateUsesRootHelperService() bool { return !canRunPanelUpdateHelper() }
-func panelUpdateRuntimeArch() string         { return runtime.GOARCH }

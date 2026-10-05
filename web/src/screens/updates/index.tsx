@@ -107,7 +107,7 @@ export function UpdatesScreen() {
           blockedReason={updateBlockReason}
           busy={actions.busy}
           onClose={close}
-          onUpdateNow={() => go(actions.start([dialog.node.nodeId]))}
+          onUpdateNow={() => go(actions.start([dialog.node.nodeId], { version: d.bundle?.version ?? "", built: d.bundle?.built ?? 0 }))}
           onSchedule={(localDatetime) => go(actions.scheduleNode({
             nodeId: dialog.node.nodeId,
             localDatetime,

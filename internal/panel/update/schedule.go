@@ -145,7 +145,7 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 		return
 	}
 	s.mu.Lock()
-	blocked := s.bundleSyncing || s.panelInstalling
+	blocked := s.bundleSyncing || s.panelBusy()
 	s.mu.Unlock()
 	if blocked {
 		return
@@ -195,7 +195,7 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 		if actor == "" {
 			actor = "system:schedule"
 		}
-		ro, err := s.startWithActorAndSchedule(ctx, []string{schedule.NodeID}, 0, actor, &schedule)
+		ro, err := s.startWithActorAndSchedule(ctx, []string{schedule.NodeID}, 0, actor, nil, &schedule)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition || ctx.Err() != nil {
 				return

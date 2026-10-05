@@ -375,12 +375,20 @@ type PanelUpdate struct {
 	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 	PublishedUnix int64                  `protobuf:"varint,3,opt,name=published_unix,json=publishedUnix,proto3" json:"published_unix,omitempty"`
 	CheckedUnix   int64                  `protobuf:"varint,4,opt,name=checked_unix,json=checkedUnix,proto3" json:"checked_unix,omitempty"`
-	Available     bool                   `protobuf:"varint,5,opt,name=available,proto3" json:"available,omitempty"`
-	Supported     bool                   `protobuf:"varint,6,opt,name=supported,proto3" json:"supported,omitempty"`
-	Installable   bool                   `protobuf:"varint,7,opt,name=installable,proto3" json:"installable,omitempty"`
-	Installing    bool                   `protobuf:"varint,8,opt,name=installing,proto3" json:"installing,omitempty"`
-	// Stable UI key: no_release, check_failed, asset_missing, download_failed, schedule_failed, or empty.
-	ErrorKey      string `protobuf:"bytes,9,opt,name=error_key,json=errorKey,proto3" json:"error_key,omitempty"`
+	// A release is available only when its signed panel manifest verifies under this binary's compiled-in release key,
+	// has not expired and is newer by build time than this panel.
+	Available   bool `protobuf:"varint,5,opt,name=available,proto3" json:"available,omitempty"`
+	Supported   bool `protobuf:"varint,6,opt,name=supported,proto3" json:"supported,omitempty"`
+	Installable bool `protobuf:"varint,7,opt,name=installable,proto3" json:"installable,omitempty"`
+	Installing  bool `protobuf:"varint,8,opt,name=installing,proto3" json:"installing,omitempty"`
+	// Stable UI key: no_release, check_failed, asset_missing, unsigned (no panel manifest signed with this panel's
+	// key: the release cannot be installed), expired, no_key (this build has no compiled-in release key),
+	// schedule_failed, install_failed (the helper ended without replacing the panel), unsupported, or empty.
+	ErrorKey string `protobuf:"bytes,9,opt,name=error_key,json=errorKey,proto3" json:"error_key,omitempty"`
+	// From the release's signed panel manifest (0 / empty without one): its build time, which orders releases, and the
+	// SHA-256 of this architecture's binary. InstallPanelUpdate names both back.
+	Built         int64  `protobuf:"varint,10,opt,name=built,proto3" json:"built,omitempty"`
+	Sha256        string `protobuf:"bytes,11,opt,name=sha256,proto3" json:"sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -474,6 +482,20 @@ func (x *PanelUpdate) GetInstalling() bool {
 func (x *PanelUpdate) GetErrorKey() string {
 	if x != nil {
 		return x.ErrorKey
+	}
+	return ""
+}
+
+func (x *PanelUpdate) GetBuilt() int64 {
+	if x != nil {
+		return x.Built
+	}
+	return 0
+}
+
+func (x *PanelUpdate) GetSha256() string {
+	if x != nil {
+		return x.Sha256
 	}
 	return ""
 }
@@ -787,8 +809,11 @@ type NodeUpdate struct {
 	ScheduledBuilt   int64  `protobuf:"varint,15,opt,name=scheduled_built,json=scheduledBuilt,proto3" json:"scheduled_built,omitempty"`
 	// Fixed UTC offset used when the schedule was created (minutes east of UTC).
 	ScheduledTimezoneOffsetMinutes int32 `protobuf:"varint,16,opt,name=scheduled_timezone_offset_minutes,json=scheduledTimezoneOffsetMinutes,proto3" json:"scheduled_timezone_offset_minutes,omitempty"`
-	unknownFields                  protoimpl.UnknownFields
-	sizeCache                      protoimpl.SizeCache
+	// The schedule could not start within 2 hours of its time (the node was offline, another update was running, the
+	// bundle changed): it is kept, marked missed, and never starts by itself. Schedule again or cancel it.
+	ScheduledMissed bool `protobuf:"varint,17,opt,name=scheduled_missed,json=scheduledMissed,proto3" json:"scheduled_missed,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *NodeUpdate) Reset() {
@@ -931,6 +956,13 @@ func (x *NodeUpdate) GetScheduledTimezoneOffsetMinutes() int32 {
 		return x.ScheduledTimezoneOffsetMinutes
 	}
 	return 0
+}
+
+func (x *NodeUpdate) GetScheduledMissed() bool {
+	if x != nil {
+		return x.ScheduledMissed
+	}
+	return false
 }
 
 type RolloutStep struct {
@@ -1391,9 +1423,13 @@ func (x *CheckPanelUpdateResponse) GetUpdate() *PanelUpdate {
 }
 
 type InstallPanelUpdateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The release the owner confirmed (PanelUpdate.version and .sha256). FAILED_PRECONDITION when the latest signed
+	// release is another one; the root helper checks them again before it installs.
+	ExpectedVersion string `protobuf:"bytes,1,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	ExpectedSha256  string `protobuf:"bytes,2,opt,name=expected_sha256,json=expectedSha256,proto3" json:"expected_sha256,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *InstallPanelUpdateRequest) Reset() {
@@ -1424,6 +1460,20 @@ func (x *InstallPanelUpdateRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use InstallPanelUpdateRequest.ProtoReflect.Descriptor instead.
 func (*InstallPanelUpdateRequest) Descriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *InstallPanelUpdateRequest) GetExpectedVersion() string {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return ""
+}
+
+func (x *InstallPanelUpdateRequest) GetExpectedSha256() string {
+	if x != nil {
+		return x.ExpectedSha256
+	}
+	return ""
 }
 
 type InstallPanelUpdateResponse struct {
@@ -1476,9 +1526,13 @@ type StartRolloutRequest struct {
 	NodeIds []string `protobuf:"bytes,1,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
 	// Nodes updated at the same time after the canary. 0 = default: 1 while the fleet has fewer than 5 nodes to
 	// update, else 2. Maximum 10. The canary is always one node.
-	BatchSize     uint32 `protobuf:"varint,2,opt,name=batch_size,json=batchSize,proto3" json:"batch_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BatchSize uint32 `protobuf:"varint,2,opt,name=batch_size,json=batchSize,proto3" json:"batch_size,omitempty"`
+	// The bundle the owner approved (GetUpdates bundle.version and .built). FAILED_PRECONDITION "the update bundle
+	// changed; review the new version" when the trusted bundle is another one by the time the rollout starts.
+	ExpectedVersion string `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	ExpectedBuilt   int64  `protobuf:"varint,4,opt,name=expected_built,json=expectedBuilt,proto3" json:"expected_built,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StartRolloutRequest) Reset() {
@@ -1521,6 +1575,20 @@ func (x *StartRolloutRequest) GetNodeIds() []string {
 func (x *StartRolloutRequest) GetBatchSize() uint32 {
 	if x != nil {
 		return x.BatchSize
+	}
+	return 0
+}
+
+func (x *StartRolloutRequest) GetExpectedVersion() string {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return ""
+}
+
+func (x *StartRolloutRequest) GetExpectedBuilt() int64 {
+	if x != nil {
+		return x.ExpectedBuilt
 	}
 	return 0
 }
@@ -2336,7 +2404,7 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x05built\x18\x02 \x01(\x03B\x020\x02R\x05built\x12&\n" +
 	"\x0fhas_release_key\x18\x03 \x01(\bR\rhasReleaseKey\x126\n" +
 	"\x17release_key_fingerprint\x18\x04 \x01(\tR\x15releaseKeyFingerprint\x126\n" +
-	"\x06update\x18\x05 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"\xa6\x02\n" +
+	"\x06update\x18\x05 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"\xd8\x02\n" +
 	"\vPanelUpdate\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12)\n" +
@@ -2348,7 +2416,10 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\n" +
 	"installing\x18\b \x01(\bR\n" +
 	"installing\x12\x1b\n" +
-	"\terror_key\x18\t \x01(\tR\berrorKey\"t\n" +
+	"\terror_key\x18\t \x01(\tR\berrorKey\x12\x18\n" +
+	"\x05built\x18\n" +
+	" \x01(\x03B\x020\x02R\x05built\x12\x16\n" +
+	"\x06sha256\x18\v \x01(\tR\x06sha256\"t\n" +
 	"\n" +
 	"BundleFile\x12\x0e\n" +
 	"\x02os\x18\x01 \x01(\tR\x02os\x12\x12\n" +
@@ -2378,7 +2449,7 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"to_version\x18\x04 \x01(\tR\ttoVersion\x12\x1d\n" +
 	"\bto_built\x18\x05 \x01(\x03B\x020\x02R\atoBuilt\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x1b\n" +
-	"\aat_unix\x18\a \x01(\x03B\x020\x02R\x06atUnix\"\xee\x04\n" +
+	"\aat_unix\x18\a \x01(\x03B\x020\x02R\x06atUnix\"\x99\x05\n" +
 	"\n" +
 	"NodeUpdate\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
@@ -2399,7 +2470,8 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x0escheduled_unix\x18\r \x01(\x03B\x020\x02R\rscheduledUnix\x12+\n" +
 	"\x11scheduled_version\x18\x0e \x01(\tR\x10scheduledVersion\x12+\n" +
 	"\x0fscheduled_built\x18\x0f \x01(\x03B\x020\x02R\x0escheduledBuilt\x12I\n" +
-	"!scheduled_timezone_offset_minutes\x18\x10 \x01(\x05R\x1escheduledTimezoneOffsetMinutes\"\xbf\x03\n" +
+	"!scheduled_timezone_offset_minutes\x18\x10 \x01(\x05R\x1escheduledTimezoneOffsetMinutes\x12)\n" +
+	"\x10scheduled_missed\x18\x11 \x01(\bR\x0fscheduledMissed\"\xbf\x03\n" +
 	"\vRolloutStep\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x14\n" +
@@ -2444,14 +2516,18 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	" schedule_timezone_offset_minutes\x18\a \x01(\x05R\x1dscheduleTimezoneOffsetMinutes\"\x19\n" +
 	"\x17CheckPanelUpdateRequest\"R\n" +
 	"\x18CheckPanelUpdateResponse\x126\n" +
-	"\x06update\x18\x01 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"\x1b\n" +
-	"\x19InstallPanelUpdateRequest\"T\n" +
+	"\x06update\x18\x01 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"o\n" +
+	"\x19InstallPanelUpdateRequest\x12)\n" +
+	"\x10expected_version\x18\x01 \x01(\tR\x0fexpectedVersion\x12'\n" +
+	"\x0fexpected_sha256\x18\x02 \x01(\tR\x0eexpectedSha256\"T\n" +
 	"\x1aInstallPanelUpdateResponse\x126\n" +
-	"\x06update\x18\x01 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"O\n" +
+	"\x06update\x18\x01 \x01(\v2\x1e.mistgate.admin.v1.PanelUpdateR\x06update\"\xa5\x01\n" +
 	"\x13StartRolloutRequest\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12\x1d\n" +
 	"\n" +
-	"batch_size\x18\x02 \x01(\rR\tbatchSize\"L\n" +
+	"batch_size\x18\x02 \x01(\rR\tbatchSize\x12)\n" +
+	"\x10expected_version\x18\x03 \x01(\tR\x0fexpectedVersion\x12)\n" +
+	"\x0eexpected_built\x18\x04 \x01(\x03B\x020\x02R\rexpectedBuilt\"L\n" +
 	"\x14StartRolloutResponse\x124\n" +
 	"\arollout\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.RolloutR\arollout\"4\n" +
 	"\x13PauseRolloutRequest\x12\x1d\n" +

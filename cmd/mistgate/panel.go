@@ -124,8 +124,11 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if err != nil && !errors.Is(err, buildinfo.ErrUnsignedBuild) {
 		log.Warn("release key is unusable, node updates are off", "err", err)
 	}
+	// A panel release is verified with the compiled-in key only, as the root helper does: release.pub is writable by
+	// the panel's service user. Without one the Updates page says the panel cannot verify releases.
+	compiledKey, _ := buildinfo.ReleasePublicKey()
 	panelUpdater := update.NewGitHubPanelUpdater(update.PanelUpdateConfig{
-		CurrentVersion: buildinfo.Version, CurrentBuilt: buildinfo.BuiltUnix(), DataDir: o.dataDir,
+		CurrentBuilt: buildinfo.BuiltUnix(), Key: compiledKey, DataDir: o.dataDir,
 		ServiceUnit: o.updateService, Enabled: update.PanelUpdateHostSupported(),
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})

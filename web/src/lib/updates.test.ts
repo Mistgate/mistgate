@@ -49,6 +49,7 @@ const node = (over: Partial<NodeUpdate> = {}): NodeUpdate => ({
   scheduledVersion: "",
   scheduledBuilt: 0,
   scheduledTimezoneOffsetMinutes: 0,
+  scheduledMissed: false,
   inbounds: 1,
   onlineUsers: 0,
   address: "de1.example.com",

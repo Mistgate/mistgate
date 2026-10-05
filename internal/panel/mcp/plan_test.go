@@ -436,12 +436,24 @@ func TestRolloutFlow(t *testing.T) {
 	applyError(t, s, "rollout_start", p.ConfirmToken)
 	e.plans.decide(p.PlanID, true)
 	applyOf(t, s, "rollout_start", p.ConfirmToken)
-	if len(e.w.startReq) != 1 || len(e.w.startReq[0].GetNodeIds()) != 1 || e.w.startReq[0].GetNodeIds()[0] != nodeA || e.w.startReq[0].GetBatchSize() != 0 {
-		t.Errorf("StartRollout: %+v", e.w.startReq)
+	if len(e.w.startReq) != 1 || len(e.w.startReq[0].GetNodeIds()) != 1 || e.w.startReq[0].GetNodeIds()[0] != nodeA || e.w.startReq[0].GetBatchSize() != 0 ||
+		e.w.startReq[0].GetExpectedVersion() != "v2" || e.w.startReq[0].GetExpectedBuilt() != 1700000200 {
+		t.Errorf("StartRollout did not pin the planned bundle: %+v", e.w.startReq)
 	}
 	// the call that changed something ran under the owner's grant for this plan
 	if c := e.w.calls("/mistgate.admin.v1.UpdateService/StartRollout"); len(c) != 1 || c[0].Approved != p.PlanID || c[0].Planning {
 		t.Errorf("grant: %+v", c)
+	}
+
+	// a bundle replaced between the plan and its approval is not rolled out under that approval
+	p = planOf(t, s, "rollout_start", args)
+	e.plans.decide(p.PlanID, true)
+	e.w.bundleBuilt = 1700000300
+	if got := applyError(t, s, "rollout_start", p.ConfirmToken); !strings.Contains(got, "changed after planning") {
+		t.Errorf("apply after the bundle changed: %q", got)
+	}
+	if len(e.w.startReq) != 1 {
+		t.Errorf("StartRollout ran for a changed bundle: %+v", e.w.startReq)
 	}
 }
 

@@ -204,6 +204,8 @@ const preconditions: Record<string, MessageKey> = {
   "node is offline": "up.e.offline",
   "the bundle differs from this rollout: cancel it and start again": "up.e.bundleDiffers",
   "a command is already running on this node": "up.e.commandBusy",
+  "the update bundle changed; review the new version": "up.e.bundleChanged",
+  "the latest signed panel release is not the one that was confirmed": "up.e.panelChanged",
 };
 
 export function callErrorText(e: unknown, t: T): string {
@@ -374,7 +376,9 @@ export function useUpdateActions() {
 
   return {
     busy: call.isPending || checkPanel.isPending,
-    start: (nodeIds: string[]) => run(() => updates.startRollout({ nodeIds, batchSize: 0 }), t("up.start.started")),
+    /** Updates the nodes to the bundle the owner saw; the server refuses when the trusted bundle is another one by then. */
+    start: (nodeIds: string[], bundle: { version: string; built: number }) =>
+      run(() => updates.startRollout({ nodeIds, batchSize: 0, expectedVersion: bundle.version, expectedBuilt: BigInt(bundle.built) }), t("up.start.started")),
     scheduleNode: (input: { nodeId: string; localDatetime: string; timezoneOffsetMinutes: number; expectedVersion: string; expectedBuilt: number }) =>
       run(() => updates.scheduleNodeUpdate({
         nodeId: input.nodeId,
@@ -391,6 +395,8 @@ export function useUpdateActions() {
     rollback: (n: { id: string; name: string }) => run(() => updates.rollbackNode({ nodeId: n.id }), t("up.toast.rollback", { name: n.name })),
     rescan: () => run(() => updates.rescanBundle({}), t("up.bundle.rescanned")),
     checkPanel: () => checkPanel.mutateAsync().then(() => true, () => false),
-    installPanel: () => run(() => updates.installPanelUpdate({}), t("up.panel.installStarted")),
+    /** Installs exactly the signed release the owner saw (its version and this architecture's SHA-256). */
+    installPanel: (release: { version: string; sha256: string }) =>
+      run(() => updates.installPanelUpdate({ expectedVersion: release.version, expectedSha256: release.sha256 }), t("up.panel.installStarted")),
   };
 }

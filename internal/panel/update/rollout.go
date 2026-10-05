@@ -123,14 +123,14 @@ func updatable(st adminv1.NodeUpdateState) bool {
 }
 
 // beginPanelUpdate reserves the same mutex used by rollout creation so the panel cannot begin an agent rollout
-// while a panel binary replacement is being downloaded and scheduled.
+// while a panel binary replacement is being checked and scheduled.
 func (s *Service) beginPanelUpdate(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.bundleSyncing {
 		return precondition("a GitHub node bundle is being installed")
 	}
-	if s.panelInstalling {
+	if s.panelBusy() {
 		return precondition("a panel update is already being installed")
 	}
 	if _, err := s.st.ActiveRollout(ctx); err == nil {
@@ -142,41 +142,36 @@ func (s *Service) beginPanelUpdate(ctx context.Context) error {
 	return nil
 }
 
-// finishPanelUpdate releases a failed reservation immediately. A successful systemd-run may still fail to start
-// its detached helper, so the reservation expires after the helper's systemd timeout plus a margin.
-func (s *Service) finishPanelUpdate(scheduled bool) {
+// finishPanelUpdate ends the reservation of the Install call. An accepted install is then held by the updater's
+// "installing" state, which ends when its helper unit finishes without replacing the panel (or after its timeout).
+func (s *Service) finishPanelUpdate() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.panelInstallGeneration++
-	generation := s.panelInstallGeneration
-	if s.panelInstallTimer != nil {
-		s.panelInstallTimer.Stop()
-		s.panelInstallTimer = nil
-	}
-	if !scheduled {
-		s.panelInstalling = false
-		return
-	}
-	s.panelInstallTimer = time.AfterFunc(panelUpdateGuardTimeout, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.panelInstallGeneration == generation {
-			s.panelInstalling = false
-			s.panelInstallTimer = nil
-		}
-	})
+	s.panelInstalling = false
+	s.mu.Unlock()
+}
+
+// panelBusy reports a panel update being scheduled or run by its helper. The caller holds s.mu.
+func (s *Service) panelBusy() bool {
+	return s.panelInstalling || (s.cfg.PanelUpdater != nil && s.cfg.PanelUpdater.Status().Installing)
+}
+
+// bundlePin is the release a caller approved: the rollout starts only while it is still the trusted bundle.
+type bundlePin struct {
+	version string
+	built   int64
 }
 
 // start creates a rollout of the trusted bundle. nodeIDs empty = every OUTDATED node.
 func (s *Service) start(ctx context.Context, nodeIDs []string, batch int) (store.RolloutRow, error) {
-	return s.startWithActor(ctx, nodeIDs, batch, s.cfg.Actor(ctx))
+	return s.startWithActorAndSchedule(ctx, nodeIDs, batch, s.cfg.Actor(ctx), nil, nil)
 }
 
-func (s *Service) startWithActor(ctx context.Context, nodeIDs []string, batch int, actor string) (store.RolloutRow, error) {
-	return s.startWithActorAndSchedule(ctx, nodeIDs, batch, actor, nil)
+// startPinned is start for the bundle the owner approved (StartRollout's expected version and build time).
+func (s *Service) startPinned(ctx context.Context, nodeIDs []string, batch int, version string, built int64) (store.RolloutRow, error) {
+	return s.startWithActorAndSchedule(ctx, nodeIDs, batch, s.cfg.Actor(ctx), &bundlePin{version, built}, nil)
 }
 
-func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []string, batch int, actor string, scheduled *store.NodeUpdateScheduleRow) (store.RolloutRow, error) {
+func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []string, batch int, actor string, pin *bundlePin, scheduled *store.NodeUpdateScheduleRow) (store.RolloutRow, error) {
 	if batch < 0 || batch > maxBatch {
 		return store.RolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("batch_size must be 0 to 10"))
 	}
@@ -188,7 +183,7 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	if s.bundleSyncing {
 		return store.RolloutRow{}, precondition("the GitHub node bundle is being installed")
 	}
-	if s.panelInstalling {
+	if s.panelBusy() {
 		return store.RolloutRow{}, precondition("a panel update is being installed")
 	}
 	b := s.rescan() // what is on disk now is what ships
@@ -197,6 +192,9 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	}
 	if scheduled != nil && (scheduled.ToBuilt != b.manifest.Built || scheduled.ToVersion != b.manifest.Version) {
 		return store.RolloutRow{}, precondition("scheduled bundle is no longer available")
+	}
+	if pin != nil && (pin.version != b.manifest.Version || pin.built != b.manifest.Built) {
+		return store.RolloutRow{}, precondition("the update bundle changed; review the new version")
 	}
 	active, activeErr := s.st.ActiveRollout(ctx)
 	if activeErr == nil {
