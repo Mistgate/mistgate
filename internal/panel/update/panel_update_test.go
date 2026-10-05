@@ -386,6 +386,55 @@ func TestPanelUpdaterCachesChecks(t *testing.T) {
 	}
 }
 
+// A GitHub outage (a timeout, a 403, a 5xx) is not an answer about the release: the update the panel already knows
+// stays on the Updates screen and in the card, with the error beside it, and Install (which re-fetches and re-verifies
+// the signed release itself) stays offered. A definite verdict about the latest release (here: it expired) replaces it.
+func TestPanelUpdaterKeepsTheKnownReleaseWhenACheckFails(t *testing.T) {
+	f := newPanelFixture()
+	now := panelTestNow
+	down := false
+	updater, _, _ := newPanelUpdater(t, f, &recorder{}, func(c *PanelUpdateConfig) {
+		c.Now = func() time.Time { return now }
+		inner := c.HTTPClient.Transport
+		c.HTTPClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if down {
+				return githubResponse(http.StatusServiceUnavailable, nil), nil
+			}
+			return inner.RoundTrip(r)
+		})}
+	})
+	good := updater.Check(context.Background())
+	if !good.Available || !good.Installable {
+		t.Fatalf("setup: %+v", good)
+	}
+
+	down = true
+	now = now.Add(panelUpdateCheckCache)
+	failed := updater.Check(context.Background())
+	if failed.ErrorKey != "check_failed" || failed.CheckedUnix != now.Unix() {
+		t.Fatalf("failed check: %+v", failed)
+	}
+	want := good
+	want.ErrorKey, want.CheckedUnix = "check_failed", now.Unix()
+	if failed != want || updater.Status() != want {
+		t.Fatalf("a failed check changed the known release:\n got %+v\nwant %+v", updater.Status(), want)
+	}
+
+	down = false
+	now = now.Add(panelUpdateCheckCache)
+	if s := updater.Check(context.Background()); !s.Available || s.ErrorKey != "" {
+		t.Fatalf("recovery: %+v", s)
+	}
+
+	f.expires = panelTestNow.Unix() - 1 // a definite verdict is not kept
+	f2, _ := f.client(t)
+	updater.client = f2
+	now = now.Add(panelUpdateCheckCache)
+	if s := updater.Check(context.Background()); s.ErrorKey != "expired" || s.Installable {
+		t.Fatalf("expired: %+v", s)
+	}
+}
+
 // A helper that ends while this panel still runs has failed: the "installing" state (and with it the reservation
 // against rollouts) ends at once instead of after the 35-minute guard.
 func TestPanelUpdaterNoticesAFailedHelper(t *testing.T) {

@@ -249,6 +249,9 @@ func (u *GitHubPanelUpdater) Check(ctx context.Context) PanelUpdateStatus {
 		if status.ErrorKey == "check_failed" || status.ErrorKey == "unsigned" {
 			u.log.Warn("check GitHub panel release", "err", err)
 		}
+		if status.ErrorKey == "check_failed" && u.keepKnownRelease(status.ErrorKey) {
+			return u.Status()
+		}
 	}
 	status.CheckedUnix = u.now().Unix()
 	status.Supported = u.supported
@@ -260,6 +263,18 @@ func (u *GitHubPanelUpdater) Check(ctx context.Context) PanelUpdateStatus {
 	return status
 }
 
+// keepKnownRelease records a failed lookup (GitHub unreachable, a 403 or 5xx: no verdict on the release) without
+// forgetting the release already known, so the Updates card does not vanish until the next good check. Install
+// re-fetches and re-verifies the signed release itself, so keeping Installable is safe. False when nothing is known yet.
+func (u *GitHubPanelUpdater) keepKnownRelease(errorKey string) bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.status.Version == "" {
+		return false
+	}
+	u.status.ErrorKey, u.status.CheckedUnix = errorKey, u.now().Unix()
+	return true
+}
 func (u *GitHubPanelUpdater) Run(ctx context.Context) {
 	if !u.supported {
 		return
