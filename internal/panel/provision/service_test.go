@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -86,6 +87,56 @@ func TestSealedCredentialsAreBoundToJobAndNeverReturnedInJobView(t *testing.T) {
 	view := toProvisionJob(store.NodeProvisionJob{ID: "prv_one", Secret: sealed, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(2, 0)})
 	if view.Id != "prv_one" || view.Name != "" {
 		t.Fatalf("public job mapping = %+v", view)
+	}
+}
+
+func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &e2eNodeManager{}
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: manager, Binaries: testBinarySource{},
+		StepUp: func(context.Context) error { return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	job := store.NodeProvisionJob{ID: "prv_retry_cancelled", NodeID: "nod_retry_cancelled", Name: "edge-retry", Address: "edge.example.com",
+		SSHHost: "203.0.113.9", SSHPort: 22, HostFingerprint: "SHA256:pin", Secret: []byte("sealed"), CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	retry := func() error {
+		_, err := svc.RetryNodeProvision(ctx, connect.NewRequest(&adminv1.RetryNodeProvisionRequest{JobId: job.ID, ConfirmInstall: true, Password: "secret"}))
+		return err
+	}
+	if err := retry(); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("retry of a queued job = %v", err)
+	}
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := retry(); err != nil {
+		t.Fatalf("retry of a cancelled job = %v", err)
+	}
+	if got, _ := st.NodeProvisionJob(ctx, job.ID); got.State != "queued" || len(got.Secret) == 0 {
+		t.Fatalf("retried job = %+v", got)
+	}
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	manager.state = "retired"
+	if err := retry(); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "node_retired") {
+		t.Fatalf("retry for a retired node = %v", err)
 	}
 }
 

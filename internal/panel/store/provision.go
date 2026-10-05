@@ -324,16 +324,6 @@ func (s *Store) ClaimNodeProvisionJob(ctx context.Context, now time.Time) (NodeP
 	return job, true, nil
 }
 
-// UpdateNodeProvisionJob changes a job without adding a journal entry.
-func (s *Store) UpdateNodeProvisionJob(ctx context.Context, id, state, phase, errorCode string, secret []byte, now time.Time) error {
-	return s.updateNodeProvisionJob(ctx, id, state, phase, errorCode, secret, "", now)
-}
-
-// UpdateNodeProvisionJobWithEvent changes the job and appends its journal event atomically.
-func (s *Store) UpdateNodeProvisionJobWithEvent(ctx context.Context, id, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
-	return s.updateNodeProvisionJob(ctx, id, state, phase, errorCode, secret, eventCode, now)
-}
-
 // UpdateRunningNodeProvisionJob only changes a job that is still running, so it
 // cannot undo a concurrent owner cancellation or overwrite a terminal result.
 func (s *Store) UpdateRunningNodeProvisionJob(ctx context.Context, id, state, phase, errorCode string, secret []byte, now time.Time) error {
@@ -346,31 +336,18 @@ func (s *Store) UpdateRunningNodeProvisionJobWithEvent(ctx context.Context, id, 
 	return s.updateNodeProvisionJobFromState(ctx, id, "running", state, phase, errorCode, secret, eventCode, now)
 }
 
-func (s *Store) updateNodeProvisionJob(ctx context.Context, id, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+// RetryNodeProvisionJob requeues a failed or cancelled job with a freshly sealed credential. It changes the job only
+// while it is still in the state the caller read (from): a double submit cannot requeue a job a worker has already
+// claimed (ErrConflict). ErrNameTaken: a live node or another active install took the name meanwhile.
+func (s *Store) RetryNodeProvisionJob(ctx context.Context, id, from string, secret []byte, now time.Time) error {
+	if from != "failed" && from != "cancelled" {
+		return ErrConflict
 	}
-	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
-		SET state = ?, phase = ?, error_code = ?, secret = ?, updated_at = ? WHERE id = ?`,
-		state, phase, errorCode, secret, unix(now), id)
-	if err != nil {
-		return err
+	err := s.updateNodeProvisionJobFromState(ctx, id, from, "queued", "queued", "", secret, "retry_requested", now)
+	if fleetIsUnique(err) {
+		return ErrNameTaken
 	}
-	if n, err := result.RowsAffected(); err != nil {
-		return err
-	} else if n != 1 {
-		return ErrNotFound
-	}
-	if eventCode != "" {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, ?, ?, ?)`,
-			id, phase, eventCode, unix(now)); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return err
 }
 
 func (s *Store) updateNodeProvisionJobFromState(ctx context.Context, id, expected, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {

@@ -80,6 +80,7 @@ type jobView struct {
 	ErrorLabel string
 	UpdatedAt  string
 	CanCancel  bool
+	CanRetry   bool
 }
 
 type eventView struct {
@@ -226,7 +227,7 @@ var installPageTemplate = template.Must(template.New("node-install").Parse(`<!do
 		</form>{{else if eq .State "cancel_requested"}}<p class="notice">Остановка запрошена. Панель завершит задание и удалит временные SSH-данные.</p>{{end}}
 		{{end}}
 		{{if .Events}}<ul class="events">{{range .Events}}<li><span>{{.Label}}</span><time>{{.CreatedAt}}</time></li>{{end}}</ul>{{else}}<p class="empty">События появятся после запуска задания.</p>{{end}}
-		{{if and .Job (eq .Job.State "failed")}}<div class="divider"></div><h2>Повторить установку</h2><p class="lead">Проверьте причину ошибки. Для повтора требуется пароль root.</p>
+		{{if and .Job .Job.CanRetry}}<div class="divider"></div><h2>Повторить установку</h2><p class="lead">Проверьте причину ошибки. Для повтора требуется пароль root.</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="retry"><input type="hidden" name="job_id" value="{{.Job.ID}}">
 			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">SSH-логин</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">Пароль SSH</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div></div>
 			<div class="check"><input id="confirm-retry" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-retry">Повторно выполнить установку для этой ноды.</label></div>
@@ -597,6 +598,7 @@ func makeJobView(job *adminv1.NodeProvisionJob) jobView {
 		ID: job.Id, Name: job.Name, Host: net.JoinHostPort(job.SshHost, strconv.FormatUint(uint64(job.SshPort), 10)),
 		State: job.State, StateLabel: stateLabel(job.State), PhaseLabel: phaseLabel(job.Phase),
 		ErrorLabel: errorLabel(job.ErrorCode), UpdatedAt: updated, CanCancel: job.State == "queued" || job.State == "running",
+		CanRetry: job.State == "failed" || job.State == "cancelled",
 	}
 }
 

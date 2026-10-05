@@ -237,15 +237,13 @@ describe("the add-node window", () => {
     expect(text()).toContain("Waiting to start");
   });
 
-  it("words the worker's phases and shows a completed install with a way to the node", async () => {
+  const job = { id: "prv_1", nodeId: "nod_1", name: "de1", errorCode: "" };
+  async function startInstall() {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
     checkSSH.mockResolvedValue({
       preflight: { distribution: "Ubuntu", version: "22.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true },
     });
-    const job = { id: "prv_1", nodeId: "nod_1", name: "de1", errorCode: "" };
     startNodeProvision.mockResolvedValue({ job: { ...job, state: "queued", phase: "queued" } });
-    getNodeProvision.mockResolvedValueOnce({ job: { ...job, state: "running", phase: "transfer" } });
-
     await open();
     await click(button("Install automatically over SSH"));
     await type(input("de1.example.com"), "de1.example.com");
@@ -261,6 +259,18 @@ describe("the add-node window", () => {
     await click(button("Start installation"));
     await settle();
     await settle();
+  }
+
+  it("offers a retry for a cancelled install", async () => {
+    getNodeProvision.mockResolvedValue({ job: { ...job, state: "cancelled", phase: "cancelled", errorCode: "remote_outcome_unknown" } });
+    await startInstall();
+    expect(text()).toContain("inspect the server before retrying");
+    expect(button("Retry installation")).toBeDefined();
+  });
+
+  it("words the worker's phases and shows a completed install with a way to the node", async () => {
+    getNodeProvision.mockResolvedValueOnce({ job: { ...job, state: "running", phase: "transfer" } });
+    await startInstall();
     expect(text()).toContain("Sending the agent");
     expect(text()).not.toContain("transfer");
 

@@ -223,7 +223,9 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: toProvisionJob(job)}), nil
 }
 
-// RetryNodeProvision requeues a failed job with freshly supplied SSH login credentials.
+// RetryNodeProvision requeues a failed or cancelled job with freshly supplied SSH login credentials. A cancelled job
+// may have changed the host already; the worker's resume path (preflight identity check, enroll --resume-key) picks
+// up from there. A job whose node was retired cannot come back.
 func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[adminv1.RetryNodeProvisionRequest]) (*connect.Response[adminv1.RetryNodeProvisionResponse], error) {
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
@@ -240,15 +242,27 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 		s.cfg.Log.Error("read node provisioning job", "err", err)
 		return nil, internalConnectError()
 	}
-	if job.State != "failed" {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("provision_job_not_failed"))
+	notRetryable := connect.NewError(connect.CodeFailedPrecondition, errors.New("provision_job_not_retryable"))
+	if job.State != "failed" && job.State != "cancelled" {
+		return nil, notRetryable
+	}
+	if state, err := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID); err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.cfg.Log.Error("read node state before provisioning retry", "job_id", job.ID, "err", err)
+		return nil, internalConnectError()
+	} else if state == "retired" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
 	}
 	secret, err := s.sealCredentials(job.ID, credentials{Username: username, Password: req.Msg.Password})
 	if err != nil {
 		return nil, internalConnectError()
 	}
 	now := s.cfg.Now().UTC()
-	if err := s.st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "queued", "queued", "", secret, "retry_requested", now); err != nil {
+	switch err := s.st.RetryNodeProvisionJob(ctx, job.ID, job.State, secret, now); {
+	case errors.Is(err, store.ErrConflict):
+		return nil, notRetryable // a concurrent retry or cancellation won
+	case errors.Is(err, store.ErrNameTaken):
+		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("name_taken"))
+	case err != nil:
 		s.cfg.Log.Error("retry node provisioning job", "job_id", job.ID, "err", err)
 		return nil, internalConnectError()
 	}

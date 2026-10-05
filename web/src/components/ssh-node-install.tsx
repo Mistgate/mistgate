@@ -43,6 +43,7 @@ function sshError(error: unknown, t: T): string {
   if (raw === "panel_address_not_configured") return t("node.ssh.error.panelAddress");
   if (raw === "ssh_preflight_failed") return t("node.ssh.error.preflight");
   if (raw === "name_taken" || raw === "node_name_taken") return t("node.ssh.nameTaken");
+  if (raw === "node_retired") return t("node.ssh.error.retired");
   return errorText(error, t);
 }
 
@@ -218,7 +219,8 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
   const jobDone = jobState === "completed";
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled";
-  const jobCanRetry = jobFailed && !["remote_outcome_unknown", "node_retired"].includes(job.data?.errorCode ?? "");
+  // a cancelled job resumes safely (preflight checks the host's enrollment first); the panel refuses a retired node
+  const jobCanRetry = (jobFailed || jobCancelled) && job.data?.errorCode !== "node_retired";
   const jobTone = jobDone ? "tone-ok tint tone-text" : jobFailed ? "tone-bad tint tone-text" : jobCancelled ? "tone-off tint tone-text" : "tone-busy tint tone-text";
 
   useEffect(() => {

@@ -58,7 +58,10 @@ func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 		t.Fatalf("initial events = %+v", events[:2])
 	}
 
-	if err := st.UpdateNodeProvisionJobWithEvent(ctx, job.ID, "completed", "completed", "", []byte{}, "agent_connected", now.Add(3*time.Minute)); err != nil {
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(3*time.Minute)); err != nil || !ok {
+		t.Fatalf("claim recovered job = %v, %v", ok, err)
+	}
+	if err := st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "completed", "completed", "", []byte{}, "agent_connected", now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = st.NodeProvisionJob(ctx, job.ID)
@@ -66,8 +69,65 @@ func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 		t.Fatalf("terminal job still has a secret: %+v, err %v", loaded, err)
 	}
 	terminalEvents, _, err := st.NodeProvisionEvents(ctx, job.ID, next, 10)
-	if err != nil || len(terminalEvents) != 1 || terminalEvents[0].Code != "agent_connected" {
+	if err != nil || len(terminalEvents) != 2 || terminalEvents[1].Code != "agent_connected" {
 		t.Fatalf("terminal event = %+v, err %v", terminalEvents, err)
+	}
+}
+
+// A retry changes the job only while it is still in the state the caller read: a double submit must not requeue a
+// job the worker already claimed (the watcher would then cancel the live SSH command).
+func TestRetryNodeProvisionJobOnlyFromTheStateRead(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	job := NodeProvisionJob{ID: "prv_retry", NodeID: "nod_retry", Name: "edge-retry", Address: "edge.example.com",
+		SSHHost: "203.0.113.8", SSHPort: 22, HostFingerprint: "SHA256:pin", Secret: []byte("sealed"),
+		CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now}
+	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
+		t.Fatalf("claim: %v %v", ok, err)
+	}
+	if err := st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "failed", "failed", "ssh_authentication_failed", []byte{}, "ssh_authentication_failed", now); err != nil {
+		t.Fatal(err)
+	}
+	// two submits read "failed"; the first requeues, the worker claims it, the second must not touch it
+	if err := st.RetryNodeProvisionJob(ctx, job.ID, "failed", []byte("sealed-1"), now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(time.Minute)); err != nil || !ok {
+		t.Fatalf("claim the retry: %v %v", ok, err)
+	}
+	if err := st.RetryNodeProvisionJob(ctx, job.ID, "failed", []byte("sealed-2"), now.Add(time.Minute)); !errors.Is(err, ErrConflict) {
+		t.Fatalf("second submit = %v, want ErrConflict", err)
+	}
+	loaded, err := st.NodeProvisionJob(ctx, job.ID)
+	if err != nil || loaded.State != "running" || string(loaded.Secret) != "sealed-1" {
+		t.Fatalf("running job was changed by a stale retry: %+v, err %v", loaded, err)
+	}
+
+	// a cancelled job can be retried, unless its name went to a live node meanwhile
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_other', 'edge-retry', 'x.example.com', 'pending', ?)`, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RetryNodeProvisionJob(ctx, job.ID, "cancelled", []byte("sealed-3"), now.Add(3*time.Minute)); !errors.Is(err, ErrNameTaken) {
+		t.Fatalf("retry onto a taken name = %v, want ErrNameTaken", err)
+	}
+	if _, err := st.W.ExecContext(ctx, `DELETE FROM node WHERE id = 'nod_other'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RetryNodeProvisionJob(ctx, job.ID, "cancelled", []byte("sealed-3"), now.Add(3*time.Minute)); err != nil {
+		t.Fatalf("retry of a cancelled job = %v", err)
+	}
+	if loaded, _ := st.NodeProvisionJob(ctx, job.ID); loaded.State != "queued" {
+		t.Fatalf("retried cancelled job = %+v", loaded)
 	}
 }
 

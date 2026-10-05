@@ -17,7 +17,7 @@ description: "M2 status and design for node installation over SSH, saved access,
 
 - Passwords are sealed to the install job while it is queued or running. Terminal completion clears temporary job credentials. After the agent connects, the verified SSH password is encrypted at rest and readable only by the owner through an operation that does not return the password.
 - Password rotation stores an encrypted pending value before changing the host, verifies a fresh SSH login with the new password, then promotes it. A retry reconciles an interrupted rotation.
-- The owner can cancel queued work or request cancellation of a running worker. The job ends with a redacted event; if the remote result may be partial, the panel says to inspect the server before retrying.
+- The owner can cancel queued work or request cancellation of a running worker. The job ends with a redacted event; if the remote result may be partial, the panel says to inspect the server before retrying. A failed or cancelled job can be retried with a fresh password: the preflight first checks whether the host is already enrolled and the install resumes from there. A job whose node was retired cannot be retried. A retry changes only a job still in the state it read, so a double submit never requeues an install that is already running.
 - Retiring a node revokes its panel identity and unused enrollment tokens, removes saved SSH access, and preserves its history.
 
 ## Encrypted backups and restore
