@@ -45,8 +45,11 @@ func (f *Fleet) measureBandwidth(ctx context.Context, n store.NodeRow) (*adminv1
 	}
 	out := &adminv1.MeasureBandwidthResponse{
 		DownMbps: mbpsParam(res.Params["down_mbps"]), UpMbps: mbpsParam(res.Params["up_mbps"]),
-		Server: clip(res.Params["server"], 64), Seconds: mbpsParam(res.Params["seconds"]),
+		Server: clip(res.Params["server"], 64), Seconds: mbpsParam(res.Params["seconds"]), Runs: mbpsParam(res.Params["runs"]),
 	}
+	// people's share is a part of the figure it is shown with: never more than it
+	out.PeopleDownMbps = min(mbpsParam(res.Params["down_people_mbps"]), out.DownMbps)
+	out.PeopleUpMbps = min(mbpsParam(res.Params["up_people_mbps"]), out.UpMbps)
 	if out.DownMbps == 0 { // a link that moved nothing is not a measurement
 		return &adminv1.MeasureBandwidthResponse{ErrorCode: "failed"}, nil
 	}

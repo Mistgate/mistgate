@@ -1916,7 +1916,13 @@ type MeasureBandwidthResponse struct {
 	// gave a usable answer), unsupported, failed.
 	ErrorCode string `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
 	// How long the whole measurement took, in seconds.
-	Seconds       uint32 `protobuf:"varint,5,opt,name=seconds,proto3" json:"seconds,omitempty"`
+	Seconds uint32 `protobuf:"varint,5,opt,name=seconds,proto3" json:"seconds,omitempty"`
+	// The part of the best run's rate that the interface carried beyond the test: people already using the node (already
+	// included in down_mbps / up_mbps). 0 = none, or the node's interface could not be read.
+	PeopleDownMbps uint32 `protobuf:"varint,6,opt,name=people_down_mbps,json=peopleDownMbps,proto3" json:"people_down_mbps,omitempty"`
+	PeopleUpMbps   uint32 `protobuf:"varint,7,opt,name=people_up_mbps,json=peopleUpMbps,proto3" json:"people_up_mbps,omitempty"`
+	// Runs that gave a result (of 3).
+	Runs          uint32 `protobuf:"varint,8,opt,name=runs,proto3" json:"runs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1982,6 +1988,27 @@ func (x *MeasureBandwidthResponse) GetErrorCode() string {
 func (x *MeasureBandwidthResponse) GetSeconds() uint32 {
 	if x != nil {
 		return x.Seconds
+	}
+	return 0
+}
+
+func (x *MeasureBandwidthResponse) GetPeopleDownMbps() uint32 {
+	if x != nil {
+		return x.PeopleDownMbps
+	}
+	return 0
+}
+
+func (x *MeasureBandwidthResponse) GetPeopleUpMbps() uint32 {
+	if x != nil {
+		return x.PeopleUpMbps
+	}
+	return 0
+}
+
+func (x *MeasureBandwidthResponse) GetRuns() uint32 {
+	if x != nil {
+		return x.Runs
 	}
 	return 0
 }
@@ -2467,14 +2494,17 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12+\n" +
 	"\x04node\x18\x04 \x01(\v2\x17.mistgate.admin.v1.NodeR\x04node\"2\n" +
 	"\x17MeasureBandwidthRequest\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\xa1\x01\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\x85\x02\n" +
 	"\x18MeasureBandwidthResponse\x12\x1b\n" +
 	"\tdown_mbps\x18\x01 \x01(\rR\bdownMbps\x12\x17\n" +
 	"\aup_mbps\x18\x02 \x01(\rR\x06upMbps\x12\x16\n" +
 	"\x06server\x18\x03 \x01(\tR\x06server\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x04 \x01(\tR\terrorCode\x12\x18\n" +
-	"\aseconds\x18\x05 \x01(\rR\aseconds\"O\n" +
+	"\aseconds\x18\x05 \x01(\rR\aseconds\x12(\n" +
+	"\x10people_down_mbps\x18\x06 \x01(\rR\x0epeopleDownMbps\x12$\n" +
+	"\x0epeople_up_mbps\x18\a \x01(\rR\fpeopleUpMbps\x12\x12\n" +
+	"\x04runs\x18\b \x01(\rR\x04runs\"O\n" +
 	"\x11RetireNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
 	"\fconfirm_name\x18\x02 \x01(\tR\vconfirmName\";\n" +

@@ -1,7 +1,9 @@
 // Package speedtest measures how fast a node reaches the internet, for the panel's "network capacity" suggestion
-// (agent.proto "BANDWIDTH TEST"). It is an estimate from one short test against a public server that needs no account:
-// parallel downloads for a few seconds, then parallel uploads, with a hard cap on the bytes moved and a deadline on every
-// phase. It asks nothing of the host and keeps nothing.
+// (agent.proto "BANDWIDTH TEST"). It is an estimate from a few short tests against a public server that needs no account:
+// three runs back to back, each with parallel downloads for a few seconds and then parallel uploads, the best run per
+// direction wins; a hard cap on the bytes moved and a deadline on every phase. In the counted window of every run the
+// node's main network interface is read too, so the traffic of the people already using the node counts as part of the
+// capacity instead of being lost from it. It asks nothing of the host and keeps nothing.
 package speedtest
 
 import (
@@ -31,32 +33,50 @@ type Endpoint struct {
 	UpURL string
 }
 
+// Counters reads the byte counters of the node's main network interface: its name (a changed name between two reads
+// means the route moved and the pair is useless), bytes received and bytes sent since boot. ok = false when it cannot.
+type Counters func() (iface string, rx, tx uint64, ok bool)
+
 // Config is the whole test. Default() is the production one; tests shrink it and point it at a local server.
 type Config struct {
 	Endpoints []Endpoint
 	// Client overrides the HTTP client (tests). Nil = a client without proxy or HTTP/2: every stream is its own TCP connection.
 	Client *http.Client
+	// Runs of download + upload one after another (at least 1), Pause between them.
+	Runs  int
+	Pause time.Duration
 	// DownStreams and UpStreams run in parallel.
 	DownStreams, UpStreams int
-	// DownFor and UpFor are the lengths of the two phases; in-flight uploads may finish up to upGrace later.
+	// DownFor and UpFor are the lengths of the two phases of a run; in-flight uploads may finish up to upGrace later.
 	DownFor, UpFor time.Duration
 	// Warm is the start of the download that does not count: TCP slow start. A run cut short (the cap) counts as a whole.
 	Warm time.Duration
-	// DownCap and UpCap are hard limits on the bytes moved in a phase. Together they are the 1 GB the admin UI promises.
+	// DownCap and UpCap are hard limits on the bytes moved in a phase of one run. Runs times both is the cap of a click.
 	DownCap, UpCap int64
-	// Overall ends everything, whatever the endpoints do.
+	// Overall ends everything, whatever the endpoints do. A run is not started when what is left would not fit it.
 	Overall time.Duration
+	// Counters is the host's interface counters; nil = the test alone is measured.
+	Counters Counters
+
+	beforeRun func(run int) // tests: called before each run, 0-based
 }
 
-// Result is what the panel gets.
+// Result is what the panel gets: the best run per direction.
 type Result struct {
-	// Mbps are megabits per second (10^6 bit/s), the unit of node.bandwidth_mbps. UpMbps is 0 when it could not be measured.
+	// Mbps are megabits per second (10^6 bit/s), the unit of node.bandwidth_mbps. Each is the better of what the test alone
+	// moved and what the interface carried in the same window, so people's traffic is part of it. UpMbps is 0 when it
+	// could not be measured.
 	DownMbps, UpMbps float64
-	Server           string
-	DownStreams      int
-	DownBytes        int64
-	UpBytes          int64
-	Seconds          float64
+	// PeopleDownMbps and PeopleUpMbps are what the interface carried beyond the test in the best run of that direction
+	// (traffic of people using the node), 0 when it was not more than the test's own headers, or there are no counters.
+	PeopleDownMbps, PeopleUpMbps float64
+	Server                       string
+	DownStreams                  int
+	// Runs that gave a result.
+	Runs      int
+	DownBytes int64 // all runs together
+	UpBytes   int64
+	Seconds   float64
 }
 
 const (
@@ -68,23 +88,28 @@ const (
 	maxFails = 3
 	// Upload requests start small, so a slow link finishes some within the phase, and double up to maxUpChunk.
 	firstUpChunk = 256 << 10
-	maxUpChunk   = 8 << 20
+	maxUpChunk   = 4 << 20
+	// wireOverhead: the interface counts every byte on the wire (IP, TCP and TLS headers, ACKs), the test only the payload.
+	// What the interface carried beyond the payload times this is people's traffic; the rest is the test's own overhead.
+	wireOverhead = 1.05
 )
 
-// Default is the production test: 6 streams down for 6 s (the first second is not counted), 4 up for 3 s, 700 MB down and
-// 300 MB up at most, 40 s in all. Cloudflare answers any size up to 50 MB per request and takes uploads; the two fallbacks
-// are plain files for a node that cannot reach it.
-func Default() Config {
+// Default is the production test: three runs of 6 streams down for 5 s (the first second is not counted) and 4 up for 2 s,
+// a second apart, at most 400 MB down and 100 MB up per run (1.5 GB in all), 45 s in all. Cloudflare answers any size up to
+// 50 MB per request (50 MB a request keeps the number of requests low: it rate-limits an address with 429) and takes uploads; the two fallbacks are plain files for a node that cannot reach it. counters may be nil.
+func Default(counters Counters) Config {
 	return Config{
 		Endpoints: []Endpoint{
-			{Name: "speed.cloudflare.com", DownURL: "https://speed.cloudflare.com/__down?bytes=25000000", UpURL: "https://speed.cloudflare.com/__up"},
+			{Name: "speed.cloudflare.com", DownURL: "https://speed.cloudflare.com/__down?bytes=50000000", UpURL: "https://speed.cloudflare.com/__up"},
 			{Name: "proof.ovh.net", DownURL: "https://proof.ovh.net/files/1Gb.dat"},
 			{Name: "cachefly.net", DownURL: "https://cachefly.cachefly.net/100mb.test"},
 		},
+		Runs: 3, Pause: time.Second,
 		DownStreams: 6, UpStreams: 4,
-		DownFor: 6 * time.Second, UpFor: 3 * time.Second, Warm: time.Second,
-		DownCap: 700_000_000, UpCap: 300_000_000,
-		Overall: 40 * time.Second,
+		DownFor: 5 * time.Second, UpFor: 2 * time.Second, Warm: time.Second,
+		DownCap: 400_000_000, UpCap: 100_000_000,
+		Overall:  45 * time.Second,
+		Counters: counters,
 	}
 }
 
@@ -105,8 +130,16 @@ func (c Config) client() *http.Client {
 	}}
 }
 
-// Run measures with the first endpoint that works: its download, then its upload when it has one. A failed upload does
-// not fail the run (UpMbps stays 0); a download that moved no byte moves on to the next endpoint.
+// run is one download + upload.
+type run struct {
+	down, up             float64 // the estimates: test or interface, the larger
+	peopleDown, peopleUp float64
+	downBytes, upBytes   int64
+}
+
+// Run measures Runs times with the first endpoint that works for the first run, and keeps the best run per direction. A
+// failed upload does not fail a run (its up stays 0); a download that moved no byte moves the first run on to the next
+// endpoint; a later run that fails, or does not fit in what is left of Overall, is skipped. It fails only when no run worked.
 func Run(ctx context.Context, cfg Config) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Overall)
 	defer cancel()
@@ -115,34 +148,101 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 		defer t.CloseIdleConnections()
 	}
 	start := time.Now()
+	res := Result{DownStreams: cfg.DownStreams}
+	var best struct{ down, up run }
+	var chosen *Endpoint
 	var last error
-	for _, ep := range cfg.Endpoints {
-		if ctx.Err() != nil {
-			break
+	one := func(ep Endpoint, i int) (run, error) {
+		if cfg.beforeRun != nil {
+			cfg.beforeRun(i)
 		}
-		down, err := download(ctx, cl, cfg, ep)
-		if err != nil {
-			last = fmt.Errorf("%s: %w", ep.Name, err)
-			continue
+		return doRun(ctx, cl, cfg, ep)
+	}
+	take := func(r run) {
+		res.Runs++
+		res.DownBytes += r.downBytes
+		res.UpBytes += r.upBytes
+		if res.Runs == 1 || r.down > best.down.down {
+			best.down = r
 		}
-		res := Result{Server: ep.Name, DownMbps: down.mbps, DownStreams: cfg.DownStreams, DownBytes: down.bytes}
-		if ep.UpURL != "" && ctx.Err() == nil {
-			if up, err := upload(ctx, cl, cfg, ep); err == nil {
-				res.UpMbps, res.UpBytes = up.mbps, up.bytes
+		if r.up > best.up.up {
+			best.up = r
+		}
+	}
+	need := cfg.DownFor + cfg.UpFor + upGrace
+	for i := range max(cfg.Runs, 1) {
+		if i > 0 {
+			sleep(ctx, cfg.Pause)
+			if d, ok := ctx.Deadline(); (ok && time.Until(d) < need) || ctx.Err() != nil {
+				break
 			}
 		}
-		res.Seconds = time.Since(start).Seconds()
-		return res, nil
+		if chosen != nil {
+			if r, err := one(*chosen, i); err == nil {
+				take(r)
+			} else {
+				last = fmt.Errorf("%s: %w", chosen.Name, err)
+			}
+			continue
+		}
+		for _, ep := range cfg.Endpoints {
+			if ctx.Err() != nil {
+				break
+			}
+			r, err := one(ep, i)
+			if err != nil {
+				last = fmt.Errorf("%s: %w", ep.Name, err)
+				continue
+			}
+			take(r)
+			chosen = &ep
+			break
+		}
+		if chosen == nil {
+			break // nothing answers: more runs would only repeat it
+		}
 	}
-	if last == nil {
-		last = ctx.Err()
+	if chosen == nil {
+		if last == nil {
+			last = ctx.Err()
+		}
+		return Result{}, fmt.Errorf("%w: %v", ErrUnreachable, last)
 	}
-	return Result{}, fmt.Errorf("%w: %v", ErrUnreachable, last)
+	res.Server = chosen.Name
+	res.DownMbps, res.PeopleDownMbps = best.down.down, best.down.peopleDown
+	res.UpMbps, res.PeopleUpMbps = best.up.up, best.up.peopleUp
+	res.Seconds = time.Since(start).Seconds()
+	return res, nil
 }
 
+// doRun is one download, then (when the endpoint takes one) one upload.
+func doRun(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (run, error) {
+	down, err := download(ctx, cl, cfg, ep)
+	if err != nil {
+		return run{}, err
+	}
+	r := run{downBytes: down.bytes}
+	r.down, r.peopleDown = combine(down)
+	if ep.UpURL != "" && ctx.Err() == nil {
+		if up, err := upload(ctx, cl, cfg, ep); err == nil {
+			r.upBytes = up.bytes
+			r.up, r.peopleUp = combine(up)
+		}
+	}
+	return r, nil
+}
+
+// combine takes the better of the test's rate and the interface's in the same window, and what the interface carried beyond
+// the test (with room for the test's own headers).
+func combine(p phase) (est, people float64) {
+	return max(p.mbps, p.nic), max(0, p.nic-p.mbps*wireOverhead)
+}
+
+// phase is one direction of one run: the test's payload rate, and the interface's rate in the same window (0 = not known).
 type phase struct {
 	bytes int64
 	mbps  float64
+	nic   float64
 }
 
 func mbps(bytes int64, d time.Duration) float64 {
@@ -152,15 +252,55 @@ func mbps(bytes int64, d time.Duration) float64 {
 	return float64(bytes) * 8 / d.Seconds() / 1e6
 }
 
+// nicSample is one read of the counters.
+type nicSample struct {
+	iface  string
+	rx, tx uint64
+	ok     bool
+}
+
+func (c Config) sample() nicSample {
+	if c.Counters == nil {
+		return nicSample{}
+	}
+	i, rx, tx, ok := c.Counters()
+	return nicSample{iface: i, rx: rx, tx: tx, ok: ok}
+}
+
+// nicRate is the interface's rate between two reads in Mbps: received bytes for a download, sent bytes for an upload. 0
+// when either read failed, the interface changed or a counter went back.
+func nicRate(a, b nicSample, d time.Duration, received bool) float64 {
+	if !a.ok || !b.ok || a.iface != b.iface {
+		return 0
+	}
+	from, to := a.tx, b.tx
+	if received {
+		from, to = a.rx, b.rx
+	}
+	if to < from {
+		return 0
+	}
+	return mbps(int64(to-from), d)
+}
+
 // download reads from the endpoint on DownStreams connections until DownFor is over or DownCap bytes have come.
 func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (phase, error) {
 	dctx, stop := context.WithTimeout(ctx, cfg.DownFor)
 	defer stop()
-	var n, warmN, warmAt atomic.Int64 // warmAt: nanoseconds after the start when the warm-up ended, 0 = not yet
+	var n atomic.Int64
+	var mu sync.Mutex // guards the warm-up mark
+	var warmN int64
+	var warmAt time.Duration // after the start, 0 = not yet
+	var warmNIC nicSample
+	startNIC := cfg.sample()
 	start := time.Now()
-	markWarm := func() { warmN.Store(n.Load()); warmAt.Store(int64(time.Since(start))) }
 	if cfg.Warm > 0 {
-		t := time.AfterFunc(cfg.Warm, markWarm)
+		t := time.AfterFunc(cfg.Warm, func() {
+			s := cfg.sample()
+			mu.Lock()
+			warmN, warmAt, warmNIC = n.Load(), time.Since(start), s
+			mu.Unlock()
+		})
 		defer t.Stop()
 	}
 	var lastErr atomic.Value
@@ -185,6 +325,7 @@ func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (ph
 	}
 	wg.Wait()
 	end := time.Since(start)
+	endNIC := cfg.sample()
 	total := n.Load()
 	if total == 0 {
 		msg, _ := lastErr.Load().(string)
@@ -193,11 +334,13 @@ func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (ph
 		}
 		return phase{}, errors.New(msg)
 	}
-	b, d := total, end
-	if at := time.Duration(warmAt.Load()); at > 0 && end-at >= minWindow {
-		b, d = total-warmN.Load(), end-at
+	mu.Lock()
+	defer mu.Unlock()
+	b, d, from := total, end, startNIC
+	if warmAt > 0 && end-warmAt >= minWindow {
+		b, d, from = total-warmN, end-warmAt, warmNIC
 	}
-	return phase{bytes: total, mbps: mbps(b, d)}, nil
+	return phase{bytes: total, mbps: mbps(b, d), nic: nicRate(from, endNIC, d, true)}, nil
 }
 
 // get reads one response to the end (or until ctx ends) and adds what came to n; it asks for the phase to stop at the cap.
@@ -236,7 +379,7 @@ func get(ctx context.Context, cl *http.Client, url string, n *atomic.Int64, limi
 
 // upload POSTs zeros on UpStreams connections. Only requests that were answered count: the bytes a socket has accepted
 // are not the bytes that left (the send buffers hide seconds of a slow link), so no new request starts after UpFor and the
-// ones in flight may finish within upGrace.
+// ones in flight may finish within upGrace. The whole phase is the window (the interface is read at both ends of it).
 func upload(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (phase, error) {
 	uctx, stop := context.WithTimeout(ctx, cfg.UpFor)
 	defer stop()
@@ -244,6 +387,7 @@ func upload(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (phas
 	defer cancel()
 	zeros := make([]byte, maxUpChunk)
 	var n atomic.Int64
+	startNIC := cfg.sample()
 	start := time.Now()
 	var wg sync.WaitGroup
 	for range cfg.UpStreams {
@@ -266,11 +410,13 @@ func upload(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (phas
 		}()
 	}
 	wg.Wait()
+	d := time.Since(start)
+	endNIC := cfg.sample()
 	total := n.Load()
 	if total == 0 {
 		return phase{}, errors.New("no upload")
 	}
-	return phase{bytes: total, mbps: mbps(total, time.Since(start))}, nil
+	return phase{bytes: total, mbps: mbps(total, d), nic: nicRate(startNIC, endNIC, d, false)}, nil
 }
 
 func post(ctx context.Context, cl *http.Client, url string, body []byte) error {

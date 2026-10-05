@@ -23,8 +23,8 @@ service NodeService {
   // awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
   // "agent too old" / "the node is not connected".
   rpc PrepareAwgKernel(PrepareAwgKernelRequest) returns (PrepareAwgKernelResponse);
-  // Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
-  // up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+  // Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: three runs, about 30 seconds,
+  // up to 1.5 GB through a public speed server, the best run counts, and the traffic of the people already using the node during the test is part of the result. It only returns the result; it never changes bandwidth_mbps (the admin
   // chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
   // FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
   // in error_code. One measurement per node at a time.
@@ -308,6 +308,12 @@ message MeasureBandwidthResponse {
   string error_code = 4;
   // How long the whole measurement took, in seconds.
   uint32 seconds = 5;
+  // The part of the best run's rate that the interface carried beyond the test: people already using the node (already
+  // included in down_mbps / up_mbps). 0 = none, or the node's interface could not be read.
+  uint32 people_down_mbps = 6;
+  uint32 people_up_mbps = 7;
+  // Runs that gave a result (of 3).
+  uint32 runs = 8;
 }
 
 message RetireNodeRequest {

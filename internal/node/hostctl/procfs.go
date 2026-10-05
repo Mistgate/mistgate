@@ -2,6 +2,8 @@ package hostctl
 
 import (
 	"bufio"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -86,6 +88,25 @@ func parseNetDev(s, iface string) (rx, tx uint64, ok bool) {
 		return r, t, e1 == nil && e2 == nil
 	}
 	return 0, 0, false
+}
+
+// NICCounters returns the byte counters since boot of the main network interface (the default route's, see defaultIface):
+// its name, bytes received and bytes sent. It is what the host metrics' NetRxBps and NetTxBps are computed from, and what the
+// bandwidth test reads to count the people already using the node. ok = false where there is no /proc or no default route.
+func NICCounters() (iface string, rx, tx uint64, ok bool) { return NICCountersAt("/proc") }
+
+// NICCountersAt is NICCounters under another /proc root (tests).
+func NICCountersAt(procRoot string) (iface string, rx, tx uint64, ok bool) {
+	read := func(rel string) string {
+		b, _ := os.ReadFile(filepath.Join(procRoot, rel))
+		return string(b)
+	}
+	iface = defaultIface(read("net/route"), read("net/ipv6_route"))
+	if iface == "" {
+		return "", 0, 0, false
+	}
+	rx, tx, ok = parseNetDev(read("net/dev"), iface)
+	return iface, rx, tx, ok
 }
 
 // defaultIface returns the interface of the IPv4 default route from /proc/net/route, else that of the IPv6 default

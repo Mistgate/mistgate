@@ -19,7 +19,7 @@ import (
 var bwCaps = []string{"doctor/1", "bandwidth/1"}
 
 func measured(down, up string) *agentv1.CommandResult {
-	return &agentv1.CommandResult{Ok: true, Params: map[string]string{"down_mbps": down, "up_mbps": up, "server": "speed.cloudflare.com", "seconds": "9"}}
+	return &agentv1.CommandResult{Ok: true, Params: map[string]string{"down_mbps": down, "up_mbps": up, "server": "speed.cloudflare.com", "seconds": "29", "runs": "3", "down_people_mbps": "35", "up_people_mbps": "0"}}
 }
 
 // answerMeasure plays the agent: it answers the next MeasureBandwidth (after `after` is closed, when given) with res.
@@ -105,7 +105,7 @@ func TestMeasureBandwidthReturnsTheResultAndNeverWritesTheCapacity(t *testing.T)
 	if p := <-asked; p.RequestId == "" {
 		t.Error("the request carried no id")
 	}
-	if r.ErrorCode != "" || r.DownMbps != 940 || r.UpMbps != 871 || r.Server != "speed.cloudflare.com" || r.Seconds != 9 {
+	if r.ErrorCode != "" || r.DownMbps != 940 || r.UpMbps != 871 || r.Server != "speed.cloudflare.com" || r.Seconds != 29 || r.Runs != 3 || r.PeopleDownMbps != 35 || r.PeopleUpMbps != 0 {
 		t.Errorf("response = %v", r)
 	}
 	if got := x.capacity(); got != 500 {
@@ -149,10 +149,12 @@ func TestMeasureBandwidthHoldsANodesNumbersToTheLimit(t *testing.T) {
 	x, a := newL3Env(t)
 	x.f.measureDelay = time.Hour
 	c, _, _ := connectCaps(a, "new", bwCaps...)
-	answerMeasure(c, measured("99999999", "-5"), nil)
+	res := measured("99999999", "-5")
+	res.Params["down_people_mbps"], res.Params["up_people_mbps"] = "999999999", "7"
+	answerMeasure(c, res, nil)
 	r, err := callMeasure(x, a.nodeID)
-	if err != nil || r.DownMbps != 1_000_000 || r.UpMbps != 0 {
-		t.Errorf("%v %v: an agent's number must not exceed what UpdateNode accepts, nor be negative", r, err)
+	if err != nil || r.DownMbps != 1_000_000 || r.UpMbps != 0 || r.PeopleDownMbps != 1_000_000 || r.PeopleUpMbps != 0 {
+		t.Errorf("%v %v: an agent's number must not exceed what UpdateNode accepts, nor be negative, and the people's share is a part of the figure, never more", r, err)
 	}
 }
 

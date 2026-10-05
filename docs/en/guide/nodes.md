@@ -156,15 +156,17 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 
 #### Measuring the network capacity
 
-Providers often do not state the real channel, and a virtual server's network card does not report the plan's limit, so the node can measure how fast it reaches the internet. Next to **Network capacity** the owner presses **Measure**. The agent on the node downloads for about 6 seconds over 6 parallel connections from a public speed server that needs no account (`speed.cloudflare.com`; if the node cannot reach it, a file on `proof.ovh.net`, then on `cachefly.net`), leaves out the first second (TCP is still speeding up), and then uploads for about 3 seconds over 4 connections to Cloudflare. The whole test takes about 10 seconds, moves at most 1 GB (up to 700 MB down and 300 MB up), and ends within 40 seconds whatever the servers do. Only one measurement runs on a node at a time.
+Providers often do not state the real channel, and a virtual server's network card does not report the plan's limit, so the node can measure how fast it reaches the internet. Next to **Network capacity** the owner presses **Measure**. One measurement is **three runs** back to back, a second apart, and the best run counts, per direction. In a run the agent on the node downloads for about 5 seconds over 6 parallel connections from a public speed server that needs no account (`speed.cloudflare.com`; if the node cannot reach it, a file on `proof.ovh.net`, then on `cachefly.net`), leaves out the first second (TCP is still speeding up), and then uploads for about 2 seconds over 4 connections to Cloudflare. The whole measurement takes about 30 seconds, moves at most 1.5 GB (per run up to 400 MB down and 100 MB up), and ends within 45 seconds whatever the servers do. Only one measurement runs on a node at a time.
 
 The panel shows "Measured: 940 Mbps ↓ · 870 ↑" and, next to it, **Use 940**. It puts the **download** figure, rounded (to 5 below 100, to 10 below 1000, to 50 above), into the field; nothing is saved until you press **Save**, and the measurement never overwrites a value you typed by itself. Uploads are measured only against Cloudflare: if the node fell back to another server, the upload is not measured.
 
+**The people already on the node count.** During the counted part of every run the agent also reads the byte counters of the node's main network interface (the same ones the node's load figures come from). The estimate of a direction in a run is the larger of what the test alone moved and what the whole interface carried in that window, so what the people using the node carry during the test is part of the capacity, not lost from it. When the interface carried more than the test did (allowing for the test's own protocol overhead), the panel adds "Including people's traffic: 35 Mbps ↓". That part is already inside the figures, not on top of them. If the counters cannot be read, only the test counts.
+
 Take the number as an estimate, not as the provider's limit:
 
-- It is one short test. It depends on the route from the node to that test server, which can be slower or faster than the route to your users.
-- It measures what the node can use **now**. Whatever the node carries for its users at that moment is part of the link, and the users feel the test too: their speed may dip for those 10 seconds.
-- A very fast link (above a few Gbit/s) hits the 1 GB limit within a second or two and the result is a lower bound.
+- It is three short tests. It depends on the route from the node to that test server, which can be slower or faster than the route to your users.
+- It measures what the node can use **now**, and the users feel the test: their speed may dip for those 30 seconds.
+- A very fast link (above a few Gbit/s) hits the 400 MB limit of a run's download within a second or two and the result is a lower bound.
 - The result says which server answered. If your provider states the limit, keep their figure.
 
 Only the owner can measure (the API refuses tokens and MCP), and each measurement is written to the audit log (`node.bandwidth_measure`). It needs a node with the agent from this release or newer: for an older agent the panel says "agent too old" and sends nothing, and the node must be connected. The node needs outbound HTTPS to the test servers.

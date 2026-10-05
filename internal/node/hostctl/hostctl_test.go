@@ -1,6 +1,8 @@
 package hostctl
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -104,6 +106,22 @@ func TestProcParsers(t *testing.T) {
 	}
 	if defaultIface("Iface\tDestination\n", "") != "" {
 		t.Fatal("no default route")
+	}
+	// the counters the bandwidth test reads: the default route's interface and its byte counters, from a /proc tree
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "net"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"net/route": route, "net/ipv6_route": "", "net/dev": dev} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if iface, rx, tx, ok := NICCountersAt(root); !ok || iface != "eth0" || rx != 1000 || tx != 2000 {
+		t.Fatalf("NICCountersAt = %q %d %d %v", iface, rx, tx, ok)
+	}
+	if _, _, _, ok := NICCountersAt(t.TempDir()); ok {
+		t.Fatal("an empty /proc has no main interface")
 	}
 	if parseBtime("cpu 1\nbtime 1700000000\n") != 1700000000 {
 		t.Fatal("btime")

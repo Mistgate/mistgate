@@ -18,6 +18,15 @@ export function BandwidthMeasure({ nodeId, current, onUse }: { nodeId: string; c
   const r = measure.data;
   const value = r && !r.errorCode && r.downMbps > 0 ? roundMbps(r.downMbps) : 0;
 
+  // what people already on the node carried during the test (it is inside the figures above, not added to them)
+  const people = !r || !value ? "" : r.peopleDownMbps > 0 && r.peopleUpMbps > 0
+    ? t("node.settings.bandwidthPeopleBoth", { down: r.peopleDownMbps, up: r.peopleUpMbps })
+    : r.peopleDownMbps > 0
+      ? t("node.settings.bandwidthPeopleDown", { down: r.peopleDownMbps })
+      : r.peopleUpMbps > 0
+        ? t("node.settings.bandwidthPeopleUp", { up: r.peopleUpMbps })
+        : "";
+
   const failure = (() => {
     if (measure.error) {
       // the node did not answer within the panel's wait: our own sentence, not the generic "network" one
@@ -56,7 +65,8 @@ export function BandwidthMeasure({ nodeId, current, onUse }: { nodeId: string; c
               ? t("node.settings.bandwidthMeasured", { down: r.downMbps, up: r.upMbps })
               : t("node.settings.bandwidthMeasuredNoUp", { down: r.downMbps })}
           </span>
-          <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.bandwidthMeasuredNote", { server: r.server })}</span>
+          {people && <span className="text-xs leading-snug text-pretty">{people}</span>}
+          <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.bandwidthMeasuredNote", { server: r.server, runs: Math.max(r.runs, 1) })}</span>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <Button type="button" variant="primary" size="sm" disabled={current.trim() === String(value)} onClick={() => onUse(String(value))}>
               {t("node.settings.bandwidthUse", { value })}

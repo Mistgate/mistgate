@@ -113,7 +113,7 @@ describe("a new install command", () => {
 
 describe("measuring the network capacity", () => {
   const field = () => document.querySelector<HTMLInputElement>('input[type="number"]')!;
-  const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 9, ...over });
+  const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 29, runs: 3, peopleDownMbps: 0, peopleUpMbps: 0, ...over });
 
   it("starts as a button with what it does, and a click shows it is busy until the node answers", async () => {
     let answer!: (v: unknown) => void;
@@ -126,7 +126,8 @@ describe("measuring the network capacity", () => {
     expect(busy).toBeDefined();
     expect(busy!.hasAttribute("disabled") || busy!.getAttribute("data-disabled") !== null).toBe(true);
     expect(text()).toContain(en["node.settings.bandwidthMeasureBusy"]);
-    expect(text()).toContain("1 GB");
+    expect(text()).toContain("30 seconds");
+    expect(text()).toContain("1.5 GB");
     await act(async () => answer(measured()));
     for (let i = 0; i < 3; i++) await settle();
     expect(button(en["node.settings.bandwidthMeasuring"])).toBeUndefined();
@@ -147,6 +148,28 @@ describe("measuring the network capacity", () => {
     const save2 = button(en["common.save"])!;
     expect(save2.hasAttribute("disabled") || save2.getAttribute("data-disabled") !== null).toBe(false);
     expect(button("Use 940")!.hasAttribute("disabled") || button("Use 940")!.getAttribute("data-disabled") !== null).toBe(true); // it is in the field now
+  });
+
+  it("says how much of the figure is the people already on the node, only when there is some", async () => {
+    measureBandwidth.mockResolvedValue(measured());
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(text()).not.toContain("people's traffic");
+    expect(text()).toContain("best of 3 runs");
+
+    for (const [over, want] of [
+      [{ peopleDownMbps: 35 }, "Including people's traffic: 35 Mbps ↓"],
+      [{ peopleUpMbps: 12 }, "Including people's traffic: 12 Mbps ↑"],
+      [{ peopleDownMbps: 35, peopleUpMbps: 12 }, "Including people's traffic: 35 Mbps ↓ · 12 ↑"],
+    ] as const) {
+      act(() => root?.unmount());
+      host?.remove();
+      measureBandwidth.mockResolvedValue(measured(over));
+      await mount(NodeStatus.ONLINE);
+      await click(button(en["node.settings.bandwidthMeasure"]));
+      expect(text()).toContain(want);
+      expect(text()).toContain("Measured: 937 Mbps ↓ · 871 ↑"); // the figures already include them
+    }
   });
 
   it("says so when only the download could be measured", async () => {

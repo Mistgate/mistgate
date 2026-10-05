@@ -75,8 +75,8 @@ type NodeServiceClient interface {
 	// awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
 	// "agent too old" / "the node is not connected".
 	PrepareAwgKernel(context.Context, *connect.Request[v1.PrepareAwgKernelRequest]) (*connect.Response[v1.PrepareAwgKernelResponse], error)
-	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
-	// up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: three runs, about 30 seconds,
+	// up to 1.5 GB through a public speed server, the best run counts, and the traffic of the people already using the node during the test is part of the result. It only returns the result; it never changes bandwidth_mbps (the admin
 	// chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
 	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
 	// in error_code. One measurement per node at a time.
@@ -233,8 +233,8 @@ type NodeServiceHandler interface {
 	// awg_backend "kernel" (unless the admin chose another backend in the meantime). Fails with FAILED_PRECONDITION
 	// "agent too old" / "the node is not connected".
 	PrepareAwgKernel(context.Context, *connect.Request[v1.PrepareAwgKernelRequest]) (*connect.Response[v1.PrepareAwgKernelResponse], error)
-	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: about 10 seconds,
-	// up to 1 GB through a public speed server. It only returns the result; it never changes bandwidth_mbps (the admin
+	// Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: three runs, about 30 seconds,
+	// up to 1.5 GB through a public speed server, the best run counts, and the traffic of the people already using the node during the test is part of the result. It only returns the result; it never changes bandwidth_mbps (the admin
 	// chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
 	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
 	// in error_code. One measurement per node at a time.

@@ -27,7 +27,7 @@ func askMeasure(h *harness, id string) *pb.CommandResult {
 func TestBandwidthIsListedAndAnswersWithTheMeasuredNumbers(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) {
 		c.SpeedTest = func(context.Context) (speedtest.Result, error) {
-			return speedtest.Result{DownMbps: 939.6, UpMbps: 871.2, Server: "speed.cloudflare.com", DownStreams: 6, DownBytes: 700_000_000, UpBytes: 120_000_000, Seconds: 9.4}, nil
+			return speedtest.Result{DownMbps: 939.6, UpMbps: 871.2, Server: "speed.cloudflare.com", DownStreams: 6, DownBytes: 700_000_000, UpBytes: 120_000_000, Seconds: 29.4, Runs: 3, PeopleDownMbps: 34.6, PeopleUpMbps: 0.2}, nil
 		}
 	}})
 	if !contains((<-h.panel.hellos).Capabilities, "bandwidth/1") {
@@ -36,7 +36,7 @@ func TestBandwidthIsListedAndAnswersWithTheMeasuredNumbers(t *testing.T) {
 	h.waitConnected()
 	r := askMeasure(h, "req_b")
 	want := map[string]string{"down_mbps": "940", "up_mbps": "871", "server": "speed.cloudflare.com", "streams": "6",
-		"down_bytes": "700000000", "up_bytes": "120000000", "seconds": "9"}
+		"down_bytes": "700000000", "up_bytes": "120000000", "seconds": "29", "runs": "3", "down_people_mbps": "35", "up_people_mbps": "0"}
 	if !r.Ok || r.Error != "" {
 		t.Fatalf("answer = %+v", r)
 	}
