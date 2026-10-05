@@ -64,6 +64,12 @@ describe("the preview of names and texts", () => {
     expect(document.body.textContent).toContain("Пример с выдуманными серверами.");
   });
 
+  it("takes no longer a name or a template than the server stores (subsettings maxTitle, maxName)", async () => {
+    await mount({ settings: settings(), effectiveTitle: "Mistgate" });
+    expect(document.querySelector<HTMLInputElement>("#subs-title")!.maxLength).toBe(100);
+    expect(document.querySelector<HTMLInputElement>("#subs-template")!.maxLength).toBe(100);
+  });
+
   it("counts the announcement against what Happ shows, and the preview cuts it the way Happ gets it", async () => {
     await mount({ settings: settings(), effectiveTitle: "Mistgate", samples, sampleGroup: "Все", namesLanguage: "ru" });
     const count = () => document.querySelector("#subs-announce-count")!;

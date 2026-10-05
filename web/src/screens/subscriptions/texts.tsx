@@ -79,7 +79,7 @@ function TextsForm({ data }: { data: Data }) {
               {t("subs.texts.sub")}
             </SectionLabel>
             <FieldBlock label={t("subs.texts.title")} htmlFor="subs-title" hint={t("subs.texts.titleHint")} className="border-t-0! pt-0!">
-              <input id="subs-title" className={inputCls} value={f.title} placeholder={data.effectiveTitle} onChange={(e) => set("title", e.target.value)} maxLength={120} autoComplete="off" />
+              <input id="subs-title" className={inputCls} value={f.title} placeholder={data.effectiveTitle} onChange={(e) => set("title", e.target.value)} maxLength={100} autoComplete="off" />
             </FieldBlock>
             <FieldBlock label={t("subs.texts.announce")} htmlFor="subs-announce" hint={<AnnounceHint t={t} text={f.announcement} />}>
               <textarea
@@ -121,7 +121,7 @@ function TextsForm({ data }: { data: Data }) {
               {t("subs.texts.servers")}
             </SectionLabel>
             <FieldBlock label={t("subs.texts.name")} htmlFor="subs-template" hint={<FlagText text={t("subs.texts.nameHint")} size={10} />} className="border-t-0! pt-0!">
-              <input ref={tplRef} id="subs-template" className={`${inputCls} font-mono`} value={f.template} placeholder={defaultNameTemplate} onChange={(e) => set("template", e.target.value)} maxLength={120} autoComplete="off" spellCheck={false} />
+              <input ref={tplRef} id="subs-template" className={`${inputCls} font-mono`} value={f.template} placeholder={defaultNameTemplate} onChange={(e) => set("template", e.target.value)} maxLength={100} autoComplete="off" spellCheck={false} />
               <div role="group" aria-label={t("subs.texts.nameChips")} className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-muted">{t("subs.texts.pieces")}:</span>
                 {chips.map((c) => (
