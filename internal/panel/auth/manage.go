@@ -251,8 +251,10 @@ var (
 		"setup", "login", "login_password", "logout", "lockout", "stepup", "captcha", "turnstile_off", "page_unlock_lockout",
 		"passkey_add", "passkey_remove", "session_end", "sessions_end_others", "password_change", "password_add", "totp_rebind", "reset_login",
 	}
-	auditChangeActions  = []string{"instance_update", "security_update", "subscription_settings_update", "mcp_apply"}
-	auditChangePrefixes = []string{"user_", "users_", "group_", "profile_", "inbound_", "preset_", "device_", "node.", "warp_", "update_", "health.", "token_", "approval_"}
+	auditChangeActions = []string{"instance_update", "security_update", "subscription_settings_update", "mcp_apply", "panel_update",
+		"node_update_schedule", "node_update_schedule_cancel"}
+	auditChangePrefixes = []string{"user_", "users_", "group_", "profile_", "inbound_", "preset_", "device_", "node.", "warp_", "update_", "health.", "token_", "approval_",
+		"backup_"}
 )
 
 var auditSources = map[adminv1.AuditSource]string{
