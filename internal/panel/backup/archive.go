@@ -2,6 +2,7 @@ package backup
 
 import (
 	"archive/tar"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"filippo.io/age"
+	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -375,10 +377,11 @@ func RestoreEncryptedArchive(ctx context.Context, src io.Reader, identities []ag
 			_ = os.RemoveAll(stage)
 		}
 	}()
-	if err := extractEncryptedArchive(ctx, src, identities, stage); err != nil {
+	var manifest backupManifest
+	if err := extractEncryptedArchive(ctx, src, identities, stage, &manifest); err != nil {
 		return err
 	}
-	if err := validateRestoredData(ctx, stage); err != nil {
+	if err := validateRestoredData(ctx, stage, manifest.AppVersion); err != nil {
 		return err
 	}
 	if _, err := os.Lstat(target); err == nil {
@@ -393,7 +396,8 @@ func RestoreEncryptedArchive(ctx context.Context, src io.Reader, identities []ag
 	return nil
 }
 
-func extractEncryptedArchive(ctx context.Context, src io.Reader, identities []age.Identity, stage string) error {
+// extractEncryptedArchive checks and unpacks an archive into stage; out gets its manifest.
+func extractEncryptedArchive(ctx context.Context, src io.Reader, identities []age.Identity, stage string, out *backupManifest) error {
 	limitedCiphertext := &io.LimitedReader{R: src, N: maxEncryptedBytes + 1}
 	decrypted, err := age.Decrypt(limitedCiphertext, identities...)
 	if err != nil {
@@ -418,6 +422,7 @@ func extractEncryptedArchive(ctx context.Context, src io.Reader, identities []ag
 	if err != nil {
 		return err
 	}
+	*out = manifest
 	expected := make(map[string]backupFile, len(manifest.Files))
 	for _, file := range manifest.Files {
 		if err := validateArchivePath(file.Path); err != nil || file.Path == manifestName || file.Size < 0 || file.Size > maxBackupBytes || len(file.SHA256) != sha256.Size*2 {
@@ -555,7 +560,9 @@ func copyContextN(ctx context.Context, dst io.Writer, src io.Reader, limit int64
 	return copyContext(ctx, dst, io.LimitReader(src, limit))
 }
 
-func validateRestoredData(ctx context.Context, root string) error {
+// validateRestoredData checks the unpacked data before it becomes a data directory: a usable master key, and a database
+// this binary can run (not newer than its migrations; opening it applies those it lacks) that passes an integrity check.
+func validateRestoredData(ctx context.Context, root, appVersion string) error {
 	key, err := os.ReadFile(filepath.Join(root, masterKeyName))
 	if err != nil {
 		return errors.New("backup: master key is missing")
@@ -569,6 +576,12 @@ func validateRestoredData(ctx context.Context, root string) error {
 	dbPath := filepath.Join(root, databaseName)
 	if info, err := os.Lstat(dbPath); err != nil || !info.Mode().IsRegular() {
 		return errors.New("backup: database file is missing or invalid")
+	}
+	if have, know, err := store.SchemaVersions(ctx, dbPath); err != nil {
+		return fmt.Errorf("backup: read the restored database version: %w", err)
+	} else if have > know {
+		return fmt.Errorf("backup: the archive comes from a newer Mistgate (%s): its database schema is %d, this binary (%s) knows %d at most; restore it with that version or a newer one",
+			cmp.Or(appVersion, "version unknown"), have, buildinfo.Version, know)
 	}
 	st, err := store.Open(ctx, dbPath)
 	if err != nil {

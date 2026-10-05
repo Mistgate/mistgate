@@ -132,6 +132,28 @@ func (s *Store) migrate(ctx context.Context) error {
 	return nil
 }
 
+// SchemaVersions are the newest migration applied to the database file at path, read without migrating it, and the
+// newest one this binary carries. goose accepts a database newer than the binary, whose code would not know its tables:
+// a restore compares the two first.
+func SchemaVersions(ctx context.Context, path string) (db, binary int64, err error) {
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, e := range entries {
+		if n, err := goose.NumericComponent(e.Name()); err == nil {
+			binary = max(binary, n)
+		}
+	}
+	r, err := openDB(path, 1, true)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer r.Close()
+	err = r.QueryRowContext(ctx, `SELECT coalesce(max(version_id), 0) FROM goose_db_version`).Scan(&db)
+	return db, binary, err
+}
+
 // Close closes both pools.
 func (s *Store) Close() error {
 	return errors.Join(s.R.Close(), s.W.Close())

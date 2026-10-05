@@ -93,6 +93,50 @@ func TestEncryptedArchiveRoundTripIncludesCommittedWAL(t *testing.T) {
 	}
 }
 
+// An archive from a newer panel, whose database is past the migrations of this binary, is refused with a clear message:
+// goose would take that database, and this code would not know its tables.
+func TestRestoreRefusesANewerSchema(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	dbPath := filepath.Join(dataDir, databaseName)
+	st, err := store.Open(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	key, err := vault.LoadKey(dataDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, latest, err := store.SchemaVersions(ctx, dbPath)
+	if err != nil || latest < 40 {
+		t.Fatalf("this binary's schema = %d, %v", latest, err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO goose_db_version (version_id, is_applied) VALUES (?, 1)`, latest+1); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := st.SnapshotDatabase(ctx, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := age.GenerateHybridIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encrypted bytes.Buffer
+	if err := CreateEncryptedArchive(ctx, dataDir, snapshot, key, "v9.9.9", identity.Recipient().String(), time.Now(), &encrypted); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restored")
+	err = RestoreEncryptedArchive(ctx, bytes.NewReader(encrypted.Bytes()), []age.Identity{identity}, target)
+	if err == nil || !strings.Contains(err.Error(), "newer Mistgate (v9.9.9)") {
+		t.Fatalf("restore of a newer schema = %v", err)
+	}
+	if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a refused restore created the destination: %v", err)
+	}
+}
+
 func TestRestoreRejectsWrongIdentityAndNeverOverwrites(t *testing.T) {
 	identity, err := age.GenerateHybridIdentity()
 	if err != nil {

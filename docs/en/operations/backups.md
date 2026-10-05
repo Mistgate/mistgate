@@ -45,6 +45,8 @@ mistgate backup restore \
   --data-dir /var/lib/mistgate-restored
 ```
 
+Use a `mistgate` binary at least as new as the panel that made the backup. An archive whose database has migrations the binary does not know is refused, with the version that made it; an older archive is fine, and the panel brings its database up to date when it starts.
+
 Run the restore as the panel service account, or set the restored directory's owner before starting the service. Point the systemd unit at `/var/lib/mistgate-restored` with `serve --data-dir`. The restored data includes the database, panel CA and master key, so enrolled nodes and encrypted panel secrets can continue working.
 
 If systemd supplies `master.key` through `CREDENTIALS_DIRECTORY`, replace that credential with the restored `master.key` before starting Mistgate. The service must use the restored key to read the restored database.
