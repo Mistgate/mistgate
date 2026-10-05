@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -22,7 +23,7 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 	for i, g := range gs {
 		happ, amnezia := s.reachOf(g, full)
 		out[i] = &adminv1.Group{Id: g.ID, Name: g.Name, ProfileIds: g.ProfileIDs, UserCount: uint32(g.UserCount), DnsPresetId: g.DNSPresetID,
-			HappNodes: happ, AmneziaNodes: amnezia}
+			HappNodes: happ, AmneziaNodes: amnezia, Color: g.Color}
 	}
 	return out, nil
 }
@@ -120,8 +121,11 @@ func (s *Service) CreateGroup(ctx context.Context, req *connect.Request[adminv1.
 	if err := s.checkDNSPreset(ctx, req.Msg.DnsPresetId); err != nil {
 		return nil, err
 	}
+	if err := checkGroupColor(req.Msg.Color); err != nil {
+		return nil, err
+	}
 	g := store.AccessGroup{ID: store.NewID("grp_"), Name: name, ProfileIDs: slices.Compact(slices.Sorted(slices.Values(req.Msg.ProfileIds))),
-		CreatedAt: s.now(), DNSPresetID: req.Msg.DnsPresetId}
+		CreatedAt: s.now(), DNSPresetID: req.Msg.DnsPresetId, Color: req.Msg.Color}
 	a := s.st.Access()
 	if err := a.CreateGroup(ctx, g); err != nil {
 		return nil, groupErr(s, "create group", err)
@@ -159,6 +163,11 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 			return nil, err
 		}
 	}
+	if m.Color != nil {
+		if err := checkGroupColor(*m.Color); err != nil {
+			return nil, err
+		}
+	}
 	before, err := a.Group(ctx, m.GroupId)
 	if err != nil {
 		return nil, groupErr(s, "get group", err)
@@ -177,7 +186,7 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 	}
 	got := before
 	if !m.DryRun {
-		if err := a.UpdateGroup(ctx, m.GroupId, name, profiles, m.DnsPresetId); err != nil {
+		if err := a.UpdateGroup(ctx, m.GroupId, name, profiles, m.DnsPresetId, m.Color); err != nil {
 			return nil, groupErr(s, "update group", err)
 		}
 		if got, err = a.Group(ctx, m.GroupId); err != nil {
@@ -218,6 +227,14 @@ func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.
 	}
 	s.audit(ctx, actor(ctx), "group_delete", map[string]any{"group": m.GroupId, "name": g.Name})
 	return connect.NewResponse(&adminv1.DeleteGroupResponse{}), nil
+}
+
+// checkGroupColor accepts "" (none picked) and a tone of the palette.
+func checkGroupColor(c string) error {
+	if c != "" && !slices.Contains(store.GroupTones, c) {
+		return invalid("group color must be one of %s", strings.Join(store.GroupTones, ", "))
+	}
+	return nil
 }
 
 // checkDNSPreset accepts "" (inherit) and the id of an existing preset.

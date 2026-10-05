@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/group.proto.
  */
 export const file_mistgate_admin_v1_group: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEijAEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDSITChFMaXN0R3JvdXBzUmVxdWVzdCI+ChJMaXN0R3JvdXBzUmVzcG9uc2USKAoGZ3JvdXBzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiTgoSQ3JlYXRlR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcHJvZmlsZV9pZHMYAiADKAkSFQoNZG5zX3ByZXNldF9pZBgDIAEoCSI+ChNDcmVhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiygEKElVwZGF0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESNwoLcHJvZmlsZV9pZHMYAyABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlSWRzSAGIAQESGgoNZG5zX3ByZXNldF9pZBgEIAEoCUgCiAEBEg8KB2RyeV9ydW4YBSABKAhCBwoFX25hbWVCDgoMX3Byb2ZpbGVfaWRzQhAKDl9kbnNfcHJlc2V0X2lkIhwKClByb2ZpbGVJZHMSDgoGdmFsdWVzGAEgAygJIm8KE1VwZGF0ZUdyb3VwUmVzcG9uc2USJwoFZ3JvdXAYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cBIvCgZpbXBhY3QYAiABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BY2Nlc3NJbXBhY3QiPQoSRGVsZXRlR3JvdXBSZXF1ZXN0EhAKCGdyb3VwX2lkGAEgASgJEhUKDW1vdmVfdXNlcnNfdG8YAiABKAkiFQoTRGVsZXRlR3JvdXBSZXNwb25zZTKDAwoMR3JvdXBTZXJ2aWNlElkKCkxpc3RHcm91cHMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RHcm91cHNSZXNwb25zZRJcCgtDcmVhdGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVzcG9uc2USXAoLVXBkYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlc3BvbnNlElwKC0RlbGV0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpHcm91cFByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_user]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEimwEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDRINCgVjb2xvchgIIAEoCSITChFMaXN0R3JvdXBzUmVxdWVzdCI+ChJMaXN0R3JvdXBzUmVzcG9uc2USKAoGZ3JvdXBzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiXQoSQ3JlYXRlR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcHJvZmlsZV9pZHMYAiADKAkSFQoNZG5zX3ByZXNldF9pZBgDIAEoCRINCgVjb2xvchgEIAEoCSI+ChNDcmVhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAi6AEKElVwZGF0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESNwoLcHJvZmlsZV9pZHMYAyABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlSWRzSAGIAQESGgoNZG5zX3ByZXNldF9pZBgEIAEoCUgCiAEBEg8KB2RyeV9ydW4YBSABKAgSEgoFY29sb3IYBiABKAlIA4gBAUIHCgVfbmFtZUIOCgxfcHJvZmlsZV9pZHNCEAoOX2Ruc19wcmVzZXRfaWRCCAoGX2NvbG9yIhwKClByb2ZpbGVJZHMSDgoGdmFsdWVzGAEgAygJIm8KE1VwZGF0ZUdyb3VwUmVzcG9uc2USJwoFZ3JvdXAYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cBIvCgZpbXBhY3QYAiABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BY2Nlc3NJbXBhY3QiPQoSRGVsZXRlR3JvdXBSZXF1ZXN0EhAKCGdyb3VwX2lkGAEgASgJEhUKDW1vdmVfdXNlcnNfdG8YAiABKAkiFQoTRGVsZXRlR3JvdXBSZXNwb25zZTKDAwoMR3JvdXBTZXJ2aWNlElkKCkxpc3RHcm91cHMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RHcm91cHNSZXNwb25zZRJcCgtDcmVhdGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVzcG9uc2USXAoLVXBkYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlc3BvbnNlElwKC0RlbGV0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpHcm91cFByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_user]);
 
 /**
  * @generated from message mistgate.admin.v1.Group
@@ -58,6 +58,14 @@ export type Group = Message<"mistgate.admin.v1.Group"> & {
    * @generated from field: uint32 amnezia_nodes = 7;
    */
   amneziaNodes: number;
+
+  /**
+   * The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
+   * picked (the admin then derives one from the id).
+   *
+   * @generated from field: string color = 8;
+   */
+  color: string;
 };
 
 /**
@@ -115,6 +123,13 @@ export type CreateGroupRequest = Message<"mistgate.admin.v1.CreateGroupRequest">
    * @generated from field: string dns_preset_id = 3;
    */
   dnsPresetId: string;
+
+  /**
+   * A tone of the palette (Group.color); "" = the least used one among the groups so far.
+   *
+   * @generated from field: string color = 4;
+   */
+  color: string;
 };
 
 /**
@@ -175,6 +190,13 @@ export type UpdateGroupRequest = Message<"mistgate.admin.v1.UpdateGroupRequest">
    * @generated from field: bool dry_run = 5;
    */
   dryRun: boolean;
+
+  /**
+   * Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
+   *
+   * @generated from field: optional string color = 6;
+   */
+  color?: string | undefined;
 };
 
 /**

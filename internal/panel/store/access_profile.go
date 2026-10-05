@@ -425,6 +425,37 @@ type AccessGroup struct {
 	UserCount   int
 	CreatedAt   time.Time
 	DNSPresetID string // "" = the instance default
+	// Color is a tone of GroupTones, "" = none picked. CreateGroup fills in the least used tone when it is empty.
+	Color string
+}
+
+// GroupTones is the palette of a group's colour, in the order the admin offers it and the order a new group takes the least
+// used tone in (ties go to the earlier one). Sky and mint come last: they are also the Link and Keys chips.
+var GroupTones = []string{"lavender", "sand", "sage", "rose", "sky", "mint"}
+
+// leastUsedTone is the tone of GroupTones fewest groups wear (the earliest on a tie).
+func leastUsedTone(ctx context.Context, tx *sql.Tx) (string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT color, count(*) FROM user_group GROUP BY color`)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	used := map[string]int{}
+	for rows.Next() {
+		var c string
+		var n int
+		if err := rows.Scan(&c, &n); err != nil {
+			return "", err
+		}
+		used[c] = n
+	}
+	best := GroupTones[0]
+	for _, t := range GroupTones {
+		if used[t] < used[best] {
+			best = t
+		}
+	}
+	return best, rows.Err()
 }
 
 func accJSON(ids []string) string {
@@ -439,7 +470,13 @@ func accJSON(ids []string) string {
 // profile id does not exist.
 func (a Access) CreateGroup(ctx context.Context, g AccessGroup) error {
 	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO user_group (id, name, created_at, dns_preset_id) VALUES (?, ?, ?, ?)`, g.ID, g.Name, unix(g.CreatedAt), accNullStr(g.DNSPresetID)); err != nil {
+		if g.Color == "" {
+			var err error
+			if g.Color, err = leastUsedTone(ctx, tx); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO user_group (id, name, created_at, dns_preset_id, color) VALUES (?, ?, ?, ?, ?)`, g.ID, g.Name, unix(g.CreatedAt), accNullStr(g.DNSPresetID), g.Color); err != nil {
 			return err
 		}
 		return accSetGroupProfiles(ctx, tx, g.ID, g.ProfileIDs)
@@ -484,7 +521,7 @@ func (a Access) Group(ctx context.Context, id string) (AccessGroup, error) {
 
 func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id), g.dns_preset_id
+		`SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id), g.dns_preset_id, g.color
 		 FROM user_group g WHERE (? = '' OR g.id = ?) ORDER BY g.name`, id, id)
 	if err != nil {
 		return nil, err
@@ -495,7 +532,7 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 		var g AccessGroup
 		var c int64
 		var dns sql.NullString
-		if err := rows.Scan(&g.ID, &g.Name, &c, &g.UserCount, &dns); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &c, &g.UserCount, &dns, &g.Color); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -527,8 +564,8 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 	return out, prow.Err()
 }
 
-// UpdateGroup renames a group, replaces its profile set and/or its DNS preset (nil = unchanged, "" = none).
-func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profileIDs *[]string, dnsPresetID *string) error {
+// UpdateGroup renames a group, replaces its profile set and/or its DNS preset, sets its colour (nil = unchanged, "" = none).
+func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profileIDs *[]string, dnsPresetID, color *string) error {
 	err := a.tx(ctx, func(tx *sql.Tx) error {
 		if name != nil {
 			res, err := tx.ExecContext(ctx, `UPDATE user_group SET name = ? WHERE id = ?`, *name, id)
@@ -546,6 +583,11 @@ func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profil
 		}
 		if dnsPresetID != nil {
 			if _, err := tx.ExecContext(ctx, `UPDATE user_group SET dns_preset_id = ? WHERE id = ?`, accNullStr(*dnsPresetID), id); err != nil {
+				return err
+			}
+		}
+		if color != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE user_group SET color = ? WHERE id = ?`, *color, id); err != nil {
 				return err
 			}
 		}

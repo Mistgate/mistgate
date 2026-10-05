@@ -148,16 +148,26 @@ describe("the people list", () => {
     expect(ago.closest(".tone-ok")).toBeNull();
   });
 
-  it("gives each group a tinted chip, the same one every time", async () => {
+  it("paints each group's chip in the colour stored on the group, and by its id while none is stored", async () => {
+    listUsers.mockResolvedValue({
+      users: [
+        person({ id: "usr_a", name: "Anna", groupColor: "mint" }),
+        person({ id: "usr_b", name: "Boris", groupId: "grp_ok", groupName: "ok", accessHapp: true, groupColor: "rose" }),
+        person({ id: "usr_c", name: "Clara", groupId: "grp_old", groupName: "old", accessHapp: true, groupColor: "" }),
+      ],
+      nextPageToken: "",
+      counts: { all: 3, online: 0, expiring: 0, overQuota: 0 },
+    });
     await mount();
     const chip = (id: string) => [...document.querySelectorAll<HTMLElement>("a[data-tone]")].filter((a) => JSON.parse(a.dataset.search!).group === id);
     const ok = chip("grp_ok");
     expect(ok.length).toBe(2); // the table and the phone card
     expect(ok[0]!.className).toContain("tone-chip");
-    expect(ok[0]!.dataset.tone).toBe(groupTone("grp_ok"));
-    expect(chip("grp_empty")[0]!.dataset.tone).toBe(groupTone("grp_empty"));
+    expect(ok.map((a) => a.dataset.tone)).toEqual(["rose", "rose"]); // not what its id would give (lavender)
+    expect(groupTone("grp_ok")).not.toBe("rose");
+    expect(chip("grp_empty")[0]!.dataset.tone).toBe("mint");
+    expect(chip("grp_old")[0]!.dataset.tone).toBe(groupTone("grp_old")); // none stored: the id's tone
   });
-
   it("shows the apps as a Link chip, a Keys chip, both or a dash, with the whole wording for a screen reader", async () => {
     listUsers.mockResolvedValue({
       users: [

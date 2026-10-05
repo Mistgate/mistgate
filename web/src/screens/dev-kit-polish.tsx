@@ -22,6 +22,7 @@ import { SessionsPage } from "@/screens/settings-pages/sessions";
 import { UpdateToast } from "@/components/update-toast";
 import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
+import { GroupForm } from "@/screens/users/groups";
 import { UsersScreen } from "@/screens/users/list";
 import { groupsQuery } from "@/screens/users/rpc";
 import { SettingRow } from "@/screens/users/ui";
@@ -134,16 +135,17 @@ function DangerZones() {
 
 // The people list on mock rows: who is online, what each used (link, keys, both, nothing), four groups with their chips.
 const listGroups = [
-  { id: "grp_7kq2m4xw3vbf", name: "SIMG", profileIds: [], userCount: 3, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
-  { id: "grp_c3ndr5e2p6ha", name: "family", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 0 },
-  { id: "grp_x9tf4gjn2k7f", name: "friends", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
-  { id: "grp_q5w8zr6y3m2e", name: "my", profileIds: [], userCount: 1, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
+  { id: "grp_7kq2m4xw3vbf", name: "SIMG", profileIds: [], userCount: 3, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "lavender" },
+  { id: "grp_c3ndr5e2p6ha", name: "family", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, color: "sand" },
+  { id: "grp_x9tf4gjn2k7f", name: "friends", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "sage" },
+  { id: "grp_q5w8zr6y3m2e", name: "my", profileIds: [], userCount: 1, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "rose" },
 ];
 const listUser = (id: string, name: string, group: number, over: object) => ({
   id: `usr_${id}`,
   name,
   groupId: listGroups[group]!.id,
   groupName: listGroups[group]!.name,
+  groupColor: listGroups[group]!.color,
   status: UserStatus.ACTIVE,
   devicesUsed: 2,
   deviceLimit: 5,
@@ -182,6 +184,11 @@ export function PolishKit() {
         seed={[owner, [groupsQuery.queryKey, listGroups], [["users", "count"], { counts: { all: 7, online: 2 } }], [["users", "list", "all", "", ""], listPage]]}
       >
         <UsersScreen />
+      </Shot>
+      <Shot id="users-group-color" title="Group editor: the colour swatches (a radio group of 44px targets)" seed={[[groupsQuery.queryKey, listGroups]]}>
+        <div className="max-w-md rounded-card-lg border border-line bg-surface px-4">
+          <GroupForm group={listGroups[1] as never} first={false} dns={false} profiles={[]} onCancel={() => {}} onCreated={() => {}} />
+        </div>
       </Shot>
       <Shot id="polish-int" title="Integrations: one card header, history in sand, “Новый токен”" seed={[owner, [tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}>
         <IntegrationsScreen />

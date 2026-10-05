@@ -21,9 +21,11 @@ import { presetName } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
-import { groupTone } from "./format";
+import { groupTone, groupTones, leastUsedTone } from "./format";
 import { useTx } from "./t";
 import { ConfirmModal } from "./ui";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
@@ -88,14 +90,14 @@ export function GroupLink({ id, name, className, children }: { id: string; name:
   );
 }
 
-/** A group as a small tinted chip that opens it; the tone comes from the group's id, so it is the same on every page. */
-export function GroupChip({ id, name, className }: { id: string; name: string; className?: string }) {
+/** A group as a small tinted chip that opens it, in the colour stored on the group (`color`; without one, a tone picked from its id). */
+export function GroupChip({ id, name, color, className }: { id: string; name: string; color?: string; className?: string }) {
   const t = useTx();
   return (
     <Link
       to="/users"
       search={{ tab: "groups", group: id }}
-      data-tone={groupTone(id)}
+      data-tone={groupTone(id, color)}
       aria-label={t("users.groupOpen", { name })}
       className={cx("tone-chip inline-flex h-[22px] max-w-full min-w-0 items-center px-2 text-xs font-bold hover:underline", className)}
     >
@@ -263,7 +265,7 @@ export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { 
             <Card key={g.id} lg className={cx("flex flex-col gap-3 p-4 transition-colors", focus === g.id && "border-accent-line")}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                 <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-3">
-                  <IconChip icon="family" tone={groupTone(g.id)} size={28} />
+                  <IconChip icon="family" tone={groupTone(g.id, g.color)} size={28} />
                   <b className="min-w-0 text-[15px] tracking-[-0.01em] break-words">{g.name}</b>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -362,6 +364,24 @@ export function GroupEditModal({ group, open, onOpenChange }: { group: Group | u
 }
 
 /**
+ * The palette of a group's colour: one swatch per tone, a radio group (arrow keys move, the chosen one rings). Each
+ * swatch is a 44px target around a 30px disc; the name of the tone is its accessible name.
+ */
+export function ColorSwatches({ value, onChange }: { value: string; onChange: (tone: string) => void }) {
+  const t = useTx();
+  return (
+    <RadioGroup aria-label={t("users.groupColor")} value={value} onValueChange={(v) => onChange(String(v))} className="-mx-1.5 flex flex-wrap">
+      {groupTones.map((tone) => (
+        <Radio.Root key={tone} value={tone} aria-label={t(`settings.accent.${tone}`)} title={t(`settings.accent.${tone}`)} data-tone={tone} className="group grid size-11 cursor-pointer place-items-center rounded-full">
+          <span className="grid size-[30px] place-items-center rounded-full border border-[color-mix(in_oklch,var(--t)_55%,#000)] bg-(--t) transition-[transform,box-shadow] duration-300 ease-spring-strong group-hover:scale-110 group-data-checked:shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--t)]">
+            <span className="-mt-[2px] h-2.5 w-[5px] scale-0 rotate-45 border-r-[2.5px] border-b-[2.5px] border-[#0c0c0e] transition-transform duration-300 ease-spring-strong group-data-checked:scale-100" />
+          </span>
+        </Radio.Root>
+      ))}
+    </RadioGroup>
+  );
+}
+/**
  * A group's name and profiles (all of them for a new one, unless `initialProfiles`); `dns` adds the DNS preset under "More".
  * With `group` it edits that group. Taking a profile away from a group with people asks first: the server's dry run names
  * what they lose (and the AmneziaVPN keys that stop working), and the red button does it.
@@ -391,6 +411,10 @@ export function GroupForm({
   const [name, setName] = useState(group?.name ?? "");
   const [chosen, setChosen] = useState<string[] | null>(group ? [...group.profileIds] : initialProfiles ? [...initialProfiles] : null); // null = every profile
   const [dnsPreset, setDnsPreset] = useState(group?.dnsPresetId ?? ""); // "" = the instance default
+  // null = not touched: a new group then gets the least used tone (the server decides, the swatches show it), an old one keeps its own
+  const [color, setColor] = useState<string | null>(null);
+  const all = useQuery(groupsQuery).data;
+  const shownColor = color ?? (group ? groupTone(group.id, group.color) : leastUsedTone(all ?? []));
   const inheritedDns = useInheritedDns();
   const ids = chosen ?? profiles.map((p) => p.id);
   const [error, setError] = useState<string | null>(null);
@@ -398,8 +422,8 @@ export function GroupForm({
   const lost = group ? group.profileIds.filter((id) => !ids.includes(id)) : [];
   const save = useMutation({
     mutationFn: async (confirmed: boolean) => {
-      if (!group) return (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, dnsPresetId: dnsPreset })).group;
-      const req = { groupId: group.id, name: name.trim(), profileIds: { values: ids }, dnsPresetId: dnsPreset };
+      if (!group) return (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, dnsPresetId: dnsPreset, ...(color !== null && { color }) })).group;
+      const req = { groupId: group.id, name: name.trim(), profileIds: { values: ids }, dnsPresetId: dnsPreset, ...(color !== null && color !== group.color && { color }) };
       if (!confirmed && group.userCount > 0 && lost.length > 0) {
         const dry = await groupsApi.updateGroup({ ...req, dryRun: true });
         if (dry.impact && dry.impact.lost.length > 0) {
@@ -441,6 +465,12 @@ export function GroupForm({
         autoComplete="off"
         maxLength={64}
       />
+      <div className="flex flex-col gap-0.5">
+        <SectionLabel icon="tag" tone="sand">
+          {t("users.groupColor")}
+        </SectionLabel>
+        <ColorSwatches value={shownColor} onChange={setColor} />
+      </div>
       <div className="flex flex-col gap-1.5">
         <SectionLabel icon="sliders" tone="sage">
           {t("users.groupProfiles")}

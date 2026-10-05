@@ -394,8 +394,10 @@ type User struct {
 	AccessAmnezia bool `protobuf:"varint,27,opt,name=access_amnezia,json=accessAmnezia,proto3" json:"access_amnezia,omitempty"`
 	// Optional name shown on the public subscription page; empty falls back to name.
 	SubscriptionName string `protobuf:"bytes,28,opt,name=subscription_name,json=subscriptionName,proto3" json:"subscription_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The colour of the user's group (Group.color), so a list of people paints the group's chip without a second request.
+	GroupColor    string `protobuf:"bytes,29,opt,name=group_color,json=groupColor,proto3" json:"group_color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -620,6 +622,13 @@ func (x *User) GetAccessAmnezia() bool {
 func (x *User) GetSubscriptionName() string {
 	if x != nil {
 		return x.SubscriptionName
+	}
+	return ""
+}
+
+func (x *User) GetGroupColor() string {
+	if x != nil {
+		return x.GroupColor
 	}
 	return ""
 }
@@ -2480,7 +2489,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\aamnezia\x18\x02 \x01(\bR\aamnezia\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\x82\t\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xa3\t\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -2516,7 +2525,9 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\vaccess_happ\x18\x1a \x01(\bR\n" +
 	"accessHapp\x12%\n" +
 	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\x12+\n" +
-	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\"\xb6\x01\n" +
+	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\x12\x1f\n" +
+	"\vgroup_color\x18\x1d \x01(\tR\n" +
+	"groupColor\"\xb6\x01\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +

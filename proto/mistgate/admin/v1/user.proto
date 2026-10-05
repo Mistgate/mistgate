@@ -127,6 +127,8 @@ message User {
   bool access_amnezia = 27;
   // Optional name shown on the public subscription page; empty falls back to name.
   string subscription_name = 28;
+  // The colour of the user's group (Group.color), so a list of people paints the group's chip without a second request.
+  string group_color = 29;
 }
 
 enum DnsSource {

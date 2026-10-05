@@ -24,13 +24,25 @@ export function avatarIndex(id: string): number {
   return h % 9;
 }
 
-const groupTones = ["lavender", "sky", "sand", "sage", "mint", "rose"] as const satisfies readonly Tone[];
+/**
+ * The palette of a group's colour, in the order the server offers it and a new group takes the least used tone in (the
+ * server's store.GroupTones). Sky and mint come last: they are also the Link and Keys chips.
+ */
+export const groupTones = ["lavender", "sand", "sage", "rose", "sky", "mint"] as const satisfies readonly Tone[];
 
-/** The tone of a group's chip, picked from its id: the same group has the same colour on every page and in every session. */
-export function groupTone(id: string): Tone {
+/** The tone of a group's chip: the colour stored on the group, or, while it has none (""), one picked from its id, the same everywhere. */
+export function groupTone(id: string, color = ""): Tone {
+  const stored = groupTones.find((t) => t === color);
+  if (stored) return stored;
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return groupTones[h % groupTones.length]!;
+}
+
+/** The tone fewest groups wear (the earliest of the palette on a tie): what a new group gets, as the server decides it. */
+export function leastUsedTone(groups: readonly { color: string }[]): Tone {
+  const used = (t: Tone) => groups.filter((g) => g.color === t).length;
+  return groupTones.reduce((best, t) => (used(t) < used(best) ? t : best));
 }
 
 // What the status column shows. The API has four statuses; "devices full" is derived (devices_used >= limit)

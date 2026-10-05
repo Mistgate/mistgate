@@ -140,7 +140,8 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		}
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
-		out[i].AccessHapp, out[i].AccessAmnezia = s.accessOf(u, groups[u.GroupID], full)
+		out[i].GroupColor = groups[u.GroupID].Color
+			out[i].AccessHapp, out[i].AccessAmnezia = s.accessOf(u, groups[u.GroupID], full)
 		if isOnline {
 			out[i].CurrentNodeId, out[i].CurrentNodeName = cur, nodeName[cur]
 		}

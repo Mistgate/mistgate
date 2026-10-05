@@ -197,7 +197,7 @@ function UserDetail({ data }: { data: DetailN }) {
             </span>
           </div>
           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted">
-            {appsText(user, t)} · <GroupChip id={user.groupId} name={user.groupName} /> · {term}
+            {appsText(user, t)} · <GroupChip id={user.groupId} name={user.groupName} color={user.groupColor} /> · {term}
           </span>
         </div>
         <div className="flex w-full flex-wrap gap-1.5 md:w-auto">

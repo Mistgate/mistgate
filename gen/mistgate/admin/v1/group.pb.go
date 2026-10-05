@@ -32,8 +32,11 @@ type Group struct {
 	// Nodes where the group's profiles give something right now: an enabled, pending or running inbound on an enrolled
 	// node (the subscription's rule, without a user's own node choice and app switches), by the kind of app that takes
 	// it: the subscription apps and AmneziaVPN keys. What a new user of the group gets; 0 = nothing there.
-	HappNodes     uint32 `protobuf:"varint,6,opt,name=happ_nodes,json=happNodes,proto3" json:"happ_nodes,omitempty"`
-	AmneziaNodes  uint32 `protobuf:"varint,7,opt,name=amnezia_nodes,json=amneziaNodes,proto3" json:"amnezia_nodes,omitempty"`
+	HappNodes    uint32 `protobuf:"varint,6,opt,name=happ_nodes,json=happNodes,proto3" json:"happ_nodes,omitempty"`
+	AmneziaNodes uint32 `protobuf:"varint,7,opt,name=amnezia_nodes,json=amneziaNodes,proto3" json:"amnezia_nodes,omitempty"`
+	// The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
+	// picked (the admin then derives one from the id).
+	Color         string `protobuf:"bytes,8,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -117,6 +120,13 @@ func (x *Group) GetAmneziaNodes() uint32 {
 	return 0
 }
 
+func (x *Group) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
 type ListGroupsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -198,10 +208,12 @@ func (x *ListGroupsResponse) GetGroups() []*Group {
 }
 
 type CreateGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	ProfileIds    []string               `protobuf:"bytes,2,rep,name=profile_ids,json=profileIds,proto3" json:"profile_ids,omitempty"`
-	DnsPresetId   string                 `protobuf:"bytes,3,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ProfileIds  []string               `protobuf:"bytes,2,rep,name=profile_ids,json=profileIds,proto3" json:"profile_ids,omitempty"`
+	DnsPresetId string                 `protobuf:"bytes,3,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
+	// A tone of the palette (Group.color); "" = the least used one among the groups so far.
+	Color         string `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -253,6 +265,13 @@ func (x *CreateGroupRequest) GetProfileIds() []string {
 func (x *CreateGroupRequest) GetDnsPresetId() string {
 	if x != nil {
 		return x.DnsPresetId
+	}
+	return ""
+}
+
+func (x *CreateGroupRequest) GetColor() string {
+	if x != nil {
+		return x.Color
 	}
 	return ""
 }
@@ -310,7 +329,9 @@ type UpdateGroupRequest struct {
 	// "" = the instance default.
 	DnsPresetId *string `protobuf:"bytes,4,opt,name=dns_preset_id,json=dnsPresetId,proto3,oneof" json:"dns_preset_id,omitempty"`
 	// Check the change and say what it does (UpdateGroupResponse.impact); nothing is written, the nodes hear nothing.
-	DryRun        bool `protobuf:"varint,5,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	DryRun bool `protobuf:"varint,5,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	// Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
+	Color         *string `protobuf:"bytes,6,opt,name=color,proto3,oneof" json:"color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -378,6 +399,13 @@ func (x *UpdateGroupRequest) GetDryRun() bool {
 		return x.DryRun
 	}
 	return false
+}
+
+func (x *UpdateGroupRequest) GetColor() string {
+	if x != nil && x.Color != nil {
+		return *x.Color
+	}
+	return ""
 }
 
 type ProfileIds struct {
@@ -572,7 +600,7 @@ var File_mistgate_admin_v1_group_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\xd3\x01\n" +
+	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\xe9\x01\n" +
 	"\x05Group\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -583,27 +611,31 @@ const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\rdns_preset_id\x18\x05 \x01(\tR\vdnsPresetId\x12\x1d\n" +
 	"\n" +
 	"happ_nodes\x18\x06 \x01(\rR\thappNodes\x12#\n" +
-	"\ramnezia_nodes\x18\a \x01(\rR\famneziaNodes\"\x13\n" +
+	"\ramnezia_nodes\x18\a \x01(\rR\famneziaNodes\x12\x14\n" +
+	"\x05color\x18\b \x01(\tR\x05color\"\x13\n" +
 	"\x11ListGroupsRequest\"F\n" +
 	"\x12ListGroupsResponse\x120\n" +
-	"\x06groups\x18\x01 \x03(\v2\x18.mistgate.admin.v1.GroupR\x06groups\"m\n" +
+	"\x06groups\x18\x01 \x03(\v2\x18.mistgate.admin.v1.GroupR\x06groups\"\x83\x01\n" +
 	"\x12CreateGroupRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vprofile_ids\x18\x02 \x03(\tR\n" +
 	"profileIds\x12\"\n" +
-	"\rdns_preset_id\x18\x03 \x01(\tR\vdnsPresetId\"E\n" +
+	"\rdns_preset_id\x18\x03 \x01(\tR\vdnsPresetId\x12\x14\n" +
+	"\x05color\x18\x04 \x01(\tR\x05color\"E\n" +
 	"\x13CreateGroupResponse\x12.\n" +
-	"\x05group\x18\x01 \x01(\v2\x18.mistgate.admin.v1.GroupR\x05group\"\xfa\x01\n" +
+	"\x05group\x18\x01 \x01(\v2\x18.mistgate.admin.v1.GroupR\x05group\"\x9f\x02\n" +
 	"\x12UpdateGroupRequest\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12C\n" +
 	"\vprofile_ids\x18\x03 \x01(\v2\x1d.mistgate.admin.v1.ProfileIdsH\x01R\n" +
 	"profileIds\x88\x01\x01\x12'\n" +
 	"\rdns_preset_id\x18\x04 \x01(\tH\x02R\vdnsPresetId\x88\x01\x01\x12\x17\n" +
-	"\adry_run\x18\x05 \x01(\bR\x06dryRunB\a\n" +
+	"\adry_run\x18\x05 \x01(\bR\x06dryRun\x12\x19\n" +
+	"\x05color\x18\x06 \x01(\tH\x03R\x05color\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
 	"\f_profile_idsB\x10\n" +
-	"\x0e_dns_preset_id\"$\n" +
+	"\x0e_dns_preset_idB\b\n" +
+	"\x06_color\"$\n" +
 	"\n" +
 	"ProfileIds\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\"~\n" +

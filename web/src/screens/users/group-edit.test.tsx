@@ -43,7 +43,7 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-const group = { id: "grp_1", name: "тест", profileIds: ["p1"], userCount: 3, dnsPresetId: "" } as unknown as Group;
+const group = { id: "grp_1", name: "тест", profileIds: ["p1"], userCount: 3, dnsPresetId: "", color: "rose" } as unknown as Group;
 
 describe("editing a group from the user card", () => {
   it("opens prefilled, shows the user count and saves the profile set with UpdateGroup", async () => {
@@ -61,6 +61,21 @@ describe("editing a group from the user card", () => {
     await click(button("Save"));
     expect(updateGroup).toHaveBeenCalledWith({ groupId: "grp_1", name: "тест", profileIds: { values: ["p1", "p2"] }, dnsPresetId: "" });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("shows the group's colour in a radio group of swatches and saves a changed one", async () => {
+    listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
+    updateGroup.mockResolvedValue({ group });
+    await mount(<GroupEditModal group={group} open onOpenChange={vi.fn()} />);
+    const radios = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label=Colour] [role=radio]")];
+    expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["Lavender", "Sand", "Sage", "Rose", "Sky", "Mint"]);
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["false", "false", "false", "true", "false", "false"]);
+    expect(radios[0]!.className).toContain("size-11"); // a 44px target
+
+    await click(radios[4]);
+    expect(radios[4]!.getAttribute("aria-checked")).toBe("true");
+    await click(button("Save"));
+    expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ groupId: "grp_1", color: "sky" }));
   });
 });
 

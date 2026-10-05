@@ -418,7 +418,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <StatusCell u={u} t={t} />
       <AppCell u={u} group={group} t={t} />
       <span className="flex min-w-0" onClick={stop}>
-        <GroupChip id={u.groupId} name={u.groupName} />
+        <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
       </span>
       <span className={cx("font-mono text-xs", full ? "text-warn" : "text-muted")}>
         {u.devicesUsed}/{u.deviceLimit}
@@ -466,7 +466,7 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <AppCell u={u} group={group} t={t} />·
         <span onClick={stop}>
-          <GroupChip id={u.groupId} name={u.groupName} />
+          <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
         </span>
         ·
         <span className={cx("font-mono", full && "text-warn")}>

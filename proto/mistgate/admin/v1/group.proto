@@ -26,6 +26,9 @@ message Group {
   // it: the subscription apps and AmneziaVPN keys. What a new user of the group gets; 0 = nothing there.
   uint32 happ_nodes = 6;
   uint32 amnezia_nodes = 7;
+  // The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
+  // picked (the admin then derives one from the id).
+  string color = 8;
 }
 
 message ListGroupsRequest {}
@@ -38,6 +41,8 @@ message CreateGroupRequest {
   string name = 1;
   repeated string profile_ids = 2;
   string dns_preset_id = 3;
+  // A tone of the palette (Group.color); "" = the least used one among the groups so far.
+  string color = 4;
 }
 
 message CreateGroupResponse {
@@ -53,6 +58,8 @@ message UpdateGroupRequest {
   optional string dns_preset_id = 4;
   // Check the change and say what it does (UpdateGroupResponse.impact); nothing is written, the nodes hear nothing.
   bool dry_run = 5;
+  // Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
+  optional string color = 6;
 }
 
 message ProfileIds {
