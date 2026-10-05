@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 14 || b != 28 || c != 52 {
+	if a, b, c := count(ro), count(op), count(ad); a != 15 || b != 33 || c != 57 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -321,6 +321,56 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	t.Logf("node_fix_plan on a node that never connected: %s", out)
 
+	// -- the subscription page's app list: any token reads it; an operator's change waits for the owner and then saves through
+	// the real SubscriptionService; an owner's save in between makes the apply refuse instead of overwriting it.
+	if out := ok(ro, "subscription_settings_get", map[string]any{}); !strings.Contains(out, `"name":"Happ"`) {
+		t.Errorf("subscription_settings_get: %s", out)
+	}
+	if code, body := rpc("", opSecret, "SubscriptionService", "UpdateSubscriptionSettings", `{}`); code != 403 {
+		t.Errorf("UpdateSubscriptionSettings over /api with a token: %d %s", code, body)
+	}
+	const tmpl = "myclient://add?url={url_enc}&name={name_enc}"
+	sub := decodeJSON[mcp.PlanOut](t, ok(op, "subscription_app_upsert_plan", map[string]any{
+		"platform": "windows", "name": "My Client", "kind": "happ", "download_url": "https://example.com/myclient.exe", "add_link_template": tmpl,
+	}))
+	if !sub.NeedsApproval || len(sub.Danger) != 1 || sub.Danger[0] != "user_page" {
+		t.Fatalf("subscription_app_upsert_plan: %+v", sub)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "ListApprovals", `{}`); code != 200 || !strings.Contains(body, tmpl) {
+		t.Errorf("the owner's card lacks the full template: %d %s", code, body)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+sub.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(op, "subscription_app_upsert_apply", map[string]any{"confirm_token": sub.ConfirmToken})); ap.Status != "applied" {
+		t.Errorf("subscription_app_upsert_apply: %+v", ap)
+	}
+	code, body = rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`)
+	if code != 200 || !strings.Contains(body, tmpl) {
+		t.Fatalf("the app was not saved: %d %s", code, body)
+	}
+	stale := decodeJSON[mcp.PlanOut](t, ok(op, "subscription_app_remove_plan", map[string]any{"platform": "windows", "name": "my client"}))
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+stale.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	var got struct {
+		Settings map[string]any `json:"settings"`
+	}
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		t.Fatal(err)
+	}
+	got.Settings["title"] = "Saved by the owner"
+	edit, _ := json.Marshal(map[string]any{"settings": got.Settings})
+	if code, body := rpc("owner", "", "SubscriptionService", "UpdateSubscriptionSettings", string(edit)); code != 200 {
+		t.Fatalf("the owner's save: %d %s", code, body)
+	}
+	if out, isErr := tool(op, "subscription_app_remove_apply", map[string]any{"confirm_token": stale.ConfirmToken}); !isErr || !strings.Contains(out, "changed after the plan") {
+		t.Errorf("apply over the owner's save: %v %s", isErr, out)
+	}
+	if code, body := rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`); code != 200 || !strings.Contains(body, tmpl) || !strings.Contains(body, "Saved by the owner") {
+		t.Errorf("after the refused apply: %d %s", code, body)
+	}
+
 	// -- the audit trail: the plan, the apply and the module's own rows carry the token as mcp:<id>
 	rows, err := st.ListAudit(ctx, "", 0, 200)
 	if err != nil {
@@ -333,7 +383,8 @@ func TestMCPEndToEnd(t *testing.T) {
 			t.Errorf("audit row %s carries a secret: %s", r.Action, r.Params)
 		}
 	}
-	for _, want := range []string{"mcp/mcp_plan/mcp:" + opID, "mcp/mcp_apply/mcp:" + opID, "mcp/mcp_apply/mcp:" + adID, "panel/approval_approve/adm_owner"} {
+	for _, want := range []string{"mcp/mcp_plan/mcp:" + opID, "mcp/mcp_apply/mcp:" + opID, "mcp/mcp_apply/mcp:" + adID, "panel/approval_approve/adm_owner",
+		"mcp/subscription_settings_update/mcp:" + opID} {
 		if !seen[want] {
 			t.Errorf("no audit row %s; have %v", want, keys(seen))
 		}
@@ -384,7 +435,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 14 {
+	if n := count(ps); n != 15 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

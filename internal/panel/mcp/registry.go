@@ -54,7 +54,7 @@ func (t toolDef) description() string {
 
 // registry is every tool; a name may appear twice with different minimum profiles (node_doctor has a refresh argument only
 // for operators): a server takes the highest entry its profile reaches.
-var registry = slices.Concat(readTools(), changeTools(), nodeProvisionTools())
+var registry = slices.Concat(readTools(), changeTools(), nodeProvisionTools(), subscriptionTools())
 
 // toolsFor lists the tools a profile sees, by name.
 func toolsFor(p Profile) []toolDef {

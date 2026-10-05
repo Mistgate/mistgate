@@ -19,10 +19,12 @@ import (
 
 	"connectrpc.com/connect"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
 // The test environment: the real MCP layer over a fake admin API (the generated Connect handlers around a fixture world),
@@ -70,18 +72,19 @@ type fakeAuth struct {
 }
 
 var tokenApproved = map[string]bool{
-	adminv1connect.HealthServiceApplyFixProcedure:                       true,
-	adminv1connect.UpdateServiceStartRolloutProcedure:                   true,
-	adminv1connect.UpdateServicePauseRolloutProcedure:                   true,
-	adminv1connect.UpdateServiceResumeRolloutProcedure:                  true,
-	adminv1connect.UpdateServiceCancelRolloutProcedure:                  true,
-	adminv1connect.UpdateServiceRollbackNodeProcedure:                   true,
-	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             true,
-	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       true,
-	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
-	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
-	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: true,
-	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        true, // planning only, in the real policy
+	adminv1connect.HealthServiceApplyFixProcedure:                         true,
+	adminv1connect.UpdateServiceStartRolloutProcedure:                     true,
+	adminv1connect.UpdateServicePauseRolloutProcedure:                     true,
+	adminv1connect.UpdateServiceResumeRolloutProcedure:                    true,
+	adminv1connect.UpdateServiceCancelRolloutProcedure:                    true,
+	adminv1connect.UpdateServiceRollbackNodeProcedure:                     true,
+	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:               true,
+	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:         true,
+	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:                true,
+	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:         true,
+	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure:   true,
+	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:          true, // planning only, in the real policy
+	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: true,
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -301,7 +304,9 @@ type world struct {
 	createReq         []*adminv1.CreateUserRequest
 	muteReq           []*adminv1.MuteAlertRequest
 	rollbackReq       []*adminv1.RollbackNodeRequest
+	subsReq           []*adminv1.UpdateSubscriptionSettingsRequest
 
+	subs                   *adminv1.SubscriptionSettings // the stored subscription settings
 	users                  map[string]*adminv1.GetUserResponse
 	rolloutStat            adminv1.RolloutStatus
 	bundleStat             adminv1.BundleStatus
@@ -338,7 +343,7 @@ const (
 )
 
 func newWorld() *world {
-	w := &world{users: map[string]*adminv1.GetUserResponse{}, rolloutStat: adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED, scheduleTimezoneOffset: 180, scheduledUnix: 1700009000}
+	w := &world{subs: subsettings.Defaults(), users: map[string]*adminv1.GetUserResponse{}, rolloutStat: adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED, scheduleTimezoneOffset: 180, scheduledUnix: 1700009000}
 	mk := func(id, name string, devs ...*adminv1.Device) {
 		w.users[id] = &adminv1.GetUserResponse{
 			User: &adminv1.User{
@@ -561,6 +566,24 @@ func (w *world) ListClients(context.Context, *connect.Request[adminv1.ListClient
 	return connect.NewResponse(&adminv1.ListClientsResponse{Clients: []*adminv1.ClientInfo{
 		{Id: "happ", Name: "Happ", Protocols: []string{"hysteria2"}, Formats: []adminv1.SubFormat{adminv1.SubFormat_SUB_FORMAT_BASE64_URIS}},
 	}}), nil
+}
+
+func (w *world) GetSubscriptionSettings(context.Context, *connect.Request[adminv1.GetSubscriptionSettingsRequest]) (*connect.Response[adminv1.GetSubscriptionSettingsResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return connect.NewResponse(&adminv1.GetSubscriptionSettingsResponse{Settings: proto.Clone(w.subs).(*adminv1.SubscriptionSettings), EffectiveTitle: "Example VPN"}), nil
+}
+
+// UpdateSubscriptionSettings is the real save's check and store: what the MCP layer sends must pass the admin's validation.
+func (w *world) UpdateSubscriptionSettings(_ context.Context, r *connect.Request[adminv1.UpdateSubscriptionSettingsRequest]) (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.subsReq = append(w.subsReq, r.Msg)
+	if err := subsettings.Validate(r.Msg.GetSettings()); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	w.subs = proto.Clone(r.Msg.GetSettings()).(*adminv1.SubscriptionSettings)
+	return connect.NewResponse(&adminv1.UpdateSubscriptionSettingsResponse{Settings: w.subs}), nil
 }
 
 func (w *world) TestUserAgent(_ context.Context, r *connect.Request[adminv1.TestUserAgentRequest]) (*connect.Response[adminv1.TestUserAgentResponse], error) {

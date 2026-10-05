@@ -557,7 +557,7 @@ func (e *env) scenario() {
 	roN, roD, _ := toolNames(ro)
 	opN, _, _ := toolNames(op)
 	adN, _, _ := toolNames(ad)
-	e.check("tool counts per profile 14 / 28 / 41", len(roN) == 14 && len(opN) == 28 && len(adN) == 41, "%d / %d / %d", len(roN), len(opN), len(adN))
+	e.check("tool counts per profile 15 / 33 / 57", len(roN) == 15 && len(opN) == 33 && len(adN) == 57, "%d / %d / %d", len(roN), len(opN), len(adN))
 	writes := 0
 	for _, n := range roN {
 		if isWrite(n) {
@@ -587,7 +587,7 @@ func (e *env) scenario() {
 	} else {
 		n, _, _ := toolNames(ps)
 		fs, isErr, _ := e.call(ps, "fleet_status", map[string]any{})
-		e.check("`mistgate mcp` stdio proxy: 14 tools, fleet_status answers", len(n) == 14 && !isErr && strings.Contains(fs, "nodes_total"), "%d tools", len(n))
+		e.check("`mistgate mcp` stdio proxy: 15 tools, fleet_status answers", len(n) == 15 && !isErr && strings.Contains(fs, "nodes_total"), "%d tools", len(n))
 		ps.Close()
 		e.check("the proxy never prints the token", !strings.Contains(perrBuf.String(), roSecret), "")
 	}

@@ -74,7 +74,7 @@ func TestProxyEndToEnd(t *testing.T) {
 	p := startProxy(t, base, writeTokenFile(t, string(rune(0xFEFF))+secret+"\r\nignored second line\n"))
 
 	names := toolNames(t, p.sess)
-	if len(names) != 28 {
+	if len(names) != 33 {
 		t.Errorf("%d tools through the proxy: %v", len(names), names)
 	}
 	out := mustOK(t, p.sess, "user_get", map[string]any{"user_id": "usr_alice"})
