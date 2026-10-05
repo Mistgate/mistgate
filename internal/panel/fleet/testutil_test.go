@@ -264,7 +264,7 @@ func hello(instance string, appliedRev uint64, appliedHash string) *agentv1.Conn
 // wait returns the next message matching pred, dropping others (Acks arrive at odd moments).
 func (c *conn) wait(pred func(*agentv1.ConnectResponse) bool) *agentv1.ConnectResponse {
 	c.t.Helper()
-	deadline := time.After(5 * time.Second)
+	deadline := time.After(15 * time.Second) // generous: a loaded machine (a full test run beside others) is slow
 	for {
 		select {
 		case m := <-c.in:

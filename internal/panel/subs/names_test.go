@@ -100,7 +100,7 @@ func TestHappRemarksStayWithinTitleLimit(t *testing.T) {
 		}(),
 	}
 	got := happRemarks(servers, "", "en", true)
-	want := []string{"\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74%", "\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74% 2"}
+	want := []string{"\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74％", "\U0001F1E9\U0001F1EA DE · HY2 · 443 · 74％ 2"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("Happ names = %q, want %q", got, want)
 	}
@@ -120,7 +120,7 @@ func TestHappRemarkTruncatesCustomNamesButKeepsLoad(t *testing.T) {
 	s := srv("de1", "DE", "Hysteria2 · A very long custom profile name")
 	s.LoadPercent = &load
 	name := happRemarks([]access.SubServer{s}, "", "en", true)[0]
-	if !strings.HasSuffix(name, " · 100%") {
+	if !strings.HasSuffix(name, " · 100％") {
 		t.Fatalf("Happ name %q lost the load percentage", name)
 	}
 	if n := len(utf16.Encode([]rune(name))); n > 30 {
@@ -179,7 +179,7 @@ func TestLoadPercentOnlyInHappNames(t *testing.T) {
 	if a, b := fetchAs(with, "mihomo/1.19.31"), fetchAs(without, "mihomo/1.19.31"); a != b || a != de+" DE · Hysteria2" {
 		t.Errorf("Mihomo proxy names with and without load: %q, %q", a, b)
 	}
-	if got := fetchAs(with, "Happ/2.1.0/ios"); got != de+" DE · Hysteria2 · 64%" {
+	if got := fetchAs(with, "Happ/2.1.0/ios"); got != de+" DE · Hysteria2 · 64％" {
 		t.Errorf("Happ name = %q", got)
 	}
 	if a, b := fetchAs(with, "v2rayNG/1.9.0"), fetchAs(without, "v2rayNG/1.9.0"); a != b || a != de+" DE · Hysteria2" {

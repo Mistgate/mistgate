@@ -26,6 +26,9 @@ func measured(down, up string) *agentv1.CommandResult {
 func answerMeasure(c *conn, res *agentv1.CommandResult, after <-chan struct{}) <-chan *agentv1.MeasureBandwidth {
 	got := make(chan *agentv1.MeasureBandwidth, 1)
 	go func() {
+		// c.wait fails the test from this goroutine, which only ends the goroutine: closing the channel makes the test's
+		// receive return nil instead of blocking until the 10-minute test timeout
+		defer close(got)
 		m := c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetMeasureBandwidth() != nil })
 		p := m.GetMeasureBandwidth()
 		got <- p
@@ -102,7 +105,7 @@ func TestMeasureBandwidthReturnsTheResultAndNeverWritesTheCapacity(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := <-asked; p.RequestId == "" {
+	if p := <-asked; p == nil || p.RequestId == "" {
 		t.Error("the request carried no id")
 	}
 	if r.ErrorCode != "" || r.DownMbps != 940 || r.UpMbps != 871 || r.Server != "speed.cloudflare.com" || r.Seconds != 29 || r.Runs != 3 || r.PeopleDownMbps != 35 || r.PeopleUpMbps != 0 {
@@ -197,7 +200,9 @@ func TestTheFirstStartNeverOverwritesWhatTheAdminTypedMeanwhile(t *testing.T) {
 	c, _, _ := connectCaps(a, "first", bwCaps...)
 	release := make(chan struct{})
 	asked := answerMeasure(c, measured("940", "871"), release)
-	<-asked // the node is measuring
+	if <-asked == nil { // the node is measuring
+		t.Fatal("the node was never asked to measure")
+	}
 	if _, err := x.st.UpdateNode(x.ctx, a.nodeID, store.NodePatch{BandwidthMbps: new(300)}); err != nil {
 		t.Fatal(err)
 	}

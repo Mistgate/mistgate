@@ -64,7 +64,9 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 		}
 		suffix := ""
 		if load && s.LoadPercent != nil {
-			suffix = " · " + strconv.Itoa(*s.LoadPercent) + "%"
+			// U+FF05, not "%": Happ decodes the name a second time, and a bare "%" makes that fail, so Happ drops the
+			// whole name and lists the server by its address. The fullwidth sign looks the same and survives it.
+			suffix = " · " + strconv.Itoa(*s.LoadPercent) + "％"
 		}
 		name := namedRemark(n, suffix, s.Profile, limitHapp)
 		for k := 2; taken[name]; k++ {
