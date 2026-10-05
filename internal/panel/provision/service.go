@@ -542,14 +542,19 @@ func (s *Service) openPendingPassword(nodeID string, ciphertext []byte) (string,
 	return string(plain), nil
 }
 
-// audit writes one provisioning event and returns storage errors so sensitive responses can fail closed.
+// audit writes one provisioning event as the caller and returns storage errors so sensitive responses can fail closed.
 func (s *Service) audit(ctx context.Context, action string, params map[string]string) error {
 	admin, ok := auth.AdminFrom(ctx)
 	if !ok {
 		return nil
 	}
+	return s.auditAs(ctx, admin.ID, action, params)
+}
+
+// auditAs writes the event for actor: the background worker has no caller, so it names who started the job.
+func (s *Service) auditAs(ctx context.Context, actor, action string, params map[string]string) error {
 	b, _ := json.Marshal(params)
-	if err := s.st.Audit(ctx, s.cfg.Now(), store.AuditEntry{Actor: admin.ID, Action: action, Params: string(b), Result: "ok"}); err != nil {
+	if err := s.st.Audit(ctx, s.cfg.Now(), store.AuditEntry{Actor: actor, Action: action, Params: string(b), Result: "ok"}); err != nil {
 		s.cfg.Log.Warn("audit node provisioning", "action", action, "err", err)
 		return err
 	}

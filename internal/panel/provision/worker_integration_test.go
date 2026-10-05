@@ -196,6 +196,11 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	if err := <-workerDone; err != nil {
 		t.Fatalf("worker returned an error after cancellation: %v", err)
 	}
+	// the worker has no admin in its context: the completion is audited as the job's creator
+	var actor string
+	if err := st.R.QueryRowContext(ctx, `SELECT actor FROM audit WHERE action = 'node.ssh_provision_complete'`).Scan(&actor); err != nil || actor != job.CreatedBy {
+		t.Fatalf("completion audit actor = %q, err %v", actor, err)
+	}
 
 	if got := <-passwords; got != password {
 		t.Fatalf("SSH password = %q", got)

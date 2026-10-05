@@ -422,7 +422,7 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 		s.failJob(ctx, job, "job_state_unavailable")
 		return
 	}
-	s.audit(context.WithoutCancel(ctx), "node.ssh_provision_complete", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
+	_ = s.auditAs(context.WithoutCancel(ctx), job.CreatedBy, "node.ssh_provision_complete", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
 	secret.Password, secret.EnrollmentToken = "", ""
 }
 
