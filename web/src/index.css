@@ -234,6 +234,10 @@
   flex: none;
   align-items: center;
   justify-content: center;
+}
+/* a tinted chip with text in it (a group's name, "Link", "Keys"): the same background and text as .id-chip, laid out by the caller */
+.id-chip,
+.tone-chip {
   border-radius: 7px;
   background: color-mix(in oklch, var(--t) calc(var(--_soft-pct) + 4%), var(--surface));
   color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);

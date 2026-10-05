@@ -4,7 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { groupTone } from "./format";
 import { UsersScreen } from "./list";
 
 const listUsers = vi.fn();
@@ -32,7 +34,7 @@ vi.mock("@tanstack/react-router", () => ({
   useSearch: () => search,
   useNavigate: () => navigate,
   Link: ({ children, to, params, search: s, className, onClick, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; className?: string; onClick?: () => void }) => (
-    <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(s ?? {})} className={className} onClick={onClick} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
+    <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(s ?? {})} className={className} onClick={onClick} aria-label={(rest as { "aria-label"?: string })["aria-label"]} data-tone={(rest as { "data-tone"?: string })["data-tone"]}>
       {children}
     </a>
   ),
@@ -124,6 +126,63 @@ describe("the people list", () => {
     // Anna (twice: the table and the phone card); Boris gets something, Clara is disabled
     expect(marks.length).toBe(2);
     expect(marks[0]!.title).toBe("Gets nothing yet: no profile of the group runs on a node");
+  });
+
+  it("shows the word now in green with a dot, and a past time in plain grey", async () => {
+    listUsers.mockResolvedValue({
+      users: [
+        person({ id: "usr_on", name: "Online", online: true, accessHapp: true }),
+        person({ id: "usr_off", name: "Offline", online: false, accessHapp: true, lastSeenUnix: BigInt(Math.floor(Date.now() / 1000) - 13 * 60) }),
+      ],
+      nextPageToken: "",
+      counts: { all: 2, online: 1, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    const table = document.querySelector<HTMLElement>(".md\\:block")!;
+    const now = [...table.querySelectorAll<HTMLElement>("span")].find((s) => s.textContent === "now")!;
+    const cell = now.closest<HTMLElement>(".tone-ok")!;
+    expect(cell.className).toContain("tone-text");
+    expect(cell.querySelector(".tone-ok.rounded-full")).not.toBeNull(); // the dot
+    const ago = [...table.querySelectorAll<HTMLElement>("span")].find((s) => s.textContent === "13 min ago")!;
+    expect(ago.className).toContain("text-muted");
+    expect(ago.closest(".tone-ok")).toBeNull();
+  });
+
+  it("gives each group a tinted chip, the same one every time", async () => {
+    await mount();
+    const chip = (id: string) => [...document.querySelectorAll<HTMLElement>("a[data-tone]")].filter((a) => JSON.parse(a.dataset.search!).group === id);
+    const ok = chip("grp_ok");
+    expect(ok.length).toBe(2); // the table and the phone card
+    expect(ok[0]!.className).toContain("tone-chip");
+    expect(ok[0]!.dataset.tone).toBe(groupTone("grp_ok"));
+    expect(chip("grp_empty")[0]!.dataset.tone).toBe(groupTone("grp_empty"));
+  });
+
+  it("shows the apps as a Link chip, a Keys chip, both or a dash, with the whole wording for a screen reader", async () => {
+    listUsers.mockResolvedValue({
+      users: [
+        person({ id: "usr_l", name: "L", accessHapp: true, via: [App.HAPP] }),
+        person({ id: "usr_k", name: "K", accessHapp: true, via: [App.AMNEZIA] }),
+        person({ id: "usr_b", name: "B", accessHapp: true, via: [App.HAPP, App.AMNEZIA] }),
+        person({ id: "usr_n", name: "N", accessHapp: true, via: [] }),
+      ],
+      nextPageToken: "",
+      counts: { all: 4, online: 0, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    const table = document.querySelector<HTMLElement>(".md\\:block")!;
+    const rows = [...table.querySelectorAll<HTMLElement>("div.cursor-pointer")];
+    const via = (row: HTMLElement) => row.querySelector<HTMLElement>('[role="img"]');
+    const chips = (row: HTMLElement) => [...via(row)!.querySelectorAll<HTMLElement>(".tone-chip")].map((c) => `${c.dataset.tone}:${c.textContent}`);
+    expect(chips(rows[0]!)).toEqual(["sky:Link"]);
+    expect(via(rows[0]!)!.getAttribute("aria-label")).toBe("Subscription link");
+    expect(chips(rows[1]!)).toEqual(["mint:Keys"]);
+    expect(via(rows[1]!)!.getAttribute("aria-label")).toBe("AmneziaVPN keys");
+    expect(chips(rows[2]!)).toEqual(["sky:Link", "mint:Keys"]);
+    expect(via(rows[2]!)!.title).toBe("Link + AmneziaVPN keys");
+    expect(via(rows[3]!)).toBeNull();
+    expect(rows[3]!.textContent).toContain("—");
+    expect(text()).not.toContain("Both");
   });
 
   it("names the group as a link to it", async () => {

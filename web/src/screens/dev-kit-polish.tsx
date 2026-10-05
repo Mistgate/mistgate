@@ -6,6 +6,8 @@ import { DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { App } from "@/gen/mistgate/admin/v1/common_pb";
+import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { ApprovalState, TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
@@ -20,6 +22,8 @@ import { SessionsPage } from "@/screens/settings-pages/sessions";
 import { UpdateToast } from "@/components/update-toast";
 import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
+import { UsersScreen } from "@/screens/users/list";
+import { groupsQuery } from "@/screens/users/rpc";
 import { SettingRow } from "@/screens/users/ui";
 
 // Development only (the /dev-kit page): the shared states (loading, errors, empty lists) as every screen shows them, on private query caches.
@@ -128,9 +132,57 @@ function DangerZones() {
   );
 }
 
+// The people list on mock rows: who is online, what each used (link, keys, both, nothing), four groups with their chips.
+const listGroups = [
+  { id: "grp_7kq2m4xw3vbf", name: "SIMG", profileIds: [], userCount: 3, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
+  { id: "grp_c3ndr5e2p6ha", name: "family", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 0 },
+  { id: "grp_x9tf4gjn2k7f", name: "friends", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
+  { id: "grp_q5w8zr6y3m2e", name: "my", profileIds: [], userCount: 1, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 },
+];
+const listUser = (id: string, name: string, group: number, over: object) => ({
+  id: `usr_${id}`,
+  name,
+  groupId: listGroups[group]!.id,
+  groupName: listGroups[group]!.name,
+  status: UserStatus.ACTIVE,
+  devicesUsed: 2,
+  deviceLimit: 5,
+  usedBytes: 12_300_000_000,
+  quotaBytes: 100_000_000_000,
+  expiresUnix: now + 86400 * 40,
+  lastSeenUnix: now - 780,
+  nextResetUnix: 0,
+  speedLimitBps: 0,
+  createdUnix: now - 86400 * 90,
+  online: false,
+  via: [App.HAPP],
+  accessHapp: true,
+  accessAmnezia: true,
+  currentNodeId: "",
+  currentNodeName: "",
+  ...over,
+});
+const listRows = [
+  listUser("a", "Marina", 1, { online: true, via: [App.HAPP, App.AMNEZIA], currentNodeId: "nod_1", currentNodeName: "de1", lastSeenUnix: now }),
+  listUser("b", "Boris", 0, { online: true, currentNodeId: "nod_2", currentNodeName: "fi1", lastSeenUnix: now }),
+  listUser("c", "Clara", 2, { via: [App.AMNEZIA], lastSeenUnix: now - 13 * 60 }),
+  listUser("d", "Denis", 3, { via: [App.HAPP, App.AMNEZIA], lastSeenUnix: now - 3 * 3600 }),
+  listUser("e", "Egor", 0, { via: [], lastSeenUnix: now - 86400 * 2 }),
+  listUser("f", "Anna", 1, { accessHapp: false, accessAmnezia: false, via: [], lastSeenUnix: 0 }),
+  listUser("g", "Ilya", 2, { status: UserStatus.DISABLED, lastSeenUnix: now - 86400 * 9 }),
+];
+const listPage = { pages: [{ users: listRows, nextPageToken: "", counts: { all: 7, online: 2, expiring: 0, overQuota: 0 } }], pageParams: [""] };
+
 export function PolishKit() {
   return (
     <div className="relative left-1/2 flex w-[min(calc(100vw-2rem),1040px)] -translate-x-1/2 flex-col gap-8">
+      <Shot
+        id="users-list"
+        title="Users: online in green, a tinted chip per group, Link / Keys chips"
+        seed={[owner, [groupsQuery.queryKey, listGroups], [["users", "count"], { counts: { all: 7, online: 2 } }], [["users", "list", "all", "", ""], listPage]]}
+      >
+        <UsersScreen />
+      </Shot>
       <Shot id="polish-int" title="Integrations: one card header, history in sand, “Новый токен”" seed={[owner, [tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}>
         <IntegrationsScreen />
       </Shot>

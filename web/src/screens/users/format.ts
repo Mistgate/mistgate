@@ -1,5 +1,6 @@
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
+import type { Tone } from "@/components/ui/icons";
 import type { StatusKind } from "@/components/ui/status";
 import { agoOf, scaleBytes, type Fmt } from "@/lib/format";
 import type { UserN as User } from "./model";
@@ -21,6 +22,15 @@ export function avatarIndex(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return h % 9;
+}
+
+const groupTones = ["lavender", "sky", "sand", "sage", "mint", "rose"] as const satisfies readonly Tone[];
+
+/** The tone of a group's chip, picked from its id: the same group has the same colour on every page and in every session. */
+export function groupTone(id: string): Tone {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return groupTones[h % groupTones.length]!;
 }
 
 // What the status column shows. The API has four statuses; "devices full" is derived (devices_used >= limit)
@@ -89,14 +99,9 @@ export function termText(u: User, t: Tx, now = nowSec()): { text: string; tone: 
   return { text: t("users.days", { n: d }), tone: d <= 7 ? "fg" : "muted" };
 }
 
-/** What the user actually connected with in the last 7 days ("Both" when both). */
-export function viaText(u: User, t: Tx): string {
-  const happ = u.via.includes(App.HAPP);
-  const awg = u.via.includes(App.AMNEZIA);
-  if (happ && awg) return t("users.via.both");
-  if (happ) return t("users.appsHapp");
-  if (awg) return t("users.appsAwg");
-  return "—";
+/** What the user actually connected with in the last 7 days: by the subscription link, by an AmneziaVPN key, or both. */
+export function viaOf(u: User): { link: boolean; keys: boolean } {
+  return { link: u.via.includes(App.HAPP), keys: u.via.includes(App.AMNEZIA) };
 }
 
 /** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */

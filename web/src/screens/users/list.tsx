@@ -6,7 +6,7 @@ import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, Card, PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
-import { Icon } from "@/components/ui/icons";
+import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { StatusDot } from "@/components/ui/status";
 import { Tabs } from "@/components/ui/tabs";
@@ -18,8 +18,8 @@ import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { userCountQuery } from "@/lib/queries";
 import { CreateUserModal } from "./create-user";
-import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, shownText, termText, usage, viaText } from "./format";
-import { GroupLink, GroupsTab } from "./groups";
+import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, shownText, termText, usage, viaOf } from "./format";
+import { GroupChip, GroupsTab } from "./groups";
 import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
 import { AppLink, useGo } from "./nav";
@@ -39,7 +39,7 @@ const filterValue: Record<FilterId, UserFilter> = {
 
 // One grid for the header and every row keeps the columns aligned: check, name, status, app, group, devices,
 // traffic, term, last seen, node.
-const cols = "grid-cols-[18px_minmax(120px,1.3fr)_132px_108px_minmax(70px,0.7fr)_40px_minmax(120px,1.2fr)_52px_86px_minmax(40px,0.5fr)]";
+const cols = "grid-cols-[18px_minmax(120px,1.3fr)_132px_136px_minmax(70px,0.7fr)_40px_minmax(120px,1.2fr)_52px_86px_minmax(40px,0.5fr)]";
 
 type Search = { create?: boolean; group?: string; tab?: "groups" };
 
@@ -345,7 +345,7 @@ function StatusCell({ u, t }: { u: User; t: Tx }) {
 }
 
 /**
- * The app column: what the person really used lately ("Subscription link", "Both", "—"). An active person whose page would give
+ * The app column: what the person really used lately, as a "Link" chip, a "Keys" chip, both, or "—". An active person whose page would give
  * nothing gets a yellow "No access" instead, with the reason on hover (the group gives nothing, or not for their apps).
  */
 function AppCell({ u, group, t }: { u: User; group?: Group; t: Tx }) {
@@ -358,7 +358,37 @@ function AppCell({ u, group, t }: { u: User; group?: Group; t: Tx }) {
       </span>
     );
   }
-  return <span className="truncate text-xs text-muted">{viaText(u, t)}</span>;
+  const { link, keys } = viaOf(u);
+  if (!link && !keys) return <span className="text-xs text-muted">—</span>;
+  // the chips say it short; the whole wording is what a screen reader and the hover get
+  const full = t(link && keys ? "users.appsBoth" : link ? "users.appsHapp" : "users.appsAwg");
+  return (
+    <span role="img" aria-label={full} title={full} className="flex flex-none items-center gap-1">
+      {link && <ViaChip tone="sky" icon="link" label={t("users.via.link")} />}
+      {keys && <ViaChip tone="mint" icon="key" label={t("users.via.keys")} />}
+    </span>
+  );
+}
+
+/** "Link" (sky) and "Keys" (mint): the two ways, tinted like the subscription page's chips. */
+function ViaChip({ tone, icon, label }: { tone: Tone; icon: IconName; label: string }) {
+  return (
+    <span data-tone={tone} className="tone-chip inline-flex h-[22px] items-center gap-1 px-1.5 text-[11px] font-bold whitespace-nowrap">
+      <Icon name={icon} size={12} />
+      {label}
+    </span>
+  );
+}
+
+/** Last seen: "now" is green (the dot and the word, like every online state); anything else is how long ago, quiet grey. */
+function SeenCell({ u, t, now }: { u: User; t: Tx; now: number }) {
+  if (!u.online) return <span className="truncate text-xs text-muted">{seenText(u, t, now)}</span>;
+  return (
+    <span className="tone-ok tone-text flex min-w-0 items-center gap-1.5 text-xs font-semibold">
+      <StatusDot kind="ok" />
+      <span className="truncate">{t("users.now")}</span>
+    </span>
+  );
 }
 
 const toneClass = { muted: "text-muted", fg: "text-fg", bad: "text-danger-text" } as const;
@@ -387,8 +417,8 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       </div>
       <StatusCell u={u} t={t} />
       <AppCell u={u} group={group} t={t} />
-      <span className="min-w-0 truncate" onClick={stop}>
-        <GroupLink id={u.groupId} name={u.groupName} className="font-semibold text-muted hover:text-fg" />
+      <span className="flex min-w-0" onClick={stop}>
+        <GroupChip id={u.groupId} name={u.groupName} />
       </span>
       <span className={cx("font-mono text-xs", full ? "text-warn" : "text-muted")}>
         {u.devicesUsed}/{u.deviceLimit}
@@ -398,7 +428,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         <UsageBar pct={use.pct} tone={use.tone} />
       </div>
       <span className={cx("font-mono text-xs", toneClass[term.tone])}>{term.text}</span>
-      <span className={cx("truncate text-xs", u.online ? "text-fg" : "text-muted")}>{seenText(u, t, now)}</span>
+      <SeenCell u={u} t={t} now={now} />
       <span className="truncate font-mono text-xs text-muted">
         {u.currentNodeId ? (
           <Link to="/nodes/$id" params={{ id: u.currentNodeId }} onClick={stop} className="hover:text-fg hover:underline">
@@ -436,7 +466,7 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <AppCell u={u} group={group} t={t} />·
         <span onClick={stop}>
-          <GroupLink id={u.groupId} name={u.groupName} className="font-semibold text-muted" />
+          <GroupChip id={u.groupId} name={u.groupName} />
         </span>
         ·
         <span className={cx("font-mono", full && "text-warn")}>
@@ -444,7 +474,7 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         </span>
         ·<span className={cx("font-mono", toneClass[term.tone])}>{term.text}</span>
         <span className="flex-1" />
-        <span className={u.online ? "text-fg" : undefined}>{seenText(u, t, now)}</span>
+        <SeenCell u={u} t={t} now={now} />
       </div>
       <div className="flex items-center gap-2.5">
         <div className="flex-1">

@@ -25,7 +25,7 @@ import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DAY, GB, agoText, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
-import { GroupEditModal, GroupLink, ImpactText, WaysOfGroup, wayMark } from "./groups";
+import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup, wayMark } from "./groups";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { big, detailN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
 import { useGo } from "./nav";
@@ -181,7 +181,6 @@ function UserDetail({ data }: { data: DetailN }) {
   const d = daysLeft(user.expiresUnix, now);
   const dateText = new Intl.DateTimeFormat(t.lang, { day: "numeric", month: "long", ...(new Date(user.expiresUnix * 1000).getFullYear() !== new Date(now * 1000).getFullYear() && { year: "numeric" }) }).format(new Date(user.expiresUnix * 1000));
   const term = d === null ? t("users.never") : user.expiresUnix <= now ? t("users.status.expired") : `${t("users.until")} ${dateText} · ${t("users.days", { n: d })}`;
-  const meta = [appsText(user, t), user.groupName, term].filter(Boolean).join(" · ");
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -197,7 +196,9 @@ function UserDetail({ data }: { data: DetailN }) {
               {t(shownKey[shown])}
             </span>
           </div>
-          <span className="text-[13px] text-muted">{meta}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted">
+            {appsText(user, t)} · <GroupChip id={user.groupId} name={user.groupName} /> · {term}
+          </span>
         </div>
         <div className="flex w-full flex-wrap gap-1.5 md:w-auto">
           <Button variant={disabled ? "ghost" : "ghostDanger"} onClick={() => void actions.setEnabled(disabled)}>

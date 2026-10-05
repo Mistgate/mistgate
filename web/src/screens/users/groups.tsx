@@ -21,6 +21,7 @@ import { presetName } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
+import { groupTone } from "./format";
 import { useTx } from "./t";
 import { ConfirmModal } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
@@ -83,6 +84,22 @@ export function GroupLink({ id, name, className, children }: { id: string; name:
   return (
     <Link to="/users" search={{ tab: "groups", group: id }} aria-label={t("users.groupOpen", { name })} className={cx("font-bold text-accent-text hover:underline", className)}>
       {children ?? name}
+    </Link>
+  );
+}
+
+/** A group as a small tinted chip that opens it; the tone comes from the group's id, so it is the same on every page. */
+export function GroupChip({ id, name, className }: { id: string; name: string; className?: string }) {
+  const t = useTx();
+  return (
+    <Link
+      to="/users"
+      search={{ tab: "groups", group: id }}
+      data-tone={groupTone(id)}
+      aria-label={t("users.groupOpen", { name })}
+      className={cx("tone-chip inline-flex h-[22px] max-w-full min-w-0 items-center px-2 text-xs font-bold hover:underline", className)}
+    >
+      <span className="truncate">{name}</span>
     </Link>
   );
 }
@@ -246,7 +263,7 @@ export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { 
             <Card key={g.id} lg className={cx("flex flex-col gap-3 p-4 transition-colors", focus === g.id && "border-accent-line")}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                 <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-3">
-                  <IconChip icon="family" tone="lavender" size={28} />
+                  <IconChip icon="family" tone={groupTone(g.id)} size={28} />
                   <b className="min-w-0 text-[15px] tracking-[-0.01em] break-words">{g.name}</b>
                 </div>
                 <div className="flex items-center gap-1.5">
