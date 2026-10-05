@@ -120,15 +120,15 @@ var procedureLevels = map[string]level{
 	// UpdateService: the page is readable by everyone; every change decides what code runs as root on all
 	// nodes (or on the panel itself), so it is owner-only and the handler also requires a fresh step-up
 	// (auth.Service.RequireStepUp, like passkey removal). Not relaxed for helpers.
-	adminv1connect.UpdateServiceGetUpdatesProcedure:         levelRead,
-	adminv1connect.UpdateServiceCheckPanelUpdateProcedure:   levelRead,
-	adminv1connect.UpdateServiceInstallPanelUpdateProcedure: levelOwner, // also needs a step-up
-	adminv1connect.UpdateServiceStartRolloutProcedure:       levelOwner, // also needs a step-up
-	adminv1connect.UpdateServicePauseRolloutProcedure:       levelOwner, // also needs a step-up
-	adminv1connect.UpdateServiceResumeRolloutProcedure:      levelOwner, // also needs a step-up
-	adminv1connect.UpdateServiceCancelRolloutProcedure:      levelOwner, // also needs a step-up
-	adminv1connect.UpdateServiceRollbackNodeProcedure:       levelOwner, // also needs a step-up
-	adminv1connect.UpdateServiceRescanBundleProcedure:       levelOwner, // also needs a step-up (reads disk, but it is the trigger of what gets rolled out)
+	adminv1connect.UpdateServiceGetUpdatesProcedure:               levelRead,
+	adminv1connect.UpdateServiceCheckPanelUpdateProcedure:         levelRead,
+	adminv1connect.UpdateServiceInstallPanelUpdateProcedure:       levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceStartRolloutProcedure:             levelOwner, // also needs a step-up
+	adminv1connect.UpdateServicePauseRolloutProcedure:             levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceResumeRolloutProcedure:            levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceCancelRolloutProcedure:            levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceRollbackNodeProcedure:             levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceRescanBundleProcedure:             levelOwner, // also needs a step-up (reads disk, but it is the trigger of what gets rolled out)
 	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:       levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure: levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:        levelOwner, // also needs a step-up
