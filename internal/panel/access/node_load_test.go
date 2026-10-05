@@ -51,6 +51,40 @@ func TestCurrentNetworkUtilizationUsesNodeCapacityAndBusierDirection(t *testing.
 	}
 }
 
+// cpuAndNetwork is a source that also reports the CPU, as the fleet does.
+type cpuAndNetwork struct {
+	networkUsageFunc
+	cpu func(nodeID string) (float64, time.Time, bool)
+}
+
+func (s cpuAndNetwork) CPUUsage(nodeID string) (float64, time.Time, bool) { return s.cpu(nodeID) }
+
+func TestCurrentNetworkUtilizationTheCPUCountsAsLoad(t *testing.T) {
+	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	source := cpuAndNetwork{
+		networkUsageFunc: func(string) (uint64, uint64, time.Time, bool) { return 30_000_000, 5_000_000, now, true },
+		cpu: func(nodeID string) (float64, time.Time, bool) {
+			switch nodeID {
+			case "stale":
+				return 99, now.Add(-networkSampleMaxAge - time.Second), true
+			case "busy-link":
+				return 10.4, now, true
+			}
+			return 71.6, now, true
+		},
+	}
+	got := CurrentNetworkUtilization([]string{"no-capacity", "busy-link", "stale"}, map[string]int{"busy-link": 50, "stale": 100}, source, now)
+	if p := got["no-capacity"].LoadPercent; p == nil || *p != 72 {
+		t.Errorf("no capacity set: the CPU is the load, got %v, want 72", p)
+	}
+	if p := got["busy-link"].LoadPercent; p == nil || *p != 60 {
+		t.Errorf("the link busier than the CPU: got %v, want 60 (30 Mbps / 50)", p)
+	}
+	if p := got["stale"].LoadPercent; p == nil || *p != 30 {
+		t.Errorf("a stale CPU sample is ignored: got %v, want 30 (the link)", p)
+	}
+}
+
 func TestCurrentNetworkUtilizationZeroTrafficAndNoSource(t *testing.T) {
 	now := time.Now()
 	source := networkUsageFunc(func(nodeID string) (uint64, uint64, time.Time, bool) {

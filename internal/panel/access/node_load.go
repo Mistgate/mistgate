@@ -15,9 +15,10 @@ type NodeNetworkUtilization struct {
 	LoadPercent  *int
 }
 
-// CurrentNetworkUtilization returns one sample per distinct node. LoadPercent is the larger of RX/TX
-// divided by that node's configured symmetric capacity; without a known capacity the percentage is nil.
-// Nodes without a recent sample are omitted.
+// CurrentNetworkUtilization returns one sample per distinct node. LoadPercent is how busy the node is: the larger of
+// RX/TX divided by its configured symmetric capacity, or its CPU use when the source reports it (CPUUsageSource) and
+// that is higher. A one-core VPS usually runs out of CPU before its link, and the CPU is known without the owner typing
+// the provider's limit; with neither the percentage is nil. Nodes without a recent sample are omitted.
 func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, source NetworkUsageSource, now time.Time) map[string]NodeNetworkUtilization {
 	if source == nil {
 		return nil
@@ -49,6 +50,14 @@ func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, so
 			percent := int(math.Round(float64(max(rx, tx)) / capacityBps * 100))
 			percent = min(100, max(0, percent))
 			usage.LoadPercent = &percent
+		}
+		if cpu, ok := source.(CPUUsageSource); ok {
+			if pct, cat, ok := cpu.CPUUsage(nodeID); ok && now.Sub(cat) >= -5*time.Second && now.Sub(cat) <= networkSampleMaxAge {
+				percent := min(100, max(0, int(math.Round(pct))))
+				if usage.LoadPercent == nil || percent > *usage.LoadPercent {
+					usage.LoadPercent = &percent
+				}
+			}
 		}
 		samples[nodeID] = usage
 	}

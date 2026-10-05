@@ -245,6 +245,20 @@ func (f *Fleet) NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time
 	return s.metrics.NetRxBps, s.metrics.NetTxBps, s.metricsAt, true
 }
 
+// CPUUsage returns the CPU use of the latest host sample of a connected node, with the time the panel received it.
+func (f *Fleet) CPUUsage(nodeID string) (pct float64, sampledAt time.Time, ok bool) {
+	s := f.session(nodeID)
+	if s == nil {
+		return 0, time.Time{}, false
+	}
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	if s.metrics == nil || s.metricsAt.IsZero() {
+		return 0, time.Time{}, false
+	}
+	return float64(s.metrics.CpuPct), s.metricsAt, true
+}
+
 func (f *Fleet) snapshotSessions() []*session {
 	f.mu.Lock()
 	defer f.mu.Unlock()

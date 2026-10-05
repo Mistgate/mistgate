@@ -83,7 +83,7 @@ The default is `{flag} {country} · {profile}`: "🇩🇪 DE · Hysteria2". Prof
 
 In the link list every name is kept within 30 characters, Happ's limit for a server name (a flag counts as four): a long name first shortens the protocol at the start of the profile name (Hysteria2 to HY2, AmneziaWG to AWG, WireGuard to WG), then is cut. The Mihomo YAML keeps the full names.
 
-In Happ, a node with a set network capacity (**Network capacity** in the node's **Settings**) also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64%", the higher of its receive and send rates as a share of that capacity. Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
+In Happ, a node also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64%", its CPU use, or the higher of its receive and send rates as a share of the **Network capacity** in the node's **Settings** when that is set and higher. Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
 
 **How it looks in the app** draws the list as Happ shows it, loads included, with the servers of the group most people are in, or with made-up servers when there is none.
 

@@ -51,6 +51,12 @@ type NetworkUsageSource interface {
 	NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
 }
 
+// CPUUsageSource is an optional interface of the NetworkUsageSource (the fleet module implements it): the node's CPU use
+// in percent from the same agent samples, and when the panel received it.
+type CPUUsageSource interface {
+	CPUUsage(nodeID string) (pct float64, sampledAt time.Time, ok bool)
+}
+
 // CapabilitySource is an optional interface of the notify / online argument of New (the fleet module implements
 // it): whether the agent of a node announced a capability string ("awg/1"). known is false while the node has never
 // connected, so a fresh node is not treated as too old.
