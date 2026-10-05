@@ -5,10 +5,11 @@ import { Notice } from "@/components/ui/notice";
 import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { capacityOf, roundMbps } from "./bandwidth";
+import { capacityOf, roundMbps, runsLine } from "./bandwidth";
 
 /**
- * "Measure" next to the capacity field. The node downloads from a public speed server for about ten seconds; the answer is
+ * "Measure" next to the capacity field. The node downloads from the nearest public speed server (Ookla, else Cloudflare and
+ * others) for about half a minute, in three runs; the answer, and how many runs worked, is
  * shown, and "Use" puts the rounded slower direction into the field (it is saved with the rest of the form, never by the
  * measurement itself). Owner only, like the API call.
  */
@@ -66,7 +67,7 @@ export function BandwidthMeasure({ nodeId, current, onUse }: { nodeId: string; c
               : t("node.settings.bandwidthMeasuredNoUp", { down: r.downMbps })}
           </span>
           {people && <span className="text-xs leading-snug text-pretty">{people}</span>}
-          <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.bandwidthMeasuredNote", { server: r.server, runs: Math.max(r.runs, 1) })}</span>
+          <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.bandwidthMeasuredNote", { runs: runsLine(t, r) })}</span>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <Button type="button" variant="primary" size="sm" disabled={current.trim() === String(value)} onClick={() => onUse(String(value))}>
               {t("node.settings.bandwidthUse", { value })}

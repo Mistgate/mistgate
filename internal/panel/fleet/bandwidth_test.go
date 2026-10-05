@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -119,6 +120,59 @@ func TestMeasureBandwidthReturnsTheResultAndNeverWritesTheCapacity(t *testing.T)
 	}
 	if n := x.count(`SELECT count(*) FROM event WHERE code = 'bandwidth_measured'`); n != 0 {
 		t.Error("a measurement the admin asked for is not an automatic one: no event")
+	}
+}
+
+// How the runs went: new fields are passed on (cleaned), and an agent that does not send them reads as "all runs worked".
+func TestMeasureBandwidthSaysHowManyRunsWorkedAndWhy(t *testing.T) {
+	x, a := newL3Env(t)
+	x.f.measureDelay = time.Hour
+	c, _, _ := connectCaps(a, "new", bwCaps...)
+	ask := func(mut func(p map[string]string)) *adminv1.MeasureBandwidthResponse {
+		t.Helper()
+		res := measured("525", "160")
+		mut(res.Params)
+		answerMeasure(c, res, nil)
+		r, err := callMeasure(x, a.nodeID)
+		if err != nil || r.ErrorCode != "" {
+			t.Fatalf("%v %v", r, err)
+		}
+		return r
+	}
+
+	r := ask(func(p map[string]string) {
+		p["runs"], p["runs_total"], p["run_failures"], p["server"], p["server_detail"] = "1", "3", "rate_limited,http_503", "Ookla", "МТС, Москва"
+	})
+	if r.Runs != 1 || r.RunsTotal != 3 || !slices.Equal(r.RunFailures, []string{"rate_limited", "http_503"}) || r.Server != "Ookla" || r.ServerDetail != "МТС, Москва" {
+		t.Errorf("response = %v", r)
+	}
+
+	// an agent from before these fields: runs only
+	r = ask(func(p map[string]string) {
+		p["runs"], p["runs_total"] = "2", ""
+		delete(p, "run_failures")
+		delete(p, "server_detail")
+	})
+	if r.Runs != 2 || r.RunsTotal != 2 || len(r.RunFailures) != 0 || r.ServerDetail != "" {
+		t.Errorf("an old agent: %v", r)
+	}
+
+	// what the agent writes is held to the known words: no text of its own reaches the UI, no more reasons than failed runs
+	r = ask(func(p map[string]string) {
+		p["runs"], p["runs_total"], p["run_failures"] = "1", "3", "<script>,http_99999"
+	})
+	if !slices.Equal(r.RunFailures, []string{"failed", "failed"}) {
+		t.Errorf("unknown reasons: %v", r.RunFailures)
+	}
+	r = ask(func(p map[string]string) {
+		p["runs"], p["runs_total"], p["run_failures"] = "2", "3", "timeout,unreachable,rate_limited"
+	})
+	if !slices.Equal(r.RunFailures, []string{"timeout"}) {
+		t.Errorf("more reasons than failed runs: %v", r.RunFailures)
+	}
+	// a total below the runs that worked is not believed
+	if r = ask(func(p map[string]string) { p["runs"], p["runs_total"], p["run_failures"] = "3", "1", "timeout" }); r.RunsTotal != 3 || len(r.RunFailures) != 0 {
+		t.Errorf("total below runs: %v", r)
 	}
 }
 

@@ -70,7 +70,7 @@ The panel is one process. `cmd/mistgate` wires the modules together; they know e
 | `certs` | Let's Encrypt and self-signed certificates for the servers on the node. |
 | `doctor` | Host checks and the four safe fixes. |
 | `update`, `awgprep` | Self-update from signed bundles; building the AmneziaWG kernel module on request. |
-| `speedtest` | The bandwidth test: parallel downloads and uploads against a public speed server, with byte and time limits. |
+| `speedtest` | The bandwidth test: parallel downloads and uploads against the nearest Ookla server (Cloudflare and others as fallbacks), with byte and time limits. |
 
 Engines never touch nftables, sysctl, the resolver or certificates themselves: they get what they need from the agent.
 

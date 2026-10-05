@@ -1939,7 +1939,7 @@ type MeasureBandwidthResponse struct {
 	// = the upload could not be measured (the server did not take it). Both are 0 when error_code is set.
 	DownMbps uint32 `protobuf:"varint,1,opt,name=down_mbps,json=downMbps,proto3" json:"down_mbps,omitempty"`
 	UpMbps   uint32 `protobuf:"varint,2,opt,name=up_mbps,json=upMbps,proto3" json:"up_mbps,omitempty"`
-	// The test server that answered, e.g. "speed.cloudflare.com".
+	// The test server that answered: "Ookla" (see server_detail), "speed.cloudflare.com", "proof.ovh.net" or "cachefly.net".
 	Server string `protobuf:"bytes,3,opt,name=server,proto3" json:"server,omitempty"`
 	// "" = measured. Otherwise what the node answered: busy (a measurement is already running), unreachable (no test server
 	// gave a usable answer), unsupported, failed.
@@ -1950,8 +1950,15 @@ type MeasureBandwidthResponse struct {
 	// included in down_mbps / up_mbps). 0 = none, or the node's interface could not be read.
 	PeopleDownMbps uint32 `protobuf:"varint,6,opt,name=people_down_mbps,json=peopleDownMbps,proto3" json:"people_down_mbps,omitempty"`
 	PeopleUpMbps   uint32 `protobuf:"varint,7,opt,name=people_up_mbps,json=peopleUpMbps,proto3" json:"people_up_mbps,omitempty"`
-	// Runs that gave a result (of 3).
-	Runs          uint32 `protobuf:"varint,8,opt,name=runs,proto3" json:"runs,omitempty"`
+	// Runs that gave a result, of runs_total.
+	Runs uint32 `protobuf:"varint,8,opt,name=runs,proto3" json:"runs,omitempty"`
+	// Runs the node was asked to do (3). 0 = the agent did not say (an older one): read it as equal to runs.
+	RunsTotal uint32 `protobuf:"varint,9,opt,name=runs_total,json=runsTotal,proto3" json:"runs_total,omitempty"`
+	// Why each run that did not work failed, in order: rate_limited, timeout, unreachable, http_<code> or failed. Empty when
+	// every run worked, and for an agent that does not report it.
+	RunFailures []string `protobuf:"bytes,10,rep,name=run_failures,json=runFailures,proto3" json:"run_failures,omitempty"`
+	// Which server of the provider answered: for Ookla, the sponsor and city ("MTS, Moscow"); "" for the others.
+	ServerDetail  string `protobuf:"bytes,11,opt,name=server_detail,json=serverDetail,proto3" json:"server_detail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2040,6 +2047,27 @@ func (x *MeasureBandwidthResponse) GetRuns() uint32 {
 		return x.Runs
 	}
 	return 0
+}
+
+func (x *MeasureBandwidthResponse) GetRunsTotal() uint32 {
+	if x != nil {
+		return x.RunsTotal
+	}
+	return 0
+}
+
+func (x *MeasureBandwidthResponse) GetRunFailures() []string {
+	if x != nil {
+		return x.RunFailures
+	}
+	return nil
+}
+
+func (x *MeasureBandwidthResponse) GetServerDetail() string {
+	if x != nil {
+		return x.ServerDetail
+	}
+	return ""
 }
 
 type RetireNodeRequest struct {
@@ -2529,7 +2557,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12+\n" +
 	"\x04node\x18\x04 \x01(\v2\x17.mistgate.admin.v1.NodeR\x04node\"2\n" +
 	"\x17MeasureBandwidthRequest\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\x85\x02\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\xec\x02\n" +
 	"\x18MeasureBandwidthResponse\x12\x1b\n" +
 	"\tdown_mbps\x18\x01 \x01(\rR\bdownMbps\x12\x17\n" +
 	"\aup_mbps\x18\x02 \x01(\rR\x06upMbps\x12\x16\n" +
@@ -2539,7 +2567,12 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\aseconds\x18\x05 \x01(\rR\aseconds\x12(\n" +
 	"\x10people_down_mbps\x18\x06 \x01(\rR\x0epeopleDownMbps\x12$\n" +
 	"\x0epeople_up_mbps\x18\a \x01(\rR\fpeopleUpMbps\x12\x12\n" +
-	"\x04runs\x18\b \x01(\rR\x04runs\"O\n" +
+	"\x04runs\x18\b \x01(\rR\x04runs\x12\x1d\n" +
+	"\n" +
+	"runs_total\x18\t \x01(\rR\trunsTotal\x12!\n" +
+	"\frun_failures\x18\n" +
+	" \x03(\tR\vrunFailures\x12#\n" +
+	"\rserver_detail\x18\v \x01(\tR\fserverDetail\"O\n" +
 	"\x11RetireNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
 	"\fconfirm_name\x18\x02 \x01(\tR\vconfirmName\";\n" +

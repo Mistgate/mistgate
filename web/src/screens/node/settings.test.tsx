@@ -114,7 +114,7 @@ describe("a new install command", () => {
 
 describe("measuring the network capacity", () => {
   const field = () => document.querySelector<HTMLInputElement>('input[type="number"]')!;
-  const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 29, runs: 3, peopleDownMbps: 0, peopleUpMbps: 0, ...over });
+  const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 29, runs: 3, runsTotal: 3, runFailures: [], serverDetail: "", peopleDownMbps: 0, peopleUpMbps: 0, ...over });
 
   it("starts as a button with what it does, and a click shows it is busy until the node answers", async () => {
     let answer!: (v: unknown) => void;
@@ -171,6 +171,21 @@ describe("measuring the network capacity", () => {
       expect(text()).toContain(want);
       expect(text()).toContain("Measured: 937 Mbps ↓ · 871 ↑"); // the figures already include them
     }
+  });
+
+  it("says which server answered, and how many of the runs worked and why the others did not", async () => {
+    measureBandwidth.mockResolvedValue(measured({ server: "Ookla", serverDetail: "MTS, Moscow" }));
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(text()).toContain("Through Ookla · MTS, Moscow, the best of 3 runs.");
+
+    act(() => root?.unmount());
+    host?.remove();
+    measureBandwidth.mockResolvedValue(measured({ runs: 1, runFailures: ["rate_limited", "rate_limited"] }));
+    await mount(NodeStatus.ONLINE);
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    expect(text()).toContain("Through speed.cloudflare.com, 1 of 3 runs worked: the others — the server limited the requests.");
+    expect(text()).not.toContain("best of 1");
   });
 
   it("says so when only the download could be measured", async () => {

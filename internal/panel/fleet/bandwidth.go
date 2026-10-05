@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -53,7 +54,40 @@ func (f *Fleet) measureBandwidth(ctx context.Context, n store.NodeRow) (*adminv1
 	if out.DownMbps == 0 { // a link that moved nothing is not a measurement
 		return &adminv1.MeasureBandwidthResponse{ErrorCode: "failed"}, nil
 	}
+	// An agent from before these fields says nothing: every run it counted worked as far as anyone knows.
+	out.ServerDetail = clip(res.Params["server_detail"], 80)
+	out.RunsTotal = max(mbpsParam(res.Params["runs_total"]), out.Runs)
+	out.RunFailures = runFailures(res.Params["run_failures"], int(out.RunsTotal-out.Runs))
 	return out, nil
+}
+
+// runFailures reads the agent's comma separated reason codes: only the known words and http_<code> are passed on, anything
+// else is "failed" (the agent's text is never shown), and never more than the runs that did not work.
+func runFailures(s string, failed int) []string {
+	if s == "" || failed <= 0 {
+		return nil
+	}
+	var out []string
+	for _, r := range strings.Split(s, ",") {
+		if len(out) == failed {
+			break
+		}
+		out = append(out, failureCode(strings.TrimSpace(r)))
+	}
+	return out
+}
+
+func failureCode(r string) string {
+	switch r {
+	case "rate_limited", "timeout", "unreachable":
+		return r
+	}
+	if code, ok := strings.CutPrefix(r, "http_"); ok && len(code) == 3 {
+		if n, err := strconv.Atoi(code); err == nil && n >= 100 && n <= 599 {
+			return r
+		}
+	}
+	return "failed"
 }
 
 // measureErrorCode is the stable word the UI words; the agent's text is never passed on.

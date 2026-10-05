@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/speedtest"
 )
 
-// The bandwidth test (agent.proto "BANDWIDTH TEST"): the panel asks, the node downloads and uploads against a public speed
-// server for about half a minute (three runs, the best counts) and answers with one CommandResult. Nothing is stored and no setting changes here.
+// The bandwidth test (agent.proto "BANDWIDTH TEST"): the panel asks, the node downloads and uploads against the nearest
+// public speed server (Ookla; Cloudflare and others as fallbacks) for about half a minute (three runs, the best counts) and
+// answers with one CommandResult. Nothing is stored and no setting changes here.
 
 // capBandwidth is listed in Hello.capabilities: the panel sends MeasureBandwidth only to agents that have it.
 const capBandwidth = "bandwidth/1"
@@ -45,7 +47,8 @@ func (a *Agent) measureBandwidth(s *session, r *pb.MeasureBandwidth) {
 		return
 	}
 	whole := func(v float64) string { return strconv.FormatInt(int64(v+0.5), 10) }
-	a.log.Info("bandwidth test", "server", res.Server, "down_mbps", whole(res.DownMbps), "up_mbps", whole(res.UpMbps), "seconds", whole(res.Seconds))
+	a.log.Info("bandwidth test", "server", res.Server, "detail", res.Detail, "down_mbps", whole(res.DownMbps), "up_mbps", whole(res.UpMbps),
+		"seconds", whole(res.Seconds), "runs", res.Runs, "of", res.RunsTotal, "failures", res.Failures)
 	s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Ok: true, Detail: res.Server, Params: map[string]string{
 		"down_mbps":  whole(res.DownMbps),
 		"up_mbps":    whole(res.UpMbps),
@@ -55,6 +58,10 @@ func (a *Agent) measureBandwidth(s *session, r *pb.MeasureBandwidth) {
 		"up_bytes":   strconv.FormatInt(res.UpBytes, 10),
 		"seconds":    whole(res.Seconds),
 		"runs":       strconv.Itoa(res.Runs),
+		// of how many runs, why the others did not work (one code per failed run, comma separated), and which server of the provider
+		"runs_total":    strconv.Itoa(res.RunsTotal),
+		"run_failures":  strings.Join(res.Failures, ","),
+		"server_detail": clipText(res.Detail, 80),
 		// what the interface carried beyond the test in the best run: the people already using the node
 		"down_people_mbps": whole(res.PeopleDownMbps),
 		"up_people_mbps":   whole(res.PeopleUpMbps),

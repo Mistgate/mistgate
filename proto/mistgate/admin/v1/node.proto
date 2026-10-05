@@ -24,7 +24,7 @@ service NodeService {
   // "agent too old" / "the node is not connected".
   rpc PrepareAwgKernel(PrepareAwgKernelRequest) returns (PrepareAwgKernelResponse);
   // Asks the connected agent (capability "bandwidth/1") to measure how fast the node reaches the internet: three runs, about 30 seconds,
-  // up to 1.5 GB through a public speed server, the best run counts, and the traffic of the people already using the node during the test is part of the result. It only returns the result; it never changes bandwidth_mbps (the admin
+  // up to 1.5 GB through a public speed server (the nearest Ookla one, else Cloudflare and others), the best run counts, and the traffic of the people already using the node during the test is part of the result. It only returns the result; it never changes bandwidth_mbps (the admin
   // chooses to use it). Owner only, closed to API tokens and MCP: it makes the node push traffic. Fails with
   // FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
   // in error_code. One measurement per node at a time.
@@ -309,7 +309,7 @@ message MeasureBandwidthResponse {
   // = the upload could not be measured (the server did not take it). Both are 0 when error_code is set.
   uint32 down_mbps = 1;
   uint32 up_mbps = 2;
-  // The test server that answered, e.g. "speed.cloudflare.com".
+  // The test server that answered: "Ookla" (see server_detail), "speed.cloudflare.com", "proof.ovh.net" or "cachefly.net".
   string server = 3;
   // "" = measured. Otherwise what the node answered: busy (a measurement is already running), unreachable (no test server
   // gave a usable answer), unsupported, failed.
@@ -320,8 +320,15 @@ message MeasureBandwidthResponse {
   // included in down_mbps / up_mbps). 0 = none, or the node's interface could not be read.
   uint32 people_down_mbps = 6;
   uint32 people_up_mbps = 7;
-  // Runs that gave a result (of 3).
+  // Runs that gave a result, of runs_total.
   uint32 runs = 8;
+  // Runs the node was asked to do (3). 0 = the agent did not say (an older one): read it as equal to runs.
+  uint32 runs_total = 9;
+  // Why each run that did not work failed, in order: rate_limited, timeout, unreachable, http_<code> or failed. Empty when
+  // every run worked, and for an agent that does not report it.
+  repeated string run_failures = 10;
+  // Which server of the provider answered: for Ookla, the sponsor and city ("MTS, Moscow"); "" for the others.
+  string server_detail = 11;
 }
 
 message RetireNodeRequest {

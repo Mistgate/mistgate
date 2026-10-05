@@ -3,18 +3,27 @@
 // three runs back to back, each with parallel downloads for a few seconds and then parallel uploads, the best run per
 // direction wins; a hard cap on the bytes moved and a deadline on every phase. In the counted window of every run the
 // node's main network interface is read too, so the traffic of the people already using the node counts as part of the
-// capacity instead of being lost from it. It asks nothing of the host and keeps nothing.
+// capacity instead of being lost from it. The servers are tried in this order: the nearest Ookla (Speedtest.net) servers
+// to the node (the public server list is geolocated by the node's address, the two with the lowest latency are used), then
+// Cloudflare, OVH and CacheFly. The result says how many runs worked and why the others did not. It asks nothing of the
+// host and keeps nothing.
 package speedtest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,14 +32,62 @@ import (
 // ErrUnreachable means no endpoint gave a usable answer (blocked, down, or the node has no route out).
 var ErrUnreachable = errors.New("no speed test server answered")
 
+// Reasons a run did not work (Result.Failures); the panel passes them on and the UI words them. http_<code> is any other
+// status the server answered.
+const (
+	ReasonRateLimited = "rate_limited" // HTTP 429 that did not clear within the phase
+	ReasonTimeout     = "timeout"      // no data before the deadline, or no time was left to start the run
+	ReasonUnreachable = "unreachable"  // refused, reset, DNS or TLS failure, an empty answer
+)
+
+// statusError is a non-2xx answer; wait is the server's Retry-After (0 = none).
+type statusError struct {
+	code int
+	wait time.Duration
+}
+
+func (e *statusError) Error() string { return "http " + strconv.Itoa(e.code) }
+
+func statusOf(resp *http.Response) error {
+	e := &statusError{code: resp.StatusCode}
+	if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && s > 0 {
+		e.wait = time.Duration(s) * time.Second
+	}
+	return e
+}
+
+func limited(err error) bool {
+	var se *statusError
+	return errors.As(err, &se) && se.code == http.StatusTooManyRequests
+}
+
+// reason is the short code for why a run failed.
+func reason(err error) string {
+	var se *statusError
+	var ne net.Error
+	switch {
+	case limited(err):
+		return ReasonRateLimited
+	case errors.As(err, &se):
+		return "http_" + strconv.Itoa(se.code)
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &ne) && ne.Timeout():
+		return ReasonTimeout
+	}
+	return ReasonUnreachable
+}
+
 // Endpoint is one public test server.
 type Endpoint struct {
-	// Name is what the result says, e.g. "speed.cloudflare.com".
+	// Name is what the result says, e.g. "speed.cloudflare.com" or "Ookla".
 	Name string
+	// Detail says which server of the provider, e.g. the sponsor and city of an Ookla server; "" = the name is enough.
+	Detail string
 	// DownURL answers a GET with a body to read; the stream reads it to the end and asks again until the time is up.
 	DownURL string
 	// UpURL takes a POST with a body of any size up to a few MB; "" = this server has no upload, the result says 0.
 	UpURL string
+	// Pause between runs on this server; 0 = Config.Pause. A server that rate-limits is given more room.
+	Pause time.Duration
 }
 
 // Counters reads the byte counters of the node's main network interface: its name (a changed name between two reads
@@ -39,6 +96,9 @@ type Counters func() (iface string, rx, tx uint64, ok bool)
 
 // Config is the whole test. Default() is the production one; tests shrink it and point it at a local server.
 type Config struct {
+	// OoklaList is the URL of the public Speedtest.net server list (JSON, geolocated by the requester's address); "" = no
+	// Ookla. The nearest servers by latency go before Endpoints; when the list or every server fails, Endpoints alone are used.
+	OoklaList string
 	Endpoints []Endpoint
 	// Client overrides the HTTP client (tests). Nil = a client without proxy or HTTP/2: every stream is its own TCP connection.
 	Client *http.Client
@@ -58,7 +118,8 @@ type Config struct {
 	// Counters is the host's interface counters; nil = the test alone is measured.
 	Counters Counters
 
-	beforeRun func(run int) // tests: called before each run, 0-based
+	beforeRun   func(run int) // tests: called before each run, 0-based
+	ooklaScheme string        // tests: "http" for a local server; "" = https
 }
 
 // Result is what the panel gets: the best run per direction.
@@ -71,12 +132,15 @@ type Result struct {
 	// (traffic of people using the node), 0 when it was not more than the test's own headers, or there are no counters.
 	PeopleDownMbps, PeopleUpMbps float64
 	Server                       string
-	DownStreams                  int
-	// Runs that gave a result.
-	Runs      int
-	DownBytes int64 // all runs together
-	UpBytes   int64
-	Seconds   float64
+	// Detail is the sponsor and city of an Ookla server ("" for the others).
+	Detail      string
+	DownStreams int
+	// Runs that gave a result, of RunsTotal asked for; Failures has one reason code (Reason*, http_<code>) per run that did not.
+	Runs, RunsTotal int
+	Failures        []string
+	DownBytes       int64 // all runs together
+	UpBytes         int64
+	Seconds         float64
 }
 
 const (
@@ -92,15 +156,29 @@ const (
 	// wireOverhead: the interface counts every byte on the wire (IP, TCP and TLS headers, ACKs), the test only the payload.
 	// What the interface carried beyond the payload times this is people's traffic; the rest is the test's own overhead.
 	wireOverhead = 1.05
+
+	// A stream that gets 429 waits before asking again (the server's Retry-After, else 0.5 s doubling), at most this long.
+	// It does not count as a failure: the phase's own deadline ends it.
+	firstBackoff, maxBackoff = 500 * time.Millisecond, 2 * time.Second
+
+	// Ookla: the whole discovery (list, then latency of every server in it) gets ooklaWait; the ooklaUse fastest servers are
+	// used, one after another when the first fails. A server's size=N download is capped by what the phase reads.
+	ooklaWait    = 6 * time.Second
+	ooklaUse     = 2
+	ooklaDownURL = "/download?size=100000000"
 )
 
 // Default is the production test: three runs of 6 streams down for 5 s (the first second is not counted) and 4 up for 2 s,
-// a second apart, at most 400 MB down and 100 MB up per run (1.5 GB in all), 45 s in all. Cloudflare answers any size up to
-// 50 MB per request (50 MB a request keeps the number of requests low: it rate-limits an address with 429) and takes uploads; the two fallbacks are plain files for a node that cannot reach it. counters may be nil.
+// a second apart, at most 400 MB down and 100 MB up per run (1.5 GB in all), 45 s in all. The nearest Ookla servers come first
+// (a server in the node's own country answers in milliseconds and is not throttled the way Cloudflare is in some). Then
+// Cloudflare, which answers any size up to 50 MB per request (the largest it takes: it rate-limits an address with 429, so
+// the runs are 3 s apart and a 429 is waited out) and takes uploads; the two last are plain files for a node that cannot reach
+// the others. counters may be nil.
 func Default(counters Counters) Config {
 	return Config{
+		OoklaList: "https://www.speedtest.net/api/js/servers?engine=js&limit=10&https_functional=true",
 		Endpoints: []Endpoint{
-			{Name: "speed.cloudflare.com", DownURL: "https://speed.cloudflare.com/__down?bytes=50000000", UpURL: "https://speed.cloudflare.com/__up"},
+			{Name: "speed.cloudflare.com", DownURL: "https://speed.cloudflare.com/__down?bytes=50000000", UpURL: "https://speed.cloudflare.com/__up", Pause: 3 * time.Second},
 			{Name: "proof.ovh.net", DownURL: "https://proof.ovh.net/files/1Gb.dat"},
 			{Name: "cachefly.net", DownURL: "https://cachefly.cachefly.net/100mb.test"},
 		},
@@ -139,7 +217,8 @@ type run struct {
 
 // Run measures Runs times with the first endpoint that works for the first run, and keeps the best run per direction. A
 // failed upload does not fail a run (its up stays 0); a download that moved no byte moves the first run on to the next
-// endpoint; a later run that fails, or does not fit in what is left of Overall, is skipped. It fails only when no run worked.
+// endpoint; a later run that fails, or does not fit in what is left of Overall, is skipped and named in Result.Failures. It
+// fails only when no run worked.
 func Run(ctx context.Context, cfg Config) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Overall)
 	defer cancel()
@@ -148,10 +227,16 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 		defer t.CloseIdleConnections()
 	}
 	start := time.Now()
-	res := Result{DownStreams: cfg.DownStreams}
+	eps := cfg.Endpoints
+	if cfg.OoklaList != "" {
+		eps = append(cfg.ookla(ctx, cl), eps...)
+	}
+	total := max(cfg.Runs, 1)
+	res := Result{DownStreams: cfg.DownStreams, RunsTotal: total}
 	var best struct{ down, up run }
 	var chosen *Endpoint
 	var last error
+	var failed []string
 	one := func(ep Endpoint, i int) (run, error) {
 		if cfg.beforeRun != nil {
 			cfg.beforeRun(i)
@@ -170,9 +255,13 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 		}
 	}
 	need := cfg.DownFor + cfg.UpFor + upGrace
-	for i := range max(cfg.Runs, 1) {
+	for i := range total {
 		if i > 0 {
-			sleep(ctx, cfg.Pause)
+			pause := cfg.Pause
+			if chosen != nil && chosen.Pause > 0 {
+				pause = chosen.Pause
+			}
+			sleep(ctx, pause)
 			if d, ok := ctx.Deadline(); (ok && time.Until(d) < need) || ctx.Err() != nil {
 				break
 			}
@@ -182,10 +271,11 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 				take(r)
 			} else {
 				last = fmt.Errorf("%s: %w", chosen.Name, err)
+				failed = append(failed, reason(err))
 			}
 			continue
 		}
-		for _, ep := range cfg.Endpoints {
+		for _, ep := range eps {
 			if ctx.Err() != nil {
 				break
 			}
@@ -208,11 +298,113 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 		}
 		return Result{}, fmt.Errorf("%w: %v", ErrUnreachable, last)
 	}
-	res.Server = chosen.Name
+	for len(failed)+res.Runs < total { // runs that were not started: the time ran out
+		failed = append(failed, ReasonTimeout)
+	}
+	res.Server, res.Detail, res.Failures = chosen.Name, chosen.Detail, failed
 	res.DownMbps, res.PeopleDownMbps = best.down.down, best.down.peopleDown
 	res.UpMbps, res.PeopleUpMbps = best.up.up, best.up.peopleUp
 	res.Seconds = time.Since(start).Seconds()
 	return res, nil
+}
+
+// ookla returns the ooklaUse Ookla servers with the lowest latency from the node, fastest first; nil when the list cannot
+// be had or no server in it answers (the caller then goes on with its own endpoints).
+func (c Config) ookla(ctx context.Context, cl *http.Client) []Endpoint {
+	ctx, cancel := context.WithTimeout(ctx, ooklaWait)
+	defer cancel()
+	servers, err := ooklaServers(ctx, cl, c.OoklaList)
+	if err != nil {
+		return nil
+	}
+	base := cmp.Or(c.ooklaScheme, "https") + "://"
+	type cand struct {
+		ep  Endpoint
+		rtt time.Duration // 0 = did not answer
+	}
+	cands := make([]cand, len(servers))
+	var wg sync.WaitGroup
+	for i, s := range servers {
+		cands[i].ep = Endpoint{
+			Name: "Ookla", Detail: s.label(),
+			DownURL: base + s.Host + ooklaDownURL, UpURL: base + s.Host + "/upload",
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cands[i].rtt = latency(ctx, cl, base+s.Host+"/hello")
+		}()
+	}
+	wg.Wait()
+	cands = slices.DeleteFunc(cands, func(c cand) bool { return c.rtt == 0 })
+	slices.SortStableFunc(cands, func(a, b cand) int { return cmp.Compare(a.rtt, b.rtt) })
+	var out []Endpoint
+	for _, c := range cands[:min(len(cands), ooklaUse)] {
+		out = append(out, c.ep)
+	}
+	return out
+}
+
+// ooklaServer is what the public list says about one server.
+type ooklaServer struct {
+	Host    string `json:"host"` // host:port, which serves HTTPS too
+	Sponsor string `json:"sponsor"`
+	Name    string `json:"name"` // the city
+}
+
+func (s ooklaServer) label() string {
+	return strings.Join(slices.DeleteFunc([]string{strings.TrimSpace(s.Sponsor), strings.TrimSpace(s.Name)}, func(p string) bool { return p == "" }), ", ")
+}
+
+// ooklaServers reads the list; entries without a plain host:port are dropped.
+func ooklaServers(ctx context.Context, cl *http.Client, listURL string) ([]ooklaServer, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := cl.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, statusOf(resp)
+	}
+	var all []ooklaServer
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&all); err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(all, func(s ooklaServer) bool {
+		u, err := url.Parse("//" + s.Host)
+		return err != nil || s.Host == "" || u.Host != s.Host || u.Path != "" || u.User != nil
+	}), nil
+}
+
+// latency is the better of two GETs of u (the second one on the connection the first opened), 0 when it did not answer 200.
+func latency(ctx context.Context, cl *http.Client, u string) time.Duration {
+	var best time.Duration
+	for range 2 {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return 0
+		}
+		req.Header.Set("User-Agent", userAgent)
+		t0 := time.Now()
+		resp, err := cl.Do(req)
+		if err != nil {
+			return 0
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<12))
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return 0
+		}
+		if d := max(time.Since(t0), time.Microsecond); best == 0 || d < best {
+			best = d
+		}
+	}
+	return best
 }
 
 // doRun is one download, then (when the endpoint takes one) one upload.
@@ -303,23 +495,34 @@ func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (ph
 		})
 		defer t.Stop()
 	}
-	var lastErr atomic.Value
+	var lastErr error // a 429 stays: it says more than what came after it
+	var errMu sync.Mutex
 	var wg sync.WaitGroup
 	for range cfg.DownStreams {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			var back time.Duration
 			for fails := 0; dctx.Err() == nil && fails < maxFails; {
 				got, err := get(dctx, cl, ep.DownURL, &n, cfg.DownCap, stop)
 				if got == 0 {
-					fails++
 					if err != nil && dctx.Err() == nil {
-						lastErr.Store(err.Error())
+						errMu.Lock()
+						if lastErr == nil || !limited(lastErr) {
+							lastErr = err
+						}
+						errMu.Unlock()
 					}
+					if limited(err) { // wait it out; the phase's deadline is the limit
+						back = nextBackoff(back, err)
+						sleep(dctx, back)
+						continue
+					}
+					fails++
 					sleep(dctx, 200*time.Millisecond)
 					continue
 				}
-				fails = 0
+				fails, back = 0, 0
 			}
 		}()
 	}
@@ -328,11 +531,10 @@ func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (ph
 	endNIC := cfg.sample()
 	total := n.Load()
 	if total == 0 {
-		msg, _ := lastErr.Load().(string)
-		if msg == "" {
-			msg = "no data"
+		if lastErr == nil { // nothing came and nothing failed: the server held the answer until the phase ended
+			lastErr = fmt.Errorf("no data: %w", context.DeadlineExceeded)
 		}
-		return phase{}, errors.New(msg)
+		return phase{}, lastErr
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -341,6 +543,19 @@ func download(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (ph
 		b, d, from = total-warmN, end-warmAt, warmNIC
 	}
 	return phase{bytes: total, mbps: mbps(b, d), nic: nicRate(from, endNIC, d, true)}, nil
+}
+
+// nextBackoff is how long a stream waits after a 429: the server's Retry-After when it gave one, else double the last wait,
+// never more than maxBackoff (a phase lasts a few seconds).
+func nextBackoff(prev time.Duration, err error) time.Duration {
+	var se *statusError
+	if errors.As(err, &se) && se.wait > 0 {
+		return min(se.wait, maxBackoff)
+	}
+	if prev == 0 {
+		return firstBackoff
+	}
+	return min(prev*2, maxBackoff)
 }
 
 // get reads one response to the end (or until ctx ends) and adds what came to n; it asks for the phase to stop at the cap.
@@ -356,7 +571,7 @@ func get(ctx context.Context, cl *http.Client, url string, n *atomic.Int64, limi
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("http %d", resp.StatusCode)
+		return 0, statusOf(resp)
 	}
 	buf := make([]byte, 64<<10)
 	var got int64
@@ -401,13 +616,19 @@ func upload(ctx context.Context, cl *http.Client, cfg Config, ep Endpoint) (phas
 		go func() {
 			defer wg.Done()
 			chunk := firstUpChunk
+			var back time.Duration
 			for fails := 0; uctx.Err() == nil && fails < maxFails; {
 				if err := post(rctx, cl, ep.UpURL, zeros[:chunk]); err != nil {
+					if limited(err) {
+						back = nextBackoff(back, err)
+						sleep(uctx, back)
+						continue
+					}
 					fails++
 					sleep(uctx, 200*time.Millisecond)
 					continue
 				}
-				fails = 0
+				fails, back = 0, 0
 				if n.Add(int64(chunk)) >= cfg.UpCap {
 					stop()
 				}
@@ -439,7 +660,7 @@ func post(ctx context.Context, cl *http.Client, url string, body []byte) error {
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("http %d", resp.StatusCode)
+		return statusOf(resp)
 	}
 	return nil
 }

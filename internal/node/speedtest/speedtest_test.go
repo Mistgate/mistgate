@@ -2,9 +2,14 @@ package speedtest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -272,6 +277,9 @@ func TestARunThatFailsOrDoesNotFitIsSkipped(t *testing.T) {
 	if err != nil || r.Runs != 1 || r.DownMbps <= 0 {
 		t.Fatalf("%+v %v", r, err)
 	}
+	if r.RunsTotal != 3 || !slices.Equal(r.Failures, []string{"http_503", "http_503"}) {
+		t.Errorf("the result must say 1 of 3 worked and why: total %d, failures %v", r.RunsTotal, r.Failures)
+	}
 
 	cfg = small(ep(paced(t, 0)))
 	cfg.Runs, cfg.Pause, cfg.DownFor, cfg.UpFor, cfg.Warm = 5, 10*time.Millisecond, 300*time.Millisecond, 100*time.Millisecond, 0
@@ -279,6 +287,280 @@ func TestARunThatFailsOrDoesNotFitIsSkipped(t *testing.T) {
 	r, err = Run(context.Background(), cfg)
 	if err != nil || r.Runs < 1 || r.Runs >= 5 {
 		t.Errorf("runs = %d (%v): the ones that do not fit in the deadline must not start", r.Runs, err)
+	}
+	if len(r.Failures) != 5-r.Runs || slices.ContainsFunc(r.Failures, func(s string) bool { return s != ReasonTimeout }) {
+		t.Errorf("runs that never started are failures of time: %v with %d of 5 worked", r.Failures, r.Runs)
+	}
+}
+
+// after is an endpoint that serves the first n downloads from inner and then answers bad.
+func after(t *testing.T, inner *httptest.Server, n int32, bad http.HandlerFunc) Endpoint {
+	t.Helper()
+	var served atomic.Int32
+	front := http.NewServeMux()
+	front.HandleFunc("/down", func(w http.ResponseWriter, r *http.Request) {
+		if served.Add(1) > n {
+			bad(w, r)
+			return
+		}
+		http.Redirect(w, r, inner.URL+"/down", http.StatusFound)
+	})
+	s := httptest.NewServer(front)
+	t.Cleanup(s.Close)
+	return Endpoint{Name: "flaky", DownURL: s.URL + "/down"}
+}
+
+func TestRunFailuresCarryAReasonCode(t *testing.T) {
+	for name, tc := range map[string]struct {
+		bad  http.HandlerFunc
+		want string
+	}{
+		"limited": {func(w http.ResponseWriter, r *http.Request) { http.Error(w, "slow down", http.StatusTooManyRequests) }, "rate_limited"},
+		"error":   {func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusBadGateway) }, "http_502"},
+		"silent":  {func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }, "timeout"},
+	} {
+		inner := paced(t, 1_000_000)
+		e := after(t, inner, 4, tc.bad) // the first run's four streams are served
+		cfg := small(e)
+		cfg.Runs, cfg.Pause, cfg.DownFor, cfg.Warm = 3, 10*time.Millisecond, 400*time.Millisecond, 100*time.Millisecond
+		r, err := Run(context.Background(), cfg)
+		if err != nil || r.Runs != 1 || r.RunsTotal != 3 || !slices.Equal(r.Failures, []string{tc.want, tc.want}) {
+			t.Errorf("%s: %+v %v, want 1 of 3 and failures [%s %s]", name, r, err, tc.want, tc.want)
+		}
+	}
+}
+
+func TestReasonOfAnError(t *testing.T) {
+	for want, err := range map[string]error{
+		"rate_limited": &statusError{code: 429},
+		"http_503":     &statusError{code: 503},
+		"timeout":      context.DeadlineExceeded,
+		"unreachable":  errors.New("dial tcp: connection refused"),
+	} {
+		if got := reason(err); got != want {
+			t.Errorf("%v: %q, want %q", err, got, want)
+		}
+	}
+	if got := reason(errors.Join(errors.New("x"), &statusError{code: 429})); got != "rate_limited" {
+		t.Errorf("a wrapped 429: %q", got)
+	}
+}
+
+// A 429 is waited out, not given up on: the server limits the first requests and answers after Retry-After.
+func TestATooManyRequestsAnswerIsWaitedOut(t *testing.T) {
+	inner := paced(t, 0)
+	var hits atomic.Int32
+	limiter := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hits.Add(1) <= 4 { // every stream of the run is turned away once
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "slow down", http.StatusTooManyRequests)
+			return
+		}
+		http.Redirect(w, r, inner.URL+"/down", http.StatusFound)
+	}))
+	defer limiter.Close()
+	cfg := small(Endpoint{Name: "limited", DownURL: limiter.URL})
+	cfg.DownFor, cfg.Warm = 2500*time.Millisecond, 0
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Runs != 1 || r.DownMbps <= 0 || len(r.Failures) != 0 || r.DownBytes == 0 {
+		t.Fatalf("a run that was limited at first and then served: %+v %v", r, err)
+	}
+	// without the wait, every stream gives up after three quick failures and the run fails
+}
+
+func TestBackoffFollowsRetryAfterAndIsCapped(t *testing.T) {
+	limited := func(wait time.Duration) error { return &statusError{code: 429, wait: wait} }
+	if got := nextBackoff(0, limited(0)); got != firstBackoff {
+		t.Errorf("first wait %s", got)
+	}
+	if got := nextBackoff(firstBackoff, limited(0)); got != 2*firstBackoff {
+		t.Errorf("it doubles: %s", got)
+	}
+	if got := nextBackoff(maxBackoff, limited(0)); got != maxBackoff {
+		t.Errorf("it is capped: %s", got)
+	}
+	if got := nextBackoff(0, limited(time.Second)); got != time.Second {
+		t.Errorf("Retry-After: %s", got)
+	}
+	if got := nextBackoff(0, limited(time.Minute)); got != maxBackoff {
+		t.Errorf("a long Retry-After is capped: %s", got)
+	}
+}
+
+// An Ookla server of the tests: /hello answers after delay, /download?size=N gives N zeros, /upload takes a body. status
+// != 0 makes the download fail with it. The counters say what was asked of it.
+type fakeOokla struct {
+	host            string
+	hello, down, up atomic.Int32
+	sizes           atomic.Value // the last size= asked
+}
+
+// closedHost is a host:port nobody listens on.
+func closedHost() string {
+	s := httptest.NewServer(http.NotFoundHandler())
+	s.Close()
+	return strings.TrimPrefix(s.URL, "http://")
+}
+
+func newFakeOokla(t *testing.T, delay time.Duration, status int) *fakeOokla {
+	t.Helper()
+	f := &fakeOokla{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		f.hello.Add(1)
+		time.Sleep(delay)
+		_, _ = w.Write([]byte("hello 2.11"))
+	})
+	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+		f.down.Add(1)
+		f.sizes.Store(r.URL.Query().Get("size"))
+		if status != 0 {
+			http.Error(w, "no", status)
+			return
+		}
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		chunk := make([]byte, 16<<10)
+		for sent := 0; sent < min(size, 64<<20); sent += len(chunk) {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	})
+	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		f.up.Add(1)
+		n, _ := io.Copy(io.Discard, r.Body)
+		_, _ = w.Write([]byte("size=" + strconv.FormatInt(n, 10)))
+	})
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+	f.host = strings.TrimPrefix(s.URL, "http://")
+	return f
+}
+
+// list serves the Speedtest.net list the way the real one answers: a JSON array with host:port, sponsor and city.
+func list(t *testing.T, servers ...map[string]any) string {
+	t.Helper()
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(servers)
+	}))
+	t.Cleanup(s.Close)
+	return s.URL
+}
+
+func entry(host, sponsor, city string) map[string]any {
+	return map[string]any{"url": "http://" + host + "/speedtest/upload.php", "name": city, "country": "Russia", "cc": "RU", "sponsor": sponsor,
+		"id": "1234", "distance": 12, "https_functional": 1, "host": host}
+}
+
+func ooklaCfg(listURL string, fallback ...Endpoint) Config {
+	cfg := small(fallback...)
+	cfg.OoklaList, cfg.ooklaScheme = listURL, "http"
+	return cfg
+}
+
+// The list is parsed and the servers are ranked by latency: the nearest answers, the others are only probed.
+func TestOoklaUsesTheServerWithTheLowestLatency(t *testing.T) {
+	slow := newFakeOokla(t, 150*time.Millisecond, 0)
+	near := newFakeOokla(t, 0, 0)
+	mid := newFakeOokla(t, 60*time.Millisecond, 0)
+	url := list(t,
+		entry(slow.host, "Far ISP", "Farville"),
+		entry(closedHost(), "Nobody", "Nowhere"), // nothing listens there
+		entry("not a/host", "Broken", "Entry"),   // dropped, not asked
+		entry(mid.host, "Mid ISP", "Midtown"),
+		entry(near.host, "МТС", "Москва"),
+	)
+	cfg := ooklaCfg(url)
+	cfg.DownFor, cfg.UpFor = 800*time.Millisecond, 400*time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Server != "Ookla" || r.Detail != "МТС, Москва" {
+		t.Errorf("server %q, detail %q", r.Server, r.Detail)
+	}
+	if near.down.Load() == 0 || near.up.Load() == 0 {
+		t.Errorf("the nearest server saw %d downloads and %d uploads", near.down.Load(), near.up.Load())
+	}
+	if size, _ := near.sizes.Load().(string); size != "100000000" {
+		t.Errorf("download asked for size=%q", size)
+	}
+	if slow.hello.Load() == 0 || slow.down.Load() != 0 || mid.down.Load() != 0 {
+		t.Errorf("a slower server is probed but not downloaded from: slow %d/%d, mid %d", slow.hello.Load(), slow.down.Load(), mid.down.Load())
+	}
+	if r.DownMbps <= 0 || r.UpMbps <= 0 || r.DownBytes == 0 || r.UpBytes == 0 {
+		t.Errorf("%+v", r)
+	}
+	if r.Runs != 1 || r.RunsTotal != 1 || len(r.Failures) != 0 {
+		t.Errorf("runs %d of %d, failures %v", r.Runs, r.RunsTotal, r.Failures)
+	}
+}
+
+// The second nearest takes over when the first one cannot serve; the others of the fallback chain are not touched.
+func TestOoklaGoesToTheNextNearestWhenTheFirstFails(t *testing.T) {
+	broken := newFakeOokla(t, 0, http.StatusServiceUnavailable)
+	next := newFakeOokla(t, 40*time.Millisecond, 0)
+	never := newFakeOokla(t, 0, 0)
+	cfg := ooklaCfg(list(t, entry(broken.host, "A", "One"), entry(next.host, "B", "Two")), Endpoint{Name: "local", DownURL: "http://" + never.host + "/download?size=1000000"})
+	cfg.DownFor, cfg.UpFor = 600*time.Millisecond, 300*time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Server != "Ookla" || r.Detail != "B, Two" || r.Runs != 1 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if broken.down.Load() == 0 || never.down.Load() != 0 {
+		t.Errorf("the broken server was asked %d times, the fallback %d", broken.down.Load(), never.down.Load())
+	}
+}
+
+// No Ookla: the list is down, not JSON, empty, or lists servers that do not answer. The configured chain runs as before.
+func TestFallsBackToTheChainWhenOoklaIsNotUsable(t *testing.T) {
+	s := paced(t, 0)
+	chain := Endpoint{Name: "local", DownURL: s.URL + "/down", UpURL: s.URL + "/up"}
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusForbidden) }))
+	defer down.Close()
+	junk := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("<html>captcha</html>")) }))
+	defer junk.Close()
+	dead := closedHost()
+	for name, listURL := range map[string]string{
+		"the list answers 403":     down.URL,
+		"the list is not JSON":     junk.URL,
+		"the list is unreachable":  "http://" + dead,
+		"the list is empty":        list(t),
+		"no listed server answers": list(t, entry(dead, "Dead", "Town")),
+		"a server without /hello":  list(t, entry(strings.TrimPrefix(down.URL, "http://"), "Forbidden", "Town")),
+	} {
+		cfg := ooklaCfg(listURL, chain)
+		cfg.DownFor, cfg.UpFor = 600*time.Millisecond, 300*time.Millisecond
+		r, err := Run(context.Background(), cfg)
+		if err != nil || r.Server != "local" || r.Detail != "" || r.DownMbps <= 0 || r.Runs != 1 {
+			t.Errorf("%s: %+v %v", name, r, err)
+		}
+	}
+}
+
+// With an Ookla server that moves no byte and a chain behind it, the chain answers; Failures stays empty because the run that
+// worked was the first run on the server that did.
+func TestAnOoklaServerThatAnswersHelloButNoDataFallsThrough(t *testing.T) {
+	bad := newFakeOokla(t, 0, http.StatusTooManyRequests)
+	s := paced(t, 0)
+	cfg := ooklaCfg(list(t, entry(bad.host, "A", "One")), Endpoint{Name: "local", DownURL: s.URL + "/down"})
+	cfg.DownFor = 500 * time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Server != "local" || len(r.Failures) != 0 {
+		t.Fatalf("%+v %v", r, err)
+	}
+}
+
+func TestDefaultAsksOoklaFirstAndSpacesCloudflareOut(t *testing.T) {
+	d := Default(nil)
+	if !strings.HasPrefix(d.OoklaList, "https://www.speedtest.net/api/js/servers?") || !strings.Contains(d.OoklaList, "https_functional=true") {
+		t.Errorf("list %q", d.OoklaList)
+	}
+	if d.Endpoints[0].Name != "speed.cloudflare.com" || d.Endpoints[0].Pause <= d.Pause || d.Endpoints[0].Pause < 2*time.Second {
+		t.Errorf("Cloudflare is 429-limited: runs on it must be spaced out, got %v", d.Endpoints[0])
+	}
+	if d.Runs != 3 || d.DownCap*int64(d.Runs)+d.UpCap*int64(d.Runs) > 1_500_000_000 || d.Overall > 45*time.Second {
+		t.Errorf("the limits moved: %+v", d)
 	}
 }
 

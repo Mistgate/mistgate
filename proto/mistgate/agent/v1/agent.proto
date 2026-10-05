@@ -311,14 +311,20 @@ package mistgate.agent.v1;
 //     The estimate of a direction in a run is the larger of the test's own rate and the interface's, so what the people using
 //     the node carry during the test is part of the capacity, not lost from it. The part of the interface's rate that is
 //     more than the test (with room for its own headers) is reported as the people's share of the best run.
-//     The first endpoint is speed.cloudflare.com (__down / __up); when it cannot be reached the agent tries the next one
-//     (a plain file on proof.ovh.net, then one on cachefly.net; download only). Every phase has a deadline, and the whole
+//     The first endpoints are the Ookla (Speedtest.net) servers nearest to the node: the agent reads the public server list
+//     (it is geolocated by the node's own address), measures the latency of every server in it with a short HTTPS GET and uses
+//     the two fastest (GET /download?size=N, POST /upload). When the list or those servers fail it goes on with
+//     speed.cloudflare.com (__down / __up; a 429 is waited out and the runs are spaced out), then a plain file on
+//     proof.ovh.net, then one on cachefly.net (download only). Every phase has a deadline, and the whole
 //     measurement ends within 45 s. It binds to nothing and uses the host's default route, like any other process of the node.
 //     The result is an estimate from three short tests: it depends on the route to the test server and on what the node is
 //     carrying at that moment.
 //   - ONE AT A TIME. A MeasureBandwidth that arrives while one runs is answered with CommandResult{ok: false, error: "busy"}.
 //   - ANSWER. Exactly one CommandResult carrying the request_id. ok = true: params{down_mbps, up_mbps, server, streams,
-//     down_bytes, up_bytes, seconds, runs, down_people_mbps, up_people_mbps} (whole decimal numbers; up_mbps = "0" when the upload could not be measured). ok = false:
+//     down_bytes, up_bytes, seconds, runs, down_people_mbps, up_people_mbps} (whole decimal numbers; up_mbps = "0" when the upload could not be measured),
+//     and, from agents newer than the first release of the test, runs_total (runs asked for), run_failures (one reason per
+//     run that did not work, comma separated: rate_limited | timeout | unreachable | http_<code>) and server_detail
+//     (sponsor and city of an Ookla server). A panel treats the missing ones as "runs_total = runs, no failures". ok = false:
 //     error = unsupported | busy | unreachable (no endpoint gave a usable answer) | "failed: <short message>".
 //
 // LOGS
