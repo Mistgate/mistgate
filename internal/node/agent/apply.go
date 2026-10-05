@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -359,19 +360,28 @@ func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, active map
 		errs = append(errs, err)
 	}
 	if err := errors.Join(errs...); err != nil {
-		a.markHostFirewallSyncFailure(err)
+		a.markHostFirewallSyncFailure(err, ports)
 	} else {
 		a.clearHostFirewallSyncFailure()
 	}
 }
 
 // markHostFirewallSyncFailure reports one warning per distinct failure; the same failure on later reconciles is quiet.
-func (a *Agent) markHostFirewallSyncFailure(err error) {
+// "ports" lists the UDP ports and hop ranges the server's firewall has to let in ("443, 20000-20010"), for the owner.
+func (a *Agent) markHostFirewallSyncFailure(err error, ports []hostctl.UDPInboundPort) {
 	errMsg := err.Error()
 	if a.hostFirewallErr != errMsg {
 		a.hostFirewallErr = errMsg
 		a.log.Warn("host firewall UDP rules were not fully reconciled", "err", err)
-		a.event(pb.Severity_SEVERITY_WARNING, "host_firewall_sync_failed", "", map[string]string{"error": errMsg})
+		list := make([]string, len(ports))
+		for i, p := range ports {
+			if p.Port != 0 {
+				list[i] = strconv.Itoa(int(p.Port))
+			} else {
+				list[i] = fmt.Sprintf("%d-%d", p.From, p.To)
+			}
+		}
+		a.event(pb.Severity_SEVERITY_WARNING, "host_firewall_sync_failed", "", map[string]string{"error": errMsg, "ports": strings.Join(list, ", ")})
 	}
 }
 

@@ -34,6 +34,9 @@ const textKeys: Record<string, MessageKey> = {
   hop_rejected: "event.hop_rejected",
   tunnel_failed: "event.tunnel_failed",
   warp_needs_attention: "event.warp_needs_attention",
+  torrent_guard_degraded: "event.torrent_guard_degraded",
+  host_firewall_sync_failed: "event.host_firewall_sync_failed",
+  host_firewall_sync_recovered: "event.host_firewall_sync_recovered",
   user_created: "event.user_created",
   user_over_quota: "event.user_over_quota",
   user_expired: "event.user_expired",
@@ -98,6 +101,9 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       return { text: t(key, { span }), detail };
     case "engine_failed":
       return { text: profile ? t("event.engine_failed.named", { profile }) : t(key), detail };
+    case "host_firewall_sync_failed":
+      // an older agent does not list the ports
+      return { text: p.ports ? t(key, { ports: p.ports }) : t("event.host_firewall_sync_failed.plain"), detail };
   }
   // {lasted}: how long a health alert lasted (traffic_resumed, check_recovered), from the whole minutes the panel wrote
   return { text: t(key, { profile, ...p, lasted: span }), detail };

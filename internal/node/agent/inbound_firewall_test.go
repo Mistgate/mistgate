@@ -94,16 +94,18 @@ func TestInboundUDPFirewallRemovesStaleRulesAndReportsSyncErrors(t *testing.T) {
 	h2 := newHarness(t, harnessOpts{})
 	h2.waitConnected()
 	h2.host.udpErr = errors.New("firewalld is active; add 443/udp manually")
-	h2.panel.push(fullState(1, inb("inb_a", 0, 0, cred("crd_a"))))
+	h2.panel.push(fullState(1, inb("inb_a", 0, 0, cred("crd_a")), withPort(inb("inb_h", 20000, 20010, cred("crd_h")), 8443)))
 	r = h2.panel.nextApply()
 	// The listener runs: a host firewall the agent could not reconcile is a node warning, not an inbound failure.
 	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Inbounds[0].Error != "" || r.Inbounds[0].State != pb.InboundRunState_INBOUND_RUN_STATE_RUNNING {
 		t.Fatalf("firewall sync error was attached to the inbound: %v", r)
 	}
+	// the owner reads which UDP ports the server's firewall has to let in
 	eventually(t, func() bool {
 		evs := h2.panel.eventsByCode("host_firewall_sync_failed")
-		return len(evs) == 1 && evs[0].Severity == pb.Severity_SEVERITY_WARNING && strings.Contains(evs[0].Params["error"], "firewalld is active")
-	}, "one host_firewall_sync_failed warning")
+		return len(evs) == 1 && evs[0].Severity == pb.Severity_SEVERITY_WARNING && strings.Contains(evs[0].Params["error"], "firewalld is active") &&
+			evs[0].Params["ports"] == "20000-20010, 443, 8443"
+	}, "one host_firewall_sync_failed warning with the ports")
 }
 
 func TestHostFirewallSyncEventsTrackFailureTransitions(t *testing.T) {

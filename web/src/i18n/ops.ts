@@ -669,6 +669,11 @@ export const en = {
   "event.hop_rejected": "a profile refused its port hopping",
   "event.tunnel_failed": "the firewall of the AmneziaWG tunnels is not in place",
   "event.warp_needs_attention": "WARP is not set up",
+  "event.torrent_guard_degraded":
+    "torrent protection does not check AmneziaWG traffic: the netfilter packet queue did not start (Hysteria2 is still checked). The server’s kernel needs netfilter queue support (nfnetlink_queue)",
+  "event.host_firewall_sync_failed": "the server’s firewall may block UDP {ports}: allow these ports in UFW, or add them to the active firewalld zone by hand",
+  "event.host_firewall_sync_failed.plain": "the server’s firewall may block the profiles’ UDP ports: check UFW or the active firewalld zone",
+  "event.host_firewall_sync_recovered": "the server’s firewall rules for the UDP ports are in order again",
   "event.subscription_shared_suspect": "a subscription link is used from {networks} networks a day",
   "event.user_created": "created",
   "event.user_over_quota": "went over quota",
@@ -1597,6 +1602,11 @@ export const ru: typeof en = {
   "event.hop_rejected": "профиль не принял прыжки по портам",
   "event.tunnel_failed": "файрвол туннелей AmneziaWG не установлен",
   "event.warp_needs_attention": "WARP не настроился",
+  "event.torrent_guard_degraded":
+    "защита от торрентов не проверяет трафик AmneziaWG: очередь пакетов netfilter не запустилась (Hysteria2 проверяется). Ядру сервера нужна поддержка очереди netfilter (nfnetlink_queue)",
+  "event.host_firewall_sync_failed": "файрвол сервера может не пропускать UDP {ports}: разреши эти порты в UFW или вручную добавь их в активную зону firewalld",
+  "event.host_firewall_sync_failed.plain": "файрвол сервера может не пропускать UDP-порты профилей: проверь UFW или активную зону firewalld",
+  "event.host_firewall_sync_recovered": "правила файрвола сервера для UDP-портов снова в порядке",
   "event.subscription_shared_suspect": "ссылкой подписки пользуются из {networks} сетей за сутки",
   "event.user_created": "создан",
   "event.user_over_quota": "превысил квоту",

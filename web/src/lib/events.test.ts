@@ -35,6 +35,18 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "node_recovered", params: { minutes: "2880" } }).text).toBe("back online after 2 d");
     expect(describeEvent(t as never, { code: "clock_skew", params: { offset_s: "4" } }).text).toBe("the server clock differs from the panel’s by 4 s");
   });
+  it("says what the torrent guard and the host firewall need, with the ports the agent listed", () => {
+    expect(describeEvent(t as never, { code: "torrent_guard_degraded", params: { error: "nfqueue: operation not supported" } })).toEqual({
+      text: en["event.torrent_guard_degraded"],
+      detail: "nfqueue: operation not supported",
+    });
+    const fw = describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "firewalld is active", ports: "20000-20010, 443" } });
+    expect(fw.text).toBe("the server’s firewall may block UDP 20000-20010, 443: allow these ports in UFW, or add them to the active firewalld zone by hand");
+    expect(fw.detail).toBe("firewalld is active");
+    // an older agent names no ports
+    expect(describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "x" } }).text).toBe(en["event.host_firewall_sync_failed.plain"]);
+    expect(describeEvent(t as never, { code: "host_firewall_sync_recovered", params: { resolved_error: "x" } }).text).toBe(en["event.host_firewall_sync_recovered"]);
+  });
   it("shows an unknown code with its params, so nothing is hidden", () => {
     expect(describeEvent(t as never, { code: "brand_new", params: { a: "1", b: "2" } })).toEqual({ text: "brand_new", detail: "a=1 b=2" });
   });

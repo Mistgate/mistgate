@@ -262,7 +262,7 @@ A few warnings of the agent have no sentence of their own yet and are shown by t
 | Code | Written when |
 |---|---|
 | `torrent_guard_degraded` | Torrent protection is on, but the node could not set up the packet queue that inspects AmneziaWG traffic (for example a build without it). AmneziaWG traffic is then not inspected; Hysteria2 is checked inside its engine and is not affected. |
-| `host_firewall_sync_failed` | The agent could not bring the UFW rules for the servers' UDP ports in line, a UFW rule of yours denies one of these ports, or an active firewalld does not open them. `host_firewall_sync_recovered` follows when it works again. See "The hoster blocks UDP" in [Troubleshooting](troubleshooting.md). |
+| `host_firewall_sync_failed` | The agent could not bring the UFW rules for the servers' UDP ports in line, a UFW rule of yours denies one of these ports, or an active firewalld does not open them. The event lists the UDP ports and hop ranges the server's firewall has to let in. `host_firewall_sync_recovered` follows when it works again. See "The hoster blocks UDP" in [Troubleshooting](troubleshooting.md). |
 
 Events of severity info are kept for 90 days, warnings and errors for 400 days. Raw check rounds are kept for 25 hours after the day is summarised; the daily summaries for 90 days.
 
