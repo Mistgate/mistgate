@@ -159,8 +159,8 @@ func (h *linuxHost) Metrics() Metrics {
 	}
 	m.DiskTotal, m.DiskUsed = diskUsage("/")
 
-	// Main NIC = the default route's interface. Rates are averaged since the previous sample.
-	if iface := defaultIface(h.read("net/route")); iface != "" {
+	// Main NIC = the default route's interface (IPv4, else IPv6). Rates are averaged since the previous sample.
+	if iface := defaultIface(h.read("net/route"), h.read("net/ipv6_route")); iface != "" {
 		if rx, tx, ok := parseNetDev(h.read("net/dev"), iface); ok {
 			now := time.Now()
 			p := &h.prevNet

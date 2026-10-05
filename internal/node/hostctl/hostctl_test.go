@@ -91,10 +91,18 @@ func TestProcParsers(t *testing.T) {
 		t.Fatal("unknown iface")
 	}
 	route := "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\nlo\t0000007F\t00000000\t0001\t0\t0\t0\t000000FF\neth0\t00000000\t0100A8C0\t0003\t0\t0\t100\t00000000\n"
-	if got := defaultIface(route); got != "eth0" {
+	route6 := "00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200       lo\n" +
+		"00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000001 00000000 00000001   mgwarp\n" +
+		"20010db8000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000001 00000000 00000001     ens3\n" +
+		"00000000000000000000000000000000 00 00000000000000000000000000000000 00 fe800000000000000000000000000001 00000400 00000001 00000000 00000003     ens3\n"
+	if got := defaultIface(route, route6); got != "eth0" {
 		t.Fatalf("iface %q", got)
 	}
-	if defaultIface("Iface\tDestination\n") != "" {
+	// An IPv6-only node: the IPv6 default route's interface, not lo's unreachable default or WARP's own table.
+	if got := defaultIface("Iface\tDestination\n", route6); got != "ens3" {
+		t.Fatalf("IPv6-only iface %q", got)
+	}
+	if defaultIface("Iface\tDestination\n", "") != "" {
 		t.Fatal("no default route")
 	}
 	if parseBtime("cpu 1\nbtime 1700000000\n") != 1700000000 {

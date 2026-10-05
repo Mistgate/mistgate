@@ -88,13 +88,26 @@ func parseNetDev(s, iface string) (rx, tx uint64, ok bool) {
 	return 0, 0, false
 }
 
-// defaultIface returns the interface of the IPv4 default route from /proc/net/route ("" if none).
-func defaultIface(route string) string {
+// defaultIface returns the interface of the IPv4 default route from /proc/net/route, else that of the IPv6 default
+// route from /proc/net/ipv6_route: an IPv6-only node has no IPv4 default. "" if there is neither.
+func defaultIface(route, route6 string) string {
 	for _, line := range strings.Split(route, "\n") {
 		f := strings.Fields(line)
 		// Iface Destination Gateway Flags ...; the header line has "Destination" in column 2.
 		if len(f) >= 4 && f[1] == "00000000" {
 			return f[0]
+		}
+	}
+	for _, line := range strings.Split(route6, "\n") {
+		// dest dest_len src src_len next_hop metric refcnt use flags iface, for every routing table. Skipped: an
+		// unreachable default (RTF_REJECT, on lo), a route that is not up, and the agent's own links (mgwarp's
+		// default lives in its own table).
+		f := strings.Fields(line)
+		if len(f) < 10 || f[0] != "00000000000000000000000000000000" || f[1] != "00" || f[9] == "lo" || strings.HasPrefix(f[9], "mg") {
+			continue
+		}
+		if flags, err := strconv.ParseUint(f[8], 16, 32); err == nil && flags&0x0001 != 0 && flags&0x0200 == 0 {
+			return f[9]
 		}
 	}
 	return ""
