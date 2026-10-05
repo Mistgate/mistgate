@@ -85,6 +85,7 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 		t.Fatalf("second apply restarted journald: %+v", *calls)
 	}
 
+	before := len(*calls)
 	if err := h.Cleanup(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -93,12 +94,24 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 			t.Errorf("%s survived cleanup", p)
 		}
 	}
-	last := (*calls)[len(*calls)-1]
-	if last.name != "nft" || last.args != "-f -" || last.stdin != "add table inet mistgate_node\ndelete table inet mistgate_node\n" {
-		t.Fatalf("cleanup script: %+v", last)
+	var nft *call
+	for i := before; i < len(*calls); i++ {
+		if c := &(*calls)[i]; c.name == "nft" {
+			nft = c
+		}
+	}
+	if nft == nil || nft.args != "-f -" || nft.stdin != "add table inet mistgate_node\ndelete table inet mistgate_node\n" {
+		t.Fatalf("cleanup script: %+v", nft)
+	}
+	// the cap goes with the drop-in: journald reads it only on start
+	if restarts() != 2 {
+		t.Fatalf("cleanup did not restart journald once: %+v", (*calls)[before:])
 	}
 	if err := h.Cleanup(ctx); err != nil { // nothing left to remove is fine
 		t.Fatal(err)
+	}
+	if restarts() != 2 {
+		t.Fatalf("a cleanup with no drop-in restarted journald: %+v", *calls)
 	}
 }
 

@@ -292,10 +292,17 @@ func (h *linuxHost) Cleanup(ctx context.Context) error {
 	h.hops, h.sshPorts = nil, nil
 	errs = append(errs, h.nft(ctx, script, true))
 	h.fw.Unlock()
-	for _, p := range []string{h.sysctlFile, h.journaldFile} {
-		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-			errs = append(errs, err)
+	if err := os.Remove(h.sysctlFile); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, err)
+	}
+	// journald only reads drop-ins on start (ApplyBaseline): restart it when its drop-in really went, or the cap stays.
+	switch err := os.Remove(h.journaldFile); {
+	case err == nil:
+		if out, err := h.run(ctx, "", "systemctl", "restart", "systemd-journald"); err != nil {
+			errs = append(errs, fmt.Errorf("restart journald: %w: %s", err, bytes.TrimSpace(out)))
 		}
+	case !os.IsNotExist(err):
+		errs = append(errs, err)
 	}
 	errs = append(errs, h.undoResolver(ctx)) // the resolver fix, if one was ever applied
 	return errors.Join(errs...)

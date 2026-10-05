@@ -139,7 +139,7 @@ If the agent is connected, it gets the order to retire and, on the server:
 
 1. stops its servers;
 2. removes WARP, when the node had it;
-3. removes its host changes: its nftables tables, the AmneziaWG interfaces, the sysctl and journald files, and the doctor's resolver fix if one was applied;
+3. removes its host changes: its nftables tables, the AmneziaWG interfaces, the sysctl and journald files (journald is restarted, so its size cap goes at once), and the doctor's resolver fix if one was applied;
 4. deletes its state directory (the key first) and exits.
 
 What stays on the server: the binary, the unit (still enabled), the values already set in the running kernel (fq, BBR, IP forwarding) until the next reboot, and the AmneziaWG kernel module with its packages if you installed it. Remove the rest by hand:

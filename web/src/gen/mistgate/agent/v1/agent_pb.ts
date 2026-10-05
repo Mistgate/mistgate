@@ -1936,8 +1936,9 @@ export const RestartInboundSchema: GenMessage<RestartInbound> = /*@__PURE__*/
   messageDesc(file_mistgate_agent_v1_agent, 38);
 
 /**
- * Retire the node: stop engines, delete state and key material, stop reconnecting, exit.
- * Removing units and nft tables from the host belongs to an SSH-driven uninstall; Retire stops at "agent exits".
+ * Retire the node: stop engines, remove WARP and the agent's host changes (hostctl Cleanup: its nft tables, tunnel
+ * interfaces, sysctl and journald drop-ins with a journald restart, the resolver fix), delete state and key material,
+ * stop reconnecting, exit. The unit and the binary stay: removing them is left to the admin (docs: Remove a node).
  *
  * @generated from message mistgate.agent.v1.Retire
  */
