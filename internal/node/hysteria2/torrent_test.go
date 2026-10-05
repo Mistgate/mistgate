@@ -107,6 +107,57 @@ func TestTorrentTCPConnPassesOrdinaryDataAfterPrefixMismatch(t *testing.T) {
 	_ = guarded.Close()
 }
 
+// A peer that reads nothing (a zero window) blocks a Write; Close must still return at once and end that Write, or
+// every such stream leaks a goroutine, a stream and a socket.
+func TestTorrentTCPConnCloseDoesNotWaitForABlockedWrite(t *testing.T) {
+	for name, tc := range map[string]struct {
+		writes    []string
+		readFirst int // bytes the peer reads before it stops reading
+	}{
+		"flushing the held prefix":     {writes: []string{"\x13Bit", "ordinary"}},
+		"after the stream was decided": {writes: []string{"GET / HTTP/1.1\r\n", "more"}, readFirst: 16},
+	} {
+		writes := tc.writes
+		t.Run(name, func(t *testing.T) {
+			local, remote := net.Pipe() // a Write blocks until the peer reads
+			defer remote.Close()
+			if tc.readFirst > 0 {
+				go func() { _, _ = io.ReadFull(remote, make([]byte, tc.readFirst)) }()
+			}
+			guarded := newTorrentTCPConn(local, nil)
+			done := make(chan error, 1)
+			go func() {
+				var err error
+				for _, w := range writes {
+					if _, err = guarded.Write([]byte(w)); err != nil {
+						break
+					}
+				}
+				done <- err
+			}()
+			time.Sleep(50 * time.Millisecond) // let the Write block on the pipe
+			closed := make(chan error, 1)
+			go func() { closed <- guarded.Close() }()
+			select {
+			case <-closed:
+			case <-time.After(time.Second):
+				t.Fatal("Close waited for a blocked Write")
+			}
+			select {
+			case err := <-done:
+				if err == nil {
+					t.Fatal("the blocked Write succeeded after Close")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("the blocked Write did not end after Close")
+			}
+			if err := guarded.Close(); err != nil {
+				t.Fatalf("second Close = %v", err)
+			}
+		})
+	}
+}
+
 func TestTorrentUDPConnDropsOnlyDetectedDatagrams(t *testing.T) {
 	base := &recordingUDPConn{}
 	var mu sync.Mutex
