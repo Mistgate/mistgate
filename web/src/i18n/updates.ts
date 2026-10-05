@@ -54,23 +54,11 @@ export const en = {
   "up.hero.noKey.text":
     "It was built without the owner’s release key, so it cannot check a bundle. Build the panel with the public key (steps below). Nodes check the signature themselves.",
   "up.progress": "{done} of {n} node updated|{done} of {n} nodes updated",
-  "up.startAll": "Update all (canary first)",
   "up.pause": "Pause",
   "up.resume": "Resume",
   "up.cancel": "Cancel rollout",
 
-  // ---- start dialog
-  "up.start.title": "Update the fleet?",
-  "up.start.titleOne": "Update {name}?",
-  "up.start.lead": "This replaces the agent program on the nodes with the signed release {version}. Only what the owner’s key signed can run.",
-  "up.start.leadOne": "This replaces the agent program on {name} with the signed release {version}.",
-  "up.start.step1": "One node goes first: {name}. It has the fewest people online ({users}) and restarts in a few seconds.",
-  "up.start.step1One": "{name} restarts in a few seconds.",
-  "up.start.step2": "The panel checks it for up to 5 minutes: it reconnects, applies its configuration and passes the client-eye check.",
-  "up.start.step3": "If all is well, the rest follow in batches of {batch}. A node that fails its check goes back to the previous version by itself and the rollout pauses.",
-  "up.start.step3One": "If it fails the check, it goes back to the previous version by itself.",
-  "up.start.nodes": "Nodes",
-  "up.start.confirm": "Start the update",
+  // ---- the update of one node
   "up.start.started": "Rollout started",
   "up.schedule.title": "Update {name}",
   "up.schedule.lead": "Choose when this node should receive signed agent version {version}.",
@@ -203,7 +191,7 @@ export const en = {
   "up.bundle.emptyTitle": "No release bundle yet",
   "up.bundle.emptyBody": "The panel reads <data-dir>/dist and notices a new bundle within a minute. To make one:",
   "up.bundle.steps":
-    "# once: make the release key (keep the file offline) and note the public key it prints\nmistgate release keygen --out ~/release.key\n\n# every release: build with the public key, then sign the node binaries\nRELEASE_KEY=<public key> make build\nmistgate release sign --key ~/release.key --version <version> --built <commit time> \\\n  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/\n\n# copy the result next to the panel’s database\nscp dist/* <panel>:<data-dir>/dist/",
+    "# once: make the release key (keep the file offline) and note the public key it prints\nmistgate release keygen --out ~/release.key\n\n# every release: check out its tag (sign refuses anything else), build with the public key, sign the node binaries\ngit checkout <tag>\nRELEASE_KEY=<public key> VERSION=<tag> make build\nmistgate release sign --key ~/release.key --version <tag> --expires 90d \\\n  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/\n\n# copy the result next to the panel’s database\nscp dist/* <panel>:<data-dir>/dist/",
 
   // ---- panel card
   "up.panel.title": "This panel",
@@ -380,23 +368,11 @@ export const ru: Record<keyof typeof en, string> = {
   "up.hero.noKey.text":
     "Её собрали без ключа релиза владельца, поэтому пакет она проверить не может. Собери панель с публичным ключом (шаги ниже). Ноды проверяют подпись сами.",
   "up.progress": "Обновлено {done} из {n} ноды|Обновлено {done} из {n} нод|Обновлено {done} из {n} нод",
-  "up.startAll": "Обновить все (сначала канарейка)",
   "up.pause": "Пауза",
   "up.resume": "Продолжить",
   "up.cancel": "Отменить раскатку",
 
-  // ---- start dialog
-  "up.start.title": "Обновить флот?",
-  "up.start.titleOne": "Обновить {name}?",
-  "up.start.lead": "Программа-агент на нодах заменится подписанным релизом {version}. Запустится только то, что подписал ключ владельца.",
-  "up.start.leadOne": "Программа-агент на {name} заменится подписанным релизом {version}.",
-  "up.start.step1": "Первой идёт одна нода: {name}. У неё меньше всего людей онлайн ({users}), перезапуск займёт несколько секунд.",
-  "up.start.step1One": "{name} перезапустится за несколько секунд.",
-  "up.start.step2": "До 5 минут панель за ней смотрит: нода должна переподключиться, применить настройки и пройти проверку глазами клиента.",
-  "up.start.step3": "Если всё хорошо, остальные пойдут пачками по {batch}. Нода, не прошедшая проверку, сама вернётся на прошлую версию, а раскатка встанет на паузу.",
-  "up.start.step3One": "Если проверка не пройдёт, нода сама вернётся на прошлую версию.",
-  "up.start.nodes": "Ноды",
-  "up.start.confirm": "Начать обновление",
+  // ---- обновление одной ноды
   "up.start.started": "Раскатка началась",
   "up.schedule.title": "Обновить {name}",
   "up.schedule.lead": "Выбери, когда установить на этой ноде подписанный агент {version}.",
@@ -529,7 +505,7 @@ export const ru: Record<keyof typeof en, string> = {
   "up.bundle.emptyTitle": "Пакета релиза пока нет",
   "up.bundle.emptyBody": "Панель читает <data-dir>/dist и замечает новый пакет в течение минуты. Как его сделать:",
   "up.bundle.steps":
-    "# один раз: сделать ключ релиза (файл держи офлайн) и запомнить публичный ключ, который он напечатает\nmistgate release keygen --out ~/release.key\n\n# на каждый релиз: собрать с публичным ключом и подписать бинари нод\nRELEASE_KEY=<публичный ключ> make build\nmistgate release sign --key ~/release.key --version <версия> --built <время коммита> \\\n  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/\n\n# положить результат рядом с базой панели\nscp dist/* <панель>:<data-dir>/dist/",
+    "# один раз: сделать ключ релиза (файл держи офлайн) и запомнить публичный ключ, который он напечатает\nmistgate release keygen --out ~/release.key\n\n# на каждый релиз: перейти на его тег (иначе sign откажет), собрать с публичным ключом, подписать бинари нод\ngit checkout <тег>\nRELEASE_KEY=<публичный ключ> VERSION=<тег> make build\nmistgate release sign --key ~/release.key --version <тег> --expires 90d \\\n  bin/mistgate-node-linux-amd64 bin/mistgate-node-linux-arm64 --out dist/\n\n# положить результат рядом с базой панели\nscp dist/* <панель>:<data-dir>/dist/",
 
   // ---- panel card
   "up.panel.title": "Эта панель",

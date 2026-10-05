@@ -345,4 +345,9 @@ describe("dictionary", () => {
     for (const c of ["step_failed", "gate_failed", "panel_restart_ambiguous", "unknown"]) expect(ru).toHaveProperty([`health.alert.update_failed.why.${c}`]);
     expect(ru["health.alert.update_failed.title"]).toBeTruthy();
   });
+  it("builds a bundle from the release tag, the only checkout release sign accepts", () => {
+    expect(en["up.bundle.steps"]).toContain("git checkout <tag>\n");
+    expect(ru["up.bundle.steps"]).toContain("git checkout <тег>\n");
+    for (const steps of [en["up.bundle.steps"], ru["up.bundle.steps"]]) expect(steps).not.toContain("--built"); // the commit time is the default
+  });
 });
