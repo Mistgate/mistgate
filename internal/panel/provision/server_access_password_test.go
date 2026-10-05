@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,56 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
+
+// An interrupted rotation and a server that cannot be reached: nothing can tell which login works, so the owner gets
+// both candidates, labelled unverified, instead of nothing. The rotation stays pending, and a new rotation refuses.
+func TestRevealWithAnUnreachableServerReturnsBothCandidatesUnverified(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const nodeID, current, pending = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "current-password-1", "pending-password-2"
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, 'edge-1', 'edge.example.com', 'active', ?)`, nodeID, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := "SHA256:" + strings.Repeat("A", 43)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node_server_access (node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, pending_password, configured_at)
+		VALUES (?, 'edge-1', 'node.example.com', 22, 'root', ?, ?, ?, ?)`, nodeID, fingerprint,
+		vlt.Seal([]byte(current), "node-access:"+nodeID), vlt.Seal([]byte(pending), "node-access-pending:"+nodeID), now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	ssh := NewClient()
+	ssh.resolver = testResolver{netip.MustParseAddr("8.8.8.8")}
+	ssh.dialer = testDialer(func(context.Context, string, string) (net.Conn, error) { return nil, errors.New("connection refused") })
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{}, SSH: ssh,
+		StepUp: func(context.Context) error { return nil }, Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revealed, err := svc.RevealNodeServerPassword(ctx, connect.NewRequest(&adminv1.RevealNodeServerPasswordRequest{NodeId: nodeID}))
+	if err != nil {
+		t.Fatalf("reveal with the server unreachable: %v", err)
+	}
+	if m := revealed.Msg; m.GetPassword() != current || m.GetPendingPassword() != pending || !m.GetUnverified() {
+		t.Fatalf("reveal = current %t, pending %t, unverified %t", m.GetPassword() == current, m.GetPendingPassword() == pending, m.GetUnverified())
+	}
+	if access, err := st.NodeServerAccess(ctx, nodeID); err != nil || access.PendingPassword == nil {
+		t.Fatalf("an undecided rotation was resolved: %+v, err %v", access, err)
+	}
+	_, err = svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: nodeID, Generate: true, Confirm: true}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "ssh_rotation_recovery_required") {
+		t.Fatalf("rotation on top of an undecided one = %v", err)
+	}
+}
 
 func TestRevealNodeServerPasswordRequiresStepUpAndDisablesCaching(t *testing.T) {
 	ctx := context.Background()

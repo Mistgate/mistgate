@@ -3,6 +3,7 @@ package provision
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"connectrpc.com/connect"
 
@@ -41,48 +42,63 @@ func (s *Service) RevealNodeServerPassword(ctx context.Context, req *connect.Req
 	}
 	defer func() { password = "" }()
 
+	var pending string
 	if access.PendingPassword != nil {
-		password, err = s.resolvePendingAccessPassword(ctx, access, password)
+		password, pending, err = s.resolvePendingAccessPassword(ctx, access, password)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err := s.audit(ctx, "node.ssh_password_reveal", map[string]string{"node_id": access.NodeID}); err != nil {
+	defer func() { pending = "" }()
+	if err := s.audit(ctx, "node.ssh_password_reveal", map[string]string{
+		"node_id": access.NodeID, "unverified": strconv.FormatBool(pending != ""),
+	}); err != nil {
 		return nil, internalConnectError()
 	}
-	response := connect.NewResponse(&adminv1.RevealNodeServerPasswordResponse{Password: password})
+	response := connect.NewResponse(&adminv1.RevealNodeServerPasswordResponse{Password: password, PendingPassword: pending, Unverified: pending != ""})
 	response.Header().Set("Cache-Control", "no-store")
 	return response, nil
 }
 
-// resolvePendingAccessPassword recovers an interrupted password change before revealing anything. It
-// promotes the pending value only when that credential authenticates; otherwise it keeps the old value
-// only when the old login still works.
-func (s *Service) resolvePendingAccessPassword(ctx context.Context, access store.NodeServerAccess, current string) (string, error) {
+// resolvePendingAccessPassword recovers an interrupted password change. It promotes the pending value when that
+// credential authenticates, and drops it when the current one does (the change never landed). When neither login
+// succeeds and the server did not reject both (it was unreachable, timed out, or showed another host key), nothing is
+// decided: it returns the current password with the pending one, both unverified. Both rejected:
+// ssh_rotation_recovery_required.
+func (s *Service) resolvePendingAccessPassword(ctx context.Context, access store.NodeServerAccess, current string) (password, unverifiedPending string, err error) {
 	target, err := NewTarget(access.SSHHost, uint32(access.SSHPort))
 	if err != nil {
-		return "", internalConnectError()
+		return "", "", internalConnectError()
 	}
 	pending, err := s.openPendingPassword(access.NodeID, access.PendingPassword)
 	if err != nil {
-		return "", internalConnectError()
+		return "", "", internalConnectError()
 	}
-	defer func() { pending = "" }()
-	if conn, dialErr := s.ssh.DialAs(ctx, target, access.SSHUser, pending, access.HostFingerprint); dialErr == nil {
-		_ = conn.Close()
+	pendingErr := s.tryLogin(ctx, target, access, pending)
+	if pendingErr == nil {
 		promoted := s.sealAccessPassword(access.NodeID, pending)
 		if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, s.cfg.Now().UTC()); err != nil {
-			return "", internalConnectError()
+			return "", "", internalConnectError()
 		}
-		return pending, nil
+		return pending, "", nil
 	}
-	conn, err := s.ssh.DialAs(ctx, target, access.SSHUser, current, access.HostFingerprint)
-	if err != nil {
-		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_rotation_recovery_required"))
+	currentErr := s.tryLogin(ctx, target, access, current)
+	if currentErr == nil {
+		if err := s.st.ClearPendingNodeServerPassword(ctx, access.NodeID); err != nil {
+			return "", "", internalConnectError()
+		}
+		return current, "", nil
 	}
-	_ = conn.Close()
-	if err := s.st.ClearPendingNodeServerPassword(ctx, access.NodeID); err != nil {
-		return "", internalConnectError()
+	if publicSSHCode(pendingErr) == "ssh_authentication_failed" && publicSSHCode(currentErr) == "ssh_authentication_failed" {
+		return "", "", connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_rotation_recovery_required"))
 	}
-	return current, nil
+	return current, pending, nil
+}
+
+func (s *Service) tryLogin(ctx context.Context, target Target, access store.NodeServerAccess, password string) error {
+	conn, err := s.ssh.DialAs(ctx, target, access.SSHUser, password, access.HostFingerprint)
+	if err == nil {
+		_ = conn.Close()
+	}
+	return err
 }

@@ -1473,10 +1473,15 @@ func (x *RevealNodeServerPasswordRequest) GetNodeId() string {
 }
 
 type RevealNodeServerPasswordResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Password      string                 `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Password string                 `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	// Set only when a password change was interrupted and the server could not be reached to tell which login works:
+	// password is then the last verified one and pending_password the replacement that may already be in effect.
+	// Neither is verified; the SPA labels them so.
+	PendingPassword string `protobuf:"bytes,2,opt,name=pending_password,json=pendingPassword,proto3" json:"pending_password,omitempty"`
+	Unverified      bool   `protobuf:"varint,3,opt,name=unverified,proto3" json:"unverified,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RevealNodeServerPasswordResponse) Reset() {
@@ -1514,6 +1519,20 @@ func (x *RevealNodeServerPasswordResponse) GetPassword() string {
 		return x.Password
 	}
 	return ""
+}
+
+func (x *RevealNodeServerPasswordResponse) GetPendingPassword() string {
+	if x != nil {
+		return x.PendingPassword
+	}
+	return ""
+}
+
+func (x *RevealNodeServerPasswordResponse) GetUnverified() bool {
+	if x != nil {
+		return x.Unverified
+	}
+	return false
 }
 
 type ForgetNodeServerAccessRequest struct {
@@ -1705,9 +1724,13 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	" RotateNodeServerPasswordResponse\x12\x18\n" +
 	"\arotated\x18\x01 \x01(\bR\arotated\":\n" +
 	"\x1fRevealNodeServerPasswordRequest\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\">\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\x89\x01\n" +
 	" RevealNodeServerPasswordResponse\x12\x1a\n" +
-	"\bpassword\x18\x01 \x01(\tR\bpassword\"8\n" +
+	"\bpassword\x18\x01 \x01(\tR\bpassword\x12)\n" +
+	"\x10pending_password\x18\x02 \x01(\tR\x0fpendingPassword\x12\x1e\n" +
+	"\n" +
+	"unverified\x18\x03 \x01(\bR\n" +
+	"unverified\"8\n" +
 	"\x1dForgetNodeServerAccessRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\" \n" +
 	"\x1eForgetNodeServerAccessResponse2\xa7\n" +

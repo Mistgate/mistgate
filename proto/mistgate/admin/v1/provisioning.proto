@@ -161,7 +161,14 @@ message RotateNodeServerPasswordResponse { bool rotated = 1; }
 
 // Owner-only, step-up protected retrieval. This procedure is deliberately not exposed as an MCP tool.
 message RevealNodeServerPasswordRequest { string node_id = 1; }
-message RevealNodeServerPasswordResponse { string password = 1; }
+message RevealNodeServerPasswordResponse {
+  string password = 1;
+  // Set only when a password change was interrupted and the server could not be reached to tell which login works:
+  // password is then the last verified one and pending_password the replacement that may already be in effect.
+  // Neither is verified; the SPA labels them so.
+  string pending_password = 2;
+  bool unverified = 3;
+}
 
 message ForgetNodeServerAccessRequest { string node_id = 1; }
 message ForgetNodeServerAccessResponse {}

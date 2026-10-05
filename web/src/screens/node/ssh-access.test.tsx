@@ -174,6 +174,19 @@ describe("node SSH access", () => {
     expect(document.querySelector("#ssh-password-nod_1")).toBeNull();
   });
 
+  it("shows both candidates of an interrupted change, labelled unverified, when the server could not be checked", async () => {
+    await mount();
+    revealNodeServerPassword.mockResolvedValueOnce({ password: "current-one", pendingPassword: "pending-one", unverified: true });
+    await act(async () => document.querySelector("button")!.click());
+    await flush();
+    expect(document.querySelector<HTMLInputElement>("#ssh-password-nod_1")?.value).toBe("current-one");
+    expect(document.querySelector<HTMLInputElement>("#ssh-pending-password-nod_1")?.value).toBe("pending-one");
+    expect(document.body.textContent).toContain("Current password (not verified)");
+    expect(document.body.textContent).toContain("New password from the interrupted change (not verified)");
+    await act(async () => document.querySelector("button")!.click()); // hide
+    expect(document.querySelector("#ssh-pending-password-nod_1")).toBeNull();
+  });
+
   it("keeps a retired node's access until the owner forgets it, after a second click", async () => {
     await mount();
     expect(document.body.textContent).not.toContain("Forget saved access");

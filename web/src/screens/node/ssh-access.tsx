@@ -30,6 +30,8 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
   const guard = useStepUp();
   const qc = useQueryClient();
   const [password, setPassword] = useState("");
+  // set only when an interrupted change could not be checked: then both are shown, labelled unverified
+  const [pendingPassword, setPendingPassword] = useState("");
   const [passwordNodeId, setPasswordNodeId] = useState("");
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,6 +50,7 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
     }
     setVisible(false);
     setPassword("");
+    setPendingPassword("");
     setPasswordNodeId("");
     setBusy(false);
   }, []);
@@ -91,6 +94,7 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
         return;
       }
       setPassword(response.password);
+      setPendingPassword(response.unverified ? response.pendingPassword : "");
       setPasswordNodeId(requestedNodeId);
       setVisible(true);
       if (expiryTimer.current !== undefined) window.clearTimeout(expiryTimer.current);
@@ -155,18 +159,26 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
           </dl>
           {showingPassword && (
             <div className="mt-3 flex flex-col gap-1.5">
-              <label htmlFor={`ssh-password-${nodeId}`} className="text-xs font-semibold text-muted">
-                {t("node.sshAccess.password")}
-              </label>
-              <input
-                id={`ssh-password-${nodeId}`}
-                type="text"
-                value={password}
-                readOnly
-                autoComplete="off"
-                spellCheck={false}
-                className="min-h-11 rounded-xl border border-line bg-inset px-3 font-mono text-sm text-main outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              />
+              {pendingPassword && <p className="text-[13px] leading-snug text-danger">{t("node.sshAccess.unverified")}</p>}
+              {[
+                { id: `ssh-password-${nodeId}`, value: password, label: pendingPassword ? t("node.sshAccess.unverifiedCurrent") : t("node.sshAccess.password") },
+                ...(pendingPassword ? [{ id: `ssh-pending-password-${nodeId}`, value: pendingPassword, label: t("node.sshAccess.unverifiedPending") }] : []),
+              ].map((field) => (
+                <div key={field.id} className="flex flex-col gap-1.5">
+                  <label htmlFor={field.id} className="text-xs font-semibold text-muted">
+                    {field.label}
+                  </label>
+                  <input
+                    id={field.id}
+                    type="text"
+                    value={field.value}
+                    readOnly
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="min-h-11 rounded-xl border border-line bg-inset px-3 font-mono text-sm text-main outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  />
+                </div>
+              ))}
               <p className="text-xs leading-snug text-muted">{t("node.sshAccess.revealHint")}</p>
             </div>
           )}

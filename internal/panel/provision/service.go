@@ -463,28 +463,15 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 	}
 	defer func() { current = "" }()
 	if access.PendingPassword != nil {
-		pending, openErr := s.openPendingPassword(access.NodeID, access.PendingPassword)
-		if openErr != nil {
-			return nil, internalConnectError()
+		// A rotation never builds on an undecided one: both candidates unverified is a refusal here.
+		resolved, unverified, err := s.resolvePendingAccessPassword(ctx, access, current)
+		if err != nil {
+			return nil, err
 		}
-		defer func() { pending = "" }()
-		if conn, dialErr := s.ssh.DialAs(ctx, target, access.SSHUser, pending, access.HostFingerprint); dialErr == nil {
-			_ = conn.Close()
-			promoted := s.sealAccessPassword(access.NodeID, pending)
-			if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, s.cfg.Now().UTC()); err != nil {
-				return nil, internalConnectError()
-			}
-			current, access.Password, access.PendingPassword = pending, access.PendingPassword, nil
-		} else {
-			conn, oldErr := s.ssh.DialAs(ctx, target, access.SSHUser, current, access.HostFingerprint)
-			if oldErr != nil {
-				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_rotation_recovery_required"))
-			}
-			_ = conn.Close()
-			if err := s.st.ClearPendingNodeServerPassword(ctx, access.NodeID); err != nil {
-				return nil, internalConnectError()
-			}
+		if unverified != "" {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_rotation_recovery_required"))
 		}
+		current = resolved
 	}
 	if newPassword == current {
 		return nil, invalidArgument("new password must differ from the current password")
