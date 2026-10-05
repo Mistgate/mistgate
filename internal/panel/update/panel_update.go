@@ -617,7 +617,17 @@ func takePanelUpdateRequest(dataDir string) (panelUpdateRequest, error) {
 	if !info.Mode().IsRegular() || info.Size() > 4<<10 {
 		return panelUpdateRequest{}, errors.New("the panel update request is not a small regular file")
 	}
-	b, err := os.ReadFile(path)
+	// The helper runs as root and the data directory belongs to the panel's user: read the file that was checked,
+	// not whatever the path points to by now.
+	f, err := os.Open(path)
+	if err != nil {
+		return panelUpdateRequest{}, err
+	}
+	defer f.Close()
+	if opened, err := f.Stat(); err != nil || !os.SameFile(info, opened) {
+		return panelUpdateRequest{}, errors.New("the panel update request changed while it was read")
+	}
+	b, err := io.ReadAll(io.LimitReader(f, 4<<10))
 	if err != nil {
 		return panelUpdateRequest{}, err
 	}
