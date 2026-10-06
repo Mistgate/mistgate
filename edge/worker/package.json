@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Cloudflare Worker shell that runs the Mistgate panel (Go compiled to js/wasm)",
   "license": "AGPL-3.0-only",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -13,9 +15,10 @@
     "dev": "wrangler dev --local --local-protocol https --config wrangler.dev.toml"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20261005.1",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0",
+    "vitest": "^4.1.11",
     "wrangler": "^4.147.0"
   }
 }

@@ -1,0 +1,13 @@
+# Test-only configuration for @cloudflare/vitest-pool-workers: just the Limiter object, nothing of the panel.
+name = "limiter-test"
+main = "worker.ts"
+# Older than the Worker's own date on purpose: the workerd that ships with the test pool lags behind wrangler's.
+compatibility_date = "2026-08-01"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
