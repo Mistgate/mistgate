@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-// 00047: the tables come up on an existing database and go away on the way down, and the way up again works.
+// 00048: the tables come up on an existing database and go away on the way down, and the way up again works.
 func TestTelegramMigrationUpAndDown(t *testing.T) {
 	ctx := context.Background()
 	s, p := openProvider(t)
-	if _, err := p.UpTo(ctx, 46); err != nil {
-		t.Fatalf("up to 46: %v", err)
+	if _, err := p.UpTo(ctx, 47); err != nil {
+		t.Fatalf("up to 47: %v", err)
 	}
 	execT(t, s, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_1', 'Owner', 'owner', x'01', 1)`)
 	if _, err := p.Up(ctx); err != nil {
@@ -26,8 +26,8 @@ func TestTelegramMigrationUpAndDown(t *testing.T) {
 	if n := countT(t, s, `SELECT count(*) FROM admin`); n != 1 {
 		t.Fatalf("the admin did not survive the migration: %d", n)
 	}
-	if _, err := p.DownTo(ctx, 46); err != nil {
-		t.Fatalf("down to 46: %v", err)
+	if _, err := p.DownTo(ctx, 47); err != nil {
+		t.Fatalf("down to 47: %v", err)
 	}
 	for _, table := range []string{"telegram_bot", "telegram_link"} {
 		if countT(t, s, `SELECT count(*) FROM sqlite_master WHERE name = ?`, table) != 0 {

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Telegram alerts: the bot and the chats of the admins who linked one. Tables: migration 00047. A chat belongs to a bot, so
+// Telegram alerts: the bot and the chats of the admins who linked one. Tables: migration 00048. A chat belongs to a bot, so
 // a different bot (or none) drops every link in the same transaction.
 
 // TelegramBotRow is the stored bot. Token is vault ciphertext and must never be returned by an admin RPC.
