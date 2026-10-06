@@ -97,7 +97,7 @@ function dnsRow(c: Ctx, s: ServerEntry): Kid[] {
               { class: "dns-keys-row" },
               h("span", { class: "tile s36 mint", "aria-hidden": "true" }, icon("key")),
               h("div", { class: "stack grow" }, h("p", { class: "b sm" }, x.label || t.devGeneric), x.platform && h("p", { class: "hint" }, t.platforms[x.platform as keyof typeof t.platforms] ?? "")),
-              h("button", { class: "btn sec sm", type: "button", "data-k": `amz-stale-${x.id}`, disabled: st.amz.busy !== "", on: { click: () => a.amz.renew(x.id) } }, st.amz.busy === `renew:${x.id}` ? t.awgBusy : t.dnsRefresh),
+              h("button", { class: "btn sec sm", type: "button", "data-k": `dns-renew-${s.id}-${x.id}`, disabled: st.amz.busy !== "", on: { click: () => a.amz.renew(x.id) } }, st.amz.busy === `renew:${x.id}` ? t.awgBusy : t.dnsRefresh),
             ),
           ),
         ),

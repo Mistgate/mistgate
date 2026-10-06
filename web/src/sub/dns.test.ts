@@ -200,9 +200,19 @@ describe("DNS in a card", () => {
     expect([...block.querySelectorAll(".dns-keys-row")].map((r) => text(r.querySelector(".b")))).toEqual(["Pixel 7"]);
     expect(text(block.querySelector(".hint.row"))).toBe("Приложения по ссылке получат новый DNS сами");
     expect(cards(el)[0]!.querySelector(".note.ok")).toBeNull(); // the block carries it
-    block.querySelector<HTMLButtonElement>("[data-k=amz-stale-d3]")!.click();
+    block.querySelector<HTMLButtonElement>("[data-k=dns-renew-nod_fra-d3]")!.click();
     expect(a.log).toEqual(["renew d3"]);
     expect(text(block.querySelector("button"))).toBe("Обновить");
+  });
+
+  it("every focus key on the page is its own: the renew buttons of the stale card and of the server cards differ", () => {
+    // after a render the page focuses the first element with the key the focused one had, so a shared key moves the focus
+    const d = data("stale-dns");
+    const el = view(d, state("android", { returning: true }), actions());
+    expect(el.querySelector(".stale [data-k]")).not.toBeNull(); // the card that lists the stale keys is on the page
+    expect(el.querySelector(".dns-keys [data-k]")).not.toBeNull(); // and so is the block of a server card
+    const keys = [...el.querySelectorAll("[data-k]")].map((x) => x.getAttribute("data-k"));
+    expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
   });
 });
 
