@@ -81,33 +81,24 @@ type AccessCred struct {
 	CreatedAt                      time.Time
 }
 
-func (a Access) insertUser(ctx context.Context, tx *sql.Tx, u AccessUser) error {
-	_, err := tx.ExecContext(ctx,
-		`INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
+func accInsertUserStmt(u AccessUser) Stmt {
+	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
 		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Name, u.SubscriptionName, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
-		int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), u.DeviceLimit, int64(u.SpeedLimitBps),
-		u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID))
-	if err != nil {
-		return err
-	}
-	return accSetUserNodes(ctx, tx, u.ID, u.NodeIDs)
+		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
+			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps),
+			u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID)}}
 }
 
-func accSetUserNodes(ctx context.Context, tx *sql.Tx, userID string, nodeIDs []string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM user_node WHERE user_id = ?`, userID); err != nil {
-		return err
+func accSetUserNodeStmts(userID string, nodeIDs []string) []Stmt {
+	stmts := []Stmt{{Query: `DELETE FROM user_node WHERE user_id = ?`, Args: []any{userID}}}
+	for _, nodeID := range nodeIDs {
+		stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_node (user_id, node_id) VALUES (?, ?)`, Args: []any{userID, nodeID}})
 	}
-	for _, n := range nodeIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO user_node (user_id, node_id) VALUES (?, ?)`, userID, n); err != nil {
-			return err
-		}
-	}
-	return nil
+	return stmts
 }
 
-func accInsertDevice(ctx context.Context, tx *sql.Tx, d AccessDevice, creds []AccessCred) error {
+func accInsertDeviceStmt(d AccessDevice) Stmt {
 	var hwid any // NULL: the implicit device
 	seen := unix(d.CreatedAt)
 	if d.NoInitialSeen {
@@ -119,21 +110,37 @@ func accInsertDevice(ctx context.Context, tx *sql.Tx, d AccessDevice, creds []Ac
 	case !d.Implicit:
 		hwid = []byte(d.ID)
 	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO device (id, user_id, hwid_hash, platform, model, os_version, first_seen_at, last_seen_at, created_at)
+	return Stmt{Query: `INSERT INTO device (id, user_id, hwid_hash, platform, model, os_version, first_seen_at, last_seen_at, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.UserID, hwid, d.Platform, d.Model, d.OSVersion, seen, seen, unix(d.CreatedAt)); err != nil {
+		Args: []any{d.ID, d.UserID, hwid, d.Platform, d.Model, d.OSVersion, seen, seen, unix(d.CreatedAt)}}
+}
+
+func accInsertCredStmts(creds []AccessCred) []Stmt {
+	stmts := make([]Stmt, 0, len(creds))
+	for _, c := range creds {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, secret_enc, data_json, config_epoch, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			Args: []any{c.ID, c.DeviceID, c.UserID, c.Protocol, accNullStr(c.ProfileID), c.SecretEnc, c.DataJSON, c.ConfigEpoch, unix(c.CreatedAt)}})
+	}
+	return stmts
+}
+
+func accInsertDeviceStmts(d AccessDevice, creds []AccessCred) []Stmt {
+	stmts := []Stmt{accInsertDeviceStmt(d)}
+	return append(stmts, accInsertCredStmts(creds)...)
+}
+
+func accInsertDevice(ctx context.Context, tx *sql.Tx, d AccessDevice, creds []AccessCred) error {
+	stmt := accInsertDeviceStmt(d)
+	if _, err := tx.ExecContext(ctx, stmt.Query, stmt.Args...); err != nil {
 		return err
 	}
 	return accInsertCreds(ctx, tx, creds)
 }
 
 func accInsertCreds(ctx context.Context, tx *sql.Tx, creds []AccessCred) error {
-	for _, c := range creds {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, secret_enc, data_json, config_epoch, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			c.ID, c.DeviceID, c.UserID, c.Protocol, accNullStr(c.ProfileID), c.SecretEnc, c.DataJSON, c.ConfigEpoch, unix(c.CreatedAt)); err != nil {
+	for _, stmt := range accInsertCredStmts(creds) {
+		if _, err := tx.ExecContext(ctx, stmt.Query, stmt.Args...); err != nil {
 			return err
 		}
 	}
@@ -145,15 +152,12 @@ func accInsertCreds(ctx context.Context, tx *sql.Tx, creds []AccessCred) error {
 // and not counted against the device limit.
 // ErrAccessExists on a name (or token) clash, ErrNotFound when the group or a node does not exist.
 func (a Access) CreateUser(ctx context.Context, u AccessUser, dev AccessDevice, creds []AccessCred) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if err := a.insertUser(ctx, tx, u); err != nil {
-			return err
-		}
-		if len(creds) == 0 {
-			return nil
-		}
-		return accInsertDevice(ctx, tx, dev, creds)
-	})
+	stmts := []Stmt{accInsertUserStmt(u)}
+	stmts = append(stmts, accSetUserNodeStmts(u.ID, u.NodeIDs)...)
+	if len(creds) != 0 {
+		stmts = append(stmts, accInsertDeviceStmts(dev, creds)...)
+	}
+	_, err := a.s.batch(ctx, stmts...)
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -336,25 +340,22 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 // replaces the explicit node list with u.NodeIDs. Usage counters are left alone (the fleet increments them).
 // ErrAccessExists on a name clash, ErrNotFound when the user, group or a node does not exist.
 func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx,
-			`UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
+	stmts := []Stmt{
+		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
+		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
 			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?,
 			   dns_preset_id = ?
 			 WHERE id = ?`,
-			u.Name, u.SubscriptionName, u.GroupID, accBool(u.Disabled), u.Status, accBool(u.AppHapp), accBool(u.AppAmnezia), accBool(u.AllNodes),
-			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), u.DeviceLimit, int64(u.SpeedLimitBps), accNullStr(u.DNSPresetID), u.ID)
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return ErrNotFound
-		}
-		if setNodes {
-			return accSetUserNodes(ctx, tx, u.ID, u.NodeIDs)
-		}
-		return nil
-	})
+			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
+				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
+	}
+	if setNodes {
+		stmts = append(stmts, accSetUserNodeStmts(u.ID, u.NodeIDs)...)
+	}
+	_, err := a.s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		return ErrNotFound
+	}
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -614,7 +615,7 @@ func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time) 
 
 // AddDevice inserts a device with its credentials (ErrAccessExists on a live implicit device race).
 func (a Access) AddDevice(ctx context.Context, d AccessDevice, creds []AccessCred) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error { return accInsertDevice(ctx, tx, d, creds) })
+	_, err := a.s.batch(ctx, accInsertDeviceStmts(d, creds)...)
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -626,7 +627,7 @@ func (a Access) AddDevice(ctx context.Context, d AccessDevice, creds []AccessCre
 
 // AddCreds inserts credentials for an existing device (ErrAccessExists when one is already live).
 func (a Access) AddCreds(ctx context.Context, creds []AccessCred) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error { return accInsertCreds(ctx, tx, creds) })
+	_, err := a.s.batch(ctx, accInsertCredStmts(creds)...)
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -661,27 +662,29 @@ func (a Access) DeviceCreds(ctx context.Context, deviceID string) ([]AccessCred,
 // RevokeDevice soft-deletes a live device and its credentials and returns its user id; ErrNotFound when
 // the device does not exist or is already revoked.
 func (a Access) RevokeDevice(ctx context.Context, id string, now time.Time) (string, error) {
-	var userID string
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if err := tx.QueryRowContext(ctx, `SELECT user_id FROM device WHERE id = ? AND revoked_at IS NULL`, id).Scan(&userID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrNotFound
-			}
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE device SET revoked_at = ? WHERE id = ?`, unix(now), id); err != nil {
-			return err
-		}
+	results, err := a.s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM device WHERE id = ? AND revoked_at IS NULL)`, id),
+		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE id = ?`, Args: []any{unix(now), id}},
 		// The tunnel addresses of its AWG credentials go into quarantine (released_at > 0).
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
-			   (SELECT id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL)`, unix(now), id); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL`, unix(now), id)
-		return err
-	})
-	return userID, err
+		Stmt{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
+		   (SELECT id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL)`, Args: []any{unix(now), id}},
+		Stmt{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL`, Args: []any{unix(now), id}},
+		Stmt{Query: `SELECT user_id FROM device WHERE id = ?`, Args: []any{id}, Returning: true},
+	)
+	if errors.Is(err, errGuard) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if len(results[4].Rows) == 0 {
+		return "", ErrNotFound
+	}
+	var userID string
+	if err := batchRow(results[4].Rows[0]).Scan(&userID); err != nil {
+		return "", err
+	}
+	return userID, nil
 }
 
 // AccessDesiredCred is a live credential that may go to a node: its user is active, belongs to a group

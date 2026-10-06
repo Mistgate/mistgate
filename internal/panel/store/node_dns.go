@@ -47,21 +47,13 @@ func (d DNS) NodeOptions(ctx context.Context) (map[string][]NodeDNSOption, error
 // caller checked the ids. ErrNotFound when the node or a preset is gone. Picks of people for presets that are no
 // longer offered stay (they do nothing while the preset is not offered).
 func (d DNS) SetNodeOptions(ctx context.Context, nodeID string, presetIDs []string, defaultID string) error {
-	tx, err := d.s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM node_dns_option WHERE node_id = ?`, nodeID); err != nil {
-		return err
-	}
+	stmts := []Stmt{{Query: `DELETE FROM node_dns_option WHERE node_id = ?`, Args: []any{nodeID}}}
 	for i, id := range presetIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO node_dns_option (node_id, preset_id, position, is_default) VALUES (?, ?, ?, ?)`,
-			nodeID, id, i, accBool(id == defaultID)); err != nil {
-			return accMapErr(err)
-		}
+		stmts = append(stmts, Stmt{Query: `INSERT INTO node_dns_option (node_id, preset_id, position, is_default) VALUES (?, ?, ?, ?)`,
+			Args: []any{nodeID, id, int64(i), int64(accBool(id == defaultID))}})
 	}
-	return tx.Commit()
+	_, err := d.s.batch(ctx, stmts...)
+	return accMapErr(err)
 }
 
 // UserNodeChoices returns what one person picked, by node id.

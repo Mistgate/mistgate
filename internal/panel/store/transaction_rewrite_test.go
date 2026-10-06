@@ -274,3 +274,378 @@ func TestRevokeAPITokenRacePreservesFirstRevocation(t *testing.T) {
 		}
 	}
 }
+
+func rewriteAccessGroup(t *testing.T, s *Store, id, name string) {
+	t.Helper()
+	if err := s.Access().CreateGroup(context.Background(), AccessGroup{ID: id, Name: name, CreatedAt: t0}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func rewriteAccessUser(t *testing.T, s *Store, id, name, groupID string) {
+	t.Helper()
+	u := AccessUser{ID: id, Name: name, GroupID: groupID, Status: "active", AppHapp: true, AppAmnezia: true,
+		AllNodes: true, QuotaReset: "month", PeriodStart: t0, DeviceLimit: 5, SubTokenHash: []byte(id + "-hash"),
+		SubTokenEnc: []byte("sealed"), CreatedAt: t0}
+	if err := s.Access().CreateUser(context.Background(), u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateUserRaceKeepsUniqueName(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rewriteAccessGroup(t, s, "grp_create_race", "Create race")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			u := AccessUser{ID: fmt.Sprintf("usr_create_race_%d", i), Name: "same name", GroupID: "grp_create_race",
+				Status: "active", AppHapp: true, AppAmnezia: true, AllNodes: true, QuotaReset: "month", PeriodStart: t0,
+				DeviceLimit: 5, SubTokenHash: []byte(fmt.Sprintf("hash-%d", i)), SubTokenEnc: []byte("sealed"), CreatedAt: t0}
+			results <- s.Access().CreateUser(ctx, u, AccessDevice{}, nil)
+		}(i)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("CreateUser race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM user WHERE name = 'same name'`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestAddDeviceRaceKeepsOneImplicitDevice(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rewriteAccessGroup(t, s, "grp_device_race", "Device race")
+	rewriteAccessUser(t, s, "usr_device_race", "Device user", "grp_device_race")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			dev := AccessDevice{ID: fmt.Sprintf("dev_implicit_race_%d", i), UserID: "usr_device_race", Implicit: true, CreatedAt: t0}
+			results <- s.Access().AddDevice(ctx, dev, nil)
+		}(i)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("AddDevice race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM device WHERE user_id = 'usr_device_race' AND hwid_hash IS NULL AND revoked_at IS NULL`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestAddCredsRaceKeepsOneLiveProtocol(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rewriteAccessGroup(t, s, "grp_creds_race", "Credential race")
+	rewriteAccessUser(t, s, "usr_creds_race", "Credential user", "grp_creds_race")
+	dev := AccessDevice{ID: "dev_creds_race", UserID: "usr_creds_race", CreatedAt: t0}
+	if err := s.Access().AddDevice(ctx, dev, nil); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			cred := AccessCred{ID: fmt.Sprintf("crd_creds_race_%d", i), DeviceID: dev.ID, UserID: dev.UserID,
+				Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
+			results <- s.Access().AddCreds(ctx, []AccessCred{cred})
+		}(i)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("AddCreds race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_creds_race' AND revoked_at IS NULL`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestUpdateUserRaceKeepsUniqueName(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	a := s.Access()
+	rewriteAccessGroup(t, s, "grp_update_race", "Update race")
+	rewriteAccessUser(t, s, "usr_update_race_a", "First", "grp_update_race")
+	rewriteAccessUser(t, s, "usr_update_race_b", "Second", "grp_update_race")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, id := range []string{"usr_update_race_a", "usr_update_race_b"} {
+		go func(id string) {
+			u, err := a.User(ctx, id)
+			if err != nil {
+				results <- err
+				return
+			}
+			u.Name = "Shared"
+			<-start
+			results <- a.UpdateUser(ctx, u, false)
+		}(id)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("UpdateUser race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM user WHERE name = 'Shared'`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestUpdateProfileRaceUsesExpectedVersion(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	a := s.Access()
+	if err := a.CreateProfile(ctx, AccessProfile{ID: "prf_update_race", Protocol: "hysteria2", Name: "Original", SettingsJSON: `{}`, CreatedAt: t0}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, name := range []string{"First update", "Second update"} {
+		go func(name string) {
+			<-start
+			_, err := a.UpdateProfile(ctx, AccessProfile{ID: "prf_update_race", Name: name, SettingsJSON: `{}`}, 1, false, false, t0)
+			results <- err
+		}(name)
+	}
+	close(start)
+	var successes, stale int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessVersion):
+			stale++
+		default:
+			t.Fatalf("UpdateProfile race: %v", err)
+		}
+	}
+	got, err := a.Profile(ctx, "prf_update_race")
+	if err != nil || got.Version != 2 || successes != 1 || stale != 1 {
+		t.Fatalf("profile=%+v successes=%d stale=%d err=%v", got, successes, stale, err)
+	}
+}
+
+func TestCreateInboundRaceKeepsUniqueProfileNode(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	a := s.Access()
+	if err := a.CreateProfile(ctx, AccessProfile{ID: "prf_inbound_race", Protocol: "hysteria2", Name: "Inbound race", SettingsJSON: `{}`, CreatedAt: t0}); err != nil {
+		t.Fatal(err)
+	}
+	execT(t, s, `INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_inbound_race', 'Inbound race', '203.0.113.12', 'active', ?)`, unix(t0))
+	in := AccessInbound{ID: "inb_inbound_race", ProfileID: "prf_inbound_race", NodeID: "nod_inbound_race", Enabled: true, CreatedAt: t0}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- a.CreateInbound(ctx, in)
+		}()
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("CreateInbound race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM inbound WHERE profile_id = 'prf_inbound_race' AND node_id = 'nod_inbound_race'`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestCreateGroupRaceKeepsUniqueName(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			g := AccessGroup{ID: fmt.Sprintf("grp_create_race_%d", i), Name: "Same group", CreatedAt: t0}
+			results <- s.Access().CreateGroup(ctx, g)
+		}(i)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("CreateGroup race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM user_group WHERE name = 'Same group'`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestUpdateGroupRaceKeepsUniqueName(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	a := s.Access()
+	rewriteAccessGroup(t, s, "grp_update_race_a", "First group")
+	rewriteAccessGroup(t, s, "grp_update_race_b", "Second group")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	shared := "Shared group"
+	for _, id := range []string{"grp_update_race_a", "grp_update_race_b"} {
+		go func(id string) {
+			<-start
+			results <- a.UpdateGroup(ctx, id, &shared, nil, nil, nil)
+		}(id)
+	}
+	close(start)
+	var successes, conflicts int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrAccessExists):
+			conflicts++
+		default:
+			t.Fatalf("UpdateGroup race: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM user_group WHERE name = 'Shared group'`) != 1 {
+		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestRevokeDeviceRaceRevokesOnce(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rewriteAccessGroup(t, s, "grp_revoke_race", "Revoke race")
+	rewriteAccessUser(t, s, "usr_revoke_race", "Revoke user", "grp_revoke_race")
+	dev := AccessDevice{ID: "dev_revoke_race", UserID: "usr_revoke_race", CreatedAt: t0}
+	cred := AccessCred{ID: "crd_revoke_race", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
+	if err := s.Access().AddDevice(ctx, dev, []AccessCred{cred}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	type result struct {
+		userID string
+		err    error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			userID, err := s.Access().RevokeDevice(ctx, dev.ID, t0.Add(time.Minute))
+			results <- result{userID: userID, err: err}
+		}()
+	}
+	close(start)
+	var successes, missing int
+	for range 2 {
+		got := <-results
+		switch {
+		case got.err == nil && got.userID == dev.UserID:
+			successes++
+		case errors.Is(got.err, ErrNotFound):
+			missing++
+		default:
+			t.Fatalf("RevokeDevice race: %+v", got)
+		}
+	}
+	if successes != 1 || missing != 1 || countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_revoke_race' AND revoked_at IS NOT NULL`) != 1 {
+		t.Fatalf("successes=%d missing=%d", successes, missing)
+	}
+}
+
+func TestDeleteInboundRaceDeletesOnce(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	_, inboundID := fixtureInbound(t, s, "delete_race")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- s.Access().DeleteInbound(ctx, inboundID, t0, nil)
+		}()
+	}
+	close(start)
+	var successes, missing int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrNotFound):
+			missing++
+		default:
+			t.Fatalf("DeleteInbound race: %v", err)
+		}
+	}
+	if successes != 1 || missing != 1 || countT(t, s, `SELECT count(*) FROM inbound WHERE id = ?`, inboundID) != 0 {
+		t.Fatalf("successes=%d missing=%d", successes, missing)
+	}
+}
+
+func TestDeleteProfileAndGroupKeepInUseGuards(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	_, _ = fixtureInbound(t, s, "profile_in_use")
+	if err := s.Access().DeleteProfile(ctx, "prf_profile_in_use", t0); !errors.Is(err, ErrAccessInUse) {
+		t.Fatalf("DeleteProfile with inbound: %v", err)
+	}
+	rewriteAccessGroup(t, s, "grp_in_use", "In use")
+	rewriteAccessGroup(t, s, "grp_move_to", "Move to")
+	rewriteAccessUser(t, s, "usr_in_group", "Group user", "grp_in_use")
+	if err := s.Access().DeleteGroup(ctx, "grp_in_use", ""); !errors.Is(err, ErrAccessInUse) {
+		t.Fatalf("DeleteGroup with user: %v", err)
+	}
+	if err := s.Access().DeleteGroup(ctx, "grp_in_use", "grp_move_to"); err != nil {
+		t.Fatalf("DeleteGroup moving user: %v", err)
+	}
+	u, err := s.Access().User(ctx, "usr_in_group")
+	if err != nil || u.GroupID != "grp_move_to" {
+		t.Fatalf("moved user = %+v, %v", u, err)
+	}
+}

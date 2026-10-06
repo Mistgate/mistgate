@@ -138,28 +138,35 @@ func accMapErr(err error) error {
 // transaction. It returns the peer index. *AccessLimitError when the user has Limit devices already,
 // ErrAccessSubnetFull when the network is used up, ErrNotFound when the user or profile is gone.
 func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Time, issue AWGIssue) (int, error) {
-	var idx int
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		var used int
-		if err := tx.QueryRowContext(ctx,
-			`SELECT count(*) FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive, add.Device.UserID).Scan(&used); err != nil {
-			return err
-		}
-		if used >= add.Limit {
-			return &AccessLimitError{Used: used, Limit: add.Limit}
-		}
-		var err error
-		if idx, err = awgAllocIdx(ctx, tx, add.ProfileID, add.MaxIdx, now); err != nil {
-			return err
-		}
-		d := add.Device
-		d.AWG, d.CreatedAt = true, now
-		if err := accInsertDevice(ctx, tx, d, nil); err != nil {
-			return err
-		}
-		return awgIssueInto(ctx, tx, d.ID, d.UserID, add.ProfileID, idx, now, issue)
-	})
-	return idx, accMapErr(err)
+	tx, err := a.s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, accMapErr(err)
+	}
+	defer tx.Rollback()
+	var used int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT count(*) FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive, add.Device.UserID).Scan(&used); err != nil {
+		return 0, accMapErr(err)
+	}
+	if used >= add.Limit {
+		return 0, &AccessLimitError{Used: used, Limit: add.Limit}
+	}
+	idx, err := awgAllocIdx(ctx, tx, add.ProfileID, add.MaxIdx, now)
+	if err != nil {
+		return 0, accMapErr(err)
+	}
+	d := add.Device
+	d.AWG, d.CreatedAt = true, now
+	if err := accInsertDevice(ctx, tx, d, nil); err != nil {
+		return idx, accMapErr(err)
+	}
+	if err := awgIssueInto(ctx, tx, d.ID, d.UserID, add.ProfileID, idx, now, issue); err != nil {
+		return idx, accMapErr(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return idx, accMapErr(err)
+	}
+	return idx, nil
 }
 
 // RotateAWGDevice replaces the credential of a live AWG device by a new one with the SAME peer index (the same
@@ -167,31 +174,38 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 // state removes the old public key and adds the new one. It returns the device's user. ErrNotFound when there is
 // no such live AWG device.
 func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.Time, issue AWGIssue) (string, error) {
-	var userID string
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		var oldCred, profileID string
-		var idx int
-		err := tx.QueryRowContext(ctx,
-			`SELECT d.user_id, c.id, c.profile_id, ap.idx FROM device d
+	tx, err := a.s.W.BeginTx(ctx, nil)
+	if err != nil {
+		return "", accMapErr(err)
+	}
+	defer tx.Rollback()
+	var userID, oldCred, profileID string
+	var idx int
+	err = tx.QueryRowContext(ctx,
+		`SELECT d.user_id, c.id, c.profile_id, ap.idx FROM device d
 			 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 			 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			 WHERE d.id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL ORDER BY c.created_at, c.id LIMIT 1`, deviceID).
-			Scan(&userID, &oldCred, &profileID, &idx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE device_credential SET revoked_at = ? WHERE id = ?`, unix(now), oldCred); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE awg_peer SET released_at = ? WHERE credential_id = ?`, unix(now), oldCred); err != nil {
-			return err
-		}
-		return awgIssueInto(ctx, tx, deviceID, userID, profileID, idx, now, issue)
-	})
-	return userID, accMapErr(err)
+		Scan(&userID, &oldCred, &profileID, &idx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", accMapErr(err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE device_credential SET revoked_at = ? WHERE id = ?`, unix(now), oldCred); err != nil {
+		return userID, accMapErr(err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE awg_peer SET released_at = ? WHERE credential_id = ?`, unix(now), oldCred); err != nil {
+		return userID, accMapErr(err)
+	}
+	if err := awgIssueInto(ctx, tx, deviceID, userID, profileID, idx, now, issue); err != nil {
+		return userID, accMapErr(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return userID, accMapErr(err)
+	}
+	return userID, nil
 }
 
 // AWGImplicitWant asks for an AWG credential of one profile on the implicit device.
@@ -208,57 +222,58 @@ type AWGImplicitWant struct {
 // per user, so the limit is exceeded by at most one).
 func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) (int, error) {
 	added := 0
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		added = 0
-		devID := ""
-		err := tx.QueryRowContext(ctx, `SELECT id FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID).Scan(&devID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		have := map[string]bool{}
-		if devID != "" {
-			rows, err := tx.QueryContext(ctx,
-				`SELECT profile_id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL AND profile_id IS NOT NULL`, devID)
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var p string
-				if err := rows.Scan(&p); err != nil {
-					rows.Close()
-					return err
-				}
-				have[p] = true
-			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-		}
-		for _, w := range want {
-			if have[w.ProfileID] {
-				continue
-			}
-			if devID == "" {
-				dev.UserID, dev.Implicit, dev.CreatedAt = userID, true, now
-				if err := accInsertDevice(ctx, tx, dev, nil); err != nil {
-					return err
-				}
-				devID = dev.ID
-			}
-			idx, err := awgAllocIdx(ctx, tx, w.ProfileID, w.MaxIdx, now)
-			if err != nil {
-				return err
-			}
-			if err := awgIssueInto(ctx, tx, devID, userID, w.ProfileID, idx, now, w.Issue); err != nil {
-				return err
-			}
-			have[w.ProfileID] = true
-			added++
-		}
-		return nil
-	})
+	tx, err := a.s.W.BeginTx(ctx, nil)
 	if err != nil {
+		return 0, accMapErr(err)
+	}
+	defer tx.Rollback()
+	devID := ""
+	err = tx.QueryRowContext(ctx, `SELECT id FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID).Scan(&devID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, accMapErr(err)
+	}
+	have := map[string]bool{}
+	if devID != "" {
+		rows, err := tx.QueryContext(ctx,
+			`SELECT profile_id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL AND profile_id IS NOT NULL`, devID)
+		if err != nil {
+			return 0, accMapErr(err)
+		}
+		for rows.Next() {
+			var p string
+			if err := rows.Scan(&p); err != nil {
+				rows.Close()
+				return 0, accMapErr(err)
+			}
+			have[p] = true
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return 0, accMapErr(err)
+		}
+	}
+	for _, w := range want {
+		if have[w.ProfileID] {
+			continue
+		}
+		if devID == "" {
+			dev.UserID, dev.Implicit, dev.CreatedAt = userID, true, now
+			if err := accInsertDevice(ctx, tx, dev, nil); err != nil {
+				return 0, accMapErr(err)
+			}
+			devID = dev.ID
+		}
+		idx, err := awgAllocIdx(ctx, tx, w.ProfileID, w.MaxIdx, now)
+		if err != nil {
+			return 0, accMapErr(err)
+		}
+		if err := awgIssueInto(ctx, tx, devID, userID, w.ProfileID, idx, now, w.Issue); err != nil {
+			return 0, accMapErr(err)
+		}
+		have[w.ProfileID] = true
+		added++
+	}
+	if err := tx.Commit(); err != nil {
 		return 0, accMapErr(err)
 	}
 	return added, nil

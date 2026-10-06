@@ -122,25 +122,16 @@ func (d DNS) Update(ctx context.Context, p DNSPreset) error {
 // Delete removes a preset and clears it from every user and group that used it, in one transaction.
 // Refusing built-ins and the instance default is the caller's job. ErrNotFound when the id is unknown.
 func (d DNS) Delete(ctx context.Context, id string) error {
-	tx, err := d.s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `DELETE FROM dns_preset WHERE id = ?`, id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	_, err := d.s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM dns_preset WHERE id = ?)`, id),
+		Stmt{Query: `DELETE FROM dns_preset WHERE id = ?`, Args: []any{id}},
+		Stmt{Query: `UPDATE user SET dns_preset_id = NULL WHERE dns_preset_id = ?`, Args: []any{id}},
+		Stmt{Query: `UPDATE user_group SET dns_preset_id = NULL WHERE dns_preset_id = ?`, Args: []any{id}},
+	)
+	if errors.Is(err, errGuard) {
 		return ErrNotFound
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE user SET dns_preset_id = NULL WHERE dns_preset_id = ?`, id); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE user_group SET dns_preset_id = NULL WHERE dns_preset_id = ?`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
 // DefaultID returns the instance default preset id as stored ("" = the built-in default).

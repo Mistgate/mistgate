@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"embed"
 	"errors"
 	"syscall/js"
@@ -83,9 +84,8 @@ func TestD1StoreSmoke(t *testing.T) {
 	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
 	// OpenAlert, InsertProbeCredIdx, RequeueNodeProvisionJobs,
 	// RequestCancelNodeProvisionJob, ClaimNodeProvisionJob, AwgPrepareStarted,
-	// AwgPrepareFinish, Access.UpdateProfile, Access.DeleteProfile, Access.DeleteInbound,
-	// Access.CreateGroup, Access.UpdateGroup, Access.DeleteGroup, Access.RevokeDevice,
-	// Access.AddAWGDevice, Access.RotateAWGDevice, and Access.EnsureImplicitAWGCreds.
+	// AwgPrepareFinish, Access.AddAWGDevice, Access.RotateAWGDevice, and
+	// Access.EnsureImplicitAWGCreds.
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
 		t.Fatal(err)
 	}
@@ -373,4 +373,251 @@ func TestD1RewrittenTelegramMethods(t *testing.T) {
 	if _, err := st.TelegramBot(ctx); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("TelegramBot after clear: %v", err)
 	}
+}
+
+func TestD1RewrittenAccessMethods(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	newUser := func(id, name, groupID string) AccessUser {
+		return AccessUser{ID: id, Name: name, GroupID: groupID, Status: "active", AppHapp: true, AppAmnezia: true,
+			AllNodes: true, QuotaReset: "month", PeriodStart: now, DeviceLimit: 5, SubTokenHash: []byte(id + "-hash"),
+			SubTokenEnc: []byte("sealed"), CreatedAt: now}
+	}
+	createGroup := func(t *testing.T, st *Store, id string, profileIDs []string) {
+		t.Helper()
+		if err := st.Access().CreateGroup(ctx, AccessGroup{ID: id, Name: id, ProfileIDs: profileIDs, CreatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	createUser := func(t *testing.T, st *Store, id, name, groupID string) {
+		t.Helper()
+		if err := st.Access().CreateUser(ctx, newUser(id, name, groupID), AccessDevice{}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	createProfile := func(t *testing.T, st *Store, id string) {
+		t.Helper()
+		if err := st.Access().CreateProfile(ctx, AccessProfile{ID: id, Protocol: "hysteria2", Name: id, SettingsJSON: "{}", CreatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	createNode := func(t *testing.T, st *Store, id string) {
+		t.Helper()
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, '203.0.113.10', 'active', ?)`, id, id, unix(now)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Run("CreateUser", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_user", nil)
+		createNode(t, st, "nod_user")
+		u := newUser("usr_user", "User", "grp_user")
+		u.AllNodes, u.NodeIDs = false, []string{"nod_user"}
+		dev := AccessDevice{ID: "dev_user", UserID: u.ID, Implicit: true, CreatedAt: now}
+		cred := AccessCred{ID: "crd_user", DeviceID: dev.ID, UserID: u.ID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
+		if err := st.Access().CreateUser(ctx, u, dev, []AccessCred{cred}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().User(ctx, "usr_user"); err != nil || got.Name != "User" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_user" {
+			t.Fatalf("user = %+v, %v", got, err)
+		}
+		if got, err := st.Access().DeviceCreds(ctx, dev.ID); err != nil || len(got) != 1 || got[0].ID != cred.ID {
+			t.Fatalf("user credentials = %+v, %v", got, err)
+		}
+	})
+	t.Run("UpdateUser", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_update_user", nil)
+		createNode(t, st, "nod_update_user")
+		createUser(t, st, "usr_update_user", "Before", "grp_update_user")
+		u, err := st.Access().User(ctx, "usr_update_user")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.Name, u.AllNodes, u.NodeIDs = "After", false, []string{"nod_update_user"}
+		if err := st.Access().UpdateUser(ctx, u, true); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().User(ctx, u.ID); err != nil || got.Name != "After" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_update_user" {
+			t.Fatalf("user = %+v, %v", got, err)
+		}
+	})
+	t.Run("AddDevice", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_add_device", nil)
+		createUser(t, st, "usr_add_device", "Device user", "grp_add_device")
+		dev := AccessDevice{ID: "dev_add_device", UserID: "usr_add_device", Implicit: true, CreatedAt: now}
+		if err := st.Access().AddDevice(ctx, dev, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().ImplicitDevice(ctx, dev.UserID); err != nil || got.ID != dev.ID {
+			t.Fatalf("implicit device = %+v, %v", got, err)
+		}
+	})
+	t.Run("AddCreds", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_add_creds", nil)
+		createUser(t, st, "usr_add_creds", "Credential user", "grp_add_creds")
+		dev := AccessDevice{ID: "dev_add_creds", UserID: "usr_add_creds", CreatedAt: now}
+		if err := st.Access().AddDevice(ctx, dev, nil); err != nil {
+			t.Fatal(err)
+		}
+		cred := AccessCred{ID: "crd_add_creds", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
+		if err := st.Access().AddCreds(ctx, []AccessCred{cred}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().DeviceCreds(ctx, dev.ID); err != nil || len(got) != 1 || got[0].ID != cred.ID {
+			t.Fatalf("credentials = %+v, %v", got, err)
+		}
+	})
+	t.Run("RevokeDevice", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_revoke_device", nil)
+		createUser(t, st, "usr_revoke_device", "Revoke user", "grp_revoke_device")
+		dev := AccessDevice{ID: "dev_revoke_device", UserID: "usr_revoke_device", CreatedAt: now}
+		cred := AccessCred{ID: "crd_revoke_device", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
+		if err := st.Access().AddDevice(ctx, dev, []AccessCred{cred}); err != nil {
+			t.Fatal(err)
+		}
+		if userID, err := st.Access().RevokeDevice(ctx, dev.ID, now); err != nil || userID != dev.UserID {
+			t.Fatalf("revoke = %q, %v", userID, err)
+		}
+		if got, err := st.Access().DeviceCreds(ctx, dev.ID); err != nil || len(got) != 0 {
+			t.Fatalf("credentials after revoke = %+v, %v", got, err)
+		}
+	})
+	t.Run("UpdateProfile", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_update_profile")
+		p := AccessProfile{ID: "prf_update_profile", Name: "Renamed", SettingsJSON: `{"updated":true}`}
+		got, err := st.Access().UpdateProfile(ctx, p, 1, false, true, now.Add(time.Minute))
+		if err != nil || got.Name != "Renamed" || got.Version != 2 {
+			t.Fatalf("updated profile = %+v, %v", got, err)
+		}
+	})
+	t.Run("DeleteProfile", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_delete_profile")
+		if err := st.Access().DeleteProfile(ctx, "prf_delete_profile", now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Access().Profile(ctx, "prf_delete_profile"); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("profile after delete: %v", err)
+		}
+	})
+	t.Run("CreateInbound", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_create_inbound")
+		createNode(t, st, "nod_create_inbound")
+		in := AccessInbound{ID: "inb_create_inbound", ProfileID: "prf_create_inbound", NodeID: "nod_create_inbound", Enabled: true, CreatedAt: now}
+		if err := st.Access().CreateInbound(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().Inbound(ctx, in.ID); err != nil || got.ProfileID != in.ProfileID || got.NodeID != in.NodeID {
+			t.Fatalf("inbound = %+v, %v", got, err)
+		}
+	})
+	t.Run("DeleteInbound", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_delete_inbound")
+		createNode(t, st, "nod_delete_inbound")
+		in := AccessInbound{ID: "inb_delete_inbound", ProfileID: "prf_delete_inbound", NodeID: "nod_delete_inbound", Enabled: true, CreatedAt: now, PluginStateEnc: []byte{1, 2}, PluginPublicJSON: `{"public_key":"test"}`}
+		if err := st.Access().CreateInbound(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Access().DeleteInbound(ctx, in.ID, now, func(enc []byte, _, _ string) ([]byte, error) { return append([]byte("retained:"), enc...), nil }); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Access().RetainedKey(ctx, in.ProfileID, in.NodeID); err != nil || string(got.StateEnc) != "retained:\x01\x02" {
+			t.Fatalf("retained key = %+v, %v", got, err)
+		}
+	})
+	t.Run("CreateGroup", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_group_profile")
+		createGroup(t, st, "grp_create", []string{"prf_group_profile"})
+		got, err := st.Access().Group(ctx, "grp_create")
+		if err != nil || len(got.ProfileIDs) != 1 || got.ProfileIDs[0] != "prf_group_profile" || got.Color != GroupTones[0] {
+			t.Fatalf("group = %+v, %v", got, err)
+		}
+	})
+	t.Run("UpdateGroup", func(t *testing.T) {
+		st := openD1Store(t)
+		createProfile(t, st, "prf_update_group")
+		createGroup(t, st, "grp_update", nil)
+		name := "Updated group"
+		profileIDs := []string{"prf_update_group"}
+		if err := st.Access().UpdateGroup(ctx, "grp_update", &name, &profileIDs, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.Access().Group(ctx, "grp_update")
+		if err != nil || got.Name != name || len(got.ProfileIDs) != 1 || got.ProfileIDs[0] != profileIDs[0] {
+			t.Fatalf("group = %+v, %v", got, err)
+		}
+	})
+	t.Run("DeleteGroup", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_delete", nil)
+		if err := st.Access().DeleteGroup(ctx, "grp_delete", ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Access().Group(ctx, "grp_delete"); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("group after delete: %v", err)
+		}
+	})
+}
+
+func TestD1RewrittenDNSAndSettingsMethods(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	t.Run("DNSDelete", func(t *testing.T) {
+		st := openD1Store(t)
+		id := "dns_delete"
+		if err := st.DNS().Create(ctx, DNSPreset{ID: id, Name: id, ServersJSON: `[]`, SplitJSON: `[]`, Transport: "plain", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO user_group (id, name, created_at, dns_preset_id) VALUES ('grp_dns_delete', 'dns group', ?, ?)`, unix(now), id); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.DNS().Delete(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+		var dns sql.NullString
+		if err := st.R.QueryRowContext(ctx, `SELECT dns_preset_id FROM user_group WHERE id = 'grp_dns_delete'`).Scan(&dns); err != nil || dns.Valid {
+			t.Fatalf("group DNS reference = %v, %v", dns, err)
+		}
+	})
+	t.Run("SetNodeOptions", func(t *testing.T) {
+		st := openD1Store(t)
+		nodeID := "nod_options"
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, '203.0.113.11', 'active', ?)`, nodeID, nodeID, unix(now)); err != nil {
+			t.Fatal(err)
+		}
+		presetID := "dns_options"
+		if err := st.DNS().Create(ctx, DNSPreset{ID: presetID, Name: presetID, ServersJSON: `[]`, SplitJSON: `[]`, Transport: "plain", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.DNS().SetNodeOptions(ctx, nodeID, []string{presetID}, presetID); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.DNS().NodeOptions(ctx)
+		if err != nil || len(got[nodeID]) != 1 || got[nodeID][0].PresetID != presetID || !got[nodeID][0].Default {
+			t.Fatalf("node options = %+v, %v", got[nodeID], err)
+		}
+	})
+	t.Run("SetSettings", func(t *testing.T) {
+		st := openD1Store(t)
+		if err := st.SetSettings(ctx, map[string]string{"edge.rewritten": "ready"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SetSettings(ctx, map[string]string{"edge.rewritten": "updated"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SetSettings(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Setting(ctx, "edge.rewritten"); err != nil || got != "updated" {
+			t.Fatalf("setting = %q, %v", got, err)
+		}
+	})
 }

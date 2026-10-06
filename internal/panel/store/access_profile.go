@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -72,31 +73,29 @@ func (a Access) Profiles(ctx context.Context) ([]AccessProfile, error) {
 // is then "stale" (an x-critical change of an AWG profile).
 // ErrAccessVersion on mismatch, ErrAccessExists on a name clash. Returns the stored row.
 func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVersion uint32, bumpInbounds, bumpEpoch bool, now time.Time) (AccessProfile, error) {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx,
-			`UPDATE profile SET name = ?, settings_json = ?, secrets_enc = ?, version = version + 1, updated_at = ?
-			 WHERE id = ? AND version = ?`,
-			p.Name, p.SettingsJSON, p.SecretsEnc, unix(now), p.ID, expectedVersion)
-		if err != nil {
-			return err
+	stmts := []Stmt{
+		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ? AND version = ?)`, p.ID, int64(expectedVersion)),
+		{Query: `UPDATE profile SET name = ?, settings_json = ?, secrets_enc = ?, version = version + 1, updated_at = ? WHERE id = ?`,
+			Args: []any{p.Name, p.SettingsJSON, p.SecretsEnc, unix(now), p.ID}},
+	}
+	if bumpEpoch {
+		stmts = append(stmts, Stmt{Query: `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, Args: []any{p.ID}})
+	}
+	if bumpInbounds {
+		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE profile_id = ?`, Args: []any{unix(now), p.ID}})
+	}
+	_, err := a.s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		var version uint32
+		readErr := a.s.R.QueryRowContext(ctx, `SELECT version FROM profile WHERE id = ?`, p.ID).Scan(&version)
+		if errors.Is(readErr, sql.ErrNoRows) {
+			return AccessProfile{}, ErrNotFound
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			var exists int
-			if tx.QueryRowContext(ctx, `SELECT 1 FROM profile WHERE id = ?`, p.ID).Scan(&exists) != nil {
-				return ErrNotFound
-			}
-			return ErrAccessVersion
+		if readErr != nil {
+			return AccessProfile{}, readErr
 		}
-		if bumpEpoch {
-			if _, err = tx.ExecContext(ctx, `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, p.ID); err != nil {
-				return err
-			}
-		}
-		if bumpInbounds {
-			_, err = tx.ExecContext(ctx, `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE profile_id = ?`, unix(now), p.ID)
-		}
-		return err
-	})
+		return AccessProfile{}, ErrAccessVersion
+	}
 	if accIsUnique(err) {
 		return AccessProfile{}, ErrAccessExists
 	}
@@ -110,28 +109,24 @@ func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVers
 // of the profile go with it (foreign keys); the explicit AWG devices that held them are revoked, so none stays
 // behind as an empty shell.
 func (a Access) DeleteProfile(ctx context.Context, id string, now time.Time) error {
-	return a.tx(ctx, func(tx *sql.Tx) error {
-		var n int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM inbound WHERE profile_id = ?`, id).Scan(&n); err != nil {
-			return err
+	_, err := a.s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ?)
+			AND NOT EXISTS (SELECT 1 FROM inbound WHERE profile_id = ?)`, id, id),
+		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND hwid_hash IS NOT NULL AND id IN
+		   (SELECT device_id FROM device_credential WHERE profile_id = ?)`, Args: []any{unix(now), id}},
+		Stmt{Query: `DELETE FROM profile WHERE id = ?`, Args: []any{id}},
+	)
+	if errors.Is(err, errGuard) {
+		var inbounds int
+		if readErr := a.s.R.QueryRowContext(ctx, `SELECT count(*) FROM inbound WHERE profile_id = ?`, id).Scan(&inbounds); readErr != nil {
+			return readErr
 		}
-		if n > 0 {
+		if inbounds != 0 {
 			return ErrAccessInUse
 		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND hwid_hash IS NOT NULL AND id IN
-			   (SELECT device_id FROM device_credential WHERE profile_id = ?)`, unix(now), id); err != nil {
-			return err
-		}
-		res, err := tx.ExecContext(ctx, `DELETE FROM profile WHERE id = ?`, id)
-		if err != nil {
-			return err
-		}
-		if c, _ := res.RowsAffected(); c == 0 {
-			return ErrNotFound
-		}
-		return nil
-	})
+		return ErrNotFound
+	}
+	return err
 }
 
 // AccessBrief is a user id and name.
@@ -218,18 +213,14 @@ func accNullPort(p uint16) any {
 // The inbound takes over the retained server key of its (profile, node), if there is one (RetainedKey): the row is
 // deleted in the same transaction, so the key is never on both sides.
 func (a Access) CreateInbound(ctx context.Context, i AccessInbound) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO inbound (id, profile_id, node_id, port_override, tls_server_name_override, enabled, spec_version, state,
-			   plugin_state_enc, plugin_public_json, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, 1, 'pending', ?, ?, ?, ?)`,
-			i.ID, i.ProfileID, i.NodeID, accNullPort(i.PortOverride), i.TLSServerNameOverride, accBool(i.Enabled),
-			i.PluginStateEnc, accPublicJSON(i.PluginPublicJSON), unix(i.CreatedAt), unix(i.CreatedAt)); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM awg_retained_key WHERE profile_id = ? AND node_id = ?`, i.ProfileID, i.NodeID)
-		return err
-	})
+	_, err := a.s.batch(ctx,
+		Stmt{Query: `INSERT INTO inbound (id, profile_id, node_id, port_override, tls_server_name_override, enabled, spec_version, state,
+		   plugin_state_enc, plugin_public_json, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, 1, 'pending', ?, ?, ?, ?)`,
+			Args: []any{i.ID, i.ProfileID, i.NodeID, accNullPort(i.PortOverride), i.TLSServerNameOverride, int64(accBool(i.Enabled)),
+				i.PluginStateEnc, accPublicJSON(i.PluginPublicJSON), unix(i.CreatedAt), unix(i.CreatedAt)}},
+		Stmt{Query: `DELETE FROM awg_retained_key WHERE profile_id = ? AND node_id = ?`, Args: []any{i.ProfileID, i.NodeID}},
+	)
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -338,10 +329,10 @@ func (a Access) RetainedKey(ctx context.Context, profileID, nodeID string) (Acce
 // retain turns the inbound's vault blob into the blob for RetainedKeyAAD, and returns nil to keep nothing (an
 // unreadable key must not make the inbound undeletable).
 func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, retain func(stateEnc []byte, profileID, nodeID string) ([]byte, error)) error {
-	return a.tx(ctx, func(tx *sql.Tx) error {
+	for range 8 { // the guard pins what retain saw; a change in between starts over
 		var profileID, nodeID, public string
 		var enc []byte
-		err := tx.QueryRowContext(ctx, `SELECT profile_id, node_id, plugin_state_enc, plugin_public_json FROM inbound WHERE id = ?`, id).
+		err := a.s.W.QueryRowContext(ctx, `SELECT profile_id, node_id, plugin_state_enc, plugin_public_json FROM inbound WHERE id = ?`, id).
 			Scan(&profileID, &nodeID, &enc, &public)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -349,23 +340,28 @@ func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, ret
 		if err != nil {
 			return err
 		}
+		stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM inbound WHERE id = ? AND profile_id = ? AND node_id = ?
+			AND plugin_state_enc IS ? AND plugin_public_json = ?)`, id, profileID, nodeID, enc, public)}
 		if retain != nil && len(enc) > 0 {
 			kept, err := retain(enc, profileID, nodeID)
 			if err != nil {
 				return err
 			}
 			if len(kept) > 0 {
-				if _, err := tx.ExecContext(ctx,
-					`INSERT OR REPLACE INTO awg_retained_key (profile_id, node_id, state_enc, public_json, created_at)
+				stmts = append(stmts, Stmt{Query: `INSERT OR REPLACE INTO awg_retained_key (profile_id, node_id, state_enc, public_json, created_at)
 					 SELECT ?1, ?2, ?3, ?4, ?5 WHERE EXISTS (SELECT 1 FROM node WHERE id = ?2 AND state <> 'retired')`,
-					profileID, nodeID, kept, accPublicJSON(public), unix(now)); err != nil {
-					return err
-				}
+					Args: []any{profileID, nodeID, kept, accPublicJSON(public), unix(now)}})
 			}
 		}
-		_, err = tx.ExecContext(ctx, `DELETE FROM inbound WHERE id = ?`, id)
-		return err
-	})
+		stmts = append(stmts, Stmt{Query: `DELETE FROM inbound WHERE id = ?`, Args: []any{id}})
+		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		return nil
+	}
+	return ErrConflict
 }
 
 // AccessInboundFull is an inbound with its profile and node.
@@ -433,31 +429,6 @@ type AccessGroup struct {
 // used tone in (ties go to the earlier one). Sky and mint come last: they are also the Link and Keys chips.
 var GroupTones = []string{"lavender", "sand", "sage", "rose", "sky", "mint"}
 
-// leastUsedTone is the tone of GroupTones fewest groups wear (the earliest on a tie).
-func leastUsedTone(ctx context.Context, tx *sql.Tx) (string, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT color, count(*) FROM user_group GROUP BY color`)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-	used := map[string]int{}
-	for rows.Next() {
-		var c string
-		var n int
-		if err := rows.Scan(&c, &n); err != nil {
-			return "", err
-		}
-		used[c] = n
-	}
-	best := GroupTones[0]
-	for _, t := range GroupTones {
-		if used[t] < used[best] {
-			best = t
-		}
-	}
-	return best, rows.Err()
-}
-
 func accJSON(ids []string) string {
 	if ids == nil {
 		ids = []string{}
@@ -469,18 +440,24 @@ func accJSON(ids []string) string {
 // CreateGroup inserts a group with its profile set. ErrAccessExists on a name clash, ErrNotFound when a
 // profile id does not exist.
 func (a Access) CreateGroup(ctx context.Context, g AccessGroup) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if g.Color == "" {
-			var err error
-			if g.Color, err = leastUsedTone(ctx, tx); err != nil {
-				return err
-			}
+	insert := Stmt{Query: `INSERT INTO user_group (id, name, created_at, dns_preset_id, color) VALUES (?, ?, ?, ?, ?)`,
+		Args: []any{g.ID, g.Name, unix(g.CreatedAt), accNullStr(g.DNSPresetID), g.Color}}
+	if g.Color == "" {
+		values := make([]string, len(GroupTones))
+		args := make([]any, 0, len(GroupTones)*2+4)
+		for i, tone := range GroupTones {
+			values[i] = "(?, ?)"
+			args = append(args, tone, int64(i))
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO user_group (id, name, created_at, dns_preset_id, color) VALUES (?, ?, ?, ?, ?)`, g.ID, g.Name, unix(g.CreatedAt), accNullStr(g.DNSPresetID), g.Color); err != nil {
-			return err
-		}
-		return accSetGroupProfiles(ctx, tx, g.ID, g.ProfileIDs)
-	})
+		args = append(args, g.ID, g.Name, unix(g.CreatedAt), accNullStr(g.DNSPresetID))
+		insert = Stmt{Query: `WITH tones(color, position) AS (VALUES ` + strings.Join(values, ",") + `)
+			INSERT INTO user_group (id, name, created_at, dns_preset_id, color)
+			SELECT ?, ?, ?, ?, (SELECT tones.color FROM tones
+				ORDER BY (SELECT count(*) FROM user_group existing WHERE existing.color = tones.color), tones.position LIMIT 1)`, Args: args}
+	}
+	stmts := []Stmt{insert}
+	stmts = append(stmts, accSetGroupProfileStmts(g.ID, g.ProfileIDs)...)
+	_, err := a.s.batch(ctx, stmts...)
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -490,16 +467,12 @@ func (a Access) CreateGroup(ctx context.Context, g AccessGroup) error {
 	return err
 }
 
-func accSetGroupProfiles(ctx context.Context, tx *sql.Tx, groupID string, profileIDs []string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM user_group_profile WHERE group_id = ?`, groupID); err != nil {
-		return err
-	}
+func accSetGroupProfileStmts(groupID string, profileIDs []string) []Stmt {
+	stmts := []Stmt{{Query: `DELETE FROM user_group_profile WHERE group_id = ?`, Args: []any{groupID}}}
 	for _, pid := range profileIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO user_group_profile (group_id, profile_id) VALUES (?, ?)`, groupID, pid); err != nil {
-			return err
-		}
+		stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_group_profile (group_id, profile_id) VALUES (?, ?)`, Args: []any{groupID, pid}})
 	}
-	return nil
+	return stmts
 }
 
 // Groups returns all groups with their profile ids and user counts, ordered by name.
@@ -566,36 +539,23 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 
 // UpdateGroup renames a group, replaces its profile set and/or its DNS preset, sets its colour (nil = unchanged, "" = none).
 func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profileIDs *[]string, dnsPresetID, color *string) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if name != nil {
-			res, err := tx.ExecContext(ctx, `UPDATE user_group SET name = ? WHERE id = ?`, *name, id)
-			if err != nil {
-				return err
-			}
-			if n, _ := res.RowsAffected(); n == 0 {
-				return ErrNotFound
-			}
-		} else {
-			var one int
-			if err := tx.QueryRowContext(ctx, `SELECT 1 FROM user_group WHERE id = ?`, id).Scan(&one); err != nil {
-				return ErrNotFound
-			}
-		}
-		if dnsPresetID != nil {
-			if _, err := tx.ExecContext(ctx, `UPDATE user_group SET dns_preset_id = ? WHERE id = ?`, accNullStr(*dnsPresetID), id); err != nil {
-				return err
-			}
-		}
-		if color != nil {
-			if _, err := tx.ExecContext(ctx, `UPDATE user_group SET color = ? WHERE id = ?`, *color, id); err != nil {
-				return err
-			}
-		}
-		if profileIDs != nil {
-			return accSetGroupProfiles(ctx, tx, id, *profileIDs)
-		}
-		return nil
-	})
+	stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM user_group WHERE id = ?)`, id)}
+	if name != nil {
+		stmts = append(stmts, Stmt{Query: `UPDATE user_group SET name = ? WHERE id = ?`, Args: []any{*name, id}})
+	}
+	if dnsPresetID != nil {
+		stmts = append(stmts, Stmt{Query: `UPDATE user_group SET dns_preset_id = ? WHERE id = ?`, Args: []any{accNullStr(*dnsPresetID), id}})
+	}
+	if color != nil {
+		stmts = append(stmts, Stmt{Query: `UPDATE user_group SET color = ? WHERE id = ?`, Args: []any{*color, id}})
+	}
+	if profileIDs != nil {
+		stmts = append(stmts, accSetGroupProfileStmts(id, *profileIDs)...)
+	}
+	_, err := a.s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		return ErrNotFound
+	}
 	switch {
 	case accIsUnique(err):
 		return ErrAccessExists
@@ -608,28 +568,34 @@ func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profil
 // DeleteGroup removes a group without users; ErrAccessInUse otherwise. A non-empty moveTo first moves the group's
 // users there, in the same transaction (ErrNotFound when that group does not exist).
 func (a Access) DeleteGroup(ctx context.Context, id, moveTo string) error {
-	err := a.tx(ctx, func(tx *sql.Tx) error {
-		if moveTo != "" {
-			if _, err := tx.ExecContext(ctx, `UPDATE user SET group_id = ? WHERE group_id = ?`, moveTo, id); err != nil {
-				return err
+	var err error
+	if moveTo == "" || moveTo == id {
+		_, err = a.s.batch(ctx,
+			guard(`EXISTS (SELECT 1 FROM user_group WHERE id = ?)
+				AND NOT EXISTS (SELECT 1 FROM user WHERE group_id = ?)`, id, id),
+			Stmt{Query: `DELETE FROM user_group WHERE id = ?`, Args: []any{id}},
+		)
+		if errors.Is(err, errGuard) {
+			var groupExists, hasUsers int
+			if readErr := a.s.R.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM user_group WHERE id = ?),
+				EXISTS (SELECT 1 FROM user WHERE group_id = ?)`, id, id).Scan(&groupExists, &hasUsers); readErr != nil {
+				return readErr
 			}
-		}
-		var n int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM user WHERE group_id = ?`, id).Scan(&n); err != nil {
-			return err
-		}
-		if n > 0 {
-			return ErrAccessInUse
-		}
-		res, err := tx.ExecContext(ctx, `DELETE FROM user_group WHERE id = ?`, id)
-		if err != nil {
-			return err
-		}
-		if c, _ := res.RowsAffected(); c == 0 {
+			if hasUsers != 0 {
+				return ErrAccessInUse
+			}
 			return ErrNotFound
 		}
-		return nil
-	})
+		return err
+	}
+	_, err = a.s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM user_group WHERE id = ?)`, id),
+		Stmt{Query: `UPDATE user SET group_id = ? WHERE group_id = ?`, Args: []any{moveTo, id}},
+		Stmt{Query: `DELETE FROM user_group WHERE id = ?`, Args: []any{id}},
+	)
+	if errors.Is(err, errGuard) {
+		return ErrNotFound
+	}
 	if accIsFK(err) {
 		return ErrNotFound
 	}

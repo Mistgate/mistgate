@@ -65,19 +65,6 @@ func accNullUnix(t time.Time) any {
 	return unix(t)
 }
 
-// accTx runs fn in a write transaction.
-func (a Access) tx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	tx, err := a.s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
 // AccessNode is the part of a node row the access module reads (the fleet module owns the table).
 type AccessNode struct {
 	ID, Name, Address, CountryCode, Location, Provider string

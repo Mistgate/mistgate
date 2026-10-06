@@ -180,16 +180,10 @@ func (s *Store) Setting(ctx context.Context, key string) (string, error) {
 
 // SetSettings upserts several settings in one transaction.
 func (s *Store) SetSettings(ctx context.Context, kv map[string]string) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	stmts := make([]Stmt, 0, len(kv))
 	for k, v := range kv {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, k, v); err != nil {
-			return err
-		}
+		stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, Args: []any{k, v}})
 	}
-	return tx.Commit()
+	_, err := s.batch(ctx, stmts...)
+	return err
 }
