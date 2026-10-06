@@ -170,8 +170,18 @@ async function run() {
     let secondPanel;
     let secondInstance;
     const masterKey = new Uint8Array(randomBytes(32));
+    const assetCalls = [];
+    const assetFiles = {
+      "index.html": Buffer.from('<!doctype html><base href="/"><title>asset-fixture</title>'),
+      "assets/app-1a2b3c.js": Buffer.from("console.log(1)"),
+    };
     const initOptions = {
       d1: globalThis.__d1,
+      assets: async (name) => {
+        assetCalls.push(name);
+        const file = assetFiles[name];
+        return file ? new Uint8Array(file) : null;
+      },
       masterKey,
       publicURL: "https://example.com",
       adminPrefix: "/test-admin/",
@@ -200,6 +210,23 @@ async function run() {
     });
     assert.equal(setupPage.status, 200, "the fresh setup page is served");
     assert.ok(setupPage.headers.some(([name, value]) => name.toLowerCase() === "content-type" && value.includes("text/html")));
+    // The SPA comes from the assets callback: a client route gets index.html with <base> rewritten to the admin path.
+    assert.ok(Buffer.from(setupPage.body).toString("utf8").includes('<base href="/test-admin/">'), "SPA fallback serves the asset index.html");
+    const jsAsset = await bridgeRequestFor(firstPanel, "https://example.com/test-admin/assets/app-1a2b3c.js", {
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+    assert.equal(jsAsset.status, 200, "a hashed asset is read through the callback");
+    assert.ok(jsAsset.headers.some(([name, value]) => name.toLowerCase() === "content-type" && value.includes("javascript")));
+    assert.equal(Buffer.from(jsAsset.body).toString("utf8"), "console.log(1)");
+    const missingAsset = await bridgeRequestFor(firstPanel, "https://example.com/test-admin/assets/gone.js", {
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+    assert.equal(missingAsset.status, 404, "a missing asset is a 404, not the app shell");
+    const callsBefore = assetCalls.length;
+    await bridgeRequestFor(firstPanel, "https://example.com/test-admin/assets/app-1a2b3c.js", {
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+    assert.equal(assetCalls.length, callsBefore, "an asset that was read once is served from the isolate cache");
 
     const rpcRequest = new Request("https://example.com/test-admin/api/mistgate.admin.v1.AuthService/GetLoginInfo", {
       method: "POST",
@@ -219,9 +246,13 @@ async function run() {
       body: rpcBody,
     });
     assert.equal(rpcEdge.status, 200, "the unauthenticated setup-state RPC succeeds");
-    if (!Buffer.from(rpcEdge.body).equals(rpcVPS.body)) {
-      throw new Error("edge setup-state RPC bytes differ from the shared VPS handler");
-    }
+    // protojson adds a random space after separators, chosen from the binary's own hash: the two builds differ in bytes
+    // and agree in content, which is what is compared.
+    assert.deepEqual(
+      JSON.parse(Buffer.from(rpcEdge.body).toString("utf8")),
+      JSON.parse(rpcVPS.body.toString("utf8")),
+      "edge setup-state RPC differs from the shared VPS handler",
+    );
     assert.equal(JSON.parse(Buffer.from(rpcEdge.body).toString("utf8")).setupOpen, true);
 
     const unknownToken = `unknown-${randomBytes(16).toString("hex")}`;

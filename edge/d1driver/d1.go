@@ -66,6 +66,10 @@ func (drv) Open(string) (driver.Conn, error) {
 	return nil, errors.New("d1driver: use a connector created from a D1 binding")
 }
 
+// Await blocks the calling goroutine until a JavaScript promise settles; the edge shell's static-asset reader uses it
+// too. It returns as soon as the context is canceled, even if the promise remains pending.
+func Await(ctx context.Context, p js.Value) (js.Value, error) { return await(ctx, p) }
+
 // await returns as soon as the context is canceled, even if the JavaScript
 // promise remains pending. Its callbacks stay alive until that promise settles.
 func await(ctx context.Context, p js.Value) (js.Value, error) {

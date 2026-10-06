@@ -1,4 +1,8 @@
+//go:build !(js && wasm)
+
 // Package web embeds the built admin SPA (web/dist) into the panel binary.
+//
+// The edge build (js/wasm) does not embed it: see embed_js.go.
 package web
 
 import (

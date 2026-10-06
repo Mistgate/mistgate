@@ -25,6 +25,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
+	"github.com/mistgate/mistgate/web"
 )
 
 type edgeState struct {
@@ -113,6 +114,7 @@ func initPanel(options js.Value) error {
 	if err != nil {
 		return err
 	}
+	web.SetAssets(opts.assets) // before app.Build: the admin SPA and sub.html are read through it
 	brand, err := instance.Load(context.Background(), st)
 	if err != nil {
 		return err

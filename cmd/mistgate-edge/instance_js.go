@@ -41,6 +41,7 @@ var (
 
 type initOptions struct {
 	d1        js.Value
+	assets    js.Value // optional async (path) => Uint8Array | null: the SPA build in the Worker's static assets
 	masterKey []byte
 	publicURL string
 	adminHost string
@@ -58,6 +59,9 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 		return out, errMissingD1
 	}
 	out.d1 = d1
+	if assets := value.Get("assets"); assets.Type() == js.TypeFunction {
+		out.assets = assets
+	}
 	var err error
 	if out.masterKey, err = masterKeyFromJS(value.Get("masterKey")); err != nil {
 		return out, err
