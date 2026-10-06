@@ -94,9 +94,10 @@ export function Pagination({
   onPage,
   label,
   busy,
+  flush,
   className,
   ...sizing
-}: SizeProps & { total: number; page: number; onPage: (page: number) => void; label?: string; busy?: boolean; className?: string }) {
+}: SizeProps & { total: number; page: number; onPage: (page: number) => void; label?: string; busy?: boolean; flush?: boolean; className?: string }) {
   const t = useT();
   const { size, sizes } = sizing;
   const smallest = sizes?.length ? Math.min(...sizes) : size;
@@ -104,7 +105,7 @@ export function Pagination({
   const count = pageCount(total, size);
   const { from, to } = rangeOf(page, size, total);
   return (
-    <Foot label={label ?? t("pager.nav")} scrollKey={page} busy={busy} className={className}>
+    <Foot label={label ?? t("pager.nav")} scrollKey={page} busy={busy} flush={flush} className={className}>
       <Summary busy={busy}>{t("pager.range", { from, to, total })}</Summary>
       <SizePicker {...sizing} />
       {count > 1 && (

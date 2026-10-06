@@ -313,7 +313,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                     </div>
                     {total > Math.min(...pageSizes) && (
                       <Card lg className="px-4">
-                        <Pagination {...pager} />
+                        <Pagination flush {...pager} />
                       </Card>
                     )}
                   </div>
