@@ -580,6 +580,20 @@ func TestListUsers(t *testing.T) {
 	_, err := e.s.ListUsers(ctx, req(&adminv1.ListUsersRequest{PageToken: "!!"}))
 	wantCode(t, err, connect.CodeInvalidArgument)
 	_ = vip
+
+	// Numbered pages: offset skips whole rows, with a filter too, and the last page says there is no more.
+	if p := list(&adminv1.ListUsersRequest{PageSize: 3, Offset: 3}); names(p.Users) != "dan,eli,fay" || p.NextPageToken == "" {
+		t.Errorf("page 2 = %s (token %q)", names(p.Users), p.NextPageToken)
+	}
+	if p := list(&adminv1.ListUsersRequest{PageSize: 3, Offset: 6}); names(p.Users) != "gus,hal" || p.NextPageToken != "" {
+		t.Errorf("page 3 = %s (token %q)", names(p.Users), p.NextPageToken)
+	}
+	if got := names(list(&adminv1.ListUsersRequest{PageSize: 1, Offset: 1, Filter: adminv1.UserFilter_USER_FILTER_ONLINE}).Users); got != "bea" {
+		t.Errorf("online page 2 = %s", got)
+	}
+	if got := list(&adminv1.ListUsersRequest{PageSize: 3, Offset: 99}).Users; len(got) != 0 {
+		t.Errorf("past the end = %d users", len(got))
+	}
 }
 
 func TestBulkEnableAndVia(t *testing.T) {

@@ -50,7 +50,7 @@ The header counts people and how many are online. Above the list:
 
 **Device limit** is not a separate state: it is an active person whose devices reached the limit. A disabled person shows **Disabled** whatever else is true; then **Expired**, then **Over quota**.
 
-The list loads 50 people at a time; **Show more** loads the next ones.
+The list is paged, 50 people to a page (25 or 100 on request): under the card there is "Showing 51–100 of 137", the page buttons and the rows per page. A filter or a search pages its own results; the page number is kept in the address.
 
 ### Bulk actions
 

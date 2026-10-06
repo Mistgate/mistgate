@@ -225,3 +225,54 @@ describe("the people list", () => {
     expect(text()).toContain("Nina gets nothing yet: no profile of the group “empty” runs on a node.");
   });
 });
+
+describe("the people list, in pages", () => {
+  const many = (n: number, from = 1) => Array.from({ length: n }, (_, i) => person({ id: `usr_${from + i}`, name: `user${String(from + i).padStart(3, "0")}`, accessHapp: true }));
+  const pages = (all: number, over: Record<string, number> = {}) => ({ nextPageToken: "", counts: { all, online: 3, expiring: 2, overQuota: 1, ...over } });
+
+  it("asks the server for the first page and shows how many there are", async () => {
+    listUsers.mockResolvedValue({ users: many(50), ...pages(137) });
+    await mount();
+    expect(listUsers.mock.calls[0]![0]).toMatchObject({ pageSize: 50, offset: 0 });
+    expect(text()).toContain("Showing 1–50 of 137");
+    expect(document.querySelector("button[aria-label='Page 3']")).not.toBeNull();
+    expect(document.querySelector("button[aria-label='Previous page']")).toHaveProperty("disabled", true);
+  });
+
+  it("asks for the rows under the page of the URL, and moves the URL when a page is clicked", async () => {
+    search = { page: 2, size: 25 };
+    listUsers.mockResolvedValue({ users: many(25, 26), ...pages(137) });
+    await mount();
+    expect(listUsers.mock.calls[0]![0]).toMatchObject({ pageSize: 25, offset: 25 });
+    expect(text()).toContain("Showing 26–50 of 137");
+    await click(document.querySelector("button[aria-label='Next page']"));
+    const move = navigate.mock.calls.at(-1)![0] as { search: (prev: Record<string, unknown>) => Record<string, unknown> };
+    expect(move.search({ page: 2, size: 25 })).toEqual({ page: 3, size: 25 });
+  });
+
+  it("pages by the filter in use: its own count is the total", async () => {
+    listUsers.mockResolvedValue({ users: many(50), ...pages(137, { online: 60 }) });
+    await mount();
+    await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.startsWith("Online")));
+    await settle();
+    expect(listUsers.mock.calls.at(-1)![0]).toMatchObject({ pageSize: 50, offset: 0 });
+    expect(text()).toContain("Showing 1–50 of 60");
+    // a filter starts from the first page again
+    const move = navigate.mock.calls.at(-1)![0] as { search: (prev: Record<string, unknown>) => Record<string, unknown> };
+    expect(move.search({ page: 3 })).toEqual({});
+  });
+
+  it("shows no pager when everybody fits a page", async () => {
+    await mount();
+    expect(document.querySelector("nav")).toBeNull();
+  });
+
+  it("steps back to the last page when the rows it showed are gone", async () => {
+    search = { page: 9 };
+    listUsers.mockResolvedValue({ users: many(37, 101), ...pages(137) });
+    await mount();
+    const move = navigate.mock.calls.at(-1)![0] as { search: (prev: Record<string, unknown>) => Record<string, unknown>; replace?: boolean };
+    expect(move.search({ page: 9 })).toEqual({ page: 3 });
+    expect(move.replace).toBe(true);
+  });
+});

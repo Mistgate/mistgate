@@ -215,7 +215,7 @@ The **History · 7 days** list says how each alert closed:
 | replaced by a bigger alert | `superseded` | A bigger alert says the same: "Alive, but no traffic" replaces the per-profile ones, a doctor problem replaces the warning of the same check, the doctor's WARP problem replaces the failing WARP profile, the fleet-wide alert replaces the per-node check alerts. |
 | accepted as normal | `accepted` | The owner accepted the doctor warning as normal for the node. |
 
-Closed alerts are kept for 90 days. The API returns up to 30 days of history, at most 200 alerts.
+Closed alerts are kept for 90 days. The API returns up to 30 days of history, at most 200 alerts. A long history is paged under the list (20, 50 or 100 rows); the page number is kept in the address.
 
 ### Buttons on an alert
 

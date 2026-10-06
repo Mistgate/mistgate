@@ -14,6 +14,7 @@ import { sections } from "@/components/nav";
 import { useT } from "@/i18n";
 import { basepath, isUnauthenticated } from "@/lib/api";
 import { bootBrand, loginInfoQuery } from "@/lib/instance";
+import { validatePaging, type PagingSearch } from "@/lib/paging";
 import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/session";
 import { validateHealthSearch } from "@/screens/health/tabs";
 import { validateNodeSearch } from "@/screens/node/tabs";
@@ -121,10 +122,10 @@ const node = createRoute({
 const users = createRoute({
   getParentRoute: () => app,
   path: "/users",
-  validateSearch: (s: Record<string, unknown>): { create?: true; group?: string; tab?: "groups" } => ({
+  validateSearch: (s: Record<string, unknown>): { create?: true; group?: string; tab?: "groups" } & PagingSearch => ({
     ...(s.create === true || s.create === "true" || s.create === "1" ? { create: true as const } : {}),
     ...(typeof s.group === "string" && s.group !== "" ? { group: s.group } : {}),
-    ...(s.tab === "groups" ? { tab: "groups" as const } : {}),
+    ...(s.tab === "groups" ? { tab: "groups" as const } : validatePaging(s)),
   }),
   component: lazyRouteComponent(() => import("@/screens/users"), "UsersScreen"),
 });
@@ -175,6 +176,8 @@ const settingsIndex = createRoute({
 const settingsPage = createRoute({
   getParentRoute: () => settings,
   path: "$section",
+  // the audit log's place (`before`, `size`) and the backups' page
+  validateSearch: validatePaging,
   component: lazyRouteComponent(() => import("@/screens/settings"), "SettingsPage"),
 });
 
@@ -194,6 +197,8 @@ const updates = createRoute({
 const integrations = createRoute({
   getParentRoute: () => app,
   path: "/integrations",
+  // the page of the approvals history
+  validateSearch: validatePaging,
   component: lazyRouteComponent(() => import("@/screens/integrations"), "IntegrationsScreen"),
 });
 

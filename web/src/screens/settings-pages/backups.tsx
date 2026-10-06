@@ -5,6 +5,7 @@ import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Pagination } from "@/components/ui/pagination";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -16,6 +17,7 @@ import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { backups } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { clampPage, usePaging } from "@/lib/paging";
 import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
 import { CopyRow } from "./domains";
@@ -37,6 +39,7 @@ type Draft = {
 
 const settingsKey = ["backup-settings"] as const;
 const backupsKey = ["backup-list"] as const;
+const historySize = 10;
 const identityFile = "./mistgate-recovery.txt";
 const archiveFile = "./backup.tar.gz.age";
 const dataDir = "/var/lib/mistgate-restored";
@@ -138,6 +141,10 @@ function BackupsForm({ stored }: { stored: Stored }) {
     queryFn: async ({ signal }) => plain(await backups.listBackups({}, { signal })).backups,
     enabled: configured,
   });
+
+  // the list is whole (one object per day at most, kept for the retention): the pages are cut here, ten rows each
+  const paging = usePaging({ sizes: [historySize], defaultSize: historySize });
+  const historyPage = clampPage(paging.page, backupsQuery.data?.length ?? 0, historySize);
 
   const save = useMutation({
     mutationFn: (request: Parameters<typeof backups.updateBackupSettings>[0]) => guard(() => backups.updateBackupSettings(request)),
@@ -328,8 +335,11 @@ function BackupsForm({ stored }: { stored: Stored }) {
         {configured && backupsQuery.data && backupsQuery.data.length === 0 && <p className="text-[13px] text-muted">{t("set.backups.empty")}</p>}
         {configured && backupsQuery.data && backupsQuery.data.length > 0 && (
           <div className="flex flex-col divide-y divide-line">
-            {backupsQuery.data.map((item) => <BackupRow key={item.key} item={item} />)}
+            {backupsQuery.data.slice((historyPage - 1) * historySize, historyPage * historySize).map((item) => <BackupRow key={item.key} item={item} />)}
           </div>
+        )}
+        {configured && backupsQuery.data && (
+          <Pagination className="-mb-1" total={backupsQuery.data.length} page={historyPage} size={historySize} onPage={paging.setPage} label={t("set.backups.history")} />
         )}
       </section>
 

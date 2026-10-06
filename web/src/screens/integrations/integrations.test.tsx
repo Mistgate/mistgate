@@ -378,6 +378,24 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("node is offline");
     expect(text()).toContain("Rejected");
     expect(text()).toContain("API tokens"); // the rest of the screen is still there
+    expect(document.querySelector("nav[aria-label='Recent decisions']")).toBeNull(); // a short history has no pager
+  });
+
+  it("pages a long history, ten decisions to a page, and asks the panel for the latest hundred", async () => {
+    const done = (n: number) => approval({ id: `pln_${n}`, tool: "node_fix", tokenName: `agent${n}`, state: ApprovalState.APPLIED, decidedUnix: NOW - n, appliedUnix: NOW - n, result: `done ${n}` });
+    await mount(tokens([]), inbox(Array.from({ length: 25 }, (_, i) => done(i + 1))));
+    expect(listApprovals.mock.calls[0]![0]).toMatchObject({ awaitingOnly: false, historyLimit: 100 });
+    expect(text()).toContain("done 10");
+    expect(text()).not.toContain("done 11");
+    expect(text()).toContain("Showing 1–10 of 25");
+  });
+
+  it("opens the history on the page of the URL", async () => {
+    search = { page: 3 as never };
+    const done = (n: number) => approval({ id: `pln_${n}`, tool: "node_fix", state: ApprovalState.APPLIED, decidedUnix: NOW - n, appliedUnix: NOW - n, result: `done ${n}` });
+    await mount(tokens([]), inbox(Array.from({ length: 25 }, (_, i) => done(i + 1))));
+    expect(text()).toContain("Showing 21–25 of 25");
+    expect(text()).toContain("done 25");
   });
 
   it("words the coded facts, keeps a profile's name on a plate inside the sentence, and words the outcomes", async () => {

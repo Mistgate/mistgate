@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusPill } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { useFmt } from "@/lib/format";
+import { clampPage, usePaging } from "@/lib/paging";
 import { safeHttpUrl } from "@/lib/warp";
 import {
   approvalStateInfo,
@@ -172,16 +174,17 @@ export function ApprovalQueue({ data }: { data: Approvals }) {
   );
 }
 
-const visibleRows = 8;
+const pageSize = 10;
 
-/** What was decided and what came of it, newest first. */
+/** What was decided and what came of it, newest first, ten to a page (the panel sends the latest hundred). */
 export function ApprovalHistory({ data }: { data: Approvals }) {
   const t = useT();
   const fmt = useFmt();
-  const [all, setAll] = useState(false);
+  const paging = usePaging({ sizes: [pageSize], defaultSize: pageSize });
   const rows = data.approvals.filter((a) => a.state !== ApprovalState.AWAITING);
   if (rows.length === 0) return null;
-  const shown = all ? rows : rows.slice(0, visibleRows);
+  const page = clampPage(paging.page, rows.length, pageSize);
+  const shown = rows.slice((page - 1) * pageSize, page * pageSize);
   return (
     <section className={card}>
       <SectionLabel as="h2" icon="list" tone="sand">
@@ -208,11 +211,7 @@ export function ApprovalHistory({ data }: { data: Approvals }) {
           );
         })}
       </ul>
-      {rows.length > visibleRows && (
-        <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="self-start text-xs font-bold text-muted underline-offset-2 hover:underline">
-          {all ? t("int.ap.less") : t("common.showMore")}
-        </button>
-      )}
+      <Pagination total={rows.length} page={page} size={pageSize} onPage={paging.setPage} label={t("int.ap.history")} />
     </section>
   );
 }

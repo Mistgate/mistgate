@@ -344,7 +344,7 @@ func (s *Service) loadUsers(ctx context.Context, ids ...string) ([]*adminv1.User
 
 func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.ListUsersRequest]) (*connect.Response[adminv1.ListUsersResponse], error) {
 	m := req.Msg
-	q := store.AccessUserQuery{Query: strings.TrimSpace(m.Query), GroupID: m.GroupId, Limit: int(m.PageSize), Now: s.now()}
+	q := store.AccessUserQuery{Query: strings.TrimSpace(m.Query), GroupID: m.GroupId, Limit: int(m.PageSize), Offset: int(min(m.Offset, 100000)), Now: s.now()}
 	if q.Limit == 0 {
 		q.Limit = 50
 	}

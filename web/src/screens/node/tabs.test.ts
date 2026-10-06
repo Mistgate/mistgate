@@ -14,4 +14,10 @@ describe("validateNodeSearch", () => {
     expect(validateNodeSearch({ tab: "logs", add: "prf_1" })).toEqual({ tab: "logs" });
     expect(validateNodeSearch({ add: "prf_1" })).toEqual({});
   });
+
+  it("keeps where the events log is read from only on the events tab", () => {
+    expect(validateNodeSearch({ tab: "events", before: 420, size: 25, page: 3 })).toEqual({ tab: "events", before: 420, size: 25 });
+    expect(validateNodeSearch({ tab: "events", before: -1, size: "x" })).toEqual({ tab: "events" });
+    expect(validateNodeSearch({ tab: "logs", before: 420 })).toEqual({ tab: "logs" });
+  });
 });

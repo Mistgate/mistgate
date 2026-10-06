@@ -1,6 +1,6 @@
-import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserFilter, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, Card, PageTitle } from "@/components/ui/bits";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusDot } from "@/components/ui/status";
 import { Tabs } from "@/components/ui/tabs";
 import { TextField } from "@/components/ui/text-field";
@@ -16,6 +17,7 @@ import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
+import { clampPage, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
 import { CreateUserModal } from "./create-user";
 import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, shownText, termText, usage, viaOf } from "./format";
@@ -29,6 +31,7 @@ import { Check, useDebounced } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 const PAGE = 50;
+const pageSizes = [25, PAGE, 100] as const;
 type FilterId = "all" | "online" | "expiring" | "over";
 const filterValue: Record<FilterId, UserFilter> = {
   all: UserFilter.UNSPECIFIED,
@@ -118,18 +121,30 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
   const [link, setLink] = useState<{ target: LinkTarget; url?: string; password?: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const list = useInfiniteQuery({
-    queryKey: ["users", "list", filter, query, groupId],
-    queryFn: ({ pageParam, signal }) =>
-      users.listUsers({ filter: filterValue[filter], query, groupId, pageSize: PAGE, pageToken: pageParam }, { signal }).then(usersPageN),
-    initialPageParam: "",
-    getNextPageParam: (last) => last.nextPageToken || undefined,
+  // numbered pages: the server skips `offset` rows; the size of the filter in use is among the counts of the answer
+  const paging = usePaging({ sizes: pageSizes, defaultSize: PAGE });
+  const list = useQuery<ReturnType<typeof usersPageN>>({
+    queryKey: ["users", "list", filter, query, groupId, paging.page, paging.size],
+    queryFn: ({ signal }) =>
+      users.listUsers({ filter: filterValue[filter], query, groupId, pageSize: paging.size, offset: (paging.page - 1) * paging.size }, { signal }).then(usersPageN),
     refetchInterval: 10_000,
+    // the old rows stay while the next page loads: the card keeps its height, nothing jumps
     placeholderData: keepPreviousData,
   });
 
-  const rows = list.data?.pages.flatMap((p) => p.users) ?? [];
-  const counts = list.data?.pages[0]?.counts;
+  const rows = list.data?.users ?? [];
+  const counts = list.data?.counts;
+  const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota }[filter] : 0;
+  const page = clampPage(paging.page, total, paging.size);
+  // rows went away (a bulk disable, an expiry) and the page is past the end now: step back to the last one
+  useEffect(() => {
+    if (counts && page !== paging.page) paging.setPage(page, true);
+  }, [counts, page, paging]);
+  const changeFilter = (next: FilterId) => {
+    setFilter(next);
+    paging.setPage(1, true);
+  };
+  const pager = { total, page, size: paging.size, sizes: pageSizes, onPage: paging.setPage, onSize: paging.setSize, busy: list.isPlaceholderData };
   const pickedList = Object.values(picked);
   const allOnPage = rows.length > 0 && rows.every((u) => picked[u.id]);
   const now = nowSec();
@@ -226,13 +241,16 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
               aria-label={t("users.search")}
               placeholder={t("users.search")}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                paging.setPage(1, true);
+              }}
               className="min-w-[200px] flex-1 md:max-w-[300px] md:flex-none"
             />
             <FilterChips
               aria-label={t("users.filters")}
               value={filter}
-              onValueChange={setFilter}
+              onValueChange={changeFilter}
               options={(Object.keys(filterLabels) as FilterId[]).map((id) => ({
                 value: id,
                 label: (
@@ -280,23 +298,26 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                         </span>
                       ))}
                     </div>
-                    {rows.map((u) => (
-                      <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
-                    ))}
+                    <div className={cx("transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
+                      {rows.map((u) => (
+                        <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                      ))}
+                    </div>
+                    <Pagination className="px-4" {...pager} />
                   </Card>
                   <div className="flex flex-col gap-2 md:hidden">
-                    {rows.map((u) => (
-                      <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
-                    ))}
+                    <div className={cx("flex flex-col gap-2 transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
+                      {rows.map((u) => (
+                        <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                      ))}
+                    </div>
+                    {total > Math.min(...pageSizes) && (
+                      <Card lg className="px-4">
+                        <Pagination {...pager} />
+                      </Card>
+                    )}
                   </div>
                 </>
-              )}
-              {list.hasNextPage && (
-                <div className="flex justify-center">
-                  <Button variant="secondary" size="lg" disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
-                    {t("users.loadMore")}
-                  </Button>
-                </div>
               )}
             </>
           )}

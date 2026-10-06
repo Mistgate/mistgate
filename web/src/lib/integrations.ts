@@ -40,8 +40,8 @@ const approvalsOf = (awaitingOnly: boolean, historyLimit: number, key: string) =
     refetchInterval: pollMs,
   });
 
-/** The page: what waits for the owner, then the recent history. */
-export const approvalsQuery = approvalsOf(false, 30, "list");
+/** The page: what waits for the owner, then the latest hundred decided (the history is paged on the screen). */
+export const approvalsQuery = approvalsOf(false, 100, "list");
 /** The sidebar badge: only what waits. */
 export const awaitingQuery = approvalsOf(true, 0, "awaiting");
 

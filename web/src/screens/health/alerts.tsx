@@ -8,6 +8,7 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusDot, kindTextClass } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
@@ -18,6 +19,7 @@ import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { alertFix, alertTitle, alertWhy, muteChoices, resolutionWord, restartConsequence, severityKind, severityWord, useCan, type Alert } from "@/lib/health";
 import { useIsPhone } from "@/lib/media";
+import { clampPage, usePaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
 import { useAcceptDoctor } from "./doctor-parts";
 import { FixControl, type FixFlow } from "./fix";
@@ -256,15 +258,21 @@ function RestartDialog({ open, onOpenChange, alert: a, scope }: { open: boolean;
   );
 }
 
+const historySizes = [20, 50, 100] as const;
+
 function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
   const phone = useIsPhone();
+  // the whole window (at most 200 rows) arrives at once: the pages are cut here, the position is in the URL
+  const paging = usePaging({ sizes: historySizes, defaultSize: 20 });
+  const page = clampPage(paging.page, rows.length, paging.size);
+  const shown = rows.slice((page - 1) * paging.size, page * paging.size);
   return (
     <section className="rounded-card-lg border border-line bg-surface px-4 py-1.5">
       <SectionLabel as="h2" icon="clock" tone="sand" className="pt-2.5 pb-1.5">
         {t("hl.alerts.history")}
       </SectionLabel>
       {rows.length === 0 && <p className="border-t border-line py-3 text-[13px] text-muted">{t("hl.alerts.historyNone")}</p>}
-      {rows.map((h) => {
+      {shown.map((h) => {
         const kind = severityKind(h.severity);
         const lasted = Math.max(0, h.resolvedAtUnix - h.firstSeenUnix);
         const sev = (
@@ -302,6 +310,7 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
           </div>
         );
       })}
+      <Pagination total={rows.length} page={page} size={paging.size} sizes={historySizes} onPage={paging.setPage} onSize={paging.setSize} label={t("hl.alerts.history")} />
     </section>
   );
 }

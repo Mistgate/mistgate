@@ -1,15 +1,17 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconChip, type IconName, type Tone } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/notice";
+import { CursorPagination } from "@/components/ui/pagination";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusPill } from "@/components/ui/status";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { useT } from "@/i18n";
 import { fleet } from "@/lib/api";
+import { useCursorPaging } from "@/lib/paging";
 import { useFmt, type Fmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
@@ -56,30 +58,49 @@ function dayLabel(t: ReturnType<typeof useT>, fmt: Fmt, unix: number, now = new 
 
 const exact = (fmt: Fmt, unix: number) => new Date(unix * 1000).toLocaleString(fmt.lang, { dateStyle: "short", timeStyle: "medium" });
 
-/** Everything the node reported and the panel concluded about it, one line per thing, newest first, 50 rows at a time. */
+const pageSizes = [25, 50, 100] as const;
+
+/**
+ * Everything the node reported and the panel concluded about it, one line per thing, newest first, one page of the
+ * server's log at a time (Newer / Older; where the page starts is in the URL).
+ */
 export function EventsTab({ nodeId }: { nodeId: string }) {
   const t = useT();
   const fmt = useFmt();
   const [filter, setFilter] = useState<EventFilter>("all");
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
+  const paging = useCursorPaging({ sizes: pageSizes, defaultSize: 50 });
   // every filter is the server's, so a page of 50 is 50 of the kind asked for
   const problems = filter === "problems";
   const family = filter === "profiles" || filter === "agent" ? filter : "";
-  const q = useInfiniteQuery({
-    queryKey: ["node-events", nodeId, filter],
-    queryFn: async ({ pageParam, signal }) =>
+  const q = useQuery({
+    queryKey: ["node-events", nodeId, filter, paging.before, paging.size],
+    queryFn: async ({ signal }) =>
       plain(
         await fleet.listEvents(
-          { nodeId, limit: pageSize, beforeId: BigInt(pageParam), minSeverity: problems ? EventSeverity.WARNING : undefined, family },
+          { nodeId, limit: paging.size, beforeId: BigInt(paging.before), minSeverity: problems ? EventSeverity.WARNING : undefined, family },
           { signal },
         ),
       ),
-    initialPageParam: 0,
-    getNextPageParam: (last) => (last.hasMore ? last.events.at(-1)?.id : undefined),
+    // the old page stays on screen while the next one loads
+    placeholderData: keepPreviousData,
     refetchInterval: pollMs,
   });
-  const events = useMemo(() => q.data?.pages.flatMap((p) => p.events) ?? [], [q.data]);
+  const events = useMemo(() => q.data?.events ?? [], [q.data]);
   const days = useMemo(() => byDay(buildLines(events, filter)), [events, filter]);
+  const older = q.data?.hasMore ? events.at(-1)?.id : undefined;
+  const goOlder = () => older !== undefined && paging.older(older);
+  const pager = (
+    <CursorPagination
+      flush
+      className="px-4"
+      busy={q.isPlaceholderData}
+      size={paging.size}
+      sizes={pageSizes}
+      onSize={paging.setSize}
+      cursor={{ before: paging.before, count: events.length, hasOlder: older !== undefined, hasNewer: paging.hasNewer, toNewest: paging.newerToFirst, index: paging.index, onOlder: goOlder, onNewer: paging.newer }}
+    />
+  );
 
   if (q.isError && events.length === 0) return <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   if (!q.data) return <Pending />;
@@ -95,14 +116,17 @@ export function EventsTab({ nodeId }: { nodeId: string }) {
     <Segmented
       aria-label={t("node.ev.filter")}
       value={filter}
-      onValueChange={setFilter}
+      onValueChange={(f) => {
+        setFilter(f);
+        paging.reset();
+      }}
       variant="flat"
       options={eventFilters.map((f) => ({ value: f, label: t(`node.ev.filter.${f}`) }))}
       className="w-fit max-w-full flex-wrap"
     />
   );
 
-  if (events.length === 0 && filter === "all") {
+  if (events.length === 0 && filter === "all" && !paging.hasNewer) {
     return (
       <div className="rounded-card-lg border border-dashed border-line">
         <EmptyState title={t("node.events.none")}>{t("node.events.noneBody")}</EmptyState>
@@ -114,12 +138,12 @@ export function EventsTab({ nodeId }: { nodeId: string }) {
       {filterBar}
       {days.length === 0 ? (
         <div className="rounded-card-lg border border-dashed border-line">
-          {q.hasNextPage ? (
-            // nothing of this kind among what is loaded, but there is more: say so, never "none at all"
+          {older !== undefined ? (
+            // nothing of this kind on this page, but there is more: say so, never "none at all"
             <EmptyState
               title={t("node.ev.noneFilteredMore", { n: events.length })}
               action={
-                <Button variant="secondary" size="md" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
+                <Button variant="secondary" size="md" onClick={goOlder}>
                   {t("node.ev.searchMore")}
                 </Button>
               }
@@ -142,18 +166,10 @@ export function EventsTab({ nodeId }: { nodeId: string }) {
           </section>
         ))
       )}
-      {q.hasNextPage && days.length > 0 && (
-        <div className="flex justify-center">
-          <Button variant="secondary" size="md" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
-            {t("common.showMore")}
-          </Button>
-        </div>
-      )}
+      {(older !== undefined || paging.hasNewer) && <div className="rounded-card-lg border border-line bg-surface">{pager}</div>}
     </div>
   );
 }
-
-const pageSize = 50;
 
 /**
  * One line. On a phone the time and the glyph go on a line of their own above the title and the family chip is left

@@ -252,6 +252,7 @@ type AccessUserQuery struct {
 	Query     string
 	GroupID   string
 	After     string // name after which the page starts ("" = first page)
+	Offset    int    // rows skipped after After, for numbered pages
 	Limit     int
 	OnlineIDs []string // users currently online (fleet), for the "online" filter and its count
 	Now       time.Time
@@ -315,8 +316,8 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	if limit < 1 {
 		limit = 50
 	}
-	largs = append(largs, limit+1)
-	rows, err := a.s.R.QueryContext(ctx, `SELECT `+accUserCols+accUserFrom+`WHERE `+lconds+` ORDER BY u.name LIMIT ?`, largs...)
+	largs = append(largs, limit+1, max(q.Offset, 0))
+	rows, err := a.s.R.QueryContext(ctx, `SELECT `+accUserCols+accUserFrom+`WHERE `+lconds+` ORDER BY u.name LIMIT ? OFFSET ?`, largs...)
 	if err != nil {
 		return nil, false, counts, err
 	}

@@ -128,7 +128,7 @@ The tab works while the agent is connected (**Healthy** or **No traffic**). If t
 
 The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the inbound and the protocol, never an address (neither the client's nor the destination); the panel adds a user's name only when the node can identify that user reliably.
 
-The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. **Show more** loads older events; when a filter finds nothing among the latest ones, **Search further** does the same.
+The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. The log is paged: 50 events at a time (25 or 100 on request), newest first, **Older** goes back in time and **Newer** returns to the page you came from; the page is in the address, so a reload or a copied link keeps it. When a filter finds nothing on a page, **Search further** goes to the next, older one.
 
 ### Doctor
 

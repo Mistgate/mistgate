@@ -640,8 +640,11 @@ type ListUsersRequest struct {
 	Query   string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	GroupId string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	// Default 50, max 200. Order: name, then id (keyset pagination, stable under inserts).
-	PageSize      uint32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string `protobuf:"bytes,5,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageSize  uint32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string `protobuf:"bytes,5,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Rows to skip before the page (after page_token when both are given): numbered pages. 0 = none, at most 100000.
+	// The size of what is being paged is in the response counts (the chip of the filter in use).
+	Offset        uint32 `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -709,6 +712,13 @@ func (x *ListUsersRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *ListUsersRequest) GetOffset() uint32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
 }
 
 // Badge numbers on the filter chips; computed for the same query and group_id, ignoring `filter`.
@@ -2527,14 +2537,15 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\x12+\n" +
 	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\x12\x1f\n" +
 	"\vgroup_color\x18\x1d \x01(\tR\n" +
-	"groupColor\"\xb6\x01\n" +
+	"groupColor\"\xce\x01\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
 	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\rR\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x05 \x01(\tR\tpageToken\"q\n" +
+	"page_token\x18\x05 \x01(\tR\tpageToken\x12\x16\n" +
+	"\x06offset\x18\x06 \x01(\rR\x06offset\"q\n" +
 	"\n" +
 	"UserCounts\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\rR\x03all\x12\x16\n" +

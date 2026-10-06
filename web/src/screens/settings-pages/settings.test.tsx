@@ -55,6 +55,8 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useParams: () => ({ section }),
+  useSearch: () => ({}),
+  useNavigate: () => () => {},
   Outlet: () => null,
   Navigate: () => null,
 }));
@@ -440,6 +442,22 @@ describe("Settings → Admins, Domains, Backups", () => {
     expect(text()).toContain("mistgate-recovery.txt");
     expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("");
     expect(backupApi.listBackups).toHaveBeenCalledOnce();
+  });
+
+  it("pages a long list of backups, ten to a page, and shows no pager for a short one", async () => {
+    backupApi.getBackupSettings.mockResolvedValue({ settings: {
+      accountId: "cf-account", jurisdiction: "eu", bucket: "mistgate-backups", accessKeyId: "access-id",
+      hasSecret: true, ageRecipient: "age1example", enabled: true, intervalHours: 24, retentionDays: 0,
+      lastSuccessUnix: 1_800_000_000, lastErrorCode: "",
+    } });
+    const day = (n: number) => ({ key: `mistgate/2026-09-${String(n).padStart(2, "0")}.tar.gz.age`, sizeBytes: 4096, createdUnix: 1_800_000_000 - n * 86400 });
+    backupApi.listBackups.mockResolvedValue({ backups: Array.from({ length: 25 }, (_, i) => day(25 - i)) });
+    await mount(<BackupsPage />);
+    expect(text()).toContain("mistgate/2026-09-25.tar.gz.age");
+    expect(text()).toContain("mistgate/2026-09-16.tar.gz.age");
+    expect(text()).not.toContain("mistgate/2026-09-15.tar.gz.age");
+    expect(text()).toContain("Showing 1–10 of 25");
+    expect(document.querySelector("nav[aria-label='Recent backups']")).not.toBeNull();
   });
 });
 

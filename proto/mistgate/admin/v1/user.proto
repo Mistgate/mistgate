@@ -146,6 +146,9 @@ message ListUsersRequest {
   // Default 50, max 200. Order: name, then id (keyset pagination, stable under inserts).
   uint32 page_size = 4;
   string page_token = 5;
+  // Rows to skip before the page (after page_token when both are given): numbered pages. 0 = none, at most 100000.
+  // The size of what is being paged is in the response counts (the chip of the filter in use).
+  uint32 offset = 6;
 }
 
 // Badge numbers on the filter chips; computed for the same query and group_id, ignoring `filter`.

@@ -1,10 +1,10 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
 import { Icon } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
+import { CursorPagination } from "@/components/ui/pagination";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Select } from "@/components/ui/select";
 import { AuditKind, AuditSource } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -13,8 +13,11 @@ import type { MessageKey } from "@/i18n/en";
 import { auth } from "@/lib/api";
 import { actorLabel, describeAudit, isFailure } from "@/lib/audit";
 import { cx } from "@/lib/cx";
+import { useCursorPaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
+
+const pageSizes = [25, 50, 100] as const;
 
 type Source = "all" | "panel" | "bot" | "mcp" | "api";
 const sources: Record<Source, AuditSource> = {
@@ -52,15 +55,18 @@ export function AuditPage() {
   const fmt = useFmt();
   const [kind, setKind] = useState<Kind>("all");
   const [source, setSource] = useState<Source>("all");
-  const q = useInfiniteQuery({
-    queryKey: ["audit", source, kind],
-    queryFn: async ({ pageParam, signal }) =>
-      plain(await auth.listAudit({ source: sources[source], kind: kinds[kind], beforeId: BigInt(pageParam), pageSize: 50 }, { signal })),
-    initialPageParam: 0,
-    getNextPageParam: (last) => (last.nextBeforeId > 0 ? last.nextBeforeId : undefined),
+  // a page of the log at a time, newest first; where it starts (`before`) is in the URL
+  const paging = useCursorPaging({ sizes: pageSizes, defaultSize: 50 });
+  const q = useQuery({
+    queryKey: ["audit", source, kind, paging.before, paging.size],
+    queryFn: async ({ signal }) =>
+      plain(await auth.listAudit({ source: sources[source], kind: kinds[kind], beforeId: BigInt(paging.before), pageSize: paging.size }, { signal })),
+    // the old page stays on screen while the next one loads
+    placeholderData: keepPreviousData,
     retry: (n, e) => ConnectError.from(e).code !== Code.PermissionDenied && n < 2,
   });
-  const entries = q.data?.pages.flatMap((p) => p.entries) ?? [];
+  const entries = q.data?.entries ?? [];
+  const older = q.data && q.data.nextBeforeId > 0 ? q.data.nextBeforeId : undefined;
   const denied = q.isError && ConnectError.from(q.error).code === Code.PermissionDenied;
   const filtered = kind !== "all" || source !== "all";
 
@@ -73,7 +79,10 @@ export function AuditPage() {
           aria-label={t("audit.kindFilter")}
           className="min-w-0 flex-1"
           value={kind}
-          onValueChange={setKind}
+          onValueChange={(k) => {
+            setKind(k);
+            paging.reset();
+          }}
           options={(Object.keys(kindLabels) as Kind[]).map((k) => ({ value: k, label: t(kindLabels[k]) }))}
         />
         <div className="w-full sm:w-[170px]">
@@ -81,7 +90,10 @@ export function AuditPage() {
             compact
             aria-label={t("audit.filter")}
             value={source}
-            onValueChange={(v) => setSource(v as Source)}
+            onValueChange={(v) => {
+              setSource(v as Source);
+              paging.reset();
+            }}
             options={(Object.keys(sourceLabels) as Source[]).map((s) => ({ value: s, label: t(sourceLabels[s]) }))}
           />
         </div>
@@ -96,6 +108,7 @@ export function AuditPage() {
       )}
       {entries.length > 0 && (
         <div className="rounded-card-lg border border-line bg-surface px-4 py-1">
+          <div className={cx("transition-opacity duration-200", q.isPlaceholderData && "opacity-60")} aria-busy={q.isPlaceholderData || undefined}>
           {entries.map((e, i) => {
             const b = badge[e.source as AuditSource] ?? badge[AuditSource.UNSPECIFIED];
             const failed = isFailure(e.result);
@@ -120,13 +133,25 @@ export function AuditPage() {
               </div>
             );
           })}
+          </div>
+          <CursorPagination
+            busy={q.isPlaceholderData}
+            label={t("settings.audit")}
+            size={paging.size}
+            sizes={pageSizes}
+            onSize={paging.setSize}
+            cursor={{ before: paging.before, count: entries.length, hasOlder: older !== undefined, hasNewer: paging.hasNewer, toNewest: paging.newerToFirst, index: paging.index, onOlder: () => older !== undefined && paging.older(older), onNewer: paging.newer }}
+          />
         </div>
       )}
-      {q.hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="secondary" size="md" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
-            {t("common.showMore")}
-          </Button>
+      {/* a page past the end (an old link) holds no rows: the way back is still there */}
+      {q.data && entries.length === 0 && paging.hasNewer && (
+        <div className="rounded-card-lg border border-line bg-surface px-4">
+          <CursorPagination
+            flush
+            size={paging.size}
+            cursor={{ before: paging.before, count: 0, hasOlder: false, hasNewer: true, toNewest: paging.newerToFirst, index: paging.index, onOlder: () => {}, onNewer: paging.newer }}
+          />
         </div>
       )}
     </>

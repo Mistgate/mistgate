@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { memoryRouter } from "@/test/router";
 import { EventsTab } from "./events";
 
 const listEvents = vi.fn();
@@ -38,13 +39,16 @@ const ev = (id: number, at: number, code: string, params: Record<string, string>
   ...over,
 });
 
-async function mount() {
+async function mount(url = "/") {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await act(async () => root!.render(<QueryClientProvider client={qc}><EventsTab nodeId="nod_1" /></QueryClientProvider>));
-  for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+  // a real router: where the log is read from lives in the URL
+  const { router, element } = memoryRouter(<EventsTab nodeId="nod_1" />, url);
+  await act(async () => root!.render(<QueryClientProvider client={qc}>{element}</QueryClientProvider>));
+  for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+  return router;
 }
 const text = () => document.body.textContent ?? "";
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -129,5 +133,45 @@ describe("the node's events tab", () => {
     await settle();
     await settle();
     expect(text()).toContain("Agent updated 0.1.0-a → 0.1.0-b");
+  });
+
+  const button = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  const before = (r: { state: { location: { search: unknown } } }) => (r.state.location.search as { before?: number }).before;
+
+  it("pages through the log: Older asks for the rows under the last one, Newer comes back, and the URL holds the place", async () => {
+    listEvents.mockImplementation(async (req: { beforeId: bigint }) =>
+      req.beforeId === 0n ? { events: [rows[0], rows[1]], hasMore: true } : { events: [rows[2], rows[3]], hasMore: false },
+    );
+    const router = await mount();
+    expect(listEvents.mock.calls[0]![0]).toMatchObject({ limit: 50, beforeId: 0n });
+    expect(text()).toContain("Entries 1–2");
+    expect(button("Newer entries")!.disabled).toBe(true);
+
+    await click(button("Older entries"));
+    await settle();
+    await settle();
+    expect(listEvents.mock.calls.at(-1)![0]).toMatchObject({ limit: 50, beforeId: 3n });
+    expect(before(router)).toBe(3);
+    expect(text()).toContain("Page 2");
+    expect(button("Older entries")!.disabled).toBe(true);
+
+    await click(button("Newer entries"));
+    await settle();
+    await settle();
+    expect(before(router)).toBeUndefined();
+    expect(text()).toContain("Page 1");
+  });
+
+  it("opens on the page a link points at and offers the way back to the newest", async () => {
+    listEvents.mockResolvedValue({ events: [rows[2], rows[3]], hasMore: false });
+    await mount("/?before=3&size=25");
+    expect(listEvents.mock.calls[0]![0]).toMatchObject({ limit: 25, beforeId: 3n });
+    expect(button("Back to the newest entries")).not.toBeNull();
+  });
+
+  it("shows no pager for a log that fits one page", async () => {
+    listEvents.mockResolvedValue({ events: rows, hasMore: false });
+    await mount();
+    expect(document.querySelector("nav")).toBeNull();
   });
 });
