@@ -26,11 +26,11 @@ func paced(t *testing.T, perStream int) *httptest.Server {
 	t.Helper()
 	var rate atomic.Int64
 	rate.Store(int64(perStream))
-	return pacedAt(t, &rate)
+	return pacedAt(t, &rate, nil)
 }
 
-// pacedAt is paced with a rate the test can change between runs.
-func pacedAt(t *testing.T, rate *atomic.Int64) *httptest.Server {
+// pacedAt is paced with a rate the test can change between runs; wrote, when not nil, counts what /down wrote.
+func pacedAt(t *testing.T, rate, wrote *atomic.Int64) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/down", func(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +38,9 @@ func pacedAt(t *testing.T, rate *atomic.Int64) *httptest.Server {
 		for sent := 0; sent < 64<<20; sent += len(chunk) {
 			if _, err := w.Write(chunk); err != nil {
 				return
+			}
+			if wrote != nil {
+				wrote.Add(int64(len(chunk)))
 			}
 			if perStream := rate.Load(); perStream > 0 {
 				select {
@@ -228,7 +231,7 @@ func ep(s *httptest.Server) Endpoint {
 // Three runs back to back and the best one wins, per direction: the first run is slow, the second fast, the third in between.
 func TestThreeRunsTheBestWins(t *testing.T) {
 	var rate atomic.Int64
-	s := pacedAt(t, &rate)
+	s := pacedAt(t, &rate, nil)
 	cfg := small(ep(s))
 	cfg.Runs, cfg.Pause = 3, 30*time.Millisecond
 	cfg.DownFor, cfg.UpFor, cfg.Warm = 800*time.Millisecond, 300*time.Millisecond, 200*time.Millisecond
@@ -263,7 +266,7 @@ func TestARunThatFailsOrDoesNotFitIsSkipped(t *testing.T) {
 	rate.Store(1_000_000)
 	var down atomic.Int32
 	mux := http.NewServeMux()
-	inner := pacedAt(t, &rate)
+	inner := pacedAt(t, &rate, nil)
 	mux.HandleFunc("/down", func(w http.ResponseWriter, r *http.Request) {
 		if down.Add(1) > 4 { // the first run's four streams are served, then it all breaks
 			http.Error(w, "no", http.StatusServiceUnavailable)
@@ -693,12 +696,18 @@ func TestPeopleOnTheNodeCountAsCapacity(t *testing.T) {
 // An interface that carries no more than the test (its headers apart) adds no people, and the test alone is the estimate when
 // the interface is slower or cannot be read.
 func TestInterfaceCountersNeverLowerTheResult(t *testing.T) {
-	s := paced(t, 1_000_000)
+	var rate, sent atomic.Int64
+	rate.Store(1_000_000)
+	s := pacedAt(t, &rate, &sent)
 	for name, c := range map[string]Counters{
-		"the same as the test (plus headers)": counters("eth0", 32e6*1.04, 8e6),
-		"slower than the test":                counters("eth0", 5e6, 1e6),
-		"unreadable":                          func() (string, uint64, uint64, bool) { return "", 0, 0, false },
-		"the route moved":                     moving(),
+		// the interface follows what the server really sent, so a loaded machine that runs the test slower than its pace
+		// still sees no one else on it
+		"the same as the test (plus headers)": func() (string, uint64, uint64, bool) {
+			return "eth0", uint64(float64(sent.Load()) * 1.04), 0, true
+		},
+		"slower than the test": counters("eth0", 5e6, 1e6),
+		"unreadable":           func() (string, uint64, uint64, bool) { return "", 0, 0, false },
+		"the route moved":      moving(),
 		"a counter went back": func() func() (string, uint64, uint64, bool) {
 			var n atomic.Uint64 // read from the warm-up timer and from the main goroutine
 			n.Store(1e9)
