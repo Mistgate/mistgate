@@ -1,4 +1,4 @@
-import { label } from "./amnezia";
+import { copyButton, label } from "./amnezia";
 import { h, type Kid } from "./dom";
 import { icon, type IconName } from "./icons";
 import { atDeviceLimit, deviceIcon, fmtAgo, isShared, keyAppName, keyAvailability, otherDevices, platformWord, selfServe, ways } from "./logic";
@@ -37,7 +37,7 @@ function when(c: Ctx, last: number, online: boolean, never: string, text: (w: st
 // ---- rows of the link apps ----
 
 function linkRow(c: Ctx, x: Device | null, app: string): HTMLElement {
-  const { t } = c;
+  const { d, a, t } = c;
   const shared = x === null || isShared(x);
   const word = x ? platformWord(x.platform, t) : "";
   const name = shared ? t.linkApps : x!.model || word || (app ? t.devApp(app) : t.devGeneric);
@@ -56,6 +56,8 @@ function linkRow(c: Ctx, x: Device | null, app: string): HTMLElement {
         shared && h("p", { class: "hint" }, t.linkAppsNote),
       ),
     ),
+    // the one action of the row: the link itself, for an app that does not take "add with one tap" (announced: "Скопировано")
+    shared && d.user.status === "active" && d.access.happ && d.subscription_url !== "" && h("div", { class: "dev-acts" }, copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "sec grow", key: "dev-link-copy", after: a.mark, live: true })),
   );
 }
 

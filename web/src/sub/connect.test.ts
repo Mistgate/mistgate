@@ -3,6 +3,7 @@ import { cases } from "./dev-data";
 import { dict } from "./i18n";
 import { appList, appKey, appNames, chosenApp, keyAppName, normalize, qrApp } from "./logic";
 import { actions, data, plain, state, text } from "./test-kit";
+import type { MgData } from "./types";
 import { view } from "./view";
 
 const t = dict.ru;
@@ -37,44 +38,104 @@ describe("step 1: the device", () => {
   });
 });
 
-describe("step 2: the app", () => {
-  it("the recommended app big, the others under 'Other apps', never folded; each says how it connects", () => {
+describe("step 1: how to connect (two ways: the same cards as the sheet)", () => {
+  const titles = (el: HTMLElement) => [...el.querySelectorAll(".step .step-t")].map(text);
+  const nums = (el: HTMLElement) => [...el.querySelectorAll(".step .sn")].map(text);
+
+  it("with both ways the first step asks: with an app (chosen, recommended) or with a key; the steps are numbered on", () => {
     const el = view(data("first"), state("ios"), actions());
+    expect(titles(el)).toEqual(["Чем подключать", "Ваше устройство", "Приложение", "Как подключиться"]);
+    expect(nums(el)).toEqual(["1", "2", "3", "4"]);
+    const cards = [...el.querySelectorAll(".step")[0]!.querySelectorAll(".opt.go")];
+    expect(cards.map((x) => x.getAttribute("data-k"))).toEqual(["way-link", "way-key"]);
+    expect(cards.map((x) => x.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(el.querySelector(".step [role=radiogroup][aria-label='Чем подключать']")).not.toBeNull();
+    expect(text(cards[0]!.querySelector(".opt-t"))).toBe("Через приложениеРекомендуем");
+    expect(text(cards[1]!.querySelector(".opt-t"))).toBe("Ключом AmneziaVPN");
+  });
+
+  it("a card tells the page; the chosen one does nothing", () => {
+    const a = actions();
+    const el = view(data("first"), state("ios"), a);
+    el.querySelector<HTMLButtonElement>("[data-k=way-link]")!.click(); // already chosen
+    el.querySelector<HTMLButtonElement>("[data-k=way-key]")!.click();
+    expect(a.log).toEqual(["way key"]);
+  });
+
+  it("the key way: the device, then install / add this device / paste the key; no app list, no QR code", () => {
+    const el = view(data("first"), state("ios", { way: "key" }), actions());
+    expect(titles(el)).toEqual(["Чем подключать", "Ваше устройство", "Как подключиться"]);
+    expect(nums(el)).toEqual(["1", "2", "3"]);
+    expect([...el.querySelectorAll(".how-i .how-t")].map(text)).toEqual(["Установите AmneziaVPN", "Добавьте это устройство", "Вставьте ключ в AmneziaVPN"]);
+    expect(el.querySelector(".app")).toBeNull();
+    expect(el.querySelector(".qr, [data-k=qr-row]")).toBeNull();
+    expect(el.querySelector(".side .qrcard")).toBeNull();
+    expect(el.querySelector("[data-k=way-key]")?.getAttribute("aria-checked")).toBe("true");
+    expect(view(data("first"), state("windows", { way: "key" }), actions()).querySelector(".qrcard")).toBeNull();
+  });
+
+  it("one way only: no question; the steps are numbered from 1", () => {
+    const link = view(data("happ"), state("ios"), actions());
+    expect(titles(link)).toEqual(["Ваше устройство", "Приложение", "Как подключиться"]);
+    expect(link.querySelector("[data-k=way-link]")).toBeNull();
+    const keys = view(data("keys-only"), state("ios"), actions());
+    expect(titles(keys)).toEqual(["Ваше устройство", "Как подключиться"]);
+    expect(nums(keys)).toEqual(["1", "2"]);
+    expect([...keys.querySelectorAll(".how-i .how-t")][1]).toBeDefined();
+  });
+
+  it("a key that cannot be had now is a quiet card, and the steps stay the link's even if the key was chosen", () => {
+    const el = view(data("limit"), state("ios", { way: "key" }), actions());
+    expect(el.querySelector("[data-k=way-key]")).toBeNull();
+    expect(text(el.querySelector(".opt.off .opt-d"))).toBe("Занято 3 из 3. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.");
+    expect(titles(el)).toContain("Приложение");
+    expect(el.querySelector("[data-k=way-link]")?.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("the keys of the wizard and the cards are one design: the same words as the sheet", () => {
+    const el = view(data("first"), state("ios"), actions());
+    expect(text(el.querySelector("[data-k=way-link] .wayslot"))).toBe("Одно место на все приложения");
+    expect(text(el.querySelector("[data-k=way-key] .wayslot"))).toBe("Занимает 1 место · свободно 3");
+  });
+});
+
+describe("step 2: the app (link apps only)", () => {
+  it("the recommended app big, the others under 'Other apps', never folded; no key app among them, no 'how' chip", () => {
+    const el = view(data("first"), state("windows"), actions());
     const cards = [...el.querySelectorAll(".app")];
-    expect(cards.map((c) => text(c.querySelector(".app-n")))).toEqual(["HappРекомендуем", "AmneziaVPN"]);
-    expect(cards.map((c) => text(c.querySelector(".way")))).toEqual(["по ссылке подписки", "ключ AmneziaVPN"]);
+    expect(cards.map((c) => text(c.querySelector(".app-n")))).toEqual(["kl!ckРекомендуем", "Happ"]);
     expect(cards.map((c) => c.getAttribute("aria-checked"))).toEqual(["true", "false"]);
     expect(cards[0]!.classList.contains("min")).toBe(false);
     expect(cards[1]!.classList.contains("min")).toBe(true);
     expect(text(el.querySelector(".step .lbl"))).toBe("Другие приложения");
-    expect(cards[1]!.closest("details")).toBeNull();
-    expect(text(el.querySelector(".only-m.hint[style]"))).toBe("Подойдёт любой способ — или оба сразу");
-    expect(text(cards[0]!.querySelector(".desc"))).toBe(plain(t.linkD));
-    expect(text(cards[1]!.querySelector(".desc"))).toBe(plain(t.keyD));
-  });
-
-  it("a computer's recommended app leads, the link app and the key app wait under 'Other apps'", () => {
-    const d = data("first");
-    expect(appList(d, "windows").map((x) => x.name)).toEqual(["kl!ck", "Happ", "AmneziaVPN"]);
-    const el = view(d, state("windows"), actions());
-    const cards = [...el.querySelectorAll(".app")];
-    expect(cards.map((c) => text(c.querySelector(".app-n")))).toEqual(["kl!ckРекомендуем", "Happ", "AmneziaVPN"]);
-    expect(el.querySelectorAll(".app-grid .app")).toHaveLength(2);
+    expect(el.querySelectorAll(".app .way")).toHaveLength(0);
+    expect(el.querySelector(".app-grid .app")).not.toBeNull();
+    expect(el.textContent).not.toContain("по ссылке подписки");
     expect(text(cards[0]!.querySelector(".desc"))).toBe("Все ваши серверы в одном приложении, подписка обновляется сама");
     expect(el.querySelector("a[href^='klick://add?url=']")).not.toBeNull();
+    const phone = view(data("first"), state("ios"), actions());
+    expect([...phone.querySelectorAll(".app")].map((c) => text(c.querySelector(".app-n")))).toEqual(["Happ"]);
+    expect(text(phone.querySelector(".app .desc"))).toBe(plain(t.linkD));
+  });
+
+  it("the lists in logic keep the kinds apart on request", () => {
+    const d = data("first");
+    expect(appList(d, "windows").map((x) => x.name)).toEqual(["kl!ck", "Happ", "AmneziaVPN"]);
+    expect(appList(d, "windows", "happ").map((x) => x.name)).toEqual(["kl!ck", "Happ"]);
+    expect(appList(d, "ios", "amnezia").map((x) => x.name)).toEqual(["AmneziaVPN"]);
   });
 
   it("choosing another app tells the page; choosing the chosen one does nothing", () => {
     const a = actions();
-    const el = view(data("first"), state("ios"), a);
-    el.querySelector<HTMLButtonElement>("[data-k='app-amnezia|AmneziaVPN']")!.click();
-    el.querySelector<HTMLButtonElement>("[data-k='app-happ|Happ']")!.click(); // the default: already chosen
-    expect(a.log).toEqual(["app amnezia|AmneziaVPN"]);
-    expect(chosenApp(data("first"), "ios", "amnezia|AmneziaVPN")?.name).toBe("AmneziaVPN");
+    const el = view(data("first"), state("windows"), a);
+    el.querySelector<HTMLButtonElement>("[data-k='app-happ|Happ']")!.click();
+    el.querySelector<HTMLButtonElement>("[data-k='app-happ|kl!ck']")!.click(); // the default: already chosen
+    expect(a.log).toEqual(["app happ|Happ"]);
+    expect(chosenApp(data("first"), "windows", "happ|Happ", "happ")?.name).toBe("Happ");
+    expect(chosenApp(data("first"), "ios", "amnezia|AmneziaVPN", "happ")?.name).toBe("Happ"); // a key app never takes a link app's place
     expect(chosenApp(data("first"), "ios", "gone|X")?.name).toBe("Happ");
     expect(appKey(appList(data("first"), "ios")[0]!)).toBe("happ|Happ");
   });
-
   it("a platform without an app says so, still offers the link and the way to write", () => {
     const a = actions();
     const el = view(data("nolinux"), state("linux"), a);
@@ -155,21 +216,21 @@ describe("step 3: a link app", () => {
   it("after the app fetched the subscription (and this device set it up) the step says so, and can show the steps again", () => {
     const a = actions();
     const el = view(data("return"), state("ios", { marked: true }), a);
-    const s3 = el.querySelectorAll(".step")[2]!;
+    const s3 = el.querySelectorAll(".step")[3]!; // after the way, the device and the app
     expect(s3.querySelector(".sn.done")).not.toBeNull();
     expect(text(s3.querySelector(".note.ok"))).toBe("Готово — приложение получило подписку 3 часа назад. Включите VPN и выберите любой сервер.");
     expect(s3.querySelector(".how")).toBeNull();
     s3.querySelector<HTMLButtonElement>("[data-k=steps-again]")!.click();
     expect(a.log).toEqual(["steps-again"]);
     const again = view(data("return"), state("ios", { marked: true, stepsAgain: true }), actions());
-    expect(again.querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
+    expect(again.querySelectorAll(".step")[3]!.querySelector(".how")).not.toBeNull();
     // not done when this device never set it up
-    expect(view(data("return"), state("ios"), actions()).querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
+    expect(view(data("return"), state("ios"), actions()).querySelectorAll(".step")[3]!.querySelector(".how")).not.toBeNull();
   });
 });
 
-describe("step 3: a key app", () => {
-  const key = { app: "amnezia|AmneziaVPN" };
+describe("step 3: the key way", () => {
+  const key = { way: "key" as const };
   it("install, add this device (its key is made), paste the key; the phone copies, the computer downloads the file", () => {
     const a = actions();
     const el = view(data("first"), state("ios", key), a);
@@ -186,27 +247,33 @@ describe("step 3: a key app", () => {
     expect(el.querySelector("a[href^='happ://']")).toBeNull(); // a key app has no add link
   });
 
+  it("no key app in the settings for the platform: the steps still say what to do, without an install button", () => {
+    const el = view(data("first", (d) => (d.apps = d.apps.filter((x) => x.kind !== "amnezia"))), state("ios", key), actions());
+    expect([...el.querySelectorAll(".how-i .how-t")].map(text)).toEqual(["Добавьте это устройство", "Вставьте ключ в AmneziaVPN"]);
+  });
+
+  // keys alone (no link app): the steps meet the states of the key way
+  const alone = (name: string, f: (d: MgData) => void = () => {}) => view(data(name, (d) => ((d.access.happ = false), f(d))), state("ios"), actions());
+
   it("the button waits at the limit, with the words; the owner issues keys: ask; no profile: not yet", () => {
-    const limit = view(data("limit"), state("ios", key), actions());
+    const limit = alone("limit");
     expect(limit.querySelector<HTMLButtonElement>(".how-i [data-k=amz-add]")?.disabled).toBe(true);
     expect(text(limit.querySelector(".how-i .note.warn"))).toBe("Занято 3 из 3. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.");
-    const admin = view(data("amnezia-off"), state("ios", key), actions());
+    const admin = alone("amnezia-off");
     const s = [...admin.querySelectorAll(".how-i")].map((i) => text(i.querySelector(".how-t")));
     expect(s[1]).toBe("Попросите ключ");
     expect(text(admin.querySelectorAll(".how-i")[1]!.querySelector(".how-sub"))).toBe("Ключи AmneziaVPN выдаёт владелец — напишите, для какого устройства нужен.");
-    const none = view(data("amnezia-none"), state("ios", key), actions());
+    const none = alone("amnezia-none");
     expect(text([...none.querySelectorAll(".how-i")][1]!.querySelector(".how-sub"))).toBe("Сервер ещё настраивается — напишите администратору.");
     expect(none.querySelector(".how-i [data-k=amz-add]")).toBeNull();
   });
 
   it("the admin's preview has no address: the button waits and nothing says 'ask the admin'", () => {
-    const d = data("first", (x) => (x.amnezia!.endpoints = ""));
-    const el = view(d, state("ios", key), actions());
+    const el = alone("first", (x) => (x.amnezia!.endpoints = ""));
     expect(el.querySelector<HTMLButtonElement>(".how-i [data-k=amz-add]")?.disabled).toBe(true);
     expect(el.textContent).not.toContain("Попросите ключ");
   });
 });
-
 describe("another device: the QR code of the link", () => {
   it("a phone folds it under 'Connect another device'; opened, it says what it does and copies the link", () => {
     const a = actions();

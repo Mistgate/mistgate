@@ -336,7 +336,7 @@ describe("view", () => {
   it("no dash starts a line: the space before it does not break", () => {
     for (const lang of ["ru", "en"] as const) {
       const t = dict[lang];
-      for (const s of [t.anyWay, t.linkD, t.privacy, t.limit(3, 3, true), t.txt.expired("X").call, t.staleSteps("A").join(" "), t.dnsLinkNote("A", "B"), t.dnsDoneLink(12).join(" "), t.soon(3).join(" ")]) expect(s).not.toMatch(/ —/);
+      for (const s of [t.linkD, t.privacy, t.limit(3, 3, true), t.txt.expired("X").call, t.staleSteps("A").join(" "), t.dnsLinkNote("A", "B"), t.dnsDoneLink(12).join(" "), t.soon(3).join(" ")]) expect(s).not.toMatch(/ —/);
     }
   });
 });

@@ -16,13 +16,13 @@ From top to bottom:
 1. **The announcement**, when **Show announcement** is on. The person can close it; a new text shows again.
 2. **The greeting and the status**: "Hi, Alice", the status ("Subscription active", "Subscription ended", "Traffic used up", "Subscription disabled"), the days left of the term and the traffic of the period against the quota, with the reset date.
 3. **Load**: how busy each server is right now, as a level: **Low**, **Medium** or **High** (from 50% and 80%): the node's CPU use, or its channel as a share of the **Network capacity** in its **Settings** when that is set and busier. A server whose agent sends no fresh sample shows no level. A server is named by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number. The page never shows the rates themselves: someone who shares a node with one other person must not see when that person streams. When a server is at **High**, the card suggests a calmer one ("The … server's channel is very busy. If your connection is slow, try …").
-4. **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable when the panel has apps for several.
-5. **The ways to connect**, side by side when the person has both ("Either of the two ways will do — or both at once"):
-   - **Subscription — Happ** (the names come from the apps list): install the app (with the store or download button and the card's description), then **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". Other apps of the platform are listed below. A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" lists the apps on the link and when they last fetched it. Opening the page does not update this time; only an app fetch does.
-   - **AmneziaVPN key**: made from **Add a device** in "My devices" when self-service is on (see below).
-6. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
-7. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
-8. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
+4. **The steps of connecting** (a first visit; the same flow, as a sheet, is **Add a device** later). With both ways the first step is **What to connect with**: two cards, the same as in the "Add a device" sheet. **With an app** is the recommended one and chosen at the start; **With a key (AmneziaVPN)** is the other. With one way only there is no question.
+   - **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable.
+   - **With an app** (the names come from the apps list; only link apps are listed, never a key app): the app, then install it (with the store or download button and the card's description) and **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" lists the apps on the link and when they last fetched it. Opening the page does not update this time; only an app fetch does.
+   - **With a key**: install AmneziaVPN, **Add a device** (the key form opens), paste the key. When self-service is off the step says "Ask for a key".
+5. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
+6. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
+7. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
 
 A platform with no app gets "There's no app for … — pick another device above". A person who gets nothing yet sees "The server is still being set up — message the admin."
 
@@ -66,7 +66,7 @@ Turn the option off on the **User page** tab if you send links only to people yo
 
 ## Instructions per platform
 
-The steps come from the apps list of the **User page** tab. For the chosen platform, each app of the person's ways gets a card:
+The steps come from the apps list of the **User page** tab. For the chosen platform, each link app gets a card (key apps never stand among them: the key way has its own steps):
 
 - the recommended app leads its way, with a "recommended" badge when there are several;
 - the download button names the store when it can (App Store, Google Play), else "website";
@@ -79,14 +79,14 @@ For keys the page gives the AmneziaVPN steps: on a phone "Open AmneziaVPN", "Tap
 
 One card holds everything that takes a slot of the person's device limit:
 
-- **Apps on the link**: one row for all the apps that fetched the subscription (Happ, kl!ck, …), with when they last did. They share one slot: "All apps on the link take one slot". The slot is taken when the first app fetches the subscription; the device limit never blocks the link.
+- **Apps on the link**: one row for all the apps that fetched the subscription (Happ, kl!ck, …), with when they last did, and **Copy link** (for an app that is not added with one tap; the button says "Copied" and the screen reader announces it). They share one slot: "All apps on the link take one slot". The slot is taken when the first app fetches the subscription; the device limit never blocks the link.
 - **Keys**: a row per AmneziaVPN key, each one slot, with **Show key** and the **⋯** menu (**Rename**, **Replace key**, **Remove**).
 - The counter in the heading ("5 of 10") and, when the person has both ways and a limit, a line saying what takes a slot.
 
 There is one **Add a device** button under the list (the "Connect another device" block that used to sit under the card is gone). With both ways it opens a sheet that asks "How will it connect?":
 
 - **With an app** (recommended): the steps of connecting a link app: this device, the app (the link apps of the platform, from the apps list), "Add with one tap" or "Copy link", and a QR code of the page for another device when **QR for a second device** is on. It takes no new slot when an app is on the link already.
-- **With a key**: the form of a new key (see below). It takes one slot and says how many are free.
+- **With a key**: the form of a new key (see below), under the same title and key icon as its card. It takes one slot and says how many are free.
 
 A way the person cannot use stays on the sheet as a quiet card with the reason: all slots used (and **Message** when there is a support link), the keys are issued by the owner, there is no connection option yet, or the owner's preview (which has no address for the calls). The link way keeps working in all of these. With one way only the question is skipped: a person with the link alone goes straight to its steps, one with keys alone to the key form.
 

@@ -465,7 +465,7 @@ describe("the list of devices", () => {
 
   it("the owner issues the keys: rows without buttons; keys alone get 'ask for a key' and Write, with the link 'Add' still opens the sheet", () => {
     const both = rows("amnezia-off");
-    expect(both.querySelectorAll(".dev-acts")).toHaveLength(0);
+    expect(both.querySelectorAll(".dev-acts [data-k^=amz-]")).toHaveLength(0); // no key actions (the link row has its own: copy)
     expect(both.querySelector("[data-k=dev-add]")).not.toBeNull();
     const el = keysAlone("amnezia-off");
     expect(el.querySelectorAll(".dev-acts")).toHaveLength(0);
@@ -487,7 +487,7 @@ describe("the list of devices", () => {
   it("the admin's preview (no address) shows the rows without buttons and does not say 'ask the owner'; the link branch still opens", () => {
     const d = data("many", (x) => (x.amnezia!.endpoints = ""));
     const p = view(d, state("android", { returning: true }), actions());
-    expect(p.querySelectorAll(".dev-acts")).toHaveLength(0);
+    expect(p.querySelectorAll(".dev-acts [data-k^=amz-]")).toHaveLength(0);
     expect(p.querySelector("[data-k=dev-add]")).not.toBeNull(); // the link needs no address
     expect(p.textContent).not.toContain("Попросите ключ");
     expect(rows("many").querySelectorAll(".dev-acts").length).toBeGreaterThan(0);
@@ -661,7 +661,7 @@ describe("the add-a-device dialog", () => {
 
   it("the device (six choices), its name, and the connection option only when there is a choice, named by countries", () => {
     const b = form();
-    expect(text(b.querySelector("h3"))).toBe("Новое устройство");
+    expect(text(b.querySelector("h3"))).toBe("Ключом AmneziaVPN"); // named as the card it came from
     expect(text(b.querySelector(".sh-head .sub"))).toBe("Для него появится свой ключ AmneziaVPN");
     expect([...b.querySelectorAll(".plats .plat")].map(text)).toEqual(["iPhone", "Android", "Windows", "Mac", "Linux", "Другое"]);
     expect(b.querySelector<HTMLElement>(".plat.on")?.textContent).toBe("iPhone");

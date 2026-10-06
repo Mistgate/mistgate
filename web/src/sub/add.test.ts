@@ -70,7 +70,8 @@ describe("step 1: the way", () => {
     expect(text(box.querySelector(".sh-head .sub"))).toBe("Как оно будет подключаться?");
     const ways = [...box.querySelectorAll<HTMLButtonElement>("button.opt.go")];
     expect(ways.map((b) => b.getAttribute("data-k"))).toEqual(["add-way-link", "add-way-key"]);
-    expect(ways[0]!.hasAttribute("data-autofocus")).toBe(true);
+    expect(box.querySelector("h3")?.hasAttribute("data-autofocus")).toBe(true); // the first focus is the title: no ring on a card
+    expect(ways.some((b) => b.hasAttribute("data-autofocus"))).toBe(false);
     const link = ways[0]!;
     expect(text(link.querySelector(".opt-t"))).toBe("Через приложениеРекомендуем");
     expect([...link.querySelectorAll(".chip")].map(text)).toEqual(["Happ"]); // the names come from the settings, not from the page
@@ -209,16 +210,47 @@ describe("the link branch: the steps of connecting with an app", () => {
   });
 });
 
+describe("the heads of the branches are built the same way as their cards", () => {
+  it("the link branch: the link icon in the card's colour, the title of the card, the title takes the first focus", () => {
+    const pick = sheet(data("devices-rich"), "pick").box;
+    const link = sheet(data("devices-rich"), "link").box;
+    expect(text(link.querySelector("h3"))).toBe(text(pick.querySelector("[data-k=add-way-link] .opt-t")).replace("Рекомендуем", ""));
+    expect(link.querySelector(".sh-head .tile.sky")).not.toBeNull();
+    expect(link.querySelector(".sh-head .tile svg")?.innerHTML).toBe(pick.querySelector("[data-k=add-way-link] .tile svg")!.innerHTML);
+    expect(link.querySelector("h3")?.getAttribute("tabindex")).toBe("-1");
+    expect(link.querySelector("h3")?.hasAttribute("data-autofocus")).toBe(true);
+    expect(link.querySelector("[data-k=add-back]")?.hasAttribute("data-autofocus")).toBe(false);
+  });
+
+  it("every app of the link branch is a link app: no card says so", () => {
+    const { box } = sheet(data("devices-rich"), "link", { platform: "windows" });
+    expect(box.querySelectorAll(".app")).toHaveLength(2);
+    expect(box.querySelectorAll(".app .way")).toHaveLength(0);
+    expect(box.textContent).not.toContain("по ссылке подписки");
+  });
+
+  it("the five devices are one group of the link branch (their row is the stylesheet's: the dialog of this branch is wider)", () => {
+    expect([...sheet(data("devices-rich"), "link").box.querySelectorAll(".lbody .plats .plat")].map(text)).toEqual(["iPhone", "Android", "Windows", "Mac", "Linux"]);
+  });
+});
+
 describe("the key branch", () => {
   it("is the form of a new device; with both ways it has the way back", () => {
     const a = actions();
     const { box, label } = sheet(data("devices-rich"), "key", { a });
-    expect(label).toBe("Новое устройство");
-    expect(text(box.querySelector("h3"))).toBe("Новое устройство");
+    expect(label).toBe("Ключом AmneziaVPN"); // named as the card it came from, with its key icon in its colour
+    expect(text(box.querySelector("h3"))).toBe("Ключом AmneziaVPN");
+    expect(text(box.querySelector(".sh-head .sub"))).toBe("Для него появится свой ключ AmneziaVPN");
+    expect(box.querySelector(".sh-head .tile.mint")).not.toBeNull();
+    expect(box.querySelector(".sh-head .tile svg")?.innerHTML).toBe(sheet(data("devices-rich"), "pick").box.querySelector("[data-k=add-way-key] .tile svg")!.innerHTML);
+    expect(box.querySelector("h3")?.hasAttribute("data-autofocus")).toBe(true);
     expect(box.querySelector("[data-k=modal-create]")).not.toBeNull();
     box.querySelector<HTMLButtonElement>("[data-k=add-back]")!.click();
     expect(a.log).toEqual(["pane pick"]);
     expect(sheet(data("keys-only"), "key").box.querySelector("[data-k=add-back]")).toBeNull();
+    const alone = sheet(data("keys-only"), "key");
+    expect(alone.label).toBe("Новое устройство"); // nothing to be named after
+    expect(alone.box.querySelector("h3")?.hasAttribute("data-autofocus")).toBe(false); // the chosen device keeps the first focus
   });
 
   it("a key's own sheets win over the pane: a device just made shows its key", () => {
@@ -236,6 +268,7 @@ describe("the keys of the page stay unique (the page puts the keyboard back by t
     for (const name of names) {
       for (const platform of ["ios", "windows"] as const) {
         const d = data(name);
+        for (const way of ["link", "key"] as const) expect(dupes(keys(view(d, state(platform, { returning: false, way }), actions()))), `${name} ${platform} first visit, ${way}`).toEqual([]);
         const page = keys(view(d, state(platform, { returning: name !== "first" && name !== "happ" }), actions()));
         expect(dupes(page), `${name} ${platform} page`).toEqual([]);
         for (const pane of ["pick", "link", "key"] as const) {
@@ -254,5 +287,32 @@ describe("the keys of the page stay unique (the page puts the keyboard back by t
       expect(dupes(keys(el))).toEqual([]);
     }
     expect(amzNoop.pane).toBeDefined();
+  });
+});
+
+describe("the row of the apps on the link has an action: copy the link", () => {
+  const row = (el: HTMLElement) => [...el.querySelectorAll(".dev")].find((x) => text(x.querySelector(".dev-n")) === "Приложения по ссылке")!;
+  const page = (name: string, f: (d: MgData) => void = () => {}, a = actions()) => view(data(name, f), state("ios", { returning: true }), a);
+
+  it("a secondary button in the row's own block of actions, like the keys'; it copies, marks the device, says 'Скопировано' and is announced", () => {
+    const a = actions();
+    const d = data("devices-rich");
+    const el = view(d, state("ios", { returning: true }), a);
+    const btn = row(el).querySelector<HTMLButtonElement>(".dev-acts [data-k=dev-link-copy]")!;
+    expect(text(btn)).toBe("Скопировать ссылку");
+    expect(btn.classList.contains("sec")).toBe(true);
+    expect(btn.getAttribute("aria-live")).toBe("polite");
+    expect(btn.closest(".dev-acts")?.parentElement).toBe(row(el)); // the same place as the key rows' actions
+    btn.click();
+    expect(a.log).toEqual([`copy ${d.subscription_url}`, "mark"]);
+    expect(text(btn)).toBe("Скопировано");
+    expect(row(el).textContent).not.toContain(d.subscription_url); // the link is copied, never written out
+  });
+
+  it("English; and no button where there is nothing to copy: no link, an inactive subscription, a key row", () => {
+    expect(text(view(data("devices-rich"), state("ios", { returning: true }, "en"), actions()).querySelector("[data-k=dev-link-copy]"))).toBe("Copy link");
+    expect(row(page("devices-rich", (d) => (d.subscription_url = ""))).querySelector("[data-k=dev-link-copy]")).toBeNull();
+    expect(view(data("expired"), state("ios"), actions()).querySelector("[data-k=dev-link-copy]")).toBeNull();
+    expect(page("devices-rich").querySelectorAll("[data-k=dev-link-copy]")).toHaveLength(1);
   });
 });

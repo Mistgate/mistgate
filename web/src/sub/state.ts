@@ -118,6 +118,8 @@ export type State = {
   detected: Platform | null;
   /** The chosen app of the platform (appKey), "" = the first. */
   app: string;
+  /** The first-visit steps are for this way (the choice of the two; the link is the recommended one). */
+  way: "link" | "key";
   theme: Theme;
   /** The "connect another device" row (the QR code of the link) is open. */
   qrOpen: boolean;
@@ -139,6 +141,7 @@ export type Actions = {
   lang(l: Lang): void;
   platform(p: Platform): void;
   app(key: string): void;
+  way(way: "link" | "key"): void;
   theme(t: Theme): void;
   qrOpen(open: boolean): void;
   stepsAgain(): void;

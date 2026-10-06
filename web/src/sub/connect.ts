@@ -13,19 +13,24 @@ import {
   hasLinkApp,
   isPhone,
   keyAppName,
+  keyAvailability,
   platformOrder,
   platformWord,
   qrApp,
   safeAddUrl,
   safeUrl,
+  ways,
+  type Way,
 } from "./logic";
 import { qrSvg } from "./qr";
 import type { Ctx } from "./state";
 import { note, rich, tile } from "./ui";
-import type { AppEntry, Kind, Platform } from "./types";
+import type { AppEntry, Platform } from "./types";
+import { wayCards } from "./ways";
 
-// The three steps of connecting: the device, the app, how. Step 3 is written for the chosen app: a link app (install, add the
-// subscription with one tap or by copying the link, turn the VPN on) or a key app (install, add this device, paste the key).
+// The steps of connecting (a first visit, and the link branch of the "add a device" sheet): the way (when there are two), the device,
+// the app, how. The link way: install, add the subscription with one tap or by copying the link, turn the VPN on. The key way:
+// install, add this device (its key is made), paste the key. No key app is ever mixed into the list of link apps.
 
 const platIcon: Record<Platform, IconName> = { ios: "phone", android: "android", windows: "monitor", macos: "laptop", linux: "terminal" };
 
@@ -40,8 +45,8 @@ function qrBox(c: Ctx): HTMLElement | null {
   return svg ? h("div", { class: "qr s" }, svg) : null;
 }
 
-/** Step 1: which device it is for. Tiles on a phone, pills on a computer. */
-export function deviceStep(c: Ctx, k = ""): HTMLElement {
+/** Which device it is for. Tiles on a phone, pills on a computer. */
+export function deviceStep(c: Ctx, k = "", n = 1): HTMLElement {
   const { s, a, t } = c;
   const detected = s.detected;
   const same = detected !== null && detected === s.platform;
@@ -55,7 +60,7 @@ export function deviceStep(c: Ctx, k = ""): HTMLElement {
   return h(
     "div",
     { class: "step" },
-    h("div", { class: "step-h" }, h("span", { class: "sn" }, "1"), h("h3", { class: "step-t" }, t.yourDevice), same && h("span", { class: "hint only-w" }, icon("check", 14), t.detectedShort)),
+    h("div", { class: "step-h" }, h("span", { class: "sn" }, String(n)), h("h3", { class: "step-t" }, t.yourDevice), same && h("span", { class: "hint only-w" }, icon("check", 14), t.detectedShort)),
     h(
       "div",
       { class: "plats", role: "radiogroup", "aria-label": t.pickDev },
@@ -69,31 +74,28 @@ export function deviceStep(c: Ctx, k = ""): HTMLElement {
 }
 
 function appCard(c: Ctx, x: AppEntry, o: { chosen: boolean; big: boolean; many: boolean }, k: string): HTMLElement {
-  const { a, t, d } = c;
+  const { a, t } = c;
   const key = appKey(x);
-  const link = x.kind === "happ";
-  const desc = x.description || (link ? t.linkD : t.keyD);
+  const desc = x.description || t.linkD;
   return h(
     "button",
     { class: `app${o.big ? "" : " min"}${o.chosen ? " on" : ""}`, type: "button", role: "radio", "aria-checked": o.chosen, "data-k": `${k}app-${key}`, on: { click: () => !o.chosen && a.app(key) } },
-    link ? tile("sky", "link", { size: o.big ? undefined : 36 }) : tile("mint", "key", { size: o.big ? undefined : 36 }),
+    tile("sky", "link", { size: o.big ? undefined : 36 }),
     h(
       "span",
       { class: "app-b" },
       h("span", { class: "app-n" }, x.name, o.many && x.recommended && h("span", { class: "badge" }, t.recommended)),
-      h("span", { class: `way ${link ? "sky" : "mint"}` }, link ? t.wayLink : t.wayKey(keyAppName(d, null))),
       h("span", { class: "desc" }, desc),
     ),
     h("span", { class: `radio${o.chosen ? " on" : ""}` }, o.chosen && icon("check", 13)),
   );
 }
 
-/** Step 2: the app. The recommended one big, the others under "Other apps", never folded. `kind` keeps only the apps of one way. */
-export function appStep(c: Ctx, platform: Platform, k = "", kind?: Kind): HTMLElement {
+/** The app, of the link way: the recommended one big, the others under "Other apps", never folded. */
+export function appStep(c: Ctx, platform: Platform, k = "", n = 2): HTMLElement {
   const { d, s, a, t } = c;
-  const all = appList(d, platform, kind);
-  const chosen = chosenApp(d, platform, s.app, kind);
-  const both = new Set(all.map((x) => x.kind)).size > 1;
+  const all = appList(d, platform, "happ");
+  const chosen = chosenApp(d, platform, s.app, "happ");
   let body: Kid;
   if (all.length === 0) {
     // nothing for this device: still the link (it fits any app that takes subscriptions) and the way to write
@@ -119,8 +121,7 @@ export function appStep(c: Ctx, platform: Platform, k = "", kind?: Kind): HTMLEl
   return h(
     "div",
     { class: "step" },
-    h("div", { class: "step-h" }, h("span", { class: "sn" }, "2"), h("h3", { class: "step-t" }, t.appT), both && h("span", { class: "hint only-w" }, t.anyWay)),
-    both && h("p", { class: "hint only-m", style: { "margin-top": "-6px" } }, t.anyWay),
+    h("div", { class: "step-h" }, h("span", { class: "sn" }, String(n)), h("h3", { class: "step-t" }, t.appT)),
     body,
   );
 }
@@ -189,7 +190,7 @@ function keySteps(c: Ctx, app: AppEntry, k: string): HTMLElement {
 }
 
 /** Step 3: the way to connect with the chosen app; or, once the app has fetched the subscription, "Done" (`done` off: the steps, always). */
-export function howStep(c: Ctx, app: AppEntry | undefined, k = "", done = true): HTMLElement | null {
+export function howStep(c: Ctx, app: AppEntry | undefined, k = "", done = true, n = 3): HTMLElement | null {
   const { d, s, a, t } = c;
   if (!app) return null;
   const at = fetchedUnix(d);
@@ -197,7 +198,7 @@ export function howStep(c: Ctx, app: AppEntry | undefined, k = "", done = true):
   return h(
     "div",
     { class: "step" },
-    h("div", { class: "step-h" }, h("span", { class: `sn${finished ? " done" : ""}` }, finished ? icon("check", 14) : "3"), h("h3", { class: "step-t" }, t.howT)),
+    h("div", { class: "step-h" }, h("span", { class: `sn${finished ? " done" : ""}` }, finished ? icon("check", 14) : String(n)), h("h3", { class: "step-t" }, t.howT)),
     finished
       ? h(
           "div",
@@ -237,25 +238,50 @@ function qrRow(c: Ctx, k = ""): HTMLElement[] {
   ].filter((x): x is HTMLElement => !!x);
 }
 
-/** The steps (a first visit): one card; on a computer the QR code stands beside it (qrSide). */
-export function connectCard(c: Ctx): HTMLElement {
-  const { d, s, t } = c;
-  const platform = s.platform;
-  const app = chosenApp(d, platform, s.app);
-  const steps = [deviceStep(c), appStep(c, platform), howStep(c, app)].filter((x): x is HTMLElement => !!x);
-  return h("section", { class: "card", "aria-label": t.connectAria }, ...steps, ...(qrOn(c) ? [h("div", { class: "only-m" }, ...qrRow(c))] : []));
+/** Which way the first-visit steps are for: the chosen one when both can be used; else the only way there is. */
+export function wizardWay(c: Pick<Ctx, "d" | "s">): Way {
+  const w = ways(c.d);
+  if (w.length > 1) return c.s.way === "key" && keyAvailability(c.d) === "ok" ? "key" : "link";
+  return w[0] ?? "link";
 }
 
+/** The first step when there are two ways: how the device will connect (the cards of the "add a device" sheet, as a choice). */
+function wayStep(c: Ctx): HTMLElement {
+  const { a, t } = c;
+  return h(
+    "div",
+    { class: "step" },
+    h("div", { class: "step-h" }, h("span", { class: "sn" }, "1"), h("h3", { class: "step-t" }, t.chooseT)),
+    h("div", { class: "stack g8", role: "radiogroup", "aria-label": t.chooseT }, ...wayCards(c, { k: "", pick: (w) => a.way(w), selected: wizardWay(c) })),
+  );
+}
+
+/** The key app of the platform for the steps of the key way (the settings may name none: the page still says what to do). */
+function keyApp(c: Ctx): AppEntry {
+  const { d, s } = c;
+  return chosenApp(d, s.platform, s.app, "amnezia") ?? { platform: s.platform, kind: "amnezia", name: keyAppName(d, null), download_url: "", add_url: "", description: "", recommended: false };
+}
+
+/** The steps of a first visit: how (with two ways), the device, then the steps of the way: a link app (app, how) or the key (install, add, paste). */
+export function connectCard(c: Ctx): HTMLElement {
+  const { d, s, t } = c;
+  const choose = ways(d).length > 1;
+  const first = choose ? 2 : 1;
+  const steps: (HTMLElement | null)[] = [choose ? wayStep(c) : null, deviceStep(c, "", first)];
+  if (wizardWay(c) === "key") steps.push(howStep(c, keyApp(c), "", true, first + 1));
+  else steps.push(appStep(c, s.platform, "", first + 1), howStep(c, chosenApp(d, s.platform, s.app, "happ"), "", true, first + 2));
+  return h("section", { class: "card", "aria-label": t.connectAria }, ...steps.filter((x): x is HTMLElement => !!x), ...(wizardWay(c) === "link" && qrOn(c) ? [h("div", { class: "only-m" }, ...qrRow(c))] : []));
+}
 /** "Connect another device" inside the "add a device" sheet: a folded row on a phone, the code itself on a computer. */
 export function qrOther(c: Ctx, k: string): HTMLElement | null {
   if (!qrOn(c)) return null;
   return h("div", { class: "stack g12" }, h("section", { class: "card only-m" }, ...qrRow(c, k).slice(1)), h("div", { class: "only-w" }, qrContent(c, `${k}qr-copy-w`)));
 }
 
-/** The QR code beside the steps on a computer (a first visit). */
+/** The QR code beside the steps on a computer (a first visit, the link way). */
 export function qrSide(c: Ctx): HTMLElement | null {
   const { d, a, t } = c;
-  const box = qrBox(c);
+  const box = wizardWay(c) === "link" ? qrBox(c) : null;
   if (!box) return null;
   return h(
     "section",

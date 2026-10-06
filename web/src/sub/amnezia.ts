@@ -42,12 +42,12 @@ export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platfo
  * A button that copies `text` and says so on itself: its label turns into `done` with a tick for a moment. `toast` is the
  * page's toast text. The page's copy() calls back only when the clipboard took the text. `after` runs when it did.
  */
-export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName }): HTMLButtonElement {
+export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName; live?: boolean }): HTMLButtonElement {
   const text = h("span", null, o.label);
   const own = o.cls?.split(" ") ?? [];
   const link = own.includes("tlink");
   const ico = o.ico ?? "copy";
-  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
+  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, "aria-live": o.live ? "polite" : false, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
   let timer = 0;
   function flash() {
     o.after?.();
@@ -76,13 +76,13 @@ export function downloadButton(url: string, t: Dict, key: string, cls = ""): HTM
 }
 
 /** The head of a sheet: ("Back" when the sheet is a step of a choice,) a tinted icon, the title, one line under it, the cross. */
-export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean }, close: () => void, back?: () => void): HTMLElement {
+export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean; focus?: boolean }, close: () => void, back?: () => void): HTMLElement {
   return h(
     "div",
     { class: "sh-head" },
     back && h("button", { class: "ibtn round", type: "button", "data-k": "add-back", "aria-label": t.back, on: { click: back } }, icon("back", 18)),
     tile(o.tone, o.ico),
-    h("div", { class: "grow" }, h("h3", { id: o.id }, o.title), o.sub && h("p", { class: `sub${o.flagRow ? " flagrow" : ""}` }, ...(Array.isArray(o.sub) ? o.sub : [o.sub]))),
+    h("div", { class: "grow" }, h("h3", { id: o.id, tabindex: o.focus ? "-1" : false, "data-autofocus": o.focus ? "" : false }, o.title), o.sub && h("p", { class: `sub${o.flagRow ? " flagrow" : ""}` }, ...(Array.isArray(o.sub) ? o.sub : [o.sub]))),
     h("button", { class: "ibtn round", type: "button", "data-k": "modal-x", "aria-label": t.close, on: { click: close } }, icon("close", 16)),
   );
 }
@@ -121,6 +121,7 @@ function addForm(c: AmzCtx): Kid[] {
   const am = d.amnezia!;
   const app = keyAppName(d, null);
   const f = s.amz.form;
+  const both = ways(d).length > 1;
   const busy = s.amz.busy === "add";
   const choices = profileChoices(am.profiles, t, s.lang, app, flagsOn(s));
   const chosen = choices.find((p) => p.id === f.profile) ?? choices[0];
@@ -134,7 +135,8 @@ function addForm(c: AmzCtx): Kid[] {
       t.platforms[p],
     );
   return [
-    sheetHead(t, { tone: "mint", ico: "plus", id: "dlg-t", title: t.newDevT, sub: t.newDevS(app) }, () => a.amz.add(false), ways(d).length > 1 ? () => a.amz.pane("pick") : undefined),
+    // after a choice the sheet is named as its card was and has "Back"; its focus starts on the title, not on a button
+    sheetHead(t, { tone: "mint", ico: "key", id: "dlg-t", title: both ? t.wayKeyT(app) : t.newDevT, sub: t.newDevS(app), focus: both }, () => a.amz.add(false), both ? () => a.amz.pane("pick") : undefined),
     h(
       "form",
       {
