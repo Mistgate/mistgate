@@ -144,7 +144,7 @@ describe("panel watcher", () => {
     expect(sends).toHaveLength(1);
     expect(JSON.parse(String(sends[0][1]?.body))).toMatchObject({
       chat_id: CHAT_ID,
-      text: "Mistgate panel is not answering: down for 2 min.",
+      text: "Mistgate panel is not answering: down for 3 min.", // three failed checks a minute apart
     });
     expect(kv.writes).toHaveLength(3);
   });
@@ -263,7 +263,7 @@ describe("panel watcher", () => {
     await check(env);
 
     const sends = mock.mock.calls.filter(([input]) => String(input).startsWith("https://api.telegram.org/"));
-    expect(JSON.parse(String(sends[0][1]?.body))).toMatchObject({ text: "Панель не отвечает уже 2 мин." });
+    expect(JSON.parse(String(sends[0][1]?.body))).toMatchObject({ text: "Панель не отвечает уже 3 мин." });
     expect(JSON.parse(String(sends[1][1]?.body))).toMatchObject({ text: "Панель снова отвечает. Не работала 4 мин." });
   });
 });

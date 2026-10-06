@@ -107,7 +107,9 @@ export async function check(env: WatchEnv): Promise<void> {
       await saveState(env.WATCH, { failures, firstFailure });
       return;
     }
-    const text = downMessage(config.alertName, now - firstFailure, config.alertLang);
+    // Cron ticks drift by tens of seconds, so the time since the first failed check can read short; N failed checks a
+    // minute apart mean at least N minutes.
+    const text = downMessage(config.alertName, Math.max(now - firstFailure, failures * 60_000), config.alertLang);
     if (!(await sendMessage(config.botToken, config.chatId, text))) return;
     await saveState(env.WATCH, { failures, firstFailure, downSince: firstFailure });
     return;
