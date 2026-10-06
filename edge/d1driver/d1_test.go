@@ -98,6 +98,50 @@ func TestD1BufferedBatchIsAtomic(t *testing.T) {
 	}
 }
 
+func TestD1BatchResultsAndRollback(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `CREATE TABLE d1driver_batch_results (id INTEGER PRIMARY KEY, value TEXT UNIQUE)`); err != nil {
+		t.Fatal(err)
+	}
+	results, err := BatchResultsDB(ctx, db, []Statement{
+		{Query: `INSERT INTO d1driver_batch_results (id, value) VALUES (1, 'first')`},
+		{Query: `UPDATE d1driver_batch_results SET value = 'changed' WHERE id = 1 RETURNING id AS row_id, value AS updated_value`, Returning: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 || results[0].RowsAffected != 1 || results[1].RowsAffected != 1 || len(results[1].Rows) != 1 {
+		t.Fatalf("batch results = %+v", results)
+	}
+	if results[1].Rows[0][0] != int64(1) || results[1].Rows[0][1] != "changed" {
+		t.Fatalf("RETURNING row = %#v", results[1].Rows[0])
+	}
+	if _, err := BatchResultsDB(ctx, db, []Statement{{Query: `SELECT 42 AS "3", 17 AS "1"`, Returning: true}}); err == nil || err.Error() != `d1driver: batch column "1" has an integer-like name; give it an alias` {
+		t.Fatalf("integer-like column error = %v", err)
+	}
+	ordered, err := BatchResultsDB(ctx, db, []Statement{{Query: `SELECT 42 AS first_value, 17 AS second_value`, Returning: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ordered) != 1 || len(ordered[0].Rows) != 1 || ordered[0].Rows[0][0] != int64(42) || ordered[0].Rows[0][1] != int64(17) {
+		t.Fatalf("ordered aliased columns = %+v", ordered)
+	}
+	if _, err := BatchResultsDB(ctx, db, []Statement{
+		{Query: `INSERT INTO d1driver_batch_results (id, value) VALUES (2, 'second')`},
+		{Query: `INSERT INTO d1driver_batch_results (id, value) VALUES (3, 'changed')`},
+	}); err == nil {
+		t.Fatal("batch with a constraint violation succeeded")
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM d1driver_batch_results`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("failed batch left %d rows, want only the earlier committed row", count)
+	}
+}
+
 func TestD1RollbackDropsBufferedWrites(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()

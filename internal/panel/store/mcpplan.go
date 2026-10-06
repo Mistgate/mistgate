@@ -75,9 +75,10 @@ func (p MCPPlan) Open(now time.Time) bool {
 	return false
 }
 
-const planColumns = `p.id, p.token_id, COALESCE(t.name, ''), COALESCE(t.profile, ''), p.tool, p.params_json, p.facts_json,
+const planColumns = `p.id, p.token_id, COALESCE(t.name, '') AS token_name, COALESCE(t.profile, '') AS token_profile,
+	p.tool, p.params_json, p.facts_json,
 	p.summary, p.danger, p.reason, p.inner_ref, p.params_hash, p.confirm_hash, p.needs_approval, p.status,
-	p.created_at, p.expires_at, p.decided_at, p.applied_at, p.decided_by, COALESCE(d.display_name, ''), p.result, p.error,
+	p.created_at, p.expires_at, p.decided_at, p.applied_at, p.decided_by, COALESCE(d.display_name, '') AS decided_by_name, p.result, p.error,
 	p.outcome_code, p.outcome_params`
 
 const planFrom = ` FROM mcp_plan p LEFT JOIN api_token t ON t.id = p.token_id LEFT JOIN admin d ON d.id = p.decided_by `
@@ -104,6 +105,14 @@ func scanPlan(r rowScanner) (MCPPlan, error) {
 		p.AppliedAt = fromUnix(applied)
 	}
 	return p, nil
+}
+
+func scanPlanRow(values []any, p *MCPPlan) error {
+	got, err := scanPlan(batchRow(values))
+	if err == nil {
+		*p = got
+	}
+	return err
 }
 
 // effective is the status a reader should see at now: an unapplied plan past its expiry is expired.
@@ -150,46 +159,50 @@ func (s *Store) CreateMCPPlan(ctx context.Context, p MCPPlan, maxOpenPerToken, m
 		p.FactsJSON = "[]"
 	}
 	now := unix(p.CreatedAt)
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `SELECT EXISTS (SELECT 1 FROM api_token WHERE id = ?) AS token_exists,
+			COALESCE((SELECT revoked_at FROM api_token WHERE id = ?), 0) AS revoked_at,
+			(SELECT count(*) FROM mcp_plan WHERE token_id = ? AND status IN ` + openStatuses + ` AND expires_at > ?) AS token_open_count,
+			(SELECT count(*) FROM mcp_plan WHERE status = 'awaiting' AND expires_at > ?) AS panel_awaiting_count`,
+			Args: []any{p.TokenID, p.TokenID, p.TokenID, now, now}, Returning: true},
+		Stmt{Query: `INSERT INTO mcp_plan
+		(id, token_id, tool, params_json, params_hash, confirm_hash, facts_json, summary, danger,
+		 needs_approval, reason, inner_ref, status, created_at, expires_at)
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		WHERE EXISTS (SELECT 1 FROM api_token WHERE id = ? AND revoked_at = 0)
+		AND (SELECT count(*) FROM mcp_plan WHERE token_id = ? AND status IN ` + openStatuses + ` AND expires_at > ?) < ?
+		AND (? <> 'awaiting' OR (SELECT count(*) FROM mcp_plan WHERE status = 'awaiting' AND expires_at > ?) < ?)`,
+			Args: []any{p.ID, p.TokenID, p.Tool, p.ParamsJSON, p.ParamsHash, p.ConfirmHash, p.FactsJSON, p.Summary, p.Danger,
+				int64(accBool(p.NeedsApproval)), Clip(p.Reason, 300), p.InnerRef, p.Status, now, unix(p.ExpiresAt),
+				p.TokenID, p.TokenID, now, int64(maxOpenPerToken), p.Status, now, int64(maxAwaiting)}},
+	)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	var revoked int64
-	if err := tx.QueryRowContext(ctx, `SELECT revoked_at FROM api_token WHERE id = ?`, p.TokenID).Scan(&revoked); errors.Is(err, sql.ErrNoRows) {
+	if results[1].RowsAffected == 1 {
+		return nil
+	}
+	if len(results[0].Rows) != 1 {
+		return errors.New("store: plan limit check returned no row")
+	}
+	state := results[0].Rows[0]
+	exists, _ := state[0].(int64)
+	revoked, _ := state[1].(int64)
+	open, _ := state[2].(int64)
+	awaiting, _ := state[3].(int64)
+	if exists == 0 {
 		return ErrNotFound
-	} else if err != nil {
-		return err
 	}
 	if revoked != 0 {
 		return &PlanStateError{Status: PlanCancelled}
 	}
-	var open, awaiting int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mcp_plan WHERE token_id = ? AND status IN `+openStatuses+` AND expires_at > ?`,
-		p.TokenID, now).Scan(&open); err != nil {
-		return err
-	}
-	if open >= maxOpenPerToken {
+	if open >= int64(maxOpenPerToken) {
 		return ErrTooManyPlans
 	}
-	if p.Status == PlanAwaiting {
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mcp_plan WHERE status = 'awaiting' AND expires_at > ?`, now).Scan(&awaiting); err != nil {
-			return err
-		}
-		if awaiting >= maxAwaiting {
-			return ErrTooManyPlans
-		}
+	if p.Status == PlanAwaiting && awaiting >= int64(maxAwaiting) {
+		return ErrTooManyPlans
 	}
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO mcp_plan (id, token_id, tool, params_json, params_hash, confirm_hash, facts_json, summary, danger,
-		                      needs_approval, reason, inner_ref, status, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.TokenID, p.Tool, p.ParamsJSON, p.ParamsHash, p.ConfirmHash, p.FactsJSON, p.Summary, p.Danger,
-		accBool(p.NeedsApproval), Clip(p.Reason, 300), p.InnerRef, p.Status, now, unix(p.ExpiresAt))
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return ErrTooManyPlans
 }
 
 // MCPPlanByConfirm finds the plan of a token by SHA-256 of its confirm token. The status is the stored one:
@@ -269,27 +282,27 @@ func (s *Store) decideMCPPlan(ctx context.Context, id, adminID string, approve b
 	if len(secret) > 0 {
 		sealed = secret
 	}
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return MCPPlan{}, err
-	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `
+	results, err := s.batch(ctx, Stmt{Query: `
 		UPDATE mcp_plan SET status = ?, decided_by = ?, decided_at = ?, owner_secret = ?
 		WHERE id = ? AND status = 'awaiting' AND needs_approval = 1 AND expires_at > ?
 		  AND EXISTS (SELECT 1 FROM api_token t WHERE t.id = mcp_plan.token_id AND t.revoked_at = 0)`,
-		to, adminID, unix(now), sealed, id, unix(now))
+		Args: []any{to, adminID, unix(now), sealed, id, unix(now)}},
+		Stmt{Query: `SELECT ` + planColumns + planFrom + `WHERE p.id = ?`, Args: []any{id}, Returning: true},
+	)
 	if err != nil {
 		return MCPPlan{}, err
 	}
-	p, err := scanPlan(tx.QueryRowContext(ctx, `SELECT `+planColumns+planFrom+`WHERE p.id = ?`, id))
-	if err != nil {
+	var p MCPPlan
+	if len(results[1].Rows) == 0 {
+		return MCPPlan{}, ErrNotFound
+	}
+	if err := scanPlanRow(results[1].Rows[0], &p); err != nil {
 		return MCPPlan{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if results[0].RowsAffected == 0 {
 		return MCPPlan{}, &PlanStateError{Status: p.effective(now)}
 	}
-	return p, tx.Commit()
+	return p, nil
 }
 
 // BeginApply is the compare-and-swap planned|approved -> applying that lets exactly one caller run a plan. It
@@ -298,12 +311,7 @@ func (s *Store) decideMCPPlan(ctx context.Context, id, adminID string, approve b
 // unexpired. A plan that is not there for this token and tool is ErrNotFound: one answer, no oracle. A plan in
 // another state is a *PlanStateError (ErrPlanState) with the status found. applied_at is set to now (the start).
 func (s *Store) BeginApply(ctx context.Context, id, tokenID, tool string, paramsHash, confirmHash []byte, now time.Time) (MCPPlan, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return MCPPlan{}, err
-	}
-	defer tx.Rollback()
-	p, err := scanPlan(tx.QueryRowContext(ctx, `SELECT `+planColumns+planFrom+`WHERE p.id = ?`, id))
+	p, err := s.GetMCPPlan(ctx, id)
 	if err != nil {
 		return MCPPlan{}, err
 	}
@@ -314,32 +322,35 @@ func (s *Store) BeginApply(ctx context.Context, id, tokenID, tool string, params
 	if !bytes.Equal(p.ParamsHash, sum[:]) || !bytes.Equal(paramsHash, sum[:]) {
 		return MCPPlan{}, fmt.Errorf("store: plan %s: the stored arguments do not match their hash", id)
 	}
-	res, err := tx.ExecContext(ctx, `
+	results, err := s.batch(ctx, Stmt{Query: `
 		UPDATE mcp_plan SET status = 'applying', applied_at = ?
 		WHERE id = ? AND token_id = ? AND tool = ? AND params_hash = ? AND confirm_hash = ?
-		  AND status IN ('planned', 'approved') AND expires_at > ?`,
-		unix(now), id, tokenID, tool, paramsHash, confirmHash, unix(now))
+		  AND params_json = ? AND status IN ('planned', 'approved') AND expires_at > ?`,
+		Args: []any{unix(now), id, tokenID, tool, paramsHash, confirmHash, p.ParamsJSON, unix(now)}},
+		Stmt{Query: `SELECT ` + planColumns + planFrom + `WHERE p.id = ?`, Args: []any{id}, Returning: true},
+	)
 	if err != nil {
 		return MCPPlan{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return MCPPlan{}, &PlanStateError{Status: p.effective(now)}
+	if len(results[1].Rows) == 0 {
+		return MCPPlan{}, ErrNotFound
 	}
-	p.Status, p.AppliedAt = PlanApplying, fromUnix(now.Unix())
-	return p, tx.Commit()
+	var current MCPPlan
+	if err := scanPlanRow(results[1].Rows[0], &current); err != nil {
+		return MCPPlan{}, err
+	}
+	if results[0].RowsAffected == 0 {
+		return MCPPlan{}, &PlanStateError{Status: current.effective(now)}
+	}
+	return current, nil
 }
 
 // TakeMCPPlanOwnerSecret hands out, once, what the owner entered when approving plan id of tool for tokenID, and clears
 // it: only while that plan is applying with a recorded human decision. ErrNotFound otherwise (nothing stored, already
 // taken, another token or tool, or a plan in another state).
 func (s *Store) TakeMCPPlanOwnerSecret(ctx context.Context, id, tokenID, tool string) ([]byte, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 	var secret []byte
-	err = tx.QueryRowContext(ctx, `SELECT owner_secret FROM mcp_plan
+	err := s.R.QueryRowContext(ctx, `SELECT owner_secret FROM mcp_plan
 		WHERE id = ? AND token_id = ? AND tool = ? AND status = 'applying' AND needs_approval = 1 AND decided_by <> ''
 		  AND owner_secret IS NOT NULL`, id, tokenID, tool).Scan(&secret)
 	if errors.Is(err, sql.ErrNoRows) || err == nil && len(secret) == 0 {
@@ -348,10 +359,17 @@ func (s *Store) TakeMCPPlanOwnerSecret(ctx context.Context, id, tokenID, tool st
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE mcp_plan SET owner_secret = NULL WHERE id = ?`, id); err != nil {
+	res, err := s.W.ExecContext(ctx, `UPDATE mcp_plan SET owner_secret = NULL WHERE id = ? AND token_id = ? AND tool = ?
+		AND status = 'applying' AND needs_approval = 1 AND decided_by <> '' AND owner_secret = ?`, id, tokenID, tool, secret)
+	if err != nil {
 		return nil, err
 	}
-	return secret, tx.Commit()
+	if n, err := res.RowsAffected(); err != nil {
+		return nil, err
+	} else if n != 1 {
+		return nil, ErrNotFound
+	}
+	return secret, nil
 }
 
 // FinishApply ends an apply: applying -> applied (ok, with result) or failed (errText), with the outcome as a code and

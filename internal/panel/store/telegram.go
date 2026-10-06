@@ -36,50 +36,29 @@ func (s *Store) TelegramBot(ctx context.Context) (TelegramBotRow, error) {
 // SetTelegramBot stores the bot. When it is another bot than the one stored, every chat link is deleted with it (chat ids
 // belong to a bot); dropped says how many.
 func (s *Store) SetTelegramBot(ctx context.Context, b TelegramBotRow, now time.Time) (dropped int, err error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM telegram_link WHERE NOT EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1)
+			OR EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1 AND bot_id <> ?)`, Args: []any{b.BotID}},
+		Stmt{Query: `INSERT INTO telegram_bot (id, token, bot_id, username, updated_at) VALUES (1, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET token = excluded.token, bot_id = excluded.bot_id, username = excluded.username, updated_at = excluded.updated_at`,
+			Args: []any{b.Token, b.BotID, b.Username, unix(now)}},
+	)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
-	var prev int64
-	switch err := tx.QueryRowContext(ctx, `SELECT bot_id FROM telegram_bot WHERE id = 1`).Scan(&prev); {
-	case errors.Is(err, sql.ErrNoRows): // first bot: no link can exist without one, but clear strays anyway
-		prev = -1
-	case err != nil:
-		return 0, err
-	}
-	if prev != b.BotID {
-		res, err := tx.ExecContext(ctx, `DELETE FROM telegram_link`)
-		if err != nil {
-			return 0, err
-		}
-		n, _ := res.RowsAffected()
-		dropped = int(n)
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO telegram_bot (id, token, bot_id, username, updated_at) VALUES (1, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET token = excluded.token, bot_id = excluded.bot_id, username = excluded.username, updated_at = excluded.updated_at`,
-		b.Token, b.BotID, b.Username, unix(now)); err != nil {
-		return 0, err
-	}
-	return dropped, tx.Commit()
+	return int(results[0].RowsAffected), nil
 }
 
 // ClearTelegramBot forgets the bot and every link; dropped says how many links went.
 func (s *Store) ClearTelegramBot(ctx context.Context) (dropped int, err error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM telegram_link`},
+		Stmt{Query: `DELETE FROM telegram_bot`},
+	)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `DELETE FROM telegram_link`)
-	if err != nil {
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM telegram_bot`); err != nil {
-		return 0, err
-	}
-	return int(n), tx.Commit()
+	return int(results[0].RowsAffected), nil
 }
 
 // TelegramLinkRow is one admin's chat with the admin's name and role.
@@ -143,24 +122,20 @@ func (s *Store) TelegramLinkByChat(ctx context.Context, chatID int64) (TelegramL
 // BindTelegramChat links the chat to the admin, alerts on. The admin's earlier chat is replaced; so is the earlier owner
 // of this chat (one chat, one admin). ErrNotFound: no such admin.
 func (s *Store) BindTelegramChat(ctx context.Context, adminID string, chatID int64, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM telegram_link WHERE (chat_id = ? OR admin_id = ?)
+			AND EXISTS (SELECT 1 FROM admin WHERE id = ?)`, Args: []any{chatID, adminID, adminID}},
+		Stmt{Query: `INSERT INTO telegram_link (admin_id, chat_id, enabled, linked_at)
+			SELECT ?, ?, 1, ? WHERE EXISTS (SELECT 1 FROM admin WHERE id = ?)`,
+			Args: []any{adminID, chatID, unix(now), adminID}},
+	)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	var one int
-	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM admin WHERE id = ?`, adminID).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+	if results[1].RowsAffected == 0 {
 		return ErrNotFound
-	} else if err != nil {
-		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM telegram_link WHERE chat_id = ? OR admin_id = ?`, chatID, adminID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO telegram_link (admin_id, chat_id, enabled, linked_at) VALUES (?, ?, 1, ?)`, adminID, chatID, unix(now)); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 // UnlinkTelegram forgets the admin's chat; it reports whether there was one.

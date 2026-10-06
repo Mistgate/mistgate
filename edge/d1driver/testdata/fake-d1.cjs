@@ -75,7 +75,21 @@ function prepared(query, bound = []) {
         return d1Promise(new Promise(() => {}));
       }
       try {
-        const result = sqlite.prepare(query).run(...bound);
+        const statement = sqlite.prepare(query);
+        statement.setReadBigInts(true);
+        if (statement.columns().length > 0) {
+          const rows = statement.all(...bound).map(d1Row);
+          const changes = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(query)
+            ? Number(sqlite.prepare("SELECT changes() AS value").get().value)
+            : 0;
+          const lastInsertRowid = Number(sqlite.prepare("SELECT last_insert_rowid() AS value").get().value);
+          return d1Promise(Promise.resolve({
+            success: true,
+            results: rows,
+            meta: { changes, last_row_id: lastInsertRowid },
+          }));
+        }
+        const result = statement.run(...bound);
         return d1Promise(Promise.resolve(resultMeta(result.changes, result.lastInsertRowid)));
       } catch (error) {
         return d1Promise(Promise.reject(error));

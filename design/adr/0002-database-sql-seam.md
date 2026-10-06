@@ -17,7 +17,10 @@ small D1 `database/sql` driver.
   and `PRAGMA foreign_keys`; CI applies the whole directory to SQLite and to a local D1.
 - Every transaction in `store` takes one of three shapes, checked by a test on both drivers:
   1. a fixed list of writes (becomes one atomic `db.batch` on D1);
-  2. one guarded statement (`INSERT … WHERE NOT EXISTS`, `UPDATE … WHERE state = ? RETURNING`, compare-and-swap);
+  2. one write uses a guarded write (`… WHERE <cond>`) and its outcome comes from `RowsAffected`; a diagnostic `SELECT`
+     before it in the same batch chooses the failure reason. Several writes that must all happen or none start with
+     `guard(cond)`, then plain writes without per-statement conditions or markers. On `errGuard`, a plain read after the
+     batch chooses the error to return; the guard provides atomicity;
   3. declared serialised: it runs inside the Durable Object that owns that area (the agent hot path lives in the node's
      Durable Object).
   Read-then-write inside a transaction is allowed only in shape 3.

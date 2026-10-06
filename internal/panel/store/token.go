@@ -45,7 +45,7 @@ func (t APIToken) Revoked() bool { return !t.RevokedAt.IsZero() }
 // Expired reports whether the token's lifetime is over at now.
 func (t APIToken) Expired(now time.Time) bool { return !now.Before(t.ExpiresAt) }
 
-const tokenColumns = `t.id, t.name, t.profile, t.hint, t.rate_per_min, t.created_by, COALESCE(a.display_name, ''),
+const tokenColumns = `t.id, t.name, t.profile, t.hint, t.rate_per_min, t.created_by, COALESCE(a.display_name, '') AS created_by_name,
 	t.revoked_by, t.created_at, t.expires_at, t.revoked_at, t.last_used_at, t.last_used_ip, t.last_used_via`
 
 const tokenFrom = ` FROM api_token t LEFT JOIN admin a ON a.id = t.created_by `
@@ -73,33 +73,33 @@ func scanToken(r rowScanner) (APIToken, error) {
 
 // CreateAPIToken stores a new token whose secret hashes to secretHash. The name must be free among the
 // unrevoked tokens (ErrNameTaken) and fewer than MaxLiveTokens live ones may exist (ErrTokenLimit); both checks
-// and the insert are one transaction on the single writer connection. t.CreatedAt is "now" for the cap.
+// are SQL guards on the insert statement. t.CreatedAt is "now" for the cap.
 func (s *Store) CreateAPIToken(ctx context.Context, t APIToken, secretHash []byte) error {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `SELECT count(*) AS live_tokens FROM api_token WHERE revoked_at = 0 AND expires_at > ?`,
+			Args: []any{unix(t.CreatedAt)}, Returning: true},
+		Stmt{Query: `INSERT INTO api_token
+		(id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at)
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		WHERE (SELECT count(*) FROM api_token WHERE revoked_at = 0 AND expires_at > ?) < ?
+		AND NOT EXISTS (SELECT 1 FROM api_token WHERE name_key = ? AND revoked_at = 0)`,
+			Args: []any{t.ID, t.Name, strings.ToLower(t.Name), t.Profile, secretHash, t.Hint, int64(t.RatePerMin), t.CreatedBy,
+				unix(t.CreatedAt), unix(t.ExpiresAt), unix(t.CreatedAt), int64(MaxLiveTokens), strings.ToLower(t.Name)}},
+	)
 	if err != nil {
+		if accIsUnique(err) && strings.Contains(err.Error(), "name_key") {
+			return ErrNameTaken
+		}
 		return err
 	}
-	defer tx.Rollback()
-	var live int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM api_token WHERE revoked_at = 0 AND expires_at > ?`,
-		unix(t.CreatedAt)).Scan(&live); err != nil {
-		return err
-	}
-	if live >= MaxLiveTokens {
-		return ErrTokenLimit
-	}
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO api_token (id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.Name, strings.ToLower(t.Name), t.Profile, secretHash, t.Hint, t.RatePerMin, t.CreatedBy,
-		unix(t.CreatedAt), unix(t.ExpiresAt))
-	if accIsUnique(err) && strings.Contains(err.Error(), "name_key") {
+	if results[1].RowsAffected == 0 {
+		live, _ := results[0].Rows[0][0].(int64)
+		if live >= int64(MaxLiveTokens) {
+			return ErrTokenLimit
+		}
 		return ErrNameTaken
 	}
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 // APITokenBySecretHash finds the token for SHA-256 of a presented secret (revoked and expired ones too: the
@@ -135,33 +135,20 @@ func (s *Store) ListAPITokens(ctx context.Context) ([]APIToken, error) {
 // changes nothing (the first revoker and time stay) and returns the token. ErrNotFound for an unknown id. The
 // partial unique index on the name is freed by the revocation.
 func (s *Store) RevokeAPIToken(ctx context.Context, id, by string, now time.Time) (APIToken, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE api_token SET revoked_at = ?, revoked_by = ? WHERE id = ? AND revoked_at = 0`,
+			Args: []any{unix(now), by, id}},
+		Stmt{Query: `UPDATE mcp_plan SET status = 'cancelled' WHERE token_id = ?
+			AND status IN ('planned', 'awaiting', 'approved')`, Args: []any{id}},
+		Stmt{Query: `SELECT ` + tokenColumns + tokenFrom + `WHERE t.id = ?`, Args: []any{id}, Returning: true},
+	)
 	if err != nil {
 		return APIToken{}, err
 	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE api_token SET revoked_at = ?, revoked_by = ? WHERE id = ? AND revoked_at = 0`,
-		unix(now), by, id)
-	if err != nil {
-		return APIToken{}, err
+	if len(results[2].Rows) == 0 {
+		return APIToken{}, ErrNotFound
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		var exists int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM api_token WHERE id = ?`, id).Scan(&exists); err != nil {
-			return APIToken{}, err
-		}
-		if exists == 0 {
-			return APIToken{}, ErrNotFound
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE mcp_plan SET status = 'cancelled' WHERE token_id = ? AND status IN ('planned', 'awaiting', 'approved')`, id); err != nil {
-		return APIToken{}, err
-	}
-	t, err := scanToken(tx.QueryRowContext(ctx, `SELECT `+tokenColumns+tokenFrom+`WHERE t.id = ?`, id))
-	if err != nil {
-		return APIToken{}, err
-	}
-	return t, tx.Commit()
+	return scanToken(batchRow(results[2].Rows[0]))
 }
 
 // TouchAPIToken records a use of the token: when, from which address and over which channel ("api" or "mcp").

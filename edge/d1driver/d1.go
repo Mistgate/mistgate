@@ -10,8 +10,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"io"
 	"math"
+	"strconv"
 	"sync"
 	"syscall/js"
 )
@@ -30,8 +32,15 @@ const maxSafeInteger = int64(1<<53 - 1)
 
 // Statement is one SQL statement sent as part of an atomic D1 batch.
 type Statement struct {
-	Query string
-	Args  []any
+	Query     string
+	Args      []any
+	Returning bool
+}
+
+// BatchResult is the D1 outcome of one statement after its batch has committed.
+type BatchResult struct {
+	RowsAffected int64
+	Rows         [][]any
 }
 
 // NewConnector creates a database/sql connector around a D1 binding.
@@ -84,8 +93,14 @@ func await(ctx context.Context, p js.Value) (js.Value, error) {
 		finish(outcome{value: value})
 		return nil
 	})
-	reject := js.FuncOf(func(_ js.Value, _ []js.Value) any {
-		finish(outcome{err: errors.New("d1driver: D1 operation failed")})
+	reject := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		message := "d1driver: D1 operation failed"
+		if len(args) > 0 && args[0].Type() == js.TypeObject && !args[0].IsNull() {
+			if detail := args[0].Get("message"); detail.Type() == js.TypeString && detail.String() != "" {
+				message = "d1driver: " + detail.String()
+			}
+		}
+		finish(outcome{err: errors.New(message)})
 		return nil
 	})
 	_, err := call(p, "then", resolve, reject)
@@ -109,41 +124,157 @@ func await(ctx context.Context, p js.Value) (js.Value, error) {
 
 // Batch sends statements in one D1 batch. D1 guarantees the batch is atomic.
 func Batch(ctx context.Context, db js.Value, statements []Statement) error {
+	_, err := BatchResults(ctx, db, statements)
+	return err
+}
+
+// BatchResults sends statements in one D1 batch and collects metadata and rows
+// for statements marked Returning.
+func BatchResults(ctx context.Context, db js.Value, statements []Statement) ([]BatchResult, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	if len(statements) == 0 {
-		return nil
+		return []BatchResult{}, nil
 	}
 	array := js.Global().Get("Array").New()
 	for _, statement := range statements {
 		prepared, err := prepare(db, statement.Query, statement.Args)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		array.Call("push", prepared)
 	}
 	result, err := call(db, "batch", array)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	result, err = await(ctx, result)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	arrayCheck, err := call(js.Global().Get("Array"), "isArray", result)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if arrayCheck.Bool() {
-		for i := 0; i < result.Length(); i++ {
-			if err := checkSuccess(result.Index(i)); err != nil {
-				return err
+	if !arrayCheck.Bool() {
+		if len(statements) != 1 {
+			return nil, errors.New("d1driver: D1 batch returned an invalid result")
+		}
+		return batchResults([]js.Value{result}, statements)
+	}
+	if result.Length() != len(statements) {
+		return nil, errors.New("d1driver: D1 batch returned an invalid result count")
+	}
+	values := make([]js.Value, result.Length())
+	for i := range values {
+		values[i] = result.Index(i)
+	}
+	return batchResults(values, statements)
+}
+
+// BatchResultsDB gets the D1 binding from a pooled database/sql connection and
+// executes one native batch, bypassing database/sql's deferred transaction results.
+func BatchResultsDB(ctx context.Context, db *sql.DB, statements []Statement) ([]BatchResult, error) {
+	sqlConn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlConn.Close()
+	var results []BatchResult
+	err = sqlConn.Raw(func(raw any) error {
+		d1, ok := raw.(*conn)
+		if !ok {
+			return errors.New("d1driver: database connection has an unexpected driver")
+		}
+		var err error
+		results, err = BatchResults(ctx, d1.db, statements)
+		return err
+	})
+	return results, err
+}
+
+func batchResults(values []js.Value, statements []Statement) ([]BatchResult, error) {
+	out := make([]BatchResult, len(values))
+	for i, value := range values {
+		if err := checkSuccess(value); err != nil {
+			return nil, err
+		}
+		meta := value.Get("meta")
+		if meta.Type() != js.TypeObject || meta.IsNull() {
+			return nil, errors.New("d1driver: D1 batch result has no metadata")
+		}
+		changes, err := metadataInteger(meta.Get("changes"))
+		if err != nil {
+			return nil, err
+		}
+		out[i].RowsAffected = changes
+		if !statements[i].Returning {
+			continue
+		}
+		rows := value.Get("results")
+		isArray, err := call(js.Global().Get("Array"), "isArray", rows)
+		if err != nil {
+			return nil, err
+		}
+		if !isArray.Bool() {
+			return nil, errors.New("d1driver: D1 batch result has no returned rows")
+		}
+		out[i].Rows, err = returnedRows(rows)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func returnedRows(values js.Value) ([][]any, error) {
+	if values.Length() == 0 {
+		return nil, nil
+	}
+	var columns []string
+	out := make([][]any, values.Length())
+	for i := range out {
+		row := values.Index(i)
+		if row.Type() != js.TypeObject || row.IsNull() {
+			return nil, errors.New("d1driver: D1 batch returned an invalid row")
+		}
+		rowKeys, err := call(js.Global().Get("Object"), "keys", row)
+		if err != nil {
+			return nil, err
+		}
+		rowColumnSet := make(map[string]bool, rowKeys.Length())
+		for j := 0; j < rowKeys.Length(); j++ {
+			column := rowKeys.Index(j).String()
+			if isArrayIndex(column) {
+				return nil, fmt.Errorf("d1driver: batch column %q has an integer-like name; give it an alias", column)
+			}
+			rowColumnSet[column] = true
+			if i == 0 {
+				columns = append(columns, column)
 			}
 		}
-		return nil
+		if rowKeys.Length() != len(columns) {
+			return nil, errors.New("d1driver: D1 batch returned inconsistent columns")
+		}
+		out[i] = make([]any, len(columns))
+		for j, column := range columns {
+			if !rowColumnSet[column] {
+				return nil, errors.New("d1driver: D1 batch returned inconsistent column order")
+			}
+			value, err := fromJS(row.Get(column))
+			if err != nil {
+				return nil, err
+			}
+			out[i][j] = value
+		}
 	}
-	return checkSuccess(result)
+	return out, nil
+}
+
+func isArrayIndex(value string) bool {
+	n, err := strconv.ParseUint(value, 10, 32)
+	return err == nil && n < 1<<32-1 && strconv.FormatUint(n, 10) == value
 }
 
 type conn struct {

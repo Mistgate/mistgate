@@ -50,18 +50,11 @@ func (s *Store) AdminCount(ctx context.Context) (int, error) {
 // PutSetupToken stores a new one-time setup token hash and drops older unused ones,
 // so only the latest printed link works.
 func (s *Store) PutSetupToken(ctx context.Context, hash []byte, expires time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM setup_token WHERE used_at IS NULL`); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO setup_token (hash, expires_at) VALUES (?, ?)`, hash, unix(expires)); err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM setup_token WHERE used_at IS NULL`},
+		Stmt{Query: `INSERT INTO setup_token (hash, expires_at) VALUES (?, ?)`, Args: []any{hash, unix(expires)}},
+	)
+	return err
 }
 
 // CheckSetupToken returns ErrSetupClosed unless hash is an unused, unexpired setup
@@ -84,54 +77,46 @@ func (s *Store) CheckSetupToken(ctx context.Context, hash []byte, now time.Time)
 // and its passkey. It returns ErrSetupClosed if the token is not valid any more or an
 // admin already exists, so a token can never create two admins.
 func (s *Store) CreateFirstAdmin(ctx context.Context, tokenHash []byte, now time.Time, a Admin, p Passkey) error {
-	return s.createFirstAdmin(ctx, tokenHash, now, a, func(tx *sql.Tx) error { return insertPasskey(ctx, tx, p, now) })
+	return s.createFirstAdmin(ctx, tokenHash, now, a, passkeyStmt(p, now))
 }
 
 // CreateFirstAdminPassword is CreateFirstAdmin for an admin whose first credential is a
 // password + authenticator code instead of a passkey. A login name that is taken (it
 // cannot be, before the first admin exists) is reported like any other insert error.
 func (s *Store) CreateFirstAdminPassword(ctx context.Context, tokenHash []byte, now time.Time, a Admin, c PasswordCred) error {
-	return s.createFirstAdmin(ctx, tokenHash, now, a, func(tx *sql.Tx) error {
-		c.AdminID = a.ID
-		_, err := tx.ExecContext(ctx,
-			`INSERT INTO admin_password (admin_id, login, hash, totp_secret, totp_step, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-			c.AdminID, c.Login, c.Hash, c.TOTPSecret, c.TOTPStep, unix(now))
-		return err
+	c.AdminID = a.ID
+	return s.createFirstAdmin(ctx, tokenHash, now, a, Stmt{
+		Query: `INSERT INTO admin_password (admin_id, login, hash, totp_secret, totp_step, created_at)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+		Args: []any{c.AdminID, c.Login, c.Hash, c.TOTPSecret, c.TOTPStep, unix(now)},
 	})
 }
 
-func (s *Store) createFirstAdmin(ctx context.Context, tokenHash []byte, now time.Time, a Admin, insertCred func(*sql.Tx) error) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+func (s *Store) createFirstAdmin(ctx context.Context, tokenHash []byte, now time.Time, a Admin, insertCred Stmt) error {
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM setup_token WHERE hash = ? AND used_at IS NULL AND expires_at > ?)
+			AND NOT EXISTS (SELECT 1 FROM admin)`, tokenHash, unix(now)),
+		Stmt{Query: `UPDATE setup_token SET used_at = ? WHERE hash = ?`, Args: []any{unix(now), tokenHash}},
+		Stmt{Query: `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES (?, ?, ?, ?, ?)`,
+			Args: []any{a.ID, a.DisplayName, a.Role, a.UserHandle, unix(now)}},
+		insertCred,
+	)
+	if errors.Is(err, errGuard) {
+		return ErrSetupClosed
 	}
-	defer tx.Rollback()
+	return err
+}
 
-	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM admin)`).Scan(&exists); err != nil {
-		return err
+// passkeyStmt is the INSERT of a passkey.
+func passkeyStmt(p Passkey, now time.Time) Stmt {
+	if p.AAGUID == nil {
+		p.AAGUID = []byte{} // nil would be bound as NULL
 	}
-	if exists {
-		return ErrSetupClosed
-	}
-	res, err := tx.ExecContext(ctx,
-		`UPDATE setup_token SET used_at = ? WHERE hash = ? AND used_at IS NULL AND expires_at > ?`,
-		unix(now), tokenHash, unix(now))
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n != 1 {
-		return ErrSetupClosed
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES (?, ?, ?, ?, ?)`,
-		a.ID, a.DisplayName, a.Role, a.UserHandle, unix(now)); err != nil {
-		return err
-	}
-	if err := insertCred(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return Stmt{Query: `INSERT INTO passkey (id, admin_id, credential_id, public_key, attestation_type, sign_count,
+		                     aaguid, transports, flags, name, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{p.ID, p.AdminID, p.CredentialID, p.PublicKey, p.AttestationType, int64(p.SignCount),
+			p.AAGUID, strings.Join(p.Transports, ","), int64(p.Flags), p.Name, unix(now)}}
 }
 
 // ErrLastMethod is returned when removing a credential would leave the admin unable to sign in.
@@ -139,56 +124,44 @@ var ErrLastMethod = errors.New("store: last sign-in method")
 
 // AddPasskey stores another passkey for an existing admin.
 func (s *Store) AddPasskey(ctx context.Context, p Passkey, now time.Time) error {
-	return insertPasskey(ctx, s.W, p, now)
+	st := passkeyStmt(p, now)
+	_, err := s.W.ExecContext(ctx, st.Query, st.Args...)
+	return err
 }
 
 // DeletePasskey removes one of the admin's passkeys. It returns ErrNotFound if the admin
 // has no such passkey and ErrLastMethod if it is the only way the admin can sign in.
 func (s *Store) DeletePasskey(ctx context.Context, adminID, id string) error {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `SELECT EXISTS (SELECT 1 FROM passkey WHERE id = ? AND admin_id = ?) AS found,
+			(SELECT count(*) FROM passkey WHERE admin_id = ?) AS passkeys,
+			EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ?) AS has_password`,
+			Args: []any{id, adminID, adminID, adminID}, Returning: true},
+		Stmt{Query: `DELETE FROM passkey WHERE id = ? AND admin_id = ?
+			AND ((SELECT count(*) FROM passkey WHERE admin_id = ?) > 1
+				 OR EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ?))`,
+			Args: []any{id, adminID, adminID, adminID}},
+	)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	var n int
-	var found bool
-	if err := tx.QueryRowContext(ctx,
-		`SELECT count(*), coalesce(sum(id = ?), 0) FROM passkey WHERE admin_id = ?`, id, adminID).Scan(&n, &found); err != nil {
-		return err
+	if results[1].RowsAffected == 1 {
+		return nil
 	}
-	if !found {
+	found, _ := results[0].Rows[0][0].(int64)
+	count, _ := results[0].Rows[0][1].(int64)
+	hasPassword, _ := results[0].Rows[0][2].(int64)
+	if found == 0 {
 		return ErrNotFound
 	}
-	if n == 1 {
-		var hasPw bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ?)`, adminID).Scan(&hasPw); err != nil {
-			return err
-		}
-		if !hasPw {
-			return ErrLastMethod
-		}
+	if count == 1 && hasPassword == 0 {
+		return ErrLastMethod
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM passkey WHERE id = ? AND admin_id = ?`, id, adminID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return ErrNotFound
 }
 
 type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
-func insertPasskey(ctx context.Context, x execer, p Passkey, now time.Time) error {
-	if p.AAGUID == nil {
-		p.AAGUID = []byte{} // nil would be bound as NULL
-	}
-	_, err := x.ExecContext(ctx, `
-		INSERT INTO passkey (id, admin_id, credential_id, public_key, attestation_type, sign_count,
-		                     aaguid, transports, flags, name, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.AdminID, p.CredentialID, p.PublicKey, p.AttestationType, int64(p.SignCount),
-		p.AAGUID, strings.Join(p.Transports, ","), int64(p.Flags), p.Name, unix(now))
-	return err
 }
 
 // Admin returns an admin by id.
