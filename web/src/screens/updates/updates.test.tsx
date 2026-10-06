@@ -703,6 +703,12 @@ describe("the nodes of a rollout in progress", () => {
     expect(row("de1").textContent).toContain("Updating…");
   });
 
+  it("subtitle a stage of one node neutrally (it is not always the next one) and a stage of several as together", async () => {
+    await mount(page({ nodes: fleet, rollout: rollout({ steps: [...steps, step({ nodeId: "nod_6", nodeName: "x1", stage: 3, state: StepState.PENDING })] }) }));
+    const stages = [...document.querySelectorAll("ol > li")].map((li) => li.firstElementChild!.textContent);
+    expect(stages).toEqual(["CanaryOne node first, checked for 5 minutes", "Batch 11 node", "Batch 21 node", "Batch 32 nodes together"]);
+    expect(text()).not.toContain("next node");
+  });
   it("keep Roll back where it is allowed, and lose Schedule", async () => {
     await mount(page({ nodes: fleet, rollout: rollout({ steps }) }));
     expect(row("fi1").querySelector("button[aria-label='More actions for fi1']")).not.toBeNull();
