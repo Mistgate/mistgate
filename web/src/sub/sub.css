@@ -405,13 +405,18 @@ a { color: inherit; }
 .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* the ways of "add a device": a whole card is the button; a way that cannot be used is a quiet dashed card that says why */
-.opt.go { align-items: center; min-height: 96px; white-space: normal;transition: transform 0.15s var(--spring); }
+.opt.go { gap: 10px; transition: transform 0.15s var(--spring); }
 .opt.go:active { transform: scale(0.985); }
-.opt.go > .i:last-child { color: var(--muted); }
-.opt.go .opt-b, .opt.off .opt-b { gap: 6px; }
-.opt.go .opt-t { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
-.opt.off { border-style: dashed; background: transparent; }
+/* the icon and the chevron sit on the title line (the top of the card), the rest hangs under the title at one rhythm */
+.opt.go > .i:last-child { color: var(--muted); margin-top: 1px; }
+.opt.go .opt-b, .opt.off .opt-b { gap: 0; }
+.opt.go .opt-t { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-height: 20px; }
+.opt.go .badge { height: 20px; padding: 0 7px; font-size: 11px; border-radius: 6px; }
+.opt.go .opt-d, .opt.off .opt-d { margin-top: 4px; }
+.opt.go .chips, .opt.go .wayslot { margin-top: 8px; }
+.opt.off { gap: 10px; border-style: dashed; background: transparent; }
 .opt.off .opt-t { color: var(--muted); }
+.opt.off .tlink { margin: 2px 0 -10px; }
 .wayslot { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; line-height: 1.4; font-weight: 600; }
 .wayslot.sky { color: var(--tone-sky); } .wayslot.mint { color: var(--tone-mint); }
 .wayslot .sq { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 3px; background: currentColor; }

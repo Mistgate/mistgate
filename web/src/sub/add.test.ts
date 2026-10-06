@@ -74,21 +74,21 @@ describe("step 1: the way", () => {
     const link = ways[0]!;
     expect(text(link.querySelector(".opt-t"))).toBe("Через приложениеРекомендуем");
     expect([...link.querySelectorAll(".chip")].map(text)).toEqual(["Happ"]); // the names come from the settings, not from the page
-    expect(text(link.querySelector(".wayslot"))).toBe("Новых мест не занимает — приложения делят одно"); // an app already took the link's slot
+    expect(text(link.querySelector(".wayslot"))).toBe("Не занимает новых мест"); // an app already took the link's slot
     expect(link.querySelector(".wayslot .sq.o")).not.toBeNull(); // hollow: no slot
     const key = ways[1]!;
     expect(text(key.querySelector(".opt-t"))).toBe("Ключом AmneziaVPN");
     expect(text(key.querySelector(".opt-d"))).toBe("Для роутера и приложения AmneziaVPN. Отдельный ключ на каждое устройство.");
-    expect(text(key.querySelector(".wayslot"))).toBe("Занимает одно место · свободно ещё 5");
+    expect(text(key.querySelector(".wayslot"))).toBe("Занимает 1 место · свободно 5");
     expect(key.querySelector(".wayslot .sq:not(.o)")).not.toBeNull(); // filled: a slot
   });
 
   it("the link not used yet takes the one shared slot at the first app; no limit: no count", () => {
     const first = sheet(data("first"), "pick");
-    expect(text(first.box.querySelector("[data-k=add-way-link] .wayslot"))).toBe("Занимает одно место — общее для всех приложений");
+    expect(text(first.box.querySelector("[data-k=add-way-link] .wayslot"))).toBe("Одно место на все приложения");
     const unlimited = sheet(data("first", (d) => (d.user.device_limit = 0)), "pick");
-    expect(text(unlimited.box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Занимает одно место");
-    expect(text(sheet(data("first", (d) => (d.user.device_limit = 2, d.user.devices_used = 1)), "pick").box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Занимает одно место · свободно ещё одно");
+    expect(text(unlimited.box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Занимает 1 место");
+    expect(text(sheet(data("first", (d) => (d.user.device_limit = 2, d.user.devices_used = 1)), "pick").box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Занимает 1 место · свободно 1");
   });
 
   it("the apps named are the ones of the person's device", () => {
@@ -134,7 +134,7 @@ describe("step 1: the way", () => {
     const { box } = sheet(data("devices-rich"), "pick", { lang: "en" });
     expect(text(box.querySelector("h3"))).toBe("Add a device");
     expect([...box.querySelectorAll(".opt-t")].map(text)).toEqual(["With an appRecommended", "With a key"]);
-    expect(text(box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Takes one slot · 5 free");
+    expect(text(box.querySelector("[data-k=add-way-key] .wayslot"))).toBe("Takes 1 slot · 5 free");
   });
 });
 
