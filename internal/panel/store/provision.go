@@ -63,32 +63,22 @@ func (s *Store) CreateNodeProvisionJob(ctx context.Context, job NodeProvisionJob
 }
 
 func (s *Store) createNodeProvisionJob(ctx context.Context, job NodeProvisionJob, eventCode string) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT INTO node_provision_job (
+	stmts := []Stmt{{Query: `INSERT INTO node_provision_job (
 		id, node_id, name, address, country_code, location, provider, ssh_host, ssh_port,
 		host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
-		job.ID, job.NodeID, job.Name, job.Address, job.CountryCode, job.Location, job.Provider,
-		job.SSHHost, job.SSHPort, job.HostFingerprint, job.Secret, "queued", "queued", job.CreatedBy,
-		unix(job.CreatedAt), unix(job.UpdatedAt))
-	if err != nil {
-		if fleetIsUnique(err) {
-			return ErrConflict
-		}
-		return err
-	}
+		Args: []any{job.ID, job.NodeID, job.Name, job.Address, job.CountryCode, job.Location, job.Provider,
+			job.SSHHost, int64(job.SSHPort), job.HostFingerprint, job.Secret, "queued", "queued", job.CreatedBy,
+			unix(job.CreatedAt), unix(job.UpdatedAt)}}}
 	if eventCode != "" {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'queued', ?, ?)`,
-			job.ID, eventCode, unix(job.CreatedAt)); err != nil {
-			return err
-		}
+		stmts = append(stmts, Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'queued', ?, ?)`,
+			Args: []any{job.ID, eventCode, unix(job.CreatedAt)}})
 	}
-	return tx.Commit()
+	_, err := s.batch(ctx, stmts...)
+	if fleetIsUnique(err) {
+		return ErrConflict
+	}
+	return err
 }
 
 // NodeProvisionJob returns one job without unsealing its secret.
@@ -131,136 +121,72 @@ func (s *Store) NodeProvisionJobs(ctx context.Context, limit int) ([]NodeProvisi
 
 // RequeueNodeProvisionJobs restores interrupted work after a panel restart.
 func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT id FROM node_provision_job WHERE state = 'running'`)
-	if err != nil {
-		return err
-	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return err
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	for _, id := range ids {
-		if _, err := tx.ExecContext(ctx, `UPDATE node_provision_job SET state = 'queued', phase = 'queued', updated_at = ? WHERE id = ? AND state = 'running'`, unix(now), id); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'queued', 'resumed_after_restart', ?)`, id, unix(now)); err != nil {
-			return err
-		}
-	}
-	rows, err = tx.QueryContext(ctx, `SELECT id FROM node_provision_job WHERE state = 'cancel_requested'`)
-	if err != nil {
-		return err
-	}
-	ids = ids[:0]
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return err
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	for _, id := range ids {
-		if _, err := tx.ExecContext(ctx, `UPDATE node_provision_job
-			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown',
-				secret = X'', updated_at = ? WHERE id = ? AND state = 'cancel_requested'`, unix(now), id); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at)
-			VALUES (?, 'cancelled', 'remote_outcome_unknown', ?)`, id, unix(now)); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	_, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'queued', 'resumed_after_restart', ? FROM node_provision_job WHERE state = 'running'`, Args: []any{unix(now)}},
+		Stmt{Query: `UPDATE node_provision_job SET state = 'queued', phase = 'queued', updated_at = ? WHERE state = 'running'`, Args: []any{unix(now)}},
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'cancelled', 'remote_outcome_unknown', ? FROM node_provision_job WHERE state = 'cancel_requested'`, Args: []any{unix(now)}},
+		Stmt{Query: `UPDATE node_provision_job
+			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
+			WHERE state = 'cancel_requested'`, Args: []any{unix(now)}},
+	)
+	return err
 }
 
 // RequestCancelNodeProvisionJob atomically stops queued work or requests cancellation
 // of the active worker. The returned state is either cancelled or cancel_requested.
 func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, now time.Time) (state string, changed bool, err error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `SELECT state FROM node_provision_job WHERE id = ?`, Args: []any{id}, Returning: true},
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, CASE WHEN state = 'queued' THEN 'cancelled' ELSE 'cancelling' END,
+				CASE WHEN state = 'queued' THEN 'cancelled_before_start' ELSE 'cancel_requested' END, ?
+			FROM node_provision_job WHERE id = ? AND state IN ('queued', 'running')`, Args: []any{unix(now), id}},
+		Stmt{Query: `UPDATE node_provision_job SET
+			state = CASE WHEN state = 'queued' THEN 'cancelled' ELSE 'cancel_requested' END,
+			phase = CASE WHEN state = 'queued' THEN 'cancelled' ELSE 'cancelling' END,
+			error_code = CASE WHEN state = 'queued' THEN 'cancelled_before_start' ELSE 'cancel_requested' END,
+			secret = CASE WHEN state = 'queued' THEN X'' ELSE secret END, updated_at = ?
+			WHERE id = ? AND state IN ('queued', 'running') RETURNING state`,
+			Args: []any{unix(now), id}, Returning: true},
+	)
 	if err != nil {
 		return "", false, err
 	}
-	defer tx.Rollback()
-	job, err := scanNodeProvisionJob(tx.QueryRowContext(ctx,
-		`SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE id = ?`, id))
-	if err != nil {
-		return "", false, err
+	if len(results[0].Rows) == 0 {
+		return "", false, ErrNotFound
 	}
-	phase, code := "cancelled", "cancelled_before_start"
-	switch job.State {
-	case "queued":
-		state = "cancelled"
-	case "running":
-		state, phase, code = "cancel_requested", "cancelling", "cancel_requested"
+	current, _ := results[0].Rows[0][0].(string)
+	switch current {
+	case "queued", "running":
+		if len(results[2].Rows) != 1 {
+			return "", false, ErrConflict
+		}
+		state, _ = results[2].Rows[0][0].(string)
+		return state, true, nil
 	case "cancel_requested", "cancelled":
-		return job.State, false, nil
+		return current, false, nil
 	default:
 		return "", false, ErrConflict
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
-		SET state = ?, phase = ?, error_code = ?, secret = CASE WHEN ? = 'cancelled' THEN X'' ELSE secret END, updated_at = ?
-		WHERE id = ? AND state = ?`, state, phase, code, state, unix(now), id, job.State)
-	if err != nil {
-		return "", false, err
-	}
-	if n, err := result.RowsAffected(); err != nil {
-		return "", false, err
-	} else if n != 1 {
-		return "", false, ErrConflict
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, ?, ?, ?)`,
-		id, phase, code, unix(now)); err != nil {
-		return "", false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return "", false, err
-	}
-	return state, true, nil
 }
 
 // FinishCancelledNodeProvisionJob clears credentials after an active worker stops.
 // The remote host may already have received some installation commands.
 func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, now time.Time) (bool, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	results, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'cancelled', 'remote_outcome_unknown', ? FROM node_provision_job
+			WHERE id = ? AND state = 'cancel_requested'`, Args: []any{unix(now), id}},
+		Stmt{Query: `UPDATE node_provision_job
+			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
+			WHERE id = ? AND state = 'cancel_requested'`, Args: []any{unix(now), id}},
+	)
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
-		SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown',
-			secret = X'', updated_at = ? WHERE id = ? AND state = 'cancel_requested'`, unix(now), id)
-	if err != nil {
-		return false, err
-	}
-	n, err := result.RowsAffected()
-	if err != nil || n == 0 {
-		return false, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at)
-		VALUES (?, 'cancelled', 'remote_outcome_unknown', ?)`, id, unix(now)); err != nil {
-		return false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
-	return true, nil
+	return results[1].RowsAffected == 1, nil
 }
 
 // cancelNodeProvisionForRetiredNode releases a name reserved by an install
@@ -296,33 +222,25 @@ func cancelNodeProvisionForRetiredNode(ctx context.Context, tx *sql.Tx, nodeID s
 
 // ClaimNodeProvisionJob atomically claims the oldest queued job for the single panel worker.
 func (s *Store) ClaimNodeProvisionJob(ctx context.Context, now time.Time) (NodeProvisionJob, bool, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	queued := `SELECT id FROM node_provision_job WHERE state = 'queued' ORDER BY created_at, id LIMIT 1`
+	results, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'connecting', 'started', ? FROM node_provision_job
+			WHERE id = (` + queued + `) AND state = 'queued'`, Args: []any{unix(now)}},
+		Stmt{Query: `UPDATE node_provision_job SET state = 'running', phase = 'connecting', error_code = '', updated_at = ?
+			WHERE id = (` + queued + `) AND state = 'queued' RETURNING ` + nodeProvisionJobCols,
+			Args: []any{unix(now)}, Returning: true},
+	)
 	if err != nil {
 		return NodeProvisionJob{}, false, err
 	}
-	defer tx.Rollback()
-	job, err := scanNodeProvisionJob(tx.QueryRowContext(ctx,
-		`SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE state = 'queued' ORDER BY created_at, id LIMIT 1`))
-	if errors.Is(err, ErrNotFound) {
+	if len(results[1].Rows) == 0 {
 		return NodeProvisionJob{}, false, nil
 	}
+	job, err := scanNodeProvisionJob(batchRow(results[1].Rows[0]))
 	if err != nil {
 		return NodeProvisionJob{}, false, err
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job SET state = 'running', phase = 'connecting', error_code = '', updated_at = ? WHERE id = ? AND state = 'queued'`, unix(now), job.ID)
-	if err != nil {
-		return NodeProvisionJob{}, false, err
-	}
-	if n, err := result.RowsAffected(); err != nil || n != 1 {
-		return NodeProvisionJob{}, false, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'connecting', 'started', ?)`, job.ID, unix(now)); err != nil {
-		return NodeProvisionJob{}, false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return NodeProvisionJob{}, false, err
-	}
-	job.State, job.Phase, job.ErrorCode, job.UpdatedAt = "running", "connecting", "", now.UTC()
 	return job, true, nil
 }
 
@@ -353,69 +271,53 @@ func (s *Store) RetryNodeProvisionJob(ctx context.Context, id, from string, secr
 }
 
 func (s *Store) updateNodeProvisionJobFromState(ctx context.Context, id, expected, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	stmts := make([]Stmt, 0, 2)
+	if eventCode != "" {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, ?, ?, ? FROM node_provision_job WHERE id = ? AND state = ?`,
+			Args: []any{phase, eventCode, unix(now), id, expected}})
 	}
-	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
+	stmts = append(stmts, Stmt{Query: `UPDATE node_provision_job
 		SET state = ?, phase = ?, error_code = ?, secret = ?, updated_at = ? WHERE id = ? AND state = ?`,
-		state, phase, errorCode, secret, unix(now), id, expected)
+		Args: []any{state, phase, errorCode, secret, unix(now), id, expected}})
+	results, err := s.batch(ctx, stmts...)
 	if err != nil {
 		return err
 	}
-	if n, err := result.RowsAffected(); err != nil {
-		return err
-	} else if n != 1 {
+	if results[len(results)-1].RowsAffected != 1 {
 		return ErrConflict
 	}
-	if eventCode != "" {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, ?, ?, ?)`,
-			id, phase, eventCode, unix(now)); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return nil
 }
 
 // CompleteNodeProvisionJob clears the temporary job secret and retains the verified SSH credential
 // in the encrypted access table in the same transaction as the completion event.
 func (s *Store) CompleteNodeProvisionJob(ctx context.Context, id string, access NodeServerAccess, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE node_provision_job
-		SET state = 'completed', phase = 'completed', error_code = '', secret = X'', updated_at = ?
-		WHERE id = ? AND state = 'running'`, unix(now), id)
-	if err != nil {
-		return err
-	}
-	if n, err := result.RowsAffected(); err != nil {
-		return err
-	} else if n != 1 {
-		return ErrNotFound
-	}
-	// node_name is kept only because the column is NOT NULL: readers take the node's current name from node.
-	_, err = tx.ExecContext(ctx, `INSERT INTO node_server_access (
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM node_provision_job WHERE id = ? AND state = 'running')`, id),
+		Stmt{Query: `UPDATE node_provision_job
+			SET state = 'completed', phase = 'completed', error_code = '', secret = X'', updated_at = ? WHERE id = ?`,
+			Args: []any{unix(now), id}},
+		// node_name is kept only because the column is NOT NULL: readers take the node's current name from node.
+		Stmt{Query: `INSERT INTO node_server_access (
 		node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, pending_password, configured_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
 	ON CONFLICT(node_id) DO UPDATE SET node_name=excluded.node_name, ssh_host=excluded.ssh_host,
 		ssh_port=excluded.ssh_port, ssh_username=excluded.ssh_username,
 		host_fingerprint=excluded.host_fingerprint, password=excluded.password,
 		pending_password=NULL, configured_at=excluded.configured_at, password_generated=0`,
-		access.NodeID, access.NodeName, access.SSHHost, access.SSHPort, access.SSHUser,
-		access.HostFingerprint, access.Password, unix(now))
+			Args: []any{access.NodeID, access.NodeName, access.SSHHost, int64(access.SSHPort), access.SSHUser,
+				access.HostFingerprint, access.Password, unix(now)}},
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			VALUES (?, 'completed', 'agent_connected', ?)`, Args: []any{id, unix(now)}},
+	)
+	if errors.Is(err, errGuard) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'completed', 'agent_connected', ?)`, id, unix(now)); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 // nodeServerAccessFrom joins the node: its name changes with a rename, and a retired node's access is marked.

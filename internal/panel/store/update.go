@@ -107,17 +107,16 @@ func scanRollout(r rowScanner) (RolloutRow, error) {
 	return x, nil
 }
 
-func insertStep(ctx context.Context, tx *sql.Tx, x StepRow) error {
-	_, err := tx.ExecContext(ctx, `
+func insertStepStmt(x StepRow) Stmt {
+	return Stmt{Query: `
 		INSERT INTO update_step (rollout_id, node_id, node_name, stage, state, from_version, from_built, pre_failed_json,
 			sent_at, acked_at, reconnected_at, finished_at, error_key, params_json)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		x.RolloutID, x.NodeID, x.NodeName, x.Stage, x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed),
-		fleetUnix(x.SentAt), fleetUnix(x.AckedAt), fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params))
-	return err
+		Args: []any{x.RolloutID, x.NodeID, x.NodeName, int64(x.Stage), x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed),
+			fleetUnix(x.SentAt), fleetUnix(x.AckedAt), fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params)}}
 }
 
-// CreateRollout stores a rollout and its steps in one transaction. ErrConflict when another rollout is active
+// CreateRollout stores a rollout and its steps in one atomic batch. ErrConflict when another rollout is active
 // (the unique index 00013 allows one RUNNING or PAUSED rollout).
 func (s *Store) CreateRollout(ctx context.Context, r RolloutRow, steps []StepRow) error {
 	return s.createRollout(ctx, r, steps, nil, nil)
@@ -138,84 +137,57 @@ func (s *Store) CreateScheduledRollout(ctx context.Context, r RolloutRow, steps 
 // AddNodeToRunningRollout inserts a manually selected node as its own stage after stage, shifting later stages down
 // the rollout plan. The update and its release must still be current, and consuming the node's schedule is atomic.
 func (s *Store) AddNodeToRunningRollout(ctx context.Context, rolloutID, version string, built int64, stage int, x StepRow) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	res, err := tx.ExecContext(ctx, `UPDATE update_rollout SET status = status
-		WHERE id = ? AND status = 'running' AND to_version = ? AND to_built = ?`, rolloutID, version, built)
-	if err != nil {
-		return err
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n != 1 {
-		return ErrConflict
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE update_step SET stage = stage + 1 WHERE rollout_id = ? AND stage >= ?`, rolloutID, stage); err != nil {
-		return err
-	}
 	x.RolloutID = rolloutID
 	x.Stage = stage
 	x.State = StepPending
-	if err := insertStep(ctx, tx, x); err != nil {
-		if fleetIsUnique(err) {
-			return ErrConflict
-		}
-		return err
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM update_rollout WHERE id = ? AND status = 'running' AND to_version = ? AND to_built = ?)`, rolloutID, version, built),
+		Stmt{Query: `UPDATE update_step SET stage = stage + 1 WHERE rollout_id = ? AND stage >= ?`, Args: []any{rolloutID, int64(stage)}},
+		insertStepStmt(x),
+		Stmt{Query: `DELETE FROM node_update_schedule WHERE node_id = ?`, Args: []any{x.NodeID}},
+	)
+	if errors.Is(err, errGuard) || fleetIsUnique(err) {
+		return ErrConflict
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule WHERE node_id = ?`, x.NodeID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
 func (s *Store) createRollout(ctx context.Context, r RolloutRow, steps []StepRow, schedule *NodeUpdateScheduleRow, clearScheduleIDs []string) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	condition := `NOT EXISTS (SELECT 1 FROM update_rollout WHERE id = ?)`
+	guardArgs := []any{r.ID}
+	if r.Active() {
+		condition += ` AND NOT EXISTS (SELECT 1 FROM update_rollout WHERE status IN ('running', 'paused'))`
 	}
-	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `
+	if schedule != nil {
+		condition += ` AND EXISTS (SELECT 1 FROM node_update_schedule
+			WHERE node_id = ? AND to_version = ? AND to_built = ? AND scheduled_at = ? AND timezone_offset_minutes = ?)`
+		guardArgs = append(guardArgs, schedule.NodeID, schedule.ToVersion, schedule.ToBuilt, schedule.ScheduledAt, int64(schedule.TimezoneOffsetMinutes))
+	}
+	stmts := []Stmt{guard(condition, guardArgs...)}
+	stmts = append(stmts, Stmt{Query: `
 		INSERT INTO update_rollout (id, status, to_version, to_built, manifest, signature, batch_size, pause_key, pause_params_json,
 			created_by, created_at, finished_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.Status, r.ToVersion, r.ToBuilt, r.Manifest, r.Signature, r.BatchSize, r.PauseKey, jsonMap(r.PauseParams),
-		r.CreatedBy, unix(r.CreatedAt), fleetUnix(r.FinishedAt))
-	if err != nil {
-		if fleetIsUnique(err) {
-			return ErrConflict
-		}
-		return err
-	}
+		Args: []any{r.ID, r.Status, r.ToVersion, r.ToBuilt, r.Manifest, r.Signature, int64(r.BatchSize), r.PauseKey, jsonMap(r.PauseParams),
+			r.CreatedBy, unix(r.CreatedAt), fleetUnix(r.FinishedAt)}})
 	for _, x := range steps {
 		x.RolloutID = r.ID
-		if err := insertStep(ctx, tx, x); err != nil {
-			return err
-		}
+		stmts = append(stmts, insertStepStmt(x))
 	}
 	if schedule != nil {
-		res, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule
+		stmts = append(stmts, Stmt{Query: `DELETE FROM node_update_schedule
 			WHERE node_id = ? AND to_version = ? AND to_built = ? AND scheduled_at = ? AND timezone_offset_minutes = ?`,
-			schedule.NodeID, schedule.ToVersion, schedule.ToBuilt, schedule.ScheduledAt, schedule.TimezoneOffsetMinutes)
-		if err != nil {
-			return err
-		}
-		if n, err := res.RowsAffected(); err != nil {
-			return err
-		} else if n != 1 {
-			return ErrConflict
-		}
+			Args: []any{schedule.NodeID, schedule.ToVersion, schedule.ToBuilt, schedule.ScheduledAt, int64(schedule.TimezoneOffsetMinutes)}})
 	} else {
 		for _, nodeID := range clearScheduleIDs {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM node_update_schedule WHERE node_id = ?`, nodeID); err != nil {
-				return err
-			}
+			stmts = append(stmts, Stmt{Query: `DELETE FROM node_update_schedule WHERE node_id = ?`, Args: []any{nodeID}})
 		}
 	}
-	return tx.Commit()
+	_, err := s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		return ErrConflict
+	}
+	return err
 }
 
 // ActiveRollout is the RUNNING or PAUSED rollout, ErrNotFound when there is none.

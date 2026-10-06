@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 )
@@ -99,35 +98,37 @@ func (s *Store) AlertHistory(ctx context.Context, since time.Time, nodeID string
 
 // OpenAlert records that the condition of a holds. A resolved alert of the same key that ended less than
 // reopenWithin ago is re-opened (id and first_seen stay, so flapping does not fill the history); otherwise a
-// row is inserted. The unique index on active rows makes a concurrent double open fail instead of duplicating.
+// row is inserted. The active-alert unique index makes concurrent opens update the same row instead of duplicating it.
 func (s *Store) OpenAlert(ctx context.Context, a HealthAlert, reopenWithin time.Duration, now time.Time) (out HealthAlert, reopened bool, err error) {
-	tx, err := s.W.BeginTx(ctx, nil)
+	a.ID, a.FirstSeen, a.CreatedAt = NewID("alt_"), now, now
+	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE health_alert SET resolved_at = 0, resolution = '', severity = ?, params_json = ?,
+			title_key = ?, why_key = ?, last_seen = ?
+			WHERE id = (SELECT id FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ?
+				AND resolved_at >= ? AND resolved_at > 0 ORDER BY resolved_at DESC LIMIT 1)
+			AND NOT EXISTS (SELECT 1 FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at = 0)
+			RETURNING ` + alertCols,
+			Args: []any{int64(a.Severity), jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now),
+				a.Kind, a.NodeID, a.Subject, unix(now.Add(-reopenWithin)), a.Kind, a.NodeID, a.Subject}, Returning: true},
+		Stmt{Query: `INSERT INTO health_alert (` + alertCols + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', 0, ?)
+			ON CONFLICT (kind, node_id, subject) WHERE resolved_at = 0 DO UPDATE SET
+				resolved_at = 0, resolution = '', severity = excluded.severity, params_json = excluded.params_json,
+				title_key = excluded.title_key, why_key = excluded.why_key, last_seen = excluded.last_seen
+			RETURNING ` + alertCols,
+			Args: []any{a.ID, a.Kind, int64(a.Severity), a.NodeID, a.Subject, jsonMap(a.Params), a.TitleKey, a.WhyKey,
+				unix(now), unix(now), unix(now)}, Returning: true},
+	)
 	if err != nil {
 		return HealthAlert{}, false, err
 	}
-	defer tx.Rollback()
-	prev, err := scanAlert(tx.QueryRowContext(ctx, `SELECT `+alertCols+` FROM health_alert
-		WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at >= ? AND resolved_at > 0
-		ORDER BY resolved_at DESC LIMIT 1`, a.Kind, a.NodeID, a.Subject, unix(now.Add(-reopenWithin))))
-	switch {
-	case err == nil:
-		if _, err := tx.ExecContext(ctx, `UPDATE health_alert SET resolved_at = 0, resolution = '', severity = ?, params_json = ?,
-			title_key = ?, why_key = ?, last_seen = ? WHERE id = ?`,
-			a.Severity, jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now), prev.ID); err != nil {
-			return HealthAlert{}, false, err
-		}
-		a.ID, a.FirstSeen, a.MutedUntil, a.CreatedAt, reopened = prev.ID, prev.FirstSeen, prev.MutedUntil, prev.CreatedAt, true
-	case errors.Is(err, ErrNotFound):
-		a.ID, a.FirstSeen, a.CreatedAt = NewID("alt_"), now, now
-		if _, err := tx.ExecContext(ctx, `INSERT INTO health_alert (`+alertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', 0, ?)`,
-			a.ID, a.Kind, a.Severity, a.NodeID, a.Subject, jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now), unix(now), unix(now)); err != nil {
-			return HealthAlert{}, false, err
-		}
-	default:
+	if len(results[1].Rows) != 1 {
+		return HealthAlert{}, false, errors.New("store: alert upsert returned no row")
+	}
+	out, err = scanAlert(batchRow(results[1].Rows[0]))
+	if err != nil {
 		return HealthAlert{}, false, err
 	}
-	a.LastSeen, a.ResolvedAt, a.Resolution = now, time.Time{}, ""
-	return a, reopened, tx.Commit()
+	return out, results[0].RowsAffected == 1, nil
 }
 
 // TouchAlert records that the condition of an active alert still holds and refreshes what may change with
@@ -200,27 +201,23 @@ type DoctorRow struct {
 // PutDoctor stores results of one node: replace drops the node's other rows first (a full report), otherwise
 // the rows are merged by check id (a partial one). Received is set on every row.
 func (s *Store) PutDoctor(ctx context.Context, nodeID string, rows []DoctorRow, replace bool, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	stmts := make([]Stmt, 0, len(rows)+1)
 	if replace {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM doctor_result WHERE node_id = ?`, nodeID); err != nil {
-			return err
-		}
+		stmts = append(stmts, Stmt{Query: `DELETE FROM doctor_result WHERE node_id = ?`, Args: []any{nodeID}})
 	}
 	for _, r := range rows {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO doctor_result (node_id, check_id, status, title_key, detail, detail_code, params_json, fix_id, measured_unix, received_unix)
+		stmts = append(stmts, Stmt{Query: `INSERT INTO doctor_result (node_id, check_id, status, title_key, detail, detail_code, params_json, fix_id, measured_unix, received_unix)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (node_id, check_id) DO UPDATE SET status = excluded.status, title_key = excluded.title_key, detail = excluded.detail,
 				detail_code = excluded.detail_code, params_json = excluded.params_json, fix_id = excluded.fix_id, measured_unix = excluded.measured_unix,
 				received_unix = excluded.received_unix`,
-			nodeID, r.CheckID, r.Status, r.TitleKey, r.Detail, r.DetailCode, jsonMap(r.Params), r.FixID, fleetUnix(r.Measured), unix(now)); err != nil {
-			return err
-		}
+			Args: []any{nodeID, r.CheckID, int64(r.Status), r.TitleKey, r.Detail, r.DetailCode, jsonMap(r.Params), r.FixID, fleetUnix(r.Measured), unix(now)}})
 	}
-	return tx.Commit()
+	if len(stmts) == 0 {
+		return nil
+	}
+	_, err := s.batch(ctx, stmts...)
+	return err
 }
 
 // DoctorResults returns the stored results of one node, or of every node for "" (ordered by node, check).
@@ -408,67 +405,30 @@ func (s *Store) DailyRows(ctx context.Context, inboundID string) ([]DailyRow, er
 // hours already pruned (it is computed from what is left); nothing reads the aggregates yet.
 func (s *Store) RollupDaily(ctx context.Context, now time.Time) error {
 	today := unix(now) - unix(now)%86400
-	samples, err := s.samples(ctx, `SELECT inbound_id, at, status, latency_ms, exit_ip, exit_country, error_code, error_detail
-		FROM health_check_sample WHERE at < ? ORDER BY inbound_id, at`, today)
-	if err != nil {
-		return err
-	}
-	type key struct {
-		in  string
-		day int64
-	}
-	type agg struct {
-		ok, failed, degraded int
-		lat                  []uint32
-	}
-	groups := map[key]*agg{}
-	for _, c := range samples {
-		k := key{c.InboundID, c.At.Unix() - c.At.Unix()%86400}
-		g := groups[k]
-		if g == nil {
-			g = &agg{}
-			groups[k] = g
-		}
-		switch c.Status {
-		case 1:
-			g.ok++
-		case 2:
-			g.degraded++
-		default:
-			g.failed++
-		}
-		if c.Status != 3 && c.LatencyMS > 0 {
-			g.lat = append(g.lat, c.LatencyMS)
-		}
-	}
-	if len(groups) == 0 {
-		return nil
-	}
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for k, g := range groups {
-		slices.Sort(g.lat)
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO health_check_daily (inbound_id, day, ok, failed, degraded, p50_ms, p95_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`, k.in, k.day, g.ok, g.failed, g.degraded, percentile(g.lat, 50), percentile(g.lat, 95)); err != nil {
-			if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
-				continue // the inbound is gone
-			}
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
-// percentile is the nearest-rank percentile of a sorted slice (0 for an empty one).
-func percentile(sorted []uint32, p int) uint32 {
-	if len(sorted) == 0 {
-		return 0
-	}
-	i := (len(sorted)*p + 99) / 100
-	return sorted[min(max(i, 1), len(sorted))-1]
+	_, err := s.batch(ctx, Stmt{Query: `WITH daily_sample AS (
+			SELECT inbound_id, at - (at % 86400) AS day, status, latency_ms
+			FROM health_check_sample WHERE at < ?
+		), counts AS (
+			SELECT inbound_id, day,
+				SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS ok,
+				SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS degraded,
+				SUM(CASE WHEN status NOT IN (1, 2) THEN 1 ELSE 0 END) AS failed
+			FROM daily_sample GROUP BY inbound_id, day
+		), ranked_latency AS (
+			SELECT inbound_id, day, latency_ms,
+				ROW_NUMBER() OVER (PARTITION BY inbound_id, day ORDER BY latency_ms) AS rank,
+				COUNT(*) OVER (PARTITION BY inbound_id, day) AS total
+			FROM daily_sample WHERE status != 3 AND latency_ms > 0
+		), percentiles AS (
+			SELECT inbound_id, day,
+				MAX(CASE WHEN rank = (total * 50 + 99) / 100 THEN latency_ms ELSE 0 END) AS p50_ms,
+				MAX(CASE WHEN rank = (total * 95 + 99) / 100 THEN latency_ms ELSE 0 END) AS p95_ms
+			FROM ranked_latency GROUP BY inbound_id, day
+		)
+		INSERT OR IGNORE INTO health_check_daily (inbound_id, day, ok, failed, degraded, p50_ms, p95_ms)
+		SELECT c.inbound_id, c.day, c.ok, c.failed, c.degraded, COALESCE(p.p50_ms, 0), COALESCE(p.p95_ms, 0)
+		FROM counts c LEFT JOIN percentiles p ON p.inbound_id = c.inbound_id AND p.day = c.day`, Args: []any{today}})
+	return err
 }
 
 // ---------------------------------------------------------------------------------------------------

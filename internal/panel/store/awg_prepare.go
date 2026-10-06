@@ -74,13 +74,13 @@ func (s *Store) AwgPrepareStarted(ctx context.Context, nodeID string, since int6
 // changes nothing but the record.
 func (s *Store) AwgPrepareFinish(ctx context.Context, nodeID string, ok bool, at int64, code, reason string) (switched bool, err error) {
 	err = s.awgPrepareTx(ctx, nodeID, func(cur AwgPrepareRow, backend string) (AwgPrepareRow, string) {
+		switched = ok && cur.Want && backend != "kernel"
 		next := AwgPrepareRow{State: AwgPrepareDone, Since: at}
 		if !ok {
 			next = AwgPrepareRow{State: AwgPrepareFailed, Since: at, Code: code, Reason: reason}
 			return next, ""
 		}
-		if cur.Want && backend != "kernel" {
-			switched = true
+		if switched {
 			return next, "kernel"
 		}
 		return next, ""
@@ -88,28 +88,27 @@ func (s *Store) AwgPrepareFinish(ctx context.Context, nodeID string, ok bool, at
 	return switched, err
 }
 
-// awgPrepareTx reads the node's state and backend, lets fn decide the next state and (when non-empty) a new awg_backend,
-// and writes both in one transaction.
+// awgPrepareTx retries fn against the exact JSON and backend values it read, so a concurrent AWG state change cannot
+// be overwritten by a decision based on stale values. ErrConflict if it keeps losing (it should not: one node, rare writes).
 func (s *Store) awgPrepareTx(ctx context.Context, nodeID string, fn func(cur AwgPrepareRow, backend string) (AwgPrepareRow, string)) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var raw, backend string
-	if err := tx.QueryRowContext(ctx, `SELECT awg_prepare_json, awg_backend FROM node WHERE id = ?`, nodeID).Scan(&raw, &backend); errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	} else if err != nil {
-		return err
-	}
-	next, setBackend := fn(parseAwgPrepare(raw), backend)
-	if _, err := tx.ExecContext(ctx, `UPDATE node SET awg_prepare_json = ? WHERE id = ?`, next.json(), nodeID); err != nil {
-		return err
-	}
-	if setBackend != "" {
-		if _, err := tx.ExecContext(ctx, `UPDATE node SET awg_backend = ? WHERE id = ?`, setBackend, nodeID); err != nil {
+	for range 8 {
+		var raw, backend string
+		if err := s.R.QueryRowContext(ctx, `SELECT awg_prepare_json, awg_backend FROM node WHERE id = ?`, nodeID).Scan(&raw, &backend); errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
 			return err
 		}
+		next, setBackend := fn(parseAwgPrepare(raw), backend)
+		results, err := s.batch(ctx, Stmt{Query: `UPDATE node SET awg_prepare_json = ?,
+			awg_backend = CASE WHEN ? = '' THEN awg_backend ELSE ? END
+			WHERE id = ? AND awg_prepare_json = ? AND awg_backend = ?`,
+			Args: []any{next.json(), setBackend, setBackend, nodeID, raw, backend}})
+		if err != nil {
+			return err
+		}
+		if results[0].RowsAffected == 1 {
+			return nil
+		}
 	}
-	return tx.Commit()
+	return ErrConflict
 }

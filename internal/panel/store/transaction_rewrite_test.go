@@ -649,3 +649,455 @@ func TestDeleteProfileAndGroupKeepInUseGuards(t *testing.T) {
 		t.Fatalf("moved user = %+v, %v", u, err)
 	}
 }
+
+func TestOpenAlertRaceKeepsOneActiveAlert(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	a := HealthAlert{Kind: "node_down", Severity: 2, NodeID: "nod_alert_race", Subject: "agent", TitleKey: "title", WhyKey: "why"}
+	start := make(chan struct{})
+	type result struct {
+		alert    HealthAlert
+		reopened bool
+		err      error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			opened, reopened, err := s.OpenAlert(ctx, a, time.Hour, t0)
+			results <- result{alert: opened, reopened: reopened, err: err}
+		}()
+	}
+	close(start)
+	var first HealthAlert
+	for range 2 {
+		got := <-results
+		if got.err != nil || got.reopened {
+			t.Fatalf("OpenAlert race: %+v reopened=%v err=%v", got.alert, got.reopened, got.err)
+		}
+		if first.ID == "" {
+			first = got.alert
+		} else if got.alert.ID != first.ID {
+			t.Fatalf("callers opened different alerts: %q and %q", first.ID, got.alert.ID)
+		}
+	}
+	if countT(t, s, `SELECT count(*) FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at = 0`, a.Kind, a.NodeID, a.Subject) != 1 {
+		t.Fatal("the alert race left other than one active row")
+	}
+}
+
+func TestPutDoctorRaceKeepsOneCheckRow(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	nodeID, _ := fixtureInbound(t, s, "doctor_race")
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, status := range []int{1, 2} {
+		go func(status int) {
+			<-start
+			results <- s.PutDoctor(ctx, nodeID, []DoctorRow{{CheckID: "resolver", Status: status}}, false, t0)
+		}(status)
+	}
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatalf("PutDoctor race: %v", err)
+		}
+	}
+	if countT(t, s, `SELECT count(*) FROM doctor_result WHERE node_id = ? AND check_id = 'resolver'`, nodeID) != 1 {
+		t.Fatal("the doctor report race duplicated a check row")
+	}
+}
+
+func TestRollupDailyRaceIsIdempotent(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	_, inboundID := fixtureInbound(t, s, "rollup_race")
+	day := t0.Unix() - t0.Unix()%86400 - 86400
+	if err := s.InsertSample(ctx, CheckSample{InboundID: inboundID, At: time.Unix(day+10, 0), Status: 1, LatencyMS: 50}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- s.RollupDaily(ctx, t0)
+		}()
+	}
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatalf("RollupDaily race: %v", err)
+		}
+	}
+	if countT(t, s, `SELECT count(*) FROM health_check_daily WHERE inbound_id = ?`, inboundID) != 1 {
+		t.Fatal("the daily rollup race duplicated a day")
+	}
+}
+
+func TestCreateNodeProvisionJobRaceKeepsOneReservation(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i, name := range []string{"node-race-a", "node-race-b"} {
+		go func(i int, name string) {
+			<-start
+			job := NodeProvisionJob{ID: fmt.Sprintf("job_race_%d", i), NodeID: "nod_provision_race", Name: name,
+				Address: "203.0.113.10", SSHHost: "203.0.113.10", SSHPort: 22, HostFingerprint: "SHA256:example",
+				Secret: []byte("sealed"), CreatedBy: "admin", CreatedAt: t0, UpdatedAt: t0}
+			results <- s.CreateNodeProvisionJob(ctx, job)
+		}(i, name)
+	}
+	close(start)
+	var created, conflict int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			created++
+		case errors.Is(err, ErrConflict):
+			conflict++
+		default:
+			t.Fatalf("CreateNodeProvisionJob race: %v", err)
+		}
+	}
+	if created != 1 || conflict != 1 || countT(t, s, `SELECT count(*) FROM node_provision_job WHERE node_id = 'nod_provision_race'`) != 1 {
+		t.Fatalf("created=%d conflicts=%d", created, conflict)
+	}
+}
+
+func TestRequeueNodeProvisionJobsRaceWritesOneEvent(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProvisionJob(t, s, "job_requeue_race", "nod_requeue_race", "node-requeue-race", "running", t0)
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- s.RequeueNodeProvisionJobs(ctx, t0.Add(time.Minute))
+		}()
+	}
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatalf("RequeueNodeProvisionJobs race: %v", err)
+		}
+	}
+	state, err := s.NodeProvisionJobState(ctx, "job_requeue_race")
+	if err != nil || state != "queued" || countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_requeue_race'`) != 1 {
+		t.Fatalf("state=%q events=%d err=%v", state, countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_requeue_race'`), err)
+	}
+}
+
+func TestRequestCancelNodeProvisionJobRaceChangesOnce(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProvisionJob(t, s, "job_cancel_race", "nod_cancel_race", "node-cancel-race", "queued", t0)
+	start := make(chan struct{})
+	type result struct {
+		state   string
+		changed bool
+		err     error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			state, changed, err := s.RequestCancelNodeProvisionJob(ctx, "job_cancel_race", t0.Add(time.Minute))
+			results <- result{state, changed, err}
+		}()
+	}
+	close(start)
+	var changed int
+	for range 2 {
+		got := <-results
+		if got.err != nil || got.state != "cancelled" {
+			t.Fatalf("RequestCancelNodeProvisionJob race: %+v", got)
+		}
+		if got.changed {
+			changed++
+		}
+	}
+	if changed != 1 || countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_cancel_race'`) != 1 {
+		t.Fatalf("changed=%d events=%d", changed, countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_cancel_race'`))
+	}
+}
+
+func TestFinishCancelledNodeProvisionJobRaceFinishesOnce(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProvisionJob(t, s, "job_finish_race", "nod_finish_race", "node-finish-race", "cancel_requested", t0)
+	start := make(chan struct{})
+	type result struct {
+		finished bool
+		err      error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			finished, err := s.FinishCancelledNodeProvisionJob(ctx, "job_finish_race", t0.Add(time.Minute))
+			results <- result{finished, err}
+		}()
+	}
+	close(start)
+	var success, noChange int
+	for range 2 {
+		got := <-results
+		if got.err != nil {
+			t.Fatalf("FinishCancelledNodeProvisionJob race: %v", got.err)
+		}
+		if got.finished {
+			success++
+		} else {
+			noChange++
+		}
+	}
+	if success != 1 || noChange != 1 || countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_finish_race'`) != 1 {
+		t.Fatalf("success=%d noChange=%d events=%d", success, noChange, countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_finish_race'`))
+	}
+}
+
+func TestClaimNodeProvisionJobRaceHasOneWinner(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProvisionJob(t, s, "job_claim_race", "nod_claim_race", "node-claim-race", "queued", t0)
+	start := make(chan struct{})
+	type result struct {
+		job NodeProvisionJob
+		ok  bool
+		err error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			job, ok, err := s.ClaimNodeProvisionJob(ctx, t0.Add(time.Minute))
+			results <- result{job, ok, err}
+		}()
+	}
+	close(start)
+	var claimed int
+	for range 2 {
+		got := <-results
+		if got.err != nil {
+			t.Fatalf("ClaimNodeProvisionJob race: %v", got.err)
+		}
+		if got.ok {
+			claimed++
+			if got.job.ID != "job_claim_race" || got.job.State != "running" {
+				t.Fatalf("claimed job: %+v", got.job)
+			}
+		}
+	}
+	if claimed != 1 || countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_claim_race'`) != 1 {
+		t.Fatalf("claimed=%d events=%d", claimed, countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_claim_race'`))
+	}
+}
+
+func TestUpdateNodeProvisionJobFromStateRaceUsesCAS(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProvisionJob(t, s, "job_state_race", "nod_state_race", "node-state-race", "running", t0)
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, code := range []string{"failed_a", "failed_b"} {
+		go func(code string) {
+			<-start
+			results <- s.updateNodeProvisionJobFromState(ctx, "job_state_race", "running", "failed", "failed", code, []byte{}, code, t0.Add(time.Minute))
+		}(code)
+	}
+	close(start)
+	var changed, conflict int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			changed++
+		case errors.Is(err, ErrConflict):
+			conflict++
+		default:
+			t.Fatalf("updateNodeProvisionJobFromState race: %v", err)
+		}
+	}
+	if changed != 1 || conflict != 1 || countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_state_race'`) != 1 {
+		t.Fatalf("changed=%d conflict=%d", changed, conflict)
+	}
+}
+
+func TestCompleteNodeProvisionJobRaceStoresOneAccess(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	nodeID, _ := fixtureInbound(t, s, "complete_race")
+	seedProvisionJob(t, s, "job_complete_race", nodeID, "node-complete-race", "running", t0)
+	access := NodeServerAccess{NodeID: nodeID, NodeName: "node-complete-race", SSHHost: "203.0.113.10", SSHPort: 22,
+		SSHUser: "user1", HostFingerprint: "SHA256:example", Password: []byte("sealed")}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- s.CompleteNodeProvisionJob(ctx, "job_complete_race", access, t0.Add(time.Minute))
+		}()
+	}
+	close(start)
+	var complete, missing int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			complete++
+		case errors.Is(err, ErrNotFound):
+			missing++
+		default:
+			t.Fatalf("CompleteNodeProvisionJob race: %v", err)
+		}
+	}
+	if complete != 1 || missing != 1 || countT(t, s, `SELECT count(*) FROM node_server_access WHERE node_id = ?`, nodeID) != 1 ||
+		countT(t, s, `SELECT count(*) FROM node_provision_event WHERE job_id = 'job_complete_race'`) != 1 {
+		t.Fatalf("complete=%d missing=%d", complete, missing)
+	}
+}
+
+func TestAddNodeToRunningRolloutRaceKeepsContiguousStages(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rollout := RolloutRow{ID: "rol_add_race", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 2, Manifest: []byte("m"), Signature: []byte("s"), BatchSize: 1, CreatedAt: t0}
+	if err := s.CreateRollout(ctx, rollout, []StepRow{{NodeID: "nod_before", NodeName: "before", Stage: 0, State: StepPending}}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, id := range []string{"nod_add_a", "nod_add_b"} {
+		go func(id string) {
+			<-start
+			results <- s.AddNodeToRunningRollout(ctx, rollout.ID, rollout.ToVersion, rollout.ToBuilt, 0, StepRow{NodeID: id, NodeName: id})
+		}(id)
+	}
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatalf("AddNodeToRunningRollout race: %v", err)
+		}
+	}
+	steps, err := s.RolloutSteps(ctx, rollout.ID)
+	if err != nil || len(steps) != 3 {
+		t.Fatalf("steps: %+v %v", steps, err)
+	}
+	for i, step := range steps {
+		if step.Stage != i {
+			t.Fatalf("non-contiguous stages: %+v", steps)
+		}
+	}
+}
+
+func TestCreateRolloutRaceKeepsOneActiveRollout(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, id := range []string{"rol_race_a", "rol_race_b"} {
+		go func(id string) {
+			<-start
+			r := RolloutRow{ID: id, Status: RolloutRunning, ToVersion: "v2", ToBuilt: 2, Manifest: []byte("m"), Signature: []byte("s"), BatchSize: 1, CreatedAt: t0}
+			results <- s.createRollout(ctx, r, nil, nil, nil)
+		}(id)
+	}
+	close(start)
+	var created, conflict int
+	for range 2 {
+		switch err := <-results; {
+		case err == nil:
+			created++
+		case errors.Is(err, ErrConflict):
+			conflict++
+		default:
+			t.Fatalf("createRollout race: %v", err)
+		}
+	}
+	if created != 1 || conflict != 1 || countT(t, s, `SELECT count(*) FROM update_rollout WHERE status IN ('running', 'paused')`) != 1 {
+		t.Fatalf("created=%d conflict=%d", created, conflict)
+	}
+}
+
+func TestReplaceWarpAccountRaceKeepsAnAccount(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	nodeID, _ := fixtureInbound(t, s, "warp_race")
+	base := WarpAccountRow{NodeID: nodeID, Source: WarpImported, SecretEnc: []byte("old"), PeerPublicKey: "old", CreatedAt: t0, UpdatedAt: t0}
+	if err := s.CreateWarpAccount(ctx, base); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, key := range []string{"new_a", "new_b"} {
+		go func(key string) {
+			<-start
+			next := base
+			next.SecretEnc, next.PeerPublicKey, next.UpdatedAt = []byte(key), key, t0.Add(time.Minute)
+			results <- s.ReplaceWarpAccount(ctx, next)
+		}(key)
+	}
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatalf("ReplaceWarpAccount race: %v", err)
+		}
+	}
+	got, err := s.WarpAccount(ctx, nodeID)
+	if err != nil || (got.PeerPublicKey != "new_a" && got.PeerPublicKey != "new_b") || countT(t, s, `SELECT count(*) FROM warp_account WHERE node_id = ?`, nodeID) != 1 {
+		t.Fatalf("account after replace race: %+v %v", got, err)
+	}
+}
+
+func TestAwgPrepareTxCASHandlesConcurrentFinish(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	nodeID, _ := fixtureInbound(t, s, "awg_prepare_race")
+	if err := s.SetAwgPrepare(ctx, nodeID, AwgPrepareRow{Want: true}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	type result struct {
+		switched bool
+		err      error
+	}
+	results := make(chan result, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			switched, err := s.AwgPrepareFinish(ctx, nodeID, true, t0.Unix()+int64(i+1), "", "")
+			results <- result{switched, err}
+		}(i)
+	}
+	close(start)
+	var switched int
+	for range 2 {
+		got := <-results
+		if got.err != nil {
+			t.Fatalf("AwgPrepareFinish race: %v", got.err)
+		}
+		if got.switched {
+			switched++
+		}
+	}
+	var backend string
+	if err := s.R.QueryRowContext(ctx, `SELECT awg_backend FROM node WHERE id = ?`, nodeID).Scan(&backend); err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := s.Node(ctx, nodeID)
+	if err != nil || switched != 1 || backend != "kernel" || prepared.AwgPrepare().State != AwgPrepareDone {
+		t.Fatalf("switches=%d backend=%q state=%+v err=%v", switched, backend, prepared.AwgPrepare(), err)
+	}
+}
+
+func seedProvisionJob(t *testing.T, s *Store, id, nodeID, name, state string, created time.Time) {
+	t.Helper()
+	_, err := s.W.ExecContext(context.Background(), `INSERT INTO node_provision_job (
+		id, node_id, name, address, ssh_host, ssh_port, host_fingerprint, secret, state, phase, created_by, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, nodeID, name, "203.0.113.10", "203.0.113.10", 22,
+		"SHA256:example", []byte("sealed"), state, state, "admin", unix(created), unix(created))
+	if err != nil {
+		t.Fatalf("seed provision job %s: %v", id, err)
+	}
+}

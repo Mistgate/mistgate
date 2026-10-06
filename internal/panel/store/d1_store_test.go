@@ -82,9 +82,8 @@ func TestD1StoreSmoke(t *testing.T) {
 	// This smoke covers Setting, SetSettings, Audit, and ListAudit. The following
 	// store methods still read inside a transaction and remain deferred to later steps:
 	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
-	// OpenAlert, InsertProbeCredIdx, RequeueNodeProvisionJobs,
-	// RequestCancelNodeProvisionJob, ClaimNodeProvisionJob, AwgPrepareStarted,
-	// AwgPrepareFinish, Access.AddAWGDevice, Access.RotateAWGDevice, and
+	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
+	// InsertProbeCredIdx, Access.AddAWGDevice, Access.RotateAWGDevice, and
 	// Access.EnsureImplicitAWGCreds.
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
 		t.Fatal(err)
@@ -618,6 +617,291 @@ func TestD1RewrittenDNSAndSettingsMethods(t *testing.T) {
 		}
 		if got, err := st.Setting(ctx, "edge.rewritten"); err != nil || got != "updated" {
 			t.Fatalf("setting = %q, %v", got, err)
+		}
+	})
+}
+
+func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	newStore := func(t *testing.T) *Store {
+		t.Helper()
+		return openD1Store(t)
+	}
+	addNode := func(t *testing.T, st *Store, id string) {
+		t.Helper()
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, '203.0.113.10', 'active', ?)`, id, id, now.Unix()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	newJob := func(id, nodeID, name string, created time.Time) NodeProvisionJob {
+		return NodeProvisionJob{ID: id, NodeID: nodeID, Name: name, Address: "203.0.113.10", SSHHost: "203.0.113.10", SSHPort: 22,
+			HostFingerprint: "SHA256:example", Secret: []byte("sealed"), CreatedBy: "admin", CreatedAt: created, UpdatedAt: created}
+	}
+	seedJob := func(t *testing.T, st *Store, id, nodeID, name, state string, created time.Time) {
+		t.Helper()
+		job := newJob(id, nodeID, name, created)
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO node_provision_job (
+			id, node_id, name, address, ssh_host, ssh_port, host_fingerprint, secret, state, phase, created_by, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, job.ID, job.NodeID, job.Name, job.Address, job.SSHHost, job.SSHPort,
+			job.HostFingerprint, job.Secret, state, state, job.CreatedBy, job.CreatedAt.Unix(), job.UpdatedAt.Unix()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	countEvents := func(t *testing.T, st *Store, jobID string) int {
+		t.Helper()
+		var count int
+		if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM node_provision_event WHERE job_id = ?`, jobID).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	newRollout := func(id string) RolloutRow {
+		return RolloutRow{ID: id, Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20, Manifest: []byte("manifest"), Signature: []byte("signature"),
+			BatchSize: 1, CreatedAt: now}
+	}
+
+	t.Run("OpenAlert", func(t *testing.T) {
+		st := newStore(t)
+		a := HealthAlert{Kind: "node_down", Severity: 2, NodeID: "node_de", Subject: "agent", TitleKey: "title", WhyKey: "why"}
+		first, reopened, err := st.OpenAlert(ctx, a, time.Hour, now)
+		if err != nil || reopened {
+			t.Fatalf("open: %+v reopened=%v err=%v", first, reopened, err)
+		}
+		if ok, err := st.ResolveAlert(ctx, first.ID, "cleared", now.Add(time.Minute)); err != nil || !ok {
+			t.Fatalf("resolve: %v %v", ok, err)
+		}
+		again, reopened, err := st.OpenAlert(ctx, a, time.Hour, now.Add(30*time.Minute))
+		if err != nil || !reopened || again.ID != first.ID || !again.FirstSeen.Equal(first.FirstSeen) {
+			t.Fatalf("reopen: %+v reopened=%v err=%v", again, reopened, err)
+		}
+	})
+	t.Run("PutDoctor", func(t *testing.T) {
+		st := newStore(t)
+		addNode(t, st, "node_doctor")
+		rows := []DoctorRow{{CheckID: "resolver", Status: 2, Detail: "old"}, {CheckID: "disk", Status: 1}}
+		if err := st.PutDoctor(ctx, "node_doctor", rows, true, now); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.PutDoctor(ctx, "node_doctor", []DoctorRow{{CheckID: "resolver", Status: 1, Detail: "new"}}, false, now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.DoctorResults(ctx, "node_doctor")
+		if err != nil || len(got) != 2 || got[0].CheckID != "disk" || got[1].Status != 1 || got[1].Detail != "new" {
+			t.Fatalf("doctor rows: %+v %v", got, err)
+		}
+	})
+	t.Run("RollupDaily", func(t *testing.T) {
+		st := newStore(t)
+		addNode(t, st, "node_health")
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO profile (id, protocol, name, settings_json, created_at, updated_at) VALUES ('prf_health', 'hysteria2', 'health', '{}', ?, ?)`, now.Unix(), now.Unix()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO inbound (id, profile_id, node_id, created_at, updated_at) VALUES ('inb_health', 'prf_health', 'node_health', ?, ?)`, now.Unix(), now.Unix()); err != nil {
+			t.Fatal(err)
+		}
+		at := now.Unix() - 2*86400 + 100
+		if err := st.InsertSample(ctx, CheckSample{InboundID: "inb_health", At: time.Unix(at, 0), Status: 1, LatencyMS: 50}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.InsertSample(ctx, CheckSample{InboundID: "inb_health", At: time.Unix(at+1, 0), Status: 2, LatencyMS: 100}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.RollupDaily(ctx, now); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := st.DailyRows(ctx, "inb_health")
+		if err != nil || len(rows) != 1 || rows[0].OK != 1 || rows[0].Degraded != 1 || rows[0].P50MS != 50 || rows[0].P95MS != 100 {
+			t.Fatalf("daily rows: %+v %v", rows, err)
+		}
+	})
+	t.Run("createNodeProvisionJob", func(t *testing.T) {
+		st := newStore(t)
+		job := newJob("job_create", "node_create", "node-create", now)
+		if err := st.createNodeProvisionJob(ctx, job, "created"); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.NodeProvisionJob(ctx, job.ID)
+		if err != nil || got.State != "queued" || countEvents(t, st, job.ID) != 1 {
+			t.Fatalf("created job: %+v events=%d err=%v", got, countEvents(t, st, job.ID), err)
+		}
+		duplicate := newJob("job_create_2", "node_create", "node-create-2", now)
+		if err := st.createNodeProvisionJob(ctx, duplicate, "created"); !errors.Is(err, ErrConflict) {
+			t.Fatalf("duplicate node job: %v", err)
+		}
+	})
+	t.Run("RequeueNodeProvisionJobs", func(t *testing.T) {
+		st := newStore(t)
+		seedJob(t, st, "job_running", "node_run", "node-run", "running", now)
+		seedJob(t, st, "job_cancel", "node_cancel", "node-cancel", "cancel_requested", now)
+		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(2*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		state1, _ := st.NodeProvisionJobState(ctx, "job_running")
+		state2, _ := st.NodeProvisionJobState(ctx, "job_cancel")
+		if state1 != "queued" || state2 != "cancelled" || countEvents(t, st, "job_running") != 1 || countEvents(t, st, "job_cancel") != 1 {
+			t.Fatalf("states=%q,%q events=%d,%d", state1, state2, countEvents(t, st, "job_running"), countEvents(t, st, "job_cancel"))
+		}
+	})
+	t.Run("RequestCancelNodeProvisionJob", func(t *testing.T) {
+		st := newStore(t)
+		seedJob(t, st, "job_cancel", "node_cancel", "node-cancel", "queued", now)
+		state, changed, err := st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(time.Minute))
+		if err != nil || !changed || state != "cancelled" {
+			t.Fatalf("cancel queued: %q %v %v", state, changed, err)
+		}
+		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(2*time.Minute))
+		if err != nil || changed || state != "cancelled" || countEvents(t, st, "job_cancel") != 1 {
+			t.Fatalf("cancel again: %q %v %v events=%d", state, changed, err, countEvents(t, st, "job_cancel"))
+		}
+		seedJob(t, st, "job_cancel_running", "node_cancel_running", "node-cancel-running", "running", now)
+		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel_running", now.Add(time.Minute))
+		if err != nil || !changed || state != "cancel_requested" || countEvents(t, st, "job_cancel_running") != 1 {
+			t.Fatalf("cancel running: %q %v %v events=%d", state, changed, err, countEvents(t, st, "job_cancel_running"))
+		}
+	})
+	t.Run("FinishCancelledNodeProvisionJob", func(t *testing.T) {
+		st := newStore(t)
+		seedJob(t, st, "job_finish", "node_finish", "node-finish", "cancel_requested", now)
+		finished, err := st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(time.Minute))
+		if err != nil || !finished {
+			t.Fatalf("finish cancellation: %v %v", finished, err)
+		}
+		finished, err = st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(2*time.Minute))
+		if err != nil || finished || countEvents(t, st, "job_finish") != 1 {
+			t.Fatalf("finish twice: %v %v events=%d", finished, err, countEvents(t, st, "job_finish"))
+		}
+	})
+	t.Run("ClaimNodeProvisionJob", func(t *testing.T) {
+		st := newStore(t)
+		seedJob(t, st, "job_first", "node_first", "node-first", "queued", now)
+		seedJob(t, st, "job_next", "node_next", "node-next", "queued", now.Add(time.Second))
+		first, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(time.Minute))
+		if err != nil || !ok || first.ID != "job_first" || first.State != "running" || countEvents(t, st, first.ID) != 1 {
+			t.Fatalf("first claim: %+v %v %v", first, ok, err)
+		}
+		second, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(2*time.Minute))
+		if err != nil || !ok || second.ID != "job_next" {
+			t.Fatalf("second claim: %+v %v %v", second, ok, err)
+		}
+		if _, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(3*time.Minute)); err != nil || ok {
+			t.Fatalf("empty claim: ok=%v err=%v", ok, err)
+		}
+	})
+	t.Run("updateNodeProvisionJobFromState", func(t *testing.T) {
+		st := newStore(t)
+		seedJob(t, st, "job_update", "node_update", "node-update", "running", now)
+		if err := st.updateNodeProvisionJobFromState(ctx, "job_update", "running", "failed", "failed", "install_failed", []byte("sealed"), "failed", now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.NodeProvisionJob(ctx, "job_update")
+		if err != nil || got.State != "failed" || got.ErrorCode != "install_failed" || countEvents(t, st, "job_update") != 1 {
+			t.Fatalf("updated job: %+v events=%d err=%v", got, countEvents(t, st, "job_update"), err)
+		}
+		if err := st.updateNodeProvisionJobFromState(ctx, "job_update", "running", "failed", "failed", "again", nil, "", now); !errors.Is(err, ErrConflict) {
+			t.Fatalf("stale state: %v", err)
+		}
+	})
+	t.Run("CompleteNodeProvisionJob", func(t *testing.T) {
+		st := newStore(t)
+		addNode(t, st, "node_complete")
+		seedJob(t, st, "job_complete", "node_complete", "node-complete", "running", now)
+		access := NodeServerAccess{NodeID: "node_complete", NodeName: "node-complete", SSHHost: "203.0.113.10", SSHPort: 22,
+			SSHUser: "user1", HostFingerprint: "SHA256:example", Password: []byte("sealed-password")}
+		if err := st.CompleteNodeProvisionJob(ctx, "job_complete", access, now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.NodeServerAccess(ctx, "node_complete")
+		if err != nil || string(got.Password) != "sealed-password" || countEvents(t, st, "job_complete") != 1 {
+			t.Fatalf("completed access: %+v events=%d err=%v", got, countEvents(t, st, "job_complete"), err)
+		}
+		if err := st.CompleteNodeProvisionJob(ctx, "job_complete", access, now.Add(2*time.Minute)); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("complete twice: %v", err)
+		}
+	})
+	t.Run("AddNodeToRunningRollout", func(t *testing.T) {
+		st := newStore(t)
+		rollout := newRollout("rol_join")
+		if err := st.CreateRollout(ctx, rollout, []StepRow{{NodeID: "node_old", NodeName: "old", Stage: 0, State: StepPending}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.AddNodeToRunningRollout(ctx, rollout.ID, rollout.ToVersion, rollout.ToBuilt, 0, StepRow{NodeID: "node_new", NodeName: "new"}); err != nil {
+			t.Fatal(err)
+		}
+		steps, err := st.RolloutSteps(ctx, rollout.ID)
+		if err != nil || len(steps) != 2 || steps[0].NodeID != "node_new" || steps[0].Stage != 0 || steps[1].Stage != 1 {
+			t.Fatalf("rollout steps: %+v %v", steps, err)
+		}
+	})
+	t.Run("createRollout", func(t *testing.T) {
+		st := newStore(t)
+		rollout := newRollout("rol_create")
+		addNode(t, st, "node_schedule")
+		schedule := NodeUpdateScheduleRow{NodeID: "node_schedule", ToVersion: rollout.ToVersion, ToBuilt: rollout.ToBuilt,
+			ScheduledAt: now.Add(time.Hour).Unix(), CreatedAt: now}
+		if err := st.SetNodeUpdateSchedule(ctx, schedule); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.createRollout(ctx, rollout, []StepRow{{NodeID: "node_rollout", NodeName: "rollout", State: StepPending}}, &schedule, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.ActiveRollout(ctx); err != nil || got.ID != rollout.ID {
+			t.Fatalf("active rollout: %+v %v", got, err)
+		}
+		if schedules, err := st.NodeUpdateSchedules(ctx); err != nil || len(schedules) != 0 {
+			t.Fatalf("consumed schedule: %+v %v", schedules, err)
+		}
+		if err := st.createRollout(ctx, newRollout("rol_second"), nil, nil, nil); !errors.Is(err, ErrConflict) {
+			t.Fatalf("second active rollout: %v", err)
+		}
+	})
+	t.Run("ReplaceWarpAccount", func(t *testing.T) {
+		st := newStore(t)
+		addNode(t, st, "node_warp")
+		old := WarpAccountRow{NodeID: "node_warp", Source: WarpImported, SecretEnc: []byte("old"), PeerPublicKey: "old-key", CreatedAt: now, UpdatedAt: now}
+		if err := st.CreateWarpAccount(ctx, old); err != nil {
+			t.Fatal(err)
+		}
+		invalid := old
+		invalid.Source = "invalid"
+		if err := st.ReplaceWarpAccount(ctx, invalid); err == nil {
+			t.Fatal("invalid replacement was accepted")
+		}
+		preserved, err := st.WarpAccount(ctx, "node_warp")
+		if err != nil || string(preserved.SecretEnc) != "old" {
+			t.Fatalf("failed replacement lost the old account: %+v %v", preserved, err)
+		}
+		next := old
+		next.SecretEnc, next.PeerPublicKey, next.UpdatedAt = []byte("new"), "new-key", now.Add(time.Minute)
+		if err := st.ReplaceWarpAccount(ctx, next); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.WarpAccount(ctx, "node_warp")
+		if err != nil || got.PeerPublicKey != "new-key" || string(got.SecretEnc) != "new" {
+			t.Fatalf("replacement: %+v %v", got, err)
+		}
+	})
+	t.Run("awgPrepareTx", func(t *testing.T) {
+		st := newStore(t)
+		addNode(t, st, "node_awg")
+		if err := st.SetAwgPrepare(ctx, "node_awg", AwgPrepareRow{Want: true}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.AwgPrepareStarted(ctx, "node_awg", now.Unix()); err != nil {
+			t.Fatal(err)
+		}
+		if switched, err := st.AwgPrepareFinish(ctx, "node_awg", true, now.Add(time.Minute).Unix(), "", ""); err != nil || !switched {
+			t.Fatalf("finish: switched=%v err=%v", switched, err)
+		}
+		var raw, backend string
+		if err := st.R.QueryRowContext(ctx, `SELECT awg_prepare_json, awg_backend FROM node WHERE id = 'node_awg'`).Scan(&raw, &backend); err != nil {
+			t.Fatal(err)
+		}
+		if prepared := parseAwgPrepare(raw); prepared.State != AwgPrepareDone || backend != "kernel" {
+			t.Fatalf("AWG state: %+v backend=%q", prepared, backend)
 		}
 	})
 }

@@ -94,34 +94,36 @@ func (s *Store) CreateWarpAccount(ctx context.Context, a WarpAccountRow) error {
 	return insertWarp(ctx, s.W, a)
 }
 
-// ReplaceWarpAccount swaps the account of the node for a new one in one transaction (a re-registration: the old
+// ReplaceWarpAccount swaps the account of the node for a new one in one atomic batch (a re-registration: the old
 // account must survive a failure to store the new one). ErrNotFound when the node has no account.
 func (s *Store) ReplaceWarpAccount(ctx context.Context, a WarpAccountRow) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `DELETE FROM warp_account WHERE node_id = ?`, a.NodeID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM warp_account WHERE node_id = ?)`, a.NodeID),
+		Stmt{Query: `DELETE FROM warp_account WHERE node_id = ?`, Args: []any{a.NodeID}},
+		warpAccountStmt(a),
+	)
+	if errors.Is(err, errGuard) {
 		return ErrNotFound
 	}
-	if err := insertWarp(ctx, tx, a); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return warpInsertError(err)
 }
 
 func insertWarp(ctx context.Context, db execer, a WarpAccountRow) error {
+	stmt := warpAccountStmt(a)
+	_, err := db.ExecContext(ctx, stmt.Query, stmt.Args...)
+	return warpInsertError(err)
+}
+
+func warpAccountStmt(a WarpAccountRow) Stmt {
 	ports, _ := json.Marshal(a.Ports)
-	_, err := db.ExecContext(ctx, `INSERT INTO warp_account (`+warpCols+`)
+	return Stmt{Query: `INSERT INTO warp_account (` + warpCols + `)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.NodeID, a.Source, a.SecretEnc, a.PeerPublicKey, a.EndpointV4, a.EndpointV6, string(ports), a.AddressV4, a.AddressV6,
-		a.MTU, a.ClientID, b2i(a.UseReserved), a.AccountType, b2i(a.Enabled), a.TOSURL, a.TOSAcceptedBy, fleetUnix(a.TOSAcceptedAt),
-		a.RegisteredWith, a.Attention, a.HealthJSON, fleetUnix(a.HealthAt), unix(a.CreatedAt), unix(a.UpdatedAt))
+		Args: []any{a.NodeID, a.Source, a.SecretEnc, a.PeerPublicKey, a.EndpointV4, a.EndpointV6, string(ports), a.AddressV4, a.AddressV6,
+			int64(a.MTU), a.ClientID, int64(b2i(a.UseReserved)), a.AccountType, int64(b2i(a.Enabled)), a.TOSURL, a.TOSAcceptedBy, fleetUnix(a.TOSAcceptedAt),
+			a.RegisteredWith, a.Attention, a.HealthJSON, fleetUnix(a.HealthAt), unix(a.CreatedAt), unix(a.UpdatedAt)}}
+}
+
+func warpInsertError(err error) error {
 	switch {
 	case err == nil:
 		return nil
