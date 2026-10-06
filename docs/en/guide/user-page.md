@@ -19,9 +19,10 @@ From top to bottom:
 4. **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable when the panel has apps for several.
 5. **The ways to connect**, side by side when the person has both ("Either of the two ways will do — or both at once"):
    - **Subscription — Happ** (the names come from the apps list): install the app (with the store or download button and the card's description), then **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". Other apps of the platform are listed below. A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" lists the apps on the link and when they last fetched it. Opening the page does not update this time; only an app fetch does.
-   - **AmneziaVPN key**: the person's keys ("Your keys"), and **Add a device** when self-service is on (see below).
-6. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
-7. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
+   - **AmneziaVPN key**: made from **Add a device** in "My devices" when self-service is on (see below).
+6. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
+7. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
+8. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
 
 A platform with no app gets "There's no app for … — pick another device above". A person who gets nothing yet sees "The server is still being set up — message the admin."
 
@@ -74,12 +75,27 @@ The steps come from the apps list of the **User page** tab. For the chosen platf
 
 For keys the page gives the AmneziaVPN steps: on a phone "Open AmneziaVPN", "Tap "+" and paste the key", "Tap "Continue""; on a computer "AmneziaVPN → "+" → "Connection settings file" → pick the downloaded file", with the warning to add the file, not the key. "Needs AmneziaVPN 5.0.1.5 or newer" names the oldest client for the key's protocol version.
 
+## My devices
+
+One card holds everything that takes a slot of the person's device limit:
+
+- **Apps on the link**: one row for all the apps that fetched the subscription (Happ, kl!ck, …), with when they last did. They share one slot: "All apps on the link take one slot". The slot is taken when the first app fetches the subscription; the device limit never blocks the link.
+- **Keys**: a row per AmneziaVPN key, each one slot, with **Show key** and the **⋯** menu (**Rename**, **Replace key**, **Remove**).
+- The counter in the heading ("5 of 10") and, when the person has both ways and a limit, a line saying what takes a slot.
+
+There is one **Add a device** button under the list (the "Connect another device" block that used to sit under the card is gone). With both ways it opens a sheet that asks "How will it connect?":
+
+- **With an app** (recommended): the steps of connecting a link app: this device, the app (the link apps of the platform, from the apps list), "Add with one tap" or "Copy link", and a QR code of the page for another device when **QR for a second device** is on. It takes no new slot when an app is on the link already.
+- **With a key**: the form of a new key (see below). It takes one slot and says how many are free.
+
+A way the person cannot use stays on the sheet as a quiet card with the reason: all slots used (and **Message** when there is a support link), the keys are issued by the owner, there is no connection option yet, or the owner's preview (which has no address for the calls). The link way keeps working in all of these. With one way only the question is skipped: a person with the link alone goes straight to its steps, one with keys alone to the key form.
+
 ## Self-service devices
 
 With **Devices on the page** on (the default), a person manages their own AmneziaVPN keys:
 
-- **Add a device**: "Connection option" (the main one is named by the countries of its nodes; a WARP profile is "Spare exit (if some site won't open)"; a 2.0 profile is "For old AmneziaVPN versions (before 5.0.1.5)"), "What kind of device", and "Name (optional)". The key opens at once.
-- For each device: **Show key**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once).
+- **Add a device** asks first how the device will connect (see [My devices](#my-devices)); the **With a key** way is the form: "Connection option" (the main one is named by the countries of its nodes; a WARP profile is "Spare exit (if some site won't open)"; a 2.0 profile is "For old AmneziaVPN versions (before 5.0.1.5)"), "What kind of device", and "Name (optional)". The key opens at once.
+- For each device: **Show key** as the main action, and the **⋯** menu with **Rename**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once). Remove and Replace ask first, in the row.
 - The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code. A server is named as on the **Channel utilization** card and in the person's app: by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number ("Germany 2"). The key's connection in AmneziaVPN carries the same name after the subscription title ("Mistgate · Germany 2").
 - When an old key stops working (a critical change of the profile, a new port or address of a node), the device says "new key needed", and **Get a new key** walks the person through replacing it.
 

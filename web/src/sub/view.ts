@@ -1,5 +1,5 @@
 import badge from "../assets/mistgate-badge.svg?raw";
-import { connectCard, moreCard, qrSide } from "./connect";
+import { connectCard, qrSide } from "./connect";
 import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
 import { dict, type Dict } from "./i18n";
@@ -15,7 +15,8 @@ import type { Lang, MgData, Theme } from "./types";
 // (sub.css); the rest is shared and restyled by the same media query.
 //
 // Top to bottom: the status, then (a first visit) the three steps of connecting, the servers, the person's devices, help
-// and the footer; a returning visitor has the servers and devices first and the steps folded into "connect one more device".
+// and the footer; a returning visitor has the servers and devices first: "Add a device" on the devices card holds the way
+// to connect one more (with an app and the link, or with a key; add.ts).
 // A subscription that is not active shows the reason and "write to support", then the devices (they can be removed and renamed).
 
 export type { Actions, State } from "./state";
@@ -91,16 +92,13 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     const stale = staleCard({ d, s, a, t, support });
     const servers = serversSection(c);
     const devices = devicesSection(c);
-    // the help card stands in two places (beside the steps on a computer, at the end on a phone): one element each
+    // the help card stands in two places on a first visit (beside the steps on a computer, at the end on a phone): one element each
     const qr = qrSide(c);
     const hasHelp = support !== "";
     const hasConnect = connectNeeded(d);
     if (stale) children.push(stale);
     if (s.returning) {
       children.push(...servers, ...devices);
-      if (hasConnect) {
-        children.push(h("div", { class: "cols" }, h("div", { class: "main" }, moreCard(c)), hasHelp && h("aside", { class: "side only-w" }, helpCard(c))));
-      }
     } else {
       if (hasConnect) {
         children.push(
@@ -110,7 +108,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
       }
       children.push(...servers, ...devices);
     }
-    if (hasHelp) children.push(h("div", { class: "only-m" }, helpCard(c)));
+    if (hasHelp) children.push(h("div", { class: s.returning ? "" : "only-m" }, helpCard(c)));
   }
   children.push(footer(c));
   return h("main", { class: "wrap" }, ...children);

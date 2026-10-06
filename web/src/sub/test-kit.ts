@@ -9,6 +9,7 @@ export const noop = () => {};
 
 export const amzNoop = {
   add: noop,
+  pane: noop,
   form: noop,
   create: noop,
   show: noop,
@@ -35,7 +36,6 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
     app: (k) => log.push(`app ${k}`),
     theme: (t) => log.push(`theme ${t}`),
     qrOpen: (o) => log.push(`qr ${o}`),
-    more: (o) => log.push(`more ${o}`),
     stepsAgain: () => log.push("steps-again"),
     closeAnn: () => log.push("closed"),
     mark: () => log.push("mark"),
@@ -44,7 +44,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
       done?.();
     },
     download: (f) => log.push(`download ${f}`),
-    amz: { ...amzNoop, add: (o) => log.push(`add ${o}`) },
+    amz: { ...amzNoop, add: (o, pane) => log.push(pane ? `add ${o} ${pane}` : `add ${o}`), pane: (p) => log.push(`pane ${p}`) },
     dns: { open: (s) => log.push(`dns-open ${s}`), pick: (p) => log.push(`dns-pick ${p}`), apply: () => log.push("dns-apply"), retry: () => log.push("dns-retry") },
     ...over,
   };
@@ -59,7 +59,6 @@ export function state(platform: State["platform"] = "ios", over: Partial<State> 
     app: "",
     theme: "auto",
     qrOpen: false,
-    more: false,
     stepsAgain: false,
     annClosed: false,
     returning: false,

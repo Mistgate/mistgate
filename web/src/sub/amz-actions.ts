@@ -1,6 +1,6 @@
 import { ApiError, type Answer } from "./api";
 import { dict } from "./i18n";
-import { defaultLabel, mainProfile } from "./logic";
+import { defaultLabel, defaultPane, mainProfile } from "./logic";
 import type { AmzActions, AmzState } from "./state";
 import type { AwgDevice, Lang, MgData } from "./types";
 
@@ -34,8 +34,8 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
   const am = () => st.amz;
   const endpoints = () => data.amnezia?.endpoints ?? "";
   const find = (id: string) => data.amnezia?.devices.find((x) => x.id === id);
-  /** The control that opened a row's question or editor, on a phone and on a computer. */
-  const back = (id: string, what: "rot" | "ren" | "del") => `amz-more-${id}|amz-${what}d-${id}`;
+  /** The control that opened a row's question or editor: its "more" button. */
+  const back = (id: string) => `amz-more-${id}`;
 
   const fail = (busy: string, e: unknown) => {
     if (e instanceof ApiError && e.code === "locked") return locked?.();
@@ -86,15 +86,16 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     am().error = "";
     am().errorAt = "";
     render();
-    if (r) focus?.(back(r.id, "ren"));
+    if (r) focus?.(back(r.id));
   }
 
   return {
     // the dialog: it shows the form, after "Create" the new device's key, a device's key, or the new key of a stale device;
     // closing it leaves the device in the list and scrolls to it
-    add(open) {
+    add(open, pane) {
       const was = am().created ?? am().renew ?? am().open;
       am().adding = open;
+      if (open) am().pane = pane ?? defaultPane(data);
       am().created = null;
       am().renew = null;
       am().open = null;
@@ -104,6 +105,12 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       if (open && !profiles.some((p) => p.id === am().form.profile)) am().form.profile = mainProfile(profiles);
       render();
       if (!open && was) reveal(`amz-row-${was}`);
+    },
+    pane(pane) {
+      am().pane = pane;
+      am().error = "";
+      am().errorAt = "";
+      render();
     },
     form(patch, draw = false) {
       Object.assign(am().form, patch); // no draw unless asked: it would drop what is being typed
@@ -167,7 +174,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       render();
       // the question takes the keyboard to its safe answer; cancelling gives it back to the control that asked
       if (c) focus?.(`amz-no-${c.id}`);
-      else if (was) focus?.(back(was.id, was.kind === "remove" ? "del" : "rot"));
+      else if (was) focus?.(back(was.id));
     },
     rotate(id) {
       void run(
@@ -231,7 +238,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
           else x.label = value;
           am().rename = null;
         },
-      ).then((ok) => ok && focus?.(back(r.id, "ren")));
+      ).then((ok) => ok && focus?.(back(r.id)));
     },
   };
 }

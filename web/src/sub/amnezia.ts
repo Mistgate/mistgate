@@ -14,6 +14,7 @@ import {
   selfServe,
   storeLabel,
   versionsFor,
+  ways,
 } from "./logic";
 import { qrSvg } from "./qr";
 import type { AmzActions, AmzState, Tools } from "./state";
@@ -74,11 +75,12 @@ export function downloadButton(url: string, t: Dict, key: string, cls = ""): HTM
   );
 }
 
-/** The head of a sheet: a tinted icon, the title, one line under it, the cross. */
-export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean }, close: () => void): HTMLElement {
+/** The head of a sheet: ("Back" when the sheet is a step of a choice,) a tinted icon, the title, one line under it, the cross. */
+export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean }, close: () => void, back?: () => void): HTMLElement {
   return h(
     "div",
     { class: "sh-head" },
+    back && h("button", { class: "ibtn round", type: "button", "data-k": "add-back", "aria-label": t.back, on: { click: back } }, icon("back", 18)),
     tile(o.tone, o.ico),
     h("div", { class: "grow" }, h("h3", { id: o.id }, o.title), o.sub && h("p", { class: `sub${o.flagRow ? " flagrow" : ""}` }, ...(Array.isArray(o.sub) ? o.sub : [o.sub]))),
     h("button", { class: "ibtn round", type: "button", "data-k": "modal-x", "aria-label": t.close, on: { click: close } }, icon("close", 16)),
@@ -132,7 +134,7 @@ function addForm(c: AmzCtx): Kid[] {
       t.platforms[p],
     );
   return [
-    sheetHead(t, { tone: "mint", ico: "plus", id: "dlg-t", title: t.newDevT, sub: t.newDevS(app) }, () => a.amz.add(false)),
+    sheetHead(t, { tone: "mint", ico: "plus", id: "dlg-t", title: t.newDevT, sub: t.newDevS(app) }, () => a.amz.add(false), ways(d).length > 1 ? () => a.amz.pane("pick") : undefined),
     h(
       "form",
       {

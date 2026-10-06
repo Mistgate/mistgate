@@ -267,7 +267,7 @@ describe("actions", () => {
     a.ask(null);
     a.ask({ id: "d4", kind: "rotate" });
     a.ask(null);
-    expect(log).toEqual(["focus amz-no-d4", "focus amz-more-d4|amz-deld-d4", "focus amz-no-d4", "focus amz-more-d4|amz-rotd-d4"]);
+    expect(log).toEqual(["focus amz-no-d4", "focus amz-more-d4", "focus amz-no-d4", "focus amz-more-d4"]);
   });
 
   it("rotate replaces the key; remove drops the device and frees the slot", async () => {
@@ -320,7 +320,7 @@ describe("actions", () => {
     a.renameCancel();
     await settle();
     expect(api.calls).toHaveLength(1);
-    expect(log.at(-1)).toBe("focus amz-more-d3|amz-rend-d3");
+    expect(log.at(-1)).toBe("focus amz-more-d3");
   });
 
   it("a failed rename keeps the field open and says what happened under it", async () => {
@@ -347,11 +347,13 @@ describe("the list of devices", () => {
     expect(el.textContent).not.toMatch(/AWG|Main|10\.66|fd66/);
   });
 
-  it("a phone: 'Show key' across the row and the 'more' button; the menu has rename, replace and a red remove", () => {
+  it("one block of actions on a phone and a computer: the main one and 'more'; the menu has rename, replace and a red remove", () => {
     const a = actions({ amz: { ...amzNoop, show: (id) => void a.log.push(`show ${id}`), menu: (id) => void a.log.push(`menu ${id}`) } });
     const el = rows("many", {}, a);
-    const acts = row(el, "d3").querySelector(".dev-acts.only-m")!;
+    expect(el.querySelectorAll(".dev-acts.only-m, .dev-acts.only-w, .links")).toHaveLength(0); // no second set of buttons for the other size
+    const acts = row(el, "d3").querySelector(".dev-acts")!;
     expect(text(acts.querySelector(".btn"))).toBe("Показать ключ");
+    expect([...acts.children].filter((x) => x.tagName === "BUTTON")).toHaveLength(2); // the main action and "more": not four words
     acts.querySelector<HTMLButtonElement>("[data-k=amz-show-d3]")!.click();
     acts.querySelector<HTMLButtonElement>("[data-k=amz-more-d3]")!.click();
     expect(a.log).toEqual(["show d3", "menu d3"]);
@@ -363,18 +365,14 @@ describe("the list of devices", () => {
     expect(row(open, "d3").querySelector("[data-k=amz-more-d3]")?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("a computer: quiet words in the row", () => {
+  it("the menu items do what they say", () => {
     const a = actions({ amz: { ...amzNoop, ask: (c) => void a.log.push(`ask ${c?.kind}`), renameStart: (id) => void a.log.push(`rename ${id}`) } });
-    const el = rows("many", {}, a);
-    const links = row(el, "d3").querySelector(".links.only-w")!;
-    expect([...links.querySelectorAll("button")].map(text)).toEqual(["Показать ключ", "Переименовать", "Заменить ключ", "Удалить"]);
-    expect(links.querySelector(".bad")).not.toBeNull();
-    links.querySelector<HTMLButtonElement>("[data-k=amz-rend-d3]")!.click();
-    links.querySelector<HTMLButtonElement>("[data-k=amz-rotd-d3]")!.click();
-    links.querySelector<HTMLButtonElement>("[data-k=amz-deld-d3]")!.click();
+    const open = rows("many", { amz: { ...newAmzState("android", "p31", "android"), menu: "d3" } }, a);
+    open.querySelector<HTMLButtonElement>("[data-k=amz-m-ren-d3]")!.click();
+    open.querySelector<HTMLButtonElement>("[data-k=amz-m-rot-d3]")!.click();
+    open.querySelector<HTMLButtonElement>("[data-k=amz-m-del-d3]")!.click();
     expect(a.log).toEqual(["rename d3", "ask rotate", "ask remove"]);
   });
-
   it("the questions say what happens, in the row, with a red 'Remove', a plain 'Cancel' and an alertdialog", () => {
     const remove = row(rows("many", { amz: { ...newAmzState("android", "p31", "android"), confirm: { id: "d3", kind: "remove" } } }), "d3");
     expect(remove.getAttribute("role")).toBe("alertdialog");
@@ -426,31 +424,52 @@ describe("the list of devices", () => {
     expect(rows("plain").querySelector(".slots")).toBeNull();
   });
 
-  it("add a device: one button that opens the dialog; with no keys yet the row explains", () => {
+  // a person with keys alone: no link app, so "Add a device" is the key form (the way is not asked)
+  const keysAlone = (name: string, f: (d: MgData) => void = () => {}) => view(data(name, (d) => { d.access.happ = false; d.devices = d.devices.filter((x) => d.amnezia?.devices.some((k) => k.id === x.id)); f(d); }), state("android", { returning: true }), actions());
+
+  it("add a device: one button for both ways that opens the dialog; the free slots under it", () => {
     const a = actions();
     const el = rows("many", {}, a);
     const btns = [...el.querySelectorAll("button")].filter((b) => text(b) === "Добавить устройство");
     expect(btns).toHaveLength(1);
+    expect(btns[0]!.getAttribute("data-k")).toBe("dev-add");
     btns[0]!.click();
     expect(a.log).toEqual(["add true"]);
-    const empty = rows("amnezia-empty");
-    expect([...empty.querySelectorAll(".dev-n")].map(text)).toEqual(["Приложения по ссылке", "Ключи AmneziaVPN"]);
+    expect(text(el.querySelector(".dev-hint"))).toBe("Свободно ещё 4 места");
+    // no second block "connect one more device" under the card
+    expect(el.querySelector("[data-k=more]")).toBeNull();
+  });
+
+  it("with no keys yet the list is the link's row; keys alone get the row that explains", () => {
+    expect([...rows("amnezia-empty").querySelectorAll(".dev-n")].map(text)).toEqual(["Приложения по ссылке"]);
+    const empty = keysAlone("amnezia-empty");
+    expect([...empty.querySelectorAll(".dev-n")].map(text)).toEqual(["Ключи AmneziaVPN"]);
     expect(text(empty.querySelector(".dev-b .sm.mut"))).toBe("Пока ни одного. Ключ выдаётся на каждое устройство отдельно");
   });
 
-  it("every slot taken: the words, 'Add' waits, and the way to write", () => {
+  it("every slot taken: the link still connects, so 'Add' stays; only the words change", () => {
     const el = rows("limit");
-    const slotRow = el.querySelector(".dev-x")!.closest(".dev")!;
-    expect(text(slotRow.querySelector(".note.warn"))).toBe("Занято 3 из 3. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.");
-    expect(slotRow.querySelector<HTMLButtonElement>("[data-k=amz-add]")?.disabled).toBe(true);
-    expect(text(slotRow.querySelector("a.btn"))).toBe("Написать");
-    expect(text(rows("limit").querySelector(".slots .only-m"))).toBe("3 из 3");
+    const btn = el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!;
+    expect(btn.disabled).toBe(false);
+    expect(text(btn.parentElement!.querySelector(".dev-hint"))).toBe("Все места заняты");
+    expect(text(el.querySelector(".slots .only-m"))).toBe("3 из 3");
   });
 
-  it("the owner issues the keys: rows without buttons, 'ask for a key' and Write", () => {
-    const el = rows("amnezia-off");
-    expect(el.querySelectorAll(".dev-acts.only-m, .links")).toHaveLength(0);
-    expect(el.querySelector("[data-k=amz-add]")).toBeNull();
+  it("every slot taken and keys the only way: the words, 'Add' waits, and the way to write", () => {
+    const el = keysAlone("limit");
+    const slotRow = el.querySelector(".dev-x")!.closest(".dev")!;
+    expect(text(slotRow.querySelector(".note.warn"))).toBe("Занято 3 из 3. Удалите устройство, которым больше не пользуетесь, или напишите — добавим место.");
+    expect(slotRow.querySelector<HTMLButtonElement>("[data-k=dev-add]")?.disabled).toBe(true);
+    expect(text(slotRow.querySelector("a.btn"))).toBe("Написать");
+  });
+
+  it("the owner issues the keys: rows without buttons; keys alone get 'ask for a key' and Write, with the link 'Add' still opens the sheet", () => {
+    const both = rows("amnezia-off");
+    expect(both.querySelectorAll(".dev-acts")).toHaveLength(0);
+    expect(both.querySelector("[data-k=dev-add]")).not.toBeNull();
+    const el = keysAlone("amnezia-off");
+    expect(el.querySelectorAll(".dev-acts")).toHaveLength(0);
+    expect(el.querySelector("[data-k=dev-add]")).toBeNull();
     const ask = [...el.querySelectorAll(".dev")].at(-1)!;
     expect(text(ask.querySelector(".dev-n"))).toBe("Попросите ключ");
     expect(text(ask.querySelector(".sm.mut"))).toBe("Ключи AmneziaVPN выдаёт владелец — напишите, для какого устройства нужен.");
@@ -458,29 +477,40 @@ describe("the list of devices", () => {
   });
 
   it("no profile: keys are not available yet", () => {
-    const el = rows("amnezia-none");
+    const el = keysAlone("amnezia-none");
     const last = [...el.querySelectorAll(".dev")].at(-1)!;
     expect(text(last.querySelector(".dev-n"))).toBe("Ключи пока недоступны");
     expect(text(last.querySelector(".sm.mut"))).toBe("Сервер ещё настраивается — напишите администратору.");
-    expect(text(view(data("amnezia-none"), state("android", { returning: true }, "en"), actions()))).toContain("The server is still being set up — message the admin.");
+    expect(text(view(data("amnezia-none", (d) => (d.access.happ = false)), state("android", { returning: true }, "en"), actions()))).toContain("The server is still being set up — message the admin.");
   });
 
-  it("the admin's preview (no address) shows the rows without buttons and does not say 'ask the owner'", () => {
-    const el = rows("many", {}, actions());
+  it("the admin's preview (no address) shows the rows without buttons and does not say 'ask the owner'; the link branch still opens", () => {
     const d = data("many", (x) => (x.amnezia!.endpoints = ""));
     const p = view(d, state("android", { returning: true }), actions());
-    expect(p.querySelectorAll(".dev-acts.only-m, .links")).toHaveLength(0);
-    expect(p.querySelector("[data-k=amz-add]")).toBeNull();
+    expect(p.querySelectorAll(".dev-acts")).toHaveLength(0);
+    expect(p.querySelector("[data-k=dev-add]")).not.toBeNull(); // the link needs no address
     expect(p.textContent).not.toContain("Попросите ключ");
-    expect(el.querySelectorAll(".dev-acts.only-m").length).toBeGreaterThan(0);
+    expect(rows("many").querySelectorAll(".dev-acts").length).toBeGreaterThan(0);
+    // keys alone: nothing to press
+    const keys = view(data("many", (x) => ((x.amnezia!.endpoints = ""), (x.access.happ = false))), state("android", { returning: true }), actions());
+    expect(keys.querySelector("[data-k=dev-add]")).toBeNull();
   });
 
-  it("only the link: one row", () => {
-    const el = rows("happ");
+  it("only the link: one row, and 'Add a device' is there for the next app", () => {
+    const a = actions();
+    const el = rows("happ", {}, a);
     expect([...el.querySelectorAll(".dev-n")].map(text)).toEqual(["Приложения по ссылке"]);
-    expect(text(el.querySelector(".dev .hint"))).toBe("Все устройства с этой ссылкой занимают одно место");
+    expect(text(el.querySelector(".dev .hint"))).toBe("Все приложения по ссылке — одно место");
+    el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!.click();
+    expect(a.log).toEqual(["add true"]);
   });
 
+  it("the hint says what takes a slot, when there is a limit and both ways", () => {
+    const hint = (el: HTMLElement) => text([...el.querySelectorAll(".shead")].find((x) => text(x.querySelector(".h2")) === "Мои устройства")?.querySelector(".sec-sub"));
+    expect(hint(rows("many"))).toBe("Ключ — одно место на устройство, приложения по ссылке — одно на всех");
+    expect(hint(rows("happ"))).toBe("");
+    expect(hint(rows("plain"))).toBe("");
+  });
   it("when the subscription is not active the devices stay: rename and remove, but no key is shown or issued", () => {
     for (const name of ["expired", "quota", "disabled"]) {
       const el = view(data(name), state("android"), actions());

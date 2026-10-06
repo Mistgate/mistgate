@@ -1,5 +1,5 @@
 import "./sub.css";
-import { addModal, modalLabel } from "./amnezia";
+import { deviceModal, deviceModalLabel } from "./add";
 import { amzActions } from "./amz-actions";
 import * as api from "./api";
 import { dnsActions } from "./dns-actions";
@@ -142,7 +142,6 @@ if (data.locked) {
     app: "",
     theme: startTheme,
     qrOpen: false,
-    more: false,
     stepsAgain: false,
     annClosed: stored(ann) === "1",
     returning: isReturning(data, stored("setup") === "1"),
@@ -184,10 +183,6 @@ if (data.locked) {
     },
     qrOpen(open) {
       st.qrOpen = open;
-      render();
-    },
-    more(open) {
-      st.more = open;
       render();
     },
     stepsAgain() {
@@ -236,19 +231,29 @@ if (data.locked) {
     true,
   );
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && st.amz.menu) {
+    if (!st.amz.menu) return;
+    if (e.key === "Escape") {
       const id = st.amz.menu;
       actions.amz.menu(null);
       focusKey(`amz-more-${id}`);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+      // a menu is walked with the arrows
+      const items = [...root.querySelectorAll<HTMLElement>(".menu [role=menuitem]")];
+      if (items.length === 0) return;
+      e.preventDefault();
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+      items[next]!.focus();
     }
   });
 
   const ctx = (): Ctx => ({ d: data, s: st, a: actions, t: dict[st.lang], support: data.options.show_support ? safeUrl(data.support_url) : "" });
-  const dialogOpen = () => (st.dns.open !== null || st.amz.adding || st.amz.renew !== null || st.amz.open !== null) && (st.dns.open !== null || data.amnezia !== null);
+  // the "add a device" dialog needs no Amnezia data for its link branch; a key sheet does
+  const dialogOpen = () => st.dns.open !== null || st.amz.adding || (data.amnezia !== null && (st.amz.renew !== null || st.amz.open !== null));
 
   // the dialog lives outside the tree the page rebuilds
   const modal = createModal({
-    label: () => (st.dns.open ? dnsLabel(ctx()) : modalLabel(ctx())),
+    label: () => (st.dns.open ? dnsLabel(ctx()) : deviceModalLabel(ctx())),
     lastUsed: () => lastKey,
     onClose: () => {
       // Esc or the backdrop: the state follows the dialog
@@ -267,9 +272,20 @@ if (data.locked) {
     setDocument(st.lang);
     if (key) root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true });
     const open = dialogOpen();
-    modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : addModal(ctx())) : []);
+    modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : deviceModal(ctx())) : []);
   };
 
+  // `vite -c vite.sub.config.ts` only: &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &ask=remove:<id>|rotate:<id> its question
+  if (import.meta.env.DEV) {
+    const sheet = devQuery.get("sheet");
+    if (sheet === "pick" || sheet === "link" || sheet === "key") {
+      st.amz.adding = true;
+      st.amz.pane = sheet;
+    }
+    st.amz.menu = devQuery.get("menu");
+    const [kind, id] = (devQuery.get("ask") ?? "").split(":");
+    if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
+  }
   render(true);
 }
 // the static favicon in sub.html is a placeholder (so the browser never asks for /favicon.ico); show the brand

@@ -137,7 +137,7 @@ a { color: inherit; }
 
 /* a heading of a section: the title, what is beside it, and (below on a phone, at the right on a computer) one line */
 .shead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; padding: 20px 4px 0; }
-.shead .h2 { flex: 1; min-width: 0; }
+.shead .h2 { flex: 1 0 auto; }
 .sec-sub { flex-basis: 100%; order: 3; }
 
 /* a dot and a pill: colour + dot + word */
@@ -360,8 +360,7 @@ a { color: inherit; }
 .stag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 8px; background: var(--warning-soft); color: var(--warning-text); font-size: 12px; font-weight: 700; align-self: flex-start; margin-top: 4px; }
 .stag .dot { width: 6px; height: 6px; background: var(--warning); }
 .dev .fld { flex: 1; min-width: 0; }
-.links { display: flex; align-items: center; gap: 0 20px; flex-wrap: wrap; }
-.links .tlink { min-height: 40px; }
+.dev-hint { text-align: center; }
 
 /* things over the page: the menu of a row, the toast */
 .pop { position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--pop); }
@@ -405,6 +404,19 @@ a { color: inherit; }
 .pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
 .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* the ways of "add a device": a whole card is the button; a way that cannot be used is a quiet dashed card that says why */
+.opt.go { align-items: center; min-height: 96px; white-space: normal;transition: transform 0.15s var(--spring); }
+.opt.go:active { transform: scale(0.985); }
+.opt.go > .i:last-child { color: var(--muted); }
+.opt.go .opt-b, .opt.off .opt-b { gap: 6px; }
+.opt.go .opt-t { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.opt.off { border-style: dashed; background: transparent; }
+.opt.off .opt-t { color: var(--muted); }
+.wayslot { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; line-height: 1.4; font-weight: 600; }
+.wayslot.sky { color: var(--tone-sky); } .wayslot.mint { color: var(--tone-mint); }
+.wayslot .sq { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 3px; background: currentColor; }
+.wayslot .sq.o { background: none; box-shadow: inset 0 0 0 1.6px currentColor; }
+
 /* an option of a choice */
 .opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); text-align: left; }
 .opt.on { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
@@ -422,6 +434,11 @@ a { color: inherit; }
 .mbox > * { flex-shrink: 0; }
 .grab { flex: none; width: 36px; height: 5px; border-radius: 3px; background: var(--faint); margin: 0 auto 2px; }
 .sh-head { display: flex; align-items: center; gap: 12px; }
+/* a long sheet (the link branch) scrolls under its head: the cross stays in reach */
+.mbox > .sh-head { position: sticky; top: 0; z-index: 2; padding: 6px 0 10px; background: var(--surface); }
+.lbody { gap: 18px; }
+.mbox .step { padding: 0; }
+.mbox .step + .step { padding-top: 18px; }
 .sh-head h3 { margin: 0; font-size: 19px; line-height: 1.2; font-weight: 800; letter-spacing: -0.03em; overflow-wrap: anywhere; }
 .sh-head .sub { font-size: 13px; line-height: 1.4; color: var(--muted); margin-top: 2px; text-wrap: pretty; }
 .sh-head .sub.flagrow { display: flex; align-items: center; gap: 6px; }
@@ -481,7 +498,6 @@ a { color: inherit; }
 
 @media (max-width: 719.98px) {
   .only-w { display: none !important; }
-  .dev-acts.only-m { display: flex; }
   /* a dns row with a long name keeps its button on the line */
   .modal { animation-name: sheet; }
 }
@@ -521,13 +537,13 @@ a { color: inherit; }
   .dev { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 14px; padding: 14px 20px; min-height: 76px; }
   .dev-top { flex: 1 1 280px; align-items: center; min-width: 0; }
   .dev-n { font-size: 15px; }
-  .dev-acts.only-m { display: none; }
   .dev-acts { flex: 0 0 auto; align-items: center; }
+  .dev-acts .ibtn.big { width: 44px; height: 44px; border-radius: 12px; }
   .dev-acts .btn { flex: none; width: auto; min-height: 44px; padding: 9px 16px; border-radius: 12px; font-size: 14px; white-space: nowrap; }
   .dev-x { flex: 1 0 100%; }
   .dev .fld { flex: 1 1 280px; }
   .dev > .btn { width: auto; flex: none; min-height: 44px; padding: 9px 16px; border-radius: 12px; font-size: 14px; }
-  .dev-hint { flex: 1 1 280px; }
+  .dev-hint { flex: 1 1 280px; text-align: left; }
   .dev .note { flex: 1 1 100%; }
 
   .help { padding: 16px 16px 16px 20px; }
@@ -545,6 +561,5 @@ a { color: inherit; }
   .keyq-t { align-self: auto; flex: 1; padding-top: 4px; }
   .cfg-actions .btn { width: 100%; }
   .lock { margin-top: 8vh; }
-  .menu { right: auto; left: 0; }
   .toast { bottom: 24px; }
 }

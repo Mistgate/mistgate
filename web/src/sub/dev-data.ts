@@ -78,7 +78,10 @@ const winbox = awg("d5", "windows", "Windows", -1);
 // the page lists them among the devices too (app "amnezia"): the page shows them once, in their own rows
 const asDevice = (x: AwgDevice): Device => ({ id: x.id, platform: x.platform, model: x.label, app: "amnezia", last_seen_unix: x.last_handshake_unix, online: x.online });
 
-const main: AwgProfile = { id: "p31", name: "Main", version: "3.1", egress: "direct", countries: ["DE", "FI"] };
+// generic names for the screenshots: an iPhone, a router (platform "other"), an Android phone and a PC
+const richKeys = [awg("d3", "ios", "iPhone", 40), awg("d6", "other", "Router", 3 * hour), awg("d7", "android", "Pixel 7", 2 * day), awg("d8", "windows", "Work PC", 9 * day)];
+
+const main: AwgProfile ={ id: "p31", name: "Main", version: "3.1", egress: "direct", countries: ["DE", "FI"] };
 // "dev:" = the sample answers the self-service calls itself (dev-api.ts); a real page carries the link's own address
 const amz = (devices: AwgDevice[], extra: Partial<AmneziaData> = {}): AmneziaData => ({ devices, profiles: [main], can_add: true, self_service: true, endpoints: "dev:", ...extra });
 
@@ -209,8 +212,16 @@ export const cases: Record<string, MgData> = {
     amnezia: keys([awg("d3", "android", "Pixel 7", 2 * day, { stale: true, stale_reason: "dns", online: false }), macbook]),
     servers: [{ ...fra, dns: { ...fra.dns!, choice: "dns_family", effective: "dns_family", keys_to_refresh: ["d3"] } }, ams, hel],
   },
+  // the list a friend complained about: the link apps online and several keys (4 keys + the link = 5 of 10)
+  "devices-rich": { ...base, announcement: "", user: withUser({ device_limit: 10, devices_used: 5 }), devices: [...shared(8 * hour, true), ...richKeys.map(asDevice)], amnezia: keys(richKeys) },
+  // one slot left
+  "devices-near": { ...base, announcement: "", user: withUser({ device_limit: 6, devices_used: 5 }), devices: [...shared(8 * hour, true), ...richKeys.map(asDevice)], amnezia: keys(richKeys) },
+  // the owner's preview of the page: no address for the self-service calls
+  preview: { ...base, announcement: "", user: withUser({ device_limit: 10, devices_used: 5 }), devices: [...shared(8 * hour, true), ...richKeys.map(asDevice)], amnezia: keys(richKeys, { endpoints: "" }) },
+  // every slot taken, with the link and with keys
+  "devices-full": { ...base, announcement: "", user: withUser({ device_limit: 5, devices_used: 5 }), devices: [...shared(8 * hour, true), ...richKeys.map(asDevice)], amnezia: keys(richKeys) },
   // every slot taken
-  limit: { ...returning, user: withUser({ device_limit: 3, devices_used: 3 }), amnezia: keys([pixel, macbook]) },
+  limit:{ ...returning, user: withUser({ device_limit: 3, devices_used: 3 }), amnezia: keys([pixel, macbook]) },
   devices: { ...base, user: withUser({ devices_used: 3 }), devices: [...shared(30, true), asDevice(pixel), asDevice(macbook)], amnezia: keys([pixel, macbook], { can_add: false }) },
   many: {
     ...base,

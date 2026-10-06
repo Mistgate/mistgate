@@ -154,17 +154,17 @@ describe("step 3: a link app", () => {
 
   it("after the app fetched the subscription (and this device set it up) the step says so, and can show the steps again", () => {
     const a = actions();
-    const el = view(data("return"), state("ios", { returning: true, more: true, marked: true }), a);
+    const el = view(data("return"), state("ios", { marked: true }), a);
     const s3 = el.querySelectorAll(".step")[2]!;
     expect(s3.querySelector(".sn.done")).not.toBeNull();
     expect(text(s3.querySelector(".note.ok"))).toBe("Готово — приложение получило подписку 3 часа назад. Включите VPN и выберите любой сервер.");
     expect(s3.querySelector(".how")).toBeNull();
     s3.querySelector<HTMLButtonElement>("[data-k=steps-again]")!.click();
     expect(a.log).toEqual(["steps-again"]);
-    const again = view(data("return"), state("ios", { returning: true, more: true, marked: true, stepsAgain: true }), actions());
+    const again = view(data("return"), state("ios", { marked: true, stepsAgain: true }), actions());
     expect(again.querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
     // not done when this device never set it up
-    expect(view(data("return"), state("ios", { returning: true, more: true }), actions()).querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
+    expect(view(data("return"), state("ios"), actions()).querySelectorAll(".step")[2]!.querySelector(".how")).not.toBeNull();
   });
 });
 
@@ -180,7 +180,7 @@ describe("step 3: a key app", () => {
     const add = how[1]!.querySelector<HTMLButtonElement>("[data-k=amz-add]")!;
     expect(text(add)).toBe("Добавить устройство");
     add.click();
-    expect(a.log).toEqual(["add true"]);
+    expect(a.log).toEqual(["add true key"]); // straight to the key form: the way is already chosen
     const pc = view(data("first"), state("windows", key), actions());
     expect(text(pc.querySelectorAll(".how-i")[2]!.querySelector(".how-sub"))).toBe("Скачайте файл → AmneziaVPN → «+» → «Файл с настройками подключения»");
     expect(el.querySelector("a[href^='happ://']")).toBeNull(); // a key app has no add link

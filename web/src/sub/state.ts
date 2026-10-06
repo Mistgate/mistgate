@@ -5,11 +5,16 @@ import type { AwgConfig, Lang, MgData, Platform, Theme } from "./types";
 
 export type Confirm = { id: string; kind: "remove" | "rotate" } | null;
 
+/** The panes of the "add a device" dialog: "pick" asks how the device will connect, "link" is the app-with-the-link branch, "key" the AmneziaVPN key form. */
+export type AddPane = "pick" | "link" | "key";
+
 export type AmzState = {
   /** The device whose key the dialog shows ("Show key"). */
   open: string | null;
   /** The "add a device" dialog is open. */
   adding: boolean;
+  /** What the open "add a device" dialog shows: the choice of the way (link app or key), the link branch, or the key form. */
+  pane: AddPane;
   /** The device this dialog just created: the dialog then shows its key instead of the form. */
   created: string | null;
   /** The stale device whose new key the dialog shows ("new key needed"). */
@@ -37,6 +42,7 @@ export type AmzState = {
 export const newAmzState = (platform: string, profile: string, here = ""): AmzState => ({
   open: null,
   adding: false,
+  pane: "key",
   created: null,
   renew: null,
   busy: "",
@@ -69,8 +75,10 @@ export type DnsState = {
 export const newDnsState = (): DnsState => ({ open: null, pick: "", busy: "", error: null, done: {} });
 
 export type AmzActions = {
-  /** Opens (true) the "add a device" dialog or closes (false) whichever dialog is open. */
-  add(open: boolean): void;
+  /** Opens (true) the "add a device" dialog, at `pane` or where the person's ways say (the choice, or the only way), or closes (false) whichever dialog is open. */
+  add(open: boolean, pane?: AddPane): void;
+  /** Moves the open "add a device" dialog to another pane (a choice made, "Back"). */
+  pane(pane: AddPane): void;
   /** Form fields change without a re-render: the page would drop what is being typed. */
   form(patch: Partial<AmzState["form"]>, draw?: boolean): void;
   create(): void;
@@ -111,10 +119,8 @@ export type State = {
   /** The chosen app of the platform (appKey), "" = the first. */
   app: string;
   theme: Theme;
-  /** The phone's "connect another device" row is open. */
+  /** The "connect another device" row (the QR code of the link) is open. */
   qrOpen: boolean;
-  /** A returning visit: "connect one more device" is open. */
-  more: boolean;
   /** The done step shows its three steps again. */
   stepsAgain: boolean;
   annClosed: boolean;
@@ -135,7 +141,6 @@ export type Actions = {
   app(key: string): void;
   theme(t: Theme): void;
   qrOpen(open: boolean): void;
-  more(open: boolean): void;
   stepsAgain(): void;
   closeAnn(): void;
   /** This device set a connection up: remembered (the "returning" mark). */

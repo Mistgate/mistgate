@@ -22,7 +22,7 @@ import {
 import { qrSvg } from "./qr";
 import type { Ctx } from "./state";
 import { note, rich, tile } from "./ui";
-import type { AppEntry, Platform } from "./types";
+import type { AppEntry, Kind, Platform } from "./types";
 
 // The three steps of connecting: the device, the app, how. Step 3 is written for the chosen app: a link app (install, add the
 // subscription with one tap or by copying the link, turn the VPN on) or a key app (install, add this device, paste the key).
@@ -41,7 +41,7 @@ function qrBox(c: Ctx): HTMLElement | null {
 }
 
 /** Step 1: which device it is for. Tiles on a phone, pills on a computer. */
-function deviceStep(c: Ctx): HTMLElement {
+export function deviceStep(c: Ctx, k = ""): HTMLElement {
   const { s, a, t } = c;
   const detected = s.detected;
   const same = detected !== null && detected === s.platform;
@@ -49,7 +49,7 @@ function deviceStep(c: Ctx): HTMLElement {
     detected && !same
       ? (() => {
           const [q, link] = t.notYours(isPhone(detected), platformWord(detected, t));
-          return h("p", { class: "hint" }, q, " ", h("button", { class: "tlink b", type: "button", "data-k": "plat-back", style: { "min-height": "44px" }, on: { click: () => a.platform(detected) } }, link));
+          return h("p", { class: "hint" }, q, " ", h("button", { class: "tlink b", type: "button", "data-k": `${k}plat-back`, style: { "min-height": "44px" }, on: { click: () => a.platform(detected) } }, link));
         })()
       : null;
   return h(
@@ -60,7 +60,7 @@ function deviceStep(c: Ctx): HTMLElement {
       "div",
       { class: "plats", role: "radiogroup", "aria-label": t.pickDev },
       ...platformOrder.map((p) =>
-        h("button", { class: `plat${p === s.platform ? " on" : ""}`, type: "button", role: "radio", "aria-checked": p === s.platform, "data-k": `plat-${p}`, on: { click: () => a.platform(p) } }, icon(platIcon[p], 24), t.platforms[p]),
+        h("button", { class: `plat${p === s.platform ? " on" : ""}`, type: "button", role: "radio", "aria-checked": p === s.platform, "data-k": `${k}plat-${p}`, on: { click: () => a.platform(p) } }, icon(platIcon[p], 24), t.platforms[p]),
       ),
     ),
     same && h("p", { class: "hint row g6 only-m" }, icon("check", 14), t.detected),
@@ -68,14 +68,14 @@ function deviceStep(c: Ctx): HTMLElement {
   );
 }
 
-function appCard(c: Ctx, x: AppEntry, o: { chosen: boolean; big: boolean; many: boolean }): HTMLElement {
+function appCard(c: Ctx, x: AppEntry, o: { chosen: boolean; big: boolean; many: boolean }, k: string): HTMLElement {
   const { a, t, d } = c;
   const key = appKey(x);
   const link = x.kind === "happ";
   const desc = x.description || (link ? t.linkD : t.keyD);
   return h(
     "button",
-    { class: `app${o.big ? "" : " min"}${o.chosen ? " on" : ""}`, type: "button", role: "radio", "aria-checked": o.chosen, "data-k": `app-${key}`, on: { click: () => !o.chosen && a.app(key) } },
+    { class: `app${o.big ? "" : " min"}${o.chosen ? " on" : ""}`, type: "button", role: "radio", "aria-checked": o.chosen, "data-k": `${k}app-${key}`, on: { click: () => !o.chosen && a.app(key) } },
     link ? tile("sky", "link", { size: o.big ? undefined : 36 }) : tile("mint", "key", { size: o.big ? undefined : 36 }),
     h(
       "span",
@@ -88,11 +88,11 @@ function appCard(c: Ctx, x: AppEntry, o: { chosen: boolean; big: boolean; many: 
   );
 }
 
-/** Step 2: the app. The recommended one big, the others under "Other apps", never folded. */
-function appStep(c: Ctx, platform: Platform): HTMLElement {
+/** Step 2: the app. The recommended one big, the others under "Other apps", never folded. `kind` keeps only the apps of one way. */
+export function appStep(c: Ctx, platform: Platform, k = "", kind?: Kind): HTMLElement {
   const { d, s, a, t } = c;
-  const all = appList(d, platform);
-  const chosen = chosenApp(d, platform, s.app);
+  const all = appList(d, platform, kind);
+  const chosen = chosenApp(d, platform, s.app, kind);
   const both = new Set(all.map((x) => x.kind)).size > 1;
   let body: Kid;
   if (all.length === 0) {
@@ -103,7 +103,7 @@ function appStep(c: Ctx, platform: Platform): HTMLElement {
       { class: "noapps" },
       tile("neu", deviceIcon(platform)),
       h("div", { class: "stack g6" }, h("p", { class: "h3" }, copy ? t.noAppsT(platformWord(platform, t)) : t.noApps), copy && h("p", { class: "sm mut" }, t.noAppsD)),
-      copy && copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "pri", key: "link-copy", after: a.mark }),
+      copy && copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "pri", key: `${k}link-copy`, after: a.mark }),
       sendLink(c),
     );
   } else {
@@ -111,9 +111,9 @@ function appStep(c: Ctx, platform: Platform): HTMLElement {
     body = h(
       "div",
       { class: "stack g8", role: "radiogroup", "aria-label": t.appAria },
-      appCard(c, first, { chosen: first === chosen, big: true, many: all.length > 1 }),
+      appCard(c, first, { chosen: first === chosen, big: true, many: all.length > 1 }, k),
       rest.length > 0 && h("p", { class: "lbl", style: { padding: "8px 2px 0" } }, t.otherApps),
-      rest.length > 0 && h("div", { class: "app-grid" }, ...rest.map((x) => appCard(c, x, { chosen: x === chosen, big: false, many: all.length > 1 }))),
+      rest.length > 0 && h("div", { class: "app-grid" }, ...rest.map((x) => appCard(c, x, { chosen: x === chosen, big: false, many: all.length > 1 }, k))),
     );
   }
   return h(
@@ -137,37 +137,37 @@ function how(items: { ico: IconName; title: string; body: Kid[] }[]): HTMLElemen
 }
 
 /** Step 3 for a link app. */
-function linkSteps(c: Ctx, app: AppEntry): HTMLElement {
+function linkSteps(c: Ctx, app: AppEntry, k: string): HTMLElement {
   const { d, a, t } = c;
   const download = safeUrl(app.download_url);
   const addUrl = safeAddUrl(app.add_url);
   const copy = (cls: string, label: string, key: string) => copyButton(a, { text: d.subscription_url, label, done: t.copiedShort, toast: t.copied, cls, key, after: a.mark });
   const items: { ico: IconName; title: string; body: Kid[] }[] = [];
-  if (download) items.push({ ico: "download", title: t.stepInstall(app.name), body: [downloadButton(download, t, "link-get", "fit-w")] });
+  if (download) items.push({ ico: "download", title: t.stepInstall(app.name), body: [downloadButton(download, t, `${k}link-get`, "fit-w")] });
   if (addUrl) {
     items.push({
       ico: "plus",
       title: t.stepAddSub,
       body: [
         h("p", { class: "how-sub" }, t.addHint(app.name)),
-        h("div", { class: "row addrow", style: { "flex-wrap": "wrap", gap: "8px 24px" } }, h("a", { class: "btn pri fit", href: addUrl, "data-k": "link-add", on: { click: () => a.mark() } }, icon("plus"), t.addOne), h("p", { class: "row g8 sm mut only-w" }, t.noOpenQ, copy("tlink", t.copyLink, "link-copy-w"))),
-        h("div", { class: "fb only-m" }, h("div", { class: "fb-h" }, h("b", null, t.noOpenQ), copy("tlink", t.copyShort, "link-copy")), hint(rich(t.pasteHow(app.name)))),
+        h("div", { class: "row addrow", style: { "flex-wrap": "wrap", gap: "8px 24px" } }, h("a", { class: "btn pri fit", href: addUrl, "data-k": `${k}link-add`, on: { click: () => a.mark() } }, icon("plus"), t.addOne), h("p", { class: "row g8 sm mut only-w" }, t.noOpenQ, copy("tlink", t.copyLink, `${k}link-copy-w`))),
+        h("div", { class: "fb only-m" }, h("div", { class: "fb-h" }, h("b", null, t.noOpenQ), copy("tlink", t.copyShort, `${k}link-copy`)), hint(rich(t.pasteHow(app.name)))),
       ],
     });
   } else {
-    items.push({ ico: "copy", title: t.copyPasteT, body: [copy("pri fit", t.copyLink, "link-copy"), h("p", { class: "how-sub", style: { "margin-top": "0" } }, t.copyHow(app.name))] });
+    items.push({ ico: "copy", title: t.copyPasteT, body: [copy("pri fit", t.copyLink, `${k}link-copy`), h("p", { class: "how-sub", style: { "margin-top": "0" } }, t.copyHow(app.name))] });
   }
   items.push({ ico: "power", title: addUrl ? t.stepVpn(app.name) : t.stepVpnPlain, body: d.server_count > 1 ? [hint(rich(t.allServers(d.server_count)))] : [] });
   return how(items);
 }
 
 /** Step 3 for a key app: install, add this device (its key is made), paste the key. */
-function keySteps(c: Ctx, app: AppEntry): HTMLElement {
+function keySteps(c: Ctx, app: AppEntry, k: string): HTMLElement {
   const { d, s, a, t, support } = c;
   const am = d.amnezia!;
   const download = safeUrl(app.download_url);
   const items: { ico: IconName; title: string; body: Kid[] }[] = [];
-  if (download) items.push({ ico: "download", title: t.stepInstall(app.name), body: [downloadButton(download, t, "key-get", "fit-w")] });
+  if (download) items.push({ ico: "download", title: t.stepInstall(app.name), body: [downloadButton(download, t, `${k}key-get`, "fit-w")] });
   if (!am.self_service) {
     items.push({ ico: "key", title: t.keysByAdminT, body: [h("p", { class: "how-sub" }, t.keysByAdminD(app.name)), sendLink(c)] });
   } else if (am.profiles.length === 0) {
@@ -179,7 +179,7 @@ function keySteps(c: Ctx, app: AppEntry): HTMLElement {
       title: t.stepAddDevT,
       body: [
         h("p", { class: "how-sub" }, t.stepAddDevS),
-        h("button", { class: "btn pri fit", type: "button", "data-k": "amz-add", disabled: !canAddDevice(d), on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd),
+        h("button", { class: "btn pri fit", type: "button", "data-k": "amz-add", disabled: !canAddDevice(d), on: { click: () => a.amz.add(true, "key") } }, icon("plus"), t.awgAdd),
         full && note("warn", "warn", t.limit(d.user.devices_used, d.user.device_limit, support !== "")),
       ],
     });
@@ -188,26 +188,26 @@ function keySteps(c: Ctx, app: AppEntry): HTMLElement {
   return how(items);
 }
 
-/** Step 3: the way to connect with the chosen app; or, once the app has fetched the subscription, "Done". */
-function howStep(c: Ctx, app: AppEntry | undefined): HTMLElement | null {
+/** Step 3: the way to connect with the chosen app; or, once the app has fetched the subscription, "Done" (`done` off: the steps, always). */
+export function howStep(c: Ctx, app: AppEntry | undefined, k = "", done = true): HTMLElement | null {
   const { d, s, a, t } = c;
   if (!app) return null;
   const at = fetchedUnix(d);
-  const done = app.kind === "happ" && s.marked && at > 0 && !s.stepsAgain;
+  const finished = done && app.kind === "happ" && s.marked && at > 0 && !s.stepsAgain;
   return h(
     "div",
     { class: "step" },
-    h("div", { class: "step-h" }, h("span", { class: `sn${done ? " done" : ""}` }, done ? icon("check", 14) : "3"), h("h3", { class: "step-t" }, t.howT)),
-    done
+    h("div", { class: "step-h" }, h("span", { class: `sn${finished ? " done" : ""}` }, finished ? icon("check", 14) : "3"), h("h3", { class: "step-t" }, t.howT)),
+    finished
       ? h(
           "div",
           { class: "donebox" },
           note("ok", "check", [h("b", null, t.doneT), " ", t.doneD(fmtAgo(at, s.lang))]),
-          h("button", { class: "tlink", type: "button", "data-k": "steps-again", on: { click: () => a.stepsAgain() } }, t.showSteps),
+          h("button", { class: "tlink", type: "button", "data-k": `${k}steps-again`, on: { click: () => a.stepsAgain() } }, t.showSteps),
         )
       : app.kind === "happ"
-        ? linkSteps(c, app)
-        : keySteps(c, app),
+        ? linkSteps(c, app, k)
+        : keySteps(c, app, k),
   );
 }
 
@@ -220,7 +220,7 @@ function qrContent(c: Ctx, key: string): HTMLElement | null {
 }
 
 /** The row that opens the QR code (a phone's way to connect another device). */
-function qrRow(c: Ctx): HTMLElement[] {
+function qrRow(c: Ctx, k = ""): HTMLElement[] {
   const { s, a, t } = c;
   if (!qrOn(c)) return [];
   const open = s.qrOpen;
@@ -228,12 +228,12 @@ function qrRow(c: Ctx): HTMLElement[] {
     h("div", { class: "div" }),
     h(
       "button",
-      { class: "xrow", type: "button", "aria-expanded": open, "data-k": "qr-row", on: { click: () => a.qrOpen(!open) } },
+      { class: "xrow", type: "button", "aria-expanded": open, "data-k": `${k}qr-row`, on: { click: () => a.qrOpen(!open) } },
       tile("neu", "qr", { size: 36 }),
       h("span", { class: "stack g4 grow" }, h("span", { class: "t" }, t.qrOtherT), h("span", { class: "s" }, t.qrOtherS)),
       icon("chev"),
     ),
-    ...(open ? [qrContent(c, "qr-copy-m")] : []),
+    ...(open ? [qrContent(c, `${k}qr-copy-m`)] : []),
   ].filter((x): x is HTMLElement => !!x);
 }
 
@@ -246,30 +246,10 @@ export function connectCard(c: Ctx): HTMLElement {
   return h("section", { class: "card", "aria-label": t.connectAria }, ...steps, ...(qrOn(c) ? [h("div", { class: "only-m" }, ...qrRow(c))] : []));
 }
 
-/** A returning visit: "Connect one more device", folded; open, it holds the steps and the QR code. */
-export function moreCard(c: Ctx): HTMLElement {
-  const { s, a, t } = c;
-  const open = s.more;
-  return h(
-    "section",
-    { class: "card", "aria-label": t.connectAria },
-    h(
-      "button",
-      { class: "xrow", type: "button", "aria-expanded": open, "data-k": "more", style: { "min-height": "64px" }, on: { click: () => a.more(!open) } },
-      tile("lav", "plus", { size: 36 }),
-      h("span", { class: "stack g4 grow" }, h("span", { class: "t" }, t.moreT), h("span", { class: "s only-m" }, t.moreS), h("span", { class: "s only-w" }, qrOn(c) ? t.moreSQr : t.moreS)),
-      icon("chev"),
-    ),
-    ...(open ? [h("div", { class: "div" }), ...connectBody(c)] : []),
-  );
-}
-
-function connectBody(c: Ctx): HTMLElement[] {
-  const { d, s } = c;
-  const platform = s.platform;
-  const app = chosenApp(d, platform, s.app);
-  const qr = qrContent(c, "qr-copy-more");
-  return [deviceStep(c), appStep(c, platform), howStep(c, app), ...(qr ? [h("div", { class: "div" }), qr] : [])].filter((x): x is HTMLElement => !!x);
+/** "Connect another device" inside the "add a device" sheet: a folded row on a phone, the code itself on a computer. */
+export function qrOther(c: Ctx, k: string): HTMLElement | null {
+  if (!qrOn(c)) return null;
+  return h("div", { class: "stack g12" }, h("section", { class: "card only-m" }, ...qrRow(c, k).slice(1)), h("div", { class: "only-w" }, qrContent(c, `${k}qr-copy-w`)));
 }
 
 /** The QR code beside the steps on a computer (a first visit). */

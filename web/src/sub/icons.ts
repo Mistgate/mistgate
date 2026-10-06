@@ -38,6 +38,8 @@ const paths = {
   lock: [rect(5, 10.5, 14, 10, 2.5), "M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"],
   dots: ["M5.5 12h.01M12 12h.01M18.5 12h.01"],
   chev: ["m6 9 6 6 6-6"],
+  next: ["m9 6 6 6-6 6"],
+  back: ["m15 6-6 6 6 6"],
   clock: [circle(12, 12, 9), "M12 7.5V12l3 2"],
   chat: ["M4.5 19.5V7a2.5 2.5 0 0 1 2.5-2.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8z"],
 } as const satisfies Record<string, readonly Shape[]>;

@@ -1,14 +1,14 @@
 import { label } from "./amnezia";
 import { h, type Kid } from "./dom";
 import { icon, type IconName } from "./icons";
-import { atDeviceLimit, canAddDevice, deviceIcon, fmtAgo, isShared, keyAppName, otherDevices, platformWord, selfServe } from "./logic";
+import { atDeviceLimit, deviceIcon, fmtAgo, isShared, keyAppName, keyAvailability, otherDevices, platformWord, selfServe, ways } from "./logic";
 import type { Ctx } from "./state";
 import { dot, note, tile } from "./ui";
 import type { AwgDevice, Device } from "./types";
 
-// "My devices": one card. The shared row of the link apps (they take one slot together), then the key devices (one key each)
-// with their actions, then "add a device". A subscription that is not active still lists the devices: they can be renamed
-// and removed, no key is shown or issued.
+// "My devices": one card. The shared row of the link apps (they take one slot together), then the key devices (one key each,
+// one main action and a "more" menu), then "add a device": one button for both ways (add.ts asks which). A subscription that is
+// not active still lists the devices: they can be renamed and removed, no key is shown or issued.
 
 const sendBtn = (c: Ctx, cls = "sec") => c.support && h("a", { class: `btn ${cls}`, href: c.support, target: "_blank", rel: "noopener noreferrer" }, icon("send"), c.t.write);
 
@@ -137,10 +137,11 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
   const menuItem = (key: string, ic: IconName, text: string, on: () => void, bad = false) =>
     h("button", { class: bad ? "bad" : "", type: "button", role: "menuitem", "data-k": key, on: { click: on } }, icon(ic), text);
 
-  const phoneActs = serve
+  // one block for a phone and a computer: the main action, and "more" with the rest
+  const acts = serve
     ? h(
         "div",
-        { class: "dev-acts only-m" },
+        { class: "dev-acts" },
         h(
           "button",
           { class: `btn ${stale ? "pri" : "sec"} grow${busyPrimary ? " busy" : ""}`, type: "button", "data-k": `amz-${primary}-${x.id}`, disabled: busy || (inactive && !stale), "aria-busy": busyPrimary, "aria-describedby": inactive ? whyOff : false, on: { click: run } },
@@ -154,22 +155,9 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
             { class: "pop menu", role: "menu", "aria-label": moreAria },
             menuItem(`amz-m-ren-${x.id}`, "pencil", t.rename, () => a.amz.renameStart(x.id)),
             !inactive && menuItem(`amz-m-rot-${x.id}`, "refresh", t.rotateKey, () => a.amz.ask({ id: x.id, kind: "rotate" })),
-            h("div", { class: "sep" }),
+            h("div", { class: "sep", role: "separator" }),
             menuItem(`amz-m-del-${x.id}`, "trash", t.removeKey, () => a.amz.ask({ id: x.id, kind: "remove" }), true),
           ),
-      )
-    : null;
-
-  const link = (key: string, text: string, on: () => void, cls = "", ic?: IconName, dis = false) =>
-    h("button", { class: `tlink${cls ? ` ${cls}` : ""}`, type: "button", "data-k": key, disabled: busy || dis, title: dis ? t.whyOff : false, on: { click: on } }, ic && icon(ic, 16), text);
-  const deskActs = serve
-    ? h(
-        "div",
-        { class: "links only-w" },
-        stale ? link(`amz-renewd-${x.id}`, busyPrimary ? t.awgBusy : t.newKey, run, "", "refresh") : link(`amz-showd-${x.id}`, busyPrimary ? t.awgBusy : t.showKey, run, "", "eye", inactive),
-        link(`amz-rend-${x.id}`, t.rename, () => a.amz.renameStart(x.id), "mut"),
-        !inactive && link(`amz-rotd-${x.id}`, t.rotateKey, () => a.amz.ask({ id: x.id, kind: "rotate" }), "mut"),
-        link(`amz-deld-${x.id}`, t.removeKey, () => a.amz.ask({ id: x.id, kind: "remove" }), "bad"),
       )
     : null;
 
@@ -188,20 +176,21 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
         stale && h("span", { class: "stag" }, dot("warn"), t.awgStale),
       ),
     ),
-    phoneActs,
-    deskActs,
+    acts,
     err,
   );
 }
 
-/** What stands under the key rows: add a device, or why that cannot be done. */
+/** What stands under the rows: add a device, or why that cannot be done. One button for both ways; add.ts asks which. */
 function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
+  // hasRows: the person has keys already (the button is then a quiet outline; the first one is the way out of an empty list)
   const { d, a, t } = c;
-  const am = d.amnezia!;
+  const am = d.amnezia;
   const app = keyAppName(d, null);
   const inactive = d.user.status !== "active";
   const top = (tone: string, ic: IconName, title: string, text: string, dash = false) =>
     h("div", { class: "dev-top" }, h("span", { class: `tile s36 ${dash ? "dash" : tone}`, "aria-hidden": "true" }, icon(ic)), h("div", { class: "dev-b" }, h("p", { class: "dev-n" }, title), h("p", { class: "sm mut" }, text)));
+  const add = (disabled = false, out = hasRows) => h("button", { class: `btn ${out ? "out" : "sec"}`, type: "button", "data-k": "dev-add", disabled, on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd);
 
   if (inactive) {
     return h(
@@ -211,22 +200,23 @@ function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
       h("p", { class: "hint dev-hint", id: whyOff, style: { "text-align": "center", "margin-top": "-4px" } }, t.whyOff),
     );
   }
+  const limit = d.user.device_limit;
+  const free = limit > 0 ? limit - d.user.devices_used : 0;
+  // an app with the link: always possible (the limit counts keys; the link's one slot is shared), so the button stays
+  if (d.access.happ) {
+    const key = keyAvailability(d);
+    const hint = key === "limit" ? [t.slotsFull, true] : key === "ok" && free > 0 ? [t.freeSlots(free), false] : null;
+    return h("div", { class: "dev" }, add(false, true), hint && h("p", { class: `hint dev-hint${hint[1] ? " warn-t b" : ""}` }, hint[0] as string));
+  }
+  // keys alone
+  if (!am) return null;
   if (!am.self_service) return h("div", { class: "dev" }, top("", "key", t.keysByAdminT, t.keysByAdminD(app), true), sendBtn(c));
   if (!selfServe(d)) return null; // the admin's preview: nothing to press
   if (am.profiles.length === 0) return h("div", { class: "dev" }, top("sand", "clock", t.noProfileT, t.noProfile), sendBtn(c));
   if (atDeviceLimit(d)) {
-    return h(
-      "div",
-      { class: "dev" },
-      note("warn", "warn", t.limit(d.user.devices_used, d.user.device_limit, c.support !== ""), { cls: "dev-x" }),
-      h("div", { class: "dev-acts" }, h("button", { class: "btn out grow", type: "button", disabled: true, "data-k": "amz-add" }, icon("plus"), t.awgAdd), sendBtn(c, "sec grow")),
-    );
+    return h("div", { class: "dev" }, note("warn", "warn", t.limit(d.user.devices_used, d.user.device_limit, c.support !== ""), { cls: "dev-x" }), h("div", { class: "dev-acts" }, h("button", { class: "btn out grow", type: "button", disabled: true, "data-k": "dev-add" }, icon("plus"), t.awgAdd), sendBtn(c, "sec grow")));
   }
-  const free = d.user.device_limit > 0 ? d.user.device_limit - d.user.devices_used : 0;
-  const add = h("button", { class: `btn ${hasRows ? "out" : "sec"}`, type: "button", "data-k": "amz-add", disabled: !canAddDevice(d), on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd);
-  return hasRows
-    ? h("div", { class: "dev" }, add, h("p", { class: "hint dev-hint only-w" }, free > 0 ? `${t.freeSlots(free)}. ${t.keysOne}` : t.keysOne))
-    : h("div", { class: "dev" }, top("", "key", t.keysT(app), t.keysNone, true), add);
+  return hasRows ? h("div", { class: "dev" }, add(), free > 0 && h("p", { class: "hint dev-hint" }, t.freeSlots(free))) : h("div", { class: "dev" }, top("", "key", t.keysT(app), t.keysNone, true), add());
 }
 
 /** The "My devices" section. */
@@ -243,14 +233,13 @@ export function devicesSection(c: Ctx): Kid[] {
   if (inactive) rows.push(h("div", { class: "dev" }, note("", "shield", d.user.status === "disabled" ? t.devOffDisabled : t.devOff, { cls: "grow" })));
   if (others.length > 0) rows.push(...others.map((x) => linkRow(c, x, app)));
   else if (d.access.happ) rows.push(linkRow(c, null, app));
-  if (keys) {
-    rows.push(...keys.devices.map((x) => keyRow(c, x, serve)));
-    const add = addRow(c, keys.devices.length > 0);
-    if (add) rows.push(add);
-  }
+  if (keys) rows.push(...keys.devices.map((x) => keyRow(c, x, serve)));
+  const add = keys || d.access.happ ? addRow(c, (keys?.devices.length ?? 0) > 0) : null;
+  if (add) rows.push(add);
   if (rows.length === 0 || (inactive && rows.length === 1)) return [];
+  const both = ways(d).length > 1;
   return [
-    h("div", { class: "shead" }, h("h2", { class: "h2" }, t.devicesT), slots(c)),
+    h("div", { class: "shead" }, h("h2", { class: "h2" }, t.devicesT), slots(c), both && d.user.device_limit > 0 && h("p", { class: "hint sec-sub" }, t.slotsHint)),
     h("section", { class: "card", "aria-label": t.devicesAria }, ...rows),
   ];
 }

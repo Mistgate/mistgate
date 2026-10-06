@@ -1,4 +1,5 @@
 import { dict, type Dict } from "./i18n";
+import type { AddPane } from "./state";
 import type {
   AmneziaData,
   AppEntry,
@@ -281,12 +282,18 @@ export function ways(d: MgData): Way[] {
   return out;
 }
 
+/** What "Add a device" opens: with both ways the choice, with one of them that way (a link: the link branch; keys: the key form). */
+export function defaultPane(d: MgData): AddPane {
+  const w = ways(d);
+  return w.length > 1 ? "pick" : w[0] === "link" ? "link" : "key";
+}
+
 /**
  * The apps of a platform as the app step lists them: the recommended ones first (the settings' order inside each group),
- * whatever their kind. The first is the big card, the rest sit under "Other apps".
+ * whatever their kind (or only those of `kind`). The first is the big card, the rest sit under "Other apps".
  */
-export function appList(d: MgData, platform: Platform): AppEntry[] {
-  const here = appsOn(d, platform).filter((a) => a.kind === "happ" || d.amnezia !== null);
+export function appList(d: MgData, platform: Platform, kind?: Kind): AppEntry[] {
+  const here = appsOn(d, platform).filter((a) => (!kind || a.kind === kind) && (a.kind === "happ" || d.amnezia !== null));
   return [...here.filter((a) => a.recommended), ...here.filter((a) => !a.recommended)];
 }
 
@@ -294,8 +301,8 @@ export function appList(d: MgData, platform: Platform): AppEntry[] {
 export const appKey = (a: AppEntry) => `${a.kind}|${a.name}`;
 
 /** The chosen app of a platform: the one picked when it is still there, else the first. */
-export function chosenApp(d: MgData, platform: Platform, key: string): AppEntry | undefined {
-  const all = appList(d, platform);
+export function chosenApp(d: MgData, platform: Platform, key: string, kind?: Kind): AppEntry | undefined {
+  const all = appList(d, platform, kind);
   return all.find((a) => appKey(a) === key) ?? all[0];
 }
 
@@ -600,6 +607,17 @@ export const selfServe = (d: MgData) => !!d.amnezia && d.amnezia.self_service &&
 /** "Add a device" is offered: self-service, the user is active, there is a profile to add on and a free slot. */
 export const canAddDevice = (d: MgData) => selfServe(d) && d.user.status === "active" && (d.amnezia?.profiles.length ?? 0) > 0 && !atDeviceLimit(d);
 
+/** Why a key cannot be added, in the order the page checks: the owner issues the keys, the admin's preview, no profile, no free slot. "none": no key way at all. */
+export type KeyAvailability = "ok" | "none" | "admin" | "preview" | "noprofile" | "limit";
+export function keyAvailability(d: MgData): KeyAvailability {
+  const am = d.amnezia;
+  if (!am || !d.access.amnezia) return "none";
+  if (!am.self_service) return "admin";
+  if (am.endpoints === "") return "preview";
+  if (am.profiles.length === 0) return "noprofile";
+  return atDeviceLimit(d) ? "limit" : "ok";
+}
+
 /** The Amnezia-app requirements of a config ("AmneziaVPN 5.0.1.5", "AmneziaWG Android v3.1.20260814"). */
 export const amneziaClients = (all: MinClient[]) => all.filter((m) => m.client === "amnezia");
 
@@ -632,6 +650,9 @@ export const otherDevices = (d: MgData): Device[] => {
 
 /** The one device every link app shares (no platform, no model: the server cannot tell the apps apart). */
 export const isShared = (x: Device) => !x.platform && !x.model;
+
+/** Some app has already taken the subscription: the link's one slot is in the list (and in the count). */
+export const linkInUse = (d: MgData) => otherDevices(d).some(isShared);
 
 export const isDesktop = (platform: string) => platform === "windows" || platform === "macos" || platform === "linux";
 export const isPhone = (platform: string) => platform === "ios" || platform === "android";

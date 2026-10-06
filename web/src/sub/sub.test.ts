@@ -268,15 +268,14 @@ describe("view", () => {
     expect(text(back)).toMatch(/Приложение получило подписку 3 часа назад/);
   });
 
-  it("first visit: steps, servers, devices; a returning visit: servers, devices, then the folded 'connect one more device'", () => {
+  it("first visit: steps, servers, devices; a returning visit: servers, devices (and the way to connect one more is in them)", () => {
     const heads = (el: HTMLElement) => [...el.querySelectorAll(".shead .h2")].map(text);
     expect(heads(view(data("first"), state("ios"), actions()))).toEqual(["Подключите VPN", "Серверы", "Мои устройства"]);
     const back = view(data("return"), state("ios", { returning: true }), actions());
     expect(heads(back)).toEqual(["Серверы", "Мои устройства"]);
-    expect(back.querySelector("[data-k=more]")?.getAttribute("aria-expanded")).toBe("false");
+    expect(back.querySelector("[data-k=more]")).toBeNull(); // no block of its own under the devices
     expect(back.querySelector(".step")).toBeNull();
-    const open = view(data("return"), state("ios", { returning: true, more: true }), actions());
-    expect(open.querySelectorAll(".step")).toHaveLength(3);
+    expect(back.querySelector("[data-k=dev-add]")).not.toBeNull();
   });
 
   it("puts server text in as text and drops unsafe links", () => {
