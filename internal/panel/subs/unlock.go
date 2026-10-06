@@ -115,7 +115,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 			}
 		}
 	}
-	v, _, err := h.identify(ctx, token, now)
+	v, _, err := h.identify(ctx, token, false)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
 		h.miss(client, now)

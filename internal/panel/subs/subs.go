@@ -323,7 +323,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		admitted = true
 	}
 
-	v, err := h.fetch(r.Context(), token, format, app)
+	v, err := h.fetch(r.Context(), token, format, app, !app)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
 		h.miss(client, now)
@@ -349,14 +349,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, r, token, v, set, sf, format)
 }
 
-// fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list. app: an app
-// asked, so the device is marked as having received the subscription and the view leaves out the page's data; the page
-// view and its calls are the other way round.
-func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, app bool) (access.SubView, error) {
+// fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list. touch: an app
+// asked, so the device is marked as having received the subscription (the page view and its calls do not). page: the view
+// carries the data only the page shows (the DNS of each server); an app's fetch and the checks of a call do without it.
+func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, touch, page bool) (access.SubView, error) {
 	if h.fsrc == nil {
 		return h.src.Subscription(ctx, token)
 	}
-	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{Format: format, NoTouch: !app, NoPageData: app})
+	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{Format: format, NoTouch: !touch, NoPageData: !page})
 }
 
 // remember keeps the user name and the data of a fetch (for MinInterval, per view format); app: an app's fetch made it.

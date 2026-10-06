@@ -578,14 +578,21 @@ func TestPickingADNSSharesTheChainOfTheDeviceCalls(t *testing.T) {
 			t.Errorf("%s over the budget: %d %v %s", name, rec.Code, rec.Header(), rec.Body.String())
 		}
 	}
-	// The status comes before the budget: a user who lost access is told so, not "too many".
+	// A budget that is used up is read from the token's state before the person's view is built (the view is the expensive
+	// part), so a user who lost access meanwhile is told "too many" until the hour is out; with room in the budget the status
+	// comes first: they are told so, and it costs nothing.
 	must(b.svc.SetUsersEnabled(b.ctx, connect.NewRequest(&adminv1.SetUsersEnabledRequest{UserIds: []string{uid3}, Enabled: false})))
-	if rec := c.post("/dns", pickBody("nod_1", "")); rec.Code != 409 || decodeDNS(t, rec).Error != "user_inactive" {
+	if rec := c.post("/dns", pickBody("nod_1", "")); rec.Code != 429 {
 		t.Errorf("inactive over the budget: %d %s", rec.Code, rec.Body.String())
+	}
+	clock = clock.Add(61 * time.Minute)
+	for i := 0; i < 5; i++ {
+		if rec := c.post("/dns", pickBody("nod_1", "")); rec.Code != 409 || decodeDNS(t, rec).Error != "user_inactive" {
+			t.Errorf("inactive with room in the budget, %d: %d %s", i, rec.Code, rec.Body.String())
+		}
 	}
 	// A new hour restores the budget.
 	must(b.svc.SetUsersEnabled(b.ctx, connect.NewRequest(&adminv1.SetUsersEnabledRequest{UserIds: []string{uid3}, Enabled: true})))
-	clock = clock.Add(61 * time.Minute)
 	if rec := c.post("/dns", pickBody("nod_1", "")); rec.Code != 200 {
 		t.Errorf("after an hour: %d %s", rec.Code, rec.Body.String())
 	}

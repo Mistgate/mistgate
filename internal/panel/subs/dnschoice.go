@@ -16,7 +16,8 @@ import (
 //	200 {"server": <the servers[] item as it is now>, "stale_devices": ["<amnezia.devices[].id>", ...]}
 //
 // It goes through the same start as the device calls (enter, then admitWrite: page password, token, cross-origin, the
-// owner's switch, the user's status, the hourly budget of writes of the token, shared with the devices) and then:
+// owner's switch, the user's status, the hourly budget of writes of the token, shared with the devices; a token the handler
+// knows is refused for a cross-origin call, the owner's switch and a used-up budget before its view is built) and then:
 //
 //	400 bad_request | 413 too_large | 415 unsupported_media_type   the body is not one small JSON object of these two fields
 //	404 not_found                                                   the server is none of the person's
@@ -62,7 +63,7 @@ func (h *handler) serveDNS(w http.ResponseWriter, r *http.Request, token, client
 		return
 	}
 	st.drop() // the cached views still carry the old DNS (the Mihomo profile's AmneziaWG proxies)
-	v, _, err := h.identify(ctx, token, now)
+	v, _, err := h.identify(ctx, token, true)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, "internal", "")
 		return

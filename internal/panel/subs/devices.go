@@ -309,6 +309,11 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 // answer is the same for a token that does not exist), the token (unknown = the decoy and a miss), the Source can do the
 // call (else the decoy: the endpoint does not exist), the cross-origin check, the owner's switch (403 off). It answers
 // and returns false when the call ends there. exists says whether the Source can do the call.
+//
+// A token the handler already knows (it was valid within this process's memory) gets the refusals its state can give
+// before the view of the person is built, the way a fetch is answered 429 from the state: the cross-origin check, the
+// owner's switch and an hourly budget of writes that is used up. The view is the expensive part, and a link that is over
+// its budget must not cost one per request. An unknown token has no state and still gets the decoy first.
 func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client string, now time.Time, exists bool,
 	on func(*adminv1.SubscriptionSettings) bool, off string) (access.SubView, *tokenState, bool) {
 	ctx := r.Context()
@@ -317,7 +322,21 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 		jsonError(w, http.StatusUnauthorized, "locked", "")
 		return access.SubView{}, nil, false
 	}
-	v, st, err := h.identify(ctx, token, now)
+	if known, ok := h.tokens.Get(token); ok && exists {
+		switch {
+		case h.cop.Check(r) != nil:
+			jsonError(w, http.StatusForbidden, "cross_origin", "")
+			return access.SubView{}, nil, false
+		case !on(set):
+			jsonError(w, http.StatusForbidden, off, "")
+			return access.SubView{}, nil, false
+		}
+		if retry := known.writeWait(h.cfg.MaxWritesPerHour, now); retry > 0 {
+			tooManyWrites(w, retry)
+			return access.SubView{}, nil, false
+		}
+	}
+	v, st, err := h.identify(ctx, token, false)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
 		h.miss(client, now)
@@ -352,23 +371,31 @@ func (h *handler) admitWrite(w http.ResponseWriter, st *tokenState, v access.Sub
 		return false
 	}
 	if retry := st.writeAdmit(h.cfg.MaxWritesPerHour, now); retry > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int((retry+time.Second-1)/time.Second)))
-		jsonError(w, http.StatusTooManyRequests, "too_many_requests", "")
+		tooManyWrites(w, retry)
 		return false
 	}
 	return true
 }
 
+func tooManyWrites(w http.ResponseWriter, retry time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(int((retry+time.Second-1)/time.Second)))
+	jsonError(w, http.StatusTooManyRequests, "too_many_requests", "")
+}
+
 // identify resolves a token to the user's view for a self-service call. Always from the source, never from the cache a page
-// fetch left: these calls reveal keys and change devices, so a link that was just rotated or a user that was just disabled
-// must stop working at once (the cache is only for the read-only page view). It does not count against the fetch budget.
-func (h *handler) identify(ctx context.Context, token string, now time.Time) (access.SubView, *tokenState, error) {
-	v, err := h.fetch(ctx, token, plugin.FormatURIList, false) // the page asks, not an app
+// fetch left, and it leaves none: these calls reveal keys and change devices, so a link that was just rotated or a user that
+// was just disabled must stop working at once (the cache is only for the read-only page view). It does not count against
+// the fetch budget. page: the view carries the page's own data (the DNS of each server), which the answer of a DNS pick
+// needs; the checks of a call do without it.
+func (h *handler) identify(ctx context.Context, token string, page bool) (access.SubView, *tokenState, error) {
+	v, err := h.fetch(ctx, token, plugin.FormatURIList, false, page) // the page asks, not an app
 	if err != nil {
 		return access.SubView{}, nil, err
 	}
 	st := h.tokens.GetOrCreate(token, func() *tokenState { return &tokenState{} })
-	st.remember(v, plugin.FormatURIList, now, false)
+	st.mu.Lock()
+	st.userName = v.UserName
+	st.mu.Unlock()
 	return v, st, nil
 }
 
@@ -377,6 +404,19 @@ func (st *tokenState) drop() {
 	st.mu.Lock()
 	st.cached = nil
 	st.mu.Unlock()
+}
+
+// writeWait says how long until the token's budget of writes has room again (0 = it has room now) and counts nothing.
+func (st *tokenState) writeWait(max int, now time.Time) time.Duration {
+	if max < 0 {
+		return 0
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if now.Sub(st.wStart) < time.Hour && st.writes >= max {
+		return st.wStart.Add(time.Hour).Sub(now)
+	}
+	return 0
 }
 
 // writeAdmit counts one self-service write against the hourly budget (max < 0: unlimited); retry > 0 = refused.
