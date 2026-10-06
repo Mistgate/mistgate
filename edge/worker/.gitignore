@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+# build output: panel.wasm and the wasm_exec.js that matches the Go toolchain that built it (scripts/build-edge.ps1)
+dist/
+# local-only configuration; the master key never goes into the repository
+wrangler.toml
+wrangler.dev.toml
+.dev.vars
