@@ -277,14 +277,15 @@ function Account({ d, nodeId, retired, onDialog }: { d: WarpData; nodeId: string
       )}
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-        {trouble?.kind === "revoked" && (
-          <Button variant="primary" size="sm" disabled={!!busy || retired} onClick={() => onDialog("again")}>
-            {t("warp.reregister")}
-          </Button>
-        )}
-        {trouble?.kind === "down" && (
+        {/* Always offered while there is an account: a slow but "up" exit needs them too, and without them the only way to a
+            fresh device was Delete + Register, which leaves the node without WARP in between. The trouble that calls for one
+            makes it the primary button. */}
+        <Button variant={trouble?.kind === "revoked" ? "primary" : "secondary"} size="sm" disabled={!!busy || retired} onClick={() => onDialog("again")}>
+          {t("warp.reregister")}
+        </Button>
+        {a.enabled && trouble?.kind !== "revoked" && (
           <Button
-            variant="primary"
+            variant={trouble?.kind === "down" ? "primary" : "secondary"}
             size="sm"
             disabled={!!busy || retired}
             onClick={() =>

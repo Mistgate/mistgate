@@ -93,8 +93,8 @@ After the last step it rests for 10 minutes, still trying the next address after
 
 | Button | When | What it does |
 |:--|:--|:--|
-| **Restart WARP** | The tunnel is down | Pauses and resumes in one step: the node tears the tunnel down and brings it up again with the ladder from the start. If the node did not confirm the pause in time, the resume goes out anyway: "WARP is on again, but the node did not confirm the pause: look again in a minute". |
-| **Register again** | Cloudflare no longer knows the account (revoked) | Registers a new account and puts it in the old one's place in one step; the old device is deleted at Cloudflare. Same terms window as **Enable WARP**. |
+| **Restart WARP** | The account is on and not revoked; the main button when the tunnel is down | Pauses and resumes in one step: the node tears the tunnel down and brings it up again with the ladder from the start. If the node did not confirm the pause in time, the resume goes out anyway: "WARP is on again, but the node did not confirm the pause: look again in a minute". |
+| **Register again** | Always; the main button when Cloudflare no longer knows the account (revoked) | Registers a new account and puts it in the old one's place in one step; the old device is deleted at Cloudflare. Same terms window as **Enable WARP**. Use it, not **Delete account** followed by a new registration, to get a fresh device for a slow or flaky exit: the node keeps its WARP until the new account arrives, so nothing stops and no alert opens. |
 | **Read from Cloudflare again** | The account has an access token | Re-reads the endpoint, addresses and client id from Cloudflare. Creates nothing. |
 | **Pause** / **Resume** | Always | Pause tears the tunnel down. The window names the profiles that stop and how many connections go through them now. A paused account is resumed, not restarted. |
 | **Delete account** | Always | Type the node name to confirm; needs a step-up. The node loses WARP; WARP-exit profiles stop. The device is deleted at Cloudflare too when a token is stored. You can register or import another account afterwards. |

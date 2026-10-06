@@ -214,6 +214,20 @@ describe("what the owner can do with a node's WARP", () => {
     expect(registerWarp).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "nod_1", acceptTos: true, replaceExisting: true }));
   });
 
+  it("a working but slow account still offers «Register again» and «Restart WARP», neither as the main action", async () => {
+    registerWarp.mockResolvedValue({});
+    await mount(data({ state: WarpState.UP, lastHandshakeUnix: nowS() - 30 }));
+    const again = button("Register again")!;
+    const restart = button("Restart WARP")!;
+    expect(again.className).not.toContain("bg-accent");
+    expect(restart.className).not.toContain("bg-accent");
+    await click(again);
+    await click(dialog().querySelector('[role="checkbox"]'));
+    await click(button("Register again", dialog()));
+    // one call that replaces the account: never Delete + Register, which leaves the node without WARP in between
+    expect(registerWarp).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "nod_1", acceptTos: true, replaceExisting: true }));
+  });
+
   it("the tunnel is down on a live account: for how long, how many checks, and «Restart WARP» first", async () => {
     restartWarp.mockResolvedValue({ confirmed: true });
     await mount(data({ state: WarpState.DOWN, lastHandshakeUnix: nowS() - 3 * 3600 - 60, consecutiveFailures: 37, lastError: "handshake_stale" }));
