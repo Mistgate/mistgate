@@ -123,22 +123,71 @@ func toRow(p Preset) (store.DNSPreset, error) {
 // Effective returns the preset that applies to a user and where it comes from: the user's own, else the
 // user's group's, else the instance default, else the built-in default. store.ErrNotFound for an unknown user.
 func (s *Service) Effective(ctx context.Context, userID string) (Preset, Source, error) {
-	d := s.st.DNS()
-	own, group, err := d.UserRefs(ctx, userID)
+	data, err := s.st.DNS().EffectiveData(ctx, userID)
 	if err != nil {
 		return Preset{}, "", err
 	}
-	l, err := d.Lookup(ctx)
-	if err != nil {
-		return Preset{}, "", err
+	l := store.DNSLookup{Names: make(map[string]string, len(data.Presets)), DefaultID: data.DefaultID}
+	for _, row := range data.Presets {
+		l.Names[row.ID] = row.Name
 	}
-	id, _, src := l.Resolve(own, group)
-	row, err := d.Get(ctx, id)
-	if err != nil {
-		return Preset{}, "", err
+	if _, ok := l.Names[l.DefaultID]; !ok {
+		l.DefaultID = store.DNSBuiltinDefaultID
 	}
-	p, err := fromRow(row)
-	return p, Source(src), err
+	id, _, src := l.Resolve(data.OwnPresetID, data.GroupPresetID)
+	for _, row := range data.Presets {
+		if row.ID == id {
+			p, err := fromRow(row)
+			return p, Source(src), err
+		}
+	}
+	return Preset{}, "", store.ErrNotFound
+}
+
+// SubscriptionState is the DNS read shared by the public user page and the access view.
+type SubscriptionState struct {
+	Choices      NodeChoices
+	Presets      map[string]Preset
+	Effective    Preset
+	EffectiveErr error
+}
+
+// SubscriptionState reads node choices, presets and the effective preset in one D1 batch.
+func (s *Service) SubscriptionState(ctx context.Context, userID string) (SubscriptionState, error) {
+	data, err := s.st.DNS().SubscriptionData(ctx, userID)
+	if err != nil {
+		return SubscriptionState{}, err
+	}
+	state := SubscriptionState{
+		Choices: NewNodeChoices(data.NodeOptions, data.UserChoices),
+		Presets: make(map[string]Preset, len(data.Presets)),
+	}
+	lookup := store.DNSLookup{Names: make(map[string]string, len(data.Presets)), DefaultID: data.DefaultID}
+	for _, row := range data.Presets {
+		lookup.Names[row.ID] = row.Name
+		if preset, err := fromRow(row); err == nil {
+			state.Presets[row.ID] = preset
+		}
+	}
+	if _, ok := lookup.Names[lookup.DefaultID]; !ok {
+		lookup.DefaultID = store.DNSBuiltinDefaultID
+	}
+	id, _, _ := lookup.Resolve(data.OwnPresetID, data.GroupPresetID)
+	if preset, ok := state.Presets[id]; ok {
+		state.Effective = preset
+		return state, nil
+	}
+	for _, row := range data.Presets {
+		if row.ID == id {
+			_, state.EffectiveErr = fromRow(row)
+			if state.EffectiveErr == nil {
+				state.EffectiveErr = store.ErrNotFound
+			}
+			return state, nil
+		}
+	}
+	state.EffectiveErr = store.ErrNotFound
+	return state, nil
 }
 
 // DefaultPresetID returns the instance default as chosen by the admin ("" = the built-in default, also

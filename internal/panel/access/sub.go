@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -56,8 +57,9 @@ type SubView struct {
 	// DNSLink is the preset that applies to the apps that take the link (Hysteria2 in Mihomo and in Happ have one resolver for the
 	// whole subscription): the person's own, the group's, the instance's. DNSPresets are the presets the page names: the ones
 	// the nodes offer and apply, and DNSLink when any node offers a choice. Both empty unless Status is active.
-	DNSLink    string
-	DNSPresets []SubDNSPreset
+	DNSLink      string
+	DNSPresets   []SubDNSPreset
+	EffectiveDNS *dns.Preset // the Mihomo link resolver, already read with the node choices
 	// Format is what Lines hold (FormatURIList unless the view was asked for another).
 	Format plugin.ClientFormat
 }
@@ -146,6 +148,8 @@ type SubOptions struct {
 	// NoPageData: the view is for an app, so it leaves out what only the user page shows (the DNS of each node, the
 	// presets they name, the keys that hold an older DNS) and does not read it.
 	NoPageData bool
+	// IncludeEffectiveDNS lets the Mihomo writer reuse the effective preset read with node DNS.
+	IncludeEffectiveDNS bool
 }
 
 // Subscription resolves a token. The lookup is by sha256(token), so the comparison never sees the token
@@ -222,20 +226,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia,
 	}
-	up, _, err := a.UserUsage(ctx, u.ID, u.PeriodStart)
+	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive)
 	if err != nil {
 		return SubView{}, err
 	}
-	v.Up = min(up, u.UsedBytes) // used_bytes is authoritative; the buckets only give the split
+	v.Up = min(data.Up, u.UsedBytes) // used_bytes is authoritative; the buckets only give the split
 	v.Down = u.UsedBytes - v.Up
-	devs, err := a.Devices(ctx, u.ID)
-	if err != nil {
-		return SubView{}, err
-	}
-	awgDevs, err := a.AWGDevices(ctx, u.ID)
-	if err != nil {
-		return SubView{}, err
-	}
+	devs, awgDevs := data.Devices, data.AWG
 	awgByID := map[string]store.AccessAWGDevice{}
 	for _, d := range awgDevs {
 		awgByID[d.ID] = d
@@ -268,37 +265,26 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return v, nil
 	}
 
-	created, err := s.ensureCreds(ctx, u, !touch)
+	created, dev, creds, err := s.ensureSubscriptionCreds(ctx, u, !touch, data.ImplicitDevice, data.ImplicitCreds, data.ImplicitFound)
 	if err != nil {
 		return SubView{}, err
 	}
-	g, err := a.Group(ctx, u.GroupID)
-	if err != nil {
-		return SubView{}, err
-	}
-	full, err := a.InboundsFull(ctx, "")
-	if err != nil {
-		return SubView{}, err
-	}
+	g, full := data.Group, data.Inbounds
 	if opt.Format == plugin.FormatMihomo {
-		if added := s.ensureMihomoAWG(ctx, u, g, full); added {
+		var credsAdded []store.AccessCred
+		var added bool
+		dev, credsAdded, added = s.ensureMihomoAWG(ctx, u, g, full, dev)
+		if added {
+			creds = append(creds, credsAdded...)
 			created = true
 		}
 	}
 	if created {
 		s.notify.StateChanged()
 	}
-	dev, err := a.ImplicitDevice(ctx, u.ID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return SubView{}, err
-	} // no implicit device: a user of the Amnezia app alone who has fetched nothing that needs one
-	var creds []store.AccessCred
 	if dev.ID != "" {
 		if touch && now.Sub(dev.LastSeenAt) >= deviceTouchEvery {
 			s.touchDevice(dev.ID, now)
-		}
-		if creds, err = a.DeviceCreds(ctx, dev.ID); err != nil {
-			return SubView{}, err
 		}
 	}
 	secrets := map[string]string{}
@@ -436,6 +422,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		v.Nodes[i].Online = s.nodeOnline(v.Nodes[i].ID, networkUsage)
 	}
 	if opt.NoPageData {
+		if format == plugin.FormatMihomo && opt.IncludeEffectiveDNS && nd != nil {
+			if preset, ok := nd.withoutNode(); ok {
+				v.EffectiveDNS = &preset
+			}
+		}
 		return v, nil
 	}
 	n := dnsOf()
@@ -447,6 +438,73 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
+}
+
+func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool, dev store.AccessDevice, creds []store.AccessCred, found bool) (bool, store.AccessDevice, []store.AccessCred, error) {
+	a := s.st.Access()
+	for range 2 {
+		if !found {
+			dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
+			if !noInitialSeen {
+				dev.FirstSeenAt, dev.LastSeenAt = dev.CreatedAt, dev.CreatedAt
+			}
+			newCreds, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, nil)
+			if err != nil || len(newCreds) == 0 {
+				return false, store.AccessDevice{}, nil, err
+			}
+			switch err := a.AddDevice(ctx, dev, newCreds); {
+			case errors.Is(err, store.ErrAccessExists):
+				dev, creds, err = a.ImplicitDeviceCreds(ctx, u.ID)
+				if errors.Is(err, store.ErrNotFound) {
+					found = false
+					continue
+				}
+				if err != nil {
+					return false, store.AccessDevice{}, nil, err
+				}
+				found = true
+				continue
+			case err != nil:
+				return false, store.AccessDevice{}, nil, err
+			}
+			for _, cred := range newCreds {
+				if !slices.Contains(dev.Protocols, cred.Protocol) {
+					dev.Protocols = append(dev.Protocols, cred.Protocol)
+				}
+			}
+			return true, dev, newCreds, nil
+		}
+		have := make(map[string]bool, len(dev.Protocols))
+		for _, protocol := range dev.Protocols {
+			have[protocol] = true
+		}
+		added, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, have)
+		if err != nil || len(added) == 0 {
+			return false, dev, creds, err
+		}
+		switch err := a.AddCreds(ctx, added); {
+		case errors.Is(err, store.ErrAccessExists):
+			dev, creds, err = a.ImplicitDeviceCreds(ctx, u.ID)
+			if errors.Is(err, store.ErrNotFound) {
+				found = false
+				continue
+			}
+			if err != nil {
+				return false, store.AccessDevice{}, nil, err
+			}
+			found = true
+			continue
+		case err != nil:
+			return false, store.AccessDevice{}, nil, err
+		}
+		for _, cred := range added {
+			if !slices.Contains(dev.Protocols, cred.Protocol) {
+				dev.Protocols = append(dev.Protocols, cred.Protocol)
+			}
+		}
+		return true, dev, append(creds, added...), nil
+	}
+	return false, dev, creds, nil
 }
 
 // AgentSessionSource is an optional interface of the online source of New (the fleet module implements it): whether the
@@ -477,17 +535,17 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 // ensureMihomoAWG gives the implicit device an AWG credential for every AWG profile the user can use, for the
 // Mihomo format (see SubOptions). It reports whether any was added. A failure (an exhausted network, say) is
 // logged and leaves that user without AWG proxies: the subscription itself must not fail for it.
-func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull) bool {
+func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, dev store.AccessDevice) (store.AccessDevice, []store.AccessCred, bool) {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
-		return false
+		return dev, nil, false
 	}
 	a := s.st.Access()
-	dev := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true}
-	if d, err := a.ImplicitDevice(ctx, u.ID); err == nil {
-		dev.ID = d.ID
+	if dev.ID == "" {
+		dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true}
 	}
 	var want []store.AWGImplicitWant
+	var issued []store.AccessCred
 	seen := map[string]bool{}
 	for _, f := range full {
 		if f.Profile.Protocol != awg.ID || seen[f.Profile.ID] || !s.usable(f, g, u) {
@@ -504,17 +562,35 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 			s.log.Error("access: bad AWG network", "profile", f.Profile.ID, "err", err)
 			continue
 		}
-		want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, MaxIdx: maxIdx, Issue: s.awgIssuer(proto, u.ID, dev.ID, f.Profile.ID, merged)})
+		issue := s.awgIssuer(proto, u.ID, dev.ID, f.Profile.ID, merged)
+		want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, MaxIdx: maxIdx, Issue: func(idx int) (store.AccessCred, string, error) {
+			cred, publicKey, err := issue(idx)
+			if err == nil {
+				cred.DeviceID, cred.UserID, cred.ProfileID = dev.ID, u.ID, f.Profile.ID
+				issued = append(issued, cred)
+			}
+			return cred, publicKey, err
+		}})
 	}
 	if len(want) == 0 {
-		return false
+		return dev, nil, false
 	}
 	n, err := a.EnsureImplicitAWGCreds(ctx, u.ID, dev, s.now(), want)
 	if err != nil {
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
-		return false
+		return dev, nil, false
 	}
-	return n > 0
+	if n == 0 && len(dev.Protocols) == 0 {
+		if actual, creds, err := a.ImplicitDeviceCreds(ctx, u.ID); err == nil {
+			return actual, creds, false
+		}
+	}
+	for _, cred := range issued {
+		if !slices.Contains(dev.Protocols, cred.Protocol) {
+			dev.Protocols = append(dev.Protocols, cred.Protocol)
+		}
+	}
+	return dev, issued, n > 0
 }
 
 // deviceTouchEvery is how stale a device's last_seen_at must be before a subscription fetch refreshes it.

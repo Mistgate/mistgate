@@ -158,34 +158,26 @@ type deviceScope struct {
 // loadDevice finds a live AWG device and what goes with it. owner != "" restricts it to that user's devices; any
 // other device is then "not found". Preconditions that make a config impossible are returned as FailedPrecondition.
 func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*deviceScope, error) {
-	a := s.st.Access()
-	dev, err := a.AWGDevice(ctx, deviceID)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && owner != "" && dev.UserID != owner) {
+	loaded, err := s.st.Access().AWGDeviceScope(ctx, deviceID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && owner != "" && loaded.Device.UserID != owner) {
 		return nil, notFound("device")
 	} else if err != nil {
 		return nil, s.internal("get device", err)
 	}
-	sc := &deviceScope{dev: dev}
-	if sc.user, err = a.User(ctx, dev.UserID); err != nil {
-		return nil, s.internal("get user", err)
-	}
-	if sc.group, err = a.Group(ctx, sc.user.GroupID); err != nil {
-		return nil, s.internal("get group", err)
-	}
-	if sc.profile, err = a.Profile(ctx, dev.ProfileID); err != nil {
-		return nil, s.internal("get profile", err)
-	}
+	sc := &deviceScope{user: loaded.User, group: loaded.Group, dev: loaded.Device, profile: loaded.Profile}
 	if sc.proto, err = s.awgPlugin(); err != nil {
 		return nil, err
 	}
 	if sc.merged, err = s.mergedSettings(sc.profile); err != nil {
 		return nil, s.internal("open profile secrets", err)
 	}
-	if !slices.Contains(sc.group.ProfileIDs, dev.ProfileID) {
+	if !slices.Contains(sc.group.ProfileIDs, sc.dev.ProfileID) {
 		return nil, failed("profile_not_in_group")
 	}
-	if sc.ins, err = s.usableInbounds(ctx, sc.user, sc.group, dev.ProfileID); err != nil {
-		return nil, s.internal("inbounds", err)
+	for _, inbound := range loaded.Inbounds {
+		if s.usable(inbound, sc.group, sc.user) {
+			sc.ins = append(sc.ins, inbound)
+		}
 	}
 	if len(sc.ins) == 0 {
 		return nil, failed("no_inbound")
@@ -450,12 +442,15 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
 	}
-	if markEpoch {
+	if markEpoch && recordDNS {
+		if err := s.st.Access().RecordDeviceConfig(ctx, sc.dev.CredID, sc.dev.CriticalEpoch, held); err != nil {
+			return nil, s.internal("record the received config and its DNS", err)
+		}
+	} else if markEpoch {
 		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch); err != nil {
 			return nil, s.internal("record the received config", err)
 		}
-	}
-	if recordDNS {
+	} else if recordDNS {
 		if err := s.st.Access().SetDNSSig(ctx, sc.dev.CredID, held); err != nil {
 			return nil, s.internal("record the DNS of the config", err)
 		}

@@ -18,6 +18,8 @@ if (!wasmPath || !wasmExecPath || !oraclePath || !dataDir) {
   throw new Error("usage: bridge.cjs <panel.wasm> <wasm_exec.js> <vps-oracle> <temp-dir>");
 }
 
+const database = path.join(dataDir, "shared.sqlite");
+process.env.MISTGATE_BRIDGE_D1_PATH = database;
 require(path.resolve(__dirname, "../../../edge/d1driver/testdata/fake-d1.cjs"));
 require(wasmExecPath);
 
@@ -32,10 +34,11 @@ function reservePort() {
   });
 }
 
-function startOracle(binary, database, port) {
+function startOracle(binary, database, port, masterKey) {
   const child = spawn(binary, [database, `127.0.0.1:${port}`], {
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
   });
+  child.stdin.end(masterKey);
   const ready = new Promise((resolve, reject) => {
     let output = "";
     let errorOutput = "";
@@ -67,7 +70,7 @@ function oracleRequest(port, request) {
     }, (response) => {
       const chunks = [];
       response.on("data", (chunk) => chunks.push(chunk));
-      response.on("end", () => resolve({ status: response.statusCode, body: Buffer.concat(chunks) }));
+      response.on("end", () => resolve({ status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks) }));
     });
     outgoing.once("error", reject);
     if (request.body) outgoing.write(request.body);
@@ -88,6 +91,40 @@ async function bridgeRequestFor(panel, url, init = {}) {
 
 async function bridgeRequest(url, init = {}) {
   return bridgeRequestFor(globalThis.mgPanel, url, init);
+}
+
+async function countedRequest(label, fn) {
+  globalThis.__d1.__beginQueryCount(label);
+  try {
+    const response = await fn();
+    return { response, queries: globalThis.__d1.__endQueryCount() };
+  } catch (error) {
+    globalThis.__d1.__endQueryCount();
+    throw error;
+  }
+}
+
+function assertQueryBudget(queries) {
+  console.log(`D1 query count ${JSON.stringify(queries)}`);
+  // Target 6 (README §3.1). The AWG formats (Mihomo, .conf) measure 7: one extra round for the AWG scopes; phase 4.
+  const budget = /^(mihomo|AWG)/.test(queries.label) ? 7 : 6;
+  assert.ok(queries.sequentialQueries <= budget, `${queries.label} used ${queries.sequentialQueries} sequential D1 queries (budget ${budget})`);
+}
+
+async function compareHandlerBytes(label, panel, port, url, init = {}) {
+  const request = new Request(url, init);
+  const { response: edge, queries } = await countedRequest(label, () => bridgeRequestFor(panel, url, init));
+  assertQueryBudget(queries);
+  const vps = await oracleRequest(port, {
+    method: request.method,
+    url: request.url,
+    headers: Array.from(request.headers.entries()),
+    body: request.body === null ? null : Buffer.from(await request.clone().arrayBuffer()),
+  });
+  if (edge.status !== vps.status || !Buffer.from(edge.body).equals(vps.body)) {
+    throw new Error(`${label} edge/VPS response bytes differ`);
+  }
+  return { edge, vps };
 }
 
 async function startIsolate(bytes, previousPanel) {
@@ -210,8 +247,8 @@ async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.
 
 async function run() {
   const port = await reservePort();
-  const database = path.join(dataDir, "vps-oracle.sqlite");
-  const oracle = startOracle(oraclePath, database, port);
+  const masterKey = new Uint8Array(randomBytes(32));
+  const oracle = startOracle(oraclePath, database, port, masterKey);
   try {
     await oracle.ready;
 
@@ -226,7 +263,6 @@ async function run() {
     let secondPanel;
     let secondInstance;
     let thirdPanel;
-    const masterKey = new Uint8Array(randomBytes(32));
     const assetCalls = [];
     const assetFiles = {
       "index.html": Buffer.from('<!doctype html><base href="/"><title>asset-fixture</title>'),
@@ -250,7 +286,8 @@ async function run() {
         firstPanel.init({ ...initOptions, publicURL: "https://192.0.2.10" }), // WebAuthn refuses an IP-address RP ID
         wasmFailure,
       ]), "invalid WebAuthn RP settings must fail before first-run settings are stored");
-      const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting").first("n");
+      // The VPS oracle shares this database; its own start writes the subscription-rules marker (subsettings.MigrateM3).
+      const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k <> 'sub_rules_m3'").first("n");
       assert.equal(Number(settingsAfterFailure), 0, "failed first init leaves no settings behind");
       firstInstance = await Promise.race([firstPanel.init(initOptions), wasmFailure]);
       secondPanel = await startIsolate(bytes, firstPanel);
@@ -411,6 +448,137 @@ async function run() {
     const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
     assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");
     assert.ok(tokens.message.nowUnix, "the API-token RPC returns its current time");
+
+    // Seed the node fixture like the Go subscription fixtures, then create the profiles and access rows through the admin API.
+    await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind("nod_bridge", "node de", "de.example.com", "active", 1).run();
+    const hysteriaProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
+      protocol: "hysteria2", name: "bridge-hysteria2",
+    }, adminCookie);
+    assert.equal(hysteriaProfile.response.status, 200, "the admin API creates a Hysteria2 profile");
+    const hysteriaInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
+      profileId: hysteriaProfile.message.profile.id, nodeId: "nod_bridge",
+    }, adminCookie);
+    assert.equal(hysteriaInbound.response.status, 200, "the admin API deploys the Hysteria2 profile");
+    const awgProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
+      protocol: "awg", name: "bridge-awg",
+    }, adminCookie);
+    assert.equal(awgProfile.response.status, 200, "the admin API creates an AmneziaWG profile");
+    const awgInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
+      profileId: awgProfile.message.profile.id, nodeId: "nod_bridge",
+    }, adminCookie);
+    assert.equal(awgInbound.response.status, 200, "the admin API deploys the AmneziaWG profile");
+    const group = await connectRPC(secondPanel, "GroupService/CreateGroup", {
+      name: "bridge-group", profileIds: [hysteriaProfile.message.profile.id, awgProfile.message.profile.id],
+    }, adminCookie);
+    assert.equal(group.response.status, 200, "the admin API creates a group with both profiles");
+    const createdUser = await connectRPC(secondPanel, "UserService/CreateUser", {
+      name: "bridge-user", groupId: group.message.group.id,
+    }, adminCookie);
+    assert.equal(createdUser.response.status, 200, "the admin API creates a subscription user");
+    const userSubURL = createdUser.message.subscriptionUrl;
+    const userToken = userSubURL.slice(userSubURL.lastIndexOf("/") + 1);
+    const pagePassword = createdUser.message.pagePassword;
+    assert.ok(userToken && pagePassword, "the admin API returns a link credential and page password");
+    const awgDevice = await connectRPC(secondPanel, "DeviceService/CreateAwgDevice", {
+      userId: createdUser.message.user.id, profileId: awgProfile.message.profile.id,
+      platform: "linux", label: "bridge-device",
+    }, adminCookie);
+    assert.equal(awgDevice.response.status, 200, "the admin API creates an AWG device");
+    const awgDeviceID = awgDevice.message.device.id;
+
+    let previousPanel = secondPanel;
+    async function freshPanel() {
+      const panel = await startIsolate(bytes, previousPanel);
+      previousPanel = panel;
+      await Promise.race([panel.init(initOptions), wasmFailure]);
+      return panel;
+    }
+
+    // These requests use fresh isolates so isolate-local response, settings, and brand caches do not hide cold-fetch work.
+    // No body masks are applied: both handlers read the same persisted rows and use the same master key.
+    for (const [label, ua] of [
+      ["Happ/4.10.2/ios", "Happ/4.10.2/ios"],
+      ["Happ/2.1.0/Android", "Happ/2.1.0/Android"],
+      ["mihomo/1.19.31", "mihomo/1.19.31"],
+    ]) {
+      const panel = await freshPanel();
+      const { edge } = await compareHandlerBytes(label, panel, port, userSubURL, {
+        headers: { "CF-Connecting-IP": "127.0.0.1", "User-Agent": ua },
+      });
+      assert.equal(edge.status, 200, `${label} subscription succeeds`);
+    }
+
+    const browserUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
+    const browserIP = "198.51.100.80";
+    const lockedPanel = await freshPanel();
+    const lockedPage = await compareHandlerBytes("browser page HTML (locked)", lockedPanel, port, userSubURL, {
+      headers: { "CF-Connecting-IP": browserIP, "User-Agent": browserUA, "Accept-Language": "en-US,en;q=0.9" },
+    });
+    assert.equal(lockedPage.edge.status, 200, "the browser receives the locked user page");
+
+    const unlockURL = `${userSubURL}/unlock`;
+    async function unlock(panel, password, ip) {
+      return bridgeRequestFor(panel, unlockURL, {
+        method: "POST",
+        headers: {
+          "CF-Connecting-IP": ip,
+          "Content-Type": "application/json",
+          Origin: "https://example.com",
+          "User-Agent": browserUA,
+        },
+        body: JSON.stringify({ password }),
+      });
+    }
+    for (let i = 0; i < 5; i++) {
+      const wrong = await unlock(lockedPanel, "wrong-password", "127.0.0.1");
+      assert.equal(wrong.status, 401, `wrong page password attempt ${i + 1} is refused`);
+    }
+    const refused = await unlock(lockedPanel, "wrong-password", "127.0.0.1");
+    assert.equal(refused.status, 429, "the limiter callback refuses the next page-password attempt");
+    await securityLimit({ operation: "reset", name: "page-password", key: `t:${userToken}` });
+
+    const unlockedPanel = await freshPanel();
+    const unlockPair = await compareHandlerBytes("page-password unlock", unlockedPanel, port, unlockURL, {
+      method: "POST",
+      headers: {
+        "CF-Connecting-IP": browserIP,
+        "Content-Type": "application/json",
+        Origin: "https://example.com",
+        "User-Agent": browserUA,
+      },
+      body: JSON.stringify({ password: pagePassword }),
+    });
+    assert.equal(unlockPair.edge.status, 200, "the correct page password unlocks the subscription");
+    const edgeCookieHeader = unlockPair.edge.headers.find(([name]) => name.toLowerCase() === "set-cookie")?.[1] || "";
+    const oracleCookies = unlockPair.vps.headers["set-cookie"] || [];
+    const edgeCookie = edgeCookieHeader.split(";", 1)[0];
+    assert.ok(edgeCookie, "the edge unlock response sets a page cookie");
+    assert.deepEqual(oracleCookies, [edgeCookieHeader], "the VPS unlock cookie matches the edge cookie");
+
+    const pagePair = await compareHandlerBytes("browser page HTML (unlocked)", unlockedPanel, port, userSubURL, {
+      headers: {
+        "CF-Connecting-IP": browserIP,
+        "User-Agent": browserUA,
+        "Accept-Language": "en-US,en;q=0.9",
+        Cookie: edgeCookie,
+      },
+    });
+    assert.equal(pagePair.edge.status, 200, "the unlocked browser page succeeds");
+
+    const configURL = `${userSubURL}/devices/${awgDeviceID}/configs`;
+    const configPair = await compareHandlerBytes("AWG .conf device configs", unlockedPanel, port, configURL, {
+      method: "POST",
+      headers: {
+        "CF-Connecting-IP": browserIP,
+        "Content-Type": "application/json",
+        Origin: "https://example.com",
+        "User-Agent": browserUA,
+        Cookie: edgeCookie,
+      },
+      body: "{}",
+    });
+    assert.equal(configPair.edge.status, 200, "the AWG device config endpoint succeeds");
 
     // This passkey ceremony carries a WebAuthn SessionData challenge across the two wasm instances.
     const crossIsolateIP = "198.51.100.72";

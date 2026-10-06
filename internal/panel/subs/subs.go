@@ -106,7 +106,7 @@ type Config struct {
 	// Events, if set, receives subscription_shared_suspect events. Log, if set, gets their write errors.
 	Events Events
 	Log    *slog.Logger
-	// Limiter is the shared backend for page-password tries. Nil uses bounded in-memory state.
+	// Limiter is the shared backend for security-sensitive subscription limits. Nil uses bounded in-memory state.
 	Limiter securitylimit.Limiter
 	// Now is the clock (tests); default time.Now.
 	Now func() time.Time
@@ -205,9 +205,6 @@ type tokenState struct {
 	winStart time.Time // start of the current hour; hits counts the fetches in it
 	hits     int
 
-	wStart time.Time // start of the current hour of self-service writes; writes counts them
-	writes int
-
 	day      int64               // unix day of nets
 	nets     map[uint64]struct{} // keyed hashes of the networks seen today, capped
 	reported bool                // the event for this day was written
@@ -220,14 +217,6 @@ type cachedView struct {
 	app bool // made for an app's fetch (the device was touched, no page data); else for the page
 }
 
-// clientState is the token-guessing record of one client network.
-type clientState struct {
-	mu           sync.Mutex
-	misses       int
-	winStart     time.Time
-	blockedUntil time.Time
-}
-
 type handler struct {
 	*common
 	src    Source
@@ -238,9 +227,8 @@ type handler struct {
 	decoy  http.Handler
 	prefix string
 
-	seed    maphash.Seed
-	tokens  *ratelimit.Map[*tokenState]
-	clients *ratelimit.Map[*clientState]
+	seed   maphash.Seed
+	tokens *ratelimit.Map[*tokenState]
 }
 
 // Handler returns the subscription endpoint. decoy answers everything that is not a valid request for a
@@ -250,10 +238,9 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 	c := newCommon(cfg)
 	h := &handler{
 		common: c, src: src, decoy: decoy, cop: http.NewCrossOriginProtection(),
-		prefix:  strings.TrimRight(cfg.Prefix, "/"),
-		seed:    maphash.MakeSeed(),
-		tokens:  ratelimit.NewMap[*tokenState](cfg.MaxKeys),
-		clients: ratelimit.NewMap[*clientState](cfg.MaxKeys),
+		prefix: strings.TrimRight(cfg.Prefix, "/"),
+		seed:   maphash.MakeSeed(),
+		tokens: ratelimit.NewMap[*tokenState](cfg.MaxKeys),
 	}
 	h.fsrc, _ = src.(FormatSource)
 	h.dev, _ = src.(Devices)
@@ -282,14 +269,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := ""
 	if ip.IsValid() {
 		client = auth.SourceKey(ip)
-		if h.blocked(client, now) {
+		if h.blocked(r.Context(), client, now) {
 			h.decoy.ServeHTTP(w, r) // even for a valid token: guessing gets nothing out of this
 			return
 		}
 	}
 	token, sub, ok := routeOf(r, h.prefix)
 	if !ok {
-		h.miss(client, now)
+		h.miss(r.Context(), client, now)
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -337,7 +324,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	v, err := h.fetch(r.Context(), token, format, app, !app)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
-		h.miss(client, now)
+		h.miss(r.Context(), client, now)
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -367,7 +354,10 @@ func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientF
 	if h.fsrc == nil {
 		return h.src.Subscription(ctx, token)
 	}
-	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{Format: format, NoTouch: !touch, NoPageData: !page})
+	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{
+		Format: format, NoTouch: !touch, NoPageData: !page,
+		IncludeEffectiveDNS: format == plugin.FormatMihomo && h.cfg.DNS != nil,
+	})
 }
 
 // remember keeps the user name and the data of a fetch (for MinInterval, per view format); app: an app's fetch made it.
@@ -464,7 +454,9 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	} else if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {
 		p.names = remarks(v.Servers, set.GetServerNameTemplate(), b.Language)
 	}
-	if h.cfg.DNS != nil && v.UserID != "" {
+	if v.EffectiveDNS != nil {
+		p.preset = v.EffectiveDNS
+	} else if h.cfg.DNS != nil && v.UserID != "" {
 		if pre, _, err := h.cfg.DNS.Effective(ctx, v.UserID); err != nil {
 			h.cfg.Log.Warn("mihomo profile: no dns section", "err", err)
 		} else {
@@ -539,32 +531,32 @@ func tooMany(w http.ResponseWriter, retry time.Duration) {
 }
 
 // blocked reports whether the client network is in its BlockFor period.
-func (h *handler) blocked(client string, now time.Time) bool {
-	if h.cfg.MissLimit < 0 {
+func (h *handler) blocked(ctx context.Context, client string, now time.Time) bool {
+	if client == "" || h.cfg.MissLimit < 0 || h.cfg.BlockFor <= 0 {
 		return false
 	}
-	c, ok := h.clients.Get(client)
-	if !ok {
-		return false
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return now.Before(c.blockedUntil)
+	d, err := h.cfg.Limiter.CheckWindow(ctx, "subscription-miss-block", "c:"+client, now, 1, h.cfg.BlockFor, h.cfg.MaxKeys, true)
+	return err != nil || !d.Allowed
 }
 
 // miss counts one unknown token (or a request under the prefix that is no token at all) against the client.
-func (h *handler) miss(client string, now time.Time) {
-	if client == "" || h.cfg.MissLimit < 0 {
+func (h *handler) miss(ctx context.Context, client string, now time.Time) {
+	if client == "" || h.cfg.MissLimit < 0 || h.cfg.MissWindow <= 0 || h.cfg.BlockFor <= 0 {
 		return
 	}
-	c := h.clients.GetOrCreate(client, func() *clientState { return &clientState{} })
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if now.Sub(c.winStart) >= h.cfg.MissWindow {
-		c.winStart, c.misses = now, 0
+	key := "c:" + client
+	if h.cfg.MissLimit > 1 {
+		d, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-miss", key, now, h.cfg.MissLimit-1, h.cfg.MissWindow, h.cfg.MaxKeys)
+		if err != nil || d.Allowed {
+			return
+		}
+		if err := h.cfg.Limiter.Reset(ctx, "subscription-miss", key); err != nil {
+			return
+		}
 	}
-	if c.misses++; c.misses >= h.cfg.MissLimit {
-		c.blockedUntil, c.misses = now.Add(h.cfg.BlockFor), 0
+	_, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-miss-block", key, now, 1, h.cfg.BlockFor, h.cfg.MaxKeys)
+	if err != nil && h.cfg.Log != nil {
+		h.cfg.Log.Warn("subscription miss limit unavailable")
 	}
 }
 

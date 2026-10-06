@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -74,5 +75,26 @@ func TestRefusedCallsDoNotBuildTheView(t *testing.T) {
 	}
 	if rec := post(unknownToken(2), cross...); !isDecoy(rec) {
 		t.Errorf("an unknown token, still: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestWriteBudgetIsSharedByHandlers(t *testing.T) {
+	src := &fakeSrc{valid: map[string]access.SubView{tokA: {UserName: "alice", Status: access.StatusActive}}}
+	limiter := securitylimit.NewMemory()
+	config := Config{Limiter: limiter, MaxWritesPerHour: 1, MinInterval: -1, MaxPerHour: -1}
+	first := Handler(fakeDevs{src}, decoyHandler, config)
+	second := Handler(fakeDevs{src}, decoyHandler, config)
+	post := func(h http.Handler) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/"+tokA+"/devices/dev_abcde/rename", strings.NewReader(`{"label":"x"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := post(first); rec.Code != http.StatusNotFound {
+		t.Fatalf("first write: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post(second); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second handler did not see the exhausted budget: %d %s", rec.Code, rec.Body)
 	}
 }

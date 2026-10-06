@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -143,6 +144,273 @@ func TestAWGProbeCredentialSharesTheAllocator(t *testing.T) {
 	}
 	if idx, err := awgDevice(t, s, profile, "usr_a", "dev_3", 10); err != nil || idx != 3 {
 		t.Fatalf("after the inbound went: %d %v", idx, err)
+	}
+}
+
+func TestAddAWGDeviceAllocatesAndGuardsThePeer(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "batch")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_batch', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_batch', 'u', 'grp_batch', 1, x'01', x'02', 1)`)
+
+	idx, err := s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{
+		Device:    AccessDevice{ID: "dev_batch", UserID: "usr_batch", Platform: "linux", Model: "test"},
+		ProfileID: profile, MaxIdx: 8, Limit: 5,
+	}, time.Unix(100, 0), func(idx int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_batch", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_batch", nil
+	})
+	if err != nil || idx != 2 {
+		t.Fatalf("AddAWGDevice = %d, %v; want index 2", idx, err)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM awg_peer WHERE profile_id = ? AND idx = 2 AND released_at = 0`, profile); n != 1 {
+		t.Fatalf("live peer at index 2 = %d, want 1", n)
+	}
+}
+
+func TestEnsureImplicitAWGCredsCreatesOnce(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "implicit_batch")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_batch', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_implicit_batch', 'u', 'grp_implicit_batch', 1, x'01', x'02', 1)`)
+	want := []AWGImplicitWant{{ProfileID: profile, MaxIdx: 8, Issue: func(idx int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_implicit_batch", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_batch", nil
+	}}}
+	dev := AccessDevice{ID: "dev_implicit_batch", UserID: "usr_implicit_batch", Implicit: true}
+	n, err := s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), want)
+	if err != nil || n != 1 {
+		t.Fatalf("EnsureImplicitAWGCreds = %d, %v; want one", n, err)
+	}
+	n, err = s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), []AWGImplicitWant{{
+		ProfileID: profile, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{}, "", errors.New("issuer called for an existing peer")
+		},
+	}})
+	if err != nil || n != 0 {
+		t.Fatalf("repeat EnsureImplicitAWGCreds = %d, %v; want zero", n, err)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM awg_peer WHERE profile_id = ? AND idx = 2 AND released_at = 0`, profile); n != 1 {
+		t.Fatalf("live implicit peer at index 2 = %d, want 1", n)
+	}
+}
+
+func TestAddAWGDeviceConcurrentAtDeviceLimit(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "concurrent_limit")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_concurrent_limit', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_concurrent_limit', 'u', 'grp_concurrent_limit', 1, x'01', x'02', 1)`)
+
+	type result struct {
+		idx int
+		err error
+	}
+	start := make(chan struct{})
+	var issueBarrier, done sync.WaitGroup
+	issueBarrier.Add(2)
+	done.Add(2)
+	results := make([]result, 2)
+	for i := range results {
+		go func(i int) {
+			defer done.Done()
+			<-start
+			firstIssue := true
+			results[i].idx, results[i].err = s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{
+				Device:    AccessDevice{ID: fmt.Sprintf("dev_limit_%d", i), UserID: "usr_concurrent_limit"},
+				ProfileID: profile, MaxIdx: 8, Limit: 1,
+			}, time.Unix(100, 0), func(int) (AccessCred, string, error) {
+				if firstIssue {
+					firstIssue = false
+					issueBarrier.Done()
+					issueBarrier.Wait()
+				}
+				return AccessCred{ID: fmt.Sprintf("crd_limit_%d", i), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, fmt.Sprintf("pub_limit_%d", i), nil
+			})
+		}(i)
+	}
+	close(start)
+	done.Wait()
+
+	succeeded, limited := 0, 0
+	for _, result := range results {
+		if result.err == nil {
+			succeeded++
+			continue
+		}
+		var limitErr *AccessLimitError
+		if errors.As(result.err, &limitErr) && limitErr.Used == 1 && limitErr.Limit == 1 {
+			limited++
+			continue
+		}
+		t.Fatalf("concurrent AddAWGDevice error = %v, want *AccessLimitError{Used: 1, Limit: 1}", result.err)
+	}
+	if succeeded != 1 || limited != 1 {
+		t.Fatalf("concurrent results: succeeded %d, limited %d; want one of each", succeeded, limited)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM device WHERE user_id = 'usr_concurrent_limit' AND revoked_at IS NULL`); n != 1 {
+		t.Fatalf("live devices = %d, want 1", n)
+	}
+}
+
+func TestAddAWGDeviceConcurrentUsersGetDistinctIndexes(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "concurrent_users")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_concurrent_users', 'g', 1)`)
+	for _, id := range []string{"usr_concurrent_a", "usr_concurrent_b"} {
+		execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, ?, 'grp_concurrent_users', 1, ?, x'02', 1)`, id, id, []byte(id))
+	}
+	type result struct {
+		idx int
+		err error
+	}
+	start := make(chan struct{})
+	var issueBarrier, done sync.WaitGroup
+	issueBarrier.Add(2)
+	done.Add(2)
+	results := make([]result, 2)
+	users := []string{"usr_concurrent_a", "usr_concurrent_b"}
+	for i := range users {
+		go func(i int) {
+			defer done.Done()
+			<-start
+			firstIssue := true
+			results[i].idx, results[i].err = s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{
+				Device:    AccessDevice{ID: fmt.Sprintf("dev_user_%d", i), UserID: users[i]},
+				ProfileID: profile, MaxIdx: 8, Limit: 1,
+			}, time.Unix(100, 0), func(int) (AccessCred, string, error) {
+				if firstIssue {
+					firstIssue = false
+					issueBarrier.Done()
+					issueBarrier.Wait()
+				}
+				return AccessCred{ID: fmt.Sprintf("crd_user_%d", i), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, fmt.Sprintf("pub_user_%d", i), nil
+			})
+		}(i)
+	}
+	close(start)
+	done.Wait()
+	if results[0].err != nil || results[1].err != nil {
+		t.Fatalf("concurrent AddAWGDevice errors = %v, %v", results[0].err, results[1].err)
+	}
+	if results[0].idx == results[1].idx {
+		t.Fatalf("concurrent peer indexes = %d and %d, want distinct indexes", results[0].idx, results[1].idx)
+	}
+}
+
+func TestAddAWGDeviceReturnsSubnetFull(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "subnet_full")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_subnet_full', 'g', 1)`)
+	for _, id := range []string{"usr_subnet_full_a", "usr_subnet_full_b"} {
+		execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, ?, 'grp_subnet_full', 1, ?, x'02', 1)`, id, id, []byte(id))
+	}
+	if idx, err := awgDevice(t, s, profile, "usr_subnet_full_a", "dev_subnet_full", 2); err != nil || idx != 2 {
+		t.Fatalf("fill the network: index %d, error %v", idx, err)
+	}
+	_, err := s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{
+		Device:    AccessDevice{ID: "dev_subnet_full_2", UserID: "usr_subnet_full_b"},
+		ProfileID: profile, MaxIdx: 2, Limit: 1,
+	}, time.Unix(100, 0), func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_subnet_full_2", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_subnet_full_2", nil
+	})
+	if !errors.Is(err, ErrAccessSubnetFull) {
+		t.Fatalf("full network error = %v, want ErrAccessSubnetFull", err)
+	}
+}
+
+func TestAddAWGDeviceRetriesAfterCriticalEpochChange(t *testing.T) {
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "epoch_retry")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_epoch_retry', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_epoch_retry', 'u', 'grp_epoch_retry', 1, x'01', x'02', 1)`)
+
+	calls := 0
+	idx, err := s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{
+		Device:    AccessDevice{ID: "dev_epoch_retry", UserID: "usr_epoch_retry"},
+		ProfileID: profile, MaxIdx: 8, Limit: 1,
+	}, time.Unix(100, 0), func(int) (AccessCred, string, error) {
+		calls++
+		if calls == 1 {
+			if _, err := s.W.ExecContext(context.Background(), `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, profile); err != nil {
+				return AccessCred{}, "", err
+			}
+		}
+		return AccessCred{ID: "crd_epoch_retry", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_epoch_retry", nil
+	})
+	if err != nil || idx != 2 {
+		t.Fatalf("AddAWGDevice after epoch retry = %d, %v; want index 2", idx, err)
+	}
+	if calls != 2 {
+		t.Fatalf("issuer calls = %d, want 2", calls)
+	}
+	if epoch := countT(t, s, `SELECT config_epoch FROM device_credential WHERE id = 'crd_epoch_retry'`); epoch != 1 {
+		t.Fatalf("stored config epoch = %d, want retried epoch 1", epoch)
+	}
+}
+
+func TestAWGDeviceScopeAndConfigRecord(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "scope")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_scope', 'g', 1)`)
+	if err := s.Access().UpdateGroup(ctx, "grp_scope", nil, &[]string{profile}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	u := AccessUser{
+		ID: "usr_scope", Name: "u", GroupID: "grp_scope", AllNodes: true, Status: "active", QuotaReset: "none", DeviceLimit: 1, AppAmnezia: true,
+		SubTokenHash: []byte("scope-token"), SubTokenEnc: []byte{1}, CreatedAt: time.Unix(100, 0), PeriodStart: time.Unix(100, 0),
+	}
+	if err := s.Access().CreateUser(ctx, u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := awgDevice(t, s, profile, u.ID, "dev_scope", 8); err != nil {
+		t.Fatal(err)
+	}
+
+	scope, err := s.Access().AWGDeviceScope(ctx, "dev_scope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Device.ID != "dev_scope" || scope.User.ID != u.ID || scope.Group.ID != "grp_scope" || scope.Profile.ID != profile {
+		t.Fatalf("scope identifiers = device %q user %q group %q profile %q", scope.Device.ID, scope.User.ID, scope.Group.ID, scope.Profile.ID)
+	}
+	if len(scope.Group.ProfileIDs) != 1 || scope.Group.ProfileIDs[0] != profile || len(scope.Inbounds) != 1 {
+		t.Fatalf("group profiles = %v, inbounds = %d", scope.Group.ProfileIDs, len(scope.Inbounds))
+	}
+
+	sig := map[string]string{"nod_scope": "1.1.1.1|2606:4700:4700::1111"}
+	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, 3, sig); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, 2, nil); err != nil {
+		t.Fatal(err)
+	}
+	device, err := s.Access().AWGDevice(ctx, "dev_scope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if device.ConfigEpoch != 3 || len(device.DNSSig) != 0 {
+		t.Fatalf("recorded device state = epoch %d DNS %v", device.ConfigEpoch, device.DNSSig)
+	}
+}
+
+func TestUserByTokenHashReturnsSelectedNodes(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	_, _ = awgNet(t, s, "token_nodes")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_token_nodes', 'g', 1)`)
+	u := AccessUser{
+		ID: "usr_token_nodes", Name: "u", GroupID: "grp_token_nodes", Status: "active", QuotaReset: "none", DeviceLimit: 1, AppHapp: true,
+		NodeIDs: []string{"nod_token_nodes"}, SubTokenHash: []byte("token-nodes"), SubTokenEnc: []byte{1},
+		CreatedAt: time.Unix(100, 0), PeriodStart: time.Unix(100, 0),
+	}
+	if err := s.Access().CreateUser(ctx, u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Access().UserByTokenHash(ctx, u.SubTokenHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != u.ID || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_token_nodes" {
+		t.Fatalf("token user = %+v", got)
 	}
 }
 

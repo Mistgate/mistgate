@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"log/slog"
@@ -30,7 +29,7 @@ func main() {
 	}
 	defer st.Close()
 	key := make([]byte, vault.KeySize)
-	if _, err := rand.Read(key); err != nil {
+	if _, err := io.ReadFull(os.Stdin, key); err != nil {
 		fatal(err)
 	}
 	vlt, err := vault.New(key)

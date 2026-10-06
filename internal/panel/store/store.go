@@ -10,6 +10,7 @@ import (
 	"encoding/base32"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,7 +28,8 @@ var (
 // Store wraps the writer and read pools. The VPS backend uses one writer connection
 // and a read pool; the D1 backend uses the same binding for both pools.
 type Store struct {
-	W, R *sql.DB
+	W, R     *sql.DB
+	awgRetry sync.Mutex // Serializes local retries after concurrent AWG batches fail their guards.
 }
 
 // Close closes both pools.
@@ -176,6 +178,28 @@ func (s *Store) Setting(ctx context.Context, key string) (string, error) {
 		return "", ErrNotFound
 	}
 	return v, err
+}
+
+// SettingValues returns the stored values among keys. Missing settings are omitted.
+func (s *Store) SettingValues(ctx context.Context, keys []string) (map[string]string, error) {
+	out := make(map[string]string, len(keys))
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := s.R.QueryContext(ctx,
+		`SELECT k, v FROM setting WHERE k IN (SELECT value FROM json_each(?))`, accJSON(keys))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		out[key] = value
+	}
+	return out, rows.Err()
 }
 
 // SetSettings upserts several settings in one transaction.

@@ -366,8 +366,13 @@ func Load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, 
 	} else if err != nil {
 		return nil, err
 	}
+	return Parse(v)
+}
+
+// Parse reads a stored subscription-settings document. Missing documents should use Defaults instead.
+func Parse(value string) (*adminv1.SubscriptionSettings, error) {
 	s := &adminv1.SubscriptionSettings{}
-	if err := unmarshal.Unmarshal([]byte(v), s); err != nil {
+	if err := unmarshal.Unmarshal([]byte(value), s); err != nil {
 		return nil, fmt.Errorf("stored subscription settings: %w", err)
 	}
 	if s.UserPage == nil {

@@ -27,14 +27,26 @@ type nodeDNS struct {
 	choices dns.NodeChoices
 	cache   map[string]dns.Preset
 	user    *dns.Preset
+	loaded  bool
+	userErr error
 	all     map[string]dns.Preset // every preset, read in one query on first use
 }
 
 func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
-	c, err := s.dns.NodeChoices(ctx, userID)
-	if err != nil {
-		// A subscription is never worth failing over this: without the choices every node is on the user's own rule.
-		s.log.Warn("access: cannot read the node DNS choices", "err", err)
+	state, err := s.dns.SubscriptionState(ctx, userID)
+	if err == nil {
+		n := &nodeDNS{s: s, ctx: ctx, userID: userID, choices: state.Choices, cache: map[string]dns.Preset{}, all: state.Presets, loaded: true, userErr: state.EffectiveErr}
+		if state.EffectiveErr == nil {
+			n.user = &state.Effective
+		}
+		return n
+	}
+	// Keep the older partial-read behavior if the combined batch fails: node choices and the fallback preset can still
+	// succeed independently.
+	s.log.Warn("access: cannot read the subscription DNS state", "err", err)
+	c, choiceErr := s.dns.NodeChoices(ctx, userID)
+	if choiceErr != nil {
+		s.log.Warn("access: cannot read the node DNS choices", "err", choiceErr)
 	}
 	return &nodeDNS{s: s, ctx: ctx, userID: userID, choices: c, cache: map[string]dns.Preset{}}
 }
@@ -42,6 +54,12 @@ func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
 // withoutNode is the preset that applies to the person where no node decides: their own, the group's, the instance's.
 func (n *nodeDNS) withoutNode() (dns.Preset, bool) {
 	if n.user == nil {
+		if n.loaded {
+			if n.userErr != nil {
+				n.s.log.Warn("access: cannot read the user's dns preset", "err", n.userErr)
+			}
+			return dns.Preset{}, false
+		}
 		p, _, err := n.s.dns.Effective(n.ctx, n.userID)
 		if err != nil {
 			n.s.log.Warn("access: cannot read the user's dns preset", "err", err)

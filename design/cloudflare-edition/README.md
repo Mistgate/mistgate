@@ -73,8 +73,22 @@ Rules, enforced by a lint/CI test that runs on both drivers:
 2. No SQL feature outside what D1 and SQLite both accept: no `BEGIN/COMMIT/SAVEPOINT`, no `PRAGMA foreign_keys` in
    migrations (`PRAGMA defer_foreign_keys` is allowed), no `VACUUM INTO` outside the backup code, no more than 100 bound
    parameters per statement, statements under 100 KB.
-3. Few round trips: ~38 ms per D1 query was measured. Each admin RPC and each subscription fetch has a query budget (target: <= 6
-   sequential queries, the rest batched or cached in the isolate with a short TTL).
+3. Few round trips: ~38 ms per D1 query was measured. Each admin RPC and subscription fetch has a query budget (target: <= 6
+   sequential queries, the rest batched or cached in the isolate with a short TTL). Measured sequential D1 queries per
+   subscription scenario:
+
+   | Format or state | Queries |
+   | --- | ---: |
+   | Happ iOS | 5 |
+   | Happ Android | 5 |
+   | Mihomo | 7 |
+   | Subscription page, locked | 5 |
+   | Subscription page, unlocked | 3 |
+   | Page-password unlock | 4 |
+   | AWG `.conf` | 7 |
+
+   Mihomo and AWG `.conf` take 7 queries because of one additional round for AWG scopes; optimizing those formats is a
+   phase-4 item.
 4. Hot reads (settings, brand, subscription settings) are cached in the isolate with the same TTLs the code already uses
    (`BrandTTL`, `MinInterval`).
 
@@ -113,14 +127,26 @@ Memory is the other budget: 128 MB per isolate including WASM memory; a warm ful
 
 ### 3.4 State that must not stay in a Worker's memory
 
-Rate limiters and counters (`auth/ratelimit.go`, `httpserver/ratelimit`, subscription `tokenState`, page-password
-tries), WebAuthn challenges, MCP sessions, caches that assume a single process. Pattern: one small Durable Object per
+Security limits and counters (`auth/ratelimit.go`, `httpserver/ratelimit`, unknown-subscription misses per client
+network, the subscription self-service write budget per token, and page-password tries), WebAuthn challenges, MCP
+sessions, and caches that assume a single process cannot rely on Worker memory. Pattern: one small Durable Object per
 key space (`Limiter(ip|token|admin)`, `Challenge(session)`), short TTL; where an approximate limit is enough, a
 per-isolate limit is allowed and documented. The code keeps its interfaces; the edge build injects DO-backed
 implementations.
 
-The per-IP request limiter in `httpserver/ratelimit`, `tokTouched`/`tokAudited`, and `access.touching` remain per-isolate.
-They throttle requests or writes and do not hold security state that must survive isolate changes.
+Per-isolate state allowed for throttling, caching, or duplicate suppression:
+
+- the per-IP request limiter in `httpserver/ratelimit`;
+- the bounded `subs.handler.tokens` map and its `tokenState` user-name metadata, per-format response cache
+  (`MinInterval`), per-token fetch throttle (`MaxPerHour`), and bounded, per-day hashed network set that emits the
+  sharing audit signal (`SharedNets`); unknown-token misses and the hourly self-service write budget live in `Limiter`;
+- the subscription-settings cache (one minute), its brand cache (`BrandTTL`, five seconds), and the embedded page
+  template/log-once flag;
+- `access.secretPtrs` and `access.criticalPtrs`, the immutable protocol-schema pointers used while merging profile
+  settings;
+- `access.touching`, which suppresses concurrent last-seen writes for one device.
+They cache read-only or immutable data, throttle per-isolate work, or suppress duplicate writes; none holds security
+state that must survive isolate changes.
 
 ## 4. One agent protocol for both editions
 

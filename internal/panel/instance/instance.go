@@ -26,6 +26,11 @@ const (
 	keyLogo      = "logo_svg"
 )
 
+// SettingKeys lists the keys that make up Settings.
+func SettingKeys() []string {
+	return []string{keyBrandHead, keyBrandTail, keyAccent, keyLanguage, keyLogo}
+}
+
 // Defaults of a fresh installation: brand "Mistgate" (wordmark "mist" + "gate"), no
 // custom logo, lavender accent, English.
 const (
@@ -65,23 +70,27 @@ func Defaults() Settings {
 	return Settings{BrandHead: DefaultBrandHead, BrandTail: DefaultBrandTail, Accent: DefaultAccent, Language: DefaultLanguage}
 }
 
-// Load reads the settings, falling back to the default for every unset key.
-func Load(ctx context.Context, st *store.Store) (Settings, error) {
+// FromValues applies the stored values to the installation defaults. Missing keys keep their defaults.
+func FromValues(values map[string]string) Settings {
 	s := Defaults()
 	for key, dst := range map[string]*string{
 		keyBrandHead: &s.BrandHead, keyBrandTail: &s.BrandTail, keyAccent: &s.Accent,
 		keyLanguage: &s.Language, keyLogo: &s.LogoSVG,
 	} {
-		v, err := st.Setting(ctx, key)
-		switch {
-		case errors.Is(err, store.ErrNotFound):
-		case err != nil:
-			return s, err
-		default:
-			*dst = v
+		if value, ok := values[key]; ok {
+			*dst = value
 		}
 	}
-	return s, nil
+	return s
+}
+
+// Load reads the settings, falling back to the default for every unset key.
+func Load(ctx context.Context, st *store.Store) (Settings, error) {
+	values, err := st.SettingValues(ctx, SettingKeys())
+	if err != nil {
+		return Defaults(), err
+	}
+	return FromValues(values), nil
 }
 
 // Patch is a partial update: a nil field is left unchanged. LogoSVG "" removes the logo.

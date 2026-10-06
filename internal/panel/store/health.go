@@ -266,43 +266,78 @@ func (s *Store) ProbeCred(ctx context.Context, inboundID string) (ProbeCredRow, 
 }
 
 // ProbeCredIssue makes the credential of an inbound once its peer index is known: it fills CredID, SecretEnc and
-// DataJSON (the store sets InboundID and AWGIdx). It runs inside the write transaction: no database access of its own.
+// DataJSON (the store sets InboundID and AWGIdx). It runs between the candidate read and guarded write, so it must not
+// access the database.
 type ProbeCredIssue func(idx int) (ProbeCredRow, error)
 
 // InsertProbeCredIdx stores the credential of an inbound whose credential holds a tunnel address (AWG): the peer index
-// comes from the profile's allocator, the same one the devices use (the index and the row are made in one transaction,
-// so a device added at the same moment cannot get the same address). An inbound that has a credential already keeps it
-// (two callers racing: the first wins, both then read the same row back with ProbeCred). ErrNotFound when the inbound does
-// not exist, ErrAccessSubnetFull when the network has no free index.
+// comes from the profile's allocator, the same one the devices use. A guarded batch protects the index and credential
+// together, so a device added at the same moment cannot get the same address. An inbound that has a credential already
+// keeps it (two callers racing: the first wins, both then read the same row back with ProbeCred). ErrNotFound when the
+// inbound does not exist, ErrAccessSubnetFull when the network has no free index.
 func (s *Store) InsertProbeCredIdx(ctx context.Context, inboundID, profileID string, maxIdx int, now time.Time, issue ProbeCredIssue) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var one int
-	switch err := tx.QueryRowContext(ctx, `SELECT 1 FROM health_probe_cred WHERE inbound_id = ?`, inboundID).Scan(&one); {
-	case err == nil:
-		return nil
-	case !errors.Is(err, sql.ErrNoRows):
-		return err
-	}
-	idx, err := awgAllocIdx(ctx, tx, profileID, maxIdx, now)
-	if err != nil {
-		return err
-	}
-	r, err := issue(idx)
-	if err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO health_probe_cred (inbound_id, cred_id, secret_enc, data_json, created_at, awg_idx) VALUES (?, ?, ?, ?, ?, ?)`,
-		inboundID, r.CredID, r.SecretEnc, r.DataJSON, unix(now), idx); err != nil {
-		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+	cutoff := unix(now.Add(-awgQuarantine))
+	retryLocked := false
+	defer func() {
+		if retryLocked {
+			s.awgRetry.Unlock()
+		}
+	}()
+	for range 8 {
+		var one int
+		switch err := s.R.QueryRowContext(ctx, `SELECT 1 FROM health_probe_cred WHERE inbound_id = ?`, inboundID).Scan(&one); {
+		case err == nil:
+			return nil
+		case !errors.Is(err, sql.ErrNoRows):
+			return err
+		}
+
+		var storedProfile string
+		err := s.R.QueryRowContext(ctx, `SELECT profile_id FROM inbound WHERE id = ?`, inboundID).Scan(&storedProfile)
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		if storedProfile != profileID {
+			return ErrNotFound
+		}
+		idx, err := s.Access().awgAllocIdxRead(ctx, profileID, maxIdx, cutoff)
+		if err != nil {
+			return err
+		}
+		r, err := issue(idx)
+		if err != nil {
+			return err
+		}
+		r.InboundID, r.AWGIdx = inboundID, idx
+		stmts := []Stmt{
+			guard(`
+				EXISTS (SELECT 1 FROM inbound WHERE id = ? AND profile_id = ?)
+				AND NOT EXISTS (SELECT 1 FROM health_probe_cred WHERE inbound_id = ?)
+				AND NOT EXISTS (SELECT 1 FROM awg_peer WHERE profile_id = ? AND idx = ? AND (released_at = 0 OR released_at > ?))
+				AND NOT EXISTS (SELECT 1 FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id WHERE i.profile_id = ? AND c.awg_idx = ? AND c.awg_idx > 0)`,
+				inboundID, profileID, inboundID, profileID, int64(idx), cutoff, profileID, int64(idx)),
+			{Query: `DELETE FROM awg_peer WHERE profile_id = ? AND released_at > 0 AND released_at <= ?`, Args: []any{profileID, cutoff}},
+			{Query: `INSERT INTO health_probe_cred (inbound_id, cred_id, secret_enc, data_json, created_at, awg_idx) VALUES (?, ?, ?, ?, ?, ?)`,
+				Args: []any{r.InboundID, r.CredID, r.SecretEnc, r.DataJSON, unix(now), int64(r.AWGIdx)}},
+		}
+		if _, err := s.batch(ctx, stmts...); errors.Is(err, errGuard) {
+			if !retryLocked {
+				s.awgRetry.Lock()
+				retryLocked = true
+			}
+			continue
+		} else if err != nil {
+			if accIsFK(err) {
+				return ErrNotFound
+			}
+			return err
+		}
+		return nil
 	}
-	return tx.Commit()
+	return ErrConflict
 }
 
 // InsertProbeCred stores a credential unless the inbound already has one (two callers racing: the first wins,

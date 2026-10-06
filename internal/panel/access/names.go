@@ -36,12 +36,23 @@ func CountryName(cc, lang string) string {
 // else the brand), the brand (for file names) and the instance language (for the country). A read that fails leaves
 // the defaults: a name is never worth failing a key over.
 func (s *Service) keyNaming(ctx context.Context) (title, brand, lang string) {
-	b, err := instance.Load(ctx, s.st)
+	keys := append(instance.SettingKeys(), subsettings.Key)
+	values, err := s.st.SettingValues(ctx, keys)
 	if err != nil {
 		s.log.Warn("access: brand unreadable, keys are named after the defaults", "err", err)
 	}
+	b := instance.Defaults()
+	if err == nil {
+		b = instance.FromValues(values)
+	}
 	title, brand, lang = b.BrandName(), b.BrandName(), b.Language
-	if set, err := subsettings.Load(ctx, s.st); err == nil && set.GetTitle() != "" {
+	if err == nil {
+		if raw, ok := values[subsettings.Key]; ok {
+			if set, parseErr := subsettings.Parse(raw); parseErr == nil && set.GetTitle() != "" {
+				title = set.GetTitle()
+			}
+		}
+	} else if set, loadErr := subsettings.Load(ctx, s.st); loadErr == nil && set.GetTitle() != "" {
 		title = set.GetTitle()
 	}
 	return title, brand, lang

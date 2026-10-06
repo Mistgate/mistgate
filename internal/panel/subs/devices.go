@@ -256,7 +256,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 		}
 	}
 	// The keys leave only for a user who can use them; removing a device and renaming one never hurt.
-	if !h.admitWrite(w, st, v, rest == "" || action == "configs" || action == "rotate", now) {
+	if !h.admitWrite(w, r.Context(), token, v, rest == "" || action == "configs" || action == "rotate", now) {
 		return
 	}
 
@@ -322,7 +322,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 		jsonError(w, http.StatusUnauthorized, "locked", "")
 		return access.SubView{}, nil, false
 	}
-	if known, ok := h.tokens.Get(token); ok && exists {
+	if _, ok := h.tokens.Get(token); ok && exists {
 		switch {
 		case h.cop.Check(r) != nil:
 			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
@@ -337,7 +337,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 			jsonError(w, http.StatusForbidden, off, "")
 			return access.SubView{}, nil, false
 		}
-		if retry := known.writeWait(h.cfg.MaxWritesPerHour, now); retry > 0 {
+		if retry := h.writeWait(ctx, token, now); retry > 0 {
 			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
 				return access.SubView{}, nil, false
 			}
@@ -348,7 +348,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	v, st, err := h.identify(ctx, token, false)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
-		h.miss(client, now)
+		h.miss(ctx, client, now)
 		h.decoy.ServeHTTP(w, r)
 		return access.SubView{}, nil, false
 	}
@@ -381,7 +381,7 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 	}
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
-		h.miss(client, now)
+		h.miss(ctx, client, now)
 		h.decoy.ServeHTTP(w, r)
 		return false
 	}
@@ -395,16 +395,46 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 // admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the
 // servers, 409 user_inactive otherwise) and the hourly budget of writes of the token (429), counted for the devices and
 // the DNS together. It answers and returns false when the call ends there.
-func (h *handler) admitWrite(w http.ResponseWriter, st *tokenState, v access.SubView, needActive bool, now time.Time) bool {
+func (h *handler) admitWrite(w http.ResponseWriter, ctx context.Context, token string, v access.SubView, needActive bool, now time.Time) bool {
 	if needActive && v.Status != access.StatusActive {
 		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 		return false
 	}
-	if retry := st.writeAdmit(h.cfg.MaxWritesPerHour, now); retry > 0 {
+	if retry := h.writeAdmit(ctx, token, now); retry > 0 {
 		tooManyWrites(w, retry)
 		return false
 	}
 	return true
+}
+
+func (h *handler) writeWait(ctx context.Context, token string, now time.Time) time.Duration {
+	if h.cfg.MaxWritesPerHour < 0 {
+		return 0
+	}
+	d, err := h.cfg.Limiter.CheckWindow(ctx, "subscription-writes", "t:"+token, now,
+		h.cfg.MaxWritesPerHour, time.Hour, h.cfg.MaxKeys, true)
+	if err != nil {
+		return time.Hour
+	}
+	if !d.Allowed {
+		return d.RetryAfter
+	}
+	return 0
+}
+
+func (h *handler) writeAdmit(ctx context.Context, token string, now time.Time) time.Duration {
+	if h.cfg.MaxWritesPerHour < 0 {
+		return 0
+	}
+	d, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-writes", "t:"+token, now,
+		h.cfg.MaxWritesPerHour, time.Hour, h.cfg.MaxKeys)
+	if err != nil {
+		return time.Hour
+	}
+	if !d.Allowed {
+		return d.RetryAfter
+	}
+	return 0
 }
 
 func tooManyWrites(w http.ResponseWriter, retry time.Duration) {
@@ -434,36 +464,6 @@ func (st *tokenState) drop() {
 	st.mu.Lock()
 	st.cached = nil
 	st.mu.Unlock()
-}
-
-// writeWait says how long until the token's budget of writes has room again (0 = it has room now) and counts nothing.
-func (st *tokenState) writeWait(max int, now time.Time) time.Duration {
-	if max < 0 {
-		return 0
-	}
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	if now.Sub(st.wStart) < time.Hour && st.writes >= max {
-		return st.wStart.Add(time.Hour).Sub(now)
-	}
-	return 0
-}
-
-// writeAdmit counts one self-service write against the hourly budget (max < 0: unlimited); retry > 0 = refused.
-func (st *tokenState) writeAdmit(max int, now time.Time) (retry time.Duration) {
-	if max < 0 {
-		return 0
-	}
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	if now.Sub(st.wStart) >= time.Hour {
-		st.wStart, st.writes = now, 0
-	}
-	if st.writes >= max {
-		return st.wStart.Add(time.Hour).Sub(now)
-	}
-	st.writes++
-	return 0
 }
 
 // validDeviceID: the ids the panel issues are "dev_" + base32; anything else cannot be one.

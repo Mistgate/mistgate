@@ -1,9 +1,18 @@
 const { DatabaseSync } = require("node:sqlite");
 
 let sqlite;
+let queryStats = null;
+let batchDepth = 0;
 
 let holdNextRun = false;
 let onNextAwait = null;
+
+function countExecution() {
+  if (!queryStats) return;
+  queryStats.prepareExecutions++;
+  if (batchDepth > 0) queryStats.batchedExecutions++;
+  else queryStats.sequentialExecutions++;
+}
 
 function resultMeta(changes = 0, lastInsertRowid = 0) {
   return {
@@ -45,6 +54,7 @@ function prepared(query, bound = []) {
       return prepared(query, args);
     },
     all() {
+      countExecution();
       try {
         const statement = sqlite.prepare(query);
         statement.setReadBigInts(true);
@@ -59,6 +69,7 @@ function prepared(query, bound = []) {
       }
     },
     raw(options) {
+      countExecution();
       try {
         const statement = sqlite.prepare(query);
         statement.setReadBigInts(true);
@@ -72,6 +83,7 @@ function prepared(query, bound = []) {
       }
     },
     run() {
+      countExecution();
       if (holdNextRun) {
         holdNextRun = false;
         return d1Promise(new Promise(() => {}));
@@ -108,7 +120,7 @@ function prepared(query, bound = []) {
 
 function reset() {
   if (sqlite) sqlite.close();
-  sqlite = new DatabaseSync(":memory:");
+  sqlite = new DatabaseSync(process.env.MISTGATE_BRIDGE_D1_PATH || ":memory:");
   sqlite.exec("PRAGMA foreign_keys = ON");
 }
 
@@ -119,8 +131,10 @@ globalThis.__d1 = {
     return prepared(query);
   },
   async batch(statements) {
-    sqlite.exec("BEGIN");
+    if (queryStats) queryStats.batchCalls++;
+    batchDepth++;
     try {
+      sqlite.exec("BEGIN");
       const results = [];
       for (const statement of statements) results.push(await statement.run());
       sqlite.exec("COMMIT");
@@ -128,6 +142,8 @@ globalThis.__d1 = {
     } catch (error) {
       sqlite.exec("ROLLBACK");
       throw error;
+    } finally {
+      batchDepth--;
     }
   },
   __holdNextRun() {
@@ -135,6 +151,19 @@ globalThis.__d1 = {
   },
   __onNextAwait(callback) {
     onNextAwait = callback;
+  },
+  __beginQueryCount(label) {
+    if (queryStats) throw new Error("a D1 query count is already active");
+    queryStats = { label, prepareExecutions: 0, sequentialExecutions: 0, batchedExecutions: 0, batchCalls: 0 };
+  },
+  __endQueryCount() {
+    if (!queryStats) throw new Error("no D1 query count is active");
+    const result = {
+      ...queryStats,
+      sequentialQueries: queryStats.sequentialExecutions + queryStats.batchCalls,
+    };
+    queryStats = null;
+    return result;
   },
   __reset: reset,
 };

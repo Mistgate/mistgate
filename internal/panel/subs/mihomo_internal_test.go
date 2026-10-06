@@ -3,6 +3,7 @@ package subs
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"flag"
 	"io"
 	"net/http"
@@ -16,7 +17,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files in testdata")
@@ -217,7 +220,7 @@ func TestAcceptsGzip(t *testing.T) {
 
 // A burst of requests cannot get more than the budget through.
 func TestWriteAdmitConcurrent(t *testing.T) {
-	var st tokenState
+	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory()}).(*handler)
 	now := time.Unix(1_800_000_000, 0)
 	var admitted atomic.Int32
 	var wg sync.WaitGroup
@@ -225,7 +228,7 @@ func TestWriteAdmitConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if st.writeAdmit(20, now) == 0 {
+			if h.writeAdmit(context.Background(), tokA, now) == 0 {
 				admitted.Add(1)
 			}
 		}()
@@ -238,22 +241,22 @@ func TestWriteAdmitConcurrent(t *testing.T) {
 
 // writeAdmit: the budget is per hour and a window restarts after an hour; a negative budget is no limit.
 func TestWriteAdmit(t *testing.T) {
-	var st tokenState
+	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(), MaxWritesPerHour: 3}).(*handler)
 	now := time.Unix(1_800_000_000, 0)
 	for i := 0; i < 3; i++ {
-		if st.writeAdmit(3, now) != 0 {
+		if retry := h.writeAdmit(context.Background(), tokA, now); retry != 0 {
 			t.Fatalf("write %d refused", i)
 		}
 	}
-	if retry := st.writeAdmit(3, now.Add(10*time.Minute)); retry <= 0 || retry > 51*time.Minute {
+	if retry := h.writeWait(context.Background(), tokA, now.Add(10*time.Minute)); retry <= 0 || retry > 51*time.Minute {
 		t.Errorf("retry = %v", retry)
 	}
-	if st.writeAdmit(3, now.Add(61*time.Minute)) != 0 {
+	if retry := h.writeAdmit(context.Background(), tokA, now.Add(61*time.Minute)); retry != 0 {
 		t.Error("a new hour must restart the budget")
 	}
-	var free tokenState
+	free := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(), MaxWritesPerHour: -1}).(*handler)
 	for i := 0; i < 1000; i++ {
-		if free.writeAdmit(-1, now) != 0 {
+		if retry := free.writeAdmit(context.Background(), tokA, now); retry != 0 {
 			t.Fatal("unlimited refused")
 		}
 	}

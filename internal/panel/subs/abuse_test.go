@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -179,6 +180,26 @@ func TestGuessingWindowAndMalformedTokens(t *testing.T) {
 	}
 }
 
+func TestGuessingLimitIsSharedByHandlers(t *testing.T) {
+	limiter := securitylimit.NewMemory()
+	r := newRig(t, func(c *Config) { c.MissLimit, c.Limiter = 2, limiter })
+	first := r.h
+	second := Handler(r.src, decoyHandler, Config{
+		Limiter: limiter, MissLimit: 2, Now: func() time.Time { return r.now },
+		ClientIP: func(req *http.Request) netip.Addr {
+			a, _ := netip.ParseAddr(req.Header.Get("X-Test-IP"))
+			return a
+		},
+	})
+	r.get("198.51.100.19", unknownToken(20))
+	r.h = second
+	r.get("198.51.100.19", unknownToken(21))
+	if rec := r.get("198.51.100.19", tokA); !isDecoy(rec) {
+		t.Fatalf("a second handler did not see the shared network block: %d", rec.Code)
+	}
+	r.h = first
+}
+
 // A request from an unknown address is never limited or counted: the panel cannot tell clients apart then.
 func TestUnknownClientIsNeverBlocked(t *testing.T) {
 	r := newRig(t, func(c *Config) { c.MissLimit = 3 })
@@ -325,13 +346,13 @@ func TestSharedLinkSignalWithoutSink(t *testing.T) {
 
 // The tables are bounded: a scan from a million networks, or a flood of valid tokens, does not grow them.
 func TestTablesAreBounded(t *testing.T) {
-	r := newRig(t, func(c *Config) { c.MaxKeys = 64 })
+	r := newRig(t, func(c *Config) { c.MaxKeys, c.MissLimit = 64, 10000 })
 	h := r.h.(*handler)
 	for i := 0; i < 2000; i++ {
 		r.get(fmt.Sprintf("2001:db8:%x::1", i), unknownToken(i))
 	}
-	if n := h.clients.Len(); n != 64 {
-		t.Errorf("%d client records, want the cap of 64", n)
+	if n := h.cfg.Limiter.(*securitylimit.Memory).Size("subscription-miss"); n != 64 {
+		t.Errorf("%d client miss records, want the cap of 64", n)
 	}
 	for i := 0; i < 2000; i++ {
 		tok := unknownToken(1_000_000 + i)

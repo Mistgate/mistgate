@@ -17,11 +17,16 @@ import (
 var transactionShape1 = map[string]string{
 	"admin.go:PutSetupToken":                       "Replaces unused setup tokens and inserts the latest in one fixed batch.",
 	"access_user.go:CreateUser":                    "Inserts the user, selected nodes, and optional implicit device credentials in one fixed batch.",
+	"access_user.go:UserByTokenHash":               "Reads the token owner and selected nodes in one fixed batch.",
+	"access_awg.go:AWGDeviceScope":                 "Reads the device and its user, group, profile, and live inbounds in one fixed batch.",
+	"access_awg.go:RecordDeviceConfig":             "Records the received profile epoch and carried DNS in one fixed batch.",
+	"access_user.go:SubscriptionData":              "Reads the independent subscription settings and access rows in one fixed batch.",
+	"dns.go:scanEffectiveData":                     "Reads the user's preset refs, preset rows, default, node offers, and picks in one fixed batch.",
 	"access_user.go:AddDevice":                     "Inserts the device and its credentials in one fixed batch.",
 	"access_user.go:AddCreds":                      "Inserts the supplied credentials in one fixed batch.",
 	"access_profile.go:CreateInbound":              "Inserts the inbound and clears its retained key in one fixed batch.",
 	"access_profile.go:CreateGroup":                "Computes an automatic color in the insert and replaces the profile set in one fixed batch.",
-	"batch_native.go:batchStore":                   "Runs fixed writes in one SQLite transaction and returns results after commit.",
+	"batch_native.go:batchStore":                   "Read batches use the reader pool; write batches run in one SQLite transaction and return results after commit.",
 	"health.go:OpenAlert":                          "A fixed batch reopens a recent alert and upserts through the active-alert unique index.",
 	"health.go:PutDoctor":                          "A fixed batch applies the report replacement and its doctor-result upserts.",
 	"health.go:RollupDaily":                        "One SQL INSERT SELECT groups finished samples and inserts daily rows idempotently.",
@@ -36,6 +41,9 @@ var transactionShape1 = map[string]string{
 
 var transactionShape2 = map[string]string{
 	"access_user.go:UpdateUser":                    "A user guard precedes the update and optional node replacement in one atomic batch.",
+	"access_awg.go:AddAWGDevice":                   "A guarded batch retries if the device limit, profile epoch, or candidate peer allocation changed.",
+	"access_awg.go:RotateAWGDevice":                "A guarded batch retries if the live credential, selected peer, or profile epoch changed.",
+	"access_awg.go:EnsureImplicitAWGCreds":         "Guarded batches retry when an implicit device, profile epoch, or candidate peer allocation changed.",
 	"access_user.go:RevokeDevice":                  "A live-device guard precedes device, peer, and credential updates plus a returning user lookup.",
 	"access_profile.go:UpdateProfile":              "A version guard precedes the profile and optional epoch and inbound bumps.",
 	"access_profile.go:DeleteProfile":              "A no-inbounds guard precedes device revocation and profile deletion.",
@@ -49,6 +57,7 @@ var transactionShape2 = map[string]string{
 	"authpw.go:ResetPasswordLogin":                 "A credential guard precedes the plain credential, lock, session, and audit writes.",
 	"awg_prepare.go:awgPrepareTx":                  "The exact JSON and backend read by fn guard its update; stale decisions retry.",
 	"dns.go:Delete":                                "A preset guard precedes preset deletion and clearing user and group references.",
+	"health.go:InsertProbeCredIdx":                 "A guarded batch retries when the inbound credential or candidate peer allocation changed.",
 	"mcpplan.go:BeginApply":                        "A status and hash compare-and-swap lets only one apply proceed.",
 	"mcpplan.go:CreateMCPPlan":                     "SQL guards per-token and panel-wide capacity in the atomic insert batch.",
 	"mcpplan.go:decideMCPPlan":                     "A status compare-and-swap records one unexpired owner decision.",
@@ -65,19 +74,15 @@ var transactionShape2 = map[string]string{
 }
 
 var transactionShape3 = map[string]string{
-	"access_awg.go:AddAWGDevice":           "The issue callback needs the selected free index before it can create the credential, so allocation and issuance stay serialized in one transaction.",
-	"access_awg.go:RotateAWGDevice":        "The issue callback needs the current peer index and owner before replacing credentials, so issuance stays serialized with the read.",
-	"access_awg.go:EnsureImplicitAWGCreds": "The method reads existing profiles and allocates each missing peer before invoking index-dependent issue callbacks.",
-	"health.go:InsertProbeCredIdx":         "The Go issuer needs the allocator's chosen index before building the credential row.",
-	"fleet_ca.go:CreateEnrollment":         "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_ca.go:Enroll":                   "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_ca.go:RenewCert":                "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:NodeApplied":            "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:NodeHello":              "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:RetireNode":             "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:IngestEvent":           "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:IngestStats":           "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:SkipSeq":               "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_ca.go:CreateEnrollment": "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_ca.go:Enroll":           "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_ca.go:RenewCert":        "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_node.go:NodeApplied":    "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_node.go:NodeHello":      "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_node.go:RetireNode":     "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_stats.go:IngestEvent":   "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_stats.go:IngestStats":   "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_stats.go:SkipSeq":       "not yet reviewed (step 2c, with the node Durable Object)",
 }
 
 func TestTransactionCallSitesClassified(t *testing.T) {

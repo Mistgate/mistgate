@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -33,6 +34,26 @@ func (r batchRow) Scan(dest ...any) error {
 	}
 	for i, value := range r {
 		switch target := dest[i].(type) {
+		case *sql.NullString:
+			if value == nil {
+				target.Valid = false
+				continue
+			}
+			v, ok := value.(string)
+			if !ok {
+				return fmt.Errorf("store: batch column %d is %T, want nullable string", i, value)
+			}
+			target.String, target.Valid = v, true
+		case *sql.NullInt64:
+			if value == nil {
+				target.Valid = false
+				continue
+			}
+			v, ok := value.(int64)
+			if !ok {
+				return fmt.Errorf("store: batch column %d is %T, want nullable integer", i, value)
+			}
+			target.Int64, target.Valid = v, true
 		case *string:
 			if value == nil {
 				*target = ""
@@ -65,6 +86,18 @@ func (r batchRow) Scan(dest ...any) error {
 				return fmt.Errorf("store: batch column %d is %T, want integer", i, value)
 			}
 			*target = v
+		case *uint64:
+			v, ok := value.(int64)
+			if !ok || v < 0 {
+				return fmt.Errorf("store: batch column %d is %T, want non-negative integer", i, value)
+			}
+			*target = uint64(v)
+		case *uint32:
+			v, ok := value.(int64)
+			if !ok || v < 0 || uint64(v) > uint64(^uint32(0)) {
+				return fmt.Errorf("store: batch column %d is %T, want non-negative uint32", i, value)
+			}
+			*target = uint32(v)
 		default:
 			return fmt.Errorf("store: unsupported batch scan target %T", dest[i])
 		}
