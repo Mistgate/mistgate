@@ -17,6 +17,17 @@ binding = "DB"
 database_name = "mistgate"
 database_id = "replace-with-your-d1-database-id"
 
+# The panel's security limits (login bursts, page-password tries, enrollment failures) live in one small Durable Object
+# per (name, key): Worker isolates share no memory, so the count has to be somewhere they all reach. SQLite-backed;
+# idle objects delete their own state and cost nothing.
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
+
 # The admin SPA and the user page (web/dist) are NOT served by Cloudflare itself: every request goes to the Worker
 # first (run_worker_first), and the panel reads these files through the ASSETS binding. html_handling and
 # not_found_handling are off so that only an exact file path is a hit.

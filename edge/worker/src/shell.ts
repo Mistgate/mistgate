@@ -1,6 +1,9 @@
 // The pure parts of the Worker shell: the fetch contract of mgPanel.fetch (cmd/mistgate-edge), the static-asset reader
 // and the init de-duplication. Nothing here touches the wasm, so it runs under plain Node in the tests.
 
+import type { Limiter } from "./limiter";
+import type { LimitReply } from "./limitmath";
+
 /** Header pairs keep repeated names (Set-Cookie) as separate entries. */
 export type HeaderPairs = [string, string][];
 
@@ -60,6 +63,17 @@ export async function readAsset(assets: Fetcher, path: string): Promise<Uint8Arr
     return null;
   }
   return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * Sends one security-limit call (the panel's `limit` init option) to the Durable Object of its (name, key) pair
+ * (name, NUL, key). Names are fixed constants of the panel and never contain a NUL, so the pair maps to one object name without
+ * ambiguity. A key too long for an object name makes idFromName throw: the call rejects and the panel refuses the
+ * guarded request, as for any limiter failure.
+ */
+export async function routeLimit(ns: DurableObjectNamespace<Limiter>, request: { name: string; key: string }): Promise<LimitReply> {
+  // async on purpose: a synchronous throw would reach Go as a js.Invoke panic instead of a rejected promise.
+  return ns.get(ns.idFromName(`${request.name}\u0000${request.key}`)).limit(request);
 }
 
 /**
