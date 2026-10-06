@@ -30,6 +30,7 @@ type instance struct {
 	RPOrigins   []string // allowed browser origins; the first one is the admin URL's origin
 	AgentSNI    string   // secret TLS server name that selects the agent endpoint, e.g. q3m8x2kd7w4ht9pa.example.com
 	SubPrefix   string   // secret path prefix of the public subscription endpoint, "/" + 24 chars + "/"
+	LinkPrefix  string   // secret path prefix of the signed agent WebSocket link
 }
 
 var errNotConfigured = errors.New("not configured: run `mistgate setup` first")
@@ -55,6 +56,7 @@ func newInstance(o setupOpts) (instance, error) {
 		return in, errors.New("--admin-listen and --admin-host are mutually exclusive: the admin is reached one way only")
 	}
 	in.SubPrefix = newSecretPrefix()
+	in.LinkPrefix = newSecretPrefix()
 
 	var pub *url.URL
 	if o.publicURL != "" {
@@ -175,6 +177,7 @@ func (in instance) settings() map[string]string {
 		"rp_origins":   strings.Join(in.RPOrigins, ","),
 		"agent_sni":    in.AgentSNI,
 		"sub_prefix":   in.SubPrefix,
+		"link_prefix":  in.LinkPrefix,
 	}
 }
 
@@ -209,7 +212,7 @@ func loadInstance(ctx context.Context, st *store.Store) (instance, error) {
 	return in, ensureSecrets(ctx, st, &in)
 }
 
-// ensureSecrets reads the agent SNI and the subscription prefix, generating and storing
+// ensureSecrets reads the agent SNI and the public path prefixes, generating and storing
 // them once for installations made before those existed (and for --dev, which stores
 // nothing else).
 func ensureSecrets(ctx context.Context, st *store.Store, in *instance) error {
@@ -224,6 +227,12 @@ func ensureSecrets(ctx context.Context, st *store.Store, in *instance) error {
 	if in.SubPrefix, err = st.Setting(ctx, "sub_prefix"); errors.Is(err, store.ErrNotFound) {
 		in.SubPrefix = newSecretPrefix()
 		fill["sub_prefix"] = in.SubPrefix
+	} else if err != nil {
+		return err
+	}
+	if in.LinkPrefix, err = st.Setting(ctx, "link_prefix"); errors.Is(err, store.ErrNotFound) {
+		in.LinkPrefix = newSecretPrefix()
+		fill["link_prefix"] = in.LinkPrefix
 	} else if err != nil {
 		return err
 	}

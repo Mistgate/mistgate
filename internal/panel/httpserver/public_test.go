@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -58,6 +59,51 @@ func TestSubscriptionMountIsIndistinguishableFromTheDecoy(t *testing.T) {
 	// 203.0.113.44 made 9 misses above: over MissLimit 6, so even its valid token gets the decoy.
 	want := do(t, http.MethodGet, e.public.URL, "/nothing", ip)
 	sameResponse(t, "blocked client, valid token", want, do(t, http.MethodGet, e.public.URL, subPrefix+valid, ip))
+}
+
+func TestAgentLinkUsesOnlyItsSecretPath(t *testing.T) {
+	prefix := "/" + strings.Repeat("l", 24) + "/"
+	var hits atomic.Int32
+	var gotPath string
+	e := newTestEnv(t, func(c *Config) {
+		c.AgentLinkPrefix = prefix
+		c.AgentLinkHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			gotPath = r.URL.Path
+			w.WriteHeader(http.StatusNoContent)
+		})
+	})
+	if r := do(t, http.MethodGet, e.public.URL, prefix+"link/node_de", nil); r.status != http.StatusNoContent || gotPath != "/link/node_de" || hits.Load() != 1 {
+		t.Fatalf("link route: status=%d path=%q hits=%d", r.status, gotPath, hits.Load())
+	}
+	for _, path := range []string{prefix + "other", "/link/node_de"} {
+		before := hits.Load()
+		do(t, http.MethodGet, e.public.URL, path, nil)
+		if hits.Load() != before {
+			t.Errorf("unrecognized path %q reached the link handler", path)
+		}
+	}
+}
+
+func TestAgentLinkPrefixMustBeSeparateAndSecret(t *testing.T) {
+	for name, mutate := range map[string]func(*Config){
+		"short":         func(c *Config) { c.AgentLinkPrefix = "/short/" },
+		"same as admin": func(c *Config) { c.AdminPrefix, c.AgentLinkPrefix = testPrefix, testPrefix },
+		"overlaps public mount": func(c *Config) {
+			c.AgentLinkPrefix = subPrefix
+			c.PublicMounts = map[string]http.Handler{subPrefix: http.NotFoundHandler()}
+		},
+	} {
+		mutate := mutate
+		t.Run(name, func(t *testing.T) {
+			if err := tryConfig(t, func(c *Config) {
+				mutate(c)
+				c.AgentLinkHandler = http.NotFoundHandler()
+			}); err == nil {
+				t.Fatal("invalid agent link prefix accepted")
+			}
+		})
+	}
 }
 
 // limited returns an env whose clients are told apart by X-Forwarded-For (127.0.0.1 is a trusted proxy)

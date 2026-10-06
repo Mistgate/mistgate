@@ -1,11 +1,12 @@
-// Package agent is the node agent core: it enrolls with the panel, keeps ONE AgentService.Connect stream
-// open (reconnecting with backoff), applies the desired state to the protocol engines, reports traffic
-// reliably (seq + ack), executes commands and serves its own log. The wire protocol is specified in the
+// Package agent is the node agent core: it enrolls with the panel, keeps ONE agent session open
+// (mTLS Connect by default, or the signed WebSocket link when configured; reconnecting with backoff),
+// applies desired state to engines, reports traffic reliably (seq + ack), executes commands and serves
+// its own log. The wire protocol is specified in the
 // comment block of proto/mistgate/agent/v1/agent.proto; this package implements it, nothing more.
 //
 // Concurrency model: one worker goroutine owns every mutation of engine and host state (desired-state
 // apply, kick, restart, retire, credential-expiry sweep), so the engines see one caller for Apply/Remove/
-// Kick as their contract demands. Each stream has a reader (the Connect goroutine) and one writer; the
+// Kick as their contract demands. Each stream has a reader (the session goroutine) and one writer; the
 // statistics collector, certificate renewal and the expiry timer run for the agent's whole life, across
 // reconnects.
 package agent
@@ -46,6 +47,8 @@ import (
 type Config struct {
 	// StateDir holds the identity and the persisted desired state (created by Enroll).
 	StateDir string
+	// LinkURL is the full wss://host/<secret-prefix> base for the optional signed WebSocket transport.
+	LinkURL string
 	// Version is reported in Hello; defaults to buildinfo.Version.
 	Version string
 	// Built is the Unix time of the source commit (Hello.built); 0 = buildinfo.BuiltUnix().
@@ -101,14 +104,16 @@ type Agent struct {
 	torrentEventsMu sync.Mutex
 	torrentEvents   map[string]time.Time
 
-	instanceID string
-	out        *outbox
-	jobs       chan job
-	settings   atomic.Pointer[pb.NodeSettings]
-	offset     atomic.Int64 // seconds: panel clock minus local clock, measured at Hello
-	skewed     atomic.Bool
-	cur        atomic.Pointer[session]
-	cancel     context.CancelCauseFunc
+	instanceID     string
+	out            *outbox
+	jobs           chan job
+	settings       atomic.Pointer[pb.NodeSettings]
+	linkAdvertised atomic.Bool
+	linkHTTPClient *http.Client // test seam; nil uses normal system-root TLS verification
+	offset         atomic.Int64 // seconds: panel clock minus local clock, measured at Hello
+	skewed         atomic.Bool
+	cur            atomic.Pointer[session]
+	cancel         context.CancelCauseFunc
 
 	upd          *update.Updater
 	helloOutcome atomic.Pointer[pb.LastUpdate] // the last_update the current Hello carried; acked by the HelloAck
@@ -173,6 +178,11 @@ type held struct {
 // New loads the identity from cfg.StateDir and builds the engines. The panel is not contacted.
 // Returns ErrNotEnrolled when `enroll` has not been run.
 func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Agent, error) {
+	if cfg.LinkURL != "" {
+		if _, err := parseLinkBase(cfg.LinkURL); err != nil {
+			return nil, fmt.Errorf("link URL: %w", err)
+		}
+	}
 	if cfg.Version == "" {
 		cfg.Version = buildinfo.Version
 	}
@@ -410,12 +420,44 @@ type ctlMsg struct {
 	done chan struct{} // closed after the message was written (or the stream died); optional
 }
 
-// session is one Connect stream. Its writer goroutine is the only caller of stream.Send after Hello.
+type agentTransport interface {
+	Context() context.Context
+	Send(*pb.ConnectRequest) error
+	Receive() (*pb.ConnectResponse, error)
+	CloseSend() error
+	Close() error
+}
+
+type connectAgentTransport struct {
+	ctx       context.Context
+	stream    *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
+	sendOnce  sync.Once
+	closeOnce sync.Once
+}
+
+func (s *connectAgentTransport) Context() context.Context              { return s.ctx }
+func (s *connectAgentTransport) Send(m *pb.ConnectRequest) error       { return s.stream.Send(m) }
+func (s *connectAgentTransport) Receive() (*pb.ConnectResponse, error) { return s.stream.Receive() }
+func (s *connectAgentTransport) CloseSend() error {
+	var err error
+	s.sendOnce.Do(func() { err = s.stream.CloseRequest() })
+	return err
+}
+func (s *connectAgentTransport) Close() error {
+	var err error
+	s.closeOnce.Do(func() {
+		_ = s.CloseSend()
+		err = s.stream.CloseResponse()
+	})
+	return err
+}
+
+// session is one agent stream. Its writer goroutine is the only caller of stream.Send after Hello.
 type session struct {
 	a      *Agent
 	ctx    context.Context
 	cancel context.CancelFunc
-	stream *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
+	stream agentTransport
 	ctl    chan ctlMsg
 	wake   chan struct{}
 	sent   uint64 // highest reliable seq written on this stream; writer goroutine only
@@ -469,7 +511,7 @@ func (s *session) sendSync(m *pb.ConnectRequest, timeout time.Duration) {
 func (s *session) drain(timeout time.Duration) {
 	s.sendMu.Lock()
 	s.halfClosed = true
-	_ = s.stream.CloseRequest()
+	_ = s.stream.CloseSend()
 	s.sendMu.Unlock()
 	select {
 	case <-s.recv:
@@ -514,6 +556,13 @@ func (s *session) writer() {
 }
 
 func (a *Agent) session(ctx context.Context) error {
+	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() {
+		return a.linkSession(ctx)
+	}
+	return a.mtlsSession(ctx)
+}
+
+func (a *Agent) mtlsSession(ctx context.Context) error {
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
@@ -522,16 +571,32 @@ func (a *Agent) session(ctx context.Context) error {
 	defer client.CloseIdleConnections()
 
 	sctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	defer func() { _ = stream.CloseRequest(); _ = stream.CloseResponse() }()
-	// Cancelling the request context alone does not wake a Receive that is blocked on an established
-	// bidi stream (observed with Go 1.27's HTTP/2 transport: the request body is still open); closing the
-	// request side does. So every cancellation (shutdown, hello timeout, writer failure) also closes it.
-	go func() { <-sctx.Done(); _ = stream.CloseRequest() }()
+	return a.runSession(ctx, sctx, cancel, &connectAgentTransport{ctx: sctx, stream: stream})
+}
 
-	if err := stream.Send(a.hello(sctx)); err != nil {
+func (a *Agent) linkSession(ctx context.Context) error {
+	stream, cleanup, err := a.dialLink(ctx)
+	if err != nil {
+		return err
+	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+	sctx, cancel := context.WithCancel(ctx)
+	stream.ctx = sctx
+	return a.runSession(ctx, sctx, cancel, stream)
+}
+
+func (a *Agent) runSession(parent, ctx context.Context, cancel context.CancelFunc, stream agentTransport) error {
+	defer stream.Close()
+	defer cancel()
+	ctx = stream.Context()
+	// Closing the transport on cancellation wakes a blocked receive for both HTTP/2 and WebSocket sessions.
+	go func() { <-ctx.Done(); _ = stream.Close() }()
+
+	if err := stream.Send(a.hello(ctx)); err != nil {
 		if errors.Is(err, io.EOF) { // the real error is on the response side
 			if _, rerr := stream.Receive(); rerr != nil {
 				err = rerr
@@ -541,13 +606,17 @@ func (a *Agent) session(ctx context.Context) error {
 	}
 	wait := a.helloTimeout
 	if wait == 0 {
-		wait = 2 * dialTimeout(st)
+		wait = 2 * dialTimeout(a.settings.Load())
 	}
-	timer := time.AfterFunc(wait, cancel) // a panel that never answers must not hold us forever
+	timedOut := atomic.Bool{}
+	timer := time.AfterFunc(wait, func() {
+		timedOut.Store(true)
+		cancel()
+	}) // a panel that never answers must not hold us forever
 	resp, err := stream.Receive()
 	timer.Stop()
 	if err != nil {
-		if ctx.Err() == nil && sctx.Err() != nil {
+		if timedOut.Load() {
 			err = errors.New("no HelloAck in time")
 		}
 		return fmt.Errorf("hello ack: %w", err)
@@ -556,13 +625,22 @@ func (a *Agent) session(ctx context.Context) error {
 	if ack == nil {
 		return errors.New("first panel message is not HelloAck")
 	}
+	a.linkAdvertised.Store(ack.LinkSupported)
 	a.onHelloAck(ack)
+	if ack.LinkSupported && a.cfg.LinkURL != "" {
+		if _, isConnect := stream.(*connectAgentTransport); isConnect {
+			// This mTLS stream only discovered link support. Close it before opening the selected transport.
+			cancel()
+			_ = stream.Close()
+			return a.linkSession(parent)
+		}
+	}
 	a.dsOK.Store(true)
 	a.connAt.Store(time.Now().UnixNano())
 	defer a.connAt.Store(0)
 
 	s := &session{
-		a: a, ctx: sctx, cancel: cancel, stream: stream,
+		a: a, ctx: ctx, cancel: cancel, stream: stream,
 		ctl: make(chan ctlMsg, 64), wake: make(chan struct{}, 1), logs: map[string]context.CancelFunc{}, recv: make(chan struct{}),
 	}
 	a.cur.Store(s)

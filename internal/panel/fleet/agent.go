@@ -27,6 +27,7 @@ const (
 	maxEngines      = 32 // engines listed in one Hello
 	capTorrentGuard = "torrentguard/1"
 	capClientIPv6   = "client-ipv6/1" // NodeSettings.client_ipv6_disabled
+	capWSLink       = "ws-link/1"
 )
 
 type agentService struct{ f *Fleet }
@@ -42,10 +43,11 @@ type logSub struct {
 	dropped atomic.Uint32
 }
 
-// session is the one live Connect stream of a node.
+// session is the one live agent session of a node.
 type session struct {
 	f        *Fleet
 	nodeID   string
+	owner    uint64
 	instance string
 	caps     []string // Hello.capabilities: optional features of this agent build (health.go)
 	ctx      context.Context
@@ -119,18 +121,38 @@ func (s *session) flushAck(now time.Time) {
 	}
 }
 
-// register makes s the node's stream; a previous stream is closed with ABORTED.
-func (f *Fleet) register(s *session) {
+// claimOwner gives an authenticated transport the right to register after Hello and closes its predecessor.
+func (f *Fleet) claimOwner(nodeID string, parent context.Context) (uint64, context.Context) {
+	ctx, cancel := context.WithCancelCause(parent)
 	f.mu.Lock()
-	old := f.sessions[s.nodeID]
-	f.sessions[s.nodeID] = s
+	old := f.owners[nodeID]
+	owner := old.generation + 1
+	f.owners[nodeID] = sessionOwner{generation: owner, cancel: cancel}
 	f.mu.Unlock()
-	if old != nil {
+	if old.cancel != nil {
 		old.cancel(connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream")))
 	}
+	return owner, ctx
 }
 
-// unregister removes s if it is still the node's stream and reports whether it was.
+func (f *Fleet) ownsSession(nodeID string, owner uint64) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.owners[nodeID].generation == owner
+}
+
+// register makes s the node's stream if no newer authenticated transport has claimed ownership.
+func (f *Fleet) register(s *session) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.owners[s.nodeID].generation != s.owner {
+		return false
+	}
+	f.sessions[s.nodeID] = s
+	return true
+}
+
+// unregister removes s if it is still registered and reports whether it still owned the node.
 func (f *Fleet) unregister(s *session) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -138,7 +160,7 @@ func (f *Fleet) unregister(s *session) bool {
 		return false
 	}
 	delete(f.sessions, s.nodeID)
-	return true
+	return f.owners[s.nodeID].generation == s.owner
 }
 
 func errOrCause(ctx context.Context) error {
@@ -152,11 +174,18 @@ func errOrCause(ctx context.Context) error {
 
 // Connect is the long-lived stream of one node (agent.proto "ONE STREAM, ONE OWNER").
 func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[agentv1.ConnectRequest, agentv1.ConnectResponse]) error {
-	f := a.f
 	id, ok := nodeID(ctx)
 	if !ok {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("no node certificate"))
 	}
+	pc, _ := peerCertFrom(ctx)
+	owner, ownerCtx := a.f.claimOwner(id, ctx)
+	return a.runSession(ownerCtx, id, pc, owner, connectSessionStream{ctx: ownerCtx, stream: stream})
+}
+
+func (a agentService) runSession(ctx context.Context, id string, pc peerCert, owner uint64, stream agentSessionStream) error {
+	f := a.f
+	ctx = stream.Context()
 	sctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
@@ -178,6 +207,9 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 		}
 	}()
 	endErr := func() error {
+		if sctx.Err() != nil {
+			return errOrCause(sctx)
+		}
 		select {
 		case err := <-rerr:
 			if errors.Is(err, io.EOF) {
@@ -212,6 +244,9 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 	if hello.InstanceId == "" || len(hello.InstanceId) > 64 {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("instance_id is required (random per agent process, at most 64 bytes)"))
 	}
+	if !f.ownsSession(id, owner) {
+		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
+	}
 	if hello.NodeId != "" && hello.NodeId != id {
 		f.log.Warn("hello names another node than the certificate", "cert_node", id)
 	}
@@ -230,13 +265,15 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 
-	s := &session{f: f, nodeID: id, instance: hello.InstanceId, ctx: sctx, cancel: cancel,
+	s := &session{f: f, nodeID: id, owner: owner, instance: hello.InstanceId, ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		userDown: map[string]uint64{}, userUp: map[string]uint64{},
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
 		logs: map[string]*logSub{}, lastSeen: now, caps: capabilities(hello)}
 	s.liveness.Store(int64(time.Duration(node.LivenessTimeoutS) * f.unit))
-	f.register(s)
+	if !f.register(s) {
+		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
+	}
 	defer func() {
 		cancel(nil)
 		close(s.done)
@@ -257,7 +294,7 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 		f.autoMeasureBandwidth(s)
 	}
 	s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
-		AckedSeq: acked, ServerTimeUnix: now.Unix(), Settings: nodeSettings(node, s.caps)}}})
+		AckedSeq: acked, ServerTimeUnix: now.Unix(), Settings: nodeSettings(node, s.caps), LinkSupported: true}}})
 	if err := f.reconcile(sctx, s, reconcileConnect, hello); err != nil {
 		f.log.Error("initial desired state", "node", id, "err", err)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -270,7 +307,6 @@ func (a agentService) Connect(ctx context.Context, stream *connect.BidiStream[ag
 	// A certificate is checked at the handshake only; a stream can live for weeks. Close it when its
 	// certificate expires or is revoked (Renew schedules the old one for revocation, re-enroll and retire
 	// revoke at once): the agent reconnects with its current certificate, or is locked out if it has none.
-	pc, _ := peerCertFrom(ctx)
 	certT := time.NewTicker(f.certCheck)
 	defer certT.Stop()
 	for {

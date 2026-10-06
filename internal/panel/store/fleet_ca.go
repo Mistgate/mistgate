@@ -84,6 +84,32 @@ type CertRow struct {
 	IssuedAt                  time.Time
 }
 
+// LinkCertificates returns the node certificates that mTLS would still accept at now, including a
+// previous certificate inside the renewal grace period. Retired nodes have no acceptable certificates.
+func (s *Store) LinkCertificates(ctx context.Context, nodeID string, now time.Time) ([]CertRow, error) {
+	rows, err := s.R.QueryContext(ctx, `
+		SELECT c.serial, c.node_id, c.ca_id, c.pem, c.not_before, c.not_after, c.issued_at
+		FROM node_cert c JOIN node n ON n.id = c.node_id
+		WHERE c.node_id = ? AND n.state <> 'retired' AND c.not_before <= ? AND c.not_after > ?
+		  AND (c.revoked_at IS NULL OR c.revoked_at > ?)
+		ORDER BY c.issued_at DESC`, nodeID, unix(now), unix(now), unix(now))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CertRow
+	for rows.Next() {
+		var c CertRow
+		var nb, na, issued int64
+		if err := rows.Scan(&c.Serial, &c.NodeID, &c.CAID, &c.PEM, &nb, &na, &issued); err != nil {
+			return nil, err
+		}
+		c.NotBefore, c.NotAfter, c.IssuedAt = fromUnix(nb), fromUnix(na), fromUnix(issued)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func insertCert(ctx context.Context, tx *sql.Tx, c CertRow) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO node_cert (serial, node_id, ca_id, pem, not_before, not_after, issued_at)

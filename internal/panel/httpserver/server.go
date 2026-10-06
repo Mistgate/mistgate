@@ -89,6 +89,11 @@ type Config struct {
 	AgentTLS     func(*tls.ClientHelloInfo) (*tls.Config, error)
 	AgentHandler http.Handler
 
+	// AgentLinkPrefix and AgentLinkHandler serve the signed WebSocket transport on the public listener.
+	// The prefix is a stored secret path; unrelated paths continue to the decoy and public mounts.
+	AgentLinkPrefix  string
+	AgentLinkHandler http.Handler
+
 	// UserPagePreview, if set, serves GET <admin>/preview/user-page/<user id>: the public user page as that user
 	// would see it, for the admin to show in a frame. The server checks the session and the right to see the user's
 	// link (GetSubscriptionLink: helper or owner, never a token) and validates the id; the function writes the
@@ -153,11 +158,12 @@ type Server struct {
 	dist  fs.FS
 	cop   *http.CrossOriginProtection
 
-	api      apiRouter
-	pages    map[string]http.Handler
-	logo     http.Handler
-	mounts   []mount
-	agentSNI string // normalised
+	api       apiRouter
+	pages     map[string]http.Handler
+	logo      http.Handler
+	mounts    []mount
+	agentSNI  string // normalised
+	agentLink http.Handler
 
 	preview http.Handler // GET /preview/user-page/<id> behind the session, nil when not configured
 	mcp     http.Handler // POST <admin>/mcp, nil when not configured
@@ -219,6 +225,14 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 	if cfg.AdminPrefix != "" && !validSecretPrefix(cfg.AdminPrefix) {
 		return nil, fmt.Errorf("admin prefix %q must look like /secret/", cfg.AdminPrefix)
 	}
+	if (cfg.AgentLinkPrefix == "") != (cfg.AgentLinkHandler == nil) {
+		return nil, errors.New("AgentLinkPrefix and AgentLinkHandler go together")
+	}
+	if cfg.AgentLinkPrefix != "" && (!validSecretPrefix(cfg.AgentLinkPrefix) || len(strings.Trim(cfg.AgentLinkPrefix, "/")) < 16 ||
+		cfg.AgentLinkPrefix == cfg.AdminPrefix || (cfg.AdminPrefix != "" &&
+		(strings.HasPrefix(cfg.AgentLinkPrefix, cfg.AdminPrefix) || strings.HasPrefix(cfg.AdminPrefix, cfg.AgentLinkPrefix)))) {
+		return nil, errors.New("AgentLinkPrefix must be a separate secret path prefix of at least 16 characters")
+	}
 	cfg.AdminHost = strings.ToLower(strings.TrimSuffix(cfg.AdminHost, "."))
 	s := &Server{cfg: cfg, auth: a, st: st, decoy: newDecoy(cfg.DecoyDir), dist: cfg.Dist, cop: http.NewCrossOriginProtection()}
 	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: 10, Burst: 60})
@@ -271,9 +285,15 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 				return nil, fmt.Errorf("public mounts %q and %q overlap", prefix, m.prefix)
 			}
 		}
+		if cfg.AgentLinkPrefix != "" && (strings.HasPrefix(prefix, cfg.AgentLinkPrefix) || strings.HasPrefix(cfg.AgentLinkPrefix, prefix)) {
+			return nil, fmt.Errorf("public mount %q overlaps the agent link prefix", prefix)
+		}
 		s.mounts = append(s.mounts, mount{prefix, http.StripPrefix(strings.TrimSuffix(prefix, "/"), s.decoy.swapErrors(h))})
 	}
 	sort.Slice(s.mounts, func(i, j int) bool { return s.mounts[i].prefix < s.mounts[j].prefix })
+	if cfg.AgentLinkHandler != nil {
+		s.agentLink = http.StripPrefix(strings.TrimSuffix(cfg.AgentLinkPrefix, "/"), s.decoy.swapErrors(cfg.AgentLinkHandler))
+	}
 
 	if (cfg.AgentTLS == nil) != (cfg.AgentHandler == nil) || (cfg.AgentTLS != nil && cfg.AgentSNI == "") {
 		return nil, errors.New("AgentTLS and AgentHandler go together and need AgentSNI")
@@ -360,6 +380,16 @@ func (s *Server) Public() http.Handler {
 			return
 		}
 		canonical := canonicalPath(r)
+		if canonical && s.agentLinkRequest(r) {
+			if !s.allow(s.agentLim, w, r) {
+				return
+			}
+			if isWebSocketUpgrade(r) {
+				liftDeadlines(w)
+			}
+			s.agentLink.ServeHTTP(w, r)
+			return
+		}
 		if canonical && s.hostAdmin != nil && ctEqual(hostOnly(r.Host), s.cfg.AdminHost) {
 			if s.allow(s.adminLim, w, r) {
 				s.hostAdmin.ServeHTTP(w, r)
@@ -387,6 +417,27 @@ func (s *Server) Public() http.Handler {
 		}
 		s.decoy.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) agentLinkRequest(r *http.Request) bool {
+	if s.agentLink == nil || !hasSecretPrefix(r.URL.Path, s.cfg.AgentLinkPrefix) {
+		return false
+	}
+	rel := strings.TrimPrefix(r.URL.Path, strings.TrimSuffix(s.cfg.AgentLinkPrefix, "/"))
+	return strings.HasPrefix(rel, "/link/") && len(strings.TrimPrefix(rel, "/link/")) > 0 &&
+		!strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
+}
+
+func isWebSocketUpgrade(r *http.Request) bool {
+	if r.Method != http.MethodGet || !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		return false
+	}
+	for _, token := range strings.Split(r.Header.Get("Connection"), ",") {
+		if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+			return true
+		}
+	}
+	return false
 }
 
 // hasSecretPrefix compares the start of path with prefix in constant time.

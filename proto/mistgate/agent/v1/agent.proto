@@ -431,8 +431,8 @@ message Hello {
   // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
-  // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST") and "client-ipv6/1"
-  // (NodeSettings.client_ipv6_disabled).
+  // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
+  // (NodeSettings.client_ipv6_disabled) and "ws-link/1" (signed WebSocket link transport).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -774,6 +774,24 @@ message HelloAck {
   // Panel clock; the agent stores offset = server_time - local_time and applies it to timestamps it sends.
   int64 server_time_unix = 2;
   NodeSettings settings = 3;
+  // The panel supports the signed WebSocket link transport. An agent uses it only when configured with a link URL.
+  bool link_supported = 4;
+}
+
+// Signed WebSocket link handshake. Each message is a separate binary protobuf frame.
+message LinkChallenge {
+  bytes nonce = 1;
+  string audience = 2;
+}
+
+message LinkAuth {
+  string node_id = 1;
+  bytes nonce = 2;
+  bytes signature = 3; // ECDSA P-256 IEEE P1363 r||s
+}
+
+message LinkAccept {
+  bytes signature = 1; // ECDSA P-256 IEEE P1363 r||s
 }
 
 message Ack {

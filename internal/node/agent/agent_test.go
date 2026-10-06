@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -18,6 +19,29 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
+
+func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
+	a := &Agent{engines: map[string]engine.Engine{}}
+	if !slices.Contains(a.capabilities(), "ws-link/1") {
+		t.Fatal("Hello.capabilities does not advertise ws-link/1")
+	}
+}
+
+func TestConfiguredLinkUsesMTLSWhenPanelDoesNotAdvertiseSupport(t *testing.T) {
+	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.LinkURL = "wss://example.com/abcdefghijklmnop" }})
+	h.waitConnected()
+	select {
+	case <-h.panel.connects:
+		t.Fatal("agent reconnected instead of staying on the unadvertised mTLS transport")
+	case <-time.After(150 * time.Millisecond):
+	}
+	if h.a.linkAdvertised.Load() {
+		t.Fatal("panel did not advertise link support")
+	}
+	if h.a.cur.Load() == nil || h.panel.connCount() != 1 {
+		t.Fatalf("agent did not keep its mTLS session: active=%v Connects=%d", h.a.cur.Load() != nil, h.panel.connCount())
+	}
+}
 
 func TestEnrollStoresIdentity(t *testing.T) {
 	panel := newFakePanel(t)

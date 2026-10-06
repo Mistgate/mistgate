@@ -61,9 +61,10 @@ type Meta struct {
 }
 
 type identity struct {
-	meta Meta
-	cert tls.Certificate // Leaf is set
-	ca   *x509.CertPool
+	meta   Meta
+	cert   tls.Certificate // Leaf is set
+	ca     *x509.CertPool
+	caCert *x509.Certificate
 }
 
 func (id *identity) notAfter() time.Time { return id.cert.Leaf.NotAfter }
@@ -349,7 +350,11 @@ func loadIdentity(dir string) (*identity, error) {
 	if !pool.AppendCertsFromPEM(caPEM) {
 		return nil, errors.New("ca.pem holds no certificate")
 	}
-	return &identity{meta: meta, cert: cert, ca: pool}, nil
+	caCert, err := parseOneCert(caPEM)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fileCA, err)
+	}
+	return &identity{meta: meta, cert: cert, ca: pool, caCert: caCert}, nil
 }
 
 // mtlsConfig trusts only the stored panel CA and presents whatever certificate is current at handshake

@@ -66,6 +66,11 @@ type Config struct {
 	Now func() time.Time
 }
 
+type sessionOwner struct {
+	generation uint64
+	cancel     context.CancelCauseFunc
+}
+
 // Fleet is the fleet module.
 type Fleet struct {
 	st  *store.Store
@@ -81,16 +86,18 @@ type Fleet struct {
 	tlsExp time.Time
 
 	mu       sync.Mutex
-	health   Health              // set by SetHealth (health.go); guarded by mu
-	upd      Updates             // set by SetUpdates (update.go); guarded by mu
-	warp     Warp                // set by SetWarp (l3.go); guarded by mu
-	sessions map[string]*session // node id -> the one live stream
-	stuck    map[string]stuckSeq // node id -> the stats batch the database refused last (statsguard.go)
+	health   Health                  // set by SetHealth (health.go); guarded by mu
+	upd      Updates                 // set by SetUpdates (update.go); guarded by mu
+	warp     Warp                    // set by SetWarp (l3.go); guarded by mu
+	sessions map[string]*session     // node id -> the one live agent session
+	owners   map[string]sessionOwner // authenticated streams claim a generation before Hello
+	stuck    map[string]stuckSeq     // node id -> the stats batch the database refused last (statsguard.go)
 
-	kick      chan struct{}
-	enrollLim *failLimiter
-	unit      time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
-	certCheck time.Duration // how often a running stream rechecks its client certificate
+	kick                 chan struct{}
+	enrollLim            *failLimiter
+	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
+	certCheck            time.Duration // how often a running stream rechecks its client certificate
+	linkHandshakeTimeout time.Duration // bounds the signed WebSocket handshake; tests may shorten it
 	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration
@@ -124,12 +131,14 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 	}
 	f := &Fleet{
 		st: st, v: v, reg: reg, cfg: cfg, log: cfg.Log, now: cfg.Now,
-		sessions:  map[string]*session{},
-		stuck:     map[string]stuckSeq{},
-		kick:      make(chan struct{}, 1),
-		enrollLim: newFailLimiter(10, time.Minute),
-		unit:      time.Second,
-		certCheck: 30 * time.Second,
+		sessions:             map[string]*session{},
+		owners:               map[string]sessionOwner{},
+		stuck:                map[string]stuckSeq{},
+		kick:                 make(chan struct{}, 1),
+		enrollLim:            newFailLimiter(10, time.Minute),
+		unit:                 time.Second,
+		certCheck:            30 * time.Second,
+		linkHandshakeTimeout: defaultLinkHandshakeTimeout,
 		// A measurement is about ten seconds and forty at most (the agent's own limit), and the admin's request must be
 		// answered within the panel's 60 s write timeout. The first measurement waits until the node has applied its first
 		// state and settled: it saturates the link for a moment.

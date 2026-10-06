@@ -23,6 +23,7 @@ import (
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	stateDir := fs.String("state-dir", envOr("MISTGATE_NODE_STATE_DIR", defaultStateDir), "state directory")
+	linkURL := fs.String("link-url", envOr("MISTGATE_LINK_URL", ""), "optional signed WebSocket link URL (wss://host/<secret-prefix>)")
 	level := fs.String("log-level", envOr("MISTGATE_LOG_LEVEL", "info"), "debug, info, warn or error")
 	format := fs.String("log-format", envOr("MISTGATE_LOG_FORMAT", "text"), "text or json")
 	if err := fs.Parse(args); err != nil {
@@ -40,7 +41,7 @@ func cmdRun(args []string) int {
 	}
 	log := slog.New(h)
 
-	a, err := newAgent(*stateDir, log)
+	a, err := newAgent(*stateDir, *linkURL, log)
 	if errors.Is(err, agent.ErrNotEnrolled) {
 		log.Error(err.Error())
 		return exitNotEnrolled
@@ -103,13 +104,14 @@ func newAwgPrepare(stateDir string) *awgprep.Controller {
 }
 
 // newAgent wires the agent to the real host and the engines of this build (see wire.go).
-func newAgent(stateDir string, log *slog.Logger) (*agent.Agent, error) {
+func newAgent(stateDir, linkURL string, log *slog.Logger) (*agent.Agent, error) {
 	hooks := &agentHooks{}
 	cfg, engines, err := wire(stateDir, log, hooks)
 	if err != nil {
 		return nil, err
 	}
 	cfg.Log = log
+	cfg.LinkURL = linkURL
 	cfg.Built = buildinfo.BuiltUnix()
 	cfg.Updater = newUpdater(stateDir, log)
 	cfg.UnitGen = unitGen()

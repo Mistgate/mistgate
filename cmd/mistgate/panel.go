@@ -66,6 +66,10 @@ type panel struct {
 // newPanel wires the modules: fleet and access know each other only through the small
 // interfaces and callbacks below, this is the one place that connects them.
 func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelOpts, log *slog.Logger) (*panel, error) {
+	// A configured installation gets this prefix in setup/ensureSecrets. Keep direct in-process panel fixtures usable too.
+	if o.in.LinkPrefix == "" {
+		o.in.LinkPrefix = newSecretPrefix()
+	}
 	reg := builtin.Registry()
 	// Telegram alerts: everything below that has news reports it here; the admin links of the news carry the admin address
 	// only when it is a public one (a separate loopback admin listener is not).
@@ -234,18 +238,20 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	admin = append(admin, integrationHandlers(authSvc)...)
 	// The Instance service is built into httpserver (it is part of the sign-in flow); Auth likewise.
 	srv, err := httpserver.New(httpserver.Config{
-		AdminHost:      o.in.AdminHost,
-		AdminPrefix:    o.in.muxPrefix(),
-		DecoyDir:       o.decoyDir,
-		TrustedOrigins: o.in.RPOrigins,
-		Log:            log,
-		AdminHandlers:  admin,
-		AdminPages:     []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: prov.PageHandler()}},
-		MCP:            mcpEndpoint(authSvc, st, log, tg.PlanWaiting),
-		PublicMounts:   map[string]http.Handler{o.in.SubPrefix: sub},
-		AgentSNI:       o.in.AgentSNI,
-		AgentTLS:       fl.AgentTLSConfig,
-		AgentHandler:   fl.AgentHandler(),
+		AdminHost:        o.in.AdminHost,
+		AdminPrefix:      o.in.muxPrefix(),
+		DecoyDir:         o.decoyDir,
+		TrustedOrigins:   o.in.RPOrigins,
+		Log:              log,
+		AdminHandlers:    admin,
+		AdminPages:       []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: prov.PageHandler()}},
+		MCP:              mcpEndpoint(authSvc, st, log, tg.PlanWaiting),
+		PublicMounts:     map[string]http.Handler{o.in.SubPrefix: sub},
+		AgentSNI:         o.in.AgentSNI,
+		AgentTLS:         fl.AgentTLSConfig,
+		AgentHandler:     fl.AgentHandler(),
+		AgentLinkPrefix:  o.in.LinkPrefix,
+		AgentLinkHandler: fl.LinkHandler(),
 		// Settings -> Domains shows the owner both addresses, read-only.
 		AdminURL: o.in.adminURL(), SubscriptionBase: subBase,
 		// The admin's framed preview of the public user page (session and read role are checked by the server).

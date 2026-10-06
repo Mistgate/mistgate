@@ -154,9 +154,16 @@ Spectrum gRPC (beta, [blog](https://blog.cloudflare.com/grpc-workers/)) is a lat
 depend on it.
 
 Security notes: signature includes node id, audience and a fresh server nonce (no replay, no relay to another panel);
-the DO rejects a connection for a retired node or a revoked key at the handshake; `Renew` rotates the stored public key;
-the agent still pins the panel (for WebSocket: TLS to a public CA name, plus a pinned SPKI or the panel's CA fingerprint
-from the install command, as today).
+the DO rejects a connection for a retired node or a revoked key at the handshake; `Renew` rotates the stored public key.
+
+The panel authenticates itself too (decided 2026-10-06, built in step 6a): the agent adds its own 32-byte nonce to
+`LinkAuth`, and the panel answers `LinkAccept` with a signature by the fleet CA key over
+`"mistgate-panel-link/1\0" + node_id + "\0" + audience + "\0" + nonce_p + nonce_a`. The agent verifies it with the CA
+certificate it already trusts for mTLS, so a panel without the CA key cannot drive a node, whatever TLS certificate it
+shows. Residual risk, accepted: the handshake is not bound to the TLS channel (on the edge Cloudflare terminates TLS, so
+there is no channel to bind to); after the handshake the session's integrity rests on TLS to a publicly trusted name.
+Someone holding a valid certificate for the panel's name and the network path could relay and alter a session. On the
+VPS edition mTLS stays the default and the link is opt-in.
 
 ## 5. Features that cannot run in a Worker move to the nodes (both editions)
 

@@ -26,6 +26,7 @@ const (
 	capTorrentGuard = "torrentguard/1"
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
+	capWSLink     = "ws-link/1"
 	// capUnit3 says the node runs from a systemd unit of generation 3: /dev/net/tun is reachable (the userspace AWG
 	// and WARP backends need it) and ExecStopPost cleans the tunnel interfaces. A node without it keeps working with
 	// the kernel backends and shows the hint "unit_outdated" on the awg_backend doctor check.
@@ -117,7 +118,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}
