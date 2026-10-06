@@ -233,9 +233,10 @@ func TestTheFirstStartMeasuresTheLinkOnceAndStoresItWhileItIsZero(t *testing.T) 
 	answerMeasure(c, measured("940", "871"), nil)
 	within(t, "the capacity", func() bool { return x.capacity() == 871 }) // the slower direction
 	within(t, "the event", func() bool { return x.count(`SELECT count(*) FROM event WHERE code = 'bandwidth_measured'`) == 1 })
-	if n := x.count(`SELECT count(*) FROM audit WHERE action = 'node.bandwidth_auto' AND actor = 'system'`); n != 1 {
-		t.Errorf("%d automatic audit rows, want 1", n)
-	}
+	// the audit row is written after the event: wait for it too
+	within(t, "the audit row", func() bool {
+		return x.count(`SELECT count(*) FROM audit WHERE action = 'node.bandwidth_auto' AND actor = 'system'`) == 1
+	})
 
 	// a reconnect of an active node is not a first start: nobody asks again, even with the capacity back at 0
 	if _, err := x.st.UpdateNode(x.ctx, a.nodeID, store.NodePatch{BandwidthMbps: new(0)}); err != nil {
