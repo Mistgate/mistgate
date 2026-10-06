@@ -834,16 +834,24 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 		delete(sess.logs, reqID)
 		sess.liveMu.Unlock()
 	}()
-	if !sess.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{
-		RequestId: reqID, Sources: m.Sources, TailLines: tail, Follow: m.Follow, FollowMaxSeconds: followMax,
-		MinLevel: agentv1.Severity(m.MinLevel)}}}) {
+	requestAt := f.now().UTC()
+	tr, err := sess.stepCore(ctx, SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
+		RequestID: reqID, Deadline: requestAt.Add(wait), Kind: PendingLog,
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{
+			RequestId: reqID, Sources: m.Sources, TailLines: tail, Follow: m.Follow, FollowMaxSeconds: followMax,
+			MinLevel: agentv1.Severity(m.MinLevel)}}},
+	}}, nil)
+	if err != nil {
 		return errLinkLost
+	}
+	if tr.Close != nil {
+		return sessionCloseError(tr.Close)
 	}
 	cancelReq := func() {
 		select {
 		case <-sess.done:
 		default:
-			sess.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogCancel{LogCancel: &agentv1.LogCancel{RequestId: reqID}}})
+			_, _ = sess.stepCore(ctx, SessionEvent{Kind: EventLogCancel, At: f.now().UTC(), Request: &AdminRequest{RequestID: reqID}}, nil)
 		}
 	}
 	end := func(msg string) error {

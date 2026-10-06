@@ -13,7 +13,6 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -48,7 +47,6 @@ type session struct {
 	f        *Fleet
 	nodeID   string
 	owner    uint64
-	instance string
 	caps     []string // Hello.capabilities: optional features of this agent build (health.go)
 	ctx      context.Context
 	cancel   context.CancelCauseFunc
@@ -56,13 +54,17 @@ type session struct {
 	out      chan *agentv1.ConnectResponse
 	liveness atomic.Int64 // nanoseconds of silence tolerated
 
+	coreMu          sync.Mutex
+	core            *SessionCore
+	coreState       SessionState
+	coreSidecar     SessionSidecar
+	reconcileMu     sync.Mutex
+	autoBandwidthAt time.Time
+
 	// Desired-state bookkeeping: what the agent holds as far as we know. Guarded by desMu, which also
 	// serializes pushes to this node.
-	desMu        sync.Mutex
-	sent         *nodeState
-	sentRev      uint64
-	sentSettings string
-	driftResent  bool
+	desMu sync.Mutex
+	sent  *nodeState
 
 	// Live data shown in the UI. Guarded by liveMu.
 	liveMu    sync.Mutex
@@ -72,28 +74,168 @@ type session struct {
 	online    []onlineSess
 	userDown  map[string]uint64 // bits/s per user, from the newest batch
 	userUp    map[string]uint64
-	lastEnd   int64
 	lastSeen  time.Time
 	drift     bool
 	cmds      map[string]chan *agentv1.CommandResult
 	docs      map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
 	logs      map[string]*logSub
+}
 
-	// Only touched by the stream's own goroutine.
-	ackPending, ackSent uint64
-	lastAck             time.Time
-	lastReject          time.Time         // last stats_rejected event
-	l3                  l3Intake          // what of the AWG / WARP health was persisted last (l3.go)
-	certSeen            map[string]string // inbound id -> "pin/notAfter" last written by certStats
+func (s *session) syncCoreFields() {
+	state, sidecar := s.coreState, s.coreSidecar
+	s.liveness.Store(state.LivenessNanos)
+	s.desMu.Lock()
+	s.sent = sidecar.SentDesired
+	s.desMu.Unlock()
+	s.liveMu.Lock()
+	s.drift = state.Drift
+	s.lastSeen = timeFromUnixNano(state.LastSeenUnixNano)
+	s.liveMu.Unlock()
+}
+
+func (s *session) stepCore(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
+	s.coreMu.Lock()
+	defer s.coreMu.Unlock()
+	if s.core == nil {
+		s.core = NewSessionCore(s.f)
+	}
+	tr, err := s.core.Step(ctx, s.coreState, s.coreSidecar, event)
+	if err != nil {
+		// Step may have mutated maps shared with the current sidecar, so any error ends this session.
+		if s.cancel != nil {
+			s.cancel(err)
+		}
+		return Transition{}, err
+	}
+	s.coreState, s.coreSidecar = tr.State, tr.Sidecar
+	s.syncCoreFields()
+	if tr.Close == nil {
+		err = s.dispatchCoreTransition(ctx, &tr, pc)
+		if err != nil && s.cancel != nil {
+			s.cancel(err)
+		} else {
+			s.coreState, s.coreSidecar = tr.State, tr.Sidecar
+			s.syncCoreFields()
+		}
+	}
+	return tr, err
+}
+
+func (s *session) stepDesired(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
+	s.reconcileMu.Lock()
+	defer s.reconcileMu.Unlock()
+	prepared, err := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
+	if err != nil {
+		return Transition{}, err
+	}
+	event.Prepared = prepared
+	return s.stepCore(ctx, event, pc)
+}
+
+func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition, pc *peerCert) error {
+	var warpEffects []SessionEffect
+	for _, effect := range tr.Effects {
+		if effect.Kind == EffectWarpAttention {
+			warpEffects = append(warpEffects, effect)
+			continue
+		}
+		if err := s.dispatchCoreEffect(ctx, tr, effect, pc); err != nil {
+			return err
+		}
+	}
+	// Sent state is recorded before enqueue; queue overflow cancels the session and teardown discards that state.
+	var frameErr error
+	for _, frame := range tr.Frames {
+		if !s.enqueue(frame) {
+			frameErr = errAgentQueueFull
+			break
+		}
+	}
+	for _, effect := range warpEffects {
+		if err := s.dispatchCoreEffect(ctx, tr, effect, pc); err != nil {
+			if frameErr == nil {
+				frameErr = err
+			}
+		}
+	}
+	return frameErr
+}
+
+func (s *session) dispatchCoreEffect(ctx context.Context, tr *Transition, effect SessionEffect, pc *peerCert) error {
+	switch effect.Kind {
+	case EffectSessionStarted:
+		if effect.Started != nil {
+			started := effect.Started
+			s.f.connectEvents(ctx, s.nodeID, started.Previous, started.BootAt, started.Now)
+			if started.AutoMeasure {
+				s.autoBandwidthAt = s.f.now().UTC()
+				deadline := s.autoBandwidthAt.Add(s.f.measureDelay)
+				s.coreState.AutoBandwidthUnixNano = deadline.UnixNano()
+				s.f.autoMeasureBandwidth(s, deadline)
+			}
+		}
+	case EffectAutoBandwidth:
+		s.f.runAutoMeasureBandwidth(s)
+	case EffectLiveUpdate:
+		if effect.Live != nil {
+			// Health-store writes finish before the live snapshot becomes visible; its final contents are unchanged.
+			s.liveMu.Lock()
+			s.metrics, s.metricsAt = effect.Live.Metrics, effect.Live.MetricsAt
+			s.health, s.online = effect.Live.Health, effect.Live.Online
+			s.userDown, s.userUp = effect.Live.UserDown, effect.Live.UserUp
+			s.liveMu.Unlock()
+		}
+	case EffectUsage:
+		if s.f.cfg.OnUsage != nil {
+			s.f.cfg.OnUsage(ctx, effect.Users)
+		}
+	case EffectCommandResult:
+		s.deliverCommand(effect.CommandResult)
+	case EffectDoctorReport:
+		s.f.onDoctorReport(ctx, s, effect.DoctorReport)
+	case EffectLogChunk:
+		s.deliverLog(effect.LogChunk)
+	case EffectAwgPrepare:
+		if effect.Event != nil {
+			s.f.onAwgPrepareEvent(ctx, s.nodeID, *effect.Event)
+		}
+	case EffectCheckCertificate:
+		if pc != nil {
+			if err := s.f.recheckCert(ctx, *pc); err != nil {
+				return connect.NewError(connect.CodeUnauthenticated, err)
+			}
+		}
+	case EffectWarpAttention:
+		w := s.f.warpModule()
+		if w == nil {
+			return nil
+		}
+		if effect.WarpReason == warpReasonRefresh {
+			now := s.f.now().UTC()
+			if !tr.Sidecar.L3.warpAsk.IsZero() && now.Sub(tr.Sidecar.L3.warpAsk) < warpRefreshGap {
+				return nil
+			}
+			tr.Sidecar.L3.warpAsk = now
+		}
+		s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
+	case EffectDesiredReconcile:
+		go func() {
+			if err := s.f.reconcile(s.ctx, s, effect.ReconcileMode); err != nil {
+				s.f.log.Warn(effect.ErrorLog, "node", s.nodeID, "err", err)
+			}
+		}()
+	}
+	return nil
+}
+
+func timeFromUnixNano(nanos int64) time.Time {
+	if nanos == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, nanos).UTC()
 }
 
 func (s *session) livenessDur() time.Duration { return time.Duration(s.liveness.Load()) }
-
-func (s *session) touch(now time.Time) {
-	s.liveMu.Lock()
-	s.lastSeen = now
-	s.liveMu.Unlock()
-}
 
 // enqueue queues a message for the stream goroutine. A full queue means the agent does not keep up: drop the stream
 // (it reconnects and resyncs) rather than block the fleet.
@@ -104,20 +246,6 @@ func (s *session) enqueue(m *agentv1.ConnectResponse) bool {
 	default:
 		s.cancel(connect.NewError(connect.CodeResourceExhausted, errors.New("agent does not keep up")))
 		return false
-	}
-}
-
-func (s *session) markAck(seq uint64, now time.Time) {
-	s.ackPending = max(s.ackPending, seq)
-	if now.Sub(s.lastAck) >= ackEvery {
-		s.flushAck(now)
-	}
-}
-
-func (s *session) flushAck(now time.Time) {
-	if s.ackPending > s.ackSent {
-		s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Ack{Ack: &agentv1.Ack{UpToSeq: s.ackPending}}})
-		s.ackSent, s.lastAck = s.ackPending, now
 	}
 }
 
@@ -221,6 +349,15 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		}
 	}
 
+	core := NewSessionCore(f)
+	opened, err := core.Step(sctx, SessionState{Version: sessionStateVersion, NodeID: id, OwnerGeneration: owner}, SessionSidecar{},
+		SessionEvent{Kind: EventOpen, At: f.now().UTC()})
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	state, sidecar := opened.State, opened.Sidecar
+	helloTimer := time.NewTimer(helloTimeout)
+	defer helloTimer.Stop()
 	var first *agentv1.ConnectRequest
 	select {
 	case m, ok := <-msgs:
@@ -228,55 +365,43 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			return endErr()
 		}
 		first = m
-	case <-time.After(helloTimeout):
+	case <-helloTimer.C:
+		deadline := timeFromUnixNano(state.HelloDeadlineUnixNano)
+		tr, alarmErr := core.Step(sctx, state, sidecar, SessionEvent{Kind: EventAlarm, Alarm: AlarmHello, At: deadline})
+		if alarmErr == nil && tr.Close != nil {
+			return sessionCloseError(tr.Close)
+		}
 		return connect.NewError(connect.CodeDeadlineExceeded, errors.New("no Hello"))
 	case <-sctx.Done():
 		return errOrCause(sctx)
 	}
-	hello := first.GetHello()
-	if hello == nil {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the first message must be Hello"))
-	}
-	if hello.ApiVersion != APIVersion {
-		return connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("unsupported api_version %d, this panel serves %d..%d", hello.ApiVersion, APIVersion, APIVersion))
-	}
-	if hello.InstanceId == "" || len(hello.InstanceId) > 64 {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("instance_id is required (random per agent process, at most 64 bytes)"))
-	}
-	if !f.ownsSession(id, owner) {
-		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
-	}
-	if hello.NodeId != "" && hello.NodeId != id {
-		f.log.Warn("hello names another node than the certificate", "cert_node", id)
-	}
 
-	now := f.now().UTC()
-	prev, acked, err := f.st.NodeHello(ctx, id, helloInfo(hello), now)
-	if errors.Is(err, store.ErrNodeRetired) {
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node retired"))
+	tr, stepErr := core.Step(sctx, state, sidecar, SessionEvent{Kind: EventHello, At: f.now().UTC(), Frame: first})
+	if tr.Close != nil && tr.State.InstanceID == "" {
+		return sessionCloseError(tr.Close)
 	}
-	if err != nil {
-		f.log.Error("hello", "node", id, "err", err)
+	if stepErr != nil && tr.State.InstanceID == "" {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	node, err := f.st.Node(ctx, id)
-	if err != nil {
+	if tr.State.InstanceID == "" {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 
-	s := &session{f: f, nodeID: id, owner: owner, instance: hello.InstanceId, ctx: sctx, cancel: cancel,
+	s := &session{f: f, nodeID: id, owner: owner, caps: slices.Clone(tr.State.Capabilities), ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		userDown: map[string]uint64{}, userUp: map[string]uint64{},
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
-		logs: map[string]*logSub{}, lastSeen: now, caps: capabilities(hello)}
-	s.liveness.Store(int64(time.Duration(node.LivenessTimeoutS) * f.unit))
+		logs: map[string]*logSub{}, core: core, coreState: tr.State, coreSidecar: tr.Sidecar}
+	s.coreMu.Lock()
+	s.syncCoreFields()
 	if !f.register(s) {
+		s.coreMu.Unlock()
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
 	}
 	defer func() {
 		cancel(nil)
 		close(s.done)
+		_, _ = s.stepCore(sctx, SessionEvent{Kind: EventDisconnected, At: f.now().UTC()}, &pc)
 		if f.unregister(s) {
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer dcancel()
@@ -288,39 +413,61 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			}
 		}
 	}()
-
-	f.connectEvents(ctx, id, prev, helloInfo(hello).BootAt, now)
-	if prev.State == "pending" && node.BandwidthMbps == 0 { // the first start after the enrollment: measure the link once
-		f.autoMeasureBandwidth(s)
+	helloErr := s.dispatchCoreTransition(sctx, &tr, &pc)
+	s.coreMu.Unlock()
+	if helloErr != nil {
+		f.log.Error("hello response", "node", id, "err", helloErr)
+		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
-		AckedSeq: acked, ServerTimeUnix: now.Unix(), Settings: nodeSettings(node, s.caps), LinkSupported: true}}})
-	if err := f.reconcile(sctx, s, reconcileConnect, hello); err != nil {
+	// Core-mediated admin frames wait until HelloAck is queued; Retire remains a direct send.
+	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventInitialReconcile, At: f.now().UTC(), Frame: first,
+		AutoBandwidthAt: s.autoBandwidthAt}, &pc)
+	if err != nil {
 		f.log.Error("initial desired state", "node", id, "err", err)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	if tr.Close != nil {
+		return sessionCloseError(tr.Close)
 	}
 
 	live := time.NewTimer(s.livenessDur())
 	defer live.Stop()
 	ackT := time.NewTicker(ackEvery)
 	defer ackT.Stop()
-	// A certificate is checked at the handshake only; a stream can live for weeks. Close it when its
-	// certificate expires or is revoked (Renew schedules the old one for revocation, re-enroll and retire
-	// revoke at once): the agent reconnects with its current certificate, or is locked out if it has none.
+	// These tickers retain the VPS loop's existing phase. Each firing is fed to the core as an alarm.
 	certT := time.NewTicker(f.certCheck)
 	defer certT.Stop()
+	_, _ = s.stepCore(sctx, SessionEvent{Kind: EventTimersStarted, At: f.now().UTC()}, &pc)
 	for {
 		select {
 		case <-sctx.Done():
+			var ce *connect.Error
+			if errors.As(context.Cause(sctx), &ce) && ce.Code() == connect.CodeAborted {
+				_, _ = s.stepCore(sctx, SessionEvent{Kind: EventOwnerSuperseded, At: f.now().UTC()}, &pc)
+			}
 			return errOrCause(sctx)
 		case <-certT.C:
-			if err := f.recheckCert(ctx, pc); err != nil {
-				return connect.NewError(connect.CodeUnauthenticated, err)
+			_, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmCertificate, At: f.now().UTC()}, &pc)
+			if err != nil {
+				return err
 			}
 		case <-live.C:
-			return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("no message from the agent for %d s", int(s.livenessDur().Seconds())))
+			s.coreMu.Lock()
+			deadline := s.coreState.LivenessDeadlineUnixNano
+			s.coreMu.Unlock()
+			at := timeFromUnixNano(deadline)
+			if at.IsZero() {
+				at = f.now().UTC()
+			}
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmLiveness, At: at}, &pc)
+			if err != nil {
+				return err
+			}
+			if tr.Close != nil {
+				return sessionCloseError(tr.Close)
+			}
 		case <-ackT.C:
-			s.flushAck(f.now())
+			_, _ = s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmAck, At: f.now().UTC()}, &pc)
 		case m := <-s.out:
 			// Only this goroutine writes to the stream (after the handler returns nobody may).
 			if err := stream.Send(m); err != nil {
@@ -330,13 +477,45 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			if !ok {
 				return endErr()
 			}
-			s.touch(f.now())
 			live.Reset(s.livenessDur())
-			if err := f.handle(sctx, s, m); err != nil {
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now().UTC(), Frame: m}, &pc)
+			if errors.Is(err, errAgentQueueFull) {
+				continue
+			}
+			if err != nil {
 				return err
+			}
+			if tr.Close != nil {
+				return sessionCloseError(tr.Close)
 			}
 		}
 	}
+}
+
+var errAgentQueueFull = errors.New("agent queue full")
+
+func sessionCloseError(close *SessionClose) error {
+	if close == nil {
+		return nil
+	}
+	code := connect.CodeInternal
+	switch close.Class {
+	case CloseInvalidArgument:
+		code = connect.CodeInvalidArgument
+	case CloseFailedPrecondition:
+		code = connect.CodeFailedPrecondition
+	case CloseUnauthenticated:
+		code = connect.CodeUnauthenticated
+	case CloseConflict:
+		code = connect.CodeAborted
+	case CloseDeadline:
+		code = connect.CodeDeadlineExceeded
+	case CloseCanceled:
+		code = connect.CodeCanceled
+	case CloseInternal:
+		code = connect.CodeInternal
+	}
+	return connect.NewError(code, errors.New(close.Reason))
 }
 
 // helloInfo takes what the node says about itself. Every string is bounded: they are stored and shown in the UI.
@@ -386,28 +565,6 @@ func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow
 	}
 }
 
-func (f *Fleet) handle(ctx context.Context, s *session, m *agentv1.ConnectRequest) error {
-	switch {
-	case m.GetHello() != nil:
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("unexpected Hello"))
-	case m.GetStats() != nil:
-		return f.onStats(ctx, s, m.Seq, m.GetStats())
-	case m.GetEvent() != nil:
-		return f.onEvent(ctx, s, m.Seq, m.GetEvent())
-	case m.GetApplyResult() != nil:
-		f.onApply(ctx, s, m.GetApplyResult())
-	case m.GetCommandResult() != nil:
-		s.deliverCommand(m.GetCommandResult())
-	case m.GetLogChunk() != nil:
-		s.deliverLog(m.GetLogChunk())
-	case m.GetDoctorReport() != nil:
-		f.onDoctorReport(ctx, s, m.GetDoctorReport())
-	}
-	return nil // Pong and unknown messages only count as liveness
-}
-
-// bucketHour picks the hourly bucket of a batch from its (corrected) end time: timestamps more than 5 min
-// ahead are clamped to the receive time, batches older than 48 h are attributed to the receive hour.
 func bucketHour(end, now time.Time) (hour int64, stale bool) {
 	t := end
 	switch {
@@ -420,194 +577,6 @@ func bucketHour(end, now time.Time) (hour int64, stale bool) {
 	return h - h%3600, stale
 }
 
-func (f *Fleet) onStats(ctx context.Context, s *session, seq uint64, st *agentv1.StatsBatch) error {
-	now := f.now().UTC()
-	hour, stale := bucketHour(time.Unix(st.IntervalEndUnix, 0), now)
-	g := f.guardStats(st)
-	if g.rejected > 0 {
-		f.rejectStats(s, g, now)
-	}
-	in := store.FleetStatsIn{NodeID: s.nodeID, Instance: s.instance, Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic}
-	for i, se := range st.Sessions {
-		if i == maxStatsDeltas {
-			break
-		}
-		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId})
-	}
-	out, err := f.st.IngestStats(ctx, in)
-	if err != nil {
-		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
-		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
-		// refused every time, and resending it would wedge this node's stats for good: drop it then.
-		f.log.Error("ingest stats", "node", s.nodeID, "err", err)
-		if !f.stuckStats(s, seq) {
-			return connect.NewError(connect.CodeInternal, errors.New("internal error"))
-		}
-		f.log.Error("stats batch refused by the database twice, dropped", "node", s.nodeID, "seq", seq)
-		f.event(ctx, 3, "stats_dropped", s.nodeID, map[string]string{"reason": "database_refused", "seq": fmt.Sprint(seq)})
-		if seq != 0 {
-			if err := f.st.SkipSeq(ctx, s.nodeID, s.instance, seq, now); err != nil {
-				return connect.NewError(connect.CodeInternal, errors.New("internal error"))
-			}
-			s.markAck(seq, now)
-		}
-		return nil
-	}
-	f.unstickStats(s)
-	if !out.Duplicate {
-		s.applySnapshot(st, g.traffic, now, out.Refs)
-		f.l3Stats(ctx, s, st, now) // AwgHealth of the inbounds, WarpHealth of the node
-		f.certStats(ctx, s, st, now)
-		f.touchAwgDevices(ctx, st, out.Refs, now)
-		if out.Skipped > 0 {
-			f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", s.nodeID, "count", out.Skipped)
-		}
-		if stale {
-			f.event(ctx, 2, "stats_stale", s.nodeID, map[string]string{"age_hours": fmt.Sprint(int(now.Sub(time.Unix(st.IntervalEndUnix, 0)).Hours()))})
-		}
-		if f.cfg.OnUsage != nil && len(out.Users) > 0 {
-			f.cfg.OnUsage(ctx, out.Users) // the access module recomputes quota status and calls StateChanged
-		}
-	}
-	if seq != 0 {
-		s.markAck(seq, now)
-	}
-	return nil
-}
-
-// applySnapshot replaces the live view with the newest batch (sessions are an absolute snapshot).
-func (s *session) applySnapshot(st *agentv1.StatsBatch, traffic []store.FleetTraffic, now time.Time, refs map[string]store.FleetCredRef) {
-	s.liveMu.Lock()
-	defer s.liveMu.Unlock()
-	// An end time from the future would make every later (honest) batch look "older" and freeze the live
-	// view: clamp it like the bucket hour.
-	end := st.IntervalEndUnix
-	if end > now.Add(maxFuture).Unix() {
-		end = now.Unix()
-	}
-	if end < s.lastEnd {
-		return // an older batch resent after a reconnect
-	}
-	s.lastEnd = end
-	if st.Host != nil {
-		s.metrics = st.Host
-		s.metricsAt = now
-	}
-	s.health = st.Health
-	s.online = s.online[:0]
-	for i, se := range st.Sessions {
-		ref, ok := refs[se.CredId]
-		if !ok || i == maxStatsDeltas {
-			continue
-		}
-		since := time.Unix(se.ConnectedAtUnix, 0).UTC()
-		if se.ConnectedAtUnix <= 0 || since.After(now) {
-			since = now
-		}
-		s.online = append(s.online, onlineSess{userID: ref.UserID, deviceID: ref.DeviceID, protocol: ref.Protocol,
-			inboundID: se.InboundId, remoteIP: clip(se.RemoteIp, 64), since: since})
-	}
-	// "Current speed" is the average over the newest batch (about 10 s), not a 60 s window.
-	secs := uint64(min(max(1, end-st.IntervalStartUnix), int64(maxBatchSpan/time.Second)))
-	s.userDown, s.userUp = map[string]uint64{}, map[string]uint64{}
-	for _, d := range traffic { // only what passed the sanity check, so the speed cannot be faked either
-		if ref, ok := refs[d.CredID]; ok {
-			s.userDown[ref.UserID] += d.Down * 8 / secs
-			s.userUp[ref.UserID] += d.Up * 8 / secs
-		}
-	}
-}
-
-func (f *Fleet) onEvent(ctx context.Context, s *session, seq uint64, ev *agentv1.Event) error {
-	now := f.now().UTC()
-	t := time.Unix(ev.TimeUnix, 0).UTC()
-	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) {
-		t = now
-	}
-	sev := int(ev.Severity)
-	if sev < 1 || sev > 3 {
-		sev = 1
-	}
-	code := ev.Code
-	if code == "" {
-		code = "agent_event"
-	}
-	row := store.EventRow{Time: t, Severity: sev, Code: store.Clip(code, 64), InboundID: store.Clip(ev.InboundId, 64)}
-	if row.Code == "torrent_attempt" {
-		row.Params = map[string]string{}
-		if userID := store.Clip(ev.Params["user_id"], 256); userID != "" {
-			row.Params["user_id"] = userID
-			if user, err := f.st.Access().User(ctx, userID); err == nil && user.Name != "" {
-				row.Params["user_name"] = store.Clip(user.Name, 256)
-			}
-		}
-		// This event has a fixed, non-secret contract. Do not persist arbitrary params such as a credential by mistake.
-		// Nor any address: events reach helpers, API tokens and MCP, while a client's address is for the owner alone
-		// (live logs), and the destination would say where a person went. The user, the inbound and the protocol stay.
-		for _, k := range []string{"protocol", "torrent_protocol"} {
-			if v := ev.Params[k]; v != "" {
-				row.Params[k] = store.Clip(v, 256)
-			}
-		}
-	} else if len(ev.Params) > 0 {
-		row.Params = map[string]string{}
-		for k, v := range ev.Params {
-			if len(row.Params) == maxEventParam {
-				break
-			}
-			row.Params[store.Clip(k, 64)] = store.Clip(v, 256)
-		}
-	}
-	dup, err := f.st.IngestEvent(ctx, s.nodeID, s.instance, seq, now, row)
-	if err != nil {
-		f.log.Error("ingest event", "node", s.nodeID, "err", err)
-		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
-	}
-	if !dup && row.Code == "update_committed" {
-		f.recordCommit(ctx, s.nodeID, row)
-	}
-	if !dup {
-		f.onAwgPrepareEvent(ctx, s.nodeID, row) // the build of the AmneziaWG kernel module (awgprep.go)
-	}
-	if seq != 0 {
-		s.markAck(seq, now)
-	}
-	f.onWarpEvent(s, ev) // a node that asks the panel to look at its WARP account (l3.go)
-	return nil
-}
-
-// maxCertLife bounds the expiry an agent may report: the self-signed certificates the panel makes live 10 years.
-const maxCertLife = 11 * 365 * 24 * time.Hour
-
-// certStats keeps the certificate each inbound serves, as the stats stream reports it: an ACME certificate is issued after
-// the ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
-// (it ends up in subscriptions of self-signed inbounds); a database failure is logged, the next batch tries again.
-// An expiry beyond maxCertLife is not believed (the health check would never warn): the stored value stays.
-func (f *Fleet) certStats(ctx context.Context, s *session, st *agentv1.StatsBatch, now time.Time) {
-	for _, h := range st.Health {
-		if h.CertPinSha256 == "" || h.CertNotAfterUnix <= 0 || h.CertNotAfterUnix > now.Add(maxCertLife).Unix() {
-			continue
-		}
-		pin, ok := protocols.NormalizePin(h.CertPinSha256)
-		if !ok {
-			continue
-		}
-		key := pin + "/" + fmt.Sprint(h.CertNotAfterUnix)
-		if s.certSeen[h.InboundId] == key {
-			continue
-		}
-		if err := f.st.SetInboundCert(ctx, s.nodeID, h.InboundId, pin, time.Unix(h.CertNotAfterUnix, 0).UTC(), now); err != nil {
-			f.log.Warn("store inbound certificate", "node", s.nodeID, "inbound", h.InboundId, "err", err)
-			continue
-		}
-		if s.certSeen == nil {
-			s.certSeen = map[string]string{}
-		}
-		s.certSeen[h.InboundId] = key
-	}
-}
-
-// clip bounds text that comes from a node on a rune boundary and as valid UTF-8 (see store.Clip).
 func clip(s string, n int) string { return store.Clip(s, n) }
 
 func runState(s agentv1.InboundRunState) string {
@@ -622,79 +591,6 @@ func runState(s agentv1.InboundRunState) string {
 
 // onApply records an ApplyResult and reacts: BASE_MISMATCH -> full resend; a hash that differs from what
 // was sent -> state_drift event and one full resend (a second drift right after stays as an error event).
-func (f *Fleet) onApply(ctx context.Context, s *session, r *agentv1.ApplyResult) {
-	switch r.Status {
-	case agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH:
-		f.log.Info("agent reports base mismatch, resending full state", "node", s.nodeID, "revision", r.Revision)
-		if err := f.reconcile(ctx, s, reconcileFull, nil); err != nil {
-			f.log.Warn("full resend", "node", s.nodeID, "err", err)
-		}
-		return
-	case agentv1.ApplyStatus_APPLY_STATUS_REJECTED:
-		f.event(ctx, 3, "apply_rejected", s.nodeID, map[string]string{"revision": fmt.Sprint(r.Revision), "error": store.Clip(r.Error, 256)})
-		return
-	case agentv1.ApplyStatus_APPLY_STATUS_APPLIED, agentv1.ApplyStatus_APPLY_STATUS_PARTIAL:
-	default:
-		return
-	}
-	var in []store.InboundApplied
-	for _, ir := range r.Inbounds {
-		ia := store.InboundApplied{ID: ir.InboundId, State: runState(ir.State), Error: clip(ir.Error, 512), SpecHash: clip(ir.SpecHash, 128)}
-		if ir.CertPinSha256 != "" {
-			// The pin ends up in every subscription of the inbound: only a real SHA-256 gets there.
-			if pin, ok := protocols.NormalizePin(ir.CertPinSha256); ok {
-				ia.CertPin = pin
-			} else {
-				f.log.Warn("node reported a malformed certificate pin, ignored", "node", s.nodeID, "inbound", ir.InboundId)
-			}
-		}
-		if ir.CertNotAfterUnix > 0 {
-			ia.CertNotAfter = time.Unix(ir.CertNotAfterUnix, 0).UTC()
-		}
-		in = append(in, ia)
-	}
-	s.desMu.Lock() // the inbounds this agent was not sent are failed, with the reason, so the node page says why
-	if s.sent != nil {
-		in = append(in, withheldApplied(s.sent.withheld)...)
-	}
-	s.desMu.Unlock()
-	if err := f.st.NodeApplied(ctx, s.nodeID, r.Revision, r.StateHash, in, f.now().UTC()); err != nil {
-		f.log.Warn("record apply result", "node", s.nodeID, "err", err)
-	}
-	s.certSeen = nil // the result just overwrote the stored certificate: let the next stats batch restore it
-	if r.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED {
-		return // a failed inbound explains a hash difference; the node page shows the failure
-	}
-	s.desMu.Lock()
-	if s.sent == nil || r.Revision != s.sentRev { // stale answer: a newer state is on its way
-		s.desMu.Unlock()
-		return
-	}
-	match := r.StateHash == s.sent.hash
-	resend := false
-	switch {
-	case match:
-		s.driftResent = false
-		s.liveMu.Lock()
-		s.drift = false
-		s.liveMu.Unlock()
-	case !s.driftResent:
-		s.driftResent, resend = true, true
-		f.event(ctx, 2, "state_drift", s.nodeID, map[string]string{"revision": fmt.Sprint(r.Revision)})
-	default:
-		s.liveMu.Lock()
-		s.drift = true
-		s.liveMu.Unlock()
-		f.event(ctx, 3, "state_drift", s.nodeID, map[string]string{"revision": fmt.Sprint(r.Revision), "persists": "true"})
-	}
-	s.desMu.Unlock()
-	if resend {
-		if err := f.reconcile(ctx, s, reconcileFull, nil); err != nil {
-			f.log.Warn("full resend after drift", "node", s.nodeID, "err", err)
-		}
-	}
-}
-
 type reconcileMode int
 
 const (
@@ -736,71 +632,14 @@ func settingsSig(s *agentv1.NodeSettings) string {
 
 // reconcile computes the node's desired state and sends what the agent lacks. Revisions are per node,
 // strictly increasing and persisted; every message that is sent gets a fresh one.
-func (f *Fleet) reconcile(ctx context.Context, s *session, mode reconcileMode, hello *agentv1.Hello) error {
-	s.desMu.Lock()
-	defer s.desMu.Unlock()
-	node, err := f.st.Node(ctx, s.nodeID)
+func (f *Fleet) reconcile(ctx context.Context, s *session, mode reconcileMode) error {
+	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now().UTC(), Mode: mode}, nil)
 	if err != nil {
 		return err
 	}
-	if node.State == "retired" {
-		return nil // RetireNode closes the stream
+	if tr.Close != nil {
+		return sessionCloseError(tr.Close)
 	}
-	s.liveness.Store(int64(time.Duration(node.LivenessTimeoutS) * f.unit))
-	want, err := f.buildState(ctx, node, s.caps)
-	if err != nil {
-		return err
-	}
-	settings := nodeSettings(node, s.caps)
-	sig := settingsSig(settings)
-	if len(want.withheld) > 0 {
-		// Nothing is sent for these, so no ApplyResult will say they failed (onApply does it for the ones that are there).
-		if err := f.st.FailWithheldInbounds(ctx, node.ID, want.withheld, withheldReason, f.now().UTC()); err != nil {
-			f.log.Warn("mark withheld inbounds", "node", node.ID, "err", err)
-		}
-	}
-
-	if mode == reconcileConnect {
-		if hello.AppliedStateHash != "" && hello.AppliedStateHash == want.hash && hello.AppliedRevision > 0 {
-			// The agent already runs exactly this state (restored from disk); nothing to send.
-			s.sent, s.sentRev, s.sentSettings = want, hello.AppliedRevision, sig
-			rev := max(node.DesiredRevision, hello.AppliedRevision)
-			return f.st.NodeDesired(ctx, node.ID, rev, want.hash)
-		}
-		mode = reconcileFull
-	}
-	if s.sent == nil && mode == reconcileChange {
-		return nil // the connect-time sync has not run yet and will build the current state itself
-	}
-	if s.sent == nil || s.sentRev == 0 {
-		mode = reconcileFull
-	}
-	// A delta cannot say "remove WARP" (absence in a delta means "unchanged"): an account that is gone goes as a full state.
-	if mode == reconcileChange && s.sent.warp != nil && want.warp == nil {
-		mode = reconcileFull
-	}
-	if mode == reconcileChange && want.hash == s.sent.hash && sig == s.sentSettings {
-		return nil
-	}
-	rev := max(node.DesiredRevision, s.sentRev) + 1
-	ds := &agentv1.DesiredState{Revision: rev, StateHash: want.hash, Settings: settings}
-	if mode == reconcileFull {
-		ds.Inbounds = fullInbounds(want)
-		ds.Warp = warpProto(want.warp) // absent in a full state = "this node has no WARP"
-	} else {
-		ds.BaseRevision = s.sentRev
-		ds.Inbounds, ds.RemovedInboundIds = diffState(s.sent, want)
-		if !sameWarp(s.sent.warp, want.warp) { // present replaces the whole configuration; (nil is handled above: full state)
-			ds.Warp = warpProto(want.warp)
-		}
-	}
-	if err := f.st.NodeDesired(ctx, node.ID, rev, want.hash); err != nil {
-		return err
-	}
-	if !s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_DesiredState{DesiredState: ds}}) {
-		return errors.New("agent queue full")
-	}
-	s.sent, s.sentRev, s.sentSettings = want, rev, sig
 	return nil
 }
 
@@ -823,8 +662,15 @@ func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(
 		delete(s.cmds, id)
 		s.liveMu.Unlock()
 	}()
-	if !s.enqueue(build(id)) {
+	requestAt := s.f.now().UTC()
+	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
+		RequestID: id, Deadline: requestAt.Add(wait), Frame: build(id), Kind: PendingCommand,
+	}}, nil)
+	if err != nil {
 		return nil, errLinkLost
+	}
+	if tr.Close != nil {
+		return nil, sessionCloseError(tr.Close)
 	}
 	t := time.NewTimer(wait)
 	defer t.Stop()

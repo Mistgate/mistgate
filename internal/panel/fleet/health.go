@@ -111,9 +111,17 @@ func (f *Fleet) RunDoctor(ctx context.Context, nodeID string, checks []string, w
 		delete(s.docs, id)
 		s.liveMu.Unlock()
 	}()
-	if !s.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{
-		RunDoctor: &agentv1.RunDoctor{RequestId: id, Checks: checks}}}) {
+	requestAt := f.now().UTC()
+	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
+		RequestID: id, Deadline: requestAt.Add(wait), Kind: PendingDoctor,
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{
+			RunDoctor: &agentv1.RunDoctor{RequestId: id, Checks: checks}}},
+	}}, nil)
+	if err != nil {
 		return nil, errLinkLost
+	}
+	if tr.Close != nil {
+		return nil, sessionCloseError(tr.Close)
 	}
 	t := time.NewTimer(wait)
 	defer t.Stop()

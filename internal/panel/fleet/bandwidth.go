@@ -135,18 +135,35 @@ func (s nodeService) MeasureBandwidth(ctx context.Context, req *connect.Request[
 // slower direction if the capacity is still 0 by then. A run without an upload figure stores nothing and leaves a warning
 // event (the download alone would overstate an asymmetric link). An agent without the capability is skipped without a word;
 // a failure is only logged: the admin can still press the button. The wait ends with the node's stream, so a node that drops is not asked later.
-func (f *Fleet) autoMeasureBandwidth(s *session) {
+func (f *Fleet) autoMeasureBandwidth(s *session, deadline time.Time) {
 	if !s.can(capBandwidth) {
 		return
 	}
+	delay := f.measureDelay
+	if !deadline.IsZero() {
+		delay = deadline.Sub(f.now().UTC())
+		if delay < 0 {
+			delay = 0
+		}
+	}
 	go func() {
-		t := time.NewTimer(f.measureDelay)
+		t := time.NewTimer(delay)
 		defer t.Stop()
 		select {
 		case <-t.C:
 		case <-s.done:
 			return
 		}
+		at := deadline.UTC()
+		if at.IsZero() {
+			at = f.now().UTC()
+		}
+		_, _ = s.stepCore(s.ctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmAutoBandwidth, At: at}, nil)
+	}()
+}
+
+func (f *Fleet) runAutoMeasureBandwidth(s *session) {
+	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		go func() {

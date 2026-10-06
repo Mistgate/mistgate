@@ -144,55 +144,6 @@ func (f *Fleet) touchAwgDevices(ctx context.Context, st *agentv1.StatsBatch, ref
 	}
 }
 
-// l3Stats stores the AWG health of the inbounds and the WARP health of the node from a stats batch (the live view of the
-// stream is replaced by applySnapshot). A failure to write is logged and never fails the batch: health is a snapshot, the
-// next batch replaces it.
-func (f *Fleet) l3Stats(ctx context.Context, s *session, st *agentv1.StatsBatch, now time.Time) {
-	for _, h := range st.Health {
-		if h.Awg == nil {
-			continue
-		}
-		if s.l3.awg == nil {
-			s.l3.awg = map[string]*healthMemo[*agentv1.AwgHealth]{}
-		}
-		m := s.l3.awg[h.InboundId]
-		if m == nil {
-			m = &healthMemo[*agentv1.AwgHealth]{}
-			s.l3.awg[h.InboundId] = m
-		}
-		if !m.due(h.Awg, now, nil) {
-			continue
-		}
-		b, err := protojson.Marshal(h.Awg)
-		if err != nil {
-			continue
-		}
-		if err := f.st.SetInboundAwgHealth(ctx, s.nodeID, h.InboundId, string(b), now); err != nil {
-			f.log.Warn("store awg health", "node", s.nodeID, "inbound", h.InboundId, "err", err)
-		}
-	}
-	w := f.warpModule()
-	if st.Warp == nil || w == nil {
-		return
-	}
-	if s.l3.warp.due(st.Warp, now, warpStateChanged) {
-		if err := w.StoreHealth(ctx, s.nodeID, st.Warp); err != nil {
-			f.log.Warn("store warp health", "node", s.nodeID, "err", err)
-		}
-	}
-	up := st.Warp.State == agentv1.WarpState_WARP_STATE_UP
-	if up && !s.l3.warpUp {
-		// The tunnel is working again: whatever the node asked the owner to look at is over (the owner sees the badge
-		// again, not a stale "needs attention").
-		if a, err := f.st.WarpAccount(ctx, s.nodeID); err == nil && a.Attention != "" {
-			if err := w.NeedsAttention(ctx, s.nodeID, ""); err != nil {
-				f.log.Warn("clear warp attention", "node", s.nodeID, "err", err)
-			}
-		}
-	}
-	s.l3.warpUp = up
-}
-
 // warp event reasons the agent sends (internal/node/warp, internal/node/agent): codes of warp_needs_attention.
 const (
 	warpReasonRefresh  = "refresh_requested" // the ladder ran out of endpoints: read the account again
@@ -200,40 +151,26 @@ const (
 	eventWarpAttention = "warp_needs_attention"
 )
 
-// onWarpEvent reacts to a warp_needs_attention event of the node, after it was stored like every event. "refresh_requested"
-// is a request to the panel, not a problem for the owner: the account is read back from Cloudflare (read only, at most once
-// per warpRefreshGap per node). Anything else is something the owner decides and is recorded on the account; a ladder that
-// ran out may also trigger the automatic re-registration, if the owner switched it on (the module decides). Cloudflare is
-// never called on the stream's goroutine.
-func (f *Fleet) onWarpEvent(s *session, ev *agentv1.Event) {
-	w := f.warpModule()
-	if w == nil || ev.Code != eventWarpAttention {
+func (f *Fleet) dispatchWarpAttention(w Warp, nodeID, reason string) {
+	if w == nil {
 		return
-	}
-	reason := store.Clip(ev.Params["reason"], 64)
-	now := f.now()
-	if reason == warpReasonRefresh {
-		if now.Sub(s.l3.warpAsk) < warpRefreshGap {
-			return
-		}
-		s.l3.warpAsk = now
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 		switch reason {
 		case warpReasonRefresh:
-			if err := w.RefreshByNode(ctx, s.nodeID); err != nil {
-				f.log.Info("warp refresh asked by the node did not work", "node", s.nodeID, "err", err)
+			if err := w.RefreshByNode(ctx, nodeID); err != nil {
+				f.log.Info("warp refresh asked by the node did not work", "node", nodeID, "err", err)
 			}
 		default:
-			if err := w.NeedsAttention(ctx, s.nodeID, reason); err != nil {
-				f.log.Warn("record warp attention", "node", s.nodeID, "err", err)
+			if err := w.NeedsAttention(ctx, nodeID, reason); err != nil {
+				f.log.Warn("record warp attention", "node", nodeID, "err", err)
 				return
 			}
 			if reason == warpReasonLadder {
-				if _, err := w.AutoReregister(ctx, s.nodeID); err != nil {
-					f.log.Info("automatic warp re-registration", "node", s.nodeID, "err", err)
+				if _, err := w.AutoReregister(ctx, nodeID); err != nil {
+					f.log.Info("automatic warp re-registration", "node", nodeID, "err", err)
 				}
 			}
 		}

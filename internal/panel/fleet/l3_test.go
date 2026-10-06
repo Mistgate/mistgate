@@ -24,15 +24,16 @@ import (
 
 // fakeWarpMod is the WARP module as the fleet sees it.
 type fakeWarpMod struct {
-	mu       sync.Mutex
-	spec     *plugin.WarpSpec
-	health   []*agentv1.WarpHealth
-	attn     []string
-	refresh  int
-	rereg    int
-	summary  adminv1.WarpState
-	specErr  error
-	storeErr error
+	mu        sync.Mutex
+	spec      *plugin.WarpSpec
+	health    []*agentv1.WarpHealth
+	attn      []string
+	refresh   int
+	rereg     int
+	refreshed chan struct{}
+	summary   adminv1.WarpState
+	specErr   error
+	storeErr  error
 }
 
 func (w *fakeWarpMod) Spec(context.Context, string) (*plugin.WarpSpec, error) {
@@ -77,7 +78,14 @@ func (w *fakeWarpMod) NeedsAttention(_ context.Context, _, reason string) error 
 func (w *fakeWarpMod) RefreshByNode(context.Context, string) error {
 	w.mu.Lock()
 	w.refresh++
+	refreshed := w.refreshed
 	w.mu.Unlock()
+	if refreshed != nil {
+		select {
+		case refreshed <- struct{}{}:
+		default:
+		}
+	}
 	return nil
 }
 
@@ -595,6 +603,54 @@ func TestWarpEventsReachTheModuleWithoutBlockingTheStream(t *testing.T) {
 	// And the events themselves are stored like any event.
 	if n := x.count(`SELECT count(*) FROM event WHERE code = 'warp_needs_attention'`); n != 5 {
 		t.Errorf("stored warp_needs_attention events: %d", n)
+	}
+}
+
+func TestWarpRefreshThrottleUsesDispatchTimeAndSurvivesAckQueueFull(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "warp-refresh")
+	h := hello("instance-warp-refresh", 0, "")
+	h.GetHello().Capabilities = []string{capWarp}
+	started := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
+	sctx, cancel := context.WithCancelCause(ctx)
+	s := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: started.State.Capabilities,
+		ctx: sctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
+		core: core, coreState: started.State, coreSidecar: started.Sidecar}
+	defer func() {
+		cancel(nil)
+		close(s.done)
+	}()
+	warpEvent := func(seq uint64, at time.Time) *agentv1.ConnectRequest {
+		return &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{
+			Code: eventWarpAttention, TimeUnix: at.Unix(), Params: map[string]string{"reason": warpReasonRefresh},
+		}}}
+	}
+	first, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.Sidecar.L3.warpAsk.IsZero() {
+		t.Fatalf("missing module consumed the refresh throttle at %v", first.Sidecar.L3.warpAsk)
+	}
+	<-s.out // Ack for the first event.
+
+	w := &fakeWarpMod{refreshed: make(chan struct{}, 1)}
+	e.f.SetWarp(w)
+	dispatchAt := now.Add(5 * time.Minute)
+	e.f.now = func() time.Time { return dispatchAt }
+	for i := 0; i < cap(s.out); i++ {
+		s.out <- &agentv1.ConnectResponse{}
+	}
+	second, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now.Add(ackEvery), Frame: warpEvent(2, now.Add(ackEvery))}, nil)
+	if err != errAgentQueueFull {
+		t.Fatalf("full Ack queue error = %v, want %v", err, errAgentQueueFull)
+	}
+	if !second.Sidecar.L3.warpAsk.Equal(dispatchAt) {
+		t.Fatalf("refresh throttle timestamp = %v, want dispatch time %v", second.Sidecar.L3.warpAsk, dispatchAt)
+	}
+	select {
+	case <-w.refreshed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("refresh was skipped after Ack queue overflow")
 	}
 }
 

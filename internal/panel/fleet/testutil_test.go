@@ -92,6 +92,30 @@ func newEnv(t *testing.T) *env {
 }
 
 func newEnvWith(t *testing.T, reg *protocols.Registry) *env {
+	e := newEnvWithoutServer(t, reg)
+	srv := httptest.NewUnstartedServer(e.f.AgentHandler())
+	srv.EnableHTTP2 = true
+	srv.TLS = &tls.Config{GetConfigForClient: e.f.AgentTLSConfig}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM([]byte(e.f.CACertPEM())) {
+		t.Fatal("CA PEM")
+	}
+	e.srv, e.pool = srv, pool
+	return e
+}
+
+func newCoreEnv(t *testing.T) *env {
+	t.Helper()
+	reg, err := protocols.NewRegistry(fakeProto{"fakehy", plugin.ClientHapp}, fakeProto{"fakewg", plugin.ClientAmnezia})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return newEnvWithoutServer(t, reg)
+}
+
+func newEnvWithoutServer(t *testing.T, reg *protocols.Registry) *env {
 	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
@@ -114,16 +138,7 @@ func newEnvWith(t *testing.T, reg *protocols.Registry) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewUnstartedServer(f.AgentHandler())
-	srv.EnableHTTP2 = true
-	srv.TLS = &tls.Config{GetConfigForClient: f.AgentTLSConfig}
-	srv.StartTLS()
-	t.Cleanup(srv.Close)
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM([]byte(f.CACertPEM())) {
-		t.Fatal("CA PEM")
-	}
-	return &env{t: t, ctx: ctx, st: st, v: v, f: f, srv: srv, pool: pool}
+	return &env{t: t, ctx: ctx, st: st, v: v, f: f}
 }
 
 // desiredFrom is the production wiring of Config.Desired: the access module owns the effective-access rule.

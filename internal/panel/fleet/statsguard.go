@@ -1,7 +1,6 @@
 package fleet
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -99,35 +98,4 @@ func satMul(a, b uint64) uint64 {
 type stuckSeq struct {
 	instance string
 	seq      uint64
-}
-
-// stuckStats records that the database refused the batch (instance, seq) and reports whether it refused the
-// same one right before: then the batch is poison and is dropped instead of resent forever.
-func (f *Fleet) stuckStats(s *session, seq uint64) bool {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	k := stuckSeq{s.instance, seq}
-	if f.stuck[s.nodeID] == k {
-		delete(f.stuck, s.nodeID)
-		return true
-	}
-	f.stuck[s.nodeID] = k
-	return false
-}
-
-// unstickStats forgets a recorded failure once any batch of the node went through.
-func (f *Fleet) unstickStats(s *session) {
-	f.mu.Lock()
-	delete(f.stuck, s.nodeID)
-	f.mu.Unlock()
-}
-
-// rejectStats logs a dropped part of a batch and, at most once a minute per stream, records an event.
-func (f *Fleet) rejectStats(s *session, g guardedStats, now time.Time) {
-	f.log.Warn("stats batch failed the sanity check, traffic dropped", "node", s.nodeID, "deltas", g.rejected, "reason", g.reason)
-	if now.Sub(s.lastReject) < rejectEventEvery {
-		return
-	}
-	s.lastReject = now
-	f.event(s.ctx, 3, "stats_rejected", s.nodeID, map[string]string{"reason": g.reason, "deltas": fmt.Sprint(g.rejected)})
 }

@@ -86,6 +86,22 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 	return st, nil
 }
 
+// prepareDesiredState reads the node and builds its desired state without touching session state.
+func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string, caps []string) (*preparedDesiredState, error) {
+	node, err := f.st.Node(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	prepared := &preparedDesiredState{node: node}
+	if node.State != "retired" {
+		prepared.desired, err = f.buildState(ctx, node, caps)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return prepared, nil
+}
+
 func (s *nodeState) list() []statehash.Inbound {
 	out := make([]statehash.Inbound, 0, len(s.in))
 	for _, id := range s.ids() {
