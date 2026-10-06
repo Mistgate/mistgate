@@ -241,6 +241,8 @@ func (s *session) dispatchCoreEffect(ctx context.Context, tr *Transition, effect
 			}
 		}
 	case EffectWarpAttention:
+		// Refresh is read-only and may call Cloudflare; other reasons ask the owner to decide, and an exhausted ladder may
+		// trigger automatic re-registration. The dispatcher runs the work in a goroutine, never on the stream's goroutine.
 		w := s.f.warpModule()
 		if w == nil {
 			return nil
@@ -619,8 +621,8 @@ func runState(s agentv1.InboundRunState) string {
 	return "pending"
 }
 
-// onApply records an ApplyResult and reacts: BASE_MISMATCH -> full resend; a hash that differs from what
-// was sent -> state_drift event and one full resend (a second drift right after stays as an error event).
+// reconcileMode is what a reconcile sends: everything after a connect unless the agent already holds it, a delta after
+// a change, or a full state after a mismatch or a drift.
 type reconcileMode int
 
 const (

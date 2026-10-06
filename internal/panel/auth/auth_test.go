@@ -34,7 +34,7 @@ func newTestService(t *testing.T) (*Service, *store.Store, *time.Time) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.lim = newLimiter(1000, time.Millisecond) // handler tests call from one unknown source
+	s.authBurst, s.authRefill = 1000, time.Millisecond // handler tests call from one unknown source
 	clock := time.Now()
 	s.now = func() time.Time { return clock }
 	return s, st, &clock
@@ -161,35 +161,5 @@ func TestSetupTokenIssue(t *testing.T) {
 	makeAdmin(t, s, st)
 	if _, err := IssueSetupToken(ctx, st, s.now()); !errors.Is(err, ErrAdminExists) {
 		t.Fatalf("token issued although an admin exists: %v", err)
-	}
-}
-
-func TestLimiter(t *testing.T) {
-	now := time.Now()
-	l := newLimiter(3, time.Second)
-	l.now = func() time.Time { return now }
-	for i := range 3 {
-		if !l.allow("a") {
-			t.Fatalf("burst request %d refused", i)
-		}
-	}
-	if l.allow("a") {
-		t.Fatal("over-burst request allowed")
-	}
-	if !l.allow("b") {
-		t.Fatal("limits are per key")
-	}
-	now = now.Add(1100 * time.Millisecond)
-	if !l.allow("a") || l.allow("a") {
-		t.Fatal("one token should have refilled, exactly")
-	}
-	now = now.Add(time.Hour)
-	for range 3 {
-		if !l.allow("a") {
-			t.Fatal("bucket must refill to the burst, no further")
-		}
-	}
-	if l.allow("a") {
-		t.Fatal("bucket refilled past the burst")
 	}
 }

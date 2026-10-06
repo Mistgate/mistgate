@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -84,6 +83,7 @@ type Config struct {
 	DataDir            string
 	UpdateService      string
 	Title              string
+	HealthBlipWindow   time.Duration
 	BackgroundStarters []BackgroundJob
 }
 
@@ -177,11 +177,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
-	hcfg := health.Config{Log: log, OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
-	// Test hook: scripts/e2e-wsl.sh cannot wait ten minutes for NODE_DOWN.
-	if d, err := time.ParseDuration(os.Getenv("MISTGATE_HEALTH_BLIP_WINDOW")); err == nil && d > 0 {
-		hcfg.BlipWindow = d
-	}
+	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	hl = health.New(st, vlt, reg, fl, hcfg)
 	fl.SetHealth(hl)
 

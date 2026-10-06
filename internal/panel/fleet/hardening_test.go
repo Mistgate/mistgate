@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
 // sync waits until the panel has processed everything the agent sent before: a stats batch is acked only
@@ -223,16 +225,31 @@ func TestPoisonBatchIsDroppedAfterASecondRefusal(t *testing.T) {
 func TestEnrollLimiterSourcesAndBound(t *testing.T) {
 	ip := func(s string) netip.Addr { return netip.MustParseAddr(s) }
 	now := time.Now()
+	ctx := context.Background()
 
-	l := newFailLimiter(10, time.Minute)
+	l := securitylimit.NewMemory()
+	fail := func(key string) {
+		t.Helper()
+		if err := l.FailWindow(ctx, "enrollment-failure", key, now, time.Minute, maxLimiterKeys); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blocked := func(key string) bool {
+		t.Helper()
+		decision, err := l.CheckWindow(ctx, "enrollment-failure", key, now, 10, time.Minute, maxLimiterKeys, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return !decision.Allowed
+	}
 	for i := 0; i < 10; i++ {
 		// ten different addresses of one /64: one source
-		l.fail(limiterKey(ip(fmt.Sprintf("2001:db8:1:2:%x::1", i+1)), ""), now)
+		fail(limiterKey(ip(fmt.Sprintf("2001:db8:1:2:%x::1", i+1)), ""))
 	}
-	if !l.blocked(limiterKey(ip("2001:db8:1:2:ffff::9"), ""), now) {
+	if !blocked(limiterKey(ip("2001:db8:1:2:ffff::9"), "")) {
 		t.Error("another address of the same /64 is not blocked")
 	}
-	if l.blocked(limiterKey(ip("2001:db8:1:3::1"), ""), now) {
+	if blocked(limiterKey(ip("2001:db8:1:3::1"), "")) {
 		t.Error("a neighbouring /64 was blocked")
 	}
 	if limiterKey(ip("::ffff:203.0.113.9"), "") != limiterKey(ip("203.0.113.9"), "") || limiterKey(ip("203.0.113.9"), "") == limiterKey(ip("203.0.113.10"), "") {
@@ -243,22 +260,21 @@ func TestEnrollLimiterSourcesAndBound(t *testing.T) {
 	}
 
 	// Bounded: a flood of rotating sources keeps the table at its cap, and is O(1) per call.
-	l = newFailLimiter(10, time.Minute)
-	l.cap = 100
+	l = securitylimit.NewMemory()
 	for i := 0; i < 50_000; i++ {
-		l.fail(fmt.Sprintf("src-%d", i), now)
+		fail(fmt.Sprintf("src-%d", i))
 	}
-	if n := l.size(); n != 100 {
-		t.Errorf("limiter holds %d sources, want the cap 100", n)
+	if n := l.Size("enrollment-failure"); n != maxLimiterKeys {
+		t.Errorf("limiter holds %d sources, want the cap %d", n, maxLimiterKeys)
 	}
 	// The most recent failures are the ones remembered.
 	for i := 0; i < 10; i++ {
-		l.fail("src-49999", now)
+		fail("src-49999")
 	}
-	if !l.blocked("src-49999", now) {
+	if !blocked("src-49999") {
 		t.Error("a recent offender is not blocked")
 	}
-	if l.blocked("src-0", now) {
+	if blocked("src-0") {
 		t.Error("the oldest source should have been evicted")
 	}
 }

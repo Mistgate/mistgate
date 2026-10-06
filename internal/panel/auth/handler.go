@@ -45,7 +45,7 @@ func (s *Service) clientIP(req connect.AnyRequest) netip.Addr {
 }
 
 func (s *Service) rateLimited(ctx context.Context, req connect.AnyRequest) error {
-	decision, err := s.lim.Take(ctx, "auth", SourceKey(s.clientIP(req)), s.now(), 10, 3*time.Second, 1)
+	decision, err := s.lim.Take(ctx, "auth", SourceKey(s.clientIP(req)), s.now(), s.authBurst, s.authRefill, 1)
 	if err != nil || !decision.Allowed {
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many attempts, try again later"))
 	}

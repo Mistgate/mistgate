@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/app"
@@ -59,6 +61,10 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if o.in.LinkPrefix == "" {
 		o.in.LinkPrefix = newSecretPrefix()
 	}
+	var healthBlipWindow time.Duration
+	if d, err := time.ParseDuration(os.Getenv("MISTGATE_HEALTH_BLIP_WINDOW")); err == nil && d > 0 {
+		healthBlipWindow = d
+	}
 	built, err := app.Build(app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, MasterKey: o.masterKey,
 		Logger: log, Instance: app.InstanceConfig{
@@ -67,7 +73,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 			AgentSNI: o.in.AgentSNI, SubPrefix: o.in.SubPrefix, LinkPrefix: o.in.LinkPrefix,
 		},
 		DecoyDir: o.decoyDir, PanelAddr: o.panelAddr, DataDir: o.dataDir,
-		UpdateService: o.updateService, Title: o.title,
+		UpdateService: o.updateService, Title: o.title, HealthBlipWindow: healthBlipWindow,
 	})
 	if err != nil {
 		return nil, err

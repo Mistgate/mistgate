@@ -464,15 +464,6 @@ func (a Access) UserStates(ctx context.Context, ids []string) ([]AccessUserState
 
 // ---- usage and derived user data (reads of tables the fleet module writes) ----
 
-// UserUsage sums a user's traffic buckets since the given time (hour granularity).
-func (a Access) UserUsage(ctx context.Context, userID string, since time.Time) (up, down uint64, err error) {
-	var u, d int64
-	err = a.s.R.QueryRowContext(ctx,
-		`SELECT coalesce(sum(bytes_up), 0), coalesce(sum(bytes_down), 0) FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`,
-		userID, unix(since)).Scan(&u, &d)
-	return uint64(u), uint64(d), err
-}
-
 // SubscriptionData reads the independent rows a subscription view needs in one store batch. The access
 // rows are omitted for a user who is not active, because the view returns before it reads them.
 type SubscriptionData struct {
@@ -871,28 +862,6 @@ func (a Access) AddCreds(ctx context.Context, creds []AccessCred) error {
 		return ErrNotFound
 	}
 	return err
-}
-
-// DeviceCreds returns the live credentials of a device.
-func (a Access) DeviceCreds(ctx context.Context, deviceID string) ([]AccessCred, error) {
-	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT id, device_id, user_id, protocol, coalesce(profile_id, ''), secret_enc, data_json, config_epoch, created_at FROM device_credential
-		 WHERE device_id = ? AND revoked_at IS NULL ORDER BY protocol, profile_id, id`, deviceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []AccessCred
-	for rows.Next() {
-		var c AccessCred
-		var created int64
-		if err := rows.Scan(&c.ID, &c.DeviceID, &c.UserID, &c.Protocol, &c.ProfileID, &c.SecretEnc, &c.DataJSON, &c.ConfigEpoch, &created); err != nil {
-			return nil, err
-		}
-		c.CreatedAt = fromUnix(created)
-		out = append(out, c)
-	}
-	return out, rows.Err()
 }
 
 // RevokeDevice soft-deletes a live device and its credentials and returns its user id; ErrNotFound when

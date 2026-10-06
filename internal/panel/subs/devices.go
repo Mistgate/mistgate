@@ -256,7 +256,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 		}
 	}
 	// The keys leave only for a user who can use them; removing a device and renaming one never hurt.
-	if !h.admitWrite(w, r.Context(), token, v, rest == "" || action == "configs" || action == "rotate", now) {
+	if !h.admitWrite(r.Context(), w, token, v, rest == "" || action == "configs" || action == "rotate", now) {
 		return
 	}
 
@@ -395,7 +395,7 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 // admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the
 // servers, 409 user_inactive otherwise) and the hourly budget of writes of the token (429), counted for the devices and
 // the DNS together. It answers and returns false when the call ends there.
-func (h *handler) admitWrite(w http.ResponseWriter, ctx context.Context, token string, v access.SubView, needActive bool, now time.Time) bool {
+func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token string, v access.SubView, needActive bool, now time.Time) bool {
 	if needActive && v.Status != access.StatusActive {
 		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 		return false

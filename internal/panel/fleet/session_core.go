@@ -11,7 +11,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 const sessionStateVersion = 1
@@ -63,6 +62,7 @@ type PendingRequest struct {
 	DeadlineUnixNano int64
 }
 
+// PendingRequestKind identifies the adapter-owned request awaiting an agent result.
 type PendingRequestKind uint8
 
 const (
@@ -79,9 +79,9 @@ type SessionSidecar struct {
 	CertSeen    map[string]string
 	L3          l3Intake
 	Pending     map[string]PendingRequest
-	PoisonSeq   *stuckSeq
 }
 
+// EventKind identifies one input that the session core can process.
 type EventKind uint8
 
 const (
@@ -99,6 +99,7 @@ const (
 	EventOwnerSuperseded
 )
 
+// AlarmKind identifies a session deadline or periodic action.
 type AlarmKind uint8
 
 const (
@@ -110,6 +111,7 @@ const (
 	AlarmCertificate
 )
 
+// AdminRequest carries a request frame and its correlation metadata into the core.
 type AdminRequest struct {
 	RequestID string
 	Deadline  time.Time
@@ -117,6 +119,7 @@ type AdminRequest struct {
 	Kind      PendingRequestKind
 }
 
+// SessionEvent is a timestamped input to SessionCore.Step.
 type SessionEvent struct {
 	Kind            EventKind
 	At              time.Time
@@ -128,6 +131,7 @@ type SessionEvent struct {
 	AutoBandwidthAt time.Time
 }
 
+// EffectKind identifies an adapter action requested by the session core.
 type EffectKind uint8
 
 const (
@@ -144,6 +148,7 @@ const (
 	EffectDesiredReconcile
 )
 
+// SessionStarted carries connection metadata needed by the transport adapter.
 type SessionStarted struct {
 	Previous    store.NodeRow
 	BootAt      time.Time
@@ -151,6 +156,7 @@ type SessionStarted struct {
 	AutoMeasure bool
 }
 
+// SessionEffect asks the adapter to perform work requested by a core transition.
 type SessionEffect struct {
 	Kind          EffectKind
 	RequestID     string
@@ -166,6 +172,7 @@ type SessionEffect struct {
 	ErrorLog      string
 }
 
+// CloseClass identifies why a session should terminate.
 type CloseClass uint8
 
 const (
@@ -178,11 +185,13 @@ const (
 	CloseCanceled
 )
 
+// SessionClose describes a protocol-level reason to end the connection.
 type SessionClose struct {
 	Class  CloseClass
 	Reason string
 }
 
+// Transition contains the updated state and outputs produced by one session event.
 type Transition struct {
 	State     SessionState
 	Sidecar   SessionSidecar
@@ -197,9 +206,10 @@ type preparedDesiredState struct {
 	desired *nodeState
 }
 
-// SessionCore processes one event at a time. It owns no goroutines, timers, channels, or transports.
+// SessionCore processes one event at a time without owning goroutines, timers, channels, or transports.
 type SessionCore struct{ f *Fleet }
 
+// NewSessionCore creates a session transition engine backed by fleet services.
 func NewSessionCore(f *Fleet) *SessionCore { return &SessionCore{f: f} }
 
 // Step processes one event. On error, the caller must discard both the transition and the sidecar it passed in;
@@ -337,10 +347,11 @@ func (c *SessionCore) hello(ctx context.Context, tr *Transition, event SessionEv
 	tr.State.SidecarVersion = tr.Sidecar.Version
 	tr.Sidecar.Live.UserDown = map[string]uint64{}
 	tr.Sidecar.Live.UserUp = map[string]uint64{}
+	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectSessionStarted, Started: &SessionStarted{
-		Previous: prev, BootAt: info.BootAt, Now: event.At, AutoMeasure: prev.State == "pending" && node.BandwidthMbps == 0,
+		Previous: prev, BootAt: info.BootAt, Now: event.At, AutoMeasure: autoMeasure,
 	}})
-	tr.State.AutoBandwidthPending = prev.State == "pending" && node.BandwidthMbps == 0 && slices.Contains(tr.State.Capabilities, capBandwidth)
+	tr.State.AutoBandwidthPending = autoMeasure && slices.Contains(tr.State.Capabilities, capBandwidth)
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
 		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: nodeSettings(node, tr.State.Capabilities), LinkSupported: c.f.cfg.LinkServed,
 	}}})
@@ -415,6 +426,9 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 	}
 	out, err := c.f.st.IngestStats(ctx, in)
 	if err != nil {
+		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
+		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
+		// refused every time, and resending it would wedge this node's stats for good: drop it then.
 		c.f.log.Error("ingest stats", "node", tr.State.NodeID, "err", err)
 		if !c.stuckStats(tr.State.NodeID, tr.State.InstanceID, seq) {
 			tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
@@ -435,7 +449,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 	if !out.Duplicate {
 		updated := applyCoreSnapshot(&tr.State, &tr.Sidecar.Live, st, g.traffic, now, out.Refs)
 		c.l3Stats(ctx, tr.State.NodeID, &tr.Sidecar.L3, st, now)
-		c.certStats(ctx, tr.State.NodeID, &tr.Sidecar.CertSeen, st, now)
+		c.certStats(ctx, tr.State.NodeID, tr.Sidecar.CertSeen, st, now)
 		c.f.touchAwgDevices(ctx, st, out.Refs, now)
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", tr.State.NodeID, "count", out.Skipped)
@@ -456,13 +470,16 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 	}
 }
 
+// applyCoreSnapshot replaces the live view with the newest absolute snapshot.
 func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic, now time.Time, refs map[string]store.FleetCredRef) bool {
 	end := st.IntervalEndUnix
+	// An end time from the future would make every later (honest) batch look older and freeze the live
+	// view: clamp it like the bucket hour.
 	if end > now.Add(maxFuture).Unix() {
 		end = now.Unix()
 	}
 	if end < state.LastEndUnix {
-		return false
+		return false // an older batch resent after a reconnect
 	}
 	state.LastEndUnix = end
 	if st.Host != nil {
@@ -612,6 +629,9 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *Transition, seq uint64
 	}
 }
 
+// applyResult records an ApplyResult and reacts: BASE_MISMATCH -> a full resend; a hash that differs from what was sent
+// -> a state_drift event and one full resend (a second drift right after stays as an error event). The resends are
+// EffectDesiredReconcile, which the adapter runs right after this step, before the next agent frame.
 func (c *SessionCore) applyResult(ctx context.Context, tr *Transition, r *agentv1.ApplyResult, now time.Time) error {
 	switch r.Status {
 	case agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH:
@@ -805,6 +825,8 @@ func nextSessionAlarm(state SessionState, sidecar SessionSidecar) *time.Time {
 	return &t
 }
 
+// l3Stats stores the AWG and WARP health from a stats batch; applyCoreSnapshot replaces the stream's live view. A health
+// write failure is logged but never fails the batch: health is a snapshot, and the next batch replaces it.
 func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Intake, st *agentv1.StatsBatch, now time.Time) {
 	for _, h := range st.Health {
 		if h.Awg == nil {
@@ -821,7 +843,7 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 		if !m.due(h.Awg, now, nil) {
 			continue
 		}
-		b, err := protojsonMarshal(h.Awg)
+		b, err := protojson.Marshal(h.Awg)
 		if err != nil {
 			continue
 		}
@@ -840,6 +862,8 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 	}
 	up := st.Warp.State == agentv1.WarpState_WARP_STATE_UP
 	if up && !intake.warpUp {
+		// The tunnel is working again: whatever the node asked the owner to look at is over (the owner sees the badge
+		// again, not a stale "needs attention").
 		if a, err := c.f.st.WarpAccount(ctx, nodeID); err == nil && a.Attention != "" {
 			if err := w.NeedsAttention(ctx, nodeID, ""); err != nil {
 				c.f.log.Warn("clear warp attention", "node", nodeID, "err", err)
@@ -849,11 +873,11 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 	intake.warpUp = up
 }
 
-func protojsonMarshal(message proto.Message) ([]byte, error) {
-	return protojson.Marshal(message)
-}
-
-func (c *SessionCore) certStats(ctx context.Context, nodeID string, seen *map[string]string, st *agentv1.StatsBatch, now time.Time) {
+// certStats keeps the certificate each inbound serves, as the stats stream reports it: an ACME certificate is issued after
+// the ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
+// (it ends up in subscriptions of self-signed inbounds); a database failure is logged, the next batch tries again.
+// An expiry beyond maxCertLife is not believed (the health check would never warn): the stored value stays.
+func (c *SessionCore) certStats(ctx context.Context, nodeID string, seen map[string]string, st *agentv1.StatsBatch, now time.Time) {
 	for _, h := range st.Health {
 		if h.CertPinSha256 == "" || h.CertNotAfterUnix <= 0 || h.CertNotAfterUnix > now.Add(maxCertLife).Unix() {
 			continue
@@ -863,13 +887,13 @@ func (c *SessionCore) certStats(ctx context.Context, nodeID string, seen *map[st
 			continue
 		}
 		key := pin + "/" + fmt.Sprint(h.CertNotAfterUnix)
-		if (*seen)[h.InboundId] == key {
+		if seen[h.InboundId] == key {
 			continue
 		}
 		if err := c.f.st.SetInboundCert(ctx, nodeID, h.InboundId, pin, time.Unix(h.CertNotAfterUnix, 0).UTC(), now); err != nil {
 			c.f.log.Warn("store inbound certificate", "node", nodeID, "inbound", h.InboundId, "err", err)
 			continue
 		}
-		(*seen)[h.InboundId] = key
+		seen[h.InboundId] = key
 	}
 }

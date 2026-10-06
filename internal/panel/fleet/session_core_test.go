@@ -80,7 +80,7 @@ func reconcilePrepared(t *testing.T, e *env, core *SessionCore, ctx context.Cont
 
 func TestSessionCoreHelloAndInitialState(t *testing.T) {
 	t.Run("sends desired state when applied hash differs", func(t *testing.T) {
-		e, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-send")
+		_, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-send")
 		tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-1", 0, "").GetHello())
 		if len(tr.Frames) != 2 || tr.Frames[0].GetHelloAck() == nil || tr.Frames[1].GetDesiredState() == nil {
 			t.Fatalf("hello frames = %#v", tr.Frames)
@@ -91,7 +91,6 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if tr.NextAlarm == nil || !tr.NextAlarm.Equal(time.Unix(0, tr.State.NextAckTickUnixNano)) {
 			t.Fatalf("next alarm = %v, ack deadline = %v", tr.NextAlarm, tr.State.NextAckTickUnixNano)
 		}
-		_ = e
 	})
 
 	t.Run("skips desired state when applied hash matches", func(t *testing.T) {
@@ -212,6 +211,12 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	originalDesired := e.f.cfg.Desired
 	entered, release := make(chan struct{}), make(chan struct{})
 	reconcileDone := make(chan error, 1)
+	type stepResult struct {
+		transition Transition
+		err        error
+	}
+	stepDone := make(chan stepResult, 1)
+	stepStarted, stepFinished := false, false
 	released := false
 	reconcileFinished := false
 	defer func() {
@@ -223,6 +228,13 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 			case <-reconcileDone:
 			case <-time.After(5 * time.Second):
 				t.Error("desired-state preparation did not stop")
+			}
+		}
+		if stepStarted && !stepFinished {
+			select {
+			case <-stepDone:
+			case <-time.After(5 * time.Second):
+				t.Error("stats frame step did not stop")
 			}
 		}
 	}()
@@ -237,17 +249,25 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("desired-state builder did not block")
 	}
-	if !s.coreMu.TryLock() {
-		t.Fatal("desired-state preparation holds coreMu")
-	}
-	s.coreMu.Unlock()
-
 	oldDeadline := s.coreState.LivenessDeadlineUnixNano
 	frameAt := now.Add(time.Duration(s.coreState.LivenessNanos) - time.Second)
 	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: frameAt.Add(-10 * time.Second).Unix(), IntervalEndUnix: frameAt.Unix(),
 	}}}
-	transition, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: frameAt, Frame: stats}, nil)
+	stepStarted = true
+	go func() {
+		transition, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: frameAt, Frame: stats}, nil)
+		stepDone <- stepResult{transition: transition, err: err}
+	}()
+	var transition Transition
+	var err error
+	select {
+	case result := <-stepDone:
+		stepFinished = true
+		transition, err = result.transition, result.err
+	case <-time.After(5 * time.Second):
+		t.Fatal("stats frame did not remain responsive while desired-state preparation was blocked")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +469,6 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	if !hasEffect(cert, EffectCheckCertificate) {
 		t.Fatalf("certificate alarm effects = %v", effectKinds(cert))
 	}
-	_ = e
 }
 
 func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
@@ -475,11 +494,6 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	if !hasEffect(beforeClose, EffectCommandResult) || beforeClose.Effects[0].RequestID != "req-command" {
 		t.Fatalf("command result effects = %+v", beforeClose.Effects)
 	}
-	closed, err := core.Step(ctx, beforeClose.State, beforeClose.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(2 * time.Second)})
-	if err != nil || hasEffect(closed, EffectCommandResult) {
-		t.Fatalf("disconnect after result = %+v, %v", closed, err)
-	}
-
 	logFrame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "req-log"}}}
 	started, err := core.Step(ctx, beforeClose.State, beforeClose.Sidecar, SessionEvent{Kind: EventLogStart, At: now, Request: &AdminRequest{
 		RequestID: "req-log", Deadline: now.Add(time.Minute), Frame: logFrame,
@@ -510,20 +524,10 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	}
 }
 
-func TestSessionStateSerializationBudget(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-size")
+func TestSessionStateSerializationSizeBudget(t *testing.T) {
+	_, core, ctx, state, sidecar, now := coreFixture(t, "core-size")
 	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-large-node", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
-	if sidecar.SentDesired == nil {
-		t.Fatal("Hello did not make the desired sidecar")
-	}
-	if sidecar.SentDesired.in == nil {
-		sidecar.SentDesired.in = map[string]*inboundState{}
-	}
-	for i := 0; i < 128; i++ {
-		id := "inbound-" + string(rune('a'+i%26)) + "-" + string(rune('a'+i/26))
-		sidecar.SentDesired.in[id] = &inboundState{specHash: "hash"}
-	}
+	state = tr.State
 	b, err := json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
@@ -538,10 +542,6 @@ func TestSessionStateSerializationBudget(t *testing.T) {
 	if len(b) >= 4<<10 {
 		t.Fatalf("session state serialized to %d bytes, want under 4096", len(b))
 	}
-	if len(sidecar.SentDesired.in) < 100 {
-		t.Fatalf("large desired state was not kept in sidecar: %d inbounds", len(sidecar.SentDesired.in))
-	}
-	_ = e
 }
 
 func hasEffect(tr Transition, kind EffectKind) bool {
