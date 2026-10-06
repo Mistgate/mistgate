@@ -143,6 +143,9 @@ type SubOptions struct {
 	Name func(SubServer) string
 	// NoTouch: the view is for the page, not for an app, so it does not mark the implicit device as having fetched the subscription.
 	NoTouch bool
+	// NoPageData: the view is for an app, so it leaves out what only the user page shows (the DNS of each node, the
+	// presets they name, the keys that hold an older DNS) and does not read it.
+	NoPageData bool
 }
 
 // Subscription resolves a token. The lookup is by sha256(token), so the comparison never sees the token
@@ -316,7 +319,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 	}
 	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, networkSource, now)
-	nodeDNS := s.newNodeDNS(ctx, u.ID)
+	var nd *nodeDNS // read on first use: only the page and the AmneziaWG proxies of a Mihomo profile need it
+	dnsOf := func() *nodeDNS {
+		if nd == nil {
+			nd = s.newNodeDNS(ctx, u.ID)
+		}
+		return nd
+	}
 	awgAt := map[string]int{}  // profile id -> its index in v.AWGProfiles
 	nodeAt := map[string]int{} // node id -> its index in v.Nodes
 	nodeOf := func(f store.AccessInboundFull) *SubNode {
@@ -383,8 +392,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			UserID: u.ID, UserName: u.Name, DeviceID: dev.ID, Secret: secret,
 		}
 		if protocols.IsPerDevice(proto) {
-			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none.)
-			dnsServers, _ := nodeDNS.awg(f.Node.ID)
+			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none; the URI list has no AWG.)
+			var dnsServers []string
+			if format == plugin.FormatMihomo {
+				dnsServers, _ = dnsOf().awg(f.Node.ID)
+			}
 			in.Peer, in.InboundPublic, in.DNS, in.NodeAddr = json.RawMessage(secret), json.RawMessage(f.Inbound.PluginPublicJSON), dnsServers, f.Node.Address
 		}
 		if opt.Name != nil {
@@ -411,13 +423,17 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	for i := range v.Nodes {
 		v.Nodes[i].Online = s.nodeOnline(v.Nodes[i].ID, networkUsage)
 	}
-	s.markDNSStale(u, g, full, nodeDNS, awgDevs)
+	if opt.NoPageData {
+		return v, nil
+	}
+	n := dnsOf()
+	s.markDNSStale(u, g, full, n, awgDevs)
 	for _, ad := range awgDevs {
 		if i := slices.IndexFunc(v.Devices, func(d SubDevice) bool { return d.ID == ad.ID }); i >= 0 && v.Devices[i].AWG != nil {
 			v.Devices[i].AWG.DNSStale = ad.DNSStale
 		}
 	}
-	s.nodeDNSData(ctx, &v, nodeDNS, awgDevs)
+	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
 }
 

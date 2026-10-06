@@ -102,6 +102,22 @@ func (s *Service) PresetByID(ctx context.Context, id string) (Preset, error) {
 	return fromRow(row)
 }
 
+// Presets loads every preset, by id, in one query (a page names every preset its nodes offer). A row that cannot be
+// decoded is left out, as a preset that is gone.
+func (s *Service) Presets(ctx context.Context) (map[string]Preset, error) {
+	rows, err := s.st.DNS().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]Preset, len(rows))
+	for _, row := range rows {
+		if p, err := fromRow(row); err == nil {
+			out[row.ID] = p
+		}
+	}
+	return out, nil
+}
+
 // EffectiveOnNode is the preset that applies to a person on a node (rules 1 to 3 above).
 func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (Preset, error) {
 	c, err := s.NodeChoices(ctx, userID)

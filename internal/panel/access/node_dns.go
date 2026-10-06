@@ -27,6 +27,7 @@ type nodeDNS struct {
 	choices dns.NodeChoices
 	cache   map[string]dns.Preset
 	user    *dns.Preset
+	all     map[string]dns.Preset // every preset, read in one query on first use
 }
 
 func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
@@ -61,7 +62,7 @@ func (n *nodeDNS) on(nodeID string) (dns.Preset, bool) {
 	if p, ok := n.cache[id]; ok {
 		return p, true
 	}
-	p, err := n.s.dns.PresetByID(n.ctx, id)
+	p, err := n.preset(id)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) {
 			n.s.log.Warn("access: cannot read a dns preset", "err", err)
@@ -70,6 +71,22 @@ func (n *nodeDNS) on(nodeID string) (dns.Preset, bool) {
 	}
 	n.cache[id] = p
 	return p, true
+}
+
+// preset is one preset by id; store.ErrNotFound when it is gone. The first call reads every preset in one query: a page
+// names every preset its nodes offer, which would be one query each.
+func (n *nodeDNS) preset(id string) (dns.Preset, error) {
+	if n.all == nil {
+		all, err := n.s.dns.Presets(n.ctx)
+		if err != nil {
+			return dns.Preset{}, err
+		}
+		n.all = all
+	}
+	if p, ok := n.all[id]; ok {
+		return p, nil
+	}
+	return dns.Preset{}, store.ErrNotFound
 }
 
 // awg is what an AWG config of the node carries: the plain IPv4 resolvers of the preset that applies there, and whether the
@@ -200,7 +217,7 @@ func (s *Service) nodeDNSData(ctx context.Context, v *SubView, n *nodeDNS, awgs 
 			v.DNSPresets = append(v.DNSPresets, p)
 		} else if n.user != nil && n.user.ID == id {
 			v.DNSPresets = append(v.DNSPresets, *n.user)
-		} else if p, err := s.dns.PresetByID(ctx, id); err == nil {
+		} else if p, err := n.preset(id); err == nil {
 			v.DNSPresets = append(v.DNSPresets, p)
 		}
 	}

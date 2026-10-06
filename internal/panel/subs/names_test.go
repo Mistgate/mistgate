@@ -16,6 +16,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 func TestFlagEmoji(t *testing.T) {
@@ -154,7 +155,10 @@ func (f loadSrc) Subscription(context.Context, string) (access.SubView, error) {
 	return f.view("hysteria2://x@de1.example.com:443/"), nil
 }
 
-func (f loadSrc) SubscriptionWith(context.Context, string, access.SubOptions) (access.SubView, error) {
+func (f loadSrc) SubscriptionWith(ctx context.Context, token string, opt access.SubOptions) (access.SubView, error) {
+	if opt.Format != plugin.FormatMihomo {
+		return f.Subscription(ctx, token) // any other format is the URI list
+	}
 	return f.view("- name: \"x\"\n  type: hysteria2\n  server: \"de1.example.com\"\n  port: 443\n  password: \"x\"\n"), nil
 }
 

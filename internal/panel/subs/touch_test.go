@@ -7,6 +7,19 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/subs"
 )
 
+// A view an app's fetch left in the cache has no page data (the DNS of the servers): the page, opened right after, must
+// still get it.
+func TestPageViewAfterAnAppFetchHasItsData(t *testing.T) {
+	r := newRig(t, "/k3xq8")
+	h, _ := r.handler(func(c *subs.Config) { c.MinInterval = 10 * time.Minute })
+	_, tok := r.user("alice", nil)
+	fetch(h, "/"+tok, happUA)
+	d, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+	if obj(obj(d["dns"])["link"])["effective"] == "" {
+		t.Errorf("the page after an app's fetch has no DNS data: %v", d["dns"])
+	}
+}
+
 // Only an app's fetch says "the app received the subscription" (the device's last_seen_at): opening the page in a browser
 // and the page's own calls must not, and a view they left in the cache must not stand in for an app's fetch either.
 func TestPageViewAndCallsDoNotTouchTheDevice(t *testing.T) {

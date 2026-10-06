@@ -241,3 +241,21 @@ func TestPresetWordsForThePage(t *testing.T) {
 		}
 	}
 }
+
+// Presets reads every preset in one query and gives each one as PresetByID does.
+func TestPresetsLoadsEveryPresetLikePresetByID(t *testing.T) {
+	e := newEnv(t)
+	all, err := e.s.Presets(e.ctx)
+	if err != nil || len(all) == 0 {
+		t.Fatalf("presets: %d, %v", len(all), err)
+	}
+	for id, p := range all {
+		one, err := e.s.PresetByID(e.ctx, id)
+		if err != nil || one.ID != p.ID || one.Name != p.Name || len(one.Servers) != len(p.Servers) {
+			t.Errorf("%s: %+v, want %+v (%v)", id, p, one, err)
+		}
+	}
+	if _, ok := all["dns_builtin_standard"]; !ok {
+		t.Error("a built-in preset is missing")
+	}
+}
