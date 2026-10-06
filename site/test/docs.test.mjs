@@ -63,7 +63,7 @@ test("the AI agent guide carries the three prompts in both languages, and llms.t
 test("the new pages appear in both documentation sidebars", () => {
   for (const [lang, base] of [["en", ""], ["ru", "/ru"]]) {
     const index = page(lang, "index");
-    for (const key of ["getting-started/ai-agents", "getting-started/ssh-install", "guide/torrent-protection", "operations/releases", "roadmap/status"]) {
+    for (const key of ["getting-started/ai-agents", "getting-started/ssh-install", "guide/torrent-protection", "operations/releases", "operations/panel-watcher", "roadmap/status"]) {
       assert.ok(index.includes(`${base}/${key}/`), `${lang} sidebar lists ${key}`);
     }
     assert.ok(!index.includes("m2-ssh-provisioning"), `${lang} sidebar has no M2 page`);

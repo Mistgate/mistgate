@@ -1,0 +1,33 @@
+name = "mistgate-cloudflare-watcher"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "WATCH"
+id = "replace-with-your-kv-namespace-id"
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+
+[vars]
+# Required: public panel listener URL. A decoy 404 response counts as healthy.
+HEALTH_URL = "https://panel.example.com/"
+# Optional request timeout in milliseconds (default: 8000).
+HEALTH_TIMEOUT_MS = "8000"
+# Optional number of consecutive failures before alerting (default: 3).
+ALERT_AFTER = "3"
+# Optional display name in messages (default: Mistgate panel).
+ALERT_NAME = "Mistgate panel"
+# Optional message language: en or ru (default: en).
+ALERT_LANG = "en"
+
+# Set these as secrets with `wrangler secret put`, not as plaintext vars:
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID

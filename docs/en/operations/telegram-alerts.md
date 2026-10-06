@@ -1,6 +1,6 @@
 ---
 title: Telegram alerts
-description: Send the panel's alerts to Telegram. Set up the bot with BotFather, link your chat, what is sent and to whom, and how the mirror Worker can use the same bot.
+description: Send the panel's alerts to Telegram. Set up the bot with BotFather, link your chat, what is sent and to whom, and use the panel watcher for outage alerts.
 ---
 
 The panel can write to your Telegram when something needs a human: a node goes down or comes back, a check fails, a backup fails, a new release is out, an agent's plan waits for your approval. It is **off until the owner sets a bot up**, and it only sends alerts: there are no commands, nothing to approve or change from the chat. An approval stays in the admin, behind a passkey or an authenticator code.
@@ -25,7 +25,7 @@ Each admin links their own chat; the owner does not link anyone else. Open **Int
 
 The code works **once** and for **10 minutes**; a new code replaces the old one. Only a private chat can be linked, not a group. A chat sending anything else to the bot gets no reply at all, so a stranger who finds the bot learns nothing from it. A chat belongs to one admin: linking it to another admin moves it.
 
-Once linked you can switch **Send me alerts** off without unlinking, **Send test** (one message to your chat, at most one every 10 seconds), or **Unlink**. Linking and unlinking are written to the audit log (`telegram_link`, `telegram_unlink`). The card also shows your **Chat ID**, which the mirror Worker needs (below).
+Once linked you can switch **Send me alerts** off without unlinking, **Send test** (one message to your chat, at most one every 10 seconds), or **Unlink**. Linking and unlinking are written to the audit log (`telegram_link`, `telegram_unlink`). The card also shows your **Chat ID**, which the panel watcher uses.
 
 ## What is sent, and to whom
 
@@ -53,9 +53,9 @@ How the messages behave:
 
 The panel connects out to `api.telegram.org` over HTTPS; the host must be able to reach it. A failed send is retried with a growing wait; a "too many requests" answer is waited out for as long as Telegram asks, capped at one hour to guard against invalid values; a chat that cannot be written to (you blocked the bot) is not retried. The messages waiting in memory when the panel stops are sent first, within a few seconds; a crash loses them. If Telegram refuses the token, or the panel cannot reach it, the card shows it under **Bot**.
 
-## The mirror Worker can use the same bot
+## Watch for a panel outage
 
-When the panel itself is down, the panel cannot tell you. The Cloudflare mirror Worker is a separate program that can: it can send its "the panel is down" and "back up" messages through the same bot and to the same chat. It needs the **bot token** (from BotFather: `/mybots` → your bot → **API Token**; the panel never shows it again) and your **Chat ID** (shown on your linked card). The Worker only sends (`sendMessage`); it must not set a webhook or poll the bot, or the panel can no longer hear the linking code.
+The [panel watcher](panel-watcher.md) is a separate Cloudflare Worker that checks the panel and sends down and recovery alerts to your linked chat. It uses the same bot and your **Chat ID** from your own linked card. It only sends Telegram messages; it does not poll the bot or set a webhook.
 
 ## Who can do what
 
