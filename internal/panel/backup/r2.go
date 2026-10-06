@@ -1,3 +1,5 @@
+//go:build !js
+
 package backup
 
 import (
@@ -13,8 +15,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -77,10 +77,7 @@ func newS3API(ctx context.Context, cfg store.PanelBackupSettings, decryptSecret 
 		return nil, errBackupInvalidSettings
 	}
 	defer clear(secret)
-	awsConfig, err := config.LoadDefaultConfig(ctx,
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, string(secret), "")),
-		config.WithRegion("auto"),
-	)
+	awsConfig, err := loadBackupAWSConfig(ctx, cfg, string(secret))
 	if err != nil {
 		return nil, errBackupStorageFailed
 	}
@@ -120,6 +117,15 @@ func testStorage(ctx context.Context, api s3API, bucket string) error {
 	}
 	return readErr
 }
+
+func checkBackupBucket(ctx context.Context, api s3API, bucket string) error {
+	if _, err := api.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(r2BackupPrefix), MaxKeys: aws.Int32(1)}); err != nil {
+		return errBackupStorageFailed
+	}
+	return nil
+}
+
+func edgeRPCUnavailable() error { return nil }
 
 func uploadBackup(ctx context.Context, api s3API, bucket, key, filePath string) (int64, error) {
 	return uploadBackupWithLimits(ctx, api, bucket, key, filePath, r2SingleUploadLimit, r2MultipartPartSize)

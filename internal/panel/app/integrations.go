@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -14,10 +14,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// Integrations: the API token and approval services, the MCP endpoint and the sweep of old plans. The
-// token model itself lives in auth and store; the MCP layer (internal/panel/mcp) knows them only through the small
-// interfaces below, and this file is the one place that connects them.
-
 // integrationHandlers are ApiTokenService and ApprovalService, owner only behind the session middleware.
 func integrationHandlers(authSvc *auth.Service) []httpserver.AdminHandler {
 	var out []httpserver.AdminHandler
@@ -30,7 +26,7 @@ func integrationHandlers(authSvc *auth.Service) []httpserver.AdminHandler {
 
 // mcpEndpoint is httpserver.Config.MCP: the MCP handler behind the bearer middleware of auth.
 // onWaiting (may be nil) is told when a plan starts waiting for the owner's approval (the Telegram alert).
-func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWaiting func(tool, tokenName string)) func(api http.Handler) http.Handler {
+func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time) func(api http.Handler) http.Handler {
 	return func(api http.Handler) http.Handler {
 		h, err := mcp.New(mcp.Config{
 			Plans: planStore{st: st, onWaiting: onWaiting},
@@ -45,7 +41,7 @@ func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWai
 				if a := auth.ClientIPFrom(ctx); a.IsValid() {
 					ip = a.String()
 				}
-				if err := st.Audit(ctx, time.Now(), store.AuditEntry{
+				if err := st.Audit(ctx, now(), store.AuditEntry{
 					Actor: e.Actor, Action: e.Action, Params: params, Result: e.Result, Source: store.AuditMCP, IP: ip,
 				}); err != nil {
 					log.Warn("audit mcp row", "action", e.Action, "err", err)
@@ -62,12 +58,12 @@ func mcpEndpoint(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWai
 	}
 }
 
-// sweepPlans runs store.ExpireMCPPlans once a minute until ctx ends.
-func sweepPlans(ctx context.Context, st *store.Store, log *slog.Logger) {
+// sweepPlans expires old MCP plans once a minute until ctx ends.
+func sweepPlans(ctx context.Context, st *store.Store, log *slog.Logger, now func() time.Time) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 	for {
-		if n, err := st.ExpireMCPPlans(ctx, time.Now()); err != nil && ctx.Err() == nil {
+		if n, err := st.ExpireMCPPlans(ctx, now()); err != nil && ctx.Err() == nil {
 			log.Warn("mcp plan sweep", "err", err)
 		} else if n > 0 {
 			log.Debug("mcp plan sweep", "rows", n)

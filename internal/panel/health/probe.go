@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	coreErrs "github.com/apernet/hysteria/core/v2/errors"
-
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -83,11 +81,11 @@ func classify(err error) (code, detail string) {
 		return pe.Code, pe.Detail
 	}
 	detail = store.Clip(strings.Join(strings.Fields(err.Error()), " "), 200)
-	var ae coreErrs.AuthError
 	low := strings.ToLower(detail)
+	if status, ok := hysteriaAuthStatus(err); ok {
+		return "auth", fmt.Sprintf("credential refused (HTTP %d)", status)
+	}
 	switch {
-	case errors.As(err, &ae):
-		return "auth", fmt.Sprintf("credential refused (HTTP %d)", ae.StatusCode)
 	case strings.Contains(low, "certificate") || strings.Contains(low, "x509") || strings.Contains(low, "tls:") || strings.Contains(low, "crypto_error"):
 		return "tls", detail
 	case strings.Contains(low, "refused") || strings.Contains(low, "unreachable") || strings.Contains(low, "connection reset"):

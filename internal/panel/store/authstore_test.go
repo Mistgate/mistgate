@@ -13,6 +13,28 @@ import (
 	"time"
 )
 
+func TestSetupTokenStatus(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	if admin, expiry, active, err := s.SetupTokenStatus(ctx, now); err != nil || admin || active || !expiry.IsZero() {
+		t.Fatalf("empty store status = admin %v, expiry %v, active %v, err %v", admin, expiry, active, err)
+	}
+	if err := s.PutSetupToken(ctx, []byte("setup"), now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if admin, expiry, active, err := s.SetupTokenStatus(ctx, now); err != nil || admin || !active || !expiry.Equal(now.Add(time.Hour)) {
+		t.Fatalf("pending token status = admin %v, expiry %v, active %v, err %v", admin, expiry, active, err)
+	}
+	if admin, expiry, active, err := s.SetupTokenStatus(ctx, now.Add(time.Hour)); err != nil || admin || active || !expiry.IsZero() {
+		t.Fatalf("expired token status = admin %v, expiry %v, active %v, err %v", admin, expiry, active, err)
+	}
+	firstAdmin(t, s, now)
+	if admin, _, active, err := s.SetupTokenStatus(ctx, now); err != nil || !admin || active {
+		t.Fatalf("completed setup status = admin %v, active %v, err %v", admin, active, err)
+	}
+}
+
 func firstAdmin(t *testing.T, s *Store, now time.Time) Admin {
 	t.Helper()
 	ctx := context.Background()

@@ -47,6 +47,24 @@ func (s *Store) AdminCount(ctx context.Context) (int, error) {
 	return n, err
 }
 
+// SetupTokenStatus reports whether setup is complete and the expiry of an unused,
+// unexpired setup token, using one query.
+func (s *Store) SetupTokenStatus(ctx context.Context, now time.Time) (adminExists bool, expiry time.Time, tokenExists bool, err error) {
+	var adminCount int64
+	var activeExpiry sql.NullInt64
+	err = s.R.QueryRowContext(ctx, `
+		SELECT (SELECT count(*) FROM admin),
+		       (SELECT expires_at FROM setup_token WHERE used_at IS NULL AND expires_at > ? ORDER BY expires_at DESC LIMIT 1)
+	`, unix(now)).Scan(&adminCount, &activeExpiry)
+	if err != nil {
+		return false, time.Time{}, false, err
+	}
+	if activeExpiry.Valid {
+		return adminCount > 0, fromUnix(activeExpiry.Int64), true, nil
+	}
+	return adminCount > 0, time.Time{}, false, nil
+}
+
 // PutSetupToken stores a new one-time setup token hash and drops older unused ones,
 // so only the latest printed link works.
 func (s *Store) PutSetupToken(ctx context.Context, hash []byte, expires time.Time) error {

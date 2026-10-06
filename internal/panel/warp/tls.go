@@ -1,3 +1,5 @@
+//go:build !js
+
 package warp
 
 // The ClientHello below and the way it is applied are derived from wgcf v2.3.0 (cloudflare/api.go,

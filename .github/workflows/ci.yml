@@ -15,8 +15,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - run: GOOS=js GOARCH=wasm go build ./internal/panel/... ./cmd/mistgate/
+      - run: GOOS=js GOARCH=wasm go build ./internal/panel/... ./cmd/mistgate/ ./cmd/mistgate-edge
+      - name: edge-entry wasm size
+        run: |
+          wasm="$RUNNER_TEMP/mistgate-edge.wasm"
+          GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o "$wasm" ./cmd/mistgate-edge
+          bytes=$(stat -c%s "$wasm")
+          echo "edge-entry wasm size: ${bytes} bytes (limit: 52428800 bytes)"
+          if [ "$bytes" -gt 52428800 ]; then exit 1; fi
       - run: pwsh -File scripts/test-edge-store.ps1
+      - run: pwsh -File scripts/test-edge-entry.ps1
 
   go:
     runs-on: ubuntu-latest

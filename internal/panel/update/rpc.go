@@ -160,6 +160,9 @@ func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.Ch
 }
 
 func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
+	if err := edgeFileRPCUnavailable(); err != nil {
+		return nil, err
+	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -258,6 +261,9 @@ func (r rpc) RollbackNode(ctx context.Context, req *connect.Request[adminv1.Roll
 }
 
 func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.RescanBundleRequest]) (*connect.Response[adminv1.RescanBundleResponse], error) {
+	if err := edgeFileRPCUnavailable(); err != nil {
+		return nil, err
+	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}

@@ -123,6 +123,8 @@ Doctor reports are snapshots, not reliable messages: the newest one wins. The ag
 - **SSH installs** connect with a password the owner enters, as root or as a user with passwordless sudo, and only to the host key the owner confirmed. The panel opens SSH, 80/tcp, 443/tcp and 443/udp in a host firewall that is already active (UFW or firewalld), uploads the agent from the trusted bundle, enrolls it with a fresh token on stdin, starts the unit and waits for the node to connect. The password stays in the database, sealed with the master key, as the node's saved access (password rotation, reveal after a step-up); it outlives a retired node until the owner forgets it. See [Install a node over SSH](../getting-started/ssh-install.md).
 - **Backups** run on a schedule (every 1 to 168 hours) or on demand: the panel snapshots the database, packs it with the other data files and the master key, encrypts the archive with age to the owner's public recipient and uploads it to Cloudflare R2. The private identity never reaches the panel; `mistgate backup restore` decrypts offline. See [Backups](../operations/backups.md).
 
+The **edge edition** stores panel data in D1. Tunnel probes run on nodes. File-backed panel backup and panel update operations are unavailable in the Worker; off-site backup support for this edition requires the R2 binding (phase 2). On startup, the Worker logs a setup link only when there is no admin and no unused, unexpired setup link. Later isolates reuse that link until it expires, so check the Worker logs for its expiry instead of expecting a new link on every start.
+
 ## The panel's HTTP surface
 
 | Listener | Serves |

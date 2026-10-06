@@ -17,8 +17,6 @@ import (
 
 	"connectrpc.com/connect"
 	"filippo.io/age"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
@@ -220,6 +218,12 @@ func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[admi
 }
 
 func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.TestBackupStorageRequest]) (*connect.Response[adminv1.TestBackupStorageResponse], error) {
+	if err := requireOwner(ctx); err != nil {
+		return nil, err
+	}
+	if err := edgeRPCUnavailable(); err != nil {
+		return nil, err
+	}
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -240,6 +244,12 @@ func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.T
 }
 
 func (r rpc) CreateBackup(ctx context.Context, _ *connect.Request[adminv1.CreateBackupRequest]) (*connect.Response[adminv1.CreateBackupResponse], error) {
+	if err := requireOwner(ctx); err != nil {
+		return nil, err
+	}
+	if err := edgeRPCUnavailable(); err != nil {
+		return nil, err
+	}
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -277,6 +287,9 @@ func (s *Service) startBackup(ctx context.Context) error {
 
 func (r rpc) ListBackups(ctx context.Context, _ *connect.Request[adminv1.ListBackupsRequest]) (*connect.Response[adminv1.ListBackupsResponse], error) {
 	if err := requireOwner(ctx); err != nil {
+		return nil, err
+	}
+	if err := edgeRPCUnavailable(); err != nil {
 		return nil, err
 	}
 	settings, err := r.s.st.PanelBackupSettings(ctx)
@@ -397,7 +410,7 @@ func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error)
 		s.recordRun(ctx, false, errorCode(err))
 		return backupObject{}, "", err
 	}
-	if _, err := api.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(settings.Bucket), Prefix: aws.String(r2BackupPrefix), MaxKeys: aws.Int32(1)}); err != nil {
+	if err := checkBackupBucket(ctx, api, settings.Bucket); err != nil {
 		s.recordRun(ctx, false, errorCode(errBackupStorageFailed))
 		return backupObject{}, "", errBackupStorageFailed
 	}
