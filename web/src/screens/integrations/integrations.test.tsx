@@ -330,6 +330,30 @@ describe("the Integrations screen: approvals", () => {
     expect(document.querySelector<HTMLInputElement>("input[type=password]")?.value ?? "").toBe("");
   });
 
+  it("shows the WARP terms link and explains the owner-approved device replacement", async () => {
+    await mount(
+      tokens([]),
+      inbox([
+        approval({
+          tool: "warp_reregister",
+          danger: ["step_up"],
+          facts: [
+            { key: "node", value: "de1", untrusted: true },
+            { key: "profiles", value: "Main, Backup", untrusted: true },
+            { key: "effect", value: "", untrusted: false, code: "warp_reregister" },
+            { key: "terms_url", value: "https://www.cloudflare.com/application/terms/", untrusted: false },
+          ],
+        }),
+      ]),
+    );
+    expect(text()).toContain("Register a new WARP device");
+    expect(text()).toContain("accepts Cloudflare's WARP terms for this account");
+    const link = document.querySelector<HTMLAnchorElement>('a[href="https://www.cloudflare.com/application/terms/"]');
+    expect(link?.textContent).toBe("Cloudflare WARP terms");
+    expect(link?.target).toBe("_blank");
+    expect(link?.rel).toBe("noopener noreferrer");
+  });
+
   it("refuses to approve what has run out of time", async () => {
     await mount(tokens([]), inbox([approval({ expiresUnix: NOW - 1 })]));
     expect(text()).toContain("expired");

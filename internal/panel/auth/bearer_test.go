@@ -151,6 +151,7 @@ const (
 	pDeleteUsers  = adminv1connect.UserServiceDeleteUsersProcedure
 	pApplyFix     = adminv1connect.HealthServiceApplyFixProcedure
 	pStartRollout = adminv1connect.UpdateServiceStartRolloutProcedure
+	pRegisterWarp = adminv1connect.WarpServiceRegisterWarpProcedure
 )
 
 func applyFixBody(t *testing.T, dry bool, ct string) []byte {
@@ -356,7 +357,7 @@ func TestBearerAllowListAndProfiles(t *testing.T) {
 		{adminv1connect.DeviceServiceGetDeviceConfigsProcedure, 403, 403, 403},
 		{adminv1connect.NodeServiceCreateEnrollmentProcedure, 403, 403, 403},
 		{adminv1connect.NodeServiceStreamLogsProcedure, 403, 403, 403},
-		{adminv1connect.WarpServiceGetWarpProcedure, 403, 403, 403},
+		{adminv1connect.WarpServiceGetWarpProcedure, 403, 403, 403}, // MCP-planning only: raw API tokens get no WARP response
 		{adminv1connect.InstanceServiceUpdateInstanceProcedure, 403, 403, 403},
 		{adminv1connect.AuthServiceListSessionsProcedure, 403, 403, 403},
 		{adminv1connect.AuthServiceMeProcedure, 403, 403, 403},
@@ -402,6 +403,27 @@ func TestBearerAllowListAndProfiles(t *testing.T) {
 		if w.Code != 200 {
 			t.Errorf("owner cookie on %s: %d", p, w.Code)
 		}
+	}
+}
+
+func TestWarpGetIsMCPPlanningOnlyForTokens(t *testing.T) {
+	e := newTokenEnv(t)
+	_, secret := e.mkToken("ro", store.ProfileReadonly, 600)
+	path := adminv1connect.WarpServiceGetWarpProcedure
+	if got := e.code(path, secret); got != 403 {
+		t.Fatalf("raw API token GetWarp: %d, want 403", got)
+	}
+	ctx := WithPlanning(WithChannel(context.Background(), ChannelMCP))
+	if got := e.code(path, secret, callOpts{ctx: ctx}); got != 200 {
+		t.Errorf("MCP planning GetWarp: %d, want 200", got)
+	}
+}
+
+func TestWarpRegisterTokenNeedsApprovedPlan(t *testing.T) {
+	e := newTokenEnv(t)
+	_, secret := e.mkToken("ad", store.ProfileAdmin, 600)
+	if got := e.code(pRegisterWarp, secret); got != 403 {
+		t.Fatalf("RegisterWarp without an approved plan: %d, want 403", got)
 	}
 }
 
@@ -673,8 +695,12 @@ func TestApprovedGrant(t *testing.T) {
 	if e.seen.admin.ID != "mcp:"+tok.ID {
 		t.Errorf("actor of the approved apply: %s", e.seen.admin.ID)
 	}
+	warpPlan := e.planFor(tok, "warp_reregister", true, "applying")
+	if got := try(pRegisterWarp, secret, mcp(warpPlan.ID)); got != 200 || e.seen.stepUpErr != nil {
+		t.Errorf("the approved WARP re-registration grant: status=%d step-up=%v", got, e.seen.stepUpErr)
+	}
 	// ... and nothing else: not another procedure that needs approval, not a closed one
-	for _, path := range []string{pApplyFix, adminv1connect.UpdateServiceRollbackNodeProcedure, adminv1connect.UpdateServiceCancelRolloutProcedure, pDeleteUsers, adminv1connect.WarpServiceDeleteWarpProcedure} {
+	for _, path := range []string{pApplyFix, adminv1connect.UpdateServiceRollbackNodeProcedure, adminv1connect.UpdateServiceCancelRolloutProcedure, pDeleteUsers, adminv1connect.WarpServiceDeleteWarpProcedure, pRegisterWarp} {
 		if got := try(path, secret, mcp(p.ID)); got != 403 {
 			t.Errorf("a rollout_start grant on %s: %d", path, got)
 		}
@@ -860,8 +886,14 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 12 {
-		t.Errorf("%d procedures need approval, want 12: %v", len(approved), approved)
+	if len(approved) != 13 {
+		t.Errorf("%d procedures need approval, want 13: %v", len(approved), approved)
+	}
+	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
+		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
+	}
+	if got, ok := TokenAccess(adminv1connect.WarpServiceGetWarpProcedure); !ok || got != TokenAccessPlanning {
+		t.Errorf("GetWarp token access = %d, %v; want MCP planning only", got, ok)
 	}
 	// every grant is for a procedure that is on the list as approved
 	for tool, path := range grantProcedures {
@@ -931,9 +963,16 @@ func TestTokenAllowList(t *testing.T) {
 		}
 	}
 	for path := range tokenProcedures {
-		for _, svc := range []string{"WarpService", "DeviceService", "DnsService", "InstanceService", "ApiTokenService", "ApprovalService", "AwgService"} {
+		for _, svc := range []string{"DeviceService", "DnsService", "InstanceService", "ApiTokenService", "ApprovalService", "AwgService"} {
 			if strings.Contains(path, "."+svc+"/") {
 				t.Errorf("%s: %s is closed to tokens as a whole", path, svc)
+			}
+		}
+		if strings.Contains(path, ".WarpService/") {
+			switch path {
+			case adminv1connect.WarpServiceGetWarpProcedure, adminv1connect.WarpServiceRestartWarpProcedure, adminv1connect.WarpServiceRegisterWarpProcedure:
+			default:
+				t.Errorf("%s: WARP is closed to tokens except for its MCP tools", path)
 			}
 		}
 		if strings.Contains(path, "AuthService") && path != adminv1connect.AuthServiceListAuditProcedure {

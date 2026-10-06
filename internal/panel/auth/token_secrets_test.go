@@ -34,6 +34,10 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.PlatformApp.download_url":                    "a public app download link every user's page shows",
 		"mistgate.admin.v1.PlatformApp.add_link_template":               "a template with placeholders; the subscription URL is filled in only on the user's own page",
 		"mistgate.admin.v1.UserPageOptions.require_page_password":       "a bool: whether the pages ask for a password",
+		"mistgate.admin.v1.WarpAccount.peer_public_key":                 "a public key; private keys are never returned",
+		"mistgate.admin.v1.WarpAccount.has_token":                       "a bool: whether refresh is available, not a token",
+		"mistgate.admin.v1.WarpAccount.tos_url":                         "the public Cloudflare terms link",
+		"mistgate.admin.v1.GetWarpResponse.tos_url":                     "the public Cloudflare terms link",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

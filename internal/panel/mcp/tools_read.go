@@ -148,6 +148,20 @@ func readTools() []toolDef {
 				return nodeGetView(r.Msg), nil
 			}),
 
+		readTool("warp_status", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.WarpServiceGetWarpProcedure),
+			"One node's WARP account and last agent report: whether it is enabled or paused, agent state, colo, handshake age, Cloudflare and other-site probes, registration time, refresh availability, and profiles using WARP egress. No addresses, keys or tokens.",
+			func(c *call, in nodeArg) (any, error) {
+				id, name, err := c.nodeRef(in.Node)
+				if err != nil {
+					return nil, err
+				}
+				r, err := c.cl.Warp.GetWarp(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetWarpRequest{NodeId: id}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				return warpStatusView(id, name, r.Msg, c.e.now()), nil
+			}),
+
 		readTool("node_metrics", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
 			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. The panel keeps no per-node history, so there are no time series.",
 			func(c *call, in nodeArg) (any, error) {

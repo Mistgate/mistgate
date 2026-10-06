@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"time"
+
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
 
@@ -214,6 +216,71 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 			UserID: u.GetUserId(), UserName: nm(u.GetUserName()), Protocol: clean(u.GetProtocol(), 40),
 			Device: nm(u.GetDeviceModel()), ConnectedAt: u.GetConnectedAtUnix(), DownBps: u.GetDownBps(),
 		})
+	}
+	return v
+}
+
+// WarpStatusV is the warp_status result. It intentionally projects only status and probe fields from GetWarp: account
+// addresses, endpoints, keys and registration metadata stay inside the panel.
+type WarpStatusV struct {
+	NodeID            string      `json:"node_id"`
+	NodeName          string      `json:"node_name"`
+	HasAccount        bool        `json:"has_account"`
+	Enabled           bool        `json:"enabled"`
+	Paused            bool        `json:"paused"`
+	AgentState        string      `json:"agent_state"`
+	Colo              string      `json:"colo,omitempty"`
+	LastHandshakeAgeS *uint64     `json:"last_handshake_age_s,omitempty"`
+	ProbeCloudflare   *warpProbeV `json:"probe_cloudflare,omitempty"`
+	ProbeOther        *warpProbeV `json:"probe_other,omitempty"`
+	RegisteredUnix    int64       `json:"registered_unix,omitempty"`
+	HasToken          bool        `json:"has_token"`
+	Profiles          []string    `json:"profiles"`
+}
+
+type warpProbeV struct {
+	OK          bool   `json:"ok"`
+	LatencyMS   uint32 `json:"latency_ms,omitempty"`
+	FailureCode string `json:"failure_code,omitempty"`
+}
+
+func warpAgentState(s adminv1.WarpState) string {
+	switch s {
+	case adminv1.WarpState_WARP_STATE_UP:
+		return "up"
+	case adminv1.WarpState_WARP_STATE_STARTING:
+		return "starting"
+	case adminv1.WarpState_WARP_STATE_DOWN:
+		return "down"
+	default:
+		return "none"
+	}
+}
+
+func warpProbeView(p *adminv1.WarpProbeResult, fallback bool) *warpProbeV {
+	if p == nil {
+		return &warpProbeV{OK: fallback}
+	}
+	return &warpProbeV{OK: p.GetOk(), LatencyMS: p.GetLatencyMs(), FailureCode: clean(p.GetFailureCode(), 60)}
+}
+
+func warpStatusView(nodeID, nodeName string, r *adminv1.GetWarpResponse, now time.Time) *WarpStatusV {
+	v := &WarpStatusV{NodeID: nodeID, NodeName: nm(nodeName), AgentState: "none", Profiles: []string{}}
+	if a := r.GetAccount(); a != nil {
+		v.HasAccount, v.Enabled, v.Paused = true, a.GetEnabled(), !a.GetEnabled()
+		v.RegisteredUnix, v.HasToken = a.GetCreatedUnix(), a.GetHasToken()
+	}
+	if h := r.GetHealth(); h != nil {
+		v.AgentState, v.Colo = warpAgentState(h.GetState()), clean(h.GetColo(), 8)
+		if at := h.GetLastHandshakeUnix(); at > 0 {
+			age := uint64(max(int64(0), now.Unix()-at))
+			v.LastHandshakeAgeS = &age
+		}
+		v.ProbeCloudflare = warpProbeView(h.GetProbeCloudflare(), h.GetProbeCloudflareOk())
+		v.ProbeOther = warpProbeView(h.GetProbeOther(), h.GetProbeOtherOk())
+	}
+	for _, in := range r.GetInbounds() {
+		v.Profiles = append(v.Profiles, nm(in.GetProfileName()))
 	}
 	return v
 }

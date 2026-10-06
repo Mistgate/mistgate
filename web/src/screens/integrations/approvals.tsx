@@ -7,6 +7,7 @@ import { TextField } from "@/components/ui/text-field";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { useFmt } from "@/lib/format";
+import { safeHttpUrl } from "@/lib/warp";
 import {
   approvalStateInfo,
   clockText,
@@ -28,12 +29,18 @@ import { card, ProfileChip } from "./parts";
 function FactRow({ fact }: { fact: Fact }) {
   const t = useT();
   const fmt = useFmt();
+  const termsUrl = fact.key === "terms_url" ? safeHttpUrl(fact.value) : "";
   return (
     <div className="flex flex-col gap-0.5 text-[13px] sm:flex-row sm:items-baseline sm:gap-3">
       <dt className="text-xs text-muted sm:w-36 sm:flex-none">{factLabel(t, fact.key)}</dt>
       {/* a host key fingerprint or an id has no spaces: it breaks anywhere instead of running off a phone's screen */}
       <dd className="min-w-0 flex-1 text-pretty wrap-anywhere">
-        {factWords(t, fmt, fact).map((p, i) =>
+        {termsUrl && (
+          <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-accent-text underline decoration-dotted underline-offset-2">
+            {t("warp.tosLink")}
+          </a>
+        )}
+        {!termsUrl && factWords(t, fmt, fact).map((p, i) =>
           typeof p === "string" ? (
             <span key={i}>{p}</span>
           ) : (

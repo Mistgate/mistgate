@@ -12,14 +12,14 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 )
 
-// Every tool's minimum profile is the strictest role among the procedures it calls: a tool cannot claim to be safer than
-// its procedures (auth.ProcedureRole is the panel's own policy). Every procedure must be one tokens may reach, and one that
+// Every tool's minimum profile is the strictest token role among the procedures it calls: a tool cannot claim to be safer
+// than its procedures (auth.TokenProcedureRole is the token policy). Every procedure must be one tokens may reach, and one that
 // needs the owner's approval or a step-up must belong to a dangerous tool, whose apply waits for the owner.
 func TestRegistryMatchesPolicy(t *testing.T) {
 	for _, td := range registry {
 		want := 1
 		for _, p := range td.procs {
-			want = max(want, roleRank(auth.ProcedureRole(p)))
+			want = max(want, roleRank(auth.TokenProcedureRole(p)))
 			access, ok := auth.TokenAccess(p)
 			if !ok {
 				t.Errorf("%s: %s is not on the token allow-list", td.name, p)
@@ -100,7 +100,7 @@ func TestRegistryShape(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 15, ProfileOperator: 33, ProfileAdmin: 57}
+	want := map[Profile]int{ProfileReadonly: 16, ProfileOperator: 34, ProfileAdmin: 62}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)

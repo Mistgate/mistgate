@@ -16,9 +16,9 @@ const (
 	// TokenAccessApproved: only with a grant in the context (WithPlanning for a call that changes nothing,
 	// WithApprovedStepUp for the owner's approved plan), which only the MCP layer can create. Never over /api.
 	TokenAccessApproved = 2
-	// TokenAccessPlanning: only while the MCP layer makes a plan (WithPlanning on the MCP channel). The call changes
-	// nothing but must not be a free tool for a script: GetSSHFingerprint would let any admin token probe the network
-	// from the panel. Never over /api.
+	// TokenAccessPlanning: only for an in-process MCP call carrying WithPlanning on the MCP channel. It changes nothing,
+	// but the raw response is not a free tool for a script (for example, GetSSHFingerprint probes a host and GetWarp
+	// contains node network details). Never over /api.
 	TokenAccessPlanning = 3
 )
 
@@ -43,6 +43,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
+	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
+	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
@@ -69,6 +71,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       TokenAccessApproved,
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              TokenAccessApproved,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: TokenAccessApproved,
+	adminv1connect.WarpServiceRegisterWarpProcedure:                     TokenAccessApproved,
 	// What every user's page shows: one app at a time, through subscription_app_upsert / _remove (level write).
 	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: TokenAccessApproved,
 }
@@ -118,6 +121,7 @@ var stepUpProcedures = map[string]bool{
 // a node_fix plan cannot start a rollout. A tool that is not listed gets no grant at all. The keys are the tool
 // names without the _plan / _apply suffix, as stored in mcp_plan.tool.
 var grantProcedures = map[string]string{
+	"warp_reregister":             adminv1connect.WarpServiceRegisterWarpProcedure,
 	"node_fix":                    adminv1connect.HealthServiceApplyFixProcedure,
 	"rollout_start":               adminv1connect.UpdateServiceStartRolloutProcedure,
 	"rollout_pause":               adminv1connect.UpdateServicePauseRolloutProcedure,
@@ -131,6 +135,22 @@ var grantProcedures = map[string]string{
 	"node_server_password_rotate": adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure,
 	"subscription_app_upsert":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
 	"subscription_app_remove":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
+}
+
+// tokenProcedureRoles is narrower than the signed-in admin policy: the MCP projection for GetWarp omits its node
+// addresses and public key, so readonly tokens may ask the MCP server for that redacted view without opening GetWarp
+// to readonly panel sessions.
+var tokenProcedureRoles = map[string]string{
+	adminv1connect.WarpServiceGetWarpProcedure: store.RoleReadonly,
+}
+
+// TokenProcedureRole is the minimum profile role for a token to call a procedure. It may be narrower than
+// ProcedureRole when the MCP layer safely projects a response before returning it.
+func TokenProcedureRole(path string) string {
+	if role, ok := tokenProcedureRoles[path]; ok {
+		return role
+	}
+	return ProcedureRole(path)
 }
 
 // ProcedureRole is the lowest role that may call a procedure: "readonly", "helper" or "owner". Unknown

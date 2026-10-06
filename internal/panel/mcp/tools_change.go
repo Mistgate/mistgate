@@ -14,6 +14,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/warp"
 )
 
 // The change tools. The plan step reads what it needs to describe the change in the panel's own
@@ -30,12 +31,136 @@ func changeTools() []toolDef {
 	var out []toolDef
 	for _, g := range [][]toolDef{
 		change(userCreate), change(userUpdate), change(userDisable), change(userEnable), change(userResetTraffic), change(deviceRevoke), change(alertMute),
+		change(warpRestart), change(warpReregister),
 		change(nodeFix), change(rolloutStart), change(nodeUpdateSchedule), change(nodeUpdateScheduleCancel), change(updateTimezone),
 		change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
 	} {
 		out = append(out, g...)
 	}
 	return out
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// WARP
+
+type warpRestartArgs struct {
+	ReasonField
+	Node string `json:"node" jsonschema:"node id or exact name"`
+}
+
+var warpRestart = changeSpec[warpRestartArgs]{
+	name: "warp_restart", min: ProfileAdmin,
+	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure,
+		adminv1connect.WarpServiceGetWarpProcedure, adminv1connect.WarpServiceRestartWarpProcedure),
+	desc: "Restart one node's WARP tunnel. The plan names the profiles that may blink for a few seconds; no owner approval is needed.",
+	plan: func(c *call, a warpRestartArgs) (*planned, error) {
+		id, name, err := c.nodeRef(a.Node)
+		if err != nil {
+			return nil, err
+		}
+		node, err := c.cl.Node.GetNode(c.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: id}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		switch node.Msg.GetNode().GetStatus() {
+		case adminv1.NodeStatus_NODE_STATUS_ONLINE, adminv1.NodeStatus_NODE_STATUS_BLIP,
+			adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC, adminv1.NodeStatus_NODE_STATUS_UPDATING:
+		case adminv1.NodeStatus_NODE_STATUS_DOWN, adminv1.NodeStatus_NODE_STATUS_PENDING:
+			return nil, errors.New("node is offline")
+		case adminv1.NodeStatus_NODE_STATUS_RETIRED:
+			return nil, errors.New("node is retired")
+		default:
+			return nil, errors.New("node status is unavailable")
+		}
+		w, err := c.cl.Warp.GetWarp(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetWarpRequest{NodeId: id}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		if w.Msg.GetAccount() == nil {
+			return nil, errors.New("node has no WARP account")
+		}
+		if !w.Msg.GetAccount().GetEnabled() {
+			return nil, errors.New("WARP account is paused")
+		}
+		profiles := make([]string, 0, len(w.Msg.GetInbounds()))
+		for _, in := range w.Msg.GetInbounds() {
+			profiles = append(profiles, nm(in.GetProfileName()))
+		}
+		profileList := strings.Join(profiles, ", ")
+		if profileList == "" {
+			profileList = "none"
+		}
+		return &planned{
+			Summary: "Restart the WARP tunnel on one node. The listed WARP egress profiles may blink for a few seconds.",
+			Facts:   []Fact{{Key: "node", Value: nm(name), Untrusted: true}, {Key: "profiles", Value: profileList, Untrusted: true}},
+			Params:  warpRestartArgs{Node: id},
+		}, nil
+	},
+	apply: func(c *call, a warpRestartArgs, _ Plan) (done, error) {
+		r, err := c.cl.Warp.RestartWarp(c.ctx, connect.NewRequest(&adminv1.RestartWarpRequest{NodeId: a.Node}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		if !r.Msg.GetConfirmed() {
+			return done{text: "Restart sent, but the node did not confirm the pause before resume."}, nil
+		}
+		return done{text: "WARP tunnel restarted."}, nil
+	},
+}
+
+type warpReregisterArgs struct {
+	ReasonField
+	Node string `json:"node" jsonschema:"node id or exact name"`
+}
+
+var warpReregister = changeSpec[warpReregisterArgs]{
+	name: "warp_reregister", min: ProfileAdmin, danger: true,
+	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.WarpServiceGetWarpProcedure,
+		adminv1connect.WarpServiceRegisterWarpProcedure),
+	desc: "Register a new anonymous WARP device in place of the node's current account. This changes its WARP exit IP and accepts Cloudflare's terms after the owner approves the plan.",
+	plan: func(c *call, a warpReregisterArgs) (*planned, error) {
+		id, name, err := c.nodeRef(a.Node)
+		if err != nil {
+			return nil, err
+		}
+		w, err := c.cl.Warp.GetWarp(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetWarpRequest{NodeId: id}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		if w.Msg.GetAccount() == nil {
+			return nil, errors.New("node has no WARP account to replace")
+		}
+		if !w.Msg.GetAgentSupports() {
+			return nil, errors.New("node agent does not support WARP")
+		}
+		profiles := make([]string, 0, len(w.Msg.GetInbounds()))
+		for _, in := range w.Msg.GetInbounds() {
+			profiles = append(profiles, nm(in.GetProfileName()))
+		}
+		profileList := strings.Join(profiles, ", ")
+		if profileList == "" {
+			profileList = "none"
+		}
+		return &planned{
+			Summary: "Register a new anonymous WARP device to replace the current account on one node. This changes the node's WARP exit IP and accepts Cloudflare's terms for this account after owner approval.",
+			Facts: []Fact{
+				{Key: "node", Value: nm(name), Untrusted: true},
+				{Key: "profiles", Value: profileList, Untrusted: true},
+				codedFact("effect", "", "warp_reregister"),
+				{Key: "terms_url", Value: warp.TOSURL},
+			},
+			Danger: []string{dangerStepUp}, Params: warpReregisterArgs{Node: id},
+		}, nil
+	},
+	apply: func(c *call, a warpReregisterArgs, _ Plan) (done, error) {
+		_, err := c.cl.Warp.RegisterWarp(c.ctx, connect.NewRequest(&adminv1.RegisterWarpRequest{
+			NodeId: a.Node, AcceptTos: true, TosUrlShown: warp.TOSURL, ReplaceExisting: true,
+		}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		return done{text: "New WARP device registered, replacing the previous account."}, nil
+	},
 }
 
 func fmtBytes(n uint64) string {

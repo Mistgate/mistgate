@@ -224,7 +224,7 @@ func (s *Service) tokenDenied(r *http.Request, tok store.APIToken, path string) 
 	if !listed {
 		return msgNotForTokens
 	}
-	if !roleAllows(profileRole(tok.Profile), levelOf(path)) {
+	if !roleAllows(profileRole(tok.Profile), levelForRole(TokenProcedureRole(path))) {
 		return msgProfile
 	}
 	if access == TokenAccessDirect {

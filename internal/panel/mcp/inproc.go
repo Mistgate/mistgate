@@ -53,6 +53,7 @@ type clients struct {
 	Update       adminv1connect.UpdateServiceClient
 	Auth         adminv1connect.AuthServiceClient
 	Provisioning adminv1connect.ProvisioningServiceClient
+	Warp         adminv1connect.WarpServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -68,6 +69,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Update:       adminv1connect.NewUpdateServiceClient(hc, base),
 		Auth:         adminv1connect.NewAuthServiceClient(hc, base),
 		Provisioning: adminv1connect.NewProvisioningServiceClient(hc, base),
+		Warp:         adminv1connect.NewWarpServiceClient(hc, base),
 	}
 }
 

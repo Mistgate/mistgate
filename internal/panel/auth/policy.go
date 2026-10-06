@@ -213,6 +213,17 @@ func levelOf(path string) level {
 	return levelOwner
 }
 
+func levelForRole(role string) level {
+	switch role {
+	case store.RoleReadonly:
+		return levelRead
+	case store.RoleHelper:
+		return levelWrite
+	default:
+		return levelOwner
+	}
+}
+
 // roleAllows reports whether an admin with this role may call a procedure of this level. An unknown role
 // may call nothing above read.
 func roleAllows(role string, l level) bool {

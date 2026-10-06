@@ -91,6 +91,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 |---|---|---|
 | `fleet_status` | Read only | Every node with status, reason, online users, speed and CPU; totals, alert counts and the top consumers now. |
 | `node_get` | Read only | One node: status and reason, host facts, profiles with their state, up to 10 online users, the owner's notes. No addresses, keys or certificate pins. |
+| `warp_status` | Read only | Whether one node has a WARP account and whether it is enabled or paused; agent state, colo, handshake age, Cloudflare and other-site probe status and latency, registration time, refresh-token availability, and WARP egress profiles. No addresses, keys, account ids, license or tokens. |
 | `node_metrics` | Read only | The node's current CPU, RAM, disk and network, traffic today, online users per protocol, today's top users. |
 | `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
 | `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
@@ -123,6 +124,8 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
+| `warp_restart` | Admin | `node` id or exact name; the plan lists profiles using WARP egress that may blink for a few seconds; apply takes only `confirm_token` | no |
+| `warp_reregister` | Admin | `node` id or exact name and optional `reason` (at most 300 characters); apply takes only `confirm_token`. The plan shows the Cloudflare terms link; owner approval accepts them for this account and replaces it with a new anonymous device, changing the WARP exit IP | always |
 | `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |
 | `node_update_schedule` | Admin | Plan: `node_id`, `local_datetime` (`YYYY-MM-DDTHH:mm` in the offset from `updates_status`, at least a minute and at most a year ahead); the trusted version and offset are pinned in the plan | always |
 | `node_update_schedule_cancel` | Admin | `node_id` | always |
