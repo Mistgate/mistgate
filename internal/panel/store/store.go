@@ -34,7 +34,12 @@ type Store struct {
 }
 
 func (s *Store) lockAWGRetry(ctx context.Context) error {
-	s.awgRetryOnce.Do(func() { s.awgRetry = make(chan struct{}, 1) })
+	// Open initializes this channel; tests that construct Store directly still need a safe zero-value path.
+	s.awgRetryOnce.Do(func() {
+		if s.awgRetry == nil {
+			s.awgRetry = make(chan struct{}, 1)
+		}
+	})
 	if err := ctx.Err(); err != nil {
 		return err
 	}

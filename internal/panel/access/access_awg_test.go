@@ -833,7 +833,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gotDevice, gotCreds, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, store.AccessDevice{}, nil)
+	gotDevice, gotCreds, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, seed, nil)
 	if added {
 		t.Fatal("a read-back of an existing device reported a new credential")
 	}

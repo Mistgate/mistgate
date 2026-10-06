@@ -534,16 +534,13 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 // Mihomo format (see SubOptions). It reports whether any was added. A failure (an exhausted network, say) is
 // logged and leaves that user without AWG proxies: the subscription itself must not fail for it.
 func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, dev store.AccessDevice, creds []store.AccessCred) (store.AccessDevice, []store.AccessCred, bool) {
-	inputDev := dev
-	hadDevice := dev.ID != ""
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
-		return inputDev, creds, false
+		return dev, creds, false
 	}
-	a := s.st.Access()
-	workDev := dev
-	if workDev.ID == "" {
-		workDev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true}
+	issuerDeviceID := dev.ID
+	if issuerDeviceID == "" {
+		issuerDeviceID = store.NewID("dev_")
 	}
 	var want []store.AWGImplicitWant
 	seen := map[string]bool{}
@@ -565,39 +562,18 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		want = append(want, store.AWGImplicitWant{
 			ProfileID: f.Profile.ID,
 			MaxIdx:    maxIdx,
-			Issue:     s.awgIssuer(proto, u.ID, workDev.ID, f.Profile.ID, merged),
+			Issue:     s.awgIssuer(proto, u.ID, issuerDeviceID, f.Profile.ID, merged),
 		})
 	}
 	if len(want) == 0 {
-		return inputDev, creds, false
+		return dev, creds, false
 	}
-	addedCreds, err := a.EnsureImplicitAWGCreds(ctx, u.ID, workDev, s.now(), want)
+	result, err := s.st.Access().EnsureImplicitAWGCreds(ctx, u.ID, dev, s.now(), want)
 	if err != nil {
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
-		return inputDev, creds, false
+		return dev, creds, false
 	}
-	added := len(addedCreds) > 0
-	if !added && hadDevice {
-		return inputDev, creds, false
-	}
-	// Something was written here or by a concurrent fetch: the response carries exactly the live credentials.
-	actual, liveCreds, err := a.ImplicitDeviceCreds(ctx, u.ID)
-	if err == nil {
-		return actual, liveCreds, added
-	}
-	s.log.Warn("access: cannot read back live AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
-	if !added {
-		return inputDev, creds, false
-	}
-	if addedCreds[0].DeviceID != "" {
-		workDev.ID = addedCreds[0].DeviceID
-	}
-	for _, cred := range addedCreds {
-		if !slices.Contains(workDev.Protocols, cred.Protocol) {
-			workDev.Protocols = append(workDev.Protocols, cred.Protocol)
-		}
-	}
-	return workDev, append(creds, addedCreds...), true
+	return result.Device, result.Creds, len(result.Added) > 0
 }
 
 // deviceTouchEvery is how stale a device's last_seen_at must be before a subscription fetch refreshes it.

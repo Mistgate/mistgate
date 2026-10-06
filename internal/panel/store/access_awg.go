@@ -90,7 +90,7 @@ func accMapErr(err error) error {
 func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Time, issue AWGIssue) (int, error) {
 	cutoff := unix(now.Add(-awgQuarantine))
 	var idx int
-	_, exhausted, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+	_, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
 		idx = 0
 		var used int
 		if err := a.s.R.QueryRowContext(ctx,
@@ -134,10 +134,7 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		return stmts, nil
 	})
 	if err != nil {
-		if exhausted {
-			return 0, ErrConflict
-		}
-		return idx, accMapErr(err)
+		return 0, accMapErr(err)
 	}
 	return idx, nil
 }
@@ -171,9 +168,8 @@ func (a Access) awgAllocIdxRead(ctx context.Context, profileID string, maxIdx in
 // revokes the old credential and peer before inserting the new pair. It returns the device's user. ErrNotFound when
 // there is no such live AWG device.
 func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.Time, issue AWGIssue) (string, error) {
-	var lastUserID string
 	var resultUserID string
-	_, exhausted, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+	_, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
 		resultUserID = ""
 		var userID, oldCred, profileID string
 		var idx int
@@ -189,7 +185,7 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 		if err != nil {
 			return nil, accMapErr(err)
 		}
-		lastUserID, resultUserID = userID, userID
+		resultUserID = userID
 
 		var epoch int64
 		if err := a.s.R.QueryRowContext(ctx, `SELECT critical_epoch FROM profile WHERE id = ?`, profileID).Scan(&epoch); err != nil {
@@ -229,9 +225,6 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 		return stmts, nil
 	})
 	if err != nil {
-		if exhausted {
-			return lastUserID, ErrConflict
-		}
 		return resultUserID, accMapErr(err)
 	}
 	return resultUserID, nil
@@ -244,14 +237,24 @@ type AWGImplicitWant struct {
 	Issue     AWGIssue
 }
 
+// ImplicitAWGResult is the implicit device and its full live credential set from the read or write batch, plus the
+// credentials this call added.
+type ImplicitAWGResult struct {
+	Device AccessDevice
+	Creds  []AccessCred
+	Found  bool
+	Added  []AccessCred
+}
+
 // EnsureImplicitAWGCreds gives the user's implicit device (created from dev when there is none) an AWG
-// credential for every wanted profile that it has none for, and returns the credentials it added. A subscription
-// in the Mihomo format has no device identity, so every Mihomo client of the user shares this one peer per profile.
+// credential for every wanted profile that it has none for, and returns the device's full live credential set plus
+// the credentials it added. A subscription in the Mihomo format has no device identity, so every Mihomo client of the
+// user shares this one peer per profile.
 // The device limit is not checked: a subscription fetch must not fail because of it (the implicit device is one
 // per user, so the limit is exceeded by at most one).
-func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) ([]AccessCred, error) {
+func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) (ImplicitAWGResult, error) {
 	if len(want) == 0 {
-		return nil, nil
+		return ImplicitAWGResult{}, nil
 	}
 	profileIDs := make([]string, 0, len(want))
 	seen := map[string]bool{}
@@ -262,16 +265,16 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 	}
 	if len(profileIDs) == 0 {
-		return nil, nil
+		return ImplicitAWGResult{}, nil
 	}
 	cutoff := unix(now.Add(-awgQuarantine))
-	var committed []AccessCred
-	_, _, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
-		committed = nil
+	var result ImplicitAWGResult
+	var liveSelect int
+	results, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		result = ImplicitAWGResult{}
+		liveSelect = -1
 		readStmts := []Stmt{
-			{Query: `SELECT d.id AS device_id, coalesce(c.profile_id, '') AS profile_id FROM device d LEFT JOIN device_credential c
-				ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
-				WHERE d.user_id = ? AND d.hwid_hash IS NULL AND d.revoked_at IS NULL ORDER BY c.profile_id`, Args: []any{userID}, Returning: true},
+			{Query: implicitDeviceCredsSQL, Args: []any{userID}, Returning: true},
 			{Query: `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, Args: []any{accJSON(profileIDs)}, Returning: true},
 			{Query: `SELECT id FROM user WHERE id = ?`, Args: []any{userID}, Returning: true},
 		}
@@ -286,16 +289,18 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		if len(results[2].Rows) == 0 {
 			return nil, ErrNotFound
 		}
-		deviceID := ""
-		have := map[string]bool{}
+		var snapshot implicitDeviceCredsSnapshot
 		for _, row := range results[0].Rows {
-			var id, profileID string
-			if err := batchRow(row).Scan(&id, &profileID); err != nil {
+			if err := snapshot.scan(batchRow(row)); err != nil {
 				return nil, err
 			}
-			deviceID = id
-			if profileID != "" {
-				have[profileID] = true
+		}
+		result.Device, result.Creds, result.Found = snapshot.Device, snapshot.Creds, snapshot.Found
+		deviceID := snapshot.Device.ID
+		have := map[string]bool{}
+		for _, cred := range snapshot.Creds {
+			if cred.ProfileID != "" {
+				have[cred.ProfileID] = true
 			}
 		}
 		if deviceID == "" {
@@ -354,7 +359,7 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 			return nil, nil
 		}
 		stmts := make([]Stmt, 0, 2+len(issues)*4)
-		if len(results[0].Rows) == 0 {
+		if !snapshot.Found {
 			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL)`, userID))
 			stmts = append(stmts, accInsertDeviceStmt(dev))
 		} else {
@@ -371,16 +376,30 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
 			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
 		}
-		committed = make([]AccessCred, len(issues))
+		result.Added = make([]AccessCred, len(issues))
 		for i, issue := range issues {
-			committed[i] = issue.cred
+			result.Added[i] = issue.cred
 		}
+		liveSelect = len(stmts)
+		stmts = append(stmts, Stmt{Query: implicitDeviceCredsSQL, Args: []any{userID}, Returning: true})
 		return stmts, nil
 	})
 	if err != nil {
-		return nil, accMapErr(err)
+		return ImplicitAWGResult{}, accMapErr(err)
 	}
-	return committed, nil
+	if liveSelect >= 0 {
+		if liveSelect >= len(results) {
+			return ImplicitAWGResult{}, errors.New("store: implicit AWG batch omitted its live credential result")
+		}
+		var snapshot implicitDeviceCredsSnapshot
+		for _, row := range results[liveSelect].Rows {
+			if err := snapshot.scan(batchRow(row)); err != nil {
+				return ImplicitAWGResult{}, err
+			}
+		}
+		result.Device, result.Creds, result.Found = snapshot.Device, snapshot.Creds, snapshot.Found
+	}
+	return result, nil
 }
 
 type awgBatchIssue struct {

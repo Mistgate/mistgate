@@ -105,9 +105,7 @@ func TestD1StoreSmoke(t *testing.T) {
 	// This smoke covers Setting, SetSettings, Audit, and ListAudit. The following
 	// store methods still read inside a transaction and remain deferred to later steps:
 	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
-	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
-	// InsertProbeCredIdx, Access.AddAWGDevice, Access.RotateAWGDevice, and
-	// Access.EnsureImplicitAWGCreds.
+	// InsertProbeCredIdx, Access.AddAWGDevice, and Access.RotateAWGDevice.
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
 		t.Fatal(err)
 	}
@@ -490,6 +488,27 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		}
 		if got, err := st.Access().DeviceCreds(ctx, dev.ID); err != nil || len(got) != 1 || got[0].ID != cred.ID {
 			t.Fatalf("credentials = %+v, %v", got, err)
+		}
+	})
+	t.Run("EnsureImplicitAWGCreds", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_implicit_awg", nil)
+		createUser(t, st, "usr_implicit_awg", "Implicit AWG", "grp_implicit_awg")
+		profileID := "prf_implicit_awg"
+		if err := st.Access().CreateProfile(ctx, AccessProfile{ID: profileID, Protocol: "awg", Name: profileID, SettingsJSON: "{}", CreatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+		dev := AccessDevice{ID: "dev_implicit_awg", UserID: "usr_implicit_awg", Implicit: true, CreatedAt: now}
+		want := []AWGImplicitWant{{ProfileID: profileID, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_implicit_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: "{}"}, "pub_implicit_awg", nil
+		}}}
+		result, err := st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
+		if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
+			t.Fatalf("EnsureImplicitAWGCreds = %+v, %v; want one added and live credential", result, err)
+		}
+		result, err = st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
+		if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
+			t.Fatalf("repeat EnsureImplicitAWGCreds = %+v, %v; want one live credential and no additions", result, err)
 		}
 	})
 	t.Run("RevokeDevice", func(t *testing.T) {

@@ -278,7 +278,7 @@ type ProbeCredIssue func(idx int) (ProbeCredRow, error)
 // inbound does not exist, ErrAccessSubnetFull when the network has no free index.
 func (s *Store) InsertProbeCredIdx(ctx context.Context, inboundID, profileID string, maxIdx int, now time.Time, issue ProbeCredIssue) error {
 	cutoff := unix(now.Add(-awgQuarantine))
-	_, _, err := s.retryGuarded(ctx, func() ([]Stmt, error) {
+	_, err := s.retryGuarded(ctx, func() ([]Stmt, error) {
 		var one int
 		switch err := s.R.QueryRowContext(ctx, `SELECT 1 FROM health_probe_cred WHERE inbound_id = ?`, inboundID).Scan(&one); {
 		case err == nil:

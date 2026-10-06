@@ -127,7 +127,7 @@ func (s *Store) batch(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) 
 
 // retryGuarded rebuilds a guarded batch after a concurrent writer makes its snapshot stale. Once a guard fails,
 // local retries serialize so they reread the state left by the winning writer instead of colliding repeatedly.
-func (s *Store) retryGuarded(ctx context.Context, attempt func() ([]Stmt, error)) ([]StmtResult, bool, error) {
+func (s *Store) retryGuarded(ctx context.Context, attempt func() ([]Stmt, error)) ([]StmtResult, error) {
 	locked := false
 	defer func() {
 		if locked {
@@ -136,32 +136,29 @@ func (s *Store) retryGuarded(ctx context.Context, attempt func() ([]Stmt, error)
 	}()
 	for range 8 {
 		if err := ctx.Err(); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		stmts, err := attempt()
 		if err != nil {
-			return nil, false, err
-		}
-		if err := ctx.Err(); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if len(stmts) == 0 {
-			return nil, false, nil
+			return nil, nil
 		}
 		results, err := s.batch(ctx, stmts...)
 		if errors.Is(err, errGuard) {
 			if !locked {
 				if err := s.lockAWGRetry(ctx); err != nil {
-					return nil, false, err
+					return nil, err
 				}
 				locked = true
 			}
 			continue
 		}
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		return results, false, nil
+		return results, nil
 	}
-	return nil, true, ErrConflict
+	return nil, ErrConflict
 }

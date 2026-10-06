@@ -486,6 +486,64 @@ type SubscriptionData struct {
 	Inbounds       []AccessInboundFull
 }
 
+// implicitDeviceCredsSQL reads one live implicit device and all its live credentials. Its aliases are unique so the
+// query can also be the trailing SELECT of a Returning batch.
+const implicitDeviceCredsSQL = `
+	SELECT d.id AS device_id, d.user_id AS user_id, coalesce(d.platform, '') AS platform, coalesce(d.model, '') AS model,
+		coalesce(d.os_version, '') AS os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
+		d.created_at AS device_created_at, coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
+		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
+		coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
+	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
+	WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NULL
+	ORDER BY c.protocol, c.profile_id, c.id`
+
+type implicitDeviceCredRowScanner interface {
+	Scan(dest ...any) error
+}
+
+type implicitDeviceCredsSnapshot struct {
+	Device AccessDevice
+	Creds  []AccessCred
+	Found  bool
+}
+
+func (s *implicitDeviceCredsSnapshot) scan(row implicitDeviceCredRowScanner) error {
+	device, cred, hasCred, err := scanImplicitDeviceCred(row)
+	if err != nil {
+		return err
+	}
+	if !s.Found {
+		s.Device, s.Found = device, true
+	}
+	if hasCred {
+		if !slices.Contains(s.Device.Protocols, cred.Protocol) {
+			s.Device.Protocols = append(s.Device.Protocols, cred.Protocol)
+		}
+		s.Creds = append(s.Creds, cred)
+	}
+	return nil
+}
+
+func scanImplicitDeviceCred(row implicitDeviceCredRowScanner) (AccessDevice, AccessCred, bool, error) {
+	var device AccessDevice
+	var first, last, deviceCreated, configEpoch, credCreated int64
+	var id, protocol, profile, data string
+	var secret []byte
+	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion,
+		&first, &last, &deviceCreated, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
+		return AccessDevice{}, AccessCred{}, false, err
+	}
+	device.Implicit = true
+	device.FirstSeenAt, device.LastSeenAt, device.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(deviceCreated)
+	if id == "" {
+		return device, AccessCred{}, false, nil
+	}
+	cred := AccessCred{ID: id, DeviceID: device.ID, UserID: device.UserID, Protocol: protocol, ProfileID: profile,
+		SecretEnc: secret, DataJSON: data, ConfigEpoch: configEpoch, CreatedAt: fromUnix(credCreated)}
+	return device, cred, true, nil
+}
+
 func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool) (SubscriptionData, error) {
 	stmts := []Stmt{
 		{Query: `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, Args: []any{userID, unix(since)}, Returning: true},
@@ -503,11 +561,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	}
 	if active {
 		stmts = append(stmts,
-			Stmt{Query: `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
-				coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol, coalesce(c.profile_id, '') AS profile_id,
-				coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json, coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
-				FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
-				WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NULL ORDER BY c.protocol, c.profile_id, c.id`, Args: []any{userID}, Returning: true},
+			Stmt{Query: implicitDeviceCredsSQL, Args: []any{userID}, Returning: true},
 			Stmt{Query: `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count, coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, Args: []any{groupID}, Returning: true},
 			Stmt{Query: `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, Args: []any{groupID}, Returning: true},
 			Stmt{Query: `SELECT i.id AS inbound_id, i.profile_id AS inbound_profile_id, i.node_id AS inbound_node_id, coalesce(i.port_override, 0) AS port_override,
@@ -574,30 +628,13 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	if !active {
 		return out, nil
 	}
+	var implicit implicitDeviceCredsSnapshot
 	for _, row := range results[3].Rows {
-		var d AccessDevice
-		var first, last, created int64
-		var id, protocol, profile, data string
-		var secret []byte
-		var epoch, credCreated int64
-		if err := batchRow(row).Scan(&d.ID, &d.UserID, &d.Platform, &d.Model, &d.OSVersion, &first, &last, &created,
-			&id, &protocol, &profile, &secret, &data, &epoch, &credCreated); err != nil {
+		if err := implicit.scan(batchRow(row)); err != nil {
 			return SubscriptionData{}, err
 		}
-		if !out.ImplicitFound {
-			out.ImplicitFound = true
-			d.Implicit = true
-			d.FirstSeenAt, d.LastSeenAt, d.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(created)
-			out.ImplicitDevice = d
-		}
-		if id != "" {
-			if !slices.Contains(out.ImplicitDevice.Protocols, protocol) {
-				out.ImplicitDevice.Protocols = append(out.ImplicitDevice.Protocols, protocol)
-			}
-			out.ImplicitCreds = append(out.ImplicitCreds, AccessCred{ID: id, DeviceID: d.ID, UserID: d.UserID,
-				Protocol: protocol, ProfileID: profile, SecretEnc: secret, DataJSON: data, ConfigEpoch: epoch, CreatedAt: fromUnix(credCreated)})
-		}
 	}
+	out.ImplicitDevice, out.ImplicitCreds, out.ImplicitFound = implicit.Device, implicit.Creds, implicit.Found
 	if len(results[4].Rows) != 1 {
 		return SubscriptionData{}, ErrNotFound
 	}
@@ -640,54 +677,24 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 
 // ImplicitDeviceCreds returns the live implicit device and its live credentials in one read.
 func (a Access) ImplicitDeviceCreds(ctx context.Context, userID string) (AccessDevice, []AccessCred, error) {
-	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0), coalesce(d.last_seen_at, 0), d.created_at,
-			c.id, c.protocol, coalesce(c.profile_id, ''), c.secret_enc, c.data_json, c.config_epoch, coalesce(c.created_at, 0)
-			FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
-			WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NULL ORDER BY c.protocol, c.profile_id, c.id`, userID)
+	rows, err := a.s.R.QueryContext(ctx, implicitDeviceCredsSQL, userID)
 	if err != nil {
 		return AccessDevice{}, nil, err
 	}
 	defer rows.Close()
-	var device AccessDevice
-	var creds []AccessCred
-	found := false
+	var snapshot implicitDeviceCredsSnapshot
 	for rows.Next() {
-		var first, last, created int64
-		var id, protocol, profile sql.NullString
-		var secret []byte
-		var data sql.NullString
-		var epoch sql.NullInt64
-		var credCreated sql.NullInt64
-		if err := rows.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion, &first, &last, &created,
-			&id, &protocol, &profile, &secret, &data, &epoch, &credCreated); err != nil {
+		if err := snapshot.scan(rows); err != nil {
 			return AccessDevice{}, nil, err
 		}
-		if !found {
-			found = true
-			device.Implicit = true
-			device.FirstSeenAt, device.LastSeenAt, device.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(created)
-		}
-		if !id.Valid {
-			continue
-		}
-		if !slices.Contains(device.Protocols, protocol.String) {
-			device.Protocols = append(device.Protocols, protocol.String)
-		}
-		c := AccessCred{ID: id.String, DeviceID: device.ID, UserID: device.UserID, Protocol: protocol.String,
-			ProfileID: profile.String, SecretEnc: secret, DataJSON: data.String, ConfigEpoch: epoch.Int64}
-		if credCreated.Valid {
-			c.CreatedAt = fromUnix(credCreated.Int64)
-		}
-		creds = append(creds, c)
 	}
 	if err := rows.Err(); err != nil {
 		return AccessDevice{}, nil, err
 	}
-	if !found {
+	if !snapshot.Found {
 		return AccessDevice{}, nil, ErrNotFound
 	}
-	return device, creds, nil
+	return snapshot.Device, snapshot.Creds, nil
 }
 
 // UsersProtocolsSince returns, per user, the protocols with traffic since the given time.
