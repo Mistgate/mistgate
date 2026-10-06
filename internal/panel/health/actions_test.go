@@ -279,6 +279,9 @@ func TestDeadWarpIsSaidOnce(t *testing.T) {
 	e.report("de1", false, withCode(res("warp_path", dFail, "", "state", "down"), "warp_path.down"))
 	got = e.active()
 	want(t, got, "doctor_fail/de1/warp_path")
+	if code := got["doctor_fail/de1/warp_path"].Params["detail_code"]; code != "warp_path.down" {
+		t.Fatalf("the doctor's alert lost its detail code: %q", code)
+	}
 	if p := got["doctor_fail/de1/warp_path"].Params["profiles"]; p == "" || !strings.Contains(p, "hy2-de1") {
 		t.Fatalf("the doctor's alert does not name the WARP profiles: %+v", got["doctor_fail/de1/warp_path"].Params)
 	}

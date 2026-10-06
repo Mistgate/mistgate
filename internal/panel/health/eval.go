@@ -537,6 +537,9 @@ func (s *Service) doctorConds(now time.Time, n store.NodeRow, rows []store.Docto
 		fail := r.Status == int(agentv1.DoctorStatus_DOCTOR_STATUS_FAIL)
 		params := withNames(r.CheckID, r.Params, ts)
 		params["check"] = r.CheckID
+		if r.DetailCode != "" {
+			params["detail_code"] = r.DetailCode
+		}
 		if r.Detail != "" {
 			params["detail"] = r.Detail
 		}

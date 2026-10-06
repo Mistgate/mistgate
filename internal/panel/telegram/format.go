@@ -160,10 +160,7 @@ func alertTitle(l L, a store.HealthAlert) string {
 		}
 		return l.pick("Profile “"+data(p["profile"], 40)+"” fails the check", "Профиль «"+data(p["profile"], 40)+"» не проходит проверку")
 	case "doctor_warn", "doctor_fail":
-		if t, ok := checkTitles[p["check"]]; ok {
-			return l.pick(t[0], t[1])
-		}
-		return data(p["check"], 40)
+		return doctorTitle(l, p["check"])
 	case "state_drift":
 		return l.pick("Node state differs from the panel", "Состояние ноды разошлось с панелью")
 	case "cert_expiry":
@@ -206,7 +203,10 @@ func alertReason(l L, a store.HealthAlert) string {
 		}
 		return strings.Join(parts, " · ")
 	case "doctor_warn", "doctor_fail":
-		return data(p["detail"], 160)
+		if text, ok := doctorDetail(l, p); ok {
+			return text
+		}
+		return l.pick("Node check: "+doctorTitle(l, p["check"]), "Проверка узла: "+doctorTitle(l, p["check"]))
 	case "cert_expiry":
 		who := data(p["profile"], 40)
 		switch {
@@ -221,6 +221,84 @@ func alertReason(l L, a store.HealthAlert) string {
 		return data(p["reason"], 160)
 	}
 	return ""
+}
+
+func doctorTitle(l L, check string) string {
+	if title, ok := checkTitles[check]; ok {
+		return l.pick(title[0], title[1])
+	}
+	return l.pick("Node check", "Проверка узла")
+}
+
+// doctorDetail words the WARP doctor rows that can open alerts. The agent's free-form detail is deliberately never a
+// fallback: it can contain English, inbound ids or other node-local identifiers. Unknown codes use the check title.
+func doctorDetail(l L, p map[string]string) (string, bool) {
+	switch p["detail_code"] {
+	case "warp_path.not_configured":
+		profiles := quotedProfiles(l, p["profiles"])
+		if profiles == "" {
+			return l.pick("Profiles with WARP egress cannot start: the node has no WARP account",
+				"Профили с выходом через WARP не стартуют: у ноды нет аккаунта WARP"), true
+		}
+		return l.pick("Profiles with WARP egress ("+profiles+") cannot start: the node has no WARP account",
+			"Профили с выходом через WARP ("+profiles+") не стартуют: у ноды нет аккаунта WARP"), true
+	case "warp_path.host_clash":
+		return l.pick("WARP cannot use this host", "WARP не может работать на этом хосте"), true
+	case "warp_path.check_failed":
+		state := warpStateWord(l, p["state"])
+		if state == "" {
+			return l.pick("The latest WARP check failed", "Последняя проверка WARP не прошла"), true
+		}
+		return l.pick("WARP is "+state+", but its latest check failed", "WARP "+state+", но последняя проверка не прошла"), true
+	case "warp_path.no_backend":
+		return l.pick("No working WireGuard backend", "Нет рабочего бэкенда WireGuard"), true
+	case "warp_path.paused_used":
+		profiles := quotedProfiles(l, p["profiles"])
+		if profiles == "" {
+			return l.pick("WARP is paused and dependent profiles fail closed", "WARP на паузе, профили с ним не пропускают трафик"), true
+		}
+		return l.pick("WARP is paused; profiles that use it fail closed: "+profiles,
+			"WARP на паузе; профили с ним не пропускают трафик: "+profiles), true
+	case "warp_path.down":
+		return l.pick("WARP is down", "WARP не работает"), true
+	case "warp_path.unknown_state":
+		return l.pick("Unknown WARP state", "Неизвестное состояние WARP"), true
+	default:
+		return "", false
+	}
+}
+
+func warpStateWord(l L, state string) string {
+	switch state {
+	case "up":
+		return l.pick("up", "работает")
+	case "starting":
+		return l.pick("starting", "запускается")
+	case "unavailable":
+		return l.pick("unavailable", "недоступен")
+	case "disabled":
+		return l.pick("paused", "на паузе")
+	case "down":
+		return l.pick("down", "не работает")
+	default:
+		return ""
+	}
+}
+
+func quotedProfiles(l L, profiles string) string {
+	var names []string
+	for _, name := range strings.Split(profiles, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if l == "ru" {
+			names = append(names, "«"+data(name, 60)+"»")
+		} else {
+			names = append(names, "“"+data(name, 60)+"”")
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 func upperFirst(s string) string {

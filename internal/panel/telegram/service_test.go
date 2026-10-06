@@ -207,9 +207,14 @@ func TestUntrustedTextIsEscaped(t *testing.T) {
 			t.Errorf("message holds raw %q: %q", bad, got)
 		}
 	}
-	for _, want := range []string{"&lt;b&gt;evil&lt;/b&gt; &amp; &quot;q&quot;", "&lt;script&gt;alert(1)&lt;/script&gt; line two", "&lt;a href=&quot;http://x&quot;&gt;click&lt;/a&gt; second line"} {
+	for _, want := range []string{"&lt;b&gt;evil&lt;/b&gt; &amp; &quot;q&quot;", "&lt;script&gt;alert(1)&lt;/script&gt; line two"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("message lacks %q: %q", want, got)
+		}
+	}
+	for _, hidden := range []string{"click", "second line"} {
+		if strings.Contains(got, hidden) {
+			t.Errorf("doctor detail should use localized wording, message contains %q: %q", hidden, got)
 		}
 	}
 	if len([]rune(got)) > maxMessage {
