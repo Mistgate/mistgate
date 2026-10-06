@@ -61,7 +61,7 @@ The most common causes:
 
 - The hoster's firewall or security group does not let the panel's server in on the SSH port ("The panel could not reach this SSH address and port in time"). The panel cannot change the hoster's rules.
 - The server cannot reach the panel's agent address, or the panel has no public address: both show "The panel's public address is not configured, so the node cannot connect back". Check `--public-url` or `--agent-addr` and the node's outbound TCP to the panel (usually 443).
-- The panel holds no trusted node bundle yet ("Installation stopped"): see the **Release bundle** card on the [Updates](updates.md) page.
+- The panel holds no trusted node bundle yet ("Installation stopped"): see the **Release bundle** line on the [Updates](updates.md) page.
 
 Every message and what to do about it: "When it fails" in [Install a node over SSH](../getting-started/ssh-install.md).
 

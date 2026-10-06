@@ -3,7 +3,7 @@ title: Updates
 description: How node agents update themselves from signed bundles, how to update a node now or on a schedule, what protects an update, and how the panel updates itself.
 ---
 
-Node agents update themselves, but only to a build signed with the release key. The panel carries the signed bundle to the nodes, and every agent checks the signature against the key compiled into its own binary before it replaces itself. The panel never updates a node on its own: you press **Update** in a node's row to update it now or to schedule it for a quiet hour. The panel itself can install a newer official release from the Updates page, again only when its signature verifies.
+Node agents update themselves, but only to a build signed with the release key. The panel carries the signed bundle to the nodes, and every agent checks the signature against the key compiled into its own binary before it replaces itself. The panel never updates a node on its own: you press **Update N nodes** (or **Update** in a node's row) to update now, or schedule a node for a quiet hour. The panel itself can install a newer official release from the Updates page, again only when its signature verifies.
 
 This page is for running a fleet. Making the release key, signing releases and publishing them is in [Releases and signing](releases.md).
 
@@ -23,7 +23,7 @@ The panel keeps the node bundle in `<data-dir>/dist`.
 - **From GitHub.** A panel with a release key checks the latest stable release of `Mistgate/mistgate` when it starts and every 10 minutes after that. When the release carries a node bundle that verifies with the panel's key and is newer than the bundle the panel has, the panel downloads it, checks every file and replaces `dist` in one step. A release signed with another key is ignored and `dist` stays as it is. Downloading a bundle never updates a node by itself.
 - **By hand.** A panel built with your own key gets the bundle you sign and copy into `dist`: see "Use a bundle of your own" in [Releases and signing](releases.md). The panel reads `dist` again within a minute; **Read the folder again** reads it at once.
 
-The **Release bundle** card on the Updates page shows the result:
+The **Release bundle** line at the foot of the top card of the Updates page shows the result (the details are behind **Details**; they open by themselves when the bundle failed the check or is missing):
 
 | Status | Meaning |
 |---|---|
@@ -49,9 +49,12 @@ The panel serves the bundle's files only to agents with a valid node certificate
 
 Everyone can view the page. Updating, scheduling, pausing, resuming and cancelling, rolling a node back and **Read the folder again** need the owner and a fresh step-up (see [Security](security.md)).
 
-- **This panel**: its version, build date and release key fingerprint (or "none: this build cannot check bundles"), the latest GitHub release and **Check GitHub** / **Update panel**.
-- **Release bundle**: the bundle in `<data-dir>/dist`.
-- **Nodes**: every node with its agent version and build date, its state and its last update. The owner gets **Update** (or **Schedule** when an update is already scheduled) and **Roll back** per row.
+From top to bottom, by what needs you:
+
+- **The top card**: where the fleet stands ("2 of 4 nodes on v0.1.24"), a bar with one segment per node, the count of each state under it, and the one main button. With something to update that is **Update N nodes** (below); while a rollout runs, **Pause** / **Resume** / **Cancel rollout**. Its last line is the **Release bundle**: the bundle in `<data-dir>/dist`, the verdict of the signature check, its version and dates, **Read the folder again**, and the folded details (files, the reason for a refusal, the steps to make a bundle yourself).
+- **The rollout**: a running one sits right under the top card, by stage (the canary, the batches) with the nodes of each; the last finished one comes after the node list, folded to one line (**Show stages**) when it ended well.
+- **This panel**: one line with its version, build date, state and **Check GitHub**. When a signed release is out, the card stands out and carries **Update panel**. The release key fingerprint, the SHA-256 and the explanation are behind **Details**; a panel that cannot update itself opens its steps on its own.
+- **Nodes**: every node with its agent version and build date, its state and its last update on one line. The owner gets one main button per row, **Update** (or **Schedule** when an update is already scheduled), and a **⋯** menu beside it with **Schedule…** and **Roll back…**.
 
 | Node state | Meaning |
 |---|---|
@@ -66,6 +69,10 @@ Everyone can view the page. Updating, scheduling, pausing, resuming and cancelli
 "No guard against repeated crashes" under a node means its service file has no crash-loop guard: only the agent's own 5-minute self-rollback protects an update there. Run `mistgate-node install` with a new binary on it once to add the guard.
 
 ## Update a node
+
+### Everything that can be updated, in one rollout
+
+**Update N nodes** in the top card opens a window with every node that can be updated: each has a tick (all ticked by default) and the canary is named, the node with the fewest people online. The window says that the canary is checked for 5 minutes, that the rest go in batches (one at a time while fewer than five nodes are to be updated, else two), and that a node that fails its checks gets its previous version back and the rollout pauses. Nothing happens until you press **Start rollout**. The call is pinned to the bundle the page showed, like the update of one node, and asks for a fresh step-up. The button is absent while a rollout runs, without a trusted bundle, and for anyone but the owner; a node to be updated at a set time is scheduled one by one (below).
 
 ### Now, with the running rollout, or later
 
@@ -136,7 +143,7 @@ Common step errors:
 
 ### Roll back by hand
 
-**Roll back** in a node's row puts the node's previous binary (`<binary>.prev`) back and restarts the agent. It works outside a rollout too. A node that was never updated has no previous version and refuses. If the node is part of an active rollout, its step is marked "rolled back" and the rollout pauses.
+**Roll back…** in the **⋯** menu of a node's row (it still asks first, naming the version the node returns to) puts the node's previous binary (`<binary>.prev`) back and restarts the agent. It works outside a rollout too. A node that was never updated has no previous version and refuses. If the node is part of an active rollout, its step is marked "rolled back" and the rollout pauses.
 
 The **Last update** column says who rolled a node back: "Rolled back by you", "The panel put the previous version back: …" (the gate), or "The previous version came back on a command of the panel".
 

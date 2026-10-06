@@ -157,7 +157,9 @@ async function mount(data: unknown, screen: ReactNode = <UpdatesScreen />) {
 const text = () => document.body.textContent ?? "";
 const buttons = () => [...document.querySelectorAll("button")];
 const button = (label: string) => buttons().find((b) => b.textContent?.trim() === label);
-const click = (b: Element | undefined) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+/** The page's one button that updates the rest of the fleet, whatever the count. */
+const bulk = () => buttons().find((b) => /^Update \d+ nodes?$/.test(b.textContent?.trim() ?? ""));
+const click = (b: Element | null | undefined) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
 describe("panel self-update", () => {
   it("lets an owner check GitHub and exposes an available release", async () => {
@@ -173,6 +175,9 @@ describe("panel self-update", () => {
     installPanelUpdate.mockResolvedValue({ update: {} });
     const sha = "ab".repeat(32);
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 1500, sha256: sha, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
+    // the SHA-256 is a detail of the panel's bar: folded until asked for
+    expect(text()).not.toContain("abababababab");
+    await click(document.querySelector("button[aria-controls='up-panel-details']"));
     expect(text()).toContain("abababababab");
     await click(button("Update panel"));
     await settle();
@@ -220,6 +225,16 @@ describe("panel self-update", () => {
     expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate/blob/main/LICENSE"]')).toBeTruthy();
   });
 });
+/** Base UI opens a menu on the press, not on the click. */
+async function press(el: Element | null | undefined) {
+  expect(el).toBeTruthy();
+  await act(async () => {
+    for (const type of ["pointerdown", "mousedown"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+    for (const type of ["pointerup", "mouseup", "click"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+  });
+  await settle();
+}
+const menuItem = (label: string) => [...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent === label);
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");
 const inDialog = (label: string) => [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
@@ -231,7 +246,7 @@ describe("the Updates screen", () => {
     expect(text()).toContain("2 nodes are older than this panel");
     expect(text()).toContain("mistgate release sign");
     expect(text()).toContain("<data-dir>/dist");
-    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(bulk()).toBeUndefined();
     // the bundle card does not repeat the hero's "no bundle" as an error
     expect(text()).not.toContain("No release bundle in the panel’s data directory");
     expect(button("Read the folder again")).toBeDefined();
@@ -241,16 +256,101 @@ describe("the Updates screen", () => {
     await mount(page({ nodes: [node({ state: NodeUpdateState.UP_TO_DATE })] }));
     expect(text()).toContain("All nodes are up to date");
     expect(text()).toContain("Every node runs the newest agent");
-    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(bulk()).toBeUndefined();
     expect(text()).toContain("Signature verified");
   });
 
-  it("shows update actions per node and never starts a bulk update", async () => {
+  it("says how far the fleet is and leads with one button that updates the rest, plus one button per node", async () => {
+    await mount(page({ nodes: [...outdated, node({ nodeId: "nod_3", name: "fi1" }), node({ nodeId: "nod_4", name: "se1" })] }));
+    expect(text()).toContain("2 of 4 nodes on 0.2.0-bbb");
+    expect(text()).toContain("Node agent 0.2.0-bbb. One node goes first (the canary)");
+    expect(button("Update 2 nodes")).toBeDefined();
+    expect(button("Update 2 nodes")!.className).toContain("bg-accent"); // the one primary button of the page
+    expect(document.querySelector("button[aria-label='Update de1']")).not.toBeNull();
+    expect(document.querySelector("button[aria-label='Update nl1']")).not.toBeNull();
+    // the other rows are done: no update button
+    expect(document.querySelector("button[aria-label='Update fi1']")).toBeNull();
+    // the fleet in one look: a segment per node and the count of each group
+    const bar = document.querySelector<HTMLElement>("[role=img][aria-label^='Nodes by update state']")!;
+    expect(bar.getAttribute("aria-label")).toBe("Nodes by update state: 2 up to date, 2 can be updated");
+    expect(bar.children).toHaveLength(4);
+  });
+
+  it("starts a rollout of every node that can be updated, the canary named, after a window that says what happens", async () => {
+    startRollout.mockResolvedValue({});
     await mount(page({ nodes: outdated }));
-    expect(text()).toContain("Node agent 0.2.0-bbb");
-    expect(button("Update all (canary first)")).toBeUndefined();
-    expect(document.querySelector("button[aria-label='Update de1']")).toBeDefined();
-    expect(document.querySelector("button[aria-label='Update nl1']")).toBeDefined();
+    expect(startRollout).not.toHaveBeenCalled();
+    await click(button("Update 2 nodes"));
+    const d = dialog()!;
+    expect(d.textContent).toContain("Update to 0.2.0-bbb");
+    expect(d.textContent).toContain("The canary goes first and is checked for 5 minutes. Then the rest, 1 at a time.");
+    expect(d.textContent).toContain("A node that fails its checks after the update gets its previous version back");
+    // nl1 has the fewest people online: it is the canary
+    const rows = [...d.querySelectorAll("li")];
+    expect(rows.map((r) => r.textContent)).toEqual(["de15 online", "nl1Canary1 online"]);
+    expect(startRollout).not.toHaveBeenCalled();
+    await click(inDialog("Start rollout"));
+    await settle();
+    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1", "nod_2"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
+    expect(dialog()).toBeNull();
+  });
+
+  it("lets the owner leave a node out of the rollout, and moves the canary to the quietest of the rest", async () => {
+    startRollout.mockResolvedValue({});
+    await mount(page({ nodes: outdated }));
+    await click(button("Update 2 nodes"));
+    const boxes = [...dialog()!.querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
+    await click(boxes[1]); // nl1 out
+    expect([...dialog()!.querySelectorAll("li")].map((r) => r.textContent)).toEqual(["de1Canary5 online", "nl11 online"]);
+    await click(inDialog("Start rollout"));
+    await settle();
+    expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
+  });
+
+  it("will not start a rollout of no node", async () => {
+    await mount(page({ nodes: outdated }));
+    await click(button("Update 2 nodes"));
+    for (const box of dialog()!.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) await click(box);
+    expect(inDialog("Start rollout")!.disabled).toBe(true);
+  });
+
+  it("keeps the dialog open when the panel refuses a rollout of the fleet", async () => {
+    startRollout.mockRejectedValue(new ConnectError("the update bundle changed; review the new version", Code.FailedPrecondition));
+    await mount(page({ nodes: outdated }));
+    await click(button("Update 2 nodes"));
+    await click(inDialog("Start rollout"));
+    await settle();
+    expect(startRollout).toHaveBeenCalledTimes(1);
+    expect(dialog()).not.toBeNull();
+  });
+
+  it("offers the rollout of the fleet only when one can start: not while one runs, not without a trusted bundle, not to a helper", async () => {
+    await mount(page({ nodes: outdated, rollout: rollout({ steps: [step({ state: StepState.GATING })] }) }));
+    expect(button("Update 2 nodes")).toBeUndefined();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ nodes: outdated, bundle: bundle({ status: BundleStatus.UNTRUSTED, errorKey: "updates.bundle.err.bad_signature" }) }));
+    expect(button("Update 2 nodes")).toBeUndefined();
+    act(() => root?.unmount());
+    host?.remove();
+    role = Role.HELPER;
+    await mount(page({ nodes: outdated }));
+    expect(button("Update 2 nodes")).toBeUndefined();
+  });
+
+  it("opens the schedule of one node from its menu", async () => {
+    await mount(page({ nodes: outdated }));
+    expect(menuItem("Schedule…")).toBeUndefined();
+    await press(document.querySelector("button[aria-label='More actions for de1']"));
+    expect(menuItem("Roll back…")).toBeUndefined(); // nothing to roll back yet
+    await click(menuItem("Schedule…"));
+    expect(dialog()!.textContent).toContain("Update de1");
+    expect(dialog()!.querySelector<HTMLInputElement>('input[name="node-update-mode"][value="schedule"]')!.checked).toBe(true);
+  });
+
+  it("keeps a row without a second action free of the menu", async () => {
+    await mount(page({ nodes: [node()] }));
+    expect(document.querySelector("button[aria-label='More actions for de1']")).toBeNull();
   });
 
   it("starts one node from its row with a dialog about that node only", async () => {
@@ -334,7 +434,7 @@ describe("the Updates screen", () => {
     await mount(page({ nodes: [...outdated, node({ nodeId: "nod_3", name: "fi1", lastUpdate: { outcome: "ok", fromVersion: "0.0.9", toVersion: "0.1.0", atUnix: 5 } })] }));
     expect(text()).toContain("Node agent 0.2.0-bbb");
     expect(text()).toContain("Only the owner can update nodes, set schedules, and manage rollouts");
-    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(bulk()).toBeUndefined();
     expect(button("Update")).toBeUndefined();
     expect(button("Roll back")).toBeUndefined();
     expect(button("Read the folder again")).toBeUndefined();
@@ -361,7 +461,7 @@ describe("the Updates screen", () => {
     expect(text()).toContain("2 nodes together");
     expect(text()).toContain("checking");
     expect(text()).toContain("waiting");
-    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(bulk()).toBeUndefined();
     expect(document.querySelector("[role=progressbar]")?.getAttribute("aria-valuenow")).toBe("1");
 
     await click(button("Pause"));
@@ -426,8 +526,15 @@ describe("the Updates screen", () => {
         }),
       }),
     );
-    const marks = [...document.querySelectorAll("section span.rounded-full.size-7")].map((s) => s.textContent);
-    expect(marks).toEqual(["✓", "–"]);
+    // a finished rollout folds to its header; its stages are one click away
+    expect(text()).not.toContain("These nodes were not touched");
+    await click(button("Show stages"));
+    expect(text()).toContain("Skipped");
+    expect(text()).toContain("These nodes were not touched");
+    const chips = [...document.querySelectorAll("ol li ul li")].map((li) => li.textContent);
+    // the node that was passed over says "skipped", never the "updated" of an update that did not happen
+    expect(chips).toEqual(["de1updated · 0.2.0-bbb", "de2skipped"]);
+    expect(text()).toContain("Skipped: the node was offline.");
   });
 
   it("keeps the last finished rollout on the page without making it the hero", async () => {
@@ -442,9 +549,13 @@ describe("the Updates screen", () => {
     rollbackNode.mockResolvedValue({});
     await mount(page({ nodes: [node({ lastUpdate: { outcome: "ok", fromVersion: "0.0.9", toVersion: "0.1.0", atUnix: 5 } })] }));
     expect(text()).toContain("0.0.9 → 0.1.0");
-    await click(document.querySelector("button[aria-label='Roll back de1']")!);
+    // it is not a button of the row: it sits behind the menu, and still asks before it does anything
+    expect(document.querySelector("button[aria-label='Roll back de1']")).toBeNull();
+    await press(document.querySelector("button[aria-label='More actions for de1']"));
+    await click(menuItem("Roll back…"));
     expect(dialog()!.textContent).toContain("Roll back de1?");
     expect(dialog()!.textContent).toContain("(0.0.9)");
+    expect(rollbackNode).not.toHaveBeenCalled();
     await click(inDialog("Roll back"));
     await settle();
     expect(rollbackNode).toHaveBeenCalledWith({ nodeId: "nod_1" });
@@ -453,7 +564,6 @@ describe("the Updates screen", () => {
   it("marks nodes that must be updated by hand and nodes without the crash guard, by name", async () => {
     await mount(page({ nodes: [node({ nodeId: "nod_1", name: "old1", state: NodeUpdateState.UNSUPPORTED, supportsUpdate: false }), node({ nodeId: "nod_2", name: "de1", crashGuard: false })] }));
     expect(text()).toContain("Update by hand");
-    expect(text()).toContain("Marked “Update by hand”: old1.");
     expect(text()).toContain("No guard against repeated crashes: de1.");
     expect(document.querySelector("button[aria-label='Update old1']")).toBeNull();
   });
@@ -485,7 +595,7 @@ describe("the Updates screen", () => {
     expect(text()).toContain("The release bundle cannot be used");
     expect(text()).toContain("mistgate-node-linux-amd64 differs from the manifest");
     expect(text()).toContain("Failed the check");
-    expect(button("Update all (canary first)")).toBeUndefined();
+    expect(bulk()).toBeUndefined();
     // There is no node action until a trusted newer bundle is available.
     expect(document.querySelector("button[aria-label='Update de1']")).toBeNull();
   });
@@ -501,5 +611,60 @@ describe("the Updates screen", () => {
     await click(button("Read the folder again"));
     await settle();
     expect(rescanBundle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the folds of the Updates screen", () => {
+  const detailsOf = (id: string) => document.querySelector<HTMLButtonElement>(`button[aria-controls='${id}']`);
+
+  it("keeps the release bundle's details folded while the panel trusts it, with the verdict and the dates in one line", async () => {
+    await mount(page({ nodes: [node()], bundle: bundle({ expiresUnix: 1_800_000_000, scannedUnix: 990 }) }));
+    expect(text()).toContain("Signature verified");
+    expect(text()).toContain("0.2.0-bbb");
+    expect(text()).toContain("valid until");
+    expect(text()).not.toContain("mistgate-node-linux-amd64"); // the files
+    expect(text()).not.toContain("The panel checks GitHub every 10 minutes"); // the long note
+    expect(detailsOf("up-bundle-details")!.getAttribute("aria-expanded")).toBe("false");
+    await click(detailsOf("up-bundle-details"));
+    expect(detailsOf("up-bundle-details")!.getAttribute("aria-expanded")).toBe("true");
+    expect(text()).toContain("mistgate-node-linux-amd64");
+    expect(text()).toContain("The panel checks GitHub every 10 minutes");
+  });
+
+  it("opens the bundle's details by itself when it is not trusted: that is where the reason and the fix are", async () => {
+    await mount(page({ nodes: outdated, bundle: bundle({ status: BundleStatus.UNTRUSTED, errorKey: "updates.bundle.err.file_missing", params: { file: "mistgate-node-linux-arm64" } }) }));
+    expect(detailsOf("up-bundle-details")!.getAttribute("aria-expanded")).toBe("true");
+    expect(text()).toContain("A file listed in the manifest is missing: mistgate-node-linux-arm64.");
+  });
+
+  it("folds a rollout that finished well to its header, and shows one that ended badly", async () => {
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.DONE, steps: [step({ state: StepState.PASSED })] }) }));
+    expect(button("Show stages")).toBeDefined();
+    expect(text()).toContain("1 of 1 node updated");
+    expect(text()).not.toContain("Canary");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [step({ state: StepState.FAILED, errorKey: "updates.step.err.probe_failed" })] }) }));
+    expect(button("Hide stages")).toBeDefined();
+    expect(text()).toContain("Canary");
+    expect(text()).toContain("The client-eye check failed after the update.");
+  });
+
+  it("shows a running rollout as chips, one per node, never as bars that run across the page", async () => {
+    await mount(page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ nodeName: "de1", state: StepState.GATING })] }) }));
+    const chips = [...document.querySelectorAll("ol li ul li")].map((li) => li.textContent);
+    expect(chips).toEqual(["de1checking…"]);
+    expect(button("Hide stages")).toBeUndefined(); // a running rollout cannot be folded
+  });
+
+  it("opens the panel's steps by itself when it cannot update itself, and leaves the details folded otherwise", async () => {
+    await mount(page({ nodes: [node()] }));
+    expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("false");
+    expect(text()).not.toContain("Updating the panel itself");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ nodes: [node()], panel: { ...page().panel, update: { ...page().panel.update, supported: false } } }));
+    expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("true");
+    expect(text()).toContain("Updating the panel itself");
   });
 });

@@ -131,6 +131,36 @@ export function useOlderNodes(): ReadonlySet<string> {
 /** Nodes the "update all" button would take: the server's own rule for an empty node list. */
 export const outdatedNodes = (nodes: readonly NodeUpdate[]) => nodes.filter((n) => n.state === NodeUpdateState.OUTDATED);
 
+export type FleetCounts = { total: number; ok: number; outdated: number; updating: number; attention: number; manual: number; offline: number };
+
+/** How the nodes stand against the release, in the groups the fleet bar and its legend use. */
+export function fleetCounts(nodes: readonly NodeUpdate[]): FleetCounts {
+  const c: FleetCounts = { total: nodes.length, ok: 0, outdated: 0, updating: 0, attention: 0, manual: 0, offline: 0 };
+  for (const n of nodes) {
+    switch (n.state) {
+      case NodeUpdateState.UP_TO_DATE:
+        c.ok++;
+        break;
+      case NodeUpdateState.OUTDATED:
+        c.outdated++;
+        break;
+      case NodeUpdateState.UPDATING:
+        c.updating++;
+        break;
+      case NodeUpdateState.ROLLED_BACK:
+      case NodeUpdateState.FAILED:
+        c.attention++;
+        break;
+      case NodeUpdateState.UNSUPPORTED:
+        c.manual++;
+        break;
+      default:
+        c.offline++;
+    }
+  }
+  return c;
+}
+
 /** The node a rollout starts with: fewest people online, then fewest profiles, then name (the same order the panel uses). */
 export function canaryOf<N extends Pick<NodeUpdate, "name" | "onlineUsers" | "inbounds">>(nodes: readonly N[]): N | undefined {
   return [...nodes].sort((a, b) => a.onlineUsers - b.onlineUsers || a.inbounds - b.inbounds || a.name.localeCompare(b.name))[0];

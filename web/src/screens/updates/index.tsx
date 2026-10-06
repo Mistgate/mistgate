@@ -14,13 +14,18 @@ import {
   type NodeUpdate,
   type Updates,
 } from "@/lib/updates";
-import { BundleCard, PanelCard } from "./cards";
-import { CancelDialog, RollbackDialog, UpdateNodeDialog } from "./dialogs";
+import { PanelBar } from "./cards";
+import { CancelDialog, RollbackDialog, RolloutDialog, UpdateNodeDialog } from "./dialogs";
 import { HeroCard } from "./hero";
 import { NodeTable } from "./nodes";
 import { RolloutCard } from "./rollout";
 
-type Dialog = { kind: "update"; node: NodeUpdate } | { kind: "rollback"; node: NodeUpdate } | { kind: "cancel"; id: string } | null;
+type Dialog =
+  | { kind: "update"; node: NodeUpdate; mode?: "now" | "schedule" }
+  | { kind: "rollback"; node: NodeUpdate }
+  | { kind: "cancel"; id: string }
+  | { kind: "rollout" }
+  | null;
 
 function subtitle(t: T, d?: Updates): string {
   if (!d) return t("up.sub.loading");
@@ -33,7 +38,11 @@ function subtitle(t: T, d?: Updates): string {
   return hero.id === "attention" ? t("up.hero.attention.title") : t("up.sub.current");
 }
 
-/** Updates: the trusted release bundle, each node's installed version, and its immediate or scheduled update. */
+/**
+ * Updates, in the order of what needs you: where the fleet stands and the one button that moves it (with the signed
+ * release bundle at its foot), the rollout in progress or the last one, this panel's own update, then every node with one
+ * main action per row.
+ */
 export function UpdatesScreen() {
   const t = useT();
   const q = useUpdates();
@@ -84,23 +93,34 @@ export function UpdatesScreen() {
         owner={owner}
         actions={actions}
         onCancel={() => d.rollout && setDialog({ kind: "cancel", id: d.rollout.id })}
+        onRollout={() => setDialog({ kind: "rollout" })}
       />
-      {d.rollout && <RolloutCard rollout={d.rollout} />}
+      {/* a rollout in progress sits right under the hero; the last finished one is history, after the nodes */}
+      {activeRollout && <RolloutCard rollout={activeRollout} />}
+      <PanelBar data={d} owner={owner} actions={actions} />
       <NodeTable
         nodes={d.nodes}
         data={d}
         owner={owner}
         onUpdate={(n) => setDialog({ kind: "update", node: n })}
+        onSchedule={(n) => setDialog({ kind: "update", node: n, mode: "schedule" })}
         onRollback={(n) => setDialog({ kind: "rollback", node: n })}
       />
-      <div className="grid items-start gap-3.5 md:grid-cols-2">
-        <BundleCard data={d} owner={owner} actions={actions} />
-        <PanelCard data={d} owner={owner} actions={actions} />
-      </div>
+      {d.rollout && !activeRollout && <RolloutCard rollout={d.rollout} />}
+      {dialog?.kind === "rollout" && currentBundle && (
+        <RolloutDialog
+          version={currentBundle.version}
+          nodes={outdatedNodes(d.nodes)}
+          busy={actions.busy}
+          onClose={close}
+          onStart={(ids) => go(actions.start(ids, { version: currentBundle.version, built: currentBundle.built }))}
+        />
+      )}
       {dialog?.kind === "update" && (
         <UpdateNodeDialog
           data={d}
           node={dialog.node}
+          initialMode={dialog.mode}
           canUpdateNow={canUpdateNow}
           queueAfterRollout={queueAfterRollout}
           nodeInActiveRollout={!!updateStep}

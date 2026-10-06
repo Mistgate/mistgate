@@ -48,6 +48,7 @@ import { FleetKit } from "./dev-kit-fleet";
 import { SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
+import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
 // 390 and 1280 px. Plain English on purpose: this page never ships.
@@ -485,6 +486,8 @@ export default function DevKit() {
       <NodeDemos />
 
       <HealthWarpKit />
+      <PagingKit />
+      <UpdatesKit />
 
       <Card className="border-dashed">
         <EmptyState icon={<NavIcon name="nodes" size={20} />} title="Nothing here yet" action={<Button variant="primary">Add node</Button>}>

@@ -94,7 +94,7 @@ mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --expires 90
 scp dist/* panel.example.com:/var/lib/mistgate/dist/
 ```
 
-The panel reads `<data-dir>/dist` and notices a change within a minute; **Read the folder again** on the Updates page reads it at once. Only regular files count (a symbolic link is not followed). Replace the whole bundle at once; changing it while a rollout runs pauses the rollout. The **Release bundle** card shows whether the signature verified: see [Updates](updates.md).
+The panel reads `<data-dir>/dist` and notices a change within a minute; **Read the folder again** on the Updates page reads it at once. Only regular files count (a symbolic link is not followed). Replace the whole bundle at once; changing it while a rollout runs pauses the rollout. The **Release bundle** line of the Updates page shows whether the signature verified: see [Updates](updates.md).
 
 ## Rotate the release key
 

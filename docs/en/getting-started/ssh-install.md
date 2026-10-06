@@ -12,7 +12,7 @@ With an SSH installation the panel itself connects to a new server, checks it, i
 - SSH open to the panel server. If a provider firewall or security group limits SSH, first allow inbound TCP on the SSH port from the panel server's public egress address. The panel can change only the firewall on the host, and only after SSH connects.
 - The panel's agent address reachable from the server: the panel's public address on TCP 443, or the address given to `serve --agent-addr`. The checks test it.
 - A public address the panel knows: `setup --public-url` or `serve --agent-addr`. Without one the wizard says "The panel's public address is not configured".
-- A trusted, unexpired node agent bundle in the panel's data directory. A panel from the official release downloads it from GitHub Releases when it starts and every 10 minutes after that. A panel you built yourself needs a bundle you signed in `<data-dir>/dist`: see [Releases and signing](../operations/releases.md). The **Release bundle** card on the Updates page shows its state.
+- A trusted, unexpired node agent bundle in the panel's data directory. A panel from the official release downloads it from GitHub Releases when it starts and every 10 minutes after that. A panel you built yourself needs a bundle you signed in `<data-dir>/dist`: see [Releases and signing](../operations/releases.md). The **Release bundle** line on the Updates page shows its state.
 
 ## The four steps
 
