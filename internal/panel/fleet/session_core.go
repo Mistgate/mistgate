@@ -684,11 +684,6 @@ func (c *SessionCore) reconcile(ctx context.Context, tr *Transition, mode reconc
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	settings := nodeSettings(node, state.Capabilities)
 	sig := settingsSig(settings)
-	if len(want.withheld) > 0 {
-		if err := c.f.st.FailWithheldInbounds(ctx, node.ID, want.withheld, withheldReason, now); err != nil {
-			c.f.log.Warn("mark withheld inbounds", "node", node.ID, "err", err)
-		}
-	}
 	if mode == reconcileConnect {
 		if hello != nil && hello.AppliedStateHash != "" && hello.AppliedStateHash == want.hash && hello.AppliedRevision > 0 {
 			sidecar.SentDesired = want

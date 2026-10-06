@@ -8,11 +8,13 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,6 +49,24 @@ func (e *env) count(q string, args ...any) int64 {
 	}
 	return n
 }
+
+type messageGateHandler struct {
+	message string
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (h *messageGateHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *messageGateHandler) Handle(_ context.Context, r slog.Record) error {
+	if r.Message == h.message {
+		h.once.Do(func() { close(h.entered) })
+		<-h.release
+	}
+	return nil
+}
+func (h *messageGateHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *messageGateHandler) WithGroup(string) slog.Handler      { return h }
 
 // connectFull connects the agent, takes the full state and confirms it. It returns the stream and the model.
 func connectFull(a *agent, instance string) (*conn, *model, *agentv1.DesiredState) {
@@ -595,6 +615,166 @@ func TestBaseMismatchAndDrift(t *testing.T) {
 		}
 	}
 	_ = ds
+}
+
+func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
+	e := newEnv(t)
+	e.run()
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	c, m, initial := connectFull(a, "inst1")
+
+	e.f.mu.Lock()
+	s := e.f.sessions[a.nodeID]
+	e.f.mu.Unlock()
+	if s == nil {
+		t.Fatal("connected session was not registered")
+	}
+
+	gate := &messageGateHandler{message: "agent reports base mismatch, resending full state",
+		entered: make(chan struct{}), release: make(chan struct{})}
+	previousLog := e.f.log
+	previousDesired := e.f.cfg.Desired
+	e.f.log = slog.New(gate)
+	preparedEntered, preparedRelease := make(chan struct{}), make(chan struct{})
+	var preparedOnce sync.Once
+	e.f.cfg.Desired = func(ctx context.Context, nodeID string) ([]statehash.Inbound, error) {
+		in, err := previousDesired(ctx, nodeID)
+		preparedOnce.Do(func() {
+			close(preparedEntered)
+			<-preparedRelease
+		})
+		return in, err
+	}
+	released := false
+	release := func() {
+		if !released {
+			close(gate.release)
+			released = true
+		}
+	}
+	defer func() {
+		release()
+		select {
+		case <-preparedRelease:
+		default:
+			close(preparedRelease)
+		}
+		e.f.log = previousLog
+		e.f.cfg.Desired = previousDesired
+	}()
+
+	c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
+		Revision: initial.Revision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
+	}}})
+	select {
+	case <-gate.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("base mismatch was not processed")
+	}
+
+	if s.reconcileMu.TryLock() {
+		s.reconcileMu.Unlock()
+		t.Fatal("ApplyResult step did not reserve desired-state order")
+	}
+
+	release()
+	select {
+	case <-preparedEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("full resend did not prepare desired state")
+	}
+	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
+	e.f.StateChanged()
+	close(preparedRelease)
+
+	full := c.desired()
+	delta := c.desired()
+	if full.BaseRevision != 0 || full.Revision <= initial.Revision {
+		t.Fatalf("base mismatch resend = %v", full)
+	}
+	if delta.BaseRevision != full.Revision || delta.Revision <= full.Revision {
+		t.Fatalf("desired-state delta after full resend = %v, full revision %d", delta, full.Revision)
+	}
+	if !m.apply(full) || !m.apply(delta) || m.hash() != delta.StateHash {
+		t.Fatal("full resend followed by delta did not reproduce the newest state")
+	}
+	n, err := e.st.Node(e.ctx, a.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.DesiredRevision != delta.Revision || n.DesiredHash != delta.StateHash {
+		t.Fatalf("stored desired revision/hash = %d/%s, newest delta = %d/%s", n.DesiredRevision, n.DesiredHash, delta.Revision, delta.StateHash)
+	}
+}
+
+func TestSessionTeardownUnregistersWithoutWaitingForCoreStep(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	c, _, _ := connectFull(a, "inst1")
+	now := time.Now().Unix()
+	drain := statsBatch(now-10, now, nil, nil)
+	drain.Seq = 1
+	c.send(1, drain)
+	c.ack()
+
+	e.f.mu.Lock()
+	s := e.f.sessions[a.nodeID]
+	e.f.mu.Unlock()
+	if s == nil {
+		t.Fatal("connected session was not registered")
+	}
+
+	entered, release := make(chan struct{}), make(chan struct{})
+	e.f.cfg.OnUsage = func(context.Context, []string) {
+		close(entered)
+		<-release
+	}
+	stepDone := make(chan error, 1)
+	stepReleased := false
+	releaseStep := func() {
+		if !stepReleased {
+			close(release)
+			stepReleased = true
+		}
+	}
+	defer func() {
+		releaseStep()
+		<-stepDone
+	}()
+	frame := statsBatch(now-10, now, []*agentv1.TrafficDelta{{CredId: "crd_hank_hy", InboundId: ids.i1, BytesUp: 600, BytesDown: 600}}, nil)
+	frame.Seq = 2
+	go func() {
+		_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: time.Now().UTC(), Frame: frame}, nil)
+		stepDone <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("test step did not reach the usage hook")
+	}
+
+	s.cancel(context.Canceled)
+	select {
+	case <-c.errc:
+	case <-time.After(5 * time.Second):
+		t.Fatal("session teardown waited for the in-flight core step")
+	}
+
+	e.f.mu.Lock()
+	registered := e.f.sessions[a.nodeID] == s
+	e.f.mu.Unlock()
+	if registered {
+		t.Fatal("session remained registered after teardown")
+	}
+	var disconnected int64
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT last_disconnected_at FROM node WHERE id = ?`, a.nodeID).Scan(&disconnected); err != nil {
+		t.Fatal(err)
+	}
+	if disconnected == 0 {
+		t.Fatal("NodeDisconnected was not recorded")
+	}
 }
 
 func TestUsageHookLetsAccessEnforceQuota(t *testing.T) {

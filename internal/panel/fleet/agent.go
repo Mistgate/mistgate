@@ -124,12 +124,47 @@ func (s *session) stepCore(ctx context.Context, event SessionEvent, pc *peerCert
 func (s *session) stepDesired(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
 	s.reconcileMu.Lock()
 	defer s.reconcileMu.Unlock()
+	return s.stepDesiredLocked(ctx, event, pc)
+}
+
+func (s *session) stepDesiredLocked(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
 	prepared, err := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
 	if err != nil {
 		return Transition{}, err
 	}
+	if prepared.node.State != "retired" && prepared.desired != nil && len(prepared.desired.withheld) > 0 {
+		if err := s.f.st.FailWithheldInbounds(ctx, prepared.node.ID, prepared.desired.withheld, withheldReason, event.At); err != nil {
+			s.f.log.Warn("mark withheld inbounds", "node", prepared.node.ID, "err", err)
+		}
+	}
 	event.Prepared = prepared
 	return s.stepCore(ctx, event, pc)
+}
+
+func (s *session) stepAgentFrame(ctx context.Context, frame *agentv1.ConnectRequest, pc *peerCert) (Transition, error) {
+	event := SessionEvent{Kind: EventAgentFrame, At: s.f.now().UTC(), Frame: frame}
+	result := frame.GetApplyResult()
+	if result == nil || (result.Status != agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH && result.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED) {
+		return s.stepCore(ctx, event, pc)
+	}
+
+	// Reserve desired-state order before applying the result, then prepare and step any resend in this receive loop.
+	s.reconcileMu.Lock()
+	defer s.reconcileMu.Unlock()
+	tr, err := s.stepCore(ctx, event, pc)
+	if err != nil {
+		return tr, err
+	}
+	for _, effect := range tr.Effects {
+		if effect.Kind != EffectDesiredReconcile {
+			continue
+		}
+		_, err := s.stepDesiredLocked(ctx, SessionEvent{Kind: EventDesiredChanged, At: s.f.now().UTC(), Mode: effect.ReconcileMode}, nil)
+		if err != nil {
+			s.f.log.Warn(effect.ErrorLog, "node", s.nodeID, "err", err)
+		}
+	}
+	return tr, nil
 }
 
 func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition, pc *peerCert) error {
@@ -219,11 +254,7 @@ func (s *session) dispatchCoreEffect(ctx context.Context, tr *Transition, effect
 		}
 		s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
 	case EffectDesiredReconcile:
-		go func() {
-			if err := s.f.reconcile(s.ctx, s, effect.ReconcileMode); err != nil {
-				s.f.log.Warn(effect.ErrorLog, "node", s.nodeID, "err", err)
-			}
-		}()
+		// The receive loop handles this effect synchronously after applying an agent frame.
 	}
 	return nil
 }
@@ -401,7 +432,6 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	defer func() {
 		cancel(nil)
 		close(s.done)
-		_, _ = s.stepCore(sctx, SessionEvent{Kind: EventDisconnected, At: f.now().UTC()}, &pc)
 		if f.unregister(s) {
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer dcancel()
@@ -478,7 +508,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 				return endErr()
 			}
 			live.Reset(s.livenessDur())
-			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now().UTC(), Frame: m}, &pc)
+			tr, err := s.stepAgentFrame(sctx, m, &pc)
 			if errors.Is(err, errAgentQueueFull) {
 				continue
 			}

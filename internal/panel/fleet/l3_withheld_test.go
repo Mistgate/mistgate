@@ -45,3 +45,42 @@ func TestAwgInboundAddedOnAnOldAgentIsFailedWithoutAnApplyResult(t *testing.T) {
 		t.Errorf("an unchanged withheld inbound was rewritten: %d -> %d", before, after)
 	}
 }
+
+func TestSessionCoreReconcileDoesNotFailWithheldInbounds(t *testing.T) {
+	x, a := newL3Env(t)
+	x.src.mu.Lock()
+	x.src.awgOn = false
+	x.src.mu.Unlock()
+	_, _, _ = connectCaps(a, "old")
+
+	row := x.inboundRow("inb_awg")
+	if row.State == "failed" {
+		t.Fatalf("inbound was failed before it became withheld: %+v", row)
+	}
+
+	x.src.mu.Lock()
+	x.src.awgOn = true
+	x.src.mu.Unlock()
+	x.f.mu.Lock()
+	s := x.f.sessions[a.nodeID]
+	x.f.mu.Unlock()
+	if s == nil {
+		t.Fatal("connected session was not registered")
+	}
+	prepared, err := x.f.prepareDesiredState(s.ctx, a.nodeID, s.caps)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.coreMu.Lock()
+	state, sidecar := s.coreState, s.coreSidecar
+	_, err = s.core.Step(s.ctx, state, sidecar, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now().UTC(),
+		Mode: reconcileChange, Prepared: prepared})
+	s.coreMu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row = x.inboundRow("inb_awg"); row.State == "failed" {
+		t.Fatalf("SessionCore.Step performed the withheld-inbound store write: %+v", row)
+	}
+}
