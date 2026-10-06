@@ -15,7 +15,9 @@ function resultMeta(changes = 0, lastInsertRowid = 0) {
   };
 }
 
+// Like Cloudflare's D1, a BLOB comes back as an array of byte values (not a Uint8Array).
 function d1Value(value) {
+  if (value instanceof Uint8Array) return Array.from(value);
   return typeof value === "bigint" ? Number(value) : value;
 }
 

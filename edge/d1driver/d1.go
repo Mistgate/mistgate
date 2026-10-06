@@ -610,7 +610,10 @@ func blobFromJS(value js.Value) (driver.Value, error) {
 		return nil, errors.New("d1driver: Uint8Array is unavailable")
 	}
 	var bytes js.Value
-	if value.InstanceOf(uint8Array) {
+	if js.Global().Get("Array").Call("isArray", value).Bool() {
+		// Cloudflare's D1 returns a BLOB as an array of byte values, not as a Uint8Array.
+		bytes = uint8Array.Call("from", value)
+	} else if value.InstanceOf(uint8Array) {
 		bytes = value
 	} else if value.InstanceOf(js.Global().Get("ArrayBuffer")) {
 		bytes = uint8Array.New(value)
