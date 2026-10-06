@@ -442,17 +442,17 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
 	}
-	if markEpoch && recordDNS {
-		if err := s.st.Access().RecordDeviceConfig(ctx, sc.dev.CredID, sc.dev.CriticalEpoch, held); err != nil {
-			return nil, s.internal("record the received config and its DNS", err)
+	if markEpoch || recordDNS {
+		var epoch *int64
+		if markEpoch {
+			epoch = &sc.dev.CriticalEpoch
 		}
-	} else if markEpoch {
-		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch); err != nil {
-			return nil, s.internal("record the received config", err)
+		var sig map[string]string
+		if recordDNS {
+			sig = held
 		}
-	} else if recordDNS {
-		if err := s.st.Access().SetDNSSig(ctx, sc.dev.CredID, held); err != nil {
-			return nil, s.internal("record the DNS of the config", err)
+		if err := s.st.Access().RecordDeviceConfig(ctx, sc.dev.CredID, epoch, sig); err != nil {
+			return nil, s.internal("record the device config", err)
 		}
 	}
 	return out, nil

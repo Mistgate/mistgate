@@ -18,6 +18,26 @@ import (
 // address it was given.
 const awgQuarantine = 24 * time.Hour
 
+// awgTakenSQL is the one definition of the peer indexes of profile ?1 that are not free at cutoff ?2: live and
+// quarantined device peers, and the synthetic checker's credentials. Only live device peers have a unique index behind
+// them, so every allocation reads its candidate from this and guards its write with "?3 NOT IN (awgTakenSQL)".
+// A rotation keeps the device's own index and does not allocate.
+const awgTakenSQL = `
+	SELECT idx FROM awg_peer
+	 WHERE profile_id = ?1 AND (released_at = 0 OR released_at > ?2)
+	UNION
+	SELECT c.awg_idx FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id
+	 WHERE i.profile_id = ?1 AND c.awg_idx > 0`
+
+func awgPurgeExpiredStmt(profileID string, cutoff int64) Stmt {
+	return Stmt{Query: `DELETE FROM awg_peer WHERE profile_id = ? AND released_at > 0 AND released_at <= ?`, Args: []any{profileID, cutoff}}
+}
+
+func awgInsertPeerStmt(credID, profileID string, idx int, publicKey string, createdAt time.Time) Stmt {
+	return Stmt{Query: `INSERT INTO awg_peer (credential_id, profile_id, idx, public_key, created_at) VALUES (?, ?, ?, ?, ?)`,
+		Args: []any{credID, profileID, int64(idx), publicKey, unix(createdAt)}}
+}
+
 // AWGHwidHash is the hwid_hash of an AWG device: NULL belongs to the implicit per-user device (one per user, a
 // unique index), so an explicit device gets a synthetic hash that never equals the hash of a real HWID header.
 func AWGHwidHash(deviceID string) []byte {
@@ -41,8 +61,9 @@ func (e *AccessLimitError) Error() string { return fmt.Sprintf("device limit %d/
 var ErrAccessSubnetFull = errors.New("store: subnet full")
 
 // AWGIssue makes the credential of one peer once its index is known: it fills ID, Protocol, SecretEnc and
-// DataJSON (the store sets the owner, the profile and the epoch) and returns the peer's public key. It runs between
-// the candidate read and guarded write, so it must not access the database.
+// DataJSON (the store sets the owner, the profile and the epoch) and returns the peer's public key. It runs once per
+// attempt between the candidate read and guarded write, so it must not access the database. Treat its result as
+// provisional: do not keep it; only credentials returned by the store after commit or read back from the store are real.
 type AWGIssue func(idx int) (cred AccessCred, publicKey string, err error)
 
 // AWGDeviceAdd describes a new AWG device.
@@ -68,92 +89,79 @@ func accMapErr(err error) error {
 // ErrAccessSubnetFull when the network is used up, ErrNotFound when the user or profile is gone.
 func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Time, issue AWGIssue) (int, error) {
 	cutoff := unix(now.Add(-awgQuarantine))
-	retryLocked := false
-	defer func() {
-		if retryLocked {
-			a.s.awgRetry.Unlock()
-		}
-	}()
-	for range 8 {
+	var idx int
+	_, exhausted, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		idx = 0
 		var used int
 		if err := a.s.R.QueryRowContext(ctx,
 			`SELECT count(*) FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive, add.Device.UserID).Scan(&used); err != nil {
-			return 0, accMapErr(err)
+			return nil, accMapErr(err)
 		}
 		if used >= add.Limit {
-			return 0, &AccessLimitError{Used: used, Limit: add.Limit}
+			return nil, &AccessLimitError{Used: used, Limit: add.Limit}
 		}
-		idx, err := a.awgAllocIdxRead(ctx, add.ProfileID, add.MaxIdx, cutoff)
+		candidate, err := a.awgAllocIdxRead(ctx, add.ProfileID, add.MaxIdx, cutoff)
 		if err != nil {
-			return 0, accMapErr(err)
+			return nil, accMapErr(err)
 		}
+		idx = candidate
 		var epoch int64
 		if err := a.s.R.QueryRowContext(ctx, `SELECT critical_epoch FROM profile WHERE id = ?`, add.ProfileID).Scan(&epoch); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return idx, ErrNotFound
+				return nil, ErrNotFound
 			}
-			return idx, accMapErr(err)
+			return nil, accMapErr(err)
 		}
 		cred, publicKey, err := issue(idx)
 		if err != nil {
-			return idx, accMapErr(err)
+			return nil, accMapErr(err)
 		}
 		device := add.Device
 		device.AWG, device.CreatedAt = true, now
 		cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = device.ID, device.UserID, add.ProfileID, epoch, now
 		guardSQL := `(
-			(SELECT count(*) FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND ` + accDeviceLive + `) < ?
-			AND EXISTS (SELECT 1 FROM profile WHERE id = ? AND critical_epoch = ?)
-			AND NOT EXISTS (SELECT 1 FROM awg_peer WHERE profile_id = ? AND idx = ? AND (released_at = 0 OR released_at > ?))
-			AND NOT EXISTS (SELECT 1 FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id WHERE i.profile_id = ? AND c.awg_idx = ? AND c.awg_idx > 0)
+			(SELECT count(*) FROM device d WHERE d.user_id = ?4 AND d.revoked_at IS NULL AND ` + accDeviceLive + `) < ?5
+			AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
+			AND ?3 NOT IN (` + awgTakenSQL + `)
 		)`
 		stmts := []Stmt{
-			guard(guardSQL, device.UserID, int64(add.Limit), add.ProfileID, epoch, add.ProfileID, int64(idx), cutoff, add.ProfileID, int64(idx)),
-			{Query: `DELETE FROM awg_peer WHERE profile_id = ? AND released_at > 0 AND released_at <= ?`, Args: []any{add.ProfileID, cutoff}},
+			guard(guardSQL, add.ProfileID, cutoff, int64(idx), device.UserID, int64(add.Limit), epoch),
+			awgPurgeExpiredStmt(add.ProfileID, cutoff),
 			accInsertDeviceStmt(device),
 		}
 		stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
-		stmts = append(stmts, Stmt{Query: `INSERT INTO awg_peer (credential_id, profile_id, idx, public_key, created_at) VALUES (?, ?, ?, ?, ?)`,
-			Args: []any{cred.ID, add.ProfileID, int64(idx), publicKey, unix(now)}})
-		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
-			if !retryLocked {
-				a.s.awgRetry.Lock()
-				retryLocked = true
-			}
-			continue
-		} else if err != nil {
-			return idx, accMapErr(err)
+		stmts = append(stmts, awgInsertPeerStmt(cred.ID, add.ProfileID, idx, publicKey, now))
+		return stmts, nil
+	})
+	if err != nil {
+		if exhausted {
+			return 0, ErrConflict
 		}
-		return idx, nil
+		return idx, accMapErr(err)
 	}
-	return 0, ErrConflict
+	return idx, nil
 }
 
 func (a Access) awgAllocIdxRead(ctx context.Context, profileID string, maxIdx int, cutoff int64) (int, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT idx FROM awg_peer WHERE profile_id = ? AND (released_at = 0 OR released_at > ?)
-		 UNION SELECT c.awg_idx FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id WHERE i.profile_id = ? AND c.awg_idx > 0
-		 ORDER BY 1`, profileID, cutoff, profileID)
+		`SELECT idx FROM (`+awgTakenSQL+`) taken ORDER BY idx`, profileID, cutoff)
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
-	next := 2
+	taken := map[int]bool{}
 	for rows.Next() {
 		var idx int
 		if err := rows.Scan(&idx); err != nil {
 			return 0, err
 		}
-		if idx == next {
-			next++
-		} else if idx > next {
-			break
-		}
+		taken[idx] = true
 	}
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
-	if next > maxIdx {
+	next := nextAWGIndex(taken, maxIdx)
+	if next == 0 {
 		return 0, ErrAccessSubnetFull
 	}
 	return next, nil
@@ -164,13 +172,9 @@ func (a Access) awgAllocIdxRead(ctx context.Context, profileID string, maxIdx in
 // there is no such live AWG device.
 func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.Time, issue AWGIssue) (string, error) {
 	var lastUserID string
-	retryLocked := false
-	defer func() {
-		if retryLocked {
-			a.s.awgRetry.Unlock()
-		}
-	}()
-	for range 8 {
+	var resultUserID string
+	_, exhausted, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		resultUserID = ""
 		var userID, oldCred, profileID string
 		var idx int
 		err := a.s.R.QueryRowContext(ctx,
@@ -180,26 +184,28 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 				 WHERE d.id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL ORDER BY c.created_at, c.id LIMIT 1`, deviceID).
 			Scan(&userID, &oldCred, &profileID, &idx)
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrNotFound
+			return nil, ErrNotFound
 		}
 		if err != nil {
-			return "", accMapErr(err)
+			return nil, accMapErr(err)
 		}
-		lastUserID = userID
+		lastUserID, resultUserID = userID, userID
 
 		var epoch int64
 		if err := a.s.R.QueryRowContext(ctx, `SELECT critical_epoch FROM profile WHERE id = ?`, profileID).Scan(&epoch); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return userID, ErrNotFound
+				return nil, ErrNotFound
 			}
-			return userID, accMapErr(err)
+			return nil, accMapErr(err)
 		}
 		cred, publicKey, err := issue(idx)
 		if err != nil {
-			return userID, accMapErr(err)
+			return nil, accMapErr(err)
 		}
 		cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = deviceID, userID, profileID, epoch, now
 
+		// The device keeps its own index: the guard proves it still holds it live through the old credential. The index
+		// is not checked against awgTakenSQL, which also lists this device's own quarantined peers of earlier rotations.
 		guardSQL := `EXISTS (
 			SELECT 1 FROM device d
 			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
@@ -219,20 +225,16 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 			{Query: `UPDATE awg_peer SET released_at = ? WHERE credential_id = ? AND released_at = 0`, Args: []any{unix(now), oldCred}},
 		}
 		stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
-		stmts = append(stmts, Stmt{Query: `INSERT INTO awg_peer (credential_id, profile_id, idx, public_key, created_at) VALUES (?, ?, ?, ?, ?)`,
-			Args: []any{cred.ID, profileID, int64(idx), publicKey, unix(now)}})
-		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
-			if !retryLocked {
-				a.s.awgRetry.Lock()
-				retryLocked = true
-			}
-			continue
-		} else if err != nil {
-			return userID, accMapErr(err)
+		stmts = append(stmts, awgInsertPeerStmt(cred.ID, profileID, idx, publicKey, now))
+		return stmts, nil
+	})
+	if err != nil {
+		if exhausted {
+			return lastUserID, ErrConflict
 		}
-		return userID, nil
+		return resultUserID, accMapErr(err)
 	}
-	return lastUserID, ErrConflict
+	return resultUserID, nil
 }
 
 // AWGImplicitWant asks for an AWG credential of one profile on the implicit device.
@@ -243,13 +245,13 @@ type AWGImplicitWant struct {
 }
 
 // EnsureImplicitAWGCreds gives the user's implicit device (created from dev when there is none) an AWG
-// credential for every wanted profile that it has none for, and returns how many it added. A subscription in the
-// Mihomo format has no device identity, so every Mihomo client of the user shares this one peer per profile.
+// credential for every wanted profile that it has none for, and returns the credentials it added. A subscription
+// in the Mihomo format has no device identity, so every Mihomo client of the user shares this one peer per profile.
 // The device limit is not checked: a subscription fetch must not fail because of it (the implicit device is one
 // per user, so the limit is exceeded by at most one).
-func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) (int, error) {
+func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) ([]AccessCred, error) {
 	if len(want) == 0 {
-		return 0, nil
+		return nil, nil
 	}
 	profileIDs := make([]string, 0, len(want))
 	seen := map[string]bool{}
@@ -260,39 +262,36 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 	}
 	if len(profileIDs) == 0 {
-		return 0, nil
+		return nil, nil
 	}
-	idsJSON := accJSON(profileIDs)
 	cutoff := unix(now.Add(-awgQuarantine))
-	retryLocked := false
-	defer func() {
-		if retryLocked {
-			a.s.awgRetry.Unlock()
-		}
-	}()
-	for range 8 {
-		results, err := a.s.batch(ctx,
-			Stmt{Query: `SELECT d.id AS device_id, coalesce(c.profile_id, '') AS profile_id FROM device d LEFT JOIN device_credential c
+	var committed []AccessCred
+	_, _, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		committed = nil
+		readStmts := []Stmt{
+			{Query: `SELECT d.id AS device_id, coalesce(c.profile_id, '') AS profile_id FROM device d LEFT JOIN device_credential c
 				ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 				WHERE d.user_id = ? AND d.hwid_hash IS NULL AND d.revoked_at IS NULL ORDER BY c.profile_id`, Args: []any{userID}, Returning: true},
-			Stmt{Query: `SELECT profile_id, idx FROM awg_peer WHERE profile_id IN (SELECT value FROM json_each(?)) AND (released_at = 0 OR released_at > ?)
-				UNION SELECT i.profile_id, c.awg_idx FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id
-				WHERE i.profile_id IN (SELECT value FROM json_each(?)) AND c.awg_idx > 0`, Args: []any{idsJSON, cutoff, idsJSON}, Returning: true},
-			Stmt{Query: `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, Args: []any{idsJSON}, Returning: true},
-			Stmt{Query: `SELECT id FROM user WHERE id = ?`, Args: []any{userID}, Returning: true},
-		)
-		if err != nil {
-			return 0, accMapErr(err)
+			{Query: `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, Args: []any{accJSON(profileIDs)}, Returning: true},
+			{Query: `SELECT id FROM user WHERE id = ?`, Args: []any{userID}, Returning: true},
 		}
-		if len(results[3].Rows) == 0 {
-			return 0, ErrNotFound
+		for _, profileID := range profileIDs {
+			readStmts = append(readStmts, Stmt{Query: `SELECT ?1 AS profile_id, taken.idx FROM (` + awgTakenSQL + `) taken`,
+				Args: []any{profileID, cutoff}, Returning: true})
+		}
+		results, err := a.s.batch(ctx, readStmts...)
+		if err != nil {
+			return nil, accMapErr(err)
+		}
+		if len(results[2].Rows) == 0 {
+			return nil, ErrNotFound
 		}
 		deviceID := ""
 		have := map[string]bool{}
 		for _, row := range results[0].Rows {
 			var id, profileID string
 			if err := batchRow(row).Scan(&id, &profileID); err != nil {
-				return 0, err
+				return nil, err
 			}
 			deviceID = id
 			if profileID != "" {
@@ -310,20 +309,22 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		for _, profileID := range profileIDs {
 			occupied[profileID] = map[int]bool{}
 		}
-		for _, row := range results[1].Rows {
-			var profileID string
-			var idx int
-			if err := batchRow(row).Scan(&profileID, &idx); err != nil {
-				return 0, err
+		for i := range profileIDs {
+			for _, row := range results[3+i].Rows {
+				var resultProfileID string
+				var idx int
+				if err := batchRow(row).Scan(&resultProfileID, &idx); err != nil {
+					return nil, err
+				}
+				occupied[resultProfileID][idx] = true
 			}
-			occupied[profileID][idx] = true
 		}
 		epochs := map[string]int64{}
-		for _, row := range results[2].Rows {
+		for _, row := range results[1].Rows {
 			var profileID string
 			var epoch int64
 			if err := batchRow(row).Scan(&profileID, &epoch); err != nil {
-				return 0, err
+				return nil, err
 			}
 			epochs[profileID] = epoch
 		}
@@ -334,15 +335,15 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 			}
 			idx := nextAWGIndex(occupied[w.ProfileID], w.MaxIdx)
 			if idx == 0 {
-				return 0, ErrAccessSubnetFull
+				return nil, ErrAccessSubnetFull
 			}
 			epoch, ok := epochs[w.ProfileID]
 			if !ok {
-				return 0, ErrNotFound
+				return nil, ErrNotFound
 			}
 			cred, publicKey, err := w.Issue(idx)
 			if err != nil {
-				return 0, accMapErr(err)
+				return nil, accMapErr(err)
 			}
 			cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = deviceID, userID, w.ProfileID, epoch, now
 			issues = append(issues, awgBatchIssue{profileID: w.ProfileID, idx: idx, epoch: epoch, cred: cred, publicKey: publicKey})
@@ -350,7 +351,7 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 			have[w.ProfileID] = true
 		}
 		if len(issues) == 0 {
-			return 0, nil
+			return nil, nil
 		}
 		stmts := make([]Stmt, 0, 2+len(issues)*4)
 		if len(results[0].Rows) == 0 {
@@ -361,32 +362,25 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 		for _, issue := range issues {
 			stmts = append(stmts, guard(`
-				EXISTS (SELECT 1 FROM device WHERE id = ? AND user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL)
-				AND EXISTS (SELECT 1 FROM profile WHERE id = ? AND critical_epoch = ?)
-				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ? AND profile_id = ? AND revoked_at IS NULL)
-				AND NOT EXISTS (SELECT 1 FROM awg_peer WHERE profile_id = ? AND idx = ? AND (released_at = 0 OR released_at > ?))
-				AND NOT EXISTS (SELECT 1 FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id WHERE i.profile_id = ? AND c.awg_idx = ? AND c.awg_idx > 0)`,
-				deviceID, userID, issue.profileID, issue.epoch, deviceID, issue.profileID,
-				issue.profileID, int64(issue.idx), cutoff, issue.profileID, int64(issue.idx)))
-			stmts = append(stmts,
-				Stmt{Query: `DELETE FROM awg_peer WHERE profile_id = ? AND released_at > 0 AND released_at <= ?`, Args: []any{issue.profileID, cutoff}},
-			)
+				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS NULL AND revoked_at IS NULL)
+				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
+				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
+				AND ?3 NOT IN (`+awgTakenSQL+`)`,
+				issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch))
+			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
-			stmts = append(stmts, Stmt{Query: `INSERT INTO awg_peer (credential_id, profile_id, idx, public_key, created_at) VALUES (?, ?, ?, ?, ?)`,
-				Args: []any{issue.cred.ID, issue.profileID, int64(issue.idx), issue.publicKey, unix(now)}})
+			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
 		}
-		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
-			if !retryLocked {
-				a.s.awgRetry.Lock()
-				retryLocked = true
-			}
-			continue
-		} else if err != nil {
-			return 0, accMapErr(err)
+		committed = make([]AccessCred, len(issues))
+		for i, issue := range issues {
+			committed[i] = issue.cred
 		}
-		return len(issues), nil
+		return stmts, nil
+	})
+	if err != nil {
+		return nil, accMapErr(err)
 	}
-	return 0, ErrConflict
+	return committed, nil
 }
 
 type awgBatchIssue struct {
@@ -456,7 +450,7 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 			&d.ConfigEpoch, &d.CriticalEpoch, &sig); err != nil {
 			return nil, err
 		}
-		if sig != "" { // written by SetDNSSig; anything else reads as "nothing recorded"
+		if sig != "" { // written by RecordDeviceConfig; anything else reads as "nothing recorded"
 			_ = json.Unmarshal([]byte(sig), &d.DNSSig)
 		}
 		d.AWG, d.Protocols = true, []string{"awg"}
@@ -606,33 +600,26 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	return out, nil
 }
 
-// SetConfigEpoch records that the credential's device received a config of the given profile epoch (never lowers it).
-func (a Access) SetConfigEpoch(ctx context.Context, credID string, epoch int64) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential SET config_epoch = max(config_epoch, ?) WHERE id = ?`, epoch, credID)
-	return err
-}
-
-// SetDNSSig records the DNS the credential's key was issued with, per node id (replacing what was there): what a person's
-// device now holds, the one thing "stale DNS" is measured against.
-func (a Access) SetDNSSig(ctx context.Context, credID string, sig map[string]string) error {
-	b, err := json.Marshal(sig)
-	if err != nil {
-		return err
+// RecordDeviceConfig records what the credential's device received: the profile epoch of the config (never lowered; nil
+// leaves it) and the DNS the key now holds per node id, replacing the stored one (nil leaves it), which is what "stale
+// DNS" is measured against.
+func (a Access) RecordDeviceConfig(ctx context.Context, credID string, epoch *int64, sig map[string]string) error {
+	var epochValue any
+	if epoch != nil {
+		epochValue = *epoch
 	}
-	_, err = a.s.W.ExecContext(ctx, `UPDATE device_credential SET dns_sig = ? WHERE id = ?`, string(b), credID)
-	return err
-}
-
-// RecordDeviceConfig records both the received profile epoch and the DNS carried by the device config.
-func (a Access) RecordDeviceConfig(ctx context.Context, credID string, epoch int64, sig map[string]string) error {
-	b, err := json.Marshal(sig)
-	if err != nil {
-		return err
+	var sigValue any
+	if sig != nil {
+		b, err := json.Marshal(sig)
+		if err != nil {
+			return err
+		}
+		sigValue = string(b)
 	}
-	_, err = a.s.batch(ctx,
-		Stmt{Query: `UPDATE device_credential SET config_epoch = max(config_epoch, ?) WHERE id = ?`, Args: []any{epoch, credID}},
-		Stmt{Query: `UPDATE device_credential SET dns_sig = ? WHERE id = ?`, Args: []any{string(b), credID}},
-	)
+	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential
+		SET config_epoch = CASE WHEN ?1 IS NULL THEN config_epoch ELSE max(config_epoch, ?1) END,
+		    dns_sig = coalesce(?2, dns_sig)
+		WHERE id = ?3`, epochValue, sigValue, credID)
 	return err
 }
 

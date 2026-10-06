@@ -19,7 +19,6 @@ var transactionShape1 = map[string]string{
 	"access_user.go:CreateUser":                    "Inserts the user, selected nodes, and optional implicit device credentials in one fixed batch.",
 	"access_user.go:UserByTokenHash":               "Reads the token owner and selected nodes in one fixed batch.",
 	"access_awg.go:AWGDeviceScope":                 "Reads the device and its user, group, profile, and live inbounds in one fixed batch.",
-	"access_awg.go:RecordDeviceConfig":             "Records the received profile epoch and carried DNS in one fixed batch.",
 	"access_user.go:SubscriptionData":              "Reads the independent subscription settings and access rows in one fixed batch.",
 	"dns.go:scanEffectiveData":                     "Reads the user's preset refs, preset rows, default, node offers, and picks in one fixed batch.",
 	"access_user.go:AddDevice":                     "Inserts the device and its credentials in one fixed batch.",
@@ -27,6 +26,7 @@ var transactionShape1 = map[string]string{
 	"access_profile.go:CreateInbound":              "Inserts the inbound and clears its retained key in one fixed batch.",
 	"access_profile.go:CreateGroup":                "Computes an automatic color in the insert and replaces the profile set in one fixed batch.",
 	"batch_native.go:batchStore":                   "Read batches use the reader pool; write batches run in one SQLite transaction and return results after commit.",
+	"batch.go:retryGuarded":                        "Runs guarded batches and serializes local retries after a guard fails.",
 	"health.go:OpenAlert":                          "A fixed batch reopens a recent alert and upserts through the active-alert unique index.",
 	"health.go:PutDoctor":                          "A fixed batch applies the report replacement and its doctor-result upserts.",
 	"health.go:RollupDaily":                        "One SQL INSERT SELECT groups finished samples and inserts daily rows idempotently.",
@@ -110,7 +110,7 @@ func TestTransactionCallSitesClassified(t *testing.T) {
 					return true
 				}
 				selector, ok := call.Fun.(*ast.SelectorExpr)
-				if ok && (selector.Sel.Name == "BeginTx" || selector.Sel.Name == "batch") {
+				if ok && (selector.Sel.Name == "BeginTx" || selector.Sel.Name == "batch" || selector.Sel.Name == "retryGuarded") {
 					found = true
 				}
 				return true

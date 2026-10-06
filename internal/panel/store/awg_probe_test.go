@@ -176,20 +176,148 @@ func TestEnsureImplicitAWGCredsCreatesOnce(t *testing.T) {
 		return AccessCred{ID: "crd_implicit_batch", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_batch", nil
 	}}}
 	dev := AccessDevice{ID: "dev_implicit_batch", UserID: "usr_implicit_batch", Implicit: true}
-	n, err := s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), want)
-	if err != nil || n != 1 {
-		t.Fatalf("EnsureImplicitAWGCreds = %d, %v; want one", n, err)
+	creds, err := s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), want)
+	if err != nil || len(creds) != 1 {
+		t.Fatalf("EnsureImplicitAWGCreds = %d credentials, %v; want one", len(creds), err)
 	}
-	n, err = s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), []AWGImplicitWant{{
+	creds, err = s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), []AWGImplicitWant{{
 		ProfileID: profile, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
 			return AccessCred{}, "", errors.New("issuer called for an existing peer")
 		},
 	}})
-	if err != nil || n != 0 {
-		t.Fatalf("repeat EnsureImplicitAWGCreds = %d, %v; want zero", n, err)
+	if err != nil || len(creds) != 0 {
+		t.Fatalf("repeat EnsureImplicitAWGCreds = %d credentials, %v; want zero", len(creds), err)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM awg_peer WHERE profile_id = ? AND idx = 2 AND released_at = 0`, profile); n != 1 {
 		t.Fatalf("live implicit peer at index 2 = %d, want 1", n)
+	}
+}
+
+func TestEnsureImplicitAWGCredsRetryReturnsCommittedCreds(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	profile, _ := awgNet(t, s, "implicit_retry")
+	const userID = "usr_implicit_retry"
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_retry', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, 'u', 'grp_implicit_retry', 1, x'01', x'02', 1)`, userID)
+	now := time.Unix(100, 0)
+	dev := AccessDevice{ID: "dev_implicit_retry", UserID: userID, Implicit: true}
+	calls := 0
+	want := []AWGImplicitWant{{ProfileID: profile, MaxIdx: 8, Issue: func(idx int) (AccessCred, string, error) {
+		calls++
+		if calls == 1 {
+			competingIdx, err := s.Access().AddAWGDevice(ctx, AWGDeviceAdd{
+				Device: AccessDevice{ID: "dev_competing_retry", UserID: userID}, ProfileID: profile, MaxIdx: 8, Limit: 5,
+			}, now, func(idx int) (AccessCred, string, error) {
+				return AccessCred{ID: "crd_competing_retry", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_competing_retry", nil
+			})
+			if err != nil {
+				return AccessCred{}, "", err
+			}
+			if competingIdx != idx {
+				return AccessCred{}, "", fmt.Errorf("competing peer index = %d, want %d", competingIdx, idx)
+			}
+		}
+		id := fmt.Sprintf("crd_implicit_retry_%d", calls)
+		return AccessCred{ID: id, Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_" + id, nil
+	}}}
+
+	creds, err := s.Access().EnsureImplicitAWGCreds(ctx, userID, dev, now, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("issuer calls = %d, want 2 after the competing peer forces a retry", calls)
+	}
+	if len(creds) != 1 {
+		t.Fatalf("returned credentials = %d, want one for the wanted profile: %+v", len(creds), creds)
+	}
+	var implicitDeviceID, rowCredID string
+	if err := s.R.QueryRowContext(ctx, `SELECT d.id, c.id FROM device d JOIN device_credential c ON c.device_id = d.id
+		WHERE d.user_id = ? AND d.hwid_hash IS NULL AND d.revoked_at IS NULL AND c.profile_id = ? AND c.revoked_at IS NULL`, userID, profile).Scan(&implicitDeviceID, &rowCredID); err != nil {
+		t.Fatal(err)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM device_credential c JOIN device d ON d.id = c.device_id
+		WHERE d.user_id = ? AND d.hwid_hash IS NULL AND d.revoked_at IS NULL AND c.profile_id = ? AND c.revoked_at IS NULL`, userID, profile); n != 1 {
+		t.Fatalf("live implicit credentials for profile = %d, want one", n)
+	}
+	if creds[0].ID != rowCredID || creds[0].DeviceID != implicitDeviceID || creds[0].UserID != userID || creds[0].ProfileID != profile {
+		t.Fatalf("returned credential %+v does not match live database row %s on device %s", creds[0], rowCredID, implicitDeviceID)
+	}
+	for _, cred := range creds {
+		if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = ? AND revoked_at IS NULL`, cred.ID); n != 1 {
+			t.Errorf("returned credential %q has %d live database rows", cred.ID, n)
+		}
+	}
+}
+
+func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	profileA, _ := awgNet(t, s, "implicit_multi_a")
+	profileB, _ := awgNet(t, s, "implicit_multi_b")
+	const userID = "usr_implicit_multi"
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_multi', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, 'u', 'grp_implicit_multi', 1, x'01', x'02', 1)`, userID)
+	dev := AccessDevice{ID: "dev_implicit_multi", UserID: userID, Implicit: true}
+	now := time.Unix(100, 0)
+	innerWant := []AWGImplicitWant{
+		{ProfileID: profileA, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_implicit_multi_a", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_multi_a", nil
+		}},
+		{ProfileID: profileB, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_implicit_multi_b", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_multi_b", nil
+		}},
+	}
+	var outerACalls int
+	outerWant := []AWGImplicitWant{
+		{ProfileID: profileA, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			outerACalls++
+			if outerACalls == 1 {
+				committed, err := s.Access().EnsureImplicitAWGCreds(ctx, userID, dev, now, innerWant)
+				if err != nil {
+					return AccessCred{}, "", err
+				}
+				if len(committed) != 2 {
+					return AccessCred{}, "", fmt.Errorf("concurrent EnsureImplicitAWGCreds returned %d credentials, want two", len(committed))
+				}
+			}
+			return AccessCred{ID: fmt.Sprintf("crd_implicit_multi_outer_a_%d", outerACalls), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_multi_outer_a", nil
+		}},
+		{ProfileID: profileB, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_implicit_multi_outer_b", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_multi_outer_b", nil
+		}},
+	}
+
+	creds, err := s.Access().EnsureImplicitAWGCreds(ctx, userID, dev, now, outerWant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outerACalls != 1 {
+		t.Fatalf("outer profile A issuer calls = %d, want one before the concurrent commit", outerACalls)
+	}
+	if len(creds) != 0 {
+		t.Fatalf("outer call returned %d credentials after the concurrent call committed both profiles: %+v", len(creds), creds)
+	}
+	for _, cred := range creds {
+		if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = ? AND device_id = ? AND profile_id = ? AND revoked_at IS NULL`, cred.ID, dev.ID, cred.ProfileID); n != 1 {
+			t.Errorf("returned credential %q has %d live rows", cred.ID, n)
+		}
+	}
+
+	actual, live, err := s.Access().ImplicitDeviceCreds(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actual.ID != dev.ID || len(live) != 2 {
+		t.Fatalf("implicit device = %q with %d live credentials, want %q with two", actual.ID, len(live), dev.ID)
+	}
+	counts := map[string]int{}
+	for _, cred := range live {
+		counts[cred.ProfileID]++
+	}
+	if counts[profileA] != 1 || counts[profileB] != 1 {
+		t.Fatalf("live credentials by profile = %v, want one each for %q and %q", counts, profileA, profileB)
 	}
 }
 
@@ -295,6 +423,74 @@ func TestAddAWGDeviceConcurrentUsersGetDistinctIndexes(t *testing.T) {
 	}
 }
 
+func TestAWGProbeAndDeviceRacingForIndexStayDistinct(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	profile, inbound := awgNet(t, s, "probe_device_race")
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_probe_device_race', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_probe_device_race', 'u', 'grp_probe_device_race', 1, x'01', x'02', 1)`)
+
+	start := make(chan struct{})
+	var issueBarrier, done sync.WaitGroup
+	issueBarrier.Add(2)
+	done.Add(2)
+	type result struct {
+		deviceIdx   int
+		deviceErr   error
+		probeErr    error
+		deviceFirst int
+		probeFirst  int
+	}
+	var got result
+	now := time.Unix(100, 0)
+	go func() {
+		defer done.Done()
+		<-start
+		first := true
+		got.deviceIdx, got.deviceErr = s.Access().AddAWGDevice(ctx, AWGDeviceAdd{
+			Device:    AccessDevice{ID: "dev_probe_device_race", UserID: "usr_probe_device_race"},
+			ProfileID: profile, MaxIdx: 8, Limit: 5,
+		}, now, func(idx int) (AccessCred, string, error) {
+			if first {
+				first = false
+				got.deviceFirst = idx
+				issueBarrier.Done()
+				issueBarrier.Wait()
+			}
+			return AccessCred{ID: "crd_probe_device_race", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_probe_device_race", nil
+		})
+	}()
+	go func() {
+		defer done.Done()
+		<-start
+		first := true
+		got.probeErr = s.InsertProbeCredIdx(ctx, inbound, profile, 8, now, func(idx int) (ProbeCredRow, error) {
+			if first {
+				first = false
+				got.probeFirst = idx
+				issueBarrier.Done()
+				issueBarrier.Wait()
+			}
+			return ProbeCredRow{CredID: "crd_probe_race", SecretEnc: []byte{1}, DataJSON: `{}`}, nil
+		})
+	}()
+	close(start)
+	done.Wait()
+	if got.deviceErr != nil || got.probeErr != nil {
+		t.Fatalf("racing device/probe errors = %v / %v", got.deviceErr, got.probeErr)
+	}
+	if got.deviceFirst != 2 || got.probeFirst != 2 {
+		t.Fatalf("first candidate indexes were %d and %d, want both to read 2", got.deviceFirst, got.probeFirst)
+	}
+	probe, err := s.ProbeCred(ctx, inbound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.deviceIdx == probe.AWGIdx {
+		t.Fatalf("device and probe both hold peer index %d", got.deviceIdx)
+	}
+}
+
 func TestAddAWGDeviceReturnsSubnetFull(t *testing.T) {
 	s := openTemp(t)
 	profile, _ := awgNet(t, s, "subnet_full")
@@ -377,17 +573,19 @@ func TestAWGDeviceScopeAndConfigRecord(t *testing.T) {
 	}
 
 	sig := map[string]string{"nod_scope": "1.1.1.1|2606:4700:4700::1111"}
-	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, 3, sig); err != nil {
+	epoch := int64(3)
+	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, &epoch, sig); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, 2, nil); err != nil {
+	lowerEpoch := int64(2)
+	if err := s.Access().RecordDeviceConfig(ctx, scope.Device.CredID, &lowerEpoch, nil); err != nil {
 		t.Fatal(err)
 	}
 	device, err := s.Access().AWGDevice(ctx, "dev_scope")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if device.ConfigEpoch != 3 || len(device.DNSSig) != 0 {
+	if device.ConfigEpoch != 3 || len(device.DNSSig) != 1 || device.DNSSig["nod_scope"] != sig["nod_scope"] {
 		t.Fatalf("recorded device state = epoch %d DNS %v", device.ConfigEpoch, device.DNSSig)
 	}
 }

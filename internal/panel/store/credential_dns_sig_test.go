@@ -30,7 +30,8 @@ func TestCredentialDNSSigMigrationUpgradesAndRollsBack(t *testing.T) {
 	if countT(t, s, `SELECT count(*) FROM pragma_table_info('device_credential') WHERE name = 'configs_at'`) != 0 {
 		t.Error("configs_at is left")
 	}
-	if err := s.Access().SetDNSSig(ctx, "crd_hy", map[string]string{"nod_a": "1.1.1.1,8.8.8.8"}); err != nil {
+	sig := map[string]string{"nod_a": "1.1.1.1,8.8.8.8"}
+	if err := s.Access().RecordDeviceConfig(ctx, "crd_hy", nil, sig); err != nil {
 		t.Fatal(err)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_hy' AND dns_sig = '{"nod_a":"1.1.1.1,8.8.8.8"}'`); n != 1 {

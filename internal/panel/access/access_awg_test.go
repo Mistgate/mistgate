@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -808,6 +810,112 @@ func TestAWGImplicitDeviceIsLazy(t *testing.T) {
 	if awgDev == nil || awgDev.AWG == nil || awgDev.AWG.ProfileName != "awg31" || awgDev.AWG.Version != "3.1" || awgDev.App != "amnezia" || awgDev.Model != "phone" ||
 		awgDev.AWG.Stale || awgDev.AWG.Address == "" || len(awgDev.AWG.MinClients) == 0 {
 		t.Errorf("awg device on the page = %+v", awgDev)
+	}
+}
+
+func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
+	f := newAWGFixture(t)
+	e := f.e
+	a := e.st.Access()
+	u := must(a.User(e.ctx, f.user))
+	g := must(a.Group(e.ctx, f.group))
+	full, err := a.InboundsFull(e.ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seed := store.AccessDevice{ID: "dev_mihomo_readback", UserID: u.ID, Implicit: true}
+	if _, _, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, seed, nil); !added {
+		t.Fatal("initial Mihomo call did not add the AWG credential")
+	}
+	wantDevice, wantCreds, err := a.ImplicitDeviceCreds(e.ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotDevice, gotCreds, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, store.AccessDevice{}, nil)
+	if added {
+		t.Fatal("a read-back of an existing device reported a new credential")
+	}
+	if gotDevice.ID != wantDevice.ID || len(gotCreds) != len(wantCreds) {
+		t.Fatalf("read-back device %q with %d credentials, want %q with %d", gotDevice.ID, len(gotCreds), wantDevice.ID, len(wantCreds))
+	}
+	gotIDs := make(map[string]bool, len(gotCreds))
+	for _, cred := range gotCreds {
+		gotIDs[cred.ID] = true
+		if cred.DeviceID != wantDevice.ID {
+			t.Errorf("credential %q belongs to device %q, want %q", cred.ID, cred.DeviceID, wantDevice.ID)
+		}
+	}
+	for _, cred := range wantCreds {
+		if !gotIDs[cred.ID] {
+			t.Errorf("live credential %q was omitted from the read-back", cred.ID)
+		}
+	}
+}
+
+type firstAWGIssueBarrier struct {
+	protocols.Protocol
+	calls   atomic.Int32
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (p *firstAWGIssueBarrier) IssueCredential(in protocols.IssueInput) (protocols.Issued, error) {
+	if p.calls.Add(1) == 1 {
+		close(p.entered)
+		<-p.release
+	}
+	return p.Protocol.IssueCredential(in)
+}
+
+func (p *firstAWGIssueBarrier) PerDevice() bool { return protocols.IsPerDevice(p.Protocol) }
+
+func TestMihomoSubscriptionUsesCredentialsCreatedByConcurrentFetch(t *testing.T) {
+	f := newAWGFixture(t)
+	e := f.e
+	base, ok := e.s.reg.Get(awg.ID)
+	if !ok {
+		t.Fatal("AWG protocol is not registered")
+	}
+	barrier := &firstAWGIssueBarrier{Protocol: base, entered: make(chan struct{}), release: make(chan struct{})}
+	plugins := e.s.reg.List()
+	for i, p := range plugins {
+		if p.ID() == awg.ID {
+			plugins[i] = barrier
+		}
+	}
+	e.s.reg = must(protocols.NewRegistry(plugins...))
+
+	type result struct {
+		lines []string
+		err   error
+	}
+	firstDone := make(chan result, 1)
+	token := e.tokenOf(f.user)
+	go func() {
+		view, err := e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo})
+		if err != nil {
+			firstDone <- result{err: err}
+			return
+		}
+		firstDone <- result{lines: view.Lines}
+	}()
+	<-barrier.entered
+	second, secondErr := e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo})
+	close(barrier.release)
+	if secondErr != nil {
+		t.Fatal(secondErr)
+	}
+	if len(second.Lines) != 1 {
+		t.Fatalf("concurrent subscription lines = %d, want one AWG proxy", len(second.Lines))
+	}
+	first := <-firstDone
+	if first.err != nil {
+		t.Fatal(first.err)
+	}
+	if len(first.lines) != 1 {
+		t.Fatalf("subscription that retried after the concurrent commit returned %d lines, want the live AWG proxy", len(first.lines))
 	}
 }
 

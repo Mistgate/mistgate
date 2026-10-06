@@ -28,9 +28,25 @@ var (
 // Store wraps the writer and read pools. The VPS backend uses one writer connection
 // and a read pool; the D1 backend uses the same binding for both pools.
 type Store struct {
-	W, R     *sql.DB
-	awgRetry sync.Mutex // Serializes local retries after concurrent AWG batches fail their guards.
+	W, R         *sql.DB
+	awgRetry     chan struct{} // Serializes local retries after concurrent AWG batches fail their guards.
+	awgRetryOnce sync.Once
 }
+
+func (s *Store) lockAWGRetry(ctx context.Context) error {
+	s.awgRetryOnce.Do(func() { s.awgRetry = make(chan struct{}, 1) })
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case s.awgRetry <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *Store) unlockAWGRetry() { <-s.awgRetry }
 
 // Close closes both pools.
 func (s *Store) Close() error {
