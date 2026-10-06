@@ -63,7 +63,7 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 	if err := s.RequireStepUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	m, now, ip := req.Msg, s.now(), s.clientIP(req)
@@ -131,7 +131,7 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 	if err := s.RequireStepUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	if s.vault == nil {
@@ -166,9 +166,9 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 		return nil, errInternal(err)
 	}
 	c.totp = newTOTPSecret()
-	id, err := s.putCeremony(c)
+	id, err := s.putCeremony(ctx, c)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginTotpEnrollmentResponse{
 		CeremonyId: id, TotpUri: totpURI(s.brandName(ctx), c.login, c.totp), TotpSecret: b32.EncodeToString(c.totp),
@@ -181,11 +181,14 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, err
 	}
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	m, now, ip := req.Msg, s.now(), s.clientIP(req)
-	c, ok := s.takeCeremony(m.CeremonyId, ceremonyTOTPEnroll)
+	c, ok, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyTOTPEnroll)
+	if err != nil {
+		return nil, errInternal(err)
+	}
 	// another admin's ceremony, or one begun in another session, is as good as unknown
 	if !ok || c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
 		return nil, codedErr(connect.CodeInvalidArgument, "enrollment_expired")
@@ -193,7 +196,9 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 	step, ok := matchTOTP(c.totp, m.TotpCode, now)
 	if !ok {
 		if c.tries++; c.tries < maxSetupCodeTries {
-			s.restoreCeremony(m.CeremonyId, c) // a typo must not cost the QR that was just scanned
+			if err := s.restoreCeremony(ctx, m.CeremonyId, c); err != nil {
+				return nil, errInternal(err)
+			}
 		}
 		return nil, codedErr(connect.CodeInvalidArgument, "invalid_code")
 	}

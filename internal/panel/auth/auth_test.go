@@ -113,26 +113,27 @@ func TestSessionLifetimes(t *testing.T) {
 
 func TestCeremonyIsSingleUseAndExpires(t *testing.T) {
 	s, _, clock := newTestService(t)
-	id, err := s.putCeremony(&ceremony{kind: "login"})
+	ctx := context.Background()
+	id, err := s.putCeremony(ctx, &ceremony{kind: "login"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := s.takeCeremony(id, "setup"); ok {
+	if _, ok, err := s.takeCeremony(ctx, id, "setup"); err != nil || ok {
 		t.Fatal("ceremony of the wrong kind accepted")
 	}
-	if _, ok := s.takeCeremony(id, "login"); ok {
+	if _, ok, err := s.takeCeremony(ctx, id, "login"); err != nil || ok {
 		t.Fatal("ceremony survived a failed take") // taking is destructive by design
 	}
-	id, _ = s.putCeremony(&ceremony{kind: "login"})
-	if _, ok := s.takeCeremony(id, "login"); !ok {
+	id, _ = s.putCeremony(ctx, &ceremony{kind: "login"})
+	if _, ok, err := s.takeCeremony(ctx, id, "login"); err != nil || !ok {
 		t.Fatal("fresh ceremony rejected")
 	}
-	if _, ok := s.takeCeremony(id, "login"); ok {
+	if _, ok, err := s.takeCeremony(ctx, id, "login"); err != nil || ok {
 		t.Fatal("ceremony reused")
 	}
-	id, _ = s.putCeremony(&ceremony{kind: "login"})
+	id, _ = s.putCeremony(ctx, &ceremony{kind: "login"})
 	*clock = clock.Add(CeremonyTTL + time.Second)
-	if _, ok := s.takeCeremony(id, "login"); ok {
+	if _, ok, err := s.takeCeremony(ctx, id, "login"); err != nil || ok {
 		t.Fatal("expired ceremony accepted")
 	}
 }

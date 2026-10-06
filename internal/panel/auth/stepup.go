@@ -86,7 +86,7 @@ func (s *Service) BeginStepUp(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, err
 	}
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	pks, err := s.st.PasskeysByAdmin(ctx, admin.ID)
@@ -110,9 +110,9 @@ func (s *Service) BeginStepUp(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(&ceremony{kind: ceremonyStepUp, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, tokenHash: currentHash(req)})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyStepUp, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, tokenHash: currentHash(req)})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginStepUpResponse{CeremonyId: id, OptionsJson: string(opts)}), nil
 }
@@ -125,7 +125,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, err
 	}
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	now, ip := s.now(), s.clientIP(req)
@@ -150,7 +150,10 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	m := req.Msg
 	method := "passkey"
 	if m.CeremonyId != "" || m.CredentialJson != "" {
-		c, ok := s.takeCeremony(m.CeremonyId, ceremonyStepUp)
+		c, ok, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyStepUp)
+		if err != nil {
+			return nil, errInternal(err)
+		}
 		if !ok || c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
 			return nil, refuse("unknown or foreign ceremony", nil)
 		}

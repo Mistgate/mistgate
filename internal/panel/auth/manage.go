@@ -96,9 +96,9 @@ func (s *Service) BeginAddPasskey(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(&ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginAddPasskeyResponse{CeremonyId: id, OptionsJson: string(opts)}), nil
 }
@@ -109,7 +109,10 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
-	c, ok := s.takeCeremony(req.Msg.CeremonyId, ceremonyAddPasskey)
+	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey)
+	if err != nil {
+		return nil, errInternal(err)
+	}
 	if !ok || c.admin.ID != admin.ID { // another admin's ceremony is as good as unknown
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
 	}

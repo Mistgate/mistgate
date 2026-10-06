@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -52,42 +51,6 @@ func (h *handler) unlocked(r *http.Request, token string) bool {
 	return err == nil && pagepass.CheckCookie(h.cfg.PageKey, token, c.Value)
 }
 
-// tryState counts the password entries of one key in a window.
-type tryState struct {
-	mu     sync.Mutex
-	start  time.Time
-	n      int
-	logged bool // the lockout of this window was reported
-}
-
-// take counts one entry. retry > 0: refused for that long (first: this is the refusal that starts the lockout).
-// left is how many entries remain in the window after this one.
-func (t *tryState) take(limit int, window time.Duration, now time.Time) (retry time.Duration, left int, first bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if now.Sub(t.start) >= window {
-		t.start, t.n, t.logged = now, 0, false
-	}
-	if t.n >= limit {
-		first, t.logged = !t.logged, true
-		return t.start.Add(window).Sub(now), 0, first
-	}
-	t.n++
-	return 0, limit - t.n, false
-}
-
-// refused reports how long this window still refuses entries once its lockout was reported (retry > 0), without
-// counting the call: the cheap answer for a request that arrives after the lockout. The refusal that starts the
-// lockout is not this one: it goes through take, which reports it.
-func (t *tryState) refused(limit int, window time.Duration, now time.Time) (retry time.Duration) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if now.Sub(t.start) >= window || t.n < limit || !t.logged {
-		return 0
-	}
-	return t.start.Add(window).Sub(now)
-}
-
 // tryKeys are the counters an entry for token from client is counted against.
 func tryKeys(token, client string) []struct{ scope, key string } {
 	keys := []struct{ scope, key string }{{"token", "t:" + token}}
@@ -105,13 +68,21 @@ func lockedAnswer(w http.ResponseWriter, retry time.Duration) {
 
 func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, client string, now time.Time) {
 	ctx := r.Context()
+	retryOnFailure := h.cfg.UnlockWindow
+	if retryOnFailure <= 0 {
+		retryOnFailure = time.Minute
+	}
 	if h.cfg.UnlockTries > 0 { // a counter that already ran out answers before any database work
 		for _, k := range tryKeys(token, client) {
-			if st, ok := h.tries.Get(k.key); ok {
-				if retry := st.refused(h.cfg.UnlockTries, h.cfg.UnlockWindow, now); retry > 0 {
-					lockedAnswer(w, retry)
-					return
-				}
+			decision, err := h.cfg.Limiter.CheckWindow(ctx, "page-password", k.key, now,
+				h.cfg.UnlockTries, h.cfg.UnlockWindow, h.cfg.MaxKeys, true)
+			if err != nil {
+				lockedAnswer(w, retryOnFailure)
+				return
+			}
+			if !decision.Allowed && !decision.First {
+				lockedAnswer(w, decision.RetryAfter)
+				return
 			}
 		}
 	}
@@ -137,16 +108,20 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 	left := h.cfg.UnlockTries
 	if left > 0 {
 		for _, k := range tryKeys(token, client) {
-			st := h.tries.GetOrCreate(k.key, func() *tryState { return &tryState{} })
-			retry, l, first := st.take(h.cfg.UnlockTries, h.cfg.UnlockWindow, now)
-			if first {
-				h.lockout(v.UserName, k.scope, now)
-			}
-			if retry > 0 {
-				lockedAnswer(w, retry)
+			decision, err := h.cfg.Limiter.RecordWindow(ctx, "page-password", k.key, now,
+				h.cfg.UnlockTries, h.cfg.UnlockWindow, h.cfg.MaxKeys)
+			if err != nil {
+				lockedAnswer(w, retryOnFailure)
 				return
 			}
-			left = min(left, l)
+			if decision.First {
+				h.lockout(v.UserName, k.scope, now)
+			}
+			if !decision.Allowed {
+				lockedAnswer(w, decision.RetryAfter)
+				return
+			}
+			left = min(left, decision.Remaining)
 		}
 	}
 	var in struct {
@@ -159,7 +134,10 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "wrong_password", "left": left})
 		return
 	}
-	h.tries.Delete("t:" + token) // a right entry clears the token's count (not the network's: a shared address)
+	if err := h.cfg.Limiter.Reset(ctx, "page-password", "t:"+token); err != nil {
+		lockedAnswer(w, retryOnFailure)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: pagepass.Cookie(h.cfg.PageKey, token), Path: h.linkPath(r, token), MaxAge: cookieMaxAge,
 		// Secure unless the instance's public URL is plain http: a browser drops a Secure cookie from an http page.

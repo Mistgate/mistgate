@@ -37,11 +37,13 @@ var (
 	errAdminModeConflict     = errors.New("adminHost and adminPrefix are mutually exclusive")
 	errInvalidAdminPrefix    = errors.New("adminPrefix must look like /secret/")
 	errInvalidSubPrefix      = errors.New("subPrefix must look like /secret/")
+	errInvalidLimitCallback  = errors.New("limit must be a function")
 )
 
 type initOptions struct {
 	d1        js.Value
 	assets    js.Value // optional async (path) => Uint8Array | null: the SPA build in the Worker's static assets
+	limit     js.Value // optional async security-limit callback
 	masterKey []byte
 	publicURL string
 	adminHost string
@@ -61,6 +63,12 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 	out.d1 = d1
 	if assets := value.Get("assets"); assets.Type() == js.TypeFunction {
 		out.assets = assets
+	}
+	limit := value.Get("limit")
+	if limit.Type() == js.TypeFunction {
+		out.limit = limit
+	} else if limit.Type() != js.TypeUndefined && !limit.IsNull() {
+		return out, errInvalidLimitCallback
 	}
 	var err error
 	if out.masterKey, err = masterKeyFromJS(value.Get("masterKey")); err != nil {
@@ -155,66 +163,67 @@ func masterKeyFromJS(value js.Value) ([]byte, error) {
 	return key, nil
 }
 
-func loadEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (app.InstanceConfig, error) {
+func loadEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (app.InstanceConfig, map[string]string, error) {
 	rpID, err := st.Setting(ctx, "rp_id")
 	if errors.Is(err, store.ErrNotFound) {
-		return newEdgeInstance(ctx, st, opts)
+		return newEdgeInstance(opts)
 	}
 	if err != nil {
-		return app.InstanceConfig{}, err
+		return app.InstanceConfig{}, nil, err
 	}
 	in := app.InstanceConfig{RPID: rpID}
 	if origins, err := st.Setting(ctx, "rp_origins"); err != nil {
-		return in, err
+		return in, nil, err
 	} else if in.RPOrigins = splitList(origins); len(in.RPOrigins) == 0 {
-		return in, errors.New("stored rp_origins setting is empty")
+		return in, nil, errors.New("stored rp_origins setting is empty")
 	}
 	for key, target := range map[string]*string{
 		"public_url": &in.PublicURL, "admin_host": &in.AdminHost,
 		"admin_prefix": &in.AdminPrefix, "admin_listen": &in.AdminListen,
 	} {
 		if *target, err = st.Setting(ctx, key); err != nil {
-			return in, err
+			return in, nil, err
 		}
 	}
 	if in.AdminListen != "" && (in.AdminHost != "" || in.AdminPrefix != "/") {
-		return in, errors.New("stored settings combine a separate admin listener with an admin host or path prefix")
+		return in, nil, errors.New("stored settings combine a separate admin listener with an admin host or path prefix")
 	}
-	if err := ensureEdgeSecrets(ctx, st, &in); err != nil {
-		return in, err
+	pending, err := ensureEdgeSecrets(ctx, st, &in)
+	if err != nil {
+		return in, nil, err
 	}
-	return in, nil
+	return in, pending, nil
 }
 
-func newEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (app.InstanceConfig, error) {
+func newEdgeInstance(opts initOptions) (app.InstanceConfig, map[string]string, error) {
 	var in app.InstanceConfig
 	if opts.publicURL == "" {
-		return in, errFreshPublicURL
+		return in, nil, errFreshPublicURL
 	}
 	publicURL, err := parsePublicURL(opts.publicURL)
 	if err != nil {
-		return in, err
+		return in, nil, err
 	}
 	in.PublicURL = publicURL.String()
 	adminHost, err := parseAdminHost(opts.adminHost)
 	if err != nil {
-		return in, err
+		return in, nil, err
 	}
 	in.AdminHost = adminHost
 	if in.AdminHost != "" && opts.adminPath != "" {
-		return in, errAdminModeConflict
+		return in, nil, errAdminModeConflict
 	}
 	if in.AdminHost != "" {
 		in.AdminPrefix = "/"
 	} else if opts.adminPath == "" {
 		in.AdminPrefix = newSecretPrefix()
 	} else if in.AdminPrefix, err = validatePrefix(opts.adminPath, errInvalidAdminPrefix); err != nil {
-		return in, err
+		return in, nil, err
 	}
 	if opts.subPath == "" {
 		in.SubPrefix = newSecretPrefix()
 	} else if in.SubPrefix, err = validatePrefix(opts.subPath, errInvalidSubPrefix); err != nil {
-		return in, err
+		return in, nil, err
 	}
 	if opts.rpID != "" {
 		in.RPID = opts.rpID
@@ -236,15 +245,13 @@ func newEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (ap
 		in.RPOrigins = []string{publicURL.Scheme + "://" + originHost}
 	}
 	in.AgentSNI = newAgentSNI(publicURL.Hostname())
-	if err := st.SetSettings(ctx, map[string]string{
+	pending := map[string]string{
 		"public_url": in.PublicURL, "admin_host": in.AdminHost,
 		"admin_prefix": in.AdminPrefix, "admin_listen": "",
 		"rp_id": in.RPID, "rp_origins": strings.Join(in.RPOrigins, ","),
 		"agent_sni": in.AgentSNI, "sub_prefix": in.SubPrefix,
-	}); err != nil {
-		return in, err
 	}
-	return in, nil
+	return in, pending, nil
 }
 
 func parsePublicURL(raw string) (*url.URL, error) {
@@ -273,25 +280,22 @@ func validatePrefix(raw string, errInvalid error) (string, error) {
 	return raw, nil
 }
 
-func ensureEdgeSecrets(ctx context.Context, st *store.Store, in *app.InstanceConfig) error {
+func ensureEdgeSecrets(ctx context.Context, st *store.Store, in *app.InstanceConfig) (map[string]string, error) {
 	fill := map[string]string{}
 	var err error
 	if in.AgentSNI, err = st.Setting(ctx, "agent_sni"); errors.Is(err, store.ErrNotFound) {
 		in.AgentSNI = newAgentSNI(hostFromURL(in.PublicURL))
 		fill["agent_sni"] = in.AgentSNI
 	} else if err != nil {
-		return err
+		return nil, err
 	}
 	if in.SubPrefix, err = st.Setting(ctx, "sub_prefix"); errors.Is(err, store.ErrNotFound) {
 		in.SubPrefix = newSecretPrefix()
 		fill["sub_prefix"] = in.SubPrefix
 	} else if err != nil {
-		return err
+		return nil, err
 	}
-	if len(fill) == 0 {
-		return nil
-	}
-	return st.SetSettings(ctx, fill)
+	return fill, nil
 }
 
 func hostFromURL(raw string) string {

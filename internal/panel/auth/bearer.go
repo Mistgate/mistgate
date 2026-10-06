@@ -96,7 +96,8 @@ func (s *Service) authenticateBearer(r *http.Request, limit bool) (store.APIToke
 		s.log.Error("look up api token", "err", err)
 		return store.APIToken{}, failure(http.StatusInternalServerError, "internal", "internal error", "database error")
 	}
-	switch now := s.now(); {
+	now := s.now()
+	switch {
 	case tok.Revoked():
 		return tok, failure(http.StatusUnauthorized, "unauthenticated", "token revoked", "token revoked")
 	case tok.Expired(now):
@@ -104,9 +105,11 @@ func (s *Service) authenticateBearer(r *http.Request, limit bool) (store.APIToke
 	}
 	if limit {
 		refill := time.Minute / time.Duration(max(tok.RatePerMin, 1))
-		if ok, wait := s.tokLim.allowRate(tok.ID, float64(min(tokenBurst, max(tok.RatePerMin, 1))), refill); !ok {
+		decision, err := s.lim.Take(r.Context(), "api-token", tok.ID, now,
+			float64(min(tokenBurst, max(tok.RatePerMin, 1))), refill, 1)
+		if err != nil || !decision.Allowed {
 			f := failure(http.StatusTooManyRequests, "resource_exhausted", "too many requests for this token, slow down", "rate limit")
-			f.retry = wait
+			f.retry = decision.RetryAfter
 			return tok, f
 		}
 	}

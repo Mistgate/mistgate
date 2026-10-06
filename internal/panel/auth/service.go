@@ -22,6 +22,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -67,6 +68,8 @@ type Config struct {
 	TurnstileURL string
 	// HTTPClient makes the siteverify call; nil means a client with a 5 s timeout.
 	HTTPClient *http.Client
+	// Limiter is the shared backend for security-sensitive limits. Nil uses bounded in-memory state.
+	Limiter securitylimit.Limiter
 	// SourceURL is where the panel's source code is published; Me hands it to the admin, which links it next to the
 	// version. Empty = no link.
 	SourceURL string
@@ -78,7 +81,7 @@ type Service struct {
 	wa    *webauthn.WebAuthn
 	vault *vault.Vault
 	log   *slog.Logger
-	lim   *limiter
+	lim   securitylimit.Limiter
 	trust ProxyTrust
 	now   func() time.Time
 
@@ -89,12 +92,8 @@ type Service struct {
 	hashSem  chan struct{}
 	hook     atomic.Pointer[func(Event)]
 
-	mu         sync.Mutex
-	ceremonies map[string]*ceremony
-
 	// API tokens (bearer.go): the per-token request limiter, and the once-a-minute gates that keep a polling
 	// script from rewriting last_used_* or filling the audit log with reads.
-	tokLim     *limiter
 	tokMu      sync.Mutex
 	tokTouched map[string]time.Time // token id -> last last_used_* write
 	tokAudited map[string]time.Time // "token id|key" -> last audited successful read (or refused burst)
@@ -144,6 +143,9 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = &http.Client{Timeout: turnstileTimeout}
 	}
+	if cfg.Limiter == nil {
+		cfg.Limiter = securitylimit.NewMemory()
+	}
 	s := &Service{
 		sourceURL:  cfg.SourceURL,
 		tsURL:      cfg.TurnstileURL,
@@ -152,15 +154,13 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		wa:         wa,
 		vault:      cfg.Vault,
 		log:        log,
-		lim:        newLimiter(10, 3*time.Second), // burst 10, then one request per 3 s per source
+		lim:        cfg.Limiter,
 		trust:      NewProxyTrust(cfg.TrustedProxies),
 		now:        time.Now,
 		hashSem:    make(chan struct{}, maxConcurrentHashes),
-		ceremonies: map[string]*ceremony{},
 		tokTouched: map[string]time.Time{},
 		tokAudited: map[string]time.Time{},
 	}
-	s.tokLim = &limiter{now: func() time.Time { return s.now() }, m: map[string]*bucket{}} // follows s.now (tests move it)
 	return s, nil
 }
 
@@ -194,53 +194,99 @@ func IssueSetupToken(ctx context.Context, st *store.Store, now time.Time) (strin
 // ErrAdminExists is returned by IssueSetupToken once the first admin has been created.
 var ErrAdminExists = errors.New("auth: an admin already exists")
 
-// putCeremony stores c and returns its id. One source may hold at most
-// maxCeremoniesPerSource pending ceremonies, and the whole table at most maxCeremonies,
-// so begin-requests cannot be used to fill the server's memory.
-func (s *Service) putCeremony(c *ceremony) (string, error) {
+// putCeremony stores c and returns its unguessable id. Expired rows are pruned and
+// both pending-ceremony caps are enforced by the store.
+func (s *Service) putCeremony(ctx context.Context, c *ceremony) (string, error) {
 	now := s.now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	perSource := 0
-	for id, old := range s.ceremonies {
-		if now.After(old.expires) {
-			delete(s.ceremonies, id)
-		} else if old.src == c.src {
-			perSource++
-		}
-	}
-	if perSource >= maxCeremoniesPerSource || len(s.ceremonies) >= maxCeremonies {
-		return "", errors.New("too many pending ceremonies")
-	}
 	c.expires = now.Add(CeremonyTTL)
 	id := randomToken(16)
-	s.ceremonies[id] = c
+	row, err := s.ceremonyRow(id, c)
+	if err != nil {
+		return "", err
+	}
+	if err := s.st.PutAuthCeremony(ctx, row, now, maxCeremoniesPerSource, maxCeremonies); err != nil {
+		return "", err
+	}
 	return id, nil
 }
 
-// takeCeremony removes and returns a ceremony of one of the given kinds; each one can be
-// finished at most once, successful or not (restoreCeremony is the one exception).
-func (s *Service) takeCeremony(id string, kinds ...string) (*ceremony, bool) {
-	s.mu.Lock()
-	c, ok := s.ceremonies[id]
-	delete(s.ceremonies, id)
-	s.mu.Unlock()
-	if !ok || s.now().After(c.expires) {
-		return nil, false
+// takeCeremony atomically removes a live ceremony. A wrong-kind finish still consumes
+// it, matching the previous map behavior.
+func (s *Service) takeCeremony(ctx context.Context, id string, kinds ...string) (*ceremony, bool, error) {
+	row, err := s.st.TakeAuthCeremony(ctx, id, s.now())
+	if errors.Is(err, store.ErrAuthCeremonyNotFound) {
+		return nil, false, nil
 	}
-	for _, k := range kinds {
-		if c.kind == k {
-			return c, true
+	if err != nil {
+		return nil, false, err
+	}
+	c, err := s.ceremonyFromRow(row)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, kind := range kinds {
+		if c.kind == kind {
+			return c, true, nil
 		}
 	}
-	return nil, false
+	return nil, false, nil
 }
 
-// restoreCeremony puts a taken ceremony back under its id with its original expiry.
-func (s *Service) restoreCeremony(id string, c *ceremony) {
-	s.mu.Lock()
-	s.ceremonies[id] = c
-	s.mu.Unlock()
+// restoreCeremony puts a recoverable ceremony back under the same id and expiry.
+func (s *Service) restoreCeremony(ctx context.Context, id string, c *ceremony) error {
+	row, err := s.ceremonyRow(id, c)
+	if err != nil {
+		return err
+	}
+	return s.st.RestoreAuthCeremony(ctx, row)
+}
+
+func ceremonyTOTPRecordID(id string) string { return "auth_ceremony.totp:" + id }
+
+func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error) {
+	data, err := json.Marshal(c.data)
+	if err != nil {
+		return store.AuthCeremony{}, err
+	}
+	admin, err := json.Marshal(c.admin)
+	if err != nil {
+		return store.AuthCeremony{}, err
+	}
+	var sealedTOTP []byte
+	if len(c.totp) > 0 {
+		if s.vault == nil {
+			return store.AuthCeremony{}, errors.New("auth: cannot persist setup ceremony without a vault")
+		}
+		sealedTOTP = s.vault.Seal(c.totp, ceremonyTOTPRecordID(id))
+	}
+	return store.AuthCeremony{
+		ID: id, Kind: c.kind, Source: c.src, SessionData: string(data), TokenHash: c.tokenHash,
+		AdminJSON: string(admin), Name: c.name, Login: c.login, PasswordHash: c.pwHash,
+		TOTPEncrypted: sealedTOTP, Tries: c.tries, ExpiresAt: c.expires,
+	}, nil
+}
+
+func (s *Service) ceremonyFromRow(row store.AuthCeremony) (*ceremony, error) {
+	c := &ceremony{
+		kind: row.Kind, src: row.Source, tokenHash: row.TokenHash, name: row.Name, login: row.Login,
+		pwHash: row.PasswordHash, tries: row.Tries, expires: row.ExpiresAt,
+	}
+	if err := json.Unmarshal([]byte(row.SessionData), &c.data); err != nil {
+		return nil, fmt.Errorf("auth: decode ceremony session: %w", err)
+	}
+	if err := json.Unmarshal([]byte(row.AdminJSON), &c.admin); err != nil {
+		return nil, fmt.Errorf("auth: decode ceremony admin: %w", err)
+	}
+	if len(row.TOTPEncrypted) > 0 {
+		if s.vault == nil {
+			return nil, errors.New("auth: cannot open setup ceremony without a vault")
+		}
+		var err error
+		if c.totp, err = s.vault.Open(row.TOTPEncrypted, ceremonyTOTPRecordID(row.ID)); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
 }
 
 // newSession creates a session for admin and returns the cookie to set.

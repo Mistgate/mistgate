@@ -99,7 +99,7 @@ func initPanel(options js.Value) error {
 		}
 	}()
 
-	in, err := loadEdgeInstance(context.Background(), st, opts)
+	in, pendingSettings, err := loadEdgeInstance(context.Background(), st, opts)
 	if err != nil {
 		return err
 	}
@@ -120,18 +120,25 @@ func initPanel(options js.Value) error {
 		return err
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	limiter := newEdgeLimiter(opts.limit, log)
 	authSvc, err := auth.New(st, auth.Config{
 		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,
+		Limiter: limiter,
 	}, log)
 	if err != nil {
 		return err
 	}
 	built, err := app.Build(app.Config{
-		Store: st, Vault: vlt, Auth: authSvc, MasterKey: opts.masterKey, Clock: time.Now,
+		Store: st, Vault: vlt, Auth: authSvc, Limiter: limiter, MasterKey: opts.masterKey, Clock: time.Now,
 		Logger: log, Instance: in, Title: brand.BrandName(), DataDir: edgeNoFilesystemDataDir,
 	})
 	if err != nil {
 		return err
+	}
+	if len(pendingSettings) != 0 {
+		if err := st.SetSettings(context.Background(), pendingSettings); err != nil {
+			return err
+		}
 	}
 
 	adminExists, expiry, tokenExists, err := st.SetupTokenStatus(context.Background(), time.Now())

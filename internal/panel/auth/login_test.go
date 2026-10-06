@@ -144,6 +144,53 @@ func TestPasswordSetupAndLogin(t *testing.T) {
 	}
 }
 
+func TestConcurrentFinishSetupConsumesCeremonyOnce(t *testing.T) {
+	s, st, clock := newTestService(t)
+	ctx := context.Background()
+	token, err := IssueSetupToken(ctx, st, s.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin, err := s.BeginSetup(ctx, connect.NewRequest(&adminv1.BeginSetupRequest{
+		SetupToken: token, DisplayName: "Ada", Method: adminv1.SetupMethod_SETUP_METHOD_PASSWORD,
+		Login: "ada", Password: testPassword,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(begin.Msg.TotpSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish := &adminv1.FinishSetupRequest{
+		SetupToken: token, CeremonyId: begin.Msg.CeremonyId, TotpCode: totpCode(secret, totpStep(*clock)),
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			_, err := s.FinishSetup(ctx, connect.NewRequest(finish))
+			results <- err
+		}()
+	}
+	close(start)
+	successes := 0
+	for range 2 {
+		if err := <-results; err == nil {
+			successes++
+		} else if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("losing finish: %v", err)
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("two finishes succeeded %d times, want once", successes)
+	}
+	if n, err := st.AdminCount(ctx); err != nil || n != 1 {
+		t.Fatalf("created admins = %d, err=%v; want one", n, err)
+	}
+}
+
 func TestPasswordLockout(t *testing.T) {
 	s, st, clock := newTestService(t)
 	ctx := context.Background()
@@ -324,39 +371,38 @@ func TestPasswordSetupValidation(t *testing.T) {
 
 func TestCeremonyCapPerSource(t *testing.T) {
 	s, _, _ := newTestService(t)
+	ctx := context.Background()
+	var finished string
 	for i := range maxCeremoniesPerSource {
-		if _, err := s.putCeremony(&ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {
+		id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"})
+		if err != nil {
 			t.Fatalf("ceremony %d refused: %v", i, err)
 		}
+		if i == 0 {
+			finished = id
+		}
 	}
-	if _, err := s.putCeremony(&ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err == nil {
+	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err == nil {
 		t.Fatal("source exceeded its cap")
 	}
-	if _, err := s.putCeremony(&ceremony{kind: ceremonyLogin, src: "203.0.113.6"}); err != nil {
+	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.6"}); err != nil {
 		t.Fatalf("another source was affected: %v", err)
 	}
 	// Finished and expired ceremonies free the slot.
-	s.mu.Lock()
-	var any string
-	for id, c := range s.ceremonies {
-		if c.src == "203.0.113.5" {
-			any = id
-			break
-		}
+	if _, ok, err := s.takeCeremony(ctx, finished, ceremonyLogin); err != nil || !ok {
+		t.Fatalf("take ceremony to free source slot: ok=%v err=%v", ok, err)
 	}
-	s.mu.Unlock()
-	s.takeCeremony(any, ceremonyLogin)
-	if _, err := s.putCeremony(&ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {
+	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {
 		t.Fatalf("slot not freed: %v", err)
 	}
 	// The global cap holds however many sources there are.
 	s2, _, _ := newTestService(t)
 	for i := range maxCeremonies {
-		if _, err := s2.putCeremony(&ceremony{kind: ceremonyLogin, src: string(rune('A'+i%50)) + string(rune('a'+i/50))}); err != nil {
+		if _, err := s2.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: string(rune('A'+i%50)) + string(rune('a'+i/50))}); err != nil {
 			t.Fatalf("ceremony %d: %v", i, err)
 		}
 	}
-	if _, err := s2.putCeremony(&ceremony{kind: ceremonyLogin, src: "fresh"}); err == nil {
+	if _, err := s2.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "fresh"}); err == nil {
 		t.Fatal("global cap not enforced")
 	}
 }

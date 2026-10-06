@@ -19,6 +19,18 @@
   },
   {
     "type": "index",
+    "name": "auth_ceremony_expiry",
+    "tbl_name": "auth_ceremony",
+    "sql": "CREATE INDEX auth_ceremony_expiry ON auth_ceremony (expires_at)"
+  },
+  {
+    "type": "index",
+    "name": "auth_ceremony_source_expiry",
+    "tbl_name": "auth_ceremony",
+    "sql": "CREATE INDEX auth_ceremony_source_expiry ON auth_ceremony (source_key, expires_at)"
+  },
+  {
+    "type": "index",
     "name": "awg_peer_live_idx",
     "tbl_name": "awg_peer",
     "sql": "CREATE UNIQUE INDEX awg_peer_live_idx ON awg_peer (profile_id, idx) WHERE released_at = 0"
@@ -304,6 +316,12 @@
     "name": "audit",
     "tbl_name": "audit",
     "sql": "CREATE TABLE audit ( id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, actor TEXT NOT NULL, -- admin id or 'anonymous' action TEXT NOT NULL, params TEXT NOT NULL DEFAULT '{}', -- JSON, never contains secrets result TEXT NOT NULL , source TEXT NOT NULL DEFAULT 'panel' CHECK (source IN ('panel', 'bot', 'mcp', 'api')), ip TEXT NOT NULL DEFAULT '') STRICT"
+  },
+  {
+    "type": "table",
+    "name": "auth_ceremony",
+    "tbl_name": "auth_ceremony",
+    "sql": "CREATE TABLE auth_ceremony ( id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_key TEXT NOT NULL DEFAULT '', session_data TEXT NOT NULL CHECK (json_valid(session_data)), token_hash BLOB NOT NULL DEFAULT X'', admin_json TEXT NOT NULL CHECK (json_valid(admin_json)), name TEXT NOT NULL DEFAULT '', login TEXT NOT NULL DEFAULT '', password_hash TEXT NOT NULL DEFAULT '', totp_enc BLOB NOT NULL DEFAULT X'', tries INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL ) STRICT"
   },
   {
     "type": "table",

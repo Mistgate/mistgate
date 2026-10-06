@@ -20,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -64,6 +65,8 @@ type Config struct {
 	Log   *slog.Logger
 	// Now is the clock (tests). Default time.Now.
 	Now func() time.Time
+	// Limiter is the shared backend for security-sensitive limits. Nil uses bounded in-memory state.
+	Limiter securitylimit.Limiter
 }
 
 type sessionOwner struct {
@@ -94,7 +97,7 @@ type Fleet struct {
 	stuck    map[string]stuckSeq     // node id -> the stats batch the database refused last (statsguard.go)
 
 	kick                 chan struct{}
-	enrollLim            *failLimiter
+	enrollLim            securitylimit.Limiter
 	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck            time.Duration // how often a running stream rechecks its client certificate
 	linkHandshakeTimeout time.Duration // bounds the signed WebSocket handshake; tests may shorten it
@@ -110,6 +113,9 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 	}
 	if cfg.Desired == nil {
 		return nil, errors.New("fleet: Desired is required")
+	}
+	if cfg.Limiter == nil {
+		cfg.Limiter = securitylimit.NewMemory()
 	}
 	cfg.AgentSNI = strings.ToLower(strings.TrimSuffix(cfg.AgentSNI, "."))
 	if cfg.Log == nil {
@@ -135,7 +141,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		owners:               map[string]sessionOwner{},
 		stuck:                map[string]stuckSeq{},
 		kick:                 make(chan struct{}, 1),
-		enrollLim:            newFailLimiter(10, time.Minute),
+		enrollLim:            cfg.Limiter,
 		unit:                 time.Second,
 		certCheck:            30 * time.Second,
 		linkHandshakeTimeout: defaultLinkHandshakeTimeout,

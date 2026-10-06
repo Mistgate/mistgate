@@ -119,6 +119,9 @@ key space (`Limiter(ip|token|admin)`, `Challenge(session)`), short TTL; where an
 per-isolate limit is allowed and documented. The code keeps its interfaces; the edge build injects DO-backed
 implementations.
 
+The per-IP request limiter in `httpserver/ratelimit`, `tokTouched`/`tokAudited`, and `access.touching` remain per-isolate.
+They throttle requests or writes and do not hold security state that must survive isolate changes.
+
 ## 4. One agent protocol for both editions
 
 Goal: agents do not diverge. Feasible, and measured in the spike.

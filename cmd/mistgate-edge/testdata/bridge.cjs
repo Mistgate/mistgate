@@ -11,6 +11,7 @@ const { createHmac } = require("node:crypto");
 
 let wasmFailure;
 let rejectWasmFailure;
+const securityLimits = new Map();
 
 const [wasmPath, wasmExecPath, oraclePath, dataDir] = process.argv.slice(2);
 if (!wasmPath || !wasmExecPath || !oraclePath || !dataDir) {
@@ -129,11 +130,66 @@ function totpCode(secret) {
   return String(value % 1000000).padStart(6, "0");
 }
 
-async function connectRPC(panel, method, body, cookie = "") {
+async function securityLimit(input) {
+  const id = `${input.name}\0${input.key}`;
+  const now = Date.now();
+  const answer = (ok, retryAfterMs = 0, remaining = 0, first = false) => ({ ok, retryAfterMs, remaining, first });
+  if (input.operation === "reset") {
+    securityLimits.delete(id);
+    return answer(true);
+  }
+  if (input.operation === "take") {
+    let bucket = securityLimits.get(id);
+    if (!bucket) {
+      bucket = { tokens: input.burst, last: now };
+      securityLimits.set(id, bucket);
+    }
+    bucket.tokens = Math.min(input.burst, bucket.tokens + (now - bucket.last) / input.refillMs);
+    bucket.last = now;
+    if (bucket.tokens < input.cost) {
+      return answer(false, (input.cost - bucket.tokens) * input.refillMs);
+    }
+    bucket.tokens -= input.cost;
+    return answer(true);
+  }
+  let counter = securityLimits.get(id);
+  if (!counter) {
+    if (input.operation === "peek") return answer(true, 0, input.limit);
+    counter = { start: now, count: 0, logged: false };
+    securityLimits.set(id, counter);
+  }
+  if (now - counter.start >= input.windowMs) {
+    counter.start = now;
+    counter.count = 0;
+    counter.logged = false;
+  }
+  if (input.operation === "peek") {
+    if (counter.count >= input.limit) {
+      return answer(false, counter.start + input.windowMs - now, 0, !counter.logged);
+    }
+    return answer(true, 0, input.limit - counter.count);
+  }
+  if (input.operation === "record") {
+    if (counter.count >= input.limit) {
+      const first = !counter.logged;
+      counter.logged = true;
+      return answer(false, counter.start + input.windowMs - now, 0, first);
+    }
+    counter.count++;
+    return answer(true, 0, input.limit - counter.count);
+  }
+  if (input.operation === "fail") {
+    counter.count++;
+    return answer(true);
+  }
+  throw new Error(`unknown security limit operation: ${input.operation}`);
+}
+
+async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.1") {
   const headers = {
     "Content-Type": "application/json",
     "Connect-Protocol-Version": "1",
-    "CF-Connecting-IP": "127.0.0.1",
+    "CF-Connecting-IP": clientIP,
     Origin: "https://example.com",
   };
   if (cookie) headers.Cookie = cookie;
@@ -169,6 +225,7 @@ async function run() {
     let firstInstance;
     let secondPanel;
     let secondInstance;
+    let thirdPanel;
     const masterKey = new Uint8Array(randomBytes(32));
     const assetCalls = [];
     const assetFiles = {
@@ -177,6 +234,7 @@ async function run() {
     };
     const initOptions = {
       d1: globalThis.__d1,
+      limit: securityLimit,
       assets: async (name) => {
         assetCalls.push(name);
         const file = assetFiles[name];
@@ -188,6 +246,12 @@ async function run() {
       subPrefix: "/test-sub/",
     };
     try {
+      await assert.rejects(Promise.race([
+        firstPanel.init({ ...initOptions, publicURL: "https://192.0.2.10" }), // WebAuthn refuses an IP-address RP ID
+        wasmFailure,
+      ]), "invalid WebAuthn RP settings must fail before first-run settings are stored");
+      const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting").first("n");
+      assert.equal(Number(settingsAfterFailure), 0, "failed first init leaves no settings behind");
       firstInstance = await Promise.race([firstPanel.init(initOptions), wasmFailure]);
       secondPanel = await startIsolate(bytes, firstPanel);
       secondInstance = await Promise.race([secondPanel.init(initOptions), wasmFailure]);
@@ -196,6 +260,7 @@ async function run() {
     }
     assert.equal(firstInstance, firstPanel, "first isolate init returns the panel API");
     assert.equal(secondInstance, secondPanel, "fresh isolate init returns the panel API");
+    // Two wasm instances in this Node process model separate Worker isolates with shared D1 and limiter callbacks.
     const setupMessages = logs.map((args) => String(args[0])).filter((message) => message.startsWith("No admin yet."));
     const newLinks = setupMessages.filter((message) => message.includes("Create one") && message.includes("/setup#"));
     const existingLinks = setupMessages.filter((message) => message.includes("already issued"));
@@ -325,7 +390,7 @@ async function run() {
       password: "test-password-1234",
     });
     assert.equal(setupBegin.response.status, 200, "the first setup link remains valid in the first isolate");
-    const setupFinish = await connectRPC(firstPanel, "AuthService/FinishSetup", {
+    const setupFinish = await connectRPC(secondPanel, "AuthService/FinishSetup", {
       setupToken: setupMatch[1],
       ceremonyId: setupBegin.message.ceremonyId,
       totpCode: totpCode(setupBegin.message.totpSecret),
@@ -346,6 +411,36 @@ async function run() {
     const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
     assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");
     assert.ok(tokens.message.nowUnix, "the API-token RPC returns its current time");
+
+    // This passkey ceremony carries a WebAuthn SessionData challenge across the two wasm instances.
+    const crossIsolateIP = "198.51.100.72";
+    const crossIsolateBegin = await connectRPC(firstPanel, "AuthService/BeginLogin", {}, "", crossIsolateIP);
+    assert.equal(crossIsolateBegin.response.status, 200, "the first isolate starts a WebAuthn ceremony");
+    const crossIsolateFinish = await connectRPC(secondPanel, "AuthService/FinishLogin", {
+      ceremonyId: crossIsolateBegin.message.ceremonyId,
+      credentialJson: "{}",
+    }, "", crossIsolateIP);
+    assert.equal(crossIsolateFinish.message.code, "unauthenticated", "the second isolate reads the stored challenge and rejects the invalid assertion");
+
+    const loginIP = "198.51.100.71";
+    for (let i = 0; i < 5; i++) {
+      const begin = await connectRPC(secondPanel, "AuthService/BeginLogin", {}, "", loginIP);
+      assert.equal(begin.response.status, 200, `login limiter burst request ${i + 1} is allowed`);
+      const finish = await connectRPC(secondPanel, "AuthService/FinishLogin", {
+        ceremonyId: begin.message.ceremonyId,
+        credentialJson: "{}",
+      }, "", loginIP);
+      assert.equal(finish.message.code, "unauthenticated", "invalid assertion consumes its ceremony");
+    }
+    const limitedLogin = await connectRPC(secondPanel, "AuthService/BeginLogin", {}, "", loginIP);
+    assert.equal(limitedLogin.message.code, "resource_exhausted", "the callback refuses login after its burst");
+
+    thirdPanel = await startIsolate(bytes, secondPanel);
+    const withoutLimiter = { ...initOptions };
+    delete withoutLimiter.limit;
+    await Promise.race([thirdPanel.init(withoutLimiter), wasmFailure]);
+    const missingCallback = await connectRPC(thirdPanel, "AuthService/BeginLogin", {});
+    assert.equal(missingCallback.message.code, "resource_exhausted", "login fails closed without the callback");
   } finally {
     oracle.child.kill();
   }

@@ -1,60 +1,54 @@
 package auth
 
 import (
-	"sync"
+	"context"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
-// limiter is a per-key token bucket: burst tokens, one more every refill.
+// limiter keeps the authentication package's test seam while delegating state to
+// the shared backend. Production parameters remain at the auth call site.
 type limiter struct {
-	burst  float64
-	refill time.Duration
-	now    func() time.Time
-
-	mu sync.Mutex
-	m  map[string]*bucket
-}
-
-type bucket struct {
-	tokens float64
-	last   time.Time
-	full   time.Duration // how long an empty bucket takes to fill again, for the cleanup
+	backend securitylimit.Limiter
+	burst   float64
+	refill  time.Duration
+	now     func() time.Time
 }
 
 func newLimiter(burst int, refill time.Duration) *limiter {
-	return &limiter{burst: float64(burst), refill: refill, now: time.Now, m: map[string]*bucket{}}
+	return &limiter{backend: securitylimit.NewMemory(), burst: float64(burst), refill: refill, now: time.Now}
+}
+
+func (l *limiter) Take(ctx context.Context, name, key string, now time.Time, burst float64, refill time.Duration, cost float64) (securitylimit.Decision, error) {
+	if name == "auth" {
+		burst, refill = l.burst, l.refill
+	}
+	return l.backend.Take(ctx, name, key, now, burst, refill, cost)
+}
+
+func (l *limiter) CheckWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int, touch bool) (securitylimit.Decision, error) {
+	return l.backend.CheckWindow(ctx, name, key, now, limit, window, maxKeys, touch)
+}
+
+func (l *limiter) RecordWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int) (securitylimit.Decision, error) {
+	return l.backend.RecordWindow(ctx, name, key, now, limit, window, maxKeys)
+}
+
+func (l *limiter) FailWindow(ctx context.Context, name, key string, now time.Time, window time.Duration, maxKeys int) error {
+	return l.backend.FailWindow(ctx, name, key, now, window, maxKeys)
+}
+
+func (l *limiter) Reset(ctx context.Context, name, key string) error {
+	return l.backend.Reset(ctx, name, key)
 }
 
 func (l *limiter) allow(key string) bool {
-	ok, _ := l.allowRate(key, l.burst, l.refill)
-	return ok
+	d, _ := l.Take(context.Background(), "auth", key, l.now(), l.burst, l.refill, 1)
+	return d.Allowed
 }
 
-// allowRate takes one token of key's bucket, which holds burst tokens and gets one more every refill (the rate
-// may differ per key: API tokens each have their own). When there is none it also returns how long until
-// the next one.
 func (l *limiter) allowRate(key string, burst float64, refill time.Duration) (bool, time.Duration) {
-	now := l.now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if len(l.m) > 4096 { // drop buckets that have fully refilled, i.e. carry no state
-		for k, b := range l.m {
-			if now.Sub(b.last) > b.full {
-				delete(l.m, k)
-			}
-		}
-	}
-	b, ok := l.m[key]
-	if !ok {
-		b = &bucket{tokens: burst, last: now}
-		l.m[key] = b
-	}
-	b.full = time.Duration(burst) * refill
-	b.tokens = min(burst, b.tokens+float64(now.Sub(b.last))/float64(refill))
-	b.last = now
-	if b.tokens < 1 {
-		return false, time.Duration((1 - b.tokens) * float64(refill))
-	}
-	b.tokens--
-	return true, 0
+	d, _ := l.backend.Take(context.Background(), "api-token", key, l.now(), burst, refill, 1)
+	return d.Allowed, d.RetryAfter
 }

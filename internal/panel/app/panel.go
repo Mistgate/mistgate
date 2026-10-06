@@ -23,6 +23,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
@@ -73,6 +74,7 @@ type Config struct {
 	Store              *store.Store
 	Vault              *vault.Vault
 	Auth               *auth.Service
+	Limiter            securitylimit.Limiter
 	MasterKey          []byte
 	Clock              func() time.Time
 	Logger             *slog.Logger
@@ -115,6 +117,10 @@ func Build(c Config) (*Panel, error) {
 	}
 
 	st, vlt, authSvc, log, in := c.Store, c.Vault, c.Auth, c.Logger, c.Instance
+	limiter := c.Limiter
+	if limiter == nil {
+		limiter = securitylimit.NewMemory()
+	}
 	reg := builtin.Registry()
 	// Telegram alerts: everything below that has news reports it here; the admin links of the news carry the admin address
 	// only when it is a public one (a separate loopback admin listener is not).
@@ -144,6 +150,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	fl, err := fleet.New(st, vlt, reg, fleet.Config{
 		AgentSNI:             in.AgentSNI,
+		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,
 		Desired:              desired,
@@ -257,6 +264,7 @@ func Build(c Config) (*Panel, error) {
 	subCfg := subs.Config{
 		Title: c.Title, BaseURL: subBase, Settings: cache, Brand: brand,
 		Routing: subs.HappRouting(dnsSvc), Events: st, Log: log,
+		Limiter: limiter,
 		PageKey: vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
 	}
 	sub := http.NewServeMux()

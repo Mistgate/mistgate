@@ -1,0 +1,114 @@
+//go:build js && wasm
+
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"math"
+	"sync"
+	"syscall/js"
+	"time"
+
+	"github.com/mistgate/mistgate/edge/d1driver"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
+)
+
+var errEdgeLimitUnavailable = errors.New("edge security limiter unavailable")
+
+type edgeLimiter struct {
+	callback js.Value
+	log      *slog.Logger
+	once     sync.Once
+}
+
+// The init limit callback receives {operation, name, key} plus operation fields:
+// take adds burst/refillMs/cost; peek and record add limit/windowMs/maxKeys (peek also
+// adds touch); fail adds windowMs/maxKeys. Every call resolves to
+// {ok, retryAfterMs, remaining, first}.
+func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &edgeLimiter{callback: callback, log: log}
+}
+
+func (l *edgeLimiter) Take(ctx context.Context, name, key string, now time.Time, burst float64, refill time.Duration, cost float64) (securitylimit.Decision, error) {
+	request := l.request("take", name, key)
+	request.Set("burst", burst)
+	request.Set("refillMs", float64(refill)/float64(time.Millisecond))
+	request.Set("cost", cost)
+	return l.call(ctx, request)
+}
+
+func (l *edgeLimiter) CheckWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int, touch bool) (securitylimit.Decision, error) {
+	request := l.windowRequest("peek", name, key, limit, window, maxKeys)
+	request.Set("touch", touch)
+	return l.call(ctx, request)
+}
+
+func (l *edgeLimiter) RecordWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int) (securitylimit.Decision, error) {
+	return l.call(ctx, l.windowRequest("record", name, key, limit, window, maxKeys))
+}
+
+func (l *edgeLimiter) FailWindow(ctx context.Context, name, key string, now time.Time, window time.Duration, maxKeys int) error {
+	_, err := l.call(ctx, l.windowRequest("fail", name, key, 0, window, maxKeys))
+	return err
+}
+
+func (l *edgeLimiter) Reset(ctx context.Context, name, key string) error {
+	_, err := l.call(ctx, l.request("reset", name, key))
+	return err
+}
+
+func (l *edgeLimiter) request(operation, name, key string) js.Value {
+	request := js.Global().Get("Object").New()
+	request.Set("operation", operation)
+	request.Set("name", name)
+	request.Set("key", key)
+	return request
+}
+
+func (l *edgeLimiter) windowRequest(operation, name, key string, limit int, window time.Duration, maxKeys int) js.Value {
+	request := l.request(operation, name, key)
+	if limit > 0 {
+		request.Set("limit", limit)
+	}
+	request.Set("windowMs", float64(window)/float64(time.Millisecond))
+	request.Set("maxKeys", maxKeys)
+	return request
+}
+
+func (l *edgeLimiter) call(ctx context.Context, request js.Value) (securitylimit.Decision, error) {
+	if l.callback.Type() != js.TypeFunction {
+		return securitylimit.Decision{}, l.unavailable()
+	}
+	value, err := d1driver.Await(ctx, l.callback.Invoke(request))
+	if err != nil || value.Type() != js.TypeObject || value.IsNull() {
+		return securitylimit.Decision{}, l.unavailable()
+	}
+	ok := value.Get("ok")
+	retry := value.Get("retryAfterMs")
+	remaining := value.Get("remaining")
+	first := value.Get("first")
+	if ok.Type() != js.TypeBoolean || retry.Type() != js.TypeNumber || remaining.Type() != js.TypeNumber || first.Type() != js.TypeBoolean {
+		return securitylimit.Decision{}, l.unavailable()
+	}
+	ms := retry.Float()
+	left := remaining.Float()
+	if math.IsNaN(ms) || math.IsInf(ms, 0) || ms < 0 || math.IsNaN(left) || math.IsInf(left, 0) || left < 0 || left != math.Trunc(left) {
+		return securitylimit.Decision{}, l.unavailable()
+	}
+	return securitylimit.Decision{
+		Allowed: ok.Bool(), RetryAfter: time.Duration(ms * float64(time.Millisecond)),
+		Remaining: remaining.Int(), First: first.Bool(),
+	}, nil
+}
+
+func (l *edgeLimiter) unavailable() error {
+	l.once.Do(func() {
+		l.log.Warn("edge security limit callback unavailable; guarded requests will be refused")
+	})
+	return errEdgeLimitUnavailable
+}

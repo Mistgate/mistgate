@@ -44,11 +44,19 @@ func (s *Service) clientIP(req connect.AnyRequest) netip.Addr {
 	return s.trust.ClientIP(req.Peer().Addr, req.Header())
 }
 
-func (s *Service) rateLimited(req connect.AnyRequest) error {
-	if !s.lim.allow(SourceKey(s.clientIP(req))) {
+func (s *Service) rateLimited(ctx context.Context, req connect.AnyRequest) error {
+	decision, err := s.lim.Take(ctx, "auth", SourceKey(s.clientIP(req)), s.now(), 10, 3*time.Second, 1)
+	if err != nil || !decision.Allowed {
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many attempts, try again later"))
 	}
 	return nil
+}
+
+func ceremonyPutError(err error) error {
+	if errors.Is(err, store.ErrAuthCeremonyLimit) {
+		return connect.NewError(connect.CodeResourceExhausted, err)
+	}
+	return errInternal(err)
 }
 
 // waUser adapts an admin and its passkeys to webauthn.User.
@@ -140,7 +148,7 @@ func (s *Service) GetLoginInfo(ctx context.Context, _ *connect.Request[adminv1.G
 // PASSWORD) a password + TOTP enrolment. options_json is the bare
 // PublicKeyCredentialCreationOptionsJSON (no "publicKey" wrapper).
 func (s *Service) BeginSetup(ctx context.Context, req *connect.Request[adminv1.BeginSetupRequest]) (*connect.Response[adminv1.BeginSetupResponse], error) {
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	if err := s.checkTurnstile(ctx, req.Msg.TurnstileToken, s.clientIP(req), "setup"); err != nil {
@@ -177,9 +185,9 @@ func (s *Service) BeginSetup(ctx context.Context, req *connect.Request[adminv1.B
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(&ceremony{kind: ceremonySetup, src: src, data: *data, tokenHash: hash, admin: admin})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonySetup, src: src, data: *data, tokenHash: hash, admin: admin})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginSetupResponse{CeremonyId: id, OptionsJson: string(opts)}), nil
 }
@@ -202,9 +210,9 @@ func (s *Service) beginSetupPassword(ctx context.Context, m *adminv1.BeginSetupR
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	secret := newTOTPSecret()
-	id, err := s.putCeremony(&ceremony{kind: ceremonySetupPassword, src: src, tokenHash: tokenHash, admin: admin, login: login, pwHash: pwHash, totp: secret})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonySetupPassword, src: src, tokenHash: tokenHash, admin: admin, login: login, pwHash: pwHash, totp: secret})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginSetupResponse{
 		CeremonyId: id, TotpUri: totpURI(s.brandName(ctx), login, secret), TotpSecret: b32.EncodeToString(secret),
@@ -214,10 +222,13 @@ func (s *Service) beginSetupPassword(ctx context.Context, m *adminv1.BeginSetupR
 // FinishSetup verifies the new credential (passkey, or the TOTP code for a password
 // admin), consumes the setup token, creates the owner and signs them in.
 func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.FinishSetupRequest]) (*connect.Response[adminv1.FinishSetupResponse], error) {
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
-	c, ok := s.takeCeremony(req.Msg.CeremonyId, ceremonySetup, ceremonySetupPassword)
+	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonySetup, ceremonySetupPassword)
+	if err != nil {
+		return nil, errInternal(err)
+	}
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
 	}
@@ -234,7 +245,9 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 		step, ok := matchTOTP(c.totp, req.Msg.TotpCode, now)
 		if !ok {
 			if c.tries++; c.tries < maxSetupCodeTries {
-				s.restoreCeremony(req.Msg.CeremonyId, c) // a typo must not cost the password and the QR
+				if err := s.restoreCeremony(ctx, req.Msg.CeremonyId, c); err != nil {
+					return nil, errInternal(err)
+				}
 			}
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid code"))
 		}
@@ -295,7 +308,7 @@ func passkeyFromCredential(adminID, name string, cred *webauthn.Credential) stor
 // BeginLogin starts a discoverable-credential assertion.
 // options_json is the bare PublicKeyCredentialRequestOptionsJSON (no "publicKey" wrapper).
 func (s *Service) BeginLogin(ctx context.Context, req *connect.Request[adminv1.BeginLoginRequest]) (*connect.Response[adminv1.BeginLoginResponse], error) {
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	if err := s.checkTurnstile(ctx, req.Msg.TurnstileToken, s.clientIP(req), "login"); err != nil {
@@ -310,9 +323,9 @@ func (s *Service) BeginLogin(ctx context.Context, req *connect.Request[adminv1.B
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(&ceremony{kind: ceremonyLogin, src: SourceKey(s.clientIP(req)), data: *data})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: SourceKey(s.clientIP(req)), data: *data})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+		return nil, ceremonyPutError(err)
 	}
 	return connect.NewResponse(&adminv1.BeginLoginResponse{CeremonyId: id, OptionsJson: string(opts)}), nil
 }
@@ -321,7 +334,7 @@ var errSignInFailed = connect.NewError(connect.CodeUnauthenticated, errors.New("
 
 // FinishLogin verifies the assertion and opens a session.
 func (s *Service) FinishLogin(ctx context.Context, req *connect.Request[adminv1.FinishLoginRequest]) (*connect.Response[adminv1.FinishLoginResponse], error) {
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	ip := s.clientIP(req)
@@ -331,7 +344,10 @@ func (s *Service) FinishLogin(ctx context.Context, req *connect.Request[adminv1.
 		s.emit(Event{Kind: EventSignInFailed, Method: "passkey", IP: ip.String()})
 		return errSignInFailed
 	}
-	c, ok := s.takeCeremony(req.Msg.CeremonyId, ceremonyLogin)
+	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyLogin)
+	if err != nil {
+		return nil, errInternal(err)
+	}
 	if !ok {
 		return nil, fail("unknown or expired ceremony", nil)
 	}
@@ -404,7 +420,7 @@ func signInFailure(f store.LoginFailure, now time.Time) error {
 // lock the login for LockDuration, and a locked login is refused without looking at the
 // credentials. A code is single-use.
 func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv1.PasswordLoginRequest]) (*connect.Response[adminv1.PasswordLoginResponse], error) {
-	if err := s.rateLimited(req); err != nil {
+	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
 	ip := s.clientIP(req)

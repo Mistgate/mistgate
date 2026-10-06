@@ -35,6 +35,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/httpserver/ratelimit"
 	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -105,6 +106,8 @@ type Config struct {
 	// Events, if set, receives subscription_shared_suspect events. Log, if set, gets their write errors.
 	Events Events
 	Log    *slog.Logger
+	// Limiter is the shared backend for page-password tries. Nil uses bounded in-memory state.
+	Limiter securitylimit.Limiter
 	// Now is the clock (tests); default time.Now.
 	Now func() time.Time
 
@@ -173,6 +176,9 @@ func (c *Config) defaults() {
 	if c.BrandTTL == 0 {
 		c.BrandTTL = 5 * time.Second
 	}
+	if c.Limiter == nil {
+		c.Limiter = securitylimit.NewMemory()
+	}
 	if c.Log == nil {
 		c.Log = slog.Default()
 	}
@@ -235,7 +241,6 @@ type handler struct {
 	seed    maphash.Seed
 	tokens  *ratelimit.Map[*tokenState]
 	clients *ratelimit.Map[*clientState]
-	tries   *ratelimit.Map[*tryState] // password entries, keyed "t:<token>" and "c:<client network>"
 }
 
 // Handler returns the subscription endpoint. decoy answers everything that is not a valid request for a
@@ -249,7 +254,6 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 		seed:    maphash.MakeSeed(),
 		tokens:  ratelimit.NewMap[*tokenState](cfg.MaxKeys),
 		clients: ratelimit.NewMap[*clientState](cfg.MaxKeys),
-		tries:   ratelimit.NewMap[*tryState](cfg.MaxKeys),
 	}
 	h.fsrc, _ = src.(FormatSource)
 	h.dev, _ = src.(Devices)
