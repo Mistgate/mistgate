@@ -288,15 +288,27 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 	a.tunErr = ""
 	if h, ok := a.host.(hostctl.V6FallbackHost); ok {
 		if mode := h.TunnelV6Fallback(); mode != a.tunV6 {
+			previous := a.tunV6
 			a.tunV6 = mode
 			if mode != "" {
 				a.log.Warn("the kernel refused nft reject: IPv6 from the tunnels is not rejected", "fallback", mode)
 				a.event(pb.Severity_SEVERITY_WARNING, "tunnel_v6_fallback", "", map[string]string{"mode": mode})
+			} else if previous != "" && tunnelRejectRequested(ts) {
+				a.event(pb.Severity_SEVERITY_INFO, "tunnel_v6_recovered", "", nil)
 			}
 		}
 	}
 	a.tunUsed = len(ts) > 0
 	a.syncTorrentGuard(ctx, next, ts, true)
+}
+
+func tunnelRejectRequested(ts []hostctl.Tunnel) bool {
+	for _, t := range ts {
+		if t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp {
+			return true
+		}
+	}
+	return false
 }
 
 // blockedFail is the failure of an inbound that may not run now. A running one is stopped: no engine keeps serving

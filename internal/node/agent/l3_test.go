@@ -672,7 +672,9 @@ func TestTunnelV6FallbackIsReportedOnceAndTheTunnelsKeepServing(t *testing.T) {
 	x.tun.tmu.Lock()
 	x.tun.v6 = "drop"
 	x.tun.tmu.Unlock()
-	r := mustApply(t, x.panel, fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1"))))
+	ds := fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1")))
+	ds.Settings = &pb.NodeSettings{ClientIpv6Disabled: true}
+	r := mustApply(t, x.panel, ds)
 	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || !x.awg.has("inb_a") {
 		t.Fatalf("a degraded IPv6 rule stopped the tunnel: has=%v %v", x.awg.has("inb_a"), r)
 	}
@@ -682,6 +684,41 @@ func TestTunnelV6FallbackIsReportedOnceAndTheTunnelsKeepServing(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	if n := len(x.panel.eventsByCode("tunnel_v6_fallback")); n != 1 {
 		t.Errorf("%d events, want 1", n)
+	}
+
+	x.tun.tmu.Lock()
+	x.tun.v6 = ""
+	x.tun.tmu.Unlock()
+	ds = fullState(2, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1")))
+	ds.Settings = &pb.NodeSettings{ClientIpv6Disabled: true}
+	r = mustApply(t, x.panel, ds)
+	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || !x.awg.has("inb_a") {
+		t.Fatalf("restoring IPv6 reject stopped the tunnel: has=%v %v", x.awg.has("inb_a"), r)
+	}
+	if !x.panel.hasEventEventually("tunnel_v6_recovered") {
+		t.Fatal("no tunnel_v6_recovered event")
+	}
+	ds = fullState(3, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1")))
+	ds.Settings = &pb.NodeSettings{ClientIpv6Disabled: true}
+	r = mustApply(t, x.panel, ds)
+	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED {
+		t.Fatalf("reapplying a recovered tunnel failed: %v", r)
+	}
+	if n := len(x.panel.eventsByCode("tunnel_v6_recovered")); n != 1 {
+		t.Errorf("%d recovery events, want 1", n)
+	}
+}
+
+// When nft's retry succeeds, the host reports no fallback and the owner receives no warning.
+func TestTunnelV6RejectSuccessDoesNotWarn(t *testing.T) {
+	x := newL3(t, 3, false)
+	x.waitConnected()
+	r := mustApply(t, x.panel, fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1"))))
+	if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || !x.awg.has("inb_a") {
+		t.Fatalf("reject support stopped the tunnel: has=%v %v", x.awg.has("inb_a"), r)
+	}
+	if x.panel.hasEvent("tunnel_v6_fallback") {
+		t.Fatal("reported a fallback although the requested IPv6 reject rule was installed")
 	}
 }
 

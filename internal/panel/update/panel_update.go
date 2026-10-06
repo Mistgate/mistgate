@@ -310,6 +310,9 @@ func (u *GitHubPanelUpdater) Install(ctx context.Context, version, digest string
 	status.CheckedUnix = u.now().Unix()
 	if err != nil {
 		status.ErrorKey = panelCheckErrorKey(err)
+		if status.ErrorKey == "check_failed" && u.keepKnownRelease(status.ErrorKey) {
+			return fmt.Errorf("check latest panel release: %w", err)
+		}
 		u.setStatus(status, false, "")
 		if status.ErrorKey != "check_failed" {
 			return err

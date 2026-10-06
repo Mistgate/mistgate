@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -89,6 +90,7 @@ type Endpoint struct {
 	UpURL string
 	// Pause between runs on this server; 0 = Config.Pause. A server that rate-limits is given more room.
 	Pause time.Duration
+	ookla bool // only Ookla endpoints use the dial-time public-address check and redirect policy
 }
 
 // Counters reads the byte counters of the node's main network interface: its name (a changed name between two reads
@@ -119,9 +121,10 @@ type Config struct {
 	// Counters is the host's interface counters; nil = the test alone is measured.
 	Counters Counters
 
-	beforeRun   func(run int) // tests: called before each run, 0-based
-	ooklaScheme string        // tests: "http" for a local server; "" = https
-	ooklaLocal  bool          // tests: the listed servers are on this machine (loopback), not to be dropped
+	beforeRun        func(run int)       // tests: called before each run, 0-based
+	ooklaScheme      string              // tests: "http" for a local server; "" = https
+	ooklaLocal       bool                // tests: the listed servers are on this machine (loopback), not to be refused
+	ooklaDialAddress func(string) string // tests: map a listed address before dialing, to model DNS rebinding
 }
 
 // Result is what the panel gets: the best run per direction.
@@ -197,9 +200,33 @@ func (c Config) client() *http.Client {
 	if c.Client != nil {
 		return c.Client
 	}
-	return &http.Client{Transport: &http.Transport{
+	return &http.Client{Transport: c.transport(false, false)}
+}
+
+func (c Config) ooklaClient() *http.Client {
+	if c.Client != nil && c.ooklaLocal {
+		client := *c.Client
+		client.CheckRedirect = rejectOoklaRedirect
+		return &client
+	}
+	return &http.Client{Transport: c.transport(true, c.ooklaLocal), CheckRedirect: rejectOoklaRedirect}
+}
+
+func (c Config) transport(ookla, allowLocal bool) *http.Transport {
+	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
+	if ookla && !allowLocal {
+		dialer.Control = rejectNonPublicOoklaAddress
+	}
+	dial := dialer.DialContext
+	if ookla && c.ooklaDialAddress != nil {
+		base := dial
+		dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			return base(ctx, network, c.ooklaDialAddress(address))
+		}
+	}
+	return &http.Transport{
 		Proxy:                 nil, // the node's own route, not whatever the environment says
-		DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}).DialContext,
+		DialContext:           dial,
 		TLSHandshakeTimeout:   5 * time.Second,
 		ResponseHeaderTimeout: 8 * time.Second,
 		MaxIdleConnsPerHost:   max(c.DownStreams, c.UpStreams),
@@ -207,7 +234,23 @@ func (c Config) client() *http.Client {
 		// A non-nil empty map turns HTTP/2 off: it would carry every stream over one connection and measure one flow.
 		TLSNextProto:    map[string]func(string, *tls.Conn) http.RoundTripper{},
 		IdleConnTimeout: 10 * time.Second,
-	}}
+	}
+}
+
+func rejectOoklaRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
+func rejectNonPublicOoklaAddress(_ string, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("reject Ookla dial address %q: %w", address, err)
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !publicAddr(ip.WithZone("")) {
+		return fmt.Errorf("reject non-public Ookla dial address %q", address)
+	}
+	return nil
 }
 
 // run is one download + upload.
@@ -225,13 +268,20 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Overall)
 	defer cancel()
 	cl := cfg.client()
-	if t, ok := cl.Transport.(*http.Transport); ok && cfg.Client == nil {
-		defer t.CloseIdleConnections()
+	if cfg.Client == nil {
+		defer cl.CloseIdleConnections()
 	}
 	start := time.Now()
 	eps := cfg.Endpoints
+	var ooklaCl *http.Client
 	if cfg.OoklaList != "" {
-		eps = append(cfg.ookla(ctx, cl), eps...)
+		// The list itself comes from speedtest.net over HTTPS with the ordinary client; the servers it names are a third
+		// party's answer, so they get the client that refuses non-public addresses at dial time and never follows a redirect.
+		ooklaCl = cfg.ooklaClient()
+		if cfg.Client == nil || !cfg.ooklaLocal {
+			defer ooklaCl.CloseIdleConnections()
+		}
+		eps = append(cfg.ookla(ctx, cl, ooklaCl), eps...)
 	}
 	total := max(cfg.Runs, 1)
 	res := Result{DownStreams: cfg.DownStreams, RunsTotal: total}
@@ -243,7 +293,11 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 		if cfg.beforeRun != nil {
 			cfg.beforeRun(i)
 		}
-		return doRun(ctx, cl, cfg, ep)
+		client := cl
+		if ep.ookla {
+			client = ooklaCl
+		}
+		return doRun(ctx, client, cfg, ep)
 	}
 	take := func(r run) {
 		res.Runs++
@@ -312,10 +366,10 @@ func Run(ctx context.Context, cfg Config) (Result, error) {
 
 // ookla returns the ooklaUse Ookla servers with the lowest latency from the node, fastest first; nil when the list cannot
 // be had or no server in it answers (the caller then goes on with its own endpoints).
-func (c Config) ookla(ctx context.Context, cl *http.Client) []Endpoint {
+func (c Config) ookla(ctx context.Context, listClient, serverClient *http.Client) []Endpoint {
 	ctx, cancel := context.WithTimeout(ctx, ooklaWait)
 	defer cancel()
-	servers, err := ooklaServers(ctx, cl, c.OoklaList)
+	servers, err := ooklaServers(ctx, listClient, c.OoklaList)
 	if err != nil {
 		return nil
 	}
@@ -328,16 +382,13 @@ func (c Config) ookla(ctx context.Context, cl *http.Client) []Endpoint {
 	var wg sync.WaitGroup
 	for i, s := range servers {
 		cands[i].ep = Endpoint{
-			Name: "Ookla", Detail: s.label(),
+			Name: "Ookla", Detail: s.label(), ookla: true,
 			DownURL: base + s.Host + ooklaDownURL, UpURL: base + s.Host + "/upload",
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if !c.ooklaLocal && !publicHost(ctx, s.Host) {
-				return
-			}
-			cands[i].rtt = latency(ctx, cl, base+s.Host+"/hello")
+			cands[i].rtt = latency(ctx, serverClient, base+s.Host+"/hello")
 		}()
 	}
 	wg.Wait()
@@ -686,20 +737,4 @@ var cgnat = netip.MustParsePrefix("100.64.0.0/10")
 func publicAddr(a netip.Addr) bool {
 	a = a.Unmap()
 	return a.IsGlobalUnicast() && !a.IsPrivate() && !cgnat.Contains(a)
-}
-
-// publicHost says whether every address of a server's host:port is public. The list is a third party's answer: a tampered
-// one must not make the node POST up to 100 MB per run at its own network. A name that does not resolve is not public.
-// ponytail: the client resolves the name again when it connects; a rebinding answer in between is not covered (a dial-time check would be).
-func publicHost(ctx context.Context, hostport string) bool {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		host = hostport
-	}
-	host = strings.Trim(host, "[]")
-	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil || len(addrs) == 0 {
-		return false
-	}
-	return !slices.ContainsFunc(addrs, func(a netip.Addr) bool { return !publicAddr(a.WithZone("")) })
 }

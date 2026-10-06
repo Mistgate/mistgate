@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // tunHost is testHost plus a fake /proc/sys for forwarding and a runner that answers `nft list counters`.
@@ -199,6 +200,16 @@ func lastNft(calls []call) string {
 	return ""
 }
 
+func nftApplyScripts(calls []call) []string {
+	var scripts []string
+	for _, c := range calls {
+		if c.name == "nft" && c.args == "-f -" {
+			scripts = append(scripts, c.stdin)
+		}
+	}
+	return scripts
+}
+
 // A kernel without nft reject must not take every tunnel of the node down: the IPv6 rule falls back to drop (it
 // still keeps IPv6 off, only the app waits for a timeout), and if even that is refused, to no rule; the rest of the
 // table (masquerade, isolation, input policy) is installed either way.
@@ -264,6 +275,82 @@ func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
 		}
 	})
 }
+
+func TestSetTunnelsRetriesRejectOnceBeforeFallingBack(t *testing.T) {
+	h, calls, _ := tunHost(t)
+	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
+	a.RejectV6 = true
+	base := h.run
+	failed := false
+	h.run = func(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
+		if name == "nft" && len(args) > 0 && args[0] == "-f" && strings.Contains(stdin, "meta nfproto ipv6 reject") && !failed {
+			failed = true
+			*calls = append(*calls, call{stdin, name, strings.Join(args, " ")})
+			return []byte("temporary nft failure"), errors.New("exit status 1")
+		}
+		return base(ctx, stdin, name, args...)
+	}
+
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+		t.Fatal(err)
+	}
+	var rejected []string
+	for _, script := range nftApplyScripts(*calls) {
+		if strings.Contains(script, "meta nfproto ipv6 reject") {
+			rejected = append(rejected, script)
+		}
+	}
+	if len(rejected) != 2 || rejected[0] != rejected[1] {
+		t.Fatalf("reject scripts = %d, want one failed attempt followed by an identical retry: %#v", len(rejected), rejected)
+	}
+	if !strings.Contains(lastNft(*calls), "meta nfproto ipv6 reject") || h.TunnelV6Fallback() != "" {
+		t.Fatalf("transient failure fell back: script=\n%s\nfallback=%q", lastNft(*calls), h.TunnelV6Fallback())
+	}
+}
+
+func TestSetTunnelsRetriesRejectOnSlowCadence(t *testing.T) {
+	h, calls, _ := tunHost(t)
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	h.tun.now = func() time.Time { return now }
+	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
+	a.RejectV6 = true
+	acceptReject := false
+	base := h.run
+	h.run = func(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
+		if name == "nft" && len(args) > 0 && args[0] == "-f" &&
+			strings.Contains(stdin, "meta nfproto ipv6 reject") && !acceptReject {
+			*calls = append(*calls, call{stdin, name, strings.Join(args, " ")})
+			return []byte("Error: reject is not supported"), errors.New("exit status 1")
+		}
+		return base(ctx, stdin, name, args...)
+	}
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+		t.Fatal(err)
+	}
+	if h.TunnelV6Fallback() != "drop" {
+		t.Fatalf("initial fallback = %q, want drop", h.TunnelV6Fallback())
+	}
+	initialScripts := len(nftApplyScripts(*calls))
+	acceptReject = true
+
+	now = now.Add(tunnelV6RetryInterval - time.Nanosecond)
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(nftApplyScripts(*calls)); got != initialScripts || h.TunnelV6Fallback() != "drop" {
+		t.Fatalf("retried before cadence: nft scripts %d->%d, fallback=%q", initialScripts, got, h.TunnelV6Fallback())
+	}
+
+	now = now.Add(time.Nanosecond)
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(nftApplyScripts(*calls)); got != initialScripts+1 || h.TunnelV6Fallback() != "" ||
+		!strings.Contains(lastNft(*calls), "meta nfproto ipv6 reject") {
+		t.Fatalf("retry at cadence: nft scripts %d->%d, fallback=%q, last=\n%s", initialScripts, got, h.TunnelV6Fallback(), lastNft(*calls))
+	}
+}
+
 func TestCleanupRemovesTunnelTableAndLinks(t *testing.T) {
 	h, calls, _ := tunHost(t)
 	linksDeleted := 0

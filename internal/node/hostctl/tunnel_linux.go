@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/vishvananda/netlink"
 )
@@ -25,7 +26,18 @@ type tunnelState struct {
 	applied   bool   // set was handed to nft (an empty set means the table is gone)
 	forwardOK bool   // and forwarding is on; false retries the sysctls with the next call
 	v6verdict string // "" the IPv6 rule is as asked; "drop" or "none" when the kernel refused reject (TunnelV6Fallback)
+	v6RetryAt time.Time
+	now       func() time.Time // injectable for the fallback retry cadence tests
 	carry     map[uint16]uint64
+}
+
+const tunnelV6RetryInterval = 10 * time.Minute
+
+func (st *tunnelState) currentTime() time.Time {
+	if st.now != nil {
+		return st.now()
+	}
+	return time.Now()
 }
 
 var _ TunnelHost = (*linuxHost)(nil)
@@ -34,8 +46,24 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 	st := &h.tun
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if st.applied && st.forwardOK && TunnelsEqual(ts, st.set) {
-		return nil
+	now := st.currentTime()
+	same := st.applied && TunnelsEqual(ts, st.set)
+	if same {
+		if st.v6verdict != "" && now.Before(st.v6RetryAt) {
+			if st.forwardOK {
+				return nil
+			}
+			if len(ts) > 0 {
+				if err := h.enableForwarding(NeedsV6(ts)); err != nil {
+					return err
+				}
+			}
+			st.forwardOK = true
+			return nil
+		}
+		if st.forwardOK && st.v6verdict == "" {
+			return nil
+		}
 	}
 	script, err := RenderTunnels(ts) // reject before anything is sent to nft
 	if err != nil {
@@ -68,14 +96,25 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 	st.applied, st.forwardOK = false, false
 	verdict := ""
 	if err := h.nft(ctx, script, len(ts) == 0); err != nil {
-		// A kernel without nft reject refuses the whole table, and with it every tunnel. The IPv6 rule is the only
-		// part that needs it: try the table with drop, then without the rule, and say so (TunnelV6Fallback).
-		if verdict = h.tunnelsWithoutReject(ctx, ts); verdict == "" {
-			st.set, st.v6verdict = nil, ""
+		if !asksTunnelV6Reject(ts) {
+			st.set, st.v6verdict, st.v6RetryAt = nil, "", time.Time{}
 			return err
+		}
+		// Retry the exact ruleset once so a transient nft failure does not make us install a weaker IPv6 rule.
+		if retryErr := h.nft(ctx, script, false); retryErr != nil {
+			// If reject is unsupported, preserve tunnel service with drop, then without the IPv6 rule.
+			if verdict = h.tunnelsWithoutReject(ctx, ts); verdict == "" {
+				st.set, st.v6verdict, st.v6RetryAt = nil, "", time.Time{}
+				return retryErr
+			}
 		}
 	}
 	st.v6verdict = verdict
+	if verdict == "" {
+		st.v6RetryAt = time.Time{}
+	} else {
+		st.v6RetryAt = st.currentTime().Add(tunnelV6RetryInterval)
+	}
 	st.set, st.applied = append([]Tunnel(nil), ts...), true
 	if len(ts) > 0 {
 		if err := h.enableForwarding(NeedsV6(ts)); err != nil {
@@ -90,11 +129,7 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 // but IPv6 stays off), and failing that with no IPv6 rule at all. It returns "drop", "none", or "" when ts has no such rule
 // or nft refuses the table for another reason too.
 func (h *linuxHost) tunnelsWithoutReject(ctx context.Context, ts []Tunnel) string {
-	asked := false
-	for _, t := range ts {
-		asked = asked || (t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp)
-	}
-	if !asked {
+	if !asksTunnelV6Reject(ts) {
 		return ""
 	}
 	if script, err := renderTunnels(ts, v6Drop); err == nil && h.nft(ctx, script, false) == nil {
@@ -108,6 +143,15 @@ func (h *linuxHost) tunnelsWithoutReject(ctx context.Context, ts []Tunnel) strin
 		return "none"
 	}
 	return ""
+}
+
+func asksTunnelV6Reject(ts []Tunnel) bool {
+	for _, t := range ts {
+		if t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp {
+			return true
+		}
+	}
+	return false
 }
 
 // TunnelV6Fallback tells how the installed table differs from the one asked for because the kernel refused reject: "drop"
@@ -237,6 +281,7 @@ func (h *linuxHost) cleanupTunnels(ctx context.Context) error {
 	script, _ := RenderTunnels(nil)
 	h.tun.mu.Lock()
 	h.tun.set, h.tun.applied, h.tun.forwardOK, h.tun.carry = nil, false, false, nil
+	h.tun.v6verdict, h.tun.v6RetryAt = "", time.Time{}
 	err := h.nft(ctx, script, true)
 	h.tun.mu.Unlock()
 	errs := []error{err}

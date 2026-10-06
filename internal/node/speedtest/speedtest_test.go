@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -480,6 +481,62 @@ func TestOoklaServersAtNonPublicAddressesAreNeverContacted(t *testing.T) {
 	}
 	if local.hello.Load() != 0 || local.down.Load() != 0 || local.up.Load() != 0 {
 		t.Errorf("a loopback server was contacted: %d hello, %d down, %d up", local.hello.Load(), local.down.Load(), local.up.Load())
+	}
+}
+
+func TestOoklaRejectsLoopbackAtDialTimeAfterAPublicListing(t *testing.T) {
+	local := newFakeOokla(t, 0, 0)
+	_, port, err := net.SplitHostPort(local.host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := net.JoinHostPort("93.184.216.34", port)
+	chain := paced(t, 0)
+	cfg := ooklaCfg(list(t, entry(listed, "Public", "Example")), Endpoint{Name: "local", DownURL: chain.URL + "/down"})
+	cfg.ooklaLocal = false
+	cfg.ooklaDialAddress = func(address string) string {
+		host, port, err := net.SplitHostPort(address)
+		if err == nil && host == "93.184.216.34" {
+			return net.JoinHostPort("127.0.0.1", port)
+		}
+		return address
+	}
+	cfg.DownFor, cfg.UpFor = 300*time.Millisecond, 100*time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Server != "local" {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if local.hello.Load() != 0 || local.down.Load() != 0 || local.up.Load() != 0 {
+		t.Errorf("a listed public address that dialed to loopback was contacted: %d hello, %d down, %d up", local.hello.Load(), local.down.Load(), local.up.Load())
+	}
+}
+
+func TestOoklaDoesNotFollowServerRedirects(t *testing.T) {
+	var redirected atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redirected.Add(1)
+		_, _ = w.Write([]byte("hello 2.11"))
+	}))
+	defer target.Close()
+	var sourceHits atomic.Int32
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/hello" {
+			sourceHits.Add(1)
+			http.Redirect(w, r, target.URL+"/hello", http.StatusFound)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer source.Close()
+	chain := paced(t, 0)
+	cfg := ooklaCfg(list(t, entry(strings.TrimPrefix(source.URL, "http://"), "Source", "Example")), Endpoint{Name: "local", DownURL: chain.URL + "/down"})
+	cfg.DownFor, cfg.UpFor = 300*time.Millisecond, 100*time.Millisecond
+	r, err := Run(context.Background(), cfg)
+	if err != nil || r.Server != "local" {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if sourceHits.Load() == 0 || redirected.Load() != 0 {
+		t.Errorf("source hits=%d, redirected target hits=%d", sourceHits.Load(), redirected.Load())
 	}
 }
 

@@ -710,6 +710,7 @@ export const en = {
   "event.tunnel_failed": "the firewall of the AmneziaWG tunnels is not in place",
   "event.tunnel_v6_fallback": "this kernel has no nft reject: IPv6 from the AmneziaWG tunnels is only blocked silently (apps may wait for a timeout), the tunnels keep working",
   "event.tunnel_v6_fallback.none": "this kernel refuses the IPv6 rule of the AmneziaWG tunnels: IPv6 from clients is not blocked on this node, the tunnels keep working",
+  "event.tunnel_v6_recovered": "IPv6 rejection for the AmneziaWG tunnels is working again",
   "event.warp_needs_attention": "WARP is not set up",
   "event.torrent_guard_degraded":
     "torrent protection does not check AmneziaWG traffic: the netfilter packet queue did not start (Hysteria2 is still checked). The server’s kernel needs netfilter queue support (nfnetlink_queue)",
@@ -1694,6 +1695,7 @@ export const ru: typeof en = {
   "event.tunnel_failed": "файрвол туннелей AmneziaWG не установлен",
   "event.tunnel_v6_fallback": "в этом ядре нет nft reject: IPv6 из туннелей AmneziaWG просто отбрасывается молча (приложения могут ждать таймаут), туннели работают",
   "event.tunnel_v6_fallback.none": "это ядро не принимает правило IPv6 для туннелей AmneziaWG: IPv6 клиентов на этой ноде не блокируется, туннели работают",
+  "event.tunnel_v6_recovered": "Блокировка IPv6 для туннелей AmneziaWG снова работает",
   "event.warp_needs_attention": "WARP не настроился",
   "event.torrent_guard_degraded":
     "защита от торрентов не проверяет трафик AmneziaWG: очередь пакетов netfilter не запустилась (Hysteria2 проверяется). Ядру сервера нужна поддержка очереди netfilter (nfnetlink_queue)",

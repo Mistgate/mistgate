@@ -419,6 +419,12 @@ func TestPanelUpdaterKeepsTheKnownReleaseWhenACheckFails(t *testing.T) {
 	if failed != want || updater.Status() != want {
 		t.Fatalf("a failed check changed the known release:\n got %+v\nwant %+v", updater.Status(), want)
 	}
+	if err := updater.Install(context.Background(), good.Version, good.SHA256); err == nil {
+		t.Fatal("install succeeded while GitHub was unavailable")
+	}
+	if installed := updater.Status(); installed != want {
+		t.Fatalf("a failed install check changed the known release:\n got %+v\nwant %+v", installed, want)
+	}
 
 	down = false
 	now = now.Add(panelUpdateCheckCache)
