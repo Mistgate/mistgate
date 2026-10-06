@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -101,6 +102,7 @@ type Fleet struct {
 	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck            time.Duration // how often a running stream rechecks its client certificate
 	linkHandshakeTimeout time.Duration // bounds the signed WebSocket handshake; tests may shorten it
+	linkServed           atomic.Bool   // set when the signed WebSocket handler is created for mounting
 	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration

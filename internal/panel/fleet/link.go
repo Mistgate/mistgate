@@ -48,7 +48,7 @@ type websocketSessionStream struct {
 func (s websocketSessionStream) Context() context.Context { return s.ctx }
 
 func (s websocketSessionStream) Receive() (*agentv1.ConnectRequest, error) {
-	typ, b, err := readLinkFrame(s.ioCtx, s.conn)
+	typ, b, err := agentlink.ReadFrame(s.ioCtx, s.conn)
 	if err != nil || typ != websocket.MessageBinary {
 		if err == nil {
 			err = errors.New("non-binary agent link frame")
@@ -68,6 +68,7 @@ func (s websocketSessionStream) Send(m *agentv1.ConnectResponse) error {
 
 // LinkHandler serves the public, signed WebSocket transport. Mount it only beneath the stored secret path prefix.
 func (f *Fleet) LinkHandler() http.Handler {
+	f.linkServed.Store(true)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := linkNodePath(r.URL.Path)
 		if !ok || r.Method != http.MethodGet {
@@ -91,34 +92,34 @@ func (f *Fleet) LinkHandler() http.Handler {
 		hsctx, cancelHandshake := context.WithCancel(r.Context())
 		defer cancelHandshake()
 		handshakeTimer := time.AfterFunc(handshakeTimeout, func() {
-			closeLink(ws, websocket.StatusPolicyViolation)
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			cancelHandshake()
 		})
 		defer handshakeTimer.Stop()
 		panelNonce := make([]byte, 32)
 		if _, err := io.ReadFull(rand.Reader, panelNonce); err != nil {
-			closeLink(ws, websocket.StatusPolicyViolation)
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
 		audience := r.Host
-		if audience == "" || writeLinkFrame(hsctx, ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: audience}) != nil {
-			closeLink(ws, websocket.StatusPolicyViolation)
+		if audience == "" || agentlink.WriteFrame(hsctx, ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: audience}) != nil {
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
-		typ, frame, err := readLinkFrame(hsctx, ws)
+		typ, frame, err := agentlink.ReadFrame(hsctx, ws)
 		if err != nil || typ != websocket.MessageBinary {
-			closeLink(ws, websocket.StatusPolicyViolation)
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
 		var auth agentv1.LinkAuth
 		if proto.Unmarshal(frame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
-			closeLink(ws, websocket.StatusPolicyViolation)
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
 		digest := agentlink.AgentDigest(nodeID, audience, panelNonce)
 		pc, ok := f.verifyLinkAuth(hsctx, nodeID, digest, auth.Signature)
 		if !ok {
-			closeLink(ws, websocket.StatusPolicyViolation)
+			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
 
@@ -126,12 +127,12 @@ func (f *Fleet) LinkHandler() http.Handler {
 		owner, ownerCtx := f.claimOwner(nodeID, r.Context())
 		stopOwnerClose := context.AfterFunc(ownerCtx, func() {
 			if isSuperseded(context.Cause(ownerCtx)) {
-				closeLink(ws, websocket.StatusCode(4000))
+				_ = ws.Close(websocket.StatusCode(4000), "")
 			}
 		})
 		defer stopOwnerClose()
 		panelSig, err := agentlink.Sign(f.ca.key, agentlink.PanelDigest(nodeID, audience, panelNonce, auth.Nonce))
-		if err != nil || writeLinkFrame(hsctx, ws, &agentv1.LinkAccept{Signature: panelSig}) != nil {
+		if err != nil || agentlink.WriteFrame(hsctx, ws, &agentv1.LinkAccept{Signature: panelSig}) != nil {
 			return
 		}
 		handshakeTimer.Stop()
@@ -193,18 +194,6 @@ func linkCertNamesNode(cert *x509.Certificate, nodeID string) bool {
 		return id == nodeID
 	}
 	return u.Scheme == nodeURIScheme && u.Host == nodeURIHost && id == nodeID && !strings.Contains(id, "/")
-}
-
-func writeLinkFrame(ctx context.Context, ws *websocket.Conn, message proto.Message) error {
-	return agentlink.WriteFrame(ctx, ws, message)
-}
-
-func readLinkFrame(ctx context.Context, ws *websocket.Conn) (websocket.MessageType, []byte, error) {
-	return agentlink.ReadFrame(ctx, ws)
-}
-
-func closeLink(ws *websocket.Conn, code websocket.StatusCode) {
-	_ = ws.Close(code, "")
 }
 
 func isSuperseded(err error) bool {

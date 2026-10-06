@@ -105,6 +105,17 @@ func TestLinkHandshakeRunsTheAgentSession(t *testing.T) {
 	}
 }
 
+func TestHelloAckDoesNotAdvertiseAnUnmountedLink(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("link-unmounted")
+	mtls := a.open()
+	mtls.send(0, hello("unmounted-link", 0, ""))
+	ack := mtls.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil }).GetHelloAck()
+	if ack.LinkSupported {
+		t.Fatal("HelloAck advertised link support without a mounted link handler")
+	}
+}
+
 func TestLinkAndConnectShareOneOwner(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("link-owner")

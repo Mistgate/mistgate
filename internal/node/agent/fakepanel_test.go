@@ -46,6 +46,7 @@ type fakePanel struct {
 
 	blackhole     atomic.Bool  // accept the stream, never answer
 	dropAcks      atomic.Bool  // commit reliable messages but never ack them
+	linkSupported atomic.Bool  // advertise the optional link transport in HelloAck
 	ackedOverride atomic.Int64 // -1 = honest; otherwise HelloAck.acked_seq is forced to this value
 	settings      atomic.Pointer[pb.NodeSettings]
 	serverSkew    atomic.Int64 // seconds added to the panel clock in HelloAck
@@ -246,7 +247,7 @@ func (p *fakePanel) Connect(ctx context.Context, stream *connect.BidiStream[pb.C
 		acked = uint64(o)
 	}
 	if err := stream.Send(&pb.ConnectResponse{Message: &pb.ConnectResponse_HelloAck{HelloAck: &pb.HelloAck{
-		AckedSeq: acked, ServerTimeUnix: time.Now().Unix() + p.serverSkew.Load(), Settings: p.settings.Load(),
+		AckedSeq: acked, ServerTimeUnix: time.Now().Unix() + p.serverSkew.Load(), Settings: p.settings.Load(), LinkSupported: p.linkSupported.Load(),
 	}}}); err != nil {
 		return err
 	}

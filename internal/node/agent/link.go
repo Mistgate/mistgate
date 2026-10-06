@@ -153,7 +153,7 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	if !ok || !agentlink.Verify(caKey, agentlink.PanelDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce), accepted.Signature) {
 		return refuse(errors.New("panel link authentication failed"))
 	}
-	return &websocketAgentTransport{conn: ws}, cleanup, nil
+	return &websocketAgentTransport{ctx: ctx, conn: ws}, cleanup, nil
 }
 
 var _ agentTransport = (*websocketAgentTransport)(nil)

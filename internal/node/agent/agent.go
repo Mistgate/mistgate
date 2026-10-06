@@ -376,6 +376,9 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		if errors.Is(err, errSwitchTransport) {
+			continue
+		}
 		lived := time.Since(started)
 		var wait time.Duration
 		wait, delay = backoffStep(delay, lived, a.backoffMin, a.backoffMax)
@@ -383,6 +386,8 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		sleepCtx(ctx, wait)
 	}
 }
+
+var errSwitchTransport = errors.New("switch to advertised agent link")
 
 // backoffStep implements "1 s -> 60 s, factor 2, +-20% jitter, reset once a stream has lived 60 s".
 // delay is the nominal delay for this wait; it returns the jittered wait and the nominal delay for the next.
@@ -557,7 +562,13 @@ func (s *session) writer() {
 
 func (a *Agent) session(ctx context.Context) error {
 	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() {
-		return a.linkSession(ctx)
+		err := a.linkSession(ctx)
+		if err != nil && ctx.Err() == nil {
+			a.linkAdvertised.Store(false)
+			a.log.Warn("agent link failed; falling back to mTLS")
+			return errors.New("agent link session failed")
+		}
+		return err
 	}
 	return a.mtlsSession(ctx)
 }
@@ -573,26 +584,26 @@ func (a *Agent) mtlsSession(ctx context.Context) error {
 	sctx, cancel := context.WithCancel(ctx)
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	return a.runSession(ctx, sctx, cancel, &connectAgentTransport{ctx: sctx, stream: stream})
+	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream})
 }
 
 func (a *Agent) linkSession(ctx context.Context) error {
-	stream, cleanup, err := a.dialLink(ctx)
+	sctx, cancel := context.WithCancel(ctx)
+	stream, cleanup, err := a.dialLink(sctx)
 	if err != nil {
+		cancel()
 		return err
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
-	sctx, cancel := context.WithCancel(ctx)
-	stream.ctx = sctx
-	return a.runSession(ctx, sctx, cancel, stream)
+	return a.runSession(cancel, stream)
 }
 
-func (a *Agent) runSession(parent, ctx context.Context, cancel context.CancelFunc, stream agentTransport) error {
+func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) error {
 	defer stream.Close()
 	defer cancel()
-	ctx = stream.Context()
+	ctx := stream.Context()
 	// Closing the transport on cancellation wakes a blocked receive for both HTTP/2 and WebSocket sessions.
 	go func() { <-ctx.Done(); _ = stream.Close() }()
 
@@ -629,10 +640,10 @@ func (a *Agent) runSession(parent, ctx context.Context, cancel context.CancelFun
 	a.onHelloAck(ack)
 	if ack.LinkSupported && a.cfg.LinkURL != "" {
 		if _, isConnect := stream.(*connectAgentTransport); isConnect {
-			// This mTLS stream only discovered link support. Close it before opening the selected transport.
+			// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
 			cancel()
 			_ = stream.Close()
-			return a.linkSession(parent)
+			return errSwitchTransport
 		}
 	}
 	a.dsOK.Store(true)

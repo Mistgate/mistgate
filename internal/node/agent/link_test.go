@@ -11,12 +11,14 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -186,6 +188,121 @@ func TestAgentLinkSessionReconnectsAndResumesReliableSequence(t *testing.T) {
 	}
 }
 
+func TestAgentLinkHandshakeFailureFallsBackToMTLS(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	linkPrefix := "/" + strings.Repeat("p", 24) + "/"
+	var linkHits atomic.Int64
+	linkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		linkHits.Add(1)
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(linkServer.Close)
+	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
+	h.a.linkHTTPClient = linkServer.Client()
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
+	h.a.linkAdvertised.Store(true) // the previous HelloAck advertised a link that is no longer served
+	logSink := &lockedLogBuffer{}
+	h.a.log = slog.New(slog.NewTextHandler(logSink, nil))
+	h.start()
+
+	select {
+	case <-h.panel.connects:
+	case <-time.After(3 * time.Second):
+		t.Fatal("agent did not reconnect over mTLS after the link handshake failed")
+	}
+	eventually(t, func() bool { return h.a.cur.Load() != nil && !h.a.linkAdvertised.Load() }, "active mTLS session after link failure")
+	if linkHits.Load() != 1 {
+		t.Fatalf("link handshake attempts = %d, want one before mTLS fallback", linkHits.Load())
+	}
+	logs := logSink.String()
+	if !strings.Contains(logs, "level=WARN") || !strings.Contains(logs, "agent link failed; falling back to mTLS") {
+		t.Fatalf("fallback warning missing: %s", logs)
+	}
+	if strings.Contains(logs, linkPrefix) {
+		t.Fatalf("agent log contains the link path prefix: %s", logs)
+	}
+}
+
+func TestAgentSwitchesToAdvertisedLinkWithoutBackoff(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	linkPrefix := "/" + strings.Repeat("q", 24) + "/"
+	linkReady := make(chan struct{}, 1)
+	linkErrors := make(chan error, 1)
+	linkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			linkErrors <- err
+			return
+		}
+		defer ws.Close(websocket.StatusNormalClosure, "")
+		panelNonce := bytes.Repeat([]byte{7}, 32)
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: r.Host}); err != nil {
+			linkErrors <- err
+			return
+		}
+		typ, frame, err := agentlink.ReadFrame(r.Context(), ws)
+		if err != nil || typ != websocket.MessageBinary {
+			linkErrors <- errors.New("agent did not send binary LinkAuth")
+			return
+		}
+		var auth agentv1.LinkAuth
+		if err := proto.Unmarshal(frame, &auth); err != nil {
+			linkErrors <- err
+			return
+		}
+		panelSignature, err := agentlink.Sign(h.panel.caKey, agentlink.PanelDigest(auth.NodeId, r.Host, panelNonce, auth.Nonce))
+		if err != nil {
+			linkErrors <- err
+			return
+		}
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkAccept{Signature: panelSignature}); err != nil {
+			linkErrors <- err
+			return
+		}
+		typ, frame, err = agentlink.ReadFrame(r.Context(), ws)
+		if err != nil || typ != websocket.MessageBinary {
+			linkErrors <- errors.New("agent did not send binary Hello")
+			return
+		}
+		var hello agentv1.ConnectRequest
+		if err := proto.Unmarshal(frame, &hello); err != nil || hello.GetHello() == nil {
+			linkErrors <- errors.New("agent did not send Hello")
+			return
+		}
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{
+			HelloAck: &agentv1.HelloAck{LinkSupported: true},
+		}}); err != nil {
+			linkErrors <- err
+			return
+		}
+		linkReady <- struct{}{}
+		for {
+			if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil {
+				return
+			}
+		}
+	}))
+	t.Cleanup(linkServer.Close)
+	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
+	h.a.linkHTTPClient = linkServer.Client()
+	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second
+	h.start()
+	h.waitConnected() // the mTLS HelloAck advertises link support
+	select {
+	case <-linkReady:
+	case err := <-linkErrors:
+		t.Fatalf("link handshake failed: %v", err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("agent waited for reconnect backoff before switching to the advertised link")
+	}
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "active link session")
+}
+
 func TestAgentRejectsLinkChallengeWithWrongAudience(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	assertAgentLinkRefusal(t, h.a, func(ws *websocket.Conn, host string) error {
@@ -307,6 +424,23 @@ func linkEventSeq(t *testing.T, st *store.Store, nodeID, code string) uint64 {
 		t.Fatal(err)
 	}
 	return seq
+}
+
+type lockedLogBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (b *lockedLogBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *lockedLogBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.String()
 }
 
 func testLinkTLSCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
