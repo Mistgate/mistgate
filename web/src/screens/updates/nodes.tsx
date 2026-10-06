@@ -6,12 +6,12 @@ import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
-import { StatusPill, kindTextClass } from "@/components/ui/status";
-import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { StatusPill, kindTextClass, type StatusKind } from "@/components/ui/status";
+import { BundleStatus, NodeUpdateState, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import { canRollbackNode, canUpdateNode, lastUpdateView, manualCommands, nodeStateKey, nodeStateKind, updateDateTimeAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
+import { canRollbackNode, canUpdateNode, inActiveRollout, lastUpdateView, manualCommands, nodeStateKey, nodeStateKind, updateDateTimeAtOffset, updateTimezoneName, pendingStep, type NodeUpdate, type Rollout, type Step, type Updates } from "@/lib/updates";
 
 // The same columns for the header and every row, so they line up: node, version, state, last update, actions.
 const colsOwner = "md:grid-cols-[minmax(120px,1fr)_130px_150px_minmax(180px,1.6fr)_160px]";
@@ -57,11 +57,19 @@ function LastUpdate({ node, fmt }: { node: NodeUpdate; fmt: Fmt }) {
   );
 }
 
-function State({ node, open, onToggle }: { node: NodeUpdate; open: boolean; onToggle: () => void }) {
+/** A node still to go in the running rollout says so, in the place of "Update available": queued (in which stage), or being updated. */
+function queuedPill(t: ReturnType<typeof useT>, step: Step): { kind: StatusKind; label: string } {
+  if (step.state === StepState.SENT) return { kind: "busy", label: t("up.state.updating") };
+  if (step.state === StepState.GATING) return { kind: "busy", label: t("up.state.checking") };
+  return { kind: "off", label: step.stage === 0 ? t("up.state.queuedCanary") : t("up.state.queued", { n: step.stage }) };
+}
+
+function State({ node, step, open, onToggle }: { node: NodeUpdate; step?: Step; open: boolean; onToggle: () => void }) {
   const t = useT();
+  const queued = step ? queuedPill(t, step) : null;
   return (
     <div className="flex flex-col items-start gap-1">
-      <StatusPill kind={nodeStateKind(node.state)} label={t(nodeStateKey(node.state))} sm />
+      <StatusPill kind={queued ? queued.kind : nodeStateKind(node.state)} label={queued ? queued.label : t(nodeStateKey(node.state))} sm />
       {unguarded(node) && <span className={cx("text-[11px] font-semibold", kindTextClass.warn)}>{t("up.noGuard")}</span>}
       {manual(node) && (
         <button
@@ -148,10 +156,11 @@ function RowMenu({ node, onSchedule, onRollback, canSchedule }: { node: NodeUpda
 
 /** One main button per row ("Update", or "Schedule" when one is saved), the rest in the menu next to it. */
 /** `part`: the phone puts the menu beside the state and keeps only the main button for the foot of the card. */
-function Actions({ node, data, part = "all", onUpdate, onSchedule, onRollback }: { node: NodeUpdate; data: Updates; part?: "all" | "main" | "menu"; onUpdate: () => void; onSchedule: () => void; onRollback: () => void }) {
+function Actions({ node, data, joined, part = "all", onUpdate, onSchedule, onRollback }: { node: NodeUpdate; data: Updates; joined: boolean; part?: "all" | "main" | "menu"; onUpdate: () => void; onSchedule: () => void; onRollback: () => void }) {
   const t = useT();
   const hasSchedule = node.scheduledUnix > 0;
-  const canManageUpdate = hasSchedule || (data.bundle?.status === BundleStatus.TRUSTED && canUpdateNode(node, data.bundle.built));
+  // a node of the active rollout is updated by it: no update or schedule of its own (the server adds a node to a rollout once)
+  const canManageUpdate = !joined && (hasSchedule || (data.bundle?.status === BundleStatus.TRUSTED && canUpdateNode(node, data.bundle.built)));
   const menu = <RowMenu node={node} canSchedule={canManageUpdate && !hasSchedule} onSchedule={onSchedule} onRollback={onRollback} />;
   if (part === "menu") return menu;
   if (part === "main" && !canManageUpdate) return null;
@@ -187,6 +196,7 @@ export function NodeTable({
   nodes,
   data,
   owner,
+  rollout,
   onUpdate,
   onSchedule,
   onRollback,
@@ -195,6 +205,8 @@ export function NodeTable({
   /** The page's data: the bundle and the panel's dist folder the manual commands are built from. */
   data: Updates;
   owner: boolean;
+  /** The active rollout, if any: its nodes show where they stand in it and offer no update of their own. */
+  rollout?: Rollout | null;
   onUpdate: (n: NodeUpdate) => void;
   onSchedule: (n: NodeUpdate) => void;
   onRollback: (n: NodeUpdate) => void;
@@ -210,7 +222,7 @@ export function NodeTable({
     });
   const heads = [t("up.nodes.col.node"), t("up.nodes.col.version"), t("up.nodes.col.state"), t("up.nodes.col.last")];
   const noGuard = nodes.filter(unguarded).map((n) => n.name);
-  const actions = (n: NodeUpdate, part: "all" | "main" | "menu" = "all") => <Actions node={n} data={data} part={part} onUpdate={() => onUpdate(n)} onSchedule={() => onSchedule(n)} onRollback={() => onRollback(n)} />;
+  const actions = (n: NodeUpdate, part: "all" | "main" | "menu" = "all") => <Actions node={n} data={data} joined={inActiveRollout(rollout, n.nodeId)} part={part} onUpdate={() => onUpdate(n)} onSchedule={() => onSchedule(n)} onRollback={() => onRollback(n)} />;
 
   return (
     <section className="flex flex-col gap-3">
@@ -233,7 +245,7 @@ export function NodeTable({
                 <div className={cx("grid min-h-[60px] items-center gap-4 px-5 py-2.5 text-[13px]", owner ? colsOwner : colsView)}>
                   <Name node={n} />
                   <Version node={n} fmt={fmt} />
-                  <State node={n} open={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
+                  <State node={n} step={pendingStep(rollout, n.nodeId)} open={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
                   <LastUpdate node={n} fmt={fmt} />
                   {owner && actions(n)}
                 </div>
@@ -251,7 +263,7 @@ export function NodeTable({
                 <div className="flex items-start justify-between gap-2">
                   <Name node={n} />
                   <div className="flex items-start gap-1">
-                    <State node={n} open={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
+                    <State node={n} step={pendingStep(rollout, n.nodeId)} open={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
                     {owner && actions(n, "menu")}
                   </div>
                 </div>

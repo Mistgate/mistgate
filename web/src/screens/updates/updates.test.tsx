@@ -382,13 +382,6 @@ describe("the Updates screen", () => {
     expect(startRollout).toHaveBeenCalledWith({ nodeIds: ["nod_2"], batchSize: 0, expectedVersion: "0.2.0-bbb", expectedBuilt: 200n });
   });
 
-  it("explains that a node already queued in the active rollout will update in its stage", async () => {
-    await mount(page({ nodes: outdated, rollout: rollout({ steps: [step({ nodeId: "nod_2", nodeName: "nl1" })] }) }));
-    await click(document.querySelector("button[aria-label='Update nl1']")!);
-    expect(dialog()!.textContent).toContain("already included in the active rollout");
-    expect(inDialog("Update now")?.disabled).toBe(true);
-  });
-
   it("schedules one offline node in the configured UTC+3 offset", async () => {
     scheduleNodeUpdate.mockResolvedValue({});
     const offline = node({ state: NodeUpdateState.OFFLINE });
@@ -666,5 +659,98 @@ describe("the folds of the Updates screen", () => {
     await mount(page({ nodes: [node()], panel: { ...page().panel, update: { ...page().panel.update, supported: false } } }));
     expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("true");
     expect(text()).toContain("Updating the panel itself");
+  });
+});
+
+describe("the nodes of a rollout in progress", () => {
+  const table = () => document.querySelector<HTMLElement>(".md\\:block")!;
+  const row = (name: string) => [...table().querySelectorAll<HTMLElement>(":scope > div:not(:first-child)")].find((r) => r.textContent?.startsWith(name))!;
+  // the server plans a canary and then one node per stage while fewer than five are to be updated
+  const fleet = [
+    node({ nodeId: "nod_1", name: "nl1", state: NodeUpdateState.UP_TO_DATE, lastUpdate: { outcome: "ok", fromVersion: "0.1.0", toVersion: "0.2.0", atUnix: 900 } }),
+    node({ nodeId: "nod_2", name: "de1", state: NodeUpdateState.UPDATING }),
+    node({ nodeId: "nod_3", name: "fi1", state: NodeUpdateState.OUTDATED, lastUpdate: { outcome: "ok", fromVersion: "0.0.9", toVersion: "0.1.0", atUnix: 5 } }),
+    node({ nodeId: "nod_4", name: "se1", state: NodeUpdateState.OUTDATED }),
+    node({ nodeId: "nod_5", name: "no1", state: NodeUpdateState.OUTDATED }),
+  ];
+  const steps = [
+    step({ nodeId: "nod_1", nodeName: "nl1", stage: 0, state: StepState.PASSED }),
+    step({ nodeId: "nod_2", nodeName: "de1", stage: 1, state: StepState.GATING }),
+    step({ nodeId: "nod_3", nodeName: "fi1", stage: 2, state: StepState.PENDING }),
+    step({ nodeId: "nod_4", nodeName: "se1", stage: 3, state: StepState.PENDING }),
+  ];
+
+  it("say where they stand in it, and offer no update of their own", async () => {
+    await mount(page({ nodes: fleet, rollout: rollout({ steps }) }));
+    expect(row("fi1").textContent).toContain("Queued · batch 2");
+    expect(row("se1").textContent).toContain("Queued · batch 3");
+    expect(row("de1").textContent).toContain("Checking…");
+    expect(row("fi1").textContent).not.toContain("Update available");
+    for (const n of ["fi1", "se1", "de1", "nl1"]) expect(document.querySelector(`button[aria-label='Update ${n}']`), n).toBeNull();
+    // a node that is not in the rollout can still be added to it
+    expect(row("no1").textContent).toContain("Update available");
+    expect(document.querySelector("button[aria-label='Update no1']")).not.toBeNull();
+  });
+
+  it("name the canary while it waits, and the node being installed", async () => {
+    await mount(
+      page({
+        nodes: [node({ nodeId: "nod_1", name: "nl1", state: NodeUpdateState.OUTDATED }), node({ nodeId: "nod_2", name: "de1", state: NodeUpdateState.UPDATING })],
+        rollout: rollout({ steps: [step({ nodeId: "nod_1", nodeName: "nl1", stage: 0, state: StepState.PENDING }), step({ nodeId: "nod_2", nodeName: "de1", stage: 1, state: StepState.SENT })] }),
+      }),
+    );
+    expect(row("nl1").textContent).toContain("Queued · canary");
+    expect(row("de1").textContent).toContain("Updating…");
+  });
+
+  it("keep Roll back where it is allowed, and lose Schedule", async () => {
+    await mount(page({ nodes: fleet, rollout: rollout({ steps }) }));
+    expect(row("fi1").querySelector("button[aria-label='More actions for fi1']")).not.toBeNull();
+    await press(row("fi1").querySelector("button[aria-label='More actions for fi1']"));
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual(["Roll back…"]);
+    // the others have nothing to offer: no menu at all
+    expect(row("se1").querySelector("button[aria-label='More actions for se1']")).toBeNull();
+    // a node that is not in the rollout keeps its Schedule
+    await click(menuItem("Roll back…")); // close the menu
+    await click(inDialog("Cancel"));
+    await press(row("nl1").querySelector("button[aria-label='More actions for nl1']"));
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual(["Roll back…"]);
+  });
+
+  it("are the same while the rollout is paused", async () => {
+    await mount(page({ nodes: fleet, rollout: rollout({ status: RolloutStatus.PAUSED, pauseKey: "updates.pause.owner", steps }) }));
+    expect(row("fi1").textContent).toContain("Queued · batch 2");
+    expect(document.querySelector("button[aria-label='Update fi1']")).toBeNull();
+  });
+
+  it("go back to their own state once the rollout is over", async () => {
+    await mount(page({ nodes: fleet, rollout: rollout({ status: RolloutStatus.CANCELLED, steps }) }));
+    expect(row("fi1").textContent).toContain("Update available");
+    expect(document.querySelector("button[aria-label='Update fi1']")).not.toBeNull();
+  });
+});
+
+describe("the rollout window follows the server's batch plan", () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => node({ nodeId: `nod_${i + 1}`, name: `n${i + 1}`, state: NodeUpdateState.OUTDATED, onlineUsers: i }));
+
+  it("goes one at a time after the canary while fewer than five nodes are to be updated", async () => {
+    await mount(page({ nodes: many(4) }));
+    await click(bulk());
+    expect(dialog()!.textContent).toContain("Then the rest, 1 at a time.");
+  });
+
+  it("goes two at a time from five nodes, and counts only the nodes still ticked", async () => {
+    await mount(page({ nodes: many(5) }));
+    await click(bulk());
+    expect(dialog()!.textContent).toContain("Then the rest, 2 at a time.");
+    await click(dialog()!.querySelector("input[type=checkbox]"));
+    expect(dialog()!.textContent).toContain("Then the rest, 1 at a time.");
+  });
+
+  it("does not talk of a rest when there is a single node", async () => {
+    await mount(page({ nodes: many(1) }));
+    await click(bulk());
+    expect(dialog()!.textContent).toContain("This node is checked for 5 minutes after the update.");
+    expect(dialog()!.textContent).not.toContain("at a time");
   });
 });

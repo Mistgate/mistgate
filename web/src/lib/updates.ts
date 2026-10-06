@@ -128,6 +128,19 @@ export function useOlderNodes(): ReadonlySet<string> {
   return useMemo(() => new Set((data?.nodes ?? []).filter((n) => isOlder(n.state)).map((n) => n.nodeId)), [data]);
 }
 
+/**
+ * The step of a node that is still to go in the active rollout (waiting, being sent or being checked). Such a node is part
+ * of the rollout: the server refuses to add it again, so its row offers no update of its own. Undefined for a node that is
+ * not in the active rollout, or whose step is decided.
+ */
+export function pendingStep(r: Rollout | null | undefined, nodeId: string): Step | undefined {
+  if (!r || !isActive(r)) return undefined;
+  return r.steps.find((s) => s.nodeId === nodeId && (s.state === StepState.PENDING || s.state === StepState.SENT || s.state === StepState.GATING));
+}
+
+/** Is the node in the active rollout at all, decided or not? The server adds a node to a rollout once: a decided step blocks a new one too. */
+export const inActiveRollout = (r: Rollout | null | undefined, nodeId: string) => !!r && isActive(r) && r.steps.some((s) => s.nodeId === nodeId);
+
 /** Nodes the "update all" button would take: the server's own rule for an empty node list. */
 export const outdatedNodes = (nodes: readonly NodeUpdate[]) => nodes.filter((n) => n.state === NodeUpdateState.OUTDATED);
 

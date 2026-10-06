@@ -304,7 +304,7 @@ const running = page({
       { ...doneStep("nod_nl1", "nl1", 0, 25 * 60), finishedUnix: NOW - 20 * 60 },
       runningStep("nod_de1", "de1", 1, StepState.GATING),
       runningStep("nod_fi1", "fi1", 2, StepState.PENDING),
-      runningStep("nod_se1", "se1", 2, StepState.PENDING),
+      runningStep("nod_se1", "se1", 3, StepState.PENDING),
     ],
   },
 });
@@ -333,7 +333,7 @@ export function UpdatesKit() {
       <Shot id="updates-available" title="Updates: 2 of 4 nodes on the new agent, the rest to update, the last rollout folded" seed={[[updatesQuery.queryKey, available]]}>
         <UpdatesScreen />
       </Shot>
-      <Shot id="updates-running" title="Updates: a rollout running (the canary done, a batch being checked)" seed={[[updatesQuery.queryKey, running]]}>
+      <Shot id="updates-running" title="Updates: a rollout of 4 nodes running, one stage at a time (the server's batch plan: the canary, then 1 at a time while fewer than 5 are to be updated)" seed={[[updatesQuery.queryKey, running]]}>
         <UpdatesScreen />
       </Shot>
       <Shot id="updates-panel" title="Updates: every node current, a signed panel release is out" seed={[[updatesQuery.queryKey, panelOffer]]}>

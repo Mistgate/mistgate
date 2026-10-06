@@ -102,6 +102,7 @@ export function UpdatesScreen() {
         nodes={d.nodes}
         data={d}
         owner={owner}
+        rollout={activeRollout}
         onUpdate={(n) => setDialog({ kind: "update", node: n })}
         onSchedule={(n) => setDialog({ kind: "update", node: n, mode: "schedule" })}
         onRollback={(n) => setDialog({ kind: "rollback", node: n })}

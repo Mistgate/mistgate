@@ -39,7 +39,7 @@ export function RolloutDialog({
       open
       onOpenChange={(o) => !o && !busy && onClose()}
       title={t("up.rollout.title", { version })}
-      description={t("up.rollout.lead", { batch: defaultBatch(picked.length) })}
+      description={picked.length > 1 ? t("up.rollout.lead", { batch: defaultBatch(picked.length) }) : t("up.rollout.leadOne")}
       footer={
         <>
           <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
