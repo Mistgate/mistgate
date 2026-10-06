@@ -264,7 +264,8 @@ describe("the key branch", () => {
 
 describe("the keys of the page stay unique (the page puts the keyboard back by them)", () => {
   const names = Object.keys(cases).filter((n) => n !== "locked");
-  it("every state, page and every pane of the dialog: no key twice, and none shared between the page and the sheet", () => {
+  // walks every sample state, page and pane: ~1.5 s alone, far more on a loaded CI machine
+  it("every state, page and every pane of the dialog: no key twice, and none shared between the page and the sheet", { timeout: 30_000 }, () => {
     for (const name of names) {
       for (const platform of ["ios", "windows"] as const) {
         const d = data(name);
