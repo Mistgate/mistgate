@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -24,9 +25,10 @@ import (
 const linkHandshakeTimeout = 10 * time.Second
 
 type websocketAgentTransport struct {
-	ctx       context.Context
-	conn      *websocket.Conn
-	closeOnce sync.Once
+	ctx         context.Context
+	conn        *websocket.Conn
+	closeOnce   sync.Once
+	established bool
 }
 
 func (s *websocketAgentTransport) Context() context.Context { return s.ctx }
@@ -103,7 +105,11 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 		if cleanup != nil {
 			cleanup()
 		}
-		return nil, nil, errors.New("link TLS or WebSocket dial failed")
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return nil, nil, fmt.Errorf("link TLS or WebSocket dial failed: %w", err)
 	}
 	ws.SetReadLimit(agentlink.MaxFrameSize)
 	refuse := func(reason error) (*websocketAgentTransport, func(), error) {

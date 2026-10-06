@@ -150,6 +150,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	fl, err := fleet.New(st, vlt, reg, fleet.Config{
 		AgentSNI:             in.AgentSNI,
+		LinkServed:           in.LinkPrefix != "",
 		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,

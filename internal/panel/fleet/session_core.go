@@ -342,7 +342,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *Transition, event SessionEv
 	}})
 	tr.State.AutoBandwidthPending = prev.State == "pending" && node.BandwidthMbps == 0 && slices.Contains(tr.State.Capabilities, capBandwidth)
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
-		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: nodeSettings(node, tr.State.Capabilities), LinkSupported: c.f.linkServed.Load(),
+		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: nodeSettings(node, tr.State.Capabilities), LinkSupported: c.f.cfg.LinkServed,
 	}}})
 	return nil
 }

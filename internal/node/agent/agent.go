@@ -109,6 +109,7 @@ type Agent struct {
 	jobs           chan job
 	settings       atomic.Pointer[pb.NodeSettings]
 	linkAdvertised atomic.Bool
+	linkHold       atomic.Bool
 	linkHTTPClient *http.Client // test seam; nil uses normal system-root TLS verification
 	offset         atomic.Int64 // seconds: panel clock minus local clock, measured at Hello
 	skewed         atomic.Bool
@@ -388,6 +389,7 @@ func (a *Agent) connectLoop(ctx context.Context) {
 }
 
 var errSwitchTransport = errors.New("switch to advertised agent link")
+var errLinkNotEstablished = errors.New("agent link session did not establish")
 
 // backoffStep implements "1 s -> 60 s, factor 2, +-20% jitter, reset once a stream has lived 60 s".
 // delay is the nominal delay for this wait; it returns the jittered wait and the nominal delay for the next.
@@ -563,10 +565,10 @@ func (s *session) writer() {
 func (a *Agent) session(ctx context.Context) error {
 	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() {
 		err := a.linkSession(ctx)
-		if err != nil && ctx.Err() == nil {
+		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
 			a.linkAdvertised.Store(false)
-			a.log.Warn("agent link failed; falling back to mTLS")
-			return errors.New("agent link session failed")
+			a.linkHold.Store(true)
+			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
 		}
 		return err
 	}
@@ -592,12 +594,19 @@ func (a *Agent) linkSession(ctx context.Context) error {
 	stream, cleanup, err := a.dialLink(sctx)
 	if err != nil {
 		cancel()
-		return err
+		return fmt.Errorf("%w: %w", errLinkNotEstablished, err)
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
-	return a.runSession(cancel, stream)
+	err = a.runSession(cancel, stream)
+	if !stream.established {
+		if err == nil {
+			return errLinkNotEstablished
+		}
+		return fmt.Errorf("%w: %w", errLinkNotEstablished, err)
+	}
+	return err
 }
 
 func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) error {
@@ -636,15 +645,21 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	if ack == nil {
 		return errors.New("first panel message is not HelloAck")
 	}
+	if link, ok := stream.(*websocketAgentTransport); ok {
+		link.established = true
+	}
 	a.linkAdvertised.Store(ack.LinkSupported)
 	a.onHelloAck(ack)
-	if ack.LinkSupported && a.cfg.LinkURL != "" {
-		if _, isConnect := stream.(*connectAgentTransport); isConnect {
-			// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
-			cancel()
-			_ = stream.Close()
-			return errSwitchTransport
-		}
+	_, isConnect := stream.(*connectAgentTransport)
+	holdLink := false
+	if isConnect && a.cfg.LinkURL != "" {
+		holdLink = a.linkHold.Swap(false)
+	}
+	if ack.LinkSupported && a.cfg.LinkURL != "" && isConnect && !holdLink {
+		// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
+		cancel()
+		_ = stream.Close()
+		return errSwitchTransport
 	}
 	a.dsOK.Store(true)
 	a.connAt.Store(time.Now().UnixNano())

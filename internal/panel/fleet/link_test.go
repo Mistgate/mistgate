@@ -93,6 +93,7 @@ func linkHello(t *testing.T, ws *websocket.Conn) *agentv1.HelloAck {
 
 func TestLinkHandshakeRunsTheAgentSession(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = true
 	a := e.enroll("link-session")
 	server := httptest.NewServer(e.f.LinkHandler())
 	t.Cleanup(server.Close)
@@ -107,6 +108,7 @@ func TestLinkHandshakeRunsTheAgentSession(t *testing.T) {
 
 func TestHelloAckDoesNotAdvertiseAnUnmountedLink(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = false
 	a := e.enroll("link-unmounted")
 	mtls := a.open()
 	mtls.send(0, hello("unmounted-link", 0, ""))
@@ -118,6 +120,7 @@ func TestHelloAckDoesNotAdvertiseAnUnmountedLink(t *testing.T) {
 
 func TestLinkAndConnectShareOneOwner(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = true
 	a := e.enroll("link-owner")
 	server := httptest.NewServer(e.f.LinkHandler())
 	t.Cleanup(server.Close)
@@ -157,6 +160,7 @@ func TestLinkAndConnectShareOneOwner(t *testing.T) {
 
 func TestNewAuthenticatedLinkClosesPendingHello(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = true
 	a := e.enroll("link-pending-hello")
 	server := httptest.NewServer(e.f.LinkHandler())
 	t.Cleanup(server.Close)
@@ -185,6 +189,7 @@ func readUntilLinkClose(t *testing.T, ws *websocket.Conn) (websocket.StatusCode,
 
 func TestLinkHandshakeRefusals(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = true
 	a := e.enroll("link-refusal")
 	other := e.enroll("link-wrong-key")
 	server := httptest.NewServer(e.f.LinkHandler())
@@ -247,6 +252,7 @@ func TestLinkHandshakeRefusals(t *testing.T) {
 
 func TestLinkAcceptsOldAndNewCertificatesDuringRenewalGrace(t *testing.T) {
 	e := newEnv(t)
+	e.f.cfg.LinkServed = true
 	a := e.enroll("link-renewal")
 	key, csr := newCSR(t)
 	client := agentv1connect.NewEnrollmentServiceClient(e.httpClient(&a.cert, testSNI), e.srv.URL)

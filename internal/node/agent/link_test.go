@@ -35,6 +35,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type agentLinkAttempt struct {
+	conn *websocket.Conn
+	hit  int64
+	err  error
+}
+
 func TestAgentLinkSessionReconnectsAndResumesReliableSequence(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -64,7 +70,7 @@ func TestAgentLinkSessionReconnectsAndResumesReliableSequence(t *testing.T) {
 	desired := []statehash.Inbound{{Spec: plugin.InboundSpec{ID: "inb_link", Protocol: "fake", ProfileID: "prf_link", Version: 1, Enabled: true,
 		Listen: plugin.Listen{Network: "udp", Port: 443}, TLS: plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: "example.com"}, Egress: "direct", Settings: []byte(`{}`)},
 		Creds: []plugin.UserCred{{CredID: "crd_link", UserID: "usr_link", DeviceID: "dev_link", Data: []byte(`{"key":"value"}`)}}}}
-	f, err := fleet.New(st, v, nil, fleet.Config{AgentSNI: testSNI, PanelAddr: "127.0.0.1:443", Desired: func(context.Context, string) ([]statehash.Inbound, error) {
+	f, err := fleet.New(st, v, nil, fleet.Config{AgentSNI: testSNI, PanelAddr: "127.0.0.1:443", LinkServed: true, Desired: func(context.Context, string) ([]statehash.Inbound, error) {
 		return desired, nil
 	}})
 	if err != nil {
@@ -220,8 +226,176 @@ func TestAgentLinkHandshakeFailureFallsBackToMTLS(t *testing.T) {
 	if !strings.Contains(logs, "level=WARN") || !strings.Contains(logs, "agent link failed; falling back to mTLS") {
 		t.Fatalf("fallback warning missing: %s", logs)
 	}
+	if !strings.Contains(logs, `err="`) || !strings.Contains(logs, "404") {
+		t.Fatalf("fallback warning lost the link dial error: %s", logs)
+	}
 	if strings.Contains(logs, linkPrefix) {
 		t.Fatalf("agent log contains the link path prefix: %s", logs)
+	}
+}
+
+func TestAgentLinkFailureHoldsMTLSSessionOnce(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	linkPrefix := "/" + strings.Repeat("w", 24) + "/"
+	var linkHits atomic.Int64
+	linkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		linkHits.Add(1)
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(linkServer.Close)
+	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
+	h.a.linkHTTPClient = linkServer.Client()
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
+	h.start()
+
+	deadline := time.NewTimer(2 * time.Second)
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer deadline.Stop()
+	defer ticker.Stop()
+	for h.a.cur.Load() == nil {
+		if count := h.panel.connCount(); count > 2 {
+			t.Fatalf("mTLS sessions during link fallback = %d, want the discovery session and one held session", count)
+		}
+		if hits := linkHits.Load(); hits > 1 {
+			t.Fatalf("link attempts before an active mTLS session = %d, want at most one", hits)
+		}
+		select {
+		case <-deadline.C:
+			t.Fatal("agent did not establish an mTLS session after the failed advertised link")
+		case <-ticker.C:
+		}
+	}
+	active := h.a.cur.Load()
+	if count := h.panel.connCount(); count != 2 {
+		t.Fatalf("mTLS sessions after link fallback = %d, want 2", count)
+	}
+	if !h.a.linkAdvertised.Load() {
+		t.Fatal("active mTLS HelloAck advertisement was cleared")
+	}
+	if hits := linkHits.Load(); hits != 1 {
+		t.Fatalf("link attempts before the mTLS session ended = %d, want 1", hits)
+	}
+
+	timer := time.NewTimer(250 * time.Millisecond)
+	defer timer.Stop()
+	<-timer.C
+	if h.a.cur.Load() != active {
+		t.Fatal("active mTLS session did not stay connected")
+	}
+	if count := h.panel.connCount(); count != 2 {
+		t.Fatalf("mTLS sessions while the held session was active = %d, want 2", count)
+	}
+	if hits := linkHits.Load(); hits != 1 {
+		t.Fatalf("link attempts while the held mTLS session was active = %d, want 1", hits)
+	}
+}
+
+func TestAgentEstablishedLinkDropReconnectsWithoutMTLS(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	linkPrefix := "/" + strings.Repeat("e", 24) + "/"
+	linkReady := make(chan agentLinkAttempt, 4)
+	var linkHits atomic.Int64
+	linkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit := linkHits.Add(1)
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		defer ws.Close(websocket.StatusNormalClosure, "")
+		panelNonce := bytes.Repeat([]byte{7}, 32)
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: r.Host}); err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		typ, frame, err := agentlink.ReadFrame(r.Context(), ws)
+		if err != nil || typ != websocket.MessageBinary {
+			linkReady <- agentLinkAttempt{hit: hit, err: errors.New("agent did not send binary LinkAuth")}
+			return
+		}
+		var auth agentv1.LinkAuth
+		if err := proto.Unmarshal(frame, &auth); err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		panelSignature, err := agentlink.Sign(h.panel.caKey, agentlink.PanelDigest(auth.NodeId, r.Host, panelNonce, auth.Nonce))
+		if err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkAccept{Signature: panelSignature}); err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		typ, frame, err = agentlink.ReadFrame(r.Context(), ws)
+		if err != nil || typ != websocket.MessageBinary {
+			linkReady <- agentLinkAttempt{hit: hit, err: errors.New("agent did not send binary Hello")}
+			return
+		}
+		var hello agentv1.ConnectRequest
+		if err := proto.Unmarshal(frame, &hello); err != nil || hello.GetHello() == nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: errors.New("agent did not send Hello")}
+			return
+		}
+		if err := agentlink.WriteFrame(r.Context(), ws, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{
+			HelloAck: &agentv1.HelloAck{LinkSupported: true},
+		}}); err != nil {
+			linkReady <- agentLinkAttempt{hit: hit, err: err}
+			return
+		}
+		linkReady <- agentLinkAttempt{conn: ws, hit: hit}
+		for {
+			if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil {
+				return
+			}
+		}
+	}))
+	t.Cleanup(linkServer.Close)
+	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
+	h.a.linkHTTPClient = linkServer.Client()
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
+	h.start()
+
+	first := waitForLinkAttempt(t, linkReady)
+	if first.hit != 1 {
+		t.Fatalf("first link attempt = %d, want 1", first.hit)
+	}
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "active established link session")
+	mtlsCount := h.panel.connCount()
+	if mtlsCount != 1 {
+		t.Fatalf("initial mTLS discovery sessions = %d, want 1", mtlsCount)
+	}
+	if err := first.conn.Close(websocket.StatusCode(4000), "superseded"); err != nil {
+		t.Fatalf("close established link: %v", err)
+	}
+
+	second := waitForLinkAttempt(t, linkReady)
+	if second.hit != 2 {
+		t.Fatalf("reconnected link attempt = %d, want 2", second.hit)
+	}
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "reconnected established link session")
+	if got := h.panel.connCount(); got != mtlsCount {
+		t.Fatalf("mTLS sessions after established link dropped = %d, want unchanged count %d", got, mtlsCount)
+	}
+}
+
+func waitForLinkAttempt(t *testing.T, attempts <-chan agentLinkAttempt) agentLinkAttempt {
+	t.Helper()
+	select {
+	case attempt := <-attempts:
+		if attempt.err != nil {
+			t.Fatalf("link handshake failed: %v", attempt.err)
+		}
+		return attempt
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for link session")
+		return agentLinkAttempt{}
 	}
 }
 

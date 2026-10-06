@@ -68,7 +68,6 @@ func (s websocketSessionStream) Send(m *agentv1.ConnectResponse) error {
 
 // LinkHandler serves the public, signed WebSocket transport. Mount it only beneath the stored secret path prefix.
 func (f *Fleet) LinkHandler() http.Handler {
-	f.linkServed.Store(true)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := linkNodePath(r.URL.Path)
 		if !ok || r.Method != http.MethodGet {
