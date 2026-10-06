@@ -107,7 +107,7 @@ The first that applies wins:
 
 | Format | Per server? | How it arrives |
 |:--|:--|:--|
-| AmneziaVPN and AmneziaWG keys (`.conf`, `vpn://`, QR code) | Yes | The DNS is written inside the key, so the person presses **Get a new key** on their page again. The key itself does not change; the page marks the device "new key needed" with the reason DNS. |
+| AmneziaVPN and AmneziaWG keys (`.conf`, `vpn://`, QR code) | Yes | The DNS is written inside the key, so the person presses **Get a new key** on their page again. The key itself does not change; the page marks the device "new key needed" with the reason DNS, whenever the DNS that applies to the person on that server differs from the one in the key (their pick, the owner's offered presets or default, an edited or deleted preset). |
 | The AmneziaWG proxies of a Mihomo profile (Clash Verge Rev, FlClash and the like) | Yes | At the next subscription update. |
 | Hysteria2 in Mihomo | No | One resolver for the whole subscription: the user's, the group's or the instance's preset. A person's choice does not reach it. |
 | Happ | No | The same: one resolver for the whole subscription. |

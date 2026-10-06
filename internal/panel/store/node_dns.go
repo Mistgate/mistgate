@@ -106,33 +106,6 @@ func (d DNS) ResetUserNodeChoices(ctx context.Context, userID string) (int, erro
 	return int(n), nil
 }
 
-// dnsStaleKeys says, for the live AWG credentials of a user, on which nodes the person's pick is newer than the last
-// time the device fetched its configs (so the key holds an older DNS there). Only picks the node still offers count.
-// The result is keyed by credential id.
-func (a Access) dnsStaleKeys(ctx context.Context, userID string) (map[string][]string, error) {
-	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT DISTINCT c.id, n.node_id FROM device_credential c
-		 JOIN user_node_dns n ON n.user_id = c.user_id
-		 JOIN node_dns_option o ON o.node_id = n.node_id AND o.preset_id = n.preset_id
-		 JOIN inbound i ON i.node_id = n.node_id AND i.profile_id = c.profile_id
-		 WHERE c.user_id = ? AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
-		   AND n.updated_at > max(c.configs_at, c.created_at * 1000)
-		 ORDER BY c.id, n.node_id`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[string][]string{}
-	for rows.Next() {
-		var cred, node string
-		if err := rows.Scan(&cred, &node); err != nil {
-			return nil, err
-		}
-		out[cred] = append(out[cred], node)
-	}
-	return out, rows.Err()
-}
-
 // NodeExists reports whether a node id exists (retired nodes included).
 func (d DNS) NodeExists(ctx context.Context, nodeID string) (bool, error) {
 	var one int

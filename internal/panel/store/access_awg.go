@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -271,8 +272,10 @@ type AccessAWGDevice struct {
 	SecretEnc                                   []byte // vault, AAD = CredID
 	Idx                                         int
 	ConfigEpoch, CriticalEpoch                  int64
-	// DNSStale lists the nodes where the person picked a DNS after the device last fetched its configs: its key holds the
-	// older one there (see dnsStaleKeys).
+	// DNSSig is the DNS the key was issued with, per node id (the pair its config holds); empty when nothing was recorded.
+	DNSSig map[string]string
+	// DNSStale lists the nodes where the DNS that applies to the person is not the one the key holds. The store leaves it
+	// empty: only the access module knows what applies.
 	DNSStale []string
 }
 
@@ -282,7 +285,7 @@ func (d AccessAWGDevice) Stale() bool { return d.ConfigEpoch < d.CriticalEpoch }
 func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]AccessAWGDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, d.platform, d.model, d.os_version, d.first_seen_at, d.last_seen_at, d.created_at,
-		   p.id, p.name, p.settings_json, c.id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch
+		   p.id, p.name, p.settings_json, c.id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, c.dns_sig
 		 FROM device d
 		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 		 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
@@ -296,10 +299,14 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 	for rows.Next() {
 		var d AccessAWGDevice
 		var first, last, created int64
+		var sig string
 		if err := rows.Scan(&d.ID, &d.UserID, &d.Platform, &d.Model, &d.OSVersion, &first, &last, &created,
 			&d.ProfileID, &d.ProfileName, &d.ProfileSettingsJSON, &d.CredID, &d.DataJSON, &d.SecretEnc, &d.PublicKey, &d.Idx,
-			&d.ConfigEpoch, &d.CriticalEpoch); err != nil {
+			&d.ConfigEpoch, &d.CriticalEpoch, &sig); err != nil {
 			return nil, err
+		}
+		if sig != "" { // written by SetDNSSig; anything else reads as "nothing recorded"
+			_ = json.Unmarshal([]byte(sig), &d.DNSSig)
 		}
 		d.AWG, d.Protocols = true, []string{"awg"}
 		if first != 0 {
@@ -311,21 +318,7 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 		d.CreatedAt = fromUnix(created)
 		out = append(out, d)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	stale := map[string]map[string][]string{} // user -> credential -> nodes
-	for i := range out {
-		byCred, ok := stale[out[i].UserID]
-		if !ok {
-			if byCred, err = a.dnsStaleKeys(ctx, out[i].UserID); err != nil {
-				return nil, err
-			}
-			stale[out[i].UserID] = byCred
-		}
-		out[i].DNSStale = byCred[out[i].CredID]
-	}
-	return out, nil
+	return out, rows.Err()
 }
 
 // AWGDevices returns the live AWG devices of a user, oldest first. FirstSeenAt and LastSeenAt are zero while the
@@ -346,10 +339,20 @@ func (a Access) AWGDevice(ctx context.Context, deviceID string) (AccessAWGDevice
 	return ds[0], nil
 }
 
-// SetConfigEpoch records that the credential's device received a config of the given profile epoch (never lowers it)
-// at the given time (what a person's DNS pick is compared with: see dnsStaleKeys).
-func (a Access) SetConfigEpoch(ctx context.Context, credID string, epoch int64, now time.Time) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential SET config_epoch = max(config_epoch, ?), configs_at = ? WHERE id = ?`, epoch, now.UnixMilli(), credID)
+// SetConfigEpoch records that the credential's device received a config of the given profile epoch (never lowers it).
+func (a Access) SetConfigEpoch(ctx context.Context, credID string, epoch int64) error {
+	_, err := a.s.W.ExecContext(ctx, `UPDATE device_credential SET config_epoch = max(config_epoch, ?) WHERE id = ?`, epoch, credID)
+	return err
+}
+
+// SetDNSSig records the DNS the credential's key was issued with, per node id (replacing what was there): what a person's
+// device now holds, the one thing "stale DNS" is measured against.
+func (a Access) SetDNSSig(ctx context.Context, credID string, sig map[string]string) error {
+	b, err := json.Marshal(sig)
+	if err != nil {
+		return err
+	}
+	_, err = a.s.W.ExecContext(ctx, `UPDATE device_credential SET dns_sig = ? WHERE id = ?`, string(b), credID)
 	return err
 }
 

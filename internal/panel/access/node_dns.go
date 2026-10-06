@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -86,6 +87,41 @@ func (s *Service) awgDNS(ctx context.Context, userID, nodeID string) (servers []
 	return s.newNodeDNS(ctx, userID).awg(nodeID)
 }
 
+// dnsSig is the resolver pair an AWG config carries for these servers (what awg.PickDNS puts in the .conf). A key holds the
+// pair it was issued with, per node (device_credential.dns_sig); it is stale on a node when the pair that applies now is another.
+func dnsSig(servers []string) string {
+	pair, _ := awg.PickDNS(servers)
+	return pair[0] + "," + pair[1]
+}
+
+// markDNSStale sets DNSStale of AWG devices of the person u: the nodes where the DNS that applies now is not the one the key
+// was issued with. Whatever changed it counts (the person's pick or its removal, the owner's offer or default, an edited
+// or deleted preset). A key with nothing recorded, or on a node the person no longer uses, is not stale.
+func (s *Service) markDNSStale(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, n *nodeDNS, devs []store.AccessAWGDevice) {
+	now := map[string]string{} // node id -> the pair that applies to the person now ("" = unknown)
+	for i := range devs {
+		d := &devs[i]
+		d.DNSStale = nil
+		for _, f := range full {
+			held, ok := d.DNSSig[f.Node.ID]
+			if !ok || f.Profile.ID != d.ProfileID || !s.usable(f, g, u) || slices.Contains(d.DNSStale, f.Node.ID) {
+				continue
+			}
+			cur, seen := now[f.Node.ID]
+			if !seen {
+				if pre, ok := n.on(f.Node.ID); ok {
+					servers, _ := awgServers(pre)
+					cur = dnsSig(servers)
+				}
+				now[f.Node.ID] = cur
+			}
+			if cur != "" && cur != held {
+				d.DNSStale = append(d.DNSStale, f.Node.ID)
+			}
+		}
+	}
+}
+
 func awgServers(pre dns.Preset) (servers []string, splitLost bool) {
 	eps, _ := pre.EndpointsFor(dns.ClientAmneziaWG)
 	for _, e := range eps {
@@ -109,8 +145,8 @@ type SubNodeDNS struct {
 	Effective string   // the preset id that applies on this server
 	Options   []string // what the owner offers, in order
 	Default   string   // what applies without a pick: the node's default, else the person's usual DNS (rule 3)
-	// KeysToRefresh are the AmneziaWG devices of the person with a key on this server that was fetched before the person's
-	// pick: it holds the older DNS.
+	// KeysToRefresh are the AmneziaWG devices of the person with a key on this server that holds a DNS other than the one
+	// that applies now.
 	KeysToRefresh []string
 }
 

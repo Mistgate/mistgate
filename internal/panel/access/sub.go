@@ -119,7 +119,7 @@ type SubAWG struct {
 	Version                string // "3.1" | "2.0"
 	Address                string // "10.66.4.5, fd66:66:0:1::5"
 	Stale                  bool   // the profile changed in a way that breaks the config the device holds
-	// DNSStale lists the nodes where the person picked a DNS after this device fetched its configs: its key holds the older one.
+	// DNSStale lists the nodes where the DNS that applies to the person is not the one this device's key holds (see markDNSStale).
 	DNSStale      []string
 	LastHandshake time.Time
 	MinClients    []protocols.ClientReq
@@ -242,7 +242,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			sd.LastSeen = ad.LastSeenAt
 			sd.AWG = &SubAWG{
 				ProfileID: ad.ProfileID, ProfileName: ad.ProfileName, Version: awgVersion([]byte(ad.ProfileSettingsJSON)),
-				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), DNSStale: ad.DNSStale, LastHandshake: ad.LastSeenAt,
+				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), LastHandshake: ad.LastSeenAt,
 				MinClients: s.awgMinClients(ad.ProfileSettingsJSON),
 			}
 		}
@@ -410,6 +410,12 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	for i := range v.Nodes {
 		v.Nodes[i].Online = s.nodeOnline(v.Nodes[i].ID, networkUsage)
+	}
+	s.markDNSStale(u, g, full, nodeDNS, awgDevs)
+	for _, ad := range awgDevs {
+		if i := slices.IndexFunc(v.Devices, func(d SubDevice) bool { return d.ID == ad.ID }); i >= 0 && v.Devices[i].AWG != nil {
+			v.Devices[i].AWG.DNSStale = ad.DNSStale
+		}
 	}
 	s.nodeDNSData(ctx, &v, nodeDNS, awgDevs)
 	return v, nil

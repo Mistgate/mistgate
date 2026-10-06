@@ -292,25 +292,25 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
 	}
 	// Created at the profile's current epoch: the configs below are the current ones.
-	cfgs, err := s.renderDeviceConfigs(ctx, &deviceScope{user: u, group: g, dev: dev, profile: p, proto: proto, merged: merged, ins: ins}, false)
+	cfgs, err := s.renderDeviceConfigs(ctx, &deviceScope{user: u, group: g, dev: dev, profile: p, proto: proto, merged: merged, ins: ins}, false, true)
 	return dev, cfgs, err
 }
 
 // DeviceConfigs renders the configs of a device for every usable node and marks the device as having received the
 // profile's current epoch (its "needs a new key" badge goes away). owner "" = an admin, else the user the device
-// must belong to. The returned device already shows the new epoch.
+// must belong to. The returned device already shows the new epoch. Only the person's own fetch (owner set) counts as
+// the device holding the DNS of every server now: an admin who looks at the keys has not delivered them.
 func (s *Service) DeviceConfigs(ctx context.Context, by, owner, deviceID string) (store.AccessAWGDevice, []DeviceConfig, error) {
 	sc, err := s.loadDevice(ctx, owner, deviceID)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, err
 	}
-	cfgs, err := s.renderDeviceConfigs(ctx, sc, true)
+	cfgs, err := s.renderDeviceConfigs(ctx, sc, true, owner != "")
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, err
 	}
 	s.audit(ctx, by, "device_configs", map[string]any{"user": sc.user.ID, "device": deviceID, "profile": sc.profile.ID})
 	sc.dev.ConfigEpoch = max(sc.dev.ConfigEpoch, sc.dev.CriticalEpoch)
-	sc.dev.DNSStale = nil // it holds the DNS of every server now
 	return sc.dev, cfgs, nil
 }
 
@@ -334,11 +334,12 @@ func (s *Service) RotateDevice(ctx context.Context, by, owner, deviceID string) 
 	if sc.dev, err = a.AWGDevice(ctx, deviceID); err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
 	}
-	cfgs, err := s.renderDeviceConfigs(ctx, sc, false) // the new credential carries the current epoch
+	cfgs, err := s.renderDeviceConfigs(ctx, sc, false, true) // the new credential carries the current epoch
 	return sc.dev, cfgs, err
 }
 
-// RelabelDevice changes the label of a device (device.model) and returns it.
+// RelabelDevice changes the label of a device (device.model) and returns it (without DNSStale: the page keeps what it
+// knows about that).
 func (s *Service) RelabelDevice(ctx context.Context, owner, deviceID, label string) (store.AccessAWGDevice, error) {
 	_, label, err := cleanDeviceInput("", label, false)
 	if err != nil {
@@ -384,8 +385,9 @@ func (s *Service) RevokeOwnDevice(ctx context.Context, by, owner, deviceID strin
 }
 
 // renderDeviceConfigs renders the .conf and the vpn:// key of the device for each usable inbound of its profile.
-// markReceived records the profile's current epoch on the credential (the user now holds current configs).
-func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, markReceived bool) ([]DeviceConfig, error) {
+// markEpoch records the profile's current epoch on the credential (the user now holds current configs); recordDNS records
+// the DNS each config carries (the key now holds it), what "stale DNS" is measured against.
+func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, markEpoch, recordDNS bool) ([]DeviceConfig, error) {
 	pt, err := s.vault.Open(sc.dev.SecretEnc, sc.dev.CredID)
 	if err != nil {
 		return nil, s.internal("open device key", err)
@@ -405,6 +407,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	title, brand, lang := s.keyNaming(ctx)
 	public, names, files := keyNames(title, brand, lang, nodes)
 	var out []DeviceConfig
+	held := map[string]string{} // node id -> the resolver pair the config of that node carries
 	for i, f := range sc.ins {
 		spec, err := s.buildSpec(f, sc.merged)
 		if err != nil {
@@ -436,6 +439,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			s.log.Error("access: cannot render a device config", "inbound", f.Inbound.ID, "device", sc.dev.ID)
 			continue
 		}
+		held[f.Node.ID] = dnsSig(servers)
 		out = append(out, DeviceConfig{
 			InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
 			ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
@@ -446,9 +450,14 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
 	}
-	if markReceived {
-		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch, s.now()); err != nil {
+	if markEpoch {
+		if err := s.st.Access().SetConfigEpoch(ctx, sc.dev.CredID, sc.dev.CriticalEpoch); err != nil {
 			return nil, s.internal("record the received config", err)
+		}
+	}
+	if recordDNS {
+		if err := s.st.Access().SetDNSSig(ctx, sc.dev.CredID, held); err != nil {
+			return nil, s.internal("record the DNS of the config", err)
 		}
 	}
 	return out, nil

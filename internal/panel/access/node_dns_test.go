@@ -388,7 +388,7 @@ func TestKeyIsStaleAfterADNSPick(t *testing.T) {
 		t.Errorf("after a pick on nl1: %v %v", devs, nodes)
 	}
 	// The rotation hands the key out again with the current DNS: device two is not stale. A pick the node stops offering
-	// stales nothing.
+	// stales the key that held it (device two), not the one that never did (device one).
 	if _, _, err := e.s.RotateDevice(e.ctx, "user:"+uid, uid, d2); err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestKeyIsStaleAfterADNSPick(t *testing.T) {
 		t.Errorf("after the rotation: %v", devs)
 	}
 	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex")
-	if devs, nodes = stale(); len(devs) != 0 || len(nodes) != 0 {
+	if devs, nodes = stale(); len(devs) != 1 || !same(devs[d2], "nod_nl1") || !same(nodes["nod_nl1"], d2) {
 		t.Errorf("after the offer was withdrawn: %v %v", devs, nodes)
 	}
 	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard") // offered again: the pick works again
