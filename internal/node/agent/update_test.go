@@ -337,6 +337,7 @@ func TestNewBuildThatDoesNotCommitRollsBack(t *testing.T) {
 	if err := os.WriteFile(f.exe+".prev", oldBin, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	start := time.Now() // the window starts when the updater is made, inside newHarness
 	h := newHarness(t, harnessOpts{noStart: true, cfg: f.cfg(newBuilt, "0.2.0-new", func(c *update.Config) { c.Window = 250 * time.Millisecond })})
 	marker := `{"from_version":"0.1.0-old","from_built":1000,"to_version":"0.2.0-new","to_built":2000,"started_unix":1}`
 	if err := os.WriteFile(filepath.Join(h.dir, update.FilePending), []byte(marker), 0o600); err != nil {
@@ -344,7 +345,6 @@ func TestNewBuildThatDoesNotCommitRollsBack(t *testing.T) {
 	}
 	h.panel.blackhole.Store(true) // connects, never gets a HelloAck
 	fast(h.a)
-	start := time.Now()
 	h.start()
 	f.waitExec()
 	if time.Since(start) < 200*time.Millisecond {
