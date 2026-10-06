@@ -5,6 +5,8 @@ description: The panel's built-in MCP server for AI agents, how to connect a cli
 
 The panel has a built-in Model Context Protocol (MCP) server, so an AI agent can read the fleet and make day-to-day changes. It uses the same API tokens and the same procedures as the [admin API](api.md): the token's profile decides what the agent sees and may do, and every call is in the audit log. Nothing changes in one call: an agent plans a change, then applies it, and the riskiest changes wait for the owner's approval in the admin.
 
+The HTTP endpoint below is available in the VPS edition. The Edge edition does not serve `/mcp` in phase 1; Edge support is planned for phase 2 behind a separate Worker service binding.
+
 ## The endpoint
 
 ```text

@@ -148,7 +148,7 @@ func initPanel(options js.Value) error {
 			js.Global().Get("console").Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+url)
 		}
 	}
-	// TODO(phase-2): Cron/alarm invokes the mcp-plan-sweep background job.
+	// TODO(phase-2): Cron/alarm expires MCP plans.
 	// TODO(phase-2): Cron/alarm invokes the fleet reconciliation background job.
 	// TODO(phase-2): Cron/alarm invokes the access cleanup background job.
 	// TODO(phase-2): Cron/alarm invokes health checks, evaluation and retention.

@@ -247,6 +247,17 @@ async function run() {
       throw new Error("unknown path response differs from the shared VPS handler");
     }
 
+    const unknownAdminURL = "https://example.com/test-admin/not-a-panel-route";
+    const unknownAdmin = await bridgeRequest(unknownAdminURL, {
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+    const edgeMCP = await bridgeRequest("https://example.com/test-admin/mcp", {
+      headers: { "CF-Connecting-IP": "127.0.0.1" },
+    });
+    if (edgeMCP.status !== unknownAdmin.status || !Buffer.from(edgeMCP.body).equals(Buffer.from(unknownAdmin.body))) {
+      throw new Error("edge MCP path does not fall through like an unknown admin path");
+    }
+
     const cookieResponse = await bridgeRequest("https://example.com/__edge_bridge_test__/cookies", {
       headers: { "CF-Connecting-IP": "127.0.0.1" },
     });
@@ -300,6 +311,10 @@ async function run() {
     const rescan = await connectRPC(secondPanel, "UpdateService/RescanBundle", {}, adminCookie);
     assert.equal(rescan.message.code, "failed_precondition", "filesystem update RPC fails cleanly on the edge");
     assert.ok(rescan.message.message.includes("edge edition"));
+
+    const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
+    assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");
+    assert.ok(tokens.message.nowUnix, "the API-token RPC returns its current time");
   } finally {
     oracle.child.kill();
   }

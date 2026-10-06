@@ -309,8 +309,8 @@ func Build(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
-	jobs := []BackgroundJob{
-		{Name: "mcp-plan-sweep", Run: func(ctx context.Context) { sweepPlans(ctx, st, log, c.Clock) }},
+	jobs := mcpBackgroundJobs(st, log, c.Clock)
+	jobs = append(jobs, []BackgroundJob{
 		{Name: "fleet", Run: func(ctx context.Context) { _ = fl.Run(ctx) }},
 		{Name: "access", Run: acc.Run},
 		{Name: "health", Run: hl.Run},
@@ -329,7 +329,7 @@ func Build(c Config) (*Panel, error) {
 				}
 			}
 		}},
-	}
+	}...)
 	jobs = append(jobs, c.BackgroundStarters...)
 	return &Panel{
 		Handler: srv.Public(), Server: srv, Fleet: fl, Access: acc, Health: hl, Update: upd,
