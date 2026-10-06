@@ -12,6 +12,11 @@ gofmt -l .                             # must print nothing
 cd web && pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
+The store has two `database/sql` backends: SQLite for the VPS edition and D1 for `js/wasm`. New migrations
+must avoid explicit `BEGIN`/`COMMIT`/`SAVEPOINT`, `-- +goose NO TRANSACTION`, and `PRAGMA foreign_keys`;
+see [ADR 0002](design/adr/0002-database-sql-seam.md). Run the edge storage tests with
+`pwsh -File scripts/test-edge-store.ps1`.
+
 For a change to `docs/`, also build the documentation site; it fails on a broken internal link (see
 [docs/README.md](docs/README.md) for the page conventions):
 

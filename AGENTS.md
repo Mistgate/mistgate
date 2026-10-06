@@ -19,6 +19,11 @@ Mistgate is a Go VPN fleet panel and node agent. The panel and agent are static 
 - `web/`: React/TypeScript admin and user interfaces; `docs/{en,ru}/`: documentation source; `site/`: static documentation renderer for Cloudflare Pages.
 - `internal/panel/store/migrations/`: forward-only SQLite migrations; never edit a migration that has shipped.
 
+The store has two `database/sql` backends: SQLite for the VPS edition and D1 for `js/wasm`. New migrations
+must avoid explicit `BEGIN`/`COMMIT`/`SAVEPOINT`, `-- +goose NO TRANSACTION`, and `PRAGMA foreign_keys`;
+see [ADR 0002](design/adr/0002-database-sql-seam.md). Run the edge storage tests with
+`pwsh -File scripts/test-edge-store.ps1`.
+
 ## Build and verify
 
 ```sh
