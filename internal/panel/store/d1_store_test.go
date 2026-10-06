@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
+	"strings"
 	"syscall/js"
 	"testing"
 	"time"
@@ -65,6 +66,28 @@ func TestD1MigrationParity(t *testing.T) {
 	for i, migration := range wantMigrations {
 		if gotVersions[i] != migration.version {
 			t.Errorf("migration version %d = %d, want %d", i, gotVersions[i], migration.version)
+		}
+	}
+}
+
+// D1 rejects a batch whose statement ends in a comment ("SQL code did not contain a statement"), which a SQLite-backed
+// fake does not notice, so the shape is checked here.
+func TestD1MigrationStatementsEndInCode(t *testing.T) {
+	migrations, err := d1Migrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, migration := range migrations {
+		statements, err := migrationStatements(migration.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, statement := range statements {
+			lines := strings.Split(statement.Query, "\n")
+			last := lines[len(lines)-1]
+			if strings.TrimSpace(stripLineComment(last)) != strings.TrimSpace(last) {
+				t.Errorf("%s: a statement ends in a comment: %q", migration.name, last)
+			}
 		}
 	}
 }

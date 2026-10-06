@@ -155,7 +155,7 @@ func migrationStatements(name string) ([]d1driver.Statement, error) {
 	var out []d1driver.Statement
 	var cur strings.Builder
 	flush := func() {
-		if q := strings.TrimSpace(cur.String()); hasSQL(q) {
+		if q := trimTrailingComments(cur.String()); hasSQL(q) {
 			out = append(out, d1driver.Statement{Query: q})
 		}
 		cur.Reset()
@@ -226,6 +226,23 @@ func stripLineComment(line string) string {
 		}
 	}
 	return line
+}
+
+// trimTrailingComments drops the comment that follows a statement's last ";" ("...; -- why", or comment lines before the
+// next statement). SQLite ignores it; D1 prepares it as a second, empty statement and rejects the whole batch with
+// "SQL code did not contain a statement".
+func trimTrailingComments(q string) string {
+	lines := strings.Split(q, "\n")
+	for len(lines) > 0 {
+		last := stripLineComment(lines[len(lines)-1])
+		if strings.TrimSpace(last) == "" {
+			lines = lines[:len(lines)-1]
+			continue
+		}
+		lines[len(lines)-1] = last
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 // hasSQL reports whether a statement holds more than comments and blank lines.
