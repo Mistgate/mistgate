@@ -73,6 +73,10 @@ type Config struct {
 	RetryMax    int           // sends tried before a message is dropped; default 6
 	WatchEvery  time.Duration // release / agent check period; default 5 min
 	WatchFirst  time.Duration // first check after Run starts; default 1 min
+
+	// Wait replaces the timers in tests: it waits d, or until ctx ends (false) or wake fires (wake is nil where a bot
+	// change must not cut the wait short).
+	Wait func(ctx context.Context, d time.Duration, wake <-chan struct{}) bool
 }
 
 // Service is the Telegram module.
@@ -223,15 +227,23 @@ func (s *Service) botChanged(newBot bool) {
 
 // sleep waits d, or until ctx ends (false) or the bot changed.
 func (s *Service) sleep(ctx context.Context, d time.Duration) bool {
+	return s.wait(ctx, d, s.wake)
+}
+
+func (s *Service) wait(ctx context.Context, d time.Duration, wake <-chan struct{}) bool {
+	if s.cfg.Wait != nil {
+		return s.cfg.Wait(ctx, d, wake)
+	}
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
 		return false
-	case <-s.wake:
+	case <-wake:
+		return ctx.Err() == nil
 	case <-t.C:
+		return true
 	}
-	return ctx.Err() == nil
 }
 
 // ---- polling: only to hear "/start <code>"
@@ -268,7 +280,7 @@ func (s *Service) pollLoop(ctx context.Context) {
 			wait := backoff
 			var ae *apiError
 			if errors.As(err, &ae) && ae.RetryAfter > 0 {
-				wait = min(ae.RetryAfter, 5*time.Minute)
+				wait = retryAfterWait(ae.RetryAfter)
 			} else {
 				backoff = min(backoff*2, 5*time.Minute)
 			}
@@ -391,6 +403,17 @@ func (s *Service) takeCode(code string) (adminID string, ok bool) {
 		return "", false
 	}
 	return c.adminID, true
+}
+
+// dropCodes invalidates pending link codes for one admin, or every code when adminID is empty.
+func (s *Service) dropCodes(adminID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for h, c := range s.codes {
+		if adminID == "" || c.adminID == adminID {
+			delete(s.codes, h)
+		}
+	}
 }
 
 // ---- what is announced
@@ -526,14 +549,7 @@ func (s *Service) watchLoop(ctx context.Context) {
 }
 
 func (s *Service) sleepPlain(ctx context.Context, d time.Duration) bool {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return true
-	}
+	return s.wait(ctx, d, nil)
 }
 
 // canSend is whether a message for this audience would reach anybody (a bot and an enabled chat). The watcher marks a
@@ -619,111 +635,198 @@ func (s *Service) flush(ctx context.Context) {
 	}
 	tok, ok := s.token(ctx)
 	if !ok {
+		if ctx.Err() != nil {
+			s.requeueUndelivered(items, nil, nil)
+		}
 		return
 	}
 	links, err := s.st.TelegramLinks(ctx)
 	if err != nil {
 		s.log.Warn("telegram: read links", "err", err)
+		if ctx.Err() != nil {
+			s.requeueUndelivered(items, nil, nil)
+		}
 		return
 	}
 	l, brand := s.panel(ctx)
+	finished := make([]map[string]struct{}, len(items))
+	markFinished := func(itemIndex int, adminID string) {
+		if finished[itemIndex] == nil {
+			finished[itemIndex] = map[string]struct{}{}
+		}
+		finished[itemIndex][adminID] = struct{}{}
+	}
 	for _, link := range links {
+		if ctx.Err() != nil {
+			s.requeueUndelivered(items, links, finished)
+			return
+		}
 		if !link.Enabled {
 			continue
 		}
 		var lines []string
-		for _, it := range items {
+		lineItems := make([][]int, 0, len(items))
+		lineIndexes := make(map[string]int, len(items))
+		for itemIndex, it := range items {
 			if !it.to(link) {
 				continue
 			}
 			t := it.text(l, brand)
-			if t == "" || containsString(lines, t) {
+			if t == "" {
+				markFinished(itemIndex, link.AdminID)
 				continue
 			}
+			if lineIndex, found := lineIndexes[t]; found {
+				lineItems[lineIndex] = append(lineItems[lineIndex], itemIndex)
+				continue
+			}
+			lineIndexes[t] = len(lines)
 			lines = append(lines, t)
+			lineItems = append(lineItems, []int{itemIndex})
 		}
 		for _, msg := range chunk(lines) {
 			if ctx.Err() != nil {
+				s.requeueUndelivered(items, links, finished)
 				return
 			}
-			s.deliver(ctx, tok, link.ChatID, msg)
+			if s.deliver(ctx, tok, link.ChatID, msg.text) {
+				s.requeueUndelivered(items, links, finished)
+				return
+			}
+			for _, lineIndex := range msg.lineIndexes {
+				for _, itemIndex := range lineItems[lineIndex] {
+					markFinished(itemIndex, link.AdminID)
+				}
+			}
 		}
 	}
 }
 
-func containsString(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
+func (s *Service) requeueUndelivered(items []item, links []store.TelegramLinkRow, finished []map[string]struct{}) {
+	var remaining []item
+	for i, it := range items {
+		if links == nil {
+			remaining = append(remaining, it)
+			continue
 		}
+		admins := make(map[string]struct{})
+		for _, link := range links {
+			if !link.Enabled || !it.to(link) {
+				continue
+			}
+			if i < len(finished) {
+				if _, done := finished[i][link.AdminID]; done {
+					continue
+				}
+			}
+			admins[link.AdminID] = struct{}{}
+		}
+		if len(admins) == 0 {
+			continue
+		}
+		to := it.to
+		it.to = func(link store.TelegramLinkRow) bool {
+			_, wanted := admins[link.AdminID]
+			return wanted && to(link)
+		}
+		remaining = append(remaining, it)
 	}
-	return false
+	if len(remaining) == 0 {
+		return
+	}
+	s.mu.Lock()
+	pending := make([]item, 0, len(remaining)+len(s.pending))
+	pending = append(pending, remaining...)
+	pending = append(pending, s.pending...)
+	s.pending = pending
+	s.mu.Unlock()
 }
 
 // chunk joins lines into messages that fit Telegram's limit (a line is never split; one too long is cut).
-func chunk(lines []string) []string {
-	var out []string
+func chunk(lines []string) []messageChunk {
+	var out []messageChunk
 	var cur string
-	for _, ln := range lines {
+	var lineIndexes []int
+	for i, ln := range lines {
 		if len([]rune(ln)) > maxMessage {
 			ln = string([]rune(ln)[:maxMessage])
 		}
 		if cur != "" && len([]rune(cur))+2+len([]rune(ln)) > maxMessage {
-			out = append(out, cur)
+			out = append(out, messageChunk{text: cur, lineIndexes: lineIndexes})
 			cur = ""
+			lineIndexes = nil
 		}
 		if cur != "" {
 			cur += "\n\n"
 		}
 		cur += ln
+		lineIndexes = append(lineIndexes, i)
 	}
 	if cur != "" {
-		out = append(out, cur)
+		out = append(out, messageChunk{text: cur, lineIndexes: lineIndexes})
 	}
 	return out
 }
 
+type messageChunk struct {
+	text        string
+	lineIndexes []int
+}
+
 // deliver sends one message, trying again after a network failure or a server error with a doubling wait, and after 429 for
-// as long as Telegram asks. A chat that cannot be written to (the user blocked the bot) or a refused token ends it at once.
-func (s *Service) deliver(ctx context.Context, tok vault.Redacted, chat int64, text string) {
+// as long as Telegram asks. It returns true only when cancellation interrupted delivery. A chat that cannot be written to
+// (the user blocked the bot) or a refused token ends it at once.
+func (s *Service) deliver(ctx context.Context, tok vault.Redacted, chat int64, text string) bool {
 	wait := s.cfg.RetryBase
-	for attempt := 1; attempt <= s.cfg.RetryMax; attempt++ {
+	attempt := 1
+retry:
+	for {
+		if ctx.Err() != nil {
+			return true
+		}
 		sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		err := s.api.sendMessage(sctx, tok, chat, text)
 		cancel()
 		if err == nil {
 			s.setBotErr("")
-			return
+			return false
 		}
 		if ctx.Err() != nil {
-			return
+			return true
 		}
 		var ae *apiError
 		errors.As(err, &ae)
 		switch {
 		case ae != nil && ae.Status == http.StatusTooManyRequests:
-			d := min(max(ae.RetryAfter, time.Second), 2*time.Minute)
+			d := retryAfterWait(ae.RetryAfter)
 			s.log.Warn("telegram: rate limited", "retry_in", d.String())
 			if !s.sleepPlain(ctx, d) {
-				return
+				return true
 			}
+			continue
 		case ae != nil && ae.Status == http.StatusUnauthorized:
 			s.setBotErr("unauthorized")
 			s.log.Warn("telegram: the bot token is refused")
-			return
+			return false
 		case ae != nil && !ae.Transport && ae.Status >= 400 && ae.Status < 500:
 			s.log.Warn("telegram: message refused", "status", ae.Status, "desc", clip(ae.Desc, 80)) // a blocked bot, a deleted chat
-			return
+			return false
 		default:
 			s.setBotErr("unreachable")
+			if attempt >= s.cfg.RetryMax {
+				s.log.Warn("telegram: send failed, retry limit reached", "code", errCode(err), "attempt", attempt)
+				break retry
+			}
 			s.log.Warn("telegram: send failed, will retry", "code", errCode(err), "attempt", attempt)
 			if !s.sleepPlain(ctx, wait) {
-				return
+				return true
 			}
 			wait *= 2
+			attempt++
 		}
 	}
 	s.log.Warn("telegram: message dropped after retries")
+	return false
 }
 
 // ---- audit

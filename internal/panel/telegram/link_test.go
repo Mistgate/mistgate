@@ -264,6 +264,105 @@ func TestExpiredAndReplacedCodes(t *testing.T) {
 	}
 }
 
+func TestPendingCodesFollowUnlinkAndBotChanges(t *testing.T) {
+	begin := func(t *testing.T, e *env, owner store.Admin) string {
+		t.Helper()
+		resp, err := rpc{e.svc}.BeginTelegramLink(e.ctxAs(owner), connect.NewRequest(&adminv1.BeginTelegramLinkRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.Msg.Code
+	}
+	waitForStart := func(t *testing.T, e *env) {
+		t.Helper()
+		waitFor(t, "the /start update to be consumed", func() bool {
+			e.tg.mu.Lock()
+			defer e.tg.mu.Unlock()
+			return len(e.tg.offsets) > 0 && e.tg.offsets[len(e.tg.offsets)-1] > e.tg.nextID
+		})
+	}
+
+	t.Run("unlink drops the admin's code", func(t *testing.T) {
+		e := newEnv(t)
+		owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		e.link(owner, 50)
+		e.run()
+		code := begin(t, e, owner)
+		if _, err := (rpc{e.svc}).UnlinkTelegram(e.ctxAs(owner), connect.NewRequest(&adminv1.UnlinkTelegramRequest{})); err != nil {
+			t.Fatal(err)
+		}
+		e.tg.say(51, "/start "+code)
+		waitForStart(t, e)
+		if _, err := e.st.TelegramLink(context.Background(), owner.ID); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("a code survived unlink and linked the owner: %v", err)
+		}
+		if got := e.tg.sentTo(51); len(got) != 0 {
+			t.Errorf("an unlinked chat got a reply: %v", got)
+		}
+	})
+
+	t.Run("clearing the bot drops every code", func(t *testing.T) {
+		e := newEnv(t)
+		owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		code := begin(t, e, owner)
+		if _, err := e.rpcSetBot(owner, "", true); err != nil {
+			t.Fatal(err)
+		}
+		if adminID, ok := e.svc.takeCode(code); ok {
+			t.Errorf("a code for %s survived clearing the bot", adminID)
+		}
+	})
+
+	t.Run("a replacement bot drops every code", func(t *testing.T) {
+		e := newEnv(t)
+		owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		e.run()
+		code := begin(t, e, owner)
+		e.tg.mu.Lock()
+		e.tg.botID++
+		e.tg.mu.Unlock()
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		e.tg.say(52, "/start "+code)
+		waitForStart(t, e)
+		if _, err := e.st.TelegramLink(context.Background(), owner.ID); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("a code survived bot replacement and linked the owner: %v", err)
+		}
+	})
+
+	t.Run("saving the same bot keeps its codes", func(t *testing.T) {
+		e := newEnv(t)
+		owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		e.link(owner, 54)
+		e.run()
+		code := begin(t, e, owner)
+		if _, err := e.rpcSetBot(owner, testToken, false); err != nil {
+			t.Fatal(err)
+		}
+		if link, err := e.st.TelegramLink(context.Background(), owner.ID); err != nil || link.ChatID != 54 {
+			t.Errorf("the same bot did not preserve the existing link: %+v, %v", link, err)
+		}
+		e.tg.say(53, "/start "+code)
+		waitFor(t, "the owner to link", func() bool {
+			link, err := e.st.TelegramLink(context.Background(), owner.ID)
+			return err == nil && link.ChatID == 53
+		})
+	})
+}
+
 // A link needs a bot; the code is not given out without one.
 func TestBeginLinkNeedsBot(t *testing.T) {
 	e := newEnv(t)

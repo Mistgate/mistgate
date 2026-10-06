@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,7 +20,33 @@ import (
 // call is a JSON POST to <base>/bot<token>/<method>. The token is part of that URL, so an error from net/http (which prints
 // the URL) is never passed on: a transport failure becomes an apiError that says only that it was one.
 
-const defaultAPIBase = "https://api.telegram.org"
+const (
+	defaultAPIBase = "https://api.telegram.org"
+	maxRetryAfter  = time.Hour
+)
+
+var botTokenInText = regexp.MustCompile(`bot[0-9]+:[A-Za-z0-9_-]+`)
+
+func scrubBotDescription(desc, token string) string {
+	if token != "" {
+		desc = strings.ReplaceAll(desc, token, "[REDACTED]")
+	}
+	return botTokenInText.ReplaceAllString(desc, "[REDACTED]")
+}
+
+func retryAfterDuration(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	if seconds > int(maxRetryAfter/time.Second) {
+		return maxRetryAfter
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func retryAfterWait(d time.Duration) time.Duration {
+	return min(max(d, time.Second), maxRetryAfter)
+}
 
 // apiError is what a call returns when it did not succeed. It never carries the token.
 type apiError struct {
@@ -102,8 +129,9 @@ func (c *apiClient) call(ctx context.Context, token vault.Redacted, method strin
 		return &apiError{Method: method, Status: resp.StatusCode, Transport: true}
 	}
 	if !env.OK {
-		return &apiError{Method: method, Status: resp.StatusCode, Desc: strings.TrimSpace(env.Description),
-			RetryAfter: time.Duration(env.Parameters.RetryAfter) * time.Second}
+		return &apiError{Method: method, Status: resp.StatusCode,
+			Desc:       strings.TrimSpace(scrubBotDescription(env.Description, token.Reveal())),
+			RetryAfter: retryAfterDuration(env.Parameters.RetryAfter)}
 	}
 	if out != nil {
 		if err := json.Unmarshal(env.Result, out); err != nil {

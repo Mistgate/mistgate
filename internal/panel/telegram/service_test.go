@@ -236,6 +236,100 @@ func TestRetryAfterIsRespected(t *testing.T) {
 	e.quiet(1, 100*time.Millisecond)
 }
 
+func TestRetryAfterBeyondOldSendCapDoesNotUseRetryBudget(t *testing.T) {
+	waited := make(chan time.Duration, 1)
+	release := make(chan struct{})
+	e := newEnv(t, func(c *Config) {
+		c.RetryMax = 1
+		c.Wait = func(ctx context.Context, d time.Duration, wake <-chan struct{}) bool {
+			waited <- d
+			select {
+			case <-release:
+				return true
+			case <-ctx.Done():
+				return false
+			case <-wake:
+				return ctx.Err() == nil
+			}
+		}
+	})
+	e.tg.mu.Lock()
+	e.tg.sendPlan = []planned{{status: 429, retryAfter: 180, desc: "Too Many Requests: retry after 180"}}
+	e.tg.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.svc.deliver(context.Background(), testTokenRedacted(), 1, "test message")
+	}()
+	select {
+	case got := <-waited:
+		if got != 3*time.Minute {
+			t.Errorf("waited %v for retry_after, want 3m", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("delivery did not wait for retry_after")
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("delivery did not finish after the retry wait")
+	}
+	if got := e.tg.count("sendMessage"); got != 2 {
+		t.Errorf("sendMessage called %d times, want one 429 and one successful retry", got)
+	}
+	if got := e.tg.sentTo(1); len(got) != 1 || got[0] != "test message" {
+		t.Errorf("sent messages: %v, want the message exactly once", got)
+	}
+}
+
+func TestRetryAfterIsCappedAtOneHour(t *testing.T) {
+	if got := retryAfterDuration(2 * 60 * 60); got != time.Hour {
+		t.Errorf("parsed retry_after is %v, want the one-hour cap", got)
+	}
+	if got := retryAfterWait(2 * time.Hour); got != time.Hour {
+		t.Errorf("retry wait is %v, want the one-hour cap", got)
+	}
+}
+
+func TestPollRetryAfterBeyondOldCapIsCancellable(t *testing.T) {
+	waited := make(chan time.Duration, 1)
+	e := newEnv(t, func(c *Config) {
+		c.Wait = func(ctx context.Context, d time.Duration, wake <-chan struct{}) bool {
+			waited <- d
+			select {
+			case <-ctx.Done():
+				return false
+			case <-wake:
+				return ctx.Err() == nil
+			}
+		}
+	})
+	e.setBot()
+	e.tg.mu.Lock()
+	e.tg.pollPlan = []planned{{status: 429, retryAfter: 360, desc: "Too Many Requests: retry after 360"}}
+	e.tg.mu.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); e.svc.pollLoop(ctx) }()
+	select {
+	case got := <-waited:
+		if got != 6*time.Minute {
+			t.Errorf("waited %v for retry_after, want 6m", got)
+		}
+	case <-time.After(5 * time.Second):
+		cancel()
+		t.Fatal("poll did not wait for retry_after")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("poll did not stop when its context was cancelled")
+	}
+}
+
 // A network failure or a server error is retried with a backoff; a blocked bot is not retried at all.
 func TestSendRetriesServerErrorsAndGivesUpOnRefusal(t *testing.T) {
 	e := newEnv(t)
@@ -395,16 +489,83 @@ func TestMessagesCarryNoSecretsFromParams(t *testing.T) {
 	}
 }
 
-// A transport error never prints the URL, which holds the token.
+// An API description and a transport error never expose the bot token.
 func TestClientErrorsDoNotLeakTheToken(t *testing.T) {
 	e := newEnv(t)
+	e.tg.mu.Lock()
+	e.tg.sendPlan = []planned{{status: 400, desc: "bad " + testToken + " and bot987654321:Fake_Description"}}
+	e.tg.mu.Unlock()
+	err := e.svc.api.sendMessage(context.Background(), testTokenRedacted(), 1, "test")
+	if err == nil {
+		t.Fatal("sendMessage unexpectedly succeeded")
+	}
+	for _, secret := range []string{testToken, "bot987654321:Fake_Description"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("API description leaked %q: %v", secret, err)
+		}
+	}
+
 	e.tg.srv.Close() // nothing listens any more
-	_, err := e.svc.api.getMe(context.Background(), testTokenRedacted())
+	_, err = e.svc.api.getMe(context.Background(), testTokenRedacted())
 	if err == nil {
 		t.Fatal("getMe succeeded against a closed server")
 	}
 	if strings.Contains(err.Error(), "123456789") || strings.Contains(err.Error(), "AAFake") {
 		t.Errorf("the error carries the token: %v", err)
+	}
+}
+
+func TestRunRequeuesOnlyUndeliveredItemsOnShutdown(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 1)
+
+	markers := []string{"event-1", "event-2", "event-3"}
+	for _, marker := range markers {
+		line := marker + ":" + strings.Repeat("x", 2000)
+		e.svc.enqueue(item{to: everyone, text: func(L, string) string { return line }})
+	}
+	blocked := make(chan struct{})
+	e.tg.mu.Lock()
+	e.tg.blockSendCall = 2 // the first chunk succeeds; the next request blocks until cancellation
+	e.tg.blockSendStarted = blocked
+	e.tg.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); e.svc.Run(ctx) }()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Run did not stop")
+		}
+	}()
+	select {
+	case <-blocked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the second send did not block")
+	}
+	line := "event-4:" + strings.Repeat("x", 2000)
+	e.svc.enqueue(item{to: everyone, text: func(L, string) string { return line }})
+	markers = append(markers, "event-4")
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not finish its final flush")
+	}
+
+	got := e.tg.sentTo(1)
+	if len(got) != len(markers) {
+		t.Fatalf("got %d sent chunks, want %d: %v", len(got), len(markers), got)
+	}
+	for i, marker := range markers {
+		if !strings.HasPrefix(got[i], marker+":") {
+			t.Errorf("chunk %d is %q, want %s", i, got[i][:min(len(got[i]), 40)], marker)
+		}
 	}
 }
 

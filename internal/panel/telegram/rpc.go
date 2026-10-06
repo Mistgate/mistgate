@@ -123,6 +123,7 @@ func (r rpc) SetTelegramBot(ctx context.Context, req *connect.Request[adminv1.Se
 			s.log.Error("telegram: clear bot", "err", err)
 			return nil, errInternal
 		}
+		s.dropCodes("")
 		s.resetOffset(ctx)
 		s.auditCtx(ctx, a, "telegram_bot_clear", map[string]any{"dropped_links": dropped})
 		s.botChanged(true)
@@ -156,6 +157,7 @@ func (r rpc) SetTelegramBot(ctx context.Context, req *connect.Request[adminv1.Se
 	}
 	newBot := prevErr != nil || prev.BotID != me.ID
 	if newBot {
+		s.dropCodes("")
 		s.resetOffset(ctx)
 	}
 	s.auditCtx(ctx, a, "telegram_bot_set", map[string]any{"bot": me.Username, "dropped_links": dropped})
@@ -203,6 +205,7 @@ func (r rpc) UnlinkTelegram(ctx context.Context, _ *connect.Request[adminv1.Unli
 		r.s.log.Error("telegram: unlink", "err", err)
 		return nil, errInternal
 	}
+	r.s.dropCodes(a.ID)
 	if had {
 		r.s.auditCtx(ctx, a, "telegram_unlink", nil)
 	}

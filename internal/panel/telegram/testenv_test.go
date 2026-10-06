@@ -30,18 +30,20 @@ type sentMsg struct {
 type fakeTG struct {
 	srv *httptest.Server
 
-	mu       sync.Mutex
-	sent     []sentMsg
-	updates  []tgUpdate
-	nextID   int64
-	offsets  []int64        // the offset of every getUpdates call
-	sendPlan []planned      // consumed one per sendMessage; empty = OK
-	pollPlan []planned      // consumed one per getUpdates; empty = serve normally
-	calls    map[string]int // method -> count
-	username string
-	botID    int64
-	webhooks int
-	badToken bool // every call answers 401
+	mu               sync.Mutex
+	sent             []sentMsg
+	updates          []tgUpdate
+	nextID           int64
+	offsets          []int64        // the offset of every getUpdates call
+	sendPlan         []planned      // consumed one per sendMessage; empty = OK
+	pollPlan         []planned      // consumed one per getUpdates; empty = serve normally
+	calls            map[string]int // method -> count
+	blockSendCall    int
+	blockSendStarted chan struct{}
+	username         string
+	botID            int64
+	webhooks         int
+	badToken         bool // every call answers 401
 }
 
 type planned struct {
@@ -108,14 +110,27 @@ func (f *fakeTG) serve(w http.ResponseWriter, r *http.Request) {
 		if len(f.sendPlan) > 0 {
 			plan, f.sendPlan = &f.sendPlan[0], f.sendPlan[1:]
 		}
-		if plan == nil || plan.status == 0 || plan.status == 200 {
-			f.sent = append(f.sent, sentMsg{m.ChatID, m.Text})
+		block := f.blockSendCall != 0 && f.blockSendCall == f.calls["sendMessage"]
+		started := f.blockSendStarted
+		if block {
+			f.blockSendCall = 0
+			f.blockSendStarted = nil
 		}
 		f.mu.Unlock()
+		if block {
+			if started != nil {
+				close(started)
+			}
+			<-r.Context().Done()
+			return
+		}
 		if plan != nil && plan.status != 0 && plan.status != 200 {
 			f.fail(w, *plan)
 			return
 		}
+		f.mu.Lock()
+		f.sent = append(f.sent, sentMsg{m.ChatID, m.Text})
+		f.mu.Unlock()
 		f.reply(w, 200, map[string]any{"ok": true, "result": map[string]any{"message_id": 1}})
 	case "getUpdates":
 		var p struct {

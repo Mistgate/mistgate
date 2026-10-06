@@ -38,7 +38,7 @@ Once linked you can switch **Send me alerts** off without unlinking, **Send test
 | A failed [backup](backups.md) | Owner | Once, however often the schedule retries; and when the next backup works |
 | An MCP plan waiting for your approval | Owner | When the plan is made, with a link to **Integrations → Waiting for you**. You decide in the admin, never in the chat |
 | A lockout after too many failed sign-ins | Owner | When it happens |
-| A sign-in from an address this panel has not seen lately; a passkey added or removed, a password or authenticator changed | Owner, and the admin it is about | When it happens |
+| A sign-in from an address this panel has not seen lately; a passkey added or removed, a password login added, a password or authenticator changed | Owner, and the admin it is about | When it happens |
 
 How the messages behave:
 
@@ -51,7 +51,7 @@ How the messages behave:
 
 ## Delivery
 
-The panel connects out to `api.telegram.org` over HTTPS; the host must be able to reach it. A failed send is retried with a growing wait; a "too many requests" answer is waited out for as long as Telegram asks; a chat that cannot be written to (you blocked the bot) is not retried. The messages waiting in memory when the panel stops are sent first, within a few seconds; a crash loses them. If Telegram refuses the token, or the panel cannot reach it, the card shows it under **Bot**.
+The panel connects out to `api.telegram.org` over HTTPS; the host must be able to reach it. A failed send is retried with a growing wait; a "too many requests" answer is waited out for as long as Telegram asks, capped at one hour to guard against invalid values; a chat that cannot be written to (you blocked the bot) is not retried. The messages waiting in memory when the panel stops are sent first, within a few seconds; a crash loses them. If Telegram refuses the token, or the panel cannot reach it, the card shows it under **Bot**.
 
 ## The mirror Worker can use the same bot
 
