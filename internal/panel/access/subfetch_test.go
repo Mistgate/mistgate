@@ -46,6 +46,8 @@ func TestSubscriptionFetchIsReadOnly(t *testing.T) {
 func TestSubscriptionNoTouchLeavesTheDeviceAlone(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
+	touches := make(chan bool, 2)
+	e.s.SetTouchHookForTest(func(started bool) { touches <- started })
 	r := e.user("sub", f.group, nil)
 	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
 	must(e.s.Subscription(e.ctx, token))
@@ -53,7 +55,7 @@ func TestSubscriptionNoTouchLeavesTheDeviceAlone(t *testing.T) {
 	e.sql(`UPDATE device SET last_seen_at = ? WHERE user_id = ?`, stale, r.User.Id)
 
 	must(e.s.SubscriptionWith(e.ctx, token, SubOptions{NoTouch: true}))
-	time.Sleep(300 * time.Millisecond) // a touch is written off the request path
+	assertNoTouchStarted(t, touches)
 	var seen int64
 	e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ?`, r.User.Id).Scan(&seen)
 	if seen != stale {
@@ -61,10 +63,45 @@ func TestSubscriptionNoTouchLeavesTheDeviceAlone(t *testing.T) {
 	}
 }
 
+func TestPageRecreatesImplicitDeviceWithoutClaimingFetch(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	touches := make(chan bool, 2)
+	e.s.SetTouchHookForTest(func(started bool) { touches <- started })
+	r := e.user("sub", f.group, nil)
+	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
+	e.sql(`UPDATE device SET revoked_at = ? WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, e.clock.Unix(), r.User.Id)
+
+	v := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{NoTouch: true}))
+	if len(v.Devices) != 0 {
+		t.Errorf("page view claims a fetched device: %+v", v.Devices)
+	}
+	var seen int64
+	if err := e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, r.User.Id).Scan(&seen); err != nil {
+		t.Fatal(err)
+	}
+	if seen != 0 {
+		t.Fatalf("page-created implicit device last_seen_at = %d, want 0", seen)
+	}
+	assertNoTouchStarted(t, touches)
+
+	must(e.s.Subscription(e.ctx, token))
+	waitTouchEvent(t, touches, true)
+	waitTouchEvent(t, touches, false)
+	if err := e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, r.User.Id).Scan(&seen); err != nil {
+		t.Fatal(err)
+	}
+	if seen != e.clock.Unix() {
+		t.Errorf("app fetch last_seen_at = %d, want %d", seen, e.clock.Unix())
+	}
+}
+
 // last_seen_at of the device is refreshed, but only when stale and never on the request path.
 func TestSubscriptionFetchTouchesStaleDeviceOffTheRequestPath(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
+	touches := make(chan bool, 2)
+	e.s.SetTouchHookForTest(func(started bool) { touches <- started })
 	r := e.user("sub", f.group, nil)
 	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
 	must(e.s.Subscription(e.ctx, token))
@@ -82,13 +119,31 @@ func TestSubscriptionFetchTouchesStaleDeviceOffTheRequestPath(t *testing.T) {
 	if d := time.Since(start); d > time.Second {
 		t.Fatalf("the fetch waited %v for the writer", d)
 	}
+	waitTouchEvent(t, touches, true)
 	w.Close() // the touch goes through once the writer is free
+	waitTouchEvent(t, touches, false)
+	if seen() != e.clock.Unix() {
+		t.Fatalf("last_seen_at = %d, want %d", seen(), e.clock.Unix())
+	}
+}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for seen() != e.clock.Unix() {
-		if time.Now().After(deadline) {
-			t.Fatalf("last_seen_at = %d, want %d", seen(), e.clock.Unix())
+func assertNoTouchStarted(t *testing.T, touches <-chan bool) {
+	t.Helper()
+	select {
+	case started := <-touches:
+		t.Fatalf("unexpected touch event: started=%t", started)
+	default:
+	}
+}
+
+func waitTouchEvent(t *testing.T, touches <-chan bool, want bool) {
+	t.Helper()
+	select {
+	case got := <-touches:
+		if got != want {
+			t.Fatalf("touch event started=%t, want %t", got, want)
 		}
-		time.Sleep(10 * time.Millisecond)
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for touch event started=%t", want)
 	}
 }

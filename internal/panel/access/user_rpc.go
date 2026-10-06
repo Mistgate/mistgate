@@ -207,12 +207,13 @@ func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map
 // credential is issued, and an empty device would take a slot of the device limit.
 // Runs on create, on app-toggle change and on subscription fetch, not on registering a new plugin
 // (a fetch covers that lazily).
-func (s *Service) ensureCreds(ctx context.Context, u store.AccessUser) (bool, error) {
+// noInitialSeen leaves a device made by a no-touch page or preview at zero until an app fetch.
+func (s *Service) ensureCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool) (bool, error) {
 	a := s.st.Access()
 	for range 2 { // a concurrent fetch may create the device first: retry once
 		dev, err := a.ImplicitDevice(ctx, u.ID)
 		if errors.Is(err, store.ErrNotFound) {
-			dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now()}
+			dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
 			creds, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, nil)
 			if err != nil || len(creds) == 0 {
 				return false, err
@@ -418,7 +419,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			continue
 		}
 		resp.Devices = append(resp.Devices, &adminv1.Device{
-			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: d.FirstSeenAt.Unix(), LastSeenUnix: d.LastSeenAt.Unix(),
+			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
 			Online: protos[0].Online, Protocols: d.Protocols,
 		})
 	}
@@ -582,7 +583,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	case err != nil:
 		return nil, s.internal("update user", err)
 	}
-	created, err := s.ensureCreds(ctx, u) // a newly enabled app may need credentials
+	created, err := s.ensureCreds(ctx, u, false) // a newly enabled app may need credentials
 	if err != nil {
 		return nil, s.internal("issue credentials", err)
 	}

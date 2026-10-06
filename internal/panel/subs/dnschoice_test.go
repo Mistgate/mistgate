@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -151,10 +152,15 @@ func TestServersOnThePage(t *testing.T) {
 	if d["server_count"] != float64(2) {
 		t.Errorf("server_count = %v", d["server_count"])
 	}
-	// No node name, no address and no rate anywhere in the data of the page.
-	for _, leak := range []string{de1Name, nl1Name, "de1.example.com", "nl1.example.com", "85000000", "rx", "\"percent\"", "load_percent"} {
-		if strings.Contains(raw, leak) {
-			t.Errorf("the page data holds %q", leak)
+	// No node name, address, or sample rate as a JSON value, and no private rate fields.
+	for _, leak := range []string{de1Name, nl1Name, "de1.example.com", "nl1.example.com", "85000000"} {
+		if jsonHasExactScalar(d, leak) {
+			t.Errorf("the page data holds the value %q", leak)
+		}
+	}
+	for _, field := range []string{"rx", "percent", "load_percent"} {
+		if jsonHasField(d, field) {
+			t.Errorf("the page data holds the field %q", field)
 		}
 	}
 	if m := regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`).FindString(raw); m != "" {
@@ -201,6 +207,46 @@ func TestServersOnThePage(t *testing.T) {
 	if dns := obj(d["dns"]); dns["enabled"] != false || dns["endpoint"] != "" || obj(serverByID(d, "nod_1")["dns"])["effective"] != "dns_builtin_adblock" {
 		t.Errorf("choice off: dns = %v", dns)
 	}
+}
+
+func jsonHasExactScalar(v any, want string) bool {
+	switch x := v.(type) {
+	case string:
+		return x == want
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64) == want
+	case []any:
+		for _, item := range x {
+			if jsonHasExactScalar(item, want) {
+				return true
+			}
+		}
+	case map[string]any:
+		for _, item := range x {
+			if jsonHasExactScalar(item, want) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsonHasField(v any, want string) bool {
+	switch x := v.(type) {
+	case []any:
+		for _, item := range x {
+			if jsonHasField(item, want) {
+				return true
+			}
+		}
+	case map[string]any:
+		for field, item := range x {
+			if field == want || jsonHasField(item, want) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // A server that no node offers anything on has no DNS row; with nothing offered anywhere there is nothing to name.

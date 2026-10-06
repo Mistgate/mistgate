@@ -155,6 +155,18 @@ func (s *Service) Subscription(ctx context.Context, token string) (SubView, erro
 	return s.SubscriptionWith(ctx, token, SubOptions{})
 }
 
+// CheckSubscriptionToken checks whether a cached subscription token still exists, without building its view.
+func (s *Service) CheckSubscriptionToken(ctx context.Context, token string) error {
+	found, err := s.st.Access().HasUserWithTokenHash(ctx, hashToken(token))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrUnknownToken
+	}
+	return nil
+}
+
 // SubscriptionWith is Subscription with a client format (see SubOptions).
 func (s *Service) SubscriptionWith(ctx context.Context, token string, opt SubOptions) (SubView, error) {
 	u, err := s.st.Access().UserByTokenHash(ctx, hashToken(token))
@@ -256,7 +268,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return v, nil
 	}
 
-	created, err := s.ensureCreds(ctx, u)
+	created, err := s.ensureCreds(ctx, u, !touch)
 	if err != nil {
 		return SubView{}, err
 	}
@@ -517,8 +529,17 @@ func (s *Service) touchDevice(id string, now time.Time) {
 	if _, busy := s.touching.LoadOrStore(id, struct{}{}); busy {
 		return
 	}
+	hook := s.touchHookForTest
+	if hook != nil {
+		hook(true)
+	}
 	go func() {
-		defer s.touching.Delete(id)
+		defer func() {
+			s.touching.Delete(id)
+			if hook != nil {
+				hook(false)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := s.st.Access().TouchDevice(ctx, id, now, now.Add(-deviceTouchEvery)); err != nil {
@@ -526,6 +547,9 @@ func (s *Service) touchDevice(id string, now time.Time) {
 		}
 	}()
 }
+
+// SetTouchHookForTest observes when an asynchronous subscription touch starts and finishes.
+func (s *Service) SetTouchHookForTest(hook func(started bool)) { s.touchHookForTest = hook }
 
 // usable is the subscription half of the effective-access rule: the user's group holds the profile, the
 // node is selected and live, the inbound is on and not failed, and an enabled app consumes the protocol.

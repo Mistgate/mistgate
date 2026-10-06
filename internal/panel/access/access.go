@@ -86,7 +86,8 @@ type Service struct {
 	log    *slog.Logger
 	now    func() time.Time
 
-	touching sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
+	touching         sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
+	touchHookForTest func(started bool)
 
 	// awgNets serialises "check the client networks of an AWG profile against the others" with the write that stores
 	// them (CreateProfile, UpdateProfile), so two requests cannot both pick or accept the same network.

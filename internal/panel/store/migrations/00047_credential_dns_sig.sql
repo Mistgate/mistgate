@@ -9,7 +9,7 @@
 -- removed, or a change on the owner's side, left nothing to compare.
 
 -- +goose Up
-ALTER TABLE device_credential ADD COLUMN dns_sig TEXT NOT NULL DEFAULT '';
+ALTER TABLE device_credential ADD COLUMN dns_sig TEXT NOT NULL DEFAULT '' CHECK (dns_sig = '' OR json_valid(dns_sig));
 ALTER TABLE device_credential DROP COLUMN configs_at;
 
 -- +goose Down

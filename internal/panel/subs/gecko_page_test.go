@@ -72,3 +72,13 @@ func TestListOfGeckoOnlyUserSaysWhy(t *testing.T) {
 		t.Errorf("servers = %v, server_count = %v", d["servers"], d["server_count"])
 	}
 }
+
+func TestListOmitsGeckoPlaceholderWhenOrdinaryURIExists(t *testing.T) {
+	r, both, _ := geckoRig(t)
+	h, _ := r.handler(nil)
+	_, tok := r.user("alice", func(c *adminv1.CreateUserRequest) { c.GroupId = both })
+	lines := strings.Split(decode(t, fetch(h, "/"+tok, happUA).Body.String()), "\n")
+	if len(lines) != 1 || !strings.Contains(lines[0], "de1.example.com") || strings.Contains(lines[0], "0.0.0.0") {
+		t.Fatalf("list = %q, want the ordinary server and no Gecko placeholder", lines)
+	}
+}

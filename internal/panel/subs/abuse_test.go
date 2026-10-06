@@ -45,6 +45,15 @@ func (f *fakeSrc) Subscription(_ context.Context, token string) (access.SubView,
 	return v, nil
 }
 
+func (f *fakeSrc) CheckSubscriptionToken(_ context.Context, token string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.valid[token]; !ok {
+		return access.ErrUnknownToken
+	}
+	return nil
+}
+
 func (f *fakeSrc) lookups() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()

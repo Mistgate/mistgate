@@ -45,6 +45,13 @@ type Source interface {
 	Subscription(ctx context.Context, token string) (access.SubView, error)
 }
 
+// TokenChecker lets a Source confirm a cached link without building the subscription view.
+type TokenChecker interface {
+	CheckSubscriptionToken(ctx context.Context, token string) error
+}
+
+var _ TokenChecker = (*access.Service)(nil)
+
 // FormatSource is a Source that can also render a client format (the Mihomo profile needs the proxies of the Mihomo
 // format); *access.Service implements it. A Source without it serves the Mihomo rule the base64 list.
 type FormatSource interface {

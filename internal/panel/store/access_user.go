@@ -65,6 +65,7 @@ type AccessDevice struct {
 	// AWG marks a device created by AddAWGDevice: a synthetic hwid_hash (AWGHwidHash) and first/last seen 0 =
 	// "never connected" until the fleet records a handshake.
 	AWG                                bool
+	NoInitialSeen                      bool // credentials were created by a no-touch subscription view
 	FirstSeenAt, LastSeenAt, CreatedAt time.Time
 	Protocols                          []string // protocols with a live credential
 }
@@ -109,6 +110,9 @@ func accSetUserNodes(ctx context.Context, tx *sql.Tx, userID string, nodeIDs []s
 func accInsertDevice(ctx context.Context, tx *sql.Tx, d AccessDevice, creds []AccessCred) error {
 	var hwid any // NULL: the implicit device
 	seen := unix(d.CreatedAt)
+	if d.NoInitialSeen {
+		seen = 0
+	}
 	switch {
 	case d.AWG:
 		hwid, seen = AWGHwidHash(d.ID), 0
@@ -195,6 +199,16 @@ func (a Access) UserByTokenHash(ctx context.Context, hash []byte) (AccessUser, e
 		return AccessUser{}, ErrNotFound
 	}
 	return us[0], nil
+}
+
+// HasUserWithTokenHash checks a subscription token without loading the user's view.
+func (a Access) HasUserWithTokenHash(ctx context.Context, hash []byte) (bool, error) {
+	var found int
+	err := a.s.R.QueryRowContext(ctx, `SELECT 1 FROM user WHERE sub_token_hash = ?`, hash).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // collectUsers drains rows and attaches the explicit node lists.

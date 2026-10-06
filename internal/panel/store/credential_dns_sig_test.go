@@ -34,6 +34,9 @@ func TestCredentialDNSSigMigrationUpgradesAndRollsBack(t *testing.T) {
 	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_hy' AND dns_sig = '{"nod_a":"1.1.1.1,8.8.8.8"}'`); n != 1 {
 		t.Errorf("the recorded signature: %d rows", n)
 	}
+	if _, err := s.W.ExecContext(ctx, `UPDATE device_credential SET dns_sig = '{' WHERE id = 'crd_hy'`); err == nil {
+		t.Fatal("invalid dns_sig JSON was accepted")
+	}
 
 	if _, err := p.DownTo(ctx, 46); err != nil {
 		t.Fatalf("down to 46: %v", err)

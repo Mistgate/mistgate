@@ -325,13 +325,22 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	if known, ok := h.tokens.Get(token); ok && exists {
 		switch {
 		case h.cop.Check(r) != nil:
+			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+				return access.SubView{}, nil, false
+			}
 			jsonError(w, http.StatusForbidden, "cross_origin", "")
 			return access.SubView{}, nil, false
 		case !on(set):
+			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+				return access.SubView{}, nil, false
+			}
 			jsonError(w, http.StatusForbidden, off, "")
 			return access.SubView{}, nil, false
 		}
 		if retry := known.writeWait(h.cfg.MaxWritesPerHour, now); retry > 0 {
+			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+				return access.SubView{}, nil, false
+			}
 			tooManyWrites(w, retry)
 			return access.SubView{}, nil, false
 		}
@@ -360,6 +369,27 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 		return access.SubView{}, nil, false
 	}
 	return v, st, true
+}
+
+// confirmCachedToken prevents a refused response from revealing a token that has since been rotated or deleted.
+func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token, client string, now time.Time) bool {
+	var err error
+	if checker, ok := h.src.(TokenChecker); ok {
+		err = checker.CheckSubscriptionToken(ctx, token)
+	} else {
+		_, err = h.fetch(ctx, token, plugin.FormatURIList, false, false)
+	}
+	if errors.Is(err, access.ErrUnknownToken) {
+		h.tokens.Delete(token)
+		h.miss(client, now)
+		h.decoy.ServeHTTP(w, r)
+		return false
+	}
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "internal", "")
+		return false
+	}
+	return true
 }
 
 // admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the

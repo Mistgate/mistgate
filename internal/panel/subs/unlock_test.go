@@ -446,8 +446,12 @@ func TestSelfServiceRefusesADisabledUserEvenWithAFreshPageCache(t *testing.T) {
 
 func TestSelfServiceRejectsARotatedLinkEvenWithAFreshPageCache(t *testing.T) {
 	m := newM3Rig(t)
-	h, _ := m.handler(nil)
+	h, _ := m.handler(func(c *subs.Config) {
+		c.MissLimit, c.BlockFor = 2, time.Hour
+		c.ClientIP = func(*http.Request) netip.Addr { return netip.MustParseAddr("198.51.100.17") }
+	})
 	userID, token := m.newUser("alice", nil)
+	_, otherToken := m.newUser("bob", nil)
 	c := call{h: h, t: t, token: token}
 	created := decodeAnswer(t, c.post("/devices", m.addBody("phone")))
 	deviceID, _ := created.Device["id"].(string)
@@ -458,9 +462,13 @@ func TestSelfServiceRejectsARotatedLinkEvenWithAFreshPageCache(t *testing.T) {
 		t.Fatalf("subscription fetch: %d", rec.Code)
 	}
 	must(m.svc.GetSubscriptionLink(m.ctx, connect.NewRequest(&adminv1.GetSubscriptionLinkRequest{UserId: userID, Rotate: true})))
-	rec := c.post("/devices/"+deviceID+"/configs", "")
-	if rec.Code != 404 {
-		got := decodeAnswer(t, rec)
-		t.Fatalf("the old link must stop at once, got HTTP %d with %d config(s), error %q", rec.Code, len(got.Configs), got.Error)
+	cross := []string{"Sec-Fetch-Site", "cross-site"}
+	rec := c.post("/devices/"+deviceID+"/configs", "", cross...)
+	unknown := (call{h: h, t: t, token: strings.Repeat("z", 43)}).post("/devices/"+deviceID+"/configs", "", cross...)
+	if rec.Code != http.StatusNotFound || rec.Code != unknown.Code || rec.Body.String() != unknown.Body.String() {
+		t.Fatalf("rotated link: %d %q; unknown token: %d %q", rec.Code, rec.Body.String(), unknown.Code, unknown.Body.String())
+	}
+	if rec := (call{h: h, t: t, token: otherToken}).post("/devices", m.addBody("phone")); rec.Code != unknown.Code || rec.Body.String() != unknown.Body.String() {
+		t.Errorf("rotated link did not count as a miss: %d %q", rec.Code, rec.Body.String())
 	}
 }
