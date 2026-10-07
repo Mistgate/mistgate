@@ -233,3 +233,11 @@ describe("muting and accepting", () => {
     expect(link("de1")?.getAttribute("href")).toBe("/nodes/nod_1");
   });
 });
+
+describe("a reopened alert", () => {
+  it("is «for» since it opened again, not since its first episode an hour ago", async () => {
+    await mount(alert({ firstSeenUnix: NOW - 3600, openedUnix: NOW - 120 }));
+    expect(text()).toContain("for 2 min");
+    expect(text()).not.toContain("for 1 h");
+  });
+});

@@ -66,7 +66,7 @@ export function NodeAlerts({ nodeId, nodeName }: { nodeId: string; nodeName: str
                 {alertTitle(t, h)}
                 <span className="text-xs text-muted">
                   {" · "}
-                  {t("hl.alerts.lasted", { duration: fmt.duration(Math.max(0, h.resolvedAtUnix - h.firstSeenUnix)) })} · {t(resolutionWord(h.resolution))}
+                  {t("hl.alerts.lasted", { duration: fmt.duration(Math.max(0, h.resolvedAtUnix - (h.openedUnix || h.firstSeenUnix))) })} · {t(resolutionWord(h.resolution))}
                 </span>
               </span>
               <span className="font-mono text-[11px] whitespace-nowrap text-muted">{fmt.stamp(h.resolvedAtUnix)}</span>

@@ -62,12 +62,12 @@ function Tab({ history }: { history: Alert[] }) {
 async function settle() {
   for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
-async function mount(count: number, url = "/") {
+async function mount(count: number, url = "/", rows: Alert[] = Array.from({ length: count }, (_, i) => closed(i + 1))) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const { router, element } = memoryRouter(<Tab history={Array.from({ length: count }, (_, i) => closed(i + 1))} />, url);
+  const { router, element } = memoryRouter(<Tab history={rows} />, url);
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -125,5 +125,12 @@ describe("Health → Alerts → History, paged on the screen", () => {
     expect(text()).toContain("Showing 1–50 of 137");
     expect(text()).toContain("node50");
     expect(text()).not.toContain("node51");
+  });
+
+  it("a reopened alert lasted since it opened again: the pause before it is not counted", async () => {
+    const reopened: Alert = { ...closed(1), firstSeenUnix: NOW - 3600, openedUnix: NOW - 600, resolvedAtUnix: NOW - 480 };
+    await mount(0, "/", [reopened]);
+    expect(text()).toContain("lasted 2 min");
+    expect(text()).not.toContain("lasted 52 min");
   });
 });

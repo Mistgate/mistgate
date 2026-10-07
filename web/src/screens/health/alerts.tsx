@@ -121,7 +121,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
           <Chip>{t("hl.alerts.fleetWide")}</Chip>
         )}
         <h3 className="min-w-40 flex-1 text-sm font-bold">{alertTitle(t, a)}</h3>
-        <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - a.firstSeenUnix)) })}</span>
+        <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
       </div>
       {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
       {muted && <p className="font-mono text-[11px] text-faint">{t("hl.alerts.muted", { time: fmt.stamp(a.mutedUntilUnix) })}</p>}
@@ -274,7 +274,7 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
       {rows.length === 0 && <p className="border-t border-line py-3 text-[13px] text-muted">{t("hl.alerts.historyNone")}</p>}
       {shown.map((h) => {
         const kind = severityKind(h.severity);
-        const lasted = Math.max(0, h.resolvedAtUnix - h.firstSeenUnix);
+        const lasted = Math.max(0, h.resolvedAtUnix - (h.openedUnix || h.firstSeenUnix));
         const sev = (
           <span className="flex items-center gap-[7px] text-xs text-muted">
             <StatusDot kind={kind} />
