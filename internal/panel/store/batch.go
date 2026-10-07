@@ -37,10 +37,59 @@ func (r *reads) add(scan func(rows [][]any) error, query string, args ...any) {
 	r.scans = append(r.scans, scan)
 }
 
-func (r *reads) run(ctx context.Context, s *Store) error {
-	if len(r.stmts) != len(r.scans) {
-		return errors.New("store: read batch statement and scanner counts differ")
+func appendRows[T any](dst *[]T, scan func(rowScanner) (T, error)) func([][]any) error {
+	return func(rows [][]any) error {
+		for _, row := range rows {
+			value, err := scan(batchRow(row))
+			if err != nil {
+				return err
+			}
+			*dst = append(*dst, value)
+		}
+		return nil
 	}
+}
+
+func oneRow[T any](dst *T, scan func(rowScanner) (T, error)) func([][]any) error {
+	return func(rows [][]any) error {
+		if len(rows) != 1 {
+			return ErrNotFound
+		}
+		value, err := scan(batchRow(rows[0]))
+		if err != nil {
+			return err
+		}
+		*dst = value
+		return nil
+	}
+}
+
+func maybeOneRow[T any](dst *T, scan func(rowScanner) (T, error)) func([][]any) error {
+	return func(rows [][]any) error {
+		if len(rows) == 0 {
+			return nil
+		}
+		if len(rows) != 1 {
+			return errors.New("store: read batch returned multiple rows")
+		}
+		value, err := scan(batchRow(rows[0]))
+		if err != nil {
+			return err
+		}
+		*dst = value
+		return nil
+	}
+}
+
+func scanString(r rowScanner) (string, error) {
+	var value sql.NullString
+	if err := r.Scan(&value); err != nil {
+		return "", err
+	}
+	return value.String, nil
+}
+
+func (r *reads) run(ctx context.Context, s *Store) error {
 	if len(r.stmts) == 0 {
 		return nil
 	}
@@ -57,6 +106,24 @@ func (r *reads) run(ctx context.Context, s *Store) error {
 		}
 	}
 	return nil
+}
+
+func scanRowValues(r rowScanner, n int) ([]any, error) {
+	if row, ok := r.(batchRow); ok {
+		if len(row) != n {
+			return nil, fmt.Errorf("store: batch row has %d values, want %d", len(row), n)
+		}
+		return []any(row), nil
+	}
+	values := make([]any, n)
+	dest := make([]any, n)
+	for i := range values {
+		dest[i] = &values[i]
+	}
+	if err := r.Scan(dest...); err != nil {
+		return nil, err
+	}
+	return values, nil
 }
 
 type batchRow []any

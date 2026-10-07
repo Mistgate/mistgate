@@ -425,10 +425,11 @@ func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.
 		t.Fatalf("outer call returned %+v after the concurrent call committed both profiles", result)
 	}
 
-	actual, live, err := s.Access().ImplicitDeviceCreds(ctx, userID)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+	actual, live := data.ImplicitDevice, data.ImplicitCreds
 	if actual.ID != dev.ID || len(live) != 2 {
 		t.Fatalf("implicit device = %q with %d live credentials, want %q with two", actual.ID, len(live), dev.ID)
 	}
@@ -481,10 +482,11 @@ func TestEnsureImplicitAWGCredsReturnsFullLiveSetAfterWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, live, err := s.Access().ImplicitDeviceCreds(ctx, userID)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+	actual, live := data.ImplicitDevice, data.ImplicitCreds
 	if result.Device.ID != actual.ID || !reflect.DeepEqual(result.Creds, live) {
 		t.Fatalf("returned device/credentials = %+v/%+v, database = %+v/%+v", result.Device, result.Creds, actual, live)
 	}

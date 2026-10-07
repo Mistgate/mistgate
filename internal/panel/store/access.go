@@ -50,6 +50,13 @@ func accTime(v sql.NullInt64) time.Time {
 	return fromUnix(v.Int64)
 }
 
+func accReadTime(v sql.NullInt64) time.Time {
+	if !v.Valid {
+		return time.Time{}
+	}
+	return fromUnix(v.Int64)
+}
+
 // accNullStr stores "" as NULL.
 func accNullStr(s string) any {
 	if s == "" {
@@ -75,9 +82,13 @@ type AccessNode struct {
 const accNodeCols = `n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code AS node_country_code,
 	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state`
 
-func scanAccessNode(r interface{ Scan(...any) error }) (AccessNode, error) {
+func scanAccessNode(r rowScanner) (AccessNode, error) {
 	var n AccessNode
-	err := r.Scan(&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.BandwidthMbps, &n.State)
+	var id, name, address, country, location, provider, state sql.NullString
+	var bandwidth sql.NullInt64
+	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state)
+	n.ID, n.Name, n.Address, n.CountryCode = id.String, name.String, address.String, country.String
+	n.Location, n.Provider, n.BandwidthMbps, n.State = location.String, provider.String, int(bandwidth.Int64), state.String
 	return n, err
 }
 

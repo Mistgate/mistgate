@@ -237,10 +237,43 @@ type AWGImplicitWant struct {
 	Issue     AWGIssue
 }
 
+type accessProfileEpoch struct {
+	ID    string
+	Epoch int64
+}
+
+func scanAccessProfileEpoch(r rowScanner) (accessProfileEpoch, error) {
+	var value accessProfileEpoch
+	err := r.Scan(&value.ID, &value.Epoch)
+	return value, err
+}
+
+type awgTakenIndex struct {
+	ProfileID string
+	Index     int
+}
+
+func scanAWGTakenIndex(r rowScanner) (awgTakenIndex, error) {
+	var value awgTakenIndex
+	err := r.Scan(&value.ProfileID, &value.Index)
+	return value, err
+}
+
+type awgDeviceProfile struct {
+	Device  AccessAWGDevice
+	Profile AccessProfile
+}
+
+func scanAWGDeviceProfile(r rowScanner) (awgDeviceProfile, error) {
+	device, profile, err := scanAWGDeviceWithProfile(r)
+	return awgDeviceProfile{Device: device, Profile: profile}, err
+}
+
 // ImplicitAWGResult is the implicit device and its full live credential set from the read or write batch, plus the
 // credentials this call added.
 type ImplicitAWGResult struct {
-	implicitDeviceCredsSnapshot
+	Device       AccessDevice
+	Creds        []AccessCred
 	Added        []AccessCred
 	FullProfiles []string
 }
@@ -270,55 +303,36 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 	var result ImplicitAWGResult
 	results, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
 		result = ImplicitAWGResult{}
-		var snapshot implicitDeviceCredsSnapshot
-		var userFound bool
-		epochs := map[string]int64{}
-		occupied := map[string]map[int]bool{}
+		var implicitRows []implicitDeviceCredRow
+		var profileEpochs []accessProfileEpoch
+		var userIDs []string
+		var taken []awgTakenIndex
 		r := reads{}
-		r.add(func(rows [][]any) error {
-			for _, row := range rows {
-				if err := snapshot.scan(batchRow(row)); err != nil {
-					return err
-				}
-			}
-			result.implicitDeviceCredsSnapshot = snapshot
-			return nil
-		}, implicitDeviceCredsSQL, userID)
-		r.add(func(rows [][]any) error {
-			for _, row := range rows {
-				var profileID string
-				var epoch int64
-				if err := batchRow(row).Scan(&profileID, &epoch); err != nil {
-					return err
-				}
-				epochs[profileID] = epoch
-			}
-			return nil
-		}, `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
-		r.add(func(rows [][]any) error {
-			userFound = len(rows) > 0
-			return nil
-		}, `SELECT id FROM user WHERE id = ?`, userID)
+		r.add(appendRows(&implicitRows, scanImplicitDeviceCredRow), implicitDeviceCredsSQL, userID)
+		r.add(appendRows(&profileEpochs, scanAccessProfileEpoch), `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
+		r.add(appendRows(&userIDs, scanString), `SELECT id FROM user WHERE id = ?`, userID)
 		for _, profileID := range profileIDs {
-			occupied[profileID] = map[int]bool{}
-			r.add(func(rows [][]any) error {
-				for _, row := range rows {
-					var resultProfileID string
-					var idx int
-					if err := batchRow(row).Scan(&resultProfileID, &idx); err != nil {
-						return err
-					}
-					occupied[resultProfileID][idx] = true
-				}
-				return nil
-			}, `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
+			r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
 		}
 		if err := r.run(ctx, a.s); err != nil {
 			return nil, accMapErr(err)
 		}
-		if !userFound {
+		if len(userIDs) == 0 {
 			return nil, ErrNotFound
 		}
+		snapshot := implicitDeviceSnapshot(implicitRows)
+		epochs := make(map[string]int64, len(profileEpochs))
+		for _, profile := range profileEpochs {
+			epochs[profile.ID] = profile.Epoch
+		}
+		occupied := make(map[string]map[int]bool, len(profileIDs))
+		for _, profileID := range profileIDs {
+			occupied[profileID] = map[int]bool{}
+		}
+		for _, row := range taken {
+			occupied[row.ProfileID][row.Index] = true
+		}
+		result.Device, result.Creds = snapshot.Device, snapshot.Creds
 		deviceID := snapshot.Device.ID
 		have := map[string]bool{}
 		for _, cred := range snapshot.Creds {
@@ -394,7 +408,7 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 				return ImplicitAWGResult{}, err
 			}
 		}
-		result.implicitDeviceCredsSnapshot = snapshot
+		result.Device, result.Creds = snapshot.Device, snapshot.Creds
 	}
 	return result, nil
 }
@@ -424,7 +438,7 @@ type AccessAWGDevice struct {
 	SecretEnc                                   []byte // vault, AAD = CredID
 	Idx                                         int
 	ConfigEpoch, CriticalEpoch                  int64
-	// DNSSig is the DNS the key was issued with, per node id (the pair its config holds); empty when nothing was recorded.
+	// DNSSig is written by RecordDeviceConfig for each node config the device receives; anything else reads as nothing recorded.
 	DNSSig map[string]string
 	// DNSStale lists the nodes where the DNS that applies to the person is not the one the key holds. The store leaves it
 	// empty: only the access module knows what applies.
@@ -443,7 +457,7 @@ type AccessAWGDeviceScope struct {
 // Stale reports whether the profile changed in a way that breaks the config the device last received.
 func (d AccessAWGDevice) Stale() bool { return d.ConfigEpoch < d.CriticalEpoch }
 
-func scanAWGDevice(r rowScanner, profile ...*AccessProfile) (AccessAWGDevice, error) {
+func scanAWGDevice(r rowScanner) (AccessAWGDevice, error) {
 	var d AccessAWGDevice
 	var id, userID, platform, model, osVersion sql.NullString
 	var first, last, created sql.NullInt64
@@ -451,17 +465,8 @@ func scanAWGDevice(r rowScanner, profile ...*AccessProfile) (AccessAWGDevice, er
 	var credID, dataJSON, publicKey, dnsSig sql.NullString
 	var secretEnc []byte
 	var idx, configEpoch, criticalEpoch sql.NullInt64
-	var profileRowID, protocol, profileName2, settings sql.NullString
-	var profileSecrets []byte
-	var version, profileCreated, profileUpdated sql.NullInt64
-	dest := []any{&id, &userID, &platform, &model, &osVersion, &first, &last, &created,
-		&profileID, &profileName, &profileSettings, &credID, &dataJSON, &secretEnc, &publicKey, &idx, &configEpoch, &criticalEpoch, &dnsSig}
-	var p *AccessProfile
-	if len(profile) > 0 {
-		p = profile[0]
-		dest = append(dest, &profileRowID, &protocol, &profileName2, &settings, &profileSecrets, &version, &profileCreated, &profileUpdated)
-	}
-	if err := r.Scan(dest...); err != nil {
+	if err := r.Scan(&id, &userID, &platform, &model, &osVersion, &first, &last, &created,
+		&profileID, &profileName, &profileSettings, &credID, &dataJSON, &secretEnc, &publicKey, &idx, &configEpoch, &criticalEpoch, &dnsSig); err != nil {
 		return AccessAWGDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
@@ -481,17 +486,23 @@ func scanAWGDevice(r rowScanner, profile ...*AccessProfile) (AccessAWGDevice, er
 	if dnsSig.String != "" {
 		_ = json.Unmarshal([]byte(dnsSig.String), &d.DNSSig)
 	}
-	if p != nil {
-		p.ID, p.Protocol, p.Name, p.SettingsJSON, p.SecretsEnc = profileRowID.String, protocol.String, profileName2.String, settings.String, profileSecrets
-		p.Version = uint32(version.Int64)
-		if profileCreated.Valid {
-			p.CreatedAt = fromUnix(profileCreated.Int64)
-		}
-		if profileUpdated.Valid {
-			p.UpdatedAt = fromUnix(profileUpdated.Int64)
-		}
-	}
 	return d, nil
+}
+
+func scanAWGDeviceWithProfile(r rowScanner) (AccessAWGDevice, AccessProfile, error) {
+	values, err := scanRowValues(r, 27)
+	if err != nil {
+		return AccessAWGDevice{}, AccessProfile{}, err
+	}
+	device, err := scanAWGDevice(batchRow(values[:19]))
+	if err != nil {
+		return AccessAWGDevice{}, AccessProfile{}, err
+	}
+	profile, err := scanAccessProfile(batchRow(values[19:]))
+	if err != nil {
+		return AccessAWGDevice{}, AccessProfile{}, err
+	}
+	return device, profile, nil
 }
 
 func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]AccessAWGDevice, error) {
@@ -538,19 +549,14 @@ func (a Access) AWGDevice(ctx context.Context, deviceID string) (AccessAWGDevice
 
 // AWGDeviceScope reads the device and the related user, group, profile and live inbounds in one fixed batch.
 func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGDeviceScope, error) {
-	var out AccessAWGDeviceScope
+	var device awgDeviceProfile
+	var user AccessUser
+	var userNodeIDs []string
+	var group AccessGroup
+	groupProfileIDs := []string{}
+	var inbounds []AccessInboundFull
 	r := reads{}
-	r.add(func(rows [][]any) error {
-		if len(rows) == 0 {
-			return ErrNotFound
-		}
-		device, err := scanAWGDevice(batchRow(rows[0]), &out.Profile)
-		if err != nil {
-			return err
-		}
-		out.Device = device
-		return nil
-	}, `SELECT d.id AS device_id, d.user_id AS device_user_id, d.platform, d.model, d.os_version,
+	r.add(oneRow(&device, scanAWGDeviceProfile), `SELECT d.id AS device_id, d.user_id AS device_user_id, d.platform, d.model, d.os_version,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at AS device_created_at,
 			p.id AS device_profile_id, p.name AS device_profile_name, p.settings_json AS device_profile_settings,
 			c.id AS credential_id, c.data_json AS credential_data, c.secret_enc AS credential_secret, ap.public_key, ap.idx,
@@ -562,59 +568,13 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND d.id = ?`, deviceID)
-	r.add(func(rows [][]any) error {
-		if len(rows) != 1 {
-			return ErrNotFound
-		}
-		user, err := scanAccessUser(batchRow(rows[0]))
-		if err == nil {
-			out.User = user
-		}
-		return err
-	}, `SELECT `+accUserCols+accUserFrom+`WHERE u.id = (SELECT user_id FROM device WHERE id = ?)`, deviceID)
-	r.add(func(rows [][]any) error {
-		for _, row := range rows {
-			var nodeID string
-			if err := batchRow(row).Scan(&nodeID); err != nil {
-				return err
-			}
-			out.User.NodeIDs = append(out.User.NodeIDs, nodeID)
-		}
-		return nil
-	}, `SELECT node_id FROM user_node WHERE user_id = (SELECT user_id FROM device WHERE id = ?) ORDER BY node_id`, deviceID)
-	r.add(func(rows [][]any) error {
-		if len(rows) != 1 {
-			return ErrNotFound
-		}
-		group, err := scanAccessGroup(batchRow(rows[0]))
-		if err == nil {
-			group.ProfileIDs = []string{}
-			out.Group = group
-		}
-		return err
-	}, `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
+	r.add(oneRow(&user, scanAccessUser), `SELECT `+accUserCols+accUserFrom+`WHERE u.id = (SELECT user_id FROM device WHERE id = ?)`, deviceID)
+	r.add(appendRows(&userNodeIDs, scanString), `SELECT node_id FROM user_node WHERE user_id = (SELECT user_id FROM device WHERE id = ?) ORDER BY node_id`, deviceID)
+	r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color
 			FROM user_group g WHERE g.id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?))`, deviceID)
-	r.add(func(rows [][]any) error {
-		for _, row := range rows {
-			var profileID string
-			if err := batchRow(row).Scan(&profileID); err != nil {
-				return err
-			}
-			out.Group.ProfileIDs = append(out.Group.ProfileIDs, profileID)
-		}
-		return nil
-	}, `SELECT profile_id FROM user_group_profile WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY profile_id`, deviceID)
-	r.add(func(rows [][]any) error {
-		for _, row := range rows {
-			full, err := scanAccessInboundFull(batchRow(row))
-			if err != nil {
-				return err
-			}
-			out.Inbounds = append(out.Inbounds, full)
-		}
-		return nil
-	}, `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
+	r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY profile_id`, deviceID)
+	r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' AND i.profile_id = (
 				SELECT c.profile_id FROM device_credential c WHERE c.device_id = ? AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
@@ -623,7 +583,9 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	if err := r.run(ctx, a.s); err != nil {
 		return AccessAWGDeviceScope{}, err
 	}
-	return out, nil
+	user.NodeIDs = userNodeIDs
+	group.ProfileIDs = groupProfileIDs
+	return AccessAWGDeviceScope{Device: device.Device, User: user, Group: group, Profile: device.Profile, Inbounds: inbounds}, nil
 }
 
 // RecordDeviceConfig records what the credential's device received: the profile epoch of the config (never lowered; nil

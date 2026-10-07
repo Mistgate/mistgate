@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -69,9 +70,10 @@ var ErrUnknownPreset = errors.New("dns: unknown preset")
 
 // Service implements DnsService and answers "which preset applies to this user".
 type Service struct {
-	st  *store.Store
-	log *slog.Logger
-	now func() time.Time
+	st           *store.Store
+	log          *slog.Logger
+	now          func() time.Time
+	warnedBroken sync.Map
 }
 
 // New builds the service.
@@ -157,6 +159,9 @@ func (s *Service) resolve(data store.DNSEffectiveData) (map[string]Preset, Prese
 	for _, row := range data.Presets {
 		preset, err := fromRow(row)
 		if err != nil {
+			if _, loaded := s.warnedBroken.LoadOrStore(row.ID, struct{}{}); !loaded {
+				s.log.Warn("dns: cannot parse preset", "preset", row.ID, "err", err)
+			}
 			continue
 		}
 		presets[row.ID] = preset

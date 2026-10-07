@@ -471,9 +471,9 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if got, err := st.Access().User(ctx, "usr_user"); err != nil || got.Name != "User" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_user" {
 			t.Fatalf("user = %+v, %v", got, err)
 		}
-		got, creds, err := st.Access().ImplicitDeviceCreds(ctx, u.ID)
-		if err != nil || got.ID != dev.ID || len(creds) != 1 || creds[0].ID != cred.ID {
-			t.Fatalf("user implicit credentials = %+v, %+v, %v", got, creds, err)
+		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true)
+		if err != nil || data.ImplicitDevice.ID != dev.ID || len(data.ImplicitCreds) != 1 || data.ImplicitCreds[0].ID != cred.ID {
+			t.Fatalf("user implicit credentials = %+v, %+v", data, err)
 		}
 	})
 	t.Run("UpdateUser", func(t *testing.T) {
@@ -505,17 +505,15 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("implicit device = %+v, %v", got, err)
 		}
 	})
-	t.Run("AddCreds", func(t *testing.T) {
+	t.Run("EnsureImplicitDeviceAddsCredentials", func(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_add_creds", nil)
 		createUser(t, st, "usr_add_creds", "Credential user", "grp_add_creds")
-		dev := AccessDevice{ID: "dev_add_creds", UserID: "usr_add_creds", CreatedAt: now}
-		if err := st.Access().AddDevice(ctx, dev, nil); err != nil {
-			t.Fatal(err)
-		}
-		cred := AccessCred{ID: "crd_add_creds", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
-		if err := st.Access().AddCreds(ctx, []AccessCred{cred}); err != nil {
-			t.Fatal(err)
+		dev := AccessDevice{ID: "dev_add_creds", UserID: "usr_add_creds", Implicit: true, CreatedAt: now}
+		cred := AccessCred{ID: "crd_add_creds", UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
+		got, live, created, err := st.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred})
+		if err != nil || !created || got.ID != dev.ID || len(live) != 1 || live[0].ID != cred.ID {
+			t.Fatalf("EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
 		}
 		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false)
 		if err != nil || len(data.Devices) != 1 || data.Devices[0].ID != dev.ID || len(data.Devices[0].Protocols) != 1 || data.Devices[0].Protocols[0] != cred.Protocol {

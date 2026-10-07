@@ -406,6 +406,53 @@ func TestAWGSubnetFull(t *testing.T) {
 	}
 }
 
+func TestMihomoSubscriptionKeepsProfilesWhenOneAWGNetworkIsFull(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	full := e.awgProfile("full", `{"subnet4":"10.77.0.0/24","subnet6":""}`)
+	available := e.awgProfile("available", `{"subnet4":"10.78.0.0/24","subnet6":""}`)
+	e.inbound(full.Id, "nod_de1")
+	e.inbound(available.Id, "nod_de1")
+	group := e.group("both", full.Id, available.Id)
+	var fillers []string
+	for i := range 3 {
+		fillers = append(fillers, e.user(fmt.Sprintf("filler%d", i), group, amnOnly(func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 100 })).User.Id)
+	}
+	owner := e.user("owner", group, amnOnly()).User
+
+	profile, err := e.st.Access().Profile(e.ctx, full.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, err := e.s.mergedSettings(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxIdx, err := awg.MaxPeerIndex(merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for idx := 2; idx <= maxIdx; idx++ {
+		devID := fmt.Sprintf("dev_fill_full_%d", idx)
+		fillerID := fillers[(idx-2)/100]
+		if _, err := e.st.Access().AddAWGDevice(e.ctx, store.AWGDeviceAdd{
+			Device: store.AccessDevice{ID: devID, UserID: fillerID}, ProfileID: full.Id, MaxIdx: maxIdx, Limit: 100,
+		}, e.clock, func(idx int) (store.AccessCred, string, error) {
+			return store.AccessCred{ID: fmt.Sprintf("crd_fill_full_%d", idx), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, fmt.Sprintf("pub_fill_full_%d", idx), nil
+		}); err != nil {
+			t.Fatalf("fill full profile at index %d: %v", idx, err)
+		}
+	}
+
+	view, err := e.s.SubscriptionWith(e.ctx, e.tokenOf(owner.Id), SubOptions{Format: plugin.FormatMihomo})
+	if err != nil {
+		t.Fatalf("Mihomo subscription with one full AWG profile: %v", err)
+	}
+	if len(view.Lines) != 1 || len(view.Servers) != 1 || view.Servers[0].ProfileID != available.Id {
+		t.Fatalf("Mihomo proxies = %+v, want only the usable profile %q", view.Servers, available.Id)
+	}
+}
+
 func TestAWGRotate(t *testing.T) {
 	f := newAWGFixture(t)
 	e := f.e
@@ -828,10 +875,11 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	if _, _, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, seed, nil); !added {
 		t.Fatal("initial Mihomo call did not add the AWG credential")
 	}
-	wantDevice, wantCreds, err := a.ImplicitDeviceCreds(e.ctx, u.ID)
+	wantData, err := a.SubscriptionData(e.ctx, u.ID, g.ID, e.clock, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+	wantDevice, wantCreds := wantData.ImplicitDevice, wantData.ImplicitCreds
 
 	gotDevice, gotCreds, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, seed, nil)
 	if added {

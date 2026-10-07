@@ -21,11 +21,14 @@ type AccessProfile struct {
 const accProfileCols = `p.id AS profile_id, p.protocol AS profile_protocol, p.name AS profile_name, p.settings_json AS profile_settings_json,
 	p.secrets_enc AS profile_secrets_enc, p.version AS profile_version, p.created_at AS profile_created_at, p.updated_at AS profile_updated_at`
 
-func scanAccessProfile(r interface{ Scan(...any) error }) (AccessProfile, error) {
+func scanAccessProfile(r rowScanner) (AccessProfile, error) {
 	var p AccessProfile
-	var c, u int64
-	err := r.Scan(&p.ID, &p.Protocol, &p.Name, &p.SettingsJSON, &p.SecretsEnc, &p.Version, &c, &u)
-	p.CreatedAt, p.UpdatedAt = fromUnix(c), fromUnix(u)
+	var id, protocol, name, settings sql.NullString
+	var version, created, updated sql.NullInt64
+	err := r.Scan(&id, &protocol, &name, &settings, &p.SecretsEnc, &version, &created, &updated)
+	p.ID, p.Protocol, p.Name, p.SettingsJSON = id.String, protocol.String, name.String, settings.String
+	p.Version = uint32(version.Int64)
+	p.CreatedAt, p.UpdatedAt = accReadTime(created), accReadTime(updated)
 	return p, err
 }
 
@@ -184,22 +187,24 @@ const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, 
 	i.updated_at AS inbound_updated_at, i.plugin_state_enc AS inbound_plugin_state_enc, i.plugin_public_json AS inbound_plugin_public_json,
 	i.awg_health_json AS inbound_awg_health_json, i.awg_health_at AS inbound_awg_health_at`
 
-func scanAccessInbound(r interface{ Scan(...any) error }) (AccessInbound, error) {
+func scanAccessInbound(r rowScanner) (AccessInbound, error) {
 	var i AccessInbound
-	var port sql.NullInt64
-	var en int
-	var notAfter, c, u, healthAt int64
-	err := r.Scan(&i.ID, &i.ProfileID, &i.NodeID, &port, &i.TLSServerNameOverride, &en, &i.SpecVersion,
-		&i.State, &i.LastError, &i.CertPinSHA256, &notAfter, &c, &u,
-		&i.PluginStateEnc, &i.PluginPublicJSON, &i.AwgHealthJSON, &healthAt)
-	i.PortOverride = uint16(port.Int64)
-	i.Enabled = en == 1
-	if notAfter != 0 {
-		i.CertNotAfter = fromUnix(notAfter)
+	var id, profileID, nodeID, tlsName, state, lastError, certPin, pluginPublic, healthJSON sql.NullString
+	var port, enabled, specVersion, notAfter, created, updated, healthAt sql.NullInt64
+	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &enabled, &specVersion,
+		&state, &lastError, &certPin, &notAfter, &created, &updated,
+		&i.PluginStateEnc, &pluginPublic, &healthJSON, &healthAt)
+	i.ID, i.ProfileID, i.NodeID = id.String, profileID.String, nodeID.String
+	i.PortOverride, i.TLSServerNameOverride = uint16(port.Int64), tlsName.String
+	i.Enabled, i.SpecVersion = enabled.Int64 == 1, uint64(specVersion.Int64)
+	i.State, i.LastError, i.CertPinSHA256 = state.String, lastError.String, certPin.String
+	i.PluginPublicJSON, i.AwgHealthJSON = pluginPublic.String, healthJSON.String
+	i.CreatedAt, i.UpdatedAt = accReadTime(created), accReadTime(updated)
+	if notAfter.Int64 != 0 {
+		i.CertNotAfter = fromUnix(notAfter.Int64)
 	}
-	i.CreatedAt, i.UpdatedAt = fromUnix(c), fromUnix(u)
-	if healthAt != 0 {
-		i.AwgHealthAt = fromUnix(healthAt)
+	if healthAt.Int64 != 0 {
+		i.AwgHealthAt = fromUnix(healthAt.Int64)
 	}
 	return i, err
 }
@@ -401,53 +406,23 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 }
 
 func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
-	var f AccessInboundFull
-	var id, profileID, nodeID, tlsName, state, lastError, certPin sql.NullString
-	var pluginPublic, healthJSON sql.NullString
-	var port, enabled, specVersion, notAfter, created, updated, healthAt sql.NullInt64
-	var pluginState []byte
-	var profileID2, protocol, profileName, settings sql.NullString
-	var version, profileCreated, profileUpdated sql.NullInt64
-	var profileSecrets []byte
-	var nodeID2, nodeName, address, country, location, provider, nodeState sql.NullString
-	var bandwidth sql.NullInt64
-	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &enabled, &specVersion,
-		&state, &lastError, &certPin, &notAfter, &created, &updated, &pluginState, &pluginPublic, &healthJSON, &healthAt,
-		&profileID2, &protocol, &profileName, &settings, &profileSecrets, &version, &profileCreated, &profileUpdated,
-		&nodeID2, &nodeName, &address, &country, &location, &provider, &bandwidth, &nodeState)
+	values, err := scanRowValues(r, 33)
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	i, p, n := &f.Inbound, &f.Profile, &f.Node
-	i.ID, i.ProfileID, i.NodeID = id.String, profileID.String, nodeID.String
-	i.PortOverride, i.TLSServerNameOverride = uint16(port.Int64), tlsName.String
-	i.Enabled, i.SpecVersion = enabled.Int64 == 1, uint64(specVersion.Int64)
-	i.State, i.LastError, i.CertPinSHA256 = state.String, lastError.String, certPin.String
-	i.PluginStateEnc, i.PluginPublicJSON, i.AwgHealthJSON = pluginState, pluginPublic.String, healthJSON.String
-	if notAfter.Valid && notAfter.Int64 != 0 {
-		i.CertNotAfter = fromUnix(notAfter.Int64)
+	inbound, err := scanAccessInbound(batchRow(values[:17]))
+	if err != nil {
+		return AccessInboundFull{}, err
 	}
-	if created.Valid {
-		i.CreatedAt = fromUnix(created.Int64)
+	profile, err := scanAccessProfile(batchRow(values[17:25]))
+	if err != nil {
+		return AccessInboundFull{}, err
 	}
-	if updated.Valid {
-		i.UpdatedAt = fromUnix(updated.Int64)
+	node, err := scanAccessNode(batchRow(values[25:]))
+	if err != nil {
+		return AccessInboundFull{}, err
 	}
-	if healthAt.Valid && healthAt.Int64 != 0 {
-		i.AwgHealthAt = fromUnix(healthAt.Int64)
-	}
-	p.ID, p.Protocol, p.Name, p.SettingsJSON, p.SecretsEnc = profileID2.String, protocol.String, profileName.String, settings.String, profileSecrets
-	p.Version = uint32(version.Int64)
-	if profileCreated.Valid {
-		p.CreatedAt = fromUnix(profileCreated.Int64)
-	}
-	if profileUpdated.Valid {
-		p.UpdatedAt = fromUnix(profileUpdated.Int64)
-	}
-	n.ID, n.Name, n.Address = nodeID2.String, nodeName.String, address.String
-	n.CountryCode, n.Location, n.Provider, n.State = country.String, location.String, provider.String, nodeState.String
-	n.BandwidthMbps = int(bandwidth.Int64)
-	return f, nil
+	return AccessInboundFull{Inbound: inbound, Profile: profile, Node: node}, nil
 }
 
 // AccessGroup is an access group: a named set of profiles.

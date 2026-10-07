@@ -440,24 +440,22 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 
 func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool, dev store.AccessDevice, creds []store.AccessCred) (bool, store.AccessDevice, []store.AccessCred, error) {
 	newDevice := dev.ID == ""
-	if newDevice {
-		dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
-		if !noInitialSeen {
-			dev.FirstSeenAt, dev.LastSeenAt = dev.CreatedAt, dev.CreatedAt
-		}
+	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
+	if !noInitialSeen {
+		template.FirstSeenAt, template.LastSeenAt = template.CreatedAt, template.CreatedAt
 	}
 	have := make(map[string]bool, len(creds))
-	for _, cred := range creds {
-		have[cred.Protocol] = true
+	for _, protocol := range dev.Protocols {
+		have[protocol] = true
 	}
-	added, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, have)
+	added, err := s.newCreds(u.ID, template.ID, u.AppHapp, u.AppAmnezia, have)
 	if err != nil || len(added) == 0 {
 		if newDevice {
 			return false, store.AccessDevice{}, nil, err
 		}
 		return false, dev, creds, err
 	}
-	device, live, created, err := s.st.Access().EnsureImplicitDevice(ctx, dev, added)
+	device, live, created, err := s.st.Access().EnsureImplicitDevice(ctx, template, added)
 	return created, device, live, err
 }
 
@@ -487,8 +485,8 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 }
 
 // ensureMihomoAWG gives the implicit device an AWG credential for every AWG profile the user can use, for the
-// Mihomo format (see SubOptions). It reports whether any was added. A failure (an exhausted network, say) is
-// logged and leaves that user without AWG proxies: the subscription itself must not fail for it.
+// Mihomo format (see SubOptions). It reports whether any was added. A full profile network is logged and only that
+// profile's proxy is skipped; the subscription itself must not fail for it.
 func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, dev store.AccessDevice, creds []store.AccessCred) (store.AccessDevice, []store.AccessCred, bool) {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {

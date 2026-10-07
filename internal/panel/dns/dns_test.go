@@ -1,8 +1,10 @@
 package dns
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -454,6 +456,8 @@ func TestEffectiveInheritance(t *testing.T) {
 
 func TestBrokenPresetFallsBackInBothReadPaths(t *testing.T) {
 	e := newEnv(t)
+	var logs bytes.Buffer
+	e.s.log = slog.New(slog.NewTextHandler(&logs, nil))
 	e.group("g_broken_preset", "")
 	e.user("u_broken_preset", "g_broken_preset", "dns_broken_preset")
 	e.sql(`INSERT INTO dns_preset (id, name, description, builtin, servers, split, ipv4_only, split_direct,
@@ -473,6 +477,9 @@ func TestBrokenPresetFallsBackInBothReadPaths(t *testing.T) {
 	}
 	if state.Effective.ID != effective.ID {
 		t.Errorf("SubscriptionState effective = %q, want %q", state.Effective.ID, effective.ID)
+	}
+	if n := strings.Count(logs.String(), "dns: cannot parse preset"); n != 1 {
+		t.Errorf("broken preset warnings = %d, want one: %s", n, logs.String())
 	}
 	if _, ok := state.Presets["dns_broken_preset"]; ok {
 		t.Error("broken preset was included in the resolved preset map")

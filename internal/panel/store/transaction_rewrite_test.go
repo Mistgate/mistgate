@@ -355,7 +355,7 @@ func TestAddDeviceRaceKeepsOneImplicitDevice(t *testing.T) {
 	}
 }
 
-func TestAddCredsRaceKeepsOneLiveProtocol(t *testing.T) {
+func TestEnsureImplicitDeviceRaceKeepsOneLiveProtocol(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()
 	rewriteAccessGroup(t, s, "grp_creds_race", "Credential race")
@@ -365,29 +365,61 @@ func TestAddCredsRaceKeepsOneLiveProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := make(chan struct{})
-	results := make(chan error, 2)
+	type outcome struct {
+		created bool
+		err     error
+	}
+	results := make(chan outcome, 2)
 	for i := range 2 {
 		go func(i int) {
 			<-start
-			cred := AccessCred{ID: fmt.Sprintf("crd_creds_race_%d", i), DeviceID: dev.ID, UserID: dev.UserID,
+			cred := AccessCred{ID: fmt.Sprintf("crd_creds_race_%d", i), UserID: dev.UserID,
 				Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
-			results <- s.Access().AddCreds(ctx, []AccessCred{cred})
+			_, _, created, err := s.Access().EnsureImplicitDevice(ctx,
+				AccessDevice{ID: fmt.Sprintf("dev_creds_race_%d", i), UserID: dev.UserID, Implicit: true, CreatedAt: t0}, []AccessCred{cred})
+			results <- outcome{created: created, err: err}
 		}(i)
 	}
 	close(start)
-	var successes, conflicts int
+	var successes, created int
 	for range 2 {
-		switch err := <-results; {
-		case err == nil:
+		switch result := <-results; {
+		case result.err == nil:
 			successes++
-		case errors.Is(err, ErrAccessExists):
-			conflicts++
+			if result.created {
+				created++
+			}
 		default:
-			t.Fatalf("AddCreds race: %v", err)
+			t.Fatalf("EnsureImplicitDevice race: %v", result.err)
 		}
 	}
-	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_creds_race' AND revoked_at IS NULL`) != 1 {
-		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
+	if successes != 2 || created != 1 || countT(t, s, `SELECT count(*) FROM device_credential WHERE user_id = 'usr_creds_race' AND revoked_at IS NULL`) != 1 {
+		t.Fatalf("successes=%d created=%d", successes, created)
+	}
+}
+
+func TestEnsureImplicitDeviceDuplicateCredentialIDCollisionErrors(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	rewriteAccessGroup(t, s, "grp_cred_collision", "Credential collision")
+	rewriteAccessUser(t, s, "usr_cred_collision_owner", "Credential owner", "grp_cred_collision")
+	rewriteAccessUser(t, s, "usr_cred_collision_target", "Credential target", "grp_cred_collision")
+
+	ownerDevice := AccessDevice{ID: "dev_cred_collision_owner", UserID: "usr_cred_collision_owner", CreatedAt: t0}
+	ownerCred := AccessCred{ID: "crd_cred_collision", DeviceID: ownerDevice.ID, UserID: ownerDevice.UserID,
+		Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
+	if err := s.Access().AddDevice(ctx, ownerDevice, []AccessCred{ownerCred}); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDevice := AccessDevice{ID: "dev_cred_collision_target", UserID: "usr_cred_collision_target", Implicit: true, CreatedAt: t0}
+	targetCred := AccessCred{ID: ownerCred.ID, UserID: targetDevice.UserID, Protocol: ownerCred.Protocol,
+		SecretEnc: []byte("other"), DataJSON: `{}`, CreatedAt: t0}
+	if _, _, _, err := s.Access().EnsureImplicitDevice(ctx, targetDevice, []AccessCred{targetCred}); err == nil {
+		t.Fatal("duplicate credential id was ignored")
+	}
+	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = ? AND revoked_at IS NULL`, targetDevice.ID); n != 0 {
+		t.Fatalf("failed credential insert left %d target devices", n)
 	}
 }
 

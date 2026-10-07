@@ -210,41 +210,27 @@ func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map
 // noInitialSeen leaves a device made by a no-touch page or preview at zero until an app fetch.
 func (s *Service) ensureCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool) (bool, error) {
 	a := s.st.Access()
-	for range 2 { // a concurrent fetch may create the device first: retry once
-		dev, err := a.ImplicitDevice(ctx, u.ID)
-		if errors.Is(err, store.ErrNotFound) {
-			dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
-			creds, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, nil)
-			if err != nil || len(creds) == 0 {
-				return false, err
-			}
-			switch err := a.AddDevice(ctx, dev, creds); {
-			case errors.Is(err, store.ErrAccessExists):
-				continue
-			case err != nil:
-				return false, err
-			}
-			return true, nil
-		} else if err != nil {
-			return false, err
-		}
-		have := map[string]bool{}
-		for _, p := range dev.Protocols {
-			have[p] = true
-		}
-		creds, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, have)
-		if err != nil || len(creds) == 0 {
-			return false, err
-		}
-		switch err := a.AddCreds(ctx, creds); {
-		case errors.Is(err, store.ErrAccessExists):
-			continue
-		case err != nil:
-			return false, err
-		}
-		return true, nil
+	dev, err := a.ImplicitDevice(ctx, u.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		dev = store.AccessDevice{}
+	} else if err != nil {
+		return false, err
 	}
-	return false, nil
+	have := make(map[string]bool, len(dev.Protocols))
+	for _, protocol := range dev.Protocols {
+		have[protocol] = true
+	}
+	now := s.now()
+	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: now, NoInitialSeen: noInitialSeen}
+	if !noInitialSeen {
+		template.FirstSeenAt, template.LastSeenAt = now, now
+	}
+	creds, err := s.newCreds(u.ID, template.ID, u.AppHapp, u.AppAmnezia, have)
+	if err != nil || len(creds) == 0 {
+		return false, err
+	}
+	_, _, created, err := a.EnsureImplicitDevice(ctx, template, creds)
+	return created, err
 }
 
 func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.CreateUserRequest]) (*connect.Response[adminv1.CreateUserResponse], error) {

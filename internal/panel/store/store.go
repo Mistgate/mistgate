@@ -36,9 +36,7 @@ type Store struct {
 func (s *Store) lockAWGRetry(ctx context.Context) error {
 	// Initialize lazily so opened stores and zero-value test stores share one path.
 	s.awgRetryOnce.Do(func() {
-		if s.awgRetry == nil {
-			s.awgRetry = make(chan struct{}, 1)
-		}
+		s.awgRetry = make(chan struct{}, 1)
 	})
 	if err := ctx.Err(); err != nil {
 		return err
