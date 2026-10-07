@@ -20,7 +20,7 @@ const prepareRetryDelay = 3 * time.Second
 // maxCertLife bounds the expiry an agent may report: the self-signed certificates the panel makes live 10 years.
 const maxCertLife = 11 * 365 * 24 * time.Hour
 
-// SessionState is the compact connection state. Large snapshots and memo tables live in SessionSidecar.
+// SessionState is the compact connection protocol state. Larger snapshots live in SessionSidecar.
 type SessionState struct {
 	Version         uint8     `json:"v"`
 	NodeID          string    `json:"n,omitempty"`
@@ -30,34 +30,35 @@ type SessionState struct {
 	LivenessNanos   int64     `json:"l,omitempty"`
 	HelloDeadline   time.Time `json:"h,omitzero"`
 	// LivenessDeadline keeps Go's monotonic reading on the VPS: a wall-clock step cannot close a live session.
-	LivenessDeadline      time.Time    `json:"d,omitzero"`
-	AutoBandwidthDeadline time.Time    `json:"b,omitzero"`
-	AutoBandwidthPending  bool         `json:"ap,omitempty"`
-	NextAckTick           time.Time    `json:"a,omitzero"`
-	NextCertCheck         time.Time    `json:"x,omitzero"`
-	AckPending            uint64       `json:"p,omitempty"`
-	AckSent               uint64       `json:"s,omitempty"`
-	LastAck               time.Time    `json:"k,omitzero"`
-	LastReject            time.Time    `json:"r,omitzero"`
-	LastEndUnix           int64        `json:"e,omitempty"`
-	LastSeenAt            time.Time    `json:"v_at,omitzero"`
-	SentRevision          uint64       `json:"q,omitempty"`
-	SentStateHash         string       `json:"sh,omitempty"`
-	SentWithheld          []string     `json:"wh,omitempty"`
-	SentSettingsHash      string       `json:"ss,omitempty"`
-	DriftResent           bool         `json:"dr,omitempty"`
-	Drift                 bool         `json:"dt,omitempty"`
-	FullResendPending     bool         `json:"fr,omitempty"`
-	HelloAppliedRevision  uint64       `json:"har,omitempty"`
-	HelloAppliedStateHash string       `json:"hah,omitempty"`
-	Preparing             bool         `json:"prep,omitempty"`
-	PrepareDirty          bool         `json:"pd,omitempty"`
-	PrepareRetryAt        time.Time    `json:"pra,omitzero"`
-	Poison                *PoisonBatch `json:"p_seq,omitempty"`
-	PeerCertSerial        string       `json:"cs,omitempty"`
-	PeerCertNotAfter      time.Time    `json:"ce,omitzero"`
-	Disconnected          bool         `json:"z,omitempty"`
-	SidecarVersion        uint32       `json:"sv,omitempty"`
+	LivenessDeadline      time.Time                 `json:"d,omitzero"`
+	AutoBandwidthDeadline time.Time                 `json:"b,omitzero"`
+	NextAckTick           time.Time                 `json:"a,omitzero"`
+	NextCertCheck         time.Time                 `json:"x,omitzero"`
+	AckPending            uint64                    `json:"p,omitempty"`
+	AckSent               uint64                    `json:"s,omitempty"`
+	LastAck               time.Time                 `json:"k,omitzero"`
+	LastReject            time.Time                 `json:"r,omitzero"`
+	LastEndUnix           int64                     `json:"e,omitempty"`
+	LastSeenAt            time.Time                 `json:"v_at,omitzero"`
+	SentRevision          uint64                    `json:"q,omitempty"`
+	SentStateHash         string                    `json:"sh,omitempty"`
+	SentWithheld          []string                  `json:"wh,omitempty"`
+	SentSettingsHash      string                    `json:"ss,omitempty"`
+	DriftResent           bool                      `json:"dr,omitempty"`
+	Drift                 bool                      `json:"dt,omitempty"`
+	FullResendPending     bool                      `json:"fr,omitempty"`
+	HelloAppliedRevision  uint64                    `json:"har,omitempty"`
+	HelloAppliedStateHash string                    `json:"hah,omitempty"`
+	Preparing             bool                      `json:"prep,omitempty"`
+	PrepareDirty          bool                      `json:"pd,omitempty"`
+	PrepareRetryAt        time.Time                 `json:"pra,omitzero"`
+	Poison                *PoisonBatch              `json:"p_seq,omitempty"`
+	PeerCertSerial        string                    `json:"cs,omitempty"`
+	PeerCertNotAfter      time.Time                 `json:"ce,omitzero"`
+	Pending               map[string]PendingRequest `json:"pr,omitempty"`
+	L3                    l3MemoState               `json:"m,omitzero"`
+	Disconnected          bool                      `json:"z,omitempty"`
+	SidecarVersion        uint32                    `json:"sv,omitempty"`
 }
 
 // PoisonBatch identifies the last stats batch refused by the store.
@@ -76,27 +77,26 @@ type LiveSnapshot struct {
 	UserUp    map[string]uint64
 }
 
-// PendingRequest is durable request metadata. VPS channels remain in the adapter; edge delivery is a later round.
+// PendingRequest is serialized request metadata. VPS channels remain in the adapter; edge delivery is a later round.
 type PendingRequest struct {
-	Kind     PendingRequestKind
-	Deadline time.Time
+	Kind     PendingRequestKind `json:"k,omitempty"`
+	Deadline time.Time          `json:"d,omitzero"`
 }
 
-// PendingRequestKind identifies the adapter-owned request awaiting an agent result.
+// PendingRequestKind identifies the agent result expected for a request.
 type PendingRequestKind uint8
 
 const (
 	PendingCommand PendingRequestKind = iota + 1
 	PendingDoctor
 	PendingLog
+	PendingAutoBandwidth
 )
 
 // SessionSidecar holds desired/live state that is too large for SessionState.
 type SessionSidecar struct {
 	Version uint32
 	Live    LiveSnapshot
-	L3      l3Intake
-	Pending map[string]PendingRequest
 }
 
 // EventKind identifies one input that the session core can process.
@@ -138,8 +138,7 @@ type SessionEvent struct {
 type EffectKind uint8
 
 const (
-	EffectAutoBandwidth EffectKind = iota + 1
-	EffectUsage
+	EffectUsage EffectKind = iota + 1
 	EffectCommandResult
 	EffectDoctorReport
 	EffectLogChunk
@@ -231,12 +230,21 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 	if sidecar.Live.UserUp == nil {
 		sidecar.Live.UserUp = map[string]uint64{}
 	}
-	if sidecar.Pending == nil {
-		sidecar.Pending = map[string]PendingRequest{}
-	}
 	tr := coreTransition{state: state, sidecar: sidecar}
 	if tr.state.Disconnected {
 		return tr.Transition, nil
+	}
+	if event.Kind != EventOpen && event.Kind != EventDisconnected && event.Kind != EventOwnerSuperseded && deadlineDue(tr.state.NextCertCheck, event.At) {
+		cert := peerCert{serial: tr.state.PeerCertSerial, notAfter: tr.state.PeerCertNotAfter}
+		if err := c.f.recheckCertAt(ctx, cert, event.At); err != nil {
+			tr.Close = &SessionClose{Class: CloseUnauthenticated, Reason: err.Error()}
+		} else {
+			tr.state.NextCertCheck = advancePeriodic(tr.state.NextCertCheck, c.f.certCheck, event.At)
+		}
+		if tr.Close != nil {
+			tr.NextAlarm = nextSessionAlarm(*tr.state, event.At)
+			return tr.Transition, nil
+		}
 	}
 	switch event.Kind {
 	case EventOpen:
@@ -264,7 +272,7 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 		if event.Request != nil {
 			id = event.Request.RequestID
 		}
-		delete(tr.sidecar.Pending, id)
+		deletePending(tr.state, id)
 		tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogCancel{LogCancel: &agentv1.LogCancel{RequestId: id}}})
 	case EventAlarm:
 		if err := c.alarm(ctx, &tr, event); err != nil {
@@ -272,15 +280,14 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 		}
 	case EventDisconnected:
 		tr.state.Disconnected = true
-		tr.sidecar.Pending = map[string]PendingRequest{}
+		tr.state.Pending = nil
 		tr.state.AutoBandwidthDeadline = time.Time{}
-		tr.state.AutoBandwidthPending = false
 	case EventOwnerSuperseded:
 		tr.Close = &SessionClose{Class: CloseConflict, Reason: "superseded by a newer stream"}
 	default:
 		return tr.Transition, fmt.Errorf("unknown session event kind %d", event.Kind)
 	}
-	tr.NextAlarm = nextSessionAlarm(*tr.state, *tr.sidecar, event.At)
+	tr.NextAlarm = nextSessionAlarm(*tr.state, event.At)
 	return tr.Transition, nil
 }
 
@@ -324,7 +331,6 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	tr.state.LastSeenAt = event.At
 	tr.state.LivenessDeadline = event.At.Add(time.Duration(tr.state.LivenessNanos))
-	tr.state.NextAckTick = event.At.Add(ackEvery)
 	tr.state.NextCertCheck = event.At.Add(c.f.certCheck)
 	tr.state.SidecarVersion = tr.sidecar.Version
 	tr.state.HelloAppliedRevision = h.AppliedRevision
@@ -333,10 +339,10 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.sidecar.Live.UserUp = map[string]uint64{}
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
-	tr.state.AutoBandwidthPending = autoMeasure && slices.Contains(tr.state.Capabilities, capBandwidth)
+	autoMeasure = autoMeasure && slices.Contains(tr.state.Capabilities, capBandwidth)
 	settings := nodeSettings(node, tr.state.Capabilities)
 	tr.state.SentSettingsHash = settingsSig(settings)
-	if tr.state.AutoBandwidthPending {
+	if autoMeasure {
 		tr.state.AutoBandwidthDeadline = event.At.Add(c.f.measureDelay)
 	}
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
@@ -357,8 +363,18 @@ func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time
 	if deadline.IsZero() {
 		deadline = at
 	}
-	tr.sidecar.Pending[request.RequestID] = PendingRequest{Kind: kind, Deadline: deadline}
+	if tr.state.Pending == nil {
+		tr.state.Pending = map[string]PendingRequest{}
+	}
+	tr.state.Pending[request.RequestID] = PendingRequest{Kind: kind, Deadline: deadline}
 	tr.Frames = append(tr.Frames, request.Frame)
+}
+
+func deletePending(state *SessionState, id string) {
+	delete(state.Pending, id)
+	if len(state.Pending) == 0 {
+		state.Pending = nil
+	}
 }
 
 func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event SessionEvent) {
@@ -383,31 +399,39 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 		}
 	case m.GetCommandResult() != nil:
 		r := m.GetCommandResult()
-		pending, ok := tr.sidecar.Pending[r.RequestId]
-		if !ok || pending.Kind != PendingCommand {
+		pending, ok := tr.state.Pending[r.RequestId]
+		if !ok {
 			return
 		}
-		delete(tr.sidecar.Pending, r.RequestId)
+		if pending.Kind == PendingAutoBandwidth {
+			deletePending(tr.state, r.RequestId)
+			c.f.storeAutoMeasureBandwidth(ctx, tr.state.NodeID, parseBandwidthResult(r))
+			return
+		}
+		if pending.Kind != PendingCommand {
+			return
+		}
+		deletePending(tr.state, r.RequestId)
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectCommandResult, RequestID: r.RequestId, CommandResult: r})
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
-		pending, ok := tr.sidecar.Pending[chunk.RequestId]
+		pending, ok := tr.state.Pending[chunk.RequestId]
 		if !ok || pending.Kind != PendingLog {
 			return
 		}
 		if chunk.Eof {
-			delete(tr.sidecar.Pending, chunk.RequestId)
+			deletePending(tr.state, chunk.RequestId)
 		}
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectLogChunk, RequestID: chunk.RequestId, LogChunk: chunk})
 	case m.GetDoctorReport() != nil:
 		r := m.GetDoctorReport()
 		c.f.recordDoctorReport(ctx, tr.state.NodeID, r)
 		if r.RequestId != "" {
-			pending, ok := tr.sidecar.Pending[r.RequestId]
+			pending, ok := tr.state.Pending[r.RequestId]
 			if !ok || pending.Kind != PendingDoctor {
 				return
 			}
-			delete(tr.sidecar.Pending, r.RequestId)
+			deletePending(tr.state, r.RequestId)
 		}
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectDoctorReport, RequestID: r.RequestId, DoctorReport: r})
 	}
@@ -460,7 +484,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	tr.state.Poison = nil
 	if !out.Duplicate {
 		applyCoreSnapshot(tr.state, &tr.sidecar.Live, st, g.traffic, now, out.Refs)
-		c.l3Stats(ctx, tr.state.NodeID, &tr.sidecar.L3, st, now)
+		c.l3Stats(ctx, tr.state, st, now)
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", tr.state.NodeID, "count", out.Skipped)
 		}
@@ -532,9 +556,13 @@ func markCoreAck(tr *coreTransition, seq uint64, now time.Time) {
 	if now.Sub(last) >= ackEvery {
 		flushCoreAck(tr, now)
 	}
+	if tr.state.AckPending > tr.state.AckSent && tr.state.NextAckTick.IsZero() {
+		tr.state.NextAckTick = tr.state.LastAck.Add(ackEvery)
+	}
 }
 
 func flushCoreAck(tr *coreTransition, now time.Time) {
+	tr.state.NextAckTick = time.Time{}
 	if tr.state.AckPending > tr.state.AckSent {
 		tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Ack{Ack: &agentv1.Ack{UpToSeq: tr.state.AckPending}}})
 		tr.state.AckSent = tr.state.AckPending
@@ -605,10 +633,10 @@ func (c *SessionCore) warpAttention(ctx context.Context, tr *coreTransition, rea
 		return
 	}
 	if reason == warpReasonRefresh {
-		if !tr.sidecar.L3.warpAsk.IsZero() && now.Sub(tr.sidecar.L3.warpAsk) < warpRefreshGap {
+		if !tr.state.L3.WarpAsk.IsZero() && now.Sub(tr.state.L3.WarpAsk) < warpRefreshGap {
 			return
 		}
-		tr.sidecar.L3.warpAsk = now
+		tr.state.L3.WarpAsk = now
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectWarpAttention, WarpReason: reason})
 		return
 	}
@@ -798,26 +826,24 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 		tr.Close = &SessionClose{Class: CloseDeadline, Reason: "no Hello"}
 		return nil
 	}
-	if tr.state.AutoBandwidthPending && deadlineDue(tr.state.AutoBandwidthDeadline, now) {
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectAutoBandwidth})
+	if deadlineDue(tr.state.AutoBandwidthDeadline, now) {
+		const requestID = "auto-bandwidth"
+		tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_MeasureBandwidth{MeasureBandwidth: &agentv1.MeasureBandwidth{RequestId: requestID}}})
+		if tr.state.Pending == nil {
+			tr.state.Pending = map[string]PendingRequest{}
+		}
+		tr.state.Pending[requestID] = PendingRequest{Kind: PendingAutoBandwidth, Deadline: now.Add(c.f.measureWait)}
 		tr.state.AutoBandwidthDeadline = time.Time{}
-		tr.state.AutoBandwidthPending = false
 	}
 	if deadlineDue(tr.state.NextAckTick, now) {
 		flushCoreAck(tr, now)
-		tr.state.NextAckTick = advancePeriodic(tr.state.NextAckTick, ackEvery, now)
 	}
-	if deadlineDue(tr.state.NextCertCheck, now) {
-		cert := peerCert{serial: tr.state.PeerCertSerial, notAfter: tr.state.PeerCertNotAfter}
-		if err := c.f.recheckCertAt(ctx, cert, now); err != nil {
-			tr.Close = &SessionClose{Class: CloseUnauthenticated, Reason: err.Error()}
-			return nil
-		}
-		tr.state.NextCertCheck = advancePeriodic(tr.state.NextCertCheck, c.f.certCheck, now)
-	}
-	for id, req := range tr.sidecar.Pending {
+	for id, req := range tr.state.Pending {
 		if deadlineDue(req.Deadline, now) {
-			delete(tr.sidecar.Pending, id)
+			if req.Kind == PendingAutoBandwidth {
+				c.f.log.Info("first bandwidth measurement did not work", "node", tr.state.NodeID, "code", "timeout")
+			}
+			deletePending(tr.state, id)
 		}
 	}
 	if deadlineDue(tr.state.LivenessDeadline, now) {
@@ -844,7 +870,7 @@ func advancePeriodic(deadline time.Time, period time.Duration, now time.Time) ti
 	return deadline.Add(missed * period)
 }
 
-func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time) *time.Time {
+func nextSessionAlarm(state SessionState, now time.Time) *time.Time {
 	if state.Disconnected {
 		return nil
 	}
@@ -860,7 +886,7 @@ func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time)
 		}
 	}
 	for _, deadline := range []time.Time{state.HelloDeadline, state.AutoBandwidthDeadline,
-		state.NextAckTick, state.NextCertCheck, state.PrepareRetryAt} {
+		state.NextAckTick, state.PrepareRetryAt} {
 		if !deadline.IsZero() {
 			add(deadline)
 		}
@@ -868,7 +894,7 @@ func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time)
 	if !state.LivenessDeadline.IsZero() {
 		add(state.LivenessDeadline)
 	}
-	for _, req := range sidecar.Pending {
+	for _, req := range state.Pending {
 		if !req.Deadline.IsZero() {
 			add(req.Deadline)
 		}
@@ -882,22 +908,20 @@ func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time)
 
 // l3Stats stores the AWG and WARP health from a stats batch; applyCoreSnapshot replaces the stream's live view. A health
 // write failure is logged but never fails the batch: health is a snapshot, and the next batch replaces it.
-func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Intake, st *agentv1.StatsBatch, now time.Time) {
+func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agentv1.StatsBatch, now time.Time) {
+	nodeID := state.NodeID
 	for _, h := range st.Health {
 		if h.Awg == nil {
 			continue
 		}
-		if intake.awg == nil {
-			intake.awg = map[string]*healthMemo[*agentv1.AwgHealth]{}
+		if state.L3.AWG == nil {
+			state.L3.AWG = map[string]l3HealthMemo{}
 		}
-		m := intake.awg[h.InboundId]
-		if m == nil {
-			m = &healthMemo[*agentv1.AwgHealth]{}
-			intake.awg[h.InboundId] = m
-		}
-		if !m.due(h.Awg, now, nil) {
+		m := state.L3.AWG[h.InboundId]
+		if !m.due(l3ReportHash(h.Awg), now, false) {
 			continue
 		}
+		state.L3.AWG[h.InboundId] = m
 		b, err := protojson.Marshal(h.Awg)
 		if err != nil {
 			continue
@@ -910,13 +934,17 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 	if st.Warp == nil || w == nil {
 		return
 	}
-	if intake.warp.due(st.Warp, now, warpStateChanged) {
+	report, warpKey := l3ReportHash(st.Warp), warpChangeKey(st.Warp)
+	warpMemo := state.L3.Warp
+	if warpMemo.due(report, now, !state.L3.Warp.At.IsZero() && state.L3.WarpChangeKey != warpKey) {
+		state.L3.Warp = warpMemo
+		state.L3.WarpChangeKey = warpKey
 		if err := w.StoreHealth(ctx, nodeID, st.Warp); err != nil {
 			c.f.log.Warn("store warp health", "node", nodeID, "err", err)
 		}
 	}
 	up := st.Warp.State == agentv1.WarpState_WARP_STATE_UP
-	if up && !intake.warpUp {
+	if up && !state.L3.WarpUp {
 		// The tunnel is working again: whatever the node asked the owner to look at is over (the owner sees the badge
 		// again, not a stale "needs attention").
 		if a, err := c.f.st.WarpAccount(ctx, nodeID); err == nil && a.Attention != "" {
@@ -925,7 +953,7 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 			}
 		}
 	}
-	intake.warpUp = up
+	state.L3.WarpUp = up
 }
 
 // certStats builds the inbound certificates to commit with this stats batch. An ACME certificate is issued after the

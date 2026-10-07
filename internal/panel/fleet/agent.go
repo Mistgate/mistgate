@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -77,6 +78,8 @@ func (s *session) publishView() {
 	state := s.coreState
 	state.Capabilities = slices.Clone(state.Capabilities)
 	state.SentWithheld = slices.Clone(state.SentWithheld)
+	state.Pending = maps.Clone(state.Pending)
+	state.L3.AWG = maps.Clone(state.L3.AWG)
 	s.view.Store(&sessionView{State: state, Live: s.coreSidecar.Live})
 }
 
@@ -214,8 +217,6 @@ func (s *session) dispatchCoreEffects(ctx context.Context, effects []SessionEffe
 
 func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) {
 	switch effect.Kind {
-	case EffectAutoBandwidth:
-		s.f.runAutoMeasureBandwidth(s)
 	case EffectUsage:
 		if s.f.cfg.OnUsage != nil {
 			s.f.cfg.OnUsage(ctx, effect.Users)

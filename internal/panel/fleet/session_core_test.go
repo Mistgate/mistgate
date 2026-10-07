@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
 	"sync"
@@ -13,10 +14,13 @@ import (
 
 	"connectrpc.com/connect"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context, SessionState, SessionSidecar, time.Time) {
@@ -67,6 +71,391 @@ type testTransition struct {
 func coreStep(ctx context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar, event SessionEvent) (testTransition, error) {
 	tr, err := core.Step(ctx, &state, &sidecar, event)
 	return testTransition{Transition: tr, State: state, Sidecar: sidecar}, err
+}
+
+type replayWarpMod struct {
+	e         *env
+	health    []*agentv1.WarpHealth
+	attention []string
+}
+
+func (w *replayWarpMod) Spec(context.Context, string) (*plugin.WarpSpec, error) { return nil, nil }
+
+func (w *replayWarpMod) StoreHealth(ctx context.Context, nodeID string, health *agentv1.WarpHealth) error {
+	b, err := protojson.Marshal(health)
+	if err != nil {
+		return err
+	}
+	if err := w.e.st.SetWarpHealth(ctx, nodeID, string(b), w.e.f.now()); err != nil {
+		return err
+	}
+	w.health = append(w.health, proto.Clone(health).(*agentv1.WarpHealth))
+	return nil
+}
+
+func (w *replayWarpMod) NeedsAttention(ctx context.Context, nodeID, reason string) error {
+	if err := w.e.st.SetWarpAttention(ctx, nodeID, reason, w.e.f.now()); err != nil {
+		return err
+	}
+	w.attention = append(w.attention, reason)
+	return nil
+}
+
+func (*replayWarpMod) RefreshByNode(context.Context, string) error { return nil }
+
+func (*replayWarpMod) AutoReregister(context.Context, string) (bool, error) { return false, nil }
+
+func (*replayWarpMod) Summary(*store.WarpAccountRow, bool, time.Time) *adminv1.WarpSummary {
+	return &adminv1.WarpSummary{}
+}
+
+type sessionReplay struct {
+	e         *env
+	ctx       context.Context
+	core      *SessionCore
+	state     SessionState
+	sidecar   SessionSidecar
+	now       time.Time
+	rehydrate bool
+	desired   *plugin.InboundSpec
+	warp      *replayWarpMod
+}
+
+func newSessionReplay(t *testing.T, nodeID string, rehydrate bool) *sessionReplay {
+	t.Helper()
+	e := newCoreEnv(t)
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	desired := &plugin.InboundSpec{ID: "inb_awg", Protocol: "awg", ProfileID: "prf_awg", Version: 1, Enabled: true,
+		Listen: plugin.Listen{Network: "udp", Port: 51820}, Egress: "direct", Settings: json.RawMessage(`{"mode":"default"}`)}
+	r := &sessionReplay{e: e, now: now, rehydrate: rehydrate, desired: desired}
+	e.f.now = func() time.Time { return r.now }
+	e.f.cfg.Now = e.f.now
+	e.f.certCheck = 30 * time.Second
+	e.f.measureDelay = 5 * time.Second
+	e.f.measureWait = 4 * time.Second
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: *r.desired}}, nil
+	}
+	if _, err := e.st.CreateEnrollment(e.ctx, &store.NodeRow{ID: nodeID, Name: "replay", Address: "example.com"}, "", []byte("test-hash"), "adm_test", now, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	liveness := 3600
+	if _, err := e.st.UpdateNode(e.ctx, nodeID, store.NodePatch{LivenessTimeoutS: &liveness}); err != nil {
+		t.Fatal(err)
+	}
+	e.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_awg', 'awg', 'awg', '{}', 1, ?, ?)`, now.Unix(), now.Unix())
+	e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_awg', 'prf_awg', ?, 1, ?, ?)`, nodeID, now.Unix(), now.Unix())
+	if err := e.st.CreateWarpAccount(e.ctx, store.WarpAccountRow{NodeID: nodeID, Source: store.WarpImported, SecretEnc: []byte{1},
+		PeerPublicKey: "cGVlcg==", EndpointV4: "203.0.113.10", Ports: []uint16{2408}, AddressV4: "172.16.0.2/32", MTU: 1280,
+		Enabled: true, Attention: "down_after_ladder", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	r.warp = &replayWarpMod{e: e}
+	e.f.SetWarp(r.warp)
+	owner, ctx := e.f.claimOwner(nodeID, e.ctx)
+	r.ctx = ctx
+	t.Cleanup(func() {
+		e.f.mu.Lock()
+		current := e.f.owners[nodeID]
+		e.f.mu.Unlock()
+		if current.cancel != nil {
+			current.cancel(nil)
+		}
+	})
+	r.state = SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: owner, HelloDeadline: now.Add(helloTimeout)}
+	r.core = NewSessionCore(e.f)
+	return r
+}
+
+func (r *sessionReplay) step(t *testing.T, event SessionEvent) testTransition {
+	t.Helper()
+	r.now = event.At
+	if r.rehydrate {
+		b, err := json.Marshal(r.state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, &r.state); err != nil {
+			t.Fatal(err)
+		}
+		r.core = NewSessionCore(r.e.f)
+	}
+	tr, err := coreStep(r.ctx, r.core, r.state, r.sidecar, event)
+	if err != nil {
+		t.Fatalf("step %d: %v", event.Kind, err)
+	}
+	r.state, r.sidecar = tr.State, tr.Sidecar
+	return tr
+}
+
+func (r *sessionReplay) prepare(t *testing.T, at time.Time) *preparedDesiredState {
+	t.Helper()
+	r.now = at
+	prepared, err := r.e.f.prepareDesiredState(r.ctx, r.state.NodeID, r.state.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return prepared
+}
+
+func replayPair(t *testing.T, label string, a, b *sessionReplay, event SessionEvent, prepare bool) (testTransition, testTransition) {
+	t.Helper()
+	eventA, eventB := event, event
+	if prepare {
+		eventA.Prepared = a.prepare(t, event.At)
+		eventB.Prepared = b.prepare(t, event.At)
+	}
+	gotA, gotB := a.step(t, eventA), b.step(t, eventB)
+	if len(gotA.Frames) != len(gotB.Frames) {
+		t.Fatalf("%s frames differ in count: A=%d B=%d", label, len(gotA.Frames), len(gotB.Frames))
+	}
+	for i := range gotA.Frames {
+		if !proto.Equal(gotA.Frames[i], gotB.Frames[i]) {
+			t.Fatalf("%s frame %d differs: A=%v B=%v", label, i, gotA.Frames[i], gotB.Frames[i])
+		}
+	}
+	if !reflect.DeepEqual(gotA.Effects, gotB.Effects) {
+		t.Fatalf("%s effects differ: A=%+v B=%+v", label, gotA.Effects, gotB.Effects)
+	}
+	if !reflect.DeepEqual(gotA.Close, gotB.Close) {
+		t.Fatalf("%s close differs: A=%+v B=%+v", label, gotA.Close, gotB.Close)
+	}
+	if (gotA.NextAlarm == nil) != (gotB.NextAlarm == nil) || gotA.NextAlarm != nil && !gotA.NextAlarm.Equal(*gotB.NextAlarm) {
+		t.Fatalf("%s next alarm differs: A=%v B=%v", label, gotA.NextAlarm, gotB.NextAlarm)
+	}
+	stateA, _ := json.Marshal(a.state)
+	stateB, _ := json.Marshal(b.state)
+	if string(stateA) != string(stateB) {
+		t.Fatalf("%s state differs after rehydration: A=%s B=%s", label, stateA, stateB)
+	}
+	if rowsA, rowsB := replayRows(t, a.e, a.state.NodeID), replayRows(t, b.e, b.state.NodeID); !reflect.DeepEqual(rowsA, rowsB) {
+		t.Fatalf("%s stored rows differ: A=%v B=%v", label, rowsA, rowsB)
+	}
+	if len(a.warp.health) != len(b.warp.health) || !reflect.DeepEqual(a.warp.attention, b.warp.attention) {
+		t.Fatalf("%s WARP writes differ: A=%d/%v B=%d/%v", label, len(a.warp.health), a.warp.attention, len(b.warp.health), b.warp.attention)
+	}
+	for i := range a.warp.health {
+		if !proto.Equal(a.warp.health[i], b.warp.health[i]) {
+			t.Fatalf("%s WARP report %d differs: A=%v B=%v", label, i, a.warp.health[i], b.warp.health[i])
+		}
+	}
+	return gotA, gotB
+}
+
+func replayRows(t *testing.T, e *env, nodeID string) map[string]string {
+	t.Helper()
+	queries := map[string]struct {
+		query string
+		args  []any
+	}{
+		"node":    {`SELECT state, agent_version, api_version, agent_instance_id, last_seq, desired_revision, desired_hash, bandwidth_mbps, last_seen_at, last_connected_at FROM node WHERE id = ?`, []any{nodeID}},
+		"facts":   {`SELECT hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at FROM node_facts WHERE node_id = ?`, []any{nodeID}},
+		"awg":     {`SELECT awg_health_json, awg_health_at FROM inbound WHERE id = 'inb_awg'`, nil},
+		"warp":    {`SELECT attention, health_json, health_at, updated_at FROM warp_account WHERE node_id = ?`, []any{nodeID}},
+		"events":  {`SELECT ts, severity, code, source, params_json, src_instance, src_seq FROM event WHERE node_id = ? ORDER BY id`, []any{nodeID}},
+		"audit":   {`SELECT ts, actor, action, params, result FROM audit WHERE action = 'node.bandwidth_auto' ORDER BY id`, nil},
+		"traffic": {`SELECT protocol, hour_start, bytes_up, bytes_down, peak_users, peak_devices FROM node_traffic_hour WHERE node_id = ? ORDER BY protocol, hour_start`, []any{nodeID}},
+	}
+	out := make(map[string]string, len(queries))
+	for name, item := range queries {
+		rows, err := e.st.R.QueryContext(e.ctx, item.query, item.args...)
+		if err != nil {
+			t.Fatalf("read %s replay rows: %v", name, err)
+		}
+		cols, err := rows.Columns()
+		if err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		var result [][]string
+		for rows.Next() {
+			values, dest := make([]any, len(cols)), make([]any, len(cols))
+			for i := range values {
+				dest[i] = &values[i]
+			}
+			if err := rows.Scan(dest...); err != nil {
+				rows.Close()
+				t.Fatal(err)
+			}
+			line := make([]string, len(cols))
+			for i, value := range values {
+				if b, ok := value.([]byte); ok {
+					line[i] = string(b)
+				} else if value != nil {
+					line[i] = fmt.Sprint(value)
+				}
+			}
+			result = append(result, line)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		rows.Close()
+		b, err := json.Marshal(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out[name] = string(b)
+	}
+	return out
+}
+
+func TestSessionCoreRehydratesStateBetweenEvents(t *testing.T) {
+	a := newSessionReplay(t, "nod_replay", false)
+	b := newSessionReplay(t, "nod_replay", true)
+	base := a.now
+	run := func(name string, event SessionEvent, prepare bool) (testTransition, testTransition) {
+		t.Helper()
+		return replayPair(t, name, a, b, event, prepare)
+	}
+	run("open", SessionEvent{Kind: EventOpen, At: base}, false)
+	helloAt := base.Add(time.Second)
+	h := hello("instance-replay", 0, "")
+	h.GetHello().Capabilities = []string{capAWG, capBandwidth, capWarp, "doctor/1"}
+	run("hello", SessionEvent{Kind: EventHello, At: helloAt, Frame: h}, false)
+	run("initial desired changed", SessionEvent{Kind: EventDesiredChanged, At: helloAt}, false)
+	run("initial desired prepared", SessionEvent{Kind: EventDesiredPrepared, At: helloAt}, true)
+
+	autoAt := a.state.AutoBandwidthDeadline
+	auto, _ := run("automatic bandwidth request", SessionEvent{Kind: EventAlarm, At: autoAt}, false)
+	if len(auto.Frames) != 1 || auto.Frames[0].GetMeasureBandwidth().GetRequestId() != "auto-bandwidth" || len(auto.Effects) != 0 {
+		t.Fatalf("automatic bandwidth transition = frames %+v effects %+v", auto.Frames, auto.Effects)
+	}
+	autoResultAt := autoAt.Add(time.Second)
+	result := &agentv1.CommandResult{RequestId: "auto-bandwidth", Ok: true, Params: map[string]string{
+		"down_mbps": "940", "up_mbps": "871", "server": "example.test", "seconds": "12", "runs": "3",
+	}}
+	run("automatic bandwidth result", SessionEvent{Kind: EventAgentFrame, At: autoResultAt,
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}}, false)
+	if node, err := a.e.st.Node(a.ctx, a.state.NodeID); err != nil || node.BandwidthMbps != 871 {
+		t.Fatalf("rehydrated automatic capacity = %d, err %v; want 871", node.BandwidthMbps, err)
+	}
+
+	statsAt := autoResultAt.Add(time.Second)
+	warpDown := &agentv1.WarpHealth{State: agentv1.WarpState_WARP_STATE_DOWN, LastError: "probe_other_failed", RxBytes: 10}
+	warpUp := &agentv1.WarpHealth{State: agentv1.WarpState_WARP_STATE_UP, ProbeCloudflareOk: true, ProbeOtherOk: true, RxBytes: 20}
+	stats := func(seq uint64, at time.Time, peers uint32, warp *agentv1.WarpHealth) (testTransition, testTransition) {
+		t.Helper()
+		frame := &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+			IntervalStartUnix: at.Add(-10 * time.Second).Unix(), IntervalEndUnix: at.Unix(),
+			Health: []*agentv1.InboundHealth{{InboundId: "inb_awg", Awg: &agentv1.AwgHealth{Backend: "userspace", IfaceUp: true, Peers: 4, PeersHandshaken: 3, PeersOnline: peers}}},
+			Warp:   warp,
+		}}}
+		return run(fmt.Sprintf("stats %d", seq), SessionEvent{Kind: EventAgentFrame, At: at, Frame: frame}, false)
+	}
+	first, _ := stats(1, statsAt, 1, warpDown)
+	if len(first.Frames) != 1 || first.Frames[0].GetAck().GetUpToSeq() != 1 {
+		t.Fatalf("first stats ack = %+v, want immediate ack 1", first.Frames)
+	}
+	for seq := uint64(2); seq <= 5; seq++ {
+		got, _ := stats(seq, statsAt.Add(time.Duration(seq-1)*ackEvery/5), 1, warpDown)
+		if len(got.Frames) != 0 {
+			t.Fatalf("stats burst %d acked early: %+v", seq, got.Frames)
+		}
+	}
+	burstAck, _ := run("stats burst alarm", SessionEvent{Kind: EventAlarm, At: statsAt.Add(ackEvery)}, false)
+	if len(burstAck.Frames) != 1 || burstAck.Frames[0].GetAck().GetUpToSeq() != 5 || !burstAck.State.NextAckTick.IsZero() {
+		t.Fatalf("stats burst ack = %+v, next tick %v; want ack 5 and no ack alarm", burstAck.Frames, burstAck.State.NextAckTick)
+	}
+
+	stats(6, base.Add(10*time.Second), 2, warpUp)  // AWG change waits; WARP state change writes urgently and clears attention.
+	stats(7, base.Add(40*time.Second), 3, warpUp)  // AWG change passes the minimum gap.
+	stats(8, base.Add(80*time.Second), 3, warpUp)  // Identical reports stay throttled.
+	stats(9, base.Add(161*time.Second), 3, warpUp) // Both unchanged reports refresh after the gap.
+
+	refreshEvent := func(seq uint64, at time.Time) SessionEvent {
+		return SessionEvent{Kind: EventAgentFrame, At: at, Frame: &agentv1.ConnectRequest{Seq: seq,
+			Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: eventWarpAttention, TimeUnix: at.Unix(),
+				Params: map[string]string{"reason": warpReasonRefresh}}}}}
+	}
+	refresh1, _ := run("first WARP refresh request", refreshEvent(10, base.Add(162*time.Second)), false)
+	if !hasEffect(refresh1, EffectWarpAttention) {
+		t.Fatalf("first WARP refresh had no effect: %+v", refresh1.Effects)
+	}
+	refresh2, _ := run("throttled WARP refresh request", refreshEvent(11, base.Add(163*time.Second)), false)
+	if hasEffect(refresh2, EffectWarpAttention) {
+		t.Fatalf("second WARP refresh inside the gap emitted an effect: %+v", refresh2.Effects)
+	}
+
+	commandAt := base.Add(164 * time.Second)
+	commandFrame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "admin-command"}}}
+	run("admin command", SessionEvent{Kind: EventAdminCommand, At: commandAt, Request: &AdminRequest{
+		RequestID: "admin-command", Deadline: commandAt.Add(10 * time.Second), Frame: commandFrame,
+	}}, false)
+	commandResult := &agentv1.CommandResult{RequestId: "admin-command", Ok: true}
+	commandDone, _ := run("admin command result", SessionEvent{Kind: EventAgentFrame, At: commandAt.Add(time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: commandResult}}}, false)
+	if !hasEffect(commandDone, EffectCommandResult) {
+		t.Fatalf("admin command result was not routed: %+v", commandDone.Effects)
+	}
+
+	requestAt := base.Add(166 * time.Second)
+	requestDeadline := base.Add(170 * time.Second)
+	run("doctor request", SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
+		RequestID: "doctor", Deadline: requestDeadline, Kind: PendingDoctor,
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: "doctor"}}},
+	}}, false)
+	run("log request", SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
+		RequestID: "log", Deadline: requestDeadline, Kind: PendingLog,
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "log"}}},
+	}}, false)
+	wrongKind, _ := run("doctor ignores command result", SessionEvent{Kind: EventAgentFrame, At: requestAt.Add(time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{RequestId: "doctor", Ok: true}}}}, false)
+	if len(wrongKind.State.Pending) != 2 {
+		t.Fatalf("wrong result kind consumed a pending request: %+v", wrongKind.State.Pending)
+	}
+	expired, _ := run("doctor and log request expiry", SessionEvent{Kind: EventAlarm, At: requestDeadline}, false)
+	if len(expired.State.Pending) != 0 {
+		t.Fatalf("doctor or log request remained pending: %+v", expired.State.Pending)
+	}
+
+	a.desired.Listen.Port = 51821
+	b.desired.Listen.Port = 51821
+	changedAt := base.Add(171 * time.Second)
+	changed, _ := run("desired changed", SessionEvent{Kind: EventDesiredChanged, At: changedAt}, false)
+	if !hasEffect(changed, EffectPrepareDesired) {
+		t.Fatalf("desired change did not request preparation: %+v", changed.Effects)
+	}
+	prepared, _ := run("desired prepared", SessionEvent{Kind: EventDesiredPrepared, At: changedAt}, true)
+	if len(prepared.Frames) != 1 || prepared.Frames[0].GetDesiredState() == nil {
+		t.Fatalf("desired preparation did not send a changed state: %+v", prepared.Frames)
+	}
+
+	certAt := a.state.NextCertCheck
+	a.state.PeerCertSerial, b.state.PeerCertSerial = "missing-serial", "missing-serial"
+	a.state.PeerCertNotAfter, b.state.PeerCertNotAfter = certAt.Add(time.Hour), certAt.Add(time.Hour)
+	failedCert, _ := run("certificate recheck failure", SessionEvent{Kind: EventAgentFrame, At: certAt,
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}}, false)
+	if failedCert.Close == nil || failedCert.Close.Class != CloseUnauthenticated {
+		t.Fatalf("certificate recheck close = %+v, want unauthenticated", failedCert.Close)
+	}
+}
+
+func TestSessionCoreRehydratesLivenessTimeoutAndDisconnect(t *testing.T) {
+	a := newSessionReplay(t, "nod_replaylive", false)
+	b := newSessionReplay(t, "nod_replaylive", true)
+	base := a.now
+	run := func(name string, event SessionEvent, prepare bool) (testTransition, testTransition) {
+		t.Helper()
+		return replayPair(t, name, a, b, event, prepare)
+	}
+	run("open", SessionEvent{Kind: EventOpen, At: base}, false)
+	helloAt := base.Add(time.Second)
+	h := hello("instance-replay-live", 0, "")
+	h.GetHello().Capabilities = []string{capAWG}
+	run("hello", SessionEvent{Kind: EventHello, At: helloAt, Frame: h}, false)
+	run("desired changed", SessionEvent{Kind: EventDesiredChanged, At: helloAt}, false)
+	run("desired prepared", SessionEvent{Kind: EventDesiredPrepared, At: helloAt}, true)
+	deadline := a.state.LivenessDeadline
+	timedOut, _ := run("liveness timeout", SessionEvent{Kind: EventAlarm, At: deadline}, false)
+	if timedOut.Close == nil || timedOut.Close.Class != CloseDeadline {
+		t.Fatalf("liveness timeout close = %+v, want deadline", timedOut.Close)
+	}
+	disconnected, _ := run("disconnect", SessionEvent{Kind: EventDisconnected, At: deadline.Add(time.Second)}, false)
+	if !disconnected.State.Disconnected || disconnected.NextAlarm != nil {
+		t.Fatalf("disconnect state = %+v, next alarm %v", disconnected.State, disconnected.NextAlarm)
+	}
 }
 
 func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr testTransition, target time.Time) testTransition {
@@ -148,8 +537,8 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if tr.State.SentRevision == 0 || tr.State.SentStateHash == "" {
 			t.Fatalf("initial desired state not recorded: state=%+v", tr.State)
 		}
-		if tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.NextAckTick) {
-			t.Fatalf("next alarm = %v, ack deadline = %v", tr.NextAlarm, tr.State.NextAckTick)
+		if !tr.State.NextAckTick.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.LivenessDeadline) {
+			t.Fatalf("hello alarm = %v, ack deadline = %v, liveness deadline = %v", tr.NextAlarm, tr.State.NextAckTick, tr.State.LivenessDeadline)
 		}
 	})
 
@@ -327,13 +716,13 @@ func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
 	if state.LivenessDeadline.IsZero() || state.LivenessDeadline == state.LivenessDeadline.Round(0) {
 		t.Fatalf("liveness deadline lost its monotonic reading: %v", state.LivenessDeadline)
 	}
-	tr := nextSessionAlarm(state, sidecar, now)
+	tr := nextSessionAlarm(state, now)
 	if tr == nil || *tr == tr.Round(0) {
 		t.Fatalf("next alarm lost its monotonic reading: %v", tr)
 	}
-	tick, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: *tr})
-	if err != nil || tick.Close != nil || deadlineDue(state.LivenessDeadline, *tr) {
-		t.Fatalf("regular alarm closed the live session: close=%+v err=%v", tick.Close, err)
+	tick, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: now.Add(ackEvery)})
+	if err != nil || tick.Close != nil || deadlineDue(state.LivenessDeadline, now.Add(ackEvery)) {
+		t.Fatalf("early alarm closed the live session: close=%+v err=%v", tick.Close, err)
 	}
 }
 
@@ -374,18 +763,22 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 			t.Fatal(stepErr)
 		}
 		tr = next
-		if hasEffect(next, EffectAutoBandwidth) {
+		if len(next.Frames) == 1 && next.Frames[0].GetMeasureBandwidth() != nil {
 			due = next
 			fired = true
 			break
 		}
 	}
-	if !fired || !due.State.AutoBandwidthDeadline.IsZero() || due.State.AutoBandwidthPending {
-		t.Fatalf("due auto-bandwidth alarm = %+v state=%+v", due.Effects, due.State)
+	if !fired || !due.State.AutoBandwidthDeadline.IsZero() || due.Frames[0].GetMeasureBandwidth().RequestId != "auto-bandwidth" {
+		t.Fatalf("due auto-bandwidth alarm = frames %+v state=%+v", due.Frames, due.State)
 	}
-	again, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAlarm, At: deadline.Add(ackEvery)})
-	if err != nil || hasEffect(again, EffectAutoBandwidth) {
-		t.Fatalf("auto-bandwidth repeated after its deadline: effects=%+v err=%v", again.Effects, err)
+	request, ok := due.State.Pending["auto-bandwidth"]
+	if !ok || request.Kind != PendingAutoBandwidth || !request.Deadline.Equal(deadline.Add(core.f.measureWait)) {
+		t.Fatalf("auto-bandwidth pending request = %+v, want deadline %v", request, deadline.Add(core.f.measureWait))
+	}
+	again, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAlarm, At: request.Deadline})
+	if err != nil || len(again.State.Pending) != 0 || len(again.Frames) != 0 {
+		t.Fatalf("unanswered auto-bandwidth request did not expire: pending=%+v frames=%+v err=%v", again.State.Pending, again.Frames, err)
 	}
 }
 
@@ -400,6 +793,40 @@ func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
 	want := now.Add(e.f.measureDelay)
 	if !helloTransition.State.AutoBandwidthDeadline.Equal(want) {
 		t.Fatalf("auto-bandwidth deadline = %v, want %v", helloTransition.State.AutoBandwidthDeadline, want)
+	}
+}
+
+func TestSessionCoreAutoBandwidthResultStoresCapacityInline(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-auto-bw-result")
+	e.f.measureDelay = 2 * time.Second
+	e.f.measureWait = 3 * time.Second
+	h := hello("instance-auto-bandwidth-result", 0, "")
+	h.GetHello().Capabilities = []string{capBandwidth}
+	started := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
+	due, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventAlarm, At: started.State.AutoBandwidthDeadline})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due.Frames) != 1 || due.Frames[0].GetMeasureBandwidth().GetRequestId() != "auto-bandwidth" || len(due.Effects) != 0 {
+		t.Fatalf("automatic measurement request = frames %+v effects %+v", due.Frames, due.Effects)
+	}
+	result := &agentv1.CommandResult{RequestId: "auto-bandwidth", Ok: true, Params: map[string]string{
+		"down_mbps": "940", "up_mbps": "871", "server": "example.test", "seconds": "12", "runs": "3",
+	}}
+	stored, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAgentFrame, At: due.State.AutoBandwidthDeadline.Add(100 * time.Millisecond),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
+	if err != nil || len(stored.Effects) != 0 {
+		t.Fatalf("automatic measurement result = effects %+v, err %v", stored.Effects, err)
+	}
+	node, err := e.st.Node(ctx, state.NodeID)
+	if err != nil || node.BandwidthMbps != 871 {
+		t.Fatalf("stored capacity = %d, err %v; want slower direction 871", node.BandwidthMbps, err)
+	}
+	if got := e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'bandwidth_measured'`, state.NodeID); got != 1 {
+		t.Fatalf("bandwidth measurement events = %d, want 1", got)
+	}
+	if got := e.count(`SELECT count(*) FROM audit WHERE actor = 'system' AND action = 'node.bandwidth_auto'`); got != 1 {
+		t.Fatalf("automatic bandwidth audit rows = %d, want 1", got)
 	}
 }
 
@@ -582,7 +1009,6 @@ func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
 	_, core, ctx, state, sidecar, now := coreFixture(t, "core-ack")
 	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-ack", 0, "").GetHello())
 	state, sidecar = tr.State, tr.Sidecar
-	state.LastAck = now
 
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
@@ -591,28 +1017,58 @@ func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tr.Frames) != 0 || tr.State.AckPending != 1 || tr.State.AckSent != 0 {
-		t.Fatalf("first ack should wait for ticker: state=%+v frames=%#v", tr.State, tr.Frames)
+	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 1 || tr.State.AckPending != 1 || tr.State.AckSent != 1 {
+		t.Fatalf("first ack should flush immediately: state=%+v frames=%#v", tr.State, tr.Frames)
 	}
-	if tr.NextAlarm == nil || !tr.NextAlarm.Equal(now.Add(ackEvery)) {
-		t.Fatalf("next alarm = %v, want ack deadline %v", tr.NextAlarm, now.Add(ackEvery))
+	if !tr.State.NextAckTick.IsZero() {
+		t.Fatalf("first ack left an alarm: %v", tr.State.NextAckTick)
 	}
 	state, sidecar = tr.State, tr.Sidecar
-	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAlarm, At: *tr.NextAlarm})
+	for seq := uint64(2); seq <= 5; seq++ {
+		batch.Seq = seq
+		at := now.Add(time.Duration(seq-1) * ackEvery / 5)
+		tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: at, Frame: batch})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(tr.Frames) != 0 {
+			t.Fatalf("batch %d flushed inside the ack interval: %#v", seq, tr.Frames)
+		}
+		state, sidecar = tr.State, tr.Sidecar
+	}
+	if !state.NextAckTick.Equal(now.Add(ackEvery)) {
+		t.Fatalf("coalesced ack deadline = %v, want %v", state.NextAckTick, now.Add(ackEvery))
+	}
+	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAlarm, At: state.NextAckTick})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 1 {
-		t.Fatalf("ticker ack = %#v", tr.Frames)
+	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 5 || !tr.State.NextAckTick.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.LivenessDeadline) {
+		t.Fatalf("coalesced alarm ack = %#v, tick=%v", tr.Frames, tr.State.NextAckTick)
 	}
 	state, sidecar = tr.State, tr.Sidecar
-	batch.Seq = 2
-	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(2*ackEvery + 100*time.Millisecond), Frame: batch})
+	batch.Seq = 6
+	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * ackEvery), Frame: batch})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 2 {
-		t.Fatalf("immediate ack = %#v", tr.Frames)
+	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 6 {
+		t.Fatalf("next ack did not flush immediately: %#v", tr.Frames)
+	}
+}
+
+func TestSessionCoreIdleAlarmTracksLivenessOnly(t *testing.T) {
+	_, core, ctx, state, sidecar, now := coreFixture(t, "core-idle-alarm")
+	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-idle-alarm", 0, "").GetHello())
+	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+	}}}
+	acked, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: stats})
+	if err != nil || len(acked.Frames) != 1 || acked.Frames[0].GetAck().GetUpToSeq() != 1 {
+		t.Fatalf("stats ack = frames %+v, err %v", acked.Frames, err)
+	}
+	if !acked.State.NextAckTick.IsZero() || acked.State.NextCertCheck.IsZero() || acked.NextAlarm == nil || !acked.NextAlarm.Equal(acked.State.LivenessDeadline) {
+		t.Fatalf("idle deadlines: next=%v liveness=%v ack=%v cert=%v", acked.NextAlarm, acked.State.LivenessDeadline, acked.State.NextAckTick, acked.State.NextCertCheck)
 	}
 }
 
@@ -814,9 +1270,10 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	}
 
 	certAt := second.State.NextCertCheck
-	cert := fireAlarmsThrough(t, ctx, core, second, certAt)
-	if cert.Close != nil {
-		t.Fatalf("uncertified test session unexpectedly closed on certificate check: %+v", cert.Close)
+	cert, err := coreStep(ctx, core, second.State, second.Sidecar, SessionEvent{Kind: EventAgentFrame, At: certAt,
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}})
+	if err != nil || cert.Close != nil || !cert.State.NextCertCheck.Equal(certAt.Add(core.f.certCheck)) {
+		t.Fatalf("certificate recheck on agent event = close %v, deadline %v, err %v", cert.Close, cert.State.NextCertCheck, err)
 	}
 }
 
@@ -831,7 +1288,7 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tr.Frames) != 1 || len(tr.Sidecar.Pending) != 1 {
+	if len(tr.Frames) != 1 || len(tr.State.Pending) != 1 {
 		t.Fatalf("command transition = state %+v frames %#v", tr.State, tr.Frames)
 	}
 	result := &agentv1.CommandResult{RequestId: "req-command", Ok: true}
@@ -843,12 +1300,12 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	if !hasEffect(beforeClose, EffectCommandResult) || beforeClose.Effects[0].RequestID != "req-command" {
 		t.Fatalf("command result effects = %+v", beforeClose.Effects)
 	}
-	if len(beforeClose.Sidecar.Pending) != 0 {
-		t.Fatalf("command result left a pending request: %+v", beforeClose.Sidecar.Pending)
+	if len(beforeClose.State.Pending) != 0 {
+		t.Fatalf("command result left a pending request: %+v", beforeClose.State.Pending)
 	}
 	disconnected, err := coreStep(ctx, core, beforeClose.State, beforeClose.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(2 * time.Second)})
-	if err != nil || len(disconnected.Sidecar.Pending) != 0 {
-		t.Fatalf("disconnect after command result left pending requests: %+v, err %v", disconnected.Sidecar.Pending, err)
+	if err != nil || len(disconnected.State.Pending) != 0 {
+		t.Fatalf("disconnect after command result left pending requests: %+v, err %v", disconnected.State.Pending, err)
 	}
 	duplicate, err := coreStep(ctx, core, disconnected.State, disconnected.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
@@ -904,12 +1361,12 @@ func TestSessionCorePendingRequestExpiresAtNextAlarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(expired.Sidecar.Pending) != 0 {
-		t.Fatalf("expired request is still pending: %+v", expired.Sidecar.Pending)
+	if len(expired.State.Pending) != 0 {
+		t.Fatalf("expired request is still pending: %+v", expired.State.Pending)
 	}
 }
 
-func TestSessionCoreCertificateRevocationClosesOnAlarm(t *testing.T) {
+func TestSessionCoreCertificateRevocationClosesOnEvent(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("node-cert-alarm")
 	owner, ctx := e.f.claimOwner(a.nodeID, e.ctx)
@@ -934,9 +1391,16 @@ func TestSessionCoreCertificateRevocationClosesOnAlarm(t *testing.T) {
 	}
 	e.exec(`UPDATE node_cert SET revoked_at = ?, revoke_reason = 'test' WHERE node_id = ?`, now.Add(-time.Second).Unix(), a.nodeID)
 	certDeadline := helloTr.State.NextCertCheck
-	closed := fireAlarmsThrough(t, ctx, core, helloTr, certDeadline)
+	if helloTr.NextAlarm == nil || helloTr.NextAlarm.Equal(certDeadline) {
+		t.Fatalf("certificate deadline scheduled an alarm: next=%v certificate=%v", helloTr.NextAlarm, certDeadline)
+	}
+	closed, err := coreStep(ctx, core, helloTr.State, helloTr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: certDeadline,
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if closed.Close == nil || closed.Close.Class != CloseUnauthenticated {
-		t.Fatalf("revoked certificate alarm = %+v, want unauthenticated close", closed.Close)
+		t.Fatalf("revoked certificate event = %+v, want unauthenticated close", closed.Close)
 	}
 }
 
@@ -1070,7 +1534,7 @@ func TestSessionCoreStepMutatesCallerState(t *testing.T) {
 	if state.HelloDeadline.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(state.HelloDeadline) {
 		t.Fatalf("Step did not update caller state: state=%+v transition=%+v", state, tr)
 	}
-	if sidecar.Pending == nil {
+	if sidecar.Live.UserDown == nil || sidecar.Live.UserUp == nil {
 		t.Fatalf("Step did not initialize caller sidecar: %+v", sidecar)
 	}
 }
@@ -1238,7 +1702,7 @@ func TestRunSessionStepsDisconnectBeforeClosingDone(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("session did not stop after cancellation")
 	}
-	if !s.coreState.Disconnected || nextSessionAlarm(s.coreState, s.coreSidecar, e.f.now()) != nil {
+	if !s.coreState.Disconnected || nextSessionAlarm(s.coreState, e.f.now()) != nil {
 		t.Fatalf("runSession ended without clearing core alarms: state=%+v", s.coreState)
 	}
 	e.f.mu.Lock()
@@ -1518,7 +1982,7 @@ func TestStepAfterEndDoesNotRearmOrRewritePoison(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.NextAlarm != nil || !s.coreState.Disconnected || nextSessionAlarm(s.coreState, s.coreSidecar, now.Add(2*time.Second)) != nil {
+	if again.NextAlarm != nil || !s.coreState.Disconnected || nextSessionAlarm(s.coreState, now.Add(2*time.Second)) != nil {
 		t.Fatalf("event after end changed session scheduling: disconnected=%t next=%v", s.coreState.Disconnected, again.NextAlarm)
 	}
 	e.f.mu.Lock()

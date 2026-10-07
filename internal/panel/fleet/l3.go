@@ -77,47 +77,61 @@ const (
 	warpRefreshGap = 10 * time.Minute
 )
 
-// l3Intake is the per-stream memory of what was last persisted, so a stats batch every 10 s does not become a database
-// write every 10 s. It is only touched by the stream's own goroutine.
-type l3Intake struct {
-	awg     map[string]*healthMemo[*agentv1.AwgHealth]
-	warp    healthMemo[*agentv1.WarpHealth]
-	warpUp  bool
-	warpAsk time.Time
+// l3MemoState keeps only hashes and timestamps, so serialized session size grows with the number of AWG inbounds.
+type l3MemoState struct {
+	AWG           map[string]l3HealthMemo `json:"a,omitempty"`
+	Warp          l3HealthMemo            `json:"w,omitzero"`
+	WarpChangeKey string                  `json:"wk,omitempty"`
+	WarpUp        bool                    `json:"u,omitempty"`
+	WarpAsk       time.Time               `json:"q,omitzero"`
 }
 
-type healthMemo[T proto.Message] struct {
-	last T
-	at   time.Time
-	have bool
+type l3HealthMemo struct {
+	Hash string    `json:"h,omitempty"`
+	At   time.Time `json:"t,omitzero"`
 }
 
-// due says whether v must be written now, and remembers it when it is. urgent (may be nil) names a change that must not
-// wait for the gap: the rest of a report (byte counters, handshake age) changes with every batch and may be written late,
-// a state may not, or the badge keeps saying what the node stopped saying.
-func (m *healthMemo[T]) due(v T, now time.Time, urgent func(prev, next T) bool) bool {
-	if m.have && now.Sub(m.at) < healthMinGap && (urgent == nil || !urgent(m.last, v)) {
+// due says whether a changed report or its refresh is due, and remembers it when it is.
+func (m *l3HealthMemo) due(hash string, now time.Time, urgent bool) bool {
+	have := !m.At.IsZero()
+	if have && now.Sub(m.At) < healthMinGap && !urgent {
 		return false
 	}
-	if m.have && proto.Equal(m.last, v) && now.Sub(m.at) < healthRefreshGap {
+	if have && hash == m.Hash && now.Sub(m.At) < healthRefreshGap {
 		return false
 	}
-	m.last, m.at, m.have = proto.Clone(v).(T), now, true
+	m.Hash, m.At = hash, now
 	return true
 }
 
-// warpStateChanged: the WARP tunnel went from one state to another (starting -> up, up -> down), or the latest check
-// flipped between passing and failing (a probe went red or green, the reason changed). The first check that passes already
-// shows a fresh handshake and green probes while the state still says "starting" (the node wants two), so a report written
-// 30 s late would keep that picture for half a minute after the node was up; the same goes for a check that starts failing
-// while the state stays "starting" (a slow WARP edge: the card must not keep showing green dots).
-func warpStateChanged(prev, next *agentv1.WarpHealth) bool {
-	return prev.GetState() != next.GetState() ||
-		prev.GetLastError() != next.GetLastError() ||
-		prev.GetProbeCloudflareOk() != next.GetProbeCloudflareOk() ||
-		prev.GetProbeOtherOk() != next.GetProbeOtherOk() ||
-		prev.GetProbeCloudflare().GetFailureCode() != next.GetProbeCloudflare().GetFailureCode() ||
-		prev.GetProbeOther().GetFailureCode() != next.GetProbeOther().GetFailureCode()
+func l3ReportHash(v proto.Message) string {
+	b, err := (proto.MarshalOptions{Deterministic: true}).Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return shortHash(b)
+}
+
+// warpChangeKey covers exactly the fields that make a WARP health change urgent: the WARP tunnel went from one state to
+// another (starting -> up, up -> down), or the latest check flipped between passing and failing (a probe went red or green,
+// the reason changed). The first check that passes already shows a fresh handshake and green probes while the state still
+// says "starting" (the node wants two), so a report written 30 s late would keep that picture for half a minute after the
+// node was up; the same goes for a check that starts failing while the state stays "starting" (a slow WARP edge: the card
+// must not keep showing green dots).
+func warpChangeKey(v *agentv1.WarpHealth) string {
+	if v == nil {
+		v = &agentv1.WarpHealth{}
+	}
+	key := &agentv1.WarpHealth{
+		State: v.State, LastError: v.LastError, ProbeCloudflareOk: v.ProbeCloudflareOk, ProbeOtherOk: v.ProbeOtherOk,
+	}
+	if failure := v.GetProbeCloudflare().GetFailureCode(); failure != "" {
+		key.ProbeCloudflare = &agentv1.WarpProbeResult{FailureCode: failure}
+	}
+	if failure := v.GetProbeOther().GetFailureCode(); failure != "" {
+		key.ProbeOther = &agentv1.WarpProbeResult{FailureCode: failure}
+	}
+	return l3ReportHash(key)
 }
 
 // warp event reasons the agent sends (internal/node/warp, internal/node/agent): codes of warp_needs_attention.

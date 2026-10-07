@@ -13,10 +13,11 @@ even before the runtime has hibernated them" (Durable Objects pricing, checked 2
 only if it uses the WebSocket hibernation API and has nothing pending between events: no timers, no unresolved
 promises. In-memory state is lost on hibernation; per-socket attachments (up to 16 KiB) and DO storage survive.
 
-The panel's session today (`internal/panel/fleet`, `runSession`) is a goroutine per stream that blocks in `Receive`,
-holds state in local variables, and runs tickers (acks, certificate checks). In Go compiled to wasm, a blocked goroutine
-or a ticker is a pending promise or timer in the isolate, so a DO hosting that loop would never be eligible for
-hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4 million included in Workers Paid.
+The panel's session (`internal/panel/fleet`, `runSession`) is a goroutine per stream that blocks in `Receive` and holds
+state in local variables. Acknowledgements need a timer only while one is owed; certificate checks run on ordinary
+inbound events. In Go compiled to wasm, a blocked goroutine or a timer is a pending promise or timer in the isolate, so
+a DO hosting that loop would never be eligible for hibernation. With four nodes that is about 1.3 million GB-s a month,
+against 0.4 million included in Workers Paid.
 
 ## Decision
 
@@ -25,16 +26,17 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
   frames, adapter effects, a close decision and the next alarm time. The core owns protocol state; effects never write
   back into it.
 - Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
-  differs by edition: delivering results to waiters, Cloudflare calls, the long bandwidth job, and the cross-module
-  usage callback. Publishing the live view for admin reads is not an effect: the adapter does it (`publishView`) after
-  every step. Desired-state reads use a single in-flight preparation with a dirty bit: the effect starts its own session
-  preparation, while `stepDesired` (the one caller that creates the desired-state-changed event) runs the first reconcile
-  round's read inline instead of through the effect.
+  differs by edition: delivering results to waiters, Cloudflare calls, and the cross-module usage callback. Publishing
+  the live view for admin reads is not an effect: the adapter does it (`publishView`) after every step. Desired-state
+  reads use a single in-flight preparation with a dirty bit: the effect starts its own session preparation, while
+  `stepDesired` (the one caller that creates the desired-state-changed event) runs the first reconcile round's read inline
+  instead of through the effect.
   Each prepared result is stepped through the core, which applies it and records withheld inbounds inline; a dirty
   follow-up starts through the effect. Certificate checks and pure database writes run inline.
 - VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now, using one timer reset
-  to the transition's `NextAlarm` after every step. The core sets hello, liveness, bandwidth, acknowledgement,
-  certificate and request-expiry deadlines. mTLS behaviour, timing and tests stay the same.
+  to the transition's `NextAlarm` after every step. The core sets hello, liveness, first-bandwidth, outstanding-ack,
+  preparation-retry and request-expiry deadlines. Certificate checks run on ordinary inbound events after their check
+  interval; the acknowledgement cadence stays the same.
 - Edge: a `NodeLink` DO per node (`idFromName(node_id)`) accepts the WebSocket with the hibernation API, does the
   signed handshake through the same Go code, keeps the small session state in the socket attachment or DO storage,
   calls the core per event, and turns "next alarm" into a DO alarm. Admin changes reach it as a call from the Worker.

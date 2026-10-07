@@ -643,8 +643,8 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.coreSidecar.L3.warpAsk.IsZero() {
-		t.Fatalf("missing module consumed the refresh throttle at %v", s.coreSidecar.L3.warpAsk)
+	if !s.coreState.L3.WarpAsk.IsZero() {
+		t.Fatalf("missing module consumed the refresh throttle at %v", s.coreState.L3.WarpAsk)
 	}
 	<-s.out // Ack for the first event.
 
@@ -658,8 +658,8 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 	if err != errAgentQueueFull {
 		t.Fatalf("full Ack queue error = %v, want %v", err, errAgentQueueFull)
 	}
-	if !s.coreSidecar.L3.warpAsk.Equal(eventAt) {
-		t.Fatalf("refresh throttle timestamp = %v, want core event time %v", s.coreSidecar.L3.warpAsk, eventAt)
+	if !s.coreState.L3.WarpAsk.Equal(eventAt) {
+		t.Fatalf("refresh throttle timestamp = %v, want core event time %v", s.coreState.L3.WarpAsk, eventAt)
 	}
 	select {
 	case <-w.refreshed:
@@ -700,7 +700,8 @@ func TestWarpUpClearsWhatTheNodeRaised(t *testing.T) {
 }
 
 // A check that starts failing while the state stays "starting" (a slow WARP edge) is written at once, a counter change is not.
-func TestWarpStateChangedSeesAFlippedCheck(t *testing.T) {
+func TestWarpChangeKeySeesAFlippedCheck(t *testing.T) {
+	warpStateChanged := func(prev, next *agentv1.WarpHealth) bool { return warpChangeKey(prev) != warpChangeKey(next) }
 	st := agentv1.WarpState_WARP_STATE_STARTING
 	ok := &agentv1.WarpHealth{State: st, ProbeCloudflareOk: true, ProbeOtherOk: true, RxBytes: 1}
 	same := &agentv1.WarpHealth{State: st, ProbeCloudflareOk: true, ProbeOtherOk: true, RxBytes: 2}

@@ -290,7 +290,7 @@ func TestEnrollLimiterSourcesAndBound(t *testing.T) {
 	}
 }
 
-// F9: after Renew the previous certificate dies after a short grace; a stream on it is closed.
+// F9: after Renew the previous certificate dies after a short grace; a later inbound event closes its stream.
 func TestRenewedOutCertificateExpiresAfterGraceAndClosesStream(t *testing.T) {
 	e := newEnv(t)
 	var offset atomic.Int64 // seconds
@@ -311,7 +311,8 @@ func TestRenewedOutCertificateExpiresAfterGraceAndClosesStream(t *testing.T) {
 	fresh := e.identity(a.nodeID, key2, rr.Msg.CertificatePem)
 
 	// Inside the grace both work, and the running stream is left alone.
-	time.Sleep(200 * time.Millisecond)
+	offset.Store(1)
+	old.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
 	select {
 	case err := <-old.errc:
 		t.Fatalf("stream closed inside the grace: %v", err)
@@ -326,6 +327,7 @@ func TestRenewedOutCertificateExpiresAfterGraceAndClosesStream(t *testing.T) {
 	fresh = e.identity(a.nodeID, key2, rr2.Msg.CertificatePem)
 
 	offset.Store(int64(oldCertGrace/time.Second) + 60)
+	old.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
 	if err := old.ended(); code(err) != connect.CodeUnauthenticated {
 		t.Errorf("stream on the renewed-out certificate: %v, want UNAUTHENTICATED", err)
 	}
@@ -339,7 +341,7 @@ func TestRenewedOutCertificateExpiresAfterGraceAndClosesStream(t *testing.T) {
 	nc.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 }
 
-// F9: a stream is closed when its certificate expires (the handshake checks it only once).
+// F9: a stream is closed on the next inbound event after its certificate expires.
 func TestStreamClosesWhenItsCertificateExpires(t *testing.T) {
 	e := newEnv(t)
 	var offset atomic.Int64
@@ -350,6 +352,7 @@ func TestStreamClosesWhenItsCertificateExpires(t *testing.T) {
 	c.send(0, hello("i", 0, ""))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	offset.Store(int64(nodeCertTTL/time.Second) + 3600)
+	c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
 	if err := c.ended(); code(err) != connect.CodeUnauthenticated {
 		t.Errorf("stream with an expired certificate: %v", err)
 	}
@@ -359,12 +362,16 @@ func TestStreamClosesWhenItsCertificateExpires(t *testing.T) {
 // (certificates are revoked in the database).
 func TestStreamClosesWhenItsCertificateIsRevoked(t *testing.T) {
 	e := newEnv(t)
+	var offset atomic.Int64
+	e.f.now = func() time.Time { return time.Now().Add(time.Duration(offset.Load()) * time.Second) }
 	e.f.certCheck = 40 * time.Millisecond
 	a := e.enroll("nodea")
 	c := a.open()
 	c.send(0, hello("i", 0, ""))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	e.exec(`UPDATE node_cert SET revoked_at = ?, revoke_reason = 'test' WHERE node_id = ?`, time.Now().Unix()-1, a.nodeID)
+	offset.Store(1)
+	c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
 	if err := c.ended(); code(err) != connect.CodeUnauthenticated {
 		t.Errorf("stream with a revoked certificate: %v", err)
 	}

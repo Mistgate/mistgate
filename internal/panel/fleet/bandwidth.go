@@ -40,8 +40,15 @@ func (f *Fleet) measureBandwidth(ctx context.Context, n store.NodeRow) (*adminv1
 	if err != nil {
 		return nil, err
 	}
+	return parseBandwidthResult(res), nil
+}
+
+func parseBandwidthResult(res *agentv1.CommandResult) *adminv1.MeasureBandwidthResponse {
+	if res == nil {
+		return &adminv1.MeasureBandwidthResponse{ErrorCode: "failed"}
+	}
 	if !res.Ok {
-		return &adminv1.MeasureBandwidthResponse{ErrorCode: measureErrorCode(res.Error)}, nil
+		return &adminv1.MeasureBandwidthResponse{ErrorCode: measureErrorCode(res.Error)}
 	}
 	out := &adminv1.MeasureBandwidthResponse{
 		DownMbps: mbpsParam(res.Params["down_mbps"]), UpMbps: mbpsParam(res.Params["up_mbps"]),
@@ -51,13 +58,13 @@ func (f *Fleet) measureBandwidth(ctx context.Context, n store.NodeRow) (*adminv1
 	out.PeopleDownMbps = min(mbpsParam(res.Params["down_people_mbps"]), out.DownMbps)
 	out.PeopleUpMbps = min(mbpsParam(res.Params["up_people_mbps"]), out.UpMbps)
 	if out.DownMbps == 0 { // a link that moved nothing is not a measurement
-		return &adminv1.MeasureBandwidthResponse{ErrorCode: "failed"}, nil
+		return &adminv1.MeasureBandwidthResponse{ErrorCode: "failed"}
 	}
 	// An agent from before these fields says nothing: every run it counted worked as far as anyone knows.
 	out.ServerDetail = clip(res.Params["server_detail"], 80)
 	out.RunsTotal = max(mbpsParam(res.Params["runs_total"]), out.Runs)
 	out.RunFailures = runFailures(res.Params["run_failures"], int(out.RunsTotal-out.Runs))
-	return out, nil
+	return out
 }
 
 // runFailures reads the agent's comma separated reason codes: only the known words and http_<code> are passed on, anything
@@ -130,45 +137,29 @@ func (s nodeService) MeasureBandwidth(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(out), nil
 }
 
-func (f *Fleet) runAutoMeasureBandwidth(s *session) {
-	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		go func() {
-			select {
-			case <-s.done:
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
-		n, err := f.st.Node(ctx, s.nodeID)
-		if err != nil || n.BandwidthMbps != 0 {
-			return
+func (f *Fleet) storeAutoMeasureBandwidth(ctx context.Context, nodeID string, out *adminv1.MeasureBandwidthResponse) {
+	if out == nil || out.ErrorCode != "" {
+		f.log.Info("first bandwidth measurement did not work", "node", nodeID, "code", out.GetErrorCode())
+		return
+	}
+	if out.UpMbps == 0 { // only the download answered: on an asymmetric link that would be recorded too high, unseen
+		f.log.Info("first bandwidth measurement has no upload figure, nothing stored", "node", nodeID, "down_mbps", out.DownMbps)
+		f.event(ctx, 2, "bandwidth_upload_missing", nodeID, map[string]string{"down_mbps": strconv.Itoa(int(out.DownMbps)), "server": out.Server})
+		return
+	}
+	stored, err := f.st.SetBandwidthIfUnset(ctx, nodeID, capacityOf(out.DownMbps, out.UpMbps))
+	if err != nil || !stored {
+		if err != nil {
+			f.log.Warn("store the measured bandwidth", "node", nodeID, "err", err)
 		}
-		out, err := f.measureBandwidth(ctx, n)
-		if err != nil || out.ErrorCode != "" {
-			f.log.Info("first bandwidth measurement did not work", "node", n.ID, "err", err, "code", out.GetErrorCode())
-			return
-		}
-		if out.UpMbps == 0 { // only the download answered: on an asymmetric link that would be recorded too high, unseen
-			f.log.Info("first bandwidth measurement has no upload figure, nothing stored", "node", n.ID, "down_mbps", out.DownMbps)
-			f.event(ctx, 2, "bandwidth_upload_missing", n.ID, map[string]string{"down_mbps": strconv.Itoa(int(out.DownMbps)), "server": out.Server})
-			return
-		}
-		stored, err := f.st.SetBandwidthIfUnset(ctx, n.ID, capacityOf(out.DownMbps, out.UpMbps))
-		if err != nil || !stored {
-			if err != nil {
-				f.log.Warn("store the measured bandwidth", "node", n.ID, "err", err)
-			}
-			return
-		}
-		p := map[string]string{"down_mbps": strconv.Itoa(int(out.DownMbps)), "up_mbps": strconv.Itoa(int(out.UpMbps)), "server": out.Server, "auto": "1"}
-		f.event(ctx, 1, "bandwidth_measured", n.ID, p)
-		b, _ := json.Marshal(p)
-		if err := f.st.Audit(ctx, f.now(), store.AuditEntry{Actor: "system", Action: "node.bandwidth_auto", Params: string(b), Result: "ok"}); err != nil {
-			f.log.Warn("audit", "action", "node.bandwidth_auto", "err", err)
-		}
-	}()
+		return
+	}
+	p := map[string]string{"down_mbps": strconv.Itoa(int(out.DownMbps)), "up_mbps": strconv.Itoa(int(out.UpMbps)), "server": out.Server, "auto": "1"}
+	f.event(ctx, 1, "bandwidth_measured", nodeID, p)
+	b, _ := json.Marshal(p)
+	if err := f.st.Audit(ctx, f.now(), store.AuditEntry{Actor: "system", Action: "node.bandwidth_auto", Params: string(b), Result: "ok"}); err != nil {
+		f.log.Warn("audit", "action", "node.bandwidth_auto", "err", err)
+	}
 }
 
 // capacityOf is the capacity a measurement gives a VPN node: the slower direction. Every byte a person downloads comes
