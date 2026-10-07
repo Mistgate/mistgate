@@ -522,7 +522,7 @@ func TestCeremonyCapPerSource(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("read ceremony to verify the source slot: ok=%v err=%v", ok, err)
 	}
-	if consumed, err := s.consumeCeremony(ctx, finished); err != nil || !consumed {
+	if consumed, err := s.st.ConsumeAuthCeremony(ctx, finished); err != nil || !consumed {
 		t.Fatalf("consume ceremony to free source slot: consumed=%v err=%v", consumed, err)
 	}
 	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {

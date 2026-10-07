@@ -109,29 +109,14 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
-	c, ok, err := s.getCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey)
+	// another admin's ceremony is as good as unknown
+	c, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey, func(c *ceremony) bool { return c.admin.ID == admin.ID })
+	if errors.Is(err, errCeremonyGone) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
+	}
 	if err != nil {
+		s.log.Error("take add-passkey ceremony", "err", err)
 		return nil, errInternal(err)
-	}
-	expired := func() error {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
-	}
-	if !ok {
-		return nil, expired()
-	}
-	if c.admin.ID != admin.ID { // another admin's ceremony is as good as unknown
-		if _, err := s.consumeCeremony(ctx, req.Msg.CeremonyId); err != nil {
-			s.log.Error("consume foreign add-passkey ceremony", "err", err)
-		}
-		return nil, expired()
-	}
-	consumed, err := s.consumeCeremony(ctx, req.Msg.CeremonyId)
-	if err != nil {
-		s.log.Error("consume add-passkey ceremony", "err", err)
-		return nil, errInternal(err)
-	}
-	if !consumed {
-		return nil, expired()
 	}
 	parsed, err := protocol.ParseCredentialCreationResponseBytes([]byte(req.Msg.CredentialJson))
 	if err != nil {

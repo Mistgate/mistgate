@@ -493,16 +493,17 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("user = %+v, %v", got, err)
 		}
 	})
-	t.Run("AddDevice", func(t *testing.T) {
+	t.Run("EnsureImplicitDeviceWithoutCredentials", func(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_add_device", nil)
 		createUser(t, st, "usr_add_device", "Device user", "grp_add_device")
 		dev := AccessDevice{ID: "dev_add_device", UserID: "usr_add_device", Implicit: true, CreatedAt: now}
-		if err := st.Access().AddDevice(ctx, dev, nil); err != nil {
-			t.Fatal(err)
+		got, live, created, err := st.Access().EnsureImplicitDevice(ctx, dev, nil)
+		if err != nil || created || got.ID != "" || len(live) != 0 {
+			t.Fatalf("EnsureImplicitDevice without credentials = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		if got, err := st.Access().ImplicitDevice(ctx, dev.UserID); err != nil || got.ID != dev.ID {
-			t.Fatalf("implicit device = %+v, %v", got, err)
+		if _, err := st.Access().ImplicitDevice(ctx, dev.UserID); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("implicit device after empty ensure = %v, want not found", err)
 		}
 	})
 	t.Run("EnsureImplicitDeviceAddsCredentials", func(t *testing.T) {
@@ -561,11 +562,12 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			return AccessCred{ID: "crd_implicit_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: "{}"}, "pub_implicit_awg", nil
 		}}}
 		result, err := st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
-		if err != nil || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
+		if err != nil || result.Device.ID == "" || len(result.Added) != 1 || len(result.Creds) != 1 {
 			t.Fatalf("EnsureImplicitAWGCreds = %+v, %v; want one added and live credential", result, err)
 		}
+		deviceID := result.Device.ID
 		result, err = st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
-		if err != nil || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
+		if err != nil || result.Device.ID != deviceID || len(result.Added) != 0 || len(result.Creds) != 1 {
 			t.Fatalf("repeat EnsureImplicitAWGCreds = %+v, %v; want one live credential and no additions", result, err)
 		}
 	})
@@ -573,10 +575,10 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_revoke_device", nil)
 		createUser(t, st, "usr_revoke_device", "Revoke user", "grp_revoke_device")
-		dev := AccessDevice{ID: "dev_revoke_device", UserID: "usr_revoke_device", CreatedAt: now}
+		dev := AccessDevice{ID: "dev_revoke_device", UserID: "usr_revoke_device", Implicit: true, CreatedAt: now}
 		cred := AccessCred{ID: "crd_revoke_device", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
-		if err := st.Access().AddDevice(ctx, dev, []AccessCred{cred}); err != nil {
-			t.Fatal(err)
+		if _, _, created, err := st.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred}); err != nil || !created {
+			t.Fatalf("create implicit device for revoke = created %v, %v", created, err)
 		}
 		if userID, err := st.Access().RevokeDevice(ctx, dev.ID, now); err != nil || userID != dev.UserID {
 			t.Fatalf("revoke = %q, %v", userID, err)

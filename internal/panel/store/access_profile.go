@@ -28,7 +28,7 @@ func scanAccessProfile(r rowScanner) (AccessProfile, error) {
 	err := r.Scan(&id, &protocol, &name, &settings, &p.SecretsEnc, &version, &created, &updated)
 	p.ID, p.Protocol, p.Name, p.SettingsJSON = id.String, protocol.String, name.String, settings.String
 	p.Version = uint32(version.Int64)
-	p.CreatedAt, p.UpdatedAt = accReadTime(created), accReadTime(updated)
+	p.CreatedAt, p.UpdatedAt = accTimeFromUnix(created), accTimeFromUnix(updated)
 	return p, err
 }
 
@@ -199,7 +199,7 @@ func scanAccessInbound(r rowScanner) (AccessInbound, error) {
 	i.Enabled, i.SpecVersion = enabled.Int64 == 1, uint64(specVersion.Int64)
 	i.State, i.LastError, i.CertPinSHA256 = state.String, lastError.String, certPin.String
 	i.PluginPublicJSON, i.AwgHealthJSON = pluginPublic.String, healthJSON.String
-	i.CreatedAt, i.UpdatedAt = accReadTime(created), accReadTime(updated)
+	i.CreatedAt, i.UpdatedAt = accTimeFromUnix(created), accTimeFromUnix(updated)
 	if notAfter.Int64 != 0 {
 		i.CertNotAfter = fromUnix(notAfter.Int64)
 	}

@@ -150,23 +150,14 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	m := req.Msg
 	method := "passkey"
 	if m.CeremonyId != "" || m.CredentialJson != "" {
-		c, ok, err := s.getCeremony(ctx, m.CeremonyId, ceremonyStepUp)
-		if err != nil {
-			return nil, errInternal(err)
-		}
-		if !ok {
+		c, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyStepUp, func(c *ceremony) bool {
+			return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, currentHash(req))
+		})
+		if errors.Is(err, errCeremonyGone) {
 			return nil, refuse("unknown or foreign ceremony", nil)
 		}
-		if c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
-			_, err := s.consumeCeremony(ctx, m.CeremonyId)
-			return nil, refuse("unknown or foreign ceremony", err)
-		}
-		consumed, err := s.consumeCeremony(ctx, m.CeremonyId)
 		if err != nil {
-			return nil, refuse("could not consume ceremony", err)
-		}
-		if !consumed {
-			return nil, refuse("unknown or foreign ceremony", nil)
+			return nil, refuse("could not take ceremony", err)
 		}
 		parsed, err := protocol.ParseCredentialRequestResponseBytes([]byte(m.CredentialJson))
 		if err != nil {

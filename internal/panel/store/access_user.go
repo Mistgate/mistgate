@@ -51,8 +51,8 @@ func scanAccessUser(r rowScanner) (AccessUser, error) {
 	u.Disabled, u.AppHapp, u.AppAmnezia, u.AllNodes = dis == 1, happ == 1, amn == 1, all == 1
 	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps = uint64(quota), uint64(used), uint64(speed)
 	u.PeriodStart = fromUnix(period)
-	u.ExpiresAt = accTime(expires)
-	u.LastSeenAt = accTime(sql.NullInt64{Int64: seen, Valid: true})
+	u.ExpiresAt = accTimeIfNonzero(expires)
+	u.LastSeenAt = accTimeIfNonzero(sql.NullInt64{Int64: seen, Valid: true})
 	u.LastNodeID = lastNode.String
 	u.CreatedAt = fromUnix(created)
 	return u, err
@@ -446,7 +446,7 @@ func (a Access) UserStates(ctx context.Context, ids []string) ([]AccessUserState
 			return nil, err
 		}
 		s.Disabled, s.QuotaBytes, s.UsedBytes = dis == 1, uint64(quota), uint64(used)
-		s.ExpiresAt, s.PeriodStart = accTime(exp), fromUnix(period)
+		s.ExpiresAt, s.PeriodStart = accTimeIfNonzero(exp), fromUnix(period)
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -491,7 +491,7 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	if last.Valid && last.Int64 != 0 {
 		d.LastSeenAt = fromUnix(last.Int64)
 	}
-	d.CreatedAt = accReadTime(created)
+	d.CreatedAt = accTimeFromUnix(created)
 	if protocols.Valid && protocols.String != "" {
 		d.Protocols = strings.Split(protocols.String, ",")
 	}
@@ -618,8 +618,11 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 }
 
 // EnsureImplicitDevice inserts any missing live credentials on the user's one implicit device and reads back its full
-// live state. Callers with no credentials to add should skip the write.
+// live state. It does not create an empty implicit device.
 func (a Access) EnsureImplicitDevice(ctx context.Context, dev AccessDevice, creds []AccessCred) (AccessDevice, []AccessCred, bool, error) {
+	if len(creds) == 0 {
+		return AccessDevice{}, nil, false, nil
+	}
 	if dev.ID == "" {
 		dev.ID = NewID("dev_")
 	}
@@ -801,18 +804,6 @@ func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time) 
 	return err
 }
 
-// AddDevice inserts a device with its credentials (ErrAccessExists on a live implicit device race).
-func (a Access) AddDevice(ctx context.Context, d AccessDevice, creds []AccessCred) error {
-	_, err := a.s.batch(ctx, accInsertDeviceStmts(d, creds)...)
-	switch {
-	case accIsUnique(err):
-		return ErrAccessExists
-	case accIsFK(err):
-		return ErrNotFound
-	}
-	return err
-}
-
 // RevokeDevice soft-deletes a live device and its credentials and returns its user id; ErrNotFound when
 // the device does not exist or is already revoked.
 func (a Access) RevokeDevice(ctx context.Context, id string, now time.Time) (string, error) {
@@ -878,7 +869,7 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 		if err := rows.Scan(&c.InboundID, &c.CredID, &c.UserID, &c.DeviceID, &c.Protocol, &c.DataJSON, &speed, &exp, &happ, &amn); err != nil {
 			return nil, err
 		}
-		c.SpeedLimitBps, c.ExpiresAt, c.AppHapp, c.AppAmnezia = uint64(speed), accTime(exp), happ == 1, amn == 1
+		c.SpeedLimitBps, c.ExpiresAt, c.AppHapp, c.AppAmnezia = uint64(speed), accTimeIfNonzero(exp), happ == 1, amn == 1
 		out = append(out, c)
 	}
 	return out, rows.Err()

@@ -324,46 +324,12 @@ func TestCreateUserRaceKeepsUniqueName(t *testing.T) {
 	}
 }
 
-func TestAddDeviceRaceKeepsOneImplicitDevice(t *testing.T) {
-	s := openTemp(t)
-	ctx := context.Background()
-	rewriteAccessGroup(t, s, "grp_device_race", "Device race")
-	rewriteAccessUser(t, s, "usr_device_race", "Device user", "grp_device_race")
-	start := make(chan struct{})
-	results := make(chan error, 2)
-	for i := range 2 {
-		go func(i int) {
-			<-start
-			dev := AccessDevice{ID: fmt.Sprintf("dev_implicit_race_%d", i), UserID: "usr_device_race", Implicit: true, CreatedAt: t0}
-			results <- s.Access().AddDevice(ctx, dev, nil)
-		}(i)
-	}
-	close(start)
-	var successes, conflicts int
-	for range 2 {
-		switch err := <-results; {
-		case err == nil:
-			successes++
-		case errors.Is(err, ErrAccessExists):
-			conflicts++
-		default:
-			t.Fatalf("AddDevice race: %v", err)
-		}
-	}
-	if successes != 1 || conflicts != 1 || countT(t, s, `SELECT count(*) FROM device WHERE user_id = 'usr_device_race' AND hwid_hash IS NULL AND revoked_at IS NULL`) != 1 {
-		t.Fatalf("successes=%d conflicts=%d", successes, conflicts)
-	}
-}
-
 func TestEnsureImplicitDeviceRaceKeepsOneLiveProtocol(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()
 	rewriteAccessGroup(t, s, "grp_creds_race", "Credential race")
-	rewriteAccessUser(t, s, "usr_creds_race", "Credential user", "grp_creds_race")
-	dev := AccessDevice{ID: "dev_creds_race", UserID: "usr_creds_race", CreatedAt: t0}
-	if err := s.Access().AddDevice(ctx, dev, nil); err != nil {
-		t.Fatal(err)
-	}
+	const userID = "usr_creds_race"
+	rewriteAccessUser(t, s, userID, "Credential user", "grp_creds_race")
 	start := make(chan struct{})
 	type outcome struct {
 		created bool
@@ -373,10 +339,10 @@ func TestEnsureImplicitDeviceRaceKeepsOneLiveProtocol(t *testing.T) {
 	for i := range 2 {
 		go func(i int) {
 			<-start
-			cred := AccessCred{ID: fmt.Sprintf("crd_creds_race_%d", i), UserID: dev.UserID,
+			cred := AccessCred{ID: fmt.Sprintf("crd_creds_race_%d", i), UserID: userID,
 				Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
 			_, _, created, err := s.Access().EnsureImplicitDevice(ctx,
-				AccessDevice{ID: fmt.Sprintf("dev_creds_race_%d", i), UserID: dev.UserID, Implicit: true, CreatedAt: t0}, []AccessCred{cred})
+				AccessDevice{ID: fmt.Sprintf("dev_creds_race_%d", i), UserID: userID, Implicit: true, CreatedAt: t0}, []AccessCred{cred})
 			results <- outcome{created: created, err: err}
 		}(i)
 	}
@@ -408,8 +374,9 @@ func TestEnsureImplicitDeviceDuplicateCredentialIDCollisionErrors(t *testing.T) 
 	ownerDevice := AccessDevice{ID: "dev_cred_collision_owner", UserID: "usr_cred_collision_owner", CreatedAt: t0}
 	ownerCred := AccessCred{ID: "crd_cred_collision", DeviceID: ownerDevice.ID, UserID: ownerDevice.UserID,
 		Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
-	if err := s.Access().AddDevice(ctx, ownerDevice, []AccessCred{ownerCred}); err != nil {
-		t.Fatal(err)
+	ownerDevice.Implicit = true
+	if _, _, created, err := s.Access().EnsureImplicitDevice(ctx, ownerDevice, []AccessCred{ownerCred}); err != nil || !created {
+		t.Fatalf("create owner implicit device = created %v, %v", created, err)
 	}
 
 	targetDevice := AccessDevice{ID: "dev_cred_collision_target", UserID: "usr_cred_collision_target", Implicit: true, CreatedAt: t0}
@@ -595,10 +562,10 @@ func TestRevokeDeviceRaceRevokesOnce(t *testing.T) {
 	ctx := context.Background()
 	rewriteAccessGroup(t, s, "grp_revoke_race", "Revoke race")
 	rewriteAccessUser(t, s, "usr_revoke_race", "Revoke user", "grp_revoke_race")
-	dev := AccessDevice{ID: "dev_revoke_race", UserID: "usr_revoke_race", CreatedAt: t0}
+	dev := AccessDevice{ID: "dev_revoke_race", UserID: "usr_revoke_race", Implicit: true, CreatedAt: t0}
 	cred := AccessCred{ID: "crd_revoke_race", DeviceID: dev.ID, UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: t0}
-	if err := s.Access().AddDevice(ctx, dev, []AccessCred{cred}); err != nil {
-		t.Fatal(err)
+	if _, _, created, err := s.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred}); err != nil || !created {
+		t.Fatalf("create implicit device for revoke = created %v, %v", created, err)
 	}
 	start := make(chan struct{})
 	type result struct {

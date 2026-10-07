@@ -113,6 +113,10 @@ type ceremony struct {
 	expires   time.Time
 }
 
+// errCeremonyGone: the ceremony is unknown, expired, of another kind, bound to someone else, or a concurrent finish
+// took it.
+var errCeremonyGone = errors.New("auth: ceremony gone")
+
 const (
 	ceremonySetup         = "setup"
 	ceremonySetupPassword = "setup-password"
@@ -237,8 +241,26 @@ func (s *Service) getCeremony(ctx context.Context, id string, kinds ...string) (
 	return nil, false, nil
 }
 
-func (s *Service) consumeCeremony(ctx context.Context, id string) (bool, error) {
-	return s.st.ConsumeAuthCeremony(ctx, id)
+// takeCeremony starts a passkey finish: a ceremony that was read is consumed whatever it holds, so none survives a
+// wrong kind or a foreign session, and the loser of two concurrent finishes stops before any WebAuthn work. It returns
+// the ceremony only when bound (nil: any session) accepts it and this call deleted it; errCeremonyGone otherwise, or a
+// store error.
+func (s *Service) takeCeremony(ctx context.Context, id, kind string, bound func(*ceremony) bool) (*ceremony, error) {
+	c, ok, err := s.getCeremony(ctx, id, kind) // a wrong kind is consumed there
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errCeremonyGone
+	}
+	won, err := s.st.ConsumeAuthCeremony(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !won || bound != nil && !bound(c) {
+		return nil, errCeremonyGone
+	}
+	return c, nil
 }
 
 func (s *Service) failCeremony(ctx context.Context, id string) (bool, error) {

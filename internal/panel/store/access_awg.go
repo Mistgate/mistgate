@@ -278,7 +278,7 @@ type ImplicitAWGResult struct {
 	FullProfiles []string
 }
 
-// EnsureImplicitAWGCreds gives the user's implicit device (created from dev when there is none) an AWG
+// EnsureImplicitAWGCreds gives the user's implicit device (created with a fresh ID when none is live) an AWG
 // credential for every wanted profile that it has none for, and returns the device's full live credential set plus
 // the credentials it added. A subscription in the Mihomo format has no device identity, so every Mihomo client of the
 // user shares this one peer per profile.
@@ -342,9 +342,7 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 		if deviceID == "" {
 			dev.UserID, dev.Implicit, dev.CreatedAt = userID, true, now
-			if dev.ID == "" {
-				dev.ID = NewID("dev_")
-			}
+			dev.ID = NewID("dev_")
 			deviceID = dev.ID
 		}
 		var issues []awgBatchIssue

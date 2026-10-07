@@ -170,7 +170,7 @@ func TestCeremonyGetConsumeWrongKindAndExpires(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatal("fresh ceremony rejected")
 	}
-	if consumed, err := s.consumeCeremony(ctx, id); err != nil || !consumed {
+	if consumed, err := s.st.ConsumeAuthCeremony(ctx, id); err != nil || !consumed {
 		t.Fatalf("consume ceremony: consumed=%v err=%v", consumed, err)
 	}
 	if _, ok, err := s.getCeremony(ctx, id, "login"); err != nil || ok {

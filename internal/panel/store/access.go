@@ -42,15 +42,15 @@ func accBool(b bool) int {
 	return 0
 }
 
-// accTime converts a nullable Unix-seconds column; NULL and 0 are the zero time.
-func accTime(v sql.NullInt64) time.Time {
+// accTimeIfNonzero treats 0 as unset; accTimeFromUnix preserves it as the Unix epoch.
+func accTimeIfNonzero(v sql.NullInt64) time.Time {
 	if !v.Valid || v.Int64 == 0 {
 		return time.Time{}
 	}
 	return fromUnix(v.Int64)
 }
 
-func accReadTime(v sql.NullInt64) time.Time {
+func accTimeFromUnix(v sql.NullInt64) time.Time {
 	if !v.Valid {
 		return time.Time{}
 	}

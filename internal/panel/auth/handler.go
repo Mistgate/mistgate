@@ -240,7 +240,7 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 	}
 	hash := hashToken(req.Msg.SetupToken)
 	if subtle.ConstantTimeCompare(hash, c.tokenHash) != 1 {
-		if _, err := s.consumeCeremony(ctx, req.Msg.CeremonyId); err != nil {
+		if _, err := s.st.ConsumeAuthCeremony(ctx, req.Msg.CeremonyId); err != nil {
 			s.log.Error("consume setup ceremony after bad token", "err", err)
 		}
 		return nil, errBadSetupToken
@@ -264,7 +264,7 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid code"))
 		}
 	}
-	consumed, err := s.consumeCeremony(ctx, req.Msg.CeremonyId)
+	consumed, err := s.st.ConsumeAuthCeremony(ctx, req.Msg.CeremonyId)
 	if err != nil {
 		s.log.Error("consume setup ceremony", "err", err)
 		return nil, errInternal(err)
@@ -367,19 +367,12 @@ func (s *Service) FinishLogin(ctx context.Context, req *connect.Request[adminv1.
 		s.emit(Event{Kind: EventSignInFailed, Method: "passkey", IP: ip.String()})
 		return errSignInFailed
 	}
-	c, ok, err := s.getCeremony(ctx, req.Msg.CeremonyId, ceremonyLogin)
-	if err != nil {
-		return nil, errInternal(err)
-	}
-	if !ok {
+	c, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyLogin, nil)
+	if errors.Is(err, errCeremonyGone) {
 		return nil, fail("unknown or expired ceremony", nil)
 	}
-	consumed, err := s.consumeCeremony(ctx, req.Msg.CeremonyId)
 	if err != nil {
-		return nil, fail("could not consume ceremony", err)
-	}
-	if !consumed {
-		return nil, fail("unknown or expired ceremony", nil)
+		return nil, fail("could not take ceremony", err)
 	}
 	parsed, err := protocol.ParseCredentialRequestResponseBytes([]byte(req.Msg.CredentialJson))
 	if err != nil {

@@ -195,7 +195,7 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 		return nil, expired()
 	}
 	if c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
-		if _, err := s.consumeCeremony(ctx, m.CeremonyId); err != nil {
+		if _, err := s.st.ConsumeAuthCeremony(ctx, m.CeremonyId); err != nil {
 			s.log.Error("consume foreign TOTP enrollment ceremony", "err", err)
 		}
 		return nil, expired()
@@ -211,7 +211,7 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 		}
 		return nil, codedErr(connect.CodeInvalidArgument, "invalid_code")
 	}
-	consumed, err := s.consumeCeremony(ctx, m.CeremonyId)
+	consumed, err := s.st.ConsumeAuthCeremony(ctx, m.CeremonyId)
 	if err != nil {
 		s.log.Error("consume TOTP enrollment ceremony", "err", err)
 		return nil, errInternal(err)

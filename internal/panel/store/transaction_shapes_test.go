@@ -18,7 +18,6 @@ var transactionShape1 = map[string]string{
 	"admin.go:PutSetupToken":                       "Replaces unused setup tokens and inserts the latest in one fixed batch.",
 	"access_user.go:CreateUser":                    "Inserts the user, selected nodes, and optional implicit device credentials in one fixed batch.",
 	"access_user.go:EnsureImplicitDevice":          "Idempotently inserts the implicit device and missing credentials, then reads back its live snapshot.",
-	"access_user.go:AddDevice":                     "Inserts the device and its credentials in one fixed batch.",
 	"access_profile.go:CreateInbound":              "Inserts the inbound and clears its retained key in one fixed batch.",
 	"access_profile.go:CreateGroup":                "Computes an automatic color in the insert and replaces the profile set in one fixed batch.",
 	"batch_native.go:runSQLBatch":                  "Runs one SQL transaction on the explicitly selected reader or writer pool.",
