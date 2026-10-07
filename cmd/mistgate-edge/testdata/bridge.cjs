@@ -492,11 +492,23 @@ async function run() {
     assert.equal(awgDevice.response.status, 200, "the admin API creates an AWG device");
     const awgDeviceID = awgDevice.message.device.id;
 
+    // The VPS oracle embeds the repo's web/dist when it is built; the parity panels read that same directory, so a
+    // built sub.html (or none) is on both sides of every comparison.
+    const repoDist = path.resolve(__dirname, "../../../web/dist");
+    const distAssets = async (name) => {
+      const file = path.resolve(repoDist, name);
+      if (!file.startsWith(repoDist + path.sep)) return null;
+      try {
+        return new Uint8Array(fs.readFileSync(file));
+      } catch {
+        return null;
+      }
+    };
     let previousPanel = secondPanel;
     async function freshPanel() {
       const panel = await startIsolate(bytes, previousPanel);
       previousPanel = panel;
-      await Promise.race([panel.init(initOptions), wasmFailure]);
+      await Promise.race([panel.init({ ...initOptions, assets: distAssets }), wasmFailure]);
       return panel;
     }
 
