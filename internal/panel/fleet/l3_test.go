@@ -606,7 +606,7 @@ func TestWarpEventsReachTheModuleWithoutBlockingTheStream(t *testing.T) {
 	}
 }
 
-func TestWarpRefreshThrottleUsesDispatchTimeAndSurvivesAckQueueFull(t *testing.T) {
+func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "warp-refresh")
 	h := hello("instance-warp-refresh", 0, "")
 	h.GetHello().Capabilities = []string{capWarp}
@@ -624,7 +624,7 @@ func TestWarpRefreshThrottleUsesDispatchTimeAndSurvivesAckQueueFull(t *testing.T
 			Code: eventWarpAttention, TimeUnix: at.Unix(), Params: map[string]string{"reason": warpReasonRefresh},
 		}}}
 	}
-	first, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)}, nil)
+	first, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -635,17 +635,16 @@ func TestWarpRefreshThrottleUsesDispatchTimeAndSurvivesAckQueueFull(t *testing.T
 
 	w := &fakeWarpMod{refreshed: make(chan struct{}, 1)}
 	e.f.SetWarp(w)
-	dispatchAt := now.Add(5 * time.Minute)
-	e.f.now = func() time.Time { return dispatchAt }
+	eventAt := now.Add(ackEvery)
 	for i := 0; i < cap(s.out); i++ {
 		s.out <- &agentv1.ConnectResponse{}
 	}
-	second, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now.Add(ackEvery), Frame: warpEvent(2, now.Add(ackEvery))}, nil)
+	second, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: eventAt, Frame: warpEvent(2, eventAt)})
 	if err != errAgentQueueFull {
 		t.Fatalf("full Ack queue error = %v, want %v", err, errAgentQueueFull)
 	}
-	if !second.Sidecar.L3.warpAsk.Equal(dispatchAt) {
-		t.Fatalf("refresh throttle timestamp = %v, want dispatch time %v", second.Sidecar.L3.warpAsk, dispatchAt)
+	if !second.Sidecar.L3.warpAsk.Equal(eventAt) {
+		t.Fatalf("refresh throttle timestamp = %v, want core event time %v", second.Sidecar.L3.warpAsk, eventAt)
 	}
 	select {
 	case <-w.refreshed:

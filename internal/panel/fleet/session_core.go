@@ -11,6 +11,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const sessionStateVersion = 1
@@ -20,30 +21,43 @@ const maxCertLife = 11 * 365 * 24 * time.Hour
 
 // SessionState is the compact connection state. Large snapshots and memo tables live in SessionSidecar.
 type SessionState struct {
-	Version                  uint8    `json:"v"`
-	NodeID                   string   `json:"n,omitempty"`
-	OwnerGeneration          uint64   `json:"o,omitempty"`
-	InstanceID               string   `json:"i,omitempty"`
-	Capabilities             []string `json:"c,omitempty"`
-	LivenessNanos            int64    `json:"l,omitempty"`
-	HelloDeadlineUnixNano    int64    `json:"h,omitempty"`
-	LivenessDeadlineUnixNano int64    `json:"d,omitempty"`
-	AutoBandwidthUnixNano    int64    `json:"b,omitempty"`
-	AutoBandwidthPending     bool     `json:"ap,omitempty"`
-	NextAckTickUnixNano      int64    `json:"a,omitempty"`
-	NextCertCheckUnixNano    int64    `json:"x,omitempty"`
-	AckPending               uint64   `json:"p,omitempty"`
-	AckSent                  uint64   `json:"s,omitempty"`
-	LastAckUnixNano          int64    `json:"k,omitempty"`
-	LastRejectUnixNano       int64    `json:"r,omitempty"`
-	LastEndUnix              int64    `json:"e,omitempty"`
-	LastSeenUnixNano         int64    `json:"v_at,omitempty"`
-	SentRevision             uint64   `json:"q,omitempty"`
-	SentStateHash            string   `json:"sh,omitempty"`
-	SentSettingsHash         string   `json:"ss,omitempty"`
-	DriftResent              bool     `json:"dr,omitempty"`
-	Drift                    bool     `json:"dt,omitempty"`
-	SidecarVersion           uint32   `json:"sv,omitempty"`
+	Version                  uint8        `json:"v"`
+	NodeID                   string       `json:"n,omitempty"`
+	OwnerGeneration          uint64       `json:"o,omitempty"`
+	InstanceID               string       `json:"i,omitempty"`
+	Capabilities             []string     `json:"c,omitempty"`
+	LivenessNanos            int64        `json:"l,omitempty"`
+	HelloDeadlineUnixNano    int64        `json:"h,omitempty"`
+	LivenessDeadlineUnixNano int64        `json:"d,omitempty"`
+	AutoBandwidthUnixNano    int64        `json:"b,omitempty"`
+	AutoBandwidthPending     bool         `json:"ap,omitempty"`
+	NextAckTickUnixNano      int64        `json:"a,omitempty"`
+	NextCertCheckUnixNano    int64        `json:"x,omitempty"`
+	AckPending               uint64       `json:"p,omitempty"`
+	AckSent                  uint64       `json:"s,omitempty"`
+	LastAckUnixNano          int64        `json:"k,omitempty"`
+	LastRejectUnixNano       int64        `json:"r,omitempty"`
+	LastEndUnix              int64        `json:"e,omitempty"`
+	LastSeenUnixNano         int64        `json:"v_at,omitempty"`
+	SentRevision             uint64       `json:"q,omitempty"`
+	SentStateHash            string       `json:"sh,omitempty"`
+	SentSettingsHash         string       `json:"ss,omitempty"`
+	DriftResent              bool         `json:"dr,omitempty"`
+	Drift                    bool         `json:"dt,omitempty"`
+	FullResendPending        bool         `json:"fr,omitempty"`
+	PrepareTicket            uint64       `json:"pt,omitempty"`
+	AppliedPrepareTicket     uint64       `json:"at,omitempty"`
+	Poison                   *PoisonBatch `json:"p_seq,omitempty"`
+	PeerCertSerial           string       `json:"cs,omitempty"`
+	PeerCertNotAfterUnixNano int64        `json:"ce,omitempty"`
+	Disconnected             bool         `json:"z,omitempty"`
+	SidecarVersion           uint32       `json:"sv,omitempty"`
+}
+
+// PoisonBatch identifies the last stats batch refused by the store.
+type PoisonBatch struct {
+	Instance string `json:"i"`
+	Seq      uint64 `json:"s"`
 }
 
 // LiveSnapshot is the current admin view of one agent, refreshed only by accepted StatsBatch messages.
@@ -86,10 +100,10 @@ type EventKind uint8
 
 const (
 	EventOpen EventKind = iota + 1
-	EventTimersStarted
 	EventHello
 	EventInitialReconcile
 	EventAgentFrame
+	EventDesiredPrepareStarted
 	EventDesiredChanged
 	EventAdminCommand
 	EventLogStart
@@ -97,18 +111,6 @@ const (
 	EventAlarm
 	EventDisconnected
 	EventOwnerSuperseded
-)
-
-// AlarmKind identifies a session deadline or periodic action.
-type AlarmKind uint8
-
-const (
-	AlarmAny AlarmKind = iota
-	AlarmHello
-	AlarmLiveness
-	AlarmAutoBandwidth
-	AlarmAck
-	AlarmCertificate
 )
 
 // AdminRequest carries a request frame and its correlation metadata into the core.
@@ -121,40 +123,26 @@ type AdminRequest struct {
 
 // SessionEvent is a timestamped input to SessionCore.Step.
 type SessionEvent struct {
-	Kind            EventKind
-	At              time.Time
-	Frame           *agentv1.ConnectRequest
-	Request         *AdminRequest
-	Alarm           AlarmKind
-	Mode            reconcileMode
-	Prepared        *preparedDesiredState
-	AutoBandwidthAt time.Time
+	Kind     EventKind
+	At       time.Time
+	Frame    *agentv1.ConnectRequest
+	Request  *AdminRequest
+	Mode     reconcileMode
+	Prepared *preparedDesiredState
 }
 
 // EffectKind identifies an adapter action requested by the session core.
 type EffectKind uint8
 
 const (
-	EffectSessionStarted EffectKind = iota + 1
-	EffectAutoBandwidth
-	EffectLiveUpdate
+	EffectAutoBandwidth EffectKind = iota + 1
 	EffectUsage
 	EffectCommandResult
 	EffectDoctorReport
 	EffectLogChunk
-	EffectAwgPrepare
-	EffectCheckCertificate
 	EffectWarpAttention
-	EffectDesiredReconcile
+	EffectPrepareDesired
 )
-
-// SessionStarted carries connection metadata needed by the transport adapter.
-type SessionStarted struct {
-	Previous    store.NodeRow
-	BootAt      time.Time
-	Now         time.Time
-	AutoMeasure bool
-}
 
 // SessionEffect asks the adapter to perform work requested by a core transition.
 type SessionEffect struct {
@@ -163,13 +151,8 @@ type SessionEffect struct {
 	CommandResult *agentv1.CommandResult
 	DoctorReport  *agentv1.DoctorReport
 	LogChunk      *agentv1.LogChunk
-	Live          *LiveSnapshot
 	Users         []string
-	Started       *SessionStarted
-	Event         *store.EventRow
 	WarpReason    string
-	ReconcileMode reconcileMode
-	ErrorLog      string
 }
 
 // CloseClass identifies why a session should terminate.
@@ -202,8 +185,10 @@ type Transition struct {
 }
 
 type preparedDesiredState struct {
-	node    store.NodeRow
-	desired *nodeState
+	node            store.NodeRow
+	desired         *nodeState
+	ticket          uint64
+	ownerGeneration uint64
 }
 
 // SessionCore processes one event at a time without owning goroutines, timers, channels, or transports.
@@ -212,11 +197,14 @@ type SessionCore struct{ f *Fleet }
 // NewSessionCore creates a session transition engine backed by fleet services.
 func NewSessionCore(f *Fleet) *SessionCore { return &SessionCore{f: f} }
 
-// Step processes one event. On error, the caller must discard both the transition and the sidecar it passed in;
-// Step may have mutated maps shared with that sidecar.
-func (c *SessionCore) Step(ctx context.Context, state SessionState, sidecar SessionSidecar, event SessionEvent) (Transition, error) {
+// Step processes one event and writes the resulting state and sidecar back to the supplied session.
+// On error the caller must end the session; state may already reflect work completed before the error.
+func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *SessionSidecar, event SessionEvent) (Transition, error) {
 	if c == nil || c.f == nil {
 		return Transition{}, errors.New("session core has no fleet")
+	}
+	if state == nil || sidecar == nil {
+		return Transition{}, errors.New("session state and sidecar are required")
 	}
 	if event.At.IsZero() {
 		return Transition{}, errors.New("session event time is required")
@@ -240,29 +228,30 @@ func (c *SessionCore) Step(ctx context.Context, state SessionState, sidecar Sess
 	if sidecar.Pending == nil {
 		sidecar.Pending = map[string]PendingRequest{}
 	}
-	tr := Transition{State: state, Sidecar: sidecar}
+	tr := Transition{State: *state, Sidecar: *sidecar}
+	defer func() {
+		*state, *sidecar = tr.State, tr.Sidecar
+	}()
+	if tr.State.Disconnected && event.Kind != EventDisconnected {
+		return tr, nil
+	}
 	switch event.Kind {
 	case EventOpen:
 		if tr.State.HelloDeadlineUnixNano == 0 {
 			tr.State.HelloDeadlineUnixNano = event.At.Add(helloTimeout).UnixNano()
 		}
-	case EventTimersStarted:
-		tr.State.LivenessDeadlineUnixNano = event.At.Add(time.Duration(tr.State.LivenessNanos)).UnixNano()
-		tr.State.NextAckTickUnixNano = event.At.Add(ackEvery).UnixNano()
-		tr.State.NextCertCheckUnixNano = event.At.Add(c.f.certCheck).UnixNano()
 	case EventHello:
 		if err := c.hello(ctx, &tr, event); err != nil {
 			return tr, err
 		}
 	case EventInitialReconcile:
-		if !event.AutoBandwidthAt.IsZero() && tr.State.AutoBandwidthPending {
-			tr.State.AutoBandwidthUnixNano = event.AutoBandwidthAt.Add(c.f.measureDelay).UnixNano()
-		}
 		if err := c.reconcile(ctx, &tr, reconcileConnect, event.Frame.GetHello(), event.Prepared, event.At); err != nil {
 			return tr, err
 		}
 	case EventAgentFrame:
 		c.agentFrame(ctx, &tr, event)
+	case EventDesiredPrepareStarted:
+		tr.State.PrepareTicket++
 	case EventDesiredChanged:
 		mode := event.Mode
 		if mode == 0 {
@@ -287,8 +276,10 @@ func (c *SessionCore) Step(ctx context.Context, state SessionState, sidecar Sess
 			return tr, err
 		}
 	case EventDisconnected:
+		tr.State.Disconnected = true
 		tr.Sidecar.Pending = map[string]PendingRequest{}
 		tr.State.AutoBandwidthUnixNano = 0
+		tr.State.AutoBandwidthPending = false
 	case EventOwnerSuperseded:
 		tr.Close = &SessionClose{Class: CloseConflict, Reason: "superseded by a newer stream"}
 	default:
@@ -347,11 +338,12 @@ func (c *SessionCore) hello(ctx context.Context, tr *Transition, event SessionEv
 	tr.State.SidecarVersion = tr.Sidecar.Version
 	tr.Sidecar.Live.UserDown = map[string]uint64{}
 	tr.Sidecar.Live.UserUp = map[string]uint64{}
+	c.f.connectEvents(ctx, tr.State.NodeID, prev, info.BootAt, event.At)
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
-	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectSessionStarted, Started: &SessionStarted{
-		Previous: prev, BootAt: info.BootAt, Now: event.At, AutoMeasure: autoMeasure,
-	}})
 	tr.State.AutoBandwidthPending = autoMeasure && slices.Contains(tr.State.Capabilities, capBandwidth)
+	if tr.State.AutoBandwidthPending {
+		tr.State.AutoBandwidthUnixNano = event.At.Add(c.f.measureDelay).UnixNano()
+	}
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
 		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: nodeSettings(node, tr.State.Capabilities), LinkSupported: c.f.cfg.LinkServed,
 	}}})
@@ -396,17 +388,32 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *Transition, event Sess
 		}
 	case m.GetCommandResult() != nil:
 		r := m.GetCommandResult()
+		pending, ok := tr.Sidecar.Pending[r.RequestId]
+		if !ok || pending.Kind != PendingCommand {
+			return
+		}
 		delete(tr.Sidecar.Pending, r.RequestId)
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectCommandResult, RequestID: r.RequestId, CommandResult: r})
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
+		pending, ok := tr.Sidecar.Pending[chunk.RequestId]
+		if !ok || pending.Kind != PendingLog {
+			return
+		}
 		if chunk.Eof {
 			delete(tr.Sidecar.Pending, chunk.RequestId)
 		}
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectLogChunk, RequestID: chunk.RequestId, LogChunk: chunk})
 	case m.GetDoctorReport() != nil:
 		r := m.GetDoctorReport()
-		delete(tr.Sidecar.Pending, r.RequestId)
+		c.f.recordDoctorReport(ctx, tr.State.NodeID, r)
+		if r.RequestId != "" {
+			pending, ok := tr.Sidecar.Pending[r.RequestId]
+			if !ok || pending.Kind != PendingDoctor {
+				return
+			}
+			delete(tr.Sidecar.Pending, r.RequestId)
+		}
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectDoctorReport, RequestID: r.RequestId, DoctorReport: r})
 	}
 }
@@ -430,12 +437,11 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
 		// refused every time, and resending it would wedge this node's stats for good: drop it then.
 		c.f.log.Error("ingest stats", "node", tr.State.NodeID, "err", err)
-		if !c.stuckStats(tr.State.NodeID, tr.State.InstanceID, seq) {
+		if tr.State.Poison == nil || tr.State.Poison.Instance != tr.State.InstanceID || tr.State.Poison.Seq != seq {
+			tr.State.Poison = &PoisonBatch{Instance: tr.State.InstanceID, Seq: seq}
 			tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
 			return
 		}
-		c.f.log.Error("stats batch refused by the database twice, dropped", "node", tr.State.NodeID, "seq", seq)
-		c.f.event(ctx, 3, "stats_dropped", tr.State.NodeID, map[string]string{"reason": "database_refused", "seq": fmt.Sprint(seq)})
 		if seq != 0 {
 			if err := c.f.st.SkipSeq(ctx, tr.State.NodeID, tr.State.InstanceID, seq, now); err != nil {
 				tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
@@ -443,11 +449,14 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 			}
 			markCoreAck(tr, seq, now)
 		}
+		tr.State.Poison = nil
+		c.f.log.Error("stats batch refused by the database twice, dropped", "node", tr.State.NodeID, "seq", seq)
+		c.f.event(ctx, 3, "stats_dropped", tr.State.NodeID, map[string]string{"reason": "database_refused", "seq": fmt.Sprint(seq)})
 		return
 	}
-	c.unstickStats(tr.State.NodeID)
+	tr.State.Poison = nil
 	if !out.Duplicate {
-		updated := applyCoreSnapshot(&tr.State, &tr.Sidecar.Live, st, g.traffic, now, out.Refs)
+		applyCoreSnapshot(&tr.State, &tr.Sidecar.Live, st, g.traffic, now, out.Refs)
 		c.l3Stats(ctx, tr.State.NodeID, &tr.Sidecar.L3, st, now)
 		c.certStats(ctx, tr.State.NodeID, tr.Sidecar.CertSeen, st, now)
 		c.f.touchAwgDevices(ctx, st, out.Refs, now)
@@ -456,10 +465,6 @@ func (c *SessionCore) stats(ctx context.Context, tr *Transition, seq uint64, st 
 		}
 		if stale {
 			c.f.event(ctx, 2, "stats_stale", tr.State.NodeID, map[string]string{"age_hours": fmt.Sprint(int(now.Sub(time.Unix(st.IntervalEndUnix, 0)).Hours()))})
-		}
-		if updated {
-			live := cloneLiveSnapshot(tr.Sidecar.Live)
-			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectLiveUpdate, Live: &live})
 		}
 		if c.f.cfg.OnUsage != nil && len(out.Users) > 0 {
 			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectUsage, Users: slices.Clone(out.Users)})
@@ -513,7 +518,15 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 
 func cloneLiveSnapshot(live LiveSnapshot) LiveSnapshot {
 	out := live
-	out.Health = slices.Clone(live.Health)
+	if live.Metrics != nil {
+		out.Metrics = proto.Clone(live.Metrics).(*agentv1.HostMetrics)
+	}
+	out.Health = make([]*agentv1.InboundHealth, len(live.Health))
+	for i, health := range live.Health {
+		if health != nil {
+			out.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
+		}
+	}
 	out.Online = slices.Clone(live.Online)
 	out.UserDown = make(map[string]uint64, len(live.UserDown))
 	for id, value := range live.UserDown {
@@ -533,24 +546,6 @@ func (c *SessionCore) rejectStats(ctx context.Context, state *SessionState, g gu
 	}
 	state.LastRejectUnixNano = now.UnixNano()
 	c.f.event(ctx, 3, "stats_rejected", state.NodeID, map[string]string{"reason": g.reason, "deltas": fmt.Sprint(g.rejected)})
-}
-
-func (c *SessionCore) stuckStats(nodeID, instance string, seq uint64) bool {
-	c.f.mu.Lock()
-	defer c.f.mu.Unlock()
-	k := stuckSeq{instance: instance, seq: seq}
-	if c.f.stuck[nodeID] == k {
-		delete(c.f.stuck, nodeID)
-		return true
-	}
-	c.f.stuck[nodeID] = k
-	return false
-}
-
-func (c *SessionCore) unstickStats(nodeID string) {
-	c.f.mu.Lock()
-	delete(c.f.stuck, nodeID)
-	c.f.mu.Unlock()
 }
 
 func markCoreAck(tr *Transition, seq uint64, now time.Time) {
@@ -618,25 +613,47 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *Transition, seq uint64
 		c.f.recordCommit(ctx, tr.State.NodeID, row)
 	}
 	if !dup {
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectAwgPrepare, Event: &row})
+		c.f.onAwgPrepareEvent(ctx, tr.State.NodeID, row)
 	}
 	if seq != 0 {
 		markCoreAck(tr, seq, now)
 	}
 	if ev.Code == eventWarpAttention {
 		reason := store.Clip(ev.Params["reason"], 64)
+		c.warpAttention(ctx, tr, reason, now)
+	}
+}
+
+func (c *SessionCore) warpAttention(ctx context.Context, tr *Transition, reason string, now time.Time) {
+	w := c.f.warpModule()
+	if w == nil {
+		return
+	}
+	if reason == warpReasonRefresh {
+		if !tr.Sidecar.L3.warpAsk.IsZero() && now.Sub(tr.Sidecar.L3.warpAsk) < warpRefreshGap {
+			return
+		}
+		tr.Sidecar.L3.warpAsk = now
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectWarpAttention, WarpReason: reason})
+		return
+	}
+	if err := w.NeedsAttention(ctx, tr.State.NodeID, reason); err != nil {
+		c.f.log.Warn("record warp attention", "node", tr.State.NodeID, "err", err)
+		return
+	}
+	if reason == warpReasonLadder {
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectWarpAttention, WarpReason: reason})
 	}
 }
 
 // applyResult records an ApplyResult and reacts: BASE_MISMATCH -> a full resend; a hash that differs from what was sent
-// -> a state_drift event and one full resend (a second drift right after stays as an error event). The resends are
-// EffectDesiredReconcile, which the adapter runs right after this step, before the next agent frame.
+// -> a state_drift event and one full resend (a second drift right after stays as an error event).
 func (c *SessionCore) applyResult(ctx context.Context, tr *Transition, r *agentv1.ApplyResult, now time.Time) error {
 	switch r.Status {
 	case agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH:
 		c.f.log.Info("agent reports base mismatch, resending full state", "node", tr.State.NodeID, "revision", r.Revision)
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectDesiredReconcile, ReconcileMode: reconcileFull, ErrorLog: "full resend"})
+		tr.State.FullResendPending = true
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectPrepareDesired})
 		return nil
 	case agentv1.ApplyStatus_APPLY_STATUS_REJECTED:
 		c.f.event(ctx, 3, "apply_rejected", tr.State.NodeID, map[string]string{"revision": fmt.Sprint(r.Revision), "error": store.Clip(r.Error, 256)})
@@ -680,8 +697,9 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *Transition, r *agentv
 	}
 	if !tr.State.DriftResent {
 		tr.State.DriftResent = true
+		tr.State.FullResendPending = true
 		c.f.event(ctx, 2, "state_drift", tr.State.NodeID, map[string]string{"revision": fmt.Sprint(r.Revision)})
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectDesiredReconcile, ReconcileMode: reconcileFull, ErrorLog: "full resend after drift"})
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectPrepareDesired})
 		return nil
 	}
 	tr.State.Drift = true
@@ -694,6 +712,13 @@ func (c *SessionCore) reconcile(ctx context.Context, tr *Transition, mode reconc
 	if prepared == nil {
 		return errors.New("prepared desired state is required")
 	}
+	if prepared.ownerGeneration != state.OwnerGeneration || prepared.ticket == 0 || prepared.ticket > state.PrepareTicket || prepared.ticket <= state.AppliedPrepareTicket {
+		return nil
+	}
+	if !c.f.ownsSession(state.NodeID, state.OwnerGeneration) {
+		return nil
+	}
+	state.AppliedPrepareTicket = prepared.ticket
 	node, want := prepared.node, prepared.desired
 	if node.State == "retired" {
 		return nil
@@ -704,7 +729,7 @@ func (c *SessionCore) reconcile(ctx context.Context, tr *Transition, mode reconc
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	settings := nodeSettings(node, state.Capabilities)
 	sig := settingsSig(settings)
-	if mode == reconcileConnect {
+	if mode == reconcileConnect && !state.FullResendPending {
 		if hello != nil && hello.AppliedStateHash != "" && hello.AppliedStateHash == want.hash && hello.AppliedRevision > 0 {
 			sidecar.SentDesired = want
 			state.SentRevision = hello.AppliedRevision
@@ -713,6 +738,9 @@ func (c *SessionCore) reconcile(ctx context.Context, tr *Transition, mode reconc
 			rev := max(node.DesiredRevision, hello.AppliedRevision)
 			return c.f.st.NodeDesired(ctx, node.ID, rev, want.hash)
 		}
+		mode = reconcileFull
+	}
+	if state.FullResendPending {
 		mode = reconcileFull
 	}
 	if sidecar.SentDesired == nil && mode == reconcileChange {
@@ -747,44 +775,42 @@ func (c *SessionCore) reconcile(ctx context.Context, tr *Transition, mode reconc
 	state.SentRevision = rev
 	state.SentStateHash = want.hash
 	state.SentSettingsHash = sig
+	if mode == reconcileFull {
+		state.FullResendPending = false
+	}
 	return nil
 }
 
 func (c *SessionCore) alarm(ctx context.Context, tr *Transition, event SessionEvent) error {
 	now := event.At
-	if event.Alarm == AlarmHello || event.Alarm == AlarmAny {
-		if tr.State.HelloDeadlineUnixNano != 0 && now.UnixNano() >= tr.State.HelloDeadlineUnixNano {
-			tr.Close = &SessionClose{Class: CloseDeadline, Reason: "no Hello"}
-			return nil
-		}
+	if deadlineDue(tr.State.HelloDeadlineUnixNano, now) {
+		tr.Close = &SessionClose{Class: CloseDeadline, Reason: "no Hello"}
+		return nil
 	}
-	if event.Alarm == AlarmLiveness || event.Alarm == AlarmAny {
-		if tr.State.LivenessDeadlineUnixNano != 0 && now.UnixNano() >= tr.State.LivenessDeadlineUnixNano {
-			tr.Close = &SessionClose{Class: CloseDeadline, Reason: fmt.Sprintf("no message from the agent for %d s", int(time.Duration(tr.State.LivenessNanos).Seconds()))}
-			return nil
-		}
-	}
-	if (event.Alarm == AlarmAutoBandwidth || event.Alarm == AlarmAny) && deadlineDue(tr.State.AutoBandwidthUnixNano, now) {
+	if tr.State.AutoBandwidthPending && deadlineDue(tr.State.AutoBandwidthUnixNano, now) {
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectAutoBandwidth})
 		tr.State.AutoBandwidthUnixNano = 0
 		tr.State.AutoBandwidthPending = false
 	}
-	if event.Alarm == AlarmAck || event.Alarm == AlarmAny {
-		if event.Alarm == AlarmAck || deadlineDue(tr.State.NextAckTickUnixNano, now) {
-			flushCoreAck(tr, now)
-			tr.State.NextAckTickUnixNano = advancePeriodic(tr.State.NextAckTickUnixNano, ackEvery, now)
-		}
+	if deadlineDue(tr.State.NextAckTickUnixNano, now) {
+		flushCoreAck(tr, now)
+		tr.State.NextAckTickUnixNano = advancePeriodic(tr.State.NextAckTickUnixNano, ackEvery, now)
 	}
-	if event.Alarm == AlarmCertificate || event.Alarm == AlarmAny {
-		if event.Alarm == AlarmCertificate || deadlineDue(tr.State.NextCertCheckUnixNano, now) {
-			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectCheckCertificate})
-			tr.State.NextCertCheckUnixNano = advancePeriodic(tr.State.NextCertCheckUnixNano, c.f.certCheck, now)
+	if deadlineDue(tr.State.NextCertCheckUnixNano, now) {
+		cert := peerCert{serial: tr.State.PeerCertSerial, notAfter: timeFromUnixNano(tr.State.PeerCertNotAfterUnixNano)}
+		if err := c.f.recheckCertAt(ctx, cert, now); err != nil {
+			tr.Close = &SessionClose{Class: CloseUnauthenticated, Reason: err.Error()}
+			return nil
 		}
+		tr.State.NextCertCheckUnixNano = advancePeriodic(tr.State.NextCertCheckUnixNano, c.f.certCheck, now)
 	}
 	for id, req := range tr.Sidecar.Pending {
 		if deadlineDue(req.DeadlineUnixNano, now) {
 			delete(tr.Sidecar.Pending, id)
 		}
+	}
+	if deadlineDue(tr.State.LivenessDeadlineUnixNano, now) {
+		tr.Close = &SessionClose{Class: CloseDeadline, Reason: fmt.Sprintf("no message from the agent for %d s", int(time.Duration(tr.State.LivenessNanos).Seconds()))}
 	}
 	return nil
 }
@@ -806,6 +832,9 @@ func advancePeriodic(deadline int64, period time.Duration, now time.Time) int64 
 }
 
 func nextSessionAlarm(state SessionState, sidecar SessionSidecar) *time.Time {
+	if state.Disconnected {
+		return nil
+	}
 	var next int64
 	for _, deadline := range []int64{state.HelloDeadlineUnixNano, state.LivenessDeadlineUnixNano, state.AutoBandwidthUnixNano,
 		state.NextAckTickUnixNano, state.NextCertCheckUnixNano} {

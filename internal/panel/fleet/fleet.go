@@ -103,6 +103,7 @@ type Fleet struct {
 	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck            time.Duration // how often a running stream rechecks its client certificate
 	linkHandshakeTimeout time.Duration // bounds the signed WebSocket handshake; tests may shorten it
+	newSessionAlarmTimer func(time.Duration) sessionAlarmTimer
 	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration
@@ -147,6 +148,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		unit:                 time.Second,
 		certCheck:            30 * time.Second,
 		linkHandshakeTimeout: defaultLinkHandshakeTimeout,
+		newSessionAlarmTimer: newWallSessionAlarmTimer,
 		// A measurement is about ten seconds and forty at most (the agent's own limit), and the admin's request must be
 		// answered within the panel's 60 s write timeout. The first measurement waits until the node has applied its first
 		// state and settled: it saturates the link for a moment.
@@ -235,12 +237,14 @@ type OnlineSession struct {
 func (f *Fleet) Online() []OnlineSession {
 	var out []OnlineSession
 	for _, s := range f.snapshotSessions() {
-		s.liveMu.Lock()
-		for _, o := range s.online {
+		view := s.view.Load()
+		if view == nil {
+			continue
+		}
+		for _, o := range view.Live.Online {
 			out = append(out, OnlineSession{NodeID: s.nodeID, UserID: o.userID, DeviceID: o.deviceID, Protocol: o.protocol,
 				InboundID: o.inboundID, RemoteIP: o.remoteIP, ConnectedAt: o.since})
 		}
-		s.liveMu.Unlock()
 	}
 	return out
 }
@@ -264,12 +268,11 @@ func (f *Fleet) NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time
 	if s == nil {
 		return 0, 0, time.Time{}, false
 	}
-	s.liveMu.Lock()
-	defer s.liveMu.Unlock()
-	if s.metrics == nil || s.metricsAt.IsZero() {
+	view := s.view.Load()
+	if view == nil || view.Live.Metrics == nil || view.Live.MetricsAt.IsZero() {
 		return 0, 0, time.Time{}, false
 	}
-	return s.metrics.NetRxBps, s.metrics.NetTxBps, s.metricsAt, true
+	return view.Live.Metrics.NetRxBps, view.Live.Metrics.NetTxBps, view.Live.MetricsAt, true
 }
 
 // CPUUsage returns the CPU use of the latest host sample of a connected node, with the time the panel received it.
@@ -278,12 +281,11 @@ func (f *Fleet) CPUUsage(nodeID string) (pct float64, sampledAt time.Time, ok bo
 	if s == nil {
 		return 0, time.Time{}, false
 	}
-	s.liveMu.Lock()
-	defer s.liveMu.Unlock()
-	if s.metrics == nil || s.metricsAt.IsZero() {
+	view := s.view.Load()
+	if view == nil || view.Live.Metrics == nil || view.Live.MetricsAt.IsZero() {
 		return 0, time.Time{}, false
 	}
-	return float64(s.metrics.CpuPct), s.metricsAt, true
+	return float64(view.Live.Metrics.CpuPct), view.Live.MetricsAt, true
 }
 
 func (f *Fleet) snapshotSessions() []*session {

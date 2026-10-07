@@ -60,13 +60,12 @@ func (f *Fleet) WarpPauseApplied(ctx context.Context, nodeID string) bool {
 	if s == nil {
 		return false
 	}
-	s.desMu.Lock()
-	defer s.desMu.Unlock()
-	if s.sent == nil || s.sent.warp == nil || s.sent.warp.Enabled {
+	view := s.view.Load()
+	if view == nil || view.SentDesired == nil || view.SentDesired.warp == nil || view.SentDesired.warp.Enabled {
 		return false
 	}
 	n, err := f.st.Node(ctx, nodeID)
-	return err == nil && n.AppliedHash == s.sent.hash
+	return err == nil && n.AppliedHash == view.SentDesired.hash
 }
 
 // Intervals of the persisted health: a changed report is written at most this often, an unchanged one this often (so that
@@ -163,15 +162,9 @@ func (f *Fleet) dispatchWarpAttention(w Warp, nodeID, reason string) {
 			if err := w.RefreshByNode(ctx, nodeID); err != nil {
 				f.log.Info("warp refresh asked by the node did not work", "node", nodeID, "err", err)
 			}
-		default:
-			if err := w.NeedsAttention(ctx, nodeID, reason); err != nil {
-				f.log.Warn("record warp attention", "node", nodeID, "err", err)
-				return
-			}
-			if reason == warpReasonLadder {
-				if _, err := w.AutoReregister(ctx, nodeID); err != nil {
-					f.log.Info("automatic warp re-registration", "node", nodeID, "err", err)
-				}
+		case warpReasonLadder:
+			if _, err := w.AutoReregister(ctx, nodeID); err != nil {
+				f.log.Info("automatic warp re-registration", "node", nodeID, "err", err)
 			}
 		}
 	}()

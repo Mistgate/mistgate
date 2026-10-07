@@ -42,95 +42,110 @@ type logSub struct {
 	dropped atomic.Uint32
 }
 
+// sessionView is one immutable admin snapshot published after each core step.
+type sessionView struct {
+	State       SessionState
+	SentDesired *nodeState
+	Live        LiveSnapshot
+}
+
+type sessionAlarmTimer interface {
+	C() <-chan time.Time
+	Stop() bool
+	Reset(time.Duration) bool
+}
+
+type wallSessionAlarmTimer struct{ timer *time.Timer }
+
+func (t *wallSessionAlarmTimer) C() <-chan time.Time { return t.timer.C }
+func (t *wallSessionAlarmTimer) Stop() bool          { return t.timer.Stop() }
+func (t *wallSessionAlarmTimer) Reset(d time.Duration) bool {
+	return t.timer.Reset(d)
+}
+
 // session is the one live agent session of a node.
 type session struct {
-	f        *Fleet
-	nodeID   string
-	owner    uint64
-	caps     []string // Hello.capabilities: optional features of this agent build (health.go)
-	ctx      context.Context
-	cancel   context.CancelCauseFunc
-	done     chan struct{} // closed when the Connect handler returns
-	out      chan *agentv1.ConnectResponse
-	liveness atomic.Int64 // nanoseconds of silence tolerated
+	f          *Fleet
+	nodeID     string
+	owner      uint64
+	caps       []string // Hello.capabilities: optional features of this agent build (health.go)
+	ctx        context.Context
+	cancel     context.CancelCauseFunc
+	done       chan struct{} // closed when the Connect handler returns
+	out        chan *agentv1.ConnectResponse
+	alarmTimer sessionAlarmTimer
 
-	coreMu          sync.Mutex
-	core            *SessionCore
-	coreState       SessionState
-	coreSidecar     SessionSidecar
-	reconcileMu     sync.Mutex
-	autoBandwidthAt time.Time
+	coreMu      sync.Mutex
+	core        *SessionCore
+	coreState   SessionState
+	coreSidecar SessionSidecar
+	view        atomic.Pointer[sessionView]
 
-	// Desired-state bookkeeping: what the agent holds as far as we know. Guarded by desMu, which also
-	// serializes pushes to this node.
-	desMu sync.Mutex
-	sent  *nodeState
-
-	// Live data shown in the UI. Guarded by liveMu.
-	liveMu    sync.Mutex
-	metrics   *agentv1.HostMetrics
-	metricsAt time.Time // panel receive time of the newest host metrics sample
-	health    []*agentv1.InboundHealth
-	online    []onlineSess
-	userDown  map[string]uint64 // bits/s per user, from the newest batch
-	userUp    map[string]uint64
-	lastSeen  time.Time
-	drift     bool
-	cmds      map[string]chan *agentv1.CommandResult
-	docs      map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
-	logs      map[string]*logSub
+	// Only request waiters need their own lock; the admin view is an immutable atomic snapshot.
+	waitMu sync.Mutex
+	cmds   map[string]chan *agentv1.CommandResult
+	docs   map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
+	logs   map[string]*logSub
 }
 
-func (s *session) syncCoreFields() {
-	state, sidecar := s.coreState, s.coreSidecar
-	s.liveness.Store(state.LivenessNanos)
-	s.desMu.Lock()
-	s.sent = sidecar.SentDesired
-	s.desMu.Unlock()
-	s.liveMu.Lock()
-	s.drift = state.Drift
-	s.lastSeen = timeFromUnixNano(state.LastSeenUnixNano)
-	s.liveMu.Unlock()
+func (s *session) publishView() {
+	state := s.coreState
+	state.Capabilities = slices.Clone(state.Capabilities)
+	s.view.Store(&sessionView{State: state, SentDesired: s.coreSidecar.SentDesired, Live: cloneLiveSnapshot(s.coreSidecar.Live)})
 }
 
-func (s *session) stepCore(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
+func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {
 	s.coreMu.Lock()
 	defer s.coreMu.Unlock()
 	if s.core == nil {
 		s.core = NewSessionCore(s.f)
 	}
-	tr, err := s.core.Step(ctx, s.coreState, s.coreSidecar, event)
+	tr, err := s.core.Step(ctx, &s.coreState, &s.coreSidecar, event)
+	s.publishView()
+	s.persistPoison(s.coreState.Poison)
+	timerNow := s.f.now().UTC()
+	if event.Kind == EventAlarm && event.At.After(timerNow) {
+		timerNow = event.At.UTC()
+	}
+	resetSessionAlarm(s.alarmTimer, tr.NextAlarm, timerNow)
 	if err != nil {
-		// Step may have mutated maps shared with the current sidecar, so any error ends this session.
 		if s.cancel != nil {
 			s.cancel(err)
 		}
 		return Transition{}, err
 	}
-	s.coreState, s.coreSidecar = tr.State, tr.Sidecar
-	s.syncCoreFields()
 	if tr.Close == nil {
-		err = s.dispatchCoreTransition(ctx, &tr, pc)
+		err = s.dispatchCoreTransition(ctx, &tr)
 		if err != nil && s.cancel != nil {
 			s.cancel(err)
-		} else {
-			s.coreState, s.coreSidecar = tr.State, tr.Sidecar
-			s.syncCoreFields()
 		}
 	}
 	return tr, err
 }
 
-func (s *session) stepDesired(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
-	s.reconcileMu.Lock()
-	defer s.reconcileMu.Unlock()
-	return s.stepDesiredLocked(ctx, event, pc)
-}
-
-func (s *session) stepDesiredLocked(ctx context.Context, event SessionEvent, pc *peerCert) (Transition, error) {
+func (s *session) stepDesired(ctx context.Context, event SessionEvent) (Transition, error) {
+	ticketStep, err := s.stepCore(ctx, SessionEvent{Kind: EventDesiredPrepareStarted, At: event.At})
+	if err != nil {
+		return Transition{}, err
+	}
+	if ticketStep.Close != nil {
+		return ticketStep, nil
+	}
 	prepared, err := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
 	if err != nil {
 		return Transition{}, err
+	}
+	prepared.ticket = ticketStep.State.PrepareTicket
+	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
+	if s.done != nil {
+		select {
+		case <-s.done:
+			return Transition{}, nil
+		default:
+		}
+	}
+	if !s.f.ownsSession(s.nodeID, s.owner) {
+		return Transition{}, nil
 	}
 	if prepared.node.State != "retired" && prepared.desired != nil && len(prepared.desired.withheld) > 0 {
 		if err := s.f.st.FailWithheldInbounds(ctx, prepared.node.ID, prepared.desired.withheld, withheldReason, event.At); err != nil {
@@ -138,43 +153,17 @@ func (s *session) stepDesiredLocked(ctx context.Context, event SessionEvent, pc 
 		}
 	}
 	event.Prepared = prepared
-	return s.stepCore(ctx, event, pc)
+	return s.stepCore(ctx, event)
 }
 
-func (s *session) stepAgentFrame(ctx context.Context, frame *agentv1.ConnectRequest, pc *peerCert) (Transition, error) {
-	event := SessionEvent{Kind: EventAgentFrame, At: s.f.now().UTC(), Frame: frame}
-	result := frame.GetApplyResult()
-	if result == nil || (result.Status != agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH && result.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED) {
-		return s.stepCore(ctx, event, pc)
-	}
-
-	// Reserve desired-state order before applying the result, then prepare and step any resend in this receive loop.
-	s.reconcileMu.Lock()
-	defer s.reconcileMu.Unlock()
-	tr, err := s.stepCore(ctx, event, pc)
-	if err != nil {
-		return tr, err
-	}
+func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition) error {
+	var deferred []SessionEffect
 	for _, effect := range tr.Effects {
-		if effect.Kind != EffectDesiredReconcile {
+		if effect.Kind == EffectWarpAttention || effect.Kind == EffectPrepareDesired {
+			deferred = append(deferred, effect)
 			continue
 		}
-		_, err := s.stepDesiredLocked(ctx, SessionEvent{Kind: EventDesiredChanged, At: s.f.now().UTC(), Mode: effect.ReconcileMode}, nil)
-		if err != nil {
-			s.f.log.Warn(effect.ErrorLog, "node", s.nodeID, "err", err)
-		}
-	}
-	return tr, nil
-}
-
-func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition, pc *peerCert) error {
-	var warpEffects []SessionEffect
-	for _, effect := range tr.Effects {
-		if effect.Kind == EffectWarpAttention {
-			warpEffects = append(warpEffects, effect)
-			continue
-		}
-		if err := s.dispatchCoreEffect(ctx, tr, effect, pc); err != nil {
+		if err := s.dispatchCoreEffect(ctx, effect); err != nil {
 			return err
 		}
 	}
@@ -186,8 +175,8 @@ func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition, pc
 			break
 		}
 	}
-	for _, effect := range warpEffects {
-		if err := s.dispatchCoreEffect(ctx, tr, effect, pc); err != nil {
+	for _, effect := range deferred {
+		if err := s.dispatchCoreEffect(ctx, effect); err != nil {
 			if frameErr == nil {
 				frameErr = err
 			}
@@ -196,30 +185,10 @@ func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition, pc
 	return frameErr
 }
 
-func (s *session) dispatchCoreEffect(ctx context.Context, tr *Transition, effect SessionEffect, pc *peerCert) error {
+func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) error {
 	switch effect.Kind {
-	case EffectSessionStarted:
-		if effect.Started != nil {
-			started := effect.Started
-			s.f.connectEvents(ctx, s.nodeID, started.Previous, started.BootAt, started.Now)
-			if started.AutoMeasure {
-				s.autoBandwidthAt = s.f.now().UTC()
-				deadline := s.autoBandwidthAt.Add(s.f.measureDelay)
-				s.coreState.AutoBandwidthUnixNano = deadline.UnixNano()
-				s.f.autoMeasureBandwidth(s, deadline)
-			}
-		}
 	case EffectAutoBandwidth:
 		s.f.runAutoMeasureBandwidth(s)
-	case EffectLiveUpdate:
-		if effect.Live != nil {
-			// Health-store writes finish before the live snapshot becomes visible; its final contents are unchanged.
-			s.liveMu.Lock()
-			s.metrics, s.metricsAt = effect.Live.Metrics, effect.Live.MetricsAt
-			s.health, s.online = effect.Live.Health, effect.Live.Online
-			s.userDown, s.userUp = effect.Live.UserDown, effect.Live.UserUp
-			s.liveMu.Unlock()
-		}
 	case EffectUsage:
 		if s.f.cfg.OnUsage != nil {
 			s.f.cfg.OnUsage(ctx, effect.Users)
@@ -227,38 +196,88 @@ func (s *session) dispatchCoreEffect(ctx context.Context, tr *Transition, effect
 	case EffectCommandResult:
 		s.deliverCommand(effect.CommandResult)
 	case EffectDoctorReport:
-		s.f.onDoctorReport(ctx, s, effect.DoctorReport)
+		s.deliverDoctor(effect.DoctorReport)
 	case EffectLogChunk:
 		s.deliverLog(effect.LogChunk)
-	case EffectAwgPrepare:
-		if effect.Event != nil {
-			s.f.onAwgPrepareEvent(ctx, s.nodeID, *effect.Event)
-		}
-	case EffectCheckCertificate:
-		if pc != nil {
-			if err := s.f.recheckCert(ctx, *pc); err != nil {
-				return connect.NewError(connect.CodeUnauthenticated, err)
-			}
-		}
 	case EffectWarpAttention:
-		// Refresh is read-only and may call Cloudflare; other reasons ask the owner to decide, and an exhausted ladder may
-		// trigger automatic re-registration. The dispatcher runs the work in a goroutine, never on the stream's goroutine.
 		w := s.f.warpModule()
 		if w == nil {
 			return nil
 		}
-		if effect.WarpReason == warpReasonRefresh {
-			now := s.f.now().UTC()
-			if !tr.Sidecar.L3.warpAsk.IsZero() && now.Sub(tr.Sidecar.L3.warpAsk) < warpRefreshGap {
-				return nil
-			}
-			tr.Sidecar.L3.warpAsk = now
-		}
 		s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
-	case EffectDesiredReconcile:
-		// The receive loop handles this effect synchronously after applying an agent frame.
+	case EffectPrepareDesired:
+		go func() {
+			at := s.f.now().UTC()
+			if _, err := s.stepDesired(s.ctx, SessionEvent{Kind: EventDesiredChanged, At: at}); err != nil && s.ctx.Err() == nil {
+				s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", err)
+			}
+		}()
 	}
 	return nil
+}
+
+func (s *session) persistPoison(poison *PoisonBatch) {
+	s.f.mu.Lock()
+	defer s.f.mu.Unlock()
+	if s.f.owners[s.nodeID].generation != s.owner {
+		return
+	}
+	if poison == nil {
+		delete(s.f.stuck, s.nodeID)
+		return
+	}
+	s.f.stuck[s.nodeID] = stuckSeq{instance: poison.Instance, seq: poison.Seq}
+}
+
+func resetSessionAlarm(timer sessionAlarmTimer, next *time.Time, now time.Time) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C():
+		default:
+		}
+	}
+	if next != nil {
+		delay := next.Sub(now)
+		if delay < 0 {
+			delay = 0
+		}
+		timer.Reset(delay)
+	}
+}
+
+func alarmDelay(next *time.Time, now time.Time) time.Duration {
+	if next == nil {
+		return time.Hour
+	}
+	delay := next.Sub(now)
+	if delay < 0 {
+		return 0
+	}
+	return delay
+}
+
+func effectiveAlarmTime(firedAt, now time.Time) time.Time {
+	if firedAt.After(now) {
+		return firedAt.UTC()
+	}
+	return now.UTC()
+}
+
+func newWallSessionAlarmTimer(d time.Duration) sessionAlarmTimer {
+	return &wallSessionAlarmTimer{timer: time.NewTimer(d)}
+}
+
+func (f *Fleet) poisonFor(nodeID string) *PoisonBatch {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	poison, ok := f.stuck[nodeID]
+	if !ok {
+		return nil
+	}
+	return &PoisonBatch{Instance: poison.instance, Seq: poison.seq}
 }
 
 func timeFromUnixNano(nanos int64) time.Time {
@@ -267,8 +286,6 @@ func timeFromUnixNano(nanos int64) time.Time {
 	}
 	return time.Unix(0, nanos).UTC()
 }
-
-func (s *session) livenessDur() time.Duration { return time.Duration(s.liveness.Load()) }
 
 // enqueue queues a message for the stream goroutine. A full queue means the agent does not keep up: drop the stream
 // (it reconnects and resyncs) rather than block the fleet.
@@ -383,14 +400,24 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	}
 
 	core := NewSessionCore(f)
-	opened, err := core.Step(sctx, SessionState{Version: sessionStateVersion, NodeID: id, OwnerGeneration: owner}, SessionSidecar{},
-		SessionEvent{Kind: EventOpen, At: f.now().UTC()})
+	state := SessionState{Version: sessionStateVersion, NodeID: id, OwnerGeneration: owner, Poison: f.poisonFor(id)}
+	if pc.serial != "" {
+		state.PeerCertSerial = pc.serial
+	}
+	if !pc.notAfter.IsZero() {
+		state.PeerCertNotAfterUnixNano = pc.notAfter.UnixNano()
+	}
+	var sidecar SessionSidecar
+	opened, err := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: f.now().UTC()})
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	state, sidecar := opened.State, opened.Sidecar
-	helloTimer := time.NewTimer(helloTimeout)
-	defer helloTimer.Stop()
+	newTimer := f.newSessionAlarmTimer
+	if newTimer == nil {
+		newTimer = newWallSessionAlarmTimer
+	}
+	alarmTimer := newTimer(alarmDelay(opened.NextAlarm, f.now().UTC()))
+	defer alarmTimer.Stop()
 	var first *agentv1.ConnectRequest
 	select {
 	case m, ok := <-msgs:
@@ -398,9 +425,10 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			return endErr()
 		}
 		first = m
-	case <-helloTimer.C:
-		deadline := timeFromUnixNano(state.HelloDeadlineUnixNano)
-		tr, alarmErr := core.Step(sctx, state, sidecar, SessionEvent{Kind: EventAlarm, Alarm: AlarmHello, At: deadline})
+	case alarmAt := <-alarmTimer.C():
+		now := effectiveAlarmTime(alarmAt, f.now().UTC())
+		tr, alarmErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: now})
+		resetSessionAlarm(alarmTimer, tr.NextAlarm, now)
 		if alarmErr == nil && tr.Close != nil {
 			return sessionCloseError(tr.Close)
 		}
@@ -409,7 +437,8 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return errOrCause(sctx)
 	}
 
-	tr, stepErr := core.Step(sctx, state, sidecar, SessionEvent{Kind: EventHello, At: f.now().UTC(), Frame: first})
+	tr, stepErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: f.now().UTC(), Frame: first})
+	resetSessionAlarm(alarmTimer, tr.NextAlarm, f.now().UTC())
 	if tr.Close != nil && tr.State.InstanceID == "" {
 		return sessionCloseError(tr.Close)
 	}
@@ -422,11 +451,11 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 
 	s := &session{f: f, nodeID: id, owner: owner, caps: slices.Clone(tr.State.Capabilities), ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
-		userDown: map[string]uint64{}, userUp: map[string]uint64{},
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
-		logs: map[string]*logSub{}, core: core, coreState: tr.State, coreSidecar: tr.Sidecar}
+		logs: map[string]*logSub{}, core: core, coreState: state, coreSidecar: sidecar, alarmTimer: alarmTimer}
 	s.coreMu.Lock()
-	s.syncCoreFields()
+	s.publishView()
+	s.persistPoison(s.coreState.Poison)
 	if !f.register(s) {
 		s.coreMu.Unlock()
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
@@ -437,23 +466,24 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		if f.unregister(s) {
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer dcancel()
-			s.liveMu.Lock()
-			seen := s.lastSeen
-			s.liveMu.Unlock()
+			view := s.view.Load()
+			seen := time.Time{}
+			if view != nil {
+				seen = timeFromUnixNano(view.State.LastSeenUnixNano)
+			}
 			if err := f.st.NodeDisconnected(dctx, id, seen, f.now().UTC()); err != nil {
 				f.log.Warn("record disconnect", "node", id, "err", err)
 			}
 		}
 	}()
-	helloErr := s.dispatchCoreTransition(sctx, &tr, &pc)
+	helloErr := s.dispatchCoreTransition(sctx, &tr)
 	s.coreMu.Unlock()
 	if helloErr != nil {
 		f.log.Error("hello response", "node", id, "err", helloErr)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	// Core-mediated admin frames wait until HelloAck is queued; Retire remains a direct send.
-	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventInitialReconcile, At: f.now().UTC(), Frame: first,
-		AutoBandwidthAt: s.autoBandwidthAt}, &pc)
+	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventInitialReconcile, At: f.now().UTC(), Frame: first})
 	if err != nil {
 		f.log.Error("initial desired state", "node", id, "err", err)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -462,44 +492,22 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return sessionCloseError(tr.Close)
 	}
 
-	live := time.NewTimer(s.livenessDur())
-	defer live.Stop()
-	ackT := time.NewTicker(ackEvery)
-	defer ackT.Stop()
-	// These tickers retain the VPS loop's existing phase. Each firing is fed to the core as an alarm.
-	certT := time.NewTicker(f.certCheck)
-	defer certT.Stop()
-	_, _ = s.stepCore(sctx, SessionEvent{Kind: EventTimersStarted, At: f.now().UTC()}, &pc)
 	for {
 		select {
 		case <-sctx.Done():
 			var ce *connect.Error
 			if errors.As(context.Cause(sctx), &ce) && ce.Code() == connect.CodeAborted {
-				_, _ = s.stepCore(sctx, SessionEvent{Kind: EventOwnerSuperseded, At: f.now().UTC()}, &pc)
+				_, _ = s.stepCore(sctx, SessionEvent{Kind: EventOwnerSuperseded, At: f.now().UTC()})
 			}
 			return errOrCause(sctx)
-		case <-certT.C:
-			_, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmCertificate, At: f.now().UTC()}, &pc)
-			if err != nil {
-				return err
-			}
-		case <-live.C:
-			s.coreMu.Lock()
-			deadline := s.coreState.LivenessDeadlineUnixNano
-			s.coreMu.Unlock()
-			at := timeFromUnixNano(deadline)
-			if at.IsZero() {
-				at = f.now().UTC()
-			}
-			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmLiveness, At: at}, &pc)
+		case alarmAt := <-alarmTimer.C():
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: effectiveAlarmTime(alarmAt, f.now().UTC())})
 			if err != nil {
 				return err
 			}
 			if tr.Close != nil {
 				return sessionCloseError(tr.Close)
 			}
-		case <-ackT.C:
-			_, _ = s.stepCore(sctx, SessionEvent{Kind: EventAlarm, Alarm: AlarmAck, At: f.now().UTC()}, &pc)
 		case m := <-s.out:
 			// Only this goroutine writes to the stream (after the handler returns nobody may).
 			if err := stream.Send(m); err != nil {
@@ -509,8 +517,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			if !ok {
 				return endErr()
 			}
-			live.Reset(s.livenessDur())
-			tr, err := s.stepAgentFrame(sctx, m, &pc)
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now().UTC(), Frame: m})
 			if errors.Is(err, errAgentQueueFull) {
 				continue
 			}
@@ -665,7 +672,7 @@ func settingsSig(s *agentv1.NodeSettings) string {
 // reconcile computes the node's desired state and sends what the agent lacks. Revisions are per node,
 // strictly increasing and persisted; every message that is sent gets a fresh one.
 func (f *Fleet) reconcile(ctx context.Context, s *session, mode reconcileMode) error {
-	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now().UTC(), Mode: mode}, nil)
+	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now().UTC(), Mode: mode})
 	if err != nil {
 		return err
 	}
@@ -686,18 +693,18 @@ var (
 func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse) (*agentv1.CommandResult, error) {
 	id := store.NewID("req_")
 	ch := make(chan *agentv1.CommandResult, 1)
-	s.liveMu.Lock()
+	s.waitMu.Lock()
 	s.cmds[id] = ch
-	s.liveMu.Unlock()
+	s.waitMu.Unlock()
 	defer func() {
-		s.liveMu.Lock()
+		s.waitMu.Lock()
 		delete(s.cmds, id)
-		s.liveMu.Unlock()
+		s.waitMu.Unlock()
 	}()
 	requestAt := s.f.now().UTC()
 	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
 		RequestID: id, Deadline: requestAt.Add(wait), Frame: build(id), Kind: PendingCommand,
-	}}, nil)
+	}})
 	if err != nil {
 		return nil, errLinkLost
 	}
@@ -724,9 +731,9 @@ func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(
 }
 
 func (s *session) deliverCommand(r *agentv1.CommandResult) {
-	s.liveMu.Lock()
+	s.waitMu.Lock()
 	ch := s.cmds[r.RequestId]
-	s.liveMu.Unlock()
+	s.waitMu.Unlock()
 	if ch != nil {
 		select {
 		case ch <- r:
@@ -736,9 +743,9 @@ func (s *session) deliverCommand(r *agentv1.CommandResult) {
 }
 
 func (s *session) deliverLog(c *agentv1.LogChunk) {
-	s.liveMu.Lock()
+	s.waitMu.Lock()
 	sub := s.logs[c.RequestId]
-	s.liveMu.Unlock()
+	s.waitMu.Unlock()
 	if sub == nil {
 		return
 	}

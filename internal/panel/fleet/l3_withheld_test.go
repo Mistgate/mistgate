@@ -67,14 +67,21 @@ func TestSessionCoreReconcileDoesNotFailWithheldInbounds(t *testing.T) {
 	if s == nil {
 		t.Fatal("connected session was not registered")
 	}
+	s.coreMu.Lock()
+	ticketStep, err := s.core.Step(s.ctx, &s.coreState, &s.coreSidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: x.clock.now().UTC()})
+	s.coreMu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	prepared, err := x.f.prepareDesiredState(s.ctx, a.nodeID, s.caps)
 	if err != nil {
 		t.Fatal(err)
 	}
+	prepared.ticket = ticketStep.State.PrepareTicket
+	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
 
 	s.coreMu.Lock()
-	state, sidecar := s.coreState, s.coreSidecar
-	_, err = s.core.Step(s.ctx, state, sidecar, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now().UTC(),
+	_, err = s.core.Step(s.ctx, &s.coreState, &s.coreSidecar, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now().UTC(),
 		Mode: reconcileChange, Prepared: prepared})
 	s.coreMu.Unlock()
 	if err != nil {

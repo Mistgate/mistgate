@@ -58,9 +58,9 @@ func (f *Fleet) Live(nodeID string) (connected bool, caps []string, drift bool) 
 	if s == nil {
 		return false, nil, false
 	}
-	s.liveMu.Lock()
-	drift = s.drift
-	s.liveMu.Unlock()
+	if view := s.view.Load(); view != nil {
+		drift = view.State.Drift
+	}
 	return true, s.caps, drift
 }
 
@@ -103,20 +103,20 @@ func (f *Fleet) RunDoctor(ctx context.Context, nodeID string, checks []string, w
 	}
 	id := store.NewID("req_")
 	ch := make(chan *agentv1.DoctorReport, 1)
-	s.liveMu.Lock()
+	s.waitMu.Lock()
 	s.docs[id] = ch
-	s.liveMu.Unlock()
+	s.waitMu.Unlock()
 	defer func() {
-		s.liveMu.Lock()
+		s.waitMu.Lock()
 		delete(s.docs, id)
-		s.liveMu.Unlock()
+		s.waitMu.Unlock()
 	}()
 	requestAt := f.now().UTC()
 	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
 		RequestID: id, Deadline: requestAt.Add(wait), Kind: PendingDoctor,
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{
 			RunDoctor: &agentv1.RunDoctor{RequestId: id, Checks: checks}}},
-	}}, nil)
+	}})
 	if err != nil {
 		return nil, errLinkLost
 	}
@@ -154,17 +154,20 @@ func (f *Fleet) ApplyFix(ctx context.Context, nodeID, fixID string, dryRun bool,
 	})
 }
 
-// onDoctorReport stores the snapshot through Health first, then wakes the admin call that asked for it.
-func (f *Fleet) onDoctorReport(ctx context.Context, s *session, r *agentv1.DoctorReport) {
+// recordDoctorReport stores the snapshot through Health before a waiting admin call is woken.
+func (f *Fleet) recordDoctorReport(ctx context.Context, nodeID string, r *agentv1.DoctorReport) {
 	if h := f.hooks(); h != nil {
-		h.DoctorReport(ctx, s.nodeID, r)
+		h.DoctorReport(ctx, nodeID, r)
 	}
-	if r.RequestId == "" {
+}
+
+func (s *session) deliverDoctor(r *agentv1.DoctorReport) {
+	if r == nil || r.RequestId == "" {
 		return
 	}
-	s.liveMu.Lock()
+	s.waitMu.Lock()
 	ch := s.docs[r.RequestId]
-	s.liveMu.Unlock()
+	s.waitMu.Unlock()
 	if ch != nil {
 		select {
 		case ch <- r:

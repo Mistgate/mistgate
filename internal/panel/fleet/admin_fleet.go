@@ -134,7 +134,8 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 	liveByProto := map[string]map[string]bool{}
 	for _, n := range nodes {
 		sess := f.session(n.ID)
-		st := f.statusOf(ctx, n, sess, inboundsOf(enabled, n.ID), now)
+		view := sessionViewOf(sess)
+		st := f.statusOfView(ctx, n, sess, view, inboundsOf(enabled, n.ID), now)
 		card := &adminv1.NodeCard{Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider,
 			Status: st.status, Reason: st.reason, SparkBytes: make([]uint64, 24)}
 		for i := range 24 {
@@ -144,26 +145,26 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 			resp.NodesProblem++
 		}
 		if sess != nil {
-			card.Online = protocolCounts(sess.onlineByProtocol())
-			sess.liveMu.Lock()
-			for _, o := range sess.online {
-				liveUsers[o.userID] = true
-				if liveByProto[o.protocol] == nil {
-					liveByProto[o.protocol] = map[string]bool{}
+			card.Online = protocolCounts(onlineByProtocolView(view))
+			if view != nil {
+				for _, o := range view.Live.Online {
+					liveUsers[o.userID] = true
+					if liveByProto[o.protocol] == nil {
+						liveByProto[o.protocol] = map[string]bool{}
+					}
+					liveByProto[o.protocol][o.userID] = true
 				}
-				liveByProto[o.protocol][o.userID] = true
+				for u, bps := range view.Live.UserDown {
+					card.DownBps += bps
+					consumers = append(consumers, consumer{u, n.ID, bps})
+				}
+				for _, bps := range view.Live.UserUp {
+					card.UpBps += bps
+				}
+				if m := view.Live.Metrics; m != nil {
+					card.HasMetrics, card.CpuPct = true, m.CpuPct
+				}
 			}
-			for u, bps := range sess.userDown {
-				card.DownBps += bps
-				consumers = append(consumers, consumer{u, n.ID, bps})
-			}
-			for _, bps := range sess.userUp {
-				card.UpBps += bps
-			}
-			if m := sess.metrics; m != nil {
-				card.HasMetrics, card.CpuPct = true, m.CpuPct
-			}
-			sess.liveMu.Unlock()
 		}
 		resp.Nodes = append(resp.Nodes, card)
 	}

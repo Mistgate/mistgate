@@ -130,6 +130,10 @@ func inboundsOf(all map[string]map[string]string, nodeID string) map[string]stri
 // enabled inbounds (inbound id -> profile name); nil when the caller needs the status alone, and then the reasons that
 // count profiles (no_profiles, the profile and the counts of inbound_failed) are left out.
 func (f *Fleet) statusOf(ctx context.Context, n store.NodeRow, s *session, enabled map[string]string, now time.Time) nodeStatus {
+	return f.statusOfView(ctx, n, s, sessionViewOf(s), enabled, now)
+}
+
+func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, s *session, view *sessionView, enabled map[string]string, now time.Time) nodeStatus {
 	switch n.State {
 	case "retired":
 		return nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_RETIRED}
@@ -150,16 +154,17 @@ func (f *Fleet) statusOf(ctx context.Context, n store.NodeRow, s *session, enabl
 	}
 	if s != nil {
 		st := nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_ONLINE}
-		s.liveMu.Lock()
-		drift := s.drift
+		var drift bool
 		var failed []*agentv1.InboundHealth
-		for _, h := range s.health {
-			_, known := enabled[h.InboundId]
-			if h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED && (enabled == nil || known) {
-				failed = append(failed, h)
+		if view != nil {
+			drift = view.State.Drift
+			for _, h := range view.Live.Health {
+				_, known := enabled[h.InboundId]
+				if h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED && (enabled == nil || known) {
+					failed = append(failed, h)
+				}
 			}
 		}
-		s.liveMu.Unlock()
 		switch {
 		case len(failed) > 0:
 			// failed of total: one profile of three down is "works partly", all of them is "broken"
@@ -198,10 +203,15 @@ func (f *Fleet) statusOf(ctx context.Context, n store.NodeRow, s *session, enabl
 
 // onlineByProtocol counts distinct online users per protocol.
 func (s *session) onlineByProtocol() map[string]uint32 {
-	s.liveMu.Lock()
-	defer s.liveMu.Unlock()
+	return onlineByProtocolView(s.view.Load())
+}
+
+func onlineByProtocolView(view *sessionView) map[string]uint32 {
 	seen := map[string]map[string]bool{}
-	for _, o := range s.online {
+	if view == nil {
+		return map[string]uint32{}
+	}
+	for _, o := range view.Live.Online {
 		if seen[o.protocol] == nil {
 			seen[o.protocol] = map[string]bool{}
 		}
@@ -224,9 +234,11 @@ func protocolCounts(m map[string]uint32) []*adminv1.ProtocolCount {
 }
 
 func (s *session) currentMetrics() *agentv1.HostMetrics {
-	s.liveMu.Lock()
-	defer s.liveMu.Unlock()
-	return s.metrics
+	view := s.view.Load()
+	if view == nil {
+		return nil
+	}
+	return view.Live.Metrics
 }
 
 func pct(used, total uint64) float32 {
@@ -249,7 +261,11 @@ func capabilityPresent(caps []string, want string) bool {
 
 func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time) *adminv1.Node {
 	s := f.session(n.ID)
-	st := f.statusOf(ctx, n, s, enabled, now)
+	return f.nodeMsgView(ctx, n, protos, todayBytes, enabled, now, s, sessionViewOf(s))
+}
+
+func (f *Fleet) nodeMsgView(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, s *session, view *sessionView) *adminv1.Node {
+	st := f.statusOfView(ctx, n, s, view, enabled, now)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
@@ -264,12 +280,12 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	if s != nil {
-		out.Online = protocolCounts(s.onlineByProtocol())
-		s.liveMu.Lock()
-		out.LastSeenUnix = s.lastSeen.Unix()
-		s.liveMu.Unlock()
-		if m := s.currentMetrics(); m != nil {
-			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
+		out.Online = protocolCounts(onlineByProtocolView(view))
+		if view != nil {
+			out.LastSeenUnix = timeFromUnixNano(view.State.LastSeenUnixNano).Unix()
+			if m := view.Live.Metrics; m != nil {
+				out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
+			}
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, s != nil, now)
@@ -281,6 +297,13 @@ func fleetUnix(t time.Time) int64 {
 		return 0
 	}
 	return t.Unix()
+}
+
+func sessionViewOf(s *session) *sessionView {
+	if s == nil {
+		return nil
+	}
+	return s.view.Load()
 }
 
 // todayBytesByNode sums up+down per node since 00:00 UTC.
@@ -360,10 +383,13 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 		return nil, internalErr(f.log.Error, "node facts", err)
 	}
 	resp := &adminv1.GetNodeResponse{
-		Node: f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now), Notes: n.Notes, DnsResolvers: n.DNSResolvers,
+		Notes: n.Notes, DnsResolvers: n.DNSResolvers,
 		Timeouts:    &adminv1.NodeTimeouts{LivenessTimeoutS: uint32(n.LivenessTimeoutS), ApplyTimeoutS: uint32(n.ApplyTimeoutS), DialTimeoutS: uint32(n.DialTimeoutS)},
 		CreatedUnix: n.CreatedAt.Unix(),
 	}
+	sess := f.session(n.ID)
+	view := sessionViewOf(sess)
+	resp.Node = f.nodeMsgView(ctx, n, protos, today[n.ID], enabled, now, sess, view)
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -380,13 +406,14 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	for _, row := range inbounds {
 		resp.Inbounds = append(resp.Inbounds, f.inboundMsg(n, row))
 	}
-	if s := f.session(n.ID); s != nil {
-		if m := s.currentMetrics(); m != nil {
+	if sess != nil {
+		if view != nil && view.Live.Metrics != nil {
+			m := view.Live.Metrics
 			resp.Metrics = &adminv1.NodeMetrics{CpuPct: m.CpuPct, SoftirqPct: m.SoftirqPct, Load1: m.Load1, RamUsedBytes: m.RamUsedBytes,
 				RamTotalBytes: m.RamTotalBytes, DiskUsedBytes: m.DiskUsedBytes, DiskTotalBytes: m.DiskTotalBytes,
 				NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, AtUnix: now.Unix()}
 		}
-		resp.OnlineUsers, err = f.onlineUsers(ctx, s)
+		resp.OnlineUsers, err = f.onlineUsers(ctx, view)
 		if err != nil {
 			return nil, internalErr(f.log.Error, "online users", err)
 		}
@@ -401,14 +428,12 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	return connect.NewResponse(resp), nil
 }
 
-func (f *Fleet) onlineUsers(ctx context.Context, s *session) ([]*adminv1.OnlineUser, error) {
-	s.liveMu.Lock()
-	online := append([]onlineSess(nil), s.online...)
-	down := make(map[string]uint64, len(s.userDown))
-	for k, v := range s.userDown {
-		down[k] = v
+func (f *Fleet) onlineUsers(ctx context.Context, view *sessionView) ([]*adminv1.OnlineUser, error) {
+	if view == nil {
+		return nil, nil
 	}
-	s.liveMu.Unlock()
+	online := append([]onlineSess(nil), view.Live.Online...)
+	down := view.Live.UserDown
 	var uids, dids []string
 	for _, o := range online {
 		uids, dids = append(uids, o.userID), append(dids, o.deviceID)
@@ -826,13 +851,13 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 
 	reqID := store.NewID("req_")
 	sub := &logSub{ch: make(chan *agentv1.LogChunk, 64)}
-	sess.liveMu.Lock()
+	sess.waitMu.Lock()
 	sess.logs[reqID] = sub
-	sess.liveMu.Unlock()
+	sess.waitMu.Unlock()
 	defer func() {
-		sess.liveMu.Lock()
+		sess.waitMu.Lock()
 		delete(sess.logs, reqID)
-		sess.liveMu.Unlock()
+		sess.waitMu.Unlock()
 	}()
 	requestAt := f.now().UTC()
 	tr, err := sess.stepCore(ctx, SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
@@ -840,7 +865,7 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{
 			RequestId: reqID, Sources: m.Sources, TailLines: tail, Follow: m.Follow, FollowMaxSeconds: followMax,
 			MinLevel: agentv1.Severity(m.MinLevel)}}},
-	}}, nil)
+	}})
 	if err != nil {
 		return errLinkLost
 	}
@@ -851,7 +876,7 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 		select {
 		case <-sess.done:
 		default:
-			_, _ = sess.stepCore(ctx, SessionEvent{Kind: EventLogCancel, At: f.now().UTC(), Request: &AdminRequest{RequestID: reqID}}, nil)
+			_, _ = sess.stepCore(ctx, SessionEvent{Kind: EventLogCancel, At: f.now().UTC(), Request: &AdminRequest{RequestID: reqID}})
 		}
 	}
 	end := func(msg string) error {

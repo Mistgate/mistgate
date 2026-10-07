@@ -20,17 +20,26 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
 
 ## Decision
 
-- The session logic becomes an event-driven core shared by both editions: given the persisted session state and one
-  event (a frame from the agent, a "desired state changed" notice, an alarm), it returns the frames to send, the new
-  state and the next alarm time. No goroutines, timers or I/O of its own beyond store calls.
-- VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now; mTLS behaviour,
-  timing and tests stay the same.
+- The session logic becomes an event-driven core shared by both editions: given the session state, sidecar and one event
+  (a frame from the agent, a "desired state changed" notice, or an alarm), it mutates the supplied state and returns
+  frames, adapter effects, a close decision and the next alarm time. The core owns protocol state; effects never write
+  back into it.
+- Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
+  differs by edition: delivering results to waiters, publishing the live view, Cloudflare calls, the long bandwidth job,
+  and the cross-module usage callback. Desired-state preparation is requested as an effect because its database reads
+  and withheld-inbound failures run outside the core lock. Certificate checks and pure database writes run inline.
+- VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now, using one timer reset
+  to the transition's `NextAlarm` after every step. The core sets hello, liveness, bandwidth, acknowledgement,
+  certificate and request-expiry deadlines. mTLS behaviour, timing and tests stay the same.
 - Edge: a `NodeLink` DO per node (`idFromName(node_id)`) accepts the WebSocket with the hibernation API, does the
   signed handshake through the same Go code, keeps the small session state in the socket attachment or DO storage,
   calls the core per event, and turns "next alarm" into a DO alarm. Admin changes reach it as a call from the Worker.
 - Session data that must outlive a connection stays where it is today (D1: `last_seq`, applied revision, certificates).
   The DO-side SQLite stats buffer from the original plan is deferred: one D1 write set per batch is well within the
   included D1 writes for a small fleet; revisit if D1 latency or cost says so (phase 4).
+- Session state carries desired-state ordering tickets and the pending full-resend bit, so stale preparations are
+  ignored and a base mismatch or first drift forces a full state before a later delta. Poisoned stats-batch identity is
+  session state too; the VPS adapter persists it per node across reconnects, and the DO will persist it in DO storage.
 
 ## Consequences
 

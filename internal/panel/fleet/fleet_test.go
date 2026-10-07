@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -631,36 +632,24 @@ func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 		t.Fatal("connected session was not registered")
 	}
 
-	gate := &messageGateHandler{message: "agent reports base mismatch, resending full state",
-		entered: make(chan struct{}), release: make(chan struct{})}
-	previousLog := e.f.log
 	previousDesired := e.f.cfg.Desired
-	e.f.log = slog.New(gate)
 	preparedEntered, preparedRelease := make(chan struct{}), make(chan struct{})
-	var preparedOnce sync.Once
+	var blockPreparation atomic.Bool
+	blockPreparation.Store(true)
 	e.f.cfg.Desired = func(ctx context.Context, nodeID string) ([]statehash.Inbound, error) {
 		in, err := previousDesired(ctx, nodeID)
-		preparedOnce.Do(func() {
+		if blockPreparation.CompareAndSwap(true, false) {
 			close(preparedEntered)
 			<-preparedRelease
-		})
+		}
 		return in, err
 	}
-	released := false
-	release := func() {
-		if !released {
-			close(gate.release)
-			released = true
-		}
-	}
 	defer func() {
-		release()
 		select {
 		case <-preparedRelease:
 		default:
 			close(preparedRelease)
 		}
-		e.f.log = previousLog
 		e.f.cfg.Desired = previousDesired
 	}()
 
@@ -668,35 +657,27 @@ func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 		Revision: initial.Revision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
 	}}})
 	select {
-	case <-gate.entered:
-	case <-time.After(5 * time.Second):
-		t.Fatal("base mismatch was not processed")
-	}
-
-	if s.reconcileMu.TryLock() {
-		s.reconcileMu.Unlock()
-		t.Fatal("ApplyResult step did not reserve desired-state order")
-	}
-
-	release()
-	select {
 	case <-preparedEntered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("full resend did not prepare desired state")
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
 	e.f.StateChanged()
-	close(preparedRelease)
-
 	full := c.desired()
-	delta := c.desired()
 	if full.BaseRevision != 0 || full.Revision <= initial.Revision {
 		t.Fatalf("base mismatch resend = %v", full)
 	}
+	if !m.apply(full) || m.hash() != full.StateHash {
+		t.Fatal("base mismatch resend did not contain the newest desired state")
+	}
+	close(preparedRelease)
+	e.exec(`UPDATE user SET status = 'active' WHERE id = 'usr_erin'`)
+	e.f.StateChanged()
+	delta := c.desired()
 	if delta.BaseRevision != full.Revision || delta.Revision <= full.Revision {
 		t.Fatalf("desired-state delta after full resend = %v, full revision %d", delta, full.Revision)
 	}
-	if !m.apply(full) || !m.apply(delta) || m.hash() != delta.StateHash {
+	if !m.apply(delta) || m.hash() != delta.StateHash {
 		t.Fatal("full resend followed by delta did not reproduce the newest state")
 	}
 	n, err := e.st.Node(e.ctx, a.nodeID)
@@ -746,7 +727,7 @@ func TestSessionTeardownUnregistersWithoutWaitingForCoreStep(t *testing.T) {
 	frame := statsBatch(now-10, now, []*agentv1.TrafficDelta{{CredId: "crd_hank_hy", InboundId: ids.i1, BytesUp: 600, BytesDown: 600}}, nil)
 	frame.Seq = 2
 	go func() {
-		_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: time.Now().UTC(), Frame: frame}, nil)
+		_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: time.Now().UTC(), Frame: frame})
 		stepDone <- err
 	}()
 	select {
