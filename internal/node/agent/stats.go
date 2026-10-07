@@ -50,12 +50,8 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 			b.Traffic = append(b.Traffic, &pb.TrafficDelta{CredId: t.CredID, InboundId: t.InboundID, BytesUp: t.Up, BytesDown: t.Down})
 		}
 		for _, s := range c.Sessions {
-			ip := ""
-			if s.RemoteIP.IsValid() {
-				ip = s.RemoteIP.String()
-			}
 			b.Sessions = append(b.Sessions, &pb.Session{
-				CredId: s.CredID, InboundId: s.InboundID, RemoteIp: ip, ConnectedAtUnix: s.Since.Add(off).Unix(),
+				CredId: s.CredID, InboundId: s.InboundID, ConnectedAtUnix: s.Since.Add(off).Unix(),
 			})
 		}
 		for _, h := range e.Health() {

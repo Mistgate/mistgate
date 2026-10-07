@@ -227,8 +227,8 @@ func (f *Fleet) Run(ctx context.Context) error {
 
 // OnlineSession is one open client session as last reported by a node.
 type OnlineSession struct {
-	NodeID, UserID, DeviceID, Protocol, InboundID, RemoteIP string
-	ConnectedAt                                             time.Time
+	NodeID, UserID, DeviceID, Protocol, InboundID string
+	ConnectedAt                                   time.Time
 }
 
 // Online returns the open sessions of every connected node (in memory, refreshed by each stats batch).
@@ -241,7 +241,7 @@ func (f *Fleet) Online() []OnlineSession {
 		}
 		for _, o := range view.Live.Online {
 			out = append(out, OnlineSession{NodeID: s.nodeID, UserID: o.userID, DeviceID: o.deviceID, Protocol: o.protocol,
-				InboundID: o.inboundID, RemoteIP: o.remoteIP, ConnectedAt: o.since})
+				InboundID: o.inboundID, ConnectedAt: o.since})
 		}
 	}
 	return out

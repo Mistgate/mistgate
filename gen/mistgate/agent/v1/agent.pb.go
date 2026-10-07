@@ -1461,12 +1461,10 @@ func (x *TrafficDelta) GetBytesDown() uint64 {
 }
 
 type Session struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	CredId    string                 `protobuf:"bytes,1,opt,name=cred_id,json=credId,proto3" json:"cred_id,omitempty"`
-	InboundId string                 `protobuf:"bytes,2,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
-	// Client address without port. Never shown in full in the UI by default.
-	RemoteIp        string `protobuf:"bytes,3,opt,name=remote_ip,json=remoteIp,proto3" json:"remote_ip,omitempty"`
-	ConnectedAtUnix int64  `protobuf:"varint,4,opt,name=connected_at_unix,json=connectedAtUnix,proto3" json:"connected_at_unix,omitempty"`
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CredId          string                 `protobuf:"bytes,1,opt,name=cred_id,json=credId,proto3" json:"cred_id,omitempty"`
+	InboundId       string                 `protobuf:"bytes,2,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	ConnectedAtUnix int64                  `protobuf:"varint,4,opt,name=connected_at_unix,json=connectedAtUnix,proto3" json:"connected_at_unix,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1511,13 +1509,6 @@ func (x *Session) GetCredId() string {
 func (x *Session) GetInboundId() string {
 	if x != nil {
 		return x.InboundId
-	}
-	return ""
-}
-
-func (x *Session) GetRemoteIp() string {
-	if x != nil {
-		return x.RemoteIp
 	}
 	return ""
 }
@@ -5132,13 +5123,12 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"inbound_id\x18\x02 \x01(\tR\tinboundId\x12\x19\n" +
 	"\bbytes_up\x18\x03 \x01(\x04R\abytesUp\x12\x1d\n" +
 	"\n" +
-	"bytes_down\x18\x04 \x01(\x04R\tbytesDown\"\x8a\x01\n" +
+	"bytes_down\x18\x04 \x01(\x04R\tbytesDown\"~\n" +
 	"\aSession\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
-	"inbound_id\x18\x02 \x01(\tR\tinboundId\x12\x1b\n" +
-	"\tremote_ip\x18\x03 \x01(\tR\bremoteIp\x12*\n" +
-	"\x11connected_at_unix\x18\x04 \x01(\x03R\x0fconnectedAtUnix\"\xd4\x02\n" +
+	"inbound_id\x18\x02 \x01(\tR\tinboundId\x12*\n" +
+	"\x11connected_at_unix\x18\x04 \x01(\x03R\x0fconnectedAtUnixJ\x04\b\x03\x10\x04R\tremote_ip\"\xd4\x02\n" +
 	"\vHostMetrics\x12\x17\n" +
 	"\acpu_pct\x18\x01 \x01(\x02R\x06cpuPct\x12\x1f\n" +
 	"\vsoftirq_pct\x18\x02 \x01(\x02R\n" +

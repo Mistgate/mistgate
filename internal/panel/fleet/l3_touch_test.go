@@ -31,8 +31,8 @@ func TestAwgSessionMovesTheDevicesLastSeenForward(t *testing.T) {
 	now := time.Now().Unix()
 	send := func(seq uint64, awgAt int64) {
 		c.send(seq, statsBatch(now-10, now, nil, []*agentv1.Session{
-			{CredId: "crd_alice_wg", InboundId: ids.i2, RemoteIp: "198.51.100.7", ConnectedAtUnix: awgAt},
-			{CredId: "crd_erin_hy", InboundId: ids.i1, RemoteIp: "198.51.100.8", ConnectedAtUnix: now - 30},
+			{CredId: "crd_alice_wg", InboundId: ids.i2, ConnectedAtUnix: awgAt},
+			{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 30},
 		}))
 		c.ack()
 	}

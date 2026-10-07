@@ -92,7 +92,6 @@ type UserTraffic struct {
 type Session struct {
 	CredID    string
 	InboundID string
-	RemoteIP  netip.Addr
 	Since     time.Time
 }
 

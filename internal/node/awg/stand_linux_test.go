@@ -519,7 +519,7 @@ func TestStandInterop(t *testing.T) {
 			if len(col.Traffic) != 1 || col.Traffic[0].CredID != "cred1" || col.Traffic[0].Up == 0 || col.Traffic[0].Down == 0 {
 				t.Errorf("traffic %+v", col.Traffic)
 			}
-			if len(col.Sessions) != 1 || col.Sessions[0].CredID != "cred1" || col.Sessions[0].RemoteIP != netip.MustParseAddr("203.0.113.2") {
+			if len(col.Sessions) != 1 || col.Sessions[0].CredID != "cred1" {
 				t.Errorf("sessions %+v", col.Sessions)
 			}
 			if o := s.observed(); o.State != desired(sp, cr) {

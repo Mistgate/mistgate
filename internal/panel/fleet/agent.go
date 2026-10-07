@@ -34,8 +34,8 @@ type agentService struct{ f *Fleet }
 
 // onlineSess is one open client session, resolved to user x device x protocol.
 type onlineSess struct {
-	userID, deviceID, protocol, inboundID, remoteIP string
-	since                                           time.Time
+	userID, deviceID, protocol, inboundID string
+	since                                 time.Time
 }
 
 type logSub struct {

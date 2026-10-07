@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/netip"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -248,7 +247,6 @@ func (cs *credState) clampKicks(open int32) {
 
 type session struct {
 	cs    *credState
-	ip    netip.Addr
 	since time.Time
 }
 
@@ -257,7 +255,7 @@ func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
 	if cs == nil {
 		return
 	}
-	s := session{cs: cs, ip: addrIP(addr), since: in.e.now()}
+	s := session{cs: cs, since: in.e.now()}
 	in.smu.Lock()
 	in.sessions[addr.String()] = s
 	in.smu.Unlock()
@@ -272,19 +270,6 @@ func (in *inbound) Disconnect(addr net.Addr, _ string, _ error) {
 	if ok {
 		s.cs.clampKicks(s.cs.conns.Add(-1))
 	}
-}
-
-func addrIP(a net.Addr) netip.Addr {
-	switch v := a.(type) {
-	case *net.UDPAddr:
-		return v.AddrPort().Addr().Unmap()
-	case *net.TCPAddr:
-		return v.AddrPort().Addr().Unmap()
-	}
-	if ap, err := netip.ParseAddrPort(a.String()); err == nil {
-		return ap.Addr().Unmap()
-	}
-	return netip.Addr{}
 }
 
 // Everything else the core offers is deliberately ignored: per-request events would be destination logs.

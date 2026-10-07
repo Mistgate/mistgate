@@ -98,7 +98,7 @@ CREATE TABLE node_live (
 - **No `seen_at`.** `node.last_seen_at` already plays that part: NodeHello, IngestStats and IngestEvent write it in the
   same batches.
 - **Hot columns.** The sample, rx/tx, cpu and users are columns so that subscriptions never parse `live_json`.
-- **No client IPs.** `OnlineSession.RemoteIP` has no reader, and storing client IPs would be a privacy regression.
+- **No client IPs.** Session reports contain no client address, and the panel stores none in its live session view.
 - **Session id = `OwnerGeneration`.** It is unique per process on the VPS; on the edge the open event carries the
   object's generation. It is a small integer: D1 refuses integers above 2^53.
 

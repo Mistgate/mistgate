@@ -525,7 +525,7 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 			since = now
 		}
 		live.Online = append(live.Online, onlineSess{userID: ref.UserID, deviceID: ref.DeviceID, protocol: ref.Protocol,
-			inboundID: se.InboundId, remoteIP: clip(se.RemoteIp, 64), since: since})
+			inboundID: se.InboundId, since: since})
 	}
 	secs := uint64(min(max(1, end-st.IntervalStartUnix), int64(maxBatchSpan/time.Second)))
 	live.UserDown, live.UserUp = map[string]uint64{}, map[string]uint64{}

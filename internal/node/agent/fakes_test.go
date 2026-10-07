@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/netip"
 	"sort"
 	"sync"
 	"testing"
@@ -104,7 +103,7 @@ func (e *fakeEngine) Collect(context.Context) (engine.Collected, error) {
 			e.emittedUp += e.upEach
 			e.emittedDown += e.downEach
 			c.Sessions = append(c.Sessions, plugin.Session{CredID: e.in[id].creds[0].CredID, InboundID: id,
-				RemoteIP: netip.MustParseAddr("203.0.113.7"), Since: time.Unix(1700000000, 0)})
+				Since: time.Unix(1700000000, 0)})
 		}
 	}
 	return c, nil

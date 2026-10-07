@@ -171,8 +171,8 @@ func TestStatsFutureEndDoesNotFreezeLiveView(t *testing.T) {
 	now := time.Now().Unix()
 	year := now + 365*24*3600
 
-	c.send(1, statsBatch(year-10, year, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, RemoteIp: "198.51.100.7", ConnectedAtUnix: year}}))
-	c.send(2, statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, RemoteIp: "198.51.100.8", ConnectedAtUnix: now - 5}}))
+	c.send(1, statsBatch(year-10, year, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: year}}))
+	c.send(2, statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 5}}))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 2 })
 	on := e.f.Online()
 	if len(on) != 1 || on[0].UserID != "usr_erin" {

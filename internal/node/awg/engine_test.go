@@ -223,7 +223,6 @@ func TestCollectDeltasSessionsAndCounterReset(t *testing.T) {
 			p.rx, p.tx = rx, tx
 			if hsAgo >= 0 {
 				p.hs = clk.Now().Add(-hsAgo)
-				p.ep = netip.MustParseAddrPort("[::ffff:203.0.113.7]:40000")
 			}
 		})
 	}
@@ -233,8 +232,8 @@ func TestCollectDeltasSessionsAndCounterReset(t *testing.T) {
 	if len(c.Traffic) != 1 || c.Traffic[0] != (plugin.UserTraffic{CredID: "a", InboundID: "inb1", Up: 1000, Down: 4000}) {
 		t.Errorf("traffic %+v (Up = rx of the peer, Down = tx)", c.Traffic)
 	}
-	if len(c.Sessions) != 1 || c.Sessions[0].CredID != "a" || c.Sessions[0].RemoteIP != netip.MustParseAddr("203.0.113.7") || !c.Sessions[0].Since.Equal(clk.Now().Add(-5*time.Second)) {
-		t.Errorf("sessions %+v (endpoint unmapped, since = last handshake)", c.Sessions)
+	if len(c.Sessions) != 1 || c.Sessions[0].CredID != "a" || !c.Sessions[0].Since.Equal(clk.Now().Add(-5*time.Second)) {
+		t.Errorf("sessions %+v (since = last handshake)", c.Sessions)
 	}
 
 	set(0x0a, 1500, 4100, 5*time.Second)

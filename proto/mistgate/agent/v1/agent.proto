@@ -259,9 +259,8 @@ package mistgate.agent.v1;
 //     trust class.
 //   - Credential.data_json for awg is {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],
 //     "psk":"<base64>"} in that field order (the bytes are hashed). The client's private key never reaches a node.
-//   - Session for awg: connected_at_unix = the peer's last handshake, remote_ip = the peer's current endpoint
-//     (the health "hopping endpoint" rule reads it from successive snapshots). A peer is a session while its last
-//     handshake is younger than 190 s.
+//   - Session for awg: connected_at_unix = the peer's last handshake. A peer is a session while its last handshake
+//     is younger than 190 s.
 //   - TrafficDelta for awg: bytes_up = the peer's received bytes (client -> internet), bytes_down = its
 //     transmitted bytes; the engine keeps the previous absolute value per (inbound, public key) and a smaller new
 //     value means the peer or interface was recreated (the delta is then the new value).
@@ -521,8 +520,9 @@ message TrafficDelta {
 message Session {
   string cred_id = 1;
   string inbound_id = 2;
-  // Client address without port. Never shown in full in the UI by default.
-  string remote_ip = 3;
+  // Client addresses are never sent.
+  reserved 3;
+  reserved "remote_ip";
   int64 connected_at_unix = 4;
 }
 

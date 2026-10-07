@@ -433,7 +433,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("want 1 session for a, got %d", n)
 	}
 	for _, s := range col.Sessions {
-		if !s.RemoteIP.IsLoopback() || s.InboundID != r.spec.ID || s.Since.IsZero() {
+		if s.InboundID != r.spec.ID || s.Since.IsZero() {
 			t.Fatalf("bad session %+v", s)
 		}
 	}

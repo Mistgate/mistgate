@@ -421,7 +421,7 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 		for _, s := range in.sessions {
 			// A removed credential's connection is about to die at its next packet; do not show it online.
 			if !s.cs.removed.Load() {
-				out.Sessions = append(out.Sessions, plugin.Session{CredID: s.cs.id, InboundID: in.spec.ID, RemoteIP: s.ip, Since: s.since})
+				out.Sessions = append(out.Sessions, plugin.Session{CredID: s.cs.id, InboundID: in.spec.ID, Since: s.since})
 			}
 		}
 		in.smu.Unlock()

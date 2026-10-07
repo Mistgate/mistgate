@@ -392,7 +392,7 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 			e.addTraffic(in.spec.ID, w.credID, deltaOf(p.rx, h.RxBytes), deltaOf(p.tx, h.TxBytes))
 			in.prev[h.PublicKey] = counters{h.RxBytes, h.TxBytes}
 			if online(h, now) {
-				out.Sessions = append(out.Sessions, plugin.Session{CredID: w.credID, InboundID: in.spec.ID, RemoteIP: endpointIP(h.Endpoint), Since: h.LastHS})
+				out.Sessions = append(out.Sessions, plugin.Session{CredID: w.credID, InboundID: in.spec.ID, Since: h.LastHS})
 			}
 		}
 	}
@@ -630,13 +630,6 @@ func deltaOf(prev, cur uint64) uint64 {
 
 func online(h awgcfg.PeerStat, now time.Time) bool {
 	return !h.LastHS.IsZero() && now.Sub(h.LastHS) < onlineWindow
-}
-
-func endpointIP(ap netip.AddrPort) netip.Addr {
-	if !ap.IsValid() {
-		return netip.Addr{}
-	}
-	return ap.Addr().Unmap()
 }
 
 func samePrefixes(a, b []netip.Prefix) bool {

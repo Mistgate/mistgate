@@ -378,8 +378,8 @@ func TestStatsSequenceDedup(t *testing.T) {
 				{CredId: "crd_alice_hy", InboundId: ids.i3, BytesUp: 999, BytesDown: 999}, // inbound of another node
 			},
 			[]*agentv1.Session{
-				{CredId: "crd_alice_hy", InboundId: ids.i1, RemoteIp: "198.51.100.7", ConnectedAtUnix: now - 60},
-				{CredId: "crd_erin_hy", InboundId: ids.i1, RemoteIp: "198.51.100.8", ConnectedAtUnix: now - 30},
+				{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now - 60},
+				{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 30},
 			})
 	}
 	bytes := func() (up, down int64) {
@@ -1083,7 +1083,7 @@ func TestAdminNodeAndFleetViews(t *testing.T) {
 	hour := now - now%3600
 	c.send(1, statsBatch(now-10, now,
 		[]*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 1000, BytesDown: 5000}},
-		[]*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, RemoteIp: "198.51.100.7", ConnectedAtUnix: now - 60}}))
+		[]*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now - 60}}))
 	c.ack()
 
 	ln, err := nodes.ListNodes(e.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))

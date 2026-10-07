@@ -306,7 +306,7 @@ func TestStatsBatchContent(t *testing.T) {
 	h.panel.mu.Lock()
 	defer h.panel.mu.Unlock()
 	s := h.panel.sessions[0]
-	if s.CredId != "crd_a" || s.InboundId != "inb_1" || s.RemoteIp != "203.0.113.7" || s.ConnectedAtUnix < 1700000000 {
+	if s.CredId != "crd_a" || s.InboundId != "inb_1" || s.ConnectedAtUnix < 1700000000 {
 		t.Errorf("session = %v", s)
 	}
 }
