@@ -2,7 +2,6 @@ package fleet
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -61,8 +60,8 @@ func (f *Fleet) WarpPauseApplied(ctx context.Context, nodeID string) bool {
 	if err != nil || len(rawDigest) == 0 {
 		return false
 	}
-	var digest sentDigest
-	if err := json.Unmarshal(rawDigest, &digest); err != nil {
+	digest, err := decodeSentDigest(rawDigest)
+	if err != nil {
 		return false
 	}
 	return digest.WarpOff && n.AppliedHash == digest.Hash

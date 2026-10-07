@@ -800,7 +800,11 @@ func (a Access) ImplicitDevice(ctx context.Context, userID string) (AccessDevice
 
 // TouchDevice sets last_seen_at unless it is already newer than `not`: a throttle for write-on-read.
 func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE device SET last_seen_at = ? WHERE id = ? AND last_seen_at < ?`, unix(now), id, unix(not))
+	stmt, err := deviceTouchStmt([]fleetDeviceTouchWrite{{DeviceID: id, LastSeenAt: unix(now), NotAfter: unix(not)}})
+	if err != nil {
+		return err
+	}
+	_, err = a.s.W.ExecContext(ctx, stmt.Query, stmt.Args...)
 	return err
 }
 

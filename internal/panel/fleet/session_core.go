@@ -93,7 +93,7 @@ const (
 	PendingAutoBandwidth
 )
 
-// SessionSidecar holds desired/live state that is too large for SessionState.
+// SessionSidecar holds live state that is too large for SessionState.
 type SessionSidecar struct {
 	Version uint32
 	Live    LiveSnapshot
@@ -451,9 +451,6 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		var connectedAt time.Time
 		if se.ConnectedAtUnix > 0 {
 			connectedAt = time.Unix(se.ConnectedAtUnix, 0).UTC()
-			if connectedAt.After(now) {
-				connectedAt = now
-			}
 		}
 		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId, ConnectedAt: connectedAt})
 	}
@@ -783,7 +780,8 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			state.SentWithheld = slices.Clone(want.withheld)
 		}
 	}
-	full := state.FullResendPending || state.SentRevision == 0 || digest == nil || digest.Revision != state.SentRevision
+	full := state.FullResendPending || state.SentRevision == 0 || digest == nil ||
+		digest.Revision != state.SentRevision || digest.Hash != state.SentStateHash
 	if !full && digest.Warp != "" && want.warp == nil {
 		full = true
 	}

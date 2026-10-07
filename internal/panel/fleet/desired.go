@@ -109,11 +109,11 @@ func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string, caps []s
 	}
 	prepared := &preparedDesiredState{node: node}
 	if len(rawDigest) > 0 {
-		var digest sentDigest
-		if err := json.Unmarshal(rawDigest, &digest); err != nil {
+		digest, err := decodeSentDigest(rawDigest)
+		if err != nil {
 			return nil, fmt.Errorf("decode sent digest for node %s: %w", nodeID, err)
 		}
-		prepared.digest = &digest
+		prepared.digest = digest
 	}
 	if node.State != "retired" {
 		prepared.desired, err = f.buildState(ctx, node, caps)
@@ -191,6 +191,14 @@ func marshalSentDigest(s *nodeState, revision uint64) (*sentDigest, []byte, erro
 	digest := sentDigestFor(s, revision)
 	encoded, err := json.Marshal(digest)
 	return digest, encoded, err
+}
+
+func decodeSentDigest(raw []byte) (*sentDigest, error) {
+	var digest sentDigest
+	if err := json.Unmarshal(raw, &digest); err != nil {
+		return nil, err
+	}
+	return &digest, nil
 }
 
 func (s *sentDigest) ids() []string {

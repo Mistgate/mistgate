@@ -133,17 +133,54 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: "prf_d1_stats", Protocol: "awg", Name: "d1-stats", SettingsJSON: "{}", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Access().CreateInbound(ctx, AccessInbound{ID: "inb_d1_stats", ProfileID: "prf_d1_stats", NodeID: node.ID, Enabled: true, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_d1_stats", Name: "d1-stats", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at)
+		VALUES ('usr_d1_stats', 'd1-stats-user', 'grp_d1_stats', ?, ?, ?, ?)`, now.Unix(), []byte("d1-stats-sub"), []byte{1}, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO device (id, user_id, hwid_hash, first_seen_at, last_seen_at, created_at)
+		VALUES ('dev_d1_stats', 'usr_d1_stats', ?, 0, 0, ?)`, []byte("d1-stats-hwid"), now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO device_credential
+		(id, device_id, user_id, protocol, secret_enc, data_json, created_at, profile_id, config_epoch)
+		VALUES ('crd_d1_stats', 'dev_d1_stats', 'usr_d1_stats', 'awg', ?, '{}', ?, 'prf_d1_stats', 0)`, []byte{1}, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
 	binding := js.Global().Get("__d1")
 	var stats FleetStatsOut
 	var calls d1CallCount
 	calls = countD1Queries(t, binding, "IngestStats", func() {
-		stats, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "d1-instance", Seq: 1, Now: now, HourStart: now.Unix() / 3600 * 3600})
+		stats, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "d1-instance", Seq: 1, Now: now, HourStart: now.Unix() / 3600 * 3600,
+			Traffic:  []FleetTraffic{{CredID: "crd_d1_stats", InboundID: "inb_d1_stats", Up: 40, Down: 60}},
+			Sessions: []FleetSessionRef{{CredID: "crd_d1_stats", InboundID: "inb_d1_stats", ConnectedAt: now.Add(-time.Minute)}},
+			Certs:    []FleetInboundCert{{InboundID: "inb_d1_stats", Pin: "d1-stats-pin", NotAfter: now.Add(24 * time.Hour)}},
+		})
 	})
 	if err != nil || stats.Duplicate {
 		t.Fatalf("IngestStats() = %+v, %v", stats, err)
 	}
 	if calls.queries != 2 || calls.batches != 2 {
 		t.Fatalf("IngestStats used %d D1 calls in %d batches, want 2 calls in 2 batches", calls.queries, calls.batches)
+	}
+	var deviceSeen, certNotAfter int64
+	var certPin string
+	if err := st.R.QueryRowContext(ctx, `SELECT last_seen_at FROM device WHERE id = 'dev_d1_stats'`).Scan(&deviceSeen); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.R.QueryRowContext(ctx, `SELECT cert_pin_sha256, cert_not_after FROM inbound WHERE id = 'inb_d1_stats'`).Scan(&certPin, &certNotAfter); err != nil {
+		t.Fatal(err)
+	}
+	if deviceSeen != now.Add(-time.Minute).Unix() || certPin != "d1-stats-pin" || certNotAfter != now.Add(24*time.Hour).Unix() {
+		t.Fatalf("D1 stats touch/certificate = %d / %q / %d", deviceSeen, certPin, certNotAfter)
 	}
 	var duplicate bool
 	calls = countD1Queries(t, binding, "IngestEvent", func() {
@@ -187,7 +224,7 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 		t.Fatalf("write-only NodeApplied transaction on D1: %v", err)
 	}
 	if err := st.SkipSeq(ctx, enrolled.ID, "d1-instance", 3, now); err != nil {
-		t.Fatalf("write-only SkipSeq transaction on D1: %v", err)
+		t.Fatalf("write-only SkipSeq batch on D1: %v", err)
 	}
 	if err := st.RenewCert(ctx, CertRow{Serial: "serial-renewed", NodeID: enrolled.ID, CAID: "cas_d1", PEM: "renewed",
 		NotBefore: now, NotAfter: now.Add(48 * time.Hour), IssuedAt: now}, now, time.Minute); err != nil {

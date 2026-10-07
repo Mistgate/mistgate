@@ -18,8 +18,14 @@ import (
 
 func TestDiffStateDigestMatchesLegacy(t *testing.T) {
 	rng := rand.New(rand.NewSource(0x6b3))
+	var coverage digestTestCoverage
 	for iteration := 0; iteration < 250; iteration++ {
-		old, next := randomDigestTestState(rng), randomDigestTestState(rng)
+		old := randomDigestTestState(rng)
+		mutation := mutateDigestTestState(rng, old, iteration)
+		next := mutation.state
+		coverage.add(countDigestTestCoverage(old, next))
+		coverage.timezoneNoops += mutation.timezoneNoops
+		coverage.emptyDataNoops += mutation.emptyDataNoops
 		gotInbounds, gotRemoved := diffState(sentDigestFor(old, uint64(iteration+1)), next)
 		wantInbounds, wantRemoved := legacyDiffState(old, next)
 		if len(gotInbounds) != len(wantInbounds) {
@@ -32,6 +38,197 @@ func TestDiffStateDigestMatchesLegacy(t *testing.T) {
 		}
 		if !slices.Equal(gotRemoved, wantRemoved) {
 			t.Fatalf("iteration %d removed inbounds = %v, want %v", iteration, gotRemoved, wantRemoved)
+		}
+	}
+	for _, check := range []struct {
+		name  string
+		count int
+	}{
+		{"unchanged credentials", coverage.unchangedCredentials},
+		{"added credentials", coverage.addedCredentials},
+		{"removed credentials", coverage.removedCredentials},
+		{"added inbounds", coverage.addedInbounds},
+		{"removed inbounds", coverage.removedInbounds},
+		{"changed specs", coverage.changedSpecs},
+		{"equivalent timezone changes", coverage.timezoneNoops},
+		{"nil/empty Data changes", coverage.emptyDataNoops},
+	} {
+		if check.count == 0 {
+			t.Errorf("property generator did not cover %s", check.name)
+		}
+	}
+}
+
+type digestMutation struct {
+	state          *nodeState
+	timezoneNoops  int
+	emptyDataNoops int
+}
+
+type digestTestCoverage struct {
+	unchangedCredentials int
+	addedCredentials     int
+	removedCredentials   int
+	addedInbounds        int
+	removedInbounds      int
+	changedSpecs         int
+	timezoneNoops        int
+	emptyDataNoops       int
+}
+
+func (c *digestTestCoverage) add(other digestTestCoverage) {
+	c.unchangedCredentials += other.unchangedCredentials
+	c.addedCredentials += other.addedCredentials
+	c.removedCredentials += other.removedCredentials
+	c.addedInbounds += other.addedInbounds
+	c.removedInbounds += other.removedInbounds
+	c.changedSpecs += other.changedSpecs
+	c.timezoneNoops += other.timezoneNoops
+	c.emptyDataNoops += other.emptyDataNoops
+}
+
+func countDigestTestCoverage(old, next *nodeState) digestTestCoverage {
+	coverage := digestTestCoverage{unchangedCredentials: countUnchangedDigestTestCredentials(old, next)}
+	for inboundID, oldInbound := range old.in {
+		nextInbound, ok := next.in[inboundID]
+		if !ok {
+			coverage.removedInbounds++
+			continue
+		}
+		if oldInbound.specHash != nextInbound.specHash {
+			coverage.changedSpecs++
+			continue
+		}
+		oldByID := make(map[string]struct{}, len(oldInbound.creds))
+		nextByID := make(map[string]struct{}, len(nextInbound.creds))
+		for _, cred := range oldInbound.creds {
+			oldByID[cred.CredID] = struct{}{}
+		}
+		for _, cred := range nextInbound.creds {
+			nextByID[cred.CredID] = struct{}{}
+		}
+		for id := range oldByID {
+			if _, ok := nextByID[id]; !ok {
+				coverage.removedCredentials++
+			}
+		}
+		for id := range nextByID {
+			if _, ok := oldByID[id]; !ok {
+				coverage.addedCredentials++
+			}
+		}
+	}
+	for inboundID := range next.in {
+		if _, ok := old.in[inboundID]; !ok {
+			coverage.addedInbounds++
+		}
+	}
+	return coverage
+}
+
+func countUnchangedDigestTestCredentials(old, next *nodeState) int {
+	unchanged := 0
+	for inboundID, nextInbound := range next.in {
+		oldInbound, ok := old.in[inboundID]
+		if !ok || oldInbound.specHash != nextInbound.specHash {
+			continue
+		}
+		oldByID := make(map[string]plugin.UserCred, len(oldInbound.creds))
+		for _, cred := range oldInbound.creds {
+			oldByID[cred.CredID] = cred
+		}
+		for _, cred := range nextInbound.creds {
+			if oldCred, ok := oldByID[cred.CredID]; ok && legacySameCred(oldCred, cred) {
+				unchanged++
+			}
+		}
+	}
+	return unchanged
+}
+
+func mutateDigestTestState(rng *rand.Rand, old *nodeState, iteration int) digestMutation {
+	next := &nodeState{in: make(map[string]*inboundState), warp: old.warp, hash: old.hash, withheld: slices.Clone(old.withheld)}
+	var mutation digestMutation
+	for _, inboundID := range old.ids() {
+		oldInbound := old.in[inboundID]
+		if rng.Intn(8) == 0 {
+			continue
+		}
+		entry := *oldInbound
+		entry.creds = make([]plugin.UserCred, 0, len(oldInbound.creds)+1)
+		if rng.Intn(5) == 0 {
+			entry.spec.Version++
+			entry.specHash = fmt.Sprintf("%s-mutated-%d", entry.specHash, iteration)
+		}
+		for _, original := range oldInbound.creds {
+			cred := original
+			switch rng.Intn(10) {
+			case 0:
+				continue
+			case 1:
+				mutateDigestTestCredential(rng, &cred)
+			case 2:
+				switch rng.Intn(2) {
+				case 0:
+					if !cred.ValidUntil.IsZero() {
+						_, offset := cred.ValidUntil.Zone()
+						cred.ValidUntil = cred.ValidUntil.In(time.FixedZone("alternate", offset+3600))
+						mutation.timezoneNoops++
+					} else if cred.Data == nil {
+						cred.Data = json.RawMessage{}
+						mutation.emptyDataNoops++
+					} else if len(cred.Data) == 0 {
+						cred.Data = nil
+						mutation.emptyDataNoops++
+					}
+				case 1:
+					if cred.Data == nil {
+						cred.Data = json.RawMessage{}
+						mutation.emptyDataNoops++
+					} else if len(cred.Data) == 0 {
+						cred.Data = nil
+						mutation.emptyDataNoops++
+					} else if !cred.ValidUntil.IsZero() {
+						_, offset := cred.ValidUntil.Zone()
+						cred.ValidUntil = cred.ValidUntil.In(time.FixedZone("alternate", offset+3600))
+						mutation.timezoneNoops++
+					}
+				}
+			}
+			entry.creds = append(entry.creds, cred)
+		}
+		if rng.Intn(4) == 0 {
+			entry.creds = append(entry.creds, plugin.UserCred{CredID: fmt.Sprintf("cred-added-%d-%s", iteration, inboundID),
+				UserID: "user-added", DeviceID: "device-added", Data: json.RawMessage(`{"v":"added"}`)})
+		}
+		sort.Slice(entry.creds, func(i, j int) bool { return entry.creds[i].CredID < entry.creds[j].CredID })
+		next.in[inboundID] = &entry
+	}
+	if rng.Intn(4) == 0 {
+		id := fmt.Sprintf("inb-added-%d", iteration)
+		cred := plugin.UserCred{CredID: fmt.Sprintf("cred-added-inbound-%d", iteration), UserID: "user-added", DeviceID: "device-added",
+			Data: json.RawMessage(`{"v":"added-inbound"}`)}
+		next.in[id] = &inboundState{spec: plugin.InboundSpec{ID: id, Protocol: "fakehy", Enabled: true}, specHash: "added-spec", creds: []plugin.UserCred{cred}}
+	}
+	mutation.state = next
+	return mutation
+}
+
+func mutateDigestTestCredential(rng *rand.Rand, cred *plugin.UserCred) {
+	switch rng.Intn(5) {
+	case 0:
+		cred.UserID += "-changed"
+	case 1:
+		cred.DeviceID += "-changed"
+	case 2:
+		cred.Data = json.RawMessage(`{"v":"changed"}`)
+	case 3:
+		cred.RateLimitBps++
+	case 4:
+		if cred.ValidUntil.IsZero() {
+			cred.ValidUntil = time.Unix(1, 0).UTC()
+		} else {
+			cred.ValidUntil = cred.ValidUntil.Add(time.Second)
 		}
 	}
 }
@@ -88,6 +285,13 @@ func randomDigestTestState(rng *rand.Rand) *nodeState {
 			if rng.Intn(3) == 0 {
 				continue
 			}
+			data := json.RawMessage(fmt.Sprintf(`{"v":%d}`, rng.Intn(5)))
+			switch rng.Intn(3) {
+			case 0:
+				data = nil
+			case 1:
+				data = json.RawMessage{}
+			}
 			validUntil := time.Time{}
 			if rng.Intn(3) != 0 {
 				seconds := int64(rng.Intn(1_000_000))
@@ -95,7 +299,7 @@ func randomDigestTestState(rng *rand.Rand) *nodeState {
 			}
 			entry.creds = append(entry.creds, plugin.UserCred{
 				CredID: fmt.Sprintf("cred-%d", cred), UserID: fmt.Sprintf("user-%d", rng.Intn(5)), DeviceID: fmt.Sprintf("device-%d", rng.Intn(5)),
-				Data: json.RawMessage(fmt.Sprintf(`{"v":%d}`, rng.Intn(5))), RateLimitBps: uint64(rng.Intn(3_000_000)), ValidUntil: validUntil,
+				Data: data, RateLimitBps: uint64(rng.Intn(3_000_000)), ValidUntil: validUntil,
 			})
 		}
 		sort.Slice(entry.creds, func(i, j int) bool { return entry.creds[i].CredID < entry.creds[j].CredID })

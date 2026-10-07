@@ -254,7 +254,7 @@ func (s *Store) retryGuarded(ctx context.Context, attempt func() ([]Stmt, error)
 	locked := false
 	defer func() {
 		if locked {
-			s.unlockAWGRetry()
+			s.unlockBatchRetry()
 		}
 	}()
 	for range 8 {
@@ -271,7 +271,7 @@ func (s *Store) retryGuarded(ctx context.Context, attempt func() ([]Stmt, error)
 		results, err := s.batch(ctx, stmts...)
 		if errors.Is(err, errGuard) {
 			if !locked {
-				if err := s.lockAWGRetry(ctx); err != nil {
+				if err := s.lockBatchRetry(ctx); err != nil {
 					return nil, err
 				}
 				locked = true

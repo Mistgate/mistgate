@@ -43,6 +43,140 @@ func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context
 	return e, core, ownerCtx, state, SessionSidecar{}, now
 }
 
+func TestSessionStateJSONRoundTrip(t *testing.T) {
+	assertSessionStateJSONTags(t, reflect.TypeOf(SessionState{}))
+
+	original := SessionState{}
+	fillSessionStateValue(t, reflect.ValueOf(&original).Elem())
+	encoded, err := json.Marshal(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded SessionState
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !sessionStateDeepEqual(reflect.ValueOf(original), reflect.ValueOf(decoded)) {
+		t.Fatalf("SessionState JSON round trip differs:\noriginal: %+v\ndecoded:  %+v\nJSON: %s", original, decoded, encoded)
+	}
+}
+
+func assertSessionStateJSONTags(t *testing.T, typ reflect.Type) {
+	t.Helper()
+	if typ == reflect.TypeOf(time.Time{}) {
+		return
+	}
+	switch typ.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Array:
+		assertSessionStateJSONTags(t, typ.Elem())
+	case reflect.Map:
+		assertSessionStateJSONTags(t, typ.Key())
+		assertSessionStateJSONTags(t, typ.Elem())
+	case reflect.Struct:
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			if field.PkgPath != "" {
+				continue
+			}
+			tag, ok := field.Tag.Lookup("json")
+			if !ok || tag == "" || tag == "-" {
+				t.Errorf("%s.%s has no JSON field tag", typ, field.Name)
+			}
+			assertSessionStateJSONTags(t, field.Type)
+		}
+	}
+}
+
+func fillSessionStateValue(t *testing.T, value reflect.Value) {
+	t.Helper()
+	if value.Type() == reflect.TypeOf(time.Time{}) {
+		value.Set(reflect.ValueOf(time.Date(2026, 10, 6, 12, 34, 56, 123, time.FixedZone("roundtrip", 3600))))
+		return
+	}
+	switch value.Kind() {
+	case reflect.Pointer:
+		value.Set(reflect.New(value.Type().Elem()))
+		fillSessionStateValue(t, value.Elem())
+	case reflect.Map:
+		key := reflect.New(value.Type().Key()).Elem()
+		fillSessionStateValue(t, key)
+		item := reflect.New(value.Type().Elem()).Elem()
+		fillSessionStateValue(t, item)
+		value.Set(reflect.MakeMapWithSize(value.Type(), 1))
+		value.SetMapIndex(key, item)
+	case reflect.Slice:
+		value.Set(reflect.MakeSlice(value.Type(), 1, 1))
+		fillSessionStateValue(t, value.Index(0))
+	case reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			fillSessionStateValue(t, value.Index(i))
+		}
+	case reflect.Struct:
+		for i := 0; i < value.NumField(); i++ {
+			fillSessionStateValue(t, value.Field(i))
+		}
+	case reflect.String:
+		value.SetString("roundtrip")
+	case reflect.Bool:
+		value.SetBool(true)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		value.SetInt(1)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		value.SetUint(1)
+	case reflect.Float32, reflect.Float64:
+		value.SetFloat(1)
+	default:
+		t.Fatalf("cannot fill non-zero test value for %s", value.Type())
+	}
+}
+
+func sessionStateDeepEqual(a, b reflect.Value) bool {
+	if a.Type() == reflect.TypeOf(time.Time{}) {
+		return a.Interface().(time.Time).Equal(b.Interface().(time.Time))
+	}
+	if a.Kind() != b.Kind() || a.Type() != b.Type() {
+		return false
+	}
+	switch a.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if a.IsNil() || b.IsNil() {
+			return a.IsNil() == b.IsNil()
+		}
+		return sessionStateDeepEqual(a.Elem(), b.Elem())
+	case reflect.Map:
+		if a.Len() != b.Len() {
+			return false
+		}
+		iter := a.MapRange()
+		for iter.Next() {
+			other := b.MapIndex(iter.Key())
+			if !other.IsValid() || !sessionStateDeepEqual(iter.Value(), other) {
+				return false
+			}
+		}
+		return true
+	case reflect.Slice, reflect.Array:
+		if a.Len() != b.Len() {
+			return false
+		}
+		for i := 0; i < a.Len(); i++ {
+			if !sessionStateDeepEqual(a.Index(i), b.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Struct:
+		for i := 0; i < a.NumField(); i++ {
+			if !sessionStateDeepEqual(a.Field(i), b.Field(i)) {
+				return false
+			}
+		}
+		return true
+	default:
+		return reflect.DeepEqual(a.Interface(), b.Interface())
+	}
+}
+
 // newTestSession builds an adapter session the way runSession does: its own cancelable context under parent, done, the
 // out queue, the alarm timer and a core (a fresh one when core is nil), with state and sidecar as the starting point.
 func newTestSession(e *env, parent context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar) *session {
@@ -248,13 +382,15 @@ func replayRows(t *testing.T, e *env, nodeID string) map[string]string {
 		query string
 		args  []any
 	}{
-		"node":    {`SELECT state, agent_version, api_version, agent_instance_id, last_seq, desired_revision, desired_hash, bandwidth_mbps, last_seen_at, last_connected_at FROM node WHERE id = ?`, []any{nodeID}},
-		"facts":   {`SELECT hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at FROM node_facts WHERE node_id = ?`, []any{nodeID}},
-		"awg":     {`SELECT awg_health_json, awg_health_at FROM inbound WHERE id = 'inb_awg'`, nil},
-		"warp":    {`SELECT attention, health_json, health_at, updated_at FROM warp_account WHERE node_id = ?`, []any{nodeID}},
-		"events":  {`SELECT ts, severity, code, source, params_json, src_instance, src_seq FROM event WHERE node_id = ? ORDER BY id`, []any{nodeID}},
-		"audit":   {`SELECT ts, actor, action, params, result FROM audit WHERE action = 'node.bandwidth_auto' ORDER BY id`, nil},
-		"traffic": {`SELECT protocol, hour_start, bytes_up, bytes_down, peak_users, peak_devices FROM node_traffic_hour WHERE node_id = ? ORDER BY protocol, hour_start`, []any{nodeID}},
+		"node":      {`SELECT state, agent_version, api_version, agent_instance_id, last_seq, desired_revision, desired_hash, bandwidth_mbps, last_seen_at, last_connected_at FROM node WHERE id = ?`, []any{nodeID}},
+		"facts":     {`SELECT hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at FROM node_facts WHERE node_id = ?`, []any{nodeID}},
+		"awg":       {`SELECT cert_pin_sha256, cert_not_after, awg_health_json, awg_health_at FROM inbound WHERE id = 'inb_awg'`, nil},
+		"devices":   {`SELECT id, last_seen_at FROM device ORDER BY id`, nil},
+		"node_sent": {`SELECT digest FROM node_sent WHERE node_id = ?`, []any{nodeID}},
+		"warp":      {`SELECT attention, health_json, health_at, updated_at FROM warp_account WHERE node_id = ?`, []any{nodeID}},
+		"events":    {`SELECT ts, severity, code, source, params_json, src_instance, src_seq FROM event WHERE node_id = ? ORDER BY id`, []any{nodeID}},
+		"audit":     {`SELECT ts, actor, action, params, result FROM audit WHERE action = 'node.bandwidth_auto' ORDER BY id`, nil},
+		"traffic":   {`SELECT protocol, hour_start, bytes_up, bytes_down, peak_users, peak_devices FROM node_traffic_hour WHERE node_id = ? ORDER BY protocol, hour_start`, []any{nodeID}},
 	}
 	out := make(map[string]string, len(queries))
 	for name, item := range queries {
@@ -669,6 +805,34 @@ func TestSessionCoreOlderSentDigestSendsFullState(t *testing.T) {
 	}
 	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil || updated.Frames[0].GetDesiredState().BaseRevision != 0 {
 		t.Fatalf("older digest state = %#v, want full resend after revision %d", updated.Frames, connected.State.SentRevision)
+	}
+}
+
+func TestSessionCoreSentDigestHashMismatchSendsFullState(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-hash-mismatch")
+	e.fixture(state.NodeID)
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-digest-hash", 0, "").GetHello())
+	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.digest == nil || prepared.digest.Revision != requested.State.SentRevision {
+		t.Fatalf("prepared digest = %+v, session sent revision = %d", prepared.digest, requested.State.SentRevision)
+	}
+	// A same-revision write from another session can land before an older session's digest.
+	prepared.digest.Hash = "another-session-state"
+	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil || updated.Frames[0].GetDesiredState().BaseRevision != 0 {
+		t.Fatalf("same-revision digest with another hash = %#v, want a full state", updated.Frames)
 	}
 }
 
@@ -2234,15 +2398,15 @@ func TestHelloShortcutRecordsDesiredHashBehindAHigherRevision(t *testing.T) {
 	}
 }
 
-func TestHelloShortcutResendsFullStateAfterSidecarLoss(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-sidecar-loss")
+func TestHelloShortcutResendsFullStateAfterSentDigestLoss(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-sent-digest-loss")
 	state.SentRevision = 9
 	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now,
-		Frame: hello("instance-sidecar-loss", 7, preparedBefore.desired.hash)})
+		Frame: hello("instance-sent-digest-loss", 7, preparedBefore.desired.hash)})
 	if err != nil || opened.Close != nil {
 		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
 	}

@@ -40,14 +40,16 @@ against 0.4 million included in Workers Paid.
 - Edge: a `NodeLink` DO per node (`idFromName(node_id)`) accepts the WebSocket with the hibernation API, does the
   signed handshake through the same Go code, keeps the small session state in the socket attachment or DO storage,
   calls the core per event, and turns "next alarm" into a DO alarm. Admin changes reach it as a call from the Worker.
-- Session data that must outlive a connection stays where it is today (D1: `last_seq`, applied revision, certificates).
+- Session data that must outlive a connection stays where it is today (D1: `last_seq`, applied revision, certificates, and the `node_sent` digest).
   The DO-side SQLite stats buffer from the original plan is deferred: one D1 write set per batch is well within the
   included D1 writes for a small fleet; revisit if D1 latency or cost says so (phase 4).
 - Session state carries the Hello-applied hash, preparation-in-flight and dirty bits, retry time, and pending full-resend
-  bit. The adapter checks ownership before applying prepared data; a base mismatch or first drift forces a full state
-  before a later delta. On rehydration, the Durable Object adapter clears `Preparing` and requests preparation again,
-  since eviction may interrupt an in-flight read. Poisoned stats-batch identity is session state too; the VPS adapter
-  persists it per node across reconnects, and the DO will persist it in DO storage.
+  bit. A delta base is valid only when the digest's revision and hash both match what the session last sent. A step whose
+  writes committed but whose state was lost ends in a full resend. The adapter checks ownership before applying prepared
+  data; a base mismatch or first drift also forces a full state before a later delta. On rehydration, the Durable Object
+  adapter clears `Preparing` and requests preparation again, since eviction may interrupt an in-flight read. Poisoned
+  stats-batch identity is session state too; the VPS adapter persists it per node across reconnects, and the DO will
+  persist it in DO storage.
 
 ## Consequences
 
