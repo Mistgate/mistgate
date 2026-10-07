@@ -105,6 +105,43 @@ func passkeyAdmin(t *testing.T, s *Service, st *store.Store) (store.Admin, strin
 	return a, sessionCookie(t, fin.Header()), k
 }
 
+func TestConcurrentFinishLoginConsumesCeremonyOnce(t *testing.T) {
+	s, st, _ := newTestService(t)
+	_, _, k := passkeyAdmin(t, s, st)
+	ctx := context.Background()
+	begin, err := s.BeginLogin(ctx, connect.NewRequest(&adminv1.BeginLoginRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts, err := virtualwebauthn.ParseAssertionOptions(begin.Msg.OptionsJson)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentialJSON := virtualwebauthn.CreateAssertionResponse(k.rp, k.dev, k.cred, *opts)
+	finish := &adminv1.FinishLoginRequest{CeremonyId: begin.Msg.CeremonyId, CredentialJson: credentialJSON}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			_, err := s.FinishLogin(ctx, connect.NewRequest(finish))
+			results <- err
+		}()
+	}
+	close(start)
+	successes := 0
+	for range 2 {
+		if err := <-results; err == nil {
+			successes++
+		} else if codeOf(err) != connect.CodeUnauthenticated {
+			t.Fatalf("losing finish: %v", err)
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("two finishes succeeded %d times, want once", successes)
+	}
+}
+
 func insertAdmin(t *testing.T, st *store.Store, role string) store.Admin {
 	t.Helper()
 	a := store.Admin{ID: store.NewID("adm_"), DisplayName: role, Role: role, UserHandle: []byte(store.NewID("h"))}

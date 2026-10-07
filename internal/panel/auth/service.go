@@ -210,45 +210,51 @@ func (s *Service) putCeremony(ctx context.Context, c *ceremony) (string, error) 
 	return id, nil
 }
 
-// takeCeremony atomically removes a live ceremony. A wrong-kind finish still consumes
-// it, matching the previous map behavior.
-func (s *Service) takeCeremony(ctx context.Context, id string, kinds ...string) (*ceremony, bool, error) {
-	row, err := s.st.TakeAuthCeremony(ctx, id, s.now())
-	if errors.Is(err, store.ErrAuthCeremonyNotFound) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	c, err := s.ceremonyFromRow(row)
-	if err != nil {
-		return nil, false, err
-	}
-	for _, kind := range kinds {
-		if c.kind == kind {
-			return c, true, nil
+// getCeremony reads a live ceremony without consuming it. A wrong-kind finish still
+// consumes it, matching the previous behavior.
+func (s *Service) getCeremony(ctx context.Context, id string, kinds ...string) (*ceremony, bool, error) {
+	for {
+		row, err := s.st.GetAuthCeremony(ctx, id, s.now())
+		if errors.Is(err, store.ErrAuthCeremonyNotFound) {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		c, err := s.ceremonyFromRow(row)
+		if err != nil {
+			if _, consumeErr := s.st.ConsumeAuthCeremony(ctx, id, row.Tries); consumeErr != nil {
+				return nil, false, consumeErr
+			}
+			return nil, false, err
+		}
+		for _, kind := range kinds {
+			if c.kind == kind {
+				return c, true, nil
+			}
+		}
+		consumed, err := s.st.ConsumeAuthCeremony(ctx, id, row.Tries)
+		if err != nil {
+			return nil, false, err
+		}
+		if consumed {
+			return nil, false, nil
 		}
 	}
-	return nil, false, nil
 }
 
-// restoreCeremony puts a recoverable ceremony back under the same id and expiry.
-func (s *Service) restoreCeremony(ctx context.Context, id string, c *ceremony) error {
-	row, err := s.ceremonyRow(id, c)
-	if err != nil {
-		return err
-	}
-	return s.st.RestoreAuthCeremony(ctx, row)
+func (s *Service) consumeCeremony(ctx context.Context, id string, c *ceremony) (bool, error) {
+	return s.st.ConsumeAuthCeremony(ctx, id, c.tries)
+}
+
+func (s *Service) failCeremony(ctx context.Context, id string, c *ceremony) (bool, error) {
+	return s.st.FailAuthCeremony(ctx, id, c.tries, maxSetupCodeTries)
 }
 
 func ceremonyTOTPRecordID(id string) string { return "auth_ceremony.totp:" + id }
 
 func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error) {
 	data, err := json.Marshal(c.data)
-	if err != nil {
-		return store.AuthCeremony{}, err
-	}
-	admin, err := json.Marshal(c.admin)
 	if err != nil {
 		return store.AuthCeremony{}, err
 	}
@@ -261,7 +267,8 @@ func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error
 	}
 	return store.AuthCeremony{
 		ID: id, Kind: c.kind, Source: c.src, SessionData: string(data), TokenHash: c.tokenHash,
-		AdminJSON: string(admin), Name: c.name, Login: c.login, PasswordHash: c.pwHash,
+		AdminID: c.admin.ID, AdminDisplayName: c.admin.DisplayName, AdminRole: c.admin.Role, AdminUserHandle: c.admin.UserHandle,
+		Name: c.name, Login: c.login, PasswordHash: c.pwHash,
 		TOTPEncrypted: sealedTOTP, Tries: c.tries, ExpiresAt: c.expires,
 	}, nil
 }
@@ -270,12 +277,10 @@ func (s *Service) ceremonyFromRow(row store.AuthCeremony) (*ceremony, error) {
 	c := &ceremony{
 		kind: row.Kind, src: row.Source, tokenHash: row.TokenHash, name: row.Name, login: row.Login,
 		pwHash: row.PasswordHash, tries: row.Tries, expires: row.ExpiresAt,
+		admin: store.Admin{ID: row.AdminID, DisplayName: row.AdminDisplayName, Role: row.AdminRole, UserHandle: row.AdminUserHandle},
 	}
 	if err := json.Unmarshal([]byte(row.SessionData), &c.data); err != nil {
 		return nil, fmt.Errorf("auth: decode ceremony session: %w", err)
-	}
-	if err := json.Unmarshal([]byte(row.AdminJSON), &c.admin); err != nil {
-		return nil, fmt.Errorf("auth: decode ceremony admin: %w", err)
 	}
 	if len(row.TOTPEncrypted) > 0 {
 		if s.vault == nil {

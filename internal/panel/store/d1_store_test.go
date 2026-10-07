@@ -187,6 +187,39 @@ func TestD1RewrittenAuthStoreMethods(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	t.Run("AuthCeremonyCAS", func(t *testing.T) {
+		row := AuthCeremony{ID: "ceremony_edge_cas", Kind: "setup-password", SessionData: "{}", ExpiresAt: now.Add(time.Minute)}
+		if err := st.PutAuthCeremony(ctx, row, now, 8, 100); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.GetAuthCeremony(ctx, row.ID, now)
+		if err != nil || got.Tries != 0 {
+			t.Fatalf("get: %+v %v", got, err)
+		}
+		if changed, err := st.FailAuthCeremony(ctx, row.ID, got.Tries, 3); err != nil || !changed {
+			t.Fatalf("fail: changed=%v err=%v", changed, err)
+		}
+		got, err = st.GetAuthCeremony(ctx, row.ID, now)
+		if err != nil || got.Tries != 1 {
+			t.Fatalf("get after failure: %+v %v", got, err)
+		}
+		if consumed, err := st.ConsumeAuthCeremony(ctx, row.ID, 0); err != nil || consumed {
+			t.Fatalf("stale consume: consumed=%v err=%v", consumed, err)
+		}
+		if consumed, err := st.ConsumeAuthCeremony(ctx, row.ID, got.Tries); err != nil || !consumed {
+			t.Fatalf("consume: consumed=%v err=%v", consumed, err)
+		}
+		row.ID = "ceremony_edge_max"
+		if err := st.PutAuthCeremony(ctx, row, now, 8, 100); err != nil {
+			t.Fatal(err)
+		}
+		if changed, err := st.FailAuthCeremony(ctx, row.ID, 0, 1); err != nil || !changed {
+			t.Fatalf("maximum failure: changed=%v err=%v", changed, err)
+		}
+		if _, err := st.GetAuthCeremony(ctx, row.ID, now); !errors.Is(err, ErrAuthCeremonyNotFound) {
+			t.Fatalf("ceremony after maximum failure: %v", err)
+		}
+	})
 	a := Admin{ID: NewID("adm_"), DisplayName: "Owner", Role: RoleOwner, UserHandle: []byte("owner-handle")}
 	pk := Passkey{ID: NewID("pk_"), AdminID: a.ID, CredentialID: []byte("owner-credential"), PublicKey: []byte("key"), Name: "Primary"}
 	t.Run("CreateFirstAdmin", func(t *testing.T) {

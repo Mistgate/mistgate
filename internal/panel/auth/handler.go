@@ -228,15 +228,31 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 	if err := s.rateLimited(ctx, req); err != nil {
 		return nil, err
 	}
-	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonySetup, ceremonySetupPassword)
+	c, ok, err := s.getCeremony(ctx, req.Msg.CeremonyId, ceremonySetup, ceremonySetupPassword)
 	if err != nil {
 		return nil, errInternal(err)
 	}
+	expired := func() error {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
+	}
+	consume := func() error {
+		won, err := s.consumeCeremony(ctx, req.Msg.CeremonyId, c)
+		if err != nil {
+			return errInternal(err)
+		}
+		if !won {
+			return expired()
+		}
+		return nil
+	}
 	if !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
+		return nil, expired()
 	}
 	hash := hashToken(req.Msg.SetupToken)
 	if subtle.ConstantTimeCompare(hash, c.tokenHash) != 1 {
+		if err := consume(); err != nil {
+			return nil, err
+		}
 		return nil, errBadSetupToken
 	}
 	now := s.now()
@@ -247,10 +263,8 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 		method = "password"
 		step, ok := matchTOTP(c.totp, req.Msg.TotpCode, now)
 		if !ok {
-			if c.tries++; c.tries < maxSetupCodeTries {
-				if err := s.restoreCeremony(ctx, req.Msg.CeremonyId, c); err != nil {
-					return nil, errInternal(err)
-				}
+			if _, err := s.failCeremony(ctx, req.Msg.CeremonyId, c); err != nil {
+				return nil, errInternal(err)
 			}
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid code"))
 		}
@@ -263,15 +277,24 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 		parsed, err := protocol.ParseCredentialCreationResponseBytes([]byte(req.Msg.CredentialJson))
 		if err != nil {
 			s.log.Info("setup: bad credential json", "err", err)
+			if consumeErr := consume(); consumeErr != nil {
+				return nil, consumeErr
+			}
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid credential"))
 		}
 		cred, err := s.wa.CreateCredential(&waUser{admin: c.admin}, c.data, parsed)
 		if err != nil {
 			s.log.Info("setup: credential rejected", "err", err)
+			if consumeErr := consume(); consumeErr != nil {
+				return nil, consumeErr
+			}
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("credential rejected"))
 		}
 		pk := passkeyFromCredential(c.admin.ID, "First passkey", cred)
 		create = func() error { return s.st.CreateFirstAdmin(ctx, hash, now, c.admin, pk) }
+	}
+	if err := consume(); err != nil {
+		return nil, err
 	}
 	if err := create(); err != nil {
 		if errors.Is(err, store.ErrSetupClosed) {
@@ -347,15 +370,22 @@ func (s *Service) FinishLogin(ctx context.Context, req *connect.Request[adminv1.
 		s.emit(Event{Kind: EventSignInFailed, Method: "passkey", IP: ip.String()})
 		return errSignInFailed
 	}
-	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyLogin)
+	c, ok, err := s.getCeremony(ctx, req.Msg.CeremonyId, ceremonyLogin)
 	if err != nil {
 		return nil, errInternal(err)
 	}
 	if !ok {
 		return nil, fail("unknown or expired ceremony", nil)
 	}
+	consumeFailure := func() error {
+		_, err := s.consumeCeremony(ctx, req.Msg.CeremonyId, c)
+		return err
+	}
 	parsed, err := protocol.ParseCredentialRequestResponseBytes([]byte(req.Msg.CredentialJson))
 	if err != nil {
+		if err := consumeFailure(); err != nil {
+			return nil, errInternal(err)
+		}
 		return nil, fail("bad credential json", err)
 	}
 	lookup := func(rawID, userHandle []byte) (webauthn.User, error) {
@@ -382,12 +412,25 @@ func (s *Service) FinishLogin(ctx context.Context, req *connect.Request[adminv1.
 	}
 	user, cred, err := s.wa.ValidatePasskeyLogin(lookup, c.data, parsed)
 	if err != nil {
+		if err := consumeFailure(); err != nil {
+			return nil, errInternal(err)
+		}
 		return nil, fail("assertion rejected", err)
 	}
 	if cred.Authenticator.CloneWarning {
+		if err := consumeFailure(); err != nil {
+			return nil, errInternal(err)
+		}
 		return nil, fail("sign counter went backwards (cloned authenticator?)", nil)
 	}
 	admin := user.(*waUser).admin
+	consumed, err := s.consumeCeremony(ctx, req.Msg.CeremonyId, c)
+	if err != nil {
+		return nil, errInternal(err)
+	}
+	if !consumed {
+		return nil, fail("unknown or expired ceremony", nil)
+	}
 	if err := s.st.TouchPasskey(ctx, cred.ID, cred.Authenticator.SignCount, byte(cred.Flags.ProtocolValue()), s.now()); err != nil {
 		s.log.Error("touch passkey", "err", err)
 		return nil, errInternal(err)

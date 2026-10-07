@@ -109,25 +109,55 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
-	c, ok, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey)
+	c, ok, err := s.getCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey)
 	if err != nil {
 		return nil, errInternal(err)
 	}
+	expired := func() error {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
+	}
+	consume := func() error {
+		won, err := s.consumeCeremony(ctx, req.Msg.CeremonyId, c)
+		if err != nil {
+			return errInternal(err)
+		}
+		if !won {
+			return expired()
+		}
+		return nil
+	}
 	if !ok || c.admin.ID != admin.ID { // another admin's ceremony is as good as unknown
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
+		if ok {
+			if err := consume(); err != nil {
+				return nil, err
+			}
+		}
+		return nil, expired()
 	}
 	parsed, err := protocol.ParseCredentialCreationResponseBytes([]byte(req.Msg.CredentialJson))
 	if err != nil {
 		s.log.Info("add passkey: bad credential json", "err", err)
+		if err := consume(); err != nil {
+			return nil, err
+		}
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid credential"))
 	}
 	cred, err := s.wa.CreateCredential(&waUser{admin: admin}, c.data, parsed)
 	if err != nil {
 		s.log.Info("add passkey: credential rejected", "err", err)
+		if err := consume(); err != nil {
+			return nil, err
+		}
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("credential rejected"))
 	}
 	if _, err := s.st.PasskeyByCredentialID(ctx, cred.ID); err == nil {
+		if err := consume(); err != nil {
+			return nil, err
+		}
 		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("this passkey is already registered"))
+	}
+	if err := consume(); err != nil {
+		return nil, err
 	}
 	pk := passkeyFromCredential(admin.ID, c.name, cred)
 	now := s.now()

@@ -150,19 +150,34 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	m := req.Msg
 	method := "passkey"
 	if m.CeremonyId != "" || m.CredentialJson != "" {
-		c, ok, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyStepUp)
+		c, ok, err := s.getCeremony(ctx, m.CeremonyId, ceremonyStepUp)
 		if err != nil {
 			return nil, errInternal(err)
 		}
+		consume := func() error {
+			_, err := s.consumeCeremony(ctx, m.CeremonyId, c)
+			return err
+		}
 		if !ok || c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
+			if ok {
+				if err := consume(); err != nil {
+					return nil, errInternal(err)
+				}
+			}
 			return nil, refuse("unknown or foreign ceremony", nil)
 		}
 		parsed, err := protocol.ParseCredentialRequestResponseBytes([]byte(m.CredentialJson))
 		if err != nil {
+			if err := consume(); err != nil {
+				return nil, errInternal(err)
+			}
 			return nil, refuse("bad credential json", err)
 		}
 		pks, err := s.st.PasskeysByAdmin(ctx, admin.ID)
 		if err != nil {
+			if consumeErr := consume(); consumeErr != nil {
+				return nil, errInternal(consumeErr)
+			}
 			s.log.Error("list passkeys", "err", err)
 			return nil, errInternal(err)
 		}
@@ -172,10 +187,23 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 		}
 		cred, err := s.wa.ValidateLogin(u, c.data, parsed)
 		if err != nil {
+			if err := consume(); err != nil {
+				return nil, errInternal(err)
+			}
 			return nil, refuse("assertion rejected", err)
 		}
 		if cred.Authenticator.CloneWarning {
+			if err := consume(); err != nil {
+				return nil, errInternal(err)
+			}
 			return nil, refuse("sign counter went backwards (cloned authenticator?)", nil)
+		}
+		consumed, err := s.consumeCeremony(ctx, m.CeremonyId, c)
+		if err != nil {
+			return nil, errInternal(err)
+		}
+		if !consumed {
+			return nil, refuse("unknown or foreign ceremony", nil)
 		}
 		if err := s.st.TouchPasskey(ctx, cred.ID, cred.Authenticator.SignCount, byte(cred.Flags.ProtocolValue()), now); err != nil {
 			s.log.Error("touch passkey", "err", err)

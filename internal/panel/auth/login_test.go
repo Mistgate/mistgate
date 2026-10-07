@@ -17,6 +17,83 @@ import (
 
 const testPassword = "correct horse battery staple"
 
+func TestSetupWrongTOTPUpdatesExistingCeremony(t *testing.T) {
+	s, st, _ := newTestService(t)
+	ctx := context.Background()
+	tok, err := IssueSetupToken(ctx, st, s.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin, err := s.BeginSetup(ctx, connect.NewRequest(&adminv1.BeginSetupRequest{
+		SetupToken: tok, Method: adminv1.SetupMethod_SETUP_METHOD_PASSWORD, Login: "ada", Password: testPassword,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(begin.Msg.TotpSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `CREATE TRIGGER reject_ceremony_restore BEFORE INSERT ON auth_ceremony
+		BEGIN SELECT RAISE(ABORT, 'ceremony restore forbidden'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.FinishSetup(ctx, connect.NewRequest(&adminv1.FinishSetupRequest{
+		SetupToken: tok, CeremonyId: begin.Msg.CeremonyId, TotpCode: "invalid",
+	})); connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "invalid code") {
+		t.Fatalf("wrong code = %v; want recoverable invalid-code response", err)
+	}
+	if _, err := st.W.ExecContext(ctx, `DROP TRIGGER reject_ceremony_restore`); err != nil {
+		t.Fatal(err)
+	}
+	var tries int
+	var sealed []byte
+	if err := st.R.QueryRowContext(ctx, `SELECT tries, totp_enc FROM auth_ceremony WHERE id = ?`, begin.Msg.CeremonyId).Scan(&tries, &sealed); err != nil || tries != 1 {
+		t.Fatalf("ceremony after typo = tries %d, err %v; want same live ceremony at try 1", tries, err)
+	}
+	opened, err := s.vault.Open(sealed, ceremonyTOTPRecordID(begin.Msg.CeremonyId))
+	if err != nil || string(opened) != string(secret) || begin.Msg.TotpUri == "" {
+		t.Fatalf("ceremony QR secret changed after typo: err %v", err)
+	}
+}
+
+func TestLateSetupTypoCannotRestoreConsumedCeremony(t *testing.T) {
+	s, st, clock := newTestService(t)
+	ctx := context.Background()
+	tok, err := IssueSetupToken(ctx, st, s.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin, err := s.BeginSetup(ctx, connect.NewRequest(&adminv1.BeginSetupRequest{
+		SetupToken: tok, Method: adminv1.SetupMethod_SETUP_METHOD_PASSWORD, Login: "ada", Password: testPassword,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, ok, err := s.getCeremony(ctx, begin.Msg.CeremonyId, ceremonySetupPassword)
+	if err != nil || !ok {
+		t.Fatalf("read ceremony for typo: ok=%v err=%v", ok, err)
+	}
+	if _, valid := matchTOTP(stale.totp, "invalid", s.now()); valid {
+		t.Fatal("test typo unexpectedly matched the TOTP secret")
+	}
+	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(begin.Msg.TotpSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.FinishSetup(ctx, connect.NewRequest(&adminv1.FinishSetupRequest{
+		SetupToken: tok, CeremonyId: begin.Msg.CeremonyId, TotpCode: totpCode(secret, totpStep(*clock)),
+	})); err != nil {
+		t.Fatalf("correct finish: %v", err)
+	}
+	if changed, err := s.failCeremony(ctx, begin.Msg.CeremonyId, stale); err != nil || changed {
+		t.Fatalf("late typo failure = changed %v, err %v; want lost compare-and-swap", changed, err)
+	}
+	if _, err := s.st.GetAuthCeremony(ctx, begin.Msg.CeremonyId, s.now()); !errors.Is(err, store.ErrAuthCeremonyNotFound) {
+		t.Fatalf("late typo restored consumed ceremony: %v", err)
+	}
+}
+
 func failureOf(t *testing.T, err error) *adminv1.SignInFailure {
 	t.Helper()
 	var ce *connect.Error
@@ -389,8 +466,12 @@ func TestCeremonyCapPerSource(t *testing.T) {
 		t.Fatalf("another source was affected: %v", err)
 	}
 	// Finished and expired ceremonies free the slot.
-	if _, ok, err := s.takeCeremony(ctx, finished, ceremonyLogin); err != nil || !ok {
+	c, ok, err := s.getCeremony(ctx, finished, ceremonyLogin)
+	if err != nil || !ok {
 		t.Fatalf("take ceremony to free source slot: ok=%v err=%v", ok, err)
+	}
+	if consumed, err := s.consumeCeremony(ctx, finished, c); err != nil || !consumed {
+		t.Fatalf("consume ceremony to free source slot: consumed=%v err=%v", consumed, err)
 	}
 	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {
 		t.Fatalf("slot not freed: %v", err)

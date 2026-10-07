@@ -185,25 +185,45 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	m, now, ip := req.Msg, s.now(), s.clientIP(req)
-	c, ok, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyTOTPEnroll)
+	c, ok, err := s.getCeremony(ctx, m.CeremonyId, ceremonyTOTPEnroll)
 	if err != nil {
 		return nil, errInternal(err)
 	}
+	expired := func() error { return codedErr(connect.CodeInvalidArgument, "enrollment_expired") }
+	consume := func() error {
+		won, err := s.consumeCeremony(ctx, m.CeremonyId, c)
+		if err != nil {
+			return errInternal(err)
+		}
+		if !won {
+			return expired()
+		}
+		return nil
+	}
 	// another admin's ceremony, or one begun in another session, is as good as unknown
 	if !ok || c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
-		return nil, codedErr(connect.CodeInvalidArgument, "enrollment_expired")
+		if ok {
+			if err := consume(); err != nil {
+				return nil, err
+			}
+		}
+		return nil, expired()
 	}
 	step, ok := matchTOTP(c.totp, m.TotpCode, now)
 	if !ok {
-		if c.tries++; c.tries < maxSetupCodeTries {
-			if err := s.restoreCeremony(ctx, m.CeremonyId, c); err != nil {
-				return nil, errInternal(err)
-			}
+		if _, err := s.failCeremony(ctx, m.CeremonyId, c); err != nil {
+			return nil, errInternal(err)
 		}
 		return nil, codedErr(connect.CodeInvalidArgument, "invalid_code")
 	}
 	if s.vault == nil {
+		if err := consume(); err != nil {
+			return nil, err
+		}
 		return nil, codedErr(connect.CodeFailedPrecondition, "no_master_key")
+	}
+	if err := consume(); err != nil {
+		return nil, err
 	}
 	sealed := s.vault.Seal(c.totp, totpAAD(admin.ID))
 	resp := &adminv1.FinishTotpEnrollmentResponse{Login: c.login}
