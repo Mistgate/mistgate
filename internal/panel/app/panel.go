@@ -85,6 +85,7 @@ type Config struct {
 	Title              string
 	HealthBlipWindow   time.Duration
 	BackgroundStarters []BackgroundJob
+	AfterResponse      access.AfterResponseRunner
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.
@@ -171,7 +172,7 @@ func Build(c Config) (*Panel, error) {
 	if in.PublicURL != "" {
 		subBase = strings.TrimRight(in.PublicURL, "/") + strings.TrimRight(in.SubPrefix, "/")
 	}
-	acc, err = access.New(st, vlt, reg, fl, fl, access.Config{SubscriptionBaseURL: subBase, Log: log})
+	acc, err = access.New(st, vlt, reg, fl, fl, access.Config{SubscriptionBaseURL: subBase, Log: log, AfterResponse: c.AfterResponse})
 	if err != nil {
 		return nil, err
 	}

@@ -41,6 +41,7 @@ describe("toResponse", () => {
         ["X-Multi-Response", "b"],
       ],
       body: new TextEncoder().encode("cookie-test"),
+      waitUntil: Promise.resolve(),
     });
     expect(response.status).toBe(201);
     expect(response.headers.getSetCookie()).toEqual(["first=one; Path=/", "second=two; Path=/"]);
@@ -50,13 +51,13 @@ describe("toResponse", () => {
 
   it("returns binary bytes unchanged", async () => {
     const bytes = Uint8Array.from({ length: 256 }, (_, i) => 255 - i);
-    const response = toResponse({ status: 200, headers: [], body: bytes });
+    const response = toResponse({ status: 200, headers: [], body: bytes, waitUntil: Promise.resolve() });
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual(Array.from(bytes));
   });
 
   it("gives a null-body status no body", async () => {
     for (const status of [204, 205, 304]) {
-      const response = toResponse({ status, headers: [], body: new Uint8Array(0) });
+      const response = toResponse({ status, headers: [], body: new Uint8Array(0), waitUntil: Promise.resolve() });
       expect(response.status).toBe(status);
       expect(response.body).toBeNull();
     }
@@ -126,7 +127,7 @@ describe("forwardLink", () => {
     return { ns: { idFromName, get } as unknown as Parameters<typeof forwardLink>[0], fetch, idFromName, get };
   };
   const request = new Request("https://example.com/p/link/nod_1", { headers: { Upgrade: "websocket" } });
-  const answer = (status: number, headers: [string, string][]) => ({ status, headers, body: new Uint8Array() });
+  const answer = (status: number, headers: [string, string][]) => ({ status, headers, body: new Uint8Array(), waitUntil: Promise.resolve() });
 
   it("sends the original request, as it is, to the object of the marked node, whatever the header's case", async () => {
     for (const name of ["X-Mistgate-Link", "x-mistgate-link"]) {

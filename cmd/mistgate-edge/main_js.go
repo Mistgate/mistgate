@@ -30,9 +30,67 @@ import (
 )
 
 type edgeState struct {
-	store   *store.Store
-	fleet   *fleet.Fleet
-	handler http.Handler
+	store         *store.Store
+	fleet         *fleet.Fleet
+	handler       http.Handler
+	afterResponse *edgeTaskRunner
+}
+
+// edgeTaskRunner tracks after-response work across overlapping requests in this isolate. Every request can wait on
+// the current idle promise; it resolves once all work started so far has finished.
+type edgeTaskRunner struct {
+	mu     sync.Mutex
+	active int
+	idle   chan struct{}
+}
+
+func newEdgeTaskRunner() *edgeTaskRunner {
+	idle := make(chan struct{})
+	close(idle)
+	return &edgeTaskRunner{idle: idle}
+}
+
+func (r *edgeTaskRunner) Run(work func()) {
+	r.mu.Lock()
+	if r.active == 0 {
+		r.idle = make(chan struct{})
+	}
+	r.active++
+	r.mu.Unlock()
+
+	go func() {
+		defer func() {
+			r.mu.Lock()
+			r.active--
+			if r.active == 0 {
+				close(r.idle)
+			}
+			r.mu.Unlock()
+		}()
+		work()
+	}()
+}
+
+func (r *edgeTaskRunner) WaitUntil() js.Value {
+	r.mu.Lock()
+	if r.active == 0 {
+		r.mu.Unlock()
+		return js.Global().Get("Promise").Call("resolve")
+	}
+	idle := r.idle
+	r.mu.Unlock()
+
+	executor := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		resolve := args[0]
+		go func() {
+			<-idle
+			resolve.Invoke(js.Undefined())
+		}()
+		return nil
+	})
+	promise := js.Global().Get("Promise").New(executor)
+	executor.Release()
+	return promise
 }
 
 // Backup.New still requires a path; its file adapter is not available in the Worker and no backup loop is started here.
@@ -72,7 +130,9 @@ func main() {
 				return js.Undefined(), err
 			}
 			resp := serve(current.handler, req)
-			return responseToJS(resp), nil
+			out := responseToJS(resp)
+			out.Set("waitUntil", current.afterResponse.WaitUntil())
+			return out, nil
 		})
 	}))
 	api.Set("link", linkFunc())
@@ -124,6 +184,7 @@ func initPanel(options js.Value) error {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	limiter := newEdgeLimiter(opts.limit, log)
+	afterResponse := newEdgeTaskRunner()
 	authSvc, err := auth.New(st, auth.Config{
 		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,
 		Limiter: limiter,
@@ -133,7 +194,7 @@ func initPanel(options js.Value) error {
 	}
 	built, err := app.Build(app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, Limiter: limiter, MasterKey: opts.masterKey, Clock: time.Now,
-		Logger: log, Instance: in, Title: brand.BrandName(), DataDir: edgeNoFilesystemDataDir,
+		Logger: log, Instance: in, Title: brand.BrandName(), DataDir: edgeNoFilesystemDataDir, AfterResponse: afterResponse.Run,
 	})
 	if err != nil {
 		return err
@@ -168,7 +229,7 @@ func initPanel(options js.Value) error {
 	// TODO(phase-2): Cron/alarm invokes backup scheduling.
 	// TODO(phase-2): Cron/alarm invokes Telegram polling and delivery.
 	// TODO(phase-2): Cron/alarm invokes provisioning workers. A Worker isolate starts none of these jobs.
-	state = &edgeState{store: st, fleet: built.Fleet, handler: withEdgeTestHooks(built.Handler, built.Fleet)}
+	state = &edgeState{store: st, fleet: built.Fleet, handler: withEdgeTestHooks(built.Handler, built.Fleet), afterResponse: afterResponse}
 	keepStore = true
 	return nil
 }

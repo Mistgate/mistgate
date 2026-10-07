@@ -64,27 +64,32 @@ type CapabilitySource interface {
 	AgentCapability(nodeID, capability string) (known, has bool)
 }
 
+// AfterResponseRunner starts work that must not delay a request response. A nil runner uses a goroutine.
+type AfterResponseRunner func(func())
+
 // Config of the access module.
 type Config struct {
 	// SubscriptionBaseURL is the public subscription address up to and including the secret prefix, e.g.
 	// "https://sub.example.com/k3xq8"; the user's token is appended after a slash.
 	SubscriptionBaseURL string
 	Log                 *slog.Logger
+	AfterResponse       AfterResponseRunner
 }
 
 // Service implements ProfileService, UserService, GroupService, DeviceService and AwgService (adminv1connect
 // handler interfaces).
 type Service struct {
-	st     *store.Store
-	vault  *vault.Vault
-	reg    *protocols.Registry
-	notify StateNotifier
-	online OnlineSource
-	caps   CapabilitySource // nil: no agent is ever "too old"
-	dns    *dns.Service
-	cfg    Config
-	log    *slog.Logger
-	now    func() time.Time
+	st            *store.Store
+	vault         *vault.Vault
+	reg           *protocols.Registry
+	notify        StateNotifier
+	online        OnlineSource
+	caps          CapabilitySource // nil: no agent is ever "too old"
+	dns           *dns.Service
+	cfg           Config
+	log           *slog.Logger
+	now           func() time.Time
+	afterResponse AfterResponseRunner
 
 	touching         sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
 	touchHookForTest func(started bool)
@@ -111,8 +116,12 @@ func (noOnline) OnlineUsers() map[string]string { return nil }
 func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateNotifier, online OnlineSource, cfg Config) (*Service, error) {
 	s := &Service{
 		st: st, vault: v, reg: reg, notify: notify, online: online, cfg: cfg, log: cfg.Log, now: time.Now,
-		dns:        dns.New(st),
-		secretPtrs: map[string][]string{}, criticalPtrs: map[string][]string{},
+		afterResponse: cfg.AfterResponse,
+		dns:           dns.New(st),
+		secretPtrs:    map[string][]string{}, criticalPtrs: map[string][]string{},
+	}
+	if s.afterResponse == nil {
+		s.afterResponse = func(work func()) { go work() }
 	}
 	if c, ok := online.(CapabilitySource); ok {
 		s.caps = c

@@ -127,6 +127,102 @@ func TestSubscriptionFetchTouchesStaleDeviceOffTheRequestPath(t *testing.T) {
 	}
 }
 
+func TestExpiredSubscriptionFetchTouchesImplicitDeviceOncePerHour(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	touches := make(chan bool, 4)
+	e.s.SetTouchHookForTest(func(started bool) { touches <- started })
+	r := e.user("sub", f.group, nil)
+	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
+	must(e.s.Subscription(e.ctx, token)) // establish the active subscription before expiry
+	var credentialsBefore int
+	if err := e.st.R.QueryRow(`SELECT count(*) FROM device_credential WHERE user_id = ? AND revoked_at IS NULL`, r.User.Id).Scan(&credentialsBefore); err != nil {
+		t.Fatal(err)
+	}
+	e.sql(`UPDATE device SET last_seen_at = ? WHERE user_id = ?`, e.clock.Add(-2*time.Hour).Unix(), r.User.Id)
+	e.sql(`UPDATE user SET expires_at = ? WHERE id = ?`, e.clock.Add(-time.Minute).Unix(), r.User.Id)
+
+	view := must(e.s.Subscription(e.ctx, token))
+	if view.Status != StatusExpired || len(view.Lines) != 0 {
+		t.Fatalf("expired subscription = status %q with %d lines, want no lines", view.Status, len(view.Lines))
+	}
+	waitTouchEvent(t, touches, true)
+	waitTouchEvent(t, touches, false)
+
+	var seen int64
+	if err := e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, r.User.Id).Scan(&seen); err != nil {
+		t.Fatal(err)
+	}
+	if seen != e.clock.Unix() {
+		t.Fatalf("last_seen_at = %d, want %d", seen, e.clock.Unix())
+	}
+
+	view = must(e.s.Subscription(e.ctx, token))
+	if view.Status != StatusExpired || len(view.Lines) != 0 {
+		t.Fatalf("second expired subscription = status %q with %d lines, want no lines", view.Status, len(view.Lines))
+	}
+	assertNoTouchStarted(t, touches)
+	var credentials int
+	if err := e.st.R.QueryRow(`SELECT count(*) FROM device_credential WHERE user_id = ? AND revoked_at IS NULL`, r.User.Id).Scan(&credentials); err != nil {
+		t.Fatal(err)
+	}
+	if credentials != credentialsBefore {
+		t.Errorf("expired fetch left %d live credentials, want the existing %d", credentials, credentialsBefore)
+	}
+}
+
+func TestExpiredSubscriptionFetchWithoutImplicitDeviceDoesNotCreateOne(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	touches := make(chan bool, 2)
+	e.s.SetTouchHookForTest(func(started bool) { touches <- started })
+	r := e.user("sub", f.group, nil)
+	token := r.SubscriptionUrl[strings.LastIndex(r.SubscriptionUrl, "/")+1:]
+	// User creation normally provisions the implicit device. Remove it to model a user whose implicit device is gone.
+	e.sql(`DELETE FROM device_credential WHERE user_id = ?`, r.User.Id)
+	e.sql(`DELETE FROM device WHERE user_id = ?`, r.User.Id)
+	e.sql(`UPDATE user SET expires_at = ? WHERE id = ?`, e.clock.Add(-time.Minute).Unix(), r.User.Id)
+
+	view := must(e.s.Subscription(e.ctx, token))
+	if view.Status != StatusExpired || len(view.Lines) != 0 {
+		t.Fatalf("expired subscription = status %q with %d lines, want no lines", view.Status, len(view.Lines))
+	}
+	assertNoTouchStarted(t, touches)
+	var devices, credentials int
+	if err := e.st.R.QueryRow(`SELECT count(*) FROM device WHERE user_id = ?`, r.User.Id).Scan(&devices); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.R.QueryRow(`SELECT count(*) FROM device_credential WHERE user_id = ?`, r.User.Id).Scan(&credentials); err != nil {
+		t.Fatal(err)
+	}
+	if devices != 0 || credentials != 0 {
+		t.Errorf("expired fetch created %d devices and %d credentials, want none", devices, credentials)
+	}
+}
+
+func TestDefaultAfterResponseRunnerDoesNotWaitForWork(t *testing.T) {
+	e := newEnv(t)
+	started, release, returned := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		e.s.afterResponse(func() {
+			close(started)
+			<-release
+		})
+		close(returned)
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("default runner did not start its work")
+	}
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("default runner waited for its work")
+	}
+	close(release)
+}
+
 func assertNoTouchStarted(t *testing.T, touches <-chan bool) {
 	t.Helper()
 	select {

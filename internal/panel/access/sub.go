@@ -262,6 +262,10 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	v.DevicesUsed = len(devs)
 	if v.Status != StatusActive {
+		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
+		if dev := data.ImplicitDevice; touch && dev.ID != "" && now.Sub(dev.LastSeenAt) >= deviceTouchEvery {
+			s.touchDevice(dev.ID, now)
+		}
 		return v, nil
 	}
 
@@ -545,7 +549,7 @@ func (s *Service) touchDevice(id string, now time.Time) {
 	if hook != nil {
 		hook(true)
 	}
-	go func() {
+	s.afterResponse(func() {
 		defer func() {
 			s.touching.Delete(id)
 			if hook != nil {
@@ -557,7 +561,7 @@ func (s *Service) touchDevice(id string, now time.Time) {
 		if err := s.st.Access().TouchDevice(ctx, id, now, now.Add(-deviceTouchEvery)); err != nil {
 			s.log.Warn("access: cannot record subscription fetch", "err", err)
 		}
-	}()
+	})
 }
 
 // SetTouchHookForTest observes when an asynchronous subscription touch starts and finishes.

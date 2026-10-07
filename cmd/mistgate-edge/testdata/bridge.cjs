@@ -579,6 +579,18 @@ async function run() {
     const pagePassword = createdUser.message.pagePassword;
     assert.ok(userToken && pagePassword, "the admin API returns a link credential and page password");
 
+    await globalThis.__d1.prepare("UPDATE device SET last_seen_at = ? WHERE user_id = ? AND hwid_hash IS NULL")
+      .bind(1, createdUser.message.user.id).run();
+    const touchResponse = await bridgeRequestFor(secondPanel, userSubURL, {
+      headers: { "CF-Connecting-IP": "127.0.0.1", "User-Agent": "Happ/4.10.2/ios" },
+    });
+    assert.equal(touchResponse.status, 200, "the edge subscription fetch succeeds");
+    assert.ok(touchResponse.waitUntil && typeof touchResponse.waitUntil.then === "function", "the edge response exposes its background work promise");
+    await touchResponse.waitUntil;
+    const touchedAt = await globalThis.__d1.prepare("SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL")
+      .bind(createdUser.message.user.id).first("last_seen_at");
+    assert.ok(Number(touchedAt) > 1, "waiting on the response promise observes the device touch in D1");
+
     const awgDevice = await connectRPC(secondPanel, "DeviceService/CreateAwgDevice", {
       userId: createdUser.message.user.id, profileId: awgProfile.message.profile.id,
       platform: "linux", label: "bridge-device",

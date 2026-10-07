@@ -19,6 +19,7 @@ export interface FetchResponse {
   status: number;
   headers: HeaderPairs;
   body: Uint8Array;
+  waitUntil: Promise<void>;
 }
 
 /**

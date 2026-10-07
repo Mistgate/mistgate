@@ -595,8 +595,9 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
+	// Read without access too: a denied fetch still touches the implicit device (access.subView).
+	r.add(appendRows(&implicitRows, scanImplicitDeviceCredRow), implicitDeviceCredsSQL, userID)
 	if active {
-		r.add(appendRows(&implicitRows, scanImplicitDeviceCredRow), implicitDeviceCredsSQL, userID)
 		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
 		r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, groupID)
@@ -607,11 +608,10 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	if err := r.run(ctx, a.s); err != nil {
 		return SubscriptionData{}, err
 	}
+	snapshot := implicitDeviceSnapshot(implicitRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds}
+		Group: group, Inbounds: inbounds, ImplicitDevice: snapshot.Device, ImplicitCreds: snapshot.Creds}
 	if active {
-		snapshot := implicitDeviceSnapshot(implicitRows)
-		out.ImplicitDevice, out.ImplicitCreds = snapshot.Device, snapshot.Creds
 		out.Group.ProfileIDs = groupProfileIDs
 	}
 	return out, nil
