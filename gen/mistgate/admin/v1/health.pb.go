@@ -326,7 +326,10 @@ type Alert struct {
 	// of the node), "open_profiles" (the node's Profiles tab: a port or a certificate to change there), "open_warp" (the
 	// node's WARP card), "open_node" (go to the node page), "accept" (a doctor warning: AcceptDoctorItem), "mute".
 	// Unknown entries are ignored by the SPA.
-	Actions       []string `protobuf:"bytes,15,rep,name=actions,proto3" json:"actions,omitempty"`
+	Actions []string `protobuf:"bytes,15,rep,name=actions,proto3" json:"actions,omitempty"`
+	// Start of the current episode: equals first_seen_unix until the alert is re-opened (see id), then the time of the
+	// re-open. A duration is counted from here, not from first_seen_unix, which also covers the gap between episodes.
+	OpenedUnix    int64 `protobuf:"varint,16,opt,name=opened_unix,json=openedUnix,proto3" json:"opened_unix,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -464,6 +467,13 @@ func (x *Alert) GetActions() []string {
 		return x.Actions
 	}
 	return nil
+}
+
+func (x *Alert) GetOpenedUnix() int64 {
+	if x != nil {
+		return x.OpenedUnix
+	}
+	return 0
 }
 
 type ListAlertsRequest struct {
@@ -2220,7 +2230,7 @@ var File_mistgate_admin_v1_health_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\n" +
-	"\x1emistgate/admin/v1/health.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xf2\x04\n" +
+	"\x1emistgate/admin/v1/health.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x97\x05\n" +
 	"\x05Alert\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
 	"\bseverity\x18\x02 \x01(\x0e2 .mistgate.admin.v1.AlertSeverityR\bseverity\x120\n" +
@@ -2239,7 +2249,9 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"resolution\x18\r \x01(\tR\n" +
 	"resolution\x12,\n" +
 	"\x10muted_until_unix\x18\x0e \x01(\x03B\x020\x02R\x0emutedUntilUnix\x12\x18\n" +
-	"\aactions\x18\x0f \x03(\tR\aactions\x1a9\n" +
+	"\aactions\x18\x0f \x03(\tR\aactions\x12#\n" +
+	"\vopened_unix\x18\x10 \x01(\x03B\x020\x02R\n" +
+	"openedUnix\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"V\n" +

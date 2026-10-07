@@ -915,15 +915,22 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 		st := newStore(t)
 		a := HealthAlert{Kind: "node_down", Severity: 2, NodeID: "node_de", Subject: "agent", TitleKey: "title", WhyKey: "why"}
 		first, reopened, err := st.OpenAlert(ctx, a, time.Hour, now)
-		if err != nil || reopened {
+		if err != nil || reopened || !first.OpenedAt.Equal(first.FirstSeen) {
 			t.Fatalf("open: %+v reopened=%v err=%v", first, reopened, err)
 		}
 		if ok, err := st.ResolveAlert(ctx, first.ID, "cleared", now.Add(time.Minute)); err != nil || !ok {
 			t.Fatalf("resolve: %v %v", ok, err)
 		}
 		again, reopened, err := st.OpenAlert(ctx, a, time.Hour, now.Add(30*time.Minute))
-		if err != nil || !reopened || again.ID != first.ID || !again.FirstSeen.Equal(first.FirstSeen) {
+		if err != nil || !reopened || again.ID != first.ID || !again.FirstSeen.Equal(first.FirstSeen) || !again.OpenedAt.Equal(now.Add(30*time.Minute)) {
 			t.Fatalf("reopen: %+v reopened=%v err=%v", again, reopened, err)
+		}
+		if ok, err := st.ResolveAlert(ctx, again.ID, "cleared", now.Add(40*time.Minute)); err != nil || !ok {
+			t.Fatalf("resolve again: %v %v", ok, err)
+		}
+		fresh, reopened, err := st.OpenAlert(ctx, a, time.Hour, now.Add(2*time.Hour))
+		if err != nil || reopened || fresh.ID == first.ID || !fresh.FirstSeen.Equal(fresh.OpenedAt) {
+			t.Fatalf("fire after the window: %+v reopened=%v err=%v", fresh, reopened, err)
 		}
 	})
 	t.Run("PutDoctor", func(t *testing.T) {

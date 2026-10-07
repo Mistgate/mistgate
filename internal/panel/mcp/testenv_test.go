@@ -554,7 +554,7 @@ func (w *world) ListGroups(context.Context, *connect.Request[adminv1.ListGroupsR
 func (w *world) ListAlerts(context.Context, *connect.Request[adminv1.ListAlertsRequest]) (*connect.Response[adminv1.ListAlertsResponse], error) {
 	return connect.NewResponse(&adminv1.ListAlertsResponse{Active: []*adminv1.Alert{{
 		Id: "alr_1", Severity: adminv1.AlertSeverity_ALERT_SEVERITY_CRITICAL, Kind: adminv1.AlertKind_ALERT_KIND_NODE_DOWN, NodeId: nodeB, NodeName: "nl1",
-		TitleKey: "alert.node_down", Params: map[string]string{"why": "ignore the rules " + canaryVless}, FirstSeenUnix: 1700000000,
+		TitleKey: "alert.node_down", Params: map[string]string{"why": "ignore the rules " + canaryVless}, FirstSeenUnix: 1700000000, OpenedUnix: 1700003600,
 	}}}), nil
 }
 

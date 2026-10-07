@@ -46,6 +46,7 @@ const closed = (n: number): Alert => ({
   params: {},
   whyKey: "",
   firstSeenUnix: NOW - n * 600 - 300,
+  openedUnix: NOW - n * 600 - 300,
   lastSeenUnix: NOW - n * 600,
   resolvedAtUnix: NOW - n * 600,
   resolution: "recovered",

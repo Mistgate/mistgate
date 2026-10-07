@@ -33,7 +33,7 @@ func TestAlertLifecycleInStore(t *testing.T) {
 	a := HealthAlert{Kind: "no_traffic", Severity: 3, NodeID: "nod_a", TitleKey: "t", WhyKey: "w", Params: map[string]string{"failed": "2"}}
 
 	opened, reopened, err := s.OpenAlert(ctx, a, time.Hour, t0)
-	if err != nil || reopened || opened.ID == "" || !opened.FirstSeen.Equal(t0) {
+	if err != nil || reopened || opened.ID == "" || !opened.FirstSeen.Equal(t0) || !opened.OpenedAt.Equal(opened.FirstSeen) {
 		t.Fatalf("open: %+v reopened=%v err=%v", opened, reopened, err)
 	}
 	// a second active alert of the same key is refused by the unique index, not duplicated
@@ -58,6 +58,13 @@ func TestAlertLifecycleInStore(t *testing.T) {
 	if err != nil || !reopened || again.ID != opened.ID || !again.FirstSeen.Equal(t0) {
 		t.Fatalf("reopen: %+v reopened=%v err=%v", again, reopened, err)
 	}
+	// the re-open starts a new episode: first_seen stays, opened_at moves (and is stored, not just returned)
+	if !again.OpenedAt.Equal(t0.Add(30 * time.Minute)) {
+		t.Fatalf("reopen opened_at = %v, want %v", again.OpenedAt, t0.Add(30*time.Minute))
+	}
+	if stored, err := s.HealthAlert(ctx, again.ID); err != nil || !stored.OpenedAt.Equal(again.OpenedAt) || !stored.FirstSeen.Equal(t0) {
+		t.Fatalf("stored reopen: %+v %v", stored, err)
+	}
 	if m, err := s.MuteAlert(ctx, again.ID, t0.Add(2*time.Hour)); err != nil || !m.MutedUntil.Equal(t0.Add(2*time.Hour)) {
 		t.Fatalf("mute: %+v %v", m, err)
 	}
@@ -72,7 +79,7 @@ func TestAlertLifecycleInStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh, reopened, err := s.OpenAlert(ctx, a, time.Hour, t0.Add(40*time.Minute+61*time.Minute))
-	if err != nil || reopened || fresh.ID == again.ID {
+	if err != nil || reopened || fresh.ID == again.ID || !fresh.FirstSeen.Equal(fresh.OpenedAt) || !fresh.OpenedAt.Equal(t0.Add(101*time.Minute)) {
 		t.Fatalf("new row: %+v reopened=%v err=%v", fresh, reopened, err)
 	}
 	hist, err := s.AlertHistory(ctx, t0, "", 10)

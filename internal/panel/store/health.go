@@ -37,6 +37,7 @@ type HealthAlert struct {
 	Params              map[string]string
 	TitleKey, WhyKey    string
 	FirstSeen, LastSeen time.Time
+	OpenedAt            time.Time // start of the current episode: FirstSeen until the alert is re-opened, then the re-open
 	ResolvedAt          time.Time // zero = active
 	Resolution          string
 	MutedUntil          time.Time // zero = not muted
@@ -44,14 +45,14 @@ type HealthAlert struct {
 }
 
 const alertCols = `id, kind, severity, node_id, subject, params_json, title_key, why_key, first_seen, last_seen,
-	resolved_at, resolution, muted_until, created_at`
+	resolved_at, resolution, muted_until, created_at, opened_at`
 
 func scanAlert(r rowScanner) (HealthAlert, error) {
 	var a HealthAlert
 	var params string
-	var first, last, res, mute, created int64
+	var first, last, res, mute, created, opened int64
 	err := r.Scan(&a.ID, &a.Kind, &a.Severity, &a.NodeID, &a.Subject, &params, &a.TitleKey, &a.WhyKey,
-		&first, &last, &res, &a.Resolution, &mute, &created)
+		&first, &last, &res, &a.Resolution, &mute, &created, &opened)
 	if errors.Is(err, sql.ErrNoRows) {
 		return HealthAlert{}, ErrNotFound
 	}
@@ -60,6 +61,7 @@ func scanAlert(r rowScanner) (HealthAlert, error) {
 	}
 	a.Params = parseMap(params)
 	a.FirstSeen, a.LastSeen, a.ResolvedAt, a.MutedUntil, a.CreatedAt = fleetTime(first), fleetTime(last), fleetTime(res), fleetTime(mute), fleetTime(created)
+	a.OpenedAt = fleetTime(opened)
 	return a, nil
 }
 
@@ -97,26 +99,27 @@ func (s *Store) AlertHistory(ctx context.Context, since time.Time, nodeID string
 }
 
 // OpenAlert records that the condition of a holds. A resolved alert of the same key that ended less than
-// reopenWithin ago is re-opened (id and first_seen stay, so flapping does not fill the history); otherwise a
-// row is inserted. The active-alert unique index makes concurrent opens update the same row instead of duplicating it.
+// reopenWithin ago is re-opened (id and first_seen stay, so flapping does not fill the history; opened_at moves to
+// now, the start of the new episode); otherwise a row is inserted. The active-alert unique index makes concurrent
+// opens update the same row instead of duplicating it.
 func (s *Store) OpenAlert(ctx context.Context, a HealthAlert, reopenWithin time.Duration, now time.Time) (out HealthAlert, reopened bool, err error) {
 	a.ID, a.FirstSeen, a.CreatedAt = NewID("alt_"), now, now
 	results, err := s.batch(ctx,
 		Stmt{Query: `UPDATE health_alert SET resolved_at = 0, resolution = '', severity = ?, params_json = ?,
-			title_key = ?, why_key = ?, last_seen = ?
+			title_key = ?, why_key = ?, last_seen = ?, opened_at = ?
 			WHERE id = (SELECT id FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ?
 				AND resolved_at >= ? AND resolved_at > 0 ORDER BY resolved_at DESC LIMIT 1)
 			AND NOT EXISTS (SELECT 1 FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at = 0)
 			RETURNING ` + alertCols,
-			Args: []any{int64(a.Severity), jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now),
+			Args: []any{int64(a.Severity), jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now), unix(now),
 				a.Kind, a.NodeID, a.Subject, unix(now.Add(-reopenWithin)), a.Kind, a.NodeID, a.Subject}, Returning: true},
-		Stmt{Query: `INSERT INTO health_alert (` + alertCols + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', 0, ?)
+		Stmt{Query: `INSERT INTO health_alert (` + alertCols + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', 0, ?, ?)
 			ON CONFLICT (kind, node_id, subject) WHERE resolved_at = 0 DO UPDATE SET
 				resolved_at = 0, resolution = '', severity = excluded.severity, params_json = excluded.params_json,
 				title_key = excluded.title_key, why_key = excluded.why_key, last_seen = excluded.last_seen
 			RETURNING ` + alertCols,
 			Args: []any{a.ID, a.Kind, int64(a.Severity), a.NodeID, a.Subject, jsonMap(a.Params), a.TitleKey, a.WhyKey,
-				unix(now), unix(now), unix(now)}, Returning: true},
+				unix(now), unix(now), unix(now), unix(now)}, Returning: true},
 	)
 	if err != nil {
 		return HealthAlert{}, false, err
@@ -154,9 +157,9 @@ func (s *Store) ResolveAlert(ctx context.Context, id, resolution string, now tim
 // InsertResolvedAlert writes a history-only record (HOST_BLIP): an alert that never was active.
 func (s *Store) InsertResolvedAlert(ctx context.Context, a HealthAlert) error {
 	a.ID = NewID("alt_")
-	_, err := s.W.ExecContext(ctx, `INSERT INTO health_alert (`+alertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+	_, err := s.W.ExecContext(ctx, `INSERT INTO health_alert (`+alertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
 		a.ID, a.Kind, a.Severity, a.NodeID, a.Subject, jsonMap(a.Params), a.TitleKey, a.WhyKey,
-		unix(a.FirstSeen), unix(a.LastSeen), max(unix(a.ResolvedAt), 1), a.Resolution, unix(a.CreatedAt))
+		unix(a.FirstSeen), unix(a.LastSeen), max(unix(a.ResolvedAt), 1), a.Resolution, unix(a.CreatedAt), unix(a.FirstSeen))
 	return err
 }
 

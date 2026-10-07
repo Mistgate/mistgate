@@ -655,7 +655,7 @@ func (s *Service) alertEvent(ctx context.Context, a store.HealthAlert, now time.
 	if a.NodeID == "" || (a.Kind != kNoTraffic && a.Kind != kCheckFailed) || (resolved && a.Resolution != "cleared" && a.Resolution != "fix_applied") {
 		return
 	}
-	minutes := strconv.Itoa(int(now.Sub(a.FirstSeen).Minutes()))
+	minutes := strconv.Itoa(int(now.Sub(a.OpenedAt).Minutes()))
 	e := store.EventRow{Time: now, Source: "panel", NodeID: a.NodeID}
 	switch {
 	case a.Kind == kNoTraffic && !resolved:

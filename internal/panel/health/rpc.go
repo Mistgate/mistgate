@@ -61,7 +61,7 @@ func alertMsg(a store.HealthAlert, names map[string]string, fixable func(store.H
 	m := &adminv1.Alert{
 		Id: a.ID, Severity: adminv1.AlertSeverity(a.Severity), Kind: kindProto[a.Kind], NodeId: a.NodeID, NodeName: names[a.NodeID],
 		Subject: a.Subject, TitleKey: a.TitleKey, Params: a.Params, WhyKey: a.WhyKey,
-		FirstSeenUnix: a.FirstSeen.Unix(), LastSeenUnix: a.LastSeen.Unix(), ResolvedAtUnix: fleetUnix(a.ResolvedAt),
+		FirstSeenUnix: a.FirstSeen.Unix(), OpenedUnix: a.OpenedAt.Unix(), LastSeenUnix: a.LastSeen.Unix(), ResolvedAtUnix: fleetUnix(a.ResolvedAt),
 		Resolution: a.Resolution, MutedUntilUnix: fleetUnix(a.MutedUntil),
 	}
 	active := a.ResolvedAt.IsZero()

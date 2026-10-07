@@ -400,6 +400,33 @@ func TestTrafficAlertsWriteTheNodesHistory(t *testing.T) {
 	}
 }
 
+// A check that fails again within the re-open window keeps its alert row (and first_seen), but the recovery event counts
+// the minutes of the last episode only, not the gap in between.
+func TestRecoveryMinutesCountFromTheReopen(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a, b := e.inbound("de1", 443), e.inbound("de1", 8443)
+	e.pass(b)
+	e.fail(a, "auth")
+	e.fail(a, "auth")
+	first := e.active()["check_failed/de1/"+a].FirstSeen
+	e.clock.Advance(10 * time.Minute)
+	e.pass(a)
+	e.clock.Advance(20 * time.Minute) // healthy for 20 minutes, then it fails again
+	e.pass(b)
+	e.fail(a, "auth")
+	e.fail(a, "auth")
+	if re := e.active()["check_failed/de1/"+a]; !re.FirstSeen.Equal(first) {
+		t.Fatalf("not re-opened: first_seen %v, want %v", re.FirstSeen, first)
+	}
+	e.clock.Advance(3 * time.Minute)
+	e.pass(a)
+	ev := e.events("de1")[0]
+	if ev.Code != "check_recovered" || ev.Params["minutes"] != "3" {
+		t.Fatalf("recovery after a re-open: %+v", ev)
+	}
+}
+
 // The node's only inbound stops answering (no_traffic), then stops running (failed): nothing on the node is checked any
 // more, which is not traffic coming back. The alert ends as superseded and the history says nothing about a resume.
 func TestTrafficIsNotResumedWhenNothingIsLeftToCheck(t *testing.T) {

@@ -104,6 +104,7 @@ const closed = (n: number): Alert => ({
   params: { profile: ["hy2 · 443", "AWG · 51820", "hy2 · WARP"][n % 3]!, port: "443" },
   whyKey: "",
   firstSeenUnix: NOW - n * 3000 - 1800,
+  openedUnix: NOW - n * 3000 - 1800,
   lastSeenUnix: NOW - n * 3000,
   resolvedAtUnix: NOW - n * 3000,
   resolution: resolutions[n % resolutions.length]!,

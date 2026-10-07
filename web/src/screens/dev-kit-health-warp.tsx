@@ -152,6 +152,7 @@ const alert = (over: Partial<Alert>): Alert => ({
   params: {},
   whyKey: "",
   firstSeenUnix: NOW - 47 * 60,
+  openedUnix: over.firstSeenUnix ?? NOW - 47 * 60,
   lastSeenUnix: NOW,
   resolvedAtUnix: 0,
   resolution: "",

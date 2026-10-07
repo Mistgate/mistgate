@@ -138,6 +138,9 @@ message Alert {
   // node's WARP card), "open_node" (go to the node page), "accept" (a doctor warning: AcceptDoctorItem), "mute".
   // Unknown entries are ignored by the SPA.
   repeated string actions = 15;
+  // Start of the current episode: equals first_seen_unix until the alert is re-opened (see id), then the time of the
+  // re-open. A duration is counted from here, not from first_seen_unix, which also covers the gap between episodes.
+  int64 opened_unix = 16 [jstype = JS_NUMBER];
 }
 
 message ListAlertsRequest {

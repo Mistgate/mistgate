@@ -64,6 +64,18 @@ func TestFleetStatusContent(t *testing.T) {
 	}
 }
 
+// A re-opened alert keeps first_seen_unix; opened_unix is the start of its current episode, so a duration is not read from
+// the first one.
+func TestAlertsListShowsEpisodeStart(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	v := decode[AlertsV](t, mustOK(t, s, "alerts_list", map[string]any{}))
+	if len(v.Active) != 1 || v.Active[0].First != 1700000000 || v.Active[0].Opened != 1700003600 {
+		t.Errorf("alerts: %+v", v.Active)
+	}
+}
+
 func TestGroupsList(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileReadonly) // readonly may list groups

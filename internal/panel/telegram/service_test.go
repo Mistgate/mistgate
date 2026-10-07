@@ -63,7 +63,7 @@ func TestResolveCarriesDurationInThePanelLanguage(t *testing.T) {
 
 	t0 := e.clk.now()
 	a := alert("node_down", "nod_1", 3)
-	a.FirstSeen = t0
+	a.FirstSeen, a.OpenedAt = t0, t0
 	e.svc.AlertTransition(a, false)
 	waitFor(t, "the open message", func() bool { return len(e.tg.sentTo(777)) == 1 })
 	a.ResolvedAt, a.Resolution = t0.Add(14*time.Minute), "node_returned"

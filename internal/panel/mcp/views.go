@@ -716,6 +716,7 @@ type alertV struct {
 	Params     map[string]string `json:"params,omitempty"`
 	Why        string            `json:"why_key,omitempty"`
 	First      int64             `json:"first_seen_unix"`
+	Opened     int64             `json:"opened_unix"`
 	Last       int64             `json:"last_seen_unix"`
 	Resolved   int64             `json:"resolved_at_unix,omitempty"`
 	Resolution string            `json:"resolution,omitempty"`
@@ -727,7 +728,7 @@ func alertView(a *adminv1.Alert) alertV {
 	v := alertV{
 		ID: a.GetId(), Severity: enumName("ALERT_SEVERITY_", a.GetSeverity().String()), Kind: enumName("ALERT_KIND_", a.GetKind().String()),
 		NodeID: a.GetNodeId(), NodeName: nm(a.GetNodeName()), Subject: nm(a.GetSubject()), Title: clean(a.GetTitleKey(), 80),
-		Params: cleanMap(a.GetParams(), maxParamValue), Why: clean(a.GetWhyKey(), 80), First: a.GetFirstSeenUnix(),
+		Params: cleanMap(a.GetParams(), maxParamValue), Why: clean(a.GetWhyKey(), 80), First: a.GetFirstSeenUnix(), Opened: a.GetOpenedUnix(),
 		Last: a.GetLastSeenUnix(), Resolved: a.GetResolvedAtUnix(), Resolution: clean(a.GetResolution(), 60),
 		MutedTill: a.GetMutedUntilUnix(),
 	}

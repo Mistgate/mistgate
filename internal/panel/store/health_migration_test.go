@@ -73,3 +73,44 @@ func TestHealthMigrationUpgradesExistingData(t *testing.T) {
 		t.Fatalf("up again: %v", err)
 	}
 }
+
+// 00053 adds health_alert.opened_at: rows that exist before it start their episode at first_seen, and it rolls back.
+func TestAlertOpenedAtMigrationBackfills(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "live.db")
+	w, err := openDB(path, 1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := openDB(path, 4, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Store{W: w, R: r}
+	t.Cleanup(func() { s.Close() })
+	sub, err := fs.Sub(migrationsFS, "migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := goose.NewProvider(goose.DialectSQLite3, s.W, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.UpTo(ctx, 52); err != nil {
+		t.Fatalf("up to 52: %v", err)
+	}
+	execT(t, s, `INSERT INTO health_alert (id, kind, severity, node_id, title_key, first_seen, last_seen, created_at) VALUES ('alt_old', 'node_down', 3, 'nod_a', 't', 700, 900, 700)`)
+	if _, err := p.UpTo(ctx, 53); err != nil {
+		t.Fatalf("up to 53: %v", err)
+	}
+	old, err := s.HealthAlert(ctx, "alt_old")
+	if err != nil || old.OpenedAt.Unix() != 700 {
+		t.Fatalf("backfilled alert: %+v %v", old, err)
+	}
+	if _, err := p.DownTo(ctx, 52); err != nil {
+		t.Fatalf("down again: %v", err)
+	}
+	if _, err := p.UpTo(ctx, 53); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}

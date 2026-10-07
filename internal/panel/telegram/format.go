@@ -318,16 +318,31 @@ func alertOpened(l L, a store.HealthAlert, node, adminURL string) string {
 	return join(
 		"<b>"+alertTitle(l, a)+"</b>"+sev,
 		nodeLine(l, node),
+		againLine(l, a),
 		alertReason(l, a),
 		link(adminURL, "health", l.pick("Open Health", "Открыть «Здоровье»")),
 	)
 }
 
-// alertResolved is the message of an alert that ended, with how long it lasted.
+// againLine marks an alert that fired again within the re-open window: its row is kept, so first_seen is the first
+// episode and opened_at the current one. UTC like lockoutText; the date is added when the first episode was not today.
+func againLine(l L, a store.HealthAlert) string {
+	if !a.OpenedAt.After(a.FirstSeen) {
+		return ""
+	}
+	first, layout := a.FirstSeen.UTC(), "15:04"
+	if a.OpenedAt.UTC().Format(time.DateOnly) != first.Format(time.DateOnly) {
+		layout = "02.01 15:04"
+	}
+	return l.pick("Again, first at ", "Снова, впервые в ") + first.Format(layout) + " UTC"
+}
+
+// alertResolved is the message of an alert that ended, with how long its current episode lasted: counted from
+// opened_at, because a re-opened alert keeps first_seen and would include the gap between its episodes.
 func alertResolved(l L, a store.HealthAlert, node string) string {
 	tail := ""
-	if !a.FirstSeen.IsZero() && a.ResolvedAt.After(a.FirstSeen) {
-		tail = l.pick("lasted ", "длилось ") + l.duration(a.ResolvedAt.Sub(a.FirstSeen))
+	if !a.OpenedAt.IsZero() && a.ResolvedAt.After(a.OpenedAt) {
+		tail = l.pick("lasted ", "длилось ") + l.duration(a.ResolvedAt.Sub(a.OpenedAt))
 	}
 	line := nodeLine(l, node)
 	switch {
@@ -336,7 +351,7 @@ func alertResolved(l L, a store.HealthAlert, node string) string {
 	case tail != "":
 		line = upperFirst(tail)
 	}
-	return join("<b>"+l.pick("Resolved: ", "Решено: ")+alertTitle(l, a)+"</b>", line)
+	return join("<b>"+l.pick("Resolved: ", "Решено: ")+alertTitle(l, a)+"</b>", line, againLine(l, a))
 }
 
 func nodeLine(l L, node string) string {
