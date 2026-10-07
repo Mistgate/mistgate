@@ -13,7 +13,7 @@ const text = (s: string) => new TextEncoder().encode(s);
 /** What a test scripts: each hook may be async (to delay) and every call is recorded in `calls`. */
 export interface FakePanel {
   calls: { op: "challenge" | "accept" | "step"; args: unknown; start: number; end?: number }[];
-  challenge: (nodeId: string, audience: string) => LinkChallenge | Promise<LinkChallenge>;
+  challenge: (audience: string) => LinkChallenge | Promise<LinkChallenge>;
   accept: (nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array) => LinkAccept | Promise<LinkAccept>;
   step: (input: LinkStepIn) => LinkStepOut | Promise<LinkStepOut>;
 }
@@ -27,7 +27,7 @@ declare global {
 export function defaultPanel(): FakePanel {
   return {
     calls: [],
-    challenge: (nodeId, audience) => ({ nonce: new Uint8Array(32).fill(7), frame: text(`challenge ${nodeId} ${audience}`) }),
+    challenge: (audience) => ({ nonce: new Uint8Array(32).fill(7), frame: text(`challenge ${audience}`) }),
     accept: (_n, _a, _nonce, auth) =>
       new TextDecoder().decode(auth).startsWith("bad")
         ? { ok: false }
@@ -54,8 +54,8 @@ async function record<T>(op: "challenge" | "accept" | "step", args: unknown, run
 }
 
 export class PanelLink extends WorkerEntrypoint {
-  challenge(nodeId: string, audience: string): Promise<LinkChallenge> {
-    return record("challenge", { nodeId, audience }, () => panel().challenge(nodeId, audience));
+  challenge(audience: string): Promise<LinkChallenge> {
+    return record("challenge", { audience }, () => panel().challenge(audience));
   }
   accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array): Promise<LinkAccept> {
     return record("accept", { nodeId, audience, nonce, auth }, () => panel().accept(nodeId, audience, nonce, auth));

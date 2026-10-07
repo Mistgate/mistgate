@@ -5,6 +5,13 @@ import { getPanel } from "./panel";
 // The Go side of the agent link. A NodeLink object holds the socket and an opaque state string and reaches Go through
 // this entrypoint (this.ctx.exports.PanelLink, a loopback call into the Worker): the Go panel wasm lives in the Worker's
 // isolates, never in the object. Go runs every handshake step and every session step; the object never reads a frame.
+//
+// Two rules for the Go side of a step:
+// - `closed{owned:false}` is not only a takeover by a second socket: it also follows a deploy or reset that took the
+//   socket away, and a session whose socket is gone when the alarm runs. Do not read it as "another agent connected".
+// - A step must never await a call into the same node's NodeLink (ask, poke, close): the object runs one event at a
+//   time, so the call waits for the very step that made it, until the block's budget runs out and the step fails. Fan
+//   out to other nodes through waitUntil, outside the step.
 
 /** What happened to the session; Go's step answers each one. `at` is the object's clock (Date.now()). */
 export type LinkEvent =
@@ -41,8 +48,8 @@ export interface LinkChallenge {
 export type LinkAccept = { ok: true; frame: Uint8Array; certSerial: string; certNotAfterUnix: number } | { ok: false };
 
 export class PanelLink extends WorkerEntrypoint<Env> {
-  challenge(nodeId: string, audience: string): Promise<LinkChallenge> {
-    return this.call("challenge", { nodeId, audience }) as Promise<LinkChallenge>;
+  challenge(audience: string): Promise<LinkChallenge> {
+    return this.call("challenge", { audience }) as Promise<LinkChallenge>;
   }
 
   accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array): Promise<LinkAccept> {

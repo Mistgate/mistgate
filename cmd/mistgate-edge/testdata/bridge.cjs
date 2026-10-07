@@ -270,17 +270,6 @@ async function assertLinkHandshake(panel) {
   const nodeID = "nod_bridge";
   const audience = "link.example.com";
   const link = (op, args) => Promise.race([panel.link(op, args), wasmFailure]);
-  const counted = async (label, fn) => {
-    globalThis.__d1.__beginQueryCount(label);
-    try {
-      const value = await fn();
-      return { value, queries: globalThis.__d1.__endQueryCount() };
-    } catch (error) {
-      globalThis.__d1.__endQueryCount();
-      throw error;
-    }
-  };
-
   const nodeKey = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
   const issueResponse = await bridgeRequestFor(panel, "https://example.com/__edge_bridge_test__/issue-node-cert", {
     method: "POST",
@@ -293,17 +282,17 @@ async function assertLinkHandshake(panel) {
     .bind(issued.serial, nodeID, issued.caId, issued.pem, issued.notBefore, issued.notAfter, issued.issuedAt).run();
   const caKey = new crypto.X509Certificate(issued.caPem).publicKey;
 
-  const challenge = await counted("link challenge", () => link("challenge", { nodeId: nodeID, audience }));
+  const challenge = await countedRequest("link challenge", () => link("challenge", { audience }));
   assert.equal(challenge.queries.sequentialQueries, 0, "a challenge reads nothing");
-  assert.ok(challenge.value.nonce instanceof Uint8Array && challenge.value.nonce.length === 32);
-  const challengeFields = pbFields(challenge.value.frame);
-  assert.deepEqual(challengeFields[1], Buffer.from(challenge.value.nonce), "the challenge frame carries the nonce");
+  assert.ok(challenge.response.nonce instanceof Uint8Array && challenge.response.nonce.length === 32);
+  const challengeFields = pbFields(challenge.response.frame);
+  assert.deepEqual(challengeFields[1], Buffer.from(challenge.response.nonce), "the challenge frame carries the nonce");
   assert.equal(challengeFields[2].toString("utf8"), audience, "the challenge frame names the audience");
-  const other = await link("challenge", { nodeId: nodeID, audience });
-  assert.notDeepEqual(Buffer.from(other.nonce), Buffer.from(challenge.value.nonce), "every challenge has its own nonce");
-  await assert.rejects(link("challenge", { nodeId: nodeID, audience: "" }), "an empty audience gets no challenge");
+  const other = await link("challenge", { audience });
+  assert.notDeepEqual(Buffer.from(other.nonce), Buffer.from(challenge.response.nonce), "every challenge has its own nonce");
+  await assert.rejects(link("challenge", { audience: "" }), "an empty audience gets no challenge");
 
-  const panelNonce = Buffer.from(challenge.value.nonce);
+  const panelNonce = Buffer.from(challenge.response.nonce);
   const agentNonce = randomBytes(32);
   const authFrame = (id, key, nonce, signOver = { audience, panelNonce }) => {
     const preimage = Buffer.concat([Buffer.from(`mistgate-agent-link/1\0${id}\0${signOver.audience}\0`), signOver.panelNonce]);
@@ -312,14 +301,14 @@ async function assertLinkHandshake(panel) {
   };
   const accept = (auth) => link("accept", { nodeId: nodeID, audience, nonce: new Uint8Array(panelNonce), auth: new Uint8Array(auth) });
 
-  const accepted = await counted("link accept", () => accept(authFrame(nodeID, nodeKey.privateKey, agentNonce)));
+  const accepted = await countedRequest("link accept", () => accept(authFrame(nodeID, nodeKey.privateKey, agentNonce)));
   console.log(`D1 query count ${JSON.stringify(accepted.queries)}`);
-  assert.equal(accepted.value.ok, true, "the node's own proof is accepted");
+  assert.equal(accepted.response.ok, true, "the node's own proof is accepted");
   assert.equal(accepted.queries.sequentialQueries, 1, "an accept costs exactly one sequential D1 query");
   assert.equal(accepted.queries.prepareExecutions, 1, "and one statement");
-  assert.equal(accepted.value.certSerial, issued.serial);
-  assert.equal(accepted.value.certNotAfterUnix, issued.notAfter);
-  const signature = pbFields(accepted.value.frame)[1];
+  assert.equal(accepted.response.certSerial, issued.serial);
+  assert.equal(accepted.response.certNotAfterUnix, issued.notAfter);
+  const signature = pbFields(accepted.response.frame)[1];
   assert.equal(signature.length, 64);
   const panelPreimage = Buffer.concat([Buffer.from(`mistgate-panel-link/1\0${nodeID}\0${audience}\0`), panelNonce, agentNonce]);
   assert.ok(

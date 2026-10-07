@@ -1,28 +1,33 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import type { LinkAccept, LinkEvent, LinkStepOut, PanelLink } from "./panellink";
-import { LINK_MARKER } from "./shell";
 
 // The shell of one node's agent link: one object per node (idFromName(node id)), holding the agent's WebSocket and the
 // session state as an opaque string. It never reads a frame: the Go panel (PanelLink) runs every handshake step and
 // every session step, and this object only moves bytes, keeps the order, and owns the alarm.
 //
 // Ordering: every entry point runs inside blockConcurrencyWhile, so one event is handled at a time, in arrival order,
-// RPC methods included. Go gets 20 s per call (blockConcurrencyWhile resets the object after 30 s); an error or a
-// timeout closes the socket with 1011 and the agent reconnects.
+// RPC methods included. blockConcurrencyWhile resets the object after 30 s, and one event can make several Go calls
+// (accept, closed, open, closed), so each block has a 25 s budget that its Go calls share (20 s at most for one); a call
+// with nothing left of the budget is not made and counts as failed. A failed or timed-out step closes the socket with
+// 1011 and the agent reconnects; a socket that is no longer open is not heard (its queued frames are dropped).
 //
 // Hibernation: nothing is kept in memory but the waiters of `ask` (a pending ask keeps the object alive anyway), and
 // no timer is left running when nothing is pending: the one alarm is the earliest of the session's own alarm, the
 // handshake deadlines of sockets that have not authenticated, and "now" when a desired-state poke is waiting.
 //
-// Storage (sync kv): nodeId; gen (last issued generation); live (generation of the open session, absent = none);
-// state (the last step's state, kept after the session ends); alarmAt; poke.
+// The node id is the object's own name (ctx.id.name, from idFromName): nothing a client sends is trusted for it.
+//
+// Storage (sync kv): gen (last issued generation); live (generation of the open session, absent = none); state (the last
+// step's state, kept after the session ends); alarmAt; poke. Only an authenticated socket ever writes any of it, so an
+// upgrade that never authenticates leaves nothing behind once its deadline has passed.
 
 const HANDSHAKE_MS = 10_000;
 const STEP_MS = 20_000;
-/** An alarm further out than this is set to this and re-armed when it fires (setAlarm wants a sane timestamp). */
-const MAX_ALARM_MS = 30 * 24 * 3600 * 1000;
-const OPEN = 1; // WebSocket.readyState
+/** What the Go calls of one serial block share; blockConcurrencyWhile gives up at 30 s. */
+const BLOCK_MS = 25_000;
+/** A session's alarm is never set closer than this: a Go side that always answers "now" must not become a hot loop (an alarm is billed). */
+const MIN_ALARM_GAP_MS = 1_000;
 
 /** Per socket. generation 0 = not authenticated yet; a session's sockets carry the generation that opened it. */
 interface Attachment {
@@ -65,6 +70,12 @@ function shut(ws: WebSocket, code: number, reason: string): void {
 
 export class NodeLink extends DurableObject<Env> {
   private waiters = new Map<string, Waiter>();
+  /** The end of the current serial block's Go budget. */
+  private until = 0;
+
+  private get nodeId(): string {
+    return this.ctx.id.name ?? "";
+  }
 
   private get kv(): SyncKvStorage {
     return this.ctx.storage.kv;
@@ -81,6 +92,7 @@ export class NodeLink extends DurableObject<Env> {
    */
   private serial<T>(work: () => Promise<T>): Promise<T | undefined> {
     return this.ctx.blockConcurrencyWhile(async () => {
+      this.until = Date.now() + BLOCK_MS;
       try {
         return await work();
       } catch (error) {
@@ -90,12 +102,19 @@ export class NodeLink extends DurableObject<Env> {
     });
   }
 
+  /** A Go call inside a serial block: at most STEP_MS, at most what the block has left, and none at all when that is gone. */
+  private call<T>(make: () => Promise<T>): Promise<T> {
+    const left = Math.min(STEP_MS, this.until - Date.now());
+    if (left <= 0) return Promise.reject(new Error("panel link budget spent"));
+    return within(make(), left);
+  }
+
   private attachment(ws: WebSocket): Attachment | null {
     return ws.deserializeAttachment() as Attachment | null;
   }
 
   private openSockets(): WebSocket[] {
-    return this.ctx.getWebSockets().filter((ws) => ws.readyState === OPEN);
+    return this.ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.READY_STATE_OPEN);
   }
 
   /** The socket of the open session, if it is still connected. */
@@ -104,24 +123,23 @@ export class NodeLink extends DurableObject<Env> {
     return live ? this.openSockets().find((ws) => this.attachment(ws)?.generation === live) : undefined;
   }
 
-  /** The agent's upgrade, forwarded by the Worker with the node id the panel checked (forwardLink). The challenge comes from Go. */
+  /** The agent's upgrade, forwarded by the Worker once the panel's marker named this node. The challenge comes from Go. */
   async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("Upgrade") !== "websocket") return new Response("Upgrade Required", { status: 426 });
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("Upgrade Required", { status: 426 });
+    if (this.nodeId === "") return new Response("Bad Request", { status: 400 });
     const url = new URL(request.url);
-    const nodeId = request.headers.get(LINK_MARKER) ?? "";
-    if (nodeId === "") return new Response("Bad Request", { status: 400 });
+    // The challenge needs no state: it is made before the block, so a stream of upgrades does not delay a live session's frames.
+    let challenge;
+    try {
+      challenge = await within(this.panel.challenge(url.host), STEP_MS);
+    } catch (error) {
+      console.error("link challenge failed:", error instanceof Error ? error.message : String(error));
+      return new Response("Service Unavailable", { status: 503 });
+    }
     const answer = await this.serial(async () => {
-      let challenge;
-      try {
-        challenge = await within(this.panel.challenge(nodeId, url.host), STEP_MS);
-      } catch (error) {
-        console.error("link challenge failed:", error instanceof Error ? error.message : String(error));
-        return new Response("Service Unavailable", { status: 503 });
-      }
       const pair = new WebSocketPair();
       const [client, server] = [pair[0], pair[1]];
       this.ctx.acceptWebSocket(server);
-      this.kv.put("nodeId", nodeId);
       const attachment: Attachment = { nonce: challenge.nonce, deadline: Date.now() + HANDSHAKE_MS, audience: url.host, generation: 0 };
       server.serializeAttachment(attachment);
       server.send(challenge.frame);
@@ -133,6 +151,8 @@ export class NodeLink extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await this.serial(async () => {
+      // A socket that is not open any more no longer speaks: after a failed step (1011) its queued frames must not reach Go.
+      if (ws.readyState !== WebSocket.READY_STATE_OPEN) return;
       const att = this.attachment(ws);
       if (att === null) return;
       if (att.generation === 0) {
@@ -161,6 +181,8 @@ export class NodeLink extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.serial(async () => {
+      // The session's socket vanished without a close event (a deploy or reset, or a socket stuck closing after our 1011).
+      if (this.kv.get("live") && !this.liveSocket()) await this.dropLive(true);
       const now = Date.now();
       for (const ws of this.openSockets()) {
         const att = this.attachment(ws);
@@ -192,18 +214,30 @@ export class NodeLink extends DurableObject<Env> {
 
   /**
    * Sends a request frame through a session step and waits for the reply a later step resolves. The wait is outside the
-   * serial block (other events must run meanwhile). Rejects with "link lost" when the session ends and "timeout" at waitMs.
+   * serial block (other events must run meanwhile). Rejects with "link lost" when the session ends and "timeout" at
+   * deadlineAt, the caller's own deadline (ms since the epoch): a request that reaches the object after the caller gave up
+   * is never sent, so a command does not run behind an answer of "timeout".
    */
-  async ask(requestId: string, frame: Uint8Array, waitMs: number): Promise<Uint8Array | null> {
-    const reply = new Promise<Uint8Array | null>((resolve, reject) => this.waiters.set(requestId, { resolve, reject }));
+  async ask(requestId: string, frame: Uint8Array, deadlineAt: number): Promise<Uint8Array | null> {
+    if (this.waiters.has(requestId)) throw new Error("duplicate request id");
+    const waitMs = deadlineAt - Date.now();
+    if (waitMs <= 0) throw new Error("timeout");
+    let waiter!: Waiter;
+    const reply = new Promise<Uint8Array | null>((resolve, reject) => (waiter = { resolve, reject }));
     reply.catch(() => {}); // a rejection before the await below is still the caller's
-    const timer = setTimeout(() => this.waiters.get(requestId)?.reject(new Error("timeout")), waitMs);
+    this.waiters.set(requestId, waiter);
+    const timer = setTimeout(() => {
+      if (this.waiters.get(requestId) !== waiter) return;
+      this.waiters.delete(requestId);
+      waiter.reject(new Error("timeout"));
+    }, waitMs);
     try {
       const sent = await this.serial(async () => {
+        // Expired, or its session ended, while it waited for the block: nothing is stepped or sent; `reply` carries the why.
+        if (this.waiters.get(requestId) !== waiter) return true;
         const ws = this.liveSocket();
         if (!ws) return false;
-        const at = Date.now();
-        await this.run(ws, { kind: "request", at, requestId, frame, deadlineAt: at + waitMs });
+        await this.run(ws, { kind: "request", at: Date.now(), requestId, frame, deadlineAt });
         await this.arm();
         return true;
       });
@@ -211,7 +245,7 @@ export class NodeLink extends DurableObject<Env> {
       return await reply;
     } finally {
       clearTimeout(timer);
-      this.waiters.delete(requestId);
+      if (this.waiters.get(requestId) === waiter) this.waiters.delete(requestId);
     }
   }
 
@@ -228,10 +262,9 @@ export class NodeLink extends DurableObject<Env> {
 
   /** LinkAuth: Go decides. A proven node takes the link over from any other socket, whose session ends. */
   private async authenticate(ws: WebSocket, att: Attachment, auth: ArrayBuffer): Promise<void> {
-    const nodeId = this.kv.get<string>("nodeId") ?? "";
     let res: LinkAccept;
     try {
-      res = await within<LinkAccept>(this.panel.accept(nodeId, att.audience, att.nonce, new Uint8Array(auth)), STEP_MS);
+      res = await this.call<LinkAccept>(() => this.panel.accept(this.nodeId, att.audience, att.nonce, new Uint8Array(auth)));
     } catch (error) {
       console.error("link accept failed:", error instanceof Error ? error.message : String(error));
       shut(ws, 1011, "link error");
@@ -244,8 +277,10 @@ export class NodeLink extends DurableObject<Env> {
     const generation = (this.kv.get<number>("gen") ?? 0) + 1;
     this.kv.put("gen", generation);
     ws.serializeAttachment({ ...att, generation });
+    // Only the other authenticated sockets are superseded; a handshake in progress stays, as on the VPS.
     for (const other of this.openSockets()) {
-      if (this.attachment(other)?.generation !== generation) shut(other, 4000, "superseded");
+      const theirs = this.attachment(other)?.generation ?? 0;
+      if (theirs !== 0 && theirs !== generation) shut(other, 4000, "superseded");
     }
     await this.dropLive(false);
     this.kv.put("live", generation);
@@ -261,10 +296,7 @@ export class NodeLink extends DurableObject<Env> {
   private async run(ws: WebSocket | undefined, event: LinkEvent): Promise<void> {
     let out: LinkStepOut;
     try {
-      out = await within(
-        this.panel.step({ nodeId: this.kv.get<string>("nodeId") ?? "", state: this.kv.get<string>("state") ?? null, event }),
-        STEP_MS,
-      );
+      out = await this.call(() => this.panel.step({ nodeId: this.nodeId, state: this.kv.get<string>("state") ?? null, event }));
     } catch (error) {
       console.error("link step failed:", error instanceof Error ? error.message : String(error));
       // The session stays "live" until the socket's close event (or the next accept) runs its closed step.
@@ -276,7 +308,7 @@ export class NodeLink extends DurableObject<Env> {
     if (ws) for (const frame of out.frames) send(ws, frame);
     for (const r of out.replies ?? []) this.waiters.get(r.requestId)?.resolve(r.frame);
     if (out.alarmAt === undefined) this.kv.delete("alarmAt");
-    else this.kv.put("alarmAt", out.alarmAt);
+    else this.kv.put("alarmAt", Math.max(out.alarmAt, Date.now() + MIN_ALARM_GAP_MS));
     if (ws && out.close) {
       shut(ws, out.close.code, out.close.reason);
       await this.dropLive(true);
@@ -301,6 +333,7 @@ export class NodeLink extends DurableObject<Env> {
 
   private rejectWaiters(): void {
     for (const w of this.waiters.values()) w.reject(new Error("link lost"));
+    this.waiters.clear(); // an ask still queued then finds its waiter gone and sends nothing
   }
 
   /** One alarm for everything pending; none when nothing is, so the object can hibernate. */
@@ -312,6 +345,6 @@ export class NodeLink extends DurableObject<Env> {
     }
     if (this.kv.get("poke")) at = 0;
     if (at === Infinity) await this.ctx.storage.deleteAlarm();
-    else await this.ctx.storage.setAlarm(Math.min(Math.max(at, Date.now()), Date.now() + MAX_ALARM_MS));
+    else await this.ctx.storage.setAlarm(Math.max(at, Date.now()));
   }
 }

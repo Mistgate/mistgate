@@ -125,19 +125,19 @@ describe("forwardLink", () => {
     const get = vi.fn((_id: string) => ({ fetch }));
     return { ns: { idFromName, get } as unknown as Parameters<typeof forwardLink>[0], fetch, idFromName, get };
   };
-  const request = new Request("https://example.com/p/link/nod_1", { headers: { Upgrade: "websocket", "X-Mistgate-Link": "nod_spoof" } });
+  const request = new Request("https://example.com/p/link/nod_1", { headers: { Upgrade: "websocket" } });
   const answer = (status: number, headers: [string, string][]) => ({ status, headers, body: new Uint8Array() });
 
-  it("sends the original request to the object of the marked node, with the checked id, whatever the header's case", async () => {
+  it("sends the original request, as it is, to the object of the marked node, whatever the header's case", async () => {
     for (const name of ["X-Mistgate-Link", "x-mistgate-link"]) {
       const f = ns();
       expect(await forwardLink(f.ns, request, answer(204, [[name, "nod_1"]]))).toBe(forwarded);
       expect(f.idFromName).toHaveBeenCalledWith("nod_1");
       expect(f.get).toHaveBeenCalledWith("nod_1");
       const sent = f.fetch.mock.calls[0]?.[0];
-      expect(sent?.url).toBe(request.url);
+      expect(sent).toBe(request);
       expect(sent?.headers.get("Upgrade")).toBe("websocket");
-      expect(sent?.headers.get("X-Mistgate-Link")).toBe("nod_1");
+      expect(sent?.headers.has("X-Mistgate-Link")).toBe(false); // the object names its node itself (ctx.id.name)
     }
   });
 

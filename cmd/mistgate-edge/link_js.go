@@ -6,9 +6,13 @@ import (
 	"context"
 	"errors"
 	"syscall/js"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 )
+
+// linkAcceptTimeout bounds the one database read of an accept; the Durable Object waits 20 s for the call.
+const linkAcceptTimeout = 15 * time.Second
 
 var (
 	errLinkRequest = errors.New("mgPanel.link requires an operation name and an arguments object")
@@ -20,7 +24,7 @@ var (
 // mgPanel.link(op, args) runs one step of the agent link for the NodeLink Durable Object (edge/worker/src/nodelink.ts),
 // which only holds the socket. Bytes cross as Uint8Array.
 //
-//	"challenge" {nodeId, audience}              -> {nonce, frame}
+//	"challenge" {audience}                      -> {nonce, frame}
 //	"accept"    {nodeId, audience, nonce, auth} -> {ok: true, frame, certSerial, certNotAfterUnix} | {ok: false}
 //	"step"      the session step: not implemented yet
 func linkFunc() js.Func {
@@ -43,7 +47,7 @@ func link(args []js.Value) (js.Value, error) {
 	switch op := args[0].String(); op {
 	case "challenge":
 		audience := in.Get("audience")
-		if in.Get("nodeId").Type() != js.TypeString || audience.Type() != js.TypeString {
+		if audience.Type() != js.TypeString {
 			return js.Undefined(), errLinkArgs
 		}
 		nonce, frame, err := fleet.LinkChallenge(audience.String())
@@ -61,7 +65,9 @@ func link(args []js.Value) (js.Value, error) {
 		if nodeID.Type() != js.TypeString || audience.Type() != js.TypeString || nonceErr != nil || authErr != nil || nonce == nil || auth == nil {
 			return js.Undefined(), errLinkArgs
 		}
-		serial, notAfter, frame, ok := current.fleet.LinkAccept(context.Background(), nodeID.String(), audience.String(), nonce, auth)
+		ctx, cancel := context.WithTimeout(context.Background(), linkAcceptTimeout)
+		defer cancel()
+		serial, notAfter, frame, ok := current.fleet.LinkAccept(ctx, nodeID.String(), audience.String(), nonce, auth)
 		out := js.Global().Get("Object").New()
 		out.Set("ok", ok)
 		if ok {

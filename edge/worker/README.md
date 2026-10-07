@@ -34,15 +34,16 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 `mgPanel.link(op, args)` (`cmd/mistgate-edge/link_js.go`: `challenge`, `accept`; `step` is not implemented yet).
 
 - Routing: the panel answers an upgrade on the link path with 204 and `X-Mistgate-Link: <node id>` (`fleet.LinkMarker`); `index.ts`
-  forwards the original request to that node's object (`forwardLink` in `shell.ts`) and the marker never reaches the client.
+  forwards the original request to that node's object (`forwardLink` in `shell.ts`); the object takes the node id from its own name (`ctx.id.name`), and the marker never reaches the client.
   The edge has no link prefix yet, so the marker is mounted only by the bridge test hooks.
 - Ordering: every entry point (upgrade, message, close, alarm, RPC) runs inside `blockConcurrencyWhile`, one event at a time.
-  A Go call gets 20 s; an error or a timeout closes the socket with 1011 and the agent reconnects.
-- Ownership: each authenticated socket carries a generation. A new accept closes every other socket with 4000, ends the old
+  A Go call gets 20 s and one block 25 s in all (the platform resets the object at 30 s); an error, a timeout or an empty budget closes the socket with 1011 and the agent reconnects.
+- Ownership: each authenticated socket carries a generation. A new accept closes every other authenticated socket with 4000 (handshakes in progress stay), ends the old
   session (a `closed` step, `owned: false`) and starts the new one; frames of an older generation are dropped. A socket that
   has not sent a valid LinkAuth within 10 s is closed with 1008.
 - Alarm: one alarm, the earliest of the session's own `alarmAt`, the handshake deadlines and "now" when a `poke()` is pending.
-  Nothing pending means no alarm and no timer, so the object hibernates.
+  The session's alarm is never set closer than 1 s from now (a Go side that always answers 
+ow must not loop; alarms are billed). Nothing pending means no alarm and no timer, so the object hibernates.
 - RPC: `poke()` (desired state changed), `ask(requestId, frame, waitMs)` (a request frame and the reply a later step resolves;
   rejects with `link lost` or `timeout`), `close(code, reason)`.
 - Step contract (`LinkEvent`, `LinkStepIn`, `LinkStepOut` in `panellink.ts`): the state goes in and out as one string; the

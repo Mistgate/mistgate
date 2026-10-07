@@ -174,7 +174,6 @@ func (f *Fleet) linkAccept(ctx context.Context, nodeID, audience string, nonce, 
 
 // LinkAccept is linkAccept for the edge Durable Object (the VPS runs it inside LinkHandler): it reports the certificate
 // the agent proved.
-
 func (f *Fleet) LinkAccept(ctx context.Context, nodeID, audience string, nonce, authFrame []byte) (serial string, notAfter time.Time, frame []byte, ok bool) {
 	pc, frame, ok := f.linkAccept(ctx, nodeID, audience, nonce, authFrame)
 	return pc.serial, pc.notAfter, frame, ok

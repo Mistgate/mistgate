@@ -56,16 +56,14 @@ export const LINK_MARKER = "x-mistgate-link";
 
 /**
  * The panel cannot hold a WebSocket, so it answers an agent link upgrade with 204 and the node's id instead of upgrading.
- * The original request, upgrade headers and all, then goes to that node's NodeLink object, carrying the id the panel
- * checked in the same header (whatever the client sent there is replaced); the object's response (the 101) is the
- * answer, and the marker never reaches the client. Undefined for any other panel answer.
+ * The original request, upgrade headers and all, then goes to the NodeLink object named by that id; the object takes the
+ * node id from its own name, never from the request. Its response (the 101) is the answer, and the marker never reaches
+ * the client. Undefined for any other panel answer.
  */
 export function forwardLink(ns: DurableObjectNamespace<NodeLink>, request: Request, answer: FetchResponse): Promise<Response> | undefined {
   const id = answer.status === 204 ? answer.headers.find(([name]) => name.toLowerCase() === LINK_MARKER)?.[1] : undefined;
   if (!id) return undefined;
-  const forwarded = new Request(request);
-  forwarded.headers.set(LINK_MARKER, id);
-  return ns.get(ns.idFromName(id)).fetch(forwarded);
+  return ns.get(ns.idFromName(id)).fetch(request);
 }
 
 /**
