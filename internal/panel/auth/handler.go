@@ -19,6 +19,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -39,13 +40,15 @@ func sessionToken(h http.Header) string {
 
 var errUnauthenticated = connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 
+var authBucket = securitylimit.Bucket{Name: "auth", Burst: 10, Refill: 3 * time.Second}
+
 // clientIP is the address of the client: the TCP peer, or the address a trusted proxy reports.
 func (s *Service) clientIP(req connect.AnyRequest) netip.Addr {
 	return s.trust.ClientIP(req.Peer().Addr, req.Header())
 }
 
 func (s *Service) rateLimited(ctx context.Context, req connect.AnyRequest) error {
-	decision, err := s.lim.Take(ctx, "auth", SourceKey(s.clientIP(req)), s.now(), s.authBurst, s.authRefill, 1)
+	decision, err := s.lim.Take(ctx, authBucket, SourceKey(s.clientIP(req)), 1)
 	if err != nil || !decision.Allowed {
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many attempts, try again later"))
 	}

@@ -77,15 +77,13 @@ type Config struct {
 
 // Service implements the admin AuthService.
 type Service struct {
-	st         *store.Store
-	wa         *webauthn.WebAuthn
-	vault      *vault.Vault
-	log        *slog.Logger
-	lim        securitylimit.Limiter
-	authBurst  float64
-	authRefill time.Duration
-	trust      ProxyTrust
-	now        func() time.Time
+	st    *store.Store
+	wa    *webauthn.WebAuthn
+	vault *vault.Vault
+	log   *slog.Logger
+	lim   securitylimit.Limiter
+	trust ProxyTrust
+	now   func() time.Time
 
 	sourceURL string // where the source code is published (Config.SourceURL)
 
@@ -157,8 +155,6 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		vault:      cfg.Vault,
 		log:        log,
 		lim:        cfg.Limiter,
-		authBurst:  10,
-		authRefill: 3 * time.Second,
 		trust:      NewProxyTrust(cfg.TrustedProxies),
 		now:        time.Now,
 		hashSem:    make(chan struct{}, maxConcurrentHashes),

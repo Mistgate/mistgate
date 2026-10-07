@@ -20,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -104,9 +105,11 @@ func (s *Service) authenticateBearer(r *http.Request, limit bool) (store.APIToke
 		return tok, failure(http.StatusUnauthorized, "unauthenticated", "token expired", "token expired")
 	}
 	if limit {
-		refill := time.Minute / time.Duration(max(tok.RatePerMin, 1))
-		decision, err := s.lim.Take(r.Context(), "api-token", tok.ID, now,
-			float64(min(tokenBurst, max(tok.RatePerMin, 1))), refill, 1)
+		rate := max(tok.RatePerMin, 1)
+		bucket := securitylimit.Bucket{
+			Name: "api-token", Burst: float64(min(tokenBurst, rate)), Refill: time.Minute / time.Duration(rate),
+		}
+		decision, err := s.lim.Take(r.Context(), bucket, tok.ID, 1)
 		if err != nil || !decision.Allowed {
 			f := failure(http.StatusTooManyRequests, "resource_exhausted", "too many requests for this token, slow down", "rate limit")
 			f.retry = decision.RetryAfter

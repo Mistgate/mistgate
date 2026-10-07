@@ -119,7 +119,7 @@ func Build(c Config) (*Panel, error) {
 	st, vlt, authSvc, log, in := c.Store, c.Vault, c.Auth, c.Logger, c.Instance
 	limiter := c.Limiter
 	if limiter == nil {
-		limiter = securitylimit.NewMemory()
+		limiter = securitylimit.NewMemoryWithOptions(c.Clock, 10_000)
 	}
 	reg := builtin.Registry()
 	// Telegram alerts: everything below that has news reports it here; the admin links of the news carry the admin address

@@ -171,55 +171,73 @@ async function securityLimit(input) {
   const id = `${input.name}\0${input.key}`;
   const now = Date.now();
   const answer = (ok, retryAfterMs = 0, remaining = 0, first = false) => ({ ok, retryAfterMs, remaining, first });
+  const saved = securityLimits.get(id) || {};
   if (input.operation === "reset") {
-    securityLimits.delete(id);
+    delete saved.window;
+    if (saved.bucket) securityLimits.set(id, saved);
+    else securityLimits.delete(id);
     return answer(true);
   }
   if (input.operation === "take") {
-    let bucket = securityLimits.get(id);
+    let bucket = saved.bucket;
     if (!bucket) {
       bucket = { tokens: input.burst, last: now };
-      securityLimits.set(id, bucket);
     }
-    bucket.tokens = Math.min(input.burst, bucket.tokens + (now - bucket.last) / input.refillMs);
+    bucket.tokens = Math.min(input.burst, bucket.tokens + Math.max(0, now - bucket.last) / input.refillMs);
     bucket.last = now;
     if (bucket.tokens < input.cost) {
-      return answer(false, (input.cost - bucket.tokens) * input.refillMs);
+      saved.bucket = bucket;
+      securityLimits.set(id, saved);
+      return answer(false, Math.ceil((input.cost - bucket.tokens) * input.refillMs));
     }
     bucket.tokens -= input.cost;
+    saved.bucket = bucket;
+    securityLimits.set(id, saved);
     return answer(true);
-  }
-  let counter = securityLimits.get(id);
-  if (!counter) {
-    if (input.operation === "peek") return answer(true, 0, input.limit);
-    counter = { start: now, count: 0, logged: false };
-    securityLimits.set(id, counter);
-  }
-  if (now - counter.start >= input.windowMs) {
-    counter.start = now;
-    counter.count = 0;
-    counter.logged = false;
   }
   if (input.operation === "peek") {
-    if (counter.count >= input.limit) {
-      return answer(false, counter.start + input.windowMs - now, 0, !counter.logged);
+    const window = saved.window;
+    if (!window) return answer(true, 0, input.limit);
+    if (window.lockedUntil > now) return answer(false, window.lockedUntil - now);
+    if (now - window.start >= input.spanMs || (window.lockedUntil > 0 && now >= window.lockedUntil)) {
+      return answer(true, 0, input.limit);
     }
-    return answer(true, 0, input.limit - counter.count);
-  }
-  if (input.operation === "record") {
-    if (counter.count >= input.limit) {
-      const first = !counter.logged;
-      counter.logged = true;
-      return answer(false, counter.start + input.windowMs - now, 0, first);
+    if (window.count >= input.limit) {
+      return answer(false, window.start + input.spanMs - now, 0, !window.logged);
     }
-    counter.count++;
-    return answer(true, 0, input.limit - counter.count);
+    return answer(true, 0, input.limit - window.count);
   }
-  if (input.operation === "fail") {
-    counter.count++;
-    return answer(true);
+  if (input.operation !== "record") throw new Error(`unknown security limit operation: ${input.operation}`);
+
+  let window = saved.window;
+  if (window && window.lockedUntil > now) {
+    return answer(false, window.lockedUntil - now);
   }
-  throw new Error(`unknown security limit operation: ${input.operation}`);
+  if (!window || now - window.start >= input.spanMs || (window.lockedUntil > 0 && now >= window.lockedUntil)) {
+    window = { start: now, count: 0, logged: false, lockedUntil: 0, end: now + input.spanMs };
+  } else {
+    window = { ...window, end: window.start + input.spanMs };
+  }
+  if (input.lockoutMs > 0 && window.count + 1 >= input.limit) {
+    window.count++;
+    window.logged = true;
+    window.lockedUntil = now + input.lockoutMs;
+    window.end = Math.max(window.end, window.lockedUntil);
+    saved.window = window;
+    securityLimits.set(id, saved);
+    return answer(false, input.lockoutMs, 0, true);
+  }
+  if (window.count >= input.limit) {
+    const first = !window.logged;
+    window.logged = true;
+    saved.window = window;
+    securityLimits.set(id, saved);
+    return answer(false, window.start + input.spanMs - now, 0, first);
+  }
+  window.count++;
+  saved.window = window;
+  securityLimits.set(id, saved);
+  return answer(true, 0, input.limit - window.count);
 }
 
 async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.1") {
@@ -480,6 +498,7 @@ async function run() {
     const userToken = userSubURL.slice(userSubURL.lastIndexOf("/") + 1);
     const pagePassword = createdUser.message.pagePassword;
     assert.ok(userToken && pagePassword, "the admin API returns a link credential and page password");
+
     const awgDevice = await connectRPC(secondPanel, "DeviceService/CreateAwgDevice", {
       userId: createdUser.message.user.id, profileId: awgProfile.message.profile.id,
       platform: "linux", label: "bridge-device",
@@ -579,6 +598,38 @@ async function run() {
       body: "{}",
     });
     assert.equal(configPair.edge.status, 200, "the AWG device config endpoint succeeds");
+
+    // The subscription miss lockout lives in the shared limiter, not in an isolate: misses on one isolate lock the client
+    // network for a fresh one. Edge only: the VPS oracle sees every request from its loopback peer, so it cannot tell
+    // client networks apart. It runs after the cold fetches above so they still measure the first fetch of the user.
+    async function edgeOnly(label, panel, url, init) {
+      const { response, queries } = await countedRequest(label, () => bridgeRequestFor(panel, url, init));
+      assertQueryBudget(queries);
+      return response;
+    }
+    const missClientIP = "198.51.100.81";
+    const missUA = "Happ/4.10.2/ios";
+    const missPanel = await freshPanel();
+    let missResponse;
+    for (let i = 0; i < 20; i++) {
+      const missURL = `https://example.com/test-sub/unknown-${randomBytes(16).toString("hex")}`;
+      const miss = await edgeOnly(`subscription miss ${i + 1}/20`, missPanel, missURL, {
+        headers: { "CF-Connecting-IP": missClientIP, "User-Agent": missUA },
+      });
+      assert.equal(miss.status, 404, `unknown subscription token ${i + 1} receives the decoy`);
+      missResponse = miss.body;
+    }
+    const lockedValid = await edgeOnly("valid subscription from a locked miss network", await freshPanel(), userSubURL, {
+      headers: { "CF-Connecting-IP": missClientIP, "User-Agent": missUA },
+    });
+    assert.equal(lockedValid.status, 404, "the locked network receives the decoy for a valid token");
+    assert.deepEqual(Buffer.from(lockedValid.body), Buffer.from(missResponse), "the locked valid token matches the decoy response");
+
+    const otherClient = await edgeOnly("valid subscription from an unaffected client network", await freshPanel(), userSubURL, {
+      headers: { "CF-Connecting-IP": "198.51.100.82", "User-Agent": missUA },
+    });
+    assert.equal(otherClient.status, 200, "the unaffected client receives the valid subscription");
+    assert.notDeepEqual(Buffer.from(otherClient.body), Buffer.from(missResponse), "the unaffected client does not receive the decoy");
 
     // This passkey ceremony carries a WebAuthn SessionData challenge across the two wasm instances.
     const crossIsolateIP = "198.51.100.72";

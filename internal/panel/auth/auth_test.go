@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -21,6 +25,14 @@ func init() {
 
 func newTestService(t *testing.T) (*Service, *store.Store, *time.Time) {
 	t.Helper()
+	clock := time.Now()
+	clockPtr := &clock
+	limiter := authTestLimiter{memory: securitylimit.NewMemoryWithOptions(func() time.Time { return *clockPtr }, 10_000)}
+	return newTestServiceWithLimiter(t, limiter, clockPtr)
+}
+
+func newTestServiceWithLimiter(t *testing.T, limiter securitylimit.Limiter, clock *time.Time) (*Service, *store.Store, *time.Time) {
+	t.Helper()
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -30,14 +42,55 @@ func newTestService(t *testing.T) (*Service, *store.Store, *time.Time) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(st, Config{RPID: "localhost", Origins: []string{"http://localhost:8081"}, Vault: v}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s, err := New(st, Config{RPID: "localhost", Origins: []string{"http://localhost:8081"}, Vault: v, Limiter: limiter}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.authBurst, s.authRefill = 1000, time.Millisecond // handler tests call from one unknown source
+	s.now = func() time.Time { return *clock }
+	return s, st, clock
+}
+
+type authTestLimiter struct {
+	memory *securitylimit.Memory
+}
+
+func (l authTestLimiter) Take(ctx context.Context, b securitylimit.Bucket, key string, cost float64) (securitylimit.Decision, error) {
+	if b.Name == "auth" {
+		return securitylimit.Decision{Allowed: true}, nil
+	}
+	return l.memory.Take(ctx, b, key, cost)
+}
+
+func (l authTestLimiter) Peek(ctx context.Context, w securitylimit.Window, key string) (securitylimit.Decision, error) {
+	return l.memory.Peek(ctx, w, key)
+}
+
+func (l authTestLimiter) Record(ctx context.Context, w securitylimit.Window, key string) (securitylimit.Decision, error) {
+	return l.memory.Record(ctx, w, key)
+}
+
+func (l authTestLimiter) Reset(ctx context.Context, name, key string) error {
+	return l.memory.Reset(ctx, name, key)
+}
+
+func TestAuthBurstRateLimit(t *testing.T) {
 	clock := time.Now()
-	s.now = func() time.Time { return clock }
-	return s, st, &clock
+	clockPtr := &clock
+	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return *clockPtr }, 10_000)
+	s, _, limiterClock := newTestServiceWithLimiter(t, limiter, clockPtr)
+	req := connect.NewRequest(&adminv1.BeginSetupRequest{})
+	for i := 0; i < 10; i++ {
+		if err := s.rateLimited(context.Background(), req); err != nil {
+			t.Fatalf("attempt %d: %v", i+1, err)
+		}
+	}
+	if err := s.rateLimited(context.Background(), req); codeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("11th rapid attempt: %v", err)
+	}
+	*limiterClock = limiterClock.Add(3 * time.Second)
+	if err := s.rateLimited(context.Background(), req); err != nil {
+		t.Fatalf("attempt after one refill: %v", err)
+	}
 }
 
 func makeAdmin(t *testing.T, s *Service, st *store.Store) store.Admin {

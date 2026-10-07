@@ -220,15 +220,16 @@ func TestAcceptsGzip(t *testing.T) {
 
 // A burst of requests cannot get more than the budget through.
 func TestWriteAdmitConcurrent(t *testing.T) {
-	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory()}).(*handler)
 	now := time.Unix(1_800_000_000, 0)
+	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return now }, 10_000)
+	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: limiter, Now: func() time.Time { return now }}).(*handler)
 	var admitted atomic.Int32
 	var wg sync.WaitGroup
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if h.writeAdmit(context.Background(), tokA, now) == 0 {
+			if h.writeAdmit(context.Background(), tokA) == 0 {
 				admitted.Add(1)
 			}
 		}()
@@ -241,22 +242,25 @@ func TestWriteAdmitConcurrent(t *testing.T) {
 
 // writeAdmit: the budget is per hour and a window restarts after an hour; a negative budget is no limit.
 func TestWriteAdmit(t *testing.T) {
-	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(), MaxWritesPerHour: 3}).(*handler)
 	now := time.Unix(1_800_000_000, 0)
+	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return now }, 10_000)
+	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: limiter, MaxWritesPerHour: 3, Now: func() time.Time { return now }}).(*handler)
 	for i := 0; i < 3; i++ {
-		if retry := h.writeAdmit(context.Background(), tokA, now); retry != 0 {
+		if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
 			t.Fatalf("write %d refused", i)
 		}
 	}
-	if retry := h.writeWait(context.Background(), tokA, now.Add(10*time.Minute)); retry <= 0 || retry > 51*time.Minute {
+	now = now.Add(10 * time.Minute)
+	if retry := h.writeWait(context.Background(), tokA); retry <= 0 || retry > 51*time.Minute {
 		t.Errorf("retry = %v", retry)
 	}
-	if retry := h.writeAdmit(context.Background(), tokA, now.Add(61*time.Minute)); retry != 0 {
+	now = now.Add(51 * time.Minute)
+	if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
 		t.Error("a new hour must restart the budget")
 	}
 	free := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(), MaxWritesPerHour: -1}).(*handler)
 	for i := 0; i < 1000; i++ {
-		if retry := free.writeAdmit(context.Background(), tokA, now); retry != 0 {
+		if retry := free.writeAdmit(context.Background(), tokA); retry != 0 {
 			t.Fatal("unlimited refused")
 		}
 	}

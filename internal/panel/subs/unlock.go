@@ -13,6 +13,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
@@ -68,14 +69,14 @@ func lockedAnswer(w http.ResponseWriter, retry time.Duration) {
 
 func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, client string, now time.Time) {
 	ctx := r.Context()
+	window := securitylimit.Window{Name: "page-password", Limit: h.cfg.UnlockTries, Span: h.cfg.UnlockWindow}
 	retryOnFailure := h.cfg.UnlockWindow
 	if retryOnFailure <= 0 {
 		retryOnFailure = time.Minute
 	}
 	if h.cfg.UnlockTries > 0 { // a counter that already ran out answers before any database work
 		for _, k := range tryKeys(token, client) {
-			decision, err := h.cfg.Limiter.CheckWindow(ctx, "page-password", k.key, now,
-				h.cfg.UnlockTries, h.cfg.UnlockWindow, h.cfg.MaxKeys, true)
+			decision, err := h.cfg.Limiter.Peek(ctx, window, k.key)
 			if err != nil {
 				lockedAnswer(w, retryOnFailure)
 				return
@@ -89,7 +90,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 	v, _, err := h.identify(ctx, token, false)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
-		h.miss(ctx, client, now)
+		h.miss(ctx, client)
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -108,8 +109,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 	left := h.cfg.UnlockTries
 	if left > 0 {
 		for _, k := range tryKeys(token, client) {
-			decision, err := h.cfg.Limiter.RecordWindow(ctx, "page-password", k.key, now,
-				h.cfg.UnlockTries, h.cfg.UnlockWindow, h.cfg.MaxKeys)
+			decision, err := h.cfg.Limiter.Record(ctx, window, k.key)
 			if err != nil {
 				lockedAnswer(w, retryOnFailure)
 				return

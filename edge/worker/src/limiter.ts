@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
-import { type Bucket, type LimitReply, type Window, failWindow, parseRequest, peekWindow, recordWindow, takeBucket } from "./limitmath";
+import { type Bucket, type LimitReply, type WindowState, parseRequest, peekWindow, recordWindow, takeBucket } from "./limitmath";
 
 // One Durable Object per (name, key) pair (see routeLimit in shell.ts): it holds the token bucket and/or the failure
 // window of that one pair, which is all internal/panel/securitylimit.Memory keeps per key. The Worker isolates share no
@@ -15,10 +15,10 @@ import { type Bucket, type LimitReply, type Window, failWindow, parseRequest, pe
 const MAX_ALARM_MS = 30 * 24 * 3600 * 1000;
 
 export class Limiter extends DurableObject<Env> {
-  /** The only RPC method: the five operations of cmd/mistgate-edge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
+/** The only RPC method: the four operations of cmd/mistgate-edge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
   async limit(raw: unknown): Promise<LimitReply> {
     const req = parseRequest(raw);
-    const now = Date.now(); // the object's clock; the Go side's `now` is deliberately not sent
+    const now = Date.now(); // this object's clock is authoritative
     const kv = this.ctx.storage.kv;
     let reply: LimitReply;
     switch (req.operation) {
@@ -29,18 +29,14 @@ export class Limiter extends DurableObject<Env> {
         break;
       }
       case "peek":
-        // Reads only; nothing to re-arm. `touch` (LRU order in Memory) means nothing without a map of keys.
-        return peekWindow(kv.get<Window>("w"), now, req.limit, req.windowMs);
+        // Reads only; nothing to re-arm. A Durable Object owns only one (name, key) pair.
+        return peekWindow(kv.get<WindowState>("w"), now, req.limit, req.spanMs);
       case "record": {
-        const r = recordWindow(kv.get<Window>("w"), now, req.limit, req.windowMs);
+        const r = recordWindow(kv.get<WindowState>("w"), now, req.limit, req.spanMs, req.lockoutMs);
         kv.put("w", r.state);
         reply = r.reply;
         break;
       }
-      case "fail":
-        kv.put("w", failWindow(kv.get<Window>("w"), now, req.windowMs));
-        reply = { ok: true, retryAfterMs: 0, remaining: 0, first: false };
-        break;
       case "reset": // Memory.Reset drops the failure window only; a token bucket of the same key stays
         kv.delete("w");
         reply = { ok: true, retryAfterMs: 0, remaining: 0, first: false };
@@ -55,13 +51,13 @@ export class Limiter extends DurableObject<Env> {
     const now = Date.now();
     const kv = this.ctx.storage.kv;
     if ((kv.get<Bucket>("b")?.fullAt ?? Infinity) <= now) kv.delete("b");
-    if ((kv.get<Window>("w")?.end ?? Infinity) <= now) kv.delete("w");
+    if ((kv.get<WindowState>("w")?.end ?? Infinity) <= now) kv.delete("w");
     await this.arm(now);
   }
 
   private async arm(now: number): Promise<void> {
     const kv = this.ctx.storage.kv;
-    const at = Math.min(kv.get<Bucket>("b")?.fullAt ?? Infinity, kv.get<Window>("w")?.end ?? Infinity);
+    const at = Math.min(kv.get<Bucket>("b")?.fullAt ?? Infinity, kv.get<WindowState>("w")?.end ?? Infinity);
     if (at === Infinity) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(Math.min(at, now + MAX_ALARM_MS));
   }

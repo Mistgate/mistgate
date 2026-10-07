@@ -19,6 +19,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -337,7 +338,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 			jsonError(w, http.StatusForbidden, off, "")
 			return access.SubView{}, nil, false
 		}
-		if retry := h.writeWait(ctx, token, now); retry > 0 {
+		if retry := h.writeWait(ctx, token); retry > 0 {
 			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
 				return access.SubView{}, nil, false
 			}
@@ -348,7 +349,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	v, st, err := h.identify(ctx, token, false)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
-		h.miss(ctx, client, now)
+		h.miss(ctx, client)
 		h.decoy.ServeHTTP(w, r)
 		return access.SubView{}, nil, false
 	}
@@ -381,7 +382,7 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 	}
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
-		h.miss(ctx, client, now)
+		h.miss(ctx, client)
 		h.decoy.ServeHTTP(w, r)
 		return false
 	}
@@ -400,19 +401,18 @@ func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token s
 		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 		return false
 	}
-	if retry := h.writeAdmit(ctx, token, now); retry > 0 {
+	if retry := h.writeAdmit(ctx, token); retry > 0 {
 		tooManyWrites(w, retry)
 		return false
 	}
 	return true
 }
 
-func (h *handler) writeWait(ctx context.Context, token string, now time.Time) time.Duration {
+func (h *handler) writeWait(ctx context.Context, token string) time.Duration {
 	if h.cfg.MaxWritesPerHour < 0 {
 		return 0
 	}
-	d, err := h.cfg.Limiter.CheckWindow(ctx, "subscription-writes", "t:"+token, now,
-		h.cfg.MaxWritesPerHour, time.Hour, h.cfg.MaxKeys, true)
+	d, err := h.cfg.Limiter.Peek(ctx, h.writeWindow(), "t:"+token)
 	if err != nil {
 		return time.Hour
 	}
@@ -422,12 +422,11 @@ func (h *handler) writeWait(ctx context.Context, token string, now time.Time) ti
 	return 0
 }
 
-func (h *handler) writeAdmit(ctx context.Context, token string, now time.Time) time.Duration {
+func (h *handler) writeAdmit(ctx context.Context, token string) time.Duration {
 	if h.cfg.MaxWritesPerHour < 0 {
 		return 0
 	}
-	d, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-writes", "t:"+token, now,
-		h.cfg.MaxWritesPerHour, time.Hour, h.cfg.MaxKeys)
+	d, err := h.cfg.Limiter.Record(ctx, h.writeWindow(), "t:"+token)
 	if err != nil {
 		return time.Hour
 	}
@@ -435,6 +434,10 @@ func (h *handler) writeAdmit(ctx context.Context, token string, now time.Time) t
 		return d.RetryAfter
 	}
 	return 0
+}
+
+func (h *handler) writeWindow() securitylimit.Window {
+	return securitylimit.Window{Name: "subscription-writes", Limit: h.cfg.MaxWritesPerHour, Span: time.Hour}
 }
 
 func tooManyWrites(w http.ResponseWriter, retry time.Duration) {

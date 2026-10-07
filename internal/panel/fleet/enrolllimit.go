@@ -2,12 +2,16 @@ package fleet
 
 import (
 	"net/netip"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
-// maxLimiterKeys bounds the memory of the Enroll limiter: one entry per recent failing source.
+// maxLimiterKeys is the per-name cap used by the enrollment limiter tests.
 const maxLimiterKeys = 8192
+
+var enrollmentWindow = securitylimit.Window{Name: "enrollment-failure", Limit: 10, Span: time.Minute}
 
 // limiterKey is the source an Enroll attempt is counted against: the IPv4 address, or the IPv6 /64 (one
 // subscriber is handed a whole /64, so a per-address limit is free to evade). The client address is the one

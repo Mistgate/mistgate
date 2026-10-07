@@ -20,7 +20,7 @@ try {
     $wasmExec = Join-Path $goRoot "lib/wasm/wasm_exec_node.js"
     $trimEnv = Join-Path $repoRoot "edge/d1driver/testdata/trim-env.cjs"
     $fakeD1 = Join-Path $repoRoot "edge/d1driver/testdata/fake-d1.cjs"
-    $exec = "node --require $trimEnv --require $fakeD1 $wasmExec"
+    $exec = "node --no-warnings --require $trimEnv --require $fakeD1 $wasmExec"
 
     $env:GOOS = "js"
     $env:GOARCH = "wasm"

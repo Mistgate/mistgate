@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"net"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -54,7 +53,7 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 	f := s.f
 	now := f.now().UTC()
 	peer := limiterKey(auth.ClientIPFrom(ctx), peerHost(req))
-	limit, limitErr := f.enrollLim.CheckWindow(ctx, "enrollment-failure", peer, now, 10, time.Minute, maxLimiterKeys, false)
+	limit, limitErr := f.enrollLim.Peek(ctx, enrollmentWindow, peer)
 	if limitErr != nil || !limit.Allowed {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too many failed attempts, try later"))
 	}
@@ -63,7 +62,8 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("api_version unsupported"))
 	}
 	deny := func() error {
-		if err := f.enrollLim.FailWindow(ctx, "enrollment-failure", peer, now, time.Minute, maxLimiterKeys); err != nil {
+		decision, err := f.enrollLim.Record(ctx, enrollmentWindow, peer)
+		if err != nil || !decision.Allowed {
 			return connect.NewError(connect.CodeResourceExhausted, errors.New("too many failed attempts, try later"))
 		}
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("enrollment token unknown, expired or used"))

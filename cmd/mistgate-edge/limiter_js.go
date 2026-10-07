@@ -24,9 +24,8 @@ type edgeLimiter struct {
 }
 
 // The init limit callback receives {operation, name, key} plus operation fields:
-// take adds burst/refillMs/cost; peek and record add limit/windowMs/maxKeys (peek also
-// adds touch); fail adds windowMs/maxKeys. Every call resolves to
-// {ok, retryAfterMs, remaining, first}.
+// take adds burst/refillMs/cost; peek and record add limit/spanMs/lockoutMs.
+// Every call resolves to {ok, retryAfterMs, remaining, first}.
 func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
 	if log == nil {
 		log = slog.Default()
@@ -34,27 +33,20 @@ func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
 	return &edgeLimiter{callback: callback, log: log}
 }
 
-func (l *edgeLimiter) Take(ctx context.Context, name, key string, now time.Time, burst float64, refill time.Duration, cost float64) (securitylimit.Decision, error) {
-	request := l.request("take", name, key)
-	request.Set("burst", burst)
-	request.Set("refillMs", float64(refill)/float64(time.Millisecond))
+func (l *edgeLimiter) Take(ctx context.Context, spec securitylimit.Bucket, key string, cost float64) (securitylimit.Decision, error) {
+	request := l.request("take", spec.Name, key)
+	request.Set("burst", spec.Burst)
+	request.Set("refillMs", float64(spec.Refill)/float64(time.Millisecond))
 	request.Set("cost", cost)
 	return l.call(ctx, request)
 }
 
-func (l *edgeLimiter) CheckWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int, touch bool) (securitylimit.Decision, error) {
-	request := l.windowRequest("peek", name, key, limit, window, maxKeys)
-	request.Set("touch", touch)
-	return l.call(ctx, request)
+func (l *edgeLimiter) Peek(ctx context.Context, spec securitylimit.Window, key string) (securitylimit.Decision, error) {
+	return l.call(ctx, l.windowRequest("peek", spec, key))
 }
 
-func (l *edgeLimiter) RecordWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int) (securitylimit.Decision, error) {
-	return l.call(ctx, l.windowRequest("record", name, key, limit, window, maxKeys))
-}
-
-func (l *edgeLimiter) FailWindow(ctx context.Context, name, key string, now time.Time, window time.Duration, maxKeys int) error {
-	_, err := l.call(ctx, l.windowRequest("fail", name, key, 0, window, maxKeys))
-	return err
+func (l *edgeLimiter) Record(ctx context.Context, spec securitylimit.Window, key string) (securitylimit.Decision, error) {
+	return l.call(ctx, l.windowRequest("record", spec, key))
 }
 
 func (l *edgeLimiter) Reset(ctx context.Context, name, key string) error {
@@ -70,13 +62,11 @@ func (l *edgeLimiter) request(operation, name, key string) js.Value {
 	return request
 }
 
-func (l *edgeLimiter) windowRequest(operation, name, key string, limit int, window time.Duration, maxKeys int) js.Value {
-	request := l.request(operation, name, key)
-	if limit > 0 {
-		request.Set("limit", limit)
-	}
-	request.Set("windowMs", float64(window)/float64(time.Millisecond))
-	request.Set("maxKeys", maxKeys)
+func (l *edgeLimiter) windowRequest(operation string, spec securitylimit.Window, key string) js.Value {
+	request := l.request(operation, spec.Name, key)
+	request.Set("limit", spec.Limit)
+	request.Set("spanMs", float64(spec.Span)/float64(time.Millisecond))
+	request.Set("lockoutMs", float64(spec.Lockout)/float64(time.Millisecond))
 	return request
 }
 

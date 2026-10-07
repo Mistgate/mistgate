@@ -1,20 +1,9 @@
-// The pure math of the Limiter Durable Object: one (name, key) pair, no storage, no clock of its own. It mirrors
-// internal/panel/securitylimit.Memory (the VPS implementation, which is the contract) for a single key, so it runs
-// under plain Node in the tests.
-//
-// What differs from Memory, on purpose:
-//   - `now` is the Durable Object's own Date.now(); the Go side's `now` is not sent (a Worker isolate's clock and the
-//     object's can differ, and the object is the one place every isolate agrees on).
-//   - `maxKeys` is accepted and ignored: Memory bounds a map of keys, here every (name, key) is its own object, so
-//     there is no map to bound; an idle object's state is deleted by its alarm instead.
-//   - retryAfterMs is rounded up to whole milliseconds, so a client told to wait that long is never early.
+// The pure math of the Limiter Durable Object: one (name, key) pair, no storage, no clock of its own.
 
 export type LimitRequest =
-  | { operation: "take"; burst: number; refillMs: number; cost: number }
-  | { operation: "peek"; limit: number; windowMs: number }
-  | { operation: "record"; limit: number; windowMs: number }
-  | { operation: "fail"; windowMs: number }
-  | { operation: "reset" };
+  | { operation: "take"; name: string; key: string; burst: number; refillMs: number; cost: number }
+  | { operation: "peek" | "record"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number }
+  | { operation: "reset"; name: string; key: string };
 
 /** What every operation resolves to; Go (cmd/mistgate-edge/limiter_js.go) checks the four types. */
 export interface LimitReply {
@@ -31,11 +20,12 @@ export interface Bucket {
   fullAt: number;
 }
 
-/** A failure window. `end` is start + the window length: from then on the state is the same as none. */
-export interface Window {
+/** A counted window, including the optional lockout deadline. */
+export interface WindowState {
   start: number;
   n: number;
   logged: boolean;
+  lockedUntil: number;
   end: number;
 }
 
@@ -46,35 +36,45 @@ function positive(value: unknown, what: string): number {
   return value;
 }
 
-function text(value: unknown, what: string): void {
+function nonnegative(value: unknown, what: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error(`limiter: invalid ${what}`);
+  return value;
+}
+
+function text(value: unknown, what: string): string {
   if (typeof value !== "string") throw new Error(`limiter: invalid ${what}`);
+  return value;
 }
 
 /** Validates what the Go side sent. Anything else throws, which Go turns into a refused request (fail closed). */
 export function parseRequest(raw: unknown): LimitRequest {
   if (typeof raw !== "object" || raw === null) throw new Error("limiter: request is not an object");
   const r = raw as Record<string, unknown>;
-  text(r.name, "name");
-  text(r.key, "key");
+  const name = text(r.name, "name");
+  const key = text(r.key, "key");
   switch (r.operation) {
     case "take":
-      return { operation: "take", burst: positive(r.burst, "burst"), refillMs: positive(r.refillMs, "refillMs"), cost: positive(r.cost, "cost") };
+      return {
+        operation: "take", name, key,
+        burst: positive(r.burst, "burst"), refillMs: positive(r.refillMs, "refillMs"), cost: positive(r.cost, "cost"),
+      };
     case "peek":
     case "record": {
       const limit = positive(r.limit, "limit");
       if (!Number.isInteger(limit)) throw new Error("limiter: invalid limit");
-      return { operation: r.operation, limit, windowMs: positive(r.windowMs, "windowMs") };
+      return {
+        operation: r.operation, name, key, limit,
+        spanMs: positive(r.spanMs, "spanMs"), lockoutMs: nonnegative(r.lockoutMs, "lockoutMs"),
+      };
     }
-    case "fail":
-      return { operation: "fail", windowMs: positive(r.windowMs, "windowMs") };
     case "reset":
-      return { operation: "reset" };
+      return { operation: "reset", name, key };
     default:
       throw new Error("limiter: unknown operation");
   }
 }
 
-/** Memory.Take: refill by the time passed (never above the burst), then spend `cost` or say how long until it fits. */
+/** Refill by the time passed (never above the burst), then spend `cost` or say how long until it fits. */
 export function takeBucket(prev: Bucket | undefined, now: number, burst: number, refillMs: number, cost: number): { state: Bucket; reply: LimitReply } {
   const tokens = Math.min(burst, (prev?.tokens ?? burst) + Math.max(0, now - (prev?.last ?? now)) / refillMs);
   if (tokens < cost) {
@@ -91,34 +91,48 @@ function bucketFullAt(tokens: number, now: number, burst: number, refillMs: numb
   return now + Math.max(0, Math.ceil((burst - tokens) * refillMs));
 }
 
-/** Memory.CheckWindow: reads only. No window, or one that has ended, is a clean slate. `first` is not consumed here. */
-export function peekWindow(w: Window | undefined, now: number, limit: number, windowMs: number): LimitReply {
-  if (!w || now - w.start >= windowMs) return allowed(limit);
-  if (w.n >= limit) return { ok: false, retryAfterMs: w.start + windowMs - now, remaining: 0, first: !w.logged };
+/** Reads only. An active lockout takes precedence over the counting window. */
+export function peekWindow(w: WindowState | undefined, now: number, limit: number, spanMs: number): LimitReply {
+  if (!w) return allowed(limit);
+  if (w.lockedUntil > now) return { ok: false, retryAfterMs: w.lockedUntil - now, remaining: 0, first: false };
+  if (now - w.start >= spanMs || (w.lockedUntil > 0 && now >= w.lockedUntil)) return allowed(limit);
+  if (w.n >= limit) return { ok: false, retryAfterMs: w.start + spanMs - now, remaining: 0, first: !w.logged };
   return allowed(limit - w.n);
 }
 
 /** The window as it stands for a write at `now`: a missing or ended one starts again at zero. */
-function current(w: Window | undefined, now: number, windowMs: number): Window {
-  if (!w || now - w.start >= windowMs) return { start: now, n: 0, logged: false, end: now + windowMs };
-  return { ...w, end: w.start + windowMs };
+function current(w: WindowState | undefined, now: number, spanMs: number): WindowState {
+  if (w && w.lockedUntil > now) return { ...w, end: Math.max(w.end, w.lockedUntil) };
+  if (!w || now - w.start >= spanMs || (w.lockedUntil > 0 && now >= w.lockedUntil)) {
+    return { start: now, n: 0, logged: false, lockedUntil: 0, end: now + spanMs };
+  }
+  return { ...w, end: w.start + spanMs };
 }
 
-/** Memory.RecordWindow: count one attempt; at the limit, refuse (and report `first` once per window). */
-export function recordWindow(prev: Window | undefined, now: number, limit: number, windowMs: number): { state: Window; reply: LimitReply } {
-  const w = current(prev, now, windowMs);
+/** Counts one attempt; with a lockout, reaching the limit refuses and locks in this operation. */
+export function recordWindow(
+  prev: WindowState | undefined,
+  now: number,
+  limit: number,
+  spanMs: number,
+  lockoutMs: number,
+): { state: WindowState; reply: LimitReply } {
+  const w = current(prev, now, spanMs);
+  if (w.lockedUntil > now) {
+    return { state: w, reply: { ok: false, retryAfterMs: w.lockedUntil - now, remaining: 0, first: false } };
+  }
+  if (lockoutMs > 0 && w.n + 1 >= limit) {
+    w.n++;
+    w.logged = true;
+    w.lockedUntil = now + lockoutMs;
+    w.end = Math.max(w.end, w.lockedUntil);
+    return { state: w, reply: { ok: false, retryAfterMs: lockoutMs, remaining: 0, first: true } };
+  }
   if (w.n >= limit) {
     const first = !w.logged;
     w.logged = true;
-    return { state: w, reply: { ok: false, retryAfterMs: w.start + windowMs - now, remaining: 0, first } };
+    return { state: w, reply: { ok: false, retryAfterMs: w.start + spanMs - now, remaining: 0, first } };
   }
   w.n++;
   return { state: w, reply: allowed(limit - w.n) };
-}
-
-/** Memory.FailWindow: count one failure with no threshold check (paired with a peek). */
-export function failWindow(prev: Window | undefined, now: number, windowMs: number): Window {
-  const w = current(prev, now, windowMs);
-  w.n++;
-  return w;
 }

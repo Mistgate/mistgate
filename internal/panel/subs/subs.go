@@ -177,7 +177,7 @@ func (c *Config) defaults() {
 		c.BrandTTL = 5 * time.Second
 	}
 	if c.Limiter == nil {
-		c.Limiter = securitylimit.NewMemory()
+		c.Limiter = securitylimit.NewMemoryWithOptions(c.Now, c.MaxKeys)
 	}
 	if c.Log == nil {
 		c.Log = slog.Default()
@@ -269,14 +269,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := ""
 	if ip.IsValid() {
 		client = auth.SourceKey(ip)
-		if h.blocked(r.Context(), client, now) {
+		if h.blocked(r.Context(), client) {
 			h.decoy.ServeHTTP(w, r) // even for a valid token: guessing gets nothing out of this
 			return
 		}
 	}
 	token, sub, ok := routeOf(r, h.prefix)
 	if !ok {
-		h.miss(r.Context(), client, now)
+		h.miss(r.Context(), client)
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -324,7 +324,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	v, err := h.fetch(r.Context(), token, format, app, !app)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
-		h.miss(r.Context(), client, now)
+		h.miss(r.Context(), client)
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -531,32 +531,28 @@ func tooMany(w http.ResponseWriter, retry time.Duration) {
 }
 
 // blocked reports whether the client network is in its BlockFor period.
-func (h *handler) blocked(ctx context.Context, client string, now time.Time) bool {
-	if client == "" || h.cfg.MissLimit < 0 || h.cfg.BlockFor <= 0 {
+func (h *handler) blocked(ctx context.Context, client string) bool {
+	if client == "" || h.cfg.MissLimit < 0 || h.cfg.MissWindow <= 0 || h.cfg.BlockFor <= 0 {
 		return false
 	}
-	d, err := h.cfg.Limiter.CheckWindow(ctx, "subscription-miss-block", "c:"+client, now, 1, h.cfg.BlockFor, h.cfg.MaxKeys, true)
+	d, err := h.cfg.Limiter.Peek(ctx, h.missWindow(), "c:"+client)
 	return err != nil || !d.Allowed
 }
 
 // miss counts one unknown token (or a request under the prefix that is no token at all) against the client.
-func (h *handler) miss(ctx context.Context, client string, now time.Time) {
+func (h *handler) miss(ctx context.Context, client string) {
 	if client == "" || h.cfg.MissLimit < 0 || h.cfg.MissWindow <= 0 || h.cfg.BlockFor <= 0 {
 		return
 	}
-	key := "c:" + client
-	if h.cfg.MissLimit > 1 {
-		d, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-miss", key, now, h.cfg.MissLimit-1, h.cfg.MissWindow, h.cfg.MaxKeys)
-		if err != nil || d.Allowed {
-			return
-		}
-		if err := h.cfg.Limiter.Reset(ctx, "subscription-miss", key); err != nil {
-			return
-		}
-	}
-	_, err := h.cfg.Limiter.RecordWindow(ctx, "subscription-miss-block", key, now, 1, h.cfg.BlockFor, h.cfg.MaxKeys)
+	_, err := h.cfg.Limiter.Record(ctx, h.missWindow(), "c:"+client)
 	if err != nil && h.cfg.Log != nil {
 		h.cfg.Log.Warn("subscription miss limit unavailable")
+	}
+}
+
+func (h *handler) missWindow() securitylimit.Window {
+	return securitylimit.Window{
+		Name: "subscription-miss", Limit: h.cfg.MissLimit, Span: h.cfg.MissWindow, Lockout: h.cfg.BlockFor,
 	}
 }
 

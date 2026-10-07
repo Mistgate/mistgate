@@ -21,23 +21,26 @@ describe("Limiter Durable Object", () => {
 
   it("counts failures in a window: the lockout is reported once, peek agrees, reset clears it", async () => {
     const s = stubFor("page-password", "t:do-window");
-    const base = { name: "page-password", key: "t:do-window", limit: 3, windowMs: 600_000, maxKeys: 4096 };
-    expect(await s.limit({ ...base, operation: "peek", touch: true })).toEqual({ ok: true, retryAfterMs: 0, remaining: 3, first: false });
+    const base = { name: "page-password", key: "t:do-window", limit: 3, spanMs: 600_000, lockoutMs: 0 };
+    expect(await s.limit({ ...base, operation: "peek" })).toEqual({ ok: true, retryAfterMs: 0, remaining: 3, first: false });
     for (let i = 0; i < 3; i++) expect(await s.limit({ ...base, operation: "record" })).toMatchObject({ ok: true, remaining: 2 - i });
     const locked = await s.limit({ ...base, operation: "record" });
     expect(locked).toMatchObject({ ok: false, remaining: 0, first: true });
     expect(locked.retryAfterMs).toBeGreaterThan(599_000);
     expect(await s.limit({ ...base, operation: "record" })).toMatchObject({ ok: false, first: false });
-    expect(await s.limit({ ...base, operation: "peek", touch: false })).toMatchObject({ ok: false, first: false });
+    expect(await s.limit({ ...base, operation: "peek" })).toMatchObject({ ok: false, first: false });
     expect(await s.limit({ ...base, operation: "reset" })).toMatchObject({ ok: true });
-    expect(await s.limit({ ...base, operation: "peek", touch: false })).toMatchObject({ ok: true, remaining: 3 });
+    expect(await s.limit({ ...base, operation: "peek" })).toMatchObject({ ok: true, remaining: 3 });
   });
 
-  it("counts a bare failure with FailWindow semantics", async () => {
-    const s = stubFor("enrollment-failure", "do-fail");
-    const base = { name: "enrollment-failure", key: "do-fail", windowMs: 600_000, maxKeys: 4096 };
-    for (let i = 0; i < 10; i++) await s.limit({ ...base, operation: "fail" });
-    expect(await s.limit({ ...base, operation: "peek", limit: 10, touch: false })).toMatchObject({ ok: false, first: true });
+  it("records the threshold and starts its lockout in one RPC", async () => {
+    const s = stubFor("subscription-miss", "client-do-lockout");
+    const base = { name: "subscription-miss", key: "client-do-lockout", limit: 3, spanMs: 60_000, lockoutMs: 900_000 };
+    expect(await s.limit({ ...base, operation: "record" })).toMatchObject({ ok: true, remaining: 2 });
+    expect(await s.limit({ ...base, operation: "record" })).toMatchObject({ ok: true, remaining: 1 });
+    const first = await s.limit({ ...base, operation: "record" });
+    expect(first).toMatchObject({ ok: false, retryAfterMs: 900_000, first: true });
+    expect(await s.limit({ ...base, operation: "peek" })).toMatchObject({ ok: false, first: false });
   });
 
   it("rejects a malformed request (the panel then refuses the guarded request)", async () => {
@@ -49,7 +52,7 @@ describe("Limiter Durable Object", () => {
 
   it("deletes its state and alarm once a window has ended", async () => {
     const s = stubFor("page-password", "t:do-alarm");
-    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, windowMs: 300 });
+    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, spanMs: 300, lockoutMs: 0 });
     expect(await runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null])).toEqual([true, true]);
     // The alarm fires by itself once the window is over; nothing is left behind (poll: its timing is the runtime's).
     const left = () => runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null]);

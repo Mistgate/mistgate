@@ -18,23 +18,41 @@ type Decision struct {
 	First      bool
 }
 
+// Bucket describes a token bucket.
+type Bucket struct {
+	Name   string
+	Burst  float64
+	Refill time.Duration
+}
+
+// Window describes a counted window. A positive Lockout locks the key as soon as
+// a Record reaches Limit.
+type Window struct {
+	Name    string
+	Limit   int
+	Span    time.Duration
+	Lockout time.Duration
+}
+
 // Limiter covers token buckets and bounded failure windows used by security checks.
 type Limiter interface {
-	Take(ctx context.Context, name, key string, now time.Time, burst float64, refill time.Duration, cost float64) (Decision, error)
-	CheckWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int, touch bool) (Decision, error)
-	RecordWindow(ctx context.Context, name, key string, now time.Time, limit int, window time.Duration, maxKeys int) (Decision, error)
-	FailWindow(ctx context.Context, name, key string, now time.Time, window time.Duration, maxKeys int) error
+	Take(ctx context.Context, b Bucket, key string, cost float64) (Decision, error)
+	Peek(ctx context.Context, w Window, key string) (Decision, error)
+	Record(ctx context.Context, w Window, key string) (Decision, error)
 	Reset(ctx context.Context, name, key string) error
 }
 
+const defaultMaxKeysPerName = 8192
+
 // Memory is the VPS implementation. Names isolate each limiter's key space.
 type Memory struct {
-	mu           sync.Mutex
-	buckets      map[limiterKey]*bucket
-	bucketCounts map[string]int
-	windows      map[limiterKey]*list.Element
-	order        *list.List
-	windowCounts map[string]int
+	mu                sync.Mutex
+	now               func() time.Time
+	maxKeysPerName    int
+	buckets           map[limiterKey]*bucket
+	bucketCounts      map[string]int
+	windows           map[limiterKey]*list.Element
+	windowOrderByName map[string]*list.List
 }
 
 type limiterKey struct {
@@ -48,176 +66,176 @@ type bucket struct {
 	full   time.Duration
 }
 
-type window struct {
-	key    limiterKey
-	start  time.Time
-	n      int
-	logged bool
+type windowState struct {
+	key         limiterKey
+	start       time.Time
+	n           int
+	logged      bool
+	lockedUntil time.Time
 }
 
-// NewMemory returns a fresh in-memory limiter backend.
+// NewMemory returns a fresh in-memory limiter backend with production defaults.
+// NewMemoryWithOptions lets callers supply a clock and per-name window cap.
 func NewMemory() *Memory {
+	return NewMemoryWithOptions(time.Now, defaultMaxKeysPerName)
+}
+
+// NewMemoryWithOptions returns an in-memory limiter with an injected clock and a
+// per-name cap for remembered windows. A cap below one is treated as one.
+func NewMemoryWithOptions(now func() time.Time, maxKeysPerName int) *Memory {
+	if now == nil {
+		now = time.Now
+	}
+	if maxKeysPerName < 1 {
+		maxKeysPerName = 1
+	}
 	return &Memory{
-		buckets:      map[limiterKey]*bucket{},
-		bucketCounts: map[string]int{},
-		windows:      map[limiterKey]*list.Element{},
-		order:        list.New(),
-		windowCounts: map[string]int{},
+		now:               now,
+		maxKeysPerName:    maxKeysPerName,
+		buckets:           map[limiterKey]*bucket{},
+		bucketCounts:      map[string]int{},
+		windows:           map[limiterKey]*list.Element{},
+		windowOrderByName: map[string]*list.List{},
 	}
 }
 
-func (m *Memory) Take(ctx context.Context, name, key string, now time.Time, burst float64, refill time.Duration, cost float64) (Decision, error) {
+func (m *Memory) Take(ctx context.Context, spec Bucket, key string, cost float64) (Decision, error) {
 	if err := contextErr(ctx); err != nil {
 		return Decision{}, err
 	}
-	if burst <= 0 || refill <= 0 || cost <= 0 {
+	if spec.Burst <= 0 || spec.Refill <= 0 || cost <= 0 {
 		return Decision{}, errors.New("security limit: invalid token bucket")
 	}
+	now := m.now()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.bucketCounts[name] > 4096 {
+	if m.bucketCounts[spec.Name] > 4096 {
 		for k, b := range m.buckets {
-			if k.name == name && now.Sub(b.last) > b.full {
+			if k.name == spec.Name && now.Sub(b.last) > b.full {
 				delete(m.buckets, k)
-				m.bucketCounts[name]--
+				m.bucketCounts[spec.Name]--
 			}
 		}
 	}
-	k := limiterKey{name: name, key: key}
+	k := limiterKey{name: spec.Name, key: key}
 	b, ok := m.buckets[k]
 	if !ok {
-		b = &bucket{tokens: burst, last: now}
+		b = &bucket{tokens: spec.Burst, last: now}
 		m.buckets[k] = b
-		m.bucketCounts[name]++
+		m.bucketCounts[spec.Name]++
 	}
-	b.full = time.Duration(burst) * refill
-	b.tokens = min(burst, b.tokens+float64(now.Sub(b.last))/float64(refill))
+	b.full = time.Duration(spec.Burst) * spec.Refill
+	b.tokens = min(spec.Burst, b.tokens+float64(now.Sub(b.last))/float64(spec.Refill))
 	b.last = now
 	if b.tokens < cost {
-		return Decision{RetryAfter: time.Duration((cost - b.tokens) * float64(refill))}, nil
+		return Decision{RetryAfter: time.Duration((cost - b.tokens) * float64(spec.Refill))}, nil
 	}
 	b.tokens -= cost
 	return Decision{Allowed: true}, nil
 }
 
-func (m *Memory) CheckWindow(ctx context.Context, name, key string, now time.Time, limit int, duration time.Duration, maxKeys int, touch bool) (Decision, error) {
+func (m *Memory) Peek(ctx context.Context, spec Window, key string) (Decision, error) {
 	if err := contextErr(ctx); err != nil {
 		return Decision{}, err
 	}
-	if limit <= 0 || duration <= 0 {
-		return Decision{}, errors.New("security limit: invalid failure window")
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	k := limiterKey{name: name, key: key}
-	e := m.windows[k]
-	if e == nil {
-		return Decision{Allowed: true, Remaining: limit}, nil
-	}
-	w := e.Value.(*window)
-	if touch {
-		m.order.MoveToFront(e)
-	}
-	if now.Sub(w.start) >= duration {
-		return Decision{Allowed: true, Remaining: limit}, nil
-	}
-	if w.n >= limit {
-		return Decision{RetryAfter: w.start.Add(duration).Sub(now), First: !w.logged}, nil
-	}
-	return Decision{Allowed: true, Remaining: limit - w.n}, nil
-}
-
-func (m *Memory) RecordWindow(ctx context.Context, name, key string, now time.Time, limit int, duration time.Duration, maxKeys int) (Decision, error) {
-	if err := contextErr(ctx); err != nil {
+	if err := validateWindow(spec); err != nil {
 		return Decision{}, err
 	}
-	if limit <= 0 || duration <= 0 {
-		return Decision{}, errors.New("security limit: invalid failure window")
-	}
-	if maxKeys < 1 {
-		maxKeys = 1
-	}
+	now := m.now()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	k := limiterKey{name: name, key: key}
+	k := limiterKey{name: spec.Name, key: key}
 	e := m.windows[k]
 	if e == nil {
-		for m.windowCounts[name] >= maxKeys {
-			var old *list.Element
-			for candidate := m.order.Back(); candidate != nil; candidate = candidate.Prev() {
-				if candidate.Value.(*window).key.name == name {
-					old = candidate
-					break
-				}
-			}
-			if old == nil {
-				break
-			}
-			m.removeWindow(old)
-		}
-		w := &window{key: k}
-		e = m.order.PushFront(w)
-		m.windows[k] = e
-		m.windowCounts[name]++
+		return Decision{Allowed: true, Remaining: spec.Limit}, nil
+	}
+	m.windowOrderByName[spec.Name].MoveToFront(e)
+	state := e.Value.(*windowState)
+	if d, expired := m.windowDecision(state, spec, now); expired {
+		return Decision{Allowed: true, Remaining: spec.Limit}, nil
 	} else {
-		m.order.MoveToFront(e)
+		return d, nil
 	}
-	w := e.Value.(*window)
-	if now.Sub(w.start) >= duration {
-		w.start, w.n, w.logged = now, 0, false
-	}
-	if w.n >= limit {
-		first := !w.logged
-		w.logged = true
-		return Decision{RetryAfter: w.start.Add(duration).Sub(now), First: first}, nil
-	}
-	w.n++
-	return Decision{Allowed: true, Remaining: limit - w.n}, nil
 }
 
-// FailWindow adds a failed attempt without a threshold check. It is paired with
-// CheckWindow when the caller only counts failed operations, as Enroll does.
-func (m *Memory) FailWindow(ctx context.Context, name, key string, now time.Time, duration time.Duration, maxKeys int) error {
+func (m *Memory) Record(ctx context.Context, spec Window, key string) (Decision, error) {
 	if err := contextErr(ctx); err != nil {
-		return err
+		return Decision{}, err
 	}
-	if duration <= 0 {
+	if err := validateWindow(spec); err != nil {
+		return Decision{}, err
+	}
+	now := m.now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	k := limiterKey{name: spec.Name, key: key}
+	e := m.windows[k]
+	if e == nil {
+		order := m.windowOrderByName[spec.Name]
+		if order == nil {
+			order = list.New()
+			m.windowOrderByName[spec.Name] = order
+		}
+		if order.Len() >= m.maxKeysPerName {
+			if oldest := order.Back(); oldest != nil {
+				m.removeWindow(oldest)
+			}
+		}
+		if m.windowOrderByName[spec.Name] == nil {
+			order = list.New()
+			m.windowOrderByName[spec.Name] = order
+		}
+		state := &windowState{key: k, start: now}
+		e = order.PushFront(state)
+		m.windows[k] = e
+	} else {
+		m.windowOrderByName[spec.Name].MoveToFront(e)
+	}
+	state := e.Value.(*windowState)
+	if _, expired := m.windowDecision(state, spec, now); expired {
+		state.start = now
+		state.n = 0
+		state.logged = false
+		state.lockedUntil = time.Time{}
+	}
+	if now.Before(state.lockedUntil) {
+		return Decision{RetryAfter: state.lockedUntil.Sub(now)}, nil
+	}
+	if spec.Lockout > 0 && state.n+1 >= spec.Limit {
+		state.n++
+		state.logged = true
+		state.lockedUntil = now.Add(spec.Lockout)
+		return Decision{RetryAfter: spec.Lockout, First: true}, nil
+	}
+	if state.n >= spec.Limit {
+		first := !state.logged
+		state.logged = true
+		return Decision{RetryAfter: state.start.Add(spec.Span).Sub(now), First: first}, nil
+	}
+	state.n++
+	return Decision{Allowed: true, Remaining: spec.Limit - state.n}, nil
+}
+
+func validateWindow(spec Window) error {
+	if spec.Limit <= 0 || spec.Span <= 0 || spec.Lockout < 0 {
 		return errors.New("security limit: invalid failure window")
 	}
-	if maxKeys < 1 {
-		maxKeys = 1
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	k := limiterKey{name: name, key: key}
-	e := m.windows[k]
-	if e == nil {
-		for m.windowCounts[name] >= maxKeys {
-			var old *list.Element
-			for candidate := m.order.Back(); candidate != nil; candidate = candidate.Prev() {
-				if candidate.Value.(*window).key.name == name {
-					old = candidate
-					break
-				}
-			}
-			if old == nil {
-				break
-			}
-			m.removeWindow(old)
-		}
-		w := &window{key: k}
-		e = m.order.PushFront(w)
-		m.windows[k] = e
-		m.windowCounts[name]++
-	} else {
-		m.order.MoveToFront(e)
-	}
-	w := e.Value.(*window)
-	if now.Sub(w.start) >= duration {
-		w.start, w.n, w.logged = now, 0, false
-	}
-	w.n++
 	return nil
+}
+
+// windowDecision returns the current decision and whether the state has expired.
+// A lockout outlives the counting span when its deadline is later.
+func (m *Memory) windowDecision(state *windowState, spec Window, now time.Time) (Decision, bool) {
+	if now.Before(state.lockedUntil) {
+		return Decision{RetryAfter: state.lockedUntil.Sub(now)}, false
+	}
+	if now.Sub(state.start) >= spec.Span || (!state.lockedUntil.IsZero() && !now.Before(state.lockedUntil)) {
+		return Decision{}, true
+	}
+	if state.n >= spec.Limit {
+		return Decision{RetryAfter: state.start.Add(spec.Span).Sub(now), First: !state.logged}, false
+	}
+	return Decision{Allowed: true, Remaining: spec.Limit - state.n}, false
 }
 
 func (m *Memory) Reset(ctx context.Context, name, key string) error {
@@ -237,14 +255,20 @@ func (m *Memory) Reset(ctx context.Context, name, key string) error {
 func (m *Memory) Size(name string) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.windowCounts[name]
+	if order := m.windowOrderByName[name]; order != nil {
+		return order.Len()
+	}
+	return 0
 }
 
 func (m *Memory) removeWindow(e *list.Element) {
-	w := e.Value.(*window)
-	delete(m.windows, w.key)
-	m.windowCounts[w.key.name]--
-	m.order.Remove(e)
+	state := e.Value.(*windowState)
+	delete(m.windows, state.key)
+	order := m.windowOrderByName[state.key.name]
+	order.Remove(e)
+	if order.Len() == 0 {
+		delete(m.windowOrderByName, state.key.name)
+	}
 }
 
 func contextErr(ctx context.Context) error {
