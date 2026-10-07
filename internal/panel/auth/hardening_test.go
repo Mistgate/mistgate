@@ -345,8 +345,8 @@ func TestCeremonyConsumeFailuresUseAuthenticationFailureResponses(t *testing.T) 
 	t.Run("login", func(t *testing.T) {
 		s, st, _ := newTestService(t)
 		_, _, _ = passkeyAdmin(t, s, st)
-		var events []Event
-		s.SetEventHook(func(e Event) { events = append(events, e) })
+		events := make(chan Event, 4) // the hook runs on its own goroutine
+		s.SetEventHook(func(e Event) { events <- e })
 		begin, err := s.BeginLogin(context.Background(), connect.NewRequest(&adminv1.BeginLoginRequest{}))
 		if err != nil {
 			t.Fatal(err)
@@ -358,8 +358,16 @@ func TestCeremonyConsumeFailuresUseAuthenticationFailureResponses(t *testing.T) 
 		if codeOf(err) != connect.CodeUnauthenticated {
 			t.Fatalf("failed ceremony consume returned %v; want sign-in failure", err)
 		}
-		if countAuditResult(t, st, "login", "fail") != 1 || len(events) != 1 || events[0].Kind != EventSignInFailed {
-			t.Fatalf("failed login was not audited and emitted: audit=%d events=%+v", countAuditResult(t, st, "login", "fail"), events)
+		if n := countAuditResult(t, st, "login", "fail"); n != 1 {
+			t.Fatalf("failed login audited %d times, want once", n)
+		}
+		select {
+		case e := <-events:
+			if e.Kind != EventSignInFailed {
+				t.Fatalf("failed login emitted %+v, want a sign-in failure", e)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("failed login emitted no event")
 		}
 	})
 
