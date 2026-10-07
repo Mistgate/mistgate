@@ -179,10 +179,12 @@ proto already uses for the SPIFFE URI migration.
 it in `HelloAck.link_supported`; the opt-in is on the agent side: an agent uses the link only when it is configured with a
 link URL (`--link-url` / `MISTGATE_LINK_URL`), otherwise it stays on mTLS. A configured agent connects over mTLS first and,
 when that `HelloAck` advertises the link, reconnects over the link at once. If a link attempt fails before it is
-established (unreachable, refused, handshake rejected), the agent falls back to mTLS and holds that mTLS session for a
-fixed hold period (10 minutes); when the period is over it ends the session and dials the link again, so a failing link
-costs at most one attempt per hold period and the node stays managed over mTLS in between. A link that was established
-and then drops is redialled directly, without going through mTLS.
+established (unreachable, refused, handshake rejected), the agent falls back to mTLS and leaves the link alone for a
+fixed hold period (10 minutes, counted from the failure, whatever happens to the mTLS sessions meanwhile). When the
+period is over, the mTLS session that is up (the panel offers the link on it) is ended, unless it has work in flight, in
+which case that waits, and the agent dials the link again without a backoff wait. A failing link therefore costs at most
+one attempt per hold period and the node stays managed over mTLS in between. A link that was established and then drops
+is redialled directly, without going through mTLS.
 
 Other agent traffic: `Enroll` / `Renew` are plain unary HTTP (work as is; the enrolment token authenticates, the CSR's public
 key is stored). `FetchUpdate` is a server-streaming download; on the edge the same bytes come from R2 with a signed,

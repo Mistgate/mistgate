@@ -27,6 +27,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/speedtest"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
@@ -469,8 +470,9 @@ func sessionOnMTLS(a *Agent) bool {
 	return ok
 }
 
-// A link attempt that fails before it is established holds the next mTLS session; once the hold period is over
-// that session ends on its own, the agent dials the link again without a backoff wait and, this time, stays on it.
+// A link attempt that fails before it is established keeps the agent on mTLS for the hold period; once it is over the
+// held session ends on its own, the agent dials the link again without a backoff wait and, this time, stays on it. The
+// backoff is 5 s here: every wait the agent must not make is checked against bounds far below it.
 func TestAgentHeldMTLSSessionEndsAfterHoldAndRetriesLink(t *testing.T) {
 	const hold = 300 * time.Millisecond
 	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
@@ -478,11 +480,17 @@ func TestAgentHeldMTLSSessionEndsAfterHoldAndRetriesLink(t *testing.T) {
 	}})
 	h.panel.linkSupported.Store(true)
 	ls := newHoldLinkServer(t, h, 1)
-	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second // a backoff wait anywhere would show as a timeout
+	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second
 	h.a.linkHoldFor = hold
+	logs := &lockedLogBuffer{}
+	h.a.log = slog.New(slog.NewTextHandler(logs, nil))
 	h.start()
 
 	eventually(t, func() bool { return len(ls.attempts()) == 1 && sessionOnMTLS(h.a) }, "held mTLS session after the failed link attempt")
+	failed := ls.attempts()[0]
+	if since := time.Since(failed); since > 2*time.Second {
+		t.Fatalf("the held mTLS session came %v after the failed link attempt: the agent waited for a backoff", since)
+	}
 	if got := h.panel.connCount(); got != 2 {
 		t.Fatalf("mTLS sessions while holding = %d, want the discovery session and one held session", got)
 	}
@@ -491,16 +499,24 @@ func TestAgentHeldMTLSSessionEndsAfterHoldAndRetriesLink(t *testing.T) {
 	if len(at) != 2 {
 		t.Fatalf("link attempts = %d, want 2 (one failed, one established)", len(at))
 	}
-	if gap := at[1].Sub(at[0]); gap < hold {
-		t.Fatalf("link retried %v after the failure, before the %v hold period was over", gap, hold)
+	if gap := at[1].Sub(at[0]); gap < hold || gap > hold+2*time.Second {
+		t.Fatalf("link retried %v after the failure, want between the %v hold period and %v: no backoff wait after the hold", gap, hold, hold+2*time.Second)
 	}
 	time.Sleep(2 * hold)
 	if !sessionOnLink(h.a) || len(ls.attempts()) != 2 || h.panel.connCount() != 2 {
 		t.Fatalf("agent left the established link: onLink=%v attempts=%d mtls=%d", sessionOnLink(h.a), len(ls.attempts()), h.panel.connCount())
 	}
+	got := logs.String()
+	if n := strings.Count(got, "agent link failed; falling back to mTLS"); n != 1 {
+		t.Errorf("the link failure was logged %d times, want once: %s", n, got)
+	}
+	if n := strings.Count(got, "agent link hold over; retrying the link"); n != 1 {
+		t.Errorf("the end of the hold was logged %d times, want once: %s", n, got)
+	}
 }
 
-// A link that keeps failing is tried at most once per hold period, and an mTLS session is up between the attempts.
+// A link that keeps failing is tried at most once per hold period, an mTLS session is up between the attempts, and
+// neither the failure nor the end of the hold costs a backoff wait (5 s here).
 func TestAgentFailingLinkIsRetriedOncePerHoldPeriod(t *testing.T) {
 	const hold = 200 * time.Millisecond
 	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
@@ -508,6 +524,7 @@ func TestAgentFailingLinkIsRetriedOncePerHoldPeriod(t *testing.T) {
 	}})
 	h.panel.linkSupported.Store(true)
 	ls := newHoldLinkServer(t, h, 1<<30)
+	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second
 	h.a.linkHoldFor = hold
 	h.start()
 
@@ -536,8 +553,8 @@ func TestAgentFailingLinkIsRetriedOncePerHoldPeriod(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	for i := 1; i < want; i++ {
-		if gap := at[i].Sub(at[i-1]); gap < hold {
-			t.Errorf("link attempts %d and %d are %v apart, want at least the %v hold period", i, i+1, gap, hold)
+		if gap := at[i].Sub(at[i-1]); gap < hold || gap > hold+2*time.Second {
+			t.Errorf("link attempts %d and %d are %v apart, want between the %v hold period and %v", i, i+1, gap, hold, hold+2*time.Second)
 		}
 		active := false
 		for _, m := range mtls {
@@ -553,6 +570,124 @@ func TestAgentFailingLinkIsRetriedOncePerHoldPeriod(t *testing.T) {
 	conns := h.panel.connCount() // read before the attempts: both only grow
 	if n := len(ls.attempts()); conns > n+1 {
 		t.Errorf("mTLS sessions = %d for %d link attempts, want at most one discovery and one held session per attempt", conns, n)
+	}
+}
+
+// The hold is a point in time, not a property of one session: an mTLS session that drops early is replaced by another
+// mTLS session (no link attempt, no discovery session in between), and the link is tried when the period is over.
+func TestAgentHeldSessionDropKeepsTheHold(t *testing.T) {
+	const hold = 600 * time.Millisecond
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 1)
+	h.a.linkHoldFor = hold
+	h.start()
+
+	eventually(t, func() bool { return len(ls.attempts()) == 1 && sessionOnMTLS(h.a) }, "held mTLS session after the failed link attempt")
+	conns := h.panel.connCount()
+	h.panel.dropConn()
+	eventually(t, func() bool { return h.panel.connCount() == conns+1 && sessionOnMTLS(h.a) }, "a new mTLS session after the drop")
+	time.Sleep(hold / 4)
+	if n := len(ls.attempts()); n != 1 || !sessionOnMTLS(h.a) || h.panel.connCount() != conns+1 {
+		t.Fatalf("after the early drop: link attempts=%d onMTLS=%v mTLS sessions=%d, want 1, true, %d", n, sessionOnMTLS(h.a), h.panel.connCount(), conns+1)
+	}
+	eventually(t, func() bool { return sessionOnLink(h.a) }, "link session after the hold period")
+	at := ls.attempts()
+	if len(at) != 2 || at[1].Sub(at[0]) < hold {
+		t.Fatalf("link attempts = %v, want a second one at least %v after the first", at, hold)
+	}
+	if got := h.panel.connCount(); got != conns+1 {
+		t.Fatalf("mTLS sessions = %d, want %d: the drop must not cost a discovery session", got, conns+1)
+	}
+}
+
+// A held session is not ended in the middle of work: while a command's operation is in flight the end is put off, and the
+// operation's answer still goes out on the same session.
+func TestAgentHeldSessionIsNotEndedDuringWork(t *testing.T) {
+	const hold = 400 * time.Millisecond
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var cancelled atomic.Bool
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+		c.SpeedTest = func(ctx context.Context) (speedtest.Result, error) {
+			started <- struct{}{}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				cancelled.Store(true)
+			}
+			return speedtest.Result{DownMbps: 100, Server: "x"}, nil
+		}
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 1)
+	h.a.linkHoldFor, h.a.linkBusyWait = hold, 50*time.Millisecond
+	h.start()
+
+	eventually(t, func() bool { return len(ls.attempts()) == 1 && sessionOnMTLS(h.a) }, "held mTLS session after the failed link attempt")
+	active := h.a.cur.Load()
+	h.panel.send(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_MeasureBandwidth{MeasureBandwidth: &agentv1.MeasureBandwidth{RequestId: "req_hold"}}})
+	<-started
+	time.Sleep(3 * hold) // the hold period is long over
+	if h.a.cur.Load() != active || cancelled.Load() || len(ls.attempts()) != 1 {
+		t.Fatalf("the held session was ended during work: same=%v cancelled=%v link attempts=%d", h.a.cur.Load() == active, cancelled.Load(), len(ls.attempts()))
+	}
+	close(release)
+	if r := h.panel.nextCmd(); r.RequestId != "req_hold" || !r.Ok {
+		t.Fatalf("the operation's answer: %+v", r)
+	}
+	eventually(t, func() bool { return sessionOnLink(h.a) }, "link session once the work is over")
+}
+
+// A session that lived long resets the reconnect delay even when the loop goes on without waiting (here: the end of a
+// held session), so the next real failure waits the minimum, not what an earlier outage had grown the delay to.
+func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	ls := newHoldLinkServer(t, h, 1<<30)
+	h.a.backoffMin, h.a.backoffMax = 100*time.Millisecond, 800*time.Millisecond
+	h.a.resetAfter, h.a.linkHoldFor = 300*time.Millisecond, 400*time.Millisecond
+	logs := &lockedLogBuffer{}
+	h.a.log = slog.New(slog.NewTextHandler(logs, nil))
+	h.start()
+
+	// Three quick failures grow the delay (waits of about 100, 200 and 400 ms) to 800 ms for the next one.
+	for i := 0; i < 3; i++ {
+		h.waitConnected()
+		if i == 2 {
+			h.panel.linkSupported.Store(true) // the next session switches to the (failing) link, then is held
+		}
+		h.panel.dropConn()
+	}
+	// The first held session lives the whole hold period, which resets the delay; the second is the one dropped.
+	eventually(t, func() bool { return len(ls.attempts()) == 2 && sessionOnMTLS(h.a) }, "second held mTLS session")
+	lost := func() []string {
+		var out []string
+		for _, l := range strings.Split(logs.String(), "\n") {
+			if strings.Contains(l, "panel connection lost") {
+				out = append(out, l)
+			}
+		}
+		return out
+	}
+	before := len(lost())
+	h.panel.dropConn()
+	eventually(t, func() bool { return len(lost()) > before }, "the drop is logged")
+	line := lost()[before]
+	i := strings.Index(line, "retry_in=")
+	if i < 0 {
+		t.Fatalf("no retry_in in %q", line)
+	}
+	retry, err := time.ParseDuration(strings.Fields(line[i+len("retry_in="):])[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retry > 300*time.Millisecond {
+		t.Fatalf("reconnect wait after the long held session = %v, want about the %v minimum: the delay was not reset", retry, h.a.backoffMin)
 	}
 }
 

@@ -109,10 +109,10 @@ type Agent struct {
 	out            *outbox
 	jobs           chan job
 	settings       atomic.Pointer[pb.NodeSettings]
-	linkAdvertised atomic.Bool  // the last HelloAck advertised the signed link
-	linkHold       atomic.Bool  // a link attempt failed before it was established: the next mTLS session stays up for linkHoldFor
-	linkHTTPClient *http.Client // test seam; nil uses normal system-root TLS verification
-	offset         atomic.Int64 // seconds: panel clock minus local clock, measured at Hello
+	linkAdvertised atomic.Bool               // the last HelloAck advertised the signed link
+	linkRetryAt    atomic.Pointer[time.Time] // a link attempt failed before it was established: the link is not tried again before this
+	linkHTTPClient *http.Client              // test seam; nil uses normal system-root TLS verification
+	offset         atomic.Int64              // seconds: panel clock minus local clock, measured at Hello
 	skewed         atomic.Bool
 	cur            atomic.Pointer[session]
 	cancel         context.CancelCauseFunc
@@ -167,12 +167,73 @@ type Agent struct {
 	helloTimeout time.Duration // 0 = twice the dial timeout
 	commitTick   time.Duration // update commit watch poll, default 2 s
 	commitSettle time.Duration // connected this long before a new build may commit, default 10 s
-	linkHoldFor  time.Duration // 0 = defaultLinkHold: how long a held mTLS session lives before the link is tried again
+	linkHoldFor  time.Duration // 0 = defaultLinkHold: how long the link is left alone after a failed attempt
+	linkBusyWait time.Duration // 0 = linkBusyRecheck: how long the end of a held session is put off while it has work in flight
+	resetAfter   time.Duration // 0 = 1 min: a session that lived this long resets the reconnect delay
+
+	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
 }
 
-// defaultLinkHold is how long an mTLS session that was kept after a failed link attempt stays up before it is ended
-// so the agent dials the link again; it bounds the failed link attempts to one per period.
-const defaultLinkHold = 10 * time.Minute
+const (
+	// defaultLinkHold is how long the link is left alone after a link attempt failed before it was established. The agent
+	// runs over mTLS meanwhile; an mTLS session that the panel offers the link on ends when the period is over, so the
+	// link is dialled again, and a failing link costs at most one attempt per period.
+	defaultLinkHold = 10 * time.Minute
+	// linkBusyRecheck is how long the end of a held session is put off while an operation is in flight on it.
+	linkBusyRecheck = 30 * time.Second
+)
+
+// linkWait is how long the link must still be left alone after a failed attempt; zero or less means it may be tried now.
+func (a *Agent) linkWait() time.Duration {
+	if t := a.linkRetryAt.Load(); t != nil {
+		return time.Until(*t)
+	}
+	return 0
+}
+
+// goBusy runs f in its own goroutine and counts it as work in flight, which a held session is not ended in the middle of.
+func (a *Agent) goBusy(f func()) {
+	a.busy.Add(1)
+	go func() {
+		defer a.busy.Add(-1)
+		f()
+	}()
+}
+
+// holdBusy reports whether ending s now would cut something short: an operation started by a command, a log stream,
+// a retire or a re-exec (the last two answer and drain on the stream).
+func (s *session) holdBusy() bool {
+	s.mu.Lock()
+	logs := len(s.logs)
+	s.mu.Unlock()
+	return s.a.busy.Load() > 0 || logs > 0 || s.a.exiting.Load()
+}
+
+// endHeldSession ends the mTLS session s after wait, once the failed link may be tried again, the way a session ends
+// when its context is cancelled; expired tells the receive loop that this was the reason. Work in flight postpones it.
+func (a *Agent) endHeldSession(s *session, wait time.Duration, expired *atomic.Bool) {
+	recheck := a.linkBusyWait
+	if recheck == 0 {
+		recheck = linkBusyRecheck
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+		}
+		if s.holdBusy() {
+			t.Reset(recheck)
+			continue
+		}
+		a.log.Info("agent link hold over; retrying the link")
+		expired.Store(true)
+		s.cancel()
+		return
+	}
+}
 
 // held remembers what was last handed to an engine so unchanged inbounds are not re-applied.
 type held struct {
@@ -383,21 +444,31 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		lived := time.Since(started)
+		if lived >= a.backoffResetAfter() {
+			delay = a.backoffMin // also when the loop goes on below without a wait: a long session ended
+		}
 		if errors.Is(err, errSwitchTransport) {
 			continue
 		}
 		if errors.Is(err, errLinkNotEstablished) {
-			// session() has cleared the advertisement, so the next session is mTLS (held for linkHoldFor): no backoff
+			// session() has noted the failure, so the next session is mTLS until the hold period is over: no backoff
 			// wait, and none of the growth it would add to the delay of later real failures.
 			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
 			continue
 		}
-		lived := time.Since(started)
 		var wait time.Duration
 		wait, delay = backoffStep(delay, lived, a.backoffMin, a.backoffMax)
 		a.log.Warn("panel connection lost", "err", err, "lived", lived.Round(time.Second), "retry_in", wait.Round(10*time.Millisecond))
 		sleepCtx(ctx, wait)
 	}
+}
+
+func (a *Agent) backoffResetAfter() time.Duration {
+	if a.resetAfter == 0 {
+		return time.Minute
+	}
+	return a.resetAfter
 }
 
 var errSwitchTransport = errors.New("switch to advertised agent link")
@@ -575,11 +646,15 @@ func (s *session) writer() {
 }
 
 func (a *Agent) session(ctx context.Context) error {
-	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() {
+	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSession(ctx)
 		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
-			a.linkAdvertised.Store(false)
-			a.linkHold.Store(true)
+			hold := a.linkHoldFor
+			if hold == 0 {
+				hold = defaultLinkHold
+			}
+			retry := time.Now().Add(hold)
+			a.linkRetryAt.Store(&retry)
 		}
 		return err
 	}
@@ -662,28 +737,16 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	a.linkAdvertised.Store(ack.LinkSupported)
 	a.onHelloAck(ack)
 	_, isConnect := stream.(*connectAgentTransport)
-	linkConfigured := isConnect && a.cfg.LinkURL != ""
-	holdLink := linkConfigured && a.linkHold.Swap(false) // the hold lasts for this one mTLS session
-	if linkConfigured && ack.LinkSupported && !holdLink {
-		// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
-		cancel()
-		_ = stream.Close()
-		return errSwitchTransport
+	var holdFor time.Duration // > 0: this mTLS session stays although the panel offers the link, for this long
+	if isConnect && a.cfg.LinkURL != "" && ack.LinkSupported {
+		if holdFor = a.linkWait(); holdFor <= 0 {
+			// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
+			cancel()
+			_ = stream.Close()
+			return errSwitchTransport
+		}
 	}
 	var holdExpired atomic.Bool
-	if holdLink && ack.LinkSupported {
-		// Held although the panel offers the link: after the hold period end this session the way any other ends
-		// (cancel closes the transport, the receive loop fails) and let the reconnect loop dial the link again.
-		hold := a.linkHoldFor
-		if hold == 0 {
-			hold = defaultLinkHold
-		}
-		t := time.AfterFunc(hold, func() {
-			holdExpired.Store(true)
-			cancel()
-		})
-		defer t.Stop()
-	}
 	a.dsOK.Store(true)
 	a.connAt.Store(time.Now().UnixNano())
 	defer a.connAt.Store(0)
@@ -699,6 +762,10 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	go func() { defer wg.Done(); s.writer() }()
 	wg.Add(1)
 	go func() { defer wg.Done(); a.doctorSchedule(s) }()
+	if holdFor > 0 {
+		wg.Add(1)
+		go func() { defer wg.Done(); a.endHeldSession(s, holdFor, &holdExpired) }()
+	}
 	defer wg.Wait()
 	defer cancel()
 	s.poke() // resend everything still unacked, in order
@@ -708,7 +775,7 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
-			if holdExpired.Load() {
+			if holdExpired.Load() && ctx.Err() != nil { // the error is the cancel of endHeldSession, not a real one
 				return errSwitchTransport
 			}
 			if errors.Is(err, io.EOF) {
@@ -797,17 +864,17 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 	case *pb.ConnectResponse_Retire:
 		a.submit(s, job{retire: m.Retire})
 	case *pb.ConnectResponse_RunDoctor:
-		go a.runDoctor(s, m.RunDoctor)
+		a.goBusy(func() { a.runDoctor(s, m.RunDoctor) })
 	case *pb.ConnectResponse_ApplyFix:
-		go a.applyFix(s, m.ApplyFix)
+		a.goBusy(func() { a.applyFix(s, m.ApplyFix) })
 	case *pb.ConnectResponse_PrepareAwgKernel:
-		go a.prepareAwgKernel(s, m.PrepareAwgKernel)
+		a.goBusy(func() { a.prepareAwgKernel(s, m.PrepareAwgKernel) })
 	case *pb.ConnectResponse_MeasureBandwidth:
-		go a.measureBandwidth(s, m.MeasureBandwidth)
+		a.goBusy(func() { a.measureBandwidth(s, m.MeasureBandwidth) })
 	case *pb.ConnectResponse_UpdateAgent:
-		go a.applyUpdate(s, m.UpdateAgent)
+		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:
-		go a.rollbackUpdate(s, m.RollbackAgent)
+		a.goBusy(func() { a.rollbackUpdate(s, m.RollbackAgent) })
 	case *pb.ConnectResponse_LogRequest:
 		s.startLog(m.LogRequest)
 	case *pb.ConnectResponse_LogCancel:
@@ -1046,6 +1113,8 @@ func (a *Agent) restartInbound(ctx context.Context, r *pb.RestartInbound) *pb.Co
 // reported in the CommandResult.
 func (a *Agent) retire(ctx context.Context, j job) {
 	a.log.Warn("retire requested by the panel")
+	a.busy.Add(1) // the answer and the drain below are on the session: it is not to be ended meanwhile
+	defer a.busy.Add(-1)
 	a.closeEngines()
 	var errs []error
 	hctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
