@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -111,11 +112,16 @@ func (s *Store) LinkCertificates(ctx context.Context, nodeID string, now time.Ti
 }
 
 func insertCert(ctx context.Context, tx *sql.Tx, c CertRow) error {
-	_, err := tx.ExecContext(ctx, `
+	stmt := insertCertStmt(c)
+	_, err := tx.ExecContext(ctx, stmt.Query, stmt.Args...)
+	return err
+}
+
+func insertCertStmt(c CertRow) Stmt {
+	return Stmt{Query: `
 		INSERT INTO node_cert (serial, node_id, ca_id, pem, not_before, not_after, issued_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		c.Serial, c.NodeID, c.CAID, c.PEM, unix(c.NotBefore), unix(c.NotAfter), unix(c.IssuedAt))
-	return err
+		Args: []any{c.Serial, c.NodeID, c.CAID, c.PEM, unix(c.NotBefore), unix(c.NotAfter), unix(c.IssuedAt)}}
 }
 
 // RenewCert records a certificate issued by Renew and makes it the node's current one. The node's other
@@ -167,47 +173,49 @@ func (s *Store) CertStatus(ctx context.Context, serial string, now time.Time) (C
 }
 
 // CreateEnrollment issues an enrollment token. With n != nil it also creates the (pending) node in the
-// same transaction (ErrConflict when the name is taken); otherwise nodeID must be an existing,
+// same batch (ErrConflict when the name is taken); otherwise nodeID must be an existing,
 // non-retired node (re-enrollment). Older unused tokens of the node stop working.
 // The returned node is the current row.
 func (s *Store) CreateEnrollment(ctx context.Context, n *NodeRow, nodeID string, tokenHash []byte, createdBy string, now, expires time.Time) (NodeRow, error) {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return NodeRow{}, err
-	}
-	defer tx.Rollback()
+	stmts := make([]Stmt, 0, 5)
 	if n != nil {
 		nodeID = n.ID
-		_, err := tx.ExecContext(ctx, `
+		stmts = append(stmts, Stmt{Query: `
 			INSERT INTO node (id, name, address, country_code, location, provider, state, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-			n.ID, n.Name, n.Address, n.CountryCode, n.Location, n.Provider, unix(now))
-		if err != nil {
-			if fleetIsUnique(err) {
-				return NodeRow{}, ErrConflict
-			}
-			return NodeRow{}, err
-		}
+			Args: []any{n.ID, n.Name, n.Address, n.CountryCode, n.Location, n.Provider, unix(now)}})
 	}
-	cur, err := scanNode(tx.QueryRowContext(ctx, `SELECT `+nodeCols+` FROM node WHERE id = ?`, nodeID))
-	if err != nil {
-		return NodeRow{}, err
-	}
-	if cur.State == "retired" {
-		return NodeRow{}, ErrNodeRetired
-	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE enrollment_token SET expires_at = ? WHERE node_id = ? AND used_at IS NULL AND expires_at > ?`,
-		unix(now), nodeID, unix(now)); err != nil {
-		return NodeRow{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `
+	stmts = append(stmts,
+		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, nodeID),
+		Stmt{Query: `UPDATE enrollment_token SET expires_at = ? WHERE node_id = ? AND used_at IS NULL AND expires_at > ?`,
+			Args: []any{unix(now), nodeID, unix(now)}},
+		Stmt{Query: `
 		INSERT INTO enrollment_token (id, node_id, token_hash, created_by, created_at, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?)`,
-		NewID("enr_"), nodeID, tokenHash, createdBy, unix(now), unix(expires)); err != nil {
+			Args: []any{NewID("enr_"), nodeID, tokenHash, createdBy, unix(now), unix(expires)}},
+		Stmt{Query: `SELECT ` + nodeCols + ` FROM node WHERE id = ?`, Args: []any{nodeID}, Returning: true},
+	)
+	results, err := s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		cur, readErr := s.Node(ctx, nodeID)
+		if errors.Is(readErr, ErrNotFound) {
+			return NodeRow{}, ErrNotFound
+		}
+		if readErr != nil {
+			return NodeRow{}, readErr
+		}
+		if cur.State == "retired" {
+			return NodeRow{}, ErrNodeRetired
+		}
+		return NodeRow{}, ErrConflict
+	}
+	if err != nil {
+		if n != nil && fleetIsUnique(err) && (strings.Contains(err.Error(), "node.name") || strings.Contains(err.Error(), "node.id")) {
+			return NodeRow{}, ErrConflict
+		}
 		return NodeRow{}, err
 	}
-	return cur, tx.Commit()
+	return scanNode(batchRow(results[len(results)-1].Rows[0]))
 }
 
 // PendingEnrollmentExpiry returns when the newest usable enrollment token of the node expires; the zero
@@ -228,94 +236,117 @@ type EnrollResult struct {
 }
 
 // Enroll consumes a one-time token. keyHash is sha256 of the CSR public key; issue signs a certificate
-// for the node (called inside the transaction, only for a first use). Errors: ErrEnrollToken,
+// for the node after the reads and before the guarded batch (only for a first use). Errors: ErrEnrollToken,
 // ErrNodeRetired. A repeat with the same token and key within 10 minutes of first use returns the
 // stored certificate. Every other certificate of the node is revoked (re-enrollment).
 func (s *Store) Enroll(ctx context.Context, tokenHash, keyHash []byte, now time.Time, issue func(nodeID string) (CertRow, error)) (EnrollResult, error) {
-	// Enroll is reachable without a certificate, so most calls are guesses. Turn away whatever cannot succeed
-	// with a read on the read pool: a failing attempt must not queue on the one writer connection that stats
-	// ingestion and every admin write share. The transaction below re-checks everything.
-	var expires0 int64
-	var used0 sql.NullInt64
-	err := s.R.QueryRowContext(ctx, `SELECT expires_at, used_at FROM enrollment_token WHERE token_hash = ?`, tokenHash).Scan(&expires0, &used0)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return EnrollResult{}, ErrEnrollToken
-	case err != nil:
-		return EnrollResult{}, err
-	case used0.Valid && now.Unix()-used0.Int64 > int64(enrollReplayWindow/time.Second):
-		return EnrollResult{}, ErrEnrollToken
-	case !used0.Valid && expires0 <= now.Unix():
-		return EnrollResult{}, ErrEnrollToken
+	type enrollSnapshot struct {
+		id, nodeID string
+		expires    int64
+		used       sql.NullInt64
+		csr        []byte
+		serial     sql.NullString
+		nodeState  string
+		tokenFound bool
+		nodeFound  bool
+		cert       CertRow
+		certFound  bool
 	}
-
-	tx, err := s.W.BeginTx(ctx, nil)
+	readSnapshot := func() (enrollSnapshot, error) {
+		var snap enrollSnapshot
+		var certNB, certNA, certIssued int64
+		r := reads{}
+		r.add(func(rows [][]any) error {
+			if len(rows) == 0 {
+				return nil
+			}
+			if len(rows) != 1 {
+				return errors.New("store: enrollment token batch returned multiple rows")
+			}
+			snap.tokenFound = true
+			return batchRow(rows[0]).Scan(&snap.id, &snap.nodeID, &snap.expires, &snap.used, &snap.csr, &snap.serial)
+		}, `SELECT id, node_id, expires_at, used_at, csr_key_hash, issued_serial FROM enrollment_token WHERE token_hash = ?`, tokenHash)
+		r.add(func(rows [][]any) error {
+			if len(rows) == 0 {
+				return nil
+			}
+			snap.nodeFound = true
+			return batchRow(rows[0]).Scan(&snap.nodeState)
+		}, `SELECT state FROM node WHERE id = (SELECT node_id FROM enrollment_token WHERE token_hash = ?)`, tokenHash)
+		r.add(func(rows [][]any) error {
+			if len(rows) == 0 {
+				return nil
+			}
+			snap.certFound = true
+			if err := batchRow(rows[0]).Scan(&snap.cert.Serial, &snap.cert.NodeID, &snap.cert.CAID, &snap.cert.PEM, &certNB, &certNA, &certIssued); err != nil {
+				return err
+			}
+			snap.cert.NotBefore, snap.cert.NotAfter, snap.cert.IssuedAt = fromUnix(certNB), fromUnix(certNA), fromUnix(certIssued)
+			return nil
+		}, `SELECT serial, node_id, ca_id, pem, not_before, not_after, issued_at FROM node_cert
+			WHERE serial = (SELECT issued_serial FROM enrollment_token WHERE token_hash = ?) AND revoked_at IS NULL`, tokenHash)
+		return snap, r.run(ctx, s)
+	}
+	checkSnapshot := func(snap enrollSnapshot) (EnrollResult, bool, error) {
+		if !snap.tokenFound {
+			return EnrollResult{}, false, ErrEnrollToken
+		}
+		if snap.used.Valid && now.Unix()-snap.used.Int64 > int64(enrollReplayWindow/time.Second) {
+			return EnrollResult{}, false, ErrEnrollToken
+		}
+		if !snap.used.Valid && snap.expires <= now.Unix() {
+			return EnrollResult{}, false, ErrEnrollToken
+		}
+		if !snap.nodeFound {
+			return EnrollResult{}, false, ErrNotFound
+		}
+		if snap.nodeState == "retired" {
+			return EnrollResult{}, false, ErrNodeRetired
+		}
+		if snap.used.Valid {
+			if !snap.serial.Valid || !bytes.Equal(snap.csr, keyHash) || now.Unix()-snap.used.Int64 > int64(enrollReplayWindow/time.Second) || !snap.certFound {
+				return EnrollResult{}, false, ErrEnrollToken
+			}
+			return EnrollResult{NodeID: snap.nodeID, Cert: snap.cert, Replay: true}, true, nil
+		}
+		return EnrollResult{}, false, nil
+	}
+	snap, err := readSnapshot()
 	if err != nil {
 		return EnrollResult{}, err
 	}
-	defer tx.Rollback()
-
-	var id, nodeID string
-	var expires int64
-	var used sql.NullInt64
-	var csr []byte
-	var serial sql.NullString
-	err = tx.QueryRowContext(ctx, `
-		SELECT id, node_id, expires_at, used_at, csr_key_hash, issued_serial FROM enrollment_token WHERE token_hash = ?`,
-		tokenHash).Scan(&id, &nodeID, &expires, &used, &csr, &serial)
-	if errors.Is(err, sql.ErrNoRows) {
-		return EnrollResult{}, ErrEnrollToken
+	if result, replay, checkErr := checkSnapshot(snap); checkErr != nil {
+		return EnrollResult{}, checkErr
+	} else if replay {
+		return result, nil
 	}
+	c, err := issue(snap.nodeID)
 	if err != nil {
 		return EnrollResult{}, err
 	}
-	var state string
-	if err := tx.QueryRowContext(ctx, `SELECT state FROM node WHERE id = ?`, nodeID).Scan(&state); err != nil {
-		return EnrollResult{}, err
-	}
-	if state == "retired" {
-		return EnrollResult{}, ErrNodeRetired
-	}
-	if used.Valid {
-		if !serial.Valid || !bytes.Equal(csr, keyHash) || now.Unix()-used.Int64 > int64(enrollReplayWindow/time.Second) {
-			return EnrollResult{}, ErrEnrollToken
-		}
-		var c CertRow
-		var nb, na, ia int64
-		err := tx.QueryRowContext(ctx, `
-			SELECT serial, node_id, ca_id, pem, not_before, not_after, issued_at FROM node_cert WHERE serial = ? AND revoked_at IS NULL`,
-			serial.String).Scan(&c.Serial, &c.NodeID, &c.CAID, &c.PEM, &nb, &na, &ia)
-		if errors.Is(err, sql.ErrNoRows) {
-			return EnrollResult{}, ErrEnrollToken // revoked meanwhile: do not resurrect it
-		}
+	_, err = s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM enrollment_token t JOIN node n ON n.id = t.node_id
+			WHERE t.id = ? AND t.used_at IS NULL AND t.expires_at > ? AND n.state <> 'retired')`, snap.id, now.Unix()),
+		Stmt{Query: `UPDATE node_cert SET revoked_at = ?, revoke_reason = 're-enrolled' WHERE node_id = ? AND (revoked_at IS NULL OR revoked_at > ?)`,
+			Args: []any{unix(now), snap.nodeID, unix(now)}},
+		insertCertStmt(c),
+		Stmt{Query: `UPDATE enrollment_token SET used_at = ?, csr_key_hash = ?, issued_serial = ? WHERE id = ?`, Args: []any{unix(now), keyHash, c.Serial, snap.id}},
+		Stmt{Query: `UPDATE node SET cert_serial = ? WHERE id = ?`, Args: []any{c.Serial, snap.nodeID}},
+	)
+	if errors.Is(err, errGuard) {
+		snap, err = readSnapshot()
 		if err != nil {
 			return EnrollResult{}, err
 		}
-		c.NotBefore, c.NotAfter, c.IssuedAt = fromUnix(nb), fromUnix(na), fromUnix(ia)
-		return EnrollResult{NodeID: nodeID, Cert: c, Replay: true}, nil
-	}
-	if expires <= now.Unix() {
+		if result, replay, checkErr := checkSnapshot(snap); checkErr != nil {
+			return EnrollResult{}, checkErr
+		} else if replay {
+			return result, nil
+		}
 		return EnrollResult{}, ErrEnrollToken
 	}
-	c, err := issue(nodeID)
 	if err != nil {
 		return EnrollResult{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE node_cert SET revoked_at = ?1, revoke_reason = 're-enrolled' WHERE node_id = ?2 AND (revoked_at IS NULL OR revoked_at > ?1)`,
-		unix(now), nodeID); err != nil {
-		return EnrollResult{}, err
-	}
-	if err := insertCert(ctx, tx, c); err != nil {
-		return EnrollResult{}, err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE enrollment_token SET used_at = ?, csr_key_hash = ?, issued_serial = ? WHERE id = ?`,
-		unix(now), keyHash, c.Serial, id); err != nil {
-		return EnrollResult{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE node SET cert_serial = ? WHERE id = ?`, c.Serial, nodeID); err != nil {
-		return EnrollResult{}, err
-	}
-	return EnrollResult{NodeID: nodeID, Cert: c}, tx.Commit()
+	return EnrollResult{NodeID: snap.nodeID, Cert: c}, nil
 }

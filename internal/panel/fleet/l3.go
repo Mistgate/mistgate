@@ -120,29 +120,6 @@ func warpStateChanged(prev, next *agentv1.WarpHealth) bool {
 		prev.GetProbeOther().GetFailureCode() != next.GetProbeOther().GetFailureCode()
 }
 
-// touchAwgDevices writes the time of the newest handshake of every AWG peer that has a session into the device's
-// last_seen_at: the admin and the user pages show it as the last handshake and draw the online dot from it. The
-// session's connected_at is the peer's last handshake; the update only ever moves the time
-// forward, so a batch resent after a reconnect changes nothing. A failure is logged and never fails the batch.
-func (f *Fleet) touchAwgDevices(ctx context.Context, st *agentv1.StatsBatch, refs map[string]store.FleetCredRef, now time.Time) {
-	for i, se := range st.Sessions {
-		if i == maxStatsDeltas {
-			break
-		}
-		ref, ok := refs[se.CredId]
-		if !ok || ref.Protocol != "awg" || ref.DeviceID == "" || se.ConnectedAtUnix <= 0 {
-			continue
-		}
-		t := time.Unix(se.ConnectedAtUnix, 0).UTC()
-		if t.After(now) {
-			t = now
-		}
-		if err := f.st.Access().TouchDevice(ctx, ref.DeviceID, t, t); err != nil {
-			f.log.Warn("touch awg device", "device", ref.DeviceID, "err", err)
-		}
-	}
-}
-
 // warp event reasons the agent sends (internal/node/warp, internal/node/agent): codes of warp_needs_attention.
 const (
 	warpReasonRefresh  = "refresh_requested" // the ladder ran out of endpoints: read the account again

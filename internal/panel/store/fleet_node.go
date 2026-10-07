@@ -228,47 +228,56 @@ type HelloInfo struct {
 // counter is reset when the agent instance changed. prev is the row before the update (for blip/restart
 // detection); ackedSeq is the highest committed seq of this instance. ErrNodeRetired for retired nodes.
 func (s *Store) NodeHello(ctx context.Context, id string, h HelloInfo, now time.Time) (prev NodeRow, ackedSeq uint64, err error) {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return NodeRow{}, 0, err
-	}
-	defer tx.Rollback()
-	prev, err = scanNode(tx.QueryRowContext(ctx, `SELECT `+nodeCols+` FROM node WHERE id = ?`, id))
-	if err != nil {
-		return NodeRow{}, 0, err
-	}
-	if prev.State == "retired" {
-		return NodeRow{}, 0, ErrNodeRetired
-	}
-	if prev.AgentInstanceID == h.Instance {
-		ackedSeq = prev.LastSeq
-	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE node SET state = 'active', agent_version = ?, api_version = ?, boot_at = CASE WHEN ? > 0 THEN ? ELSE boot_at END,
-			last_seen_at = ?, last_connected_at = ?, agent_instance_id = ?, last_seq = ?,
-			agent_built = ?, agent_caps = ?, last_update_json = CASE WHEN ? <> '' THEN ? ELSE last_update_json END
-		WHERE id = ?`,
-		h.AgentVersion, h.APIVersion, fleetUnix(h.BootAt), fleetUnix(h.BootAt), unix(now), unix(now), h.Instance, ackedSeq,
-		max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, id); err != nil {
-		return NodeRow{}, 0, err
-	}
 	engines := make([]map[string]string, len(h.Facts.Engines))
 	for i, e := range h.Facts.Engines {
 		engines[i] = map[string]string{"protocol": e.Protocol, "version": e.Version}
 	}
 	eb, _ := json.Marshal(engines)
 	f := h.Facts
-	if _, err := tx.ExecContext(ctx, `
+	results, err := s.batch(ctx,
+		Stmt{Query: `SELECT ` + nodeCols + ` FROM node WHERE id = ?`, Args: []any{id}, Returning: true},
+		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, id),
+		Stmt{Query: `
+		UPDATE node SET state = 'active', agent_version = ?, api_version = ?, boot_at = CASE WHEN ? > 0 THEN ? ELSE boot_at END,
+			last_seen_at = ?, last_connected_at = ?, agent_instance_id = ?,
+			last_seq = CASE WHEN agent_instance_id = ? THEN last_seq ELSE 0 END,
+			agent_built = ?, agent_caps = ?, last_update_json = CASE WHEN ? <> '' THEN ? ELSE last_update_json END
+		WHERE id = ?`,
+			Args: []any{h.AgentVersion, h.APIVersion, fleetUnix(h.BootAt), fleetUnix(h.BootAt), unix(now), unix(now), h.Instance, h.Instance,
+				max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, id}},
+		Stmt{Query: `
 		INSERT INTO node_facts (node_id, hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (node_id) DO UPDATE SET hostname = excluded.hostname, os = excluded.os, kernel = excluded.kernel,
 			arch = excluded.arch, cpu_count = excluded.cpu_count, ram_total_bytes = excluded.ram_total_bytes,
 			disk_total_bytes = excluded.disk_total_bytes, virt = excluded.virt, has_ipv6 = excluded.has_ipv6,
 			engines_json = excluded.engines_json, updated_at = excluded.updated_at`,
-		id, f.Hostname, f.OS, f.Kernel, f.Arch, f.CPUCount, int64(f.RAMTotal), int64(f.DiskTotal), f.Virt, f.HasIPv6, string(eb), unix(now)); err != nil {
+			Args: []any{id, f.Hostname, f.OS, f.Kernel, f.Arch, f.CPUCount, int64(f.RAMTotal), int64(f.DiskTotal), f.Virt, f.HasIPv6, string(eb), unix(now)}},
+	)
+	if errors.Is(err, errGuard) {
+		current, readErr := s.Node(ctx, id)
+		if errors.Is(readErr, ErrNotFound) {
+			return NodeRow{}, 0, ErrNotFound
+		}
+		if readErr != nil {
+			return NodeRow{}, 0, readErr
+		}
+		if current.State == "retired" {
+			return NodeRow{}, 0, ErrNodeRetired
+		}
+		return NodeRow{}, 0, ErrConflict
+	}
+	if err != nil {
 		return NodeRow{}, 0, err
 	}
-	return prev, ackedSeq, tx.Commit()
+	prev, err = scanNode(batchRow(results[0].Rows[0]))
+	if err != nil {
+		return NodeRow{}, 0, err
+	}
+	if prev.AgentInstanceID == h.Instance {
+		ackedSeq = prev.LastSeq
+	}
+	return prev, ackedSeq, nil
 }
 
 // NodeFacts returns the stored host facts (zero value if none yet).
@@ -337,46 +346,50 @@ func (s *Store) NodeApplied(ctx context.Context, id string, rev uint64, hash str
 // SetInboundCert stores the certificate an inbound serves as the node's stats report it (an ACME certificate appears and
 // renews after the ApplyResult was sent). Only an enabled inbound of this node, and only when the value differs.
 func (s *Store) SetInboundCert(ctx context.Context, nodeID, inboundID, pin string, notAfter, now time.Time) error {
-	_, err := s.W.ExecContext(ctx, `
+	stmt := inboundCertStmt(nodeID, inboundID, pin, notAfter, now)
+	_, err := s.W.ExecContext(ctx, stmt.Query, stmt.Args...)
+	return err
+}
+
+func inboundCertStmt(nodeID, inboundID, pin string, notAfter, now time.Time) Stmt {
+	return Stmt{Query: `
 		UPDATE inbound SET cert_pin_sha256 = ?1, cert_not_after = ?2, updated_at = ?3
 		WHERE id = ?4 AND node_id = ?5 AND enabled = 1 AND (cert_pin_sha256 != ?1 OR cert_not_after != ?2)`,
-		pin, fleetUnix(notAfter), unix(now), inboundID, nodeID)
-	return err
+		Args: []any{pin, fleetUnix(notAfter), unix(now), inboundID, nodeID}}
 }
 
 // RetireNode marks the node retired, revokes every certificate and kills unused enrollment tokens.
 // The row, its traffic and its events stay, and so does its saved server access: the sealed password may be the only
 // copy (a generated one), so only the owner's ForgetNodeServerAccess deletes it. ErrNotFound / ErrNodeRetired as appropriate.
 func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var state string
-	if err := tx.QueryRowContext(ctx, `SELECT state FROM node WHERE id = ?`, id).Scan(&state); errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	} else if err != nil {
-		return err
-	}
-	if state == "retired" {
-		return ErrNodeRetired
-	}
-	for _, q := range []string{
-		`UPDATE node SET state = 'retired', retired_at = ?1, desired_hash = '' WHERE id = ?2`,
-		`UPDATE node_cert SET revoked_at = ?1, revoke_reason = 'retired' WHERE node_id = ?2 AND (revoked_at IS NULL OR revoked_at > ?1)`,
-		`UPDATE enrollment_token SET expires_at = ?1 WHERE node_id = ?2 AND used_at IS NULL AND expires_at > ?1`,
-	} {
-		if _, err := tx.ExecContext(ctx, q, unix(now), id); err != nil {
-			return err
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, id),
+		Stmt{Query: `UPDATE node SET state = 'retired', retired_at = ?, desired_hash = '' WHERE id = ?`, Args: []any{unix(now), id}},
+		Stmt{Query: `UPDATE node_cert SET revoked_at = ?, revoke_reason = 'retired' WHERE node_id = ? AND (revoked_at IS NULL OR revoked_at > ?)`, Args: []any{unix(now), id, unix(now)}},
+		Stmt{Query: `UPDATE enrollment_token SET expires_at = ? WHERE node_id = ? AND used_at IS NULL AND expires_at > ?`, Args: []any{unix(now), id, unix(now)}},
+		// An install still running for the node is cancelled; it may already have changed the host, so the remote-outcome
+		// warning stays while its saved credentials go.
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'cancelled', 'remote_outcome_unknown', ? FROM node_provision_job
+			WHERE node_id = ? AND state IN ('queued', 'running', 'cancel_requested')`, Args: []any{unix(now), id}},
+		Stmt{Query: `UPDATE node_provision_job
+			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
+			WHERE node_id = ? AND state IN ('queued', 'running', 'cancel_requested')`, Args: []any{unix(now), id}},
+		// A retired node takes no inbounds any more: its parked AWG server keys are dead weight.
+		Stmt{Query: `DELETE FROM awg_retained_key WHERE node_id = ?`, Args: []any{id}},
+	)
+	if errors.Is(err, errGuard) {
+		current, readErr := s.Node(ctx, id)
+		if errors.Is(readErr, ErrNotFound) {
+			return ErrNotFound
 		}
+		if readErr != nil {
+			return readErr
+		}
+		if current.State == "retired" {
+			return ErrNodeRetired
+		}
+		return ErrConflict
 	}
-	if err := cancelNodeProvisionForRetiredNode(ctx, tx, id, now); err != nil {
-		return err
-	}
-	// A retired node takes no inbounds any more: its parked AWG server keys are dead weight.
-	if _, err := tx.ExecContext(ctx, `DELETE FROM awg_retained_key WHERE node_id = ?`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }

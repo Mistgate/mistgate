@@ -95,7 +95,6 @@ type SessionSidecar struct {
 	Version     uint32
 	SentDesired *nodeState
 	Live        LiveSnapshot
-	CertSeen    map[string]string
 	L3          l3Intake
 	Pending     map[string]PendingRequest
 }
@@ -230,9 +229,6 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 	}
 	if sidecar.Live.UserUp == nil {
 		sidecar.Live.UserUp = map[string]uint64{}
-	}
-	if sidecar.CertSeen == nil {
-		sidecar.CertSeen = map[string]string{}
 	}
 	if sidecar.Pending == nil {
 		sidecar.Pending = map[string]PendingRequest{}
@@ -427,8 +423,16 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		if i == maxStatsDeltas {
 			break
 		}
-		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId})
+		var connectedAt time.Time
+		if se.ConnectedAtUnix > 0 {
+			connectedAt = time.Unix(se.ConnectedAtUnix, 0).UTC()
+			if connectedAt.After(now) {
+				connectedAt = now
+			}
+		}
+		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId, ConnectedAt: connectedAt})
 	}
+	in.Certs = certStats(st, now)
 	out, err := c.f.st.IngestStats(ctx, in)
 	if err != nil {
 		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
@@ -456,8 +460,6 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	if !out.Duplicate {
 		applyCoreSnapshot(tr.state, &tr.sidecar.Live, st, g.traffic, now, out.Refs)
 		c.l3Stats(ctx, tr.state.NodeID, &tr.sidecar.L3, st, now)
-		c.certStats(ctx, tr.state.NodeID, tr.sidecar.CertSeen, st, now)
-		c.f.touchAwgDevices(ctx, st, out.Refs, now)
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", tr.state.NodeID, "count", out.Skipped)
 		}
@@ -655,7 +657,6 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
 	}
-	tr.sidecar.CertSeen = map[string]string{}
 	if r.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED {
 		return nil
 	}
@@ -910,11 +911,12 @@ func (c *SessionCore) l3Stats(ctx context.Context, nodeID string, intake *l3Inta
 	intake.warpUp = up
 }
 
-// certStats keeps the certificate each inbound serves, as the stats stream reports it: an ACME certificate is issued after
-// the ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
-// (it ends up in subscriptions of self-signed inbounds); a database failure is logged, the next batch tries again.
-// An expiry beyond maxCertLife is not believed (the health check would never warn): the stored value stays.
-func (c *SessionCore) certStats(ctx context.Context, nodeID string, seen map[string]string, st *agentv1.StatsBatch, now time.Time) {
+// certStats builds the inbound certificates to commit with this stats batch. An ACME certificate is issued after the
+// ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
+// (it ends up in subscriptions of self-signed inbounds). An expiry beyond maxCertLife is not believed (the health
+// check would never warn), so that value stays unchanged.
+func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
+	var certs []store.FleetInboundCert
 	for _, h := range st.Health {
 		if h.CertPinSha256 == "" || h.CertNotAfterUnix <= 0 || h.CertNotAfterUnix > now.Add(maxCertLife).Unix() {
 			continue
@@ -923,14 +925,7 @@ func (c *SessionCore) certStats(ctx context.Context, nodeID string, seen map[str
 		if !ok {
 			continue
 		}
-		key := pin + "/" + fmt.Sprint(h.CertNotAfterUnix)
-		if seen[h.InboundId] == key {
-			continue
-		}
-		if err := c.f.st.SetInboundCert(ctx, nodeID, h.InboundId, pin, time.Unix(h.CertNotAfterUnix, 0).UTC(), now); err != nil {
-			c.f.log.Warn("store inbound certificate", "node", nodeID, "inbound", h.InboundId, "err", err)
-			continue
-		}
-		seen[h.InboundId] = key
+		certs = append(certs, store.FleetInboundCert{InboundID: h.InboundId, Pin: pin, NotAfter: time.Unix(h.CertNotAfterUnix, 0).UTC()})
 	}
+	return certs
 }

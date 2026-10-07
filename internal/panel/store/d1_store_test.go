@@ -102,12 +102,12 @@ func TestD1StoreSmoke(t *testing.T) {
 	t.Cleanup(func() { _ = st.Close() })
 	ctx := context.Background()
 
-	// This smoke covers Setting, SetSettings, Audit, and ListAudit. The following
-	// store methods still use their existing multi-statement transactions and remain deferred to later steps:
-	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
-	// InsertProbeCredIdx, Access.AddAWGDevice, and Access.RotateAWGDevice.
+	// This smoke covers Setting, SetSettings, Audit, ListAudit, and NodeHello's missing-node error mapping.
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
 		t.Fatal(err)
+	}
+	if _, _, err := st.NodeHello(ctx, "nod_missing", HelloInfo{Instance: "instance"}, time.Unix(123, 0).UTC()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("NodeHello(missing) = %v, want ErrNotFound", err)
 	}
 	if value, err := st.Setting(ctx, "edge.smoke"); err != nil || value != "ready" {
 		t.Fatalf("Setting() = %q, %v", value, err)
@@ -119,6 +119,97 @@ func TestD1StoreSmoke(t *testing.T) {
 	if err != nil || len(rows) != 1 || rows[0].Action != "edge.smoke" {
 		t.Fatalf("ListAudit() = %+v, %v", rows, err)
 	}
+}
+
+func TestD1FleetBatchSmoke(t *testing.T) {
+	st := openD1Store(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0).UTC()
+	if err := st.InsertCA(ctx, CARow{ID: "cas_d1", CertPEM: "ca", Fingerprint: "fingerprint", KeyEnc: []byte{1},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.AddDate(1, 0, 0)}, now); err != nil {
+		t.Fatal(err)
+	}
+	node, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_d1_stats", Name: "d1-stats", Address: "example.com"}, "", []byte("d1-stats-token"), "adm_test", now, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := js.Global().Get("__d1")
+	var stats FleetStatsOut
+	var calls d1CallCount
+	calls = countD1Queries(t, binding, "IngestStats", func() {
+		stats, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "d1-instance", Seq: 1, Now: now, HourStart: now.Unix() / 3600 * 3600})
+	})
+	if err != nil || stats.Duplicate {
+		t.Fatalf("IngestStats() = %+v, %v", stats, err)
+	}
+	if calls.queries != 2 || calls.batches != 2 {
+		t.Fatalf("IngestStats used %d D1 calls in %d batches, want 2 calls in 2 batches", calls.queries, calls.batches)
+	}
+	var duplicate bool
+	calls = countD1Queries(t, binding, "IngestEvent", func() {
+		duplicate, err = st.IngestEvent(ctx, node.ID, "d1-instance", 2, now, EventRow{Time: now, Severity: 1, Code: "edge.smoke.event"})
+	})
+	if err != nil || duplicate {
+		t.Fatalf("IngestEvent() = duplicate %v, %v", duplicate, err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("IngestEvent used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
+	}
+	calls = countD1Queries(t, binding, "NodeHello", func() {
+		_, acked, helloErr := st.NodeHello(ctx, node.ID, HelloInfo{AgentVersion: "test", Instance: "d1-instance"}, now)
+		if helloErr != nil {
+			err = helloErr
+			return
+		}
+		if acked != 2 {
+			err = errors.New("NodeHello did not return the committed sequence")
+		}
+	})
+	if err != nil {
+		t.Fatalf("NodeHello() = %v", err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("NodeHello used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
+	}
+
+	enrolled, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_d1_enroll", Name: "d1-enroll", Address: "example.com"}, "", []byte("d1-enroll-token"), "adm_test", now, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := st.Enroll(ctx, []byte("d1-enroll-token"), []byte("d1-key"), now, func(nodeID string) (CertRow, error) {
+		return CertRow{Serial: "serial-d1", NodeID: nodeID, CAID: "cas_d1", PEM: "certificate", NotBefore: now,
+			NotAfter: now.Add(24 * time.Hour), IssuedAt: now}, nil
+	})
+	if err != nil || result.NodeID != enrolled.ID || result.Replay {
+		t.Fatalf("Enroll() = %+v, %v", result, err)
+	}
+	if err := st.NodeApplied(ctx, enrolled.ID, 1, "hash", nil, now); err != nil {
+		t.Fatalf("write-only NodeApplied transaction on D1: %v", err)
+	}
+	if err := st.SkipSeq(ctx, enrolled.ID, "d1-instance", 3, now); err != nil {
+		t.Fatalf("write-only SkipSeq transaction on D1: %v", err)
+	}
+	if err := st.RenewCert(ctx, CertRow{Serial: "serial-renewed", NodeID: enrolled.ID, CAID: "cas_d1", PEM: "renewed",
+		NotBefore: now, NotAfter: now.Add(48 * time.Hour), IssuedAt: now}, now, time.Minute); err != nil {
+		t.Fatalf("write-only RenewCert transaction on D1: %v", err)
+	}
+	calls = countD1Queries(t, binding, "RetireNode", func() { err = st.RetireNode(ctx, enrolled.ID, now) })
+	if err != nil {
+		t.Fatalf("RetireNode() = %v", err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("RetireNode used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
+	}
+}
+
+type d1CallCount struct{ queries, batches int }
+
+func countD1Queries(t *testing.T, binding js.Value, label string, run func()) d1CallCount {
+	t.Helper()
+	binding.Call("__beginQueryCount", label)
+	run()
+	counts := binding.Call("__endQueryCount")
+	return d1CallCount{queries: counts.Get("sequentialQueries").Int(), batches: counts.Get("batchCalls").Int()}
 }
 
 func openD1Store(t *testing.T) *Store {

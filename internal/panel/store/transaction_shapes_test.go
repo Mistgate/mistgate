@@ -53,6 +53,12 @@ var transactionShape2 = map[string]string{
 	"authpw.go:ResetPasswordLogin":                 "A credential guard precedes the plain credential, lock, session, and audit writes.",
 	"awg_prepare.go:awgPrepareTx":                  "The exact JSON and backend read by fn guard its update; stale decisions retry.",
 	"dns.go:Delete":                                "A preset guard precedes preset deletion and clearing user and group references.",
+	"fleet_ca.go:CreateEnrollment":                 "Optional node creation, token replacement, and the current-node read share one batch guarded against missing or retired nodes.",
+	"fleet_ca.go:Enroll":                           "A reader batch loads the token, node, and replay certificate; signing runs outside one guarded consume-and-issue batch.",
+	"fleet_node.go:NodeHello":                      "Previous and current node rows bracket the guarded facts update in one D1 batch.",
+	"fleet_node.go:RetireNode":                     "A node-state guard precedes retirement, certificate/token changes, provisioning cancellation, and retained-key deletion.",
+	"fleet_stats.go:IngestEvent":                   "One batch conditionally inserts the event and advances the node sequence, distinguishing duplicates from missing nodes.",
+	"fleet_stats.go:IngestStats":                   "Credential and node lookups run in one read batch; a guarded write batch applies counters, certificates, device touches, and the sequence.",
 	"health.go:InsertProbeCredIdx":                 "A guarded batch retries when the inbound credential or candidate peer allocation changed.",
 	"mcpplan.go:BeginApply":                        "A status and hash compare-and-swap lets only one apply proceed.",
 	"mcpplan.go:CreateMCPPlan":                     "SQL guards per-token and panel-wide capacity in the atomic insert batch.",
@@ -70,15 +76,9 @@ var transactionShape2 = map[string]string{
 }
 
 var transactionShape3 = map[string]string{
-	"fleet_ca.go:CreateEnrollment": "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_ca.go:Enroll":           "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_ca.go:RenewCert":        "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:NodeApplied":    "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:NodeHello":      "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_node.go:RetireNode":     "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:IngestEvent":   "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:IngestStats":   "not yet reviewed (step 2c, with the node Durable Object)",
-	"fleet_stats.go:SkipSeq":       "not yet reviewed (step 2c, with the node Durable Object)",
+	"fleet_ca.go:RenewCert":     "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
+	"fleet_node.go:NodeApplied": "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
+	"fleet_stats.go:SkipSeq":    "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
 }
 
 func TestTransactionCallSitesClassified(t *testing.T) {
