@@ -1,5 +1,6 @@
 // Package agent is the node agent core: it enrolls with the panel, keeps ONE agent session open
-// (mTLS Connect by default, or the signed WebSocket link when configured; reconnecting with backoff),
+// (mTLS Connect by default, or the signed WebSocket link when the agent has a link URL and the panel advertises
+// it; a link that fails to establish falls back to mTLS and is retried after a hold period; reconnecting with backoff),
 // applies desired state to engines, reports traffic reliably (seq + ack), executes commands and serves
 // its own log. The wire protocol is specified in the
 // comment block of proto/mistgate/agent/v1/agent.proto; this package implements it, nothing more.
@@ -108,8 +109,8 @@ type Agent struct {
 	out            *outbox
 	jobs           chan job
 	settings       atomic.Pointer[pb.NodeSettings]
-	linkAdvertised atomic.Bool
-	linkHold       atomic.Bool
+	linkAdvertised atomic.Bool  // the last HelloAck advertised the signed link
+	linkHold       atomic.Bool  // a link attempt failed before it was established: the next mTLS session stays up for linkHoldFor
 	linkHTTPClient *http.Client // test seam; nil uses normal system-root TLS verification
 	offset         atomic.Int64 // seconds: panel clock minus local clock, measured at Hello
 	skewed         atomic.Bool
@@ -166,7 +167,12 @@ type Agent struct {
 	helloTimeout time.Duration // 0 = twice the dial timeout
 	commitTick   time.Duration // update commit watch poll, default 2 s
 	commitSettle time.Duration // connected this long before a new build may commit, default 10 s
+	linkHoldFor  time.Duration // 0 = defaultLinkHold: how long a held mTLS session lives before the link is tried again
 }
+
+// defaultLinkHold is how long an mTLS session that was kept after a failed link attempt stays up before it is ended
+// so the agent dials the link again; it bounds the failed link attempts to one per period.
+const defaultLinkHold = 10 * time.Minute
 
 // held remembers what was last handed to an engine so unchanged inbounds are not re-applied.
 type held struct {
@@ -380,6 +386,12 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		if errors.Is(err, errSwitchTransport) {
 			continue
 		}
+		if errors.Is(err, errLinkNotEstablished) {
+			// session() has cleared the advertisement, so the next session is mTLS (held for linkHoldFor): no backoff
+			// wait, and none of the growth it would add to the delay of later real failures.
+			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
+			continue
+		}
 		lived := time.Since(started)
 		var wait time.Duration
 		wait, delay = backoffStep(delay, lived, a.backoffMin, a.backoffMax)
@@ -568,7 +580,6 @@ func (a *Agent) session(ctx context.Context) error {
 		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
 			a.linkAdvertised.Store(false)
 			a.linkHold.Store(true)
-			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
 		}
 		return err
 	}
@@ -651,15 +662,27 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	a.linkAdvertised.Store(ack.LinkSupported)
 	a.onHelloAck(ack)
 	_, isConnect := stream.(*connectAgentTransport)
-	holdLink := false
-	if isConnect && a.cfg.LinkURL != "" {
-		holdLink = a.linkHold.Swap(false)
-	}
-	if ack.LinkSupported && a.cfg.LinkURL != "" && isConnect && !holdLink {
+	linkConfigured := isConnect && a.cfg.LinkURL != ""
+	holdLink := linkConfigured && a.linkHold.Swap(false) // the hold lasts for this one mTLS session
+	if linkConfigured && ack.LinkSupported && !holdLink {
 		// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
 		cancel()
 		_ = stream.Close()
 		return errSwitchTransport
+	}
+	var holdExpired atomic.Bool
+	if holdLink && ack.LinkSupported {
+		// Held although the panel offers the link: after the hold period end this session the way any other ends
+		// (cancel closes the transport, the receive loop fails) and let the reconnect loop dial the link again.
+		hold := a.linkHoldFor
+		if hold == 0 {
+			hold = defaultLinkHold
+		}
+		t := time.AfterFunc(hold, func() {
+			holdExpired.Store(true)
+			cancel()
+		})
+		defer t.Stop()
 	}
 	a.dsOK.Store(true)
 	a.connAt.Store(time.Now().UnixNano())
@@ -685,6 +708,9 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
+			if holdExpired.Load() {
+				return errSwitchTransport
+			}
 			if errors.Is(err, io.EOF) {
 				err = errors.New("stream closed by the panel")
 			}

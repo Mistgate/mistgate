@@ -175,6 +175,15 @@ and the panel's `NodeSettings`/address message says which transport to prefer. m
 during the transition (existing nodes keep working untouched) and is retired by the same date-driven mechanism the
 proto already uses for the SPIFFE URI migration.
 
+**Transport choice (VPS edition).** Every VPS panel serves the signed link under its own secret path prefix and advertises
+it in `HelloAck.link_supported`; the opt-in is on the agent side: an agent uses the link only when it is configured with a
+link URL (`--link-url` / `MISTGATE_LINK_URL`), otherwise it stays on mTLS. A configured agent connects over mTLS first and,
+when that `HelloAck` advertises the link, reconnects over the link at once. If a link attempt fails before it is
+established (unreachable, refused, handshake rejected), the agent falls back to mTLS and holds that mTLS session for a
+fixed hold period (10 minutes); when the period is over it ends the session and dials the link again, so a failing link
+costs at most one attempt per hold period and the node stays managed over mTLS in between. A link that was established
+and then drops is redialled directly, without going through mTLS.
+
 Other agent traffic: `Enroll` / `Renew` are plain unary HTTP (work as is; the enrolment token authenticates, the CSR's public
 key is stored). `FetchUpdate` is a server-streaming download; on the edge the same bytes come from R2 with a signed,
 short-lived request instead of the client certificate (server streaming was measured to work).
@@ -192,7 +201,8 @@ certificate it already trusts for mTLS, so a panel without the CA key cannot dri
 shows. Residual risk, accepted: the handshake is not bound to the TLS channel (on the edge Cloudflare terminates TLS, so
 there is no channel to bind to); after the handshake the session's integrity rests on TLS to a publicly trusted name.
 Someone holding a valid certificate for the panel's name and the network path could relay and alter a session. On the
-VPS edition mTLS stays the default and the link is opt-in.
+VPS edition mTLS stays the default for agents: the link is used only by agents configured with a link URL (see "Transport
+choice" above).
 
 ## 5. Features that cannot run in a Worker move to the nodes (both editions)
 

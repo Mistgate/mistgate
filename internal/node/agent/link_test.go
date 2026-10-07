@@ -385,6 +385,177 @@ func TestAgentEstablishedLinkDropReconnectsWithoutMTLS(t *testing.T) {
 	}
 }
 
+// holdLinkServer is a fake link endpoint for the hold-expiry tests: the first `fail` requests get a 404 (the link is
+// unreachable before it is established), every later one completes the signed handshake and is held open as an
+// established link. It records the time of each request.
+type holdLinkServer struct {
+	srv  *httptest.Server
+	mu   sync.Mutex
+	at   []time.Time
+	fail int
+}
+
+func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
+	t.Helper()
+	s := &holdLinkServer{fail: fail}
+	s.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.at = append(s.at, time.Now())
+		n := len(s.at)
+		s.mu.Unlock()
+		if n <= s.fail {
+			http.NotFound(w, r)
+			return
+		}
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer ws.Close(websocket.StatusNormalClosure, "")
+		panelNonce := bytes.Repeat([]byte{7}, 32)
+		if agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: r.Host}) != nil {
+			return
+		}
+		_, frame, err := agentlink.ReadFrame(r.Context(), ws)
+		var auth agentv1.LinkAuth
+		if err != nil || proto.Unmarshal(frame, &auth) != nil {
+			return
+		}
+		sig, err := agentlink.Sign(h.panel.caKey, agentlink.PanelDigest(auth.NodeId, r.Host, panelNonce, auth.Nonce))
+		if err != nil || agentlink.WriteFrame(r.Context(), ws, &agentv1.LinkAccept{Signature: sig}) != nil {
+			return
+		}
+		if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil { // Hello
+			return
+		}
+		if agentlink.WriteFrame(r.Context(), ws, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{
+			HelloAck: &agentv1.HelloAck{LinkSupported: true},
+		}}) != nil {
+			return
+		}
+		for {
+			if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil {
+				return
+			}
+		}
+	}))
+	t.Cleanup(s.srv.Close)
+	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(s.srv.URL, "https") + "/" + strings.Repeat("h", 24) + "/"
+	h.a.linkHTTPClient = s.srv.Client()
+	return s
+}
+
+func (s *holdLinkServer) attempts() []time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]time.Time(nil), s.at...)
+}
+
+func sessionOnLink(a *Agent) bool {
+	s := a.cur.Load()
+	if s == nil {
+		return false
+	}
+	_, ok := s.stream.(*websocketAgentTransport)
+	return ok
+}
+
+func sessionOnMTLS(a *Agent) bool {
+	s := a.cur.Load()
+	if s == nil {
+		return false
+	}
+	_, ok := s.stream.(*connectAgentTransport)
+	return ok
+}
+
+// A link attempt that fails before it is established holds the next mTLS session; once the hold period is over
+// that session ends on its own, the agent dials the link again without a backoff wait and, this time, stays on it.
+func TestAgentHeldMTLSSessionEndsAfterHoldAndRetriesLink(t *testing.T) {
+	const hold = 300 * time.Millisecond
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 1)
+	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second // a backoff wait anywhere would show as a timeout
+	h.a.linkHoldFor = hold
+	h.start()
+
+	eventually(t, func() bool { return len(ls.attempts()) == 1 && sessionOnMTLS(h.a) }, "held mTLS session after the failed link attempt")
+	if got := h.panel.connCount(); got != 2 {
+		t.Fatalf("mTLS sessions while holding = %d, want the discovery session and one held session", got)
+	}
+	eventually(t, func() bool { return sessionOnLink(h.a) }, "link session after the hold period")
+	at := ls.attempts()
+	if len(at) != 2 {
+		t.Fatalf("link attempts = %d, want 2 (one failed, one established)", len(at))
+	}
+	if gap := at[1].Sub(at[0]); gap < hold {
+		t.Fatalf("link retried %v after the failure, before the %v hold period was over", gap, hold)
+	}
+	time.Sleep(2 * hold)
+	if !sessionOnLink(h.a) || len(ls.attempts()) != 2 || h.panel.connCount() != 2 {
+		t.Fatalf("agent left the established link: onLink=%v attempts=%d mtls=%d", sessionOnLink(h.a), len(ls.attempts()), h.panel.connCount())
+	}
+}
+
+// A link that keeps failing is tried at most once per hold period, and an mTLS session is up between the attempts.
+func TestAgentFailingLinkIsRetriedOncePerHoldPeriod(t *testing.T) {
+	const hold = 200 * time.Millisecond
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 1<<30)
+	h.a.linkHoldFor = hold
+	h.start()
+
+	var mu sync.Mutex
+	var mtls []time.Time // when an mTLS session was seen active
+	stop := make(chan struct{})
+	t.Cleanup(func() { close(stop) })
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(5 * time.Millisecond):
+			}
+			if sessionOnMTLS(h.a) {
+				mu.Lock()
+				mtls = append(mtls, time.Now())
+				mu.Unlock()
+			}
+		}
+	}()
+
+	const want = 5
+	eventually(t, func() bool { return len(ls.attempts()) >= want }, "repeated link attempts")
+	at := ls.attempts()[:want]
+	mu.Lock()
+	defer mu.Unlock()
+	for i := 1; i < want; i++ {
+		if gap := at[i].Sub(at[i-1]); gap < hold {
+			t.Errorf("link attempts %d and %d are %v apart, want at least the %v hold period", i, i+1, gap, hold)
+		}
+		active := false
+		for _, m := range mtls {
+			if m.After(at[i-1]) && m.Before(at[i]) {
+				active = true
+				break
+			}
+		}
+		if !active {
+			t.Errorf("no active mTLS session between link attempts %d and %d", i, i+1)
+		}
+	}
+	conns := h.panel.connCount() // read before the attempts: both only grow
+	if n := len(ls.attempts()); conns > n+1 {
+		t.Errorf("mTLS sessions = %d for %d link attempts, want at most one discovery and one held session per attempt", conns, n)
+	}
+}
+
 func waitForLinkAttempt(t *testing.T, attempts <-chan agentLinkAttempt) agentLinkAttempt {
 	t.Helper()
 	select {

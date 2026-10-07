@@ -114,7 +114,7 @@ The hidden **`mistgate panel-update-helper`** takes `--fetch-latest` (required),
 | `enroll --resume-key` | none | off | Keep the new key in `enroll-pending.pem` until enrollment succeeds and reuse it on a retry. Used by the SSH install. |
 | `enroll --force` | none | off | Replace an identity that is already there. |
 | `enroll`, `install`, `run --state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | The agent's state directory. Use the same one for all three. |
-| `run --link-url` | `MISTGATE_LINK_URL` | empty | Optional `wss://host/<secret-prefix>` base for the signed WebSocket link. The agent uses it when the panel advertises support; otherwise it uses mTLS. Existing nodes stay on mTLS unless you configure this value. The install command does not set it. |
+| `run --link-url` | `MISTGATE_LINK_URL` | empty | Optional `wss://host/<secret-prefix>` base for the signed WebSocket link. The agent uses it when the panel advertises support; otherwise it uses mTLS. Every panel serves and advertises the link; only agents with this value use it. If the link cannot be established the agent falls back to mTLS and tries the link again after 10 minutes. Existing nodes stay on mTLS unless you configure this value. The install command does not set it. |
 | `install --bin` | none | `/usr/local/bin/mistgate-node` | Where the binary lives; the running executable is copied there when it is elsewhere. Its directory becomes writable for the agent (self-update). |
 | `install --no-start` | none | off | Write and enable the unit without starting it. |
 | `run --log-level` | `MISTGATE_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
