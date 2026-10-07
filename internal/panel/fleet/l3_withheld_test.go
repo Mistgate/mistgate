@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
 
 // An awg inbound added while an old agent (no "awg/1") is connected changes nothing in what that agent is sent, so no
@@ -72,5 +74,21 @@ func TestSessionCoreReconcileFailsWithheldInbounds(t *testing.T) {
 	}
 	if row = x.inboundRow("inb_awg"); row.State != "failed" || !strings.HasPrefix(row.LastError, "agent_too_old") {
 		t.Fatalf("the preparation apply did not fail the withheld inbound: %+v", row)
+	}
+}
+
+func TestApplyResultUsesSessionWithheldIds(t *testing.T) {
+	x, a := newL3Env(t)
+	state := SessionState{NodeID: a.nodeID, SentRevision: 7, SentStateHash: "sent-state", SentWithheld: []string{"inb_awg"}}
+	tr := coreTransition{state: &state, sidecar: &SessionSidecar{}}
+	err := NewSessionCore(x.f).applyResult(x.ctx, &tr, &agentv1.ApplyResult{
+		Revision: state.SentRevision, StateHash: state.SentStateHash, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED,
+	}, x.f.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := x.inboundRow("inb_awg")
+	if row.State != "failed" || row.LastError != withheldReason {
+		t.Fatalf("withheld inbound after ApplyResult = %+v", row)
 	}
 }

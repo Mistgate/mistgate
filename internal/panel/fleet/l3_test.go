@@ -394,6 +394,28 @@ func TestWarpPauseAppliedNeedsThePausedStateConfirmed(t *testing.T) {
 	within(t, "the pause is confirmed", func() bool { return x.f.WarpPauseApplied(x.ctx, a.nodeID) })
 }
 
+func TestWarpPauseAppliedUsesPersistedDigestWithoutSession(t *testing.T) {
+	x, a := newL3Env(t)
+	digest := sentDigest{Revision: 9, Hash: "paused-state", Warp: "warp-hash", WarpOff: true}
+	raw, err := json.Marshal(digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := x.st.NodeDesired(x.ctx, a.nodeID, digest.Revision, digest.Hash, raw); err != nil {
+		t.Fatal(err)
+	}
+	if x.f.session(a.nodeID) != nil {
+		t.Fatal("test unexpectedly has a live session")
+	}
+	if x.f.WarpPauseApplied(x.ctx, a.nodeID) {
+		t.Fatal("an unconfirmed pause counted without a session")
+	}
+	x.exec(`UPDATE node SET applied_hash = ? WHERE id = ?`, digest.Hash, a.nodeID)
+	if !x.f.WarpPauseApplied(x.ctx, a.nodeID) {
+		t.Fatal("a confirmed persisted pause was not recognized without a session")
+	}
+}
+
 func TestUpdateNodeAwgBackendRules(t *testing.T) {
 	x, a := newL3Env(t)
 	call := func(v string) error {

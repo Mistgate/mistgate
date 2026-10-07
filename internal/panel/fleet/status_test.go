@@ -79,12 +79,12 @@ func setHealth(e *env, id string, h ...*agentv1.InboundHealth) {
 	view := s.view.Load()
 	live := LiveSnapshot{}
 	var state SessionState
-	var sent *nodeState
 	if view != nil {
-		state, sent, live = view.State, view.SentDesired, cloneLiveSnapshot(view.Live)
+		state, live = view.State, cloneLiveSnapshot(view.Live)
 	}
+	state.SentWithheld = slices.Clone(state.SentWithheld)
 	live.Health = h
-	s.view.Store(&sessionView{State: state, SentDesired: sent, Live: live})
+	s.view.Store(&sessionView{State: state, Live: live})
 }
 
 // An online node is "healthy" only when someone can use it: without a single enabled profile it needs attention, and a

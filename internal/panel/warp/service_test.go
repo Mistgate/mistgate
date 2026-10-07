@@ -640,7 +640,7 @@ func TestStoreHealthAndPending(t *testing.T) {
 	}
 
 	// Pending: the node has a stream and has not applied what the panel last sent.
-	if err := e.st.NodeDesired(e.ctx, node, 5, "hash-new"); err != nil {
+	if err := e.st.NodeDesired(e.ctx, node, 5, "hash-new", []byte(`{"r":5,"h":"hash-new"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if g, _ = e.rpc().GetWarp(e.ctx, connect.NewRequest(&adminv1.GetWarpRequest{NodeId: node})); !g.Msg.PendingApply {

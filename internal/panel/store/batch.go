@@ -180,18 +180,24 @@ func (r batchRow) Scan(dest ...any) error {
 				return fmt.Errorf("store: batch column %d is %T, want integer", i, value)
 			}
 			*target = int(v)
-		case *bool:
-			v, ok := value.(int64)
-			if !ok {
-				return fmt.Errorf("store: batch column %d is %T, want boolean", i, value)
-			}
-			*target = v != 0
 		case *int64:
 			v, ok := value.(int64)
 			if !ok {
 				return fmt.Errorf("store: batch column %d is %T, want integer", i, value)
 			}
 			*target = v
+		case *bool:
+			switch v := value.(type) {
+			case bool:
+				*target = v
+			case int64:
+				if v != 0 && v != 1 {
+					return fmt.Errorf("store: batch column %d is %d, want boolean", i, v)
+				}
+				*target = v != 0
+			default:
+				return fmt.Errorf("store: batch column %d is %T, want boolean", i, value)
+			}
 		case *uint64:
 			v, ok := value.(int64)
 			if !ok || v < 0 {

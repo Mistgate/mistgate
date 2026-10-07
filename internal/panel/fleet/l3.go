@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -56,16 +57,15 @@ func (f *Fleet) warpModule() Warp {
 // confirmed exactly that state. It is RestartWarp's proof that the tunnel went down; another change applied meanwhile (a
 // state that still runs WARP) does not count.
 func (f *Fleet) WarpPauseApplied(ctx context.Context, nodeID string) bool {
-	s := f.session(nodeID)
-	if s == nil {
+	n, rawDigest, err := f.st.NodeWithSentDigest(ctx, nodeID)
+	if err != nil || len(rawDigest) == 0 {
 		return false
 	}
-	view := s.view.Load()
-	if view == nil || view.SentDesired == nil || view.SentDesired.warp == nil || view.SentDesired.warp.Enabled {
+	var digest sentDigest
+	if err := json.Unmarshal(rawDigest, &digest); err != nil {
 		return false
 	}
-	n, err := f.st.Node(ctx, nodeID)
-	return err == nil && n.AppliedHash == view.SentDesired.hash
+	return digest.WarpOff && n.AppliedHash == digest.Hash
 }
 
 // Intervals of the persisted health: a changed report is written at most this often, an unchanged one this often (so that

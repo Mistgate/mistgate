@@ -44,9 +44,8 @@ type logSub struct {
 
 // sessionView is one immutable admin snapshot published after each core step.
 type sessionView struct {
-	State       SessionState
-	SentDesired *nodeState
-	Live        LiveSnapshot
+	State SessionState
+	Live  LiveSnapshot
 }
 
 // session is the one live agent session of a node.
@@ -77,7 +76,8 @@ type session struct {
 func (s *session) publishView() {
 	state := s.coreState
 	state.Capabilities = slices.Clone(state.Capabilities)
-	s.view.Store(&sessionView{State: state, SentDesired: s.coreSidecar.SentDesired, Live: s.coreSidecar.Live})
+	state.SentWithheld = slices.Clone(state.SentWithheld)
+	s.view.Store(&sessionView{State: state, Live: s.coreSidecar.Live})
 }
 
 func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {

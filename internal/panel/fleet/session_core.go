@@ -43,6 +43,7 @@ type SessionState struct {
 	LastSeenAt            time.Time    `json:"v_at,omitzero"`
 	SentRevision          uint64       `json:"q,omitempty"`
 	SentStateHash         string       `json:"sh,omitempty"`
+	SentWithheld          []string     `json:"wh,omitempty"`
 	SentSettingsHash      string       `json:"ss,omitempty"`
 	DriftResent           bool         `json:"dr,omitempty"`
 	Drift                 bool         `json:"dt,omitempty"`
@@ -92,11 +93,10 @@ const (
 
 // SessionSidecar holds desired/live state that is too large for SessionState.
 type SessionSidecar struct {
-	Version     uint32
-	SentDesired *nodeState
-	Live        LiveSnapshot
-	L3          l3Intake
-	Pending     map[string]PendingRequest
+	Version uint32
+	Live    LiveSnapshot
+	L3      l3Intake
+	Pending map[string]PendingRequest
 }
 
 // EventKind identifies one input that the session core can process.
@@ -192,6 +192,7 @@ type Transition struct {
 type preparedDesiredState struct {
 	node    store.NodeRow
 	desired *nodeState
+	digest  *sentDigest
 }
 
 type coreTransition struct {
@@ -651,19 +652,17 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 		}
 		in = append(in, ia)
 	}
-	if tr.sidecar.SentDesired != nil {
-		in = append(in, withheldApplied(tr.sidecar.SentDesired.withheld)...)
-	}
+	in = append(in, withheldApplied(tr.state.SentWithheld)...)
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
 	}
 	if r.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED {
 		return nil
 	}
-	if tr.sidecar.SentDesired == nil || r.Revision != tr.state.SentRevision {
+	if tr.state.SentRevision == 0 || r.Revision != tr.state.SentRevision {
 		return nil
 	}
-	if r.StateHash == tr.sidecar.SentDesired.hash {
+	if r.StateHash == tr.state.SentStateHash {
 		tr.state.DriftResent = false
 		tr.state.Drift = false
 		return nil
@@ -720,7 +719,7 @@ func (c *SessionCore) desiredPrepared(ctx context.Context, tr *coreTransition, e
 }
 
 func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransition, prepared *preparedDesiredState, now time.Time) error {
-	state, sidecar := tr.state, tr.sidecar
+	state := tr.state
 	node, want := prepared.node, prepared.desired
 	if node.State == "retired" {
 		return nil
@@ -731,22 +730,36 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	settings := nodeSettings(node, state.Capabilities)
 	sig := settingsSig(settings)
-	if sidecar.SentDesired == nil && !state.FullResendPending && state.SentRevision == 0 {
+	digest := prepared.digest
+	if !state.FullResendPending && state.SentRevision == 0 {
 		if state.HelloAppliedStateHash != "" && state.HelloAppliedStateHash == want.hash && state.HelloAppliedRevision > 0 {
-			sidecar.SentDesired = want
-			state.SentRevision = state.HelloAppliedRevision
-			state.SentStateHash = want.hash
-			rev := max(node.DesiredRevision, state.HelloAppliedRevision)
-			if sig == state.SentSettingsHash {
-				return c.f.st.NodeDesired(ctx, node.ID, rev, want.hash)
+			var raw []byte
+			var err error
+			digest, raw, err = marshalSentDigest(want, state.HelloAppliedRevision)
+			if err != nil {
+				return err
 			}
+			if err := c.f.st.NodeDesired(ctx, node.ID, max(node.DesiredRevision, state.HelloAppliedRevision), want.hash, raw); err != nil {
+				return err
+			}
+			state.SentRevision = digest.Revision
+			state.SentStateHash = want.hash
+			state.SentWithheld = slices.Clone(want.withheld)
+			if sig == state.SentSettingsHash {
+				return nil
+			}
+		} else if digest != nil && state.HelloAppliedRevision > 0 &&
+			digest.Revision == state.HelloAppliedRevision && digest.Hash == state.HelloAppliedStateHash {
+			state.SentRevision = digest.Revision
+			state.SentStateHash = digest.Hash
+			state.SentWithheld = slices.Clone(want.withheld)
 		}
 	}
-	full := state.FullResendPending || sidecar.SentDesired == nil || state.SentRevision == 0
-	if !full && sidecar.SentDesired.warp != nil && want.warp == nil {
+	full := state.FullResendPending || state.SentRevision == 0 || digest == nil || digest.Revision != state.SentRevision
+	if !full && digest.Warp != "" && want.warp == nil {
 		full = true
 	}
-	if !full && want.hash == sidecar.SentDesired.hash && sig == state.SentSettingsHash {
+	if !full && want.hash == digest.Hash && sig == state.SentSettingsHash {
 		return nil
 	}
 	rev := max(node.DesiredRevision, state.SentRevision) + 1
@@ -756,18 +769,22 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		ds.Warp = warpProto(want.warp)
 	} else {
 		ds.BaseRevision = state.SentRevision
-		ds.Inbounds, ds.RemovedInboundIds = diffState(sidecar.SentDesired, want)
-		if !sameWarp(sidecar.SentDesired.warp, want.warp) {
+		ds.Inbounds, ds.RemovedInboundIds = diffState(digest, want)
+		if digest.Warp != warpHash(want.warp) {
 			ds.Warp = warpProto(want.warp)
 		}
 	}
-	if err := c.f.st.NodeDesired(ctx, node.ID, rev, want.hash); err != nil {
+	_, raw, err := marshalSentDigest(want, rev)
+	if err != nil {
+		return err
+	}
+	if err := c.f.st.NodeDesired(ctx, node.ID, rev, want.hash, raw); err != nil {
 		return err
 	}
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_DesiredState{DesiredState: ds}})
-	sidecar.SentDesired = want
 	state.SentRevision = rev
 	state.SentStateHash = want.hash
+	state.SentWithheld = slices.Clone(want.withheld)
 	state.SentSettingsHash = sig
 	if full {
 		state.FullResendPending = false

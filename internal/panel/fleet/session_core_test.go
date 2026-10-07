@@ -145,8 +145,8 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if len(tr.Frames) != 2 || tr.Frames[0].GetHelloAck() == nil || tr.Frames[1].GetDesiredState() == nil {
 			t.Fatalf("hello frames = %#v", tr.Frames)
 		}
-		if tr.State.SentRevision == 0 || tr.Sidecar.SentDesired == nil {
-			t.Fatalf("initial desired state not recorded: state=%+v sidecar=%+v", tr.State, tr.Sidecar)
+		if tr.State.SentRevision == 0 || tr.State.SentStateHash == "" {
+			t.Fatalf("initial desired state not recorded: state=%+v", tr.State)
 		}
 		if tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.NextAckTick) {
 			t.Fatalf("next alarm = %v, ack deadline = %v", tr.NextAlarm, tr.State.NextAckTick)
@@ -167,10 +167,151 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if len(tr.Frames) != 1 || tr.Frames[0].GetHelloAck() == nil {
 			t.Fatalf("matching applied state sent frames = %#v", tr.Frames)
 		}
-		if tr.State.SentRevision != 7 || tr.Sidecar.SentDesired == nil {
-			t.Fatalf("matching baseline not recorded: state=%+v sidecar=%+v", tr.State, tr.Sidecar)
+		if tr.State.SentRevision != 7 || tr.State.SentStateHash != want.hash {
+			t.Fatalf("matching baseline not recorded: state=%+v", tr.State)
 		}
 	})
+}
+
+func TestSessionCoreReconnectUsesStoredSentDigest(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-reconnect-digest")
+	e.fixture(state.NodeID)
+	first := stepHello(t, core, ctx, state, sidecar, now, hello("instance-before-reconnect", 0, "").GetHello())
+
+	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
+	newCore := NewSessionCore(e.f)
+	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
+		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout)}
+	reconnected, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
+		At: now.Add(2 * time.Second), Frame: hello("instance-after-reconnect", first.State.SentRevision, first.State.SentStateHash)})
+	if err != nil || reconnected.Close != nil {
+		t.Fatalf("reconnect Hello = close %v, err %v", reconnected.Close, err)
+	}
+	requested, err := coreStep(newCtx, newCore, reconnected.State, reconnected.Sidecar,
+		SessionEvent{Kind: EventDesiredChanged, At: now.Add(3 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_alice'`)
+	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := coreStep(newCtx, newCore, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(3 * time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil {
+		t.Fatalf("reconnect desired frames = %#v", updated.Frames)
+	}
+	delta := updated.Frames[0].GetDesiredState()
+	if delta.BaseRevision != first.State.SentRevision || len(delta.Inbounds) == 0 {
+		t.Fatalf("reconnect change = %+v, want delta based on revision %d", delta, first.State.SentRevision)
+	}
+}
+
+func TestSessionCoreReconnectHelloMismatchSendsFullState(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-reconnect-mismatch")
+	e.fixture(state.NodeID)
+	first := stepHello(t, core, ctx, state, sidecar, now, hello("instance-before-mismatch", 0, "").GetHello())
+	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
+	newCore := NewSessionCore(e.f)
+	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
+		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout)}
+	reconnected, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
+		At: now.Add(2 * time.Second), Frame: hello("instance-mismatch", first.State.SentRevision, "different-hash")})
+	if err != nil || reconnected.Close != nil {
+		t.Fatalf("mismatched Hello = close %v, err %v", reconnected.Close, err)
+	}
+	requested, err := coreStep(newCtx, newCore, reconnected.State, reconnected.Sidecar,
+		SessionEvent{Kind: EventDesiredChanged, At: now.Add(3 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := coreStep(newCtx, newCore, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(3 * time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil || updated.Frames[0].GetDesiredState().BaseRevision != 0 {
+		t.Fatalf("mismatched Hello state = %#v, want full resend after revision %d", updated.Frames, first.State.SentRevision)
+	}
+}
+
+func TestSessionCoreOlderSentDigestSendsFullState(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-stale-digest")
+	e.fixture(state.NodeID)
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-stale-digest", 0, "").GetHello())
+	_, rawDigest, err := e.st.NodeWithSentDigest(ctx, state.NodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var digest sentDigest
+	if err := json.Unmarshal(rawDigest, &digest); err != nil {
+		t.Fatal(err)
+	}
+	digest.Revision = connected.State.SentRevision - 1
+	rawDigest, err = json.Marshal(digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.NodeDesired(ctx, state.NodeID, digest.Revision, digest.Hash, rawDigest); err != nil {
+		t.Fatal(err)
+	}
+	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_alice'`)
+	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil || updated.Frames[0].GetDesiredState().BaseRevision != 0 {
+		t.Fatalf("older digest state = %#v, want full resend after revision %d", updated.Frames, connected.State.SentRevision)
+	}
+}
+
+func TestSessionCoreRetiredNodeDoesNotSendDesiredState(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-retired-desired")
+	e.fixture(state.NodeID)
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-retired-desired", 0, "").GetHello())
+	if err := e.st.RetireNode(ctx, state.NodeID, now); err != nil {
+		t.Fatal(err)
+	}
+	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, frame := range updated.Frames {
+		if frame.GetDesiredState() != nil {
+			t.Fatalf("retired node received a desired state: %+v", frame.GetDesiredState())
+		}
+	}
+	if updated.State.SentRevision != connected.State.SentRevision {
+		t.Fatalf("retired node sent revision %d, want %d", updated.State.SentRevision, connected.State.SentRevision)
+	}
 }
 
 func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
@@ -988,8 +1129,8 @@ func TestSessionViewIsAtomicAcrossCoreStepsAndAdminReads(t *testing.T) {
 					failures <- "missing session view"
 					return
 				}
-				if view.SentDesired != nil && view.State.SentStateHash != view.SentDesired.hash {
-					failures <- "sent revision snapshot mixed state and desired hash"
+				if view.State.SentRevision != 0 && view.State.SentStateHash == "" {
+					failures <- "sent revision snapshot lost its state hash"
 					return
 				}
 				if view.State.Drift && !view.State.DriftResent {
@@ -1130,6 +1271,7 @@ func TestSessionStateSerializationSizeBudget(t *testing.T) {
 	_, core, ctx, state, sidecar, now := coreFixture(t, "core-size")
 	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-large-node", 0, "").GetHello())
 	state = tr.State
+	state.SentWithheld = []string{"inb_awg", "inb_tunnel"}
 	b, err := json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
@@ -1345,12 +1487,12 @@ func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
 	}
 	frames := receiveDesired(t, s, 2)
 	view := s.view.Load()
-	if view == nil || view.SentDesired == nil || view.SentDesired.hash != latest.desired.hash {
-		var sent *nodeState
+	if view == nil || view.State.SentStateHash != latest.desired.hash {
+		var sent string
 		if view != nil {
-			sent = view.SentDesired
+			sent = view.State.SentStateHash
 		}
-		t.Fatalf("last sent hash = %v, latest database hash = %v", sent, latest.desired.hash)
+		t.Fatalf("last sent hash = %q, latest database hash = %v", sent, latest.desired.hash)
 	}
 	if frames[len(frames)-1].StateHash != latest.desired.hash {
 		t.Fatalf("last DesiredState = %v, latest database hash = %v", frames, latest.desired.hash)
@@ -1582,6 +1724,49 @@ func TestHelloShortcutSendsChangedSettingsDelta(t *testing.T) {
 	delta := sent.Frames[0].GetDesiredState()
 	if delta.BaseRevision != 7 || delta.Settings == nil || delta.Settings.CountryCode != updatedNode.CountryCode {
 		t.Fatalf("settings delta = %+v, want base revision 7 and country %q", delta, updatedNode.CountryCode)
+	}
+}
+
+// The node row may already hold a higher desired revision than the one the agent applied (sent, then changed back):
+// the shortcut keeps that revision and still records the state the agent holds as the desired one.
+func TestHelloShortcutRecordsDesiredHashBehindAHigherRevision(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-higher-rev")
+	if err := e.st.NodeDesired(ctx, state.NodeID, 9, "sent-then-changed-back", []byte(`{"r":9,"h":"sent-then-changed-back"}`)); err != nil {
+		t.Fatal(err)
+	}
+	want, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-higher", 7, want.desired.hash)})
+	if err != nil || opened.Close != nil {
+		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
+	}
+	requested, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(done.Frames) != 0 || done.State.SentRevision != 7 {
+		t.Fatalf("shortcut sent %d frames, sent revision %d; want none and 7", len(done.Frames), done.State.SentRevision)
+	}
+	node, raw, err := e.st.NodeWithSentDigest(ctx, state.NodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var digest sentDigest
+	if err := json.Unmarshal(raw, &digest); err != nil {
+		t.Fatal(err)
+	}
+	if node.DesiredRevision != 9 || node.DesiredHash != want.desired.hash || digest.Revision != 7 {
+		t.Fatalf("node desired %d/%q, digest revision %d; want 9/%q and 7", node.DesiredRevision, node.DesiredHash, digest.Revision, want.desired.hash)
 	}
 }
 

@@ -224,6 +224,25 @@ func openD1Store(t *testing.T) *Store {
 	return st
 }
 
+func TestD1NodeDesiredStoresSentDigest(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, created_at) VALUES ('nod_digest', 'node-digest', '203.0.113.10', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	digest := []byte(`{"r":8,"h":"sent-state"}`)
+	if err := st.NodeDesired(ctx, "nod_digest", 8, "sent-state", digest); err != nil {
+		t.Fatal(err)
+	}
+	node, gotDigest, err := st.NodeWithSentDigest(ctx, "nod_digest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.DesiredRevision != 8 || node.DesiredHash != "sent-state" || string(gotDigest) != string(digest) {
+		t.Fatalf("node with sent digest = %+v/%q", node, gotDigest)
+	}
+}
+
 func TestD1BatchGuard(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

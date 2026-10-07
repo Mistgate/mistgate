@@ -1,11 +1,12 @@
 package fleet
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"sort"
 
@@ -44,6 +45,20 @@ type nodeState struct {
 	hash string           // statehash.StateWarp of the whole
 	// withheld are the inbounds the agent cannot take (an awg inbound for an agent without "awg/1"); the node page says why.
 	withheld []string
+}
+
+// sentDigest is what the panel last sent on a node's stream, as much as the next delta needs.
+type sentDigest struct {
+	Revision uint64                 `json:"r"`
+	Hash     string                 `json:"h"` // nodeState.hash
+	In       map[string]sentInbound `json:"i,omitempty"`
+	Warp     string                 `json:"w,omitempty"`  // hash of the WarpSpec, "" = none
+	WarpOff  bool                   `json:"wo,omitempty"` // a WarpSpec with Enabled=false (RestartWarp's pause)
+}
+
+type sentInbound struct {
+	Spec  string            `json:"s"`           // inboundState.specHash
+	Creds map[string]string `json:"c,omitempty"` // cred id -> short hash of the fields sameCred compares
 }
 
 func (s *nodeState) ids() []string {
@@ -88,11 +103,18 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 
 // prepareDesiredState reads the node and builds its desired state without touching session state.
 func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string, caps []string) (*preparedDesiredState, error) {
-	node, err := f.st.Node(ctx, nodeID)
+	node, rawDigest, err := f.st.NodeWithSentDigest(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
 	prepared := &preparedDesiredState{node: node}
+	if len(rawDigest) > 0 {
+		var digest sentDigest
+		if err := json.Unmarshal(rawDigest, &digest); err != nil {
+			return nil, fmt.Errorf("decode sent digest for node %s: %w", nodeID, err)
+		}
+		prepared.digest = &digest
+	}
 	if node.State != "retired" {
 		prepared.desired, err = f.buildState(ctx, node, caps)
 		if err != nil {
@@ -108,6 +130,76 @@ func (s *nodeState) list() []statehash.Inbound {
 		out = append(out, statehash.Inbound{Spec: s.in[id].spec, Creds: s.in[id].creds})
 	}
 	return out
+}
+
+func shortHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:8])
+}
+
+func appendDigestPart(dst, part []byte) []byte {
+	var size [8]byte
+	binary.BigEndian.PutUint64(size[:], uint64(len(part)))
+	dst = append(dst, size[:]...)
+	return append(dst, part...)
+}
+
+func credentialHash(c plugin.UserCred) string {
+	var data []byte
+	data = appendDigestPart(data, []byte(c.CredID))
+	data = appendDigestPart(data, []byte(c.UserID))
+	data = appendDigestPart(data, []byte(c.DeviceID))
+	data = appendDigestPart(data, c.Data) // bytes.Equal treats nil and empty data as the same.
+	var value [8]byte
+	binary.BigEndian.PutUint64(value[:], c.RateLimitBps)
+	data = append(data, value[:]...)
+	binary.BigEndian.PutUint64(value[:], uint64(c.ValidUntil.Unix()))
+	data = append(data, value[:]...)
+	binary.BigEndian.PutUint64(value[:], uint64(c.ValidUntil.Nanosecond()))
+	data = append(data, value[:]...)
+	return shortHash(data)
+}
+
+// warpHash tells WarpSpecs apart as reflect.DeepEqual did: the JSON of the struct keeps nil and empty slices apart.
+func warpHash(w *plugin.WarpSpec) string {
+	if w == nil {
+		return ""
+	}
+	b, _ := json.Marshal(w)
+	return shortHash(b)
+}
+
+func sentDigestFor(s *nodeState, revision uint64) *sentDigest {
+	digest := &sentDigest{
+		Revision: revision, Hash: s.hash, In: make(map[string]sentInbound, len(s.in)),
+		Warp: warpHash(s.warp), WarpOff: s.warp != nil && !s.warp.Enabled,
+	}
+	for id, inbound := range s.in {
+		sent := sentInbound{Spec: inbound.specHash}
+		if len(inbound.creds) > 0 {
+			sent.Creds = make(map[string]string, len(inbound.creds))
+			for _, cred := range inbound.creds {
+				sent.Creds[cred.CredID] = credentialHash(cred)
+			}
+		}
+		digest.In[id] = sent
+	}
+	return digest
+}
+
+func marshalSentDigest(s *nodeState, revision uint64) (*sentDigest, []byte, error) {
+	digest := sentDigestFor(s, revision)
+	encoded, err := json.Marshal(digest)
+	return digest, encoded, err
+}
+
+func (s *sentDigest) ids() []string {
+	ids := make([]string, 0, len(s.In))
+	for id := range s.In {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // buildSpec turns an inbound row into the node-side spec through the protocol plugin. The framework owns
@@ -200,13 +292,6 @@ func warpProto(w *plugin.WarpSpec) *agentv1.WarpSpec {
 	return out
 }
 
-func sameWarp(a, b *plugin.WarpSpec) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return reflect.DeepEqual(*a, *b)
-}
-
 func credProto(c plugin.UserCred) *agentv1.Credential {
 	var vu int64
 	if !c.ValidUntil.IsZero() {
@@ -234,37 +319,33 @@ func fullInbounds(s *nodeState) []*agentv1.InboundState {
 	return out
 }
 
-func sameCred(a, b plugin.UserCred) bool {
-	return a.CredID == b.CredID && a.UserID == b.UserID && a.DeviceID == b.DeviceID &&
-		bytes.Equal(a.Data, b.Data) && a.RateLimitBps == b.RateLimitBps && a.ValidUntil.Equal(b.ValidUntil)
-}
-
 // diffState returns the delta that turns old into next: new or re-specced inbounds are sent whole, inbounds
 // with an unchanged spec only as credential upserts/removals (the agent applies those without a restart).
-func diffState(old, next *nodeState) (changed []*agentv1.InboundState, removed []string) {
+func diffState(old *sentDigest, next *nodeState) (changed []*agentv1.InboundState, removed []string) {
 	for _, id := range next.ids() {
 		n := next.in[id]
-		o, ok := old.in[id]
-		if !ok || o.specHash != n.specHash {
+		o, ok := old.In[id]
+		if !ok || o.Spec != n.specHash {
 			changed = append(changed, &agentv1.InboundState{InboundId: id, Spec: specProto(n.spec), CredsReplace: true, Creds: credsProto(n.creds)})
 			continue
-		}
-		oldByID := make(map[string]plugin.UserCred, len(o.creds))
-		for _, c := range o.creds {
-			oldByID[c.CredID] = c
 		}
 		var up []*agentv1.Credential
 		seen := make(map[string]bool, len(n.creds))
 		for _, c := range n.creds {
 			seen[c.CredID] = true
-			if oc, ok := oldByID[c.CredID]; !ok || !sameCred(oc, c) {
+			if oldHash, ok := o.Creds[c.CredID]; !ok || oldHash != credentialHash(c) {
 				up = append(up, credProto(c))
 			}
 		}
 		var rm []string
-		for _, c := range o.creds {
-			if !seen[c.CredID] {
-				rm = append(rm, c.CredID)
+		oldCredIDs := make([]string, 0, len(o.Creds))
+		for credID := range o.Creds {
+			oldCredIDs = append(oldCredIDs, credID)
+		}
+		sort.Strings(oldCredIDs)
+		for _, credID := range oldCredIDs {
+			if !seen[credID] {
+				rm = append(rm, credID)
 			}
 		}
 		if len(up) > 0 || len(rm) > 0 {

@@ -99,6 +99,19 @@ func (s *Store) Node(ctx context.Context, id string) (NodeRow, error) {
 	return scanNode(s.R.QueryRowContext(ctx, `SELECT `+nodeCols+` FROM node WHERE id = ?`, id))
 }
 
+// NodeWithSentDigest returns one node and its last-sent digest in one read batch.
+func (s *Store) NodeWithSentDigest(ctx context.Context, id string) (NodeRow, []byte, error) {
+	var node NodeRow
+	var digest string
+	r := reads{}
+	r.add(oneRow(&node, scanNode), `SELECT `+nodeCols+` FROM node WHERE id = ?`, id)
+	r.add(maybeOneRow(&digest, scanString), `SELECT digest FROM node_sent WHERE node_id = ?`, id)
+	if err := r.run(ctx, s); err != nil {
+		return NodeRow{}, nil, err
+	}
+	return node, []byte(digest), nil
+}
+
 // Nodes lists nodes by name; retired ones only when asked for.
 func (s *Store) Nodes(ctx context.Context, includeRetired bool) ([]NodeRow, error) {
 	q := `SELECT ` + nodeCols + ` FROM node`
@@ -310,9 +323,15 @@ func (s *Store) NodeDisconnected(ctx context.Context, id string, seen, now time.
 	return err
 }
 
-// NodeDesired stores the desired revision and hash (kept across panel restarts so revisions stay monotonic).
-func (s *Store) NodeDesired(ctx context.Context, id string, rev uint64, hash string) error {
-	_, err := s.W.ExecContext(ctx, `UPDATE node SET desired_revision = ?, desired_hash = ? WHERE id = ? AND desired_revision <= ?`, int64(rev), hash, id, int64(rev))
+// NodeDesired stores the desired revision and hash (kept across panel restarts so revisions stay monotonic: an older
+// revision leaves the node row alone) and, in the same batch, the digest of what was sent, which carries its own revision.
+func (s *Store) NodeDesired(ctx context.Context, id string, rev uint64, hash string, digest []byte) error {
+	_, err := s.batch(ctx,
+		Stmt{Query: `UPDATE node SET desired_revision = ?, desired_hash = ? WHERE id = ? AND desired_revision <= ?`,
+			Args: []any{int64(rev), hash, id, int64(rev)}},
+		Stmt{Query: `INSERT INTO node_sent (node_id, digest) VALUES (?, ?) ON CONFLICT(node_id) DO UPDATE SET digest = excluded.digest`,
+			Args: []any{id, string(digest)}},
+	)
 	return err
 }
 
