@@ -44,6 +44,35 @@ func TestStoreBatchResults(t *testing.T) {
 	}
 }
 
+func TestStoreReadBatchUsesReadPool(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	if err := s.W.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var value string
+	r := reads{}
+	r.add(func(rows [][]any) error {
+		if len(rows) != 1 {
+			return errors.New("read returned no row")
+		}
+		return batchRow(rows[0]).Scan(&value)
+	}, `SELECT 'reader' AS value`)
+	if err := r.run(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	if value != "reader" {
+		t.Fatalf("read batch value = %q", value)
+	}
+
+	if _, err := s.read(ctx, Stmt{Query: `INSERT INTO setting (k, v) VALUES ('read.only', 'no') RETURNING k`, Returning: true}); err == nil {
+		t.Fatal("read batch accepted a write")
+	}
+	if _, err := s.Setting(ctx, "read.only"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("read-only batch left a setting: %v", err)
+	}
+}
+
 func TestStoreBatchGuard(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()

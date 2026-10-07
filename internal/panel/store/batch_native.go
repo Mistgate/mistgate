@@ -9,20 +9,14 @@ import (
 )
 
 func (s *Store) batchStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
-	db := s.W
-	if len(stmts) > 0 {
-		readOnly := true
-		for _, stmt := range stmts {
-			query := strings.ToUpper(strings.TrimSpace(stmt.Query))
-			if !stmt.Returning || !strings.HasPrefix(query, "SELECT") {
-				readOnly = false
-				break
-			}
-		}
-		if readOnly {
-			db = s.R
-		}
-	}
+	return runSQLBatch(ctx, s.W, stmts...)
+}
+
+func (s *Store) readStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
+	return runSQLBatch(ctx, s.R, stmts...)
+}
+
+func runSQLBatch(ctx context.Context, db *sql.DB, stmts ...Stmt) ([]StmtResult, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err

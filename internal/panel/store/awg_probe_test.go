@@ -178,7 +178,7 @@ func TestEnsureImplicitAWGCredsCreatesOnce(t *testing.T) {
 	}}}
 	dev := AccessDevice{ID: "dev_implicit_batch", UserID: "usr_implicit_batch", Implicit: true}
 	result, err := s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), want)
-	if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
+	if err != nil || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
 		t.Fatalf("EnsureImplicitAWGCreds = %+v, %v; want the device and one added/live credential", result, err)
 	}
 	result, err = s.Access().EnsureImplicitAWGCreds(context.Background(), dev.UserID, dev, time.Unix(100, 0), []AWGImplicitWant{{
@@ -186,11 +186,135 @@ func TestEnsureImplicitAWGCredsCreatesOnce(t *testing.T) {
 			return AccessCred{}, "", errors.New("issuer called for an existing peer")
 		},
 	}})
-	if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
+	if err != nil || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
 		t.Fatalf("repeat EnsureImplicitAWGCreds = %+v, %v; want the existing live credential and no additions", result, err)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM awg_peer WHERE profile_id = ? AND idx = 2 AND released_at = 0`, profile); n != 1 {
 		t.Fatalf("live implicit peer at index 2 = %d, want 1", n)
+	}
+}
+
+func TestEnsureImplicitDeviceConcurrentIdempotent(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	const userID = "usr_implicit_device_race"
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_device_race', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, 'u', 'grp_implicit_device_race', 1, x'01', x'02', 1)`, userID)
+	now := time.Unix(100, 0)
+	start := make(chan struct{})
+	type result struct {
+		device  AccessDevice
+		creds   []AccessCred
+		created bool
+		err     error
+	}
+	results := make(chan result, 2)
+	for i := range 2 {
+		go func(i int) {
+			<-start
+			suffix, devID := "a", "dev_implicit_device_a"
+			if i == 1 {
+				suffix, devID = "b", "dev_implicit_device_b"
+			}
+			dev := AccessDevice{ID: devID, UserID: userID, Implicit: true, CreatedAt: now, NoInitialSeen: true}
+			creds := []AccessCred{
+				{ID: "crd_implicit_device_" + suffix + "_hysteria", DeviceID: dev.ID, UserID: userID, Protocol: "hysteria2", SecretEnc: []byte{1}, DataJSON: `{}`, CreatedAt: now},
+				{ID: "crd_implicit_device_" + suffix + "_tuic", DeviceID: dev.ID, UserID: userID, Protocol: "tuic", SecretEnc: []byte{2}, DataJSON: `{}`, CreatedAt: now},
+			}
+			gotDevice, gotCreds, created, err := s.Access().EnsureImplicitDevice(ctx, dev, creds)
+			results <- result{device: gotDevice, creds: gotCreds, created: created, err: err}
+		}(i)
+	}
+	close(start)
+	first, second := <-results, <-results
+	if first.err != nil || second.err != nil {
+		t.Fatalf("EnsureImplicitDevice errors = %v, %v", first.err, second.err)
+	}
+	if first.created == second.created {
+		t.Fatalf("created flags = %v, %v; want exactly one true", first.created, second.created)
+	}
+	for _, got := range []result{first, second} {
+		if got.device.ID == "" || len(got.creds) != 2 || len(got.device.Protocols) != 2 {
+			t.Fatalf("EnsureImplicitDevice returned %+v", got)
+		}
+		protocols := map[string]bool{}
+		for _, cred := range got.creds {
+			protocols[cred.Protocol] = cred.DeviceID == got.device.ID
+		}
+		if len(protocols) != 2 || !protocols["hysteria2"] || !protocols["tuic"] {
+			t.Fatalf("EnsureImplicitDevice credentials = %+v, want one of each protocol on %q", got.creds, got.device.ID)
+		}
+	}
+	if first.device.ID != second.device.ID || !reflect.DeepEqual(first.creds, second.creds) {
+		t.Fatalf("callers saw different implicit state: %+v / %+v", first, second)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID); n != 1 {
+		t.Fatalf("live implicit devices = %d, want 1", n)
+	}
+	for _, protocol := range []string{"hysteria2", "tuic"} {
+		if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE user_id = ? AND protocol = ? AND revoked_at IS NULL`, userID, protocol); n != 1 {
+			t.Fatalf("live %s credentials = %d, want 1", protocol, n)
+		}
+	}
+	var firstSeen, lastSeen int64
+	if err := s.R.QueryRowContext(ctx, `SELECT first_seen_at, last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID).Scan(&firstSeen, &lastSeen); err != nil {
+		t.Fatal(err)
+	}
+	if firstSeen != 0 || lastSeen != 0 {
+		t.Fatalf("NoInitialSeen stored %d/%d, want 0/0", firstSeen, lastSeen)
+	}
+}
+
+func TestEnsureImplicitDeviceOnExistingDevice(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_device_existing', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_implicit_device_existing', 'u', 'grp_implicit_device_existing', 1, x'01', x'02', 1)`)
+	dev := AccessDevice{ID: "dev_implicit_device_existing", UserID: "usr_implicit_device_existing", Implicit: true, CreatedAt: time.Unix(100, 0)}
+	firstCred := AccessCred{ID: "crd_implicit_device_existing_hysteria", UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte{1}, DataJSON: `{}`, CreatedAt: dev.CreatedAt}
+	device, creds, created, err := s.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{firstCred})
+	if err != nil || !created || device.ID != dev.ID || len(creds) != 1 {
+		t.Fatalf("first EnsureImplicitDevice = %+v, %+v, %v, %v", device, creds, created, err)
+	}
+	secondCred := AccessCred{ID: "crd_implicit_device_existing_tuic", UserID: dev.UserID, Protocol: "tuic", SecretEnc: []byte{2}, DataJSON: `{}`, CreatedAt: dev.CreatedAt}
+	device, creds, created, err = s.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{secondCred})
+	if err != nil || !created || device.ID != dev.ID || len(creds) != 2 {
+		t.Fatalf("EnsureImplicitDevice adding to existing device = %+v, %+v, %v, %v", device, creds, created, err)
+	}
+	device, creds, created, err = s.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{secondCred})
+	if err != nil || created || device.ID != dev.ID || len(creds) != 2 {
+		t.Fatalf("repeat EnsureImplicitDevice on existing device = %+v, %+v, %v, %v", device, creds, created, err)
+	}
+}
+
+func TestEnsureImplicitAWGCredsSkipsFullProfile(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	profileA, _ := awgNet(t, s, "implicit_full_a")
+	profileB, _ := awgNet(t, s, "implicit_full_b")
+	const userID = "usr_implicit_full_networks"
+	execT(t, s, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_implicit_full_networks', 'g', 1)`)
+	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES (?, 'u', 'grp_implicit_full_networks', 1, x'01', x'02', 1)`, userID)
+	if idx, err := awgDevice(t, s, profileA, userID, "dev_implicit_full_a", 2); err != nil || idx != 2 {
+		t.Fatalf("fill profile A network = %d, %v; want index 2", idx, err)
+	}
+	want := []AWGImplicitWant{
+		{ProfileID: profileA, MaxIdx: 2, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{}, "", errors.New("issuer called for an exhausted profile")
+		}},
+		{ProfileID: profileB, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_implicit_full_b", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_implicit_full_b", nil
+		}},
+	}
+	result, err := s.Access().EnsureImplicitAWGCreds(ctx, userID, AccessDevice{ID: "dev_implicit_full", UserID: userID, Implicit: true}, time.Unix(100, 0), want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.FullProfiles) != 1 || result.FullProfiles[0] != profileA {
+		t.Fatalf("full profiles = %v, want %q", result.FullProfiles, profileA)
+	}
+	if len(result.Added) != 1 || result.Added[0].ProfileID != profileB || len(result.Creds) != 1 || result.Creds[0].ProfileID != profileB {
+		t.Fatalf("added/live credentials = %+v / %+v, want profile B only", result.Added, result.Creds)
 	}
 }
 
@@ -230,7 +354,7 @@ func TestEnsureImplicitAWGCredsRetryReturnsCommittedCreds(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("issuer calls = %d, want 2 after the competing peer forces a retry", calls)
 	}
-	if !result.Found || result.Device.ID == "" || len(result.Added) != 1 || len(result.Creds) != 1 {
+	if result.Device.ID == "" || len(result.Added) != 1 || len(result.Creds) != 1 {
 		t.Fatalf("returned result = %+v, want one added/live credential on the implicit device", result)
 	}
 	var implicitDeviceID, rowCredID string
@@ -297,7 +421,7 @@ func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.
 	if outerACalls != 1 {
 		t.Fatalf("outer profile A issuer calls = %d, want one before the concurrent commit", outerACalls)
 	}
-	if !result.Found || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 2 {
+	if result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 2 {
 		t.Fatalf("outer call returned %+v after the concurrent call committed both profiles", result)
 	}
 
@@ -361,7 +485,7 @@ func TestEnsureImplicitAWGCredsReturnsFullLiveSetAfterWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Found || result.Device.ID != actual.ID || !reflect.DeepEqual(result.Creds, live) {
+	if result.Device.ID != actual.ID || !reflect.DeepEqual(result.Creds, live) {
 		t.Fatalf("returned device/credentials = %+v/%+v, database = %+v/%+v", result.Device, result.Creds, actual, live)
 	}
 	if len(result.Added) != 1 || result.Added[0].ProfileID != profileA {

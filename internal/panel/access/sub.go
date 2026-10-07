@@ -265,7 +265,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return v, nil
 	}
 
-	created, dev, creds, err := s.ensureSubscriptionCreds(ctx, u, !touch, data.ImplicitDevice, data.ImplicitCreds, data.ImplicitFound)
+	created, dev, creds, err := s.ensureSubscriptionCreds(ctx, u, !touch, data.ImplicitDevice, data.ImplicitCreds)
 	if err != nil {
 		return SubView{}, err
 	}
@@ -438,71 +438,27 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	return v, nil
 }
 
-func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool, dev store.AccessDevice, creds []store.AccessCred, found bool) (bool, store.AccessDevice, []store.AccessCred, error) {
-	a := s.st.Access()
-	for range 2 {
-		if !found {
-			dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
-			if !noInitialSeen {
-				dev.FirstSeenAt, dev.LastSeenAt = dev.CreatedAt, dev.CreatedAt
-			}
-			newCreds, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, nil)
-			if err != nil || len(newCreds) == 0 {
-				return false, store.AccessDevice{}, nil, err
-			}
-			switch err := a.AddDevice(ctx, dev, newCreds); {
-			case errors.Is(err, store.ErrAccessExists):
-				dev, creds, err = a.ImplicitDeviceCreds(ctx, u.ID)
-				if errors.Is(err, store.ErrNotFound) {
-					found = false
-					continue
-				}
-				if err != nil {
-					return false, store.AccessDevice{}, nil, err
-				}
-				found = true
-				continue
-			case err != nil:
-				return false, store.AccessDevice{}, nil, err
-			}
-			for _, cred := range newCreds {
-				if !slices.Contains(dev.Protocols, cred.Protocol) {
-					dev.Protocols = append(dev.Protocols, cred.Protocol)
-				}
-			}
-			return true, dev, newCreds, nil
+func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool, dev store.AccessDevice, creds []store.AccessCred) (bool, store.AccessDevice, []store.AccessCred, error) {
+	newDevice := dev.ID == ""
+	if newDevice {
+		dev = store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
+		if !noInitialSeen {
+			dev.FirstSeenAt, dev.LastSeenAt = dev.CreatedAt, dev.CreatedAt
 		}
-		have := make(map[string]bool, len(dev.Protocols))
-		for _, protocol := range dev.Protocols {
-			have[protocol] = true
-		}
-		added, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, have)
-		if err != nil || len(added) == 0 {
-			return false, dev, creds, err
-		}
-		switch err := a.AddCreds(ctx, added); {
-		case errors.Is(err, store.ErrAccessExists):
-			dev, creds, err = a.ImplicitDeviceCreds(ctx, u.ID)
-			if errors.Is(err, store.ErrNotFound) {
-				found = false
-				continue
-			}
-			if err != nil {
-				return false, store.AccessDevice{}, nil, err
-			}
-			found = true
-			continue
-		case err != nil:
+	}
+	have := make(map[string]bool, len(creds))
+	for _, cred := range creds {
+		have[cred.Protocol] = true
+	}
+	added, err := s.newCreds(u.ID, dev.ID, u.AppHapp, u.AppAmnezia, have)
+	if err != nil || len(added) == 0 {
+		if newDevice {
 			return false, store.AccessDevice{}, nil, err
 		}
-		for _, cred := range added {
-			if !slices.Contains(dev.Protocols, cred.Protocol) {
-				dev.Protocols = append(dev.Protocols, cred.Protocol)
-			}
-		}
-		return true, dev, append(creds, added...), nil
+		return false, dev, creds, err
 	}
-	return false, dev, creds, nil
+	device, live, created, err := s.st.Access().EnsureImplicitDevice(ctx, dev, added)
+	return created, device, live, err
 }
 
 // AgentSessionSource is an optional interface of the online source of New (the fleet module implements it): whether the
@@ -538,10 +494,6 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 	if !ok {
 		return dev, creds, false
 	}
-	issuerDeviceID := dev.ID
-	if issuerDeviceID == "" {
-		issuerDeviceID = store.NewID("dev_")
-	}
 	var want []store.AWGImplicitWant
 	seen := map[string]bool{}
 	for _, f := range full {
@@ -562,7 +514,7 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		want = append(want, store.AWGImplicitWant{
 			ProfileID: f.Profile.ID,
 			MaxIdx:    maxIdx,
-			Issue:     s.awgIssuer(proto, u.ID, issuerDeviceID, f.Profile.ID, merged),
+			Issue:     s.awgIssuer(proto, u.ID, dev.ID, f.Profile.ID, merged),
 		})
 	}
 	if len(want) == 0 {
@@ -572,6 +524,9 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 	if err != nil {
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
 		return dev, creds, false
+	}
+	for _, profileID := range result.FullProfiles {
+		s.log.Warn("access: AWG profile network is full for a Mihomo subscription", "user", u.ID, "profile", profileID, "err", store.ErrAccessSubnetFull)
 	}
 	return result.Device, result.Creds, len(result.Added) > 0
 }

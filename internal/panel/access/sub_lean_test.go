@@ -26,7 +26,7 @@ func TestAppFetchDoesNotReadThePageData(t *testing.T) {
 		t.Helper()
 		logged.Reset()
 		v := must(e.s.SubscriptionWith(e.ctx, token, opt))
-		return v, strings.Contains(logged.String(), "node DNS choices")
+		return v, strings.Contains(logged.String(), "subscription DNS state")
 	}
 
 	v, read1 := read(SubOptions{NoPageData: true})

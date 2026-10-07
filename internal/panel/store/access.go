@@ -72,7 +72,8 @@ type AccessNode struct {
 	State                                              string // pending | active | retired
 }
 
-const accNodeCols = `n.id, n.name, n.address, n.country_code, n.location, n.provider, n.bandwidth_mbps, n.state`
+const accNodeCols = `n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code AS node_country_code,
+	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state`
 
 func scanAccessNode(r interface{ Scan(...any) error }) (AccessNode, error) {
 	var n AccessNode

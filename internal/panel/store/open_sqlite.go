@@ -33,7 +33,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		w.Close()
 		return nil, err
 	}
-	s := &Store{W: w, R: r, awgRetry: make(chan struct{}, 1)}
+	s := &Store{W: w, R: r}
 	if err := s.migrate(ctx); err != nil {
 		s.Close()
 		return nil, err

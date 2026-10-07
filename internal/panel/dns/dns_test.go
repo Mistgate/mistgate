@@ -451,3 +451,30 @@ func TestEffectiveInheritance(t *testing.T) {
 		t.Errorf("DefaultPresetID of a stale setting = %q", id)
 	}
 }
+
+func TestBrokenPresetFallsBackInBothReadPaths(t *testing.T) {
+	e := newEnv(t)
+	e.group("g_broken_preset", "")
+	e.user("u_broken_preset", "g_broken_preset", "dns_broken_preset")
+	e.sql(`INSERT INTO dns_preset (id, name, description, builtin, servers, split, ipv4_only, split_direct,
+		preferred_transport, sort, created_at, updated_at)
+		VALUES ('dns_broken_preset', 'Broken', '', 0, '{}', '[]', 0, 0, 'plain', 1, 1, 1)`)
+
+	effective, source, err := e.s.Effective(e.ctx, "u_broken_preset")
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := e.s.SubscriptionState(e.ctx, "u_broken_preset")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if effective.ID != store.DNSBuiltinDefaultID || source != SourceDefault {
+		t.Errorf("Effective = %q/%q, want built-in default", effective.ID, source)
+	}
+	if state.Effective.ID != effective.ID {
+		t.Errorf("SubscriptionState effective = %q, want %q", state.Effective.ID, effective.ID)
+	}
+	if _, ok := state.Presets["dns_broken_preset"]; ok {
+		t.Error("broken preset was included in the resolved preset map")
+	}
+}

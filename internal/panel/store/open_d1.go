@@ -34,7 +34,7 @@ func (s *Store) SnapshotDatabase(context.Context, string) error { return errClou
 func OpenD1(ctx context.Context, binding js.Value) (*Store, error) {
 	w := sql.OpenDB(d1driver.NewConnector(binding))
 	r := sql.OpenDB(d1driver.NewConnector(binding))
-	s := &Store{W: w, R: r, awgRetry: make(chan struct{}, 1)}
+	s := &Store{W: w, R: r}
 	if err := migrateD1(ctx, binding, w); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("migrate D1: %w", err)

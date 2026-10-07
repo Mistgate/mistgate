@@ -22,50 +22,29 @@ import (
 // nodeDNS resolves a person's DNS preset per node, for one request.
 type nodeDNS struct {
 	s       *Service
-	ctx     context.Context
-	userID  string
 	choices dns.NodeChoices
 	cache   map[string]dns.Preset
 	user    *dns.Preset
-	loaded  bool
-	userErr error
-	all     map[string]dns.Preset // every preset, read in one query on first use
+	all     map[string]dns.Preset // presets from the subscription read
 }
 
 func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
 	state, err := s.dns.SubscriptionState(ctx, userID)
 	if err == nil {
-		n := &nodeDNS{s: s, ctx: ctx, userID: userID, choices: state.Choices, cache: map[string]dns.Preset{}, all: state.Presets, loaded: true, userErr: state.EffectiveErr}
-		if state.EffectiveErr == nil {
+		n := &nodeDNS{s: s, choices: state.Choices, cache: map[string]dns.Preset{}, all: state.Presets}
+		if state.Effective.ID != "" {
 			n.user = &state.Effective
 		}
 		return n
 	}
-	// Keep the older partial-read behavior if the combined batch fails: node choices and the fallback preset can still
-	// succeed independently.
 	s.log.Warn("access: cannot read the subscription DNS state", "err", err)
-	c, choiceErr := s.dns.NodeChoices(ctx, userID)
-	if choiceErr != nil {
-		s.log.Warn("access: cannot read the node DNS choices", "err", choiceErr)
-	}
-	return &nodeDNS{s: s, ctx: ctx, userID: userID, choices: c, cache: map[string]dns.Preset{}}
+	return &nodeDNS{s: s, choices: dns.NewNodeChoices(nil, nil), cache: map[string]dns.Preset{}, all: map[string]dns.Preset{}}
 }
 
 // withoutNode is the preset that applies to the person where no node decides: their own, the group's, the instance's.
 func (n *nodeDNS) withoutNode() (dns.Preset, bool) {
 	if n.user == nil {
-		if n.loaded {
-			if n.userErr != nil {
-				n.s.log.Warn("access: cannot read the user's dns preset", "err", n.userErr)
-			}
-			return dns.Preset{}, false
-		}
-		p, _, err := n.s.dns.Effective(n.ctx, n.userID)
-		if err != nil {
-			n.s.log.Warn("access: cannot read the user's dns preset", "err", err)
-			return dns.Preset{}, false
-		}
-		n.user = &p
+		return dns.Preset{}, false
 	}
 	return *n.user, true
 }
@@ -91,16 +70,8 @@ func (n *nodeDNS) on(nodeID string) (dns.Preset, bool) {
 	return p, true
 }
 
-// preset is one preset by id; store.ErrNotFound when it is gone. The first call reads every preset in one query: a page
-// names every preset its nodes offer, which would be one query each.
+// preset is one preset by id; store.ErrNotFound when it is gone. The subscription state already read them in one batch.
 func (n *nodeDNS) preset(id string) (dns.Preset, error) {
-	if n.all == nil {
-		all, err := n.s.dns.Presets(n.ctx)
-		if err != nil {
-			return dns.Preset{}, err
-		}
-		n.all = all
-	}
 	if p, ok := n.all[id]; ok {
 		return p, nil
 	}

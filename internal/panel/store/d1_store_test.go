@@ -103,7 +103,7 @@ func TestD1StoreSmoke(t *testing.T) {
 	ctx := context.Background()
 
 	// This smoke covers Setting, SetSettings, Audit, and ListAudit. The following
-	// store methods still read inside a transaction and remain deferred to later steps:
+	// store methods still use their existing multi-statement transactions and remain deferred to later steps:
 	// CreateEnrollment, Enroll, NodeHello, RetireNode, IngestStats, IngestEvent,
 	// InsertProbeCredIdx, Access.AddAWGDevice, and Access.RotateAWGDevice.
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
@@ -522,6 +522,34 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("subscription devices after add credentials = %+v, %v", data.Devices, err)
 		}
 	})
+	t.Run("ReadBatchAndEnsureImplicitDevice", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_implicit_device", nil)
+		createUser(t, st, "usr_implicit_device", "Implicit device", "grp_implicit_device")
+		var value string
+		r := reads{}
+		r.add(func(rows [][]any) error {
+			if len(rows) != 1 {
+				return errors.New("read batch returned no row")
+			}
+			return batchRow(rows[0]).Scan(&value)
+		}, `SELECT 'd1' AS value`)
+		if err := r.run(ctx, st); err != nil || value != "d1" {
+			t.Fatalf("read batch = %q, %v", value, err)
+		}
+
+		dev := AccessDevice{ID: "dev_implicit_device_a", UserID: "usr_implicit_device", Implicit: true, CreatedAt: now, NoInitialSeen: true}
+		cred := AccessCred{ID: "crd_implicit_device_a", UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
+		got, live, created, err := st.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred})
+		if err != nil || !created || got.ID != dev.ID || len(live) != 1 {
+			t.Fatalf("EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
+		}
+		dev.ID, cred.ID = "dev_implicit_device_b", "crd_implicit_device_b"
+		got, live, created, err = st.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred})
+		if err != nil || created || got.ID != "dev_implicit_device_a" || len(live) != 1 || live[0].ID != "crd_implicit_device_a" {
+			t.Fatalf("repeat EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
+		}
+	})
 	t.Run("EnsureImplicitAWGCreds", func(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_implicit_awg", nil)
@@ -535,11 +563,11 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			return AccessCred{ID: "crd_implicit_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: "{}"}, "pub_implicit_awg", nil
 		}}}
 		result, err := st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
-		if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
+		if err != nil || result.Device.ID != dev.ID || len(result.Added) != 1 || len(result.Creds) != 1 {
 			t.Fatalf("EnsureImplicitAWGCreds = %+v, %v; want one added and live credential", result, err)
 		}
 		result, err = st.Access().EnsureImplicitAWGCreds(ctx, dev.UserID, dev, now, want)
-		if err != nil || !result.Found || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
+		if err != nil || result.Device.ID != dev.ID || len(result.Added) != 0 || len(result.Creds) != 1 {
 			t.Fatalf("repeat EnsureImplicitAWGCreds = %+v, %v; want one live credential and no additions", result, err)
 		}
 	})

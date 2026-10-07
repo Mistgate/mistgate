@@ -235,75 +235,75 @@ type DNSSubscriptionData struct {
 	UserChoices map[string]UserNodeDNS
 }
 
-func (d DNS) effectiveStmts(userID string, withNode bool) []Stmt {
-	stmts := []Stmt{
-		{Query: `SELECT ` + dnsCols + ` FROM dns_preset ORDER BY builtin DESC, sort, name`, Returning: true},
-		{Query: `SELECT coalesce(u.dns_preset_id, '') AS own_preset_id, coalesce(g.dns_preset_id, '') AS group_preset_id
-			FROM user u JOIN user_group g ON g.id = u.group_id WHERE u.id = ?`, Args: []any{userID}, Returning: true},
-		{Query: `SELECT v FROM setting WHERE k = ?`, Args: []any{dnsDefaultKey}, Returning: true},
-	}
-	if withNode {
-		stmts = append(stmts,
-			Stmt{Query: `SELECT node_id, preset_id, position, is_default FROM node_dns_option ORDER BY node_id, position, preset_id`, Returning: true},
-			Stmt{Query: `SELECT node_id, preset_id, updated_at FROM user_node_dns WHERE user_id = ?`, Args: []any{userID}, Returning: true},
-		)
-	}
-	return stmts
-}
-
 func (d DNS) scanEffectiveData(ctx context.Context, userID string, withNode bool) (DNSEffectiveData, map[string][]NodeDNSOption, map[string]UserNodeDNS, error) {
-	results, err := d.s.batch(ctx, d.effectiveStmts(userID, withNode)...)
-	if err != nil {
-		return DNSEffectiveData{}, nil, nil, err
-	}
-	if len(results) != 3 && len(results) != 5 {
-		return DNSEffectiveData{}, nil, nil, errors.New("store: unexpected dns batch result count")
-	}
-	data := DNSEffectiveData{Presets: make([]DNSPreset, 0, len(results[0].Rows))}
-	for _, row := range results[0].Rows {
-		p, err := scanDNSPreset(batchRow(row))
-		if err != nil {
-			return DNSEffectiveData{}, nil, nil, err
+	data := DNSEffectiveData{Presets: []DNSPreset{}, DefaultID: DNSBuiltinDefaultID}
+	var offers map[string][]NodeDNSOption
+	var choices map[string]UserNodeDNS
+	userFound := false
+	r := reads{}
+	r.add(func(rows [][]any) error {
+		for _, row := range rows {
+			p, err := scanDNSPreset(batchRow(row))
+			if err != nil {
+				return err
+			}
+			data.Presets = append(data.Presets, p)
 		}
-		data.Presets = append(data.Presets, p)
-	}
-	if len(results[1].Rows) == 0 {
-		return DNSEffectiveData{}, nil, nil, ErrNotFound
-	}
-	if err := batchRow(results[1].Rows[0]).Scan(&data.OwnPresetID, &data.GroupPresetID); err != nil {
-		return DNSEffectiveData{}, nil, nil, err
-	}
-	data.DefaultID = DNSBuiltinDefaultID
-	if len(results[2].Rows) > 0 {
+		return nil
+	}, `SELECT `+dnsCols+` FROM dns_preset ORDER BY builtin DESC, sort, name`)
+	r.add(func(rows [][]any) error {
+		userFound = len(rows) > 0
+		if !userFound {
+			return nil
+		}
+		return batchRow(rows[0]).Scan(&data.OwnPresetID, &data.GroupPresetID)
+	}, `SELECT coalesce(u.dns_preset_id, '') AS own_preset_id, coalesce(g.dns_preset_id, '') AS group_preset_id
+		FROM user u JOIN user_group g ON g.id = u.group_id WHERE u.id = ?`, userID)
+	r.add(func(rows [][]any) error {
+		if len(rows) == 0 {
+			return nil
+		}
 		var stored string
-		if err := batchRow(results[2].Rows[0]).Scan(&stored); err != nil {
-			return DNSEffectiveData{}, nil, nil, err
+		if err := batchRow(rows[0]).Scan(&stored); err != nil {
+			return err
 		}
 		data.DefaultID = strings.TrimSpace(stored)
+		return nil
+	}, `SELECT v FROM setting WHERE k = ?`, dnsDefaultKey)
+	if withNode {
+		offers = map[string][]NodeDNSOption{}
+		choices = map[string]UserNodeDNS{}
+		r.add(func(rows [][]any) error {
+			for _, row := range rows {
+				var option NodeDNSOption
+				var isDefault int
+				if err := batchRow(row).Scan(&option.NodeID, &option.PresetID, &option.Position, &isDefault); err != nil {
+					return err
+				}
+				option.Default = isDefault == 1
+				offers[option.NodeID] = append(offers[option.NodeID], option)
+			}
+			return nil
+		}, `SELECT node_id, preset_id, position, is_default FROM node_dns_option ORDER BY node_id, position, preset_id`)
+		r.add(func(rows [][]any) error {
+			for _, row := range rows {
+				choice := UserNodeDNS{UserID: userID}
+				if err := batchRow(row).Scan(&choice.NodeID, &choice.PresetID, &choice.UpdatedMs); err != nil {
+					return err
+				}
+				choices[choice.NodeID] = choice
+			}
+			return nil
+		}, `SELECT node_id, preset_id, updated_at FROM user_node_dns WHERE user_id = ?`, userID)
+	}
+	if err := r.run(ctx, d.s); err != nil {
+		return DNSEffectiveData{}, nil, nil, err
+	}
+	if !userFound {
+		return DNSEffectiveData{}, nil, nil, ErrNotFound
 	}
 	if data.DefaultID == "" {
 		data.DefaultID = DNSBuiltinDefaultID
-	}
-	if !withNode {
-		return data, nil, nil, nil
-	}
-	offers := map[string][]NodeDNSOption{}
-	for _, row := range results[3].Rows {
-		var option NodeDNSOption
-		var isDefault int
-		if err := batchRow(row).Scan(&option.NodeID, &option.PresetID, &option.Position, &isDefault); err != nil {
-			return DNSEffectiveData{}, nil, nil, err
-		}
-		option.Default = isDefault == 1
-		offers[option.NodeID] = append(offers[option.NodeID], option)
-	}
-	choices := make(map[string]UserNodeDNS, len(results[4].Rows))
-	for _, row := range results[4].Rows {
-		choice := UserNodeDNS{UserID: userID}
-		if err := batchRow(row).Scan(&choice.NodeID, &choice.PresetID, &choice.UpdatedMs); err != nil {
-			return DNSEffectiveData{}, nil, nil, err
-		}
-		choices[choice.NodeID] = choice
 	}
 	return data, offers, choices, nil
 }

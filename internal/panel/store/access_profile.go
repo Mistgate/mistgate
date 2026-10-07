@@ -18,7 +18,8 @@ type AccessProfile struct {
 	CreatedAt, UpdatedAt             time.Time
 }
 
-const accProfileCols = `p.id, p.protocol, p.name, p.settings_json, p.secrets_enc, p.version, p.created_at, p.updated_at`
+const accProfileCols = `p.id AS profile_id, p.protocol AS profile_protocol, p.name AS profile_name, p.settings_json AS profile_settings_json,
+	p.secrets_enc AS profile_secrets_enc, p.version AS profile_version, p.created_at AS profile_created_at, p.updated_at AS profile_updated_at`
 
 func scanAccessProfile(r interface{ Scan(...any) error }) (AccessProfile, error) {
 	var p AccessProfile
@@ -176,9 +177,12 @@ type AccessInbound struct {
 	AwgHealthAt   time.Time
 }
 
-const accInboundCols = `i.id, i.profile_id, i.node_id, i.port_override, i.tls_server_name_override, i.enabled, i.spec_version,
-	i.state, i.last_error, i.cert_pin_sha256, i.cert_not_after, i.created_at, i.updated_at,
-	i.plugin_state_enc, i.plugin_public_json, i.awg_health_json, i.awg_health_at`
+const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, i.node_id AS inbound_node_id,
+	i.port_override AS inbound_port_override, i.tls_server_name_override AS inbound_tls_server_name_override, i.enabled AS inbound_enabled,
+	i.spec_version AS inbound_spec_version, i.state AS inbound_state, i.last_error AS inbound_last_error,
+	i.cert_pin_sha256 AS inbound_cert_pin_sha256, i.cert_not_after AS inbound_cert_not_after, i.created_at AS inbound_created_at,
+	i.updated_at AS inbound_updated_at, i.plugin_state_enc AS inbound_plugin_state_enc, i.plugin_public_json AS inbound_plugin_public_json,
+	i.awg_health_json AS inbound_awg_health_json, i.awg_health_at AS inbound_awg_health_at`
 
 func scanAccessInbound(r interface{ Scan(...any) error }) (AccessInbound, error) {
 	var i AccessInbound
@@ -387,31 +391,63 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 	defer rows.Close()
 	var out []AccessInboundFull
 	for rows.Next() {
-		var f AccessInboundFull
-		var port sql.NullInt64
-		var en int
-		var notAfter, ic, iu, pc, pu, healthAt int64
-		i, p, n := &f.Inbound, &f.Profile, &f.Node
-		if err := rows.Scan(&i.ID, &i.ProfileID, &i.NodeID, &port, &i.TLSServerNameOverride, &en, &i.SpecVersion,
-			&i.State, &i.LastError, &i.CertPinSHA256, &notAfter, &ic, &iu,
-			&i.PluginStateEnc, &i.PluginPublicJSON, &i.AwgHealthJSON, &healthAt,
-			&p.ID, &p.Protocol, &p.Name, &p.SettingsJSON, &p.SecretsEnc, &p.Version, &pc, &pu,
-			&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.BandwidthMbps, &n.State); err != nil {
+		f, err := scanAccessInboundFull(rows)
+		if err != nil {
 			return nil, err
 		}
-		i.PortOverride = uint16(port.Int64)
-		i.Enabled = en == 1
-		if notAfter != 0 {
-			i.CertNotAfter = fromUnix(notAfter)
-		}
-		i.CreatedAt, i.UpdatedAt = fromUnix(ic), fromUnix(iu)
-		if healthAt != 0 {
-			i.AwgHealthAt = fromUnix(healthAt)
-		}
-		p.CreatedAt, p.UpdatedAt = fromUnix(pc), fromUnix(pu)
 		out = append(out, f)
 	}
 	return out, rows.Err()
+}
+
+func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
+	var f AccessInboundFull
+	var id, profileID, nodeID, tlsName, state, lastError, certPin sql.NullString
+	var pluginPublic, healthJSON sql.NullString
+	var port, enabled, specVersion, notAfter, created, updated, healthAt sql.NullInt64
+	var pluginState []byte
+	var profileID2, protocol, profileName, settings sql.NullString
+	var version, profileCreated, profileUpdated sql.NullInt64
+	var profileSecrets []byte
+	var nodeID2, nodeName, address, country, location, provider, nodeState sql.NullString
+	var bandwidth sql.NullInt64
+	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &enabled, &specVersion,
+		&state, &lastError, &certPin, &notAfter, &created, &updated, &pluginState, &pluginPublic, &healthJSON, &healthAt,
+		&profileID2, &protocol, &profileName, &settings, &profileSecrets, &version, &profileCreated, &profileUpdated,
+		&nodeID2, &nodeName, &address, &country, &location, &provider, &bandwidth, &nodeState)
+	if err != nil {
+		return AccessInboundFull{}, err
+	}
+	i, p, n := &f.Inbound, &f.Profile, &f.Node
+	i.ID, i.ProfileID, i.NodeID = id.String, profileID.String, nodeID.String
+	i.PortOverride, i.TLSServerNameOverride = uint16(port.Int64), tlsName.String
+	i.Enabled, i.SpecVersion = enabled.Int64 == 1, uint64(specVersion.Int64)
+	i.State, i.LastError, i.CertPinSHA256 = state.String, lastError.String, certPin.String
+	i.PluginStateEnc, i.PluginPublicJSON, i.AwgHealthJSON = pluginState, pluginPublic.String, healthJSON.String
+	if notAfter.Valid && notAfter.Int64 != 0 {
+		i.CertNotAfter = fromUnix(notAfter.Int64)
+	}
+	if created.Valid {
+		i.CreatedAt = fromUnix(created.Int64)
+	}
+	if updated.Valid {
+		i.UpdatedAt = fromUnix(updated.Int64)
+	}
+	if healthAt.Valid && healthAt.Int64 != 0 {
+		i.AwgHealthAt = fromUnix(healthAt.Int64)
+	}
+	p.ID, p.Protocol, p.Name, p.SettingsJSON, p.SecretsEnc = profileID2.String, protocol.String, profileName.String, settings.String, profileSecrets
+	p.Version = uint32(version.Int64)
+	if profileCreated.Valid {
+		p.CreatedAt = fromUnix(profileCreated.Int64)
+	}
+	if profileUpdated.Valid {
+		p.UpdatedAt = fromUnix(profileUpdated.Int64)
+	}
+	n.ID, n.Name, n.Address = nodeID2.String, nodeName.String, address.String
+	n.CountryCode, n.Location, n.Provider, n.State = country.String, location.String, provider.String, nodeState.String
+	n.BandwidthMbps = int(bandwidth.Int64)
+	return f, nil
 }
 
 // AccessGroup is an access group: a named set of profiles.
@@ -502,15 +538,11 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 	var out []AccessGroup
 	idx := map[string]int{}
 	for rows.Next() {
-		var g AccessGroup
-		var c int64
-		var dns sql.NullString
-		if err := rows.Scan(&g.ID, &g.Name, &c, &g.UserCount, &dns, &g.Color); err != nil {
+		g, err := scanAccessGroup(rows)
+		if err != nil {
 			rows.Close()
 			return nil, err
 		}
-		g.DNSPresetID = dns.String
-		g.CreatedAt = fromUnix(c)
 		g.ProfileIDs = []string{}
 		idx[g.ID] = len(out)
 		out = append(out, g)
@@ -535,6 +567,22 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 		}
 	}
 	return out, prow.Err()
+}
+
+func scanAccessGroup(r rowScanner) (AccessGroup, error) {
+	var g AccessGroup
+	var id, name, dnsPresetID, color sql.NullString
+	var created, userCount sql.NullInt64
+	err := r.Scan(&id, &name, &created, &userCount, &dnsPresetID, &color)
+	if err != nil {
+		return AccessGroup{}, err
+	}
+	g.ID, g.Name, g.DNSPresetID, g.Color = id.String, name.String, dnsPresetID.String, color.String
+	g.UserCount = int(userCount.Int64)
+	if created.Valid {
+		g.CreatedAt = fromUnix(created.Int64)
+	}
+	return g, nil
 }
 
 // UpdateGroup renames a group, replaces its profile set and/or its DNS preset, sets its colour (nil = unchanged, "" = none).

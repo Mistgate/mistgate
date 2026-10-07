@@ -23,3 +23,7 @@ func (s *Store) batchStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, er
 	}
 	return out, nil
 }
+
+func (s *Store) readStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
+	return s.batchStore(ctx, stmts...)
+}

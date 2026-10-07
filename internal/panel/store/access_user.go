@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -193,28 +192,35 @@ func (a Access) UsersByIDs(ctx context.Context, ids []string) ([]AccessUser, err
 
 // UserByTokenHash finds the user of a subscription token hash (sha256), or ErrNotFound.
 func (a Access) UserByTokenHash(ctx context.Context, hash []byte) (AccessUser, error) {
-	results, err := a.s.batch(ctx,
-		Stmt{Query: `SELECT ` + accUserCols + accUserFrom + `WHERE u.sub_token_hash = ?`, Args: []any{hash}, Returning: true},
-		Stmt{Query: `SELECT node_id FROM user_node WHERE user_id = (SELECT id FROM user WHERE sub_token_hash = ?) ORDER BY node_id`, Args: []any{hash}, Returning: true},
-	)
-	if err != nil {
+	var user AccessUser
+	found := false
+	r := reads{}
+	r.add(func(rows [][]any) error {
+		if len(rows) == 0 {
+			return nil
+		}
+		var err error
+		user, err = scanAccessUser(batchRow(rows[0]))
+		found = err == nil
+		return err
+	}, `SELECT `+accUserCols+accUserFrom+`WHERE u.sub_token_hash = ?`, hash)
+	r.add(func(rows [][]any) error {
+		for _, row := range rows {
+			var nodeID string
+			if err := batchRow(row).Scan(&nodeID); err != nil {
+				return err
+			}
+			user.NodeIDs = append(user.NodeIDs, nodeID)
+		}
+		return nil
+	}, `SELECT node_id FROM user_node WHERE user_id = (SELECT id FROM user WHERE sub_token_hash = ?) ORDER BY node_id`, hash)
+	if err := r.run(ctx, a.s); err != nil {
 		return AccessUser{}, err
 	}
-	if len(results[0].Rows) == 0 {
+	if !found {
 		return AccessUser{}, ErrNotFound
 	}
-	u, err := scanAccessUser(batchRow(results[0].Rows[0]))
-	if err != nil {
-		return AccessUser{}, err
-	}
-	for _, row := range results[1].Rows {
-		var nodeID string
-		if err := batchRow(row).Scan(&nodeID); err != nil {
-			return AccessUser{}, err
-		}
-		u.NodeIDs = append(u.NodeIDs, nodeID)
-	}
-	return u, nil
+	return user, nil
 }
 
 // HasUserWithTokenHash checks a subscription token without loading the user's view.
@@ -472,7 +478,6 @@ type SubscriptionData struct {
 	AWG            []AccessAWGDevice
 	ImplicitDevice AccessDevice
 	ImplicitCreds  []AccessCred
-	ImplicitFound  bool
 	Group          AccessGroup
 	Inbounds       []AccessInboundFull
 }
@@ -489,23 +494,18 @@ const implicitDeviceCredsSQL = `
 	WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NULL
 	ORDER BY c.protocol, c.profile_id, c.id`
 
-type implicitDeviceCredRowScanner interface {
-	Scan(dest ...any) error
-}
-
 type implicitDeviceCredsSnapshot struct {
 	Device AccessDevice
 	Creds  []AccessCred
-	Found  bool
 }
 
-func (s *implicitDeviceCredsSnapshot) scan(row implicitDeviceCredRowScanner) error {
+func (s *implicitDeviceCredsSnapshot) scan(row rowScanner) error {
 	device, cred, hasCred, err := scanImplicitDeviceCred(row)
 	if err != nil {
 		return err
 	}
-	if !s.Found {
-		s.Device, s.Found = device, true
+	if s.Device.ID == "" {
+		s.Device = device
 	}
 	if hasCred {
 		if !slices.Contains(s.Device.Protocols, cred.Protocol) {
@@ -516,7 +516,7 @@ func (s *implicitDeviceCredsSnapshot) scan(row implicitDeviceCredRowScanner) err
 	return nil
 }
 
-func scanImplicitDeviceCred(row implicitDeviceCredRowScanner) (AccessDevice, AccessCred, bool, error) {
+func scanImplicitDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) {
 	var device AccessDevice
 	var first, last, deviceCreated, configEpoch, credCreated int64
 	var id, protocol, profile, data string
@@ -536,132 +536,103 @@ func scanImplicitDeviceCred(row implicitDeviceCredRowScanner) (AccessDevice, Acc
 }
 
 func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool) (SubscriptionData, error) {
-	stmts := []Stmt{
-		{Query: `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, Args: []any{userID, unix(since)}, Returning: true},
-		{Query: `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.platform, d.model, d.os_version,
+	var out SubscriptionData
+	r := reads{}
+	r.add(func(rows [][]any) error {
+		if len(rows) != 1 {
+			return errors.New("store: subscription usage batch returned no row")
+		}
+		var up, down int64
+		if err := batchRow(rows[0]).Scan(&up, &down); err != nil {
+			return err
+		}
+		out.Up, out.Down = uint64(up), uint64(down)
+		return nil
+	}, `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
+	r.add(func(rows [][]any) error {
+		for _, row := range rows {
+			var d AccessDevice
+			var implicit int
+			var first, last, created int64
+			var protocols string
+			if err := batchRow(row).Scan(&d.ID, &d.UserID, &implicit, &d.Platform, &d.Model, &d.OSVersion, &first, &last, &created, &protocols); err != nil {
+				return err
+			}
+			d.Implicit = implicit == 1
+			d.FirstSeenAt, d.LastSeenAt, d.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(created)
+			if protocols != "" {
+				d.Protocols = strings.Split(protocols, ",")
+			}
+			out.Devices = append(out.Devices, d)
+		}
+		return nil
+	}, `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.platform, d.model, d.os_version,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols
-			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND ` + accDeviceLive + ` ORDER BY d.created_at, d.id`, Args: []any{userID}, Returning: true},
-		{Query: `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
+			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive+` ORDER BY d.created_at, d.id`, userID)
+	r.add(func(rows [][]any) error {
+		for _, row := range rows {
+			d, err := scanAWGDevice(batchRow(row))
+			if err != nil {
+				return err
+			}
+			out.AWG = append(out.AWG, d)
+		}
+		return nil
+	}, `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig
 			FROM device d
 			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
-			WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND d.user_id = ? ORDER BY d.created_at, d.id`, Args: []any{userID}, Returning: true},
-	}
+			WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
 	if active {
-		stmts = append(stmts,
-			Stmt{Query: implicitDeviceCredsSQL, Args: []any{userID}, Returning: true},
-			Stmt{Query: `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count, coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, Args: []any{groupID}, Returning: true},
-			Stmt{Query: `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, Args: []any{groupID}, Returning: true},
-			Stmt{Query: `SELECT i.id AS inbound_id, i.profile_id AS inbound_profile_id, i.node_id AS inbound_node_id, coalesce(i.port_override, 0) AS port_override,
-				i.tls_server_name_override, i.enabled, i.spec_version, i.state, i.last_error, i.cert_pin_sha256,
-				coalesce(i.cert_not_after, 0) AS cert_not_after, coalesce(i.created_at, 0) AS inbound_created_at, coalesce(i.updated_at, 0) AS inbound_updated_at,
-				i.plugin_state_enc, i.plugin_public_json, i.awg_health_json, coalesce(i.awg_health_at, 0) AS awg_health_at,
-				p.id AS profile_id, p.protocol, p.name AS profile_name, p.settings_json AS profile_settings_json, p.secrets_enc AS profile_secrets_enc,
-				p.version AS profile_version, p.created_at AS profile_created_at, p.updated_at AS profile_updated_at,
-				n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code, n.location, n.provider, n.bandwidth_mbps, n.state AS node_state
-				FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
-				WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`, Returning: true},
-		)
+		r.add(func(rows [][]any) error {
+			var snapshot implicitDeviceCredsSnapshot
+			for _, row := range rows {
+				if err := snapshot.scan(batchRow(row)); err != nil {
+					return err
+				}
+			}
+			out.ImplicitDevice, out.ImplicitCreds = snapshot.Device, snapshot.Creds
+			return nil
+		}, implicitDeviceCredsSQL, userID)
+		r.add(func(rows [][]any) error {
+			if len(rows) != 1 {
+				return ErrNotFound
+			}
+			group, err := scanAccessGroup(batchRow(rows[0]))
+			if err == nil {
+				out.Group = group
+			}
+			return err
+		}, `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
+			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
+		r.add(func(rows [][]any) error {
+			for _, row := range rows {
+				var profileID string
+				if err := batchRow(row).Scan(&profileID); err != nil {
+					return err
+				}
+				out.Group.ProfileIDs = append(out.Group.ProfileIDs, profileID)
+			}
+			return nil
+		}, `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, groupID)
+		r.add(func(rows [][]any) error {
+			for _, row := range rows {
+				full, err := scanAccessInboundFull(batchRow(row))
+				if err != nil {
+					return err
+				}
+				out.Inbounds = append(out.Inbounds, full)
+			}
+			return nil
+		}, `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
+			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
+			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
 	}
-	results, err := a.s.batch(ctx, stmts...)
-	if err != nil {
+	if err := r.run(ctx, a.s); err != nil {
 		return SubscriptionData{}, err
-	}
-	var out SubscriptionData
-	if len(results[0].Rows) != 1 {
-		return out, errors.New("store: subscription usage batch returned no row")
-	}
-	var up, down int64
-	if err := (batchRow(results[0].Rows[0])).Scan(&up, &down); err != nil {
-		return out, err
-	}
-	out.Up, out.Down = uint64(up), uint64(down)
-	for _, row := range results[1].Rows {
-		var d AccessDevice
-		var implicit int
-		var first, last, created int64
-		var protocols string
-		if err := (batchRow(row)).Scan(&d.ID, &d.UserID, &implicit, &d.Platform, &d.Model, &d.OSVersion, &first, &last, &created, &protocols); err != nil {
-			return SubscriptionData{}, err
-		}
-		d.Implicit = implicit == 1
-		d.FirstSeenAt, d.LastSeenAt, d.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(created)
-		if protocols != "" {
-			d.Protocols = strings.Split(protocols, ",")
-		}
-		out.Devices = append(out.Devices, d)
-	}
-	for _, row := range results[2].Rows {
-		var d AccessAWGDevice
-		var first, last, created int64
-		var sig string
-		if err := (batchRow(row)).Scan(&d.ID, &d.UserID, &d.Platform, &d.Model, &d.OSVersion, &first, &last, &created,
-			&d.ProfileID, &d.ProfileName, &d.ProfileSettingsJSON, &d.CredID, &d.DataJSON, &d.SecretEnc, &d.PublicKey, &d.Idx,
-			&d.ConfigEpoch, &d.CriticalEpoch, &sig); err != nil {
-			return SubscriptionData{}, err
-		}
-		if sig != "" {
-			_ = json.Unmarshal([]byte(sig), &d.DNSSig)
-		}
-		d.AWG, d.Protocols = true, []string{"awg"}
-		if first != 0 {
-			d.FirstSeenAt = fromUnix(first)
-		}
-		if last != 0 {
-			d.LastSeenAt = fromUnix(last)
-		}
-		d.CreatedAt = fromUnix(created)
-		out.AWG = append(out.AWG, d)
-	}
-	if !active {
-		return out, nil
-	}
-	var implicit implicitDeviceCredsSnapshot
-	for _, row := range results[3].Rows {
-		if err := implicit.scan(batchRow(row)); err != nil {
-			return SubscriptionData{}, err
-		}
-	}
-	out.ImplicitDevice, out.ImplicitCreds, out.ImplicitFound = implicit.Device, implicit.Creds, implicit.Found
-	if len(results[4].Rows) != 1 {
-		return SubscriptionData{}, ErrNotFound
-	}
-	var groupCreated int64
-	if err := (batchRow(results[4].Rows[0])).Scan(&out.Group.ID, &out.Group.Name, &groupCreated, &out.Group.UserCount, &out.Group.DNSPresetID, &out.Group.Color); err != nil {
-		return SubscriptionData{}, err
-	}
-	out.Group.CreatedAt = fromUnix(groupCreated)
-	for _, row := range results[5].Rows {
-		var profileID string
-		if err := (batchRow(row)).Scan(&profileID); err != nil {
-			return SubscriptionData{}, err
-		}
-		out.Group.ProfileIDs = append(out.Group.ProfileIDs, profileID)
-	}
-	for _, row := range results[6].Rows {
-		var f AccessInboundFull
-		var port, enabled int
-		var notAfter, ic, iu, healthAt, pc, pu int64
-		i, p, n := &f.Inbound, &f.Profile, &f.Node
-		if err := (batchRow(row)).Scan(&i.ID, &i.ProfileID, &i.NodeID, &port, &i.TLSServerNameOverride, &enabled, &i.SpecVersion,
-			&i.State, &i.LastError, &i.CertPinSHA256, &notAfter, &ic, &iu, &i.PluginStateEnc, &i.PluginPublicJSON, &i.AwgHealthJSON, &healthAt,
-			&p.ID, &p.Protocol, &p.Name, &p.SettingsJSON, &p.SecretsEnc, &p.Version, &pc, &pu,
-			&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.BandwidthMbps, &n.State); err != nil {
-			return SubscriptionData{}, err
-		}
-		i.PortOverride, i.Enabled = uint16(port), enabled == 1
-		if notAfter != 0 {
-			i.CertNotAfter = fromUnix(notAfter)
-		}
-		i.CreatedAt, i.UpdatedAt = fromUnix(ic), fromUnix(iu)
-		if healthAt != 0 {
-			i.AwgHealthAt = fromUnix(healthAt)
-		}
-		p.CreatedAt, p.UpdatedAt = fromUnix(pc), fromUnix(pu)
-		out.Inbounds = append(out.Inbounds, f)
 	}
 	return out, nil
 }
@@ -682,10 +653,57 @@ func (a Access) ImplicitDeviceCreds(ctx context.Context, userID string) (AccessD
 	if err := rows.Err(); err != nil {
 		return AccessDevice{}, nil, err
 	}
-	if !snapshot.Found {
+	if snapshot.Device.ID == "" {
 		return AccessDevice{}, nil, ErrNotFound
 	}
 	return snapshot.Device, snapshot.Creds, nil
+}
+
+// EnsureImplicitDevice inserts any missing live credentials on the user's one implicit device and reads back its full
+// live state. No device is created when there are no credentials to add.
+func (a Access) EnsureImplicitDevice(ctx context.Context, dev AccessDevice, creds []AccessCred) (AccessDevice, []AccessCred, bool, error) {
+	if len(creds) == 0 {
+		device, live, err := a.ImplicitDeviceCreds(ctx, dev.UserID)
+		if errors.Is(err, ErrNotFound) {
+			return AccessDevice{}, nil, false, nil
+		}
+		return device, live, false, err
+	}
+	if dev.ID == "" {
+		dev.ID = NewID("dev_")
+	}
+	dev.Implicit, dev.AWG = true, false
+	deviceStmt := accInsertDeviceStmt(dev)
+	deviceStmt.Query += ` ON CONFLICT(user_id) WHERE hwid_hash IS NULL AND revoked_at IS NULL DO NOTHING`
+	stmts := []Stmt{deviceStmt}
+	for _, cred := range creds {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO device_credential
+				(id, device_id, user_id, protocol, profile_id, secret_enc, data_json, config_epoch, created_at)
+			SELECT ?, (SELECT id FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL), ?, ?, ?, ?, ?, ?, ?
+			WHERE EXISTS (SELECT 1 FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL)
+			ON CONFLICT DO NOTHING`,
+			Args: []any{cred.ID, dev.UserID, dev.UserID, cred.Protocol, accNullStr(cred.ProfileID), cred.SecretEnc, cred.DataJSON,
+				cred.ConfigEpoch, unix(cred.CreatedAt), dev.UserID}})
+	}
+	stmts = append(stmts, Stmt{Query: implicitDeviceCredsSQL, Args: []any{dev.UserID}, Returning: true})
+	results, err := a.s.batch(ctx, stmts...)
+	if err != nil {
+		return AccessDevice{}, nil, false, accMapErr(err)
+	}
+	var snapshot implicitDeviceCredsSnapshot
+	for _, row := range results[len(results)-1].Rows {
+		if err := snapshot.scan(batchRow(row)); err != nil {
+			return AccessDevice{}, nil, false, err
+		}
+	}
+	if snapshot.Device.ID == "" {
+		return AccessDevice{}, nil, false, ErrNotFound
+	}
+	created := false
+	for _, result := range results[:len(results)-1] {
+		created = created || result.RowsAffected > 0
+	}
+	return snapshot.Device, snapshot.Creds, created, nil
 }
 
 // UsersProtocolsSince returns, per user, the protocols with traffic since the given time.

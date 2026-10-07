@@ -26,6 +26,39 @@ type StmtResult struct {
 	Rows         [][]any
 }
 
+// reads keeps each batch statement paired with the scanner that consumes only its rows.
+type reads struct {
+	stmts []Stmt
+	scans []func(rows [][]any) error
+}
+
+func (r *reads) add(scan func(rows [][]any) error, query string, args ...any) {
+	r.stmts = append(r.stmts, Stmt{Query: query, Args: args, Returning: true})
+	r.scans = append(r.scans, scan)
+}
+
+func (r *reads) run(ctx context.Context, s *Store) error {
+	if len(r.stmts) != len(r.scans) {
+		return errors.New("store: read batch statement and scanner counts differ")
+	}
+	if len(r.stmts) == 0 {
+		return nil
+	}
+	results, err := s.read(ctx, r.stmts...)
+	if err != nil {
+		return err
+	}
+	if len(results) != len(r.scans) {
+		return errors.New("store: unexpected read batch result count")
+	}
+	for i, result := range results {
+		if err := r.scans[i](result.Rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type batchRow []any
 
 func (r batchRow) Scan(dest ...any) error {
@@ -123,6 +156,17 @@ func (s *Store) batch(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) 
 		return nil, errGuard
 	}
 	return results, err
+}
+
+// read runs a read-only batch on the reader pool. D1 uses the same binding as writes.
+func (s *Store) read(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
+	for _, stmt := range stmts {
+		query := strings.ToUpper(strings.TrimSpace(stmt.Query))
+		if !stmt.Returning || !strings.HasPrefix(query, "SELECT") {
+			return nil, errors.New("store: read batch requires SELECT statements")
+		}
+	}
+	return s.readStore(ctx, stmts...)
 }
 
 // retryGuarded rebuilds a guarded batch after a concurrent writer makes its snapshot stale. Once a guard fails,
