@@ -262,7 +262,7 @@ func Build(c Config) (*Panel, error) {
 	subCfg := subs.Config{
 		Title: c.Title, BaseURL: subBase, Settings: cache, Brand: brand,
 		Routing: subs.HappRouting(dnsSvc), Events: st, Log: log,
-		Limiter: limiter,
+		Limiter: limiter, AfterResponse: c.AfterResponse,
 		PageKey: vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
 	}
 	sub := http.NewServeMux()

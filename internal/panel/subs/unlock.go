@@ -166,11 +166,11 @@ func (h *handler) lockout(user, scope string, now time.Time) {
 	}
 	params, _ := json.Marshal(map[string]string{"user": user, "scope": scope})
 	e := store.AuditEntry{Actor: "anonymous", Action: "page_unlock_lockout", Result: "locked", Params: string(params)}
-	go func() { // off the request, like the other events of the public handler
+	h.after(func() { // off the request, like the other events of the public handler
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := a.Audit(ctx, now, e); err != nil {
 			h.cfg.Log.Warn("audit page unlock lockout", "err", err)
 		}
-	}()
+	})
 }

@@ -106,6 +106,8 @@ type Config struct {
 	// Events, if set, receives subscription_shared_suspect events. Log, if set, gets their write errors.
 	Events Events
 	Log    *slog.Logger
+	// AfterResponse runs work that must not delay a response (on Cloudflare the Worker waits for it); nil = a goroutine.
+	AfterResponse func(func())
 	// Limiter is the shared backend for security-sensitive subscription limits. Nil uses bounded in-memory state.
 	Limiter securitylimit.Limiter
 	// Now is the clock (tests); default time.Now.
@@ -608,6 +610,15 @@ func networkOf(ip netip.Addr) string {
 	return netip.PrefixFrom(ip, bits).Masked().String()
 }
 
+// after runs work off the response: through cfg.AfterResponse, or in a goroutine when that is nil.
+func (h *handler) after(work func()) {
+	if h.cfg.AfterResponse == nil {
+		go work()
+		return
+	}
+	h.cfg.AfterResponse(work)
+}
+
 // suspect writes the once-a-day "link shared" event: a count, never an address.
 func (h *handler) suspect(user string) {
 	if h.cfg.Events == nil {
@@ -620,13 +631,13 @@ func (h *handler) suspect(user string) {
 		Time: h.cfg.Now(), Severity: 2, Code: EventSharedSuspect, Source: "panel",
 		Params: map[string]string{"user": user, "networks": strconv.Itoa(h.cfg.SharedNets + 1), "period": "day"},
 	}
-	go func() { // off the request: the event table has one writer
+	h.after(func() { // off the request: the event table has one writer
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := h.cfg.Events.InsertEvent(ctx, e); err != nil && h.cfg.Log != nil {
 			h.cfg.Log.Warn("write subscription event", "err", err)
 		}
-	}()
+	})
 }
 
 // routeOf splits a request under the prefix into the token and what follows it: GET/HEAD <prefix>/<token> is the

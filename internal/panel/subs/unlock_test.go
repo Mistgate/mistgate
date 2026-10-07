@@ -322,6 +322,34 @@ func TestAnUnlockLockoutIsAuditedWithoutTokenOrAddress(t *testing.T) {
 	}
 }
 
+// The lockout audit row is written by the after-response runner: none before the saved work runs.
+func TestUnlockLockoutAuditWaitsForTheAfterResponseRunner(t *testing.T) {
+	var saved []func()
+	g := newGate(t, func(c *subs.Config) {
+		c.AfterResponse = func(work func()) { saved = append(saved, work) }
+	})
+	_, tok := g.newUser("alice", nil)
+	for i := 0; i < 7; i++ {
+		g.unlock(t, tok, "aaaa-bbbb")
+	}
+	audited := func() (n int) {
+		g.st.R.QueryRow(`SELECT count(*) FROM audit WHERE action = 'page_unlock_lockout'`).Scan(&n)
+		return n
+	}
+	if len(saved) == 0 {
+		t.Fatal("no lockout work handed to the runner")
+	}
+	if n := audited(); n != 0 {
+		t.Fatalf("%d lockout audit rows before the runner ran the work", n)
+	}
+	for _, work := range saved {
+		work()
+	}
+	if n := audited(); n < 1 {
+		t.Error("no lockout audit row after the saved work ran")
+	}
+}
+
 func TestRotatingTheLinkChangesThePasswordAndKillsTheCookie(t *testing.T) {
 	g := newGate(t, nil)
 	uid, tok := g.newUser("alice", nil)

@@ -275,6 +275,35 @@ func TestHourlyCapPerToken(t *testing.T) {
 	}
 }
 
+// The event is written by the after-response runner: nothing is written until the saved work runs.
+func TestSharedSuspectEventWaitsForTheAfterResponseRunner(t *testing.T) {
+	var saved []func()
+	r := newRig(t, func(c *Config) {
+		c.SharedNets = 1
+		c.MaxPerHour = -1
+		c.AfterResponse = func(work func()) { saved = append(saved, work) }
+	})
+	r.get("203.0.113.1", tokA)
+	r.get("198.51.100.1", tokA) // the second network: over
+	if len(saved) != 1 {
+		t.Fatalf("%d works handed to the runner, want 1", len(saved))
+	}
+	select {
+	case e := <-r.ev.ch:
+		t.Fatalf("event written before the runner ran the work: %+v", e)
+	default:
+	}
+	saved[0]()
+	select {
+	case e := <-r.ev.ch:
+		if e.Code != EventSharedSuspect {
+			t.Errorf("event: %+v", e)
+		}
+	default:
+		t.Fatal("no event after the saved work ran")
+	}
+}
+
 // "Link shared": distinct client networks per token per day; above the threshold exactly one event per day,
 // carrying counts only.
 func TestSharedLinkSignal(t *testing.T) {
