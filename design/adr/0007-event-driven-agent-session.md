@@ -25,9 +25,11 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
   frames, adapter effects, a close decision and the next alarm time. The core owns protocol state; effects never write
   back into it.
 - Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
-  differs by edition: delivering results to waiters, publishing the live view, Cloudflare calls, the long bandwidth job,
-  and the cross-module usage callback. Desired-state reads use a single in-flight preparation with a dirty bit: the
-  effect starts its own session preparation, while `stepDesired` takes one read inline for the first reconcile round.
+  differs by edition: delivering results to waiters, Cloudflare calls, the long bandwidth job, and the cross-module
+  usage callback. Publishing the live view for admin reads is not an effect: the adapter does it (`publishView`) after
+  every step. Desired-state reads use a single in-flight preparation with a dirty bit: the effect starts its own session
+  preparation, while `stepDesired` (the one caller that creates the desired-state-changed event) runs the first reconcile
+  round's read inline instead of through the effect.
   Each prepared result is stepped through the core, which applies it and records withheld inbounds inline; a dirty
   follow-up starts through the effect. Certificate checks and pure database writes run inline.
 - VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now, using one timer reset

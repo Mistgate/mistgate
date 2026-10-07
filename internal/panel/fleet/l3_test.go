@@ -611,20 +611,13 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 	h := hello("instance-warp-refresh", 0, "")
 	h.GetHello().Capabilities = []string{capWarp}
 	started := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
-	sctx, cancel := context.WithCancelCause(ctx)
-	s := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: started.State.Capabilities,
-		ctx: sctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
-		core: core, coreState: started.State, coreSidecar: started.Sidecar}
-	defer func() {
-		cancel(nil)
-		close(s.done)
-	}()
+	s := newTestSession(e, ctx, core, started.State, started.Sidecar)
 	warpEvent := func(seq uint64, at time.Time) *agentv1.ConnectRequest {
 		return &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{
 			Code: eventWarpAttention, TimeUnix: at.Unix(), Params: map[string]string{"reason": warpReasonRefresh},
 		}}}
 	}
-	_, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)})
+	_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -639,7 +632,7 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 	for i := 0; i < cap(s.out); i++ {
 		s.out <- &agentv1.ConnectResponse{}
 	}
-	_, err = s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: eventAt, Frame: warpEvent(2, eventAt)})
+	_, err = s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: eventAt, Frame: warpEvent(2, eventAt)})
 	if err != errAgentQueueFull {
 		t.Fatalf("full Ack queue error = %v, want %v", err, errAgentQueueFull)
 	}

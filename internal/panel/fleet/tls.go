@@ -109,11 +109,7 @@ func (f *Fleet) nodeFromCert(ctx context.Context, cert *x509.Certificate) (strin
 	return id, peerCert{serial: serial, notAfter: cert.NotAfter}, nil
 }
 
-// recheckCert reports why a stream's client certificate is no longer acceptable, nil if it still is.
-func (f *Fleet) recheckCert(ctx context.Context, pc peerCert) error {
-	return f.recheckCertAt(ctx, pc, f.now())
-}
-
+// recheckCertAt reports why a stream's client certificate is no longer acceptable, nil if it still is.
 func (f *Fleet) recheckCertAt(ctx context.Context, pc peerCert, now time.Time) error {
 	if pc.serial == "" {
 		return nil // not from the agent middleware (tests calling the handler directly)

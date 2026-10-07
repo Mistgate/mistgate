@@ -81,10 +81,12 @@ func (s *session) publishView() {
 }
 
 func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {
+	return s.step(ctx, event, 0)
+}
+
+// step runs one core step. The effect of kind inline (0 for none) is not dispatched: the caller runs it itself.
+func (s *session) step(ctx context.Context, event SessionEvent, inline EffectKind) (Transition, error) {
 	s.coreMu.Lock()
-	if s.core == nil {
-		s.core = NewSessionCore(s.f)
-	}
 	var oldPoison *PoisonBatch
 	if s.coreState.Poison != nil {
 		poison := *s.coreState.Poison
@@ -103,29 +105,26 @@ func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition,
 	}
 	if tr.Close != nil {
 		s.coreMu.Unlock()
-		if s.cancel != nil {
-			s.cancel(sessionCloseError(tr.Close))
-		}
+		s.cancel(sessionCloseError(tr.Close))
 		return tr, nil
 	}
 	err = s.enqueueFrames(tr.Frames)
 	s.coreMu.Unlock()
 	effects := tr.Effects
-	if event.Kind == EventDesiredChanged {
-		// sent only by stepDesired, which reads the first round inline
-		effects = slices.DeleteFunc(slices.Clone(effects), func(e SessionEffect) bool { return e.Kind == EffectPrepareDesired })
+	if inline != 0 {
+		effects = slices.DeleteFunc(slices.Clone(effects), func(e SessionEffect) bool { return e.Kind == inline })
 	}
-	if effectErr := s.dispatchCoreEffects(ctx, effects); err == nil {
-		err = effectErr
-	}
+	s.dispatchCoreEffects(ctx, effects)
 	if err != nil {
 		s.endOnError(err)
 	}
 	return tr, err
 }
 
-func (s *session) stepDesired(ctx context.Context, event SessionEvent) (Transition, error) {
-	tr, err := s.stepCore(ctx, event)
+// stepDesired is the only place that creates EventDesiredChanged: it runs the first preparation round inline, and the
+// core's follow-up rounds start in the background.
+func (s *session) stepDesired(ctx context.Context) (Transition, error) {
+	tr, err := s.step(ctx, SessionEvent{Kind: EventDesiredChanged, At: s.f.now()}, EffectPrepareDesired)
 	if err != nil {
 		return Transition{}, err
 	}
@@ -153,17 +152,7 @@ func (s *session) runDesiredPreparation(ctx context.Context) (Transition, error)
 }
 
 func (s *session) canApplyPrepared() bool {
-	if s.ctx.Err() != nil {
-		return false
-	}
-	if s.done != nil {
-		select {
-		case <-s.done:
-			return false
-		default:
-		}
-	}
-	return s.f.ownsSession(s.nodeID, s.owner)
+	return s.ctx.Err() == nil && s.f.ownsSession(s.nodeID, s.owner)
 }
 
 func (s *session) startDesiredPreparation() {
@@ -175,14 +164,15 @@ func (s *session) startDesiredPreparation() {
 // endOnError ends the session on a step's error and logs the cause once, while the session was still live (a failed
 // background preparation would otherwise end it as a bare "stream closed").
 func (s *session) endOnError(err error) {
-	if s.cancel == nil {
-		return
-	}
-	if errors.Is(err, errAgentQueueFull) {
-		err = connect.NewError(connect.CodeResourceExhausted, errors.New("agent does not keep up"))
-	}
 	if s.ctx.Err() == nil {
 		s.f.log.Error("session step", "node", s.nodeID, "err", err)
+	}
+	var ce *connect.Error
+	switch {
+	case errors.Is(err, errAgentQueueFull):
+		err = connect.NewError(connect.CodeResourceExhausted, errors.New("agent does not keep up"))
+	case !errors.As(err, &ce):
+		err = connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	s.cancel(err)
 }
@@ -216,17 +206,13 @@ func (s *session) enqueueFrames(frames []*agentv1.ConnectResponse) error {
 }
 
 // dispatchCoreEffects runs one step's effects after its frames are queued, outside coreMu.
-func (s *session) dispatchCoreEffects(ctx context.Context, effects []SessionEffect) error {
-	var firstErr error
+func (s *session) dispatchCoreEffects(ctx context.Context, effects []SessionEffect) {
 	for _, effect := range effects {
-		if err := s.dispatchCoreEffect(ctx, effect); err != nil && firstErr == nil {
-			firstErr = err
-		}
+		s.dispatchCoreEffect(ctx, effect)
 	}
-	return firstErr
 }
 
-func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) error {
+func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) {
 	switch effect.Kind {
 	case EffectAutoBandwidth:
 		s.f.runAutoMeasureBandwidth(s)
@@ -241,11 +227,9 @@ func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) 
 	case EffectLogChunk:
 		s.deliverLog(effect.LogChunk)
 	case EffectWarpAttention:
-		w := s.f.warpModule()
-		if w == nil {
-			return nil
+		if w := s.f.warpModule(); w != nil {
+			s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
 		}
-		s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
 	case EffectConnectEvents:
 		if effect.PreviousNode != nil {
 			s.f.connectEvents(ctx, s.nodeID, *effect.PreviousNode, effect.BootAt.UTC(), effect.At.UTC())
@@ -253,7 +237,6 @@ func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) 
 	case EffectPrepareDesired:
 		s.startDesiredPreparation()
 	}
-	return nil
 }
 
 func (s *session) persistPoison(poison *PoisonBatch) {
@@ -270,9 +253,6 @@ func (s *session) persistPoison(poison *PoisonBatch) {
 }
 
 func resetSessionAlarm(timer *time.Timer, next *time.Time, now time.Time) {
-	if timer == nil {
-		return
-	}
 	timer.Stop()
 	if next == nil {
 		return
@@ -499,17 +479,15 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			}
 		}
 	}()
-	if helloErr == nil {
-		helloErr = s.dispatchCoreEffects(sctx, tr.Effects)
-	}
 	if helloErr != nil {
 		f.log.Error("hello response", "node", id, "err", helloErr)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
+	s.dispatchCoreEffects(sctx, tr.Effects)
 	// Core-mediated admin frames wait until HelloAck is queued; Retire remains a direct send.
-	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventDesiredChanged, At: f.now()})
+	tr, err = s.stepDesired(sctx)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return errOrCause(sctx)
 	}
 	if tr.Close != nil {
 		return sessionCloseError(tr.Close)
@@ -530,7 +508,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			}
 			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: now})
 			if err != nil {
-				return err
+				return errOrCause(sctx)
 			}
 			if tr.Close != nil {
 				return sessionCloseError(tr.Close)
@@ -545,11 +523,8 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 				return endErr()
 			}
 			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now(), Frame: m})
-			if errors.Is(err, errAgentQueueFull) {
-				continue
-			}
 			if err != nil {
-				return err
+				return errOrCause(sctx)
 			}
 			if tr.Close != nil {
 				return sessionCloseError(tr.Close)
@@ -688,15 +663,9 @@ func settingsSig(s *agentv1.NodeSettings) string {
 
 // reconcile computes the node's desired state and sends what the agent lacks. Revisions are per node,
 // strictly increasing and persisted; every message that is sent gets a fresh one.
-func (f *Fleet) reconcile(ctx context.Context, s *session) error {
-	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now()})
-	if err != nil {
-		return err
-	}
-	if tr.Close != nil {
-		return sessionCloseError(tr.Close)
-	}
-	return nil
+// A failed step or a close ends the session itself (endOnError, the step's cancel), so there is no result to return.
+func (f *Fleet) reconcile(ctx context.Context, s *session) {
+	_, _ = s.stepDesired(ctx)
 }
 
 // --- commands and logs ---

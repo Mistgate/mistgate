@@ -802,7 +802,7 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 			delete(tr.sidecar.Pending, id)
 		}
 	}
-	if livenessDeadlineDue(tr.state, now) {
+	if deadlineDue(tr.state.LivenessDeadline, now) {
 		tr.Close = &SessionClose{Class: CloseDeadline, Reason: fmt.Sprintf("no message from the agent for %d s", int(time.Duration(tr.state.LivenessNanos).Seconds()))}
 	}
 	if tr.Close == nil && !tr.state.Preparing && deadlineDue(tr.state.PrepareRetryAt, now) {
@@ -824,10 +824,6 @@ func advancePeriodic(deadline time.Time, period time.Duration, now time.Time) ti
 	}
 	missed := now.Sub(deadline)/period + 1
 	return deadline.Add(missed * period)
-}
-
-func livenessDeadlineDue(state *SessionState, now time.Time) bool {
-	return !state.LivenessDeadline.IsZero() && !now.Before(state.LivenessDeadline)
 }
 
 func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time) *time.Time {

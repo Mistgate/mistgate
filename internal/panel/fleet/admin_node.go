@@ -154,15 +154,12 @@ func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, view *session
 	}
 	if view != nil {
 		st := nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_ONLINE}
-		var drift bool
+		drift := view.State.Drift
 		var failed []*agentv1.InboundHealth
-		if view != nil {
-			drift = view.State.Drift
-			for _, h := range view.Live.Health {
-				_, known := enabled[h.InboundId]
-				if h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED && (enabled == nil || known) {
-					failed = append(failed, h)
-				}
+		for _, h := range view.Live.Health {
+			_, known := enabled[h.InboundId]
+			if h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED && (enabled == nil || known) {
+				failed = append(failed, h)
 			}
 		}
 		switch {
@@ -267,11 +264,9 @@ func (f *Fleet) nodeMsgView(ctx context.Context, n store.NodeRow, protos []strin
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	if view != nil {
 		out.Online = protocolCounts(onlineByProtocolView(view))
-		if view != nil {
-			out.LastSeenUnix = view.State.LastSeenAt.Unix()
-			if m := view.Live.Metrics; m != nil {
-				out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
-			}
+		out.LastSeenUnix = view.State.LastSeenAt.Unix()
+		if m := view.Live.Metrics; m != nil {
+			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, view != nil, now)

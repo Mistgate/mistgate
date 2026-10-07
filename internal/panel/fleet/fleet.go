@@ -116,15 +116,15 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 	if cfg.Desired == nil {
 		return nil, errors.New("fleet: Desired is required")
 	}
-	if cfg.Limiter == nil {
-		cfg.Limiter = securitylimit.NewMemory(nil, 0)
-	}
 	cfg.AgentSNI = strings.ToLower(strings.TrimSuffix(cfg.AgentSNI, "."))
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
+	}
+	if cfg.Limiter == nil {
+		cfg.Limiter = securitylimit.NewMemory(cfg.Now, 0)
 	}
 	if cfg.Debounce <= 0 {
 		cfg.Debounce = 200 * time.Millisecond

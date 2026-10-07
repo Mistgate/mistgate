@@ -67,8 +67,7 @@ func TestSessionCoreReconcileFailsWithheldInbounds(t *testing.T) {
 	if s == nil {
 		t.Fatal("connected session was not registered")
 	}
-	_, err := s.stepDesired(s.ctx, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now()})
-	if err != nil {
+	if _, err := s.stepDesired(s.ctx); err != nil {
 		t.Fatal(err)
 	}
 	if row = x.inboundRow("inb_awg"); row.State != "failed" || !strings.HasPrefix(row.LastError, "agent_too_old") {

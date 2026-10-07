@@ -662,9 +662,7 @@ func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 		t.Fatal("full resend did not prepare desired state")
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
-	if err := e.f.reconcile(e.ctx, s); err != nil {
-		t.Fatal(err)
-	}
+	e.f.reconcile(e.ctx, s)
 	close(preparedRelease)
 	full := c.desired()
 	if full.BaseRevision != 0 || full.Revision <= initial.Revision {
@@ -681,9 +679,7 @@ func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 		t.Fatal("coalesced desired-state delta did not contain the newest state")
 	}
 	e.exec(`UPDATE user SET status = 'active' WHERE id = 'usr_erin'`)
-	if err := e.f.reconcile(e.ctx, s); err != nil {
-		t.Fatal(err)
-	}
+	e.f.reconcile(e.ctx, s)
 	delta := c.desired()
 	if delta.BaseRevision != disabled.Revision || delta.Revision <= disabled.Revision {
 		t.Fatalf("desired-state delta after full resend = %v, base revision %d", delta, disabled.Revision)

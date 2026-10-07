@@ -11,7 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
 
@@ -33,6 +37,25 @@ func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context
 	state := SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: 1,
 		HelloDeadline: now.Add(helloTimeout)}
 	return e, core, ownerCtx, state, SessionSidecar{}, now
+}
+
+// newTestSession builds an adapter session the way runSession does: its own cancelable context under parent, done, the
+// out queue, the alarm timer and a core (a fresh one when core is nil), with state and sidecar as the starting point.
+func newTestSession(e *env, parent context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar) *session {
+	e.t.Helper()
+	ctx, cancel := context.WithCancelCause(parent)
+	timer := time.NewTimer(time.Hour)
+	e.t.Cleanup(func() {
+		cancel(nil)
+		timer.Stop()
+	})
+	if core == nil {
+		core = NewSessionCore(e.f)
+	}
+	return &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: state.Capabilities,
+		ctx: ctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
+		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{}, logs: map[string]*logSub{},
+		core: core, coreState: state, coreSidecar: sidecar, alarmTimer: timer}
 }
 
 type testTransition struct {
@@ -168,7 +191,7 @@ func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
 		t.Fatalf("next alarm lost its monotonic reading: %v", tr)
 	}
 	tick, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: *tr})
-	if err != nil || tick.Close != nil || livenessDeadlineDue(&state, *tr) {
+	if err != nil || tick.Close != nil || deadlineDue(state.LivenessDeadline, *tr) {
 		t.Fatalf("regular alarm closed the live session: close=%+v err=%v", tick.Close, err)
 	}
 }
@@ -240,34 +263,58 @@ func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
 }
 
 func TestSessionStepErrorCancelsSession(t *testing.T) {
-	e, core, ctx, state, _, _ := coreFixture(t, "core-step-error")
-	sctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	s := &session{f: e.f, nodeID: state.NodeID, ctx: sctx, cancel: cancel, core: core}
-	tr, err := s.stepCore(sctx, SessionEvent{Kind: EventKind(255), At: time.Now()})
+	e, core, ctx, state, sidecar, _ := coreFixture(t, "core-step-error")
+	s := newTestSession(e, ctx, core, state, sidecar)
+	tr, err := s.stepCore(s.ctx, SessionEvent{Kind: EventKind(255), At: time.Now()})
 	if err == nil || tr.NextAlarm != nil {
 		t.Fatalf("failed Step transition = %+v, %v", tr, err)
 	}
-	if context.Cause(sctx) == nil {
-		t.Fatal("Step error did not cancel the session")
+	if cause := context.Cause(s.ctx); cause == nil || code(cause) != connect.CodeInternal || errOrCause(s.ctx) != cause {
+		t.Fatalf("Step error cause = %v, want an internal connect error", cause)
 	}
-	if !errors.Is(context.Cause(sctx), err) {
-		t.Fatalf("Step error cause = %v, want %v", context.Cause(sctx), err)
+}
+
+// A full out queue ends the session with ResourceExhausted on every branch of the loop, not only the frame branch.
+func TestRunSessionEndsWithResourceExhaustedWhenQueueIsFull(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("queue-full-core")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	owner, ownerCtx := e.f.claimOwner(a.nodeID, ctx)
+	stream := &refillingAgentStream{manualAgentSessionStream: manualAgentSessionStream{ctx: ownerCtx,
+		in: make(chan *agentv1.ConnectRequest, 2), out: make(chan *agentv1.ConnectResponse, 16)}}
+	done := make(chan error, 1)
+	go func() {
+		done <- (agentService{e.f}).runSession(ownerCtx, a.nodeID, peerCert{serial: a.leaf.SerialNumber.Text(16), notAfter: a.leaf.NotAfter}, owner, stream)
+	}()
+	stream.in <- hello("instance-queue-full", 0, "")
+	waitSessionAck(t, stream.out, 0)
+	s := e.f.session(a.nodeID)
+	if s == nil {
+		t.Fatal("session was not registered after HelloAck")
+	}
+	stream.full.Store(s)
+	for s.enqueue(&agentv1.ConnectResponse{}) {
+	}
+	stream.in <- &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "core_test"}}}
+	select {
+	case err := <-done:
+		if code(err) != connect.CodeResourceExhausted {
+			t.Fatalf("session ended with %v, want ResourceExhausted", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("session did not end on a full queue")
 	}
 }
 
 func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "core-slow-desired")
 	helloTransition := stepHello(t, core, ctx, state, sidecar, now, hello("instance-slow-desired", 0, "").GetHello())
-	sctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	s := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: helloTransition.State.Capabilities,
-		ctx: sctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
-		core: core, coreState: helloTransition.State, coreSidecar: helloTransition.Sidecar}
+	s := newTestSession(e, ctx, core, helloTransition.State, helloTransition.Sidecar)
 
 	originalDesired := e.f.cfg.Desired
 	entered, release := make(chan struct{}), make(chan struct{})
-	reconcileDone := make(chan error, 1)
+	reconcileDone := make(chan struct{})
 	type stepResult struct {
 		transition Transition
 		err        error
@@ -300,7 +347,10 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 		<-release
 		return originalDesired(ctx, nodeID)
 	}
-	go func() { reconcileDone <- e.f.reconcile(e.ctx, s) }()
+	go func() {
+		e.f.reconcile(e.ctx, s)
+		close(reconcileDone)
+	}()
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
@@ -313,7 +363,7 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	}}}
 	stepStarted = true
 	go func() {
-		transition, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: frameAt, Frame: stats})
+		transition, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: frameAt, Frame: stats})
 		stepDone <- stepResult{transition: transition, err: err}
 	}()
 	var transition Transition
@@ -339,7 +389,7 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	if transition.Close != nil || !s.coreState.LivenessDeadline.After(oldDeadline) {
 		t.Fatalf("stats did not reset liveness: close=%+v state=%+v", transition.Close, s.coreState)
 	}
-	liveness, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: oldDeadline})
+	liveness, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAlarm, At: oldDeadline})
 	if err != nil || liveness.Close != nil {
 		t.Fatalf("old liveness deadline closed the session: close=%+v err=%v", liveness.Close, err)
 	}
@@ -347,13 +397,13 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	close(release)
 	released = true
 	select {
-	case err := <-reconcileDone:
+	case <-reconcileDone:
 		reconcileFinished = true
-		if err != nil {
-			t.Fatal(err)
-		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("desired-state preparation did not finish")
+	}
+	if s.ctx.Err() != nil || s.coreState.Preparing {
+		t.Fatalf("reconcile left the session ended or preparing: cause=%v state=%+v", context.Cause(s.ctx), s.coreState)
 	}
 }
 
@@ -478,7 +528,7 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 	if first.Close == nil || first.Close.Class != CloseInternal || len(first.Frames) != 0 {
 		t.Fatalf("first refusal = close %v, frames %#v", first.Close, first.Frames)
 	}
-	oldAdapter := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration}
+	oldAdapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
 	oldAdapter.persistPoison(first.State.Poison)
 	disconnected, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
 	if err != nil {
@@ -502,7 +552,7 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 	if second.Close != nil || len(second.Frames) != 1 || second.Frames[0].GetAck().GetUpToSeq() != 1 {
 		t.Fatalf("second refusal = close %v, frames %#v", second.Close, second.Frames)
 	}
-	newAdapter := &session{f: e.f, nodeID: state.NodeID, owner: newOwner}
+	newAdapter := newTestSession(e, newCtx, nil, newState, SessionSidecar{})
 	newAdapter.persistPoison(second.State.Poison)
 	if e.f.poisonFor(state.NodeID) != nil {
 		t.Fatal("the successful drop left poison state behind")
@@ -525,7 +575,7 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	if err != nil || first.Close == nil || first.State.Poison == nil {
 		t.Fatalf("first refusal = transition %+v, err %v", first, err)
 	}
-	adapter := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration}
+	adapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
 	adapter.persistPoison(first.State.Poison)
 	disconnected, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
 	if err != nil {
@@ -551,7 +601,7 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	if second.State.Poison == nil || second.State.Poison.Instance != "instance-poison-skip-error" || second.State.Poison.Seq != 1 {
 		t.Fatalf("failed sequence skip cleared poison state: %+v", second.State.Poison)
 	}
-	adapter = &session{f: e.f, nodeID: state.NodeID, owner: newOwner}
+	adapter = newTestSession(e, newCtx, nil, newState, SessionSidecar{})
 	adapter.persistPoison(second.State.Poison)
 	if poison := e.f.poisonFor(state.NodeID); poison == nil || *poison != *second.State.Poison {
 		t.Fatalf("adapter did not retain poison state after failed skip: %+v", poison)
@@ -630,7 +680,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 }
 
 func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-requests")
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-requests")
 	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-requests", 0, "").GetHello())
 	state, sidecar = tr.State, tr.Sidecar
 	command := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "req-command"}}}
@@ -681,7 +731,8 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 		t.Fatalf("log routing effects = %+v", routed.Effects)
 	}
 
-	adapter := &session{logs: map[string]*logSub{"req-log": {ch: make(chan *agentv1.LogChunk, 1)}}}
+	adapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
+	adapter.logs["req-log"] = &logSub{ch: make(chan *agentv1.LogChunk, 1)}
 	adapter.deliverLog(chunk)
 	adapter.deliverLog(&agentv1.LogChunk{RequestId: "req-log", Lines: []*agentv1.LogLine{{Message: "overflow"}}})
 	if got := adapter.logs["req-log"].dropped.Load(); got != 1 {
@@ -803,9 +854,7 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "core-ended-prepare")
 	e.fixture(state.NodeID)
 	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-ended-prepare", 0, "").GetHello())
-	old := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: connected.State.Capabilities,
-		ctx: ctx, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue), core: core,
-		coreState: connected.State, coreSidecar: connected.Sidecar}
+	old := newTestSession(e, ctx, core, connected.State, connected.Sidecar)
 
 	originalDesired := e.f.cfg.Desired
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -828,7 +877,7 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	})
 	oldDone := make(chan error, 1)
 	go func() {
-		_, err := old.stepDesired(context.Background(), SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+		_, err := old.stepDesired(context.Background())
 		oldDone <- err
 	}()
 	select {
@@ -838,6 +887,7 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	}
 
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
+	old.cancel(nil)
 	close(old.done)
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner}
@@ -846,10 +896,8 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("new session Hello = close %v, err %v", newHello.Close, err)
 	}
-	newSession := &session{f: e.f, nodeID: state.NodeID, owner: newOwner, caps: newHello.State.Capabilities,
-		ctx: newCtx, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue), core: newCore,
-		coreState: newHello.State, coreSidecar: newHello.Sidecar}
-	if _, err := newSession.stepDesired(newCtx, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second)}); err != nil {
+	newSession := newTestSession(e, newCtx, newCore, newHello.State, newHello.Sidecar)
+	if _, err := newSession.stepDesired(newCtx); err != nil {
 		t.Fatal(err)
 	}
 	newRevision := newSession.coreState.SentRevision
@@ -890,10 +938,7 @@ func TestSessionViewIsAtomicAcrossCoreStepsAndAdminReads(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "core-view-atomic")
 	e.fixture(state.NodeID)
 	initial := stepHello(t, core, ctx, state, sidecar, now, hello("instance-view-atomic", 0, "").GetHello())
-	sctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	s := &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: initial.State.Capabilities, ctx: sctx, cancel: cancel,
-		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue), core: core, coreState: initial.State, coreSidecar: initial.Sidecar}
+	s := newTestSession(e, ctx, core, initial.State, initial.Sidecar)
 	s.publishView()
 	if !e.f.register(s) {
 		t.Fatal("could not register read-snapshot session")
@@ -965,7 +1010,7 @@ func TestSessionViewIsAtomicAcrossCoreStepsAndAdminReads(t *testing.T) {
 			status = "active"
 		}
 		e.exec(`UPDATE user SET status = ? WHERE id = 'usr_erin'`, status)
-		if _, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Duration(i+1) * time.Second)}); err != nil {
+		if _, err := s.stepDesired(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1003,6 +1048,23 @@ func (stream *manualAgentSessionStream) Send(response *agentv1.ConnectResponse) 
 	case <-stream.ctx.Done():
 		return stream.ctx.Err()
 	}
+}
+
+// refillingAgentStream drops what the loop sends and, once full is set, tops the session's out queue up again on every
+// Send, so the next step that queues a frame finds it full.
+type refillingAgentStream struct {
+	manualAgentSessionStream
+	full atomic.Pointer[session]
+}
+
+func (stream *refillingAgentStream) Send(response *agentv1.ConnectResponse) error {
+	s := stream.full.Load()
+	if s == nil {
+		return stream.manualAgentSessionStream.Send(response)
+	}
+	for s.enqueue(&agentv1.ConnectResponse{}) {
+	}
+	return nil
 }
 
 func TestRunSessionStepsDisconnectBeforeClosingDone(t *testing.T) {
@@ -1111,4 +1173,465 @@ func effectKinds(tr any) []EffectKind {
 		out[i] = effect.Kind
 	}
 	return out
+}
+
+// helloSession is a session whose core has taken Open and Hello; it is not registered with the fleet.
+func helloSession(t *testing.T, name string) (*env, *session) {
+	t.Helper()
+	e, core, ctx, state, sidecar, now := coreFixture(t, name)
+	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-1", 0, "")}); err != nil {
+		t.Fatal(err)
+	}
+	return e, newTestSession(e, ctx, core, state, sidecar)
+}
+
+// registeredSession is a registered session that has sent its first desired state; end unregisters it.
+func registeredSession(t *testing.T, e *env, name string) (*session, func()) {
+	t.Helper()
+	nodeID, _, _ := e.createEnrollment(name, name+".example.com")
+	owner, ctx := e.f.claimOwner(nodeID, e.ctx)
+	core := NewSessionCore(e.f)
+	state := SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: owner}
+	var sidecar SessionSidecar
+	now := e.f.now()
+	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+		t.Fatal(err)
+	}
+	helloTr, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-"+name, 0, "")})
+	if err != nil || helloTr.Close != nil {
+		t.Fatalf("session Hello = close %v, err %v", helloTr.Close, err)
+	}
+	s := newTestSession(e, ctx, core, state, sidecar)
+	if !e.f.register(s) {
+		t.Fatal("session owner was not registered")
+	}
+	if _, err := s.stepDesired(s.ctx); err != nil {
+		t.Fatal(err)
+	}
+	receiveDesired(t, s, 0)
+
+	var endOnce sync.Once
+	end := func() {
+		endOnce.Do(func() {
+			s.cancel(nil)
+			close(s.done)
+			e.f.unregister(s)
+		})
+	}
+	t.Cleanup(end)
+	return s, end
+}
+
+// receiveDesired returns the DesiredState frames queued for the agent: it waits for at least atLeast of them, then takes
+// whatever else is already queued.
+func receiveDesired(t *testing.T, s *session, atLeast int) []*agentv1.DesiredState {
+	t.Helper()
+	timeout := time.After(5 * time.Second)
+	var frames []*agentv1.DesiredState
+	for {
+		var frame *agentv1.ConnectResponse
+		if len(frames) < atLeast {
+			select {
+			case frame = <-s.out:
+			case <-timeout:
+				t.Fatalf("received %d DesiredState frames, want %d", len(frames), atLeast)
+			}
+		} else {
+			select {
+			case frame = <-s.out:
+			default:
+				return frames
+			}
+		}
+		if desired := frame.GetDesiredState(); desired != nil {
+			frames = append(frames, desired)
+		}
+	}
+}
+
+func waitSignal(t *testing.T, ch <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
+func TestInitialReconcileSurvivesConcurrentRecompute(t *testing.T) {
+	e, s := helloSession(t, "initial-reconcile")
+	started, release := make(chan struct{}), make(chan struct{})
+	var reads atomic.Int32
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		if reads.Add(1) == 1 {
+			close(started)
+			<-release
+		}
+		return nil, nil
+	}
+	initial := make(chan error, 1)
+	go func() {
+		_, err := s.stepDesired(s.ctx)
+		initial <- err
+	}()
+	<-started
+	if _, err := s.stepDesired(s.ctx); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-initial; err != nil {
+		t.Fatal(err)
+	}
+	if got := receiveDesired(t, s, 0); len(got) == 0 {
+		t.Fatal("initial desired state was lost when recompute finished first")
+	}
+}
+
+func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
+	e, s := helloSession(t, "prepare-order")
+	if _, err := s.stepDesired(s.ctx); err != nil {
+		t.Fatal(err)
+	}
+	receiveDesired(t, s, 0)
+
+	var version atomic.Int32
+	version.Store(1)
+	var reads, active, maxActive atomic.Int32
+	started, followupStarted, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		v := version.Load()
+		call := reads.Add(1)
+		if call == 2 {
+			close(followupStarted)
+		}
+		inFlight := active.Add(1)
+		defer active.Add(-1)
+		for old := maxActive.Load(); inFlight > old; old = maxActive.Load() {
+			if maxActive.CompareAndSwap(old, inFlight) {
+				break
+			}
+		}
+		if call == 1 {
+			close(started)
+			<-release
+		}
+		return []statehash.Inbound{{Spec: plugin.InboundSpec{ID: "inb_prepare", Protocol: "fakehy", ProfileID: "prf_prepare", Version: uint64(v), Enabled: true}}}, nil
+	}
+	first := make(chan error, 1)
+	go func() {
+		_, err := s.stepDesired(s.ctx)
+		first <- err
+	}()
+	<-started
+	version.Store(2)
+	if _, err := s.stepDesired(s.ctx); err != nil {
+		t.Fatal(err)
+	}
+	readsBeforeRelease := reads.Load()
+	close(release)
+	waitSignal(t, followupStarted, "the dirty preparation hand-off")
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	if maxActive.Load() != 1 || readsBeforeRelease != 1 {
+		t.Fatalf("preparations overlapped: max active=%d reads before release=%d", maxActive.Load(), readsBeforeRelease)
+	}
+	latest, err := e.f.prepareDesiredState(s.ctx, s.nodeID, s.caps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames := receiveDesired(t, s, 2)
+	view := s.view.Load()
+	if view == nil || view.SentDesired == nil || view.SentDesired.hash != latest.desired.hash {
+		var sent *nodeState
+		if view != nil {
+			sent = view.SentDesired
+		}
+		t.Fatalf("last sent hash = %v, latest database hash = %v", sent, latest.desired.hash)
+	}
+	if frames[len(frames)-1].StateHash != latest.desired.hash {
+		t.Fatalf("last DesiredState = %v, latest database hash = %v", frames, latest.desired.hash)
+	}
+}
+
+func TestStepAfterEndDoesNotRearmOrRewritePoison(t *testing.T) {
+	e, s := helloSession(t, "step-after-end")
+	now := e.f.now()
+	poison := &PoisonBatch{Instance: "instance-1", Seq: 7}
+	s.coreState.Poison = poison
+	e.f.mu.Lock()
+	e.f.stuck[s.nodeID] = stuckSeq{instance: poison.Instance, seq: poison.Seq}
+	e.f.mu.Unlock()
+	ended, err := s.stepCore(s.ctx, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ended.NextAlarm != nil {
+		t.Fatalf("disconnected session has next alarm %v", ended.NextAlarm)
+	}
+	again, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAlarm, At: now.Add(2 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.NextAlarm != nil || !s.coreState.Disconnected || nextSessionAlarm(s.coreState, s.coreSidecar, now.Add(2*time.Second)) != nil {
+		t.Fatalf("event after end changed session scheduling: disconnected=%t next=%v", s.coreState.Disconnected, again.NextAlarm)
+	}
+	e.f.mu.Lock()
+	got := e.f.stuck[s.nodeID]
+	e.f.mu.Unlock()
+	if got != (stuckSeq{instance: poison.Instance, seq: poison.Seq}) {
+		t.Fatalf("poison entry changed after end: %+v", got)
+	}
+}
+
+func TestFailedPreparationRetriesOnAlarmAndKeepsFullResend(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "prepare-retry")
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-retry", 0, "").GetHello())
+	mismatchFrame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
+		Revision: connected.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
+	}}}
+	mismatch, err := coreStep(ctx, core, connected.State, connected.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: mismatchFrame})
+	if err != nil || !hasEffect(mismatch, EffectPrepareDesired) || !mismatch.State.FullResendPending {
+		t.Fatalf("base mismatch transition = %+v, err %v", mismatch, err)
+	}
+	failed, err := coreStep(ctx, core, mismatch.State, mismatch.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(2 * time.Second), Err: errors.New("desired source unavailable")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed.State.Preparing || !failed.State.PrepareRetryAt.Equal(now.Add(2*time.Second+prepareRetryDelay)) || !failed.State.FullResendPending {
+		t.Fatalf("failed preparation state = %+v", failed.State)
+	}
+	retryAt := failed.State.PrepareRetryAt
+	retry, err := coreStep(ctx, core, failed.State, failed.Sidecar, SessionEvent{Kind: EventAlarm, At: retryAt})
+	if err != nil || !retry.State.Preparing || !hasEffect(retry, EffectPrepareDesired) {
+		t.Fatalf("retry alarm transition = %+v, err %v", retry, err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, retry.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resent, err := coreStep(ctx, core, retry.State, retry.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: retryAt, Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resent.Frames) != 1 || resent.Frames[0].GetDesiredState() == nil || resent.Frames[0].GetDesiredState().BaseRevision != 0 || resent.State.FullResendPending {
+		t.Fatalf("successful retry did not send the pending full state: state=%+v frames=%#v", resent.State, resent.Frames)
+	}
+}
+
+func TestRepeatedBaseMismatchCoalescesDesiredPreparation(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "rev-base-flight")
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-base-mismatch", 0, "").GetHello())
+	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
+		Revision: connected.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
+	}}}
+	inFlight, err := coreStep(ctx, core, connected.State, connected.Sidecar, SessionEvent{Kind: EventAgentFrame,
+		At: now.Add(time.Second), Frame: frame})
+	if err != nil || !hasEffect(inFlight, EffectPrepareDesired) || !inFlight.State.Preparing {
+		t.Fatalf("initial base mismatch did not start preparation: state=%+v effects=%v err=%v", inFlight.State, effectKinds(inFlight), err)
+	}
+	for i := 2; i < 10; i++ {
+		again, stepErr := coreStep(ctx, core, inFlight.State, inFlight.Sidecar, SessionEvent{Kind: EventAgentFrame,
+			At: now.Add(time.Duration(i) * time.Second), Frame: frame})
+		if stepErr != nil {
+			t.Fatal(stepErr)
+		}
+		if hasEffect(again, EffectPrepareDesired) || !again.State.PrepareDirty || !again.State.Preparing {
+			t.Fatalf("base mismatch %d started extra work: state=%+v effects=%v", i, again.State, effectKinds(again))
+		}
+		inFlight = again
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, inFlight.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := coreStep(ctx, core, inFlight.State, inFlight.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(10 * time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.State.Preparing || first.State.PrepareDirty || !hasEffect(first, EffectPrepareDesired) ||
+		len(first.Frames) != 1 || first.Frames[0].GetDesiredState().BaseRevision != 0 {
+		t.Fatalf("first completion did not send full state and request one more prepare: state=%+v effects=%v frames=%v",
+			first.State, effectKinds(first), first.Frames)
+	}
+	secondPrepared, err := e.f.prepareDesiredState(ctx, state.NodeID, first.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(11 * time.Second), Prepared: secondPrepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.State.Preparing || hasEffect(second, EffectPrepareDesired) {
+		t.Fatalf("coalesced second preparation left extra work: state=%+v effects=%v", second.State, effectKinds(second))
+	}
+}
+
+func TestRecomputeWaitsForOnePreparationRoundPerNode(t *testing.T) {
+	e := newCoreEnv(t)
+	slow, endSlow := registeredSession(t, e, "de")
+	fast, endFast := registeredSession(t, e, "node1")
+	originalDesired := e.f.cfg.Desired
+	firstRead, secondRead, fastRead := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	releaseFirst, releaseSecond := make(chan struct{}), make(chan struct{})
+	recomputeDone := make(chan struct{})
+	var closeFirst, closeSecond sync.Once
+	var reads atomic.Int32
+	e.f.cfg.Desired = func(ctx context.Context, nodeID string) ([]statehash.Inbound, error) {
+		if nodeID == slow.nodeID {
+			switch reads.Add(1) {
+			case 1:
+				close(firstRead)
+				<-releaseFirst
+				if err := answerBaseMismatch(slow); err != nil {
+					return nil, err
+				}
+			case 2:
+				close(secondRead)
+				if err := answerBaseMismatch(slow); err != nil {
+					return nil, err
+				}
+				<-releaseSecond
+			}
+		} else if nodeID == fast.nodeID {
+			close(fastRead)
+		}
+		return originalDesired(ctx, nodeID)
+	}
+	t.Cleanup(func() {
+		closeFirst.Do(func() { close(releaseFirst) })
+		closeSecond.Do(func() { close(releaseSecond) })
+		endSlow()
+		endFast()
+		select {
+		case <-recomputeDone:
+		case <-time.After(5 * time.Second):
+			t.Error("recompute did not stop after test sessions ended")
+		}
+	})
+
+	go func() {
+		e.f.recomputeAll(e.ctx)
+		close(recomputeDone)
+	}()
+	waitSignal(t, firstRead, "the slow node's inline read")
+	waitSignal(t, fastRead, "the other node's read")
+	closeFirst.Do(func() { close(releaseFirst) })
+	waitSignal(t, secondRead, "the slow node's background follow-up")
+	select {
+	case <-recomputeDone:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("recompute waited for the slow node's background follow-up; reads=%d", reads.Load())
+	}
+}
+
+func answerBaseMismatch(s *session) error {
+	view := s.view.Load()
+	if view == nil || view.State.SentRevision == 0 {
+		return nil
+	}
+	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
+		Revision: view.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
+	}}}
+	_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: s.f.now(), Frame: frame})
+	return err
+}
+
+func TestHelloShortcutSendsChangedSettingsDelta(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-settings-shortcut")
+	node, err := e.st.Node(ctx, state.NodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now,
+		Frame: hello("instance-settings", 7, preparedBefore.desired.hash)})
+	if err != nil || opened.Close != nil {
+		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
+	}
+	country := "DE"
+	updatedNode, err := e.st.UpdateNode(ctx, node.ID, store.NodePatch{CountryCode: &country})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sent.Frames) != 1 || sent.Frames[0].GetDesiredState() == nil {
+		t.Fatalf("changed settings did not produce DesiredState: %+v", sent.Frames)
+	}
+	delta := sent.Frames[0].GetDesiredState()
+	if delta.BaseRevision != 7 || delta.Settings == nil || delta.Settings.CountryCode != updatedNode.CountryCode {
+		t.Fatalf("settings delta = %+v, want base revision 7 and country %q", delta, updatedNode.CountryCode)
+	}
+}
+
+func TestHelloShortcutResendsFullStateAfterSidecarLoss(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-sidecar-loss")
+	state.SentRevision = 9
+	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now,
+		Frame: hello("instance-sidecar-loss", 7, preparedBefore.desired.hash)})
+	if err != nil || opened.Close != nil {
+		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
+	}
+	requested, err := coreStep(ctx, core, opened.State, SessionSidecar{}, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := coreStep(ctx, core, requested.State, SessionSidecar{}, SessionEvent{Kind: EventDesiredPrepared,
+		At: now.Add(time.Second), Prepared: prepared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sent.Frames) != 1 || sent.Frames[0].GetDesiredState() == nil {
+		t.Fatalf("sidecar loss skipped DesiredState: %+v", sent.Frames)
+	}
+	full := sent.Frames[0].GetDesiredState()
+	if full.BaseRevision != 0 || full.Revision <= state.SentRevision || full.Settings == nil {
+		t.Fatalf("sidecar loss state = %+v, want a full state after revision %d", full, state.SentRevision)
+	}
+}
+
+func TestSessionStepCloseCancelsWithReceiveCause(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "session-close-cause")
+	s := newTestSession(e, ctx, core, state, sidecar)
+	tr, err := s.stepCore(s.ctx, SessionEvent{Kind: EventOwnerSuperseded, At: now})
+	if err != nil || tr.Close == nil {
+		t.Fatalf("session close transition = %+v, err %v", tr.Close, err)
+	}
+	cause := context.Cause(s.ctx)
+	closeErr := sessionCloseError(tr.Close)
+	if cause == nil || code(cause) != code(closeErr) || cause.Error() != closeErr.Error() {
+		t.Fatalf("session cause = %v, want %v", cause, closeErr)
+	}
+	if received := errOrCause(s.ctx); received == nil || code(received) != code(cause) || received.Error() != cause.Error() {
+		t.Fatalf("receive loop error = %v, want close cause %v", received, cause)
+	}
 }
