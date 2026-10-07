@@ -42,8 +42,8 @@ func (e *env) updateProfile(id, settings string) *adminv1.UpdateProfileResponse 
 	return must(e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{ProfileId: id, ExpectedVersion: ver, SettingsJson: &settings}))).Msg
 }
 
-// Every way a device's config is rendered carries the device's own I1: the admin's create and read, a rotation,
-// and the Mihomo subscription of the user's implicit device. The profile's I1 stays the template.
+// Every way a device's config is rendered carries the device's own I1, the same at every render: the admin's create
+// and read, a rotation, and the Mihomo subscription of the user's implicit device. The profile's I1 stays the template.
 func TestAWGPerDeviceSignatureOnEveryPath(t *testing.T) {
 	f := newAWGFixture(t) // a default profile: 3.1, DNS, per-device signatures on
 	e := f.e
@@ -51,10 +51,13 @@ func TestAWGPerDeviceSignatureOnEveryPath(t *testing.T) {
 	if !tmpl.Obfuscation.PerDeviceSignature || tmpl.Obfuscation.SignatureSeed == "" || tmpl.Obfuscation.I1 == "" {
 		t.Fatalf("a new profile: %+v", tmpl.Obfuscation)
 	}
+	// A device's chain draws its name from a pool of 128, so two devices (or a device and the template) can carry the
+	// same packet; awg's TestDeviceSignature pins the derivation itself. Here: every path carries a chain, and not all
+	// of them are the template (checked once the Mihomo one is known).
 	a, b := f.add(f.user, "a"), f.add(f.user, "b")
 	ia, ib := confValue(a.Configs[0].Conf, "I1"), confValue(b.Configs[0].Conf, "I1")
-	if ia == "" || ib == "" || ia == ib || ia == tmpl.Obfuscation.I1 || ib == tmpl.Obfuscation.I1 {
-		t.Fatalf("I1 of device a %.40q, b %.40q, template %.40q: three different packets expected", ia, ib, tmpl.Obfuscation.I1)
+	if ia == "" || ib == "" {
+		t.Fatalf("I1 of device a %.40q, b %.40q: a chain expected", ia, ib)
 	}
 
 	// reading a device again, and rotating its keys, give the same signature (the config on the user's phone
@@ -90,8 +93,11 @@ func TestAWGPerDeviceSignatureOnEveryPath(t *testing.T) {
 		t.Fatalf("mihomo yaml: %v\n%s", err, m1)
 	}
 	mi1, _ := proxies[0]["amnezia-wg-option"].(map[string]any)["i1"].(string)
-	if mi1 == "" || mi1 == ia || mi1 == ib || mi1 == tmpl.Obfuscation.I1 {
-		t.Errorf("the implicit device's I1 %.40q must be its own", mi1)
+	if mi1 == "" {
+		t.Error("the implicit device's Mihomo proxy carries no I1")
+	}
+	if tI1 := tmpl.Obfuscation.I1; ia == tI1 && ib == tI1 && mi1 == tI1 {
+		t.Errorf("three devices all carry the template %.40q: per-device signatures are not applied", tI1)
 	}
 
 	// off: every device carries the profile's own packets, as an old profile always did
