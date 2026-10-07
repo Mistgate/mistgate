@@ -227,7 +227,7 @@ func TestEnrollLimiterSourcesAndBound(t *testing.T) {
 	now := time.Now()
 	ctx := context.Background()
 
-	l := securitylimit.NewMemoryWithOptions(func() time.Time { return now }, maxLimiterKeys)
+	l := securitylimit.NewMemory(func() time.Time { return now }, 0)
 	fail := func(key string) {
 		t.Helper()
 		peek, err := l.Peek(ctx, enrollmentWindow, key)
@@ -271,12 +271,12 @@ func TestEnrollLimiterSourcesAndBound(t *testing.T) {
 	}
 
 	// Bounded: a flood of rotating sources keeps the table at its cap, and is O(1) per call.
-	l = securitylimit.NewMemoryWithOptions(func() time.Time { return now }, maxLimiterKeys)
+	l = securitylimit.NewMemory(func() time.Time { return now }, 0)
 	for i := 0; i < 50_000; i++ {
 		fail(fmt.Sprintf("src-%d", i))
 	}
-	if n := l.Size("enrollment-failure"); n != maxLimiterKeys {
-		t.Errorf("limiter holds %d sources, want the cap %d", n, maxLimiterKeys)
+	if n := l.Size("enrollment-failure"); n != securitylimit.DefaultMaxKeysPerName {
+		t.Errorf("limiter holds %d sources, want the cap %d", n, securitylimit.DefaultMaxKeysPerName)
 	}
 	// The most recent failures are the ones remembered.
 	for i := 0; i < 10; i++ {

@@ -40,7 +40,7 @@ type dnsAnswer struct {
 func (h *handler) serveDNS(w http.ResponseWriter, r *http.Request, token, client string, now time.Time) {
 	ctx := r.Context()
 	v, st, ok := h.enter(w, r, token, client, now, h.pdns != nil, subsettings.DNSChoice, "dns_disabled")
-	if !ok || !h.admitWrite(r.Context(), w, token, v, true, now) { // a user without access has no servers to pick on
+	if !ok || !h.admitWrite(r.Context(), w, token, v, true) { // a user without access has no servers to pick on
 		return
 	}
 	var in struct {

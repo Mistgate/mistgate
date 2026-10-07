@@ -24,7 +24,7 @@ type edgeLimiter struct {
 }
 
 // The init limit callback receives {operation, name, key} plus operation fields:
-// take adds burst/refillMs/cost; peek and record add limit/spanMs/lockoutMs.
+// take adds burst/refillMs; peek and record add limit/spanMs/lockoutMs.
 // Every call resolves to {ok, retryAfterMs, remaining, first}.
 func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
 	if log == nil {
@@ -33,11 +33,10 @@ func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
 	return &edgeLimiter{callback: callback, log: log}
 }
 
-func (l *edgeLimiter) Take(ctx context.Context, spec securitylimit.Bucket, key string, cost float64) (securitylimit.Decision, error) {
+func (l *edgeLimiter) Take(ctx context.Context, spec securitylimit.Bucket, key string) (securitylimit.Decision, error) {
 	request := l.request("take", spec.Name, key)
 	request.Set("burst", spec.Burst)
 	request.Set("refillMs", float64(spec.Refill)/float64(time.Millisecond))
-	request.Set("cost", cost)
 	return l.call(ctx, request)
 }
 
@@ -49,8 +48,8 @@ func (l *edgeLimiter) Record(ctx context.Context, spec securitylimit.Window, key
 	return l.call(ctx, l.windowRequest("record", spec, key))
 }
 
-func (l *edgeLimiter) Reset(ctx context.Context, name, key string) error {
-	_, err := l.call(ctx, l.request("reset", name, key))
+func (l *edgeLimiter) Reset(ctx context.Context, spec securitylimit.Window, key string) error {
+	_, err := l.call(ctx, l.request("reset", spec.Name, key))
 	return err
 }
 

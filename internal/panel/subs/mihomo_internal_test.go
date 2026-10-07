@@ -221,7 +221,7 @@ func TestAcceptsGzip(t *testing.T) {
 // A burst of requests cannot get more than the budget through.
 func TestWriteAdmitConcurrent(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return now }, 10_000)
+	limiter := securitylimit.NewMemory(func() time.Time { return now }, 0)
 	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: limiter, Now: func() time.Time { return now }}).(*handler)
 	var admitted atomic.Int32
 	var wg sync.WaitGroup
@@ -243,7 +243,7 @@ func TestWriteAdmitConcurrent(t *testing.T) {
 // writeAdmit: the budget is per hour and a window restarts after an hour; a negative budget is no limit.
 func TestWriteAdmit(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return now }, 10_000)
+	limiter := securitylimit.NewMemory(func() time.Time { return now }, 0)
 	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: limiter, MaxWritesPerHour: 3, Now: func() time.Time { return now }}).(*handler)
 	for i := 0; i < 3; i++ {
 		if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
@@ -258,7 +258,7 @@ func TestWriteAdmit(t *testing.T) {
 	if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
 		t.Error("a new hour must restart the budget")
 	}
-	free := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(), MaxWritesPerHour: -1}).(*handler)
+	free := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(nil, 0), MaxWritesPerHour: -1}).(*handler)
 	for i := 0; i < 1000; i++ {
 		if retry := free.writeAdmit(context.Background(), tokA); retry != 0 {
 			t.Fatal("unlimited refused")

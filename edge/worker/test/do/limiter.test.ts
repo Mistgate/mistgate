@@ -10,7 +10,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 describe("Limiter Durable Object", () => {
   it("allows the burst of a token bucket over RPC, then refuses; another key has its own bucket", async () => {
     const a = stubFor("auth", "do-bucket-a");
-    const take = { operation: "take", name: "auth", key: "do-bucket-a", burst: 3, refillMs: 3_600_000, cost: 1 };
+    const take = { operation: "take", name: "auth", key: "do-bucket-a", burst: 3, refillMs: 3_600_000 };
     for (let i = 0; i < 3; i++) expect((await a.limit(take)).ok, `burst request ${i}`).toBe(true);
     const refused = await a.limit(take);
     expect(refused.ok).toBe(false);
@@ -46,7 +46,7 @@ describe("Limiter Durable Object", () => {
   it("rejects a malformed request (the panel then refuses the guarded request)", async () => {
     const s = stubFor("auth", "do-bad");
     await expect(s.limit({ operation: "drop", name: "auth", key: "do-bad" })).rejects.toThrow(/unknown operation/);
-    await expect(s.limit({ operation: "take", name: "auth", key: "do-bad", burst: 0, refillMs: 1, cost: 1 })).rejects.toThrow(/invalid burst/);
+    await expect(s.limit({ operation: "take", name: "auth", key: "do-bad", burst: 0, refillMs: 1 })).rejects.toThrow(/invalid burst/);
     await expect(s.limit(null)).rejects.toThrow();
   });
 
@@ -63,7 +63,7 @@ describe("Limiter Durable Object", () => {
   it("deletes a bucket once it is full again, and keeps it before that", async () => {
     const s = stubFor("auth", "do-alarm-bucket");
     const held = () => runInDurableObject(s, async (_o, state) => [state.storage.kv.get("b") !== undefined, (await state.storage.getAlarm()) !== null]);
-    await s.limit({ operation: "take", name: "auth", key: "do-alarm-bucket", burst: 2, refillMs: 400, cost: 1 }); // full again after 400 ms
+    await s.limit({ operation: "take", name: "auth", key: "do-alarm-bucket", burst: 2, refillMs: 400 }); // full again after 400 ms
     await runDurableObjectAlarm(s); // far too early: it runs, finds the bucket not yet full, keeps it and sets the alarm again
     expect(await held()).toEqual([true, true]);
     for (let i = 0; i < 100 && (await held()).includes(true); i++) await sleep(20);

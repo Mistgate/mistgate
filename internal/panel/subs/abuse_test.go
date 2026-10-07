@@ -181,7 +181,7 @@ func TestGuessingWindowAndMalformedTokens(t *testing.T) {
 }
 
 func TestGuessingLimitIsSharedByHandlers(t *testing.T) {
-	limiter := securitylimit.NewMemory()
+	limiter := securitylimit.NewMemory(nil, 0)
 	r := newRig(t, func(c *Config) { c.MissLimit, c.Limiter = 2, limiter })
 	first := r.h
 	second := Handler(r.src, decoyHandler, Config{

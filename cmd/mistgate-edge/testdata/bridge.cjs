@@ -8,10 +8,12 @@ const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const { createHmac } = require("node:crypto");
+const { pathToFileURL } = require("node:url");
 
 let wasmFailure;
 let rejectWasmFailure;
 const securityLimits = new Map();
+let limitMath;
 
 const [wasmPath, wasmExecPath, oraclePath, dataDir] = process.argv.slice(2);
 if (!wasmPath || !wasmExecPath || !oraclePath || !dataDir) {
@@ -167,77 +169,59 @@ function totpCode(secret) {
   return String(value % 1000000).padStart(6, "0");
 }
 
-async function securityLimit(input) {
+async function securityLimit(input, now = Date.now()) {
+  const request = limitMath.parseRequest(input);
   const id = `${input.name}\0${input.key}`;
-  const now = Date.now();
-  const answer = (ok, retryAfterMs = 0, remaining = 0, first = false) => ({ ok, retryAfterMs, remaining, first });
   const saved = securityLimits.get(id) || {};
-  if (input.operation === "reset") {
+  if (request.operation === "reset") {
     delete saved.window;
     if (saved.bucket) securityLimits.set(id, saved);
     else securityLimits.delete(id);
-    return answer(true);
+    return { ok: true, retryAfterMs: 0, remaining: 0, first: false };
   }
-  if (input.operation === "take") {
-    let bucket = saved.bucket;
-    if (!bucket) {
-      bucket = { tokens: input.burst, last: now };
-    }
-    bucket.tokens = Math.min(input.burst, bucket.tokens + Math.max(0, now - bucket.last) / input.refillMs);
-    bucket.last = now;
-    if (bucket.tokens < input.cost) {
-      saved.bucket = bucket;
-      securityLimits.set(id, saved);
-      return answer(false, Math.ceil((input.cost - bucket.tokens) * input.refillMs));
-    }
-    bucket.tokens -= input.cost;
-    saved.bucket = bucket;
+  if (request.operation === "take") {
+    const result = limitMath.takeBucket(saved.bucket, now, request.burst, request.refillMs);
+    saved.bucket = result.state;
     securityLimits.set(id, saved);
-    return answer(true);
+    return result.reply;
   }
-  if (input.operation === "peek") {
-    const window = saved.window;
-    if (!window) return answer(true, 0, input.limit);
-    if (window.lockedUntil > now) return answer(false, window.lockedUntil - now);
-    if (now - window.start >= input.spanMs || (window.lockedUntil > 0 && now >= window.lockedUntil)) {
-      return answer(true, 0, input.limit);
-    }
-    if (window.count >= input.limit) {
-      return answer(false, window.start + input.spanMs - now, 0, !window.logged);
-    }
-    return answer(true, 0, input.limit - window.count);
+  if (request.operation === "peek") {
+    return limitMath.peekWindow(saved.window, now, request.limit, request.spanMs);
   }
-  if (input.operation !== "record") throw new Error(`unknown security limit operation: ${input.operation}`);
-
-  let window = saved.window;
-  if (window && window.lockedUntil > now) {
-    return answer(false, window.lockedUntil - now);
-  }
-  if (!window || now - window.start >= input.spanMs || (window.lockedUntil > 0 && now >= window.lockedUntil)) {
-    window = { start: now, count: 0, logged: false, lockedUntil: 0, end: now + input.spanMs };
-  } else {
-    window = { ...window, end: window.start + input.spanMs };
-  }
-  if (input.lockoutMs > 0 && window.count + 1 >= input.limit) {
-    window.count++;
-    window.logged = true;
-    window.lockedUntil = now + input.lockoutMs;
-    window.end = Math.max(window.end, window.lockedUntil);
-    saved.window = window;
-    securityLimits.set(id, saved);
-    return answer(false, input.lockoutMs, 0, true);
-  }
-  if (window.count >= input.limit) {
-    const first = !window.logged;
-    window.logged = true;
-    saved.window = window;
-    securityLimits.set(id, saved);
-    return answer(false, window.start + input.spanMs - now, 0, first);
-  }
-  window.count++;
-  saved.window = window;
+  const result = limitMath.recordWindow(saved.window, now, request.limit, request.spanMs, request.lockoutMs);
+  saved.window = result.state;
   securityLimits.set(id, saved);
-  return answer(true, 0, input.limit - window.count);
+  return result.reply;
+}
+
+async function assertSharedLimitVectors() {
+  const vectorPath = path.resolve(__dirname, "../../../internal/panel/securitylimit/testdata/vectors.json");
+  const vectors = JSON.parse(fs.readFileSync(vectorPath, "utf8"));
+  for (const scenario of vectors.scenarios) {
+    if (scenario.go_only) continue;
+    securityLimits.clear();
+    for (const [index, operation] of scenario.operations.entries()) {
+      const input = { operation: operation.op, name: operation.name, key: operation.key };
+      if (operation.bucket) {
+        input.burst = operation.bucket.burst;
+        input.refillMs = operation.bucket.refill_ms;
+      }
+      if (operation.window) {
+        input.limit = operation.window.limit;
+        input.spanMs = operation.window.span_ms;
+        input.lockoutMs = operation.window.lockout_ms;
+      }
+      const got = await securityLimit(input, operation.at_ms);
+      const want = {
+        ok: operation.want.allowed,
+        retryAfterMs: operation.want.retry_after_ms,
+        remaining: operation.want.remaining,
+        first: operation.want.first,
+      };
+      assert.deepEqual(got, want, `${scenario.name}, operation ${index} (${operation.op})`);
+    }
+  }
+  securityLimits.clear();
 }
 
 async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.1") {
@@ -264,6 +248,8 @@ async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.
 }
 
 async function run() {
+  limitMath = await import(pathToFileURL(path.resolve(__dirname, "../../../edge/worker/src/limitmath.ts")).href);
+  await assertSharedLimitVectors();
   const port = await reservePort();
   const masterKey = new Uint8Array(randomBytes(32));
   const oracle = startOracle(oraclePath, database, port, masterKey);

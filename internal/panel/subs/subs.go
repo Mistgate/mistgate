@@ -117,7 +117,7 @@ type Config struct {
 	MinInterval time.Duration // cache lifetime of a token's data; default 10 seconds
 	MaxPerHour  int           // fetches per token per hour; default 60
 	SharedNets  int           // distinct client networks per token per day before the event; default 8
-	MaxKeys     int           // clients and tokens tracked per table (memory bound); default 10000
+	MaxKeys     int           // clients and tokens tracked per table (memory bound); default securitylimit.DefaultMaxKeysPerName
 	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename, pick a DNS) per token an hour;
 	// default 20, negative = no limit. Separate from MaxPerHour.
 	MaxWritesPerHour int
@@ -159,7 +159,7 @@ func (c *Config) defaults() {
 		c.SharedNets = 8
 	}
 	if c.MaxKeys <= 0 {
-		c.MaxKeys = 10000
+		c.MaxKeys = securitylimit.DefaultMaxKeysPerName
 	}
 	if c.MaxWritesPerHour == 0 {
 		c.MaxWritesPerHour = 20
@@ -177,7 +177,7 @@ func (c *Config) defaults() {
 		c.BrandTTL = 5 * time.Second
 	}
 	if c.Limiter == nil {
-		c.Limiter = securitylimit.NewMemoryWithOptions(c.Now, c.MaxKeys)
+		c.Limiter = securitylimit.NewMemory(c.Now, c.MaxKeys)
 	}
 	if c.Log == nil {
 		c.Log = slog.Default()

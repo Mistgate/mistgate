@@ -45,7 +45,7 @@ try {
     }
     $wasmExec = Join-Path $goRoot "lib/wasm/wasm_exec.js"
     $harness = Join-Path $repoRoot "cmd/mistgate-edge/testdata/bridge.cjs"
-    & $nodeExe --no-warnings $harness $wasm $wasmExec $oracle $resolvedTempDir
+    & $nodeExe --experimental-strip-types --disable-warning=ExperimentalWarning $harness $wasm $wasmExec $oracle $resolvedTempDir
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

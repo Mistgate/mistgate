@@ -8,9 +8,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
-// maxLimiterKeys is the per-name cap used by the enrollment limiter tests.
-const maxLimiterKeys = 8192
-
 var enrollmentWindow = securitylimit.Window{Name: "enrollment-failure", Limit: 10, Span: time.Minute}
 
 // limiterKey is the source an Enroll attempt is counted against: the IPv4 address, or the IPv6 /64 (one

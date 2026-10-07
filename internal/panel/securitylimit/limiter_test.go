@@ -19,16 +19,16 @@ type vectorFile struct {
 
 type vectorScenario struct {
 	Name           string        `json:"name"`
-	MaxKeysPerName int           `json:"max_keys_per_name"`
+	MaxKeysPerName int           `json:"max_keys_per_name,omitempty"`
+	GoOnly         bool          `json:"go_only,omitempty"`
 	Operations     []vectorEntry `json:"operations"`
 }
 
 type vectorEntry struct {
-	Op     string  `json:"op"`
-	AtMS   int64   `json:"at_ms"`
-	Name   string  `json:"name"`
-	Key    string  `json:"key"`
-	Cost   float64 `json:"cost"`
+	Op     string `json:"op"`
+	AtMS   int64  `json:"at_ms"`
+	Name   string `json:"name"`
+	Key    string `json:"key"`
 	Bucket *struct {
 		Name     string  `json:"name"`
 		Burst    float64 `json:"burst"`
@@ -58,11 +58,7 @@ func TestSharedVectors(t *testing.T) {
 	for _, scenario := range vectors.Scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
 			clock := time.Unix(0, 0)
-			cap := scenario.MaxKeysPerName
-			if cap == 0 {
-				cap = defaultMaxKeysPerName
-			}
-			limiter := NewMemoryWithOptions(func() time.Time { return clock }, cap)
+			limiter := NewMemory(func() time.Time { return clock }, scenario.MaxKeysPerName)
 			for i, op := range scenario.Operations {
 				clock = time.UnixMilli(op.AtMS)
 				var got Decision
@@ -74,7 +70,7 @@ func TestSharedVectors(t *testing.T) {
 					}
 					got, err = limiter.Take(context.Background(), Bucket{
 						Name: op.Bucket.Name, Burst: op.Bucket.Burst, Refill: time.Duration(op.Bucket.RefillMS * float64(time.Millisecond)),
-					}, op.Key, op.Cost)
+					}, op.Key)
 				case "peek", "record":
 					if op.Window == nil {
 						t.Fatalf("operation %d has no window", i)
@@ -90,7 +86,7 @@ func TestSharedVectors(t *testing.T) {
 						got, err = limiter.Record(context.Background(), spec, op.Key)
 					}
 				case "reset":
-					err = limiter.Reset(context.Background(), op.Name, op.Key)
+					err = limiter.Reset(context.Background(), Window{Name: op.Name}, op.Key)
 					got.Allowed = err == nil
 				default:
 					t.Fatalf("operation %d has unknown op %q", i, op.Op)
@@ -107,9 +103,19 @@ func TestSharedVectors(t *testing.T) {
 	}
 }
 
+func TestNewMemoryUsesDefaultsForMissingOptions(t *testing.T) {
+	limiter := NewMemory(nil, 0)
+	if limiter.now == nil {
+		t.Fatal("default clock is nil")
+	}
+	if limiter.maxKeysPerName != DefaultMaxKeysPerName {
+		t.Fatalf("default cap = %d, want %d", limiter.maxKeysPerName, DefaultMaxKeysPerName)
+	}
+}
+
 func TestWindowEvictionIsPerNameAndLeastRecentlyUsed(t *testing.T) {
 	clock := time.Unix(1_800_000_000, 0)
-	limiter := NewMemoryWithOptions(func() time.Time { return clock }, 3)
+	limiter := NewMemory(func() time.Time { return clock }, 3)
 	ctx := context.Background()
 	alpha := Window{Name: "alpha", Limit: 1, Span: time.Hour}
 	beta := Window{Name: "beta", Limit: 1, Span: time.Hour}
@@ -158,7 +164,7 @@ func TestWindowEvictionIsPerNameAndLeastRecentlyUsed(t *testing.T) {
 
 func TestMemoryCanEvictWithOneKeyPerName(t *testing.T) {
 	clock := time.Unix(1_800_000_000, 0)
-	limiter := NewMemoryWithOptions(func() time.Time { return clock }, 1)
+	limiter := NewMemory(func() time.Time { return clock }, 1)
 	window := Window{Name: "single", Limit: 1, Span: time.Hour}
 	if _, err := limiter.Record(context.Background(), window, "old"); err != nil {
 		t.Fatal(err)
@@ -179,7 +185,7 @@ func TestMemoryCanEvictWithOneKeyPerName(t *testing.T) {
 
 func TestRecordLockoutIsAtomic(t *testing.T) {
 	clock := time.Unix(1_800_000_000, 0)
-	limiter := NewMemoryWithOptions(func() time.Time { return clock }, 100)
+	limiter := NewMemory(func() time.Time { return clock }, 100)
 	spec := Window{Name: "subscription-miss", Limit: 20, Span: time.Minute, Lockout: 15 * time.Minute}
 	const attempts = 100
 	results := make(chan Decision, attempts)
@@ -220,5 +226,100 @@ func TestRecordLockoutIsAtomic(t *testing.T) {
 	}
 	if first != 1 {
 		t.Errorf("first lockout decisions = %d, want exactly one", first)
+	}
+}
+
+func TestWindowEvictionKeepsLockedKeysBeforeUnlockedKeys(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 2)
+	ctx := context.Background()
+	spec := Window{Name: "shared", Limit: 2, Span: time.Hour, Lockout: time.Minute}
+	if d, err := limiter.Record(ctx, spec, "locked"); err != nil || !d.Allowed {
+		t.Fatalf("first record for locked key: %+v, %v", d, err)
+	}
+	if d, err := limiter.Record(ctx, spec, "locked"); err != nil || d.Allowed || !d.First {
+		t.Fatalf("second record should lock key: %+v, %v", d, err)
+	}
+	for i := 0; i < 10; i++ {
+		if d, err := limiter.Record(ctx, spec, string(rune('a'+i))); err != nil || !d.Allowed {
+			t.Fatalf("record one-miss key %d: %+v, %v", i, d, err)
+		}
+	}
+	if d, err := limiter.Peek(ctx, spec, "locked"); err != nil || d.Allowed || d.RetryAfter != time.Minute {
+		t.Fatalf("locked key was evicted during the unlocked-key flood: %+v, %v", d, err)
+	}
+}
+
+func TestPeekExpiredWindowDoesNotEvictLiveWindow(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 2)
+	ctx := context.Background()
+	expired := Window{Name: "shared", Limit: 1, Span: time.Millisecond}
+	live := Window{Name: "shared", Limit: 1, Span: time.Hour}
+	if d, err := limiter.Record(ctx, expired, "expired"); err != nil || !d.Allowed {
+		t.Fatalf("record expired key: %+v, %v", d, err)
+	}
+	clock = clock.Add(time.Millisecond)
+	if d, err := limiter.Record(ctx, live, "live"); err != nil || !d.Allowed {
+		t.Fatalf("record live key: %+v, %v", d, err)
+	}
+	if d, err := limiter.Peek(ctx, expired, "expired"); err != nil || !d.Allowed {
+		t.Fatalf("peek expired key: %+v, %v", d, err)
+	}
+	if d, err := limiter.Record(ctx, live, "new"); err != nil || !d.Allowed {
+		t.Fatalf("record replacement key: %+v, %v", d, err)
+	}
+	if d, err := limiter.Peek(ctx, live, "live"); err != nil || d.Allowed {
+		t.Fatalf("peek touched away live key: %+v, %v", d, err)
+	}
+}
+
+func TestBucketLRUIsBoundedPerName(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 64)
+	ctx := context.Background()
+	spec := Bucket{Name: "bounded", Burst: 1, Refill: time.Minute}
+	for i := 0; i < 20_000; i++ {
+		if _, err := limiter.Take(ctx, spec, string(rune(i+0x1000))); err != nil {
+			t.Fatalf("take key %d: %v", i, err)
+		}
+	}
+	if got := len(limiter.buckets); got != 64 {
+		t.Errorf("bucket count = %d, want cap 64", got)
+	}
+	if got := limiter.bucketOrderByName[spec.Name].Len(); got != 64 {
+		t.Errorf("per-name bucket count = %d, want cap 64", got)
+	}
+	other := Bucket{Name: "other", Burst: 1, Refill: time.Minute}
+	if _, err := limiter.Take(ctx, other, "key"); err != nil {
+		t.Fatal(err)
+	}
+	if got := limiter.bucketOrderByName[other.Name].Len(); got != 1 {
+		t.Errorf("other-name bucket count = %d, want 1", got)
+	}
+}
+
+func TestBucketEvictionDropsTheOldestState(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 2)
+	ctx := context.Background()
+	spec := Bucket{Name: "bucket-lru", Burst: 1, Refill: time.Minute}
+	for _, key := range []string{"old", "recent"} {
+		if d, err := limiter.Take(ctx, spec, key); err != nil || !d.Allowed {
+			t.Fatalf("take %s: %+v, %v", key, d, err)
+		}
+	}
+	clock = clock.Add(time.Minute)
+	if d, err := limiter.Take(ctx, spec, "old"); err != nil || !d.Allowed {
+		t.Fatalf("refill old bucket: %+v, %v", d, err)
+	}
+	if d, err := limiter.Take(ctx, spec, "new"); err != nil || !d.Allowed {
+		t.Fatalf("insert new bucket: %+v, %v", d, err)
+	}
+	if d, err := limiter.Take(ctx, spec, "recent"); err != nil || !d.Allowed {
+		t.Fatalf("evicted bucket did not start full: %+v, %v", d, err)
+	}
+	if got := limiter.bucketOrderByName[spec.Name].Len(); got != 2 {
+		t.Fatalf("bucket count = %d, want cap 2", got)
 	}
 }

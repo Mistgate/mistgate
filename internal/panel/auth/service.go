@@ -144,7 +144,7 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		cfg.HTTPClient = &http.Client{Timeout: turnstileTimeout}
 	}
 	if cfg.Limiter == nil {
-		cfg.Limiter = securitylimit.NewMemory()
+		cfg.Limiter = securitylimit.NewMemory(nil, 0)
 	}
 	s := &Service{
 		sourceURL:  cfg.SourceURL,

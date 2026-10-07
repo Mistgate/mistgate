@@ -257,7 +257,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 		}
 	}
 	// The keys leave only for a user who can use them; removing a device and renaming one never hurt.
-	if !h.admitWrite(r.Context(), w, token, v, rest == "" || action == "configs" || action == "rotate", now) {
+	if !h.admitWrite(r.Context(), w, token, v, rest == "" || action == "configs" || action == "rotate") {
 		return
 	}
 
@@ -326,20 +326,20 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	if _, ok := h.tokens.Get(token); ok && exists {
 		switch {
 		case h.cop.Check(r) != nil:
-			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+			if !h.confirmCachedToken(ctx, w, r, token, client) {
 				return access.SubView{}, nil, false
 			}
 			jsonError(w, http.StatusForbidden, "cross_origin", "")
 			return access.SubView{}, nil, false
 		case !on(set):
-			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+			if !h.confirmCachedToken(ctx, w, r, token, client) {
 				return access.SubView{}, nil, false
 			}
 			jsonError(w, http.StatusForbidden, off, "")
 			return access.SubView{}, nil, false
 		}
 		if retry := h.writeWait(ctx, token); retry > 0 {
-			if !h.confirmCachedToken(ctx, w, r, token, client, now) {
+			if !h.confirmCachedToken(ctx, w, r, token, client) {
 				return access.SubView{}, nil, false
 			}
 			tooManyWrites(w, retry)
@@ -373,7 +373,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 }
 
 // confirmCachedToken prevents a refused response from revealing a token that has since been rotated or deleted.
-func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token, client string, now time.Time) bool {
+func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token, client string) bool {
 	var err error
 	if checker, ok := h.src.(TokenChecker); ok {
 		err = checker.CheckSubscriptionToken(ctx, token)
@@ -396,7 +396,7 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 // admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the
 // servers, 409 user_inactive otherwise) and the hourly budget of writes of the token (429), counted for the devices and
 // the DNS together. It answers and returns false when the call ends there.
-func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token string, v access.SubView, needActive bool, now time.Time) bool {
+func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token string, v access.SubView, needActive bool) bool {
 	if needActive && v.Status != access.StatusActive {
 		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 		return false

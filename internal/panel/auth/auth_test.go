@@ -27,7 +27,7 @@ func newTestService(t *testing.T) (*Service, *store.Store, *time.Time) {
 	t.Helper()
 	clock := time.Now()
 	clockPtr := &clock
-	limiter := authTestLimiter{memory: securitylimit.NewMemoryWithOptions(func() time.Time { return *clockPtr }, 10_000)}
+	limiter := authTestLimiter{Memory: securitylimit.NewMemory(func() time.Time { return *clockPtr }, 0)}
 	return newTestServiceWithLimiter(t, limiter, clockPtr)
 }
 
@@ -51,32 +51,20 @@ func newTestServiceWithLimiter(t *testing.T, limiter securitylimit.Limiter, cloc
 }
 
 type authTestLimiter struct {
-	memory *securitylimit.Memory
+	*securitylimit.Memory
 }
 
-func (l authTestLimiter) Take(ctx context.Context, b securitylimit.Bucket, key string, cost float64) (securitylimit.Decision, error) {
+func (l authTestLimiter) Take(ctx context.Context, b securitylimit.Bucket, key string) (securitylimit.Decision, error) {
 	if b.Name == "auth" {
 		return securitylimit.Decision{Allowed: true}, nil
 	}
-	return l.memory.Take(ctx, b, key, cost)
-}
-
-func (l authTestLimiter) Peek(ctx context.Context, w securitylimit.Window, key string) (securitylimit.Decision, error) {
-	return l.memory.Peek(ctx, w, key)
-}
-
-func (l authTestLimiter) Record(ctx context.Context, w securitylimit.Window, key string) (securitylimit.Decision, error) {
-	return l.memory.Record(ctx, w, key)
-}
-
-func (l authTestLimiter) Reset(ctx context.Context, name, key string) error {
-	return l.memory.Reset(ctx, name, key)
+	return l.Memory.Take(ctx, b, key)
 }
 
 func TestAuthBurstRateLimit(t *testing.T) {
 	clock := time.Now()
 	clockPtr := &clock
-	limiter := securitylimit.NewMemoryWithOptions(func() time.Time { return *clockPtr }, 10_000)
+	limiter := securitylimit.NewMemory(func() time.Time { return *clockPtr }, 0)
 	s, _, limiterClock := newTestServiceWithLimiter(t, limiter, clockPtr)
 	req := connect.NewRequest(&adminv1.BeginSetupRequest{})
 	for i := 0; i < 10; i++ {

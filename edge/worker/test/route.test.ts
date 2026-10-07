@@ -19,7 +19,7 @@ function namespace(reply = { ok: true, retryAfterMs: 0, remaining: 0, first: fal
 describe("routeLimit", () => {
   it("sends each (name, key) to its own object and passes the request through", async () => {
     const { ns, calls } = namespace();
-    const request = { operation: "take", name: "auth", key: "203.0.113.7", burst: 10, refillMs: 3000, cost: 1 };
+    const request = { operation: "take", name: "auth", key: "203.0.113.7", burst: 10, refillMs: 3000 };
     await routeLimit(ns, request);
     await routeLimit(ns, { ...request, key: "203.0.113.8" });
     await routeLimit(ns, { ...request, name: "api-token" });

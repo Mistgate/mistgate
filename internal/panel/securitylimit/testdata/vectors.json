@@ -3,62 +3,56 @@
     {
       "name": "allows the burst, then refuses, like the auth limiter",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}}
       ]
     },
     {
       "name": "refills one token per refill period, exactly",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}},
-        {"op":"take","at_ms":1100,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":1100,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":900,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}},
+        {"op":"take","at_ms":1100,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":1100,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":900,"remaining":0,"first":false}}
       ]
     },
     {
       "name": "never refills past the burst",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":3600000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":3,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}}
       ]
     },
     {
-      "name": "charges the cost and says how long until it fits",
+      "name": "spends one token and says when it refills",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":5,"refill_ms":1000},"cost":4,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":5,"refill_ms":1000},"cost":3,"want":{"allowed":false,"retry_after_ms":2000,"remaining":0,"first":false}},
-        {"op":"take","at_ms":2000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":5,"refill_ms":1000},"cost":3,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}},
+        {"op":"take","at_ms":1000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}}
       ]
     },
     {
       "name": "a refused request still counts the time that passed",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":400,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":600,"remaining":0,"first":false}},
-        {"op":"take","at_ms":900,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"cost":1,"want":{"allowed":false,"retry_after_ms":100,"remaining":0,"first":false}},
-        {"op":"take","at_ms":1000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":400,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":600,"remaining":0,"first":false}},
+        {"op":"take","at_ms":900,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"want":{"allowed":false,"retry_after_ms":100,"remaining":0,"first":false}},
+        {"op":"take","at_ms":1000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":1000},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}}
       ]
     },
     {
       "name": "rounds retryAfter up to a whole millisecond",
       "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":2.5},"cost":1,"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
-        {"op":"take","at_ms":1,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":2.5},"cost":1,"want":{"allowed":false,"retry_after_ms":2,"remaining":0,"first":false}}
-      ]
-    },
-    {
-      "name": "a cost above the burst is never allowed, as in Memory",
-      "operations": [
-        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"cost":3,"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}},
-        {"op":"take","at_ms":10000,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":2,"refill_ms":1000},"cost":3,"want":{"allowed":false,"retry_after_ms":1000,"remaining":0,"first":false}}
+        {"op":"take","at_ms":0,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":2.5},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"take","at_ms":1,"name":"auth","key":"source-a","bucket":{"name":"auth","burst":1,"refill_ms":2.5},"want":{"allowed":false,"retry_after_ms":2,"remaining":0,"first":false}}
       ]
     },
     {
@@ -216,6 +210,37 @@
         {"op":"record","at_ms":100,"name":"subscription-miss","key":"c:client-one","window":{"name":"subscription-miss","limit":1,"span_ms":60000,"lockout_ms":900000},"want":{"allowed":false,"retry_after_ms":900000,"remaining":0,"first":true}},
         {"op":"peek","at_ms":101,"name":"subscription-miss","key":"c:client-one","window":{"name":"subscription-miss","limit":1,"span_ms":60000,"lockout_ms":900000},"want":{"allowed":false,"retry_after_ms":899999,"remaining":0,"first":false}},
         {"op":"peek","at_ms":101,"name":"subscription-miss","key":"c:client-two","window":{"name":"subscription-miss","limit":1,"span_ms":60000,"lockout_ms":900000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}}
+      ]
+    },
+    {
+      "name": "a record during lockout is refused without extending it",
+      "operations": [
+        {"op":"record","at_ms":0,"name":"active-lockout","key":"key-a","window":{"name":"active-lockout","limit":1,"span_ms":60000,"lockout_ms":5000},"want":{"allowed":false,"retry_after_ms":5000,"remaining":0,"first":true}},
+        {"op":"record","at_ms":1000,"name":"active-lockout","key":"key-a","window":{"name":"active-lockout","limit":1,"span_ms":60000,"lockout_ms":5000},"want":{"allowed":false,"retry_after_ms":4000,"remaining":0,"first":false}},
+        {"op":"peek","at_ms":4999,"name":"active-lockout","key":"key-a","window":{"name":"active-lockout","limit":1,"span_ms":60000,"lockout_ms":5000},"want":{"allowed":false,"retry_after_ms":1,"remaining":0,"first":false}}
+      ]
+    },
+    {
+      "name": "a short lockout ends the current window and starts a fresh one",
+      "operations": [
+        {"op":"record","at_ms":0,"name":"short-lockout","key":"key-a","window":{"name":"short-lockout","limit":2,"span_ms":1000,"lockout_ms":100},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"record","at_ms":10,"name":"short-lockout","key":"key-a","window":{"name":"short-lockout","limit":2,"span_ms":1000,"lockout_ms":100},"want":{"allowed":false,"retry_after_ms":100,"remaining":0,"first":true}},
+        {"op":"peek","at_ms":110,"name":"short-lockout","key":"key-a","window":{"name":"short-lockout","limit":2,"span_ms":1000,"lockout_ms":100},"want":{"allowed":true,"retry_after_ms":0,"remaining":2,"first":false}},
+        {"op":"record","at_ms":110,"name":"short-lockout","key":"key-a","window":{"name":"short-lockout","limit":2,"span_ms":1000,"lockout_ms":100},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}}
+      ]
+    },
+    {
+      "name": "locked windows survive an unlocked-key flood",
+      "max_keys_per_name": 2,
+      "go_only": true,
+      "operations": [
+        {"op":"record","at_ms":0,"name":"window-eviction","key":"locked","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"record","at_ms":1,"name":"window-eviction","key":"locked","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":false,"retry_after_ms":60000,"remaining":0,"first":true}},
+        {"op":"record","at_ms":2,"name":"window-eviction","key":"other","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"record","at_ms":3,"name":"window-eviction","key":"new-1","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"record","at_ms":4,"name":"window-eviction","key":"new-2","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"record","at_ms":5,"name":"window-eviction","key":"new-3","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
+        {"op":"peek","at_ms":6,"name":"window-eviction","key":"locked","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":false,"retry_after_ms":59995,"remaining":0,"first":false}}
       ]
     }
   ]

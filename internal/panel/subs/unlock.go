@@ -134,7 +134,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "wrong_password", "left": left})
 		return
 	}
-	if err := h.cfg.Limiter.Reset(ctx, "page-password", "t:"+token); err != nil {
+	if err := h.cfg.Limiter.Reset(ctx, window, "t:"+token); err != nil {
 		lockedAnswer(w, retryOnFailure)
 		return
 	}

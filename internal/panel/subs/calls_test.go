@@ -80,7 +80,7 @@ func TestRefusedCallsDoNotBuildTheView(t *testing.T) {
 
 func TestWriteBudgetIsSharedByHandlers(t *testing.T) {
 	src := &fakeSrc{valid: map[string]access.SubView{tokA: {UserName: "alice", Status: access.StatusActive}}}
-	limiter := securitylimit.NewMemory()
+	limiter := securitylimit.NewMemory(nil, 0)
 	config := Config{Limiter: limiter, MaxWritesPerHour: 1, MinInterval: -1, MaxPerHour: -1}
 	first := Handler(fakeDevs{src}, decoyHandler, config)
 	second := Handler(fakeDevs{src}, decoyHandler, config)

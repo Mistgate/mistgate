@@ -1,7 +1,7 @@
 // The pure math of the Limiter Durable Object: one (name, key) pair, no storage, no clock of its own.
 
 export type LimitRequest =
-  | { operation: "take"; name: string; key: string; burst: number; refillMs: number; cost: number }
+  | { operation: "take"; name: string; key: string; burst: number; refillMs: number }
   | { operation: "peek" | "record"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number }
   | { operation: "reset"; name: string; key: string };
 
@@ -56,7 +56,7 @@ export function parseRequest(raw: unknown): LimitRequest {
     case "take":
       return {
         operation: "take", name, key,
-        burst: positive(r.burst, "burst"), refillMs: positive(r.refillMs, "refillMs"), cost: positive(r.cost, "cost"),
+        burst: positive(r.burst, "burst"), refillMs: positive(r.refillMs, "refillMs"),
       };
     case "peek":
     case "record": {
@@ -74,16 +74,16 @@ export function parseRequest(raw: unknown): LimitRequest {
   }
 }
 
-/** Refill by the time passed (never above the burst), then spend `cost` or say how long until it fits. */
-export function takeBucket(prev: Bucket | undefined, now: number, burst: number, refillMs: number, cost: number): { state: Bucket; reply: LimitReply } {
+/** Refill by the time passed (never above the burst), then spend one token or say when it fits. */
+export function takeBucket(prev: Bucket | undefined, now: number, burst: number, refillMs: number): { state: Bucket; reply: LimitReply } {
   const tokens = Math.min(burst, (prev?.tokens ?? burst) + Math.max(0, now - (prev?.last ?? now)) / refillMs);
-  if (tokens < cost) {
+  if (tokens < 1) {
     return {
       state: { tokens, last: now, fullAt: bucketFullAt(tokens, now, burst, refillMs) },
-      reply: { ok: false, retryAfterMs: Math.ceil((cost - tokens) * refillMs), remaining: 0, first: false },
+      reply: { ok: false, retryAfterMs: Math.ceil((1 - tokens) * refillMs), remaining: 0, first: false },
     };
   }
-  const left = tokens - cost;
+  const left = tokens - 1;
   return { state: { tokens: left, last: now, fullAt: bucketFullAt(left, now, burst, refillMs) }, reply: allowed() };
 }
 

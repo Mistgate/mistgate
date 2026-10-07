@@ -109,7 +109,7 @@ func (s *Service) authenticateBearer(r *http.Request, limit bool) (store.APIToke
 		bucket := securitylimit.Bucket{
 			Name: "api-token", Burst: float64(min(tokenBurst, rate)), Refill: time.Minute / time.Duration(rate),
 		}
-		decision, err := s.lim.Take(r.Context(), bucket, tok.ID, 1)
+		decision, err := s.lim.Take(r.Context(), bucket, tok.ID)
 		if err != nil || !decision.Allowed {
 			f := failure(http.StatusTooManyRequests, "resource_exhausted", "too many requests for this token, slow down", "rate limit")
 			f.retry = decision.RetryAfter

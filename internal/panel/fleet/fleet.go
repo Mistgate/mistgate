@@ -117,7 +117,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		return nil, errors.New("fleet: Desired is required")
 	}
 	if cfg.Limiter == nil {
-		cfg.Limiter = securitylimit.NewMemory()
+		cfg.Limiter = securitylimit.NewMemory(nil, 0)
 	}
 	cfg.AgentSNI = strings.ToLower(strings.TrimSuffix(cfg.AgentSNI, "."))
 	if cfg.Log == nil {
