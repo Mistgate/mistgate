@@ -11,7 +11,31 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"google.golang.org/protobuf/proto"
 )
+
+func cloneLiveSnapshot(live LiveSnapshot) LiveSnapshot {
+	out := live
+	if live.Metrics != nil {
+		out.Metrics = proto.Clone(live.Metrics).(*agentv1.HostMetrics)
+	}
+	out.Health = make([]*agentv1.InboundHealth, len(live.Health))
+	for i, health := range live.Health {
+		if health != nil {
+			out.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
+		}
+	}
+	out.Online = slices.Clone(live.Online)
+	out.UserDown = make(map[string]uint64, len(live.UserDown))
+	for id, value := range live.UserDown {
+		out.UserDown[id] = value
+	}
+	out.UserUp = make(map[string]uint64, len(live.UserUp))
+	for id, value := range live.UserUp {
+		out.UserUp[id] = value
+	}
+	return out
+}
 
 // reasonOf is the status and reason of one node as the node page, the node list and the Overview card each show it:
 // the three must agree.

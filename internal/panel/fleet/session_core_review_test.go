@@ -81,10 +81,13 @@ func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
 	var version atomic.Int32
 	version.Store(1)
 	var reads, active, maxActive atomic.Int32
-	started, release := make(chan struct{}), make(chan struct{})
+	started, followupStarted, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
 		v := version.Load()
 		call := reads.Add(1)
+		if call == 2 {
+			close(followupStarted)
+		}
 		inFlight := active.Add(1)
 		defer active.Add(-1)
 		for old := maxActive.Load(); inFlight > old; old = maxActive.Load() {
@@ -110,6 +113,7 @@ func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
 	}
 	readsBeforeRelease := reads.Load()
 	close(release)
+	waitRound3(t, followupStarted, "the dirty preparation hand-off")
 	if err := <-first; err != nil {
 		t.Fatal(err)
 	}
@@ -120,11 +124,16 @@ func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.coreSidecar.SentDesired == nil || s.coreSidecar.SentDesired.hash != latest.desired.hash {
-		t.Fatalf("last sent hash = %v, latest database hash = %v", s.coreSidecar.SentDesired, latest.desired.hash)
+	frames := desiredRound3Frames(t, s, 2)
+	view := s.view.Load()
+	if view == nil || view.SentDesired == nil || view.SentDesired.hash != latest.desired.hash {
+		var sent *nodeState
+		if view != nil {
+			sent = view.SentDesired
+		}
+		t.Fatalf("last sent hash = %v, latest database hash = %v", sent, latest.desired.hash)
 	}
-	frames := drainDesiredFrames(s)
-	if len(frames) == 0 || frames[len(frames)-1].StateHash != latest.desired.hash {
+	if frames[len(frames)-1].StateHash != latest.desired.hash {
 		t.Fatalf("last DesiredState = %v, latest database hash = %v", frames, latest.desired.hash)
 	}
 }
@@ -173,10 +182,10 @@ func TestFailedPreparationRetriesOnAlarmAndKeepsFullResend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if failed.State.Preparing || failed.State.PrepareRetryAtUnixNano != now.Add(2*time.Second+prepareRetryDelay).UnixNano() || !failed.State.FullResendPending {
+	if failed.State.Preparing || !failed.State.PrepareRetryAt.Equal(now.Add(2*time.Second+prepareRetryDelay)) || !failed.State.FullResendPending {
 		t.Fatalf("failed preparation state = %+v", failed.State)
 	}
-	retryAt := time.Unix(0, failed.State.PrepareRetryAtUnixNano)
+	retryAt := failed.State.PrepareRetryAt
 	retry, err := coreStep(ctx, core, failed.State, failed.Sidecar, SessionEvent{Kind: EventAlarm, At: retryAt})
 	if err != nil || !retry.State.Preparing || !hasEffect(retry, EffectPrepareDesired) {
 		t.Fatalf("retry alarm transition = %+v, err %v", retry, err)

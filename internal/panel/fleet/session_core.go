@@ -11,7 +11,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 const sessionStateVersion = 1
@@ -23,41 +22,41 @@ const maxCertLife = 11 * 365 * 24 * time.Hour
 
 // SessionState is the compact connection state. Large snapshots and memo tables live in SessionSidecar.
 type SessionState struct {
-	Version               uint8    `json:"v"`
-	NodeID                string   `json:"n,omitempty"`
-	OwnerGeneration       uint64   `json:"o,omitempty"`
-	InstanceID            string   `json:"i,omitempty"`
-	Capabilities          []string `json:"c,omitempty"`
-	LivenessNanos         int64    `json:"l,omitempty"`
-	HelloDeadlineUnixNano int64    `json:"h,omitempty"`
+	Version         uint8     `json:"v"`
+	NodeID          string    `json:"n,omitempty"`
+	OwnerGeneration uint64    `json:"o,omitempty"`
+	InstanceID      string    `json:"i,omitempty"`
+	Capabilities    []string  `json:"c,omitempty"`
+	LivenessNanos   int64     `json:"l,omitempty"`
+	HelloDeadline   time.Time `json:"h,omitzero"`
 	// LivenessDeadline keeps Go's monotonic reading on the VPS: a wall-clock step cannot close a live session.
-	LivenessDeadline         time.Time    `json:"d"`
-	AutoBandwidthUnixNano    int64        `json:"b,omitempty"`
-	AutoBandwidthPending     bool         `json:"ap,omitempty"`
-	NextAckTickUnixNano      int64        `json:"a,omitempty"`
-	NextCertCheckUnixNano    int64        `json:"x,omitempty"`
-	AckPending               uint64       `json:"p,omitempty"`
-	AckSent                  uint64       `json:"s,omitempty"`
-	LastAckUnixNano          int64        `json:"k,omitempty"`
-	LastRejectUnixNano       int64        `json:"r,omitempty"`
-	LastEndUnix              int64        `json:"e,omitempty"`
-	LastSeenUnixNano         int64        `json:"v_at,omitempty"`
-	SentRevision             uint64       `json:"q,omitempty"`
-	SentStateHash            string       `json:"sh,omitempty"`
-	SentSettingsHash         string       `json:"ss,omitempty"`
-	DriftResent              bool         `json:"dr,omitempty"`
-	Drift                    bool         `json:"dt,omitempty"`
-	FullResendPending        bool         `json:"fr,omitempty"`
-	HelloAppliedRevision     uint64       `json:"har,omitempty"`
-	HelloAppliedStateHash    string       `json:"hah,omitempty"`
-	Preparing                bool         `json:"prep,omitempty"`
-	PrepareDirty             bool         `json:"pd,omitempty"`
-	PrepareRetryAtUnixNano   int64        `json:"pra,omitempty"`
-	Poison                   *PoisonBatch `json:"p_seq,omitempty"`
-	PeerCertSerial           string       `json:"cs,omitempty"`
-	PeerCertNotAfterUnixNano int64        `json:"ce,omitempty"`
-	Disconnected             bool         `json:"z,omitempty"`
-	SidecarVersion           uint32       `json:"sv,omitempty"`
+	LivenessDeadline      time.Time    `json:"d,omitzero"`
+	AutoBandwidthDeadline time.Time    `json:"b,omitzero"`
+	AutoBandwidthPending  bool         `json:"ap,omitempty"`
+	NextAckTick           time.Time    `json:"a,omitzero"`
+	NextCertCheck         time.Time    `json:"x,omitzero"`
+	AckPending            uint64       `json:"p,omitempty"`
+	AckSent               uint64       `json:"s,omitempty"`
+	LastAck               time.Time    `json:"k,omitzero"`
+	LastReject            time.Time    `json:"r,omitzero"`
+	LastEndUnix           int64        `json:"e,omitempty"`
+	LastSeenAt            time.Time    `json:"v_at,omitzero"`
+	SentRevision          uint64       `json:"q,omitempty"`
+	SentStateHash         string       `json:"sh,omitempty"`
+	SentSettingsHash      string       `json:"ss,omitempty"`
+	DriftResent           bool         `json:"dr,omitempty"`
+	Drift                 bool         `json:"dt,omitempty"`
+	FullResendPending     bool         `json:"fr,omitempty"`
+	HelloAppliedRevision  uint64       `json:"har,omitempty"`
+	HelloAppliedStateHash string       `json:"hah,omitempty"`
+	Preparing             bool         `json:"prep,omitempty"`
+	PrepareDirty          bool         `json:"pd,omitempty"`
+	PrepareRetryAt        time.Time    `json:"pra,omitzero"`
+	Poison                *PoisonBatch `json:"p_seq,omitempty"`
+	PeerCertSerial        string       `json:"cs,omitempty"`
+	PeerCertNotAfter      time.Time    `json:"ce,omitzero"`
+	Disconnected          bool         `json:"z,omitempty"`
+	SidecarVersion        uint32       `json:"sv,omitempty"`
 }
 
 // PoisonBatch identifies the last stats batch refused by the store.
@@ -78,8 +77,8 @@ type LiveSnapshot struct {
 
 // PendingRequest is durable request metadata. VPS channels remain in the adapter; edge delivery is a later round.
 type PendingRequest struct {
-	Kind             PendingRequestKind
-	DeadlineUnixNano int64
+	Kind     PendingRequestKind
+	Deadline time.Time
 }
 
 // PendingRequestKind identifies the adapter-owned request awaiting an agent result.
@@ -244,8 +243,8 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 	}
 	switch event.Kind {
 	case EventOpen:
-		if tr.state.HelloDeadlineUnixNano == 0 {
-			tr.state.HelloDeadlineUnixNano = event.At.Add(helloTimeout).UnixNano()
+		if tr.state.HelloDeadline.IsZero() {
+			tr.state.HelloDeadline = event.At.Add(helloTimeout)
 		}
 	case EventHello:
 		if err := c.hello(ctx, &tr, event); err != nil {
@@ -277,7 +276,7 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 	case EventDisconnected:
 		tr.state.Disconnected = true
 		tr.sidecar.Pending = map[string]PendingRequest{}
-		tr.state.AutoBandwidthUnixNano = 0
+		tr.state.AutoBandwidthDeadline = time.Time{}
 		tr.state.AutoBandwidthPending = false
 	case EventOwnerSuperseded:
 		tr.Close = &SessionClose{Class: CloseConflict, Reason: "superseded by a newer stream"}
@@ -324,12 +323,12 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.state.Version = sessionStateVersion
 	tr.state.InstanceID = h.InstanceId
 	tr.state.Capabilities = capabilities(h)
-	tr.state.HelloDeadlineUnixNano = 0
+	tr.state.HelloDeadline = time.Time{}
 	tr.state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
-	tr.state.LastSeenUnixNano = event.At.UnixNano()
+	tr.state.LastSeenAt = event.At
 	tr.state.LivenessDeadline = event.At.Add(time.Duration(tr.state.LivenessNanos))
-	tr.state.NextAckTickUnixNano = event.At.Add(ackEvery).UnixNano()
-	tr.state.NextCertCheckUnixNano = event.At.Add(c.f.certCheck).UnixNano()
+	tr.state.NextAckTick = event.At.Add(ackEvery)
+	tr.state.NextCertCheck = event.At.Add(c.f.certCheck)
 	tr.state.SidecarVersion = tr.sidecar.Version
 	tr.state.HelloAppliedRevision = h.AppliedRevision
 	tr.state.HelloAppliedStateHash = h.AppliedStateHash
@@ -338,11 +337,13 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
 	tr.state.AutoBandwidthPending = autoMeasure && slices.Contains(tr.state.Capabilities, capBandwidth)
+	settings := nodeSettings(node, tr.state.Capabilities)
+	tr.state.SentSettingsHash = settingsSig(settings)
 	if tr.state.AutoBandwidthPending {
-		tr.state.AutoBandwidthUnixNano = event.At.Add(c.f.measureDelay).UnixNano()
+		tr.state.AutoBandwidthDeadline = event.At.Add(c.f.measureDelay)
 	}
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HelloAck{HelloAck: &agentv1.HelloAck{
-		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: nodeSettings(node, tr.state.Capabilities), LinkSupported: c.f.cfg.LinkServed,
+		AckedSeq: acked, ServerTimeUnix: event.At.Unix(), Settings: settings, LinkSupported: c.f.cfg.LinkServed,
 	}}})
 	return nil
 }
@@ -359,7 +360,7 @@ func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time
 	if deadline.IsZero() {
 		deadline = at
 	}
-	tr.sidecar.Pending[request.RequestID] = PendingRequest{Kind: kind, DeadlineUnixNano: deadline.UnixNano()}
+	tr.sidecar.Pending[request.RequestID] = PendingRequest{Kind: kind, Deadline: deadline}
 	tr.Frames = append(tr.Frames, request.Frame)
 }
 
@@ -368,7 +369,7 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 	if m == nil {
 		return
 	}
-	tr.state.LastSeenUnixNano = event.At.UnixNano()
+	tr.state.LastSeenAt = event.At
 	if tr.state.LivenessNanos > 0 {
 		tr.state.LivenessDeadline = event.At.Add(time.Duration(tr.state.LivenessNanos))
 	}
@@ -513,44 +514,18 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 	return true
 }
 
-func cloneLiveSnapshot(live LiveSnapshot) LiveSnapshot {
-	out := live
-	if live.Metrics != nil {
-		out.Metrics = proto.Clone(live.Metrics).(*agentv1.HostMetrics)
-	}
-	out.Health = make([]*agentv1.InboundHealth, len(live.Health))
-	for i, health := range live.Health {
-		if health != nil {
-			out.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
-		}
-	}
-	out.Online = slices.Clone(live.Online)
-	out.UserDown = make(map[string]uint64, len(live.UserDown))
-	for id, value := range live.UserDown {
-		out.UserDown[id] = value
-	}
-	out.UserUp = make(map[string]uint64, len(live.UserUp))
-	for id, value := range live.UserUp {
-		out.UserUp[id] = value
-	}
-	return out
-}
-
 func (c *SessionCore) rejectStats(ctx context.Context, state *SessionState, g guardedStats, now time.Time) {
 	c.f.log.Warn("stats batch failed the sanity check, traffic dropped", "node", state.NodeID, "deltas", g.rejected, "reason", g.reason)
-	if state.LastRejectUnixNano != 0 && now.Sub(time.Unix(0, state.LastRejectUnixNano)) < rejectEventEvery {
+	if !state.LastReject.IsZero() && now.Sub(state.LastReject) < rejectEventEvery {
 		return
 	}
-	state.LastRejectUnixNano = now.UnixNano()
+	state.LastReject = now
 	c.f.event(ctx, 3, "stats_rejected", state.NodeID, map[string]string{"reason": g.reason, "deltas": fmt.Sprint(g.rejected)})
 }
 
 func markCoreAck(tr *coreTransition, seq uint64, now time.Time) {
 	tr.state.AckPending = max(tr.state.AckPending, seq)
-	last := time.Time{}
-	if tr.state.LastAckUnixNano != 0 {
-		last = time.Unix(0, tr.state.LastAckUnixNano)
-	}
+	last := tr.state.LastAck
 	if now.Sub(last) >= ackEvery {
 		flushCoreAck(tr, now)
 	}
@@ -560,7 +535,7 @@ func flushCoreAck(tr *coreTransition, now time.Time) {
 	if tr.state.AckPending > tr.state.AckSent {
 		tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Ack{Ack: &agentv1.Ack{UpToSeq: tr.state.AckPending}}})
 		tr.state.AckSent = tr.state.AckPending
-		tr.state.LastAckUnixNano = now.UnixNano()
+		tr.state.LastAck = now
 	}
 }
 
@@ -711,7 +686,7 @@ func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {
 	}
 	tr.state.Preparing = true
 	tr.state.PrepareDirty = false
-	tr.state.PrepareRetryAtUnixNano = 0
+	tr.state.PrepareRetryAt = time.Time{}
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectPrepareDesired})
 }
 
@@ -721,10 +696,10 @@ func (c *SessionCore) desiredPrepared(ctx context.Context, tr *coreTransition, e
 	}
 	tr.state.Preparing = false
 	if event.Err != nil {
-		tr.state.PrepareRetryAtUnixNano = event.At.Add(prepareRetryDelay).UnixNano()
+		tr.state.PrepareRetryAt = event.At.Add(prepareRetryDelay)
 		return nil
 	}
-	tr.state.PrepareRetryAtUnixNano = 0
+	tr.state.PrepareRetryAt = time.Time{}
 	if event.Prepared == nil {
 		return errors.New("prepared desired state is required")
 	}
@@ -755,14 +730,15 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	settings := nodeSettings(node, state.Capabilities)
 	sig := settingsSig(settings)
-	if sidecar.SentDesired == nil && !state.FullResendPending {
+	if sidecar.SentDesired == nil && !state.FullResendPending && state.SentRevision == 0 {
 		if state.HelloAppliedStateHash != "" && state.HelloAppliedStateHash == want.hash && state.HelloAppliedRevision > 0 {
 			sidecar.SentDesired = want
 			state.SentRevision = state.HelloAppliedRevision
-			state.SentSettingsHash = sig
 			state.SentStateHash = want.hash
 			rev := max(node.DesiredRevision, state.HelloAppliedRevision)
-			return c.f.st.NodeDesired(ctx, node.ID, rev, want.hash)
+			if sig == state.SentSettingsHash {
+				return c.f.st.NodeDesired(ctx, node.ID, rev, want.hash)
+			}
 		}
 	}
 	full := state.FullResendPending || sidecar.SentDesired == nil || state.SentRevision == 0
@@ -800,55 +776,54 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 
 func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event SessionEvent) error {
 	now := event.At
-	if deadlineDue(tr.state.HelloDeadlineUnixNano, now) {
+	if deadlineDue(tr.state.HelloDeadline, now) {
 		tr.Close = &SessionClose{Class: CloseDeadline, Reason: "no Hello"}
 		return nil
 	}
-	if tr.state.AutoBandwidthPending && deadlineDue(tr.state.AutoBandwidthUnixNano, now) {
+	if tr.state.AutoBandwidthPending && deadlineDue(tr.state.AutoBandwidthDeadline, now) {
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectAutoBandwidth})
-		tr.state.AutoBandwidthUnixNano = 0
+		tr.state.AutoBandwidthDeadline = time.Time{}
 		tr.state.AutoBandwidthPending = false
 	}
-	if deadlineDue(tr.state.NextAckTickUnixNano, now) {
+	if deadlineDue(tr.state.NextAckTick, now) {
 		flushCoreAck(tr, now)
-		tr.state.NextAckTickUnixNano = advancePeriodic(tr.state.NextAckTickUnixNano, ackEvery, now)
+		tr.state.NextAckTick = advancePeriodic(tr.state.NextAckTick, ackEvery, now)
 	}
-	if deadlineDue(tr.state.NextCertCheckUnixNano, now) {
-		cert := peerCert{serial: tr.state.PeerCertSerial, notAfter: timeFromUnixNano(tr.state.PeerCertNotAfterUnixNano)}
+	if deadlineDue(tr.state.NextCertCheck, now) {
+		cert := peerCert{serial: tr.state.PeerCertSerial, notAfter: tr.state.PeerCertNotAfter}
 		if err := c.f.recheckCertAt(ctx, cert, now); err != nil {
 			tr.Close = &SessionClose{Class: CloseUnauthenticated, Reason: err.Error()}
 			return nil
 		}
-		tr.state.NextCertCheckUnixNano = advancePeriodic(tr.state.NextCertCheckUnixNano, c.f.certCheck, now)
+		tr.state.NextCertCheck = advancePeriodic(tr.state.NextCertCheck, c.f.certCheck, now)
 	}
 	for id, req := range tr.sidecar.Pending {
-		if deadlineDue(req.DeadlineUnixNano, now) {
+		if deadlineDue(req.Deadline, now) {
 			delete(tr.sidecar.Pending, id)
 		}
 	}
 	if livenessDeadlineDue(tr.state, now) {
 		tr.Close = &SessionClose{Class: CloseDeadline, Reason: fmt.Sprintf("no message from the agent for %d s", int(time.Duration(tr.state.LivenessNanos).Seconds()))}
 	}
-	if tr.Close == nil && !tr.state.Preparing && deadlineDue(tr.state.PrepareRetryAtUnixNano, now) {
+	if tr.Close == nil && !tr.state.Preparing && deadlineDue(tr.state.PrepareRetryAt, now) {
 		c.requestDesiredPreparation(tr)
 	}
 	return nil
 }
 
-func deadlineDue(deadline int64, now time.Time) bool {
-	return deadline != 0 && now.UnixNano() >= deadline
+func deadlineDue(deadline, now time.Time) bool {
+	return !deadline.IsZero() && !now.Before(deadline)
 }
 
-func advancePeriodic(deadline int64, period time.Duration, now time.Time) int64 {
-	if deadline == 0 || period <= 0 {
-		return 0
+func advancePeriodic(deadline time.Time, period time.Duration, now time.Time) time.Time {
+	if deadline.IsZero() || period <= 0 {
+		return time.Time{}
 	}
-	periodNanos := int64(period)
-	if now.UnixNano() < deadline {
+	if now.Before(deadline) {
 		return deadline
 	}
-	missed := (now.UnixNano()-deadline)/periodNanos + 1
-	return deadline + missed*periodNanos
+	missed := now.Sub(deadline)/period + 1
+	return deadline.Add(missed * period)
 }
 
 func livenessDeadlineDue(state *SessionState, now time.Time) bool {
@@ -870,18 +845,18 @@ func nextSessionAlarm(state SessionState, sidecar SessionSidecar, now time.Time)
 			delay, found = wait, true
 		}
 	}
-	for _, deadline := range []int64{state.HelloDeadlineUnixNano, state.AutoBandwidthUnixNano,
-		state.NextAckTickUnixNano, state.NextCertCheckUnixNano, state.PrepareRetryAtUnixNano} {
-		if deadline != 0 {
-			add(time.Unix(0, deadline))
+	for _, deadline := range []time.Time{state.HelloDeadline, state.AutoBandwidthDeadline,
+		state.NextAckTick, state.NextCertCheck, state.PrepareRetryAt} {
+		if !deadline.IsZero() {
+			add(deadline)
 		}
 	}
 	if !state.LivenessDeadline.IsZero() {
 		add(state.LivenessDeadline)
 	}
 	for _, req := range sidecar.Pending {
-		if req.DeadlineUnixNano != 0 {
-			add(time.Unix(0, req.DeadlineUnixNano))
+		if !req.Deadline.IsZero() {
+			add(req.Deadline)
 		}
 	}
 	if !found {

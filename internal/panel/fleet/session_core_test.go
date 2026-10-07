@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"reflect"
 	"sync"
@@ -30,7 +31,7 @@ func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context
 	core := NewSessionCore(e.f)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
 	state := SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: 1,
-		HelloDeadlineUnixNano: now.Add(helloTimeout).UnixNano()}
+		HelloDeadline: now.Add(helloTimeout)}
 	return e, core, ownerCtx, state, SessionSidecar{}, now
 }
 
@@ -124,8 +125,8 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if tr.State.SentRevision == 0 || tr.Sidecar.SentDesired == nil {
 			t.Fatalf("initial desired state not recorded: state=%+v sidecar=%+v", tr.State, tr.Sidecar)
 		}
-		if tr.NextAlarm == nil || !tr.NextAlarm.Equal(time.Unix(0, tr.State.NextAckTickUnixNano)) {
-			t.Fatalf("next alarm = %v, ack deadline = %v", tr.NextAlarm, tr.State.NextAckTickUnixNano)
+		if tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.NextAckTick) {
+			t.Fatalf("next alarm = %v, ack deadline = %v", tr.NextAlarm, tr.State.NextAckTick)
 		}
 	})
 
@@ -151,7 +152,7 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 
 func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
 	_, core, ctx, state, sidecar, _ := coreFixture(t, "core-monotonic-live")
-	state.HelloDeadlineUnixNano = 0
+	state.HelloDeadline = time.Time{}
 	now := time.Now()
 	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
 		t.Fatal(err)
@@ -178,8 +179,8 @@ func TestSessionCoreHelloDeadlineIsDecidedByAlarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opened.NextAlarm == nil || !opened.NextAlarm.Equal(time.Unix(0, opened.State.HelloDeadlineUnixNano)) {
-		t.Fatalf("open next alarm = %v, hello deadline = %d", opened.NextAlarm, opened.State.HelloDeadlineUnixNano)
+	if opened.NextAlarm == nil || !opened.NextAlarm.Equal(opened.State.HelloDeadline) {
+		t.Fatalf("open next alarm = %v, hello deadline = %v", opened.NextAlarm, opened.State.HelloDeadline)
 	}
 	tr, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventAlarm, At: *opened.NextAlarm})
 	if err != nil {
@@ -195,11 +196,11 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 	h := hello("instance-auto-bandwidth", 0, "")
 	h.GetHello().Capabilities = []string{capBandwidth}
 	tr := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
-	want := now.Add(core.f.measureDelay).UnixNano()
-	if tr.State.AutoBandwidthUnixNano != want {
-		t.Fatalf("auto-bandwidth deadline = %d, want %d", tr.State.AutoBandwidthUnixNano, want)
+	want := now.Add(core.f.measureDelay)
+	if !tr.State.AutoBandwidthDeadline.Equal(want) {
+		t.Fatalf("auto-bandwidth deadline = %v, want %v", tr.State.AutoBandwidthDeadline, want)
 	}
-	deadline := time.Unix(0, want).UTC()
+	deadline := want
 	var due testTransition
 	var fired bool
 	for i := 0; i < 10_000 && tr.NextAlarm != nil && !tr.NextAlarm.After(deadline); i++ {
@@ -215,7 +216,7 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 			break
 		}
 	}
-	if !fired || due.State.AutoBandwidthUnixNano != 0 || due.State.AutoBandwidthPending {
+	if !fired || !due.State.AutoBandwidthDeadline.IsZero() || due.State.AutoBandwidthPending {
 		t.Fatalf("due auto-bandwidth alarm = %+v state=%+v", due.Effects, due.State)
 	}
 	again, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAlarm, At: deadline.Add(ackEvery)})
@@ -232,9 +233,9 @@ func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := now.Add(e.f.measureDelay).UnixNano()
-	if helloTransition.State.AutoBandwidthUnixNano != want {
-		t.Fatalf("auto-bandwidth deadline = %d, want %d", helloTransition.State.AutoBandwidthUnixNano, want)
+	want := now.Add(e.f.measureDelay)
+	if !helloTransition.State.AutoBandwidthDeadline.Equal(want) {
+		t.Fatalf("auto-bandwidth deadline = %v, want %v", helloTransition.State.AutoBandwidthDeadline, want)
 	}
 }
 
@@ -249,6 +250,9 @@ func TestSessionStepErrorCancelsSession(t *testing.T) {
 	}
 	if context.Cause(sctx) == nil {
 		t.Fatal("Step error did not cancel the session")
+	}
+	if !errors.Is(context.Cause(sctx), err) {
+		t.Fatalf("Step error cause = %v, want %v", context.Cause(sctx), err)
 	}
 }
 
@@ -387,7 +391,7 @@ func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
 	_, core, ctx, state, sidecar, now := coreFixture(t, "core-ack")
 	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-ack", 0, "").GetHello())
 	state, sidecar = tr.State, tr.Sidecar
-	state.LastAckUnixNano = now.UnixNano()
+	state.LastAck = now
 
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
@@ -485,7 +489,7 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
-		HelloDeadlineUnixNano: now.Add(2 * time.Second).Add(helloTimeout).UnixNano(), Poison: e.f.poisonFor(state.NodeID)}
+		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout), Poison: e.f.poisonFor(state.NodeID)}
 	newSidecar := SessionSidecar{}
 	newHello, err := coreStep(newCtx, newCore, newState, newSidecar, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: hello("instance-poison", 0, "")})
 	if err != nil || newHello.Close != nil {
@@ -532,7 +536,7 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
-		HelloDeadlineUnixNano: now.Add(2 * time.Second).Add(helloTimeout).UnixNano(), Poison: e.f.poisonFor(state.NodeID)}
+		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout), Poison: e.f.poisonFor(state.NodeID)}
 	newHello, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
 		At: now.Add(2 * time.Second), Frame: hello("instance-poison-skip-error", 0, "")})
 	if err != nil || newHello.Close != nil {
@@ -618,7 +622,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 		t.Fatalf("liveness alarm = %+v", expired.Close)
 	}
 
-	certAt := time.Unix(0, second.State.NextCertCheckUnixNano)
+	certAt := second.State.NextCertCheck
 	cert := fireAlarmsThrough(t, ctx, core, second, certAt)
 	if cert.Close != nil {
 		t.Fatalf("uncertified test session unexpectedly closed on certificate check: %+v", cert.Close)
@@ -729,15 +733,15 @@ func TestSessionCoreCertificateRevocationClosesOnAlarm(t *testing.T) {
 	now := e.f.now().UTC()
 	serial := a.leaf.SerialNumber.Text(16)
 	state := SessionState{Version: sessionStateVersion, NodeID: a.nodeID, OwnerGeneration: owner,
-		PeerCertSerial: serial, PeerCertNotAfterUnixNano: a.leaf.NotAfter.UnixNano(),
-		HelloDeadlineUnixNano: now.Add(helloTimeout).UnixNano()}
+		PeerCertSerial: serial, PeerCertNotAfter: a.leaf.NotAfter,
+		HelloDeadline: now.Add(helloTimeout)}
 	var sidecar SessionSidecar
 	helloTr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-cert-alarm", 0, "")})
 	if err != nil || helloTr.Close != nil {
 		t.Fatalf("hello transition = close %v, err %v", helloTr.Close, err)
 	}
 	e.exec(`UPDATE node_cert SET revoked_at = ?, revoke_reason = 'test' WHERE node_id = ?`, now.Add(-time.Second).Unix(), a.nodeID)
-	certDeadline := time.Unix(0, helloTr.State.NextCertCheckUnixNano).UTC()
+	certDeadline := helloTr.State.NextCertCheck
 	closed := fireAlarmsThrough(t, ctx, core, helloTr, certDeadline)
 	if closed.Close == nil || closed.Close.Class != CloseUnauthenticated {
 		t.Fatalf("revoked certificate alarm = %+v, want unauthenticated close", closed.Close)
@@ -874,7 +878,7 @@ func TestSessionCoreStepMutatesCallerState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.HelloDeadlineUnixNano == 0 || tr.NextAlarm == nil || !tr.NextAlarm.Equal(time.Unix(0, state.HelloDeadlineUnixNano)) {
+	if state.HelloDeadline.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(state.HelloDeadline) {
 		t.Fatalf("Step did not update caller state: state=%+v transition=%+v", state, tr)
 	}
 	if sidecar.Pending == nil {

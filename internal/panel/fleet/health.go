@@ -111,7 +111,7 @@ func (f *Fleet) RunDoctor(ctx context.Context, nodeID string, checks []string, w
 		delete(s.docs, id)
 		s.waitMu.Unlock()
 	}()
-	requestAt := f.now().UTC()
+	requestAt := f.now()
 	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
 		RequestID: id, Deadline: requestAt.Add(wait), Kind: PendingDoctor,
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{

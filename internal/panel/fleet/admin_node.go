@@ -268,7 +268,7 @@ func (f *Fleet) nodeMsgView(ctx context.Context, n store.NodeRow, protos []strin
 	if view != nil {
 		out.Online = protocolCounts(onlineByProtocolView(view))
 		if view != nil {
-			out.LastSeenUnix = timeFromUnixNano(view.State.LastSeenUnixNano).Unix()
+			out.LastSeenUnix = view.State.LastSeenAt.Unix()
 			if m := view.Live.Metrics; m != nil {
 				out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
 			}
@@ -844,7 +844,7 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 		delete(sess.logs, reqID)
 		sess.waitMu.Unlock()
 	}()
-	requestAt := f.now().UTC()
+	requestAt := f.now()
 	tr, err := sess.stepCore(ctx, SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
 		RequestID: reqID, Deadline: requestAt.Add(wait), Kind: PendingLog,
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{
@@ -861,7 +861,7 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 		select {
 		case <-sess.done:
 		default:
-			_, _ = sess.stepCore(ctx, SessionEvent{Kind: EventLogCancel, At: f.now().UTC(), Request: &AdminRequest{RequestID: reqID}})
+			_, _ = sess.stepCore(ctx, SessionEvent{Kind: EventLogCancel, At: f.now(), Request: &AdminRequest{RequestID: reqID}})
 		}
 	}
 	end := func(msg string) error {

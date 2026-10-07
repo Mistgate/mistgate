@@ -324,9 +324,7 @@ func (f *Fleet) recomputeAll(ctx context.Context) {
 		sem <- struct{}{}
 		go func() {
 			defer func() { <-sem; wg.Done() }()
-			if err := f.reconcile(ctx, s); err != nil && ctx.Err() == nil {
-				f.log.Warn("recompute desired state", "node", s.nodeID, "err", err)
-			}
+			f.reconcile(ctx, s)
 		}()
 	}
 	wg.Wait()

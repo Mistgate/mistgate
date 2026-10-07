@@ -27,8 +27,9 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
 - Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
   differs by edition: delivering results to waiters, publishing the live view, Cloudflare calls, the long bandwidth job,
   and the cross-module usage callback. Desired-state reads use a single in-flight preparation with a dirty bit: the
-  adapter reads and steps the result, while the core applies it and records withheld inbounds inline. Certificate checks
-  and pure database writes run inline.
+  effect starts its own session preparation, while `stepDesired` takes one read inline for the first reconcile round.
+  Each prepared result is stepped through the core, which applies it and records withheld inbounds inline; a dirty
+  follow-up starts through the effect. Certificate checks and pure database writes run inline.
 - VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now, using one timer reset
   to the transition's `NextAlarm` after every step. The core sets hello, liveness, bandwidth, acknowledgement,
   certificate and request-expiry deadlines. mTLS behaviour, timing and tests stay the same.
@@ -40,8 +41,9 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
   included D1 writes for a small fleet; revisit if D1 latency or cost says so (phase 4).
 - Session state carries the Hello-applied hash, preparation-in-flight and dirty bits, retry time, and pending full-resend
   bit. The adapter checks ownership before applying prepared data; a base mismatch or first drift forces a full state
-  before a later delta. Poisoned stats-batch identity is session state too; the VPS adapter persists it per node across
-  reconnects, and the DO will persist it in DO storage.
+  before a later delta. On rehydration, the Durable Object adapter clears `Preparing` and requests preparation again,
+  since eviction may interrupt an in-flight read. Poisoned stats-batch identity is session state too; the VPS adapter
+  persists it per node across reconnects, and the DO will persist it in DO storage.
 
 ## Consequences
 
