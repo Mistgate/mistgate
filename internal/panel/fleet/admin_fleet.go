@@ -135,7 +135,7 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 	for _, n := range nodes {
 		sess := f.session(n.ID)
 		view := sessionViewOf(sess)
-		st := f.statusOfView(ctx, n, sess, view, inboundsOf(enabled, n.ID), now)
+		st := f.statusOfView(ctx, n, view, inboundsOf(enabled, n.ID), now)
 		card := &adminv1.NodeCard{Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider,
 			Status: st.status, Reason: st.reason, SparkBytes: make([]uint64, 24)}
 		for i := range 24 {

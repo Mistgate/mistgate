@@ -624,12 +624,12 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 			Code: eventWarpAttention, TimeUnix: at.Unix(), Params: map[string]string{"reason": warpReasonRefresh},
 		}}}
 	}
-	first, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)})
+	_, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: warpEvent(1, now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !first.Sidecar.L3.warpAsk.IsZero() {
-		t.Fatalf("missing module consumed the refresh throttle at %v", first.Sidecar.L3.warpAsk)
+	if !s.coreSidecar.L3.warpAsk.IsZero() {
+		t.Fatalf("missing module consumed the refresh throttle at %v", s.coreSidecar.L3.warpAsk)
 	}
 	<-s.out // Ack for the first event.
 
@@ -639,12 +639,12 @@ func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.
 	for i := 0; i < cap(s.out); i++ {
 		s.out <- &agentv1.ConnectResponse{}
 	}
-	second, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: eventAt, Frame: warpEvent(2, eventAt)})
+	_, err = s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: eventAt, Frame: warpEvent(2, eventAt)})
 	if err != errAgentQueueFull {
 		t.Fatalf("full Ack queue error = %v, want %v", err, errAgentQueueFull)
 	}
-	if !second.Sidecar.L3.warpAsk.Equal(eventAt) {
-		t.Fatalf("refresh throttle timestamp = %v, want core event time %v", second.Sidecar.L3.warpAsk, eventAt)
+	if !s.coreSidecar.L3.warpAsk.Equal(eventAt) {
+		t.Fatalf("refresh throttle timestamp = %v, want core event time %v", s.coreSidecar.L3.warpAsk, eventAt)
 	}
 	select {
 	case <-w.refreshed:

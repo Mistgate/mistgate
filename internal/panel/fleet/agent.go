@@ -49,20 +49,6 @@ type sessionView struct {
 	Live        LiveSnapshot
 }
 
-type sessionAlarmTimer interface {
-	C() <-chan time.Time
-	Stop() bool
-	Reset(time.Duration) bool
-}
-
-type wallSessionAlarmTimer struct{ timer *time.Timer }
-
-func (t *wallSessionAlarmTimer) C() <-chan time.Time { return t.timer.C }
-func (t *wallSessionAlarmTimer) Stop() bool          { return t.timer.Stop() }
-func (t *wallSessionAlarmTimer) Reset(d time.Duration) bool {
-	return t.timer.Reset(d)
-}
-
 // session is the one live agent session of a node.
 type session struct {
 	f          *Fleet
@@ -73,7 +59,7 @@ type session struct {
 	cancel     context.CancelCauseFunc
 	done       chan struct{} // closed when the Connect handler returns
 	out        chan *agentv1.ConnectResponse
-	alarmTimer sessionAlarmTimer
+	alarmTimer *time.Timer
 
 	coreMu      sync.Mutex
 	core        *SessionCore
@@ -91,98 +77,140 @@ type session struct {
 func (s *session) publishView() {
 	state := s.coreState
 	state.Capabilities = slices.Clone(state.Capabilities)
-	s.view.Store(&sessionView{State: state, SentDesired: s.coreSidecar.SentDesired, Live: cloneLiveSnapshot(s.coreSidecar.Live)})
+	s.view.Store(&sessionView{State: state, SentDesired: s.coreSidecar.SentDesired, Live: s.coreSidecar.Live})
 }
 
 func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {
 	s.coreMu.Lock()
-	defer s.coreMu.Unlock()
 	if s.core == nil {
 		s.core = NewSessionCore(s.f)
 	}
+	var oldPoison *PoisonBatch
+	if s.coreState.Poison != nil {
+		poison := *s.coreState.Poison
+		oldPoison = &poison
+	}
 	tr, err := s.core.Step(ctx, &s.coreState, &s.coreSidecar, event)
 	s.publishView()
-	s.persistPoison(s.coreState.Poison)
-	timerNow := s.f.now().UTC()
-	if event.Kind == EventAlarm && event.At.After(timerNow) {
-		timerNow = event.At.UTC()
+	if !samePoison(oldPoison, s.coreState.Poison) {
+		s.persistPoison(s.coreState.Poison)
 	}
-	resetSessionAlarm(s.alarmTimer, tr.NextAlarm, timerNow)
+	resetSessionAlarm(s.alarmTimer, tr.NextAlarm, event.At)
 	if err != nil {
+		s.coreMu.Unlock()
 		if s.cancel != nil {
 			s.cancel(err)
 		}
 		return Transition{}, err
 	}
-	if tr.Close == nil {
-		err = s.dispatchCoreTransition(ctx, &tr)
-		if err != nil && s.cancel != nil {
-			s.cancel(err)
-		}
+	if tr.Close != nil {
+		s.coreMu.Unlock()
+		return tr, nil
+	}
+	err = s.enqueueFrames(tr.Frames)
+	s.coreMu.Unlock()
+	if effectErr := s.dispatchCoreEffects(ctx, tr.Effects); err == nil {
+		err = effectErr
+	}
+	if err != nil && s.cancel != nil {
+		s.cancel(err)
 	}
 	return tr, err
 }
 
 func (s *session) stepDesired(ctx context.Context, event SessionEvent) (Transition, error) {
-	ticketStep, err := s.stepCore(ctx, SessionEvent{Kind: EventDesiredPrepareStarted, At: event.At})
+	tr, err := s.stepCore(ctx, event)
 	if err != nil {
 		return Transition{}, err
 	}
-	if ticketStep.Close != nil {
-		return ticketStep, nil
+	if !transitionHasEffect(tr, EffectPrepareDesired) || tr.Close != nil {
+		return tr, nil
 	}
-	prepared, err := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
-	if err != nil {
-		return Transition{}, err
+	return s.runDesiredPreparation(ctx)
+}
+
+// runDesiredPreparation is the one preparation of the session in flight: it reads, hands the result (or the error) to
+// the core and goes again while the core asks for another. Only the end of the session leaves it unanswered.
+func (s *session) runDesiredPreparation(ctx context.Context) (Transition, error) {
+	var tr Transition
+	for {
+		if !s.canApplyPrepared() {
+			return tr, nil
+		}
+		prepared, prepareErr := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
+		if !s.canApplyPrepared() {
+			return tr, nil
+		}
+		result, err := s.stepCore(ctx, SessionEvent{Kind: EventDesiredPrepared, At: s.f.now(), Prepared: prepared, Err: prepareErr})
+		if prepareErr != nil && ctx.Err() == nil {
+			s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", prepareErr)
+		}
+		if err != nil {
+			return result, err
+		}
+		tr = result
+		if !transitionHasEffect(tr, EffectPrepareDesired) {
+			return tr, nil
+		}
 	}
-	prepared.ticket = ticketStep.State.PrepareTicket
-	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
+}
+
+func (s *session) canApplyPrepared() bool {
 	if s.done != nil {
 		select {
 		case <-s.done:
-			return Transition{}, nil
+			return false
 		default:
 		}
 	}
-	if !s.f.ownsSession(s.nodeID, s.owner) {
-		return Transition{}, nil
-	}
-	if prepared.node.State != "retired" && prepared.desired != nil && len(prepared.desired.withheld) > 0 {
-		if err := s.f.st.FailWithheldInbounds(ctx, prepared.node.ID, prepared.desired.withheld, withheldReason, event.At); err != nil {
-			s.f.log.Warn("mark withheld inbounds", "node", prepared.node.ID, "err", err)
-		}
-	}
-	event.Prepared = prepared
-	return s.stepCore(ctx, event)
+	return s.f.ownsSession(s.nodeID, s.owner)
 }
 
-func (s *session) dispatchCoreTransition(ctx context.Context, tr *Transition) error {
-	var deferred []SessionEffect
+func (s *session) startDesiredPreparation() {
+	go func() {
+		if _, err := s.runDesiredPreparation(s.ctx); err != nil && s.ctx.Err() == nil {
+			s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", err)
+		}
+	}()
+}
+
+func transitionHasEffect(tr Transition, kind EffectKind) bool {
 	for _, effect := range tr.Effects {
-		if effect.Kind == EffectWarpAttention || effect.Kind == EffectPrepareDesired {
-			deferred = append(deferred, effect)
-			continue
-		}
-		if err := s.dispatchCoreEffect(ctx, effect); err != nil {
-			return err
+		if effect.Kind == kind {
+			return true
 		}
 	}
-	// Sent state is recorded before enqueue; queue overflow cancels the session and teardown discards that state.
-	var frameErr error
-	for _, frame := range tr.Frames {
+	return false
+}
+
+func samePoison(a, b *PoisonBatch) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// enqueueFrames queues one step's frames. The caller holds coreMu, so the agent receives frames in the order the core
+// recorded them as sent (a delta never overtakes its base). Sent state is recorded before enqueue; queue overflow
+// cancels the session and teardown discards that state.
+func (s *session) enqueueFrames(frames []*agentv1.ConnectResponse) error {
+	for _, frame := range frames {
 		if !s.enqueue(frame) {
-			frameErr = errAgentQueueFull
-			break
+			return errAgentQueueFull
 		}
 	}
-	for _, effect := range deferred {
-		if err := s.dispatchCoreEffect(ctx, effect); err != nil {
-			if frameErr == nil {
-				frameErr = err
-			}
+	return nil
+}
+
+// dispatchCoreEffects runs one step's effects after its frames are queued, outside coreMu.
+func (s *session) dispatchCoreEffects(ctx context.Context, effects []SessionEffect) error {
+	var firstErr error
+	for _, effect := range effects {
+		if err := s.dispatchCoreEffect(ctx, effect); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	return frameErr
+	return firstErr
 }
 
 func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) error {
@@ -205,13 +233,13 @@ func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) 
 			return nil
 		}
 		s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
+	case EffectConnectEvents:
+		if effect.PreviousNode != nil {
+			s.f.connectEvents(ctx, s.nodeID, *effect.PreviousNode, effect.BootAt.UTC(), effect.At.UTC())
+		}
 	case EffectPrepareDesired:
-		go func() {
-			at := s.f.now().UTC()
-			if _, err := s.stepDesired(s.ctx, SessionEvent{Kind: EventDesiredChanged, At: at}); err != nil && s.ctx.Err() == nil {
-				s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", err)
-			}
-		}()
+		// run by the step's caller: inline in stepDesired, or startDesiredPreparation for frames and alarms
+		return nil
 	}
 	return nil
 }
@@ -229,45 +257,19 @@ func (s *session) persistPoison(poison *PoisonBatch) {
 	s.f.stuck[s.nodeID] = stuckSeq{instance: poison.Instance, seq: poison.Seq}
 }
 
-func resetSessionAlarm(timer sessionAlarmTimer, next *time.Time, now time.Time) {
+func resetSessionAlarm(timer *time.Timer, next *time.Time, now time.Time) {
 	if timer == nil {
 		return
 	}
-	if !timer.Stop() {
-		select {
-		case <-timer.C():
-		default:
-		}
-	}
-	if next != nil {
-		delay := next.Sub(now)
-		if delay < 0 {
-			delay = 0
-		}
-		timer.Reset(delay)
-	}
-}
-
-func alarmDelay(next *time.Time, now time.Time) time.Duration {
+	timer.Stop()
 	if next == nil {
-		return time.Hour
+		return
 	}
 	delay := next.Sub(now)
 	if delay < 0 {
-		return 0
+		delay = 0
 	}
-	return delay
-}
-
-func effectiveAlarmTime(firedAt, now time.Time) time.Time {
-	if firedAt.After(now) {
-		return firedAt.UTC()
-	}
-	return now.UTC()
-}
-
-func newWallSessionAlarmTimer(d time.Duration) sessionAlarmTimer {
-	return &wallSessionAlarmTimer{timer: time.NewTimer(d)}
+	timer.Reset(delay)
 }
 
 func (f *Fleet) poisonFor(nodeID string) *PoisonBatch {
@@ -408,15 +410,18 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		state.PeerCertNotAfterUnixNano = pc.notAfter.UnixNano()
 	}
 	var sidecar SessionSidecar
-	opened, err := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: f.now().UTC()})
+	opened, err := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: f.now()})
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	newTimer := f.newSessionAlarmTimer
-	if newTimer == nil {
-		newTimer = newWallSessionAlarmTimer
+	delay := time.Duration(0)
+	if opened.NextAlarm != nil {
+		delay = opened.NextAlarm.Sub(f.now())
 	}
-	alarmTimer := newTimer(alarmDelay(opened.NextAlarm, f.now().UTC()))
+	if delay < 0 {
+		delay = 0
+	}
+	alarmTimer := time.NewTimer(delay)
 	defer alarmTimer.Stop()
 	var first *agentv1.ConnectRequest
 	select {
@@ -425,8 +430,11 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			return endErr()
 		}
 		first = m
-	case alarmAt := <-alarmTimer.C():
-		now := effectiveAlarmTime(alarmAt, f.now().UTC())
+	case alarmAt := <-alarmTimer.C:
+		now := f.now()
+		if alarmAt.After(now) {
+			now = alarmAt
+		}
 		tr, alarmErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: now})
 		resetSessionAlarm(alarmTimer, tr.NextAlarm, now)
 		if alarmErr == nil && tr.Close != nil {
@@ -437,31 +445,42 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return errOrCause(sctx)
 	}
 
-	tr, stepErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: f.now().UTC(), Frame: first})
-	resetSessionAlarm(alarmTimer, tr.NextAlarm, f.now().UTC())
-	if tr.Close != nil && tr.State.InstanceID == "" {
+	if sctx.Err() != nil {
+		return errOrCause(sctx)
+	}
+	if !f.ownsSession(id, owner) {
+		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
+	}
+	helloAt := f.now()
+	tr, stepErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: helloAt, Frame: first})
+	resetSessionAlarm(alarmTimer, tr.NextAlarm, helloAt)
+	if tr.Close != nil && state.InstanceID == "" {
 		return sessionCloseError(tr.Close)
 	}
-	if stepErr != nil && tr.State.InstanceID == "" {
+	if stepErr != nil && state.InstanceID == "" {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	if tr.State.InstanceID == "" {
+	if state.InstanceID == "" {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 
-	s := &session{f: f, nodeID: id, owner: owner, caps: slices.Clone(tr.State.Capabilities), ctx: sctx, cancel: cancel,
+	s := &session{f: f, nodeID: id, owner: owner, caps: slices.Clone(state.Capabilities), ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
 		logs: map[string]*logSub{}, core: core, coreState: state, coreSidecar: sidecar, alarmTimer: alarmTimer}
 	s.coreMu.Lock()
 	s.publishView()
-	s.persistPoison(s.coreState.Poison)
 	if !f.register(s) {
 		s.coreMu.Unlock()
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
 	}
+	helloErr := s.enqueueFrames(tr.Frames)
+	s.coreMu.Unlock()
 	defer func() {
 		cancel(nil)
+		if _, err := s.stepCore(context.Background(), SessionEvent{Kind: EventDisconnected, At: f.now()}); err != nil {
+			f.log.Warn("disconnect session core", "node", id, "err", err)
+		}
 		close(s.done)
 		if f.unregister(s) {
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -476,14 +495,15 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			}
 		}
 	}()
-	helloErr := s.dispatchCoreTransition(sctx, &tr)
-	s.coreMu.Unlock()
+	if helloErr == nil {
+		helloErr = s.dispatchCoreEffects(sctx, tr.Effects)
+	}
 	if helloErr != nil {
 		f.log.Error("hello response", "node", id, "err", helloErr)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	// Core-mediated admin frames wait until HelloAck is queued; Retire remains a direct send.
-	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventInitialReconcile, At: f.now().UTC(), Frame: first})
+	tr, err = s.stepDesired(sctx, SessionEvent{Kind: EventDesiredChanged, At: f.now()})
 	if err != nil {
 		f.log.Error("initial desired state", "node", id, "err", err)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -497,13 +517,20 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		case <-sctx.Done():
 			var ce *connect.Error
 			if errors.As(context.Cause(sctx), &ce) && ce.Code() == connect.CodeAborted {
-				_, _ = s.stepCore(sctx, SessionEvent{Kind: EventOwnerSuperseded, At: f.now().UTC()})
+				_, _ = s.stepCore(sctx, SessionEvent{Kind: EventOwnerSuperseded, At: f.now()})
 			}
 			return errOrCause(sctx)
-		case alarmAt := <-alarmTimer.C():
-			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: effectiveAlarmTime(alarmAt, f.now().UTC())})
+		case alarmAt := <-alarmTimer.C:
+			now := f.now()
+			if alarmAt.After(now) {
+				now = alarmAt
+			}
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: now})
 			if err != nil {
 				return err
+			}
+			if transitionHasEffect(tr, EffectPrepareDesired) {
+				s.startDesiredPreparation()
 			}
 			if tr.Close != nil {
 				return sessionCloseError(tr.Close)
@@ -517,12 +544,15 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			if !ok {
 				return endErr()
 			}
-			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now().UTC(), Frame: m})
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now(), Frame: m})
 			if errors.Is(err, errAgentQueueFull) {
 				continue
 			}
 			if err != nil {
 				return err
+			}
+			if transitionHasEffect(tr, EffectPrepareDesired) {
+				s.startDesiredPreparation()
 			}
 			if tr.Close != nil {
 				return sessionCloseError(tr.Close)
@@ -628,16 +658,6 @@ func runState(s agentv1.InboundRunState) string {
 	return "pending"
 }
 
-// reconcileMode is what a reconcile sends: everything after a connect unless the agent already holds it, a delta after
-// a change, or a full state after a mismatch or a drift.
-type reconcileMode int
-
-const (
-	reconcileConnect reconcileMode = iota // after HelloAck: send a full state unless the agent already holds the desired one
-	reconcileChange                       // something changed: send a delta if the hash moved
-	reconcileFull                         // resend everything (base mismatch, drift)
-)
-
 // nodeSettings is what the agent of a stream with these capabilities is told. The AWG, torrent blocker and client IPv6 settings
 // are sent only to agents that advertise the capability, keeping old-agent settings signatures unchanged.
 // An empty resolver list stays empty: the node then uses the server's own resolver (some hosters allow only theirs);
@@ -671,8 +691,8 @@ func settingsSig(s *agentv1.NodeSettings) string {
 
 // reconcile computes the node's desired state and sends what the agent lacks. Revisions are per node,
 // strictly increasing and persisted; every message that is sent gets a fresh one.
-func (f *Fleet) reconcile(ctx context.Context, s *session, mode reconcileMode) error {
-	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now().UTC(), Mode: mode})
+func (f *Fleet) reconcile(ctx context.Context, s *session) error {
+	tr, err := s.stepDesired(ctx, SessionEvent{Kind: EventDesiredChanged, At: f.now()})
 	if err != nil {
 		return err
 	}
@@ -701,7 +721,7 @@ func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(
 		delete(s.cmds, id)
 		s.waitMu.Unlock()
 	}()
-	requestAt := s.f.now().UTC()
+	requestAt := s.f.now()
 	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
 		RequestID: id, Deadline: requestAt.Add(wait), Frame: build(id), Kind: PendingCommand,
 	}})

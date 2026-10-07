@@ -46,7 +46,7 @@ func TestAwgInboundAddedOnAnOldAgentIsFailedWithoutAnApplyResult(t *testing.T) {
 	}
 }
 
-func TestSessionCoreReconcileDoesNotFailWithheldInbounds(t *testing.T) {
+func TestSessionCoreReconcileFailsWithheldInbounds(t *testing.T) {
 	x, a := newL3Env(t)
 	x.src.mu.Lock()
 	x.src.awgOn = false
@@ -67,27 +67,11 @@ func TestSessionCoreReconcileDoesNotFailWithheldInbounds(t *testing.T) {
 	if s == nil {
 		t.Fatal("connected session was not registered")
 	}
-	s.coreMu.Lock()
-	ticketStep, err := s.core.Step(s.ctx, &s.coreState, &s.coreSidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: x.clock.now().UTC()})
-	s.coreMu.Unlock()
+	_, err := s.stepDesired(s.ctx, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := x.f.prepareDesiredState(s.ctx, a.nodeID, s.caps)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prepared.ticket = ticketStep.State.PrepareTicket
-	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
-
-	s.coreMu.Lock()
-	_, err = s.core.Step(s.ctx, &s.coreState, &s.coreSidecar, SessionEvent{Kind: EventDesiredChanged, At: x.clock.now().UTC(),
-		Mode: reconcileChange, Prepared: prepared})
-	s.coreMu.Unlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if row = x.inboundRow("inb_awg"); row.State == "failed" {
-		t.Fatalf("SessionCore.Step performed the withheld-inbound store write: %+v", row)
+	if row = x.inboundRow("inb_awg"); row.State != "failed" || !strings.HasPrefix(row.LastError, "agent_too_old") {
+		t.Fatalf("the preparation apply did not fail the withheld inbound: %+v", row)
 	}
 }

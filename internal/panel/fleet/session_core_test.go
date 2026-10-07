@@ -34,11 +34,18 @@ func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context
 	return e, core, ownerCtx, state, SessionSidecar{}, now
 }
 
-func coreStep(ctx context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar, event SessionEvent) (Transition, error) {
-	return core.Step(ctx, &state, &sidecar, event)
+type testTransition struct {
+	Transition
+	State   SessionState
+	Sidecar SessionSidecar
 }
 
-func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr Transition, target time.Time) Transition {
+func coreStep(ctx context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar, event SessionEvent) (testTransition, error) {
+	tr, err := core.Step(ctx, &state, &sidecar, event)
+	return testTransition{Transition: tr, State: state, Sidecar: sidecar}, err
+}
+
+func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr testTransition, target time.Time) testTransition {
 	t.Helper()
 	for i := 0; i < 10_000 && tr.Close == nil && tr.NextAlarm != nil && !tr.NextAlarm.After(target); i++ {
 		at := *tr.NextAlarm
@@ -51,7 +58,7 @@ func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr 
 	return tr
 }
 
-func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state SessionState, sidecar SessionSidecar, now time.Time, h *agentv1.Hello) Transition {
+func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state SessionState, sidecar SessionSidecar, now time.Time, h *agentv1.Hello) testTransition {
 	t.Helper()
 	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Hello{Hello: h}}
 	started, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: frame})
@@ -61,18 +68,15 @@ func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state Sessi
 	if started.Close != nil {
 		t.Fatalf("hello closed: %+v", started.Close)
 	}
-	ticketStep, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: now})
+	requested, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := core.f.prepareDesiredState(ctx, ticketStep.State.NodeID, ticketStep.State.Capabilities)
+	prepared, err := core.f.prepareDesiredState(ctx, requested.State.NodeID, requested.State.Capabilities)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared.ticket = ticketStep.State.PrepareTicket
-	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
-	tr, err := coreStep(ctx, core, ticketStep.State, ticketStep.Sidecar, SessionEvent{Kind: EventInitialReconcile, At: now, Frame: frame,
-		Prepared: prepared})
+	tr, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,23 +88,29 @@ func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state Sessi
 	return tr
 }
 
-func reconcilePrepared(t *testing.T, e *env, core *SessionCore, ctx context.Context, tr Transition, mode reconcileMode, at time.Time) Transition {
+func reconcilePrepared(t *testing.T, e *env, core *SessionCore, ctx context.Context, tr testTransition, at time.Time) testTransition {
 	t.Helper()
-	ticketStep, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: at})
+	requested := tr
+	if !requested.State.Preparing {
+		var err error
+		requested, err = coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: at})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	prepared, err := e.f.prepareDesiredState(ctx, requested.State.NodeID, requested.State.Capabilities)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, ticketStep.State.NodeID, ticketStep.State.Capabilities)
+	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: at, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared.ticket = ticketStep.State.PrepareTicket
-	prepared.ownerGeneration = ticketStep.State.OwnerGeneration
-	updated, err := coreStep(ctx, core, ticketStep.State, ticketStep.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: at, Mode: mode, Prepared: prepared})
-	if err != nil {
-		t.Fatal(err)
+	for _, effect := range tr.Effects {
+		if effect.Kind != EffectPrepareDesired {
+			updated.Effects = append([]SessionEffect{effect}, updated.Effects...)
+		}
 	}
-	updated.Effects = append(tr.Effects, updated.Effects...)
 	return updated
 }
 
@@ -139,6 +149,29 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 	})
 }
 
+func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
+	_, core, ctx, state, sidecar, _ := coreFixture(t, "core-monotonic-live")
+	state.HelloDeadlineUnixNano = 0
+	now := time.Now()
+	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-monotonic", 0, "")}); err != nil {
+		t.Fatal(err)
+	}
+	if state.LivenessDeadline.IsZero() || state.LivenessDeadline == state.LivenessDeadline.Round(0) {
+		t.Fatalf("liveness deadline lost its monotonic reading: %v", state.LivenessDeadline)
+	}
+	tr := nextSessionAlarm(state, sidecar, now)
+	if tr == nil || *tr == tr.Round(0) {
+		t.Fatalf("next alarm lost its monotonic reading: %v", tr)
+	}
+	tick, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: *tr})
+	if err != nil || tick.Close != nil || livenessDeadlineDue(&state, *tr) {
+		t.Fatalf("regular alarm closed the live session: close=%+v err=%v", tick.Close, err)
+	}
+}
+
 func TestSessionCoreHelloDeadlineIsDecidedByAlarm(t *testing.T) {
 	_, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-deadline")
 	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventOpen, At: now})
@@ -167,7 +200,7 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 		t.Fatalf("auto-bandwidth deadline = %d, want %d", tr.State.AutoBandwidthUnixNano, want)
 	}
 	deadline := time.Unix(0, want).UTC()
-	var due Transition
+	var due testTransition
 	var fired bool
 	for i := 0; i < 10_000 && tr.NextAlarm != nil && !tr.NextAlarm.After(deadline); i++ {
 		at := *tr.NextAlarm
@@ -211,7 +244,7 @@ func TestSessionStepErrorCancelsSession(t *testing.T) {
 	defer cancel(nil)
 	s := &session{f: e.f, nodeID: state.NodeID, ctx: sctx, cancel: cancel, core: core}
 	tr, err := s.stepCore(sctx, SessionEvent{Kind: EventKind(255), At: time.Now()})
-	if err == nil || tr.State.Version != 0 {
+	if err == nil || tr.NextAlarm != nil {
 		t.Fatalf("failed Step transition = %+v, %v", tr, err)
 	}
 	if context.Cause(sctx) == nil {
@@ -263,13 +296,13 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 		<-release
 		return originalDesired(ctx, nodeID)
 	}
-	go func() { reconcileDone <- e.f.reconcile(e.ctx, s, reconcileChange) }()
+	go func() { reconcileDone <- e.f.reconcile(e.ctx, s) }()
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("desired-state builder did not block")
 	}
-	oldDeadline := s.coreState.LivenessDeadlineUnixNano
+	oldDeadline := s.coreState.LivenessDeadline
 	frameAt := now.Add(time.Duration(s.coreState.LivenessNanos) - time.Second)
 	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: frameAt.Add(-10 * time.Second).Unix(), IntervalEndUnix: frameAt.Unix(),
@@ -299,10 +332,10 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 	default:
 		t.Fatal("stats frame was not acked while desired-state preparation was blocked")
 	}
-	if transition.Close != nil || transition.State.LivenessDeadlineUnixNano <= oldDeadline {
-		t.Fatalf("stats did not reset liveness: close=%+v state=%+v", transition.Close, transition.State)
+	if transition.Close != nil || !s.coreState.LivenessDeadline.After(oldDeadline) {
+		t.Fatalf("stats did not reset liveness: close=%+v state=%+v", transition.Close, s.coreState)
 	}
-	liveness, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: time.Unix(0, oldDeadline)})
+	liveness, err := s.stepCore(sctx, SessionEvent{Kind: EventAlarm, At: oldDeadline})
 	if err != nil || liveness.Close != nil {
 		t.Fatalf("old liveness deadline closed the session: close=%+v err=%v", liveness.Close, err)
 	}
@@ -323,12 +356,12 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 func TestSessionCoreLivenessTimeoutChangeTakesEffectOnNextFrame(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "core-liveness-change")
 	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-liveness-change", 0, "").GetHello())
-	oldDeadline := connected.State.LivenessDeadlineUnixNano
+	oldDeadline := connected.State.LivenessDeadline
 	e.exec(`UPDATE node SET liveness_timeout_s = 15 WHERE id = ?`, state.NodeID)
-	updated := reconcilePrepared(t, e, core, ctx, connected, reconcileChange, now.Add(5*time.Second))
-	if updated.State.LivenessNanos != int64(15*time.Second) || updated.State.LivenessDeadlineUnixNano != oldDeadline {
+	updated := reconcilePrepared(t, e, core, ctx, connected, now.Add(5*time.Second))
+	if updated.State.LivenessNanos != int64(15*time.Second) || !updated.State.LivenessDeadline.Equal(oldDeadline) {
 		t.Fatalf("timeout change moved the current deadline: timeout=%v deadline=%v, want 15s and %v",
-			time.Duration(updated.State.LivenessNanos), time.Unix(0, updated.State.LivenessDeadlineUnixNano), time.Unix(0, oldDeadline))
+			time.Duration(updated.State.LivenessNanos), updated.State.LivenessDeadline, oldDeadline)
 	}
 	beforeNextFrame := fireAlarmsThrough(t, ctx, core, updated, now.Add(16*time.Second))
 	if beforeNextFrame.Close != nil {
@@ -340,11 +373,11 @@ func TestSessionCoreLivenessTimeoutChangeTakesEffectOnNextFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantDeadline := frameAt.Add(15 * time.Second).UnixNano()
-	if frame.State.LivenessDeadlineUnixNano != wantDeadline {
-		t.Fatalf("next frame deadline = %v, want %v", time.Unix(0, frame.State.LivenessDeadlineUnixNano), time.Unix(0, wantDeadline))
+	wantDeadline := frameAt.Add(15 * time.Second)
+	if !frame.State.LivenessDeadline.Equal(wantDeadline) {
+		t.Fatalf("next frame deadline = %v, want %v", frame.State.LivenessDeadline, wantDeadline)
 	}
-	expired := fireAlarmsThrough(t, ctx, core, frame, time.Unix(0, wantDeadline))
+	expired := fireAlarmsThrough(t, ctx, core, frame, wantDeadline)
 	if expired.Close == nil || expired.Close.Class != CloseDeadline {
 		t.Fatalf("new liveness deadline alarm = %+v, want deadline close", expired.Close)
 	}
@@ -539,7 +572,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	if !hasEffect(tr, EffectPrepareDesired) {
 		t.Fatalf("base mismatch effects = %#v", tr.Effects)
 	}
-	tr = reconcilePrepared(t, e, core, ctx, tr, reconcileFull, now)
+	tr = reconcilePrepared(t, e, core, ctx, tr, now)
 	if len(tr.Frames) != 1 || tr.Frames[0].GetDesiredState() == nil || tr.Frames[0].GetDesiredState().BaseRevision != 0 {
 		t.Fatalf("base mismatch resend = %#v", tr.Frames)
 	}
@@ -566,7 +599,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	if !first.State.DriftResent || !hasEffect(first, EffectPrepareDesired) {
 		t.Fatalf("first drift = state %+v effects %#v", first.State, first.Effects)
 	}
-	first = reconcilePrepared(t, e, core, ctx, first, reconcileFull, now)
+	first = reconcilePrepared(t, e, core, ctx, first, now)
 	if len(first.Frames) != 1 || first.Frames[0].GetDesiredState().BaseRevision != 0 {
 		t.Fatalf("first drift resend = %#v", first.Frames)
 	}
@@ -579,7 +612,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 		t.Fatalf("persistent drift = state %+v frames %#v", second.State, second.Frames)
 	}
 
-	liveAt := time.Unix(0, second.State.LivenessDeadlineUnixNano)
+	liveAt := second.State.LivenessDeadline
 	expired := fireAlarmsThrough(t, ctx, core, second, liveAt)
 	if expired.Close == nil || expired.Close.Class != CloseDeadline {
 		t.Fatalf("liveness alarm = %+v", expired.Close)
@@ -711,50 +744,54 @@ func TestSessionCoreCertificateRevocationClosesOnAlarm(t *testing.T) {
 	}
 }
 
-func TestSessionCoreDropsStalePreparedDesiredState(t *testing.T) {
+func TestSessionCoreCoalescesDesiredPreparation(t *testing.T) {
 	e, core, ctx, state, sidecar, now := coreFixture(t, "core-stale-prepare")
 	e.fixture(state.NodeID)
 	current := stepHello(t, core, ctx, state, sidecar, now, hello("instance-stale-prepare", 0, "").GetHello())
-	olderTicket, err := coreStep(ctx, core, current.State, current.Sidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: now.Add(time.Second)})
+	requested, err := coreStep(ctx, core, current.State, current.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !requested.State.Preparing || !hasEffect(requested, EffectPrepareDesired) {
+		t.Fatalf("desired change did not start preparation: %+v", requested.State)
 	}
 	older, err := e.f.prepareDesiredState(ctx, state.NodeID, current.State.Capabilities)
 	if err != nil {
 		t.Fatal(err)
 	}
-	older.ticket, older.ownerGeneration = olderTicket.State.PrepareTicket, olderTicket.State.OwnerGeneration
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
-	newerTicket, err := coreStep(ctx, core, olderTicket.State, olderTicket.Sidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: now.Add(2 * time.Second)})
+	dirty, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	newer, err := e.f.prepareDesiredState(ctx, state.NodeID, current.State.Capabilities)
+	if !dirty.State.Preparing || !dirty.State.PrepareDirty || hasEffect(dirty, EffectPrepareDesired) {
+		t.Fatalf("change during preparation was not coalesced: state=%+v effects=%v", dirty.State, effectKinds(dirty))
+	}
+	first, err := coreStep(ctx, core, dirty.State, dirty.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(2 * time.Second), Prepared: older})
 	if err != nil {
 		t.Fatal(err)
 	}
-	newer.ticket, newer.ownerGeneration = newerTicket.State.PrepareTicket, newerTicket.State.OwnerGeneration
-	fresh, err := coreStep(ctx, core, newerTicket.State, newerTicket.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second), Prepared: newer})
+	if !first.State.Preparing || first.State.PrepareDirty || !hasEffect(first, EffectPrepareDesired) {
+		t.Fatalf("dirty preparation did not start once after apply: state=%+v effects=%v", first.State, effectKinds(first))
+	}
+	fresh, err := e.f.prepareDesiredState(ctx, state.NodeID, current.State.Capabilities)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fresh.Frames) != 1 || fresh.Frames[0].GetDesiredState() == nil {
-		t.Fatalf("newer prepared state frames = %#v", fresh.Frames)
-	}
-	newRevision := fresh.State.SentRevision
-	stale, err := coreStep(ctx, core, fresh.State, fresh.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(3 * time.Second), Prepared: older})
+	updated, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(3 * time.Second), Prepared: fresh})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stale.Frames) != 0 || stale.State.SentRevision != newRevision || stale.Sidecar.SentDesired.hash != fresh.Sidecar.SentDesired.hash {
-		t.Fatalf("stale prepared state changed the session: sent=%d frames=%#v", stale.State.SentRevision, stale.Frames)
+	if len(updated.Frames) != 1 || updated.Frames[0].GetDesiredState() == nil {
+		t.Fatalf("coalesced prepared state frames = %#v", updated.Frames)
 	}
+	newRevision := updated.State.SentRevision
 	node, err := e.st.Node(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if node.DesiredRevision != newRevision || node.DesiredHash != fresh.State.SentStateHash {
-		t.Fatalf("stored desired state = %d/%s, newest prepared state = %d/%s", node.DesiredRevision, node.DesiredHash, newRevision, fresh.State.SentStateHash)
+	if node.DesiredRevision != newRevision || node.DesiredHash != updated.State.SentStateHash {
+		t.Fatalf("stored desired state = %d/%s, newest prepared state = %d/%s", node.DesiredRevision, node.DesiredHash, newRevision, updated.State.SentStateHash)
 	}
 }
 
@@ -795,7 +832,6 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("old session preparation did not reach the desired-state read")
 	}
-	oldTicket := old.coreState.PrepareTicket
 
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
 	close(old.done)
@@ -806,31 +842,13 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("new session Hello = close %v, err %v", newHello.Close, err)
 	}
-	ticket, err := coreStep(newCtx, newCore, newHello.State, newHello.Sidecar, SessionEvent{Kind: EventDesiredPrepareStarted, At: now.Add(2 * time.Second)})
-	if err != nil {
+	newSession := &session{f: e.f, nodeID: state.NodeID, owner: newOwner, caps: newHello.State.Capabilities,
+		ctx: newCtx, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue), core: newCore,
+		coreState: newHello.State, coreSidecar: newHello.Sidecar}
+	if _, err := newSession.stepDesired(newCtx, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second)}); err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, ticket.State.Capabilities)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prepared.ticket, prepared.ownerGeneration = ticket.State.PrepareTicket, ticket.State.OwnerGeneration
-	newReconcile, err := coreStep(newCtx, newCore, ticket.State, ticket.Sidecar, SessionEvent{Kind: EventInitialReconcile,
-		At: now.Add(2 * time.Second), Frame: newHelloFrame, Prepared: prepared})
-	if err != nil {
-		t.Fatal(err)
-	}
-	newRevision := newReconcile.State.SentRevision
-	stalePrepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, newReconcile.State.Capabilities)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stalePrepared.ticket, stalePrepared.ownerGeneration = oldTicket, old.owner
-	stale, err := coreStep(newCtx, newCore, newReconcile.State, newReconcile.Sidecar, SessionEvent{Kind: EventDesiredChanged,
-		At: now.Add(3 * time.Second), Prepared: stalePrepared})
-	if err != nil || stale.State.SentRevision != newRevision || len(stale.Frames) != 0 {
-		t.Fatalf("older owner's preparation changed the new session: transition=%+v err=%v", stale, err)
-	}
+	newRevision := newSession.coreState.SentRevision
 	close(release)
 	select {
 	case err := <-oldDone:
@@ -844,9 +862,9 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if node.DesiredRevision != newRevision || node.DesiredHash != newReconcile.State.SentStateHash || len(old.out) != 0 {
+	if node.DesiredRevision != newRevision || node.DesiredHash != newSession.coreState.SentStateHash || len(old.out) != 0 {
 		t.Fatalf("old preparation reached the new session: stored=%d/%s new=%d/%s old frames=%d",
-			node.DesiredRevision, node.DesiredHash, newRevision, newReconcile.State.SentStateHash, len(old.out))
+			node.DesiredRevision, node.DesiredHash, newRevision, newSession.coreState.SentStateHash, len(old.out))
 	}
 }
 
@@ -856,10 +874,10 @@ func TestSessionCoreStepMutatesCallerState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.HelloDeadlineUnixNano == 0 || tr.State.HelloDeadlineUnixNano != state.HelloDeadlineUnixNano {
-		t.Fatalf("Step did not update caller state: state=%+v transition=%+v", state, tr.State)
+	if state.HelloDeadlineUnixNano == 0 || tr.NextAlarm == nil || !tr.NextAlarm.Equal(time.Unix(0, state.HelloDeadlineUnixNano)) {
+		t.Fatalf("Step did not update caller state: state=%+v transition=%+v", state, tr)
 	}
-	if sidecar.Pending == nil || tr.Sidecar.Pending == nil {
+	if sidecar.Pending == nil {
 		t.Fatalf("Step did not initialize caller sidecar: %+v", sidecar)
 	}
 }
@@ -956,43 +974,6 @@ func TestSessionViewIsAtomicAcrossCoreStepsAndAdminReads(t *testing.T) {
 	}
 }
 
-type manualSessionAlarmTimer struct {
-	ch          chan time.Time
-	resets      chan sessionAlarmReset
-	mu          sync.Mutex
-	resetCount  int
-	currentWait time.Duration
-}
-
-type sessionAlarmReset struct {
-	count int
-	wait  time.Duration
-}
-
-func newManualSessionAlarmTimer(initialWait time.Duration) *manualSessionAlarmTimer {
-	return &manualSessionAlarmTimer{ch: make(chan time.Time, 1), resets: make(chan sessionAlarmReset, 64), currentWait: initialWait}
-}
-
-func (timer *manualSessionAlarmTimer) C() <-chan time.Time { return timer.ch }
-func (timer *manualSessionAlarmTimer) Stop() bool          { return true }
-func (timer *manualSessionAlarmTimer) Reset(wait time.Duration) bool {
-	timer.mu.Lock()
-	timer.resetCount++
-	timer.currentWait = wait
-	reset := sessionAlarmReset{count: timer.resetCount, wait: wait}
-	timer.mu.Unlock()
-	timer.resets <- reset
-	return true
-}
-
-func (timer *manualSessionAlarmTimer) fire(at time.Time) { timer.ch <- at }
-
-func (timer *manualSessionAlarmTimer) resetSnapshot() (int, time.Duration) {
-	timer.mu.Lock()
-	defer timer.mu.Unlock()
-	return timer.resetCount, timer.currentWait
-}
-
 type manualAgentSessionStream struct {
 	ctx context.Context
 	in  chan *agentv1.ConnectRequest
@@ -1020,88 +1001,44 @@ func (stream *manualAgentSessionStream) Send(response *agentv1.ConnectResponse) 
 	}
 }
 
-func TestVPSSessionUsesOneAlarmTimerForAckCadence(t *testing.T) {
+func TestRunSessionStepsDisconnectBeforeClosingDone(t *testing.T) {
 	e := newEnv(t)
-	a := e.enroll("single-alarm-adapter")
-	base := time.Now().UTC().Truncate(time.Second)
-	var nowNanos atomic.Int64
-	nowNanos.Store(base.UnixNano())
-	e.f.now = func() time.Time { return time.Unix(0, nowNanos.Load()).UTC() }
-	timers := make(chan *manualSessionAlarmTimer, 1)
-	var timerCount atomic.Int64
-	previousTimerFactory := e.f.newSessionAlarmTimer
-	e.f.newSessionAlarmTimer = func(wait time.Duration) sessionAlarmTimer {
-		timerCount.Add(1)
-		timer := newManualSessionAlarmTimer(wait)
-		timers <- timer
-		return timer
-	}
-	t.Cleanup(func() { e.f.newSessionAlarmTimer = previousTimerFactory })
+	a := e.enroll("disconnect-core")
+	e.f.mu.Lock()
+	e.f.stuck[a.nodeID] = stuckSeq{instance: "instance-disconnect", seq: 7}
+	e.f.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	owner, ownerCtx := e.f.claimOwner(a.nodeID, ctx)
-	stream := &manualAgentSessionStream{ctx: ownerCtx, in: make(chan *agentv1.ConnectRequest, 4), out: make(chan *agentv1.ConnectResponse, 16)}
+	stream := &manualAgentSessionStream{ctx: ownerCtx, in: make(chan *agentv1.ConnectRequest, 2), out: make(chan *agentv1.ConnectResponse, 16)}
 	done := make(chan error, 1)
 	go func() {
 		done <- (agentService{e.f}).runSession(ownerCtx, a.nodeID, peerCert{serial: a.leaf.SerialNumber.Text(16), notAfter: a.leaf.NotAfter}, owner, stream)
 	}()
-
-	var timer *manualSessionAlarmTimer
-	select {
-	case timer = <-timers:
-	case <-time.After(5 * time.Second):
-		t.Fatal("session did not create its alarm timer")
-	}
-	if _, initialWait := timer.resetSnapshot(); initialWait != helloTimeout {
-		t.Fatalf("new timer wait = %v, want the Hello deadline %v", initialWait, helloTimeout)
-	}
-	stream.in <- hello("single-alarm-adapter", 0, "")
+	stream.in <- hello("instance-disconnect", 0, "")
 	waitSessionAck(t, stream.out, 0)
-	_, waitAfterHello := timer.resetSnapshot()
-	if waitAfterHello != ackEvery {
-		t.Fatalf("timer after Hello waits %v, want %v until the ack tick", waitAfterHello, ackEvery)
+	s := e.f.session(a.nodeID)
+	if s == nil {
+		t.Fatal("session was not registered after HelloAck")
 	}
-
-	stream.in <- &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "timer-first", TimeUnix: base.Unix()}}}
-	waitSessionAck(t, stream.out, 1)
-	beforeSecond, _ := timer.resetSnapshot()
-	nowNanos.Store(base.Add(100 * time.Millisecond).UnixNano())
-	stream.in <- &agentv1.ConnectRequest{Seq: 2, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "timer-second", TimeUnix: base.Unix()}}}
-	var secondReset sessionAlarmReset
-	timerResetDeadline := time.After(5 * time.Second)
-	for secondReset.count <= beforeSecond {
-		select {
-		case secondReset = <-timer.resets:
-		case <-timerResetDeadline:
-			t.Fatal("second frame did not reset the session alarm")
-		}
-	}
-	if secondReset.wait != ackEvery-100*time.Millisecond {
-		t.Fatalf("timer after the second frame waits %v, want %v until ack is due", secondReset.wait, ackEvery-100*time.Millisecond)
-	}
-	for {
-		select {
-		case response := <-stream.out:
-			if ack := response.GetAck(); ack != nil && ack.UpToSeq >= 2 {
-				t.Fatalf("pending ack was sent before its alarm: %+v", ack)
-			}
-		default:
-			goto noEarlyAck
-		}
-	}
-noEarlyAck:
-	nowNanos.Store(base.Add(ackEvery).UnixNano())
-	timer.fire(base.Add(ackEvery))
-	waitSessionAck(t, stream.out, 2)
-	cancel()
+	close(stream.in)
 	select {
-	case <-done:
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("session close returned %v", err)
+		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("session did not stop after cancellation")
 	}
-	if got := timerCount.Load(); got != 1 {
-		t.Fatalf("runSession created %d alarm timers, want exactly one", got)
+	if !s.coreState.Disconnected || nextSessionAlarm(s.coreState, s.coreSidecar, e.f.now()) != nil {
+		t.Fatalf("runSession ended without clearing core alarms: state=%+v", s.coreState)
+	}
+	e.f.mu.Lock()
+	poison := e.f.stuck[a.nodeID]
+	e.f.mu.Unlock()
+	if poison != (stuckSeq{instance: "instance-disconnect", seq: 7}) {
+		t.Fatalf("disconnect rewrote poison state: %+v", poison)
 	}
 }
 
@@ -1143,8 +1080,19 @@ func TestSessionStateSerializationSizeBudget(t *testing.T) {
 	}
 }
 
-func hasEffect(tr Transition, kind EffectKind) bool {
-	for _, effect := range tr.Effects {
+func effectsOf(tr any) []SessionEffect {
+	switch value := tr.(type) {
+	case Transition:
+		return value.Effects
+	case testTransition:
+		return value.Effects
+	default:
+		return nil
+	}
+}
+
+func hasEffect(tr any, kind EffectKind) bool {
+	for _, effect := range effectsOf(tr) {
 		if effect.Kind == kind {
 			return true
 		}
@@ -1152,9 +1100,10 @@ func hasEffect(tr Transition, kind EffectKind) bool {
 	return false
 }
 
-func effectKinds(tr Transition) []EffectKind {
-	out := make([]EffectKind, len(tr.Effects))
-	for i, effect := range tr.Effects {
+func effectKinds(tr any) []EffectKind {
+	effects := effectsOf(tr)
+	out := make([]EffectKind, len(effects))
+	for i, effect := range effects {
 		out[i] = effect.Kind
 	}
 	return out

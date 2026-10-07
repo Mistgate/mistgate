@@ -303,7 +303,7 @@ func (s *Store) NodeDisconnected(ctx context.Context, id string, seen, now time.
 
 // NodeDesired stores the desired revision and hash (kept across panel restarts so revisions stay monotonic).
 func (s *Store) NodeDesired(ctx context.Context, id string, rev uint64, hash string) error {
-	_, err := s.W.ExecContext(ctx, `UPDATE node SET desired_revision = ?, desired_hash = ? WHERE id = ?`, int64(rev), hash, id)
+	_, err := s.W.ExecContext(ctx, `UPDATE node SET desired_revision = ?, desired_hash = ? WHERE id = ? AND desired_revision <= ?`, int64(rev), hash, id, int64(rev))
 	return err
 }
 

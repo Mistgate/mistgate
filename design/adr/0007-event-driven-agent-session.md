@@ -26,8 +26,9 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
   back into it.
 - Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
   differs by edition: delivering results to waiters, publishing the live view, Cloudflare calls, the long bandwidth job,
-  and the cross-module usage callback. Desired-state preparation is requested as an effect because its database reads
-  and withheld-inbound failures run outside the core lock. Certificate checks and pure database writes run inline.
+  and the cross-module usage callback. Desired-state reads use a single in-flight preparation with a dirty bit: the
+  adapter reads and steps the result, while the core applies it and records withheld inbounds inline. Certificate checks
+  and pure database writes run inline.
 - VPS: the existing `Connect` and WebSocket handlers drive the core from a goroutine loop as now, using one timer reset
   to the transition's `NextAlarm` after every step. The core sets hello, liveness, bandwidth, acknowledgement,
   certificate and request-expiry deadlines. mTLS behaviour, timing and tests stay the same.
@@ -37,9 +38,10 @@ hibernation. With four nodes that is about 1.3 million GB-s a month, against 0.4
 - Session data that must outlive a connection stays where it is today (D1: `last_seq`, applied revision, certificates).
   The DO-side SQLite stats buffer from the original plan is deferred: one D1 write set per batch is well within the
   included D1 writes for a small fleet; revisit if D1 latency or cost says so (phase 4).
-- Session state carries desired-state ordering tickets and the pending full-resend bit, so stale preparations are
-  ignored and a base mismatch or first drift forces a full state before a later delta. Poisoned stats-batch identity is
-  session state too; the VPS adapter persists it per node across reconnects, and the DO will persist it in DO storage.
+- Session state carries the Hello-applied hash, preparation-in-flight and dirty bits, retry time, and pending full-resend
+  bit. The adapter checks ownership before applying prepared data; a base mismatch or first drift forces a full state
+  before a later delta. Poisoned stats-batch identity is session state too; the VPS adapter persists it per node across
+  reconnects, and the DO will persist it in DO storage.
 
 ## Consequences
 

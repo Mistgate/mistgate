@@ -103,7 +103,6 @@ type Fleet struct {
 	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck            time.Duration // how often a running stream rechecks its client certificate
 	linkHandshakeTimeout time.Duration // bounds the signed WebSocket handshake; tests may shorten it
-	newSessionAlarmTimer func(time.Duration) sessionAlarmTimer
 	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration
@@ -148,7 +147,6 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		unit:                 time.Second,
 		certCheck:            30 * time.Second,
 		linkHandshakeTimeout: defaultLinkHandshakeTimeout,
-		newSessionAlarmTimer: newWallSessionAlarmTimer,
 		// A measurement is about ten seconds and forty at most (the agent's own limit), and the admin's request must be
 		// answered within the panel's 60 s write timeout. The first measurement waits until the node has applied its first
 		// state and settled: it saturates the link for a moment.
@@ -326,7 +324,7 @@ func (f *Fleet) recomputeAll(ctx context.Context) {
 		sem <- struct{}{}
 		go func() {
 			defer func() { <-sem; wg.Done() }()
-			if err := f.reconcile(ctx, s, reconcileChange); err != nil && ctx.Err() == nil {
+			if err := f.reconcile(ctx, s); err != nil && ctx.Err() == nil {
 				f.log.Warn("recompute desired state", "node", s.nodeID, "err", err)
 			}
 		}()

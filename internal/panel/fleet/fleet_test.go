@@ -662,20 +662,31 @@ func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 		t.Fatal("full resend did not prepare desired state")
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
-	e.f.StateChanged()
+	if err := e.f.reconcile(e.ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	close(preparedRelease)
 	full := c.desired()
 	if full.BaseRevision != 0 || full.Revision <= initial.Revision {
 		t.Fatalf("base mismatch resend = %v", full)
 	}
 	if !m.apply(full) || m.hash() != full.StateHash {
-		t.Fatal("base mismatch resend did not contain the newest desired state")
+		t.Fatal("base mismatch resend did not apply its prepared full state")
 	}
-	close(preparedRelease)
+	disabled := c.desired()
+	if disabled.BaseRevision != full.Revision || disabled.Revision <= full.Revision {
+		t.Fatalf("coalesced desired-state delta = %v, full revision %d", disabled, full.Revision)
+	}
+	if !m.apply(disabled) || m.hash() != disabled.StateHash {
+		t.Fatal("coalesced desired-state delta did not contain the newest state")
+	}
 	e.exec(`UPDATE user SET status = 'active' WHERE id = 'usr_erin'`)
-	e.f.StateChanged()
+	if err := e.f.reconcile(e.ctx, s); err != nil {
+		t.Fatal(err)
+	}
 	delta := c.desired()
-	if delta.BaseRevision != full.Revision || delta.Revision <= full.Revision {
-		t.Fatalf("desired-state delta after full resend = %v, full revision %d", delta, full.Revision)
+	if delta.BaseRevision != disabled.Revision || delta.Revision <= disabled.Revision {
+		t.Fatalf("desired-state delta after full resend = %v, base revision %d", delta, disabled.Revision)
 	}
 	if !m.apply(delta) || m.hash() != delta.StateHash {
 		t.Fatal("full resend followed by delta did not reproduce the newest state")
