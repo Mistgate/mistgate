@@ -22,6 +22,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/panel/app"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
@@ -30,6 +31,7 @@ import (
 
 type edgeState struct {
 	store   *store.Store
+	fleet   *fleet.Fleet
 	handler http.Handler
 }
 
@@ -73,6 +75,7 @@ func main() {
 			return responseToJS(resp), nil
 		})
 	}))
+	api.Set("link", linkFunc())
 	js.Global().Set("mgPanel", api)
 	select {}
 }
@@ -165,7 +168,7 @@ func initPanel(options js.Value) error {
 	// TODO(phase-2): Cron/alarm invokes backup scheduling.
 	// TODO(phase-2): Cron/alarm invokes Telegram polling and delivery.
 	// TODO(phase-2): Cron/alarm invokes provisioning workers. A Worker isolate starts none of these jobs.
-	state = &edgeState{store: st, handler: withEdgeTestHooks(built.Handler)}
+	state = &edgeState{store: st, fleet: built.Fleet, handler: withEdgeTestHooks(built.Handler, built.Fleet)}
 	keepStore = true
 	return nil
 }
@@ -280,9 +283,13 @@ func responseToJS(resp edgeResponse) js.Value {
 		}
 	}
 	out.Set("headers", pairs)
-	body := js.Global().Get("Uint8Array").New(len(resp.body))
-	js.CopyBytesToJS(body, resp.body)
-	out.Set("body", body)
+	out.Set("body", bytesToJS(resp.body))
+	return out
+}
+
+func bytesToJS(data []byte) js.Value {
+	out := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(out, data)
 	return out
 }
 

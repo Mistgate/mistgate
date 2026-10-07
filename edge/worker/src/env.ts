@@ -1,4 +1,5 @@
 import type { Limiter } from "./limiter";
+import type { NodeLink } from "./nodelink";
 
 export interface Env {
   DB: D1Database;
@@ -6,6 +7,8 @@ export interface Env {
   ASSETS: Fetcher;
   /** One Limiter object per (name, key): the panel's security limits (login bursts, page-password tries), shared by all isolates. */
   LIMITER: DurableObjectNamespace<Limiter>;
+  /** One NodeLink object per node (idFromName(node id)): the agent's WebSocket and its session state; the Go panel runs the steps. */
+  NODELINK: DurableObjectNamespace<NodeLink>;
   /** 32 random bytes as 64 hex characters (a Worker secret). */
   MASTER_KEY: string;
   /** Optional first-run settings, read by the panel only while the database is empty. */

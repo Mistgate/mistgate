@@ -10,6 +10,7 @@ to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`.
   requests share it).
 - `src/shell.ts`: the pure parts (request/response conversion, static-asset reader, init de-duplication, routing of limit calls); tested by `pnpm test`.
 - `src/limiter.ts`, `src/limitmath.ts`: the `Limiter` Durable Object (see below) and its pure math.
+- `src/nodelink.ts`, `src/panellink.ts`: the agent link shell (`NodeLink` Durable Object) and the entrypoint through which it reaches Go (see below).
 
 ## Security limits (`Limiter` Durable Object)
 
@@ -24,6 +25,28 @@ init option (`take`, `peek`, `record`, `fail`, `reset`) with the semantics of `s
   again / the window has ended (the state is then the same as none) and deletes it, so an idle object stores nothing.
 - A malformed request throws; a rejected call, or a missing `limit` option, makes the panel refuse the guarded request
   (fail closed). The object is created by the `[[migrations]]` entry (`new_sqlite_classes`) of `wrangler.example.toml`.
+
+## Agent link (`NodeLink` Durable Object, `PanelLink` entrypoint)
+
+One `NodeLink` object per node (`idFromName(node id)`, SQLite-backed) holds the agent's WebSocket and the session state as an
+opaque string; it never reads a frame. The Go panel runs every handshake step and every session step in the Worker's wasm:
+the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint, nothing to bind), which calls
+`mgPanel.link(op, args)` (`cmd/mistgate-edge/link_js.go`: `challenge`, `accept`; `step` is not implemented yet).
+
+- Routing: the panel answers an upgrade on the link path with 204 and `X-Mistgate-Link: <node id>` (`fleet.LinkMarker`); `index.ts`
+  forwards the original request to that node's object (`forwardLink` in `shell.ts`) and the marker never reaches the client.
+  The edge has no link prefix yet, so the marker is mounted only by the bridge test hooks.
+- Ordering: every entry point (upgrade, message, close, alarm, RPC) runs inside `blockConcurrencyWhile`, one event at a time.
+  A Go call gets 20 s; an error or a timeout closes the socket with 1011 and the agent reconnects.
+- Ownership: each authenticated socket carries a generation. A new accept closes every other socket with 4000, ends the old
+  session (a `closed` step, `owned: false`) and starts the new one; frames of an older generation are dropped. A socket that
+  has not sent a valid LinkAuth within 10 s is closed with 1008.
+- Alarm: one alarm, the earliest of the session's own `alarmAt`, the handshake deadlines and "now" when a `poke()` is pending.
+  Nothing pending means no alarm and no timer, so the object hibernates.
+- RPC: `poke()` (desired state changed), `ask(requestId, frame, waitMs)` (a request frame and the reply a later step resolves;
+  rejects with `link lost` or `timeout`), `close(code, reason)`.
+- Step contract (`LinkEvent`, `LinkStepIn`, `LinkStepOut` in `panellink.ts`): the state goes in and out as one string; the
+  object writes it first, then sends the frames, delivers replies, applies the close and re-arms the alarm.
 
 ## Init contract (`mgPanel.init`)
 
@@ -49,8 +72,9 @@ pnpm install
 pnpm dev                        # wrangler dev --local over https (the panel only serves https origins; the certificate is self-signed)
 ```
 
-`pnpm test` runs two vitest projects: the pure code under Node (`test/*.test.ts`) and the `Limiter` class in workerd with
-real Durable Object storage (`test/do`, `@cloudflare/vitest-pool-workers`; its own `wrangler.test.toml`).
+`pnpm test` runs two vitest projects: the pure code under Node (`test/*.test.ts`) and the `Limiter` and `NodeLink` classes in
+workerd with real Durable Object storage (`test/do`, `@cloudflare/vitest-pool-workers`; its own `wrangler.test.toml`). There
+`NodeLink` reaches a scripted fake `PanelLink` (`test/do/worker.ts`) through `ctx.exports`, like the real one.
 
 `dist/` is generated: `wasm_exec.js` must come from the Go toolchain that built `panel.wasm`, so it is copied by the
 build script rather than committed. `wrangler.example.toml` is the deployment template (no account id, no secret).

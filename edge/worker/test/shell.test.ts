@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { memoizeRetry, panelURL, readAsset, toFetchRequest, toResponse } from "../src/shell";
+import { forwardLink, memoizeRetry, panelURL, readAsset, toFetchRequest, toResponse } from "../src/shell";
 
 describe("toFetchRequest", () => {
   it("forces https and keeps the path, query and port", async () => {
@@ -114,5 +114,38 @@ describe("memoizeRetry", () => {
     expect(await get(3)).toBe("up");
     expect(start).toHaveBeenCalledTimes(2);
     expect(start).toHaveBeenLastCalledWith(3);
+  });
+});
+
+describe("forwardLink", () => {
+  const forwarded = new Response("101");
+  const ns = () => {
+    const fetch = vi.fn(async (_request: Request) => forwarded);
+    const idFromName = vi.fn((name: string) => name);
+    const get = vi.fn((_id: string) => ({ fetch }));
+    return { ns: { idFromName, get } as unknown as Parameters<typeof forwardLink>[0], fetch, idFromName, get };
+  };
+  const request = new Request("https://example.com/p/link/nod_1", { headers: { Upgrade: "websocket", "X-Mistgate-Link": "nod_spoof" } });
+  const answer = (status: number, headers: [string, string][]) => ({ status, headers, body: new Uint8Array() });
+
+  it("sends the original request to the object of the marked node, with the checked id, whatever the header's case", async () => {
+    for (const name of ["X-Mistgate-Link", "x-mistgate-link"]) {
+      const f = ns();
+      expect(await forwardLink(f.ns, request, answer(204, [[name, "nod_1"]]))).toBe(forwarded);
+      expect(f.idFromName).toHaveBeenCalledWith("nod_1");
+      expect(f.get).toHaveBeenCalledWith("nod_1");
+      const sent = f.fetch.mock.calls[0]?.[0];
+      expect(sent?.url).toBe(request.url);
+      expect(sent?.headers.get("Upgrade")).toBe("websocket");
+      expect(sent?.headers.get("X-Mistgate-Link")).toBe("nod_1");
+    }
+  });
+
+  it("leaves any other panel answer alone", () => {
+    const f = ns();
+    expect(forwardLink(f.ns, request, answer(204, []))).toBeUndefined();
+    expect(forwardLink(f.ns, request, answer(200, [["X-Mistgate-Link", "nod_1"]]))).toBeUndefined();
+    expect(forwardLink(f.ns, request, answer(204, [["X-Mistgate-Link", ""]]))).toBeUndefined();
+    expect(f.get).not.toHaveBeenCalled();
   });
 });

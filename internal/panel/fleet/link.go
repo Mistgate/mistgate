@@ -95,13 +95,9 @@ func (f *Fleet) LinkHandler() http.Handler {
 			cancelHandshake()
 		})
 		defer handshakeTimer.Stop()
-		panelNonce := make([]byte, 32)
-		if _, err := io.ReadFull(rand.Reader, panelNonce); err != nil {
-			_ = ws.Close(websocket.StatusPolicyViolation, "")
-			return
-		}
 		audience := r.Host
-		if audience == "" || agentlink.WriteFrame(hsctx, ws, &agentv1.LinkChallenge{Nonce: panelNonce, Audience: audience}) != nil {
+		panelNonce, challenge, err := LinkChallenge(audience)
+		if err != nil || ws.Write(hsctx, websocket.MessageBinary, challenge) != nil {
 			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
@@ -110,13 +106,7 @@ func (f *Fleet) LinkHandler() http.Handler {
 			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
 		}
-		var auth agentv1.LinkAuth
-		if proto.Unmarshal(frame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
-			_ = ws.Close(websocket.StatusPolicyViolation, "")
-			return
-		}
-		digest := agentlink.AgentDigest(nodeID, audience, panelNonce)
-		pc, ok := f.verifyLinkAuth(hsctx, nodeID, digest, auth.Signature)
+		pc, acceptFrame, ok := f.linkAccept(hsctx, nodeID, audience, panelNonce, frame)
 		if !ok {
 			_ = ws.Close(websocket.StatusPolicyViolation, "")
 			return
@@ -130,8 +120,7 @@ func (f *Fleet) LinkHandler() http.Handler {
 			}
 		})
 		defer stopOwnerClose()
-		panelSig, err := agentlink.Sign(f.ca.key, agentlink.PanelDigest(nodeID, audience, panelNonce, auth.Nonce))
-		if err != nil || agentlink.WriteFrame(hsctx, ws, &agentv1.LinkAccept{Signature: panelSig}) != nil {
+		if ws.Write(hsctx, websocket.MessageBinary, acceptFrame) != nil {
 			return
 		}
 		handshakeTimer.Stop()
@@ -146,6 +135,68 @@ func (f *Fleet) LinkHandler() http.Handler {
 		}
 	})
 }
+
+// LinkChallenge is the panel's first handshake frame: a fresh nonce bound to the host the agent dialled. The VPS
+// handler and the edge Durable Object both run it.
+func LinkChallenge(audience string) (nonce, frame []byte, err error) {
+	if audience == "" {
+		return nil, nil, errors.New("link challenge needs an audience")
+	}
+	nonce = make([]byte, 32)
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, nil, err
+	}
+	frame, err = proto.Marshal(&agentv1.LinkChallenge{Nonce: nonce, Audience: audience})
+	return nonce, frame, err
+}
+
+// linkAccept checks the agent's LinkAuth frame against the challenge nonce and, when the node proves its certificate,
+// returns the LinkAccept frame signed with the panel CA. One database read (the node's certificates).
+func (f *Fleet) linkAccept(ctx context.Context, nodeID, audience string, nonce, authFrame []byte) (peerCert, []byte, bool) {
+	var auth agentv1.LinkAuth
+	if proto.Unmarshal(authFrame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
+		return peerCert{}, nil, false
+	}
+	pc, ok := f.verifyLinkAuth(ctx, nodeID, agentlink.AgentDigest(nodeID, audience, nonce), auth.Signature)
+	if !ok {
+		return peerCert{}, nil, false
+	}
+	sig, err := agentlink.Sign(f.ca.key, agentlink.PanelDigest(nodeID, audience, nonce, auth.Nonce))
+	if err != nil {
+		return peerCert{}, nil, false
+	}
+	frame, err := proto.Marshal(&agentv1.LinkAccept{Signature: sig})
+	if err != nil {
+		return peerCert{}, nil, false
+	}
+	return pc, frame, true
+}
+
+// LinkAccept is linkAccept for the edge Durable Object (the VPS runs it inside LinkHandler): it reports the certificate
+// the agent proved.
+
+func (f *Fleet) LinkAccept(ctx context.Context, nodeID, audience string, nonce, authFrame []byte) (serial string, notAfter time.Time, frame []byte, ok bool) {
+	pc, frame, ok := f.linkAccept(ctx, nodeID, audience, nonce, authFrame)
+	return pc.serial, pc.notAfter, frame, ok
+}
+
+// LinkMarker is what the edge mounts under its link prefix instead of LinkHandler: a Worker cannot keep a WebSocket in
+// the panel's wasm, so a GET with an upgrade is answered 204 with the node's id, and the Worker hands the original
+// request to that node's Durable Object.
+func LinkMarker() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nodeID, ok := linkNodePath(r.URL.Path)
+		if !ok || r.Method != http.MethodGet || !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set(LinkMarkerHeader, nodeID)
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// LinkMarkerHeader carries the node id of a LinkMarker answer; the Worker strips it.
+const LinkMarkerHeader = "X-Mistgate-Link"
 
 func linkNodePath(path string) (string, bool) {
 	if !strings.HasPrefix(path, "/link/") {

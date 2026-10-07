@@ -5,8 +5,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     // workerd reports an exception thrown inside a Durable Object as an unhandled rejection even when the caller catches
-    // it; the malformed-request test throws on purpose, and only those errors are let through.
-    onUnhandledError: (error) => (/^limiter: /.test(error.message) ? false : undefined),
+    // it; the malformed-request test and the failing `ask` calls throw on purpose, and only those errors are let through.
+    onUnhandledError: (error) => (/^(limiter: |timeout$|link lost$)/.test(error.message) ? false : undefined),
     projects: [
       { test: { name: "node", include: ["test/*.test.ts"] } },
       {

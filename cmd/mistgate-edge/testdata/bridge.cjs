@@ -7,7 +7,8 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { createHmac } = require("node:crypto");
+const crypto = require("node:crypto");
+const { createHmac } = crypto;
 const { pathToFileURL } = require("node:url");
 
 let wasmFailure;
@@ -245,6 +246,110 @@ async function connectRPC(panel, method, body, cookie = "", clientIP = "127.0.0.
     throw new Error(`${method} returned a non-JSON response`);
   }
   return { response, message };
+}
+
+// protobuf: a length-delimited field (field numbers < 16, payloads < 128 bytes: one tag byte, one length byte)
+function pbField(field, bytes) {
+  return Buffer.concat([Buffer.from([(field << 3) | 2, bytes.length]), Buffer.from(bytes)]);
+}
+
+function pbFields(frame) {
+  const out = {};
+  for (let i = 0; i < frame.length;) {
+    const field = frame[i] >> 3;
+    out[field] = Buffer.from(frame.subarray(i + 2, i + 2 + frame[i + 1]));
+    i += 2 + frame[i + 1];
+  }
+  return out;
+}
+
+// The edge half of the signed agent link (cmd/mistgate-edge/link_js.go): mgPanel.link challenge and accept, with the
+// agent played by node:crypto. agentlink signs the SHA-256 digest of "domain NUL node NUL audience NUL nonce(s)", which is
+// plain ECDSA-SHA256 over that preimage, in IEEE P1363 r||s form.
+async function assertLinkHandshake(panel) {
+  const nodeID = "nod_bridge";
+  const audience = "link.example.com";
+  const link = (op, args) => Promise.race([panel.link(op, args), wasmFailure]);
+  const counted = async (label, fn) => {
+    globalThis.__d1.__beginQueryCount(label);
+    try {
+      const value = await fn();
+      return { value, queries: globalThis.__d1.__endQueryCount() };
+    } catch (error) {
+      globalThis.__d1.__endQueryCount();
+      throw error;
+    }
+  };
+
+  const nodeKey = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const issueResponse = await bridgeRequestFor(panel, "https://example.com/__edge_bridge_test__/issue-node-cert", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "CF-Connecting-IP": "127.0.0.1" },
+    body: JSON.stringify({ nodeId: nodeID, spki: nodeKey.publicKey.export({ type: "spki", format: "der" }).toString("base64") }),
+  });
+  assert.equal(issueResponse.status, 200, "the test hook issues a node certificate from the panel CA");
+  const issued = JSON.parse(Buffer.from(issueResponse.body).toString("utf8"));
+  await globalThis.__d1.prepare("INSERT INTO node_cert (serial, node_id, ca_id, pem, not_before, not_after, issued_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(issued.serial, nodeID, issued.caId, issued.pem, issued.notBefore, issued.notAfter, issued.issuedAt).run();
+  const caKey = new crypto.X509Certificate(issued.caPem).publicKey;
+
+  const challenge = await counted("link challenge", () => link("challenge", { nodeId: nodeID, audience }));
+  assert.equal(challenge.queries.sequentialQueries, 0, "a challenge reads nothing");
+  assert.ok(challenge.value.nonce instanceof Uint8Array && challenge.value.nonce.length === 32);
+  const challengeFields = pbFields(challenge.value.frame);
+  assert.deepEqual(challengeFields[1], Buffer.from(challenge.value.nonce), "the challenge frame carries the nonce");
+  assert.equal(challengeFields[2].toString("utf8"), audience, "the challenge frame names the audience");
+  const other = await link("challenge", { nodeId: nodeID, audience });
+  assert.notDeepEqual(Buffer.from(other.nonce), Buffer.from(challenge.value.nonce), "every challenge has its own nonce");
+  await assert.rejects(link("challenge", { nodeId: nodeID, audience: "" }), "an empty audience gets no challenge");
+
+  const panelNonce = Buffer.from(challenge.value.nonce);
+  const agentNonce = randomBytes(32);
+  const authFrame = (id, key, nonce, signOver = { audience, panelNonce }) => {
+    const preimage = Buffer.concat([Buffer.from(`mistgate-agent-link/1\0${id}\0${signOver.audience}\0`), signOver.panelNonce]);
+    const signature = crypto.createSign("sha256").update(preimage).sign({ key, dsaEncoding: "ieee-p1363" });
+    return Buffer.concat([pbField(1, Buffer.from(id)), pbField(2, nonce), pbField(3, signature)]);
+  };
+  const accept = (auth) => link("accept", { nodeId: nodeID, audience, nonce: new Uint8Array(panelNonce), auth: new Uint8Array(auth) });
+
+  const accepted = await counted("link accept", () => accept(authFrame(nodeID, nodeKey.privateKey, agentNonce)));
+  console.log(`D1 query count ${JSON.stringify(accepted.queries)}`);
+  assert.equal(accepted.value.ok, true, "the node's own proof is accepted");
+  assert.equal(accepted.queries.sequentialQueries, 1, "an accept costs exactly one sequential D1 query");
+  assert.equal(accepted.queries.prepareExecutions, 1, "and one statement");
+  assert.equal(accepted.value.certSerial, issued.serial);
+  assert.equal(accepted.value.certNotAfterUnix, issued.notAfter);
+  const signature = pbFields(accepted.value.frame)[1];
+  assert.equal(signature.length, 64);
+  const panelPreimage = Buffer.concat([Buffer.from(`mistgate-panel-link/1\0${nodeID}\0${audience}\0`), panelNonce, agentNonce]);
+  assert.ok(
+    crypto.createVerify("sha256").update(panelPreimage).verify({ key: caKey, dsaEncoding: "ieee-p1363" }, signature),
+    "the accept frame verifies against the panel CA key",
+  );
+
+  const stranger = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+  for (const [label, auth] of [
+    ["a wrong key", authFrame(nodeID, stranger.privateKey, agentNonce)],
+    ["a wrong node id", authFrame("nod_other", nodeKey.privateKey, agentNonce)],
+    ["a 31-byte nonce", authFrame(nodeID, nodeKey.privateKey, agentNonce.subarray(0, 31))],
+    ["a 33-byte nonce", authFrame(nodeID, nodeKey.privateKey, Buffer.concat([agentNonce, Buffer.from([0])]))],
+    ["a signature over another audience", authFrame(nodeID, nodeKey.privateKey, agentNonce, { audience: "other.example.com", panelNonce })],
+    ["a signature over another nonce", authFrame(nodeID, nodeKey.privateKey, agentNonce, { audience, panelNonce: randomBytes(32) })],
+    ["garbage", Buffer.from([0xff, 0xff])],
+  ]) {
+    assert.deepEqual(await accept(auth), { ok: false }, `${label} is refused`);
+  }
+  await assert.rejects(link("accept", { nodeId: nodeID, audience }), /invalid arguments/, "accept without its bytes rejects");
+  await assert.rejects(link("step", { nodeId: nodeID }), /not implemented/);
+  await assert.rejects(link("bogus", {}), /unknown operation/);
+
+  // The marker the edge mounts under its link prefix (reachable only through the test hooks until the wiring step).
+  const markerURL = `https://example.com/__edge_bridge_test__/link/${nodeID}`;
+  const upgrade = await panel.fetch({ method: "GET", url: markerURL, headers: [["Upgrade", "websocket"], ["Connection", "Upgrade"], ["CF-Connecting-IP", "127.0.0.1"]], body: null });
+  assert.equal(upgrade.status, 204);
+  assert.deepEqual(upgrade.headers.filter(([name]) => name.toLowerCase() === "x-mistgate-link"), [["X-Mistgate-Link", nodeID]]);
+  const plain = await panel.fetch({ method: "GET", url: markerURL, headers: [["CF-Connecting-IP", "127.0.0.1"]], body: null });
+  assert.equal(plain.status, 404, "a request without an upgrade gets no marker");
 }
 
 async function run() {
@@ -651,6 +756,8 @@ async function run() {
     }
     const limitedLogin = await connectRPC(secondPanel, "AuthService/BeginLogin", {}, "", loginIP);
     assert.equal(limitedLogin.message.code, "resource_exhausted", "the callback refuses login after its burst");
+
+    await assertLinkHandshake(secondPanel);
 
     thirdPanel = await startIsolate(bytes, secondPanel);
     const withoutLimiter = { ...initOptions };

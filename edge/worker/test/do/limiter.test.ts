@@ -52,11 +52,11 @@ describe("Limiter Durable Object", () => {
 
   it("deletes its state and alarm once a window has ended", async () => {
     const s = stubFor("page-password", "t:do-alarm");
-    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, spanMs: 300, lockoutMs: 0 });
+    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, spanMs: 2_000, lockoutMs: 0 }); // the first check must come well before the alarm
     expect(await runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null])).toEqual([true, true]);
     // The alarm fires by itself once the window is over; nothing is left behind (poll: its timing is the runtime's).
     const left = () => runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null]);
-    for (let i = 0; i < 50 && (await left()).includes(true); i++) await sleep(20);
+    for (let i = 0; i < 300 && (await left()).includes(true); i++) await sleep(20);
     expect(await left()).toEqual([false, false]);
   });
 

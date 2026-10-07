@@ -1,9 +1,11 @@
 package fleet
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -323,5 +325,82 @@ func assertCloseStatus(t *testing.T, ws *websocket.Conn, want websocket.StatusCo
 	_, _, err := ws.Read(ctx)
 	if got := websocket.CloseStatus(err); got != want {
 		t.Fatalf("close status = %v, want %v (err=%v)", got, want, err)
+	}
+}
+
+func TestLinkAcceptStep(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("link-accept-step")
+	other := e.enroll("link-accept-other")
+	const audience = "panel.example.com"
+	nonce, frame, err := LinkChallenge(audience)
+	if err != nil || len(nonce) != 32 {
+		t.Fatalf("LinkChallenge: nonce %d bytes, err=%v", len(nonce), err)
+	}
+	var challenge agentv1.LinkChallenge
+	if err := proto.Unmarshal(frame, &challenge); err != nil || challenge.Audience != audience || !bytes.Equal(challenge.Nonce, nonce) {
+		t.Fatalf("challenge frame = %+v, err=%v", &challenge, err)
+	}
+	if _, _, err := LinkChallenge(""); err == nil {
+		t.Fatal("LinkChallenge accepted an empty audience")
+	}
+	auth := func(nodeID string, key *ecdsa.PrivateKey, agentNonce []byte) []byte {
+		sig, err := agentlink.Sign(key, agentlink.AgentDigest(nodeID, audience, nonce))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := proto.Marshal(&agentv1.LinkAuth{NodeId: nodeID, Nonce: agentNonce, Signature: sig})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	agentNonce := bytes.Repeat([]byte{7}, 32)
+	pc, accept, ok := e.f.linkAccept(e.ctx, a.nodeID, audience, nonce, auth(a.nodeID, a.key, agentNonce))
+	if !ok || pc.serial != a.leaf.SerialNumber.Text(16) {
+		t.Fatalf("linkAccept refused the node's own proof: ok=%v serial=%q", ok, pc.serial)
+	}
+	var accepted agentv1.LinkAccept
+	caKey := e.f.ca.cert.PublicKey.(*ecdsa.PublicKey)
+	if err := proto.Unmarshal(accept, &accepted); err != nil || !agentlink.Verify(caKey, agentlink.PanelDigest(a.nodeID, audience, nonce, agentNonce), accepted.Signature) {
+		t.Fatalf("accept frame does not verify with the CA: %v", err)
+	}
+	for name, authFrame := range map[string][]byte{
+		"wrong key":      auth(a.nodeID, other.key, agentNonce),
+		"wrong node id":  auth(other.nodeID, a.key, agentNonce),
+		"short nonce":    auth(a.nodeID, a.key, agentNonce[:31]),
+		"long nonce":     auth(a.nodeID, a.key, append(bytes.Clone(agentNonce), 0)),
+		"not a LinkAuth": {0xff, 0xff},
+	} {
+		if _, f, ok := e.f.linkAccept(e.ctx, a.nodeID, audience, nonce, authFrame); ok || f != nil {
+			t.Errorf("%s: linkAccept accepted", name)
+		}
+	}
+}
+
+func TestLinkMarker(t *testing.T) {
+	serve := func(method, path, upgrade string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, nil)
+		if upgrade != "" {
+			r.Header.Set("Upgrade", upgrade)
+		}
+		w := httptest.NewRecorder()
+		LinkMarker().ServeHTTP(w, r)
+		return w
+	}
+	if w := serve(http.MethodGet, "/link/nod_x", "websocket"); w.Code != http.StatusNoContent || w.Header().Get(LinkMarkerHeader) != "nod_x" {
+		t.Fatalf("upgrade: status %d, header %q", w.Code, w.Header().Get(LinkMarkerHeader))
+	}
+	for name, w := range map[string]*httptest.ResponseRecorder{
+		"no upgrade":     serve(http.MethodGet, "/link/nod_x", ""),
+		"POST":           serve(http.MethodPost, "/link/nod_x", "websocket"),
+		"other path":     serve(http.MethodGet, "/other/nod_x", "websocket"),
+		"nested id":      serve(http.MethodGet, "/link/a/b", "websocket"),
+		"empty id":       serve(http.MethodGet, "/link/", "websocket"),
+		"other protocol": serve(http.MethodGet, "/link/nod_x", "h2c"),
+	} {
+		if w.Code != http.StatusNotFound || w.Header().Get(LinkMarkerHeader) != "" {
+			t.Errorf("%s: status %d, header %q", name, w.Code, w.Header().Get(LinkMarkerHeader))
+		}
 	}
 }

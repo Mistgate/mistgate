@@ -1,5 +1,6 @@
-# Test-only configuration for @cloudflare/vitest-pool-workers: just the Limiter object, nothing of the panel.
-name = "limiter-test"
+# Test-only configuration for @cloudflare/vitest-pool-workers: the Limiter and NodeLink objects with a scripted fake of
+# PanelLink, nothing of the panel.
+name = "do-test"
 main = "worker.ts"
 # Older than the Worker's own date on purpose: the workerd that ships with the test pool lags behind wrangler's.
 compatibility_date = "2026-08-01"
@@ -8,6 +9,14 @@ compatibility_date = "2026-08-01"
 name = "LIMITER"
 class_name = "Limiter"
 
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Limiter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["NodeLink"]

@@ -2,10 +2,52 @@
 
 package main
 
-import "net/http"
+import (
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/json"
+	"net/http"
+	"strings"
 
-func withEdgeTestHooks(handler http.Handler) http.Handler {
+	"github.com/mistgate/mistgate/internal/panel/fleet"
+)
+
+func withEdgeTestHooks(handler http.Handler, fl *fleet.Fleet) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The link marker is not mounted on the edge yet (no edge LinkPrefix until the wiring step): reachable here only.
+		if strings.HasPrefix(r.URL.Path, "/__edge_bridge_test__/link/") {
+			r2 := r.Clone(r.Context())
+			r2.URL.Path = strings.TrimPrefix(r.URL.Path, "/__edge_bridge_test__")
+			fleet.LinkMarker().ServeHTTP(w, r2)
+			return
+		}
+		// POST {nodeId, spki (base64 DER P-256 public key)}: a CA-signed node certificate row and the CA certificate.
+		if r.URL.Path == "/__edge_bridge_test__/issue-node-cert" {
+			var in struct {
+				NodeID string `json:"nodeId"`
+				SPKI   []byte `json:"spki"`
+			}
+			err := json.NewDecoder(r.Body).Decode(&in)
+			var pub any
+			if err == nil {
+				pub, err = x509.ParsePKIXPublicKey(in.SPKI)
+			}
+			key, isECDSA := pub.(*ecdsa.PublicKey)
+			if err != nil || !isECDSA {
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			row, err := fl.IssueNodeCert(in.NodeID, key)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"serial": row.Serial, "caId": row.CAID, "pem": row.PEM, "caPem": fl.CACertPEM(),
+				"notBefore": row.NotBefore.Unix(), "notAfter": row.NotAfter.Unix(), "issuedAt": row.IssuedAt.Unix(),
+			})
+			return
+		}
 		if r.URL.Path == "/__edge_bridge_test__/cookies" {
 			w.Header().Add("Set-Cookie", "first=one; Path=/")
 			w.Header().Add("Set-Cookie", "second=two; Path=/")

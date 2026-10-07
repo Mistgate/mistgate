@@ -7,6 +7,8 @@ import { type FetchRequest, type FetchResponse, memoizeRetry, readAsset, routeLi
 interface PanelApi {
   init(options: Record<string, unknown>): Promise<unknown>;
   fetch(request: FetchRequest): Promise<FetchResponse>;
+  /** One step of the agent link (cmd/mistgate-edge/link_js.go); bytes are Uint8Array. */
+  link(op: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
 declare global {

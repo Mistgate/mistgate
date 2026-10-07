@@ -24,9 +24,20 @@ database_id = "replace-with-your-d1-database-id"
 name = "LIMITER"
 class_name = "Limiter"
 
+# The agent link of each node (internal/agentlink) lives in one Durable Object per node: it holds the agent's WebSocket
+# and the session state, and the Go panel runs every step through the PanelLink entrypoint (src/panellink.ts, reached by
+# ctx.exports, so there is nothing to bind). SQLite-backed; an idle object holds no timer and hibernates.
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Limiter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["NodeLink"]
 
 # The admin SPA and the user page (web/dist) are NOT served by Cloudflare itself: every request goes to the Worker
 # first (run_worker_first), and the panel reads these files through the ASSETS binding. html_handling and
