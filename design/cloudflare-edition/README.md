@@ -1,7 +1,8 @@
 # Mistgate edition on Cloudflare: specification
 
-Status: ACCEPTED as the plan (2026-10-06), not implemented yet. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
-Decisions with their reasons: [`../adr/`](../adr/). A FULL Cloudflare edition kept in parity with the VPS edition: same
+Status: ACCEPTED as the plan (2026-10-06); phase 1 in progress. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
+Decisions with their reasons: [`../adr/`](../adr/). The agent link and session core (step 6b-3), with its status and the
+next steps: [`AGENT-LINK.md`](AGENT-LINK.md). A FULL Cloudflare edition kept in parity with the VPS edition: same
 features, same release, ONE version number. This document says how to get there; it is not an implementation.
 
 Words: **VPS edition** = today's `mistgate` binary (SQLite, own listener). **Edge edition** = the same Go code built for
