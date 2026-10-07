@@ -86,8 +86,8 @@ func TestLateSetupTypoCannotRestoreConsumedCeremony(t *testing.T) {
 	})); err != nil {
 		t.Fatalf("correct finish: %v", err)
 	}
-	if changed, err := s.failCeremony(ctx, begin.Msg.CeremonyId, stale); err != nil || changed {
-		t.Fatalf("late typo failure = changed %v, err %v; want lost compare-and-swap", changed, err)
+	if changed, err := s.failCeremony(ctx, begin.Msg.CeremonyId); err != nil || changed {
+		t.Fatalf("late typo failure = changed %v, err %v; want a deleted ceremony", changed, err)
 	}
 	if _, err := s.st.GetAuthCeremony(ctx, begin.Msg.CeremonyId, s.now()); !errors.Is(err, store.ErrAuthCeremonyNotFound) {
 		t.Fatalf("late typo restored consumed ceremony: %v", err)
@@ -221,7 +221,7 @@ func TestPasswordSetupAndLogin(t *testing.T) {
 	}
 }
 
-func TestConcurrentFinishSetupConsumesCeremonyOnce(t *testing.T) {
+func TestConcurrentWrongAndCorrectSetupCodes(t *testing.T) {
 	s, st, clock := newTestService(t)
 	ctx := context.Background()
 	token, err := IssueSetupToken(ctx, st, s.now())
@@ -235,28 +235,28 @@ func TestConcurrentFinishSetupConsumesCeremonyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(begin.Msg.TotpSecret)
-	if err != nil {
-		t.Fatal(err)
+	secret := secretOf(t, begin.Msg.TotpSecret)
+	correct := totpCode(secret, totpStep(*clock))
+	wrong := "000000"
+	if wrong == correct {
+		wrong = "000001"
 	}
-	finish := &adminv1.FinishSetupRequest{
-		SetupToken: token, CeremonyId: begin.Msg.CeremonyId, TotpCode: totpCode(secret, totpStep(*clock)),
+	finish := func(code string) error {
+		_, err := s.FinishSetup(ctx, connect.NewRequest(&adminv1.FinishSetupRequest{
+			SetupToken: token, CeremonyId: begin.Msg.CeremonyId, TotpCode: code,
+		}))
+		return err
 	}
 	start := make(chan struct{})
 	results := make(chan error, 2)
-	for range 2 {
-		go func() {
-			<-start
-			_, err := s.FinishSetup(ctx, connect.NewRequest(finish))
-			results <- err
-		}()
-	}
+	go func() { <-start; results <- finish(correct) }()
+	go func() { <-start; results <- finish(wrong) }()
 	close(start)
 	successes := 0
 	for range 2 {
 		if err := <-results; err == nil {
 			successes++
-		} else if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		} else if codeOf(err) != connect.CodeInvalidArgument {
 			t.Fatalf("losing finish: %v", err)
 		}
 	}
@@ -265,6 +265,58 @@ func TestConcurrentFinishSetupConsumesCeremonyOnce(t *testing.T) {
 	}
 	if n, err := st.AdminCount(ctx); err != nil || n != 1 {
 		t.Fatalf("created admins = %d, err=%v; want one", n, err)
+	}
+}
+
+func TestConcurrentWrongSetupCodesRespectLimit(t *testing.T) {
+	s, st, clock := newTestService(t)
+	ctx := context.Background()
+	token, err := IssueSetupToken(ctx, st, s.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin, err := s.BeginSetup(ctx, connect.NewRequest(&adminv1.BeginSetupRequest{
+		SetupToken: token, DisplayName: "Ada", Method: adminv1.SetupMethod_SETUP_METHOD_PASSWORD,
+		Login: "ada", Password: testPassword,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrong := "000000"
+	if wrong == totpCode(secretOf(t, begin.Msg.TotpSecret), totpStep(*clock)) {
+		wrong = "000001"
+	}
+	const attempts = 100
+	start := make(chan struct{})
+	results := make(chan error, attempts)
+	for range attempts {
+		go func() {
+			<-start
+			_, err := s.FinishSetup(ctx, connect.NewRequest(&adminv1.FinishSetupRequest{
+				SetupToken: token, CeremonyId: begin.Msg.CeremonyId, TotpCode: wrong,
+			}))
+			results <- err
+		}()
+	}
+	close(start)
+	invalidCodes := 0
+	for range attempts {
+		err := <-results
+		if err == nil || codeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("wrong code result: %v", err)
+		}
+		if strings.Contains(err.Error(), "invalid code") {
+			invalidCodes++
+		}
+	}
+	if invalidCodes != maxSetupCodeTries {
+		t.Fatalf("concurrent invalid-code answers = %d, want %d", invalidCodes, maxSetupCodeTries)
+	}
+	if _, ok, err := s.getCeremony(ctx, begin.Msg.CeremonyId, ceremonySetupPassword); err != nil || ok {
+		t.Fatalf("ceremony after wrong codes: ok=%v err=%v; want it deleted", ok, err)
+	}
+	if n, err := st.AdminCount(ctx); err != nil || n != 0 {
+		t.Fatalf("created admins = %d, err=%v; want none", n, err)
 	}
 }
 
@@ -466,11 +518,11 @@ func TestCeremonyCapPerSource(t *testing.T) {
 		t.Fatalf("another source was affected: %v", err)
 	}
 	// Finished and expired ceremonies free the slot.
-	c, ok, err := s.getCeremony(ctx, finished, ceremonyLogin)
+	_, ok, err := s.getCeremony(ctx, finished, ceremonyLogin)
 	if err != nil || !ok {
-		t.Fatalf("take ceremony to free source slot: ok=%v err=%v", ok, err)
+		t.Fatalf("read ceremony to verify the source slot: ok=%v err=%v", ok, err)
 	}
-	if consumed, err := s.consumeCeremony(ctx, finished, c); err != nil || !consumed {
+	if consumed, err := s.consumeCeremony(ctx, finished); err != nil || !consumed {
 		t.Fatalf("consume ceremony to free source slot: consumed=%v err=%v", consumed, err)
 	}
 	if _, err := s.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "203.0.113.5"}); err != nil {

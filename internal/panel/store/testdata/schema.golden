@@ -321,7 +321,7 @@
     "type": "table",
     "name": "auth_ceremony",
     "tbl_name": "auth_ceremony",
-    "sql": "CREATE TABLE auth_ceremony ( id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_key TEXT NOT NULL DEFAULT '', session_data TEXT NOT NULL CHECK (json_valid(session_data)), token_hash BLOB NOT NULL DEFAULT X'', admin_id TEXT NOT NULL DEFAULT '', admin_display_name TEXT NOT NULL DEFAULT '', admin_role TEXT NOT NULL DEFAULT '', admin_user_handle BLOB NOT NULL DEFAULT X'', name TEXT NOT NULL DEFAULT '', login TEXT NOT NULL DEFAULT '', password_hash TEXT NOT NULL DEFAULT '', totp_enc BLOB NOT NULL DEFAULT X'', tries INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL ) STRICT"
+    "sql": "CREATE TABLE auth_ceremony ( id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_key TEXT NOT NULL DEFAULT '', session_data TEXT NOT NULL CHECK (json_valid(session_data)), token_hash BLOB NOT NULL DEFAULT X'', admin_id TEXT NOT NULL DEFAULT '', admin_user_handle BLOB NOT NULL DEFAULT X'', name TEXT NOT NULL DEFAULT '', login TEXT NOT NULL DEFAULT '', password_hash TEXT NOT NULL DEFAULT '', totp_enc BLOB NOT NULL DEFAULT X'', tries INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL ) STRICT"
   },
   {
     "type": "table",

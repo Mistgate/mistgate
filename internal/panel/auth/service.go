@@ -110,7 +110,6 @@ type ceremony struct {
 	login     string      // setup-password
 	pwHash    string      // setup-password: argon2id of the password (the password itself is never kept)
 	totp      []byte      // setup-password: the secret shown to the admin
-	tries     int
 	expires   time.Time
 }
 
@@ -210,45 +209,40 @@ func (s *Service) putCeremony(ctx context.Context, c *ceremony) (string, error) 
 	return id, nil
 }
 
-// getCeremony reads a live ceremony without consuming it. A wrong-kind finish still
-// consumes it, matching the previous behavior.
+// getCeremony reads a live ceremony. A wrong-kind finish still consumes it.
 func (s *Service) getCeremony(ctx context.Context, id string, kinds ...string) (*ceremony, bool, error) {
-	for {
-		row, err := s.st.GetAuthCeremony(ctx, id, s.now())
-		if errors.Is(err, store.ErrAuthCeremonyNotFound) {
-			return nil, false, nil
+	row, err := s.st.GetAuthCeremony(ctx, id, s.now())
+	if errors.Is(err, store.ErrAuthCeremonyNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	c, err := s.ceremonyFromRow(row)
+	if err != nil {
+		if _, consumeErr := s.st.ConsumeAuthCeremony(ctx, id); consumeErr != nil {
+			s.log.Error("consume unreadable auth ceremony", "err", consumeErr)
+			return nil, false, consumeErr
 		}
-		if err != nil {
-			return nil, false, err
-		}
-		c, err := s.ceremonyFromRow(row)
-		if err != nil {
-			if _, consumeErr := s.st.ConsumeAuthCeremony(ctx, id, row.Tries); consumeErr != nil {
-				return nil, false, consumeErr
-			}
-			return nil, false, err
-		}
-		for _, kind := range kinds {
-			if c.kind == kind {
-				return c, true, nil
-			}
-		}
-		consumed, err := s.st.ConsumeAuthCeremony(ctx, id, row.Tries)
-		if err != nil {
-			return nil, false, err
-		}
-		if consumed {
-			return nil, false, nil
+		return nil, false, err
+	}
+	for _, kind := range kinds {
+		if c.kind == kind {
+			return c, true, nil
 		}
 	}
+	if _, err := s.st.ConsumeAuthCeremony(ctx, id); err != nil {
+		s.log.Error("consume wrong-kind auth ceremony", "err", err)
+	}
+	return nil, false, nil
 }
 
-func (s *Service) consumeCeremony(ctx context.Context, id string, c *ceremony) (bool, error) {
-	return s.st.ConsumeAuthCeremony(ctx, id, c.tries)
+func (s *Service) consumeCeremony(ctx context.Context, id string) (bool, error) {
+	return s.st.ConsumeAuthCeremony(ctx, id)
 }
 
-func (s *Service) failCeremony(ctx context.Context, id string, c *ceremony) (bool, error) {
-	return s.st.FailAuthCeremony(ctx, id, c.tries, maxSetupCodeTries)
+func (s *Service) failCeremony(ctx context.Context, id string) (bool, error) {
+	return s.st.FailAuthCeremony(ctx, id, maxSetupCodeTries)
 }
 
 func ceremonyTOTPRecordID(id string) string { return "auth_ceremony.totp:" + id }
@@ -265,19 +259,28 @@ func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error
 		}
 		sealedTOTP = s.vault.Seal(c.totp, ceremonyTOTPRecordID(id))
 	}
+	name := c.name
+	if c.kind == ceremonySetup || c.kind == ceremonySetupPassword {
+		name = c.admin.DisplayName
+	}
 	return store.AuthCeremony{
 		ID: id, Kind: c.kind, Source: c.src, SessionData: string(data), TokenHash: c.tokenHash,
-		AdminID: c.admin.ID, AdminDisplayName: c.admin.DisplayName, AdminRole: c.admin.Role, AdminUserHandle: c.admin.UserHandle,
-		Name: c.name, Login: c.login, PasswordHash: c.pwHash,
-		TOTPEncrypted: sealedTOTP, Tries: c.tries, ExpiresAt: c.expires,
+		AdminID: c.admin.ID, AdminUserHandle: c.admin.UserHandle,
+		Name: name, Login: c.login, PasswordHash: c.pwHash,
+		TOTPEncrypted: sealedTOTP, ExpiresAt: c.expires,
 	}, nil
 }
 
 func (s *Service) ceremonyFromRow(row store.AuthCeremony) (*ceremony, error) {
+	admin := store.Admin{ID: row.AdminID, UserHandle: row.AdminUserHandle}
+	name := row.Name
+	if row.Kind == ceremonySetup || row.Kind == ceremonySetupPassword {
+		admin.DisplayName, admin.Role = row.Name, store.RoleOwner
+		name = ""
+	}
 	c := &ceremony{
-		kind: row.Kind, src: row.Source, tokenHash: row.TokenHash, name: row.Name, login: row.Login,
-		pwHash: row.PasswordHash, tries: row.Tries, expires: row.ExpiresAt,
-		admin: store.Admin{ID: row.AdminID, DisplayName: row.AdminDisplayName, Role: row.AdminRole, UserHandle: row.AdminUserHandle},
+		kind: row.Kind, src: row.Source, tokenHash: row.TokenHash, name: name, login: row.Login,
+		pwHash: row.PasswordHash, expires: row.ExpiresAt, admin: admin,
 	}
 	if err := json.Unmarshal([]byte(row.SessionData), &c.data); err != nil {
 		return nil, fmt.Errorf("auth: decode ceremony session: %w", err)

@@ -15,21 +15,19 @@ var (
 // AuthCeremony is the persisted server-side half of an authentication ceremony.
 // SessionData is JSON; transient secrets such as a setup TOTP seed are sealed by auth.
 type AuthCeremony struct {
-	ID               string
-	Kind             string
-	Source           string
-	SessionData      string
-	TokenHash        []byte
-	AdminID          string
-	AdminDisplayName string
-	AdminRole        string
-	AdminUserHandle  []byte
-	Name             string
-	Login            string
-	PasswordHash     string
-	TOTPEncrypted    []byte
-	Tries            int
-	ExpiresAt        time.Time
+	ID              string
+	Kind            string
+	Source          string
+	SessionData     string
+	TokenHash       []byte
+	AdminID         string
+	AdminUserHandle []byte
+	Name            string
+	Login           string
+	PasswordHash    string
+	TOTPEncrypted   []byte
+	Tries           int
+	ExpiresAt       time.Time
 }
 
 // PutAuthCeremony prunes up to 100 expired rows, then inserts only while both caps allow it.
@@ -50,13 +48,13 @@ func (s *Store) PutAuthCeremony(ctx context.Context, c AuthCeremony, now time.Ti
 	}
 	result, err := s.W.ExecContext(ctx, `
 		INSERT INTO auth_ceremony (
-			id, kind, source_key, session_data, token_hash, admin_id, admin_display_name, admin_role, admin_user_handle, name, login,
+			id, kind, source_key, session_data, token_hash, admin_id, admin_user_handle, name, login,
 			password_hash, totp_enc, tries, expires_at
 		)
-		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		WHERE (SELECT count(*) FROM auth_ceremony WHERE source_key = ? AND expires_at > ?) < ?
 		  AND (SELECT count(*) FROM auth_ceremony WHERE expires_at > ?) < ?`,
-		c.ID, c.Kind, c.Source, c.SessionData, c.TokenHash, c.AdminID, c.AdminDisplayName, c.AdminRole, c.AdminUserHandle, c.Name, c.Login,
+		c.ID, c.Kind, c.Source, c.SessionData, c.TokenHash, c.AdminID, c.AdminUserHandle, c.Name, c.Login,
 		c.PasswordHash, c.TOTPEncrypted, c.Tries, c.ExpiresAt.Unix(),
 		c.Source, now.Unix(), maxPerSource, now.Unix(), maxTotal,
 	)
@@ -78,12 +76,12 @@ func (s *Store) GetAuthCeremony(ctx context.Context, id string, now time.Time) (
 	var c AuthCeremony
 	var expires int64
 	err := s.R.QueryRowContext(ctx, `
-		SELECT id, kind, source_key, session_data, token_hash, admin_id, admin_display_name, admin_role, admin_user_handle,
+		SELECT id, kind, source_key, session_data, token_hash, admin_id, admin_user_handle,
 		       name, login, password_hash, totp_enc, tries, expires_at
 		FROM auth_ceremony
 		WHERE id = ? AND expires_at > ?
 	`, id, now.Unix()).Scan(&c.ID, &c.Kind, &c.Source, &c.SessionData, &c.TokenHash,
-		&c.AdminID, &c.AdminDisplayName, &c.AdminRole, &c.AdminUserHandle, &c.Name, &c.Login, &c.PasswordHash, &c.TOTPEncrypted, &c.Tries, &expires)
+		&c.AdminID, &c.AdminUserHandle, &c.Name, &c.Login, &c.PasswordHash, &c.TOTPEncrypted, &c.Tries, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return AuthCeremony{}, ErrAuthCeremonyNotFound
 	}
@@ -94,9 +92,9 @@ func (s *Store) GetAuthCeremony(ctx context.Context, id string, now time.Time) (
 	return c, nil
 }
 
-// ConsumeAuthCeremony deletes a ceremony only if it has not changed since it was read.
-func (s *Store) ConsumeAuthCeremony(ctx context.Context, id string, tries int) (bool, error) {
-	result, err := s.W.ExecContext(ctx, `DELETE FROM auth_ceremony WHERE id = ? AND tries = ?`, id, tries)
+// ConsumeAuthCeremony deletes a ceremony, returning whether this call won.
+func (s *Store) ConsumeAuthCeremony(ctx context.Context, id string) (bool, error) {
+	result, err := s.W.ExecContext(ctx, `DELETE FROM auth_ceremony WHERE id = ?`, id)
 	if err != nil {
 		return false, err
 	}
@@ -104,16 +102,14 @@ func (s *Store) ConsumeAuthCeremony(ctx context.Context, id string, tries int) (
 	return n == 1, err
 }
 
-// FailAuthCeremony advances a recoverable code failure, deleting the ceremony at the limit.
-func (s *Store) FailAuthCeremony(ctx context.Context, id string, tries, maxTries int) (bool, error) {
-	query := `UPDATE auth_ceremony SET tries = tries + 1 WHERE id = ? AND tries = ?`
-	if tries >= maxTries-1 {
-		query = `DELETE FROM auth_ceremony WHERE id = ? AND tries = ?`
-	}
-	result, err := s.W.ExecContext(ctx, query, id, tries)
+// FailAuthCeremony advances one recoverable code failure and deletes the ceremony at the limit.
+func (s *Store) FailAuthCeremony(ctx context.Context, id string, maxTries int) (bool, error) {
+	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE auth_ceremony SET tries = tries + 1 WHERE id = ? RETURNING tries`, Args: []any{id}, Returning: true},
+		Stmt{Query: `DELETE FROM auth_ceremony WHERE id = ? AND tries >= ?`, Args: []any{id, maxTries}},
+	)
 	if err != nil {
 		return false, err
 	}
-	n, err := result.RowsAffected()
-	return n == 1, err
+	return len(results[0].Rows) == 1, nil
 }

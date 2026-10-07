@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -140,6 +141,251 @@ func TestConcurrentFinishLoginConsumesCeremonyOnce(t *testing.T) {
 	if successes != 1 {
 		t.Fatalf("two finishes succeeded %d times, want once", successes)
 	}
+}
+
+func TestConcurrentCeremonyFinishesConsumeOnce(t *testing.T) {
+	type finishCase struct {
+		name      string
+		loserCode connect.Code
+		prepare   func(*testing.T, *Service, *store.Store, *time.Time) (func() error, func(*testing.T))
+	}
+	verifySetup := func(t *testing.T, st *store.Store) {
+		t.Helper()
+		n, err := st.AdminCount(context.Background())
+		if err != nil || n != 1 {
+			t.Fatalf("created admins = %d, err=%v; want one", n, err)
+		}
+		var id, name, role string
+		if err := st.R.QueryRowContext(context.Background(), `SELECT id, display_name, role FROM admin`).Scan(&id, &name, &role); err != nil {
+			t.Fatal(err)
+		}
+		if id == "" || name != "Ada" || role != store.RoleOwner {
+			t.Fatalf("created admin = id %q, name %q, role %q; want Ada as owner", id, name, role)
+		}
+	}
+	cases := []finishCase{
+		{
+			name:      "passkey setup",
+			loserCode: connect.CodeInvalidArgument,
+			prepare: func(t *testing.T, s *Service, st *store.Store, _ *time.Time) (func() error, func(*testing.T)) {
+				tok, err := IssueSetupToken(context.Background(), st, s.now())
+				if err != nil {
+					t.Fatal(err)
+				}
+				k := &keyring{rp: virtualwebauthn.RelyingParty{Name: "Mistgate", ID: "localhost", Origin: "http://localhost:8081"}, dev: virtualwebauthn.NewAuthenticator(), cred: virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)}
+				begin, err := s.BeginSetup(context.Background(), connect.NewRequest(&adminv1.BeginSetupRequest{SetupToken: tok, DisplayName: "Ada"}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts, err := virtualwebauthn.ParseAttestationOptions(begin.Msg.OptionsJson)
+				if err != nil {
+					t.Fatal(err)
+				}
+				k.dev.Options.UserHandle = []byte(opts.UserID)
+				credentialJSON := virtualwebauthn.CreateAttestationResponse(k.rp, k.dev, k.cred, *opts)
+				finishReq := &adminv1.FinishSetupRequest{SetupToken: tok, CeremonyId: begin.Msg.CeremonyId, CredentialJson: credentialJSON}
+				finish := func() error {
+					_, err := s.FinishSetup(context.Background(), connect.NewRequest(finishReq))
+					return err
+				}
+				verify := func(t *testing.T) {
+					verifySetup(t, st)
+				}
+				return finish, verify
+			},
+		},
+		{
+			name:      "password setup",
+			loserCode: connect.CodeInvalidArgument,
+			prepare: func(t *testing.T, s *Service, st *store.Store, clock *time.Time) (func() error, func(*testing.T)) {
+				tok, err := IssueSetupToken(context.Background(), st, s.now())
+				if err != nil {
+					t.Fatal(err)
+				}
+				begin, err := s.BeginSetup(context.Background(), connect.NewRequest(&adminv1.BeginSetupRequest{
+					SetupToken: tok, DisplayName: "Ada", Method: adminv1.SetupMethod_SETUP_METHOD_PASSWORD, Login: "ada", Password: testPassword,
+				}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				code := totpCode(secretOf(t, begin.Msg.TotpSecret), totpStep(*clock))
+				finishReq := &adminv1.FinishSetupRequest{SetupToken: tok, CeremonyId: begin.Msg.CeremonyId, TotpCode: code}
+				finish := func() error {
+					_, err := s.FinishSetup(context.Background(), connect.NewRequest(finishReq))
+					return err
+				}
+				verify := func(t *testing.T) {
+					verifySetup(t, st)
+				}
+				return finish, verify
+			},
+		},
+		{
+			name:      "step-up",
+			loserCode: connect.CodeUnauthenticated,
+			prepare: func(t *testing.T, s *Service, st *store.Store, clock *time.Time) (func() error, func(*testing.T)) {
+				admin, cookie, k := passkeyAdmin(t, s, st)
+				*clock = clock.Add(StepUpWindow + time.Second)
+				begin, err := s.BeginStepUp(authed(t, s, cookie), cookieReq(&adminv1.BeginStepUpRequest{}, cookie))
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts, err := virtualwebauthn.ParseAssertionOptions(begin.Msg.OptionsJson)
+				if err != nil {
+					t.Fatal(err)
+				}
+				credentialJSON := virtualwebauthn.CreateAssertionResponse(k.rp, k.dev, k.cred, *opts)
+				finishReq := &adminv1.FinishStepUpRequest{CeremonyId: begin.Msg.CeremonyId, CredentialJson: credentialJSON}
+				ctx := authed(t, s, cookie)
+				finish := func() error {
+					_, err := s.FinishStepUp(ctx, cookieReq(finishReq, cookie))
+					return err
+				}
+				verify := func(t *testing.T) {
+					pks, err := st.PasskeysByAdmin(context.Background(), admin.ID)
+					if err != nil || len(pks) != 1 || countAuditResult(t, st, "stepup", "ok") != 1 {
+						t.Fatalf("step-up state: passkeys=%d err=%v", len(pks), err)
+					}
+				}
+				return finish, verify
+			},
+		},
+		{
+			name:      "add passkey",
+			loserCode: connect.CodeInvalidArgument,
+			prepare: func(t *testing.T, s *Service, st *store.Store, _ *time.Time) (func() error, func(*testing.T)) {
+				admin, cookie, _ := passkeyAdmin(t, s, st)
+				begin, err := s.BeginAddPasskey(authed(t, s, cookie), cookieReq(&adminv1.BeginAddPasskeyRequest{}, cookie))
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts, err := virtualwebauthn.ParseAttestationOptions(begin.Msg.OptionsJson)
+				if err != nil {
+					t.Fatal(err)
+				}
+				dev, cred := virtualwebauthn.NewAuthenticator(), virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+				dev.Options.UserHandle = []byte(opts.UserID)
+				credentialJSON := virtualwebauthn.CreateAttestationResponse(virtualwebauthn.RelyingParty{Name: "Mistgate", ID: "localhost", Origin: "http://localhost:8081"}, dev, cred, *opts)
+				finishReq := &adminv1.FinishAddPasskeyRequest{CeremonyId: begin.Msg.CeremonyId, CredentialJson: credentialJSON}
+				ctx := authed(t, s, cookie)
+				finish := func() error {
+					_, err := s.FinishAddPasskey(ctx, cookieReq(finishReq, cookie))
+					return err
+				}
+				verify := func(t *testing.T) {
+					pks, err := st.PasskeysByAdmin(context.Background(), admin.ID)
+					if err != nil || len(pks) != 2 {
+						t.Fatalf("passkeys after finish = %d, err=%v; want two", len(pks), err)
+					}
+				}
+				return finish, verify
+			},
+		},
+		{
+			name:      "TOTP enrollment",
+			loserCode: connect.CodeInvalidArgument,
+			prepare: func(t *testing.T, s *Service, st *store.Store, clock *time.Time) (func() error, func(*testing.T)) {
+				adminID, oldSecret := passwordAdmin(t, s, st, "ada")
+				cookie := signedInPassword(t, s, clock, "ada", testPassword, oldSecret)
+				begin, err := beginTOTP(s, cookie, "", "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				newSecret := secretOf(t, begin.Msg.TotpSecret)
+				code := totpCode(newSecret, totpStep(*clock))
+				finish := func() error {
+					_, err := finishTOTP(s, cookie, begin.Msg.CeremonyId, code)
+					return err
+				}
+				verify := func(t *testing.T) {
+					pw, err := st.PasswordByAdmin(context.Background(), adminID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					got, err := s.vault.Open(pw.TOTPSecret, totpAAD(adminID))
+					if err != nil || !bytes.Equal(got, newSecret) || countAuditResult(t, st, "totp_rebind", "ok") != 1 {
+						t.Fatalf("TOTP enrollment state: secret updated=%v err=%v", bytes.Equal(got, newSecret), err)
+					}
+				}
+				return finish, verify
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, st, clock := newTestService(t)
+			finish, verify := tc.prepare(t, s, st, clock)
+			start := make(chan struct{})
+			results := make(chan error, 2)
+			for range 2 {
+				go func() {
+					<-start
+					results <- finish()
+				}()
+			}
+			close(start)
+			successes := 0
+			for range 2 {
+				if err := <-results; err == nil {
+					successes++
+				} else if codeOf(err) != tc.loserCode {
+					t.Fatalf("losing finish: %v", err)
+				}
+			}
+			if successes != 1 {
+				t.Fatalf("two finishes succeeded %d times, want once", successes)
+			}
+			verify(t)
+		})
+	}
+}
+
+func TestCeremonyConsumeFailuresUseAuthenticationFailureResponses(t *testing.T) {
+	t.Run("login", func(t *testing.T) {
+		s, st, _ := newTestService(t)
+		_, _, _ = passkeyAdmin(t, s, st)
+		var events []Event
+		s.SetEventHook(func(e Event) { events = append(events, e) })
+		begin, err := s.BeginLogin(context.Background(), connect.NewRequest(&adminv1.BeginLoginRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.W.Exec(`CREATE TRIGGER reject_login_ceremony_consume BEFORE DELETE ON auth_ceremony BEGIN SELECT RAISE(ABORT, 'consume denied'); END`); err != nil {
+			t.Fatal(err)
+		}
+		_, err = s.FinishLogin(context.Background(), connect.NewRequest(&adminv1.FinishLoginRequest{CeremonyId: begin.Msg.CeremonyId}))
+		if codeOf(err) != connect.CodeUnauthenticated {
+			t.Fatalf("failed ceremony consume returned %v; want sign-in failure", err)
+		}
+		if countAuditResult(t, st, "login", "fail") != 1 || len(events) != 1 || events[0].Kind != EventSignInFailed {
+			t.Fatalf("failed login was not audited and emitted: audit=%d events=%+v", countAuditResult(t, st, "login", "fail"), events)
+		}
+	})
+
+	t.Run("step-up", func(t *testing.T) {
+		s, st, clock := newTestService(t)
+		admin, cookie, _ := passkeyAdmin(t, s, st)
+		*clock = clock.Add(StepUpWindow + time.Second)
+		begin, err := s.BeginStepUp(authed(t, s, cookie), cookieReq(&adminv1.BeginStepUpRequest{}, cookie))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.W.Exec(`CREATE TRIGGER reject_stepup_ceremony_consume BEFORE DELETE ON auth_ceremony BEGIN SELECT RAISE(ABORT, 'consume denied'); END`); err != nil {
+			t.Fatal(err)
+		}
+		_, err = s.FinishStepUp(authed(t, s, cookie), cookieReq(&adminv1.FinishStepUpRequest{CeremonyId: begin.Msg.CeremonyId}, cookie))
+		if codeOf(err) != connect.CodeUnauthenticated {
+			t.Fatalf("failed ceremony consume returned %v; want step-up failure", err)
+		}
+		if countAuditResult(t, st, "stepup", "fail") != 1 {
+			t.Fatal("failed step-up consume was not audited")
+		}
+		failure, err := st.LoginFailures(context.Background(), stepUpLockKey+admin.ID, *clock, FailureWindow)
+		if err != nil || failure.Failures != 1 {
+			t.Fatalf("step-up failures = %+v, err=%v; want one", failure, err)
+		}
+	})
 }
 
 func insertAdmin(t *testing.T, st *store.Store, role string) store.Admin {

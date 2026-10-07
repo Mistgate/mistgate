@@ -166,11 +166,11 @@ func TestCeremonyGetConsumeWrongKindAndExpires(t *testing.T) {
 		t.Fatal("wrong-kind finish did not consume the ceremony")
 	}
 	id, _ = s.putCeremony(ctx, &ceremony{kind: "login"})
-	c, ok, err := s.getCeremony(ctx, id, "login")
+	_, ok, err := s.getCeremony(ctx, id, "login")
 	if err != nil || !ok {
 		t.Fatal("fresh ceremony rejected")
 	}
-	if consumed, err := s.consumeCeremony(ctx, id, c); err != nil || !consumed {
+	if consumed, err := s.consumeCeremony(ctx, id); err != nil || !consumed {
 		t.Fatalf("consume ceremony: consumed=%v err=%v", consumed, err)
 	}
 	if _, ok, err := s.getCeremony(ctx, id, "login"); err != nil || ok {

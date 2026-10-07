@@ -196,24 +196,21 @@ func TestD1RewrittenAuthStoreMethods(t *testing.T) {
 		if err != nil || got.Tries != 0 {
 			t.Fatalf("get: %+v %v", got, err)
 		}
-		if changed, err := st.FailAuthCeremony(ctx, row.ID, got.Tries, 3); err != nil || !changed {
+		if changed, err := st.FailAuthCeremony(ctx, row.ID, 3); err != nil || !changed {
 			t.Fatalf("fail: changed=%v err=%v", changed, err)
 		}
 		got, err = st.GetAuthCeremony(ctx, row.ID, now)
 		if err != nil || got.Tries != 1 {
 			t.Fatalf("get after failure: %+v %v", got, err)
 		}
-		if consumed, err := st.ConsumeAuthCeremony(ctx, row.ID, 0); err != nil || consumed {
-			t.Fatalf("stale consume: consumed=%v err=%v", consumed, err)
-		}
-		if consumed, err := st.ConsumeAuthCeremony(ctx, row.ID, got.Tries); err != nil || !consumed {
-			t.Fatalf("consume: consumed=%v err=%v", consumed, err)
+		if consumed, err := st.ConsumeAuthCeremony(ctx, row.ID); err != nil || !consumed {
+			t.Fatalf("consume after a wrong code: consumed=%v err=%v", consumed, err)
 		}
 		row.ID = "ceremony_edge_max"
 		if err := st.PutAuthCeremony(ctx, row, now, 8, 100); err != nil {
 			t.Fatal(err)
 		}
-		if changed, err := st.FailAuthCeremony(ctx, row.ID, 0, 1); err != nil || !changed {
+		if changed, err := st.FailAuthCeremony(ctx, row.ID, 1); err != nil || !changed {
 			t.Fatalf("maximum failure: changed=%v err=%v", changed, err)
 		}
 		if _, err := st.GetAuthCeremony(ctx, row.ID, now); !errors.Is(err, ErrAuthCeremonyNotFound) {

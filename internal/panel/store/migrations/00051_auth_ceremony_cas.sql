@@ -9,8 +9,6 @@ CREATE TABLE auth_ceremony (
     session_data TEXT NOT NULL CHECK (json_valid(session_data)),
     token_hash BLOB NOT NULL DEFAULT X'',
     admin_id TEXT NOT NULL DEFAULT '',
-    admin_display_name TEXT NOT NULL DEFAULT '',
-    admin_role TEXT NOT NULL DEFAULT '',
     admin_user_handle BLOB NOT NULL DEFAULT X'',
     name TEXT NOT NULL DEFAULT '',
     login TEXT NOT NULL DEFAULT '',

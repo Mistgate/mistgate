@@ -52,6 +52,7 @@ var transactionShape2 = map[string]string{
 	"access_profile.go:DeleteGroup":                "A group and user guard or a group guard precedes its optional move and deletion.",
 	"admin.go:DeletePasskey":                       "SQL guards the delete against removing an admin's last sign-in method.",
 	"admin.go:createFirstAdmin":                    "A setup-token guard precedes the plain first-admin writes in one atomic batch.",
+	"authceremony.go:FailAuthCeremony":             "A fixed batch increments one code failure and deletes the ceremony at the limit atomically.",
 	"authpw.go:AddPassword":                        "A guarded insert checks account and login uniqueness in SQL.",
 	"authpw.go:RecordLoginFailure":                 "The upsert computes lockout state in SQL and returns the resulting row.",
 	"authpw.go:ResetPasswordLogin":                 "A credential guard precedes the plain credential, lock, session, and audit writes.",

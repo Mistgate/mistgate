@@ -116,48 +116,35 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	expired := func() error {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
 	}
-	consume := func() error {
-		won, err := s.consumeCeremony(ctx, req.Msg.CeremonyId, c)
-		if err != nil {
-			return errInternal(err)
-		}
-		if !won {
-			return expired()
-		}
-		return nil
+	if !ok {
+		return nil, expired()
 	}
-	if !ok || c.admin.ID != admin.ID { // another admin's ceremony is as good as unknown
-		if ok {
-			if err := consume(); err != nil {
-				return nil, err
-			}
+	if c.admin.ID != admin.ID { // another admin's ceremony is as good as unknown
+		if _, err := s.consumeCeremony(ctx, req.Msg.CeremonyId); err != nil {
+			s.log.Error("consume foreign add-passkey ceremony", "err", err)
 		}
+		return nil, expired()
+	}
+	consumed, err := s.consumeCeremony(ctx, req.Msg.CeremonyId)
+	if err != nil {
+		s.log.Error("consume add-passkey ceremony", "err", err)
+		return nil, errInternal(err)
+	}
+	if !consumed {
 		return nil, expired()
 	}
 	parsed, err := protocol.ParseCredentialCreationResponseBytes([]byte(req.Msg.CredentialJson))
 	if err != nil {
 		s.log.Info("add passkey: bad credential json", "err", err)
-		if err := consume(); err != nil {
-			return nil, err
-		}
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid credential"))
 	}
 	cred, err := s.wa.CreateCredential(&waUser{admin: admin}, c.data, parsed)
 	if err != nil {
 		s.log.Info("add passkey: credential rejected", "err", err)
-		if err := consume(); err != nil {
-			return nil, err
-		}
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("credential rejected"))
 	}
 	if _, err := s.st.PasskeyByCredentialID(ctx, cred.ID); err == nil {
-		if err := consume(); err != nil {
-			return nil, err
-		}
 		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("this passkey is already registered"))
-	}
-	if err := consume(); err != nil {
-		return nil, err
 	}
 	pk := passkeyFromCredential(admin.ID, c.name, cred)
 	now := s.now()
