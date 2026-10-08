@@ -105,6 +105,9 @@ For each port, `delivered = got / sent`:
 | lossy | 70–95 % | 5–30 % lost |
 | broken | < 70 % | 30 % or more lost |
 
+- A port that delivered ≥ 95 % but at least 4 % of the packets fewer than the best port of the same run is **lossy**
+  too: the ports share the sender, the path and the minute, so the difference is the port's. The first run on a real
+  node with a filtered port got 300 of 300 on every port and 286 on the filtered one.
 - A run counts only if at least one of its ports delivered ≥ 95 %. Otherwise the path from that sender is lossy, or
   UDP does not get through at all, and nothing can be said about any single port. Such a run is **inconclusive**: the
   panel tries one more sender, then reports `inconclusive` and stores nothing.

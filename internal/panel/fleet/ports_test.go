@@ -192,6 +192,35 @@ func TestUDPPortVerdictsAndGROMath(t *testing.T) {
 	}
 }
 
+// The run that found a filtered port on a real node: every port 300 of 300, the filtered one 286 (above 95 %).
+func TestRelativeLossMarksAPortWorseThanItsRun(t *testing.T) {
+	run := func(gots ...uint32) []string {
+		checks := make([]store.PortCheck, len(gots))
+		for i, got := range gots {
+			checks[i] = store.PortCheck{Sent: 300, Got: got, Verdict: udpPortVerdict(300, uint64(got))}
+		}
+		relativeLoss(checks)
+		verdicts := make([]string, len(checks))
+		for i, c := range checks {
+			verdicts[i] = c.Verdict
+		}
+		return verdicts
+	}
+	for _, test := range []struct {
+		gots []uint32
+		want []string
+	}{
+		{[]uint32{300, 300, 300, 286}, []string{"ok", "ok", "ok", "lossy"}},
+		{[]uint32{300, 289, 288}, []string{"ok", "ok", "lossy"}}, // 11 below the best is noise, 12 is not
+		{[]uint32{294, 290, 286}, []string{"ok", "ok", "ok"}},    // a slightly lossy path: no port stands out
+		{[]uint32{300, 200}, []string{"ok", "broken"}},           // absolute verdicts stay
+	} {
+		if got := run(test.gots...); !reflect.DeepEqual(got, test.want) {
+			t.Errorf("relativeLoss(%v) = %v, want %v", test.gots, got, test.want)
+		}
+	}
+}
+
 func TestPortSenderPreferenceByProviderThenCountry(t *testing.T) {
 	target := store.NodeRow{Provider: "provider-a", CountryCode: "TR"}
 	ordered := udpPortSenderOrder(target, []store.NodeRow{

@@ -24,8 +24,10 @@ const (
 	udpCheckSendCount = 300
 	udpCheckPPS       = 50
 	udpCheckSize      = 1200
-	udpCheckWait      = 12 * time.Second
-	udpCheckStopWait  = 2 * time.Second
+	// a port that lost this many percent more than the best port of its run is lossy even above 95 % (relativeLoss)
+	udpCheckRelativeLossPct = 4
+	udpCheckWait            = 12 * time.Second
+	udpCheckStopWait        = 2 * time.Second
 )
 
 // Keep this list in step with access.twinPreferred.
@@ -422,7 +424,24 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 	if !conclusive {
 		return portCheckOutcome{checks: checks, sender: portSenderID(sender), errorCode: "inconclusive"}
 	}
+	relativeLoss(checks)
 	return portCheckOutcome{checks: checks, sender: portSenderID(sender)}
+}
+
+// relativeLoss marks lossy an "ok" port that lost clearly more than the best port of the same run: the ports share the
+// sender, the path and the minute, so the difference is the port's. A hoster that filters one port often lets most of a
+// slow test through (286 of 300 to a filtered port while every other port got 300), which the absolute 95 % misses.
+// ponytail: 4 % of the packets (12 of 300), well above the noise between ports of one run on a clean path; calibrate.
+func relativeLoss(checks []store.PortCheck) {
+	var best uint32
+	for _, c := range checks {
+		best = max(best, c.Got)
+	}
+	for i, c := range checks {
+		if c.Verdict == "ok" && uint64(best-c.Got)*100 >= uint64(c.Sent)*udpCheckRelativeLossPct {
+			checks[i].Verdict = "lossy"
+		}
+	}
 }
 
 func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender portSender, ports []uint16, tag [8]byte) (string, int, string) {
