@@ -86,7 +86,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 The agent, once started:
 
-1. Applies its host baseline: the fq and BBR sysctl values, UDP socket buffer maxima (`net.core.rmem_max` and `net.core.wmem_max`) of at least 16 MiB, the journald size cap and the SSH guard in its own nftables table.
+1. Applies its host baseline: the fq and BBR sysctl values, UDP socket buffer maxima (`net.core.rmem_max` and `net.core.wmem_max`) of at least 16 MiB, the journald size cap and the SSH guard in its own nftables table. New UDP relay sockets inherit at least 1 MiB from `net.core.rmem_default` and `net.core.wmem_default`; `net.ipv4.udp_mem` still caps total UDP memory. The conntrack table gets at least 65,536 entries and 16,384 buckets, preserving higher live values.
 2. Brings back the last applied state from its state directory (nothing on the first start).
 3. Opens one long-lived connection to the panel with mutual TLS, reports the host's facts, and receives its settings and the desired state: which servers to run, with which users' credentials.
 4. Sends traffic, sessions and host metrics every 10 seconds, runs the doctor 30 seconds after connecting and every 10 minutes after that, and renews its certificate (with a new key) when less than 10 days are left.

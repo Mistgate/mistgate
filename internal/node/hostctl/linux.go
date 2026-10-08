@@ -175,38 +175,84 @@ func (h *linuxHost) Metrics() Metrics {
 	return m
 }
 
-func baselineUDPBufferValue(procSys, key string) uint64 {
+type baselineSysctlValues struct {
+	rmemMax, wmemMax               uint64
+	rmemDefault, wmemDefault       uint64
+	conntrackMax, conntrackBuckets uint64
+}
+
+func readBaselineSysctlValues(procSys string) baselineSysctlValues {
+	return baselineSysctlValues{
+		rmemMax:          baselineSysctlValue(procSys, "net/core/rmem_max", UDPBufferMinBytes),
+		wmemMax:          baselineSysctlValue(procSys, "net/core/wmem_max", UDPBufferMinBytes),
+		rmemDefault:      baselineSysctlValue(procSys, "net/core/rmem_default", UDPDefaultBufferMinBytes),
+		wmemDefault:      baselineSysctlValue(procSys, "net/core/wmem_default", UDPDefaultBufferMinBytes),
+		conntrackMax:     baselineSysctlValue(procSys, "net/netfilter/nf_conntrack_max", ConntrackMaxMin),
+		conntrackBuckets: baselineSysctlValue(procSys, "net/netfilter/nf_conntrack_buckets", ConntrackBucketsMin),
+	}
+}
+
+func (v baselineSysctlValues) fileBody() string {
+	return sysctlFileBodyWithValues(v.rmemMax, v.wmemMax, v.rmemDefault, v.wmemDefault, v.conntrackMax, v.conntrackBuckets)
+}
+
+func (v baselineSysctlValues) conntrackSettings() [][2]string {
+	return [][2]string{
+		{"net/netfilter/nf_conntrack_max", strconv.FormatUint(v.conntrackMax, 10)},
+		{"net/netfilter/nf_conntrack_buckets", strconv.FormatUint(v.conntrackBuckets, 10)},
+	}
+}
+
+func baselineSysctlValue(procSys, key string, target uint64) uint64 {
 	b, err := os.ReadFile(filepath.Join(procSys, key))
 	if err != nil {
-		return UDPBufferMinBytes
+		return target
 	}
 	value, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
-	if err != nil || value < UDPBufferMinBytes {
-		return UDPBufferMinBytes
+	if err != nil || value < target {
+		return target
 	}
 	return value
 }
 
+func applyLiveSysctl(procSys, key, value string, tolerateUnavailable bool) error {
+	path := filepath.Join(procSys, key)
+	if cur, err := os.ReadFile(path); err == nil && strings.TrimSpace(string(cur)) == value {
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+		if tolerateUnavailable && ignorableConntrackSysctlError(err) {
+			return nil
+		}
+		return fmt.Errorf("sysctl %s=%s: %w", strings.ReplaceAll(key, "/", "."), value, err)
+	}
+	return nil
+}
+
+func ignorableConntrackSysctlError(err error) bool {
+	return errors.Is(err, syscall.EPERM) || errors.Is(err, os.ErrPermission) || os.IsNotExist(err)
+}
+
 func (h *linuxHost) ApplyBaseline(ctx context.Context) error {
 	var errs []error
-	rmemMax := baselineUDPBufferValue(h.procSys, "net/core/rmem_max")
-	wmemMax := baselineUDPBufferValue(h.procSys, "net/core/wmem_max")
-	if _, err := writeIfChanged(h.sysctlFile, sysctlFileBodyWithBuffers(rmemMax, wmemMax), 0o644); err != nil {
+	values := readBaselineSysctlValues(h.procSys)
+	if _, err := writeIfChanged(h.sysctlFile, values.fileBody(), 0o644); err != nil {
 		errs = append(errs, err)
 	}
 	// Apply now without the sysctl binary. On OpenVZ/LXC these files are read-only or absent.
 	for _, kv := range [][2]string{
 		{"net/core/default_qdisc", "fq"},
 		{"net/ipv4/tcp_congestion_control", "bbr"},
-		{"net/core/rmem_max", strconv.FormatUint(rmemMax, 10)},
-		{"net/core/wmem_max", strconv.FormatUint(wmemMax, 10)},
+		{"net/core/rmem_max", strconv.FormatUint(values.rmemMax, 10)},
+		{"net/core/wmem_max", strconv.FormatUint(values.wmemMax, 10)},
+		{"net/core/rmem_default", strconv.FormatUint(values.rmemDefault, 10)},
+		{"net/core/wmem_default", strconv.FormatUint(values.wmemDefault, 10)},
+		{"net/netfilter/nf_conntrack_max", strconv.FormatUint(values.conntrackMax, 10)},
+		{"net/netfilter/nf_conntrack_buckets", strconv.FormatUint(values.conntrackBuckets, 10)},
 	} {
-		p := filepath.Join(h.procSys, kv[0])
-		if cur, err := os.ReadFile(p); err == nil && strings.TrimSpace(string(cur)) == kv[1] {
-			continue
-		}
-		if err := os.WriteFile(p, []byte(kv[1]), 0o644); err != nil {
-			errs = append(errs, fmt.Errorf("sysctl %s=%s: %w", strings.ReplaceAll(kv[0], "/", "."), kv[1], err))
+		optional := strings.HasPrefix(kv[0], "net/netfilter/")
+		if err := applyLiveSysctl(h.procSys, kv[0], kv[1], optional); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	changed, err := writeIfChanged(h.journaldFile, journaldFileBody, 0o644)
@@ -256,7 +302,26 @@ func (h *linuxHost) applyFirewall(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return h.nft(ctx, script, len(h.hops) == 0 && len(h.sshPorts) == 0)
+	if err := h.nft(ctx, script, len(h.hops) == 0 && len(h.sshPorts) == 0); err != nil {
+		return err
+	}
+	return h.applyConntrackBaseline()
+}
+
+// applyConntrackBaseline runs after the nft rules load nf_conntrack. The persistent sysctl line also
+// applies at boot when the module is already present; this live pass covers when it loads later.
+func (h *linuxHost) applyConntrackBaseline() error {
+	values := readBaselineSysctlValues(h.procSys)
+	var errs []error
+	for _, kv := range values.conntrackSettings() {
+		if err := applyLiveSysctl(h.procSys, kv[0], kv[1], true); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if _, err := writeIfChanged(h.sysctlFile, values.fileBody(), 0o644); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 // detectSSHPorts finds where sshd really listens: `sshd -T` (the effective config, Include files and

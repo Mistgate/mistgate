@@ -435,6 +435,11 @@ func TestNetBaseline(t *testing.T) {
 		f.put("/proc/sys/net/ipv4/tcp_congestion_control", "bbr\n")
 		f.put("/proc/sys/net/core/rmem_max", "16777216\n")
 		f.put("/proc/sys/net/core/wmem_max", "16777216\n")
+		f.put("/proc/sys/net/core/rmem_default", "1048576\n")
+		f.put("/proc/sys/net/core/wmem_default", "1048576\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_count", "100\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_max", "65536\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_buckets", "16384\n")
 		f.put("/proc/sys/net/ipv4/tcp_available_congestion_control", "reno cubic bbr\n")
 		f.put(hostctl.SysctlFilePath, hostctl.SysctlFileBody)
 		f.put(hostctl.JournaldFilePath, hostctl.JournaldFileBody)
@@ -495,9 +500,43 @@ func TestNetBaseline(t *testing.T) {
 	good(f)
 	f.put("/proc/sys/net/core/rmem_max", "33554432\n")
 	f.put("/proc/sys/net/core/wmem_max", "67108864\n")
-	file := strings.Replace(hostctl.SysctlFileBody, "net.core.rmem_max = 16777216", "net.core.rmem_max = 33554432", 1)
-	file = strings.Replace(file, "net.core.wmem_max = 16777216", "net.core.wmem_max = 67108864", 1)
+	f.put("/proc/sys/net/core/rmem_default", "2097152\n")
+	f.put("/proc/sys/net/core/wmem_default", "4194304\n")
+	f.put("/proc/sys/net/netfilter/nf_conntrack_max", "131072\n")
+	f.put("/proc/sys/net/netfilter/nf_conntrack_buckets", "32768\n")
+	file := hostctl.SysctlFileBody
+	for _, setting := range [][3]string{
+		{"net.core.rmem_max", "16777216", "33554432"},
+		{"net.core.wmem_max", "16777216", "67108864"},
+		{"net.core.rmem_default", "1048576", "2097152"},
+		{"net.core.wmem_default", "1048576", "4194304"},
+		{"net.netfilter.nf_conntrack_max", "65536", "131072"},
+		{"net.netfilter.nf_conntrack_buckets", "16384", "32768"},
+	} {
+		file = strings.Replace(file, setting[0]+" = "+setting[1], setting[0]+" = "+setting[2], 1)
+	}
 	f.put(hostctl.SysctlFilePath, file)
+	want(t, run(t, f.doctor(), CheckNetBaseline), OK, "")
+
+	for _, setting := range []struct{ name, path, below string }{
+		{"rmem_default", "/proc/sys/net/core/rmem_default", "1048575"},
+		{"wmem_default", "/proc/sys/net/core/wmem_default", "1048575"},
+		{"conntrack_max", "/proc/sys/net/netfilter/nf_conntrack_max", "65535"},
+		{"conntrack_buckets", "/proc/sys/net/netfilter/nf_conntrack_buckets", "16383"},
+	} {
+		good(f)
+		f.put(setting.path, setting.below+"\n")
+		r = run(t, f.doctor(), CheckNetBaseline)
+		want(t, r, Warn, FixApplyBaseline)
+		param(t, r, "differs", setting.name)
+	}
+	good(f)
+	for path, value := range map[string]string{
+		"/proc/sys/net/core/rmem_default": "2097152", "/proc/sys/net/core/wmem_default": "2097152",
+		"/proc/sys/net/netfilter/nf_conntrack_max": "131072", "/proc/sys/net/netfilter/nf_conntrack_buckets": "32768",
+	} {
+		f.put(path, value+"\n")
+	}
 	want(t, run(t, f.doctor(), CheckNetBaseline), OK, "")
 
 	f.put("/proc/sys/net/core/default_qdisc", "fq_codel\n")
@@ -533,6 +572,67 @@ func TestNetBaseline(t *testing.T) {
 	r = run(t, f.doctor(func(e *Env) { e.Virt = "openvz" }), CheckNetBaseline)
 	want(t, r, OK, "")
 	code(t, r, CodeBaselineNotes, "notes", "container")
+}
+
+func TestNetBaselineConntrackParamsAndPressure(t *testing.T) {
+	good := func(f *fake) {
+		f.put("/proc/sys/net/core/default_qdisc", "fq\n")
+		f.put("/proc/sys/net/ipv4/tcp_congestion_control", "bbr\n")
+		f.put("/proc/sys/net/core/rmem_max", "16777216\n")
+		f.put("/proc/sys/net/core/wmem_max", "16777216\n")
+		f.put("/proc/sys/net/core/rmem_default", "1048576\n")
+		f.put("/proc/sys/net/core/wmem_default", "1048576\n")
+		f.put("/proc/sys/net/ipv4/tcp_available_congestion_control", "reno cubic bbr\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_count", "52428\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_max", "65536\n")
+		f.put("/proc/sys/net/netfilter/nf_conntrack_buckets", "16384\n")
+		f.put(hostctl.SysctlFilePath, hostctl.SysctlFileBody)
+		f.put(hostctl.JournaldFilePath, hostctl.JournaldFileBody)
+		f.put("/run/systemd/system/.keep", "")
+		f.put("/proc/net/stat/nf_conntrack", "entries drop early_drop\n00000001 0000000e 00000002\n00000002 00000010 00000004\n")
+	}
+	f := newFake(t)
+	good(f)
+	r := run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, OK, "")
+	param(t, r, "conntrack_count", "52428")
+	param(t, r, "conntrack_max", "65536")
+	param(t, r, "conntrack_drops", "30")
+
+	f.put("/proc/sys/net/netfilter/nf_conntrack_count", "52429\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, Warn, "")
+	if !strings.Contains(r.Detail, "80%") || !strings.Contains(r.Detail, "52429/65536") {
+		t.Fatalf("conntrack pressure detail is unclear: %q", r.Detail)
+	}
+	param(t, r, "differs", "conntrack_pressure")
+
+	good(f)
+	f.put("/proc/sys/net/netfilter/nf_conntrack_count", "52429\n")
+	f.remove("/proc/net/stat/nf_conntrack")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, Warn, "")
+	for _, key := range []string{"conntrack_count", "conntrack_max", "conntrack_drops"} {
+		if _, ok := r.Params[key]; ok {
+			t.Errorf("missing drop stats added %s: %v", key, r.Params)
+		}
+	}
+	if !strings.Contains(r.Detail, "52429/65536") {
+		t.Fatalf("missing drop stats hid the count warning: %+v", r)
+	}
+
+	for _, missing := range []string{
+		"/proc/net/stat/nf_conntrack",
+		"/proc/sys/net/netfilter/nf_conntrack_count",
+		"/proc/sys/net/netfilter/nf_conntrack_max",
+	} {
+		good(f)
+		f.remove(missing)
+		r = run(t, f.doctor(), CheckNetBaseline)
+		if len(r.Params) != 0 {
+			t.Fatalf("missing %s added conntrack params: %v", missing, r.Params)
+		}
+	}
 }
 
 func TestCertExpiry(t *testing.T) {

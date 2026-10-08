@@ -4,11 +4,13 @@ package hostctl
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -31,14 +33,23 @@ func testHost(t *testing.T) (*linuxHost, *[]call) {
 			return nil, nil
 		},
 	}
-	for _, f := range []string{"net/core/default_qdisc", "net/ipv4/tcp_congestion_control", "net/core/rmem_max", "net/core/wmem_max"} {
+	for _, f := range []string{
+		"net/core/default_qdisc", "net/ipv4/tcp_congestion_control",
+		"net/core/rmem_max", "net/core/wmem_max", "net/core/rmem_default", "net/core/wmem_default",
+		"net/netfilter/nf_conntrack_max", "net/netfilter/nf_conntrack_buckets",
+	} {
 		p := filepath.Join(h.procSys, f)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		value := "fq_codel\n"
-		if f == "net/core/rmem_max" || f == "net/core/wmem_max" {
+		switch f {
+		case "net/core/rmem_max", "net/core/wmem_max":
 			value = "4096\n"
+		case "net/core/rmem_default", "net/core/wmem_default":
+			value = "212992\n"
+		case "net/netfilter/nf_conntrack_max", "net/netfilter/nf_conntrack_buckets":
+			value = "8192\n"
 		}
 		if err := os.WriteFile(p, []byte(value), 0o644); err != nil {
 			t.Fatal(err)
@@ -54,10 +65,14 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 	for f, want := range map[string]string{
-		"net/core/default_qdisc":          "fq",
-		"net/ipv4/tcp_congestion_control": "bbr",
-		"net/core/rmem_max":               "16777216",
-		"net/core/wmem_max":               "16777216",
+		"net/core/default_qdisc":             "fq",
+		"net/ipv4/tcp_congestion_control":    "bbr",
+		"net/core/rmem_max":                  "16777216",
+		"net/core/wmem_max":                  "16777216",
+		"net/core/rmem_default":              "1048576",
+		"net/core/wmem_default":              "1048576",
+		"net/netfilter/nf_conntrack_max":     "65536",
+		"net/netfilter/nf_conntrack_buckets": "16384",
 	} {
 		if b, _ := os.ReadFile(filepath.Join(h.procSys, f)); string(b) != want {
 			t.Errorf("%s = %q, want %q", f, b, want)
@@ -121,9 +136,14 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 	}
 }
 
-func TestApplyBaselinePreservesHigherUDPBufferValues(t *testing.T) {
+func TestApplyBaselinePreservesHigherSysctlValues(t *testing.T) {
 	h, _ := testHost(t)
-	for f, want := range map[string]string{"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864"} {
+	higher := map[string]string{
+		"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864",
+		"net/core/rmem_default": "2097152", "net/core/wmem_default": "4194304",
+		"net/netfilter/nf_conntrack_max": "131072", "net/netfilter/nf_conntrack_buckets": "32768",
+	}
+	for f, want := range higher {
 		if err := os.WriteFile(filepath.Join(h.procSys, f), []byte(want+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -131,16 +151,125 @@ func TestApplyBaselinePreservesHigherUDPBufferValues(t *testing.T) {
 	if err := h.ApplyBaseline(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	for f, want := range map[string]string{"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864"} {
+	for f, want := range higher {
 		// left as the kernel shows it (with its newline): a higher value is not rewritten
 		if b, err := os.ReadFile(filepath.Join(h.procSys, f)); err != nil || strings.TrimSpace(string(b)) != want {
 			t.Errorf("%s = %q, %v; want %q", f, b, err, want)
 		}
 	}
-	wantFile := strings.Replace(sysctlFileBody, "net.core.rmem_max = 16777216", "net.core.rmem_max = 33554432", 1)
-	wantFile = strings.Replace(wantFile, "net.core.wmem_max = 16777216", "net.core.wmem_max = 67108864", 1)
+	wantFile := sysctlFileBody
+	for _, setting := range [][3]string{
+		{"net.core.rmem_max", "net/core/rmem_max", "16777216"},
+		{"net.core.wmem_max", "net/core/wmem_max", "16777216"},
+		{"net.core.rmem_default", "net/core/rmem_default", "1048576"},
+		{"net.core.wmem_default", "net/core/wmem_default", "1048576"},
+		{"net.netfilter.nf_conntrack_max", "net/netfilter/nf_conntrack_max", "65536"},
+		{"net.netfilter.nf_conntrack_buckets", "net/netfilter/nf_conntrack_buckets", "16384"},
+	} {
+		wantFile = strings.Replace(wantFile, setting[0]+" = "+setting[2], setting[0]+" = "+higher[setting[1]], 1)
+	}
 	if b, err := os.ReadFile(h.sysctlFile); err != nil || string(b) != wantFile {
 		t.Errorf("sysctl.d = %q, %v; want %q", b, err, wantFile)
+	}
+}
+
+func TestApplyBaselineReappliesConntrackAfterNftAndIsIdempotent(t *testing.T) {
+	h, calls := testHost(t)
+	for _, key := range []string{"net/netfilter/nf_conntrack_max", "net/netfilter/nf_conntrack_buckets"} {
+		if err := os.Remove(filepath.Join(h.procSys, key)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := h.run
+	installs := 0
+	h.run = func(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
+		out, err := run(ctx, stdin, name, args...)
+		if name == "nft" && err == nil {
+			installs++
+			if installs == 1 {
+				for _, key := range []string{"net/netfilter/nf_conntrack_max", "net/netfilter/nf_conntrack_buckets"} {
+					path := filepath.Join(h.procSys, key)
+					if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, []byte("8192\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			} else if installs == 2 {
+				for key, value := range map[string]string{
+					"net/netfilter/nf_conntrack_max":     "131072",
+					"net/netfilter/nf_conntrack_buckets": "32768",
+				} {
+					if err := os.WriteFile(filepath.Join(h.procSys, key), []byte(value+"\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+		}
+		return out, err
+	}
+
+	ctx := context.Background()
+	if err := h.ApplyBaseline(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{
+		"net/netfilter/nf_conntrack_max":     "65536",
+		"net/netfilter/nf_conntrack_buckets": "16384",
+	} {
+		if b, err := os.ReadFile(filepath.Join(h.procSys, key)); err != nil || strings.TrimSpace(string(b)) != want {
+			t.Errorf("%s after nft install = %q, %v; want %s", key, b, err, want)
+		}
+	}
+	if err := h.SetPortHops(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.SetPortHops(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{
+		"net/netfilter/nf_conntrack_max":     "131072",
+		"net/netfilter/nf_conntrack_buckets": "32768",
+	} {
+		if b, err := os.ReadFile(filepath.Join(h.procSys, key)); err != nil || strings.TrimSpace(string(b)) != want {
+			t.Errorf("%s after repeated firewall applies = %q, %v; want %s", key, b, err, want)
+		}
+	}
+	nftCalls := 0
+	for _, c := range *calls {
+		if c.name == "nft" {
+			nftCalls++
+		}
+	}
+	if nftCalls != 3 {
+		t.Fatalf("nft calls = %d, want 3", nftCalls)
+	}
+}
+
+func TestApplyBaselineToleratesMissingConntrackSysctls(t *testing.T) {
+	h, _ := testHost(t)
+	for _, key := range []string{"net/netfilter/nf_conntrack_max", "net/netfilter/nf_conntrack_buckets"} {
+		if err := os.Remove(filepath.Join(h.procSys, key)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.ApplyBaseline(context.Background()); err != nil {
+		t.Fatalf("missing conntrack sysctls: %v", err)
+	}
+	if b, err := os.ReadFile(h.sysctlFile); err != nil || !strings.Contains(string(b), "net.netfilter.nf_conntrack_max = 65536") {
+		t.Fatalf("conntrack settings were not persisted: %q, %v", b, err)
+	}
+}
+
+func TestConntrackSysctlPermissionAndMissingErrorsAreOptional(t *testing.T) {
+	for _, err := range []error{syscall.EPERM, os.ErrPermission, os.ErrNotExist} {
+		if !ignorableConntrackSysctlError(err) {
+			t.Errorf("%v should be tolerated", err)
+		}
+	}
+	if ignorableConntrackSysctlError(errors.New("unexpected sysctl failure")) {
+		t.Error("an unrelated sysctl failure should not be tolerated")
 	}
 }
 

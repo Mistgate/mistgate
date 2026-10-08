@@ -1,7 +1,7 @@
 // Package hostctl is the agent's view of the machine it runs on: host facts for Hello, host metrics for
 // StatsBatch, and the only host state the agent owns: its own nftables table for
 // port-hop redirects and the SSH brute-force guard, the UDP delivery counter, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall,
-// the fq + bbr and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
+// the fq + bbr, conntrack and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
 // Linux-only behind a build tag; other OSes get a no-op stub so the whole repo still builds and vets.
 package hostctl
 
@@ -213,21 +213,32 @@ const (
 	JournaldFileBody = journaldFileBody
 	// UDPBufferMinBytes is the minimum net.core.rmem_max and net.core.wmem_max value.
 	UDPBufferMinBytes = 16 << 20
+	// UDPDefaultBufferMinBytes is the minimum receive and send buffer inherited by new UDP sockets.
+	UDPDefaultBufferMinBytes = 1 << 20
+	// ConntrackMaxMin and ConntrackBucketsMin size the connection tracking table for relayed user traffic.
+	ConntrackMaxMin     = 65536
+	ConntrackBucketsMin = 16384
 	// JournalCapMB is SystemMaxUse in journaldFileBody and the target of VacuumJournal.
 	JournalCapMB = 200
 )
 
 const (
-	sysctlFileBody = "# Managed by mistgate-node.\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\nnet.core.rmem_max = 16777216\nnet.core.wmem_max = 16777216\n"
-	// SystemMaxUse/RuntimeMaxUse only; no retention time and no conntrack tuning (add conntrack when a node is
-	// measured to need it).
+	// The conntrack keys exist only once nf_conntrack is loaded, which at boot is usually after systemd-sysctl ran: the
+	// leading "-" tells systemd-sysctl to skip a missing key instead of failing; the agent applies them after its nft
+	// rules load the module.
+	sysctlFileBody = "# Managed by mistgate-node.\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\nnet.core.rmem_max = 16777216\nnet.core.wmem_max = 16777216\nnet.core.rmem_default = 1048576\nnet.core.wmem_default = 1048576\n-net.netfilter.nf_conntrack_max = 65536\n-net.netfilter.nf_conntrack_buckets = 16384\n"
+	// SystemMaxUse/RuntimeMaxUse only; there is no retention-time override.
 	journaldFileBody = "# Managed by mistgate-node.\n[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=200M\n"
 )
 
-// sysctlFileBodyWithBuffers keeps larger live values in the persistent baseline.
-func sysctlFileBodyWithBuffers(rmemMax, wmemMax uint64) string {
+// sysctlFileBodyWithValues keeps larger live values in the persistent baseline.
+func sysctlFileBodyWithValues(rmemMax, wmemMax, rmemDefault, wmemDefault, conntrackMax, conntrackBuckets uint64) string {
 	body := strings.Replace(sysctlFileBody, "net.core.rmem_max = 16777216", fmt.Sprintf("net.core.rmem_max = %d", rmemMax), 1)
-	return strings.Replace(body, "net.core.wmem_max = 16777216", fmt.Sprintf("net.core.wmem_max = %d", wmemMax), 1)
+	body = strings.Replace(body, "net.core.wmem_max = 16777216", fmt.Sprintf("net.core.wmem_max = %d", wmemMax), 1)
+	body = strings.Replace(body, "net.core.rmem_default = 1048576", fmt.Sprintf("net.core.rmem_default = %d", rmemDefault), 1)
+	body = strings.Replace(body, "net.core.wmem_default = 1048576", fmt.Sprintf("net.core.wmem_default = %d", wmemDefault), 1)
+	body = strings.Replace(body, "net.netfilter.nf_conntrack_max = 65536", fmt.Sprintf("net.netfilter.nf_conntrack_max = %d", conntrackMax), 1)
+	return strings.Replace(body, "net.netfilter.nf_conntrack_buckets = 16384", fmt.Sprintf("net.netfilter.nf_conntrack_buckets = %d", conntrackBuckets), 1)
 }
 
 // hasGlobalIPv6 reports whether any interface carries a global unicast IPv6 address (ULA excluded).

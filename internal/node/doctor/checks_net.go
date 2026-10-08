@@ -665,8 +665,8 @@ func checkPortConflicts(_ context.Context, e *Env) Result {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// net_baseline: fq + BBR and the journald cap; exactly what hostctl.ApplyBaseline installs (the
-// SSH guard and conntrack tuning are not part of it). Fix: apply_baseline.
+// net_baseline: fq + BBR, conntrack sizing, UDP buffers and the journald cap; exactly what
+// hostctl.ApplyBaseline installs (the SSH guard is not part of it). Fix: apply_baseline.
 
 // baselineNotes are the tokens baselineDiff returns as notes, with their English wording (the UI has its own).
 var baselineNotes = map[string]string{
@@ -705,16 +705,23 @@ func baselineDiff(e *Env) (diff, fixable []string, notes []string) {
 			}
 			fixable = append(fixable, kv.name)
 		}
-		for _, kv := range []struct{ name, file string }{
-			{"rmem_max", "/proc/sys/net/core/rmem_max"},
-			{"wmem_max", "/proc/sys/net/core/wmem_max"},
+		for _, kv := range []struct {
+			name, file string
+			minimum    uint64
+		}{
+			{"rmem_max", "/proc/sys/net/core/rmem_max", hostctl.UDPBufferMinBytes},
+			{"wmem_max", "/proc/sys/net/core/wmem_max", hostctl.UDPBufferMinBytes},
+			{"rmem_default", "/proc/sys/net/core/rmem_default", hostctl.UDPDefaultBufferMinBytes},
+			{"wmem_default", "/proc/sys/net/core/wmem_default", hostctl.UDPDefaultBufferMinBytes},
+			{"conntrack_max", "/proc/sys/net/netfilter/nf_conntrack_max", hostctl.ConntrackMaxMin},
+			{"conntrack_buckets", "/proc/sys/net/netfilter/nf_conntrack_buckets", hostctl.ConntrackBucketsMin},
 		} {
 			cur, err := e.read(kv.file)
 			if err != nil {
 				continue
 			}
 			value, err := strconv.ParseUint(strings.TrimSpace(cur), 10, 64)
-			if err == nil && value >= hostctl.UDPBufferMinBytes {
+			if err == nil && value >= kv.minimum {
 				continue
 			}
 			diff = append(diff, kv.name)
@@ -740,36 +747,46 @@ func baselineDiff(e *Env) (diff, fixable []string, notes []string) {
 
 func sysctlFileMatchesBaseline(body string) bool {
 	lines := strings.Split(body, "\n")
-	seenRmem, seenWmem := false, false
+	minimums := map[string]uint64{
+		"net.core.rmem_max":                  hostctl.UDPBufferMinBytes,
+		"net.core.wmem_max":                  hostctl.UDPBufferMinBytes,
+		"net.core.rmem_default":              hostctl.UDPDefaultBufferMinBytes,
+		"net.core.wmem_default":              hostctl.UDPDefaultBufferMinBytes,
+		"net.netfilter.nf_conntrack_max":     hostctl.ConntrackMaxMin,
+		"net.netfilter.nf_conntrack_buckets": hostctl.ConntrackBucketsMin,
+	}
+	seen := make(map[string]bool, len(minimums))
 	for i, line := range lines {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
 		}
-		switch strings.TrimSpace(key) {
-		case "net.core.rmem_max":
-			if seenRmem {
-				return false
-			}
-			seenRmem = true
-			bytes, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
-			if err != nil || bytes < hostctl.UDPBufferMinBytes {
-				return false
-			}
-			lines[i] = fmt.Sprintf("net.core.rmem_max = %d", hostctl.UDPBufferMinBytes)
-		case "net.core.wmem_max":
-			if seenWmem {
-				return false
-			}
-			seenWmem = true
-			bytes, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
-			if err != nil || bytes < hostctl.UDPBufferMinBytes {
-				return false
-			}
-			lines[i] = fmt.Sprintf("net.core.wmem_max = %d", hostctl.UDPBufferMinBytes)
+		key = strings.TrimSpace(key)
+		optional := strings.HasPrefix(key, "-") // systemd-sysctl: skip the key when it does not exist
+		key = strings.TrimPrefix(key, "-")
+		minimum, baselineKey := minimums[key]
+		if !baselineKey {
+			continue
+		}
+		if seen[key] {
+			return false
+		}
+		seen[key] = true
+		parsedValue, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+		if err != nil || parsedValue < minimum {
+			return false
+		}
+		if optional {
+			key = "-" + key
+		}
+		lines[i] = fmt.Sprintf("%s = %d", key, minimum)
+	}
+	for key := range minimums {
+		if !seen[key] {
+			return false
 		}
 	}
-	return seenRmem && seenWmem && strings.Join(lines, "\n") == hostctl.SysctlFileBody
+	return strings.Join(lines, "\n") == hostctl.SysctlFileBody
 }
 
 func udpBufferErrorParams(e *Env) map[string]string {
@@ -822,6 +839,97 @@ func addUDPBufferErrorParams(params map[string]string, e *Env) map[string]string
 	return params
 }
 
+type conntrackSnapshot struct {
+	count, max, drops uint64
+	hasCountAndMax    bool
+}
+
+func readConntrackSnapshot(e *Env) (conntrackSnapshot, bool) {
+	countText, err := e.read("/proc/sys/net/netfilter/nf_conntrack_count")
+	if err != nil {
+		return conntrackSnapshot{}, false
+	}
+	count, err := strconv.ParseUint(strings.TrimSpace(countText), 10, 64)
+	if err != nil {
+		return conntrackSnapshot{}, false
+	}
+	maxText, err := e.read("/proc/sys/net/netfilter/nf_conntrack_max")
+	if err != nil {
+		return conntrackSnapshot{}, false
+	}
+	max, err := strconv.ParseUint(strings.TrimSpace(maxText), 10, 64)
+	if err != nil {
+		return conntrackSnapshot{}, false
+	}
+	snapshot := conntrackSnapshot{count: count, max: max, hasCountAndMax: true}
+	statText, err := e.read("/proc/net/stat/nf_conntrack")
+	if err != nil {
+		return snapshot, false
+	}
+	drops, ok := parseConntrackDrops(statText)
+	if !ok {
+		return snapshot, false
+	}
+	snapshot.drops = drops
+	return snapshot, true
+}
+
+func parseConntrackDrops(content string) (uint64, bool) {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	for i, line := range lines {
+		header := strings.Fields(line)
+		dropIndex := -1
+		for j, name := range header {
+			if name != "drop" {
+				continue
+			}
+			if dropIndex >= 0 {
+				return 0, false
+			}
+			dropIndex = j
+		}
+		if dropIndex < 0 {
+			continue
+		}
+		var total uint64
+		rows := 0
+		for _, row := range lines[i+1:] {
+			fields := strings.Fields(row)
+			if len(fields) == 0 {
+				continue
+			}
+			if len(fields) != len(header) || dropIndex >= len(fields) {
+				return 0, false
+			}
+			value, err := strconv.ParseUint(fields[dropIndex], 16, 64)
+			if err != nil || ^uint64(0)-total < value {
+				return 0, false
+			}
+			total += value
+			rows++
+		}
+		return total, rows > 0
+	}
+	return 0, false
+}
+
+func conntrackAtCapacity(count, max uint64) bool {
+	if max == 0 {
+		return false
+	}
+	threshold := max/5*4 + (max%5*4+4)/5 // ceil(80% of max), without overflowing uint64.
+	return count >= threshold
+}
+
+func addConntrackParams(params map[string]string, snapshot conntrackSnapshot, ok bool) map[string]string {
+	if ok {
+		params["conntrack_count"] = strconv.FormatUint(snapshot.count, 10)
+		params["conntrack_max"] = strconv.FormatUint(snapshot.max, 10)
+		params["conntrack_drops"] = strconv.FormatUint(snapshot.drops, 10)
+	}
+	return params
+}
+
 func containsField(s, want string) bool {
 	for _, f := range strings.Fields(s) {
 		if f == want {
@@ -833,16 +941,36 @@ func containsField(s, want string) bool {
 
 func checkNetBaseline(_ context.Context, e *Env) Result {
 	diff, fixable, notes := baselineDiff(e)
-	if len(diff) == 0 {
+	conntrack, hasConntrack := readConntrackSnapshot(e)
+	underPressure := conntrack.hasCountAndMax && conntrackAtCapacity(conntrack.count, conntrack.max)
+	if len(diff) == 0 && !underPressure {
 		if len(notes) > 0 {
-			return Result{Status: OK, Code: CodeBaselineNotes, Params: addUDPBufferErrorParams(p("notes", strings.Join(notes, ",")), e), Detail: noteText(notes)}
+			params := addConntrackParams(addUDPBufferErrorParams(p("notes", strings.Join(notes, ",")), e), conntrack, hasConntrack)
+			return Result{Status: OK, Code: CodeBaselineNotes, Params: params, Detail: noteText(notes)}
 		}
-		return Result{Status: OK, Code: CodeBaselineOK, Params: addUDPBufferErrorParams(p(), e), Detail: "fq, bbr, UDP buffers and the journald cap are in place"}
+		params := addConntrackParams(addUDPBufferErrorParams(p(), e), conntrack, hasConntrack)
+		return Result{Status: OK, Code: CodeBaselineOK, Params: params, Detail: "fq, bbr, conntrack, UDP buffers and the journald cap are in place"}
 	}
-	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: addUDPBufferErrorParams(p("differs", strings.Join(diff, ","), "notes", strings.Join(notes, ",")), e)}
-	r.Detail = "baseline differs: " + strings.Join(diff, ", ")
+	reportedDiff := append([]string(nil), diff...)
+	if underPressure {
+		reportedDiff = append(reportedDiff, "conntrack_pressure")
+	}
+	params := addConntrackParams(addUDPBufferErrorParams(p("differs", strings.Join(reportedDiff, ","), "notes", strings.Join(notes, ",")), e), conntrack, hasConntrack)
+	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: params}
+	if len(diff) > 0 {
+		r.Detail = "baseline differs: " + strings.Join(diff, ", ")
+	}
+	if underPressure {
+		if r.Detail != "" {
+			r.Detail += "; "
+		}
+		r.Detail += fmt.Sprintf("conntrack table is at least 80%% full (%d/%d entries)", conntrack.count, conntrack.max)
+	}
 	if len(notes) > 0 {
-		r.Detail += "; " + noteText(notes)
+		if r.Detail != "" {
+			r.Detail += "; "
+		}
+		r.Detail += noteText(notes)
 	}
 	if len(fixable) > 0 {
 		r.FixID = FixApplyBaseline
