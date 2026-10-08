@@ -12,14 +12,21 @@ const text = (s: string) => new TextEncoder().encode(s);
 const str = (b: ArrayBuffer | Uint8Array | string) => (typeof b === "string" ? b : new TextDecoder().decode(b));
 
 let nodes = 0;
-const newNode = () => `nod_test${++nodes}`;
+// The nodes of the running test. An earlier test's object can run its closed step after that test ended (afterEach
+// closes the sockets) and land on this test's fake: only this test's nodes count.
+let mine = new Set<string>();
+const newNode = () => {
+  const id = `nod_test${++nodes}`;
+  mine.add(id);
+  return id;
+};
 const stubFor = (nodeId: string) => env.NODELINK.get(env.NODELINK.idFromName(nodeId));
 
 /** Installs a fake panel: the defaults with the given hooks replaced. */
 function script(hooks: Partial<FakePanel> = {}): FakePanel {
   return (globalThis.__fakePanel = { ...defaultPanel(), ...hooks });
 }
-const steps = (fake: FakePanel) => fake.calls.filter((c) => c.op === "step");
+const steps = (fake: FakePanel) => fake.calls.filter((c) => c.op === "step" && mine.has((c.args as LinkStepIn).nodeId));
 const kinds = (fake: FakePanel) => steps(fake).map((c) => (c.args as LinkStepIn).event.kind);
 
 class Client {
@@ -62,6 +69,7 @@ afterEach(async () => {
   // The objects see these closes asynchronously, and each runs a closed step: let them land on this test's fake.
   await sleep(100);
   globalThis.__fakePanel = undefined;
+  mine = new Set();
 });
 
 async function connect(nodeId: string): Promise<Client> {
