@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,6 +21,31 @@ type EventRow struct {
 	Params                                                  map[string]string
 	SrcInstance                                             string // agent events: dedup
 	SrcSeq                                                  uint64
+}
+
+const deviceLimitEventWindow = time.Hour
+
+// RecordDeviceLimitReached adds one user-history event per user per hour. The read skips repeated writes; the
+// conditional insert protects concurrent refusals from adding duplicate rows.
+func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, used, limit int, now time.Time) error {
+	cutoff := unix(now.Add(-deviceLimitEventWindow))
+	var recorded bool
+	if err := s.R.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ?
+	)`, userID, cutoff).Scan(&recorded); err != nil {
+		return err
+	}
+	if recorded {
+		return nil
+	}
+	params, _ := json.Marshal(map[string]string{"used": strconv.Itoa(used), "limit": strconv.Itoa(limit)})
+	_, err := s.batch(ctx, Stmt{Query: `
+		INSERT INTO event (ts, severity, code, source, user_id, params_json)
+		SELECT ?, 1, 'device_limit_reached', 'panel', ?, ?
+		WHERE NOT EXISTS (
+			SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ?
+		)`, Args: []any{unix(now), userID, string(params), userID, cutoff}})
+	return err
 }
 
 // InsertEvent appends an event (for panel and admin events; other modules may use it too).

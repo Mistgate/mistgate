@@ -185,6 +185,11 @@ An alert that fires again within an hour of closing reopens with its original id
 | The node's state differs from the panel's | `state_drift` | Warning | The configuration the node applied differs from the panel's even after an automatic full resend. |
 | Certificate is about to expire | `cert_expiry` | Warning; Critical under 3 days, expired or not matching the domain | From the doctor's certificate check. For an agent without the doctor, from the panel's own view of the profile certificates (under 14 days). |
 | The node update stopped | `update_failed` | Warning | A rollout paused because a node rejected the update, failed the check after updating, or the panel lost track of a step after a restart. Closes when the rollout is resumed, cancelled or replaced. See [Updates](updates.md). |
+| A user keeps trying after access ended | `access_ended` | Warning | A user with an expired subscription or exhausted quota fetched a subscription in the last six hours. |
+| A user may have a connection problem | `user_connection` | Info | An AWG device has never connected or has a stale key, or an active user keeps fetching a subscription despite having no recent traffic. |
+| Connections dropped for some users | `users_impacted` | Warning | After 20 minutes in the hour, the peak is at most a quarter of the seven-day median for that hour, with a baseline of at least three users. |
+
+These alerts are derived from user, device and hourly peak data the panel already stores.
 
 The reason under a traffic alert names the likely cause:
 

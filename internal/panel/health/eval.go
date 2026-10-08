@@ -23,14 +23,17 @@ import (
 
 // Alert kinds as stored (the lower-case name of adminv1.AlertKind).
 const (
-	kNodeDown    = "node_down"
-	kHostBlip    = "host_blip"
-	kNoTraffic   = "no_traffic"
-	kCheckFailed = "check_failed"
-	kDoctorWarn  = "doctor_warn"
-	kDoctorFail  = "doctor_fail"
-	kStateDrift  = "state_drift"
-	kCertExpiry  = "cert_expiry"
+	kNodeDown       = "node_down"
+	kHostBlip       = "host_blip"
+	kNoTraffic      = "no_traffic"
+	kCheckFailed    = "check_failed"
+	kDoctorWarn     = "doctor_warn"
+	kDoctorFail     = "doctor_fail"
+	kStateDrift     = "state_drift"
+	kCertExpiry     = "cert_expiry"
+	kAccessEnded    = "access_ended"
+	kUserConnection = "user_connection"
+	kUsersImpacted  = "users_impacted"
 )
 
 var kindProto = map[string]adminv1.AlertKind{
@@ -39,7 +42,10 @@ var kindProto = map[string]adminv1.AlertKind{
 	kDoctorWarn: adminv1.AlertKind_ALERT_KIND_DOCTOR_WARN, kDoctorFail: adminv1.AlertKind_ALERT_KIND_DOCTOR_FAIL,
 	kStateDrift: adminv1.AlertKind_ALERT_KIND_STATE_DRIFT, kCertExpiry: adminv1.AlertKind_ALERT_KIND_CERT_EXPIRY,
 	"quota": adminv1.AlertKind_ALERT_KIND_QUOTA, "subscription_shared_suspect": adminv1.AlertKind_ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT,
-	kUpdateFailed: adminv1.AlertKind_ALERT_KIND_UPDATE_FAILED,
+	kUpdateFailed:   adminv1.AlertKind_ALERT_KIND_UPDATE_FAILED,
+	kAccessEnded:    adminv1.AlertKind_ALERT_KIND_ACCESS_ENDED,
+	kUserConnection: adminv1.AlertKind_ALERT_KIND_USER_CONNECTION,
+	kUsersImpacted:  adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED,
 }
 
 const (
@@ -87,11 +93,16 @@ type derived struct {
 	holdDown   map[string]bool // not connected and inside the start grace: NODE_DOWN stays as it is
 	holdDoctor map[string]bool // the doctor report is stale: doctor alerts stay as they are
 	holdSynth  map[string]bool // a check result of the node is stale (no round since it came back): check alerts stay
+	holdKeys   map[key]bool    // an alert's comparison window is still warming up
+	superseded map[key]bool    // an open alert is explained by a more specific current check alert
 	guard      bool            // the panel's own network is suspect: no per-node synthetic alert is raised
 	health     map[string]nodeHealth
 }
 
 func (d *derived) holds(a store.HealthAlert) bool {
+	if d.holdKeys[key{a.Kind, a.NodeID, a.Subject}] {
+		return true
+	}
 	if a.NodeID == "" {
 		return false
 	}
@@ -149,11 +160,21 @@ func (s *Service) evaluate(ctx context.Context) {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	d := s.derive(ctx, now, sn, rows, acceptsByNode(accepts))
+	signals, err := s.st.HealthSignals(ctx, now)
+	if err != nil {
+		s.log.Warn("health: evaluate", "err", err)
+		return
+	}
+	active, err := s.st.ActiveAlerts(ctx)
+	if err != nil {
+		s.log.Warn("health: evaluate", "err", err)
+		return
+	}
+	d := s.derive(ctx, now, sn, rows, acceptsByNode(accepts), signals, active)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()
-	if err := s.reconcile(ctx, now, d); err != nil {
+	if err := s.reconcile(ctx, now, d, active); err != nil {
 		s.log.Warn("health: reconcile alerts", "err", err)
 	}
 }
@@ -178,9 +199,10 @@ func accepted(r store.DoctorRow, acc map[string]store.DoctorAccept) (store.Docto
 }
 
 // derive computes the conditions that hold now.
-func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept) *derived {
+func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
+	signals store.HealthSignalBatch, active []store.HealthAlert) *derived {
 	d := &derived{conds: map[key]cond{}, accepted: map[key]bool{}, nodes: map[string]bool{}, holdNode: map[string]bool{}, holdDown: map[string]bool{},
-		holdDoctor: map[string]bool{}, holdSynth: map[string]bool{}, health: map[string]nodeHealth{}}
+		holdDoctor: map[string]bool{}, holdSynth: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
 	docs := map[string][]store.DoctorRow{}
 	for _, r := range rows {
 		docs[r.NodeID] = append(docs[r.NodeID], r)
@@ -298,6 +320,11 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 	for _, c := range s.extConds(ctx) { // e.g. a paused rollout (update_failed)
 		add(cond{key: key{c.Kind, c.NodeID, c.Subject}, severity: c.Severity, why: c.Why, params: c.Params})
 	}
+	activeKeys := make(map[key]bool, len(active))
+	for _, alert := range active {
+		activeKeys[key{alert.Kind, alert.NodeID, alert.Subject}] = true
+	}
+	userConds(now, sn, signals, activeKeys, d, add)
 	return d
 }
 
@@ -595,17 +622,17 @@ func (s *Service) doctorConds(now time.Time, n store.NodeRow, rows []store.Docto
 }
 
 // reconcile applies derived conditions to the stored alerts.
-func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived) error {
-	active, err := s.st.ActiveAlerts(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, active []store.HealthAlert) error {
 	have := map[key]bool{}
 	for _, a := range active {
 		k := key{a.Kind, a.NodeID, a.Subject}
 		have[k] = true
 		if c, ok := d.conds[k]; ok {
-			if changed(a, c) || now.Sub(a.LastSeen) >= time.Second {
+			refreshAfter := time.Second
+			if a.Kind == kAccessEnded || a.Kind == kUserConnection || a.Kind == kUsersImpacted {
+				refreshAfter = userAlertRefreshInterval
+			}
+			if changed(a, c) || now.Sub(a.LastSeen) >= refreshAfter {
 				na := c.alert()
 				na.ID = a.ID
 				if err := s.st.TouchAlert(ctx, na, now); err != nil {
@@ -704,6 +731,8 @@ func (s *Service) resolution(a store.HealthAlert, d *derived, now time.Time) str
 	_, silent := d.conds[key{kNoTraffic, a.NodeID, ""}]
 	_, warpDead := d.conds[key{kDoctorFail, a.NodeID, "warp_path"}]
 	switch {
+	case d.superseded[key{a.Kind, a.NodeID, a.Subject}]:
+		return "superseded"
 	case a.Kind == kNodeDown:
 		return "node_returned"
 	case a.Kind == kDoctorWarn && worse, a.Kind == kCheckFailed && silent,

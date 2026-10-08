@@ -171,6 +171,12 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("A user reached the quota", "Пользователь выбрал квоту")
 	case "subscription_shared_suspect":
 		return l.pick("A subscription looks shared", "Подписка похожа на общую")
+	case "access_ended":
+		return l.pick("Access ended while the user is still trying", "Доступ закончился, но пользователь продолжает подключаться")
+	case "user_connection":
+		return l.pick("A user may have a connection problem", "У пользователя может быть проблема с подключением")
+	case "users_impacted":
+		return l.pick("Connections dropped for some users", "У части пользователей пропало подключение")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -219,6 +225,37 @@ func alertReason(l L, a store.HealthAlert) string {
 		}
 	case "update_failed":
 		return data(p["reason"], 160)
+	case "access_ended":
+		name := data(p["user_name"], 60)
+		since, err := strconv.ParseInt(p["since"], 10, 64)
+		if err != nil || since <= 0 {
+			return l.pick(name+" keeps trying to connect, but the subscription has ended.", name+" продолжает подключаться, хотя подписка закончилась.")
+		}
+		opened := a.OpenedAt
+		if opened.IsZero() {
+			opened = a.FirstSeen
+		}
+		ago := l.duration(opened.Sub(time.Unix(since, 0)))
+		if strings.HasSuffix(a.WhyKey, ".quota") {
+			return l.pick(name+" keeps trying to connect, but the quota ran out "+ago+" ago.",
+				name+" продолжает подключаться, хотя квота закончилась "+ago+" назад.")
+		}
+		return l.pick(name+" keeps trying to connect, but the subscription ended "+ago+" ago.",
+			name+" продолжает подключаться, хотя подписка закончилась "+ago+" назад.")
+	case "users_impacted":
+		protocol := a.Subject
+		switch protocol {
+		case "awg":
+			protocol = "AmneziaWG"
+		case "hysteria2":
+			protocol = "Hysteria2"
+		default:
+			protocol = data(protocol, 32)
+		}
+		return l.pick("People on "+protocol+": now "+data(p["now"], 8)+", usually about "+data(p["usual"], 8)+
+			" at this hour, while the node is online. This looks like a block on the users' side.",
+			"Людей на "+protocol+": сейчас "+data(p["now"], 8)+", обычно около "+data(p["usual"], 8)+
+				" в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.")
 	}
 	return ""
 }

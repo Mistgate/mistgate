@@ -147,6 +147,12 @@ describe("alerts", () => {
     const paused = alert({ kind: AlertKind.UPDATE_FAILED, whyKey: "health.alert.update_failed.why.gate_failed", params: { node: "de2", reason: "probe_failed" } });
     expect(alertWhy(t, fmt, paused)).toContain("de2 did not pass the check after updating: the client-eye check failed. Where possible");
   });
+  it("says when access ended and names the protocol people dropped off", () => {
+    const ended = alert({ kind: AlertKind.ACCESS_ENDED, whyKey: "health.alert.access_ended.why.expired", params: { user_name: "alice", since: "1700000000" } });
+    expect(alertWhy(t, fmt, ended)).toContain(`alice’s subscription ended on ${fmt.stamp(1700000000)}`);
+    const gone = alert({ kind: AlertKind.USERS_IMPACTED, subject: "hysteria2", whyKey: "health.alert.users_impacted.why.gone", params: { now: "0", usual: "5", users: "5" } });
+    expect(alertWhy(tRu, fmtRu, gone)).toMatch(/^Людей на Hysteria2: сейчас 0, обычно около 5 в этот час, а нода на связи\./);
+  });
   it("offers the mute choices up to the panel's week, «until morning» to the next 08:00", () => {
     const clock = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
     const secs = (d: Date) => muteChoices(d).map((c) => c.seconds);
@@ -304,7 +310,8 @@ describe("the server's vocabulary is covered", () => {
   const checks = ["disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft", "port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path"];
   const fixes = ["journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp"];
   const errors = ["timeout", "auth", "tls", "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active", "inbound_failed", "inbound_disabled", "inbound_pending"];
-  const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect"];
+  const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
+    "access_ended", "user_connection", "users_impacted"];
   const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
   const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress"];
   const expected = [
@@ -325,6 +332,10 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.cert_expiry.why",
     "health.alert.cert_expiry.why.expired",
     "health.alert.cert_expiry.why.san_mismatch",
+    "health.alert.access_ended.why.expired",
+    "health.alert.access_ended.why.quota",
+    ...["never_connected", "stale_key", "silent"].map((v) => `health.alert.user_connection.why.${v}`),
+    "health.alert.users_impacted.why.gone",
     "hl.res.accepted",
     "hl.res.superseded",
     "hl.fix.err.unknown_fix",

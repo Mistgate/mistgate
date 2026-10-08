@@ -243,6 +243,22 @@ export const en = {
     "The certificate of “{profile}”{server_part} has expired, clients cannot connect. Check the domain and ports 80 and 443 so it can be renewed, or restart the profile if it is self-signed.",
   "health.alert.cert_expiry.why.san_mismatch": "The certificate of “{profile}” does not match the domain {server_name}: clients cannot connect. Check the domain in the node’s profiles.",
 
+  // ---- alerts about people (derived from what the panel already stores)
+  "health.alert.access_ended.title": "Access ended, but the person keeps trying",
+  "health.alert.access_ended.why.expired": "{user_name}’s subscription ended on {date}, and their app still asks for it. Extend it or let them know.",
+  "health.alert.access_ended.why.quota":
+    "{user_name} ran out of traffic around {date}, and their app still asks for the subscription. Raise or reset the quota, or let them know.",
+  "health.alert.user_connection.title": "Someone may not be able to connect",
+  "health.alert.user_connection.why.never_connected":
+    "{user_name} has an AmneziaWG key that has never connected. The config may not be imported yet, or their network blocks it.",
+  "health.alert.user_connection.why.stale_key":
+    "{user_name}’s AmneziaWG key is older than the last profile change and has not connected for over an hour. They need the new config.",
+  "health.alert.user_connection.why.silent":
+    "{user_name}’s app keeps refreshing the subscription, but there has been no traffic for over a day. The VPN may not connect for them.",
+  "health.alert.users_impacted.title": "Connections dropped on the node",
+  "health.alert.users_impacted.why.gone":
+    "People on {protocol}: now {now}, usually about {usual} at this hour, while the node is online. This looks like a block on the users’ side.",
+
   // ---- doctor titles (doctor.<check>.title), neutral: the facts come as a caption
   "doctor.disk_space.title": "Disk space",
   "doctor.journald_size.title": "System journal size",
@@ -660,6 +676,22 @@ export const ru: typeof en = {
   "health.alert.cert_expiry.why.expired":
     "Сертификат «{profile}»{server_part} истёк, клиенты не подключаются. Проверь домен и порты 80 и 443, чтобы его можно было продлить, а самоподписанный профиль просто перезапусти.",
   "health.alert.cert_expiry.why.san_mismatch": "Сертификат «{profile}» не подходит к домену {server_name}: клиенты не подключатся. Проверь домен в профилях ноды.",
+
+  // ---- алерты о людях
+  "health.alert.access_ended.title": "Доступ закончился, а человек пытается подключиться",
+  "health.alert.access_ended.why.expired": "Подписка пользователя {user_name} закончилась {date}, а приложение всё ещё её запрашивает. Продли её или предупреди человека.",
+  "health.alert.access_ended.why.quota":
+    "У пользователя {user_name} закончился трафик примерно {date}, а приложение всё ещё запрашивает подписку. Увеличь или сбрось квоту либо предупреди человека.",
+  "health.alert.user_connection.title": "Возможно, у человека не работает подключение",
+  "health.alert.user_connection.why.never_connected":
+    "Ключ AmneziaWG пользователя {user_name} выдан, но ни разу не подключался. Возможно, конфиг ещё не импортирован или сеть его блокирует.",
+  "health.alert.user_connection.why.stale_key":
+    "Ключ AmneziaWG пользователя {user_name} старше последнего изменения профиля и больше часа не подключается. Нужен новый конфиг.",
+  "health.alert.user_connection.why.silent":
+    "Приложение пользователя {user_name} обновляет подписку, но трафика нет больше суток. Возможно, VPN не подключается.",
+  "health.alert.users_impacted.title": "На ноде пропали подключения",
+  "health.alert.users_impacted.why.gone":
+    "Людей на {protocol}: сейчас {now}, обычно около {usual} в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.",
 
   // ---- doctor titles
   "doctor.disk_space.title": "Место на диске",

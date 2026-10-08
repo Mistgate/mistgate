@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -107,6 +108,50 @@ func TestUnknownDoctorDetailUsesLocalizedGenericLine(t *testing.T) {
 		for _, forbidden := range []string{"inb_test", "new English detail"} {
 			if strings.Contains(got, forbidden) {
 				t.Errorf("%s message contains %q: %q", tc.lang, forbidden, got)
+			}
+		}
+	}
+}
+
+func TestUserHealthAlertsAreLocalized(t *testing.T) {
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	accessEnded := store.HealthAlert{
+		Kind: "access_ended", Severity: 2, WhyKey: "health.alert.access_ended.why.expired",
+		Params:    map[string]string{"user_name": "Alice <VIP>", "since": strconv.FormatInt(now.Add(-72*time.Hour).Unix(), 10)},
+		FirstSeen: now, OpenedAt: now,
+	}
+	impacted := store.HealthAlert{
+		Kind: "users_impacted", Severity: 2, NodeID: "nod_de", Subject: "hysteria2", WhyKey: "health.alert.users_impacted.why.gone",
+		Params: map[string]string{"now": "0", "usual": "5", "users": "5"}, FirstSeen: now, OpenedAt: now,
+	}
+
+	for _, tc := range []struct {
+		lang  L
+		alert store.HealthAlert
+		want  []string
+	}{
+		{lang: "en", alert: accessEnded, want: []string{"Alice &lt;VIP&gt;", "subscription ended 3 d ago"}},
+		{lang: "ru", alert: func() store.HealthAlert { a := accessEnded; a.WhyKey = "health.alert.access_ended.why.quota"; return a }(), want: []string{"Alice &lt;VIP&gt;", "квота закончилась 3 д назад"}},
+		{lang: "en", alert: impacted, want: []string{"People on Hysteria2", "now 0", "usually about 5", "users' side"}},
+		{lang: "ru", alert: impacted, want: []string{"Людей на Hysteria2", "сейчас 0", "обычно около 5", "на стороне пользователей"}},
+	} {
+		node := ""
+		if tc.alert.Kind == "users_impacted" {
+			node = "de1"
+		}
+		got := alertOpened(tc.lang, tc.alert, node, "")
+		if tc.alert.Kind == "users_impacted" {
+			wantReason := "People on Hysteria2: now 0, usually about 5 at this hour, while the node is online. This looks like a block on the users' side."
+			if tc.lang == "ru" {
+				wantReason = "Людей на Hysteria2: сейчас 0, обычно около 5 в этот час, а нода на связи. Похоже на блокировку на стороне пользователей."
+			}
+			if reason := alertReason(tc.lang, tc.alert); reason != wantReason {
+				t.Errorf("%s users_impacted reason = %q, want %q", tc.lang, reason, wantReason)
+			}
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s %s message %q lacks %q", tc.lang, tc.alert.Kind, got, want)
 			}
 		}
 	}

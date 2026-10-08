@@ -20,6 +20,7 @@ import { itemParams } from "./doctor-detail";
 import type { Fmt } from "./format";
 import { plain, type Plain } from "./plain";
 import { pollMs } from "./queries";
+import { protocolName } from "./series";
 import { meQuery } from "./session";
 import { pauseReasonText } from "./updates";
 
@@ -117,6 +118,8 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   // a paused rollout names the step error code of its node: say it in words, the short form of the pause
   if (a.kind === AlertKind.UPDATE_FAILED && a.params.reason) params.reason = pauseReasonText(t, a.params.reason);
   if (a.kind === AlertKind.NODE_DOWN && a.params.minutes) params.duration = fmt.duration(Number(a.params.minutes) * 60);
+  if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
+  if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
   return lookup(t, a.whyKey, params) ?? "";
 }
 

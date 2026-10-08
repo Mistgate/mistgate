@@ -255,6 +255,39 @@ func TestAWGDeviceLimit(t *testing.T) {
 	if !strings.Contains(err.Error(), "device_limit: 2/2") {
 		t.Errorf("message = %v", err)
 	}
+	for range 3 {
+		if err := f.addErr(u.Id); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "device_limit") {
+			t.Fatalf("repeated device-limit refusal = %v", err)
+		}
+	}
+	countLimitEvents := func() int {
+		t.Helper()
+		var count int
+		if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM event WHERE user_id = ? AND code = 'device_limit_reached'`, u.Id).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	if got := countLimitEvents(); got != 1 {
+		t.Fatalf("device limit events in one hour = %d, want 1", got)
+	}
+	events, _, err := e.st.Events(e.ctx, store.EventFilter{
+		UserID: u.Id, Limit: 10, Match: &store.CodeMatch{Codes: []string{"device_limit_reached"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Severity != 1 ||
+		events[0].Params["used"] != "2" || events[0].Params["limit"] != "2" {
+		t.Fatalf("device-limit event = %+v, want one severity-1 event with used=2 and limit=2", events)
+	}
+	e.clock = e.clock.Add(time.Hour)
+	if err := f.addErr(u.Id); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "device_limit") {
+		t.Fatalf("device-limit refusal after one hour = %v", err)
+	}
+	if got := countLimitEvents(); got != 2 {
+		t.Fatalf("device limit events after one hour = %d, want 2", got)
+	}
 	// A revoked device gives its slot back.
 	devs := f.user_(u.Id).Devices
 	must(e.s.RevokeDevice(e.ctx, req(&adminv1.RevokeDeviceRequest{DeviceId: devs[0].Id})))

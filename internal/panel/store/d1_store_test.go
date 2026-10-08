@@ -280,6 +280,29 @@ func TestD1NodeDesiredStoresSentDigest(t *testing.T) {
 	}
 }
 
+func TestD1HealthSignalsUsesOneReadBatch(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Date(2026, 10, 7, 12, 40, 0, 0, time.UTC)
+	seedHealthSignals(t, st, now)
+
+	binding := js.Global().Get("__d1")
+	var got HealthSignalBatch
+	var err error
+	calls := countD1Queries(t, binding, "HealthSignals", func() {
+		got, err = st.HealthSignals(ctx, now)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("HealthSignals used %d D1 calls in %d batches, want 1 call in 1 read batch", calls.queries, calls.batches)
+	}
+	if len(got.Users) != 3 || len(got.AWGDevices) != 1 || len(got.NodeHours) != 8 {
+		t.Fatalf("signals = users %d, AWG devices %d, node hours %d", len(got.Users), len(got.AWGDevices), len(got.NodeHours))
+	}
+}
+
 func TestD1BatchGuard(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

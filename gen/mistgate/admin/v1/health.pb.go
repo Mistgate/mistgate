@@ -114,6 +114,16 @@ const (
 	// when the rollout is resumed, cancelled or replaced. Produced from the updates module through a health
 	// condition source, not from a doctor check.
 	AlertKind_ALERT_KIND_UPDATE_FAILED AlertKind = 11
+	// A user whose access expired or quota ran out is still fetching a subscription. WARNING.
+	// node_id = "", subject = user id; why = expired or quota, params{user_name, since}.
+	AlertKind_ALERT_KIND_ACCESS_ENDED AlertKind = 12
+	// A likely connection problem for one user or device. INFO, never sent to Telegram.
+	// subject = device id, or user id for silent; node_id is the node when known, else "".
+	// Only never_connected, stale_key and silent are raised in this phase.
+	AlertKind_ALERT_KIND_USER_CONNECTION AlertKind = 13
+	// The current-hour peak users fell far below the same hour's usual level. WARNING.
+	// node_id = node id, subject = protocol; only the gone variant is raised in this phase, params{now, usual, users}.
+	AlertKind_ALERT_KIND_USERS_IMPACTED AlertKind = 14
 )
 
 // Enum value maps for AlertKind.
@@ -131,6 +141,9 @@ var (
 		9:  "ALERT_KIND_CERT_EXPIRY",
 		10: "ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT",
 		11: "ALERT_KIND_UPDATE_FAILED",
+		12: "ALERT_KIND_ACCESS_ENDED",
+		13: "ALERT_KIND_USER_CONNECTION",
+		14: "ALERT_KIND_USERS_IMPACTED",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -145,6 +158,9 @@ var (
 		"ALERT_KIND_CERT_EXPIRY":                 9,
 		"ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT": 10,
 		"ALERT_KIND_UPDATE_FAILED":               11,
+		"ALERT_KIND_ACCESS_ENDED":                12,
+		"ALERT_KIND_USER_CONNECTION":             13,
+		"ALERT_KIND_USERS_IMPACTED":              14,
 	}
 )
 
@@ -297,7 +313,7 @@ type Alert struct {
 	Id       string        `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Severity AlertSeverity `protobuf:"varint,2,opt,name=severity,proto3,enum=mistgate.admin.v1.AlertSeverity" json:"severity,omitempty"`
 	Kind     AlertKind     `protobuf:"varint,3,opt,name=kind,proto3,enum=mistgate.admin.v1.AlertKind" json:"kind,omitempty"`
-	// Empty for fleet-wide and user alerts (QUOTA, SUBSCRIPTION_SHARED_SUSPECT, the panel-egress guard).
+	// Empty for fleet-wide and user alerts (QUOTA, SUBSCRIPTION_SHARED_SUSPECT, ACCESS_ENDED, the panel-egress guard).
 	NodeId string `protobuf:"bytes,4,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	// Resolved by the server; a retired or renamed node keeps its last name.
 	NodeName string `protobuf:"bytes,5,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
@@ -2410,7 +2426,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xe3\x02\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xbf\x03\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -2424,7 +2440,10 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x16ALERT_KIND_CERT_EXPIRY\x10\t\x12*\n" +
 	"&ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT\x10\n" +
 	"\x12\x1c\n" +
-	"\x18ALERT_KIND_UPDATE_FAILED\x10\v*\x8e\x01\n" +
+	"\x18ALERT_KIND_UPDATE_FAILED\x10\v\x12\x1b\n" +
+	"\x17ALERT_KIND_ACCESS_ENDED\x10\f\x12\x1e\n" +
+	"\x1aALERT_KIND_USER_CONNECTION\x10\r\x12\x1d\n" +
+	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

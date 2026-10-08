@@ -100,6 +100,21 @@ func TestListAlerts(t *testing.T) {
 	}
 }
 
+func TestNewAlertKindsUseTheirProtoNames(t *testing.T) {
+	for _, tc := range []struct {
+		stored string
+		proto  adminv1.AlertKind
+	}{
+		{kAccessEnded, adminv1.AlertKind_ALERT_KIND_ACCESS_ENDED},
+		{kUserConnection, adminv1.AlertKind_ALERT_KIND_USER_CONNECTION},
+		{kUsersImpacted, adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED},
+	} {
+		if got := kindProto[tc.stored]; got != tc.proto {
+			t.Errorf("kindProto[%q] = %s, want %s", tc.stored, got, tc.proto)
+		}
+	}
+}
+
 func TestMuteAlertRPC(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

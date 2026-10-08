@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
 
 // Every read tool, called as the strongest profile: the answer parses, fits the size cap and carries none of the canaries
@@ -73,6 +75,21 @@ func TestAlertsListShowsEpisodeStart(t *testing.T) {
 	v := decode[AlertsV](t, mustOK(t, s, "alerts_list", map[string]any{}))
 	if len(v.Active) != 1 || v.Active[0].First != 1700000000 || v.Active[0].Opened != 1700003600 {
 		t.Errorf("alerts: %+v", v.Active)
+	}
+}
+
+func TestAlertsListReturnsNewProtoKindNames(t *testing.T) {
+	for _, tc := range []struct {
+		kind adminv1.AlertKind
+		want string
+	}{
+		{adminv1.AlertKind_ALERT_KIND_ACCESS_ENDED, "access_ended"},
+		{adminv1.AlertKind_ALERT_KIND_USER_CONNECTION, "user_connection"},
+		{adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED, "users_impacted"},
+	} {
+		if got := alertView(&adminv1.Alert{Kind: tc.kind}).Kind; got != tc.want {
+			t.Errorf("alert kind = %q, want %q", got, tc.want)
+		}
 	}
 }
 

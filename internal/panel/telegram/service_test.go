@@ -121,6 +121,19 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 	e.link(owner, 777)
 	e.run()
 
+	before := e.tg.total()
+	userAlert := alert("user_connection", "", 1)
+	e.svc.AlertTransition(userAlert, false)
+	if got := e.tg.total(); got != before {
+		t.Fatalf("info USER_CONNECTION was sent: total messages %d, before %d", got, before)
+	}
+	e.svc.mu.Lock()
+	queued := e.svc.open["user_connection//"]
+	e.svc.mu.Unlock()
+	if queued {
+		t.Fatal("info USER_CONNECTION was recorded as announced")
+	}
+
 	e.svc.AlertTransition(alert("doctor_warn", "nod_1", 1), false)
 	for i, res := range []string{"superseded", "accepted", "node_retired"} {
 		a := alert("doctor_warn", "nod_1", 2)

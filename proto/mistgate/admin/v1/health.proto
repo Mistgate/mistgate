@@ -101,6 +101,16 @@ enum AlertKind {
   // when the rollout is resumed, cancelled or replaced. Produced from the updates module through a health
   // condition source, not from a doctor check.
   ALERT_KIND_UPDATE_FAILED = 11;
+  // A user whose access expired or quota ran out is still fetching a subscription. WARNING.
+  // node_id = "", subject = user id; why = expired or quota, params{user_name, since}.
+  ALERT_KIND_ACCESS_ENDED = 12;
+  // A likely connection problem for one user or device. INFO, never sent to Telegram.
+  // subject = device id, or user id for silent; node_id is the node when known, else "".
+  // Only never_connected, stale_key and silent are raised in this phase.
+  ALERT_KIND_USER_CONNECTION = 13;
+  // The current-hour peak users fell far below the same hour's usual level. WARNING.
+  // node_id = node id, subject = protocol; only the gone variant is raised in this phase, params{now, usual, users}.
+  ALERT_KIND_USERS_IMPACTED = 14;
 }
 
 message Alert {
@@ -108,7 +118,7 @@ message Alert {
   string id = 1;
   AlertSeverity severity = 2;
   AlertKind kind = 3;
-  // Empty for fleet-wide and user alerts (QUOTA, SUBSCRIPTION_SHARED_SUSPECT, the panel-egress guard).
+  // Empty for fleet-wide and user alerts (QUOTA, SUBSCRIPTION_SHARED_SUSPECT, ACCESS_ENDED, the panel-egress guard).
   string node_id = 4;
   // Resolved by the server; a retired or renamed node keeps its last name.
   string node_name = 5;
