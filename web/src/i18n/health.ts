@@ -110,6 +110,7 @@ export const en = {
   "hl.pills.when": "last round {ago}",
   "hl.pills.interval": "every {min} min",
   "hl.ms": "ms",
+  "hl.cell.latencyHour": "{median} ms median over the last hour · last check {last} ms",
 
   // ---- doctor
   "hl.doctor.sum": "Items checked: {items} · nodes: {nodes} · found: {n}",
@@ -547,6 +548,7 @@ export const ru: typeof en = {
   "hl.pills.when": "последний круг {ago}",
   "hl.pills.interval": "раз в {min} мин",
   "hl.ms": "мс",
+  "hl.cell.latencyHour": "{median} мс — медиана за час · последняя проверка {last} мс",
 
   // ---- doctor
   "hl.doctor.sum": "Проверено пунктов: {items} · нод: {nodes} · найдено: {n}",

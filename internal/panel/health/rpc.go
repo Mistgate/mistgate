@@ -284,6 +284,8 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		lat        []uint32
 	}
 	hist := map[string][buckets]acc{}
+	hourAgo := now.Add(-time.Hour)
+	hourLat := map[string][]uint32{} // OK-round latencies of the last hour, for the cell median
 	for _, x := range samples {
 		i := int((x.At.Unix() - first) / 1800)
 		if i < 0 || i >= buckets {
@@ -296,6 +298,9 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 			h[i].ok++
 			if x.LatencyMS > 0 {
 				h[i].lat = append(h[i].lat, x.LatencyMS)
+				if !x.At.Before(hourAgo) {
+					hourLat[x.InboundID] = append(hourLat[x.InboundID], x.LatencyMS)
+				}
 			}
 		}
 		hist[x.InboundID] = h
@@ -333,6 +338,10 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		}
 		for _, t := range sn.byNode[n.ID] {
 			cell := &adminv1.CheckCell{Deployed: true, InboundId: t.in.ID, History: make([]*adminv1.CheckBucket, buckets)}
+			if l := hourLat[t.in.ID]; len(l) > 0 {
+				slices.Sort(l)
+				cell.LatencyHourMs = l[len(l)/2]
+			}
 			c := s.cellOf(ctx, t.in.ID)
 			cell.FailStreak = uint32(c.streak)
 			if why := s.skipReason(t); why != "" {

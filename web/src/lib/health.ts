@@ -204,12 +204,16 @@ export function cellLook(t: T, cell: CheckCell, nodeStatus: NodeStatus): CellLoo
   const last = cell.last;
   if (!last || last.status === CheckStatus.UNSPECIFIED) return { kind: "off", label: t("hl.cell.wait"), state: t("hl.cell.noResult") };
   const ms = `${last.latencyMs} ${t("hl.ms")}`;
+  // the cell shows the median of the last hour when there is one, so a single spike does not read as the latency
+  const median = cell.latencyHourMs > 0;
+  const label = median ? `${cell.latencyHourMs} ${t("hl.ms")}` : ms;
+  const latency = median ? t("hl.cell.latencyHour", { median: cell.latencyHourMs, last: last.latencyMs }) : ms;
   const err = checkError(t, last.errorCode);
   switch (last.status) {
     case CheckStatus.OK:
-      return { kind: "ok", label: ms, state: ms };
+      return { kind: "ok", label, state: latency };
     case CheckStatus.DEGRADED:
-      return { kind: "warn", label: ms, state: [ms, err].filter(Boolean).join(" · ") };
+      return { kind: "warn", label, state: [latency, err].filter(Boolean).join(" · ") };
     case CheckStatus.FAILED:
       return { kind: "bad", label: t("hl.cell.fail"), state: err || t("hl.cell.fail") };
     default: // skipped on purpose: a profile that failed to start must not look like one switched off

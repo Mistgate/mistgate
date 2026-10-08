@@ -951,7 +951,9 @@ type CheckCell struct {
 	// Consecutive failed rounds up to now (the alert opens at 2).
 	FailStreak uint32 `protobuf:"varint,4,opt,name=fail_streak,json=failStreak,proto3" json:"fail_streak,omitempty"`
 	// Exactly 48 buckets, oldest first, the last one is the current partial bucket.
-	History       []*CheckBucket `protobuf:"bytes,5,rep,name=history,proto3" json:"history,omitempty"`
+	History []*CheckBucket `protobuf:"bytes,5,rep,name=history,proto3" json:"history,omitempty"`
+	// Median latency of the OK rounds over the last hour, ms; 0 = no data.
+	LatencyHourMs uint32 `protobuf:"varint,6,opt,name=latency_hour_ms,json=latencyHourMs,proto3" json:"latency_hour_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1019,6 +1021,13 @@ func (x *CheckCell) GetHistory() []*CheckBucket {
 		return x.History
 	}
 	return nil
+}
+
+func (x *CheckCell) GetLatencyHourMs() uint32 {
+	if x != nil {
+		return x.LatencyHourMs
+	}
+	return 0
 }
 
 type CheckRow struct {
@@ -2305,7 +2314,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x02ok\x18\x02 \x01(\rR\x02ok\x12\x16\n" +
 	"\x06failed\x18\x03 \x01(\rR\x06failed\x12\x1d\n" +
 	"\n" +
-	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\xd5\x01\n" +
+	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\xfd\x01\n" +
 	"\tCheckCell\x12\x1a\n" +
 	"\bdeployed\x18\x01 \x01(\bR\bdeployed\x12\x1d\n" +
 	"\n" +
@@ -2313,7 +2322,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x04last\x18\x03 \x01(\v2\x1e.mistgate.admin.v1.CheckResultR\x04last\x12\x1f\n" +
 	"\vfail_streak\x18\x04 \x01(\rR\n" +
 	"failStreak\x128\n" +
-	"\ahistory\x18\x05 \x03(\v2\x1e.mistgate.admin.v1.CheckBucketR\ahistory\"\xd7\x01\n" +
+	"\ahistory\x18\x05 \x03(\v2\x1e.mistgate.admin.v1.CheckBucketR\ahistory\x12&\n" +
+	"\x0flatency_hour_ms\x18\x06 \x01(\rR\rlatencyHourMs\"\xd7\x01\n" +
 	"\bCheckRow\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12!\n" +

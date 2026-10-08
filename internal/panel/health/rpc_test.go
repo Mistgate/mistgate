@@ -274,6 +274,42 @@ func TestGetChecksMatrix(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound, "node")
 }
 
+func TestGetChecksHourMedian(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a := e.inbound("de1", 443)
+	b := e.inbound("de1", 8443)
+	now := e.clock.Now()
+	for _, x := range []struct {
+		in  string
+		at  time.Time
+		st  adminv1.CheckStatus
+		lat uint32
+	}{
+		{a, now.Add(-50 * time.Minute), cOK, 100},
+		{a, now.Add(-40 * time.Minute), cOK, 300},
+		{a, now.Add(-30 * time.Minute), cOK, 200},
+		{a, now.Add(-20 * time.Minute), cFail, 5000}, // FAILED is not a latency sample
+		{a, now.Add(-2 * time.Hour), cOK, 9000},      // older than an hour
+		{b, now.Add(-3 * time.Hour), cOK, 50},        // only old rounds: no median
+	} {
+		e.s.record(e.ctx, x.in, Result{Status: x.st, At: x.at, LatencyMS: x.lat, ExitIP: "203.0.113.9", ExitCountry: "DE"})
+	}
+	resp, err := rpc{e.s}.GetChecks(e.ctx, req(&adminv1.GetChecksRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]uint32{}
+	for _, cell := range resp.Msg.Rows[0].Cells {
+		if cell.Deployed {
+			got[cell.InboundId] = cell.LatencyHourMs
+		}
+	}
+	if got[a] != 200 || got[b] != 0 {
+		t.Fatalf("hour median: a %d (want 200), b %d (want 0)", got[a], got[b])
+	}
+}
+
 func TestGetDoctorViews(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

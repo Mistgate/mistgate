@@ -77,7 +77,7 @@ const item = (over: Partial<DoctorItem> = {}): DoctorItem => ({
   ...over,
 });
 
-const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], ...over });
+const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], latencyHourMs: 0, ...over });
 const at = (status: CheckStatus, latencyMs = 0, errorCode = "") => ({ status, atUnix: 1, latencyMs, exitIp: "", exitCountry: "", errorCode, errorDetail: "" });
 
 describe("lookup", () => {
@@ -199,6 +199,13 @@ describe("cellLook", () => {
     const failed = look(at(CheckStatus.FAILED, 0, "timeout"));
     expect(failed).toMatchObject({ kind: "bad", label: "✕ fails" });
     expect(failed.state).toBe(en["health.check.err.timeout"]);
+  });
+  it("shows the last hour's median in the cell and both numbers in the tooltip, the last latency without a median", () => {
+    const withMedian = (last: CheckCell["last"]) => cellLook(t, cell({ last, latencyHourMs: 70 }), NodeStatus.ONLINE);
+    const hour = fill(en["hl.cell.latencyHour"], { median: 70, last: 3400 });
+    expect(withMedian(at(CheckStatus.OK, 3400))).toMatchObject({ kind: "ok", label: "70 ms", state: hour });
+    expect(withMedian(at(CheckStatus.DEGRADED, 3400, "timeout"))).toMatchObject({ kind: "warn", label: "70 ms", state: `${hour} · ${en["health.check.err.timeout"]}` });
+    expect(look(at(CheckStatus.OK, 3400))).toMatchObject({ kind: "ok", label: "3400 ms", state: "3400 ms" });
   });
   it("shows a skipped cell as updating while the node updates, else by why it was skipped", () => {
     expect(look(at(CheckStatus.SKIPPED, 0, "node_offline"), NodeStatus.UPDATING)).toMatchObject({ kind: "busy", label: "upd." });
