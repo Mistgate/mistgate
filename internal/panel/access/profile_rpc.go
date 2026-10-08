@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -382,6 +383,83 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		return nil, s.internal("profile inbounds", err)
 	}
+	type changedInboundPort struct {
+		node        store.AccessNode
+		listen      plugin.Listen
+		others      []nodeListen
+		portChanged bool
+	}
+	var changedPorts []changedInboundPort
+	var portWarnings []*adminv1.StatusReason
+	var lossyOverrides []changedInboundPort
+	if settingsChanged {
+		full, err := a.InboundsFull(ctx, "")
+		if err != nil {
+			return nil, s.internal("profile inbounds", err)
+		}
+		for _, f := range full {
+			if f.Profile.ID != p.ID || !f.Inbound.Enabled {
+				continue
+			}
+			oldSpec, oldErr := s.buildSpec(f, oldMerged)
+			newSpec, newErr := s.buildSpec(f, newMerged)
+			if newErr != nil {
+				return nil, invalid("node %s: %v", f.Node.Name, newErr)
+			}
+			if oldErr == nil && !specChanged(oldSpec, newSpec) {
+				continue
+			}
+			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
+			if err != nil {
+				return nil, err
+			}
+			changedPorts = append(changedPorts, changedInboundPort{
+				node: f.Node, listen: newSpec.Listen, others: others,
+				portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
+			})
+		}
+	}
+	if len(changedPorts) > 0 {
+		nodeIDs := make([]string, 0, len(changedPorts))
+		seen := make(map[string]bool, len(changedPorts))
+		for _, changed := range changedPorts {
+			if !seen[changed.node.ID] {
+				seen[changed.node.ID] = true
+				nodeIDs = append(nodeIDs, changed.node.ID)
+			}
+		}
+		portChecks, err := s.readPortChecks(ctx, nodeIDs...)
+		if err != nil {
+			return nil, s.internal("read UDP port checks", err)
+		}
+		for _, changed := range changedPorts {
+			checks := portChecks[changed.node.ID]
+			if m.DryRun {
+				if bad, ok := cachedPortLossy(checks, changed.listen.Port, s.now()); ok {
+					if changed.portChanged && !m.AllowLossyPort {
+						free := freePortFor(p.Protocol, changed.listen, changed.others, checks, s.now())
+						return nil, portLossyRefusal(ctx, s, changed.node.Name, bad, free)
+					}
+					portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
+				}
+				continue
+			}
+			if changed.portChanged {
+				warning, override, err := s.checkPort(ctx, changed.node, p.Protocol, changed.listen, changed.others, checks, m.AllowLossyPort)
+				if err != nil {
+					return nil, err
+				}
+				if warning != nil {
+					portWarnings = append(portWarnings, warning)
+				}
+				if override {
+					lossyOverrides = append(lossyOverrides, changed)
+				}
+			} else if bad, ok := cachedPortLossy(checks, changed.listen.Port, s.now()); ok {
+				portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
+			}
+		}
+	}
 	if !m.DryRun {
 		pub, sealed, err := s.sealSettings(proto, p.ID, newMerged)
 		if err != nil {
@@ -402,11 +480,15 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			s.notify.StateChanged()
 		}
 		s.audit(ctx, actor(ctx), "profile_update", map[string]any{"profile": p.ID, "name": next.Name, "settings_changed": settingsChanged, "reissue": reissue})
+		for _, changed := range lossyOverrides {
+			s.auditLossyPort(ctx, changed.node.Name, changed.listen.Port)
+		}
 	}
 	sum, err := s.summaryOf(ctx, next, proto, proto.Summary(newMerged), inbounds)
 	if err != nil {
 		return nil, err
 	}
+	sum.Warnings = append(sum.Warnings, portWarnings...)
 	return connect.NewResponse(&adminv1.UpdateProfileResponse{Profile: sum, Impact: impact}), nil
 }
 
@@ -609,22 +691,19 @@ func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
 	return nil
 }
 
-// freePortFor is a port an inbound listening as l could take instead of l.Port: TwinProfile's picker (freePort), with
-// the inbound's own hop range around the new port and the port outside that range; 0 when none is free.
-func freePortFor(protocol string, l plugin.Listen, others []nodeListen) uint16 {
-	return freePort(protocol, func(p uint16) bool {
-		if p == l.Port || (l.HopFrom != 0 && p >= l.HopFrom && p <= l.HopTo) {
-			return false
-		}
-		moved := l
-		moved.Port = p
-		return clashOf(moved, others) == nil
-	})
+// freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and stored bad
+// checks excluded; 0 when none is free.
+func freePortFor(protocol string, l plugin.Listen, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
+	ports := freePortCandidates(protocol, 1, l, others, checks, now)
+	if len(ports) == 0 {
+		return 0
+	}
+	return ports[0]
 }
 
 // portRefusal is the coded refusal of a listen that another profile of the node fights over, or nil: "hop_taken" when
 // the inbound's own hop range is what overlaps (no port fixes that), else "port_taken" with a free port to take instead.
-func portRefusal(protocol, node string, l plugin.Listen, others []nodeListen) error {
+func portRefusal(protocol, node string, l plugin.Listen, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) error {
 	if l.HopFrom != 0 {
 		// the range alone: its start stands in for the port, so that only the range is compared
 		if c := clashOf(plugin.Listen{Network: l.Network, Port: l.HopFrom, HopFrom: l.HopFrom, HopTo: l.HopTo}, others); c != nil {
@@ -636,7 +715,8 @@ func portRefusal(protocol, node string, l plugin.Listen, others []nodeListen) er
 	if c == nil {
 		return nil
 	}
-	kv := []string{"port", strconv.Itoa(int(l.Port)), "profile", c.profile, "node", node, "free", strconv.Itoa(int(freePortFor(protocol, l, others)))}
+	kv := []string{"port", strconv.Itoa(int(l.Port)), "profile", c.profile, "node", node,
+		"free", strconv.Itoa(int(freePortFor(protocol, l, others, checks, now)))}
 	if c.l.Port != l.Port {
 		kv = append(kv, "hop", fmt.Sprintf("%d-%d", c.l.HopFrom, c.l.HopTo)) // the port lies in that profile's hop range
 	}
@@ -764,6 +844,10 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if here[f.Profile.ID] {
 		return nil, coded(connect.CodeAlreadyExists, "already_on_node")
 	}
+	portChecks, err := s.readPortChecks(ctx, f.Node.ID)
+	if err != nil {
+		return nil, s.internal("read UDP port checks", err)
+	}
 	if ini, ok := proto.(protocols.InboundInitializer); ok {
 		// Key material of this (profile, node) only (AWG: the server key pair): a hacked node must not give away the
 		// others. A key parked by DeleteInbound is taken back, so that a remove + re-add does not break the configs
@@ -797,7 +881,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
 	}
-	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others); err != nil {
+	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, spec)
@@ -805,8 +889,22 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, err
 	}
 	if m.ValidateOnly {
+		if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+			free := freePortFor(proto.ID(), spec.Listen, others, portChecks[f.Node.ID], s.now())
+			if !m.AllowLossyPort {
+				return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
+			}
+			warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
+		}
 		return connect.NewResponse(&adminv1.CreateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings,
-			FreePort: uint32(freePortFor(proto.ID(), spec.Listen, others))}), nil
+			FreePort: uint32(freePortFor(proto.ID(), spec.Listen, others, portChecks[f.Node.ID], s.now()))}), nil
+	}
+	portWarning, lossyOverride, err := s.checkPort(ctx, f.Node, proto.ID(), spec.Listen, others, portChecks[f.Node.ID], m.AllowLossyPort)
+	if err != nil {
+		return nil, err
+	}
+	if portWarning != nil {
+		warnings = append(warnings, portWarning)
 	}
 	switch err := a.CreateInbound(ctx, f.Inbound); {
 	case errors.Is(err, store.ErrAccessExists):
@@ -818,6 +916,9 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	s.nodeEvent(ctx, "profile_added", f.Inbound.NodeID, f.Inbound.ID, f.Profile)
 	s.audit(ctx, actor(ctx), "inbound_add", map[string]any{"inbound": f.Inbound.ID, "profile": f.Profile.Name, "node": f.Node.Name, "port": spec.Listen.Port})
+	if lossyOverride {
+		s.auditLossyPort(ctx, f.Node.Name, spec.Listen.Port)
+	}
 	s.notify.StateChanged()
 	return connect.NewResponse(&adminv1.CreateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings}), nil
 }
@@ -831,6 +932,11 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, s.internal("load inbound", err)
 	}
 	in := f.Inbound
+	oldEnabled := in.Enabled
+	oldSpec, err := s.buildSpec(f, merged)
+	if err != nil {
+		return nil, buildRefusal(err, f.Node.Name)
+	}
 	specChangedByAdmin := false
 	if m.PortOverride != nil {
 		port, _, err := checkOverrides(*m.PortOverride, "")
@@ -863,17 +969,47 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, err
 	}
 	var warnings []*adminv1.StatusReason
+	var portWarning *adminv1.StatusReason
+	var lossyOverride bool
+	var portChecks portCheckCache
+	if m.ValidateOnly || in.Enabled {
+		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
+		if err != nil {
+			return nil, s.internal("read UDP port checks", err)
+		}
+	}
 	if in.Enabled {
-		if err := portRefusal(f.Profile.Protocol, f.Node.Name, spec.Listen, others); err != nil {
+		if err := portRefusal(f.Profile.Protocol, f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 			return nil, err
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, spec); err != nil {
 			return nil, err
 		}
+		portChanged := oldSpec.Listen.Port != spec.Listen.Port
+		switchedOn := !oldEnabled && in.Enabled
+		if m.ValidateOnly {
+			if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+				free := freePortFor(f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], s.now())
+				if (portChanged || switchedOn) && !m.AllowLossyPort {
+					return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
+				}
+				warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
+			}
+		} else if portChanged || switchedOn {
+			portWarning, lossyOverride, err = s.checkPort(ctx, f.Node, f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], m.AllowLossyPort)
+			if err != nil {
+				return nil, err
+			}
+			if portWarning != nil {
+				warnings = append(warnings, portWarning)
+			}
+		} else if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+			warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
+		}
 	}
 	if m.ValidateOnly {
 		return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings,
-			FreePort: uint32(freePortFor(f.Profile.Protocol, spec.Listen, others))}), nil
+			FreePort: uint32(freePortFor(f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], s.now()))}), nil
 	}
 	if specChangedByAdmin {
 		in.SpecVersion++
@@ -894,6 +1030,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 			f.Inbound.State = "disabled"
 		}
 		s.audit(ctx, actor(ctx), "inbound_update", map[string]any{"inbound": in.ID, "profile": f.Profile.Name, "node": f.Node.Name, "port": spec.Listen.Port, "enabled": in.Enabled})
+		if lossyOverride {
+			s.auditLossyPort(ctx, f.Node.Name, spec.Listen.Port)
+		}
 		s.notify.StateChanged()
 	}
 	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings}), nil

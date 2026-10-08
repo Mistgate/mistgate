@@ -74,6 +74,8 @@ type Config struct {
 	SubscriptionBaseURL string
 	Log                 *slog.Logger
 	AfterResponse       AfterResponseRunner
+	// CheckPorts runs the fleet UDP delivery check; nil disables save-time checks.
+	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 }
 
 // Service implements ProfileService, UserService, GroupService, DeviceService and AwgService (adminv1connect
@@ -91,8 +93,9 @@ type Service struct {
 	now           func() time.Time
 	afterResponse AfterResponseRunner
 
-	touching         sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
-	touchHookForTest func(started bool)
+	touching                  sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
+	touchHookForTest          func(started bool)
+	portChecksReadHookForTest func()
 
 	// awgNets serialises "check the client networks of an AWG profile against the others" with the write that stores
 	// them (CreateProfile, UpdateProfile), so two requests cannot both pick or accept the same network.

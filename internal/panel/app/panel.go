@@ -172,7 +172,7 @@ func Build(c Config) (*Panel, error) {
 	if in.PublicURL != "" {
 		subBase = strings.TrimRight(in.PublicURL, "/") + strings.TrimRight(in.SubPrefix, "/")
 	}
-	acc, err = access.New(st, vlt, reg, fl, fl, access.Config{SubscriptionBaseURL: subBase, Log: log, AfterResponse: c.AfterResponse})
+	acc, err = access.New(st, vlt, reg, fl, fl, access.Config{SubscriptionBaseURL: subBase, Log: log, AfterResponse: c.AfterResponse, CheckPorts: fl.CheckPorts})
 	if err != nil {
 		return nil, err
 	}

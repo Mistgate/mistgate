@@ -580,8 +580,10 @@ type UpdateProfileRequest struct {
 	SettingsJson    *string                `protobuf:"bytes,3,opt,name=settings_json,json=settingsJson,proto3,oneof" json:"settings_json,omitempty"`
 	ExpectedVersion uint32                 `protobuf:"varint,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
 	DryRun          bool                   `protobuf:"varint,5,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Save although a node's changed port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
+	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateProfileRequest) Reset() {
@@ -645,6 +647,13 @@ func (x *UpdateProfileRequest) GetExpectedVersion() uint32 {
 func (x *UpdateProfileRequest) GetDryRun() bool {
 	if x != nil {
 		return x.DryRun
+	}
+	return false
+}
+
+func (x *UpdateProfileRequest) GetAllowLossyPort() bool {
+	if x != nil {
+		return x.AllowLossyPort
 	}
 	return false
 }
@@ -1159,7 +1168,9 @@ func (x *ScoreItem) GetParams() map[string]string {
 // 0 = none found), "hop_taken: from=20000&to=30000&profile=Main&node=de1" (this profile's own hop range overlaps another
 // profile: no port fixes it), "port_in_hop: from=20000&to=30000" (the port lies inside the profile's own hop range),
 // "sni_needs_domain: name=1.2.3.4" (an IP where Let's Encrypt wants a domain), "sni_invalid: name=..." (neither a domain
-// nor an IP), "already_on_node", "node_retired".
+// nor an IP), "already_on_node", "node_retired", "port_lossy: port=8443&node=de1&sent=300&got=190&at=<unix>&sender=nl1&free=2053"
+// (FAILED_PRECONDITION: the UDP delivery check of design/udp-port-check.md found the port losing packets on that node;
+// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway).
 type CreateInboundRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
@@ -1170,10 +1181,13 @@ type CreateInboundRequest struct {
 	TlsServerNameOverride string `protobuf:"bytes,4,opt,name=tls_server_name_override,json=tlsServerNameOverride,proto3" json:"tls_server_name_override,omitempty"`
 	// Check only: the same checks and refusals as the real call, but nothing is written, no event and no state push, and
 	// no key is kept (an AmneziaWG inbound is built with a throwaway one). The answer is the inbound as it would be, its
-	// warnings and free_port. The add-profile dialog asks this on every change, before the click.
-	ValidateOnly  bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// warnings and free_port. The add-profile dialog asks this on every change, before the click. It reads stored UDP
+	// checks only and never runs one.
+	ValidateOnly bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
+	// Add although the port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
+	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateInboundRequest) Reset() {
@@ -1241,12 +1255,21 @@ func (x *CreateInboundRequest) GetValidateOnly() bool {
 	return false
 }
 
+func (x *CreateInboundRequest) GetAllowLossyPort() bool {
+	if x != nil {
+		return x.AllowLossyPort
+	}
+	return false
+}
+
 type CreateInboundResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Inbound *Inbound               `protobuf:"bytes,1,opt,name=inbound,proto3" json:"inbound,omitempty"`
 	// What the admin should know although nothing stops the call: "warp_missing" {state: "none" | "paused" | "down"} (the
 	// profile exits through WARP and the node has no WARP account, it is paused, or the node's last report says the tunnel
-	// is down: the profile will not pass traffic there).
+	// is down: the profile will not pass traffic there); "port_unchecked" {node, port, reason} (the UDP delivery check
+	// could not run: reason as PortCheck.reason); "port_lossy" {node, port, sent, got, at, sender} (saved with
+	// allow_lossy_port, or the port did not change).
 	Warnings []*StatusReason `protobuf:"bytes,2,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	// validate_only: a UDP port the inbound could take on this node instead of its own (TwinProfile's picker: 8443, 4443,
 	// 2053, 2083, 2087, 2096, then random ones in 10000-60000; hop ranges count). 0 = none found, or not a check.
@@ -1313,9 +1336,11 @@ type UpdateInboundRequest struct {
 	TlsServerNameOverride *string                `protobuf:"bytes,3,opt,name=tls_server_name_override,json=tlsServerNameOverride,proto3,oneof" json:"tls_server_name_override,omitempty"`
 	Enabled               *bool                  `protobuf:"varint,4,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
 	// As CreateInboundRequest.validate_only.
-	ValidateOnly  bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ValidateOnly bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
+	// As CreateInboundRequest.allow_lossy_port.
+	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateInboundRequest) Reset() {
@@ -1379,6 +1404,13 @@ func (x *UpdateInboundRequest) GetEnabled() bool {
 func (x *UpdateInboundRequest) GetValidateOnly() bool {
 	if x != nil {
 		return x.ValidateOnly
+	}
+	return false
+}
+
+func (x *UpdateInboundRequest) GetAllowLossyPort() bool {
+	if x != nil {
+		return x.AllowLossyPort
 	}
 	return false
 }
@@ -1536,7 +1568,11 @@ type TwinProfileResponse struct {
 	NodeIds  []string `protobuf:"bytes,5,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
 	GroupIds []string `protobuf:"bytes,6,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
 	// The profile has port hopping and the twin has none (the two ranges would overlap).
-	HopDropped    bool `protobuf:"varint,7,opt,name=hop_dropped,json=hopDropped,proto3" json:"hop_dropped,omitempty"`
+	HopDropped bool `protobuf:"varint,7,opt,name=hop_dropped,json=hopDropped,proto3" json:"hop_dropped,omitempty"`
+	// The UDP delivery check behind the chosen port: its result on each node (verdict "" with a reason where it could
+	// not run), and the candidates skipped because they lost packets. A twin that finds no clean port fails with
+	// FAILED_PRECONDITION "no_clean_port".
+	PortChecks    []*PortCheck `protobuf:"bytes,8,rep,name=port_checks,json=portChecks,proto3" json:"port_checks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1618,6 +1654,13 @@ func (x *TwinProfileResponse) GetHopDropped() bool {
 		return x.HopDropped
 	}
 	return false
+}
+
+func (x *TwinProfileResponse) GetPortChecks() []*PortCheck {
+	if x != nil {
+		return x.PortChecks
+	}
+	return nil
 }
 
 type DeleteProfileRequest struct {
@@ -1820,14 +1863,15 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
 	"\rsettings_json\x18\x03 \x01(\tR\fsettingsJson\"T\n" +
 	"\x15CreateProfileResponse\x12;\n" +
-	"\aprofile\x18\x01 \x01(\v2!.mistgate.admin.v1.ProfileSummaryR\aprofile\"\xd7\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2!.mistgate.admin.v1.ProfileSummaryR\aprofile\"\x81\x02\n" +
 	"\x14UpdateProfileRequest\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12(\n" +
 	"\rsettings_json\x18\x03 \x01(\tH\x01R\fsettingsJson\x88\x01\x01\x12)\n" +
 	"\x10expected_version\x18\x04 \x01(\rR\x0fexpectedVersion\x12\x17\n" +
-	"\adry_run\x18\x05 \x01(\bR\x06dryRunB\a\n" +
+	"\adry_run\x18\x05 \x01(\bR\x06dryRun\x12(\n" +
+	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPortB\a\n" +
 	"\x05_nameB\x10\n" +
 	"\x0e_settings_json\"\xec\x01\n" +
 	"\rProfileImpact\x12-\n" +
@@ -1871,25 +1915,27 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2(.mistgate.admin.v1.ScoreItem.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd1\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfb\x01\n" +
 	"\x14CreateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12#\n" +
 	"\rport_override\x18\x03 \x01(\rR\fportOverride\x127\n" +
 	"\x18tls_server_name_override\x18\x04 \x01(\tR\x15tlsServerNameOverride\x12#\n" +
-	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\"\xa7\x01\n" +
+	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
+	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\"\xa7\x01\n" +
 	"\x15CreateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +
-	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\x9c\x02\n" +
+	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\xc6\x02\n" +
 	"\x14UpdateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12(\n" +
 	"\rport_override\x18\x02 \x01(\rH\x00R\fportOverride\x88\x01\x01\x12<\n" +
 	"\x18tls_server_name_override\x18\x03 \x01(\tH\x01R\x15tlsServerNameOverride\x88\x01\x01\x12\x1d\n" +
 	"\aenabled\x18\x04 \x01(\bH\x02R\aenabled\x88\x01\x01\x12#\n" +
-	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnlyB\x10\n" +
+	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
+	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPortB\x10\n" +
 	"\x0e_port_overrideB\x1b\n" +
 	"\x19_tls_server_name_overrideB\n" +
 	"\n" +
@@ -1904,7 +1950,7 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x06egress\x18\x02 \x01(\tR\x06egress\x12\x17\n" +
 	"\adry_run\x18\x03 \x01(\bR\x06dryRun\x12\x12\n" +
 	"\x04port\x18\x04 \x01(\rR\x04port\x12\"\n" +
-	"\rskip_node_ids\x18\x05 \x03(\tR\vskipNodeIds\"\xeb\x01\n" +
+	"\rskip_node_ids\x18\x05 \x03(\tR\vskipNodeIds\"\xaa\x02\n" +
 	"\x13TwinProfileResponse\x12;\n" +
 	"\aprofile\x18\x01 \x01(\v2!.mistgate.admin.v1.ProfileSummaryR\aprofile\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -1913,7 +1959,9 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\bnode_ids\x18\x05 \x03(\tR\anodeIds\x12\x1b\n" +
 	"\tgroup_ids\x18\x06 \x03(\tR\bgroupIds\x12\x1f\n" +
 	"\vhop_dropped\x18\a \x01(\bR\n" +
-	"hopDropped\"5\n" +
+	"hopDropped\x12=\n" +
+	"\vport_checks\x18\b \x03(\v2\x1c.mistgate.admin.v1.PortCheckR\n" +
+	"portChecks\"5\n" +
 	"\x14DeleteProfileRequest\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\"\x17\n" +
@@ -1984,6 +2032,7 @@ var file_mistgate_admin_v1_profile_proto_goTypes = []any{
 	(App)(0),                       // 30: mistgate.admin.v1.App
 	(*StatusReason)(nil),           // 31: mistgate.admin.v1.StatusReason
 	(*Inbound)(nil),                // 32: mistgate.admin.v1.Inbound
+	(*PortCheck)(nil),              // 33: mistgate.admin.v1.PortCheck
 }
 var file_mistgate_admin_v1_profile_proto_depIdxs = []int32{
 	30, // 0: mistgate.admin.v1.ProtocolInfo.apps:type_name -> mistgate.admin.v1.App
@@ -2006,33 +2055,34 @@ var file_mistgate_admin_v1_profile_proto_depIdxs = []int32{
 	32, // 17: mistgate.admin.v1.UpdateInboundResponse.inbound:type_name -> mistgate.admin.v1.Inbound
 	31, // 18: mistgate.admin.v1.UpdateInboundResponse.warnings:type_name -> mistgate.admin.v1.StatusReason
 	3,  // 19: mistgate.admin.v1.TwinProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
-	1,  // 20: mistgate.admin.v1.ProfileService.ListProtocols:input_type -> mistgate.admin.v1.ListProtocolsRequest
-	4,  // 21: mistgate.admin.v1.ProfileService.ListProfiles:input_type -> mistgate.admin.v1.ListProfilesRequest
-	6,  // 22: mistgate.admin.v1.ProfileService.GetProfile:input_type -> mistgate.admin.v1.GetProfileRequest
-	8,  // 23: mistgate.admin.v1.ProfileService.CreateProfile:input_type -> mistgate.admin.v1.CreateProfileRequest
-	10, // 24: mistgate.admin.v1.ProfileService.UpdateProfile:input_type -> mistgate.admin.v1.UpdateProfileRequest
-	14, // 25: mistgate.admin.v1.ProfileService.PreviewProfile:input_type -> mistgate.admin.v1.PreviewProfileRequest
-	24, // 26: mistgate.admin.v1.ProfileService.DeleteProfile:input_type -> mistgate.admin.v1.DeleteProfileRequest
-	18, // 27: mistgate.admin.v1.ProfileService.CreateInbound:input_type -> mistgate.admin.v1.CreateInboundRequest
-	20, // 28: mistgate.admin.v1.ProfileService.UpdateInbound:input_type -> mistgate.admin.v1.UpdateInboundRequest
-	26, // 29: mistgate.admin.v1.ProfileService.DeleteInbound:input_type -> mistgate.admin.v1.DeleteInboundRequest
-	22, // 30: mistgate.admin.v1.ProfileService.TwinProfile:input_type -> mistgate.admin.v1.TwinProfileRequest
-	2,  // 31: mistgate.admin.v1.ProfileService.ListProtocols:output_type -> mistgate.admin.v1.ListProtocolsResponse
-	5,  // 32: mistgate.admin.v1.ProfileService.ListProfiles:output_type -> mistgate.admin.v1.ListProfilesResponse
-	7,  // 33: mistgate.admin.v1.ProfileService.GetProfile:output_type -> mistgate.admin.v1.GetProfileResponse
-	9,  // 34: mistgate.admin.v1.ProfileService.CreateProfile:output_type -> mistgate.admin.v1.CreateProfileResponse
-	12, // 35: mistgate.admin.v1.ProfileService.UpdateProfile:output_type -> mistgate.admin.v1.UpdateProfileResponse
-	15, // 36: mistgate.admin.v1.ProfileService.PreviewProfile:output_type -> mistgate.admin.v1.PreviewProfileResponse
-	25, // 37: mistgate.admin.v1.ProfileService.DeleteProfile:output_type -> mistgate.admin.v1.DeleteProfileResponse
-	19, // 38: mistgate.admin.v1.ProfileService.CreateInbound:output_type -> mistgate.admin.v1.CreateInboundResponse
-	21, // 39: mistgate.admin.v1.ProfileService.UpdateInbound:output_type -> mistgate.admin.v1.UpdateInboundResponse
-	27, // 40: mistgate.admin.v1.ProfileService.DeleteInbound:output_type -> mistgate.admin.v1.DeleteInboundResponse
-	23, // 41: mistgate.admin.v1.ProfileService.TwinProfile:output_type -> mistgate.admin.v1.TwinProfileResponse
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	33, // 20: mistgate.admin.v1.TwinProfileResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
+	1,  // 21: mistgate.admin.v1.ProfileService.ListProtocols:input_type -> mistgate.admin.v1.ListProtocolsRequest
+	4,  // 22: mistgate.admin.v1.ProfileService.ListProfiles:input_type -> mistgate.admin.v1.ListProfilesRequest
+	6,  // 23: mistgate.admin.v1.ProfileService.GetProfile:input_type -> mistgate.admin.v1.GetProfileRequest
+	8,  // 24: mistgate.admin.v1.ProfileService.CreateProfile:input_type -> mistgate.admin.v1.CreateProfileRequest
+	10, // 25: mistgate.admin.v1.ProfileService.UpdateProfile:input_type -> mistgate.admin.v1.UpdateProfileRequest
+	14, // 26: mistgate.admin.v1.ProfileService.PreviewProfile:input_type -> mistgate.admin.v1.PreviewProfileRequest
+	24, // 27: mistgate.admin.v1.ProfileService.DeleteProfile:input_type -> mistgate.admin.v1.DeleteProfileRequest
+	18, // 28: mistgate.admin.v1.ProfileService.CreateInbound:input_type -> mistgate.admin.v1.CreateInboundRequest
+	20, // 29: mistgate.admin.v1.ProfileService.UpdateInbound:input_type -> mistgate.admin.v1.UpdateInboundRequest
+	26, // 30: mistgate.admin.v1.ProfileService.DeleteInbound:input_type -> mistgate.admin.v1.DeleteInboundRequest
+	22, // 31: mistgate.admin.v1.ProfileService.TwinProfile:input_type -> mistgate.admin.v1.TwinProfileRequest
+	2,  // 32: mistgate.admin.v1.ProfileService.ListProtocols:output_type -> mistgate.admin.v1.ListProtocolsResponse
+	5,  // 33: mistgate.admin.v1.ProfileService.ListProfiles:output_type -> mistgate.admin.v1.ListProfilesResponse
+	7,  // 34: mistgate.admin.v1.ProfileService.GetProfile:output_type -> mistgate.admin.v1.GetProfileResponse
+	9,  // 35: mistgate.admin.v1.ProfileService.CreateProfile:output_type -> mistgate.admin.v1.CreateProfileResponse
+	12, // 36: mistgate.admin.v1.ProfileService.UpdateProfile:output_type -> mistgate.admin.v1.UpdateProfileResponse
+	15, // 37: mistgate.admin.v1.ProfileService.PreviewProfile:output_type -> mistgate.admin.v1.PreviewProfileResponse
+	25, // 38: mistgate.admin.v1.ProfileService.DeleteProfile:output_type -> mistgate.admin.v1.DeleteProfileResponse
+	19, // 39: mistgate.admin.v1.ProfileService.CreateInbound:output_type -> mistgate.admin.v1.CreateInboundResponse
+	21, // 40: mistgate.admin.v1.ProfileService.UpdateInbound:output_type -> mistgate.admin.v1.UpdateInboundResponse
+	27, // 41: mistgate.admin.v1.ProfileService.DeleteInbound:output_type -> mistgate.admin.v1.DeleteInboundResponse
+	23, // 42: mistgate.admin.v1.ProfileService.TwinProfile:output_type -> mistgate.admin.v1.TwinProfileResponse
+	32, // [32:43] is the sub-list for method output_type
+	21, // [21:32] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_profile_proto_init() }

@@ -107,6 +107,8 @@ While you fill in the add-profile dialog (and the per-node edit dialog), the pan
 | `already_on_node` | The profile is already on this node | "This profile is already on this node." |
 | `node_retired` | The node was retired | "The node is retired from the fleet." |
 
+The UDP delivery check runs when you save a new or changed port and can take about 8 seconds; **validate only** stays cache-only. If the selected port loses packets, saving stops and offers a port that passed the same check. You can choose **Add anyway** to save it, and Mistgate records that choice in the audit log. The picker hides ports that lost packets in the last 30 days, so they are not offered; a fresh passing result is suggested first, then unchecked ports.
+
 A warning does not stop the button. Today there is one: `warp_missing`, when the profile exits through WARP and the node has no WARP account, WARP is paused there, or the node's last report says the tunnel is down. The dialog says that the profile will not pass traffic there and links to the node's WARP card.
 
 The same codes come back from the API and the MCP server, as "code: key=value&key=value", so scripts can read them too. See [API](../reference/api.md).

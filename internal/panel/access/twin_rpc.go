@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -105,10 +108,11 @@ func hopOf(raw json.RawMessage) (from, to int) {
 	return h.From, h.To
 }
 
-// freePort is the port picker of a profile that needs a port of its own (the twin, an inbound whose port is taken): the
-// first of the protocol's candidates that ok accepts, 0 when none does. The candidates are twinPreferred (not for
-// AmneziaWG), then 64 random ports in 10000-60000.
-func freePort(protocol string, ok func(uint16) bool) uint16 {
+// freePorts returns up to n accepted candidates in the protocol's preferred order, then up to 64 random ports.
+func freePorts(protocol string, n int, ok func(uint16) bool) []uint16 {
+	if n <= 0 {
+		return nil
+	}
 	var cands []uint16
 	if protocol != awg.ID {
 		cands = append(cands, twinPreferred...)
@@ -120,27 +124,44 @@ func freePort(protocol string, ok func(uint16) bool) uint16 {
 		}
 		cands = append(cands, uint16(p))
 	}
+	seen := make(map[uint16]bool, len(cands))
+	var out []uint16
 	for _, p := range cands {
-		if ok(p) {
-			return p
+		if p != 0 && !seen[p] && ok(p) {
+			out = append(out, p)
+			seen[p] = true
+			if len(out) == n {
+				break
+			}
 		}
 	}
-	return 0
+	return out
 }
 
-// twinPort is the port the twin listens on: the asked one if it is free on every node, otherwise the first free one of
-// the protocol's candidates (the twin has no hop range, so only another listen port or a foreign hop range can clash).
-func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.AccessNode, want uint32) (uint16, error) {
+type twinPortNodeChecks struct {
+	checks map[uint16]store.PortCheck
+	reason string
+}
+
+// twinPort chooses a port that is free on every node and has no bad delivery result on any of them.
+func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.AccessNode, want uint32) (uint16, []*adminv1.PortCheck, error) {
 	if want > 65535 {
-		return 0, invalid("port must be 1-65535")
+		return 0, nil, invalid("port must be 1-65535")
 	}
 	listens := make([][]nodeListen, len(nodes))
+	nodeIDs := make([]string, len(nodes))
 	for i, n := range nodes {
+		nodeIDs[i] = n.ID
 		var err error
 		if listens[i], _, err = s.nodeInbounds(ctx, n.ID, ""); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
+	cache, err := s.readPortChecks(ctx, nodeIDs...)
+	if err != nil {
+		return 0, nil, s.internal("read UDP port checks", err)
+	}
+	now := s.now()
 	// takenOn says why a port is taken on one of the nodes ("" = free on all of them)
 	takenOn := func(port uint16) string {
 		for i, n := range nodes {
@@ -152,14 +173,203 @@ func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.A
 	}
 	if want != 0 {
 		if why := takenOn(uint16(want)); why != "" {
-			return 0, connect.NewError(connect.CodeAlreadyExists, errors.New(why))
+			return 0, nil, connect.NewError(connect.CodeAlreadyExists, errors.New(why))
 		}
-		return uint16(want), nil
+		for _, n := range nodes {
+			if bad, ok := cachedPortLossy(cache[n.ID], uint16(want), now); ok {
+				free := s.twinFreePort(protocol, nodes, listens, cache, now)
+				return 0, nil, portLossyRefusal(ctx, s, n.Name, bad, free)
+			}
+		}
+		messages, err := s.twinPortMessages(ctx, nodes, uint16(want), nil, cache, nil)
+		return uint16(want), messages, err
 	}
-	if p := freePort(protocol, func(p uint16) bool { return takenOn(p) == "" }); p != 0 {
-		return p, nil
+
+	candidates := freePorts(protocol, len(twinPreferred)+64, func(p uint16) bool { return takenOn(p) == "" })
+	var skipped []store.PortCheck
+	var clean []uint16
+	for _, candidate := range candidates {
+		bad := false
+		for _, n := range nodes {
+			if row, ok := cachedPortLossy(cache[n.ID], candidate, now); ok {
+				skipped = append(skipped, row)
+				bad = true
+			}
+		}
+		if !bad {
+			clean = append(clean, candidate)
+		}
 	}
-	return 0, failed("no free UDP port found on the profile's nodes")
+	slices.SortStableFunc(clean, func(a, b uint16) int {
+		fresh := func(port uint16) int {
+			count := 0
+			for _, n := range nodes {
+				if check, ok := cache[n.ID][port]; ok && check.Fresh(now) {
+					count++
+				}
+			}
+			return count
+		}
+		fa, fb := fresh(a), fresh(b)
+		if fa > fb {
+			return -1
+		}
+		if fa < fb {
+			return 1
+		}
+		return 0
+	})
+	if len(clean) > 8 {
+		clean = clean[:8]
+	}
+
+	for start := 0; start < len(clean); start += 4 {
+		end := min(start+4, len(clean))
+		batch := clean[start:end]
+		results := s.checkTwinBatch(ctx, nodes, batch, cache)
+		for _, candidate := range batch {
+			bad := false
+			for i := range nodes {
+				row, ok := results[i].checks[candidate]
+				if ok && results[i].reason != "same_host" && badPortVerdict(row.Verdict) {
+					skipped = append(skipped, row)
+					bad = true
+				}
+			}
+			if bad {
+				continue
+			}
+			messages, err := s.twinPortMessages(ctx, nodes, candidate, results, cache, skipped)
+			return candidate, messages, err
+		}
+	}
+	return 0, nil, coded(connect.CodeFailedPrecondition, "no_clean_port")
+}
+
+func (s *Service) twinFreePort(protocol string, nodes []store.AccessNode, listens [][]nodeListen, cache portCheckCache, now time.Time) uint16 {
+	takenOn := func(port uint16) bool {
+		for i := range nodes {
+			if clashOf(plugin.Listen{Network: "udp", Port: port}, listens[i]) != nil {
+				return true
+			}
+			if check, ok := cachedPortLossy(cache[nodes[i].ID], port, now); ok {
+				_ = check
+				return true
+			}
+		}
+		return false
+	}
+	ports := freePorts(protocol, len(twinPreferred)+64, func(port uint16) bool { return !takenOn(port) })
+	best, bestFresh := uint16(0), -1
+	for _, port := range ports {
+		fresh := 0
+		for _, node := range nodes {
+			if check, ok := cache[node.ID][port]; ok && check.Fresh(now) {
+				fresh++
+			}
+		}
+		if fresh > bestFresh {
+			best, bestFresh = port, fresh
+		}
+	}
+	return best
+}
+
+func (s *Service) checkTwinBatch(ctx context.Context, nodes []store.AccessNode, ports []uint16,
+	cache portCheckCache) []twinPortNodeChecks {
+	results := make([]twinPortNodeChecks, len(nodes))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
+	for i, node := range nodes {
+		allFresh := len(ports) > 0
+		for _, port := range ports {
+			check, ok := cache[node.ID][port]
+			if !ok || !check.Fresh(s.now()) || check.Bad(s.now()) {
+				allFresh = false
+				break
+			}
+		}
+		if allFresh {
+			results[i].checks = make(map[uint16]store.PortCheck, len(ports))
+			for _, port := range ports {
+				results[i].checks[port] = cache[node.ID][port]
+			}
+			continue
+		}
+		if s.cfg.CheckPorts == nil {
+			results[i].reason = "inconclusive"
+			continue
+		}
+		wg.Add(1)
+		go func(i int, node store.AccessNode) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				results[i].reason = "failed"
+				return
+			}
+			defer func() { <-sem }()
+			runCtx, cancel := context.WithTimeout(ctx, portCheckTimeout)
+			rows, sender, reason := s.cfg.CheckPorts(runCtx, node.ID, ports)
+			cancel()
+			results[i].checks = make(map[uint16]store.PortCheck, len(rows))
+			results[i].reason = reason
+			for _, row := range rows {
+				if row.NodeID == "" {
+					row.NodeID = node.ID
+				}
+				if row.Sender == "" {
+					row.Sender = sender
+				}
+				results[i].checks[row.Port] = row
+			}
+		}(i, node)
+	}
+	wg.Wait()
+	return results
+}
+
+func (s *Service) twinPortMessages(ctx context.Context, nodes []store.AccessNode, chosen uint16,
+	results []twinPortNodeChecks, cache portCheckCache, skipped []store.PortCheck) ([]*adminv1.PortCheck, error) {
+	out := make([]*adminv1.PortCheck, 0, len(nodes)+len(skipped))
+	for i, node := range nodes {
+		row, ok := store.PortCheck{}, false
+		reason := ""
+		if i < len(results) {
+			row, ok = results[i].checks[chosen]
+			reason = results[i].reason
+		}
+		if !ok {
+			row, ok = cache[node.ID][chosen]
+		}
+		if !ok {
+			row = store.PortCheck{NodeID: node.ID, Port: chosen}
+			if reason == "" {
+				reason = "inconclusive"
+			}
+		}
+		if row.NodeID == "" {
+			row.NodeID = node.ID
+		}
+		if row.Port == 0 {
+			row.Port = chosen
+		}
+		if reason == "same_host" {
+			row.Verdict = ""
+		}
+		out = append(out, s.portCheckMessage(ctx, row, reason))
+	}
+	seen := make(map[string]bool)
+	for _, row := range skipped {
+		key := row.NodeID + "/" + strconv.Itoa(int(row.Port))
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, s.portCheckMessage(ctx, row, ""))
+	}
+	return out, nil
 }
 
 func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.TwinProfileRequest]) (*connect.Response[adminv1.TwinProfileResponse], error) {
@@ -232,7 +442,7 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 		taken[o.Name] = true
 	}
 
-	port, err := s.twinPort(ctx, p.Protocol, nodes, m.Port)
+	port, portChecks, err := s.twinPort(ctx, p.Protocol, nodes, m.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +450,7 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, s.internal("twin settings", err)
 	}
-	resp.Name, resp.Port, resp.HopDropped = twinName(p.Name, to, taken), uint32(port), hopDropped
+	resp.Name, resp.Port, resp.HopDropped, resp.PortChecks = twinName(p.Name, to, taken), uint32(port), hopDropped, portChecks
 	if _, errs, err := s.resolveSettings(proto, string(input), nil, false); err != nil {
 		return nil, err
 	} else if len(errs) > 0 {

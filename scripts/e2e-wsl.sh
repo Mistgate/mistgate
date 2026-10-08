@@ -551,6 +551,10 @@ say "install command: enroll --panel $E_PANEL --sni [secret] --ca-sha256 ${E_PIN
 start_node
 NODE_PID=$LAST_PID
 wait_for 60 "node ONLINE" node_online || die "node never became ONLINE (status: $(node_status))"
+PORT_CHECK=$(mutate NodeService/CheckPorts "$(jq -nc --arg n "$NODE_ID" --argjson ports "[$HY2,$HY2_PLAIN,443]" '{nodeId:$n,ports:$ports}')")
+jq -e '(.errorCode == "same_host") and (.ports | length == 3) and ([.ports[] | .got == .sent] | all)' <<<"$PORT_CHECK" >/dev/null \
+  || die "local UDP port check did not return same_host with matching counts: $(jq -c '{errorCode,ports}' <<<"$PORT_CHECK")"
+pass "CheckPorts reports same_host with matching sent and received counts on every port"
 
 SETTINGS=$(api ProfileService/ListProtocols '{}' | jq -c --argjson p "$HY2" --argjson f "$HOP_FROM" --argjson t "$HOP_TO" \
   '.protocols[] | select(.id == "hysteria2") | .defaultSettingsJson | fromjson

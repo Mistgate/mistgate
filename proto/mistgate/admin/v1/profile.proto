@@ -118,6 +118,8 @@ message UpdateProfileRequest {
   optional string settings_json = 3;
   uint32 expected_version = 4;
   bool dry_run = 5;
+  // Save although a node's changed port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
+  bool allow_lossy_port = 6;
 }
 
 // What saving would do; filled for dry_run and real updates alike.
@@ -203,7 +205,9 @@ message ScoreItem {
 // 0 = none found), "hop_taken: from=20000&to=30000&profile=Main&node=de1" (this profile's own hop range overlaps another
 // profile: no port fixes it), "port_in_hop: from=20000&to=30000" (the port lies inside the profile's own hop range),
 // "sni_needs_domain: name=1.2.3.4" (an IP where Let's Encrypt wants a domain), "sni_invalid: name=..." (neither a domain
-// nor an IP), "already_on_node", "node_retired".
+// nor an IP), "already_on_node", "node_retired", "port_lossy: port=8443&node=de1&sent=300&got=190&at=<unix>&sender=nl1&free=2053"
+// (FAILED_PRECONDITION: the UDP delivery check of design/udp-port-check.md found the port losing packets on that node;
+// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway).
 message CreateInboundRequest {
   string profile_id = 1;
   string node_id = 2;
@@ -213,15 +217,20 @@ message CreateInboundRequest {
   string tls_server_name_override = 4;
   // Check only: the same checks and refusals as the real call, but nothing is written, no event and no state push, and
   // no key is kept (an AmneziaWG inbound is built with a throwaway one). The answer is the inbound as it would be, its
-  // warnings and free_port. The add-profile dialog asks this on every change, before the click.
+  // warnings and free_port. The add-profile dialog asks this on every change, before the click. It reads stored UDP
+  // checks only and never runs one.
   bool validate_only = 5;
+  // Add although the port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
+  bool allow_lossy_port = 6;
 }
 
 message CreateInboundResponse {
   Inbound inbound = 1;
   // What the admin should know although nothing stops the call: "warp_missing" {state: "none" | "paused" | "down"} (the
   // profile exits through WARP and the node has no WARP account, it is paused, or the node's last report says the tunnel
-  // is down: the profile will not pass traffic there).
+  // is down: the profile will not pass traffic there); "port_unchecked" {node, port, reason} (the UDP delivery check
+  // could not run: reason as PortCheck.reason); "port_lossy" {node, port, sent, got, at, sender} (saved with
+  // allow_lossy_port, or the port did not change).
   repeated StatusReason warnings = 2;
   // validate_only: a UDP port the inbound could take on this node instead of its own (TwinProfile's picker: 8443, 4443,
   // 2053, 2083, 2087, 2096, then random ones in 10000-60000; hop ranges count). 0 = none found, or not a check.
@@ -235,6 +244,8 @@ message UpdateInboundRequest {
   optional bool enabled = 4;
   // As CreateInboundRequest.validate_only.
   bool validate_only = 5;
+  // As CreateInboundRequest.allow_lossy_port.
+  bool allow_lossy_port = 6;
 }
 
 message UpdateInboundResponse {
@@ -268,6 +279,10 @@ message TwinProfileResponse {
   repeated string group_ids = 6;
   // The profile has port hopping and the twin has none (the two ranges would overlap).
   bool hop_dropped = 7;
+  // The UDP delivery check behind the chosen port: its result on each node (verdict "" with a reason where it could
+  // not run), and the candidates skipped because they lost packets. A twin that finds no clean port fails with
+  // FAILED_PRECONDITION "no_clean_port".
+  repeated PortCheck port_checks = 8;
 }
 
 message DeleteProfileRequest {
