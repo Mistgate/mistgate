@@ -169,6 +169,20 @@ func TestEnrollTokenRules(t *testing.T) {
 	}
 }
 
+func TestSweepLiveReadErrorDoesNotEmitEvents(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	stale := time.Now().Add(-time.Hour).Unix()
+	e.exec(`UPDATE node SET last_seen_at = ?, last_connected_at = ?, last_disconnected_at = ? WHERE id = ?`, stale, stale, stale, a.nodeID)
+	before := e.count(`SELECT count(*) FROM event`)
+	e.exec(`DROP TABLE node_live`)
+
+	e.f.sweep(e.ctx)
+	if after := e.count(`SELECT count(*) FROM event`); after != before {
+		t.Fatalf("sweep emitted events after the live read failed: before=%d after=%d", before, after)
+	}
+}
+
 // The add-node window offers a ready scp of the trusted bundle's binary, run on the panel's server; without a bundle it
 // says where to put the file instead (empty command).
 func TestEnrollmentCopyCommand(t *testing.T) {
@@ -404,7 +418,7 @@ func TestStatsSequenceDedup(t *testing.T) {
 	if nu != 6000 || nd != 1000 || peakU != 2 || peakD != 2 {
 		t.Errorf("node_traffic_hour total %d up %d peak users %d devices %d", nu, nd, peakU, peakD)
 	}
-	on := e.f.Online()
+	on := e.f.Online(e.ctx)
 	if len(on) != 2 {
 		t.Fatalf("online %v", on)
 	}
@@ -1043,6 +1057,11 @@ func TestNodeDownAndRecoveredEvents(t *testing.T) {
 	a := e.enroll("nodea")
 	e.fixture(a.nodeID)
 	c, _, _ := connectFull(a, "inst1")
+	now := time.Now().UTC()
+	c.send(1, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+	}}})
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
 	c.st.CloseRequest()
 	c.ended()
 	time.Sleep(100 * time.Millisecond)
@@ -1081,6 +1100,23 @@ func TestNodeDownAndRecoveredEvents(t *testing.T) {
 	c2.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	if n := e.count(`SELECT count(*) FROM event WHERE code = 'node_recovered'`); n != 1 {
 		t.Errorf("node_recovered events: %d", n)
+	}
+}
+
+func TestSweepUsesStaleNodeLiveProjection(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	connectFull(a, "inst1")
+	stale := time.Now().UTC().Add(-20 * time.Minute).Unix()
+	e.exec(`UPDATE node SET last_seen_at = ?, last_disconnected_at = ?, last_connected_at = ? WHERE id = ?`, stale, stale, stale, a.nodeID)
+	rows, err := e.f.Live(e.ctx)
+	if err != nil || !liveRowsByID(rows)[a.nodeID].Exists || liveRowsByID(rows)[a.nodeID].Connected {
+		t.Fatalf("stale node_live row = %+v, %v; want an existing offline row", rows, err)
+	}
+	e.f.sweep(e.ctx)
+	if got := e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'node_down'`, a.nodeID); got != 1 {
+		t.Fatalf("node_down events after stale projection = %d, want 1", got)
 	}
 }
 

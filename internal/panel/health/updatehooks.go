@@ -55,13 +55,17 @@ func (s *Service) extConds(ctx context.Context) []ExtCond {
 // NodeChecksSince counts the inbounds of the node that the synthetic checker can probe right now (no skip reason)
 // and how many of them have a round that ended at or after since: ok = the newest round is OK, failed = FAILED or
 // DEGRADED. An inbound without such a round is neither.
-func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int) {
+func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, err error) {
 	sn, err := s.snapshot(ctx)
 	if err != nil {
-		return 0, 0, 0
+		return 0, 0, 0, err
+	}
+	live, err := s.liveNode(ctx, nodeID)
+	if err != nil {
+		return 0, 0, 0, err
 	}
 	for _, t := range sn.byNode[nodeID] {
-		if s.skipReason(t) != "" {
+		if s.skipReason(t, live) != "" {
 			continue
 		}
 		probeable++
@@ -75,5 +79,5 @@ func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time
 			failed++
 		}
 	}
-	return probeable, ok, failed
+	return probeable, ok, failed, nil
 }

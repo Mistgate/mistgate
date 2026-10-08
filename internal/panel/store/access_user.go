@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -464,9 +465,23 @@ type SubscriptionData struct {
 	ImplicitCreds  []AccessCred
 	Group          AccessGroup
 	Inbounds       []AccessInboundFull
+	LiveNodes      []NodeLiveRow
 }
 
 type subscriptionTraffic struct{ Up, Down uint64 }
+
+func scanSubscriptionNodeLive(r rowScanner) (NodeLiveRow, error) {
+	var row NodeLiveRow
+	var liveNodeID sql.NullString
+	var connected, userOnline int64
+	if err := r.Scan(&row.NodeID, &liveNodeID, &row.SampleAt, &row.RxBps, &row.TxBps, &row.CPUPct, &connected, &userOnline); err != nil {
+		return NodeLiveRow{}, err
+	}
+	row.Exists = liveNodeID.Valid
+	row.Connected = connected != 0
+	row.UserOnline = userOnline != 0
+	return row, nil
+}
 
 func scanSubscriptionTraffic(r rowScanner) (subscriptionTraffic, error) {
 	var up, down int64
@@ -574,7 +589,7 @@ func scanImplicitDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, err
 	return device, cred, true, nil
 }
 
-func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool) (SubscriptionData, error) {
+func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool, now time.Time) (SubscriptionData, error) {
 	var traffic subscriptionTraffic
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
@@ -582,6 +597,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var group AccessGroup
 	var groupProfileIDs []string
 	var inbounds []AccessInboundFull
+	var liveNodes []NodeLiveRow
 	r := reads{}
 	r.add(oneRow(&traffic, scanSubscriptionTraffic), `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
 	r.add(appendRows(&devices, scanAccessDevice), `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.platform, d.model, d.os_version,
@@ -605,12 +621,20 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
 	}
+	path, _ := json.Marshal(userID)
+	r.add(appendRows(&liveNodes, scanSubscriptionNodeLive), `SELECT n.id AS node_id,
+		l.node_id AS live_node_id, coalesce(l.sample_at, 0) AS sample_at, coalesce(l.rx_bps, 0) AS rx_bps,
+		coalesce(l.tx_bps, 0) AS tx_bps, coalesce(l.cpu_pct, 0) AS cpu_pct,
+		(l.node_id IS NOT NULL AND n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s) AS connected,
+		(l.node_id IS NOT NULL AND n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s AND json_extract(l.users, ?) IS NOT NULL) AS user_online
+		FROM node AS n LEFT JOIN node_live AS l ON l.node_id = n.id WHERE n.state <> 'retired' ORDER BY n.id`,
+		unix(now), unix(now), "$."+string(path))
 	if err := r.run(ctx, a.s); err != nil {
 		return SubscriptionData{}, err
 	}
 	snapshot := implicitDeviceSnapshot(implicitRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, ImplicitDevice: snapshot.Device, ImplicitCreds: snapshot.Creds}
+		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, ImplicitDevice: snapshot.Device, ImplicitCreds: snapshot.Creds}
 	if active {
 		out.Group.ProfileIDs = groupProfileIDs
 	}

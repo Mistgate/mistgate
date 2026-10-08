@@ -118,6 +118,11 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 	if err != nil {
 		return nil, err
 	}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		return nil, err
+	}
+	live := indexLiveRows(liveRows)
 	lastChecked := make(map[string]time.Time, len(checks))
 	for _, check := range checks {
 		if check.CheckedAt.After(lastChecked[check.NodeID]) {
@@ -130,7 +135,7 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 		if s.portCheckAttempts[node.ID] == period {
 			continue
 		}
-		online, caps, _ := s.fl.Live(node.ID)
+		current := live[node.ID]
 		hasEnabledInbound := false
 		for _, target := range sn.byNode[node.ID] {
 			if target.in.Enabled {
@@ -139,7 +144,7 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 			}
 		}
 		nodes = append(nodes, PortCheckScheduleNode{
-			ID: node.ID, State: node.State, Online: online, UDPCheck: slices.Contains(caps, portCheckCapability),
+			ID: node.ID, State: node.State, Online: current.Connected, UDPCheck: slices.Contains(current.AgentCaps, portCheckCapability),
 			HasEnabledInbound: hasEnabledInbound, LastCheckedAt: lastChecked[node.ID],
 		})
 	}

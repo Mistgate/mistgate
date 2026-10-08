@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -215,12 +216,22 @@ func (f *Fleet) runPortCheck(ctx context.Context, target store.NodeRow, requeste
 }
 
 func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow, requested []uint16, allowPanel bool) portCheckOutcome {
+	liveRows, err := f.Live(ctx)
+	if err != nil {
+		f.log.Warn("read live nodes for UDP port check", "node", target.ID, "err", err)
+		return portCheckOutcome{errorCode: "failed"}
+	}
+	live := liveRowsByID(liveRows)
+	targetLive := live[target.ID]
+	if !targetLive.Connected {
+		return portCheckOutcome{errorCode: "node_offline"}
+	}
+	if !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
+		return portCheckOutcome{errorCode: "agent_too_old"}
+	}
 	targetSession := f.session(target.ID)
 	if targetSession == nil {
 		return portCheckOutcome{errorCode: "node_offline"}
-	}
-	if !targetSession.can(capUDPCheck) {
-		return portCheckOutcome{errorCode: "agent_too_old"}
 	}
 
 	allNodes, err := f.st.Nodes(ctx, false)
@@ -228,7 +239,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		f.log.Warn("list nodes for UDP port check", "node", target.ID, "err", err)
 		return portCheckOutcome{errorCode: "failed"}
 	}
-	candidates := f.portSenders(target, allNodes)
+	candidates := f.portSenders(target, allNodes, live)
 	if len(candidates) == 0 && !allowPanel {
 		return portCheckOutcome{errorCode: "no_sender"}
 	}
@@ -297,15 +308,18 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	return result
 }
 
-func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow) []portSender {
+func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow) []portSender {
 	var eligible []store.NodeRow
 	sessions := make(map[string]*session)
 	for _, node := range nodes {
 		if node.ID == target.ID {
 			continue
 		}
+		if current := live[node.ID]; !current.Connected || !slices.Contains(current.AgentCaps, capUDPCheck) {
+			continue
+		}
 		sess := f.session(node.ID)
-		if sess == nil || !sess.can(capUDPCheck) {
+		if sess == nil {
 			continue
 		}
 		eligible = append(eligible, node)

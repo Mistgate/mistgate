@@ -21,13 +21,14 @@ against 0.4 million included in Workers Paid.
 
 ## Decision
 
-- The session logic becomes an event-driven core shared by both editions: given the session state, sidecar and one event
+- The session logic becomes an event-driven core shared by both editions: given the session state and one event
   (a frame from the agent, a "desired state changed" notice, or an alarm), it mutates the supplied state and returns
   frames, adapter effects, a close decision and the next alarm time. The core owns protocol state; effects never write
   back into it.
-- Store calls run inline in the core, including on the edge where D1 is available. Effects are reserved for work that
-  differs by edition: delivering results to waiters, Cloudflare calls, and the cross-module usage callback. Publishing
-  the live view for admin reads is not an effect: the adapter does it (`publishView`) after every step. Desired-state
+- Store calls run inline in the core, including on the edge where D1 is available. The core writes the admin live view
+  to the `node_live` projection inline with stats processing; readers use that row, with no in-memory sidecar or
+  adapter-published view. Effects are reserved for work that differs by edition: delivering results to waiters,
+  Cloudflare calls, and the cross-module usage callback. Desired-state
   reads use a single in-flight preparation with a dirty bit: the effect starts its own session preparation, while
   `stepDesired` (the one caller that creates the desired-state-changed event) runs the first reconcile round's read inline
   instead of through the effect.

@@ -45,25 +45,6 @@ type OnlineSource interface {
 	OnlineUsers() map[string]string
 }
 
-// NetworkUsageSource is implemented by the fleet module. Rates are host network-interface bits per second;
-// sampledAt is the panel receive time of that agent sample.
-type NetworkUsageSource interface {
-	NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
-}
-
-// CPUUsageSource is an optional interface of the NetworkUsageSource (the fleet module implements it): the node's CPU use
-// in percent from the same agent samples, and when the panel received it.
-type CPUUsageSource interface {
-	CPUUsage(nodeID string) (pct float64, sampledAt time.Time, ok bool)
-}
-
-// CapabilitySource is an optional interface of the notify / online argument of New (the fleet module implements
-// it): whether the agent of a node announced a capability string ("awg/1"). known is false while the node has never
-// connected, so a fresh node is not treated as too old.
-type CapabilitySource interface {
-	AgentCapability(nodeID, capability string) (known, has bool)
-}
-
 // AfterResponseRunner starts work that must not delay a request response. A nil runner uses a goroutine.
 type AfterResponseRunner func(func())
 
@@ -86,7 +67,6 @@ type Service struct {
 	reg           *protocols.Registry
 	notify        StateNotifier
 	online        OnlineSource
-	caps          CapabilitySource // nil: no agent is ever "too old"
 	dns           *dns.Service
 	cfg           Config
 	log           *slog.Logger
@@ -125,11 +105,6 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateN
 	}
 	if s.afterResponse == nil {
 		s.afterResponse = func(work func()) { go work() }
-	}
-	if c, ok := online.(CapabilitySource); ok {
-		s.caps = c
-	} else if c, ok := notify.(CapabilitySource); ok {
-		s.caps = c
 	}
 	if s.log == nil {
 		s.log = slog.Default()

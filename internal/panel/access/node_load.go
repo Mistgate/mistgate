@@ -3,6 +3,8 @@ package access
 import (
 	"math"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 const networkSampleMaxAge = 90 * time.Second
@@ -15,12 +17,10 @@ type NodeNetworkUtilization struct {
 	LoadPercent  *int
 }
 
-// CurrentNetworkUtilization returns one sample per distinct node. LoadPercent is how busy the node is: the larger of
-// RX/TX divided by its configured symmetric capacity, or its CPU use when the source reports it (CPUUsageSource) and
-// that is higher. A one-core VPS usually runs out of CPU before its link, and the CPU is known without the owner typing
-// the provider's limit; with neither the percentage is nil. Nodes without a recent sample are omitted.
-func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, source NetworkUsageSource, now time.Time) map[string]NodeNetworkUtilization {
-	if source == nil {
+// CurrentNetworkUtilization returns one fresh sample per distinct connected node. LoadPercent is the larger of the
+// RX/TX rate as a percentage of its configured capacity and CPU use. Nodes without a recent sample are omitted.
+func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, rows map[string]store.NodeLiveRow, now time.Time) map[string]NodeNetworkUtilization {
+	if rows == nil {
 		return nil
 	}
 
@@ -35,10 +35,12 @@ func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, so
 		}
 		seen[nodeID] = struct{}{}
 
-		rx, tx, at, ok := source.NetworkUsage(nodeID)
-		if !ok || at.IsZero() {
+		row, ok := rows[nodeID]
+		if !ok || !row.Connected || row.SampleAt <= 0 {
 			continue
 		}
+		rx, tx := uint64(max(row.RxBps, 0)), uint64(max(row.TxBps, 0))
+		at := time.Unix(row.SampleAt, 0).UTC()
 		age := now.Sub(at)
 		// The sample can arrive after the view's clock snapshot while this function is running.
 		if age < -5*time.Second || age > networkSampleMaxAge {
@@ -51,13 +53,9 @@ func CurrentNetworkUtilization(nodeIDs []string, capacityMbps map[string]int, so
 			percent = min(100, max(0, percent))
 			usage.LoadPercent = &percent
 		}
-		if cpu, ok := source.(CPUUsageSource); ok {
-			if pct, cat, ok := cpu.CPUUsage(nodeID); ok && now.Sub(cat) >= -5*time.Second && now.Sub(cat) <= networkSampleMaxAge {
-				percent := min(100, max(0, int(math.Round(pct))))
-				if usage.LoadPercent == nil || percent > *usage.LoadPercent {
-					usage.LoadPercent = &percent
-				}
-			}
+		percent := min(100, max(0, int(math.Round(float64(row.CPUPct)))))
+		if usage.LoadPercent == nil || percent > *usage.LoadPercent {
+			usage.LoadPercent = &percent
 		}
 		samples[nodeID] = usage
 	}

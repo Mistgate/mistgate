@@ -1,26 +1,14 @@
 package access
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
 
-type subscriptionNetworkSample struct {
-	rx, tx uint64
-	at     time.Time
-}
-
-type subscriptionOnline struct {
-	users   map[string]string
-	samples map[string]subscriptionNetworkSample
-}
+type subscriptionOnline struct{ users map[string]string }
 
 func (s subscriptionOnline) OnlineUsers() map[string]string { return s.users }
-
-func (s subscriptionOnline) NetworkUsage(nodeID string) (uint64, uint64, time.Time, bool) {
-	sample, ok := s.samples[nodeID]
-	return sample.rx, sample.tx, sample.at, ok
-}
 
 func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	f := newFixture(t)
@@ -33,12 +21,38 @@ func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	if _, err := e.st.W.Exec(`UPDATE node SET bandwidth_mbps = 50 WHERE id = 'nod_nl1'`); err != nil {
 		t.Fatal(err)
 	}
-	e.s.online = subscriptionOnline{samples: map[string]subscriptionNetworkSample{
-		f.nodeID:  {rx: 80_000_000, at: e.clock.Add(-time.Second)},
-		"nod_nl1": {rx: 20_000_000, tx: 30_000_000, at: e.clock.Add(-time.Second)},
-	}}
+	for _, sample := range []struct {
+		id     string
+		rx, tx int64
+	}{
+		{id: f.nodeID, rx: 80_000_000},
+		{id: "nod_nl1", rx: 20_000_000, tx: 30_000_000},
+	} {
+		e.sql(`UPDATE node SET last_seen_at = ? WHERE id = ?`, e.clock.Unix(), sample.id)
+		e.sql(`INSERT INTO node_live (node_id, session, sample_at, rx_bps, tx_bps, users, live_json)
+			VALUES (?, 1, ?, ?, ?, '{}', '{}')`, sample.id, e.clock.Add(-time.Second).Unix(), sample.rx, sample.tx)
+	}
+	e.s.online = subscriptionOnline{users: map[string]string{}}
 	created := e.user("alice", f.group, nil).User
+	users, err := json.Marshal(map[string]int64{created.Id: e.clock.Unix()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.sql(`UPDATE node_live SET users = ? WHERE node_id = ?`, string(users), f.nodeID)
 	user := must(e.st.Access().User(e.ctx, created.Id))
+	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.GroupID, user.PeriodStart, true, e.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundOnline := false
+	for _, live := range data.LiveNodes {
+		if live.NodeID == f.nodeID {
+			foundOnline = live.UserOnline
+		}
+	}
+	if !foundOnline {
+		t.Fatalf("subscription live rows did not find the user key: %+v", data.LiveNodes)
+	}
 
 	view, err := e.s.subView(e.ctx, user, false, SubOptions{})
 	if err != nil {
@@ -57,5 +71,17 @@ func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	}
 	if got[f.nodeID] != 80 || got["nod_nl1"] != 60 {
 		t.Errorf("capacity utilization = %v, want de1=80 nl1=60", got)
+	}
+	for _, node := range view.Nodes {
+		if !node.Online {
+			t.Errorf("node row %q is offline despite a fresh last_seen_at", node.ID)
+		}
+	}
+	var hasOnlineDevice bool
+	for _, device := range view.Devices {
+		hasOnlineDevice = hasOnlineDevice || device.Online
+	}
+	if !hasOnlineDevice {
+		t.Error("implicit device did not use the user-online flag from node_live.users")
 	}
 }

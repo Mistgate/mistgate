@@ -137,16 +137,22 @@ func (s *Service) scheduleDue(ctx context.Context) {
 		s.log.Warn("health: list probe targets", "err", err)
 		return
 	}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		s.log.Warn("health: read live nodes", "err", err)
+		return
+	}
+	live := indexLiveRows(liveRows)
 	now := s.now()
 	s.schedMu.Lock()
 	defer s.schedMu.Unlock()
 	for id := range s.sched {
-		if t := sn.targets[id]; t == nil || s.skipReason(t) != "" {
+		if t := sn.targets[id]; t == nil || s.skipReason(t, live[t.node.ID]) != "" {
 			delete(s.sched, id) // gone, or not probed now: it gets a fresh first run when it is probed again
 		}
 	}
 	for id, t := range sn.targets {
-		if s.skipReason(t) != "" {
+		if s.skipReason(t, live[t.node.ID]) != "" {
 			continue
 		}
 		sc := s.sched[id]
@@ -208,7 +214,11 @@ func (s *Service) round(ctx context.Context, id string) (Result, bool) {
 		return Result{}, false
 	}
 	t := sn.targets[id]
-	if t == nil || s.skipReason(t) != "" {
+	if t == nil {
+		return Result{}, false
+	}
+	live, err := s.liveNode(ctx, t.node.ID)
+	if err != nil || s.skipReason(t, live) != "" {
 		return Result{}, false
 	}
 	res, skipped := s.attempt(ctx, t)
@@ -221,7 +231,8 @@ func (s *Service) round(ctx context.Context, id string) (Result, bool) {
 			return Result{}, false
 		case <-time.After(s.cfg.RetryDelay):
 		}
-		if s.skipReason(t) != "" { // the node went away while we waited: not a failure of the inbound
+		live, err = s.liveNode(ctx, t.node.ID)
+		if err != nil || s.skipReason(t, live) != "" { // the node went away while we waited: not a failure of the inbound
 			return Result{}, false
 		}
 		if again, skipped := s.attempt(ctx, t); !skipped {
@@ -240,6 +251,20 @@ func (s *Service) RunChecksNow(ctx context.Context, nodeID string) (scheduled, s
 	if err != nil {
 		return 0, 0, 0, err
 	}
+	var live map[string]store.NodeLiveRow
+	if nodeID == "" {
+		liveRows, err := s.fl.Live(ctx)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		live = indexLiveRows(liveRows)
+	} else {
+		row, err := s.liveNode(ctx, nodeID)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		live = map[string]store.NodeLiveRow{nodeID: row}
+	}
 	now := s.now()
 	s.schedMu.Lock()
 	defer s.schedMu.Unlock()
@@ -247,7 +272,7 @@ func (s *Service) RunChecksNow(ctx context.Context, nodeID string) (scheduled, s
 		if nodeID != "" && t.node.ID != nodeID {
 			continue
 		}
-		if s.skipReason(t) != "" {
+		if s.skipReason(t, live[t.node.ID]) != "" {
 			skipped++
 			continue
 		}

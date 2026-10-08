@@ -40,8 +40,7 @@ type NodeSpec struct {
 // NodeManager joins a durable installation job to the fleet CA and agent stream.
 type NodeManager interface {
 	CreateProvisionEnrollment(context.Context, NodeSpec, string, time.Time, time.Time) (token, caFingerprint string, err error)
-	ProvisionNodeState(context.Context, string) (string, error)
-	ProvisionNodeConnected(string) bool
+	ProvisionNodeState(context.Context, string) (state string, connected bool, err error)
 }
 
 // BinarySource returns a file from the currently trusted release bundle and the digest in its signed manifest.
@@ -286,7 +285,7 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 	if job.State != "failed" && job.State != "cancelled" {
 		return nil, notRetryable
 	}
-	if state, err := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID); err != nil && !errors.Is(err, store.ErrNotFound) {
+	if state, _, err := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.cfg.Log.Error("read node state before provisioning retry", "job_id", job.ID, "err", err)
 		return nil, internalConnectError()
 	} else if state == "retired" {

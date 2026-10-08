@@ -131,13 +131,13 @@ func (s *Service) usableInbounds(ctx context.Context, u store.AccessUser, g stor
 	return out, nil
 }
 
-// checkAgents fails with "agent too old" when every node of the inbounds announced that it cannot run awg.
+// checkAgents fails with "agent too old" when every previously connected node lacks awg/1.
 func (s *Service) checkAgents(ins []store.AccessInboundFull) error {
-	if s.caps == nil || len(ins) == 0 {
+	if len(ins) == 0 {
 		return nil
 	}
 	for _, f := range ins {
-		if known, has := s.caps.AgentCapability(f.Node.ID, "awg/1"); !known || has {
+		if f.Node.LastSeenAt.IsZero() || slices.Contains(f.Node.AgentCaps, "awg/1") {
 			return nil
 		}
 	}

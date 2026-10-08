@@ -163,7 +163,7 @@ In the user card, under **Devices** → **AmneziaVPN keys**, **Add device** open
 - **Platform**: iPhone / iPad, Android, Windows, Mac, Linux or Other;
 - **Name**, up to 40 characters; empty uses the platform name.
 
-**Create** makes a key pair and a tunnel address, and the config window opens at once. A device counts against the person's device limit. The add is refused when the limit is reached, the user is disabled, AmneziaVPN is switched off for them, the profile is not in their group or not on any node they may use, or the client network is full.
+**Create** makes a key pair and a tunnel address, and the config window opens at once. A device counts against the person's device limit. The add is refused when the limit is reached, the user is disabled, AmneziaVPN is switched off for them, the profile is not in their group or not on any node they may use, or the client network is full. It is also refused if every usable node has connected before but none reports AmneziaWG support; update an agent on one of those nodes before adding the device.
 
 **Show key** opens the same window for an existing device:
 

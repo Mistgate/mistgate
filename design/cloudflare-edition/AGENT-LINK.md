@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
-Status (2026-10-08): steps 1a, 1b, 2 and 3 and their review follow-up are merged; step 4a is implemented in this
-worktree. Steps 4b-6 are designed below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
+Status (2026-10-08): steps 1a, 1b, 2 and 3 and their review follow-up are merged; steps 4a and 4b are implemented in this
+worktree. Steps 4c-6 are designed below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -69,8 +69,8 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 3 | Agent store paths as atomic batches, safe on D1 (stats 2 D1 calls, event 1, Hello 1) | merged |
 | — | Review follow-up: delta base also checks the hash; IngestStats write batch with a fixed statement count; state round-trip test over every field; duplicate SQL | merged |
 | 4a | Write the `node_live` projection (sidecar kept, compared by a test) | implemented (2026-10-08) |
-| 4b | Every reader on the projection; delete `SessionSidecar` | designed (§4) |
-| 4c | `ask`/`retire`/`drop` seam, `Config.Remote`, capabilities from `node.agent_caps` | designed (§4) |
+| 4b | Every reader on the projection; delete `SessionSidecar` | implemented in this worktree (2026-10-08) |
+| 4c | `ask`/`retire`/`drop` seam, `Config.Remote`, remove `SessionState.Capabilities` | designed (§4) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) LinkOut`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | planned |
 | 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
 
@@ -127,6 +127,9 @@ The admin view, ported from today's `applyCoreSnapshot` without mutation:
 - online sessions: user, device, protocol, inbound, since;
 - per-user download rate and the total upload rate.
 
+Everything comes from the batch itself (every agent batch carries the host metrics): IngestStats never reads the
+previous row, which would cost up to 1.5 MB per batch on D1.
+
 Bounds:
 - 2000 sessions and 64 health entries;
 - agent-supplied inbound ids clipped to 64 bytes and details to 256; user, device and protocol values from the database
@@ -149,13 +152,15 @@ user and is unbounded. `buildFleetLive` leaves the previous row in place when `l
 - **Store.** One read, `NodeLive(ctx, now, nodeID, view)`: `""` means all nodes, `view` adds `live_json`, and
   `n.agent_caps` comes in the same JOIN.
 - **Subscriptions.** `SubscriptionData` adds one statement to its existing read batch: the node rows plus
-  `json_extract(users, '$."<user>"') IS NOT NULL` for the device-online flag. Query budgets do not grow.
+  `json_extract(users, '$."<user>"') IS NOT NULL` for the device-online flag. The active batch grows from 7 to 8
+  statements and the inactive batch from 4 to 5. The bridge query budgets stay fixed: Happ 5, Mihomo 7, page 5/3/4,
+  and AWG configs 7.
 - **Every reader of the live session moves to the projection.** They are grepped from `f.session(`, `view.Load`,
   `.Live`, `.caps`, `Online*`, `NetworkUsage`, `CPUUsage` and `AgentConnected`:
   - **fleet:** status, Overview, ListNodes (one read per request), GetNode, the node down sweep, OnlineUsers,
     OnlineByInbound, rollout gates (drift from the row);
   - **access:** load and online on the subscription page; the `NetworkUsage`, `CPUUsage` and `AgentSession` sources
-    are deleted;
+    are deleted. AWG device creation reads `agent_caps` and `last_seen_at` from the existing node rows;
   - **subs:** reads the store directly;
   - **health:** `Live(ctx)` once per pass; an error cancels the pass instead of raising false NODE_DOWN alerts;
   - **update, warp, provision.**
@@ -180,8 +185,8 @@ user and is unbounded. `buildFleetLive` leaves the previous row in place when `l
   - The offline and "agent too old" checks read the projection in both editions, with the same error texts.
 - **Re-enrol** calls `f.drop(ctx, id, reason)`: on the VPS it cancels the session; on the edge it calls `Remote.Close`.
 - **Logs.** `StreamLogs` with `Remote != nil` answers Unimplemented.
-- **Capabilities.** `SessionState.Capabilities` and `session.caps` go; hello and desired preparation read
-  `node.agent_caps`.
+- **Capabilities.** `session.caps` is gone. Capability checks read `node.agent_caps`; `SessionState.Capabilities`
+  remains until the 4c seam removes it.
 
 ### 4.6 Sidecar removal
 
@@ -198,7 +203,7 @@ ADR 0007 then says that the live view is the `node_live` projection, written inl
 | Round | Changes | Proof | Risks |
 |---|---|---|---|
 | 4a | migration, `NodeLive`, the four writes, the `Live` builder; the sidecar stays | SQLite tests; fake D1 smoke run by the lead (Hello replaces an old session, a foreign session's stats update or end is a no-op, duplicate seq writes nothing, retired/stale filters, NaN/2^63 values do not fail a batch); projection = sidecar after a stats series; `node_live` in the rehydration test; 2001 sessions → 2000 | the builder must stay pure under retries |
-| 4b | every reader moves (§4.4); the sidecar is deleted | the existing admin/status/health/update/warp tests on the projection; online right after Hello, offline after close; a stale row → the sweep raises `node_down`; a `Live` error opens no alerts; subscription load and online from rows; bridge budgets unchanged; subscription diff on a production database copy; race for fleet, agent, store, access, health and update | the largest VPS change: test churn in six packages; fake clocks moved past liveness without stats now see offline |
+| 4b (implemented 2026-10-08) | every reader moves (§4.4); the sidecar is deleted | admin/status/health/update/warp/access tests; online right after Hello, offline after close; a stale row → the sweep raises `node_down`; a `Live` error opens no alerts; subscription load and online from rows. The lead still runs `scripts/test-edge-entry.ps1` for bridge query budgets; race tests and a production database subscription diff remain separate checks. | fake clocks moved past liveness without stats now see offline |
 | 4c | the seam (§4.5) | allowlist, a request before Hello is refused, the Retire sequence; the existing VPS command/doctor/update/bandwidth/retire/re-enrol tests; a fake `Remote` (frame, request id, deadline, error mapping, no call when offline or too old, StreamLogs) | completeness of the allowlist; RetireNode no longer waits |
 
 After the release that carries step 4: an end-to-end check as the test user (load % and "online" on the subscription
@@ -222,6 +227,5 @@ page).
   the 1.5 MB valve in section 4.3 keeps the previous row when that would happen. `live_json` keeps the 2000 highest
   per-user download rates (ties by user id), like the 2000 sessions. The admin view only shows top consumers.
 - **Billing.** Each stats frame costs about 3 billed row writes on the object (state, alarmAt, setAlarm).
-- **Side finding.** `access.CapabilitySource` never fires in production (`Fleet` does not implement
-  `AgentCapability`), so the awg/1 check in device creation never runs. Either implement it from `node.agent_caps` or
-  delete the dead check.
+- **Resolved in 4b.** AWG device creation reads `agent_caps` and `last_seen_at` from the existing node rows, so the
+  awg/1 check no longer depends on the unimplemented `CapabilitySource`.

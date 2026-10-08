@@ -29,22 +29,6 @@ const (
 	de1Name, nl1Name = "inner-de1", "inner-nl1"
 )
 
-// liveFleet is the fleet as the access module sees it: which agents hold a session, and a fresh network sample for the nodes
-// with an rx rate.
-type liveFleet struct {
-	agents map[string]bool
-	rx     map[string]uint64
-}
-
-func (liveFleet) OnlineUsers() map[string]string { return nil }
-func (l liveFleet) AgentConnected(nodeID string) bool {
-	return l.agents[nodeID]
-}
-func (l liveFleet) NetworkUsage(nodeID string) (uint64, uint64, time.Time, bool) {
-	rx, ok := l.rx[nodeID]
-	return rx, 0, time.Now(), ok
-}
-
 type dnsRig struct {
 	*m3rig
 	h     http.Handler
@@ -56,8 +40,12 @@ type dnsRig struct {
 // Standard and Family; nl1 offers Yandex (the default) and Standard.
 func newDNSRig(t *testing.T, mut func(*subs.Config)) *dnsRig {
 	t.Helper()
-	m := newM3RigOnline(t, liveFleet{agents: map[string]bool{"nod_1": true}, rx: map[string]uint64{"nod_1": 85_000_000}})
+	m := newM3Rig(t)
 	m.st.W.Exec(`UPDATE node SET name = ?, country_code = 'DE', location = 'Frankfurt', bandwidth_mbps = 100 WHERE id = 'nod_1'`, de1Name)
+	now := time.Now().Unix()
+	m.st.W.Exec(`UPDATE node SET last_seen_at = ? WHERE id = 'nod_1'`, now)
+	m.st.W.Exec(`INSERT INTO node_live (node_id, session, sample_at, rx_bps, tx_bps, users, live_json)
+		VALUES ('nod_1', 1, ?, 85000000, 0, '{}', '{}')`, now)
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_2', ?, 'nl1.example.com', 'NL', 'active', 1)`, nl1Name)
 	for _, p := range []string{m.profile, m.awg} {
 		must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: p, NodeId: "nod_2"})))

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -32,21 +31,9 @@ const (
 
 type agentService struct{ f *Fleet }
 
-// onlineSess is one open client session, resolved to user x device x protocol.
-type onlineSess struct {
-	userID, deviceID, protocol, inboundID string
-	since                                 time.Time
-}
-
 type logSub struct {
 	ch      chan *agentv1.LogChunk
 	dropped atomic.Uint32
-}
-
-// sessionView is one immutable admin snapshot published after each core step.
-type sessionView struct {
-	State SessionState
-	Live  LiveSnapshot
 }
 
 // session is the one live agent session of a node.
@@ -54,33 +41,21 @@ type session struct {
 	f          *Fleet
 	nodeID     string
 	owner      uint64
-	caps       []string // Hello.capabilities: optional features of this agent build (health.go)
 	ctx        context.Context
 	cancel     context.CancelCauseFunc
 	done       chan struct{} // closed when the Connect handler returns
 	out        chan *agentv1.ConnectResponse
 	alarmTimer *time.Timer
 
-	coreMu      sync.Mutex
-	core        *SessionCore
-	coreState   SessionState
-	coreSidecar SessionSidecar
-	view        atomic.Pointer[sessionView]
+	coreMu    sync.Mutex
+	core      *SessionCore
+	coreState SessionState
 
-	// Only request waiters need their own lock; the admin view is an immutable atomic snapshot.
+	// Only request waiters need their own lock; core state is protected by coreMu.
 	waitMu sync.Mutex
 	cmds   map[string]chan *agentv1.CommandResult
 	docs   map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
 	logs   map[string]*logSub
-}
-
-func (s *session) publishView() {
-	state := s.coreState
-	state.Capabilities = slices.Clone(state.Capabilities)
-	state.SentWithheld = slices.Clone(state.SentWithheld)
-	state.Pending = maps.Clone(state.Pending)
-	state.L3.AWG = maps.Clone(state.L3.AWG)
-	s.view.Store(&sessionView{State: state, Live: s.coreSidecar.Live})
 }
 
 func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {
@@ -95,8 +70,7 @@ func (s *session) step(ctx context.Context, event SessionEvent, inline EffectKin
 		poison := *s.coreState.Poison
 		oldPoison = &poison
 	}
-	tr, err := s.core.Step(ctx, &s.coreState, &s.coreSidecar, event)
-	s.publishView()
+	tr, err := s.core.Step(ctx, &s.coreState, event)
 	if !samePoison(oldPoison, s.coreState.Poison) {
 		s.persistPoison(s.coreState.Poison)
 	}
@@ -143,7 +117,7 @@ func (s *session) runDesiredPreparation(ctx context.Context) (Transition, error)
 	if !s.canApplyPrepared() {
 		return Transition{}, nil
 	}
-	prepared, prepareErr := s.f.prepareDesiredState(ctx, s.nodeID, s.caps)
+	prepared, prepareErr := s.f.prepareDesiredState(ctx, s.nodeID)
 	if !s.canApplyPrepared() {
 		return Transition{}, nil
 	}
@@ -394,8 +368,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	if !pc.notAfter.IsZero() {
 		state.PeerCertNotAfter = pc.notAfter
 	}
-	var sidecar SessionSidecar
-	opened, err := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: f.now()})
+	opened, err := core.Step(sctx, &state, SessionEvent{Kind: EventOpen, At: f.now()})
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
@@ -420,7 +393,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		if alarmAt.After(now) {
 			now = alarmAt
 		}
-		tr, alarmErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: now})
+		tr, alarmErr := core.Step(sctx, &state, SessionEvent{Kind: EventAlarm, At: now})
 		resetSessionAlarm(alarmTimer, tr.NextAlarm, now)
 		if alarmErr == nil && tr.Close != nil {
 			return sessionCloseError(tr.Close)
@@ -437,7 +410,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
 	}
 	helloAt := f.now()
-	tr, stepErr := core.Step(sctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: helloAt, Frame: first})
+	tr, stepErr := core.Step(sctx, &state, SessionEvent{Kind: EventHello, At: helloAt, Frame: first})
 	resetSessionAlarm(alarmTimer, tr.NextAlarm, helloAt)
 	if tr.Close != nil && state.InstanceID == "" {
 		return sessionCloseError(tr.Close)
@@ -449,12 +422,11 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 
-	s := &session{f: f, nodeID: id, owner: owner, caps: slices.Clone(state.Capabilities), ctx: sctx, cancel: cancel,
+	s := &session{f: f, nodeID: id, owner: owner, ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
-		logs: map[string]*logSub{}, core: core, coreState: state, coreSidecar: sidecar, alarmTimer: alarmTimer}
+		logs: map[string]*logSub{}, core: core, coreState: state, alarmTimer: alarmTimer}
 	s.coreMu.Lock()
-	s.publishView()
 	if !f.register(s) {
 		s.coreMu.Unlock()
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))

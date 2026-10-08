@@ -29,11 +29,11 @@ import (
 
 // Fleet is what the module needs from the fleet module (*fleet.Fleet implements it).
 type Fleet interface {
-	// Live: whether the node has an agent stream now, the capabilities of its Hello and whether its state
-	// drift persists.
-	Live(nodeID string) (connected bool, caps []string, drift bool)
-	// NodeStatus is the status the UI shows for a node row.
-	NodeStatus(ctx context.Context, n store.NodeRow) adminv1.NodeStatus
+	// Live reads the durable view once for a pass; an error must stop that pass before alerts are reconciled.
+	Live(ctx context.Context) ([]store.NodeLiveRow, error)
+	// NodeLive reads one node's durable projection for a node-scoped check.
+	NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error)
+	NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus
 	// RunDoctor asks a node to run checks (nil = all) and waits for the report. FAILED_PRECONDITION: not
 	// connected, or an agent without "doctor/1".
 	RunDoctor(ctx context.Context, nodeID string, checks []string, wait time.Duration) (*agentv1.DoctorReport, error)
@@ -41,7 +41,11 @@ type Fleet interface {
 	ApplyFix(ctx context.Context, nodeID, fixID string, dryRun bool, params map[string]string) (*agentv1.CommandResult, error)
 	// OnlineByInbound counts the open sessions of every inbound of the connected nodes (the restart dialogs say how
 	// many connections drop).
-	OnlineByInbound() map[string]int
+	OnlineByInbound(ctx context.Context) map[string]int
+}
+
+func (s *Service) liveNode(ctx context.Context, nodeID string) (store.NodeLiveRow, error) {
+	return s.fl.NodeLive(ctx, nodeID)
 }
 
 // Timing of the module. Everything a test needs to shorten is a Config field; these are the defaults.

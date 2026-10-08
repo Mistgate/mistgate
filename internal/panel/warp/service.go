@@ -36,23 +36,28 @@ const CapWarp = "warp/1"
 
 // Fleet is what the module needs from the fleet module (*fleet.Fleet implements it).
 type Fleet interface {
-	// Live: whether the node has an agent stream now.
-	Live(nodeID string) (connected bool, caps []string, drift bool)
+	// Live reads the durable liveness projection for the fleet in one statement.
+	Live(ctx context.Context) ([]store.NodeLiveRow, error)
+	// NodeLive reads one node's durable liveness projection.
+	NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error)
 	// StateChanged asks for a recompute of the desired state of the nodes. Deleting an account must reach the node as
 	// a FULL state, because a delta cannot say "remove" (agent.proto, DesiredState.warp).
 	StateChanged()
 	// OnlineByInbound counts the open sessions of every inbound of the connected nodes.
-	OnlineByInbound() map[string]int
+	OnlineByInbound(ctx context.Context) map[string]int
 	// WarpPauseApplied: the node confirmed a desired state that pauses its WARP (RestartWarp waits for it).
 	WarpPauseApplied(ctx context.Context, nodeID string) bool
 }
 
 type noFleet struct{}
 
-func (noFleet) Live(string) (bool, []string, bool)            { return false, nil, false }
-func (noFleet) StateChanged()                                 {}
-func (noFleet) OnlineByInbound() map[string]int               { return nil }
-func (noFleet) WarpPauseApplied(context.Context, string) bool { return false }
+func (noFleet) Live(context.Context) ([]store.NodeLiveRow, error) { return nil, nil }
+func (noFleet) NodeLive(context.Context, string) (store.NodeLiveRow, error) {
+	return store.NodeLiveRow{}, nil
+}
+func (noFleet) StateChanged()                                  {}
+func (noFleet) OnlineByInbound(context.Context) map[string]int { return nil }
+func (noFleet) WarpPauseApplied(context.Context, string) bool  { return false }
 
 // Config configures Service.
 type Config struct {
@@ -260,11 +265,11 @@ func (s *Service) node(ctx context.Context, id string, mutating bool) (store.Nod
 
 // supports is whether the node's agent (last Hello, or the live stream) lists warp/1.
 func (s *Service) supports(n store.NodeRow) bool {
-	if slices.Contains(n.AgentCaps, CapWarp) {
-		return true
-	}
-	_, caps, _ := s.fl.Live(n.ID)
-	return slices.Contains(caps, CapWarp)
+	return slices.Contains(n.AgentCaps, CapWarp)
+}
+
+func (s *Service) liveNode(ctx context.Context, nodeID string) (store.NodeLiveRow, error) {
+	return s.fl.NodeLive(ctx, nodeID)
 }
 
 func (s *Service) params(ctx context.Context) Params {
@@ -525,7 +530,11 @@ func (s *Service) restart(ctx context.Context, nodeID string) (store.WarpAccount
 	if err != nil {
 		return store.WarpAccountRow{}, false, err
 	}
-	if up, _, _ := s.fl.Live(nodeID); !up {
+	live, err := s.liveNode(ctx, nodeID)
+	if err != nil {
+		return store.WarpAccountRow{}, false, s.internal("load live node", err)
+	}
+	if !live.Connected {
 		return store.WarpAccountRow{}, false, fail(connect.CodeFailedPrecondition, "node_offline")
 	}
 	ctx = context.WithoutCancel(ctx)
@@ -579,7 +588,7 @@ func (s *Service) warpInbounds(ctx context.Context, nodeID string) ([]*adminv1.W
 	if err != nil {
 		return nil, err
 	}
-	online := s.fl.OnlineByInbound()
+	online := s.fl.OnlineByInbound(ctx)
 	var out []*adminv1.WarpInbound
 	for _, r := range rows {
 		var v struct {

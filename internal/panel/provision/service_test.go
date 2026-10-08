@@ -327,10 +327,9 @@ type testNodeManager struct{}
 func (testNodeManager) CreateProvisionEnrollment(context.Context, NodeSpec, string, time.Time, time.Time) (string, string, error) {
 	return "token", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil
 }
-func (testNodeManager) ProvisionNodeState(context.Context, string) (string, error) {
-	return "pending", nil
+func (testNodeManager) ProvisionNodeState(context.Context, string) (string, bool, error) {
+	return "pending", false, nil
 }
-func (testNodeManager) ProvisionNodeConnected(string) bool { return false }
 
 type testBinarySource struct{}
 

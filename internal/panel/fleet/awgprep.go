@@ -80,11 +80,18 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, internalErr(f.log.Error, "prepare awg kernel", err)
 	}
+	live, err := f.liveRowsForNode(ctx, n.ID, true)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node live projection", err)
+	}
+	if !live.Connected {
+		return nil, errNodeOffline
+	}
 	sess := f.session(n.ID)
 	if sess == nil {
 		return nil, errNodeOffline
 	}
-	if !sess.can(capAwgPrepare) {
+	if !slices.Contains(live.AgentCaps, capAwgPrepare) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	confirm := req.Msg.Confirm
@@ -148,7 +155,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	return connect.NewResponse(&adminv1.PrepareAwgKernelResponse{
 		Outcome: outcome, ReasonCode: clip(res.Params["code"], 32), Reason: clip(res.Params["reason"], 200),
-		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), t),
+		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), t, live),
 	}), nil
 }
 

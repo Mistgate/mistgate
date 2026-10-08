@@ -205,11 +205,10 @@ func TestAWGDeviceCreateRejections(t *testing.T) {
 	u2 := e.user("bob", g2, amnOnly()).User
 	_, err = e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: u2.Id, ProfileId: other.Id, Platform: "ios"}))
 	precondition(err, "no_inbound")
-	e.s.caps = fakeCaps{"nod_de1": false}
-	precondition(f.addErr(f.user), "agent too old")
-	e.s.caps = fakeCaps{"nod_other": false} // a node never seen: not too old
+	e.sql(`UPDATE node SET last_seen_at = 1, agent_caps = '' WHERE id = ?`, f.nodeID)
+	precondition(f.addErr(f.user), "agent too old: update the node agent to use AmneziaWG")
+	e.sql(`UPDATE node SET last_seen_at = 0 WHERE id = ?`, f.nodeID) // a node never seen: not too old
 	f.add(f.user, "ok")
-	e.s.caps = nil
 
 	// Bad input and unknown things.
 	for name, r := range map[string]*adminv1.CreateAwgDeviceRequest{
@@ -235,13 +234,6 @@ func TestAWGDeviceCreateRejections(t *testing.T) {
 	if n := must(e.st.Access().DeviceCounts(e.ctx, []string{f.user}))[f.user]; n != 1 {
 		t.Errorf("devices = %d", n)
 	}
-}
-
-type fakeCaps map[string]bool
-
-func (c fakeCaps) AgentCapability(nodeID, _ string) (bool, bool) {
-	has, known := c[nodeID]
-	return known, has
 }
 
 func TestAWGDeviceLimit(t *testing.T) {
@@ -908,7 +900,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	if _, _, added := e.s.ensureMihomoAWG(e.ctx, u, g, full, seed, nil); !added {
 		t.Fatal("initial Mihomo call did not add the AWG credential")
 	}
-	wantData, err := a.SubscriptionData(e.ctx, u.ID, g.ID, e.clock, true)
+	wantData, err := a.SubscriptionData(e.ctx, u.ID, g.ID, e.clock, true, e.clock)
 	if err != nil {
 		t.Fatal(err)
 	}

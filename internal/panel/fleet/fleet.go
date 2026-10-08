@@ -6,6 +6,7 @@ package fleet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -238,17 +239,21 @@ type OnlineSession struct {
 	ConnectedAt                                   time.Time
 }
 
-// Online returns the open sessions of every connected node (in memory, refreshed by each stats batch).
-func (f *Fleet) Online() []OnlineSession {
+// Online returns the open sessions reported by connected nodes' live projections.
+func (f *Fleet) Online(ctx context.Context) []OnlineSession {
 	var out []OnlineSession
-	for _, s := range f.snapshotSessions() {
-		view := s.view.Load()
-		if view == nil {
+	rows, err := f.liveView(ctx)
+	if err != nil {
+		f.log.Warn("read live nodes", "err", err)
+		return nil
+	}
+	for _, row := range rows {
+		if !row.Connected {
 			continue
 		}
-		for _, o := range view.Live.Online {
-			out = append(out, OnlineSession{NodeID: s.nodeID, UserID: o.userID, DeviceID: o.deviceID, Protocol: o.protocol,
-				InboundID: o.inboundID, ConnectedAt: o.since})
+		for _, o := range decodeLiveView(row).Online {
+			out = append(out, OnlineSession{NodeID: row.NodeID, UserID: o.UserID, DeviceID: o.DeviceID, Protocol: o.Protocol,
+				InboundID: o.InboundID, ConnectedAt: time.Unix(o.SinceUnix, 0).UTC()})
 		}
 	}
 	return out
@@ -257,40 +262,27 @@ func (f *Fleet) Online() []OnlineSession {
 // OnlineUsers maps each user with an open session to the node of the newest one (access.OnlineSource).
 func (f *Fleet) OnlineUsers() map[string]string {
 	out := map[string]string{}
-	newest := map[string]time.Time{}
-	for _, o := range f.Online() {
-		if t, ok := newest[o.UserID]; !ok || o.ConnectedAt.After(t) {
-			out[o.UserID], newest[o.UserID] = o.NodeID, o.ConnectedAt
+	newest := map[string]int64{}
+	rows, err := f.Live(context.Background())
+	if err != nil {
+		f.log.Warn("read live nodes", "err", err)
+		return out
+	}
+	for _, row := range rows {
+		if !row.Connected || row.UsersJSON == "" {
+			continue
+		}
+		var users map[string]int64
+		if err := json.Unmarshal([]byte(row.UsersJSON), &users); err != nil {
+			continue
+		}
+		for userID, since := range users {
+			if previous, ok := newest[userID]; !ok || since > previous {
+				out[userID], newest[userID] = row.NodeID, since
+			}
 		}
 	}
 	return out
-}
-
-// NetworkUsage returns the latest host-network sample received from a connected node. The timestamp is when the
-// panel received that sample, so callers can hide percentages when the agent stops reporting.
-func (f *Fleet) NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool) {
-	s := f.session(nodeID)
-	if s == nil {
-		return 0, 0, time.Time{}, false
-	}
-	view := s.view.Load()
-	if view == nil || view.Live.Metrics == nil || view.Live.MetricsAt.IsZero() {
-		return 0, 0, time.Time{}, false
-	}
-	return view.Live.Metrics.NetRxBps, view.Live.Metrics.NetTxBps, view.Live.MetricsAt, true
-}
-
-// CPUUsage returns the CPU use of the latest host sample of a connected node, with the time the panel received it.
-func (f *Fleet) CPUUsage(nodeID string) (pct float64, sampledAt time.Time, ok bool) {
-	s := f.session(nodeID)
-	if s == nil {
-		return 0, time.Time{}, false
-	}
-	view := s.view.Load()
-	if view == nil || view.Live.Metrics == nil || view.Live.MetricsAt.IsZero() {
-		return 0, time.Time{}, false
-	}
-	return float64(view.Live.Metrics.CpuPct), view.Live.MetricsAt, true
 }
 
 func (f *Fleet) snapshotSessions() []*session {
@@ -302,10 +294,6 @@ func (f *Fleet) snapshotSessions() []*session {
 	}
 	return out
 }
-
-// AgentConnected reports whether the node's agent holds a live session with the panel (access.AgentSessionSource: the
-// user page calls a server that answers "online").
-func (f *Fleet) AgentConnected(nodeID string) bool { return f.session(nodeID) != nil }
 
 func (f *Fleet) session(nodeID string) *session {
 	f.mu.Lock()
@@ -344,12 +332,19 @@ func (f *Fleet) sweep(ctx context.Context) {
 		f.log.Warn("sweep", "err", err)
 		return
 	}
-	now := f.now()
+	liveRows, err := f.Live(ctx)
+	if err != nil {
+		f.log.Warn("sweep live nodes", "err", err)
+		return
+	}
+	liveByID := liveRowsByID(liveRows)
+	now := f.now().UTC()
 	for _, n := range nodes {
-		if n.State != "active" || f.session(n.ID) != nil {
+		live := liveByID[n.ID]
+		if n.State != "active" || live.Connected {
 			continue
 		}
-		last := latest(n.LastSeenAt, n.LastDisconnectedAt, n.LastConnectedAt)
+		last := latest(live.LastSeenAt, n.LastSeenAt, n.LastDisconnectedAt, n.LastConnectedAt)
 		if last.IsZero() || now.Sub(last) < blipWindow {
 			continue
 		}

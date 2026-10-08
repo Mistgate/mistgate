@@ -126,14 +126,10 @@ func inboundsOf(all map[string]map[string]string, nodeID string) map[string]stri
 	return map[string]string{}
 }
 
-// statusOf derives the status shown in the UI from the stored state, the stream registry and time. enabled is the node's
+// statusOf derives the status shown in the UI from the stored state, its live projection and time. enabled is the node's
 // enabled inbounds (inbound id -> profile name); nil when the caller needs the status alone, and then the reasons that
 // count profiles (no_profiles, the profile and the counts of inbound_failed) are left out.
-func (f *Fleet) statusOf(ctx context.Context, n store.NodeRow, s *session, enabled map[string]string, now time.Time) nodeStatus {
-	return f.statusOfView(ctx, n, sessionViewOf(s), enabled, now)
-}
-
-func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, view *sessionView, enabled map[string]string, now time.Time) nodeStatus {
+func (f *Fleet) statusOfLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, enabled map[string]string, now time.Time) nodeStatus {
 	switch n.State {
 	case "retired":
 		return nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_RETIRED}
@@ -152,13 +148,14 @@ func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, view *session
 	if f.updating(n.ID) { // a rollout step is in flight: the agent re-executes and its stream drops for seconds
 		return nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_UPDATING}
 	}
-	if view != nil {
+	if live.Connected {
+		view := decodeLiveView(live)
 		st := nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_ONLINE}
-		drift := view.State.Drift
-		var failed []*agentv1.InboundHealth
-		for _, h := range view.Live.Health {
-			_, known := enabled[h.InboundId]
-			if h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED && (enabled == nil || known) {
+		drift := live.Drift
+		var failed []liveJSONHealth
+		for _, h := range view.Health {
+			_, known := enabled[h.InboundID]
+			if h.RunState == "failed" && (enabled == nil || known) {
 				failed = append(failed, h)
 			}
 		}
@@ -166,9 +163,9 @@ func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, view *session
 		case len(failed) > 0:
 			// failed of total: one profile of three down is "works partly", all of them is "broken"
 			first := failed[0]
-			st.reason = reason("inbound_failed", "inbound", first.InboundId, "error", first.Detail)
+			st.reason = reason("inbound_failed", "inbound", first.InboundID, "error", first.Detail)
 			if enabled != nil {
-				st.reason.Params["profile"] = enabled[first.InboundId]
+				st.reason.Params["profile"] = enabled[first.InboundID]
 				st.reason.Params["failed"] = fmt.Sprint(len(failed))
 				st.reason.Params["total"] = fmt.Sprint(max(len(enabled), len(failed)))
 			}
@@ -198,16 +195,13 @@ func (f *Fleet) statusOfView(ctx context.Context, n store.NodeRow, view *session
 	return nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_DOWN, reason: reason("agent_silent", "minutes", minutes)}
 }
 
-func onlineByProtocolView(view *sessionView) map[string]uint32 {
+func onlineByProtocolView(view liveJSONView) map[string]uint32 {
 	seen := map[string]map[string]bool{}
-	if view == nil {
-		return map[string]uint32{}
-	}
-	for _, o := range view.Live.Online {
-		if seen[o.protocol] == nil {
-			seen[o.protocol] = map[string]bool{}
+	for _, o := range view.Online {
+		if seen[o.Protocol] == nil {
+			seen[o.Protocol] = map[string]bool{}
 		}
-		seen[o.protocol][o.userID] = true
+		seen[o.Protocol][o.UserID] = true
 	}
 	out := map[string]uint32{}
 	for p, u := range seen {
@@ -232,7 +226,7 @@ func pct(used, total uint64) float32 {
 	return float32(float64(used) * 100 / float64(total))
 }
 
-// nodeMsg builds the Node message. protos, todayBytes and enabled (see statusOf) are looked up by the caller once per
+// nodeMsg builds the Node message. protos, todayBytes, enabled and live are looked up by the caller once per
 // request.
 func capabilityPresent(caps []string, want string) bool {
 	for _, cap := range caps {
@@ -243,33 +237,26 @@ func capabilityPresent(caps []string, want string) bool {
 	return false
 }
 
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time) *adminv1.Node {
-	return f.nodeMsgView(ctx, n, protos, todayBytes, enabled, now, sessionViewOf(f.session(n.ID)))
-}
-
-func (f *Fleet) nodeMsgView(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, view *sessionView) *adminv1.Node {
-	st := f.statusOfView(ctx, n, view, enabled, now)
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow) *adminv1.Node {
+	view := decodeLiveView(live)
+	st := f.statusOfLive(ctx, n, live, enabled, now)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
-		LastSeenUnix: fleetUnix(n.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
+		LastSeenUnix: fleetUnix(live.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
 	}
-	caps := n.AgentCaps
-	if view != nil {
-		caps = view.State.Capabilities
-	}
+	caps := live.AgentCaps
 	out.TorrentBlockerSupported = capabilityPresent(caps, capTorrentGuard)
 	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
-	if view != nil {
+	if live.Connected {
 		out.Online = protocolCounts(onlineByProtocolView(view))
-		out.LastSeenUnix = view.State.LastSeenAt.Unix()
-		if m := view.Live.Metrics; m != nil {
-			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, m.CpuPct, pct(m.RamUsedBytes, m.RamTotalBytes), m.UptimeS
+		if m := view.Metrics; m != nil {
+			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, float32(m.CPUPct), pct(m.RAMUsedBytes, m.RAMTotalBytes), m.UptimeS
 		}
 	}
-	out.Warp = f.warpSummary(ctx, n.ID, view != nil, now)
+	out.Warp = f.warpSummary(ctx, n.ID, live.Connected, now)
 	return out
 }
 
@@ -278,13 +265,6 @@ func fleetUnix(t time.Time) int64 {
 		return 0
 	}
 	return t.Unix()
-}
-
-func sessionViewOf(s *session) *sessionView {
-	if s == nil {
-		return nil
-	}
-	return s.view.Load()
 }
 
 // todayBytesByNode sums up+down per node since 00:00 UTC.
@@ -321,9 +301,14 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node inbounds", err)
 	}
+	liveRows, err := f.liveView(ctx)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node live", err)
+	}
+	live := liveRowsByID(liveRows)
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -376,8 +361,12 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node UDP port check senders", err)
 	}
-	view := sessionViewOf(f.session(n.ID))
-	resp.Node = f.nodeMsgView(ctx, n, protos, today[n.ID], enabled, now, view)
+	live, err := f.liveRowsForNode(ctx, n.ID, true)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node live", err)
+	}
+	view := decodeLiveView(live)
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live)
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -394,12 +383,11 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	for _, row := range inbounds {
 		resp.Inbounds = append(resp.Inbounds, f.inboundMsg(n, row))
 	}
-	if view != nil {
-		if view.Live.Metrics != nil {
-			m := view.Live.Metrics
-			resp.Metrics = &adminv1.NodeMetrics{CpuPct: m.CpuPct, SoftirqPct: m.SoftirqPct, Load1: m.Load1, RamUsedBytes: m.RamUsedBytes,
-				RamTotalBytes: m.RamTotalBytes, DiskUsedBytes: m.DiskUsedBytes, DiskTotalBytes: m.DiskTotalBytes,
-				NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, AtUnix: now.Unix()}
+	if live.Connected {
+		if m := view.Metrics; m != nil {
+			resp.Metrics = &adminv1.NodeMetrics{CpuPct: float32(m.CPUPct), SoftirqPct: float32(m.SoftirqPct), Load1: float32(m.Load1), RamUsedBytes: m.RAMUsedBytes,
+				RamTotalBytes: m.RAMTotalBytes, DiskUsedBytes: m.DiskUsedBytes, DiskTotalBytes: m.DiskTotalBytes,
+				NetRxBps: m.RxBPS, NetTxBps: m.TxBPS, AtUnix: view.MetricsAtUnix}
 		}
 		resp.OnlineUsers, err = f.onlineUsers(ctx, view)
 		if err != nil {
@@ -442,15 +430,12 @@ func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv
 	return connect.NewResponse(&adminv1.CheckPortsResponse{Ports: rows, Sender: senderName, ErrorCode: errorCode}), nil
 }
 
-func (f *Fleet) onlineUsers(ctx context.Context, view *sessionView) ([]*adminv1.OnlineUser, error) {
-	if view == nil {
-		return nil, nil
-	}
-	online := append([]onlineSess(nil), view.Live.Online...)
-	down := view.Live.UserDown
+func (f *Fleet) onlineUsers(ctx context.Context, view liveJSONView) ([]*adminv1.OnlineUser, error) {
+	online := append([]liveJSONOnline(nil), view.Online...)
+	down := view.UserDownBPS
 	var uids, dids []string
 	for _, o := range online {
-		uids, dids = append(uids, o.userID), append(dids, o.deviceID)
+		uids, dids = append(uids, o.UserID), append(dids, o.DeviceID)
 	}
 	names, err := f.st.FleetUserNames(ctx, uids)
 	if err != nil {
@@ -460,11 +445,11 @@ func (f *Fleet) onlineUsers(ctx context.Context, view *sessionView) ([]*adminv1.
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(online, func(i, j int) bool { return online[i].since.Before(online[j].since) })
+	sort.Slice(online, func(i, j int) bool { return online[i].SinceUnix < online[j].SinceUnix })
 	out := make([]*adminv1.OnlineUser, 0, len(online))
 	for _, o := range online {
-		out = append(out, &adminv1.OnlineUser{UserId: o.userID, UserName: names[o.userID], Protocol: o.protocol,
-			DeviceModel: models[o.deviceID], ConnectedAtUnix: o.since.Unix(), DownBps: down[o.userID]})
+		out = append(out, &adminv1.OnlineUser{UserId: o.UserID, UserName: names[o.UserID], Protocol: o.Protocol,
+			DeviceModel: models[o.DeviceID], ConnectedAtUnix: o.SinceUnix, DownBps: down[o.UserID]})
 	}
 	return out, nil
 }
@@ -547,7 +532,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	}
 	f.audit(ctx, "node.create_enrollment", map[string]string{"node_id": n.ID, "name": n.Name}) // never the token
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now),
+		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}),
 		InstallCommand: installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token),
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
@@ -662,11 +647,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			caps := cur.AgentCaps
-			if sess := f.session(cur.ID); sess != nil {
-				caps = sess.caps
-			}
-			if !capabilityPresent(caps, capTorrentGuard) {
+			if !capabilityPresent(cur.AgentCaps, capTorrentGuard) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -685,11 +666,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			caps := cur.AgentCaps
-			if sess := f.session(cur.ID); sess != nil {
-				caps = sess.caps
-			}
-			if !capabilityPresent(caps, capClientIPv6) {
+			if !capabilityPresent(cur.AgentCaps, capClientIPv6) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -707,6 +684,10 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 		if cur, err := f.st.Node(ctx, m.NodeId); err == nil { // a missing node is answered by the update
 			oldAddress = cur.Address
 		}
+	}
+	live, err := f.liveRowsForNode(ctx, m.NodeId, true)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node live projection", err)
 	}
 	n, err := f.st.UpdateNode(ctx, m.NodeId, p)
 	switch {
@@ -732,7 +713,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, now)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now)}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live)}), nil
 }
 
 // staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the

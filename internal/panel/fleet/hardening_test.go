@@ -174,7 +174,7 @@ func TestStatsFutureEndDoesNotFreezeLiveView(t *testing.T) {
 	c.send(1, statsBatch(year-10, year, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: year}}))
 	c.send(2, statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 5}}))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 2 })
-	on := e.f.Online()
+	on := e.f.Online(e.ctx)
 	if len(on) != 1 || on[0].UserID != "usr_erin" {
 		t.Fatalf("online after a future-dated batch and an honest one: %+v", on)
 	}

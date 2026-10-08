@@ -218,8 +218,17 @@ func newEnv(t *testing.T) *env {
 // envFleet is the fake fleet: live nodes and a count of StateChanged calls.
 type envFleet env
 
-func (f *envFleet) Live(id string) (bool, []string, bool) { return f.live[id], nil, false }
-func (f *envFleet) OnlineByInbound() map[string]int       { return f.online }
+func (f *envFleet) Live(context.Context) ([]store.NodeLiveRow, error) {
+	rows := make([]store.NodeLiveRow, 0, len(f.live))
+	for id, connected := range f.live {
+		rows = append(rows, store.NodeLiveRow{NodeID: id, State: "active", Exists: connected, Connected: connected})
+	}
+	return rows, nil
+}
+func (f *envFleet) NodeLive(_ context.Context, nodeID string) (store.NodeLiveRow, error) {
+	return store.NodeLiveRow{NodeID: nodeID, State: "active", Exists: f.live[nodeID], Connected: f.live[nodeID]}, nil
+}
+func (f *envFleet) OnlineByInbound(context.Context) map[string]int { return f.online }
 func (f *envFleet) WarpPauseApplied(context.Context, string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()

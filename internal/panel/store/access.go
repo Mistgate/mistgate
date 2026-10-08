@@ -77,18 +77,26 @@ type AccessNode struct {
 	ID, Name, Address, CountryCode, Location, Provider string
 	BandwidthMbps                                      int
 	State                                              string // pending | active | retired
+	LastSeenAt                                         time.Time
+	AgentCaps                                          []string
 }
 
 const accNodeCols = `n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code AS node_country_code,
-	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state`
+	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state,
+	n.last_seen_at AS node_last_seen_at, n.agent_caps AS node_agent_caps`
 
 func scanAccessNode(r rowScanner) (AccessNode, error) {
 	var n AccessNode
-	var id, name, address, country, location, provider, state sql.NullString
+	var id, name, address, country, location, provider, state, caps sql.NullString
 	var bandwidth sql.NullInt64
-	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state)
+	var seen int64
+	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state, &seen, &caps)
 	n.ID, n.Name, n.Address, n.CountryCode = id.String, name.String, address.String, country.String
 	n.Location, n.Provider, n.BandwidthMbps, n.State = location.String, provider.String, int(bandwidth.Int64), state.String
+	n.LastSeenAt = fleetTime(seen)
+	if caps.String != "" {
+		n.AgentCaps = strings.Fields(caps.String)
+	}
 	return n, err
 }
 

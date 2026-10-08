@@ -491,6 +491,7 @@ type pass struct {
 	ctx   context.Context
 	ro    store.RolloutRow
 	steps []store.StepRow
+	live  map[string]store.NodeLiveRow
 	now   time.Time
 }
 
@@ -511,7 +512,16 @@ func (s *Service) tick(ctx context.Context) {
 		s.log.Warn("update: load steps", "err", err)
 		return
 	}
-	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, now: s.now()}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		s.log.Warn("update: load live nodes", "err", err)
+		return
+	}
+	live := make(map[string]store.NodeLiveRow, len(liveRows))
+	for _, row := range liveRows {
+		live[row.NodeID] = row
+	}
+	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, live: live, now: s.now()}
 	for i := range p.steps {
 		switch p.steps[i].State {
 		case store.StepSent:
@@ -589,14 +599,13 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 	}
 }
 
-func (p *pass) node(x *store.StepRow) (n store.NodeRow, connected bool, ok bool) {
+func (p *pass) node(x *store.StepRow) (n store.NodeRow, live store.NodeLiveRow, ok bool) {
 	n, err := p.s.st.Node(p.ctx, x.NodeID)
 	if err != nil {
 		p.s.log.Warn("update: load node", "node", x.NodeID, "err", err)
-		return n, false, false
+		return n, store.NodeLiveRow{}, false
 	}
-	connected, _, _ = p.s.fl.Live(x.NodeID)
-	return n, connected, true
+	return n, p.live[x.NodeID], true
 }
 
 // recentLast returns the node's reported last update when it is about this rollout's build and newer than the step.
@@ -612,10 +621,11 @@ func (p *pass) recentLast(n store.NodeRow, x *store.StepRow) (store.LastUpdateRo
 // itself back, or the deadline passes.
 func (p *pass) advanceSent(i int) {
 	x := &p.steps[i]
-	n, connected, ok := p.node(x)
+	n, live, ok := p.node(x)
 	if !ok {
 		return
 	}
+	connected := live.Connected
 	if connected && n.AgentBuilt >= p.ro.ToBuilt {
 		x.State, x.ReconnectedAt = store.StepGating, p.now
 		p.save(x)
@@ -710,8 +720,10 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 		delete(s.failing, x.NodeID)
 	}
 	if s.hl != nil {
-		probeable, ok, _ := s.hl.NodeChecksSince(p.ctx, x.NodeID, x.ReconnectedAt)
-		if probeable > 0 && ok < probeable {
+		probeable, ok, _, err := s.hl.NodeChecksSince(p.ctx, x.NodeID, x.ReconnectedAt)
+		if err != nil {
+			miss(errProbeFailed)
+		} else if probeable > 0 && ok < probeable {
 			miss(errProbeFailed)
 			if _, _, _, err := s.hl.RunChecksNow(p.ctx, x.NodeID); err != nil {
 				s.log.Warn("update: run checks", "node", x.NodeID, "err", err)
@@ -728,10 +740,11 @@ func (p *pass) advanceGate(i int) {
 	if s.inflight[x.NodeID] {
 		return // a RollbackAgent is on its way
 	}
-	n, connected, ok := p.node(x)
+	n, live, ok := p.node(x)
 	if !ok {
 		return
 	}
+	connected := live.Connected
 	deadline := !p.now.Before(x.ReconnectedAt.Add(s.cfg.GateWait))
 	if connected && n.AgentBuilt < p.ro.ToBuilt { // the old build is running again: it rolled itself back (or the guard did)
 		if lu, ok := p.recentLast(n, x); ok && lu.Outcome == "rolled_back" {
@@ -752,8 +765,7 @@ func (p *pass) advanceGate(i int) {
 		}
 		return
 	}
-	_, _, drift := s.fl.Live(x.NodeID)
-	g := p.gate(x, n, drift)
+	g := p.gate(x, n, live.Drift)
 	switch {
 	case g.pass:
 		p.finish(x, store.StepPassed, "", nil)
@@ -885,16 +897,15 @@ func (p *pass) launch() {
 		if x.State != store.StepPending || x.Stage != stage {
 			continue
 		}
-		n, connected, ok := p.node(x)
+		n, live, ok := p.node(x)
 		if !ok {
 			continue
 		}
-		_, caps, _ := s.fl.Live(x.NodeID)
 		switch {
-		case !connected:
+		case !live.Connected:
 			p.finish(x, store.StepSkipped, errOffline, nil)
 			continue
-		case !slices.Contains(caps, capUpdate):
+		case !slices.Contains(live.AgentCaps, capUpdate):
 			p.finish(x, store.StepSkipped, errUnsupported, nil)
 			continue
 		case n.AgentBuilt >= p.ro.ToBuilt:
@@ -959,8 +970,14 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 			}
 			p.finish(x, store.StepSkipped, key, nil)
 		case connect.CodeDeadlineExceeded: // no answer in AnswerWait: the node may still have updated; look before judging
-			if n, connected, ok := p.node(x); ok && connected && n.AgentBuilt >= p.ro.ToBuilt {
-				return
+			if n, nodeErr := s.st.Node(ctx, x.NodeID); nodeErr == nil {
+				live, liveErr := s.fl.NodeLive(ctx, x.NodeID)
+				if liveErr != nil {
+					return // the next pass can decide with a fresh projection
+				}
+				if live.Connected && n.AgentBuilt >= p.ro.ToBuilt {
+					return
+				}
 			}
 			p.finish(x, store.StepFailed, errNoAnswer, nil)
 			p.pause(pauseGateFailed, x, errNoAnswer)

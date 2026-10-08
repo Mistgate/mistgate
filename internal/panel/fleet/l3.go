@@ -228,11 +228,7 @@ func (f *Fleet) checkAwgBackend(ctx context.Context, n store.NodeRow, value stri
 	if !has {
 		return nil
 	}
-	caps := n.AgentCaps
-	if _, live, _ := f.Live(n.ID); live != nil {
-		caps = live
-	}
-	if !slices.Contains(caps, capAWG) {
+	if !slices.Contains(n.AgentCaps, capAWG) {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	return nil

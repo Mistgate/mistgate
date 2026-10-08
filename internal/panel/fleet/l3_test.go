@@ -629,11 +629,11 @@ func TestWarpEventsReachTheModuleWithoutBlockingTheStream(t *testing.T) {
 }
 
 func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "warp-refresh")
+	e, core, ctx, state, now := coreFixture(t, "warp-refresh")
 	h := hello("instance-warp-refresh", 0, "")
 	h.GetHello().Capabilities = []string{capWarp}
-	started := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
-	s := newTestSession(e, ctx, core, started.State, started.Sidecar)
+	started := stepHello(t, core, ctx, state, now, h.GetHello())
+	s := newTestSession(e, ctx, core, started.State)
 	warpEvent := func(seq uint64, at time.Time) *agentv1.ConnectRequest {
 		return &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{
 			Code: eventWarpAttention, TimeUnix: at.Unix(), Params: map[string]string{"reason": warpReasonRefresh},

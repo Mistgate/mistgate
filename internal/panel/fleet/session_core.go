@@ -26,13 +26,12 @@ const prepareRetryDelay = 3 * time.Second
 // maxCertLife bounds the expiry an agent may report: the self-signed certificates the panel makes live 10 years.
 const maxCertLife = 11 * 365 * 24 * time.Hour
 
-// SessionState is the compact connection protocol state. Larger snapshots live in SessionSidecar.
+// SessionState is the compact connection protocol state. The live admin view is stored in node_live.
 type SessionState struct {
 	Version         uint8     `json:"v"`
 	NodeID          string    `json:"n,omitempty"`
 	OwnerGeneration uint64    `json:"o,omitempty"`
 	InstanceID      string    `json:"i,omitempty"`
-	Capabilities    []string  `json:"c,omitempty"`
 	LivenessNanos   int64     `json:"l,omitempty"`
 	HelloDeadline   time.Time `json:"h,omitzero"`
 	// LivenessDeadline keeps Go's monotonic reading on the VPS: a wall-clock step cannot close a live session.
@@ -64,23 +63,12 @@ type SessionState struct {
 	Pending               map[string]PendingRequest `json:"pr,omitempty"`
 	L3                    l3MemoState               `json:"m,omitzero"`
 	Disconnected          bool                      `json:"z,omitempty"`
-	SidecarVersion        uint32                    `json:"sv,omitempty"`
 }
 
 // PoisonBatch identifies the last stats batch refused by the store.
 type PoisonBatch struct {
 	Instance string `json:"i"`
 	Seq      uint64 `json:"s"`
-}
-
-// LiveSnapshot is the current admin view of one agent, refreshed only by accepted StatsBatch messages.
-type LiveSnapshot struct {
-	Metrics   *agentv1.HostMetrics
-	MetricsAt time.Time
-	Health    []*agentv1.InboundHealth
-	Online    []onlineSess
-	UserDown  map[string]uint64
-	UserUp    map[string]uint64
 }
 
 // PendingRequest is serialized request metadata. VPS channels remain in the adapter; edge delivery is a later round.
@@ -98,12 +86,6 @@ const (
 	PendingLog
 	PendingAutoBandwidth
 )
-
-// SessionSidecar holds live state that is too large for SessionState.
-type SessionSidecar struct {
-	Version uint32
-	Live    LiveSnapshot
-}
 
 // EventKind identifies one input that the session core can process.
 type EventKind uint8
@@ -202,8 +184,7 @@ type preparedDesiredState struct {
 
 type coreTransition struct {
 	Transition
-	state   *SessionState
-	sidecar *SessionSidecar
+	state *SessionState
 }
 
 // SessionCore processes one event at a time without owning goroutines, timers, channels, or transports.
@@ -212,14 +193,14 @@ type SessionCore struct{ f *Fleet }
 // NewSessionCore creates a session transition engine backed by fleet services.
 func NewSessionCore(f *Fleet) *SessionCore { return &SessionCore{f: f} }
 
-// Step processes one event and writes the resulting state and sidecar back to the supplied session.
+// Step processes one event and writes the resulting protocol state back to the supplied session.
 // On error the caller must end the session; state may already reflect work completed before the error.
-func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *SessionSidecar, event SessionEvent) (Transition, error) {
+func (c *SessionCore) Step(ctx context.Context, state *SessionState, event SessionEvent) (Transition, error) {
 	if c == nil || c.f == nil {
 		return Transition{}, errors.New("session core has no fleet")
 	}
-	if state == nil || sidecar == nil {
-		return Transition{}, errors.New("session state and sidecar are required")
+	if state == nil {
+		return Transition{}, errors.New("session state is required")
 	}
 	if event.At.IsZero() {
 		return Transition{}, errors.New("session event time is required")
@@ -227,16 +208,7 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 	if state.Version == 0 {
 		state.Version = sessionStateVersion
 	}
-	if sidecar.Version == 0 {
-		sidecar.Version = 1
-	}
-	if sidecar.Live.UserDown == nil {
-		sidecar.Live.UserDown = map[string]uint64{}
-	}
-	if sidecar.Live.UserUp == nil {
-		sidecar.Live.UserUp = map[string]uint64{}
-	}
-	tr := coreTransition{state: state, sidecar: sidecar}
+	tr := coreTransition{state: state}
 	if tr.state.Disconnected {
 		return tr.Transition, nil
 	}
@@ -335,21 +307,17 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	}
 	tr.state.Version = sessionStateVersion
 	tr.state.InstanceID = h.InstanceId
-	tr.state.Capabilities = capabilities(h)
 	tr.state.HelloDeadline = time.Time{}
 	tr.state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	tr.state.LastSeenAt = event.At
 	tr.state.LivenessDeadline = event.At.Add(time.Duration(tr.state.LivenessNanos))
 	tr.state.NextCertCheck = event.At.Add(c.f.certCheck)
-	tr.state.SidecarVersion = tr.sidecar.Version
 	tr.state.HelloAppliedRevision = h.AppliedRevision
 	tr.state.HelloAppliedStateHash = h.AppliedStateHash
-	tr.sidecar.Live.UserDown = map[string]uint64{}
-	tr.sidecar.Live.UserUp = map[string]uint64{}
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
-	autoMeasure = autoMeasure && slices.Contains(tr.state.Capabilities, capBandwidth)
-	settings := nodeSettings(node, tr.state.Capabilities)
+	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
+	settings := nodeSettings(node, info.Caps)
 	tr.state.SentSettingsHash = settingsSig(settings)
 	if autoMeasure {
 		tr.state.AutoBandwidthDeadline = event.At.Add(c.f.measureDelay)
@@ -452,12 +420,15 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	if g.rejected > 0 {
 		c.rejectStats(ctx, tr.state, g, now)
 	}
-	projectionState, projectionLive := *tr.state, tr.sidecar.Live
+	projectionState := *tr.state
 	projectionTooLarge := false
+	var projectionEnd int64
+	projectionBuilt := false
 	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
 		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic}
 	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
-		live, tooLarge := buildFleetLive(projectionState, projectionLive, st, g.traffic, now, refs)
+		live, end, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
+		projectionEnd, projectionBuilt = end, true
 		projectionTooLarge = projectionTooLarge || tooLarge
 		return live
 	}
@@ -500,7 +471,9 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	}
 	tr.state.Poison = nil
 	if !out.Duplicate {
-		applyCoreSnapshot(tr.state, &tr.sidecar.Live, st, g.traffic, now, out.Refs)
+		if projectionBuilt && projectionEnd >= tr.state.LastEndUnix {
+			tr.state.LastEndUnix = projectionEnd
+		}
 		c.l3Stats(ctx, tr.state, st, now)
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", tr.state.NodeID, "count", out.Skipped)
@@ -554,9 +527,10 @@ type liveJSONOnline struct {
 	SinceUnix int64  `json:"since_unix"`
 }
 
-// buildCoreSnapshot returns the next live sidecar value without changing session or sidecar state.
-func buildCoreSnapshot(state SessionState, current LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
-	now time.Time, refs map[string]store.FleetCredRef) (LiveSnapshot, int64, bool) {
+// buildFleetLive builds a new projection from an accepted stats batch. Every batch of the agent carries the host
+// metrics, so nothing is carried over from the previous row (reading it would cost up to 1.5 MB per batch on D1).
+func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
+	now time.Time, refs map[string]store.FleetCredRef) (store.FleetLive, int64, bool) {
 	end := st.IntervalEndUnix
 	// An end time from the future would make every later (honest) batch look older and freeze the live
 	// view: clamp it like the bucket hour.
@@ -564,15 +538,38 @@ func buildCoreSnapshot(state SessionState, current LiveSnapshot, st *agentv1.Sta
 		end = now.Unix()
 	}
 	if end < state.LastEndUnix {
-		return current, end, false // an older batch resent after a reconnect
+		return store.FleetLive{}, end, false // an older batch resent after a reconnect
 	}
-	live := current
-	if st.Host != nil {
-		live.Metrics = st.Host
-		live.MetricsAt = now
+	const maxRate = uint64(1 << 50)
+	view := liveJSONView{
+		IntervalEndUnix: end,
+		Health:          make([]liveJSONHealth, 0, min(len(st.Health), 64)),
+		Online:          make([]liveJSONOnline, 0, min(len(st.Sessions), 2000)),
+		UserDownBPS:     make(map[string]uint64),
 	}
-	live.Health = st.Health
-	live.Online = make([]onlineSess, 0, len(st.Sessions))
+	projection := store.FleetLive{Apply: true, Drift: state.Drift}
+	if metrics := st.Host; metrics != nil {
+		cpu := clampLiveFloat(float64(metrics.CpuPct), 0, 100)
+		rxBPS, txBPS := min(metrics.NetRxBps, maxRate), min(metrics.NetTxBps, maxRate)
+		view.MetricsAtUnix = now.Unix()
+		view.Metrics = &liveJSONMetrics{
+			CPUPct: cpu, SoftirqPct: finiteLiveFloat(float64(metrics.SoftirqPct)), Load1: finiteLiveFloat(float64(metrics.Load1)),
+			RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes,
+			DiskUsedBytes: metrics.DiskUsedBytes, DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: rxBPS, TxBPS: txBPS, UptimeS: metrics.UptimeS,
+		}
+		projection.SampleAt, projection.RxBps, projection.TxBps = view.MetricsAtUnix, rxBPS, txBPS
+		projection.CPUPct = int64(math.Round(cpu))
+	}
+	for _, h := range st.Health {
+		if len(view.Health) == 64 {
+			break
+		}
+		if h == nil {
+			continue
+		}
+		view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
+	}
+	users := make(map[string]int64)
 	for i, se := range st.Sessions {
 		if i == maxStatsDeltas {
 			break
@@ -585,96 +582,34 @@ func buildCoreSnapshot(state SessionState, current LiveSnapshot, st *agentv1.Sta
 		if se.ConnectedAtUnix <= 0 || since.After(now) {
 			since = now
 		}
-		live.Online = append(live.Online, onlineSess{userID: ref.UserID, deviceID: ref.DeviceID, protocol: ref.Protocol,
-			inboundID: se.InboundId, since: since})
+		sinceUnix := since.Unix()
+		if previous, ok := users[ref.UserID]; !ok || sinceUnix > previous {
+			users[ref.UserID] = sinceUnix
+		}
+		if len(view.Online) < 2000 {
+			view.Online = append(view.Online, liveJSONOnline{UserID: ref.UserID, DeviceID: ref.DeviceID,
+				Protocol: ref.Protocol, InboundID: clip(se.InboundId, 64), SinceUnix: sinceUnix})
+		}
 	}
 	secs := uint64(min(max(1, end-st.IntervalStartUnix), int64(maxBatchSpan/time.Second)))
-	live.UserDown, live.UserUp = map[string]uint64{}, map[string]uint64{}
 	for _, d := range traffic {
 		if ref, ok := refs[d.CredID]; ok {
-			live.UserDown[ref.UserID] = satAdd(live.UserDown[ref.UserID], d.Down*8/secs)
-			live.UserUp[ref.UserID] = satAdd(live.UserUp[ref.UserID], d.Up*8/secs)
+			view.UserDownBPS[ref.UserID] = satAdd(view.UserDownBPS[ref.UserID], d.Down*8/secs)
+			view.UploadBPS = satAdd(view.UploadBPS, d.Up*8/secs)
 		}
 	}
-	return live, end, true
-}
-
-// applyCoreSnapshot replaces the live view with the newest absolute snapshot.
-func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic, now time.Time, refs map[string]store.FleetCredRef) bool {
-	next, end, ok := buildCoreSnapshot(*state, *live, st, traffic, now, refs)
-	if !ok {
-		return false
+	for userID, rate := range view.UserDownBPS {
+		view.UserDownBPS[userID] = min(rate, maxRate)
 	}
-	state.LastEndUnix = end
-	*live = next
-	return true
-}
-
-func buildFleetLive(state SessionState, current LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
-	now time.Time, refs map[string]store.FleetCredRef) (store.FleetLive, bool) {
-	live, end, ok := buildCoreSnapshot(state, current, st, traffic, now, refs)
-	if !ok {
-		return store.FleetLive{}, false
-	}
-	const maxRate = uint64(1 << 50)
-	view := liveJSONView{
-		IntervalEndUnix: end,
-		Health:          make([]liveJSONHealth, 0, min(len(live.Health), 64)),
-		Online:          make([]liveJSONOnline, 0, min(len(live.Online), 2000)),
-		UserDownBPS:     make(map[string]uint64),
-	}
-	if !live.MetricsAt.IsZero() {
-		view.MetricsAtUnix = live.MetricsAt.Unix()
-	}
-	projection := store.FleetLive{Apply: true, Drift: state.Drift, SampleAt: view.MetricsAtUnix}
-	if metrics := live.Metrics; metrics != nil {
-		cpu := clampLiveFloat(float64(metrics.CpuPct), 0, 100)
-		rxBPS, txBPS := min(metrics.NetRxBps, maxRate), min(metrics.NetTxBps, maxRate)
-		view.Metrics = &liveJSONMetrics{
-			CPUPct: cpu, SoftirqPct: finiteLiveFloat(float64(metrics.SoftirqPct)), Load1: finiteLiveFloat(float64(metrics.Load1)),
-			RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes,
-			DiskUsedBytes: metrics.DiskUsedBytes, DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: rxBPS, TxBPS: txBPS, UptimeS: metrics.UptimeS,
-		}
-		projection.RxBps, projection.TxBps = rxBPS, txBPS
-		projection.CPUPct = int64(math.Round(cpu))
-	}
-	for _, h := range live.Health {
-		if len(view.Health) == 64 {
-			break
-		}
-		if h == nil {
-			continue
-		}
-		view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
-	}
-	users := make(map[string]int64)
-	for _, online := range live.Online {
-		since := online.since.Unix()
-		if previous, ok := users[online.userID]; !ok || since > previous {
-			users[online.userID] = since
-		}
-	}
-	for _, online := range live.Online[:min(len(live.Online), 2000)] {
-		view.Online = append(view.Online, liveJSONOnline{UserID: online.userID, DeviceID: online.deviceID,
-			Protocol: online.protocol, InboundID: clip(online.inboundID, 64), SinceUnix: online.since.Unix()})
-	}
-	var upload uint64
-	userDownRates := make(map[string]uint64, len(live.UserDown))
-	for userID, rate := range live.UserDown {
-		userDownRates[userID] = min(rate, maxRate)
-	}
-	for _, rate := range live.UserUp {
-		upload = satAdd(upload, rate)
-	}
-	view.UserDownBPS = topRates(userDownRates, 2000)
-	view.UploadBPS = min(upload, maxRate)
+	view.UserDownBPS = topRates(view.UserDownBPS, 2000)
+	view.UploadBPS = min(view.UploadBPS, maxRate)
 	usersJSON, _ := json.Marshal(users)
 	encoded, _ := json.Marshal(view)
 	if len(usersJSON)+len(encoded) > maxFleetLiveJSONBytes {
-		return store.FleetLive{}, true
+		return store.FleetLive{}, end, true
 	}
 	projection.UsersJSON, projection.LiveJSON = string(usersJSON), string(encoded)
-	return projection, false
+	return projection, end, false
 }
 
 const maxFleetLiveJSONBytes = 1_500_000
@@ -959,7 +894,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		return errors.New("prepared desired state has no node state")
 	}
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
-	settings := nodeSettings(node, state.Capabilities)
+	settings := nodeSettings(node, node.AgentCaps)
 	sig := settingsSig(settings)
 	digest := prepared.digest
 	if !state.FullResendPending && state.SentRevision == 0 {
@@ -1110,7 +1045,7 @@ func nextSessionAlarm(state SessionState, now time.Time) *time.Time {
 	return &t
 }
 
-// l3Stats stores the AWG and WARP health from a stats batch; applyCoreSnapshot replaces the stream's live view. A health
+// l3Stats stores the AWG and WARP health from a stats batch; the core writes its live view inline. A health
 // write failure is logged but never fails the batch: health is a snapshot, and the next batch replaces it.
 func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agentv1.StatsBatch, now time.Time) {
 	nodeID := state.NodeID

@@ -206,7 +206,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, "insufficient_disk_space")
 		return
 	}
-	nodeState, stateErr := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID)
+	nodeState, _, stateErr := s.cfg.Nodes.ProvisionNodeState(ctx, job.NodeID)
 	if stateErr != nil && !errors.Is(stateErr, store.ErrNotFound) {
 		s.failJob(ctx, job, "node_state_unavailable")
 		return
@@ -445,14 +445,14 @@ func (s *Service) waitOnline(ctx context.Context, nodeID string) error {
 	ticker := time.NewTicker(s.cfg.RetryDelay)
 	defer ticker.Stop()
 	for {
-		state, err := s.cfg.Nodes.ProvisionNodeState(ctx, nodeID)
+		state, connected, err := s.cfg.Nodes.ProvisionNodeState(ctx, nodeID)
 		if err != nil {
 			return err
 		}
 		if state == "retired" {
 			return store.ErrNodeRetired
 		}
-		if s.cfg.Nodes.ProvisionNodeConnected(nodeID) {
+		if connected {
 			return nil
 		}
 		select {

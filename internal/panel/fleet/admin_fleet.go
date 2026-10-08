@@ -90,6 +90,11 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, internalErr(f.log.Error, "overview nodes", err)
 	}
+	liveRows, err := f.liveView(ctx)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "overview live nodes", err)
+	}
+	liveByID := liveRowsByID(liveRows)
 	hours, err := f.st.FleetHours(ctx, start)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "overview hours", err)
@@ -133,9 +138,9 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 	liveUsers := map[string]bool{}
 	liveByProto := map[string]map[string]bool{}
 	for _, n := range nodes {
-		sess := f.session(n.ID)
-		view := sessionViewOf(sess)
-		st := f.statusOfView(ctx, n, view, inboundsOf(enabled, n.ID), now)
+		row := liveByID[n.ID]
+		view := decodeLiveView(row)
+		st := f.statusOfLive(ctx, n, row, inboundsOf(enabled, n.ID), now)
 		card := &adminv1.NodeCard{Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider,
 			Status: st.status, Reason: st.reason, SparkBytes: make([]uint64, 24)}
 		for i := range 24 {
@@ -144,26 +149,22 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 		if st.problem() {
 			resp.NodesProblem++
 		}
-		if sess != nil {
+		if row.Connected {
 			card.Online = protocolCounts(onlineByProtocolView(view))
-			if view != nil {
-				for _, o := range view.Live.Online {
-					liveUsers[o.userID] = true
-					if liveByProto[o.protocol] == nil {
-						liveByProto[o.protocol] = map[string]bool{}
-					}
-					liveByProto[o.protocol][o.userID] = true
+			for _, o := range view.Online {
+				liveUsers[o.UserID] = true
+				if liveByProto[o.Protocol] == nil {
+					liveByProto[o.Protocol] = map[string]bool{}
 				}
-				for u, bps := range view.Live.UserDown {
-					card.DownBps += bps
-					consumers = append(consumers, consumer{u, n.ID, bps})
-				}
-				for _, bps := range view.Live.UserUp {
-					card.UpBps += bps
-				}
-				if m := view.Live.Metrics; m != nil {
-					card.HasMetrics, card.CpuPct = true, m.CpuPct
-				}
+				liveByProto[o.Protocol][o.UserID] = true
+			}
+			for u, bps := range view.UserDownBPS {
+				card.DownBps += bps
+				consumers = append(consumers, consumer{u, n.ID, bps})
+			}
+			card.UpBps = view.UploadBPS
+			if m := view.Metrics; m != nil {
+				card.HasMetrics, card.CpuPct = true, float32(m.CPUPct)
 			}
 		}
 		resp.Nodes = append(resp.Nodes, card)

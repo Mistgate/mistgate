@@ -24,6 +24,7 @@ type NodeLiveRow struct {
 	UsersJSON  string
 	LiveJSON   string
 	Connected  bool
+	UserOnline bool
 }
 
 // FleetLive is one sanitized projection built from a StatsBatch and its resolved credentials.
@@ -74,7 +75,9 @@ func (s *Store) NodeLive(ctx context.Context, now time.Time, nodeID string, view
 		if err := batchRow(values).Scan(dest...); err != nil {
 			return nil, err
 		}
-		row.LastSeenAt = fromUnix(seenAt)
+		if seenAt > 0 {
+			row.LastSeenAt = fromUnix(seenAt)
+		}
 		row.AgentCaps = strings.Fields(caps.String)
 		row.Exists = liveNodeID.Valid
 		row.Session = session.Int64

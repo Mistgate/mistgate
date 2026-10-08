@@ -11,7 +11,7 @@ func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 		"inb_null", "prf_null", "nod_null", nil, nil, nil, int64(7), nil, nil, nil,
 		nil, nil, nil, nil, nil, nil, nil,
 		"prf_null", nil, nil, nil, nil, nil, nil, nil,
-		"nod_null", nil, nil, nil, nil, nil, nil, nil,
+		"nod_null", nil, nil, nil, nil, nil, nil, nil, int64(0), "",
 	}
 	full, err := scanAccessInboundFull(batchRow(inboundRow))
 	if err != nil {

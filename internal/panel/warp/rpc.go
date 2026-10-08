@@ -23,6 +23,10 @@ func (r rpc) GetWarp(ctx context.Context, req *connect.Request[adminv1.GetWarpRe
 		return nil, err
 	}
 	resp := &adminv1.GetWarpResponse{TosUrl: TOSURL, AgentSupports: s.supports(n)}
+	live, err := s.liveNode(ctx, n.ID)
+	if err != nil {
+		return nil, s.internal("load live node", err)
+	}
 	a, err := s.st.WarpAccount(ctx, n.ID)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -38,8 +42,7 @@ func (r rpc) GetWarp(ctx context.Context, req *connect.Request[adminv1.GetWarpRe
 	}
 	// Applied means the node confirmed the whole desired state that was computed (it carries the account); a
 	// stream is needed for anything to be pending.
-	online, _, _ := s.fl.Live(n.ID)
-	resp.PendingApply = online && n.DesiredHash != n.AppliedHash
+	resp.PendingApply = live.Connected && n.DesiredHash != n.AppliedHash
 	return connect.NewResponse(resp), nil
 }
 

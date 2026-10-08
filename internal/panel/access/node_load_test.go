@@ -3,36 +3,24 @@ package access
 import (
 	"testing"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-type networkUsageFunc func(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
-
-func (f networkUsageFunc) NetworkUsage(nodeID string) (uint64, uint64, time.Time, bool) {
-	return f(nodeID)
-}
-
-func TestCurrentNetworkUtilizationUsesNodeCapacityAndBusierDirection(t *testing.T) {
+func TestCurrentNetworkUtilizationUsesNodeCapacityAndFreshProjection(t *testing.T) {
 	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
-	source := networkUsageFunc(func(nodeID string) (uint64, uint64, time.Time, bool) {
-		switch nodeID {
-		case "de1":
-			return 64_000_000, 10_000_000, now.Add(-time.Second), true
-		case "nl1":
-			return 20_000_000, 30_000_000, now.Add(-2 * time.Second), true
-		case "unknown":
-			return 5_000_000, 1_000_000, now, true
-		case "stale":
-			return 1_000_000, 0, now.Add(-networkSampleMaxAge - time.Second), true
-		case "future":
-			return 1_000_000, 0, now.Add(6 * time.Second), true
-		default:
-			return 0, 0, time.Time{}, false
-		}
-	})
-
+	rows := map[string]store.NodeLiveRow{
+		"de1":       {Connected: true, SampleAt: now.Add(-time.Second).Unix(), RxBps: 64_000_000, TxBps: 10_000_000, CPUPct: 13},
+		"nl1":       {Connected: true, SampleAt: now.Add(-2 * time.Second).Unix(), RxBps: 20_000_000, TxBps: 30_000_000, CPUPct: 5},
+		"unknown":   {Connected: true, SampleAt: now.Unix(), RxBps: 5_000_000, TxBps: 1_000_000, CPUPct: 12},
+		"stale":     {Connected: true, SampleAt: now.Add(-networkSampleMaxAge - time.Second).Unix(), RxBps: 1_000_000},
+		"future":    {Connected: true, SampleAt: now.Add(6 * time.Second).Unix(), RxBps: 1_000_000},
+		"offline":   {Connected: false, SampleAt: now.Unix(), RxBps: 1_000_000},
+		"no-sample": {Connected: true},
+	}
 	usage := CurrentNetworkUtilization(
-		[]string{"de1", "de1", "nl1", "unknown", "stale", "future", "missing", ""},
-		map[string]int{"de1": 100, "nl1": 50}, source, now,
+		[]string{"de1", "de1", "nl1", "unknown", "stale", "future", "offline", "no-sample", "missing", ""},
+		map[string]int{"de1": 100, "nl1": 50}, rows, now,
 	)
 	if len(usage) != 3 {
 		t.Fatalf("got %d samples, want 3: %#v", len(usage), usage)
@@ -43,61 +31,47 @@ func TestCurrentNetworkUtilizationUsesNodeCapacityAndBusierDirection(t *testing.
 	if got := usage["nl1"].LoadPercent; got == nil || *got != 60 {
 		t.Errorf("nl1 utilization = %v, want 60%% (30 Mbps TX / 50 Mbps)", got)
 	}
-	if got := usage["unknown"].LoadPercent; got != nil {
-		t.Errorf("unknown-capacity utilization = %v, want nil", *got)
+	if got := usage["unknown"].LoadPercent; got == nil || *got != 12 {
+		t.Errorf("unknown-capacity CPU utilization = %v, want 12%%", got)
 	}
 	if got := usage["de1"].RxBps; got != 64_000_000 {
 		t.Errorf("de1 receive rate = %d", got)
 	}
 }
 
-// cpuAndNetwork is a source that also reports the CPU, as the fleet does.
-type cpuAndNetwork struct {
-	networkUsageFunc
-	cpu func(nodeID string) (float64, time.Time, bool)
-}
-
-func (s cpuAndNetwork) CPUUsage(nodeID string) (float64, time.Time, bool) { return s.cpu(nodeID) }
-
-func TestCurrentNetworkUtilizationTheCPUCountsAsLoad(t *testing.T) {
+func TestCurrentNetworkUtilizationUsesCPUAndBusierLink(t *testing.T) {
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
-	source := cpuAndNetwork{
-		networkUsageFunc: func(string) (uint64, uint64, time.Time, bool) { return 30_000_000, 5_000_000, now, true },
-		cpu: func(nodeID string) (float64, time.Time, bool) {
-			switch nodeID {
-			case "stale":
-				return 99, now.Add(-networkSampleMaxAge - time.Second), true
-			case "busy-link":
-				return 10.4, now, true
-			}
-			return 71.6, now, true
-		},
+	rows := map[string]store.NodeLiveRow{
+		"no-capacity": {Connected: true, SampleAt: now.Unix(), RxBps: 30_000_000, TxBps: 5_000_000, CPUPct: 72},
+		"busy-link":   {Connected: true, SampleAt: now.Unix(), RxBps: 30_000_000, TxBps: 5_000_000, CPUPct: 10},
+		"stale":       {Connected: true, SampleAt: now.Add(-networkSampleMaxAge - time.Second).Unix(), RxBps: 30_000_000, CPUPct: 99},
 	}
-	got := CurrentNetworkUtilization([]string{"no-capacity", "busy-link", "stale"}, map[string]int{"busy-link": 50, "stale": 100}, source, now)
+	got := CurrentNetworkUtilization([]string{"no-capacity", "busy-link", "stale"}, map[string]int{"busy-link": 50, "stale": 100}, rows, now)
 	if p := got["no-capacity"].LoadPercent; p == nil || *p != 72 {
 		t.Errorf("no capacity set: the CPU is the load, got %v, want 72", p)
 	}
 	if p := got["busy-link"].LoadPercent; p == nil || *p != 60 {
 		t.Errorf("the link busier than the CPU: got %v, want 60 (30 Mbps / 50)", p)
 	}
-	if p := got["stale"].LoadPercent; p == nil || *p != 30 {
-		t.Errorf("a stale CPU sample is ignored: got %v, want 30 (the link)", p)
+	if _, ok := got["stale"]; ok {
+		t.Errorf("a stale projection sample was included: %#v", got["stale"])
 	}
 }
 
-func TestCurrentNetworkUtilizationZeroTrafficAndNoSource(t *testing.T) {
-	now := time.Now()
-	source := networkUsageFunc(func(nodeID string) (uint64, uint64, time.Time, bool) {
-		return 0, 0, now, true
-	})
-	got := CurrentNetworkUtilization([]string{"de1", "nl1"}, map[string]int{"de1": 100}, source, now)
+func TestCurrentNetworkUtilizationZeroTrafficAndEmptyRows(t *testing.T) {
+	now := time.Now().UTC()
+	rows := map[string]store.NodeLiveRow{
+		"de1": {Connected: true, SampleAt: now.Unix()},
+		"nl1": {Connected: true, SampleAt: now.Unix()},
+	}
+	got := CurrentNetworkUtilization([]string{"de1", "nl1"}, map[string]int{"de1": 100}, rows, now)
 	if got["de1"].LoadPercent == nil || *got["de1"].LoadPercent != 0 {
 		t.Errorf("zero traffic with known capacity = %#v, want 0%%", got["de1"])
 	}
-	if got["nl1"].LoadPercent != nil {
-		t.Errorf("zero traffic with unknown capacity = %#v, want nil percent", got["nl1"])
+	if got["nl1"].LoadPercent == nil || *got["nl1"].LoadPercent != 0 {
+		t.Errorf("zero CPU without capacity = %#v, want 0%%", got["nl1"])
 	}
 	if got := CurrentNetworkUtilization([]string{"de1"}, nil, nil, now); len(got) != 0 {
-		t.Errorf("usage without a source = %#v", got)
+		t.Errorf("usage without rows = %#v", got)
 	}
 }

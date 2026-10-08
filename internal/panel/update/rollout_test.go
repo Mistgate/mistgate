@@ -283,6 +283,47 @@ func TestGateWithoutProbeableInbounds(t *testing.T) {
 	}
 }
 
+func TestGateHealthReadErrorDoesNotPass(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	n := e.addNode("n1", nodeOpts{inbounds: 1})
+	e.startRollout()
+	e.tick()
+	e.upgrade(n)
+	e.tick()
+	e.commit(n)
+	e.hl.setError(n, errors.New("health read failed"))
+	e.tick()
+	e.wantStep(n, store.StepGating, "")
+}
+
+func TestOfflineUpdateAnswerIsRecordedWhenLiveReadFails(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	n := e.addNode("n1", nodeOpts{})
+	e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+		e.fl.setLiveError(errors.New("live read failed"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	e.startRollout()
+	e.tick()
+	e.wantStep(n, store.StepSkipped, "offline")
+	e.wantRollout(store.RolloutDone, "")
+}
+
+func TestPanelRestartedUpdateLaunchIsSkippedWithoutSession(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	n := e.addNode("n1", nodeOpts{}) // the persisted projection is fresh, but the command has no live stream
+	e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	e.startRollout()
+	e.tick()
+	e.wantStep(n, store.StepSkipped, "offline")
+	e.wantRollout(store.RolloutDone, "")
+}
+
 func TestBatchSizes(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()

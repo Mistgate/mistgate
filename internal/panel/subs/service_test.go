@@ -14,12 +14,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
-type networkUsageFunc func(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
-
-func (f networkUsageFunc) NetworkUsage(nodeID string) (uint64, uint64, time.Time, bool) {
-	return f(nodeID)
-}
-
 // The admin's preview of server names is drawn from what a person of the busiest group gets in Happ now: its running
 // servers in subscription order, not made-up ones. AmneziaWG, a switched-off inbound and a node out of service are not
 // in Happ's list, so not in the preview either.
@@ -36,18 +30,20 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_3', 'aa-down', 'a.example.com', 'FI', 'pending', 1)`)
 	off := must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_2"}))).Msg.Inbound
 	must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_3"})))
+	now := time.Now().UTC()
+	for _, sample := range []struct {
+		node   string
+		rx, tx int64
+	}{
+		{node: "nod_1", rx: 64_000_000, tx: 10_000_000},
+		{node: "nod_2", rx: 20_000_000, tx: 6_000_000},
+	} {
+		m.st.W.Exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Unix(), sample.node)
+		m.st.W.Exec(`INSERT INTO node_live (node_id, session, sample_at, rx_bps, tx_bps, users, live_json)
+			VALUES (?, 1, ?, ?, ?, '{}', '{}')`, sample.node, now.Add(-time.Second).Unix(), sample.rx, sample.tx)
+	}
 	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
-		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil,
-		networkUsageFunc(func(nodeID string) (uint64, uint64, time.Time, bool) {
-			sampledAt := time.Now().Add(-time.Second)
-			if nodeID == "nod_1" {
-				return 64_000_000, 10_000_000, sampledAt, true
-			}
-			if nodeID == "nod_2" {
-				return 20_000_000, 6_000_000, sampledAt, true
-			}
-			return 0, 0, time.Time{}, false
-		}))
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil)
 	get := func() *adminv1.GetSubscriptionSettingsResponse {
 		return must(svc.GetSubscriptionSettings(m.ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg
 	}

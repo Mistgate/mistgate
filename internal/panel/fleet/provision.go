@@ -33,14 +33,14 @@ func (f *Fleet) CreateProvisionEnrollment(ctx context.Context, spec provision.No
 	return token, f.ca.fingerprint, nil
 }
 
-// ProvisionNodeState reports the durable fleet state used to resume an installation safely.
-func (f *Fleet) ProvisionNodeState(ctx context.Context, nodeID string) (string, error) {
-	node, err := f.st.Node(ctx, nodeID)
+// ProvisionNodeState reports the durable fleet state and connection used to resume an installation safely.
+func (f *Fleet) ProvisionNodeState(ctx context.Context, nodeID string) (string, bool, error) {
+	live, err := f.liveRowsForNode(ctx, nodeID, false)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return node.State, nil
+	if live.State == "" {
+		return "", false, store.ErrNotFound
+	}
+	return live.State, live.Connected, nil
 }
-
-// ProvisionNodeConnected reports whether the agent has established its authenticated stream.
-func (f *Fleet) ProvisionNodeConnected(nodeID string) bool { return f.session(nodeID) != nil }

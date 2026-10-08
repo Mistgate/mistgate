@@ -122,6 +122,63 @@ func TestHelloCarriesTheBuildAndTheLastUpdate(t *testing.T) {
 	}
 }
 
+func TestCommandsAreOfflineAfterPanelRestartWithFreshLiveRow(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	c := connectUpdater(a, "inst-restarted", 1_790_000_000, "update/1", "doctor/1", "bandwidth/1")
+	live, err := e.f.NodeLive(e.ctx, a.nodeID)
+	if err != nil || !live.Exists || !live.Connected {
+		t.Fatalf("fresh live row = %+v, %v", live, err)
+	}
+	e.f.mu.Lock()
+	delete(e.f.sessions, a.nodeID)
+	e.f.mu.Unlock()
+
+	checkOffline := func(name string, err error) {
+		t.Helper()
+		if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(strings.ToLower(err.Error()), "offline") {
+			t.Errorf("%s after restart = %v, want an offline precondition", name, err)
+		}
+	}
+	_, err = e.f.UpdateAgent(e.ctx, a.nodeID, nil, nil, time.Millisecond)
+	checkOffline("UpdateAgent", err)
+	_, err = e.f.RunDoctor(e.ctx, a.nodeID, nil, time.Millisecond)
+	checkOffline("RunDoctor", err)
+	_, err = e.f.measureBandwidth(e.ctx, mustNode(e, a.nodeID))
+	checkOffline("MeasureBandwidth", err)
+
+	c.st.CloseRequest()
+	c.ended()
+}
+
+func TestCommandSessionLiveReadErrorsAreInternal(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call func(*Fleet, context.Context, string) error
+	}{
+		{name: "update", call: func(f *Fleet, ctx context.Context, id string) error {
+			_, err := f.updateSession(ctx, id)
+			return err
+		}},
+		{name: "doctor", call: func(f *Fleet, ctx context.Context, id string) error {
+			_, err := f.doctorSession(ctx, id)
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			a := e.enroll("nodea")
+			e.fixture(a.nodeID)
+			e.exec(`DROP TABLE node_live`)
+			err := tc.call(e.f, e.ctx, a.nodeID)
+			if code(err) != connect.CodeInternal || err.Error() != "internal: internal error" {
+				t.Fatalf("live read error reached the command API: %v", err)
+			}
+		})
+	}
+}
+
 // UpdateAgent reaches an agent with the capability, and its answer arrives even when the stream ends right after it
 // (the agent re-executes).
 func TestUpdateAgentAnswerSurvivesTheStreamEnding(t *testing.T) {
@@ -282,7 +339,7 @@ func TestUpdatingNodeIsNotABlip(t *testing.T) {
 	e.fixture(a.nodeID)
 	c, _, _ := connectFull(a, "inst1")
 
-	statusOf := func() adminv1.NodeStatus { return e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)) }
+	statusOf := func() adminv1.NodeStatus { return mustStatus(t, e, a.nodeID) }
 	if statusOf() != adminv1.NodeStatus_NODE_STATUS_ONLINE {
 		t.Fatalf("status %v", statusOf())
 	}

@@ -156,6 +156,11 @@ func (s *Service) fixOffers(ctx context.Context) (func(store.HealthAlert) string
 	if err != nil {
 		return nil, err
 	}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		return nil, err
+	}
+	live := indexLiveRows(liveRows)
 	offers := map[[2]string]string{}
 	for _, r := range rows {
 		if r.FixID != "" {
@@ -171,7 +176,7 @@ func (s *Service) fixOffers(ctx context.Context) (func(store.HealthAlert) string
 		if fix == "" {
 			return ""
 		}
-		if up, caps, _ := s.fl.Live(a.NodeID); !up || !slices.Contains(caps, capDoctor) {
+		if node := live[a.NodeID]; !node.Connected || !slices.Contains(node.AgentCaps, capDoctor) {
 			return ""
 		}
 		return fix
@@ -208,7 +213,7 @@ func (r rpc) ListAlerts(ctx context.Context, req *connect.Request[adminv1.ListAl
 	if err != nil {
 		return nil, s.internal("inbounds", err)
 	}
-	online := s.fl.OnlineByInbound()
+	online := s.fl.OnlineByInbound(ctx)
 	inbounds := func(nodeID string) []string {
 		var ids []string
 		for _, t := range sn.byNode[nodeID] {
@@ -278,6 +283,20 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 	if id := req.Msg.NodeId; id != "" && len(sn.byNode[id]) == 0 && !slices.ContainsFunc(sn.nodes, func(n store.NodeRow) bool { return n.ID == id }) {
 		return nil, notFound("node")
 	}
+	var live map[string]store.NodeLiveRow
+	if req.Msg.NodeId != "" {
+		row, err := s.liveNode(ctx, req.Msg.NodeId)
+		if err != nil {
+			return nil, s.internal("live node", err)
+		}
+		live = map[string]store.NodeLiveRow{req.Msg.NodeId: row}
+	} else {
+		liveRows, err := s.fl.Live(ctx)
+		if err != nil {
+			return nil, s.internal("live nodes", err)
+		}
+		live = indexLiveRows(liveRows)
+	}
 	cur := now.Unix() - now.Unix()%1800
 	first := cur - (buckets-1)*1800
 	samples, err := s.st.SamplesSince(ctx, time.Unix(first, 0))
@@ -336,7 +355,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		if req.Msg.NodeId != "" && n.ID != req.Msg.NodeId {
 			continue
 		}
-		row := &adminv1.CheckRow{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode, NodeStatus: s.fl.NodeStatus(ctx, n),
+		row := &adminv1.CheckRow{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode, NodeStatus: s.fl.NodeStatusWithLive(ctx, n, live[n.ID]),
 			Cells: make([]*adminv1.CheckCell, len(cols))}
 		for i := range row.Cells {
 			row.Cells[i] = &adminv1.CheckCell{}
@@ -349,7 +368,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 			}
 			c := s.cellOf(ctx, t.in.ID)
 			cell.FailStreak = uint32(c.streak)
-			if why := s.skipReason(t); why != "" {
+			if why := s.skipReason(t, live[t.node.ID]); why != "" {
 				cell.Last = &adminv1.CheckResult{Status: adminv1.CheckStatus_CHECK_STATUS_SKIPPED, AtUnix: now.Unix(), ErrorCode: why}
 			} else if c.last != nil {
 				cell.Last = resultMsg(*c.last)
@@ -427,9 +446,14 @@ func (r rpc) RunDoctor(ctx context.Context, req *connect.Request[adminv1.RunDoct
 		if err != nil {
 			return nil, s.internal("run doctor", err)
 		}
+		liveRows, err := s.fl.Live(ctx)
+		if err != nil {
+			return nil, s.internal("live nodes", err)
+		}
+		live := indexLiveRows(liveRows)
 		var wg sync.WaitGroup
 		for _, n := range nodes {
-			if up, caps, _ := s.fl.Live(n.ID); !up || !slices.Contains(caps, capDoctor) {
+			if node := live[n.ID]; !node.Connected || !slices.Contains(node.AgentCaps, capDoctor) {
 				continue // offline and old nodes keep their last report; that is not an error
 			}
 			wg.Add(1)
@@ -559,7 +583,7 @@ func (s *Service) restartFacts(ctx context.Context, nodeID, asked string, from m
 	if err != nil {
 		return out
 	}
-	online := s.fl.OnlineByInbound()
+	online := s.fl.OnlineByInbound(ctx)
 	var names []string
 	n := 0
 	for _, id := range ids {

@@ -25,7 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context, SessionState, SessionSidecar, time.Time) {
+func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context, SessionState, time.Time) {
 	t.Helper()
 	e := newCoreEnv(t)
 	nodeID, _, _ := e.createEnrollment(name, name+".example.com")
@@ -42,7 +42,7 @@ func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
 	state := SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: 1,
 		HelloDeadline: now.Add(helloTimeout)}
-	return e, core, ownerCtx, state, SessionSidecar{}, now
+	return e, core, ownerCtx, state, now
 }
 
 func TestSessionStateJSONRoundTrip(t *testing.T) {
@@ -60,6 +60,20 @@ func TestSessionStateJSONRoundTrip(t *testing.T) {
 	}
 	if !sessionStateDeepEqual(reflect.ValueOf(original), reflect.ValueOf(decoded)) {
 		t.Fatalf("SessionState JSON round trip differs:\noriginal: %+v\ndecoded:  %+v\nJSON: %s", original, decoded, encoded)
+	}
+}
+
+func TestSessionStateDecodesLegacyCapabilities(t *testing.T) {
+	var state SessionState
+	if err := json.Unmarshal([]byte(`{"v":1,"n":"nod_legacy_state","c":["doctor/1"],"o":7}`), &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.NodeID != "nod_legacy_state" || state.OwnerGeneration != 7 {
+		t.Fatalf("legacy state decoded as %+v", state)
+	}
+	encoded, err := json.Marshal(state)
+	if err != nil || strings.Contains(string(encoded), `"c"`) {
+		t.Fatalf("removed capabilities field was retained: %s, %v", encoded, err)
 	}
 }
 
@@ -180,8 +194,8 @@ func sessionStateDeepEqual(a, b reflect.Value) bool {
 }
 
 // newTestSession builds an adapter session the way runSession does: its own cancelable context under parent, done, the
-// out queue, the alarm timer and a core (a fresh one when core is nil), with state and sidecar as the starting point.
-func newTestSession(e *env, parent context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar) *session {
+// out queue, the alarm timer and a core (a fresh one when core is nil), with state as the starting point.
+func newTestSession(e *env, parent context.Context, core *SessionCore, state SessionState) *session {
 	e.t.Helper()
 	ctx, cancel := context.WithCancelCause(parent)
 	timer := time.NewTimer(time.Hour)
@@ -192,21 +206,20 @@ func newTestSession(e *env, parent context.Context, core *SessionCore, state Ses
 	if core == nil {
 		core = NewSessionCore(e.f)
 	}
-	return &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration, caps: state.Capabilities,
+	return &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration,
 		ctx: ctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{}, logs: map[string]*logSub{},
-		core: core, coreState: state, coreSidecar: sidecar, alarmTimer: timer}
+		core: core, coreState: state, alarmTimer: timer}
 }
 
 type testTransition struct {
 	Transition
-	State   SessionState
-	Sidecar SessionSidecar
+	State SessionState
 }
 
-func coreStep(ctx context.Context, core *SessionCore, state SessionState, sidecar SessionSidecar, event SessionEvent) (testTransition, error) {
-	tr, err := core.Step(ctx, &state, &sidecar, event)
-	return testTransition{Transition: tr, State: state, Sidecar: sidecar}, err
+func coreStep(ctx context.Context, core *SessionCore, state SessionState, event SessionEvent) (testTransition, error) {
+	tr, err := core.Step(ctx, &state, event)
+	return testTransition{Transition: tr, State: state}, err
 }
 
 type replayWarpMod struct {
@@ -250,7 +263,6 @@ type sessionReplay struct {
 	ctx       context.Context
 	core      *SessionCore
 	state     SessionState
-	sidecar   SessionSidecar
 	now       time.Time
 	rehydrate bool
 	desired   *plugin.InboundSpec
@@ -316,18 +328,18 @@ func (r *sessionReplay) step(t *testing.T, event SessionEvent) testTransition {
 		}
 		r.core = NewSessionCore(r.e.f)
 	}
-	tr, err := coreStep(r.ctx, r.core, r.state, r.sidecar, event)
+	tr, err := coreStep(r.ctx, r.core, r.state, event)
 	if err != nil {
 		t.Fatalf("step %d: %v", event.Kind, err)
 	}
-	r.state, r.sidecar = tr.State, tr.Sidecar
+	r.state = tr.State
 	return tr
 }
 
 func (r *sessionReplay) prepare(t *testing.T, at time.Time) *preparedDesiredState {
 	t.Helper()
 	r.now = at
-	prepared, err := r.e.f.prepareDesiredState(r.ctx, r.state.NodeID, r.state.Capabilities)
+	prepared, err := r.e.f.prepareDesiredState(r.ctx, r.state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,16 +610,16 @@ func TestSessionCoreRehydratesLivenessTimeoutAndDisconnect(t *testing.T) {
 }
 
 func TestDisconnectStateChangesOnlyAfterStoreSucceeds(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-disconnect-write")
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-disconnect-write", 0, "").GetHello())
-	state, sidecar = connected.State, connected.Sidecar
+	e, core, ctx, state, now := coreFixture(t, "core-disconnect-write")
+	connected := stepHello(t, core, ctx, state, now, hello("instance-disconnect-write", 0, "").GetHello())
+	state = connected.State
 	state.Pending = map[string]PendingRequest{"pending": {Kind: PendingAutoBandwidth, Deadline: now.Add(time.Minute)}}
 	state.AutoBandwidthDeadline = now.Add(time.Minute)
 	pending := map[string]PendingRequest{"pending": state.Pending["pending"]}
 	autoDeadline := state.AutoBandwidthDeadline
 	e.exec(`CREATE TRIGGER reject_core_disconnect BEFORE DELETE ON node_live BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 
-	_, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventDisconnected, At: now})
+	_, err := core.Step(ctx, &state, SessionEvent{Kind: EventDisconnected, At: now})
 	if err == nil {
 		t.Fatal("EventDisconnected succeeded despite the store refusing the write")
 	}
@@ -620,12 +632,33 @@ func TestDisconnectStateChangesOnlyAfterStoreSucceeds(t *testing.T) {
 	}
 }
 
+func TestNodeLiveConnectedFollowsHelloAndClose(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-live-connect-close")
+	e.f.now = func() time.Time { return now }
+	e.f.cfg.Now = e.f.now
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventHello, At: now,
+		Frame: hello("instance-live-connect-close", 0, "")}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := e.f.Live(ctx)
+	if err != nil || len(rows) != 1 || !rows[0].Connected {
+		t.Fatalf("node_live after Hello = %+v, %v; want connected", rows, err)
+	}
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = e.f.Live(ctx)
+	if err != nil || len(rows) != 1 || rows[0].Connected {
+		t.Fatalf("node_live after close = %+v, %v; want offline", rows, err)
+	}
+}
+
 func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr testTransition, target time.Time) testTransition {
 	t.Helper()
 	for i := 0; i < 10_000 && tr.Close == nil && tr.NextAlarm != nil && !tr.NextAlarm.After(target); i++ {
 		at := *tr.NextAlarm
 		var err error
-		tr, err = coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAlarm, At: at})
+		tr, err = coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAlarm, At: at})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -633,25 +666,25 @@ func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr 
 	return tr
 }
 
-func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state SessionState, sidecar SessionSidecar, now time.Time, h *agentv1.Hello) testTransition {
+func stepHello(t *testing.T, core *SessionCore, ctx context.Context, state SessionState, now time.Time, h *agentv1.Hello) testTransition {
 	t.Helper()
 	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Hello{Hello: h}}
-	started, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: frame})
+	started, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now, Frame: frame})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if started.Close != nil {
 		t.Fatalf("hello closed: %+v", started.Close)
 	}
-	requested, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now})
+	requested, err := coreStep(ctx, core, started.State, SessionEvent{Kind: EventDesiredChanged, At: now})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := core.f.prepareDesiredState(ctx, requested.State.NodeID, requested.State.Capabilities)
+	prepared, err := core.f.prepareDesiredState(ctx, requested.State.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
+	tr, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,16 +701,16 @@ func reconcilePrepared(t *testing.T, e *env, core *SessionCore, ctx context.Cont
 	requested := tr
 	if !requested.State.Preparing {
 		var err error
-		requested, err = coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: at})
+		requested, err = coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredChanged, At: at})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, requested.State.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, requested.State.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: at, Prepared: prepared})
+	updated, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared, At: at, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,8 +724,8 @@ func reconcilePrepared(t *testing.T, e *env, core *SessionCore, ctx context.Cont
 
 func TestSessionCoreHelloAndInitialState(t *testing.T) {
 	t.Run("sends desired state when applied hash differs", func(t *testing.T) {
-		_, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-send")
-		tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-1", 0, "").GetHello())
+		_, core, ctx, state, now := coreFixture(t, "core-hello-send")
+		tr := stepHello(t, core, ctx, state, now, hello("instance-1", 0, "").GetHello())
 		if len(tr.Frames) != 2 || tr.Frames[0].GetHelloAck() == nil || tr.Frames[1].GetDesiredState() == nil {
 			t.Fatalf("hello frames = %#v", tr.Frames)
 		}
@@ -705,7 +738,7 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 	})
 
 	t.Run("skips desired state when applied hash matches", func(t *testing.T) {
-		e, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-skip")
+		e, core, ctx, state, now := coreFixture(t, "core-hello-skip")
 		node, err := e.st.Node(ctx, state.NodeID)
 		if err != nil {
 			t.Fatal(err)
@@ -714,7 +747,7 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-2", 7, want.hash).GetHello())
+		tr := stepHello(t, core, ctx, state, now, hello("instance-2", 7, want.hash).GetHello())
 		if len(tr.Frames) != 1 || tr.Frames[0].GetHelloAck() == nil {
 			t.Fatalf("matching applied state sent frames = %#v", tr.Frames)
 		}
@@ -725,30 +758,30 @@ func TestSessionCoreHelloAndInitialState(t *testing.T) {
 }
 
 func TestSessionCoreReconnectUsesStoredSentDigest(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-reconnect-digest")
+	e, core, ctx, state, now := coreFixture(t, "core-reconnect-digest")
 	e.fixture(state.NodeID)
-	first := stepHello(t, core, ctx, state, sidecar, now, hello("instance-before-reconnect", 0, "").GetHello())
+	first := stepHello(t, core, ctx, state, now, hello("instance-before-reconnect", 0, "").GetHello())
 
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
 		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout)}
-	reconnected, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
+	reconnected, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello,
 		At: now.Add(2 * time.Second), Frame: hello("instance-after-reconnect", first.State.SentRevision, first.State.SentStateHash)})
 	if err != nil || reconnected.Close != nil {
 		t.Fatalf("reconnect Hello = close %v, err %v", reconnected.Close, err)
 	}
-	requested, err := coreStep(newCtx, newCore, reconnected.State, reconnected.Sidecar,
+	requested, err := coreStep(newCtx, newCore, reconnected.State,
 		SessionEvent{Kind: EventDesiredChanged, At: now.Add(3 * time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_alice'`)
-	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(newCtx, newCore, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	updated, err := coreStep(newCtx, newCore, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(3 * time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -763,28 +796,28 @@ func TestSessionCoreReconnectUsesStoredSentDigest(t *testing.T) {
 }
 
 func TestSessionCoreReconnectHelloMismatchSendsFullState(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-reconnect-mismatch")
+	e, core, ctx, state, now := coreFixture(t, "core-reconnect-mismatch")
 	e.fixture(state.NodeID)
-	first := stepHello(t, core, ctx, state, sidecar, now, hello("instance-before-mismatch", 0, "").GetHello())
+	first := stepHello(t, core, ctx, state, now, hello("instance-before-mismatch", 0, "").GetHello())
 	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
 		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout)}
-	reconnected, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
+	reconnected, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello,
 		At: now.Add(2 * time.Second), Frame: hello("instance-mismatch", first.State.SentRevision, "different-hash")})
 	if err != nil || reconnected.Close != nil {
 		t.Fatalf("mismatched Hello = close %v, err %v", reconnected.Close, err)
 	}
-	requested, err := coreStep(newCtx, newCore, reconnected.State, reconnected.Sidecar,
+	requested, err := coreStep(newCtx, newCore, reconnected.State,
 		SessionEvent{Kind: EventDesiredChanged, At: now.Add(3 * time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(newCtx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(newCtx, newCore, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	updated, err := coreStep(newCtx, newCore, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(3 * time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -795,9 +828,9 @@ func TestSessionCoreReconnectHelloMismatchSendsFullState(t *testing.T) {
 }
 
 func TestSessionCoreOlderSentDigestSendsFullState(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-stale-digest")
+	e, core, ctx, state, now := coreFixture(t, "core-stale-digest")
 	e.fixture(state.NodeID)
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-stale-digest", 0, "").GetHello())
+	connected := stepHello(t, core, ctx, state, now, hello("instance-stale-digest", 0, "").GetHello())
 	_, rawDigest, err := e.st.NodeWithSentDigest(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -815,16 +848,16 @@ func TestSessionCoreOlderSentDigestSendsFullState(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_alice'`)
-	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+	requested, err := coreStep(ctx, core, connected.State,
 		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	updated, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -835,15 +868,15 @@ func TestSessionCoreOlderSentDigestSendsFullState(t *testing.T) {
 }
 
 func TestSessionCoreSentDigestHashMismatchSendsFullState(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-hash-mismatch")
+	e, core, ctx, state, now := coreFixture(t, "core-hash-mismatch")
 	e.fixture(state.NodeID)
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-digest-hash", 0, "").GetHello())
-	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+	connected := stepHello(t, core, ctx, state, now, hello("instance-digest-hash", 0, "").GetHello())
+	requested, err := coreStep(ctx, core, connected.State,
 		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -852,7 +885,7 @@ func TestSessionCoreSentDigestHashMismatchSendsFullState(t *testing.T) {
 	}
 	// A same-revision write from another session can land before an older session's digest.
 	prepared.digest.Hash = "another-session-state"
-	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	updated, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -863,22 +896,22 @@ func TestSessionCoreSentDigestHashMismatchSendsFullState(t *testing.T) {
 }
 
 func TestSessionCoreRetiredNodeDoesNotSendDesiredState(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-retired-desired")
+	e, core, ctx, state, now := coreFixture(t, "core-retired-desired")
 	e.fixture(state.NodeID)
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-retired-desired", 0, "").GetHello())
+	connected := stepHello(t, core, ctx, state, now, hello("instance-retired-desired", 0, "").GetHello())
 	if err := e.st.RetireNode(ctx, state.NodeID, now); err != nil {
 		t.Fatal(err)
 	}
-	requested, err := coreStep(ctx, core, connected.State, connected.Sidecar,
+	requested, err := coreStep(ctx, core, connected.State,
 		SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	updated, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -894,13 +927,13 @@ func TestSessionCoreRetiredNodeDoesNotSendDesiredState(t *testing.T) {
 }
 
 func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
-	_, core, ctx, state, sidecar, _ := coreFixture(t, "core-monotonic-live")
+	_, core, ctx, state, _ := coreFixture(t, "core-monotonic-live")
 	state.HelloDeadline = time.Time{}
 	now := time.Now()
-	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventOpen, At: now}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-monotonic", 0, "")}); err != nil {
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-monotonic", 0, "")}); err != nil {
 		t.Fatal(err)
 	}
 	if state.LivenessDeadline.IsZero() || state.LivenessDeadline == state.LivenessDeadline.Round(0) {
@@ -910,22 +943,22 @@ func TestSessionCoreKeepsMonotonicLivenessDeadline(t *testing.T) {
 	if tr == nil || *tr == tr.Round(0) {
 		t.Fatalf("next alarm lost its monotonic reading: %v", tr)
 	}
-	tick, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventAlarm, At: now.Add(ackEvery)})
+	tick, err := core.Step(ctx, &state, SessionEvent{Kind: EventAlarm, At: now.Add(ackEvery)})
 	if err != nil || tick.Close != nil || deadlineDue(state.LivenessDeadline, now.Add(ackEvery)) {
 		t.Fatalf("early alarm closed the live session: close=%+v err=%v", tick.Close, err)
 	}
 }
 
 func TestSessionCoreHelloDeadlineIsDecidedByAlarm(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-hello-deadline")
-	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventOpen, At: now})
+	_, core, ctx, state, now := coreFixture(t, "core-hello-deadline")
+	opened, err := coreStep(ctx, core, state, SessionEvent{Kind: EventOpen, At: now})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if opened.NextAlarm == nil || !opened.NextAlarm.Equal(opened.State.HelloDeadline) {
 		t.Fatalf("open next alarm = %v, hello deadline = %v", opened.NextAlarm, opened.State.HelloDeadline)
 	}
-	tr, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventAlarm, At: *opened.NextAlarm})
+	tr, err := coreStep(ctx, core, opened.State, SessionEvent{Kind: EventAlarm, At: *opened.NextAlarm})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -935,10 +968,10 @@ func TestSessionCoreHelloDeadlineIsDecidedByAlarm(t *testing.T) {
 }
 
 func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-auto-bandwidth")
+	_, core, ctx, state, now := coreFixture(t, "core-auto-bandwidth")
 	h := hello("instance-auto-bandwidth", 0, "")
 	h.GetHello().Capabilities = []string{capBandwidth}
-	tr := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
+	tr := stepHello(t, core, ctx, state, now, h.GetHello())
 	want := now.Add(core.f.measureDelay)
 	if !tr.State.AutoBandwidthDeadline.Equal(want) {
 		t.Fatalf("auto-bandwidth deadline = %v, want %v", tr.State.AutoBandwidthDeadline, want)
@@ -948,7 +981,7 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 	var fired bool
 	for i := 0; i < 10_000 && tr.NextAlarm != nil && !tr.NextAlarm.After(deadline); i++ {
 		at := *tr.NextAlarm
-		next, stepErr := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAlarm, At: at})
+		next, stepErr := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAlarm, At: at})
 		if stepErr != nil {
 			t.Fatal(stepErr)
 		}
@@ -966,17 +999,17 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 	if !ok || request.Kind != PendingAutoBandwidth || !request.Deadline.Equal(deadline.Add(core.f.measureWait)) {
 		t.Fatalf("auto-bandwidth pending request = %+v, want deadline %v", request, deadline.Add(core.f.measureWait))
 	}
-	again, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAlarm, At: request.Deadline})
+	again, err := coreStep(ctx, core, due.State, SessionEvent{Kind: EventAlarm, At: request.Deadline})
 	if err != nil || len(again.State.Pending) != 0 || len(again.Frames) != 0 {
 		t.Fatalf("unanswered auto-bandwidth request did not expire: pending=%+v frames=%+v err=%v", again.State.Pending, again.Frames, err)
 	}
 }
 
 func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-bw-start")
+	e, core, ctx, state, now := coreFixture(t, "core-bw-start")
 	h := hello("instance-auto-bandwidth-start", 0, "")
 	h.GetHello().Capabilities = []string{capBandwidth}
-	helloTransition, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: h})
+	helloTransition, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now, Frame: h})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -987,13 +1020,13 @@ func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
 }
 
 func TestSessionCoreAutoBandwidthResultStoresCapacityInline(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-auto-bw-result")
+	e, core, ctx, state, now := coreFixture(t, "core-auto-bw-result")
 	e.f.measureDelay = 2 * time.Second
 	e.f.measureWait = 3 * time.Second
 	h := hello("instance-auto-bandwidth-result", 0, "")
 	h.GetHello().Capabilities = []string{capBandwidth}
-	started := stepHello(t, core, ctx, state, sidecar, now, h.GetHello())
-	due, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventAlarm, At: started.State.AutoBandwidthDeadline})
+	started := stepHello(t, core, ctx, state, now, h.GetHello())
+	due, err := coreStep(ctx, core, started.State, SessionEvent{Kind: EventAlarm, At: started.State.AutoBandwidthDeadline})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1003,7 +1036,7 @@ func TestSessionCoreAutoBandwidthResultStoresCapacityInline(t *testing.T) {
 	result := &agentv1.CommandResult{RequestId: "auto-bandwidth", Ok: true, Params: map[string]string{
 		"down_mbps": "940", "up_mbps": "871", "server": "example.test", "seconds": "12", "runs": "3",
 	}}
-	stored, err := coreStep(ctx, core, due.State, due.Sidecar, SessionEvent{Kind: EventAgentFrame, At: due.State.AutoBandwidthDeadline.Add(100 * time.Millisecond),
+	stored, err := coreStep(ctx, core, due.State, SessionEvent{Kind: EventAgentFrame, At: due.State.AutoBandwidthDeadline.Add(100 * time.Millisecond),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
 	if err != nil || len(stored.Effects) != 0 {
 		t.Fatalf("automatic measurement result = effects %+v, err %v", stored.Effects, err)
@@ -1021,8 +1054,8 @@ func TestSessionCoreAutoBandwidthResultStoresCapacityInline(t *testing.T) {
 }
 
 func TestSessionStepErrorCancelsSession(t *testing.T) {
-	e, core, ctx, state, sidecar, _ := coreFixture(t, "core-step-error")
-	s := newTestSession(e, ctx, core, state, sidecar)
+	e, core, ctx, state, _ := coreFixture(t, "core-step-error")
+	s := newTestSession(e, ctx, core, state)
 	tr, err := s.stepCore(s.ctx, SessionEvent{Kind: EventKind(255), At: time.Now()})
 	if err == nil || tr.NextAlarm != nil {
 		t.Fatalf("failed Step transition = %+v, %v", tr, err)
@@ -1066,9 +1099,9 @@ func TestRunSessionEndsWithResourceExhaustedWhenQueueIsFull(t *testing.T) {
 }
 
 func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-slow-desired")
-	helloTransition := stepHello(t, core, ctx, state, sidecar, now, hello("instance-slow-desired", 0, "").GetHello())
-	s := newTestSession(e, ctx, core, helloTransition.State, helloTransition.Sidecar)
+	e, core, ctx, state, now := coreFixture(t, "core-slow-desired")
+	helloTransition := stepHello(t, core, ctx, state, now, hello("instance-slow-desired", 0, "").GetHello())
+	s := newTestSession(e, ctx, core, helloTransition.State)
 
 	originalDesired := e.f.cfg.Desired
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -1166,8 +1199,8 @@ func TestSlowDesiredPreparationDoesNotBlockStatsOrLiveness(t *testing.T) {
 }
 
 func TestSessionCoreLivenessTimeoutChangeTakesEffectOnNextFrame(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-liveness-change")
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-liveness-change", 0, "").GetHello())
+	e, core, ctx, state, now := coreFixture(t, "core-liveness-change")
+	connected := stepHello(t, core, ctx, state, now, hello("instance-liveness-change", 0, "").GetHello())
 	oldDeadline := connected.State.LivenessDeadline
 	e.exec(`UPDATE node SET liveness_timeout_s = 15 WHERE id = ?`, state.NodeID)
 	updated := reconcilePrepared(t, e, core, ctx, connected, now.Add(5*time.Second))
@@ -1180,7 +1213,7 @@ func TestSessionCoreLivenessTimeoutChangeTakesEffectOnNextFrame(t *testing.T) {
 		t.Fatalf("new timeout closed the session before another frame: %+v", beforeNextFrame.Close)
 	}
 	frameAt := now.Add(20 * time.Second)
-	frame, err := coreStep(ctx, core, beforeNextFrame.State, beforeNextFrame.Sidecar, SessionEvent{Kind: EventAgentFrame, At: frameAt,
+	frame, err := coreStep(ctx, core, beforeNextFrame.State, SessionEvent{Kind: EventAgentFrame, At: frameAt,
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}})
 	if err != nil {
 		t.Fatal(err)
@@ -1196,14 +1229,13 @@ func TestSessionCoreLivenessTimeoutChangeTakesEffectOnNextFrame(t *testing.T) {
 }
 
 func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-ack")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-ack", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
-
+	_, core, ctx, state, now := coreFixture(t, "core-ack")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-ack", 0, "").GetHello())
+	state = tr.State
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 	}}}
-	tr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	tr, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1213,32 +1245,32 @@ func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
 	if !tr.State.NextAckTick.IsZero() {
 		t.Fatalf("first ack left an alarm: %v", tr.State.NextAckTick)
 	}
-	state, sidecar = tr.State, tr.Sidecar
+	state = tr.State
 	for seq := uint64(2); seq <= 5; seq++ {
 		batch.Seq = seq
 		at := now.Add(time.Duration(seq-1) * ackEvery / 5)
-		tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: at, Frame: batch})
+		tr, err = coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: at, Frame: batch})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(tr.Frames) != 0 {
 			t.Fatalf("batch %d flushed inside the ack interval: %#v", seq, tr.Frames)
 		}
-		state, sidecar = tr.State, tr.Sidecar
+		state = tr.State
 	}
 	if !state.NextAckTick.Equal(now.Add(ackEvery)) {
 		t.Fatalf("coalesced ack deadline = %v, want %v", state.NextAckTick, now.Add(ackEvery))
 	}
-	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAlarm, At: state.NextAckTick})
+	tr, err = coreStep(ctx, core, state, SessionEvent{Kind: EventAlarm, At: state.NextAckTick})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(tr.Frames) != 1 || tr.Frames[0].GetAck().GetUpToSeq() != 5 || !tr.State.NextAckTick.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(tr.State.LivenessDeadline) {
 		t.Fatalf("coalesced alarm ack = %#v, tick=%v", tr.Frames, tr.State.NextAckTick)
 	}
-	state, sidecar = tr.State, tr.Sidecar
+	state = tr.State
 	batch.Seq = 6
-	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * ackEvery), Frame: batch})
+	tr, err = coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * ackEvery), Frame: batch})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1248,12 +1280,12 @@ func TestSessionCoreAckCoalescingAndImmediateFlush(t *testing.T) {
 }
 
 func TestSessionCoreIdleAlarmTracksLivenessOnly(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-idle-alarm")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-idle-alarm", 0, "").GetHello())
+	_, core, ctx, state, now := coreFixture(t, "core-idle-alarm")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-idle-alarm", 0, "").GetHello())
 	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 	}}}
-	acked, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: stats})
+	acked, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: stats})
 	if err != nil || len(acked.Frames) != 1 || acked.Frames[0].GetAck().GetUpToSeq() != 1 {
 		t.Fatalf("stats ack = frames %+v, err %v", acked.Frames, err)
 	}
@@ -1263,34 +1295,39 @@ func TestSessionCoreIdleAlarmTracksLivenessOnly(t *testing.T) {
 }
 
 func TestSessionCoreDuplicateStatsAndEvents(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-dedupe")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-dedupe", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
+	e, core, ctx, state, now := coreFixture(t, "core-dedupe")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-dedupe", 0, "").GetHello())
+	state = tr.State
 	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Host: &agentv1.HostMetrics{CpuPct: 12.5},
 	}}}
-	first, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: stats})
+	first, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: stats})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: stats})
+	second, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: stats})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Sidecar.Live.Metrics == nil || second.Sidecar.Live.Metrics == nil {
-		t.Fatalf("stats did not update the core live snapshot: first=%+v second=%+v", first.Sidecar.Live, second.Sidecar.Live)
+	rows, err := e.st.NodeLive(e.ctx, now.Add(time.Second), state.NodeID, true)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NodeLive after duplicate stats = %+v, %v", rows, err)
+	}
+	var live liveJSONView
+	if err := json.Unmarshal([]byte(rows[0].LiveJSON), &live); err != nil || live.Metrics == nil || live.Metrics.CPUPct != 12.5 {
+		t.Fatalf("stats did not update the live projection: %+v, %v", live, err)
 	}
 	if len(first.Frames) != 1 || len(second.Frames) != 0 {
 		t.Fatalf("stats acknowledgements: first=%#v second=%#v", first.Frames, second.Frames)
 	}
 
 	ev := &agentv1.ConnectRequest{Seq: 2, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "core_test"}}}
-	first, err = coreStep(ctx, core, second.State, second.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * time.Second), Frame: ev})
+	first, err = coreStep(ctx, core, second.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * time.Second), Frame: ev})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err = coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second), Frame: ev})
+	second, err = coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second), Frame: ev})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1299,112 +1336,10 @@ func TestSessionCoreDuplicateStatsAndEvents(t *testing.T) {
 	}
 }
 
-func TestNodeLiveProjectionMatchesSessionSidecarAfterStatsSeries(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-projection")
-	ids := e.fixture(state.NodeID)
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-projection", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
-
-	for seq := uint64(1); seq <= 2; seq++ {
-		at := now.Add(time.Duration(seq) * 10 * time.Second)
-		frame := &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
-			IntervalStartUnix: at.Add(-10 * time.Second).Unix(), IntervalEndUnix: at.Unix(),
-			Traffic: []*agentv1.TrafficDelta{
-				{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 100 * seq, BytesDown: 200 * seq},
-				{CredId: "crd_gina_hy", InboundId: ids.i1, BytesUp: 50 * seq, BytesDown: 150 * seq},
-			},
-			Sessions: []*agentv1.Session{
-				{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-30 * time.Second).Unix()},
-				{CredId: "crd_gina_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-20 * time.Second).Unix()},
-				{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-5 * time.Second).Unix()},
-			},
-			Host: &agentv1.HostMetrics{CpuPct: 20 + float32(seq), SoftirqPct: 2, Load1: 0.5,
-				RamUsedBytes: 1024, RamTotalBytes: 2048, DiskUsedBytes: 4096, DiskTotalBytes: 8192,
-				NetRxBps: 100 + seq, NetTxBps: 200 + seq, UptimeS: 3600 + seq},
-			Health: []*agentv1.InboundHealth{
-				{InboundId: ids.i1, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING, Detail: "ready"},
-				{InboundId: ids.i2, State: agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED, Detail: "bind failed"},
-			},
-		}}}
-		tr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: at, Frame: frame})
-		if err != nil {
-			t.Fatalf("stats %d: %v", seq, err)
-		}
-		state, sidecar = tr.State, tr.Sidecar
-		assertNodeLiveMatchesSidecar(t, e, state, sidecar, at)
-	}
-}
-
-func assertNodeLiveMatchesSidecar(t *testing.T, e *env, state SessionState, sidecar SessionSidecar, now time.Time) {
-	t.Helper()
-	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
-	if err != nil || len(rows) != 1 || !rows[0].Exists || !rows[0].Connected {
-		t.Fatalf("NodeLive row = %+v, %v", rows, err)
-	}
-	row := rows[0]
-	var got liveJSONView
-	if err := json.Unmarshal([]byte(row.LiveJSON), &got); err != nil {
-		t.Fatalf("decode live_json: %v", err)
-	}
-	if row.Session != int64(state.OwnerGeneration) || row.Drift != state.Drift || row.SampleAt != sidecar.Live.MetricsAt.Unix() {
-		t.Fatalf("projection columns = %+v; state session/drift=%d/%v metrics_at=%d", row, state.OwnerGeneration, state.Drift, sidecar.Live.MetricsAt.Unix())
-	}
-
-	wantOnline := make([]liveJSONOnline, 0, len(sidecar.Live.Online))
-	users := map[string]int64{}
-	for _, online := range sidecar.Live.Online {
-		userID := online.userID
-		wantOnline = append(wantOnline, liveJSONOnline{UserID: userID, DeviceID: online.deviceID, Protocol: online.protocol,
-			InboundID: clip(online.inboundID, 64), SinceUnix: online.since.Unix()})
-		if previous, ok := users[userID]; !ok || online.since.Unix() > previous {
-			users[userID] = online.since.Unix()
-		}
-	}
-	if !reflect.DeepEqual(got.Online, wantOnline) || !reflect.DeepEqual(got.Health, projectHealth(sidecar.Live.Health)) {
-		t.Fatalf("live sessions/health differ from sidecar: projection=%+v/%+v sidecar=%+v/%+v", got.Online, got.Health, wantOnline, projectHealth(sidecar.Live.Health))
-	}
-	var gotUsers map[string]int64
-	if err := json.Unmarshal([]byte(row.UsersJSON), &gotUsers); err != nil || !reflect.DeepEqual(gotUsers, users) {
-		t.Fatalf("users column = %v, %v; want newest starts %v", gotUsers, err, users)
-	}
-	wantDown := make(map[string]uint64, len(sidecar.Live.UserDown))
-	var wantUpload uint64
-	for userID, rate := range sidecar.Live.UserDown {
-		wantDown[userID] = min(rate, uint64(1<<50))
-	}
-	for _, rate := range sidecar.Live.UserUp {
-		wantUpload = min(satAdd(wantUpload, rate), uint64(1<<50))
-	}
-	if !reflect.DeepEqual(got.UserDownBPS, wantDown) || got.UploadBPS != wantUpload {
-		t.Fatalf("live rates = down %v/upload %d; want down %v/upload %d", got.UserDownBPS, got.UploadBPS, wantDown, wantUpload)
-	}
-	metrics := sidecar.Live.Metrics
-	if metrics == nil || got.Metrics == nil {
-		t.Fatalf("live metrics missing: projection=%+v sidecar=%+v", got.Metrics, metrics)
-	}
-	wantMetrics := liveJSONMetrics{CPUPct: float64(metrics.CpuPct), SoftirqPct: float64(metrics.SoftirqPct), Load1: float64(metrics.Load1),
-		RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes, DiskUsedBytes: metrics.DiskUsedBytes,
-		DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: metrics.NetRxBps, TxBPS: metrics.NetTxBps, UptimeS: metrics.UptimeS}
-	if !reflect.DeepEqual(*got.Metrics, wantMetrics) || row.RxBps != int64(metrics.NetRxBps) || row.TxBps != int64(metrics.NetTxBps) ||
-		row.CPUPct != int64(math.Round(float64(metrics.CpuPct))) {
-		t.Fatalf("live metrics = %+v/%d/%d/%d; want %+v", got.Metrics, row.RxBps, row.TxBps, row.CPUPct, wantMetrics)
-	}
-}
-
-func projectHealth(health []*agentv1.InboundHealth) []liveJSONHealth {
-	out := make([]liveJSONHealth, 0, len(health))
-	for _, entry := range health {
-		if entry != nil {
-			out = append(out, liveJSONHealth{InboundID: clip(entry.InboundId, 64), RunState: runState(entry.State), Detail: clip(entry.Detail, 256)})
-		}
-	}
-	return out
-}
-
 func TestNodeLiveProjectionBoundsAndSanitizesStats(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-bounds")
+	e, core, ctx, state, now := coreFixture(t, "core-live-bounds")
 	ids := e.fixture(state.NodeID)
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-bounds", 0, "").GetHello())
+	tr := stepHello(t, core, ctx, state, now, hello("instance-live-bounds", 0, "").GetHello())
 	e.f.cfg.MaxNodeBytesPerSec = 1 << 54
 	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Traffic:  []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 1 << 51, BytesDown: 1 << 51}},
@@ -1420,7 +1355,7 @@ func TestNodeLiveProjectionBoundsAndSanitizesStats(t *testing.T) {
 			State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING, Detail: strings.Repeat("detail", 60)}
 	}
 	frame := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: stats}}
-	tr, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: frame})
+	tr, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: frame})
 	if err != nil {
 		t.Fatalf("hostile stats batch failed: %v", err)
 	}
@@ -1433,8 +1368,8 @@ func TestNodeLiveProjectionBoundsAndSanitizesStats(t *testing.T) {
 	if err := json.Unmarshal([]byte(row.LiveJSON), &got); err != nil {
 		t.Fatalf("decode live_json: %v", err)
 	}
-	if len(got.Online) != 2000 || len(tr.Sidecar.Live.Online) != 2001 || len(got.Health) != 64 {
-		t.Fatalf("live bounds: projection sessions=%d health=%d sidecar sessions=%d", len(got.Online), len(got.Health), len(tr.Sidecar.Live.Online))
+	if len(got.Online) != 2000 || len(got.Health) != 64 {
+		t.Fatalf("live bounds: projection sessions=%d health=%d", len(got.Online), len(got.Health))
 	}
 	if len(got.Health[0].InboundID) > 64 || len(got.Health[0].Detail) > 256 {
 		t.Fatalf("health fields exceeded bounds: %+v", got.Health[0])
@@ -1463,28 +1398,22 @@ func TestBuildFleetLiveIsPureDeterministicAndClipsOnlyAgentFields(t *testing.T) 
 	userID, deviceID, protocol := strings.Repeat("u", 70), strings.Repeat("d", 70), strings.Repeat("p", 70)
 	inboundID, detail := strings.Repeat("i", 80), strings.Repeat("x", 300)
 	state := SessionState{Version: sessionStateVersion, NodeID: "nod_projection_pure", OwnerGeneration: 9,
-		LastEndUnix: now.Add(-time.Minute).Unix(), Capabilities: []string{"doctor/1"}, Pending: map[string]PendingRequest{"pending": {Kind: PendingDoctor}}}
+		LastEndUnix: now.Add(-time.Minute).Unix(), Pending: map[string]PendingRequest{"pending": {Kind: PendingDoctor}}}
 	stateBefore := state
-	stateBefore.Capabilities = append([]string(nil), state.Capabilities...)
 	stateBefore.Pending = map[string]PendingRequest{"pending": state.Pending["pending"]}
-	sidecar := SessionSidecar{Version: 1, Live: LiveSnapshot{Metrics: &agentv1.HostMetrics{CpuPct: 20}, MetricsAt: now.Add(-time.Minute),
-		Health:   []*agentv1.InboundHealth{{InboundId: "old", Detail: "old"}},
-		Online:   []onlineSess{{userID: "old-user", deviceID: "old-device", protocol: "old-protocol", inboundID: "old-inbound", since: now}},
-		UserDown: map[string]uint64{"old-user": 11}, UserUp: map[string]uint64{"old-user": 12}}}
-	sidecarBefore := cloneLiveSidecarForTest(sidecar)
 	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Sessions: []*agentv1.Session{{CredId: "credential", InboundId: inboundID, ConnectedAtUnix: now.Add(-time.Minute).Unix()}},
 		Health:   []*agentv1.InboundHealth{{InboundId: inboundID, Detail: detail, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING}}}
 	traffic := []store.FleetTraffic{{CredID: "credential", InboundID: inboundID, Down: 20, Up: 10}}
 	refs := map[string]store.FleetCredRef{"credential": {UserID: userID, DeviceID: deviceID, Protocol: protocol}}
 
-	first, firstTooLarge := buildFleetLive(state, sidecar.Live, stats, traffic, now, refs)
-	second, secondTooLarge := buildFleetLive(state, sidecar.Live, stats, traffic, now, refs)
+	first, _, firstTooLarge := buildFleetLive(state, stats, traffic, now, refs)
+	second, _, secondTooLarge := buildFleetLive(state, stats, traffic, now, refs)
 	if firstTooLarge || secondTooLarge || !reflect.DeepEqual(first, second) {
 		t.Fatalf("repeated buildFleetLive results differ: first=%+v second=%+v", first, second)
 	}
-	if !reflect.DeepEqual(state, stateBefore) || !reflect.DeepEqual(sidecar, sidecarBefore) {
-		t.Fatalf("buildFleetLive mutated inputs: state=%+v sidecar=%+v", state, sidecar)
+	if !reflect.DeepEqual(state, stateBefore) {
+		t.Fatalf("buildFleetLive mutated its state: %+v", state)
 	}
 	var view liveJSONView
 	if err := json.Unmarshal([]byte(first.LiveJSON), &view); err != nil {
@@ -1499,31 +1428,60 @@ func TestBuildFleetLiveIsPureDeterministicAndClipsOnlyAgentFields(t *testing.T) 
 	}
 }
 
-func cloneLiveSidecarForTest(in SessionSidecar) SessionSidecar {
-	out := in
-	if in.Live.Online != nil {
-		out.Live.Online = append(make([]onlineSess, 0, len(in.Live.Online)), in.Live.Online...)
+func TestStatsWriteCompleteLiveProjection(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-live-complete")
+	ids := e.fixture(state.NodeID)
+	tr := stepHello(t, core, ctx, state, now, hello("instance-live-complete", 0, "").GetHello())
+	stats := &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Traffic: []*agentv1.TrafficDelta{
+			{CredId: "crd_alice_hy", InboundId: ids.i1, BytesDown: 100, BytesUp: 50},
+			{CredId: "crd_alice_wg", InboundId: ids.i2, BytesDown: 20, BytesUp: 10},
+		},
+		Sessions: []*agentv1.Session{
+			{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now.Add(-time.Minute).Unix()},
+			{CredId: "crd_alice_wg", InboundId: ids.i2, ConnectedAtUnix: now.Add(-30 * time.Second).Unix()},
+		},
+		Health: []*agentv1.InboundHealth{{InboundId: ids.i1, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING, Detail: "healthy"}},
+		Host:   &agentv1.HostMetrics{CpuPct: 42.5, NetRxBps: 101, NetTxBps: 202},
 	}
-	out.Live.UserDown = make(map[string]uint64, len(in.Live.UserDown))
-	for id, rate := range in.Live.UserDown {
-		out.Live.UserDown[id] = rate
+	if _, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: &agentv1.ConnectRequest{
+		Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: stats}}}); err != nil {
+		t.Fatal(err)
 	}
-	out.Live.UserUp = make(map[string]uint64, len(in.Live.UserUp))
-	for id, rate := range in.Live.UserUp {
-		out.Live.UserUp[id] = rate
+	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NodeLive() = %+v, %v", rows, err)
 	}
-	if in.Live.Metrics != nil {
-		out.Live.Metrics = proto.Clone(in.Live.Metrics).(*agentv1.HostMetrics)
+	row := rows[0]
+	if row.SampleAt != now.Unix() || row.RxBps != 101 || row.TxBps != 202 || row.CPUPct != 43 {
+		t.Fatalf("live projection columns: sample=%d rx=%d tx=%d cpu=%d", row.SampleAt, row.RxBps, row.TxBps, row.CPUPct)
 	}
-	if in.Live.Health != nil {
-		out.Live.Health = make([]*agentv1.InboundHealth, len(in.Live.Health))
-		for i, health := range in.Live.Health {
-			if health != nil {
-				out.Live.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
-			}
-		}
+	var users map[string]int64
+	if err := json.Unmarshal([]byte(row.UsersJSON), &users); err != nil || len(users) != 1 || users["usr_alice"] != now.Add(-30*time.Second).Unix() {
+		t.Fatalf("users column = %v, %v", users, err)
 	}
-	return out
+	var view liveJSONView
+	if err := json.Unmarshal([]byte(row.LiveJSON), &view); err != nil {
+		t.Fatalf("decode live_json: %v", err)
+	}
+	if len(view.Online) != 2 || view.UserDownBPS["usr_alice"] != 96 || view.UploadBPS != 48 ||
+		len(view.Health) != 1 || view.Health[0].InboundID != ids.i1 || view.Health[0].RunState != "active" || view.Health[0].Detail != "healthy" {
+		t.Fatalf("live_json projection: %+v", view)
+	}
+}
+
+func TestBuildFleetLiveStopsBeforeSessionAtMaxStatsDeltas(t *testing.T) {
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	sessions := make([]*agentv1.Session, maxStatsDeltas+1)
+	for i := range maxStatsDeltas {
+		sessions[i] = &agentv1.Session{CredId: "unknown", ConnectedAtUnix: now.Unix()}
+	}
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-time.Second).Unix(), IntervalEndUnix: now.Unix(), Sessions: sessions}
+	projection, _, tooLarge := buildFleetLive(SessionState{}, stats, nil, now, nil)
+	if tooLarge || !projection.Apply {
+		t.Fatalf("projection = %+v, tooLarge=%t", projection, tooLarge)
+	}
 }
 
 func TestBuildFleetLiveSkipsOversizedProjection(t *testing.T) {
@@ -1537,36 +1495,22 @@ func TestBuildFleetLiveSkipsOversizedProjection(t *testing.T) {
 		stats.Sessions[i] = &agentv1.Session{CredId: credID, InboundId: "inb_live_limit", ConnectedAtUnix: now.Unix()}
 		refs[credID] = store.FleetCredRef{UserID: fmt.Sprintf("usr_%s_%05d", strings.Repeat("u", 40), i), DeviceID: "dev", Protocol: "awg"}
 	}
-	projection, tooLarge := buildFleetLive(SessionState{}, LiveSnapshot{}, stats, nil, now, refs)
+	projection, _, tooLarge := buildFleetLive(SessionState{}, stats, nil, now, refs)
 	if !tooLarge || projection.Apply || projection.UsersJSON != "" || projection.LiveJSON != "" {
 		t.Fatalf("oversized projection was applied: users=%d live=%d apply=%t", len(projection.UsersJSON), len(projection.LiveJSON), projection.Apply)
 	}
 }
 
-func TestBuildCoreSnapshotStopsAtMaxStatsDeltas(t *testing.T) {
-	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
-	sessions := make([]*agentv1.Session, maxStatsDeltas+1)
-	for i := 0; i < maxStatsDeltas; i++ {
-		sessions[i] = &agentv1.Session{}
-	}
-	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-time.Second).Unix(), IntervalEndUnix: now.Unix(), Sessions: sessions}
-
-	live, _, ok := buildCoreSnapshot(SessionState{}, LiveSnapshot{}, stats, nil, now, map[string]store.FleetCredRef{})
-	if !ok || len(live.Online) != 0 {
-		t.Fatalf("buildCoreSnapshot() = online %d, ok=%t; want an empty bounded view", len(live.Online), ok)
-	}
-}
-
-func TestOlderStatsBatchLeavesProjectionAndSidecarUnchanged(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-older")
+func TestOlderStatsBatchLeavesProjectionUnchanged(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-live-older")
 	ids := e.fixture(state.NodeID)
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-older", 0, "").GetHello())
+	tr := stepHello(t, core, ctx, state, now, hello("instance-live-older", 0, "").GetHello())
 	newer := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesDown: 20}},
 		Host:    &agentv1.HostMetrics{CpuPct: 33, NetRxBps: 44},
 	}}}
-	first, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: newer})
+	first, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: newer})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1574,12 +1518,11 @@ func TestOlderStatsBatchLeavesProjectionAndSidecarUnchanged(t *testing.T) {
 	if err != nil || len(beforeRows) != 1 {
 		t.Fatalf("NodeLive before older batch = %+v, %v", beforeRows, err)
 	}
-	beforeSidecar := cloneLiveSidecarForTest(first.Sidecar)
 	older := &agentv1.ConnectRequest{Seq: 2, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-20 * time.Second).Unix(), IntervalEndUnix: now.Add(-time.Second).Unix(),
 		Host: &agentv1.HostMetrics{CpuPct: 99, NetRxBps: 999},
 	}}}
-	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: older})
+	second, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: older})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1587,16 +1530,18 @@ func TestOlderStatsBatchLeavesProjectionAndSidecarUnchanged(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(beforeRows, afterRows) {
 		t.Fatalf("older batch changed node_live: before=%+v after=%+v err=%v", beforeRows, afterRows, err)
 	}
-	if second.State.LastEndUnix != first.State.LastEndUnix || !reflect.DeepEqual(second.Sidecar, beforeSidecar) {
-		t.Fatalf("older batch changed core state: end=%d/%d sidecar equal=%t", first.State.LastEndUnix, second.State.LastEndUnix, reflect.DeepEqual(second.Sidecar, beforeSidecar))
+	if second.State.LastEndUnix != first.State.LastEndUnix {
+		t.Fatalf("older batch changed core state: end=%d/%d", first.State.LastEndUnix, second.State.LastEndUnix)
 	}
 }
 
-func TestStatsWithoutHostAndUnknownCredentialKeepsHostOnly(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-unknown")
+// The host metrics come from the batch itself (every agent batch carries them): a batch without them shows none, and an
+// unknown credential never appears.
+func TestStatsWithoutHostAndUnknownCredential(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-live-unknown")
 	ids := e.fixture(state.NodeID)
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-unknown", 0, "").GetHello())
-	first, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: &agentv1.ConnectRequest{
+	tr := stepHello(t, core, ctx, state, now, hello("instance-live-unknown", 0, "").GetHello())
+	first, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: &agentv1.ConnectRequest{
 		Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(),
 			IntervalEndUnix: now.Unix(), Host: &agentv1.HostMetrics{CpuPct: 37, NetRxBps: 123}}}}})
 	if err != nil {
@@ -1607,13 +1552,9 @@ func TestStatsWithoutHostAndUnknownCredentialKeepsHostOnly(t *testing.T) {
 		Traffic:  []*agentv1.TrafficDelta{{CredId: "crd_unknown", InboundId: ids.i1, BytesDown: 10}},
 		Sessions: []*agentv1.Session{{CredId: "crd_unknown", InboundId: ids.i1, ConnectedAtUnix: now.Unix()}},
 	}}}
-	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: unknown})
+	_, err = coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: unknown})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if second.Sidecar.Live.Metrics == nil || second.Sidecar.Live.Metrics.CpuPct != 37 || second.Sidecar.Live.MetricsAt != now ||
-		len(second.Sidecar.Live.Online) != 0 || len(second.Sidecar.Live.UserDown) != 0 || len(second.Sidecar.Live.UserUp) != 0 {
-		t.Fatalf("host-only unknown-credential batch changed sidecar unexpectedly: %+v", second.Sidecar.Live)
 	}
 	rows, err := e.st.NodeLive(e.ctx, now.Add(time.Second), state.NodeID, true)
 	if err != nil || len(rows) != 1 {
@@ -1623,8 +1564,8 @@ func TestStatsWithoutHostAndUnknownCredentialKeepsHostOnly(t *testing.T) {
 	if err := json.Unmarshal([]byte(rows[0].LiveJSON), &view); err != nil {
 		t.Fatal(err)
 	}
-	if view.Metrics == nil || view.Metrics.CPUPct != 37 || len(view.Online) != 0 || len(view.UserDownBPS) != 0 || view.UploadBPS != 0 {
-		t.Fatalf("unknown credential appeared in live projection: %+v", view)
+	if view.Metrics != nil || rows[0].CPUPct != 0 || len(view.Online) != 0 || len(view.UserDownBPS) != 0 || view.UploadBPS != 0 {
+		t.Fatalf("a batch without host metrics and with an unknown credential: %+v, cpu column %d", view, rows[0].CPUPct)
 	}
 }
 
@@ -1647,24 +1588,24 @@ func TestTopRatesKeepsTheHighest(t *testing.T) {
 }
 
 func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-poison")
+	e, core, ctx, state, now := coreFixture(t, "core-poison")
 	ids := e.fixture(state.NodeID)
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-poison", 0, "").GetHello())
+	tr := stepHello(t, core, ctx, state, now, hello("instance-poison", 0, "").GetHello())
 	e.exec(`CREATE TRIGGER reject_core_stats BEFORE INSERT ON traffic_bucket WHEN NEW.user_id = 'usr_alice' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 5}},
 	}}}
-	first, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	first, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.Close == nil || first.Close.Class != CloseInternal || len(first.Frames) != 0 {
 		t.Fatalf("first refusal = close %v, frames %#v", first.Close, first.Frames)
 	}
-	oldAdapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
+	oldAdapter := newTestSession(e, ctx, nil, state)
 	oldAdapter.persistPoison(first.State.Poison)
-	disconnected, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
+	disconnected, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1674,19 +1615,18 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
 		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout), Poison: e.f.poisonFor(state.NodeID)}
-	newSidecar := SessionSidecar{}
-	newHello, err := coreStep(newCtx, newCore, newState, newSidecar, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: hello("instance-poison", 0, "")})
+	newHello, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: hello("instance-poison", 0, "")})
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("reconnect Hello = close %v, err %v", newHello.Close, err)
 	}
-	second, err := coreStep(newCtx, newCore, newHello.State, newHello.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second), Frame: batch})
+	second, err := coreStep(newCtx, newCore, newHello.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second), Frame: batch})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if second.Close != nil || len(second.Frames) != 1 || second.Frames[0].GetAck().GetUpToSeq() != 1 {
 		t.Fatalf("second refusal = close %v, frames %#v", second.Close, second.Frames)
 	}
-	newAdapter := newTestSession(e, newCtx, nil, newState, SessionSidecar{})
+	newAdapter := newTestSession(e, newCtx, nil, newState)
 	newAdapter.persistPoison(second.State.Poison)
 	if e.f.poisonFor(state.NodeID) != nil {
 		t.Fatal("the successful drop left poison state behind")
@@ -1697,21 +1637,21 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 }
 
 func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-poison-skip-error")
+	e, core, ctx, state, now := coreFixture(t, "core-poison-skip-error")
 	ids := e.fixture(state.NodeID)
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-poison-skip-error", 0, "").GetHello())
+	connected := stepHello(t, core, ctx, state, now, hello("instance-poison-skip-error", 0, "").GetHello())
 	e.exec(`CREATE TRIGGER reject_core_stats BEFORE INSERT ON traffic_bucket WHEN NEW.user_id = 'usr_alice' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 5}},
 	}}}
-	first, err := coreStep(ctx, core, connected.State, connected.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	first, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
 	if err != nil || first.Close == nil || first.State.Poison == nil {
 		t.Fatalf("first refusal = transition %+v, err %v", first, err)
 	}
-	adapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
+	adapter := newTestSession(e, ctx, nil, state)
 	adapter.persistPoison(first.State.Poison)
-	disconnected, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
+	disconnected, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1721,13 +1661,13 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
 		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout), Poison: e.f.poisonFor(state.NodeID)}
-	newHello, err := coreStep(newCtx, newCore, newState, SessionSidecar{}, SessionEvent{Kind: EventHello,
+	newHello, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello,
 		At: now.Add(2 * time.Second), Frame: hello("instance-poison-skip-error", 0, "")})
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("reconnect Hello = close %v, err %v", newHello.Close, err)
 	}
 	e.exec(`CREATE TRIGGER reject_core_skip_seq BEFORE UPDATE OF last_seq ON node WHEN NEW.last_seq > OLD.last_seq BEGIN SELECT RAISE(ABORT, 'test skip refusal'); END`)
-	second, err := coreStep(newCtx, newCore, newHello.State, newHello.Sidecar, SessionEvent{Kind: EventAgentFrame,
+	second, err := coreStep(newCtx, newCore, newHello.State, SessionEvent{Kind: EventAgentFrame,
 		At: now.Add(3 * time.Second), Frame: batch})
 	if err != nil || second.Close == nil || len(second.Frames) != 0 {
 		t.Fatalf("failed sequence skip = close %v, frames %#v, err %v", second.Close, second.Frames, err)
@@ -1735,7 +1675,7 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	if second.State.Poison == nil || second.State.Poison.Instance != "instance-poison-skip-error" || second.State.Poison.Seq != 1 {
 		t.Fatalf("failed sequence skip cleared poison state: %+v", second.State.Poison)
 	}
-	adapter = newTestSession(e, newCtx, nil, newState, SessionSidecar{})
+	adapter = newTestSession(e, newCtx, nil, newState)
 	adapter.persistPoison(second.State.Poison)
 	if poison := e.f.poisonFor(state.NodeID); poison == nil || *poison != *second.State.Poison {
 		t.Fatalf("adapter did not retain poison state after failed skip: %+v", poison)
@@ -1746,14 +1686,14 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 }
 
 func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-apply")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-apply", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
+	e, core, ctx, state, now := coreFixture(t, "core-apply")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-apply", 0, "").GetHello())
+	state = tr.State
 	revision := state.SentRevision
 	base := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
 		Revision: revision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
 	}}}
-	tr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: base})
+	tr, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: base})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1765,11 +1705,11 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 		t.Fatalf("base mismatch resend = %#v", tr.Frames)
 	}
 
-	state, sidecar = tr.State, tr.Sidecar
+	state = tr.State
 	stale := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
 		Revision: state.SentRevision - 1, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED, StateHash: "stale",
 	}}}
-	tr, err = coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: stale})
+	tr, err = coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: stale})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1780,7 +1720,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	bad := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
 		Revision: state.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED, StateHash: "wrong",
 	}}}
-	first, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: bad})
+	first, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: bad})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1792,7 +1732,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 		t.Fatalf("first drift resend = %#v", first.Frames)
 	}
 	bad.GetApplyResult().Revision = first.State.SentRevision
-	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: bad})
+	second, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: bad})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1807,7 +1747,7 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 	}
 
 	certAt := second.State.NextCertCheck
-	cert, err := coreStep(ctx, core, second.State, second.Sidecar, SessionEvent{Kind: EventAgentFrame, At: certAt,
+	cert, err := coreStep(ctx, core, second.State, SessionEvent{Kind: EventAgentFrame, At: certAt,
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}})
 	if err != nil || cert.Close != nil || !cert.State.NextCertCheck.Equal(certAt.Add(core.f.certCheck)) {
 		t.Fatalf("certificate recheck on agent event = close %v, deadline %v, err %v", cert.Close, cert.State.NextCertCheck, err)
@@ -1815,11 +1755,11 @@ func TestSessionCoreApplyResultsAndAlarms(t *testing.T) {
 }
 
 func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-requests")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-requests", 0, "").GetHello())
-	state, sidecar = tr.State, tr.Sidecar
+	e, core, ctx, state, now := coreFixture(t, "core-requests")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-requests", 0, "").GetHello())
+	state = tr.State
 	command := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "req-command"}}}
-	tr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+	tr, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
 		RequestID: "req-command", Deadline: now.Add(time.Minute), Frame: command,
 	}})
 	if err != nil {
@@ -1829,7 +1769,7 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 		t.Fatalf("command transition = state %+v frames %#v", tr.State, tr.Frames)
 	}
 	result := &agentv1.CommandResult{RequestId: "req-command", Ok: true}
-	beforeClose, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
+	beforeClose, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
 	if err != nil {
 		t.Fatal(err)
@@ -1840,24 +1780,24 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	if len(beforeClose.State.Pending) != 0 {
 		t.Fatalf("command result left a pending request: %+v", beforeClose.State.Pending)
 	}
-	disconnected, err := coreStep(ctx, core, beforeClose.State, beforeClose.Sidecar, SessionEvent{Kind: EventDisconnected, At: now.Add(2 * time.Second)})
+	disconnected, err := coreStep(ctx, core, beforeClose.State, SessionEvent{Kind: EventDisconnected, At: now.Add(2 * time.Second)})
 	if err != nil || len(disconnected.State.Pending) != 0 {
 		t.Fatalf("disconnect after command result left pending requests: %+v, err %v", disconnected.State.Pending, err)
 	}
-	duplicate, err := coreStep(ctx, core, disconnected.State, disconnected.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second),
+	duplicate, err := coreStep(ctx, core, disconnected.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
 	if err != nil || hasEffect(duplicate, EffectCommandResult) {
 		t.Fatalf("disconnected session emitted a second command result: %+v, err %v", duplicate.Effects, err)
 	}
 	logFrame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "req-log"}}}
-	started, err := coreStep(ctx, core, beforeClose.State, beforeClose.Sidecar, SessionEvent{Kind: EventLogStart, At: now, Request: &AdminRequest{
+	started, err := coreStep(ctx, core, beforeClose.State, SessionEvent{Kind: EventLogStart, At: now, Request: &AdminRequest{
 		RequestID: "req-log", Deadline: now.Add(time.Minute), Frame: logFrame,
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	chunk := &agentv1.LogChunk{RequestId: "req-log", Lines: []*agentv1.LogLine{{Message: "line"}}}
-	routed, err := coreStep(ctx, core, started.State, started.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now,
+	routed, err := coreStep(ctx, core, started.State, SessionEvent{Kind: EventAgentFrame, At: now,
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_LogChunk{LogChunk: chunk}}})
 	if err != nil {
 		t.Fatal(err)
@@ -1866,7 +1806,7 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 		t.Fatalf("log routing effects = %+v", routed.Effects)
 	}
 
-	adapter := newTestSession(e, ctx, nil, state, SessionSidecar{})
+	adapter := newTestSession(e, ctx, nil, state)
 	adapter.logs["req-log"] = &logSub{ch: make(chan *agentv1.LogChunk, 1)}
 	adapter.deliverLog(chunk)
 	adapter.deliverLog(&agentv1.LogChunk{RequestId: "req-log", Lines: []*agentv1.LogLine{{Message: "overflow"}}})
@@ -1874,27 +1814,27 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 		t.Fatalf("log overflow dropped lines = %d, want 1", got)
 	}
 
-	superseded, err := coreStep(ctx, core, routed.State, routed.Sidecar, SessionEvent{Kind: EventOwnerSuperseded, At: now})
+	superseded, err := coreStep(ctx, core, routed.State, SessionEvent{Kind: EventOwnerSuperseded, At: now})
 	if err != nil || superseded.Close == nil || superseded.Close.Class != CloseConflict {
 		t.Fatalf("supersede = %+v, %v", superseded.Close, err)
 	}
 }
 
 func TestSessionCorePendingRequestExpiresAtNextAlarm(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-request-expiry")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-request-expiry", 0, "").GetHello())
+	_, core, ctx, state, now := coreFixture(t, "core-request-expiry")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-request-expiry", 0, "").GetHello())
 	deadline := now.Add(500 * time.Millisecond)
 	request := &AdminRequest{RequestID: "req-expiry", Deadline: deadline, Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{
 		UpdateAgent: &agentv1.UpdateAgent{RequestId: "req-expiry"},
 	}}}
-	tr, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAdminCommand, At: now, Request: request})
+	tr, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAdminCommand, At: now, Request: request})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if tr.NextAlarm == nil || !tr.NextAlarm.Equal(deadline) {
 		t.Fatalf("next alarm = %v, want pending request expiry %v", tr.NextAlarm, deadline)
 	}
-	expired, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAlarm, At: *tr.NextAlarm})
+	expired, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAlarm, At: *tr.NextAlarm})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1921,8 +1861,8 @@ func TestSessionCoreCertificateRevocationClosesOnEvent(t *testing.T) {
 	state := SessionState{Version: sessionStateVersion, NodeID: a.nodeID, OwnerGeneration: owner,
 		PeerCertSerial: serial, PeerCertNotAfter: a.leaf.NotAfter,
 		HelloDeadline: now.Add(helloTimeout)}
-	var sidecar SessionSidecar
-	helloTr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-cert-alarm", 0, "")})
+
+	helloTr, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-cert-alarm", 0, "")})
 	if err != nil || helloTr.Close != nil {
 		t.Fatalf("hello transition = close %v, err %v", helloTr.Close, err)
 	}
@@ -1931,7 +1871,7 @@ func TestSessionCoreCertificateRevocationClosesOnEvent(t *testing.T) {
 	if helloTr.NextAlarm == nil || helloTr.NextAlarm.Equal(certDeadline) {
 		t.Fatalf("certificate deadline scheduled an alarm: next=%v certificate=%v", helloTr.NextAlarm, certDeadline)
 	}
-	closed, err := coreStep(ctx, core, helloTr.State, helloTr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: certDeadline,
+	closed, err := coreStep(ctx, core, helloTr.State, SessionEvent{Kind: EventAgentFrame, At: certDeadline,
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}}})
 	if err != nil {
 		t.Fatal(err)
@@ -1942,40 +1882,40 @@ func TestSessionCoreCertificateRevocationClosesOnEvent(t *testing.T) {
 }
 
 func TestSessionCoreCoalescesDesiredPreparation(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-stale-prepare")
+	e, core, ctx, state, now := coreFixture(t, "core-stale-prepare")
 	e.fixture(state.NodeID)
-	current := stepHello(t, core, ctx, state, sidecar, now, hello("instance-stale-prepare", 0, "").GetHello())
-	requested, err := coreStep(ctx, core, current.State, current.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	current := stepHello(t, core, ctx, state, now, hello("instance-stale-prepare", 0, "").GetHello())
+	requested, err := coreStep(ctx, core, current.State, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !requested.State.Preparing || !hasEffect(requested, EffectPrepareDesired) {
 		t.Fatalf("desired change did not start preparation: %+v", requested.State)
 	}
-	older, err := e.f.prepareDesiredState(ctx, state.NodeID, current.State.Capabilities)
+	older, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.exec(`UPDATE user SET status = 'disabled' WHERE id = 'usr_erin'`)
-	dirty, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second)})
+	dirty, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredChanged, At: now.Add(2 * time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !dirty.State.Preparing || !dirty.State.PrepareDirty || hasEffect(dirty, EffectPrepareDesired) {
 		t.Fatalf("change during preparation was not coalesced: state=%+v effects=%v", dirty.State, effectKinds(dirty))
 	}
-	first, err := coreStep(ctx, core, dirty.State, dirty.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(2 * time.Second), Prepared: older})
+	first, err := coreStep(ctx, core, dirty.State, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(2 * time.Second), Prepared: older})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !first.State.Preparing || first.State.PrepareDirty || !hasEffect(first, EffectPrepareDesired) {
 		t.Fatalf("dirty preparation did not start once after apply: state=%+v effects=%v", first.State, effectKinds(first))
 	}
-	fresh, err := e.f.prepareDesiredState(ctx, state.NodeID, current.State.Capabilities)
+	fresh, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(3 * time.Second), Prepared: fresh})
+	updated, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDesiredPrepared, At: now.Add(3 * time.Second), Prepared: fresh})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1993,10 +1933,10 @@ func TestSessionCoreCoalescesDesiredPreparation(t *testing.T) {
 }
 
 func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-ended-prepare")
+	e, core, ctx, state, now := coreFixture(t, "core-ended-prepare")
 	e.fixture(state.NodeID)
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-ended-prepare", 0, "").GetHello())
-	old := newTestSession(e, ctx, core, connected.State, connected.Sidecar)
+	connected := stepHello(t, core, ctx, state, now, hello("instance-ended-prepare", 0, "").GetHello())
+	old := newTestSession(e, ctx, core, connected.State)
 
 	originalDesired := e.f.cfg.Desired
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -2034,11 +1974,11 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 	newCore := NewSessionCore(e.f)
 	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner}
 	newHelloFrame := hello("instance-ended-prepare-new", 0, "")
-	newHello, err := coreStep(newCtx, newCore, newState, sidecar, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: newHelloFrame})
+	newHello, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: newHelloFrame})
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("new session Hello = close %v, err %v", newHello.Close, err)
 	}
-	newSession := newTestSession(e, newCtx, newCore, newHello.State, newHello.Sidecar)
+	newSession := newTestSession(e, newCtx, newCore, newHello.State)
 	if _, err := newSession.stepDesired(newCtx); err != nil {
 		t.Fatal(err)
 	}
@@ -2063,105 +2003,13 @@ func TestDesiredPreparationFromEndedOwnerDoesNotReachNewSession(t *testing.T) {
 }
 
 func TestSessionCoreStepMutatesCallerState(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-pointer-step")
-	tr, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now})
+	_, core, ctx, state, now := coreFixture(t, "core-pointer-step")
+	tr, err := core.Step(ctx, &state, SessionEvent{Kind: EventOpen, At: now})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if state.HelloDeadline.IsZero() || tr.NextAlarm == nil || !tr.NextAlarm.Equal(state.HelloDeadline) {
 		t.Fatalf("Step did not update caller state: state=%+v transition=%+v", state, tr)
-	}
-	if sidecar.Live.UserDown == nil || sidecar.Live.UserUp == nil {
-		t.Fatalf("Step did not initialize caller sidecar: %+v", sidecar)
-	}
-}
-
-func TestSessionViewIsAtomicAcrossCoreStepsAndAdminReads(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "core-view-atomic")
-	e.fixture(state.NodeID)
-	initial := stepHello(t, core, ctx, state, sidecar, now, hello("instance-view-atomic", 0, "").GetHello())
-	s := newTestSession(e, ctx, core, initial.State, initial.Sidecar)
-	s.publishView()
-	if !e.f.register(s) {
-		t.Fatal("could not register read-snapshot session")
-	}
-	defer e.f.unregister(s)
-	stats := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
-		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(), Host: &agentv1.HostMetrics{CpuPct: 30},
-	}}}
-	if _, err := s.stepCore(ctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: stats}); err != nil {
-		t.Fatal(err)
-	}
-	wrongApply := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
-		Revision: initial.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED, StateHash: "wrong",
-	}}}
-	for i := 0; i < 2; i++ {
-		s.coreMu.Lock()
-		tr, err := s.core.Step(ctx, &s.coreState, &s.coreSidecar, SessionEvent{Kind: EventAgentFrame,
-			At: now.Add(time.Duration(i+1) * time.Second), Frame: wrongApply})
-		s.publishView()
-		s.coreMu.Unlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i == 0 && !hasEffect(tr, EffectPrepareDesired) {
-			t.Fatalf("first drift transition = %+v, want a desired-state preparation effect", tr.Effects)
-		}
-	}
-	if view := s.view.Load(); view == nil || !view.State.Drift || !view.State.DriftResent {
-		t.Fatalf("initial read snapshot does not contain persistent drift: %+v", view)
-	}
-	var readers sync.WaitGroup
-	start, stop := make(chan struct{}), make(chan struct{})
-	failures := make(chan string, 8)
-	for i := 0; i < 4; i++ {
-		readers.Add(1)
-		go func() {
-			defer readers.Done()
-			<-start
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-				}
-				view := s.view.Load()
-				if view == nil {
-					failures <- "missing session view"
-					return
-				}
-				if view.State.SentRevision != 0 && view.State.SentStateHash == "" {
-					failures <- "sent revision snapshot lost its state hash"
-					return
-				}
-				if view.State.Drift && !view.State.DriftResent {
-					failures <- "drift snapshot lost its resend state"
-					return
-				}
-				e.f.Live(state.NodeID)
-				e.f.Online()
-				e.f.NetworkUsage(state.NodeID)
-				e.f.CPUUsage(state.NodeID)
-			}
-		}()
-	}
-	close(start)
-	for i := 0; i < 20; i++ {
-		status := "disabled"
-		if i%2 == 0 {
-			status = "active"
-		}
-		e.exec(`UPDATE user SET status = ? WHERE id = 'usr_erin'`, status)
-		if _, err := s.stepDesired(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
-	close(stop)
-	readers.Wait()
-	select {
-	case failure := <-failures:
-		t.Fatal(failure)
-	default:
 	}
 }
 
@@ -2269,8 +2117,8 @@ func waitSessionAck(t *testing.T, responses <-chan *agentv1.ConnectResponse, upT
 }
 
 func TestSessionStateSerializationSizeBudget(t *testing.T) {
-	_, core, ctx, state, sidecar, now := coreFixture(t, "core-size")
-	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-large-node", 0, "").GetHello())
+	_, core, ctx, state, now := coreFixture(t, "core-size")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-large-node", 0, "").GetHello())
 	state = tr.State
 	state.SentWithheld = []string{"inb_awg", "inb_tunnel"}
 	b, err := json.Marshal(state)
@@ -2321,14 +2169,14 @@ func effectKinds(tr any) []EffectKind {
 // helloSession is a session whose core has taken Open and Hello; it is not registered with the fleet.
 func helloSession(t *testing.T, name string) (*env, *session) {
 	t.Helper()
-	e, core, ctx, state, sidecar, now := coreFixture(t, name)
-	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+	e, core, ctx, state, now := coreFixture(t, name)
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventOpen, At: now}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-1", 0, "")}); err != nil {
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-1", 0, "")}); err != nil {
 		t.Fatal(err)
 	}
-	return e, newTestSession(e, ctx, core, state, sidecar)
+	return e, newTestSession(e, ctx, core, state)
 }
 
 // registeredSession is a registered session that has sent its first desired state; end unregisters it.
@@ -2338,16 +2186,16 @@ func registeredSession(t *testing.T, e *env, name string) (*session, func()) {
 	owner, ctx := e.f.claimOwner(nodeID, e.ctx)
 	core := NewSessionCore(e.f)
 	state := SessionState{Version: sessionStateVersion, NodeID: nodeID, OwnerGeneration: owner}
-	var sidecar SessionSidecar
+
 	now := e.f.now()
-	if _, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventOpen, At: now}); err != nil {
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventOpen, At: now}); err != nil {
 		t.Fatal(err)
 	}
-	helloTr, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-"+name, 0, "")})
+	helloTr, err := core.Step(ctx, &state, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-"+name, 0, "")})
 	if err != nil || helloTr.Close != nil {
 		t.Fatalf("session Hello = close %v, err %v", helloTr.Close, err)
 	}
-	s := newTestSession(e, ctx, core, state, sidecar)
+	s := newTestSession(e, ctx, core, state)
 	if !e.f.register(s) {
 		t.Fatal("session owner was not registered")
 	}
@@ -2482,18 +2330,16 @@ func TestDesiredPreparationSerializesReadsAndSendsLatestState(t *testing.T) {
 	if maxActive.Load() != 1 || readsBeforeRelease != 1 {
 		t.Fatalf("preparations overlapped: max active=%d reads before release=%d", maxActive.Load(), readsBeforeRelease)
 	}
-	latest, err := e.f.prepareDesiredState(s.ctx, s.nodeID, s.caps)
+	latest, err := e.f.prepareDesiredState(s.ctx, s.nodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	frames := receiveDesired(t, s, 2)
-	view := s.view.Load()
-	if view == nil || view.State.SentStateHash != latest.desired.hash {
-		var sent string
-		if view != nil {
-			sent = view.State.SentStateHash
-		}
-		t.Fatalf("last sent hash = %q, latest database hash = %v", sent, latest.desired.hash)
+	s.coreMu.Lock()
+	sentHash := s.coreState.SentStateHash
+	s.coreMu.Unlock()
+	if sentHash != latest.desired.hash {
+		t.Fatalf("last sent hash = %q, latest database hash = %v", sentHash, latest.desired.hash)
 	}
 	if frames[len(frames)-1].StateHash != latest.desired.hash {
 		t.Fatalf("last DesiredState = %v, latest database hash = %v", frames, latest.desired.hash)
@@ -2531,16 +2377,16 @@ func TestStepAfterEndDoesNotRearmOrRewritePoison(t *testing.T) {
 }
 
 func TestFailedPreparationRetriesOnAlarmAndKeepsFullResend(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "prepare-retry")
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-retry", 0, "").GetHello())
+	e, core, ctx, state, now := coreFixture(t, "prepare-retry")
+	connected := stepHello(t, core, ctx, state, now, hello("instance-retry", 0, "").GetHello())
 	mismatchFrame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
 		Revision: connected.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
 	}}}
-	mismatch, err := coreStep(ctx, core, connected.State, connected.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: mismatchFrame})
+	mismatch, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: mismatchFrame})
 	if err != nil || !hasEffect(mismatch, EffectPrepareDesired) || !mismatch.State.FullResendPending {
 		t.Fatalf("base mismatch transition = %+v, err %v", mismatch, err)
 	}
-	failed, err := coreStep(ctx, core, mismatch.State, mismatch.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	failed, err := coreStep(ctx, core, mismatch.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(2 * time.Second), Err: errors.New("desired source unavailable")})
 	if err != nil {
 		t.Fatal(err)
@@ -2549,15 +2395,15 @@ func TestFailedPreparationRetriesOnAlarmAndKeepsFullResend(t *testing.T) {
 		t.Fatalf("failed preparation state = %+v", failed.State)
 	}
 	retryAt := failed.State.PrepareRetryAt
-	retry, err := coreStep(ctx, core, failed.State, failed.Sidecar, SessionEvent{Kind: EventAlarm, At: retryAt})
+	retry, err := coreStep(ctx, core, failed.State, SessionEvent{Kind: EventAlarm, At: retryAt})
 	if err != nil || !retry.State.Preparing || !hasEffect(retry, EffectPrepareDesired) {
 		t.Fatalf("retry alarm transition = %+v, err %v", retry, err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, retry.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resent, err := coreStep(ctx, core, retry.State, retry.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: retryAt, Prepared: prepared})
+	resent, err := coreStep(ctx, core, retry.State, SessionEvent{Kind: EventDesiredPrepared, At: retryAt, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2567,18 +2413,18 @@ func TestFailedPreparationRetriesOnAlarmAndKeepsFullResend(t *testing.T) {
 }
 
 func TestRepeatedBaseMismatchCoalescesDesiredPreparation(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "rev-base-flight")
-	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-base-mismatch", 0, "").GetHello())
+	e, core, ctx, state, now := coreFixture(t, "rev-base-flight")
+	connected := stepHello(t, core, ctx, state, now, hello("instance-base-mismatch", 0, "").GetHello())
 	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
 		Revision: connected.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
 	}}}
-	inFlight, err := coreStep(ctx, core, connected.State, connected.Sidecar, SessionEvent{Kind: EventAgentFrame,
+	inFlight, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame,
 		At: now.Add(time.Second), Frame: frame})
 	if err != nil || !hasEffect(inFlight, EffectPrepareDesired) || !inFlight.State.Preparing {
 		t.Fatalf("initial base mismatch did not start preparation: state=%+v effects=%v err=%v", inFlight.State, effectKinds(inFlight), err)
 	}
 	for i := 2; i < 10; i++ {
-		again, stepErr := coreStep(ctx, core, inFlight.State, inFlight.Sidecar, SessionEvent{Kind: EventAgentFrame,
+		again, stepErr := coreStep(ctx, core, inFlight.State, SessionEvent{Kind: EventAgentFrame,
 			At: now.Add(time.Duration(i) * time.Second), Frame: frame})
 		if stepErr != nil {
 			t.Fatal(stepErr)
@@ -2588,11 +2434,11 @@ func TestRepeatedBaseMismatchCoalescesDesiredPreparation(t *testing.T) {
 		}
 		inFlight = again
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, inFlight.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := coreStep(ctx, core, inFlight.State, inFlight.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	first, err := coreStep(ctx, core, inFlight.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(10 * time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -2602,11 +2448,11 @@ func TestRepeatedBaseMismatchCoalescesDesiredPreparation(t *testing.T) {
 		t.Fatalf("first completion did not send full state and request one more prepare: state=%+v effects=%v frames=%v",
 			first.State, effectKinds(first), first.Frames)
 	}
-	secondPrepared, err := e.f.prepareDesiredState(ctx, state.NodeID, first.State.Capabilities)
+	secondPrepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	second, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(11 * time.Second), Prepared: secondPrepared})
 	if err != nil {
 		t.Fatal(err)
@@ -2675,28 +2521,30 @@ func TestRecomputeWaitsForOnePreparationRoundPerNode(t *testing.T) {
 }
 
 func answerBaseMismatch(s *session) error {
-	view := s.view.Load()
-	if view == nil || view.State.SentRevision == 0 {
+	s.coreMu.Lock()
+	revision := s.coreState.SentRevision
+	s.coreMu.Unlock()
+	if revision == 0 {
 		return nil
 	}
 	frame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_ApplyResult{ApplyResult: &agentv1.ApplyResult{
-		Revision: view.State.SentRevision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
+		Revision: revision, Status: agentv1.ApplyStatus_APPLY_STATUS_BASE_MISMATCH,
 	}}}
 	_, err := s.stepCore(s.ctx, SessionEvent{Kind: EventAgentFrame, At: s.f.now(), Frame: frame})
 	return err
 }
 
 func TestHelloShortcutSendsChangedSettingsDelta(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-settings-shortcut")
+	e, core, ctx, state, now := coreFixture(t, "hello-settings-shortcut")
 	node, err := e.st.Node(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now,
+	opened, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now,
 		Frame: hello("instance-settings", 7, preparedBefore.desired.hash)})
 	if err != nil || opened.Close != nil {
 		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
@@ -2706,15 +2554,15 @@ func TestHelloShortcutSendsChangedSettingsDelta(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requested, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	requested, err := coreStep(ctx, core, opened.State, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sent, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared,
+	sent, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
@@ -2731,27 +2579,27 @@ func TestHelloShortcutSendsChangedSettingsDelta(t *testing.T) {
 // The node row may already hold a higher desired revision than the one the agent applied (sent, then changed back):
 // the shortcut keeps that revision and still records the state the agent holds as the desired one.
 func TestHelloShortcutRecordsDesiredHashBehindAHigherRevision(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-higher-rev")
+	e, core, ctx, state, now := coreFixture(t, "hello-higher-rev")
 	if err := e.st.NodeDesired(ctx, state.NodeID, 9, "sent-then-changed-back", []byte(`{"r":9,"h":"sent-then-changed-back"}`)); err != nil {
 		t.Fatal(err)
 	}
-	want, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	want, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-higher", 7, want.desired.hash)})
+	opened, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now, Frame: hello("instance-higher", 7, want.desired.hash)})
 	if err != nil || opened.Close != nil {
 		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
 	}
-	requested, err := coreStep(ctx, core, opened.State, opened.Sidecar, SessionEvent{Kind: EventDesiredChanged, At: now})
+	requested, err := coreStep(ctx, core, opened.State, SessionEvent{Kind: EventDesiredChanged, At: now})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	done, err := coreStep(ctx, core, requested.State, requested.Sidecar, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
+	done, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared, At: now, Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2772,42 +2620,42 @@ func TestHelloShortcutRecordsDesiredHashBehindAHigherRevision(t *testing.T) {
 }
 
 func TestHelloShortcutResendsFullStateAfterSentDigestLoss(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "hello-sent-digest-loss")
+	e, core, ctx, state, now := coreFixture(t, "hello-sent-digest-loss")
 	state.SentRevision = 9
-	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID, nil)
+	preparedBefore, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventHello, At: now,
+	opened, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now,
 		Frame: hello("instance-sent-digest-loss", 7, preparedBefore.desired.hash)})
 	if err != nil || opened.Close != nil {
 		t.Fatalf("Hello = close %v, err %v", opened.Close, err)
 	}
-	requested, err := coreStep(ctx, core, opened.State, SessionSidecar{}, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
+	requested, err := coreStep(ctx, core, opened.State, SessionEvent{Kind: EventDesiredChanged, At: now.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID, requested.State.Capabilities)
+	prepared, err := e.f.prepareDesiredState(ctx, state.NodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sent, err := coreStep(ctx, core, requested.State, SessionSidecar{}, SessionEvent{Kind: EventDesiredPrepared,
+	sent, err := coreStep(ctx, core, requested.State, SessionEvent{Kind: EventDesiredPrepared,
 		At: now.Add(time.Second), Prepared: prepared})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(sent.Frames) != 1 || sent.Frames[0].GetDesiredState() == nil {
-		t.Fatalf("sidecar loss skipped DesiredState: %+v", sent.Frames)
+		t.Fatalf("sent digest loss skipped DesiredState: %+v", sent.Frames)
 	}
 	full := sent.Frames[0].GetDesiredState()
 	if full.BaseRevision != 0 || full.Revision <= state.SentRevision || full.Settings == nil {
-		t.Fatalf("sidecar loss state = %+v, want a full state after revision %d", full, state.SentRevision)
+		t.Fatalf("sent digest loss state = %+v, want a full state after revision %d", full, state.SentRevision)
 	}
 }
 
 func TestSessionStepCloseCancelsWithReceiveCause(t *testing.T) {
-	e, core, ctx, state, sidecar, now := coreFixture(t, "session-close-cause")
-	s := newTestSession(e, ctx, core, state, sidecar)
+	e, core, ctx, state, now := coreFixture(t, "session-close-cause")
+	s := newTestSession(e, ctx, core, state)
 	tr, err := s.stepCore(s.ctx, SessionEvent{Kind: EventOwnerSuperseded, At: now})
 	if err != nil || tr.Close == nil {
 		t.Fatalf("session close transition = %+v, err %v", tr.Close, err)

@@ -159,9 +159,19 @@ func TestSubViewNodes(t *testing.T) {
 	e.sql(`UPDATE node SET country_code = 'NL', bandwidth_mbps = 100 WHERE id = 'nod_nl1'`)
 	e.node("nod_old", "old1", "old1.example.com", "active")
 	e.inbound(m.hy2, "nod_old")
-	e.s.online = &liveSource{
-		agents:  map[string]bool{"nod_de1": true},
-		samples: map[string]sample{"nod_nl1": {rx: 85_000_000, at: e.clock.Add(-30 * time.Second)}, "nod_old": {rx: 1, at: e.clock.Add(-2 * time.Minute)}},
+	for _, live := range []struct {
+		id       string
+		lastSeen time.Time
+		sampleAt time.Time
+		rxBps    int64
+	}{
+		{id: "nod_de1", lastSeen: e.clock},
+		{id: "nod_nl1", lastSeen: e.clock, sampleAt: e.clock.Add(-30 * time.Second), rxBps: 85_000_000},
+		{id: "nod_old", lastSeen: e.clock.Add(-2 * time.Minute), sampleAt: e.clock.Add(-2 * time.Minute), rxBps: 1},
+	} {
+		e.sql(`UPDATE node SET last_seen_at = ? WHERE id = ?`, live.lastSeen.Unix(), live.id)
+		e.sql(`INSERT INTO node_live (node_id, session, sample_at, rx_bps, users, live_json)
+			VALUES (?, 1, ?, ?, '{}', '{}')`, live.id, live.sampleAt.Unix(), live.rxBps)
 	}
 	// A warp exit: a profile with egress warp on nl1.
 	warp := e.profile("hy2 warp", `{"egress":"warp","port":8444}`)
@@ -247,26 +257,6 @@ func TestSubViewNodes(t *testing.T) {
 	if want := []string{"dns_builtin_adblock", "dns_builtin_family", "dns_builtin_ru_split", "dns_builtin_standard", "dns_builtin_yandex"}; !slices.Equal(ids, want) {
 		t.Errorf("presets = %v, want %v", ids, want)
 	}
-}
-
-type sample struct {
-	rx uint64
-	at time.Time
-}
-
-// liveSource is the fleet as the page sees it: which agents hold a session, the latest network samples.
-type liveSource struct {
-	agents  map[string]bool
-	samples map[string]sample
-}
-
-func (liveSource) OnlineUsers() map[string]string { return nil }
-func (l *liveSource) AgentConnected(nodeID string) bool {
-	return l.agents[nodeID]
-}
-func (l *liveSource) NetworkUsage(nodeID string) (uint64, uint64, time.Time, bool) {
-	s, ok := l.samples[nodeID]
-	return s.rx, 0, s.at, ok
 }
 
 func TestPageDNSPickRules(t *testing.T) {

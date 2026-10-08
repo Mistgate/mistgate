@@ -36,9 +36,10 @@ func (c *clock) Advance(d time.Duration) {
 }
 
 type liveState struct {
-	up    bool
-	caps  []string
-	drift bool
+	up       bool
+	caps     []string
+	drift    bool
+	lastSeen time.Time
 }
 
 type fixCall struct {
@@ -51,13 +52,14 @@ type fixCall struct {
 type fakeFleet struct {
 	mu       sync.Mutex
 	live     map[string]liveState
+	liveErr  error
 	doctor   func(ctx context.Context, node string, checks []string) (*agentv1.DoctorReport, error)
 	fix      func(c fixCall) (*agentv1.CommandResult, error)
 	fixCalls []fixCall
 	online   map[string]int
 }
 
-func (f *fakeFleet) OnlineByInbound() map[string]int {
+func (f *fakeFleet) OnlineByInbound(context.Context) map[string]int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.online
@@ -69,22 +71,52 @@ func (f *fakeFleet) set(node string, l liveState) {
 	f.mu.Unlock()
 }
 
-func (f *fakeFleet) Live(node string) (bool, []string, bool) {
+func (f *fakeFleet) Live(context.Context) ([]store.NodeLiveRow, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	l := f.live[node]
-	return l.up, l.caps, l.drift
+	if f.liveErr != nil {
+		return nil, f.liveErr
+	}
+	rows := make([]store.NodeLiveRow, 0, len(f.live))
+	for node, live := range f.live {
+		rows = append(rows, store.NodeLiveRow{NodeID: node, State: "active", Exists: true, Connected: live.up,
+			LastSeenAt: live.lastSeen, AgentCaps: live.caps, Drift: live.drift})
+	}
+	return rows, nil
 }
 
-func (f *fakeFleet) NodeStatus(_ context.Context, n store.NodeRow) adminv1.NodeStatus {
-	if up, _, _ := f.Live(n.ID); up {
+func (f *fakeFleet) NodeLive(_ context.Context, nodeID string) (store.NodeLiveRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.liveErr != nil {
+		return store.NodeLiveRow{}, f.liveErr
+	}
+	live, ok := f.live[nodeID]
+	if !ok {
+		return store.NodeLiveRow{NodeID: nodeID}, nil
+	}
+	return store.NodeLiveRow{NodeID: nodeID, State: "active", Exists: true, Connected: live.up,
+		LastSeenAt: live.lastSeen, AgentCaps: live.caps, Drift: live.drift}, nil
+}
+
+func (f *fakeFleet) NodeStatusWithLive(_ context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus {
+	if n.State == "retired" {
+		return adminv1.NodeStatus_NODE_STATUS_RETIRED
+	}
+	if n.State == "pending" {
+		return adminv1.NodeStatus_NODE_STATUS_PENDING
+	}
+	if live.Connected {
 		return adminv1.NodeStatus_NODE_STATUS_ONLINE
 	}
 	return adminv1.NodeStatus_NODE_STATUS_DOWN
 }
 
 func (f *fakeFleet) RunDoctor(ctx context.Context, node string, checks []string, _ time.Duration) (*agentv1.DoctorReport, error) {
-	if up, caps, _ := f.Live(node); !up || len(caps) == 0 {
+	f.mu.Lock()
+	live := f.live[node]
+	f.mu.Unlock()
+	if !live.up || len(live.caps) == 0 {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errTooOld)
 	}
 	if f.doctor == nil {
@@ -94,7 +126,10 @@ func (f *fakeFleet) RunDoctor(ctx context.Context, node string, checks []string,
 }
 
 func (f *fakeFleet) ApplyFix(_ context.Context, node, fix string, dry bool, params map[string]string) (*agentv1.CommandResult, error) {
-	if up, caps, _ := f.Live(node); !up || len(caps) == 0 {
+	f.mu.Lock()
+	live := f.live[node]
+	f.mu.Unlock()
+	if !live.up || len(live.caps) == 0 {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errTooOld)
 	}
 	c := fixCall{node, fix, dry, params}
@@ -169,7 +204,7 @@ func (e *env) node(id, provider string, up bool) {
 	now := e.clock.Now().Unix()
 	e.exec(`INSERT INTO node (id, name, address, provider, state, created_at, last_seen_at, last_connected_at) VALUES (?, ?, ?, ?, 'active', 1, ?, ?)`,
 		id, id, id+".example.com", provider, now, now)
-	e.fl.set(id, liveState{up: up, caps: []string{capDoctor}})
+	e.fl.set(id, liveState{up: up, caps: []string{capDoctor}, lastSeen: time.Unix(now, 0)})
 }
 
 // inbound deploys a new hy2 profile on a node on the given port and marks it active (as the node reports).

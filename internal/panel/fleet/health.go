@@ -51,44 +51,36 @@ func (f *Fleet) hooks() Health {
 	return f.health
 }
 
-// Live reports whether the node has a stream now, the capabilities its Hello listed and whether the
-// desired state stays different from the applied one after the automatic resend (state drift).
-func (f *Fleet) Live(nodeID string) (connected bool, caps []string, drift bool) {
-	s := f.session(nodeID)
-	if s == nil {
-		return false, nil, false
-	}
-	if view := s.view.Load(); view != nil {
-		drift = view.State.Drift
-	}
-	return true, s.caps, drift
-}
-
 // OnlineByInbound counts the open sessions of every inbound of the connected nodes (the health and WARP dialogs
 // say how many connections a restart or a pause drops).
-func (f *Fleet) OnlineByInbound() map[string]int {
+func (f *Fleet) OnlineByInbound(ctx context.Context) map[string]int {
 	out := map[string]int{}
-	for _, o := range f.Online() {
+	for _, o := range f.Online(ctx) {
 		out[o.InboundID]++
 	}
 	return out
 }
 
-// NodeStatus is the status the admin UI shows for a node row.
-func (f *Fleet) NodeStatus(ctx context.Context, n store.NodeRow) adminv1.NodeStatus {
-	return f.statusOf(ctx, n, f.session(n.ID), nil, f.now().UTC()).status
+// NodeStatusWithLive derives status from a projection already read for the surrounding request.
+func (f *Fleet) NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus {
+	return f.statusOfLive(ctx, n, live, nil, f.now().UTC()).status
 }
 
-func (s *session) can(capability string) bool { return slices.Contains(s.caps, capability) }
-
 // doctorSession returns the node's stream if it can run the doctor, else the error the admin API answers.
-func (f *Fleet) doctorSession(nodeID string) (*session, error) {
+func (f *Fleet) doctorSession(ctx context.Context, nodeID string) (*session, error) {
+	live, err := f.liveRowsForNode(ctx, nodeID, false)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node live projection", err)
+	}
+	if !live.Connected {
+		return nil, errNodeOffline
+	}
+	if !slices.Contains(live.AgentCaps, capDoctor) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
+	}
 	s := f.session(nodeID)
 	if s == nil {
 		return nil, errNodeOffline
-	}
-	if !s.can(capDoctor) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	return s, nil
 }
@@ -97,7 +89,7 @@ func (f *Fleet) doctorSession(nodeID string) (*session, error) {
 // that echoes the request. The report has been handed to Health by then. A node without the capability is
 // never sent anything (FAILED_PRECONDITION "agent too old").
 func (f *Fleet) RunDoctor(ctx context.Context, nodeID string, checks []string, wait time.Duration) (*agentv1.DoctorReport, error) {
-	s, err := f.doctorSession(nodeID)
+	s, err := f.doctorSession(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +132,7 @@ func (f *Fleet) RunDoctor(ctx context.Context, nodeID string, checks []string, w
 // ApplyFix sends one fix (or its dry run) to a connected node with the doctor capability and waits up to the
 // node's apply timeout for the CommandResult.
 func (f *Fleet) ApplyFix(ctx context.Context, nodeID, fixID string, dryRun bool, params map[string]string) (*agentv1.CommandResult, error) {
-	s, err := f.doctorSession(nodeID)
+	s, err := f.doctorSession(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}

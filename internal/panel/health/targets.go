@@ -252,11 +252,11 @@ const (
 	errUnsupportedText = "no probe client for this configuration"
 )
 
-func (s *Service) skipReason(t *target) string {
+func (s *Service) skipReason(t *target, live store.NodeLiveRow) string {
 	if t.node.State != "active" {
 		return skipNodeOffline
 	}
-	if connected, _, _ := s.fl.Live(t.node.ID); !connected {
+	if !live.Connected {
 		return skipNodeOffline
 	}
 	switch {

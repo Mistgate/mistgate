@@ -80,7 +80,7 @@ func TestSessionCoreReconcileFailsWithheldInbounds(t *testing.T) {
 func TestApplyResultUsesSessionWithheldIds(t *testing.T) {
 	x, a := newL3Env(t)
 	state := SessionState{NodeID: a.nodeID, SentRevision: 7, SentStateHash: "sent-state", SentWithheld: []string{"inb_awg"}}
-	tr := coreTransition{state: &state, sidecar: &SessionSidecar{}}
+	tr := coreTransition{state: &state}
 	err := NewSessionCore(x.f).applyResult(x.ctx, &tr, &agentv1.ApplyResult{
 		Revision: state.SentRevision, StateHash: state.SentStateHash, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED,
 	}, x.f.now())

@@ -164,9 +164,9 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 
 	// between the two processes the node is UPDATING, not DOWN or BLIP
 	deadline := time.Now().Add(5 * time.Second)
-	for e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)) != adminv1.NodeStatus_NODE_STATUS_UPDATING {
+	for mustStatus(t, e, a.nodeID) != adminv1.NodeStatus_NODE_STATUS_UPDATING {
 		if time.Now().After(deadline) {
-			t.Fatalf("node status during the re-exec: %v", e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)))
+			t.Fatalf("node status during the re-exec: %v", mustStatus(t, e, a.nodeID))
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -210,7 +210,7 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM event WHERE code IN ('node_blip', 'node_recovered', 'node_down')`); n != 0 {
 		t.Fatalf("%d blip or outage events for a planned re-exec", n)
 	}
-	if st := e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)); st != adminv1.NodeStatus_NODE_STATUS_ONLINE {
+	if st := mustStatus(t, e, a.nodeID); st != adminv1.NodeStatus_NODE_STATUS_ONLINE {
 		t.Fatalf("node status after the rollout: %v", st)
 	}
 }

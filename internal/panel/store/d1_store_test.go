@@ -755,7 +755,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if got, err := st.Access().User(ctx, "usr_user"); err != nil || got.Name != "User" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_user" {
 			t.Fatalf("user = %+v, %v", got, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true)
+		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true, now)
 		if err != nil || data.ImplicitDevice.ID != dev.ID || len(data.ImplicitCreds) != 1 || data.ImplicitCreds[0].ID != cred.ID {
 			t.Fatalf("user implicit credentials = %+v, %+v", data, err)
 		}
@@ -800,7 +800,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil || !created || got.ID != dev.ID || len(live) != 1 || live[0].ID != cred.ID {
 			t.Fatalf("EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false, now)
 		if err != nil || len(data.Devices) != 1 || data.Devices[0].ID != dev.ID || len(data.Devices[0].Protocols) != 1 || data.Devices[0].Protocols[0] != cred.Protocol {
 			t.Fatalf("subscription devices after add credentials = %+v, %v", data.Devices, err)
 		}
@@ -867,7 +867,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if userID, err := st.Access().RevokeDevice(ctx, dev.ID, now); err != nil || userID != dev.UserID {
 			t.Fatalf("revoke = %q, %v", userID, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_revoke_device", now, false)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_revoke_device", now, false, now)
 		if err != nil || len(data.Devices) != 0 {
 			t.Fatalf("subscription devices after revoke = %+v, %v", data.Devices, err)
 		}

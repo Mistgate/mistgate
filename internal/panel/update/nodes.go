@@ -3,6 +3,7 @@ package update
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"slices"
 	"sort"
 
@@ -73,20 +74,31 @@ func (s *Service) nodes(ctx context.Context, b *bundleState, steps []store.StepR
 	if err != nil {
 		return nil, err
 	}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		return nil, err
+	}
+	liveByID := make(map[string]store.NodeLiveRow, len(liveRows))
+	for _, live := range liveRows {
+		liveByID[live.NodeID] = live
+	}
 	ref := s.refBuilt(b)
 	busy := updatingSet(steps)
-	online := s.fl.OnlineUsersByNode()
 	var out []nodeView
 	for _, n := range rows {
 		if n.State != "active" { // pending: no agent yet
 			continue
 		}
-		connected, _, _ := s.fl.Live(n.ID)
+		live := liveByID[n.ID]
+		var users map[string]int64
+		if live.Connected && live.UsersJSON != "" {
+			_ = json.Unmarshal([]byte(live.UsersJSON), &users)
+		}
 		in, err := s.st.FleetInbounds(ctx, n.ID, true)
 		if err != nil {
 			return nil, err
 		}
-		v := nodeView{row: n, connected: connected, state: nodeState(n, connected, busy[n.ID], ref), inbounds: len(in), online: online[n.ID]}
+		v := nodeView{row: n, connected: live.Connected, state: nodeState(n, live.Connected, busy[n.ID], ref), inbounds: len(in), online: len(users)}
 		if v.state == adminv1.NodeUpdateState_NODE_UPDATE_STATE_UNSUPPORTED { // the page builds its manual commands from it
 			f, err := s.st.NodeFacts(ctx, n.ID)
 			if err != nil {

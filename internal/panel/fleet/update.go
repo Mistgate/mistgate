@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"time"
 
@@ -70,13 +71,20 @@ func (a agentService) FetchUpdate(ctx context.Context, req *connect.Request[agen
 
 // updateSession returns the node's stream if it can update itself, else the error the admin API answers. Nothing is
 // ever sent to a node that did not list "update/1".
-func (f *Fleet) updateSession(nodeID string) (*session, error) {
+func (f *Fleet) updateSession(ctx context.Context, nodeID string) (*session, error) {
+	live, err := f.liveRowsForNode(ctx, nodeID, false)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node live projection", err)
+	}
+	if !live.Connected {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	if !slices.Contains(live.AgentCaps, capUpdate) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node cannot update itself"))
+	}
 	s := f.session(nodeID)
 	if s == nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
-	}
-	if !s.can(capUpdate) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node cannot update itself"))
 	}
 	return s, nil
 }
@@ -85,7 +93,7 @@ func (f *Fleet) updateSession(nodeID string) (*session, error) {
 // CommandResult (the download is part of it). The agent answers before it re-executes; a stream that drops right
 // after the answer still delivers it.
 func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error) {
-	s, err := f.updateSession(nodeID)
+	s, err := f.updateSession(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +105,7 @@ func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signat
 
 // RollbackAgent asks a connected node with the update capability to put its previous binary back.
 func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error) {
-	s, err := f.updateSession(nodeID)
+	s, err := f.updateSession(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -105,23 +113,6 @@ func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Dura
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RollbackAgent{
 			RollbackAgent: &agentv1.RollbackAgent{RequestId: reqID}}}
 	})
-}
-
-// OnlineUsersByNode counts the distinct users with an open session on each connected node (the canary is the node
-// with the fewest).
-func (f *Fleet) OnlineUsersByNode() map[string]int {
-	seen := map[string]map[string]bool{}
-	for _, o := range f.Online() {
-		if seen[o.NodeID] == nil {
-			seen[o.NodeID] = map[string]bool{}
-		}
-		seen[o.NodeID][o.UserID] = true
-	}
-	out := make(map[string]int, len(seen))
-	for n, u := range seen {
-		out[n] = len(u)
-	}
-	return out
 }
 
 // lastUpdateJSON is Hello.last_update as stored on the node row ("" = none). Strings are bounded: they are stored and shown.

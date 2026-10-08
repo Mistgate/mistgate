@@ -32,24 +32,23 @@ import (
 
 // Fleet is what the module needs from the fleet module (*fleet.Fleet implements it).
 type Fleet interface {
-	// Live: whether the node has an agent stream now, the capabilities of its Hello, whether its state drift persists.
-	Live(nodeID string) (connected bool, caps []string, drift bool)
+	// Live reads the durable liveness projection for the fleet in one statement.
+	Live(ctx context.Context) ([]store.NodeLiveRow, error)
+	// NodeLive reads one node's durable liveness projection.
+	NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error)
 	// UpdateAgent sends a signed manifest and waits for the CommandResult (the download is part of it).
 	// FAILED_PRECONDITION when the node is not connected or did not list "update/1": nothing was sent.
 	UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error)
 	// RollbackAgent asks the node to put its previous binary back; same preconditions.
 	RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error)
-	// OnlineUsersByNode is the number of distinct users with an open session on each connected node.
-	OnlineUsersByNode() map[string]int
 }
 
 // Health is what the rollout gate needs from the health module (*health.Service implements it); nil = no probe gate.
 type Health interface {
 	// RunChecksNow schedules an immediate synthetic round for the inbounds of a node (rate limited to one per 30 s).
 	RunChecksNow(ctx context.Context, nodeID string) (scheduled, skipped int, retry time.Duration, err error)
-	// NodeChecksSince counts the probeable inbounds of the node and how many have a round that ended at or after since
-	// with OK / with FAILED or DEGRADED.
-	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int)
+	// NodeChecksSince counts probeable inbounds and rounds ended at or after since; read errors are returned to the gate.
+	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, err error)
 }
 
 // Timing of the module. The zero value is production; tests shorten what they need.

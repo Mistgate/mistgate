@@ -25,6 +25,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/awg/awgcfg"
 	"github.com/mistgate/mistgate/internal/node/awg/awguapi"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -292,7 +293,7 @@ func TestAWGRoundIsStoredAndShownAsARealRow(t *testing.T) {
 	id := r.deploy("awg", "", true)
 	r.s.invalidateSnapshot()
 	sn, _ := r.s.snapshot(r.ctx)
-	if why := r.s.skipReason(sn.targets[id]); why != "" {
+	if why := r.s.skipReason(sn.targets[id], store.NodeLiveRow{Connected: true}); why != "" {
 		t.Fatalf("skip reason %q: the inbound would still be n/a", why)
 	}
 	res, ok := r.s.round(r.ctx, id)

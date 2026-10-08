@@ -37,6 +37,7 @@ func TestListAlerts(t *testing.T) {
 	e.clock.Advance(time.Minute)
 	e.report("de1", true, res("disk_space", dFail, "journald_vacuum"))
 	e.exec(`UPDATE node SET last_seen_at = 1, last_connected_at = 1 WHERE id = 'nl1'`)
+	e.fl.set("nl1", liveState{lastSeen: time.Unix(1, 0)})
 	e.clock.Advance(time.Second)
 	e.evaluate() // nl1 is down
 

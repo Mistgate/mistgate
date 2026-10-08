@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"encoding/json"
 	"slices"
 	"strconv"
 	"testing"
@@ -11,31 +12,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"google.golang.org/protobuf/proto"
 )
-
-func cloneLiveSnapshot(live LiveSnapshot) LiveSnapshot {
-	out := live
-	if live.Metrics != nil {
-		out.Metrics = proto.Clone(live.Metrics).(*agentv1.HostMetrics)
-	}
-	out.Health = make([]*agentv1.InboundHealth, len(live.Health))
-	for i, health := range live.Health {
-		if health != nil {
-			out.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
-		}
-	}
-	out.Online = slices.Clone(live.Online)
-	out.UserDown = make(map[string]uint64, len(live.UserDown))
-	for id, value := range live.UserDown {
-		out.UserDown[id] = value
-	}
-	out.UserUp = make(map[string]uint64, len(live.UserUp))
-	for id, value := range live.UserUp {
-		out.UserUp[id] = value
-	}
-	return out
-}
 
 // reasonOf is the status and reason of one node as the node page, the node list and the Overview card each show it:
 // the three must agree.
@@ -75,16 +52,22 @@ func reasonOf(t *testing.T, e *env, id string) (adminv1.NodeStatus, *adminv1.Sta
 }
 
 func setHealth(e *env, id string, h ...*agentv1.InboundHealth) {
-	s := e.f.session(id)
-	view := s.view.Load()
-	live := LiveSnapshot{}
-	var state SessionState
-	if view != nil {
-		state, live = view.State, cloneLiveSnapshot(view.Live)
+	rows, err := e.st.NodeLive(e.ctx, e.f.now().UTC(), id, true)
+	if err != nil || len(rows) != 1 {
+		e.t.Fatalf("load node live projection: rows=%+v err=%v", rows, err)
 	}
-	state.SentWithheld = slices.Clone(state.SentWithheld)
-	live.Health = h
-	s.view.Store(&sessionView{State: state, Live: live})
+	view := decodeLiveView(rows[0])
+	view.Health = make([]liveJSONHealth, 0, len(h))
+	for _, health := range h {
+		if health != nil {
+			view.Health = append(view.Health, liveJSONHealth{InboundID: clip(health.InboundId, 64), RunState: runState(health.State), Detail: clip(health.Detail, 256)})
+		}
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.exec(`UPDATE node_live SET live_json = ? WHERE node_id = ?`, string(encoded), id)
 }
 
 // An online node is "healthy" only when someone can use it: without a single enabled profile it needs attention, and a
@@ -99,7 +82,7 @@ func TestStatusCountsTheProfilesOfANode(t *testing.T) {
 	if st != adminv1.NodeStatus_NODE_STATUS_ONLINE || r == nil || r.Code != "no_profiles" {
 		t.Fatalf("online without profiles: %v %v", st, r)
 	}
-	if e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)) != adminv1.NodeStatus_NODE_STATUS_ONLINE {
+	if mustStatus(t, e, a.nodeID) != adminv1.NodeStatus_NODE_STATUS_ONLINE {
 		t.Fatal("the status alone stays ONLINE")
 	}
 

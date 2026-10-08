@@ -32,22 +32,16 @@ type Service struct {
 	reg      *protocols.Registry
 	brand    func(ctx context.Context) (instance.Settings, error)
 	dns      DefaultPresets // nil = no DNS module: default_dns_preset_id stays empty
-	network  NetworkUsageSource
 	log      *slog.Logger
-}
-
-// NetworkUsageSource supplies the latest host-level rates from connected agents.
-type NetworkUsageSource interface {
-	NetworkUsage(nodeID string) (rxBps, txBps uint64, sampledAt time.Time, ok bool)
 }
 
 // NewService builds the service; settings is the cache the public handler reads too, brand the loader of the
 // instance brand (for effective_title).
-func NewService(st *store.Store, settings *subsettings.Cache, reg *protocols.Registry, brand func(ctx context.Context) (instance.Settings, error), dns DefaultPresets, log *slog.Logger, network NetworkUsageSource) *Service {
+func NewService(st *store.Store, settings *subsettings.Cache, reg *protocols.Registry, brand func(ctx context.Context) (instance.Settings, error), dns DefaultPresets, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{st: st, settings: settings, reg: reg, brand: brand, dns: dns, network: network, log: log}
+	return &Service{st: st, settings: settings, reg: reg, brand: brand, dns: dns, log: log}
 }
 
 // Handler returns the Connect path and handler of SubscriptionService.
@@ -140,7 +134,16 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 		nodeIDs = append(nodeIDs, candidate.nodeID)
 		capacityMbps[candidate.nodeID] = candidate.bandwidthMbps
 	}
-	usage := access.CurrentNetworkUtilization(nodeIDs, capacityMbps, s.network, time.Now())
+	now := time.Now().UTC()
+	liveRows, err := s.st.NodeLive(ctx, now, "", false)
+	if err != nil {
+		return "", nil, err
+	}
+	live := make(map[string]store.NodeLiveRow, len(liveRows))
+	for _, row := range liveRows {
+		live[row.NodeID] = row
+	}
+	usage := access.CurrentNetworkUtilization(nodeIDs, capacityMbps, live, now)
 	var out []*adminv1.ServerSample
 	for _, candidate := range candidates {
 		server := &adminv1.ServerSample{Node: candidate.node, CountryCode: candidate.countryCode, Profile: candidate.profile}

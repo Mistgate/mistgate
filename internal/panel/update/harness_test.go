@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -44,6 +45,7 @@ func (c *clock) Advance(d time.Duration) {
 type fakeFleet struct {
 	mu       sync.Mutex
 	live     map[string]bool
+	liveErr  error
 	caps     map[string][]string
 	drift    map[string]bool
 	online   map[string]int
@@ -58,20 +60,51 @@ func newFakeFleet() *fakeFleet {
 	return &fakeFleet{live: map[string]bool{}, caps: map[string][]string{}, drift: map[string]bool{}, online: map[string]int{}}
 }
 
-func (f *fakeFleet) Live(id string) (bool, []string, bool) {
+func (f *fakeFleet) Live(context.Context) ([]store.NodeLiveRow, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.live[id], f.caps[id], f.drift[id]
+	if f.liveErr != nil {
+		return nil, f.liveErr
+	}
+	ids := map[string]bool{}
+	for id := range f.live {
+		ids[id] = true
+	}
+	for id := range f.caps {
+		ids[id] = true
+	}
+	for id := range f.drift {
+		ids[id] = true
+	}
+	for id := range f.online {
+		ids[id] = true
+	}
+	rows := make([]store.NodeLiveRow, 0, len(ids))
+	for id := range ids {
+		users := make(map[string]int64, f.online[id])
+		for i := range f.online[id] {
+			users[fmt.Sprintf("usr_%d", i)] = 0
+		}
+		encoded, _ := json.Marshal(users)
+		rows = append(rows, store.NodeLiveRow{NodeID: id, State: "active", Exists: true, Connected: f.live[id],
+			AgentCaps: f.caps[id], Drift: f.drift[id], UsersJSON: string(encoded)})
+	}
+	return rows, nil
 }
 
-func (f *fakeFleet) OnlineUsersByNode() map[string]int {
+func (f *fakeFleet) NodeLive(_ context.Context, nodeID string) (store.NodeLiveRow, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	out := map[string]int{}
-	for k, v := range f.online {
-		out[k] = v
+	if f.liveErr != nil {
+		return store.NodeLiveRow{}, f.liveErr
 	}
-	return out
+	return store.NodeLiveRow{NodeID: nodeID, State: "active", Exists: true, Connected: f.live[nodeID], AgentCaps: f.caps[nodeID], Drift: f.drift[nodeID]}, nil
+}
+
+func (f *fakeFleet) setLiveError(err error) {
+	f.mu.Lock()
+	f.liveErr = err
+	f.mu.Unlock()
 }
 
 // precondition is what the real fleet answers when nothing can be sent.
@@ -139,10 +172,11 @@ type fakeHealth struct {
 	failed    map[string]int
 	runs      map[string]int
 	since     map[string]time.Time
+	errors    map[string]error
 }
 
 func newFakeHealth() *fakeHealth {
-	return &fakeHealth{probeable: map[string]int{}, ok: map[string]int{}, failed: map[string]int{}, runs: map[string]int{}, since: map[string]time.Time{}}
+	return &fakeHealth{probeable: map[string]int{}, ok: map[string]int{}, failed: map[string]int{}, runs: map[string]int{}, since: map[string]time.Time{}, errors: map[string]error{}}
 }
 
 func (h *fakeHealth) RunChecksNow(_ context.Context, id string) (int, int, time.Duration, error) {
@@ -152,16 +186,22 @@ func (h *fakeHealth) RunChecksNow(_ context.Context, id string) (int, int, time.
 	return 1, 0, 0, nil
 }
 
-func (h *fakeHealth) NodeChecksSince(_ context.Context, id string, since time.Time) (int, int, int) {
+func (h *fakeHealth) NodeChecksSince(_ context.Context, id string, since time.Time) (int, int, int, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.since[id] = since
-	return h.probeable[id], h.ok[id], h.failed[id]
+	return h.probeable[id], h.ok[id], h.failed[id], h.errors[id]
 }
 
 func (h *fakeHealth) set(id string, probeable, ok, failed int) {
 	h.mu.Lock()
 	h.probeable[id], h.ok[id], h.failed[id] = probeable, ok, failed
+	h.mu.Unlock()
+}
+
+func (h *fakeHealth) setError(id string, err error) {
+	h.mu.Lock()
+	h.errors[id] = err
 	h.mu.Unlock()
 }
 

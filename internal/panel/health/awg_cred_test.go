@@ -95,6 +95,7 @@ func TestAWGSystemCredentialLifecycle(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
 	e.node("de2", "hetzner", true)
+	e.exec(`UPDATE node SET agent_caps = 'awg/1' WHERE id IN ('de1', 'de2')`)
 	pid := e.awgProfile("awg", "")
 	in1, in2 := e.awgInbound(pid, "de1"), e.awgInbound(pid, "de2")
 	grp := must(e.acc.CreateGroup(e.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "g", ProfileIds: []string{pid}}))).Msg.Group.Id

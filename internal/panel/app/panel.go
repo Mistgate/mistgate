@@ -269,7 +269,7 @@ func Build(c Config) (*Panel, error) {
 	sub := http.NewServeMux()
 	sub.Handle("GET /brand/logo.svg", httpserver.NewLogoHandler(st, log))
 	sub.Handle("/", subs.Handler(acc, httpserver.NewDecoy(c.DecoyDir), subCfg))
-	subSvc := subs.NewService(st, cache, reg, brand, dnsSvc, log, fl)
+	subSvc := subs.NewService(st, cache, reg, brand, dnsSvc, log)
 
 	var admin []httpserver.AdminHandler
 	for _, h := range []func() (string, http.Handler){

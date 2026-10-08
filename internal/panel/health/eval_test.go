@@ -17,6 +17,46 @@ const (
 	cDeg  = adminv1.CheckStatus_CHECK_STATUS_DEGRADED
 )
 
+func TestLiveReadErrorDoesNotOpenAlerts(t *testing.T) {
+	newStaleEnv := func() *env {
+		e := newEnv(t)
+		e.node("node-a", "provider", false)
+		stale := e.clock.Now().Add(-2 * time.Hour)
+		e.exec(`UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'node-a'`, stale.Unix(), stale.Unix())
+		e.fl.set("node-a", liveState{lastSeen: stale})
+		return e
+	}
+	control := newStaleEnv()
+	control.evaluate()
+	if got := control.active(); len(got) != 1 || got["node_down/node-a/"].Kind != kNodeDown {
+		t.Fatalf("stale last-seen control did not open node_down: %v", got)
+	}
+
+	e := newStaleEnv()
+	e.fl.mu.Lock()
+	e.fl.liveErr = errString("live read failed")
+	e.fl.mu.Unlock()
+
+	e.evaluate()
+	if got := e.active(); len(got) != 0 {
+		t.Fatalf("live read error opened alerts: %v", got)
+	}
+}
+
+func TestMissingLiveRowUsesNodeLastSeenAt(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider", false)
+	e.exec(`UPDATE node SET last_connected_at = ? WHERE id = 'node-a'`, e.clock.Now().Add(-2*time.Hour).Unix())
+	e.fl.mu.Lock()
+	delete(e.fl.live, "node-a")
+	e.fl.mu.Unlock()
+
+	e.evaluate()
+	if got := e.active(); len(got) != 0 {
+		t.Fatalf("missing live row opened alerts despite a recent node last_seen_at: %v", got)
+	}
+}
+
 // A synthetic alert opens only after two failed rounds, resolves by itself on the next passing round, and a
 // failure that returns within an hour re-opens the same row.
 func TestSyntheticAlertOpensAfterTwoRoundsAndReopens(t *testing.T) {
@@ -519,7 +559,11 @@ func TestUsersImpactedIsSuppressedByHeldActiveCheckFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := e.s.derive(e.ctx, e.clock.Now(), sn, rows, acceptsByNode(accepts), signals, portChecks, mustActiveAlerts(t, e))
+	liveRows, err := e.fl.Live(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := e.s.derive(e.ctx, e.clock.Now(), sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, mustActiveAlerts(t, e))
 	if !d.holdSynth["de1"] {
 		t.Fatal("test did not leave CHECK_FAILED in the held state")
 	}
@@ -730,7 +774,7 @@ func TestNodeDownAndBlip(t *testing.T) {
 		t.Fatalf("node_down: %+v", nd)
 	}
 
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor}})
+	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor}, lastSeen: e.clock.Now()})
 	e.evaluate()
 	want(t, e.active(), "doctor_warn/de1/disk_space")
 	found := false
@@ -749,6 +793,7 @@ func TestNodeDownWaitsForTheStartGrace(t *testing.T) {
 	e.node("de1", "hetzner", false)
 	old := e.clock.Now().Add(-time.Hour).Unix() // long silent before the panel started
 	e.exec(`UPDATE node SET last_seen_at = ?, last_connected_at = ?`, old, old)
+	e.fl.set("de1", liveState{lastSeen: time.Unix(old, 0)})
 	e.evaluate()
 	want(t, e.active())
 	e.clock.Advance(6 * time.Minute)

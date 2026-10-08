@@ -102,7 +102,7 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 }
 
 // prepareDesiredState reads the node and builds its desired state without touching session state.
-func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string, caps []string) (*preparedDesiredState, error) {
+func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string) (*preparedDesiredState, error) {
 	node, rawDigest, err := f.st.NodeWithSentDigest(ctx, nodeID)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (f *Fleet) prepareDesiredState(ctx context.Context, nodeID string, caps []s
 		prepared.digest = digest
 	}
 	if node.State != "retired" {
-		prepared.desired, err = f.buildState(ctx, node, caps)
+		prepared.desired, err = f.buildState(ctx, node, node.AgentCaps)
 		if err != nil {
 			return nil, err
 		}

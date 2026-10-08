@@ -152,6 +152,11 @@ func (s *Service) evaluate(ctx context.Context) {
 	s.evalMu.Lock()
 	defer s.evalMu.Unlock()
 	now := s.now()
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		s.log.Warn("health: evaluate live", "err", err)
+		return
+	}
 	sn, err := s.snapshot(ctx)
 	if err != nil {
 		s.log.Warn("health: evaluate", "err", err)
@@ -182,13 +187,21 @@ func (s *Service) evaluate(ctx context.Context) {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	d := s.derive(ctx, now, sn, rows, acceptsByNode(accepts), signals, portChecks, active)
+	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, active)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()
 	if err := s.reconcile(ctx, now, d, active); err != nil {
 		s.log.Warn("health: reconcile alerts", "err", err)
 	}
+}
+
+func indexLiveRows(rows []store.NodeLiveRow) map[string]store.NodeLiveRow {
+	out := make(map[string]store.NodeLiveRow, len(rows))
+	for _, row := range rows {
+		out[row.NodeID] = row
+	}
+	return out
 }
 
 // acceptsByNode indexes the accepted doctor warnings: node id -> check id -> acceptance.
@@ -211,7 +224,7 @@ func accepted(r store.DoctorRow, acc map[string]store.DoctorAccept) (store.Docto
 }
 
 // derive computes the conditions that hold now.
-func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
+func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live map[string]store.NodeLiveRow, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
 	signals store.HealthSignalBatch, portChecks []store.PortCheck, active []store.HealthAlert) *derived {
 	d := &derived{conds: map[key]cond{}, accepted: map[key]bool{}, nodes: map[string]bool{}, holdNode: map[string]bool{}, holdDown: map[string]bool{},
 		holdDoctor: map[string]bool{}, holdSynth: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
@@ -232,10 +245,10 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 			d.holdNode[n.ID] = true
 			continue
 		}
-		up, _, drift := s.fl.Live(n.ID)
-		if !up {
+		nodeLive := live[n.ID]
+		if !nodeLive.Connected {
 			d.holdNode[n.ID] = true
-			gap := now.Sub(latest(n.LastSeenAt, n.LastDisconnectedAt, n.LastConnectedAt))
+			gap := now.Sub(latest(nodeLive.LastSeenAt, n.LastSeenAt, n.LastDisconnectedAt, n.LastConnectedAt))
 			switch {
 			case gap < s.cfg.BlipWindow: // a blip is an event, not an alert
 			case grace:
@@ -247,14 +260,14 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 			continue
 		}
 		connected = append(connected, n)
-		if drift {
+		if nodeLive.Drift {
 			add(cond{key: key{kStateDrift, n.ID, ""}, severity: sevWarning, why: "health.alert.state_drift.why"})
 		}
 		for _, c := range s.doctorConds(now, n, docs[n.ID], sn.byNode[n.ID], d, accepts[n.ID]) {
 			add(c)
 		}
 		for _, t := range sn.byNode[n.ID] {
-			if s.skipReason(t) != "" {
+			if s.skipReason(t, live[t.node.ID]) != "" {
 				continue
 			}
 			c := s.cellOf(ctx, t.in.ID)

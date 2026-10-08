@@ -226,9 +226,15 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia,
 	}
-	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive)
+	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive, now)
 	if err != nil {
 		return SubView{}, err
+	}
+	liveByNode := make(map[string]store.NodeLiveRow, len(data.LiveNodes))
+	userOnline := false
+	for _, live := range data.LiveNodes {
+		liveByNode[live.NodeID] = live
+		userOnline = userOnline || live.UserOnline
 	}
 	v.Up = min(data.Up, u.UsedBytes) // used_bytes is authoritative; the buckets only give the split
 	v.Down = u.UsedBytes - v.Up
@@ -237,7 +243,6 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	for _, d := range awgDevs {
 		awgByID[d.ID] = d
 	}
-	_, userOnline := s.online.OnlineUsers()[u.ID]
 	for _, d := range devs {
 		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, LastSeen: d.LastSeenAt, Online: d.Implicit && userOnline}
 		for _, pid := range d.Protocols {
@@ -304,21 +309,17 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	v.Format = format
 	var networkNodeIDs []string
-	var networkSource NetworkUsageSource
 	capacityMbps := map[string]int{}
-	if source, ok := s.online.(NetworkUsageSource); ok {
-		networkSource = source
-		for _, f := range full {
-			if !s.usable(f, g, u) {
-				continue
-			}
-			if _, exists := s.reg.Get(f.Profile.Protocol); exists {
-				networkNodeIDs = append(networkNodeIDs, f.Node.ID)
-				capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
-			}
+	for _, f := range full {
+		if !s.usable(f, g, u) {
+			continue
+		}
+		if _, exists := s.reg.Get(f.Profile.Protocol); exists {
+			networkNodeIDs = append(networkNodeIDs, f.Node.ID)
+			capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
 		}
 	}
-	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, networkSource, now)
+	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, liveByNode, now)
 	var nd *nodeDNS // read on first use: only the page and the AmneziaWG proxies of a Mihomo profile need it
 	dnsOf := func() *nodeDNS {
 		if nd == nil {
@@ -421,7 +422,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 	}
 	for i := range v.Nodes {
-		v.Nodes[i].Online = s.nodeOnline(v.Nodes[i].ID, networkUsage)
+		v.Nodes[i].Online = liveByNode[v.Nodes[i].ID].Connected
 	}
 	if opt.NoPageData {
 		if format == plugin.FormatMihomo && opt.IncludeEffectiveDNS && nd != nil {
@@ -461,21 +462,6 @@ func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUse
 	}
 	device, live, created, err := s.st.Access().EnsureImplicitDevice(ctx, template, added)
 	return created, device, live, err
-}
-
-// AgentSessionSource is an optional interface of the online source of New (the fleet module implements it): whether the
-// agent of a node holds a live session with the panel.
-type AgentSessionSource interface {
-	AgentConnected(nodeID string) bool
-}
-
-// nodeOnline: the agent of the node answers (a live session, or a network sample that is not older than 90 seconds).
-func (s *Service) nodeOnline(nodeID string, usage map[string]NodeNetworkUtilization) bool {
-	if _, ok := usage[nodeID]; ok {
-		return true
-	}
-	src, ok := s.online.(AgentSessionSource)
-	return ok && src.AgentConnected(nodeID)
 }
 
 // awgMinClients are the minimum client versions of an AWG profile, from its settings without secrets (the

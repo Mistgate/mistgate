@@ -493,7 +493,7 @@ func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.
 		t.Fatalf("outer call returned %+v after the concurrent call committed both profiles", result)
 	}
 
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +550,7 @@ func TestEnsureImplicitAWGCredsReturnsFullLiveSetAfterWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true, now)
 	if err != nil {
 		t.Fatal(err)
 	}

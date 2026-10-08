@@ -386,19 +386,13 @@ func (m *e2eNodeManager) CreateProvisionEnrollment(_ context.Context, _ NodeSpec
 	return m.enrollmentToken, strings.Repeat("a", 64), nil
 }
 
-func (m *e2eNodeManager) ProvisionNodeState(context.Context, string) (string, error) {
+func (m *e2eNodeManager) ProvisionNodeState(context.Context, string) (string, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.state == "" {
-		return "", store.ErrNotFound
+		return "", false, store.ErrNotFound
 	}
-	return m.state, nil
-}
-
-func (m *e2eNodeManager) ProvisionNodeConnected(string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.connected
+	return m.state, m.connected, nil
 }
 
 func (m *e2eNodeManager) setConnected() {

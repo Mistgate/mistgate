@@ -27,6 +27,20 @@ type fakeHealth struct {
 	critical   uint32
 }
 
+func mustLive(t *testing.T, e *env) []store.NodeLiveRow {
+	t.Helper()
+	rows, err := e.f.Live(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}
+
+func mustStatus(t *testing.T, e *env, nodeID string) adminv1.NodeStatus {
+	t.Helper()
+	return e.f.NodeStatusWithLive(e.ctx, mustNode(e, nodeID), liveRowsByID(mustLive(t, e))[nodeID])
+}
+
 func (h *fakeHealth) DoctorReport(_ context.Context, _ string, r *agentv1.DoctorReport) {
 	h.mu.Lock()
 	h.reports = append(h.reports, r)
@@ -82,14 +96,21 @@ func TestOldAgentIsNeverSentDoctorCommands(t *testing.T) {
 	if _, err := e.f.RunDoctor(e.ctx, a.nodeID, nil, time.Second); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node_offline" {
 		t.Fatalf("offline: %v", err)
 	}
-	if up, _, _ := e.f.Live(a.nodeID); up {
+	live := func() store.NodeLiveRow {
+		rows, err := e.f.Live(e.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return liveRowsByID(rows)[a.nodeID]
+	}
+	if live().Connected {
 		t.Fatal("live before connecting")
 	}
 
 	c, _, _ := connectFull(a, "inst1") // no capabilities in this Hello
-	up, caps, drift := e.f.Live(a.nodeID)
-	if !up || len(caps) != 0 || drift {
-		t.Fatalf("live: %v %v %v", up, caps, drift)
+	row := live()
+	if !row.Connected || len(row.AgentCaps) != 0 || row.Drift {
+		t.Fatalf("live: %v %v %v", row.Connected, row.AgentCaps, row.Drift)
 	}
 	_, err := e.f.RunDoctor(e.ctx, a.nodeID, nil, time.Second)
 	if code(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "agent too old") {
@@ -124,7 +145,7 @@ func TestDoctorRelay(t *testing.T) {
 	e.fixture(a.nodeID)
 	e.exec(`UPDATE node SET liveness_timeout_s = 3600`)
 	c := connectDoctor(a, "inst1")
-	if _, caps, _ := e.f.Live(a.nodeID); len(caps) != 1 || caps[0] != "doctor/1" {
+	if caps := liveRowsByID(mustLive(t, e))[a.nodeID].AgentCaps; len(caps) != 1 || caps[0] != "doctor/1" {
 		t.Fatalf("capabilities %v", caps)
 	}
 
@@ -243,7 +264,7 @@ func TestHealthSeamFeedsStatusAndOverview(t *testing.T) {
 		t.Fatalf("a node without traffic is a problem node: %+v", o)
 	}
 	list, _ := nodes.ListNodes(e.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
-	if list.Msg.Nodes[0].Status != adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC || e.f.NodeStatus(e.ctx, mustNode(e, a.nodeID)) != adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC {
+	if list.Msg.Nodes[0].Status != adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC || mustStatus(t, e, a.nodeID) != adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC {
 		t.Fatalf("list status %v", list.Msg.Nodes[0].Status)
 	}
 	var cardStatus adminv1.NodeStatus
@@ -274,7 +295,11 @@ func TestDriftIsVisibleToHealth(t *testing.T) {
 	c.send(0, applied(ds2, "0000"))
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, _, drift := e.f.Live(a.nodeID); drift {
+		rows, err := e.f.Live(e.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if liveRowsByID(rows)[a.nodeID].Drift {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
