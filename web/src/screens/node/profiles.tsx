@@ -37,7 +37,7 @@ export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }
   [InboundState.DISABLED]: { kind: "off", word: "node.inbound.off" },
 };
 
-type Cell = { label: string; value: string; mono?: boolean; sub?: string; tone?: "warn" | "bad" };
+type Cell = { label: string; value: string; mono?: boolean; title?: string; tone?: "warn" | "bad" };
 
 /** The certificate cell: its date, amber under 14 days left and red under 3; "none" for a profile that is not running. */
 function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
@@ -52,31 +52,29 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
 }
 
 /**
- * The facts a row shows, by protocol: a TLS protocol has a domain and a certificate, a WireGuard-family one has neither
- * (its interface, backend, egress and devices matter instead). Anything that is not AmneziaWG reads as TLS.
+ * The facts a row shows: port and egress for every protocol, then a TLS protocol's domain and certificate, or a
+ * WireGuard-family one's devices and backend (the backend's version is its tooltip). Always four, so the columns of
+ * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
 function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell[] {
   const port: Cell = { label: t("node.profiles.port"), value: i.port ? `udp/${i.port}` : "", mono: true };
+  const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
     return [
       port,
-      { label: t("node.profiles.backend"), value: a?.backend ?? "", sub: a?.backendVersion },
-      { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" },
+      egress,
       { label: t("node.profiles.devices"), value: a ? t("node.profiles.devicesOnline", { n: a.peers, online: a.peersOnline }) : "" },
+      { label: t("node.profiles.backend"), value: a?.backend ?? "", title: a?.backendVersion },
     ];
   }
-  return [port, { label: t("node.profiles.tls"), value: i.tlsServerName, mono: true }, certCell(t, fmt, i, now)];
+  return [port, egress, { label: t("node.profiles.tls"), value: i.tlsServerName, mono: true }, certCell(t, fmt, i, now)];
 }
 
 const toneText = { warn: "text-warn-text", bad: "text-danger-text" } as const;
 
-// one literal class per column set: Tailwind reads class names from the source. The last column fits the longest pill
-// ("Не запустился"), so the columns of every row line up.
-const gridClass: Record<number, string> = {
-  3: "md:grid-cols-[minmax(0,1.5fr)_76px_minmax(0,1.3fr)_minmax(0,1.2fr)_124px]",
-  4: "md:grid-cols-[minmax(0,1.5fr)_76px_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_124px]",
-};
+// The last column fits the longest pill ("Не запустился").
+const gridClass = "md:grid-cols-[minmax(0,1.4fr)_92px_minmax(0,0.7fr)_minmax(0,1.3fr)_minmax(0,1fr)_124px]";
 
 /** The process that holds a profile's port, by inbound id, as the node's doctor saw it ("caddy(812)" -> "caddy"). */
 export function usePortHolders(nodeId: string, enabled = true): Record<string, string> {
@@ -166,7 +164,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
           ) : null;
         return (
           <div key={i.id} className="flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
-            <div className={`grid items-center gap-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${gridClass[cs.length] ?? gridClass[3]}`}>
+            <div className={`grid items-center gap-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${gridClass}`}>
               <div className="flex min-w-0 items-center gap-2.5">
                 <IconChip icon="sliders" tone="sage" size={28} />
                 <div className="flex min-w-0 flex-col gap-[3px]">
@@ -181,8 +179,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                 <div key={c.label} className="min-w-0 max-md:hidden">
                   <div className="flex min-w-0 flex-col gap-[3px]">
                     <span className="text-[11px] text-muted">{c.label}</span>
-                    <span className={cx(c.mono ? "font-mono text-[13px] break-all" : "text-xs font-semibold break-words", c.tone && toneText[c.tone])}>{c.value || "—"}</span>
-                    {c.sub && <span className="font-mono text-[11px] break-all text-muted">{c.sub}</span>}
+                    <span title={c.title} className={cx(c.mono ? "font-mono text-[13px] break-all" : "text-xs font-semibold break-words", c.tone && toneText[c.tone])}>
+                      {c.value || "—"}
+                    </span>
                   </div>
                 </div>
               ))}

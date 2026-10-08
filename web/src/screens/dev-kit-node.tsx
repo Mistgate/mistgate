@@ -180,7 +180,19 @@ export function NodeDemos() {
             data={
               {
                 node: baseNode({ status: NodeStatus.NO_TRAFFIC, warp: { state: WarpState.DOWN, source: 1, colo: "", accountType: "free" } }),
-                inbounds: [inbound({}), inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp", state: InboundState.FAILED, certNotAfterUnix: now + 5 * 86400, lastError: "egress warp: tunnel is down" })],
+                inbounds: [
+                  inbound({
+                    id: "inb_3",
+                    profileId: "prf_awg",
+                    profileName: "AWG3.1",
+                    protocol: "awg",
+                    port: 33183,
+                    tlsServerName: "",
+                    awg: { backend: "kernel", backendVersion: "amneziawg kernel module, genl v3, maxattr 34", ifaceUp: true, peers: 15, peersOnline: 1, peersHandshaken: 2, newestHandshakeUnix: now - 70, udpRxPackets: 900 },
+                  }),
+                  inbound({}),
+                  inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp", state: InboundState.FAILED, certNotAfterUnix: now + 5 * 86400, lastError: "egress warp: tunnel is down" }),
+                ],
                 metrics,
                 facts,
               } as never

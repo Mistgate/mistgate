@@ -271,8 +271,6 @@ export const en = {
   "awg.err.kernel_not_ready": "The kernel module is not ready on this node. Prepare it first in the node’s settings (“AmneziaWG backend”), or add the profile on Auto.",
 
   // ---- node: status line of an inbound
-  "awg.node.peers": "{n} device|{n} devices",
-  "awg.node.online": "{n} online",
   "awg.node.never": "{n} never connected",
   "awg.node.handshake": "last handshake {s}",
   "awg.node.handshakeNow": "last handshake just now",
@@ -560,8 +558,6 @@ export const ru: typeof en = {
   "awg.prep.reason.no_systemd": "на ноде нет systemd-run",
   "awg.err.kernel_not_ready": "Модуль ядра на этой ноде не готов. Сначала подготовь его в настройках ноды («Бэкенд AmneziaWG») или добавь профиль на «Авто».",
 
-  "awg.node.peers": "{n} устройство|{n} устройства|{n} устройств",
-  "awg.node.online": "{n} онлайн",
   "awg.node.never": "{n} ни разу не подключались",
   "awg.node.handshake": "последнее рукопожатие {s}",
   "awg.node.handshakeNow": "последнее рукопожатие только что",
