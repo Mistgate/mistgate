@@ -57,10 +57,11 @@ var transactionShape2 = map[string]string{
 	"dns.go:Delete":                                "A preset guard precedes preset deletion and clearing user and group references.",
 	"fleet_ca.go:CreateEnrollment":                 "Optional node creation, token replacement, and the current-node read share one batch guarded against missing or retired nodes.",
 	"fleet_ca.go:Enroll":                           "A reader batch loads the token, node, and replay certificate; signing runs outside one guarded consume-and-issue batch.",
-	"fleet_node.go:NodeHello":                      "Previous and current node rows bracket the guarded facts update in one D1 batch.",
+	"fleet_node.go:NodeHello":                      "Previous and current node rows bracket the guarded facts update and live-session replacement in one D1 batch.",
+	"fleet_node.go:NodeDisconnected":               "The matching live session guards last-seen/disconnect time and row deletion in one fixed batch.",
 	"fleet_node.go:RetireNode":                     "A node-state guard precedes retirement, certificate/token changes, provisioning cancellation, and retained-key deletion.",
 	"fleet_stats.go:IngestEvent":                   "One batch conditionally inserts the event and advances the node sequence, distinguishing duplicates from missing nodes.",
-	"fleet_stats.go:IngestStats":                   "Credential and node lookups run in one read batch; a guarded write batch applies counters, certificates, device touches, and the sequence.",
+	"fleet_stats.go:IngestStats":                   "Credential and node lookups run in one read batch; an eight-statement guarded write batch also updates the session-matched live projection.",
 	"health.go:InsertProbeCredIdx":                 "A guarded batch retries when the inbound credential or candidate peer allocation changed.",
 	"mcpplan.go:BeginApply":                        "A status and hash compare-and-swap lets only one apply proceed.",
 	"mcpplan.go:CreateMCPPlan":                     "SQL guards per-token and panel-wide capacity in the atomic insert batch.",
@@ -79,7 +80,7 @@ var transactionShape2 = map[string]string{
 
 var transactionShape3 = map[string]string{
 	"fleet_ca.go:RenewCert":     "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
-	"fleet_node.go:NodeApplied": "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
+	"fleet_node.go:NodeApplied": "The guarded live drift update and node/inbound apply records commit in one batch.",
 	"fleet_stats.go:SkipSeq":    "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
 }
 

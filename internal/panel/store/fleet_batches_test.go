@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -204,6 +206,92 @@ func TestIngestStatsCommitsCertAndAWGTouchOnce(t *testing.T) {
 	}
 }
 
+func TestIngestStatsLiveBuilderIsPureAcrossGuardRetry(t *testing.T) {
+	s := openTemp(t)
+	f := newFleetBatchFixture(t, s, "stats_live_retry")
+	ctx := context.Background()
+	if _, _, err := s.NodeHello(ctx, f.nodeID, 4, HelloInfo{Instance: "instance-retry"}, f.now); err != nil {
+		t.Fatal(err)
+	}
+	in := FleetStatsIn{
+		NodeID: f.nodeID, Instance: "instance-retry", Session: 4, Seq: 100, Now: f.now, HourStart: f.now.Unix() / 3600 * 3600,
+		Traffic:  []FleetTraffic{{CredID: f.credID, InboundID: f.inboundID, Up: 4, Down: 5}},
+		Sessions: []FleetSessionRef{{CredID: f.credID, InboundID: f.inboundID, ConnectedAt: f.now.Add(-time.Minute)}},
+		Certs:    []FleetInboundCert{{InboundID: f.inboundID, Pin: "retry-pin", NotAfter: f.now.Add(time.Hour)}},
+	}
+	trafficBefore := append([]FleetTraffic(nil), in.Traffic...)
+	sessionsBefore := append([]FleetSessionRef(nil), in.Sessions...)
+	certsBefore := append([]FleetInboundCert(nil), in.Certs...)
+	var calls int
+	var forcedRetryErr error
+	in.Live = func(refs map[string]FleetCredRef) FleetLive {
+		calls++
+		if calls == 1 {
+			_, forcedRetryErr = s.W.ExecContext(ctx, `UPDATE node SET last_seq = 50 WHERE id = ?`, f.nodeID)
+		}
+		if _, ok := refs[f.credID]; !ok {
+			t.Errorf("Live builder retry %d did not receive the resolved credential", calls)
+		}
+		return FleetLive{Apply: true, SampleAt: f.now.Unix(), UsersJSON: `{"usr_retry":1699999940}`,
+			LiveJSON: fmt.Sprintf(`{"result":%d}`, calls)}
+	}
+
+	out, err := s.IngestStats(ctx, in)
+	if err != nil || out.Duplicate {
+		t.Fatalf("IngestStats() = %+v, %v", out, err)
+	}
+	if forcedRetryErr != nil {
+		t.Fatalf("forcing the guarded retry: %v", forcedRetryErr)
+	}
+	if calls != 2 {
+		t.Fatalf("Live builder called %d times, want two guarded attempts", calls)
+	}
+	rows, err := s.NodeLive(ctx, f.now, f.nodeID, true)
+	if err != nil || len(rows) != 1 || rows[0].Session != 4 || !strings.Contains(rows[0].LiveJSON, `"result":2`) {
+		t.Fatalf("node_live after retry = %+v, %v; want the second builder result", rows, err)
+	}
+	if !reflect.DeepEqual(in.Traffic, trafficBefore) || !reflect.DeepEqual(in.Sessions, sessionsBefore) || !reflect.DeepEqual(in.Certs, certsBefore) {
+		t.Fatalf("IngestStats mutated its inputs: traffic=%+v sessions=%+v certs=%+v", in.Traffic, in.Sessions, in.Certs)
+	}
+	if got := queryInt(t, s, `SELECT used_bytes FROM user WHERE id = ?`, f.userID); got != 9 {
+		t.Fatalf("used_bytes after retry = %d, want 9", got)
+	}
+}
+
+func TestIngestStatsKeepsTrafficWhenLiveProjectionIsSkipped(t *testing.T) {
+	s := openTemp(t)
+	f := newFleetBatchFixture(t, s, "stats_live_skip")
+	ctx := context.Background()
+	if _, _, err := s.NodeHello(ctx, f.nodeID, 1, HelloInfo{Instance: "instance-skip"}, f.now); err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.IngestStats(ctx, FleetStatsIn{NodeID: f.nodeID, Instance: "instance-skip", Session: 1, Seq: 1, Now: f.now,
+		HourStart: f.now.Unix() / 3600 * 3600, Traffic: []FleetTraffic{{CredID: f.credID, InboundID: f.inboundID, Up: 2, Down: 3}},
+		Live: func(map[string]FleetCredRef) FleetLive {
+			return FleetLive{Apply: true, UsersJSON: `{"usr_previous":1}`, LiveJSON: `{"marker":"previous"}`}
+		},
+	})
+	if err != nil || first.Duplicate {
+		t.Fatalf("first IngestStats() = %+v, %v", first, err)
+	}
+	second, err := s.IngestStats(ctx, FleetStatsIn{NodeID: f.nodeID, Instance: "instance-skip", Session: 1, Seq: 2, Now: f.now.Add(time.Second),
+		HourStart: f.now.Unix() / 3600 * 3600, Traffic: []FleetTraffic{{CredID: f.credID, InboundID: f.inboundID, Up: 4, Down: 5}},
+		Live: func(map[string]FleetCredRef) FleetLive {
+			return FleetLive{UsersJSON: `{"usr_skipped":1}`, LiveJSON: `{"marker":"skipped"}`}
+		},
+	})
+	if err != nil || second.Duplicate {
+		t.Fatalf("second IngestStats() = %+v, %v", second, err)
+	}
+	rows, err := s.NodeLive(ctx, f.now.Add(time.Second), f.nodeID, true)
+	if err != nil || len(rows) != 1 || !strings.Contains(rows[0].LiveJSON, `"marker":"previous"`) {
+		t.Fatalf("skipped projection changed node_live: %+v, %v", rows, err)
+	}
+	if got := queryInt(t, s, `SELECT used_bytes FROM user WHERE id = ?`, f.userID); got != 14 {
+		t.Fatalf("used_bytes after skipped projection = %d, want 14", got)
+	}
+}
+
 func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	const users = 300
 	const sessions = 600
@@ -226,7 +314,7 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	for i := 0; i < certificates; i++ {
 		certs = append(certs, fleetInboundCertWrite{InboundID: fmt.Sprintf("inb_%03d", i), Pin: "pin", NotAfter: now.Add(time.Hour).Unix()})
 	}
-	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, certs, touches)
+	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, certs, touches, FleetLive{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,8 +322,8 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	if before != 1211 {
 		t.Fatalf("legacy batch statement count = %d, want 1211", before)
 	}
-	if len(stmts) != 7 {
-		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 7 after",
+	if len(stmts) != 8 {
+		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 8 after",
 			users, sessions, certificates, before, len(stmts))
 	}
 	t.Logf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d",
@@ -304,7 +392,7 @@ func TestEnrollmentBatchReplayAndFleetErrors(t *testing.T) {
 		t.Fatalf("different-key Enroll = %v, want ErrEnrollToken", err)
 	}
 
-	if _, _, err := s.NodeHello(ctx, "nod_missing", HelloInfo{Instance: "instance"}, f.now); !errors.Is(err, ErrNotFound) {
+	if _, _, err := s.NodeHello(ctx, "nod_missing", 1, HelloInfo{Instance: "instance"}, f.now); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("NodeHello(missing) = %v, want ErrNotFound", err)
 	}
 	retired, err := s.CreateEnrollment(ctx, &NodeRow{ID: "nod_retired_batch", Name: "retired_batch", Address: "example.com"}, "", []byte("retired-token"), "adm_test", f.now, f.now.Add(time.Hour))
@@ -317,7 +405,7 @@ func TestEnrollmentBatchReplayAndFleetErrors(t *testing.T) {
 	if err := s.RetireNode(ctx, retired.ID, f.now); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.NodeHello(ctx, retired.ID, HelloInfo{Instance: "instance"}, f.now); !errors.Is(err, ErrNodeRetired) {
+	if _, _, err := s.NodeHello(ctx, retired.ID, 1, HelloInfo{Instance: "instance"}, f.now); !errors.Is(err, ErrNodeRetired) {
 		t.Fatalf("NodeHello(retired) = %v, want ErrNodeRetired", err)
 	}
 	if err := s.RetireNode(ctx, retired.ID, f.now); !errors.Is(err, ErrNodeRetired) {

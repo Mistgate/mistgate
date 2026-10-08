@@ -457,6 +457,12 @@
   },
   {
     "type": "table",
+    "name": "node_live",
+    "tbl_name": "node_live",
+    "sql": "CREATE TABLE node_live ( node_id TEXT PRIMARY KEY REFERENCES node(id) ON DELETE CASCADE, session INTEGER NOT NULL, drift INTEGER NOT NULL DEFAULT 0, sample_at INTEGER NOT NULL DEFAULT 0, rx_bps INTEGER NOT NULL DEFAULT 0, tx_bps INTEGER NOT NULL DEFAULT 0, cpu_pct INTEGER NOT NULL DEFAULT 0, users TEXT NOT NULL DEFAULT '{}', live_json TEXT NOT NULL DEFAULT '{}' )"
+  },
+  {
+    "type": "table",
     "name": "node_port_check",
     "tbl_name": "node_port_check",
     "sql": "CREATE TABLE node_port_check ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, port INTEGER NOT NULL, address TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, verdict TEXT NOT NULL, sender TEXT NOT NULL, checked_at INTEGER NOT NULL, bad_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, port) )"

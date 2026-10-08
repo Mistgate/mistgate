@@ -106,7 +106,7 @@ func TestD1StoreSmoke(t *testing.T) {
 	if err := st.SetSettings(ctx, map[string]string{"edge.smoke": "ready"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := st.NodeHello(ctx, "nod_missing", HelloInfo{Instance: "instance"}, time.Unix(123, 0).UTC()); !errors.Is(err, ErrNotFound) {
+	if _, _, err := st.NodeHello(ctx, "nod_missing", 1, HelloInfo{Instance: "instance"}, time.Unix(123, 0).UTC()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("NodeHello(missing) = %v, want ErrNotFound", err)
 	}
 	if value, err := st.Setting(ctx, "edge.smoke"); err != nil || value != "ready" {
@@ -139,6 +139,9 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if err := st.Access().CreateInbound(ctx, AccessInbound{ID: "inb_d1_stats", ProfileID: "prf_d1_stats", NodeID: node.ID, Enabled: true, CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := st.NodeHello(ctx, node.ID, 1, HelloInfo{AgentVersion: "test", Instance: "d1-instance"}, now); err != nil {
+		t.Fatalf("NodeHello() before stats = %v", err)
+	}
 	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_d1_stats", Name: "d1-stats", CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
@@ -159,10 +162,14 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	var stats FleetStatsOut
 	var calls d1CallCount
 	calls = countD1Queries(t, binding, "IngestStats", func() {
-		stats, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "d1-instance", Seq: 1, Now: now, HourStart: now.Unix() / 3600 * 3600,
+		stats, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "d1-instance", Session: 1, Seq: 1, Now: now, HourStart: now.Unix() / 3600 * 3600,
 			Traffic:  []FleetTraffic{{CredID: "crd_d1_stats", InboundID: "inb_d1_stats", Up: 40, Down: 60}},
 			Sessions: []FleetSessionRef{{CredID: "crd_d1_stats", InboundID: "inb_d1_stats", ConnectedAt: now.Add(-time.Minute)}},
 			Certs:    []FleetInboundCert{{InboundID: "inb_d1_stats", Pin: "d1-stats-pin", NotAfter: now.Add(24 * time.Hour)}},
+			Live: func(map[string]FleetCredRef) FleetLive {
+				return FleetLive{Apply: true, SampleAt: now.Unix(), RxBps: 7, TxBps: 8, CPUPct: 9,
+					UsersJSON: `{"usr_d1_stats":1699999940}`, LiveJSON: `{"interval_end_unix":1700000000,"marker":"d1"}`}
+			},
 		})
 	})
 	if err != nil || stats.Duplicate {
@@ -170,6 +177,10 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	}
 	if calls.queries != 2 || calls.batches != 2 {
 		t.Fatalf("IngestStats used %d D1 calls in %d batches, want 2 calls in 2 batches", calls.queries, calls.batches)
+	}
+	live, err := st.NodeLive(ctx, now, node.ID, true)
+	if err != nil || len(live) != 1 || live[0].Session != 1 || live[0].RxBps != 7 || !strings.Contains(live[0].LiveJSON, "\"marker\":\"d1\"") {
+		t.Fatalf("D1 NodeLive after stats = %+v, %v", live, err)
 	}
 	var deviceSeen, certNotAfter int64
 	var certPin string
@@ -193,7 +204,7 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 		t.Fatalf("IngestEvent used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
 	}
 	calls = countD1Queries(t, binding, "NodeHello", func() {
-		_, acked, helloErr := st.NodeHello(ctx, node.ID, HelloInfo{AgentVersion: "test", Instance: "d1-instance"}, now)
+		_, acked, helloErr := st.NodeHello(ctx, node.ID, 2, HelloInfo{AgentVersion: "test", Instance: "d1-instance"}, now)
 		if helloErr != nil {
 			err = helloErr
 			return
@@ -208,6 +219,10 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if calls.queries != 1 || calls.batches != 1 {
 		t.Fatalf("NodeHello used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
 	}
+	reset, err := st.NodeLive(ctx, now, node.ID, true)
+	if err != nil || len(reset) != 1 || reset[0].Session != 2 || reset[0].LiveJSON != "{}" {
+		t.Fatalf("D1 NodeHello did not replace node_live: %+v, %v", reset, err)
+	}
 
 	enrolled, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_d1_enroll", Name: "d1-enroll", Address: "example.com"}, "", []byte("d1-enroll-token"), "adm_test", now, now.Add(time.Hour))
 	if err != nil {
@@ -220,7 +235,7 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if err != nil || result.NodeID != enrolled.ID || result.Replay {
 		t.Fatalf("Enroll() = %+v, %v", result, err)
 	}
-	if err := st.NodeApplied(ctx, enrolled.ID, 1, "hash", nil, now); err != nil {
+	if err := st.NodeApplied(ctx, enrolled.ID, 1, false, 1, "hash", nil, now); err != nil {
 		t.Fatalf("write-only NodeApplied transaction on D1: %v", err)
 	}
 	if err := st.SkipSeq(ctx, enrolled.ID, "d1-instance", 3, now); err != nil {
@@ -236,6 +251,67 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	}
 	if calls.queries != 1 || calls.batches != 1 {
 		t.Fatalf("RetireNode used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
+	}
+}
+
+func TestD1NodeLiveSessionGuardsAndDuplicateStats(t *testing.T) {
+	st := openD1Store(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_100, 0).UTC()
+	node, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_d1_live_guards", Name: "d1-live-guards", Address: "example.com"},
+		"", []byte("d1-live-guards-token"), "adm_test", now, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.NodeHello(ctx, node.ID, 1, HelloInfo{Instance: "instance-one"}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.NodeDisconnected(ctx, node.ID, 1, now, now.Add(time.Second)); err != nil {
+		t.Fatalf("own NodeDisconnected() = %v", err)
+	}
+	rows, err := st.NodeLive(ctx, now.Add(time.Second), node.ID, true)
+	if err != nil || len(rows) != 1 || rows[0].Exists {
+		t.Fatalf("own disconnect left node_live row: %+v, %v", rows, err)
+	}
+	if _, _, err := st.NodeHello(ctx, node.ID, 2, HelloInfo{Instance: "instance-two"}, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.NodeDisconnected(ctx, node.ID, 1, now, now.Add(3*time.Second)); err != nil {
+		t.Fatalf("foreign NodeDisconnected() = %v", err)
+	}
+	foreign, err := st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "instance-two", Session: 1, Seq: 1,
+		Now: now.Add(4 * time.Second), HourStart: now.Unix() / 3600 * 3600,
+		Live: func(map[string]FleetCredRef) FleetLive {
+			return FleetLive{Apply: true, UsersJSON: `{"usr_foreign":1}`, LiveJSON: `{"marker":"foreign"}`}
+		},
+	})
+	if err != nil || foreign.Duplicate {
+		t.Fatalf("foreign-session stats = %+v, %v", foreign, err)
+	}
+	rows, err = st.NodeLive(ctx, now.Add(4*time.Second), node.ID, true)
+	if err != nil || len(rows) != 1 || !rows[0].Exists || rows[0].Session != 2 || rows[0].LiveJSON != "{}" {
+		t.Fatalf("foreign session changed node_live: %+v, %v", rows, err)
+	}
+
+	binding := js.Global().Get("__d1")
+	var duplicate FleetStatsOut
+	calls := countD1Queries(t, binding, "IngestStatsDuplicate", func() {
+		duplicate, err = st.IngestStats(ctx, FleetStatsIn{NodeID: node.ID, Instance: "instance-two", Session: 2, Seq: 1,
+			Now: now.Add(5 * time.Second), HourStart: now.Unix() / 3600 * 3600,
+			Live: func(map[string]FleetCredRef) FleetLive {
+				return FleetLive{Apply: true, UsersJSON: `{"usr_duplicate":1}`, LiveJSON: `{"marker":"duplicate"}`}
+			},
+		})
+	})
+	if err != nil || !duplicate.Duplicate {
+		t.Fatalf("duplicate D1 stats = %+v, %v", duplicate, err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("duplicate IngestStats used %d calls in %d batches, want one read batch and no write batch", calls.queries, calls.batches)
+	}
+	rows, err = st.NodeLive(ctx, now.Add(5*time.Second), node.ID, true)
+	if err != nil || len(rows) != 1 || rows[0].Session != 2 || rows[0].LiveJSON != "{}" {
+		t.Fatalf("duplicate stats changed node_live: %+v, %v", rows, err)
 	}
 }
 

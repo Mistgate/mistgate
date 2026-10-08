@@ -242,7 +242,7 @@ func (e *env) addNode(name string, caps ...string) string {
 	if _, err := e.st.W.ExecContext(e.ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'active', 1)`, id, name, name+".example.com"); err != nil {
 		e.t.Fatal(err)
 	}
-	if _, _, err := e.st.NodeHello(e.ctx, id, store.HelloInfo{AgentVersion: "0.3.0", Instance: "i-1", Caps: caps}, e.now); err != nil {
+	if _, _, err := e.st.NodeHello(e.ctx, id, 1, store.HelloInfo{AgentVersion: "0.3.0", Instance: "i-1", Caps: caps}, e.now); err != nil {
 		e.t.Fatal(err)
 	}
 	return id

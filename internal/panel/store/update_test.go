@@ -78,7 +78,7 @@ func TestUpdatesMigrationUpgradesVersion12(t *testing.T) {
 	if err := s.CreateRollout(ctx, ro, []StepRow{{NodeID: nodeID, NodeName: "na", State: StepPending}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.NodeHello(ctx, nodeID, HelloInfo{AgentVersion: "0.2.0", Built: 100, Caps: []string{"update/1"}}, time.Unix(9, 0)); err != nil {
+	if _, _, err := s.NodeHello(ctx, nodeID, 1, HelloInfo{AgentVersion: "0.2.0", Built: 100, Caps: []string{"update/1"}}, time.Unix(9, 0)); err != nil {
 		t.Fatal(err)
 	}
 	_ = inboundID
@@ -110,7 +110,7 @@ func TestHelloStoresBuildCapsAndKeepsLastUpdate(t *testing.T) {
 	now := time.Unix(1000, 0)
 	lu := LastUpdateRow{Outcome: "rolled_back", FromVersion: "a", FromBuilt: 10, ToVersion: "b", ToBuilt: 20, Reason: "not_committed", AtUnix: 990}
 
-	if _, _, err := s.NodeHello(ctx, nodeID, HelloInfo{AgentVersion: "b", Instance: "i1", Built: 10, Caps: []string{"doctor/1", "update/1", "update-guard/1"}, LastUpdateJSON: lu.JSON()}, now); err != nil {
+	if _, _, err := s.NodeHello(ctx, nodeID, 1, HelloInfo{AgentVersion: "b", Instance: "i1", Built: 10, Caps: []string{"doctor/1", "update/1", "update-guard/1"}, LastUpdateJSON: lu.JSON()}, now); err != nil {
 		t.Fatal(err)
 	}
 	n, _ := s.Node(ctx, nodeID)
@@ -122,7 +122,7 @@ func TestHelloStoresBuildCapsAndKeepsLastUpdate(t *testing.T) {
 		t.Fatalf("last update: %+v %v", got, ok)
 	}
 	// the next Hello carries no outcome (the agent reported it once): what is stored stays
-	if _, _, err := s.NodeHello(ctx, nodeID, HelloInfo{AgentVersion: "b", Instance: "i2", Built: 20, Caps: []string{"doctor/1"}}, now.Add(time.Minute)); err != nil {
+	if _, _, err := s.NodeHello(ctx, nodeID, 2, HelloInfo{AgentVersion: "b", Instance: "i2", Built: 20, Caps: []string{"doctor/1"}}, now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	n, _ = s.Node(ctx, nodeID)

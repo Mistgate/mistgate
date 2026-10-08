@@ -596,9 +596,22 @@ func TestBaseMismatchAndDrift(t *testing.T) {
 	if again.BaseRevision != 0 || again.Revision <= full.Revision {
 		t.Fatalf("expected a full resend after drift: %v", again)
 	}
+	liveDrift := func() bool {
+		rows, err := e.st.NodeLive(e.ctx, time.Now(), a.nodeID, false)
+		if err != nil || len(rows) != 1 || !rows[0].Exists {
+			t.Fatalf("node_live: %v %+v", err, rows)
+		}
+		return rows[0].Drift
+	}
+	if liveDrift() {
+		t.Error("the projection reports drift after the first mismatch, which only resends")
+	}
 	// ... and a second drift right after only raises the error event.
 	c.send(0, applied(again, "deadbeef"))
 	c.quiet(300 * time.Millisecond)
+	if !liveDrift() {
+		t.Error("the projection does not report the drift that persists")
+	}
 	rows, _, _ := e.st.Events(e.ctx, store.EventFilter{NodeID: a.nodeID, Limit: 50})
 	var sev []int
 	for _, r := range rows {
@@ -825,8 +838,16 @@ func TestNewerStreamSupersedes(t *testing.T) {
 	c2 := a.open()
 	c2.send(0, hello("inst1", 0, ""))
 	c2.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
+	live, err := e.st.NodeLive(e.ctx, time.Now().UTC(), a.nodeID, false)
+	if err != nil || len(live) != 1 || live[0].Session != 2 {
+		t.Fatalf("new stream node_live session = %+v, %v; want generation 2", live, err)
+	}
 	if err := c1.ended(); code(err) != connect.CodeAborted {
 		t.Errorf("old stream ended with %v, want ABORTED", err)
+	}
+	afterOldEnd, err := e.st.NodeLive(e.ctx, time.Now().UTC(), a.nodeID, false)
+	if err != nil || len(afterOldEnd) != 1 || !afterOldEnd[0].Exists || afterOldEnd[0].Session != 2 {
+		t.Fatalf("old stream end changed node_live: %+v, %v; want session 2", afterOldEnd, err)
 	}
 	if e.f.session(a.nodeID) == nil {
 		t.Error("the new stream is not registered")
@@ -878,6 +899,10 @@ func TestLivenessIsJudgedByReceivedMessages(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if n, _ := e.st.Node(e.ctx, a.nodeID); n.LastDisconnectedAt.IsZero() {
 		t.Error("disconnect not recorded")
+	}
+	rows, err := e.st.NodeLive(e.ctx, time.Now().UTC(), a.nodeID, false)
+	if err != nil || len(rows) != 1 || rows[0].Exists {
+		t.Errorf("liveness disconnect left node_live row: %+v, %v", rows, err)
 	}
 }
 

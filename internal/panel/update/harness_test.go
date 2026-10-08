@@ -321,7 +321,7 @@ func (e *env) exec(q string, args ...any) {
 // hello records a Hello of the node (what fleet.Connect does) and marks it connected.
 func (e *env) hello(id, version string, built int64, caps []string, lastUpdateJSON string) {
 	e.t.Helper()
-	if _, _, err := e.st.NodeHello(e.ctx, id, store.HelloInfo{AgentVersion: version, Instance: "i-" + version, Built: built, Caps: caps, LastUpdateJSON: lastUpdateJSON}, e.clk.Now()); err != nil {
+	if _, _, err := e.st.NodeHello(e.ctx, id, 1, store.HelloInfo{AgentVersion: version, Instance: "i-" + version, Built: built, Caps: caps, LastUpdateJSON: lastUpdateJSON}, e.clk.Now()); err != nil {
 		e.t.Fatal(err)
 	}
 	e.fl.mu.Lock()

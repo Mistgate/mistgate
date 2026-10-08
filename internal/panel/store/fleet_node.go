@@ -240,7 +240,11 @@ type HelloInfo struct {
 // NodeHello records a (re)connect: the node becomes active, facts are stored, and the reliable-message
 // counter is reset when the agent instance changed. prev is the row before the update (for blip/restart
 // detection); ackedSeq is the highest committed seq of this instance. ErrNodeRetired for retired nodes.
-func (s *Store) NodeHello(ctx context.Context, id string, h HelloInfo, now time.Time) (prev NodeRow, ackedSeq uint64, err error) {
+func (s *Store) NodeHello(ctx context.Context, id string, session uint64, h HelloInfo, now time.Time) (prev NodeRow, ackedSeq uint64, err error) {
+	sessionID, err := nodeSessionValue(session)
+	if err != nil {
+		return NodeRow{}, 0, err
+	}
 	engines := make([]map[string]string, len(h.Facts.Engines))
 	for i, e := range h.Facts.Engines {
 		engines[i] = map[string]string{"protocol": e.Protocol, "version": e.Version}
@@ -266,6 +270,9 @@ func (s *Store) NodeHello(ctx context.Context, id string, h HelloInfo, now time.
 			disk_total_bytes = excluded.disk_total_bytes, virt = excluded.virt, has_ipv6 = excluded.has_ipv6,
 			engines_json = excluded.engines_json, updated_at = excluded.updated_at`,
 			Args: []any{id, f.Hostname, f.OS, f.Kernel, f.Arch, f.CPUCount, int64(f.RAMTotal), int64(f.DiskTotal), f.Virt, f.HasIPv6, string(eb), unix(now)}},
+		// An older session's Hello cannot land after a newer one: the VPS has one writer and claimOwner cancels the
+		// old session's context; the edge serialises with blockConcurrencyWhile.
+		Stmt{Query: `INSERT OR REPLACE INTO node_live (node_id, session) VALUES (?, ?)`, Args: []any{id, sessionID}},
 	)
 	if errors.Is(err, errGuard) {
 		current, readErr := s.Node(ctx, id)
@@ -316,10 +323,21 @@ func (s *Store) NodeFacts(ctx context.Context, id string) (NodeFactsRow, error) 
 	return f, nil
 }
 
-// NodeDisconnected records the end of a stream.
-func (s *Store) NodeDisconnected(ctx context.Context, id string, seen, now time.Time) error {
-	_, err := s.W.ExecContext(ctx,
-		`UPDATE node SET last_seen_at = max(last_seen_at, ?), last_disconnected_at = ? WHERE id = ?`, unix(seen), unix(now), id)
+// NodeDisconnected records the end of the session that still owns the live row.
+func (s *Store) NodeDisconnected(ctx context.Context, id string, session uint64, seen, now time.Time) error {
+	sessionID, err := nodeSessionValue(session)
+	if err != nil {
+		return err
+	}
+	_, err = s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM node_live WHERE node_id = ? AND session = ?)`, id, sessionID),
+		Stmt{Query: `UPDATE node SET last_seen_at = max(last_seen_at, ?), last_disconnected_at = ? WHERE id = ?`,
+			Args: []any{unix(seen), unix(now), id}},
+		Stmt{Query: `DELETE FROM node_live WHERE node_id = ? AND session = ?`, Args: []any{id, sessionID}},
+	)
+	if errors.Is(err, errGuard) {
+		return nil
+	}
 	return err
 }
 
@@ -342,24 +360,22 @@ type InboundApplied struct {
 }
 
 // NodeApplied records an ApplyResult: the node's applied revision/hash and per-inbound outcome.
-func (s *Store) NodeApplied(ctx context.Context, id string, rev uint64, hash string, in []InboundApplied, now time.Time) error {
-	tx, err := s.W.BeginTx(ctx, nil)
+func (s *Store) NodeApplied(ctx context.Context, id string, session uint64, drift bool, rev uint64, hash string, in []InboundApplied, now time.Time) error {
+	sessionID, err := nodeSessionValue(session)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE node SET applied_revision = ?, applied_hash = ? WHERE id = ?`, int64(rev), hash, id); err != nil {
-		return err
+	stmts := []Stmt{
+		{Query: `UPDATE node SET applied_revision = ?, applied_hash = ? WHERE id = ?`, Args: []any{int64(rev), hash, id}},
+		{Query: `UPDATE node_live SET drift = ? WHERE node_id = ? AND session = ?`, Args: []any{boolInt(drift), id, sessionID}},
 	}
 	for _, r := range in {
-		if _, err := tx.ExecContext(ctx, `
+		stmts = append(stmts, Stmt{Query: `
 			UPDATE inbound SET state = ?, last_error = ?, applied_spec_hash = ?, cert_pin_sha256 = ?, cert_not_after = ?, updated_at = ?
-			WHERE id = ? AND node_id = ? AND enabled = 1`,
-			r.State, r.Error, r.SpecHash, r.CertPin, fleetUnix(r.CertNotAfter), unix(now), r.ID, id); err != nil {
-			return err
-		}
+			WHERE id = ? AND node_id = ? AND enabled = 1`, Args: []any{r.State, r.Error, r.SpecHash, r.CertPin, fleetUnix(r.CertNotAfter), unix(now), r.ID, id}})
 	}
-	return tx.Commit()
+	_, err = s.batch(ctx, stmts...)
+	return err
 }
 
 // SetInboundCert stores the certificate an inbound serves as the node's stats report it (an ACME certificate appears and

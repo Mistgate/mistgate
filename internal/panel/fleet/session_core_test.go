@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -387,6 +389,7 @@ func replayRows(t *testing.T, e *env, nodeID string) map[string]string {
 		"awg":       {`SELECT cert_pin_sha256, cert_not_after, awg_health_json, awg_health_at FROM inbound WHERE id = 'inb_awg'`, nil},
 		"devices":   {`SELECT id, last_seen_at FROM device ORDER BY id`, nil},
 		"node_sent": {`SELECT digest FROM node_sent WHERE node_id = ?`, []any{nodeID}},
+		"node_live": {`SELECT session, drift, sample_at, rx_bps, tx_bps, cpu_pct, users, live_json FROM node_live WHERE node_id = ?`, []any{nodeID}},
 		"warp":      {`SELECT attention, health_json, health_at, updated_at FROM warp_account WHERE node_id = ?`, []any{nodeID}},
 		"events":    {`SELECT ts, severity, code, source, params_json, src_instance, src_seq FROM event WHERE node_id = ? ORDER BY id`, []any{nodeID}},
 		"audit":     {`SELECT ts, actor, action, params, result FROM audit WHERE action = 'node.bandwidth_auto' ORDER BY id`, nil},
@@ -591,6 +594,29 @@ func TestSessionCoreRehydratesLivenessTimeoutAndDisconnect(t *testing.T) {
 	disconnected, _ := run("disconnect", SessionEvent{Kind: EventDisconnected, At: deadline.Add(time.Second)}, false)
 	if !disconnected.State.Disconnected || disconnected.NextAlarm != nil {
 		t.Fatalf("disconnect state = %+v, next alarm %v", disconnected.State, disconnected.NextAlarm)
+	}
+}
+
+func TestDisconnectStateChangesOnlyAfterStoreSucceeds(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-disconnect-write")
+	connected := stepHello(t, core, ctx, state, sidecar, now, hello("instance-disconnect-write", 0, "").GetHello())
+	state, sidecar = connected.State, connected.Sidecar
+	state.Pending = map[string]PendingRequest{"pending": {Kind: PendingAutoBandwidth, Deadline: now.Add(time.Minute)}}
+	state.AutoBandwidthDeadline = now.Add(time.Minute)
+	pending := map[string]PendingRequest{"pending": state.Pending["pending"]}
+	autoDeadline := state.AutoBandwidthDeadline
+	e.exec(`CREATE TRIGGER reject_core_disconnect BEFORE DELETE ON node_live BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
+
+	_, err := core.Step(ctx, &state, &sidecar, SessionEvent{Kind: EventDisconnected, At: now})
+	if err == nil {
+		t.Fatal("EventDisconnected succeeded despite the store refusing the write")
+	}
+	if state.Disconnected || !reflect.DeepEqual(state.Pending, pending) || !state.AutoBandwidthDeadline.Equal(autoDeadline) {
+		t.Fatalf("disconnect state changed after the store error: disconnected=%t pending=%v deadline=%v", state.Disconnected, state.Pending, state.AutoBandwidthDeadline)
+	}
+	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, false)
+	if err != nil || len(rows) != 1 || !rows[0].Exists {
+		t.Fatalf("failed disconnect changed node_live: %+v, %v", rows, err)
 	}
 }
 
@@ -1270,6 +1296,353 @@ func TestSessionCoreDuplicateStatsAndEvents(t *testing.T) {
 	}
 	if len(first.Frames) != 1 || first.Frames[0].GetAck().GetUpToSeq() != 2 || len(second.Frames) != 0 {
 		t.Fatalf("event acknowledgements: first=%#v second=%#v", first.Frames, second.Frames)
+	}
+}
+
+func TestNodeLiveProjectionMatchesSessionSidecarAfterStatsSeries(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-projection")
+	ids := e.fixture(state.NodeID)
+	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-projection", 0, "").GetHello())
+	state, sidecar = tr.State, tr.Sidecar
+
+	for seq := uint64(1); seq <= 2; seq++ {
+		at := now.Add(time.Duration(seq) * 10 * time.Second)
+		frame := &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+			IntervalStartUnix: at.Add(-10 * time.Second).Unix(), IntervalEndUnix: at.Unix(),
+			Traffic: []*agentv1.TrafficDelta{
+				{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 100 * seq, BytesDown: 200 * seq},
+				{CredId: "crd_gina_hy", InboundId: ids.i1, BytesUp: 50 * seq, BytesDown: 150 * seq},
+			},
+			Sessions: []*agentv1.Session{
+				{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-30 * time.Second).Unix()},
+				{CredId: "crd_gina_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-20 * time.Second).Unix()},
+				{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: at.Add(-5 * time.Second).Unix()},
+			},
+			Host: &agentv1.HostMetrics{CpuPct: 20 + float32(seq), SoftirqPct: 2, Load1: 0.5,
+				RamUsedBytes: 1024, RamTotalBytes: 2048, DiskUsedBytes: 4096, DiskTotalBytes: 8192,
+				NetRxBps: 100 + seq, NetTxBps: 200 + seq, UptimeS: 3600 + seq},
+			Health: []*agentv1.InboundHealth{
+				{InboundId: ids.i1, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING, Detail: "ready"},
+				{InboundId: ids.i2, State: agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED, Detail: "bind failed"},
+			},
+		}}}
+		tr, err := coreStep(ctx, core, state, sidecar, SessionEvent{Kind: EventAgentFrame, At: at, Frame: frame})
+		if err != nil {
+			t.Fatalf("stats %d: %v", seq, err)
+		}
+		state, sidecar = tr.State, tr.Sidecar
+		assertNodeLiveMatchesSidecar(t, e, state, sidecar, at)
+	}
+}
+
+func assertNodeLiveMatchesSidecar(t *testing.T, e *env, state SessionState, sidecar SessionSidecar, now time.Time) {
+	t.Helper()
+	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || len(rows) != 1 || !rows[0].Exists || !rows[0].Connected {
+		t.Fatalf("NodeLive row = %+v, %v", rows, err)
+	}
+	row := rows[0]
+	var got liveJSONView
+	if err := json.Unmarshal([]byte(row.LiveJSON), &got); err != nil {
+		t.Fatalf("decode live_json: %v", err)
+	}
+	if row.Session != int64(state.OwnerGeneration) || row.Drift != state.Drift || row.SampleAt != sidecar.Live.MetricsAt.Unix() {
+		t.Fatalf("projection columns = %+v; state session/drift=%d/%v metrics_at=%d", row, state.OwnerGeneration, state.Drift, sidecar.Live.MetricsAt.Unix())
+	}
+
+	wantOnline := make([]liveJSONOnline, 0, len(sidecar.Live.Online))
+	users := map[string]int64{}
+	for _, online := range sidecar.Live.Online {
+		userID := online.userID
+		wantOnline = append(wantOnline, liveJSONOnline{UserID: userID, DeviceID: online.deviceID, Protocol: online.protocol,
+			InboundID: clip(online.inboundID, 64), SinceUnix: online.since.Unix()})
+		if previous, ok := users[userID]; !ok || online.since.Unix() > previous {
+			users[userID] = online.since.Unix()
+		}
+	}
+	if !reflect.DeepEqual(got.Online, wantOnline) || !reflect.DeepEqual(got.Health, projectHealth(sidecar.Live.Health)) {
+		t.Fatalf("live sessions/health differ from sidecar: projection=%+v/%+v sidecar=%+v/%+v", got.Online, got.Health, wantOnline, projectHealth(sidecar.Live.Health))
+	}
+	var gotUsers map[string]int64
+	if err := json.Unmarshal([]byte(row.UsersJSON), &gotUsers); err != nil || !reflect.DeepEqual(gotUsers, users) {
+		t.Fatalf("users column = %v, %v; want newest starts %v", gotUsers, err, users)
+	}
+	wantDown := make(map[string]uint64, len(sidecar.Live.UserDown))
+	var wantUpload uint64
+	for userID, rate := range sidecar.Live.UserDown {
+		wantDown[userID] = min(rate, uint64(1<<50))
+	}
+	for _, rate := range sidecar.Live.UserUp {
+		wantUpload = min(satAdd(wantUpload, rate), uint64(1<<50))
+	}
+	if !reflect.DeepEqual(got.UserDownBPS, wantDown) || got.UploadBPS != wantUpload {
+		t.Fatalf("live rates = down %v/upload %d; want down %v/upload %d", got.UserDownBPS, got.UploadBPS, wantDown, wantUpload)
+	}
+	metrics := sidecar.Live.Metrics
+	if metrics == nil || got.Metrics == nil {
+		t.Fatalf("live metrics missing: projection=%+v sidecar=%+v", got.Metrics, metrics)
+	}
+	wantMetrics := liveJSONMetrics{CPUPct: float64(metrics.CpuPct), SoftirqPct: float64(metrics.SoftirqPct), Load1: float64(metrics.Load1),
+		RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes, DiskUsedBytes: metrics.DiskUsedBytes,
+		DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: metrics.NetRxBps, TxBPS: metrics.NetTxBps, UptimeS: metrics.UptimeS}
+	if !reflect.DeepEqual(*got.Metrics, wantMetrics) || row.RxBps != int64(metrics.NetRxBps) || row.TxBps != int64(metrics.NetTxBps) ||
+		row.CPUPct != int64(math.Round(float64(metrics.CpuPct))) {
+		t.Fatalf("live metrics = %+v/%d/%d/%d; want %+v", got.Metrics, row.RxBps, row.TxBps, row.CPUPct, wantMetrics)
+	}
+}
+
+func projectHealth(health []*agentv1.InboundHealth) []liveJSONHealth {
+	out := make([]liveJSONHealth, 0, len(health))
+	for _, entry := range health {
+		if entry != nil {
+			out = append(out, liveJSONHealth{InboundID: clip(entry.InboundId, 64), RunState: runState(entry.State), Detail: clip(entry.Detail, 256)})
+		}
+	}
+	return out
+}
+
+func TestNodeLiveProjectionBoundsAndSanitizesStats(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-bounds")
+	ids := e.fixture(state.NodeID)
+	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-bounds", 0, "").GetHello())
+	e.f.cfg.MaxNodeBytesPerSec = 1 << 54
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Traffic:  []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 1 << 51, BytesDown: 1 << 51}},
+		Sessions: make([]*agentv1.Session, 2001), Health: make([]*agentv1.InboundHealth, 65),
+		Host: &agentv1.HostMetrics{CpuPct: 150, SoftirqPct: float32(math.NaN()), Load1: float32(math.Inf(1)),
+			RamTotalBytes: 1 << 63, DiskTotalBytes: 1<<63 + 1, NetRxBps: 1 << 63, NetTxBps: ^uint64(0)},
+	}
+	for i := range stats.Sessions {
+		stats.Sessions[i] = &agentv1.Session{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now.Add(-time.Minute).Unix()}
+	}
+	for i := range stats.Health {
+		stats.Health[i] = &agentv1.InboundHealth{InboundId: strings.Repeat("inbound-id-", 8),
+			State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING, Detail: strings.Repeat("detail", 60)}
+	}
+	frame := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: stats}}
+	tr, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: frame})
+	if err != nil {
+		t.Fatalf("hostile stats batch failed: %v", err)
+	}
+	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NodeLive() = %+v, %v", rows, err)
+	}
+	row := rows[0]
+	var got liveJSONView
+	if err := json.Unmarshal([]byte(row.LiveJSON), &got); err != nil {
+		t.Fatalf("decode live_json: %v", err)
+	}
+	if len(got.Online) != 2000 || len(tr.Sidecar.Live.Online) != 2001 || len(got.Health) != 64 {
+		t.Fatalf("live bounds: projection sessions=%d health=%d sidecar sessions=%d", len(got.Online), len(got.Health), len(tr.Sidecar.Live.Online))
+	}
+	if len(got.Health[0].InboundID) > 64 || len(got.Health[0].Detail) > 256 {
+		t.Fatalf("health fields exceeded bounds: %+v", got.Health[0])
+	}
+	if got.Metrics == nil || got.Metrics.CPUPct != 100 || got.Metrics.SoftirqPct != 0 || got.Metrics.Load1 != 0 ||
+		row.CPUPct != 100 || row.RxBps != 1<<50 || row.TxBps != 1<<50 || got.Metrics.RxBPS != 1<<50 || got.Metrics.TxBPS != 1<<50 {
+		t.Fatalf("sanitized metrics = %+v, hot columns cpu/rx/tx=%d/%d/%d", got.Metrics, row.CPUPct, row.RxBps, row.TxBps)
+	}
+	if got.Metrics.RAMTotalBytes != 1<<63 || got.Metrics.DiskTotalBytes != 1<<63+1 {
+		t.Fatalf("large metrics did not survive JSON encoding: %+v", got.Metrics)
+	}
+	if got.UserDownBPS["usr_alice"] != 1<<50 || got.UploadBPS != 1<<50 {
+		t.Fatalf("traffic rates were not clamped: down=%v upload=%d", got.UserDownBPS, got.UploadBPS)
+	}
+	var users map[string]int64
+	if err := json.Unmarshal([]byte(row.UsersJSON), &users); err != nil || len(users) != 1 || users["usr_alice"] != now.Add(-time.Minute).Unix() {
+		t.Fatalf("users column = %v, %v", users, err)
+	}
+	if strings.Contains(row.LiveJSON, "remote_ip") || strings.Contains(row.LiveJSON, "client_ip") {
+		t.Fatalf("live_json contains an IP field: %s", row.LiveJSON)
+	}
+}
+
+func TestBuildFleetLiveIsPureDeterministicAndClipsOnlyAgentFields(t *testing.T) {
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	userID, deviceID, protocol := strings.Repeat("u", 70), strings.Repeat("d", 70), strings.Repeat("p", 70)
+	inboundID, detail := strings.Repeat("i", 80), strings.Repeat("x", 300)
+	state := SessionState{Version: sessionStateVersion, NodeID: "nod_projection_pure", OwnerGeneration: 9,
+		LastEndUnix: now.Add(-time.Minute).Unix(), Capabilities: []string{"doctor/1"}, Pending: map[string]PendingRequest{"pending": {Kind: PendingDoctor}}}
+	stateBefore := state
+	stateBefore.Capabilities = append([]string(nil), state.Capabilities...)
+	stateBefore.Pending = map[string]PendingRequest{"pending": state.Pending["pending"]}
+	sidecar := SessionSidecar{Version: 1, Live: LiveSnapshot{Metrics: &agentv1.HostMetrics{CpuPct: 20}, MetricsAt: now.Add(-time.Minute),
+		Health:   []*agentv1.InboundHealth{{InboundId: "old", Detail: "old"}},
+		Online:   []onlineSess{{userID: "old-user", deviceID: "old-device", protocol: "old-protocol", inboundID: "old-inbound", since: now}},
+		UserDown: map[string]uint64{"old-user": 11}, UserUp: map[string]uint64{"old-user": 12}}}
+	sidecarBefore := cloneLiveSidecarForTest(sidecar)
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Sessions: []*agentv1.Session{{CredId: "credential", InboundId: inboundID, ConnectedAtUnix: now.Add(-time.Minute).Unix()}},
+		Health:   []*agentv1.InboundHealth{{InboundId: inboundID, Detail: detail, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING}}}
+	traffic := []store.FleetTraffic{{CredID: "credential", InboundID: inboundID, Down: 20, Up: 10}}
+	refs := map[string]store.FleetCredRef{"credential": {UserID: userID, DeviceID: deviceID, Protocol: protocol}}
+
+	first, firstTooLarge := buildFleetLive(state, sidecar.Live, stats, traffic, now, refs)
+	second, secondTooLarge := buildFleetLive(state, sidecar.Live, stats, traffic, now, refs)
+	if firstTooLarge || secondTooLarge || !reflect.DeepEqual(first, second) {
+		t.Fatalf("repeated buildFleetLive results differ: first=%+v second=%+v", first, second)
+	}
+	if !reflect.DeepEqual(state, stateBefore) || !reflect.DeepEqual(sidecar, sidecarBefore) {
+		t.Fatalf("buildFleetLive mutated inputs: state=%+v sidecar=%+v", state, sidecar)
+	}
+	var view liveJSONView
+	if err := json.Unmarshal([]byte(first.LiveJSON), &view); err != nil {
+		t.Fatalf("decode live_json: %v", err)
+	}
+	if len(view.Online) != 1 || view.Online[0].UserID != userID || view.Online[0].DeviceID != deviceID || view.Online[0].Protocol != protocol ||
+		len(view.Online[0].InboundID) != 64 || len(view.Health[0].InboundID) != 64 || len(view.Health[0].Detail) != 256 {
+		t.Fatalf("projected database/agent fields have wrong clipping: online=%+v health=%+v", view.Online, view.Health)
+	}
+	if _, ok := view.UserDownBPS[userID]; !ok {
+		t.Fatalf("database user id was clipped in per-user rates: %v", view.UserDownBPS)
+	}
+}
+
+func cloneLiveSidecarForTest(in SessionSidecar) SessionSidecar {
+	out := in
+	if in.Live.Online != nil {
+		out.Live.Online = append(make([]onlineSess, 0, len(in.Live.Online)), in.Live.Online...)
+	}
+	out.Live.UserDown = make(map[string]uint64, len(in.Live.UserDown))
+	for id, rate := range in.Live.UserDown {
+		out.Live.UserDown[id] = rate
+	}
+	out.Live.UserUp = make(map[string]uint64, len(in.Live.UserUp))
+	for id, rate := range in.Live.UserUp {
+		out.Live.UserUp[id] = rate
+	}
+	if in.Live.Metrics != nil {
+		out.Live.Metrics = proto.Clone(in.Live.Metrics).(*agentv1.HostMetrics)
+	}
+	if in.Live.Health != nil {
+		out.Live.Health = make([]*agentv1.InboundHealth, len(in.Live.Health))
+		for i, health := range in.Live.Health {
+			if health != nil {
+				out.Live.Health[i] = proto.Clone(health).(*agentv1.InboundHealth)
+			}
+		}
+	}
+	return out
+}
+
+func TestBuildFleetLiveSkipsOversizedProjection(t *testing.T) {
+	const sessionsN = 40_000
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Sessions: make([]*agentv1.Session, sessionsN)}
+	refs := make(map[string]store.FleetCredRef, sessionsN)
+	for i := range sessionsN {
+		credID := fmt.Sprintf("cred_%05d", i)
+		stats.Sessions[i] = &agentv1.Session{CredId: credID, InboundId: "inb_live_limit", ConnectedAtUnix: now.Unix()}
+		refs[credID] = store.FleetCredRef{UserID: fmt.Sprintf("usr_%s_%05d", strings.Repeat("u", 40), i), DeviceID: "dev", Protocol: "awg"}
+	}
+	projection, tooLarge := buildFleetLive(SessionState{}, LiveSnapshot{}, stats, nil, now, refs)
+	if !tooLarge || projection.Apply || projection.UsersJSON != "" || projection.LiveJSON != "" {
+		t.Fatalf("oversized projection was applied: users=%d live=%d apply=%t", len(projection.UsersJSON), len(projection.LiveJSON), projection.Apply)
+	}
+}
+
+func TestBuildCoreSnapshotStopsAtMaxStatsDeltas(t *testing.T) {
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	sessions := make([]*agentv1.Session, maxStatsDeltas+1)
+	for i := 0; i < maxStatsDeltas; i++ {
+		sessions[i] = &agentv1.Session{}
+	}
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-time.Second).Unix(), IntervalEndUnix: now.Unix(), Sessions: sessions}
+
+	live, _, ok := buildCoreSnapshot(SessionState{}, LiveSnapshot{}, stats, nil, now, map[string]store.FleetCredRef{})
+	if !ok || len(live.Online) != 0 {
+		t.Fatalf("buildCoreSnapshot() = online %d, ok=%t; want an empty bounded view", len(live.Online), ok)
+	}
+}
+
+func TestOlderStatsBatchLeavesProjectionAndSidecarUnchanged(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-older")
+	ids := e.fixture(state.NodeID)
+	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-older", 0, "").GetHello())
+	newer := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesDown: 20}},
+		Host:    &agentv1.HostMetrics{CpuPct: 33, NetRxBps: 44},
+	}}}
+	first, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: newer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeRows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || len(beforeRows) != 1 {
+		t.Fatalf("NodeLive before older batch = %+v, %v", beforeRows, err)
+	}
+	beforeSidecar := cloneLiveSidecarForTest(first.Sidecar)
+	older := &agentv1.ConnectRequest{Seq: 2, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-20 * time.Second).Unix(), IntervalEndUnix: now.Add(-time.Second).Unix(),
+		Host: &agentv1.HostMetrics{CpuPct: 99, NetRxBps: 999},
+	}}}
+	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: older})
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterRows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || !reflect.DeepEqual(beforeRows, afterRows) {
+		t.Fatalf("older batch changed node_live: before=%+v after=%+v err=%v", beforeRows, afterRows, err)
+	}
+	if second.State.LastEndUnix != first.State.LastEndUnix || !reflect.DeepEqual(second.Sidecar, beforeSidecar) {
+		t.Fatalf("older batch changed core state: end=%d/%d sidecar equal=%t", first.State.LastEndUnix, second.State.LastEndUnix, reflect.DeepEqual(second.Sidecar, beforeSidecar))
+	}
+}
+
+func TestStatsWithoutHostAndUnknownCredentialKeepsHostOnly(t *testing.T) {
+	e, core, ctx, state, sidecar, now := coreFixture(t, "core-live-unknown")
+	ids := e.fixture(state.NodeID)
+	tr := stepHello(t, core, ctx, state, sidecar, now, hello("instance-live-unknown", 0, "").GetHello())
+	first, err := coreStep(ctx, core, tr.State, tr.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now, Frame: &agentv1.ConnectRequest{
+		Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(),
+			IntervalEndUnix: now.Unix(), Host: &agentv1.HostMetrics{CpuPct: 37, NetRxBps: 123}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unknown := &agentv1.ConnectRequest{Seq: 2, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Unix(), IntervalEndUnix: now.Add(time.Second).Unix(),
+		Traffic:  []*agentv1.TrafficDelta{{CredId: "crd_unknown", InboundId: ids.i1, BytesDown: 10}},
+		Sessions: []*agentv1.Session{{CredId: "crd_unknown", InboundId: ids.i1, ConnectedAtUnix: now.Unix()}},
+	}}}
+	second, err := coreStep(ctx, core, first.State, first.Sidecar, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: unknown})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Sidecar.Live.Metrics == nil || second.Sidecar.Live.Metrics.CpuPct != 37 || second.Sidecar.Live.MetricsAt != now ||
+		len(second.Sidecar.Live.Online) != 0 || len(second.Sidecar.Live.UserDown) != 0 || len(second.Sidecar.Live.UserUp) != 0 {
+		t.Fatalf("host-only unknown-credential batch changed sidecar unexpectedly: %+v", second.Sidecar.Live)
+	}
+	rows, err := e.st.NodeLive(e.ctx, now.Add(time.Second), state.NodeID, true)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NodeLive after unknown credential = %+v, %v", rows, err)
+	}
+	var view liveJSONView
+	if err := json.Unmarshal([]byte(rows[0].LiveJSON), &view); err != nil {
+		t.Fatal(err)
+	}
+	if view.Metrics == nil || view.Metrics.CPUPct != 37 || len(view.Online) != 0 || len(view.UserDownBPS) != 0 || view.UploadBPS != 0 {
+		t.Fatalf("unknown credential appeared in live projection: %+v", view)
+	}
+}
+
+// A batch may name up to maxStatsDeltas users: the projection keeps the top consumers, not a row past D1's 2 MB.
+func TestTopRatesKeepsTheHighest(t *testing.T) {
+	rates := map[string]uint64{"usr_a": 5, "usr_b": 9, "usr_c": 9, "usr_d": 1}
+	if got := topRates(rates, 2); !reflect.DeepEqual(got, map[string]uint64{"usr_b": 9, "usr_c": 9}) {
+		t.Fatalf("topRates = %v", got)
+	}
+	if got := topRates(rates, 4); len(got) != 4 {
+		t.Fatalf("a small map must stay whole: %v", got)
+	}
+	many := map[string]uint64{}
+	for i := range 3000 {
+		many[fmt.Sprintf("usr_%04d", i)] = uint64(i)
+	}
+	if got := topRates(many, 2000); len(got) != 2000 || got["usr_2999"] != 2999 || got["usr_0999"] != 0 {
+		t.Fatalf("topRates(3000 users) kept %d, highest %d", len(got), got["usr_2999"])
 	}
 }
 

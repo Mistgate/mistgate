@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
-Status (2026-10-07): steps 1a, 1b, 2 and 3 and their review follow-up are merged. Steps 4-6 are designed
-below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
+Status (2026-10-08): steps 1a, 1b, 2 and 3 and their review follow-up are merged; step 4a is implemented in this
+worktree. Steps 4b-6 are designed below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -68,7 +68,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 2 | NodeLink Durable Object, PanelLink loopback, shared handshake (`LinkChallenge`/`linkAccept`), marker routing | merged |
 | 3 | Agent store paths as atomic batches, safe on D1 (stats 2 D1 calls, event 1, Hello 1) | merged |
 | — | Review follow-up: delta base also checks the hash; IngestStats write batch with a fixed statement count; state round-trip test over every field; duplicate SQL | merged |
-| 4a | Write the `node_live` projection (sidecar kept, compared by a test) | designed (§4) |
+| 4a | Write the `node_live` projection (sidecar kept, compared by a test) | implemented (2026-10-08) |
 | 4b | Every reader on the projection; delete `SessionSidecar` | designed (§4) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote`, capabilities from `node.agent_caps` | designed (§4) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) LinkOut`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | planned |
@@ -100,22 +100,24 @@ CREATE TABLE node_live (
 - **Hot columns.** The sample, rx/tx, cpu and users are columns so that subscriptions never parse `live_json`.
 - **No client IPs.** Session reports contain no client address, and the panel stores none in its live session view.
 - **Session id = `OwnerGeneration`.** It is unique per process on the VPS; on the edge the open event carries the
-  object's generation. It is a small integer: D1 refuses integers above 2^53.
+  object's generation. It is a small integer: D1 refuses integers above 2^53-1.
 
 **Connected** = the row exists, `node.state = 'active'`, and `node.last_seen_at >= now - liveness_timeout_s`. One SQL
-for both editions. Retired nodes disappear at once. After a process crash a row looks online until liveness (90 s).
+for both editions. Retired nodes disappear at once. After a crash or an interrupted takeover, a row looks online until
+liveness (90 s).
 
 ### 4.2 When it is written (all inside existing batches)
 
 | Event | Where | Statement |
 |---|---|---|
 | Hello | NodeHello gets `session` | `INSERT OR REPLACE INTO node_live (node_id, session) …`: online right after Hello, a new session always wins |
-| Stats (not a duplicate, newer than the last batch) | IngestStats gets a pure `Live` builder called inside the guarded attempt | upsert of all columns `WHERE node_live.session = excluded.session` |
+| Stats (not a duplicate, newer than the last batch) | IngestStats gets a pure `Live` builder called inside the guarded attempt | guarded `UPDATE` of all columns where `node_id` and `session` match; `Live.Apply = false` skips the row |
 | ApplyResult | NodeApplied gets `session, drift`; the core computes drift before writing | `UPDATE node_live SET drift = ? WHERE node_id = ? AND session = ?` |
 | Session end | EventDisconnected → NodeDisconnected(session) as a batch | update `last_disconnected_at` and delete the row, both guarded by session |
 
 The session guard means a late batch of a superseded session cannot overwrite the row, and its end cannot delete the
-new session's row. The `Live` builder must be pure: `retryGuarded` may call it more than once.
+new session's row. The `Live` builder must be pure: `retryGuarded` may call it more than once. The core's `LastEndUnix`
+orders batches within a session, and Hello resets the row for a new session.
 
 ### 4.3 `live_json`
 
@@ -127,14 +129,20 @@ The admin view, ported from today's `applyCoreSnapshot` without mutation:
 
 Bounds:
 - 2000 sessions and 64 health entries;
-- ids clipped to 64 bytes, details to 256.
+- agent-supplied inbound ids clipped to 64 bytes and details to 256; user, device and protocol values from the database
+  are kept as stored.
+
+`users` and `user_down_bps` include the resolved values from the bounded StatsBatch input; session and health arrays
+have the explicit view limits above.
 
 Sanitising (the agent may be hostile):
 - NaN and Inf become 0;
 - rates are clamped to 2^50 and cpu to 0..100.
 
-Without this, one bad value would fail every batch of the node, forever. A typical row is 5-8 KB; the bounded worst
-case is ~0.4 MB (the D1 row limit is 2 MB).
+Without this, one bad value would fail every batch of the node, forever. Measured `live_json` size is ~0.49 MB with
+honest values and ~1.3 MB for hostile values because JSON escapes `<` as `\u003c`; `users` adds about 44 B per online
+user and is unbounded. `buildFleetLive` leaves the previous row in place when `len(usersJSON)+len(liveJSON)` exceeds
+1.5 MB, while the stats accounting still commits (D1's row limit is 2 MB).
 
 ### 4.4 Readers
 
@@ -189,7 +197,7 @@ ADR 0007 then says that the live view is the `node_live` projection, written inl
 
 | Round | Changes | Proof | Risks |
 |---|---|---|---|
-| 4a | migration, `NodeLive`, the four writes, the `Live` builder; the sidecar stays | store tests on SQLite and fake D1 (Hello replaces an old session, a foreign session's upsert or end is a no-op, duplicate seq writes nothing, retired/stale filters, NaN/2^63 values do not fail a batch); a non-empty D1 smoke; projection = sidecar after a stats series; `node_live` in the rehydration test; 2001 sessions → 2000 | the builder must stay pure under retries |
+| 4a | migration, `NodeLive`, the four writes, the `Live` builder; the sidecar stays | SQLite tests; fake D1 smoke run by the lead (Hello replaces an old session, a foreign session's stats update or end is a no-op, duplicate seq writes nothing, retired/stale filters, NaN/2^63 values do not fail a batch); projection = sidecar after a stats series; `node_live` in the rehydration test; 2001 sessions → 2000 | the builder must stay pure under retries |
 | 4b | every reader moves (§4.4); the sidecar is deleted | the existing admin/status/health/update/warp tests on the projection; online right after Hello, offline after close; a stale row → the sweep raises `node_down`; a `Live` error opens no alerts; subscription load and online from rows; bridge budgets unchanged; subscription diff on a production database copy; race for fleet, agent, store, access, health and update | the largest VPS change: test churn in six packages; fake clocks moved past liveness without stats now see offline |
 | 4c | the seam (§4.5) | allowlist, a request before Hello is refused, the Retire sequence; the existing VPS command/doctor/update/bandwidth/retire/re-enrol tests; a fake `Remote` (frame, request id, deadline, error mapping, no call when offline or too old, StreamLogs) | completeness of the allowlist; RetireNode no longer waits |
 
@@ -205,8 +213,14 @@ page).
 - **Where Go runs.** `ctx.exports.PanelLink` most likely runs on the object's own thread and isolate. A cold panel start
   then lands inside an object's block, and the 128 MB is shared with NodeLink and Limiter. Measure this in step 6;
   ADR 0007 says "outside the object's request context".
-- **D1 batch size.** The IngestStats write batch is a fixed seven statements (json_each); before step 6, still measure
-  the largest batch on real D1 (parameter size, rows read).
+- **D1 batch size.** The IngestStats write batch is a fixed eight statements (json_each, including the guarded
+  `node_live` UPDATE, whether or not the projection applies); before step 6, still measure the largest batch on real D1
+  (parameter size, rows read).
+- **NodeApplied batch size.** It currently has 2 + inbounds statements, with the number of inbounds set by the agent;
+  move those updates to `json_each` before step 6.
+- **Projection size.** A StatsBatch may name up to 65 536 users, so the `users` column can exceed D1's 2 MB row limit;
+  the 1.5 MB valve in section 4.3 keeps the previous row when that would happen. `live_json` keeps the 2000 highest
+  per-user download rates (ties by user id), like the 2000 sessions. The admin view only shows top consumers.
 - **Billing.** Each stats frame costs about 3 billed row writes on the object (state, alarmAt, setAlarm).
 - **Side finding.** `access.CapabilitySource` never fires in production (`Fleet` does not implement
   `AgentCapability`), so the awg/1 check in device creation never runs. Either implement it from `node.agent_caps` or

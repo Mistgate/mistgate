@@ -463,22 +463,15 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	s.coreMu.Unlock()
 	defer func() {
 		cancel(nil)
-		if _, err := s.stepCore(context.Background(), SessionEvent{Kind: EventDisconnected, At: f.now()}); err != nil {
-			f.log.Warn("disconnect session core", "node", id, "err", err)
+		if f.unregister(s) {
+			// the end is written to the store (NodeDisconnected) before the waiters are released: bound it
+			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if _, err := s.stepCore(dctx, SessionEvent{Kind: EventDisconnected, At: f.now()}); err != nil {
+				f.log.Warn("disconnect session core", "node", id, "err", err)
+			}
+			dcancel()
 		}
 		close(s.done)
-		if f.unregister(s) {
-			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer dcancel()
-			view := s.view.Load()
-			seen := time.Time{}
-			if view != nil {
-				seen = view.State.LastSeenAt.UTC()
-			}
-			if err := f.st.NodeDisconnected(dctx, id, seen, f.now().UTC()); err != nil {
-				f.log.Warn("record disconnect", "node", id, "err", err)
-			}
-		}
 	}()
 	if helloErr != nil {
 		f.log.Error("hello response", "node", id, "err", helloErr)

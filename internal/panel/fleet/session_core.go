@@ -1,11 +1,16 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -280,6 +285,9 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, sidecar *Se
 			return tr.Transition, err
 		}
 	case EventDisconnected:
+		if err := c.f.st.NodeDisconnected(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.LastSeenAt, event.At); err != nil {
+			return tr.Transition, err
+		}
 		tr.state.Disconnected = true
 		tr.state.Pending = nil
 		tr.state.AutoBandwidthDeadline = time.Time{}
@@ -310,7 +318,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 		c.f.log.Warn("hello names another node than the certificate", "cert_node", tr.state.NodeID)
 	}
 	info := helloInfo(h)
-	prev, acked, err := c.f.st.NodeHello(ctx, tr.state.NodeID, info, event.At)
+	prev, acked, err := c.f.st.NodeHello(ctx, tr.state.NodeID, tr.state.OwnerGeneration, info, event.At)
 	if errors.Is(err, store.ErrNodeRetired) {
 		tr.Close = &SessionClose{Class: CloseFailedPrecondition, Reason: "node retired"}
 		return nil
@@ -444,7 +452,15 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	if g.rejected > 0 {
 		c.rejectStats(ctx, tr.state, g, now)
 	}
-	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic}
+	projectionState, projectionLive := *tr.state, tr.sidecar.Live
+	projectionTooLarge := false
+	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
+		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic}
+	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
+		live, tooLarge := buildFleetLive(projectionState, projectionLive, st, g.traffic, now, refs)
+		projectionTooLarge = projectionTooLarge || tooLarge
+		return live
+	}
 	for i, se := range st.Sessions {
 		if i == maxStatsDeltas {
 			break
@@ -457,6 +473,9 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	}
 	in.Certs = certStats(st, now)
 	out, err := c.f.st.IngestStats(ctx, in)
+	if projectionTooLarge {
+		c.f.warnOversizedLiveProjection(projectionState.NodeID)
+	}
 	if err != nil {
 		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
 		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
@@ -498,8 +517,46 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	}
 }
 
-// applyCoreSnapshot replaces the live view with the newest absolute snapshot.
-func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic, now time.Time, refs map[string]store.FleetCredRef) bool {
+type liveJSONView struct {
+	IntervalEndUnix int64             `json:"interval_end_unix"`
+	MetricsAtUnix   int64             `json:"metrics_at_unix"`
+	Metrics         *liveJSONMetrics  `json:"metrics,omitempty"`
+	Health          []liveJSONHealth  `json:"health"`
+	Online          []liveJSONOnline  `json:"online"`
+	UserDownBPS     map[string]uint64 `json:"user_down_bps"`
+	UploadBPS       uint64            `json:"upload_bps"`
+}
+
+type liveJSONMetrics struct {
+	CPUPct         float64 `json:"cpu_pct"`
+	SoftirqPct     float64 `json:"softirq_pct"`
+	Load1          float64 `json:"load1"`
+	RAMUsedBytes   uint64  `json:"ram_used_bytes"`
+	RAMTotalBytes  uint64  `json:"ram_total_bytes"`
+	DiskUsedBytes  uint64  `json:"disk_used_bytes"`
+	DiskTotalBytes uint64  `json:"disk_total_bytes"`
+	RxBPS          uint64  `json:"rx_bps"`
+	TxBPS          uint64  `json:"tx_bps"`
+	UptimeS        uint64  `json:"uptime_s"`
+}
+
+type liveJSONHealth struct {
+	InboundID string `json:"inbound_id"`
+	RunState  string `json:"run_state"`
+	Detail    string `json:"detail"`
+}
+
+type liveJSONOnline struct {
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id"`
+	Protocol  string `json:"protocol"`
+	InboundID string `json:"inbound_id"`
+	SinceUnix int64  `json:"since_unix"`
+}
+
+// buildCoreSnapshot returns the next live sidecar value without changing session or sidecar state.
+func buildCoreSnapshot(state SessionState, current LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
+	now time.Time, refs map[string]store.FleetCredRef) (LiveSnapshot, int64, bool) {
 	end := st.IntervalEndUnix
 	// An end time from the future would make every later (honest) batch look older and freeze the live
 	// view: clamp it like the bucket hour.
@@ -507,9 +564,9 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 		end = now.Unix()
 	}
 	if end < state.LastEndUnix {
-		return false // an older batch resent after a reconnect
+		return current, end, false // an older batch resent after a reconnect
 	}
-	state.LastEndUnix = end
+	live := current
 	if st.Host != nil {
 		live.Metrics = st.Host
 		live.MetricsAt = now
@@ -517,8 +574,11 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 	live.Health = st.Health
 	live.Online = make([]onlineSess, 0, len(st.Sessions))
 	for i, se := range st.Sessions {
+		if i == maxStatsDeltas {
+			break
+		}
 		ref, ok := refs[se.CredId]
-		if !ok || i == maxStatsDeltas {
+		if !ok {
 			continue
 		}
 		since := time.Unix(se.ConnectedAtUnix, 0).UTC()
@@ -532,11 +592,128 @@ func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.Stat
 	live.UserDown, live.UserUp = map[string]uint64{}, map[string]uint64{}
 	for _, d := range traffic {
 		if ref, ok := refs[d.CredID]; ok {
-			live.UserDown[ref.UserID] += d.Down * 8 / secs
-			live.UserUp[ref.UserID] += d.Up * 8 / secs
+			live.UserDown[ref.UserID] = satAdd(live.UserDown[ref.UserID], d.Down*8/secs)
+			live.UserUp[ref.UserID] = satAdd(live.UserUp[ref.UserID], d.Up*8/secs)
 		}
 	}
+	return live, end, true
+}
+
+// applyCoreSnapshot replaces the live view with the newest absolute snapshot.
+func applyCoreSnapshot(state *SessionState, live *LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic, now time.Time, refs map[string]store.FleetCredRef) bool {
+	next, end, ok := buildCoreSnapshot(*state, *live, st, traffic, now, refs)
+	if !ok {
+		return false
+	}
+	state.LastEndUnix = end
+	*live = next
 	return true
+}
+
+func buildFleetLive(state SessionState, current LiveSnapshot, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
+	now time.Time, refs map[string]store.FleetCredRef) (store.FleetLive, bool) {
+	live, end, ok := buildCoreSnapshot(state, current, st, traffic, now, refs)
+	if !ok {
+		return store.FleetLive{}, false
+	}
+	const maxRate = uint64(1 << 50)
+	view := liveJSONView{
+		IntervalEndUnix: end,
+		Health:          make([]liveJSONHealth, 0, min(len(live.Health), 64)),
+		Online:          make([]liveJSONOnline, 0, min(len(live.Online), 2000)),
+		UserDownBPS:     make(map[string]uint64),
+	}
+	if !live.MetricsAt.IsZero() {
+		view.MetricsAtUnix = live.MetricsAt.Unix()
+	}
+	projection := store.FleetLive{Apply: true, Drift: state.Drift, SampleAt: view.MetricsAtUnix}
+	if metrics := live.Metrics; metrics != nil {
+		cpu := clampLiveFloat(float64(metrics.CpuPct), 0, 100)
+		rxBPS, txBPS := min(metrics.NetRxBps, maxRate), min(metrics.NetTxBps, maxRate)
+		view.Metrics = &liveJSONMetrics{
+			CPUPct: cpu, SoftirqPct: finiteLiveFloat(float64(metrics.SoftirqPct)), Load1: finiteLiveFloat(float64(metrics.Load1)),
+			RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes,
+			DiskUsedBytes: metrics.DiskUsedBytes, DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: rxBPS, TxBPS: txBPS, UptimeS: metrics.UptimeS,
+		}
+		projection.RxBps, projection.TxBps = rxBPS, txBPS
+		projection.CPUPct = int64(math.Round(cpu))
+	}
+	for _, h := range live.Health {
+		if len(view.Health) == 64 {
+			break
+		}
+		if h == nil {
+			continue
+		}
+		view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
+	}
+	users := make(map[string]int64)
+	for _, online := range live.Online {
+		since := online.since.Unix()
+		if previous, ok := users[online.userID]; !ok || since > previous {
+			users[online.userID] = since
+		}
+	}
+	for _, online := range live.Online[:min(len(live.Online), 2000)] {
+		view.Online = append(view.Online, liveJSONOnline{UserID: online.userID, DeviceID: online.deviceID,
+			Protocol: online.protocol, InboundID: clip(online.inboundID, 64), SinceUnix: online.since.Unix()})
+	}
+	var upload uint64
+	userDownRates := make(map[string]uint64, len(live.UserDown))
+	for userID, rate := range live.UserDown {
+		userDownRates[userID] = min(rate, maxRate)
+	}
+	for _, rate := range live.UserUp {
+		upload = satAdd(upload, rate)
+	}
+	view.UserDownBPS = topRates(userDownRates, 2000)
+	view.UploadBPS = min(upload, maxRate)
+	usersJSON, _ := json.Marshal(users)
+	encoded, _ := json.Marshal(view)
+	if len(usersJSON)+len(encoded) > maxFleetLiveJSONBytes {
+		return store.FleetLive{}, true
+	}
+	projection.UsersJSON, projection.LiveJSON = string(usersJSON), string(encoded)
+	return projection, false
+}
+
+const maxFleetLiveJSONBytes = 1_500_000
+
+func (f *Fleet) warnOversizedLiveProjection(nodeID string) {
+	if _, loaded := f.liveProjectionWarnings.LoadOrStore(nodeID, struct{}{}); !loaded {
+		f.log.Warn("node live projection exceeds the row size limit; retaining the previous row", "node", nodeID)
+	}
+}
+
+// topRates keeps the n highest rates (ties by user id): a batch may carry up to maxStatsDeltas users, which would make
+// the row larger than D1's 2 MB, and the admin view only ever shows the top consumers.
+func topRates(rates map[string]uint64, n int) map[string]uint64 {
+	if len(rates) <= n {
+		return rates
+	}
+	ids := slices.Collect(maps.Keys(rates))
+	slices.SortFunc(ids, func(a, b string) int {
+		if c := cmp.Compare(rates[b], rates[a]); c != 0 {
+			return c
+		}
+		return strings.Compare(a, b)
+	})
+	top := make(map[string]uint64, n)
+	for _, id := range ids[:n] {
+		top[id] = rates[id]
+	}
+	return top
+}
+
+func finiteLiveFloat(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	return value
+}
+
+func clampLiveFloat(value, minValue, maxValue float64) float64 {
+	return min(max(finiteLiveFloat(value), minValue), maxValue)
 }
 
 func (c *SessionCore) rejectStats(ctx context.Context, state *SessionState, g guardedStats, now time.Time) {
@@ -706,30 +883,31 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 		in = append(in, ia)
 	}
 	in = append(in, withheldApplied(tr.state.SentWithheld)...)
-	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, r.Revision, r.StateHash, in, now); err != nil {
+	c.updateApplyDrift(ctx, tr, r)
+	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.Drift, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
 	}
-	if r.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED {
-		return nil
-	}
-	if tr.state.SentRevision == 0 || r.Revision != tr.state.SentRevision {
-		return nil
+	return nil
+}
+
+func (c *SessionCore) updateApplyDrift(ctx context.Context, tr *coreTransition, r *agentv1.ApplyResult) {
+	if r.Status != agentv1.ApplyStatus_APPLY_STATUS_APPLIED || tr.state.SentRevision == 0 || r.Revision != tr.state.SentRevision {
+		return
 	}
 	if r.StateHash == tr.state.SentStateHash {
 		tr.state.DriftResent = false
 		tr.state.Drift = false
-		return nil
+		return
 	}
 	if !tr.state.DriftResent {
 		tr.state.DriftResent = true
 		tr.state.FullResendPending = true
 		c.f.event(ctx, 2, "state_drift", tr.state.NodeID, map[string]string{"revision": fmt.Sprint(r.Revision)})
 		c.requestDesiredPreparation(tr)
-		return nil
+		return
 	}
 	tr.state.Drift = true
 	c.f.event(ctx, 3, "state_drift", tr.state.NodeID, map[string]string{"revision": fmt.Sprint(r.Revision), "persists": "true"})
-	return nil
 }
 
 func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {

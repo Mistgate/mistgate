@@ -34,12 +34,15 @@ type FleetInboundCert struct {
 // FleetStatsIn is one reliable StatsBatch to commit.
 type FleetStatsIn struct {
 	NodeID, Instance string
+	Session          uint64
 	Seq              uint64
 	Now              time.Time
 	HourStart        int64 // bucket hour (multiple of 3600), already clamped by the caller
 	Traffic          []FleetTraffic
 	Sessions         []FleetSessionRef
 	Certs            []FleetInboundCert
+	// Live builds the session projection inside each guarded attempt. It must not mutate captured state.
+	Live func(refs map[string]FleetCredRef) FleetLive
 }
 
 // FleetCredRef is what a credential id resolves to (credentials are soft-deleted, so revoked ones resolve).
@@ -171,6 +174,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			return nil, nil
 		}
 		out.Refs = creds
+		live := FleetLive{}
+		if in.Live != nil {
+			live = in.Live(creds)
+		}
 
 		perBucket := map[bucketKey]*fleetStatsSums{}
 		perProto := map[string]*fleetStatsSums{}
@@ -296,7 +303,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			seenAt := touchAtByDevice[id]
 			touchWrites = append(touchWrites, fleetDeviceTouchWrite{DeviceID: id, LastSeenAt: seenAt, NotAfter: seenAt})
 		}
-		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, certWrites, touchWrites)
+		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, certWrites, touchWrites, live)
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +317,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 
 func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets []fleetStatsBucketWrite,
 	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, certs []fleetInboundCertWrite,
-	touches []fleetDeviceTouchWrite) ([]Stmt, error) {
+	touches []fleetDeviceTouchWrite, live FleetLive) ([]Stmt, error) {
 	bucketJSON, err := json.Marshal(buckets)
 	if err != nil {
 		return nil, err
@@ -328,6 +335,10 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		return nil, err
 	}
 	touchStmt, err := deviceTouchStmt(touches)
+	if err != nil {
+		return nil, err
+	}
+	liveStmt, err := nodeLiveStatsStmt(in.NodeID, in.Session, live)
 	if err != nil {
 		return nil, err
 	}
@@ -360,8 +371,27 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 			WHERE user.id = json_extract(change.value, '$.user_id')`, Args: []any{string(userJSON), unix(in.Now), in.NodeID}},
 		certStmt,
 		touchStmt,
+		liveStmt,
 		commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now),
 	}, nil
+}
+
+func nodeLiveStatsStmt(nodeID string, session uint64, live FleetLive) (Stmt, error) {
+	sessionID, err := nodeSessionValue(session)
+	if err != nil {
+		return Stmt{}, err
+	}
+	if live.UsersJSON == "" {
+		live.UsersJSON = "{}"
+	}
+	if live.LiveJSON == "" {
+		live.LiveJSON = "{}"
+	}
+	return Stmt{Query: `
+		UPDATE node_live SET drift = ?, sample_at = ?, rx_bps = ?, tx_bps = ?, cpu_pct = ?, users = ?, live_json = ?
+		WHERE node_id = ? AND session = ? AND ? = 1`,
+		Args: []any{boolInt(live.Drift), live.SampleAt, int64(live.RxBps), int64(live.TxBps),
+			live.CPUPct, live.UsersJSON, live.LiveJSON, nodeID, sessionID, boolInt(live.Apply)}}, nil
 }
 
 func inboundCertsStmt(nodeID string, now time.Time, certs []fleetInboundCertWrite) (Stmt, error) {
