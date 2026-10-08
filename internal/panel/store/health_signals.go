@@ -103,9 +103,10 @@ func scanHealthTorrent(r rowScanner) (HealthTorrentSignal, error) {
 
 // healthTorrentSQL reads the last day of torrent_attempt events, one row per user and node. It is served by
 // event_retention (severity, ts): the guard writes warnings, so only the last day of severity 2 and 3 is read, not the
-// whole table (TestHealthSignalsTorrentQueryUsesTheSeverityTimeIndex holds the plan). The user is in params_json (the
-// event's user_id column stays empty for the guard); an event without one is skipped. With a single max(), SQLite takes
-// the bare column (the evidence) from the row that holds the maximum: the last attempt.
+// whole table (TestHealthSignalsTorrentQueryUsesTheSeverityTimeIndex holds the plan). The user and evidence are in
+// params_json (the event's user_id column stays empty for the guard); events without a user or non-empty evidence are
+// skipped so an older agent cannot name a person. With a single max(), SQLite takes the bare evidence column from the
+// row that holds the maximum: the last attempt.
 const healthTorrentSQL = `
 	SELECT json_extract(params_json, '$.user_id') AS user_id, node_id AS node_id, count(*) AS attempts, max(ts) AS last_at,
 	       coalesce(json_extract(params_json, '$.evidence'), '') AS evidence,
@@ -113,6 +114,7 @@ const healthTorrentSQL = `
 	FROM event
 	WHERE severity IN (2, 3) AND ts >= ? AND code = 'torrent_attempt' AND node_id IS NOT NULL
 	  AND coalesce(json_extract(params_json, '$.user_id'), '') <> ''
+	  AND coalesce(json_extract(params_json, '$.evidence'), '') <> ''
 	GROUP BY 1, 2`
 
 // HealthSignals reads the user, AWG, hourly fleet and torrent inputs in one read batch.

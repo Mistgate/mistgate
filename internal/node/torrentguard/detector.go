@@ -4,10 +4,10 @@
 //
 // These parsers do not identify MSE/PE-encrypted BitTorrent, BitTorrent inside
 // another VPN or proxy, or HTTPS web seeds. Unknown and malformed traffic must
-// be allowed by callers. A validated uTP header alone is structural evidence
-// only: DetectClientUDPRequest accepts nothing but a standalone SYN, and only
-// what the client sends may be classified (a remote peer must not be able to
-// frame a user with a crafted packet).
+// be allowed by callers. A uTP SYN is weak structural evidence: the classifier
+// accepts only standalone SYN shapes used by clients, and callers must pass
+// only what the client sends so a remote peer cannot frame a user with a
+// crafted packet.
 package torrentguard
 
 import (
@@ -61,15 +61,14 @@ type Evidence string
 const (
 	EvidenceTrackerConnect Evidence = "tracker_connect" // BEP 15 connect request with the protocol's 64-bit magic
 	EvidenceDHTQuery       Evidence = "dht_query"       // BEP 5 KRPC query (ping, find_node, get_peers, announce_peer)
-	EvidenceUTPSyn         Evidence = "utp_syn"         // BEP 29 standalone SYN with a zero timestamp difference
+	EvidenceUTPSyn         Evidence = "utp_syn"         // BEP 29 standalone SYN with no ack and an observed client shape
 	EvidenceTCPHandshake   Evidence = "tcp_handshake"   // the 20-byte plaintext BitTorrent handshake at the stream start
 )
 
 // DetectClientUDPRequest recognizes client-to-network BitTorrent requests: call it only on datagrams the
 // client sent. It avoids treating ordinary DHT replies or arbitrary uTP DATA/STATE packets as proof (every
-// WireGuard handshake initiation, "01 00 00 00", is a structurally valid uTP DATA header). A new uTP flow
-// is recognized only by its standalone SYN, whose timestamp_difference is zero (nothing was received yet):
-// four zero bytes a QUIC short header or other random-looking datagram almost never has.
+// WireGuard handshake initiation, "01 00 00 00", is a structurally valid uTP DATA header). A new uTP flow is
+// recognized only by a standalone SYN with ack_nr 0 and one of the two observed client header shapes.
 //
 // It does not know where the datagram goes; callers that do should use ClassifyClientUDPRequest.
 func DetectClientUDPRequest(packet []byte) (Protocol, bool) {
@@ -97,10 +96,26 @@ func ClassifyClientUDPRequest(packet []byte, dstPort uint16) (Protocol, Evidence
 	if message, ok := ParseKRPCMessage(packet); ok && message.Type == KRPCQuery {
 		return ProtocolBitTorrentDHT, EvidenceDHTQuery, true
 	}
-	if header, ok := ParseUTPHeader(packet); ok && header.Type == UTPSyn && header.TimestampDiff == 0 {
+	if header, ok := ParseUTPHeader(packet); ok && isUTPSynClientRequest(packet, header) {
 		return ProtocolBitTorrentUTP, EvidenceUTPSyn, true
 	}
 	return "", "", false
+}
+
+// isUTPSynClientRequest limits weak uTP evidence to the two SYNs real clients send: libtorrent's has no extension (20
+// bytes), libutp's exactly one 8-byte extension-bits record (30 bytes). Both stamp their send clock into
+// timestamp_microseconds and send ack_nr 0. The window is not checked: libtorrent's SYN advertises none. Other
+// structurally valid extension chains and zero-filled game datagrams can overlap with ordinary traffic, so ParseUTPHeader
+// stays general while classification is deliberately narrow.
+func isUTPSynClientRequest(packet []byte, header UTPHeader) bool {
+	if header.Type != UTPSyn || header.TimestampDiff != 0 || header.AckNumber != 0 || header.Timestamp == 0 {
+		return false
+	}
+	if header.ExtensionCount == 0 {
+		return header.HeaderLength == 20 && len(packet) == 20 && packet[1] == 0
+	}
+	return header.ExtensionCount == 1 && header.HeaderLength == 30 && len(packet) == 30 &&
+		packet[1] == 2 && packet[20] == 0 && packet[21] == 8
 }
 
 // UDPTrackerPacket contains the validated action and transaction ID from a
@@ -248,7 +263,7 @@ type bencodeParser struct {
 }
 
 // ParseKRPCMessage validates a complete, canonical bencoded BEP 5 query,
-// response, or error. It requires the two-byte transaction ID, a recognized
+// response, or error. It requires a transaction ID of 1 to 16 bytes, a recognized
 // query method and method-specific required fields, or a correctly shaped
 // response/error. Arbitrary bencoded dictionaries and bare d/e prefixes are
 // not classified as KRPC.
@@ -266,7 +281,7 @@ func ParseKRPCMessage(packet []byte) (KRPCMessage, bool) {
 		return KRPCMessage{}, false
 	}
 	t, ok := dictGet(root, "t")
-	if !ok || t.kind != bencodeBytes || len(t.data) != 2 {
+	if !ok || t.kind != bencodeBytes || len(t.data) < 1 || len(t.data) > 16 {
 		return KRPCMessage{}, false
 	}
 	message := KRPCMessage{TransactionID: string(t.data)}

@@ -104,6 +104,7 @@ type Agent struct {
 
 	torrentEventsMu sync.Mutex
 	torrentEvents   map[string]time.Time
+	torrentUTPSyn   map[string]*torrentUTPSynWindow
 
 	instanceID     string
 	out            *outbox
@@ -285,6 +286,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		log:           slog.New(&ringHandler{ring: ring, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
+		torrentUTPSyn: map[string]*torrentUTPSynWindow{},
 		instanceID:    hex.EncodeToString(inst),
 		out:           newOutbox(cfg.MaxPending, cfg.MaxPendingBytes),
 		jobs:          make(chan job, 256),
@@ -917,10 +919,10 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 	}}})
 }
 
-// engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue:
-// one per inbound and user every 5 minutes (one per inbound for detections without a known user), so a noisy client
-// cannot fill the durable queue. Only the fixed parameters leave the node: never a client address or a destination
-// address (the destination port and what matched are fixed parameters).
+// engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue.
+// uTP SYN reports wait for five detections to three destination ports within 10 minutes; all reported detections then
+// use the existing one-per-inbound and user five-minute throttle (one per inbound without a known user). Only the fixed
+// parameters leave the node: never a client address or a destination address.
 func (a *Agent) engineEvent(ev engine.Event) {
 	if ev.Code != "torrent_attempt" {
 		return
@@ -935,6 +937,12 @@ func (a *Agent) engineEvent(ev engine.Event) {
 	for k, last := range a.torrentEvents {
 		if now.Sub(last) >= 15*time.Minute {
 			delete(a.torrentEvents, k)
+		}
+	}
+	if ev.Params["evidence"] == "utp_syn" {
+		if !a.recordUTPSynLocked(key, now, parseTorrentPort(ev.Params["dst_port"])) {
+			a.torrentEventsMu.Unlock()
+			return
 		}
 	}
 	if last := a.torrentEvents[key]; !last.IsZero() && now.Sub(last) < 5*time.Minute {
@@ -967,6 +975,112 @@ func (a *Agent) engineEvent(ev engine.Event) {
 		sev = pb.Severity_SEVERITY_WARNING
 	}
 	a.event(sev, ev.Code, ev.InboundID, params)
+}
+
+const (
+	torrentUTPSynWindowDuration = 10 * time.Minute // ponytail: starting point, calibrate.
+	torrentUTPSynMinDetections  = 5                // ponytail: starting point, calibrate.
+	torrentUTPSynMinPorts       = 3                // ponytail: starting point, calibrate.
+	torrentUTPSynStateMapLimit  = 4096
+)
+
+type torrentUTPSynPort struct {
+	port uint16
+	at   time.Time
+}
+
+// torrentUTPSynWindow keeps only the last five detection times and the three most recently seen destination ports.
+// Those are enough to decide the threshold while keeping per-user state bounded and free of addresses.
+type torrentUTPSynWindow struct {
+	events    [torrentUTPSynMinDetections]time.Time
+	eventNext int
+	eventUsed int
+	ports     [torrentUTPSynMinPorts]torrentUTPSynPort
+	portUsed  int
+	last      time.Time
+}
+
+func (w *torrentUTPSynWindow) add(now time.Time, port uint16) {
+	w.events[w.eventNext] = now
+	w.eventNext = (w.eventNext + 1) % len(w.events)
+	if w.eventUsed < len(w.events) {
+		w.eventUsed++
+	}
+	w.last = now
+	if port == 0 {
+		return
+	}
+	for i := 0; i < w.portUsed; i++ {
+		if w.ports[i].port == port {
+			w.ports[i].at = now
+			return
+		}
+	}
+	if w.portUsed < len(w.ports) {
+		w.ports[w.portUsed] = torrentUTPSynPort{port: port, at: now}
+		w.portUsed++
+		return
+	}
+	oldest := 0
+	for i := 1; i < len(w.ports); i++ {
+		if w.ports[i].at.Before(w.ports[oldest].at) {
+			oldest = i
+		}
+	}
+	w.ports[oldest] = torrentUTPSynPort{port: port, at: now}
+}
+
+func (w *torrentUTPSynWindow) qualifies(now time.Time) bool {
+	if w.eventUsed < torrentUTPSynMinDetections {
+		return false
+	}
+	recentEvents := 0
+	for _, at := range w.events {
+		if !at.IsZero() && !at.After(now) && now.Sub(at) <= torrentUTPSynWindowDuration {
+			recentEvents++
+		}
+	}
+	if recentEvents < torrentUTPSynMinDetections {
+		return false
+	}
+	recentPorts := 0
+	for i := 0; i < w.portUsed; i++ {
+		if !w.ports[i].at.IsZero() && !w.ports[i].at.After(now) && now.Sub(w.ports[i].at) <= torrentUTPSynWindowDuration {
+			recentPorts++
+		}
+	}
+	return recentPorts >= torrentUTPSynMinPorts
+}
+
+// recordUTPSynLocked records weak evidence and returns true only once the window has enough detections and ports.
+// The caller holds torrentEventsMu, which protects both maps.
+func (a *Agent) recordUTPSynLocked(key string, now time.Time, port uint16) bool {
+	if a.torrentUTPSyn == nil {
+		a.torrentUTPSyn = map[string]*torrentUTPSynWindow{}
+	}
+	for k, state := range a.torrentUTPSyn {
+		if now.Sub(state.last) > torrentUTPSynWindowDuration {
+			delete(a.torrentUTPSyn, k)
+		}
+	}
+	state := a.torrentUTPSyn[key]
+	if state == nil {
+		if len(a.torrentUTPSyn) >= torrentUTPSynStateMapLimit {
+			return false
+		}
+		state = &torrentUTPSynWindow{}
+		a.torrentUTPSyn[key] = state
+	}
+	state.add(now, port)
+	return state.qualifies(now)
+}
+
+func parseTorrentPort(value string) uint16 {
+	port, err := strconv.ParseUint(value, 10, 16)
+	if err != nil {
+		return 0
+	}
+	return uint16(port)
 }
 
 // ---------------------------------------------------------------------------------------------------

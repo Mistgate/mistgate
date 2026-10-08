@@ -61,8 +61,8 @@ func seedHealthSignals(t *testing.T, s *Store, now time.Time) {
 	}
 }
 
-// seedTorrentEvents adds, after seedHealthSignals: usr_active tried twice on nod_signals and once on nod_other in the last
-// day; an older attempt, an attempt without a user, a node-less attempt and another event code must all be ignored.
+// seedTorrentEvents adds, after seedHealthSignals: usr_active tried twice on nod_signals in the last day. Events without
+// evidence, an older attempt, an attempt without a user, a node-less attempt and another event code must be ignored.
 func seedTorrentEvents(t *testing.T, s *Store, now time.Time) {
 	t.Helper()
 	ctx := context.Background()
@@ -79,6 +79,7 @@ func seedTorrentEvents(t *testing.T, s *Store, now time.Time) {
 		{10 * time.Hour, 2, "torrent_attempt", "nod_signals", `{"user_id":"usr_active","user_name":"Active","protocol":"tcp","evidence":"tcp_handshake","dst_port":"6881"}`},
 		{time.Hour, 2, "torrent_attempt", "nod_signals", `{"user_id":"usr_active","protocol":"udp","evidence":"tracker_connect","dst_port":"6969"}`},
 		{3 * time.Hour, 2, "torrent_attempt", "nod_other", `{"user_id":"usr_active"}`},
+		{2 * time.Hour, 2, "torrent_attempt", "nod_other", `{"user_id":"usr_active","evidence":""}`},
 		{25 * time.Hour, 2, "torrent_attempt", "nod_signals", `{"user_id":"usr_limited"}`},
 		{time.Hour, 2, "torrent_attempt", "nod_signals", `{"protocol":"tcp"}`},
 		{time.Hour, 2, "torrent_attempt", "nod_signals", `{"user_id":""}`},

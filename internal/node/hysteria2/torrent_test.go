@@ -1,6 +1,7 @@
 package hysteria2
 
 import (
+	"encoding/binary"
 	"io"
 	"net"
 	"sync"
@@ -199,6 +200,8 @@ func TestTorrentUDPConnNeverInspectsDNS(t *testing.T) {
 	guarded := torrentUDPConn{UDPConn: base, attempt: func(torrentguard.Protocol, torrentguard.Evidence, string) { detected++ }}
 	syn := make([]byte, 20)
 	syn[0] = 0x41
+	binary.BigEndian.PutUint32(syn[4:8], 1)       // timestamp_microseconds
+	binary.BigEndian.PutUint32(syn[12:16], 1<<20) // wnd_size
 	dns := dnsQueryWithEDNSCookie()
 	for _, addr := range []string{"1.1.1.1:53", "[2606:4700::1111]:53", "224.0.0.251:5353"} {
 		for _, p := range [][]byte{dns, syn} {

@@ -63,8 +63,8 @@ func TestHealthSignalsTorrentAttemptsPerUserAndNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Torrents) != 2 {
-		t.Fatalf("torrent signals = %+v, want usr_active on two nodes only", got.Torrents)
+	if len(got.Torrents) != 1 {
+		t.Fatalf("torrent signals = %+v, want only evidence-qualified usr_active event on nod_signals", got.Torrents)
 	}
 	byNode := map[string]HealthTorrentSignal{}
 	for _, signal := range got.Torrents {
@@ -76,10 +76,8 @@ func TestHealthSignalsTorrentAttemptsPerUserAndNode(t *testing.T) {
 		signal.Evidence != "tracker_connect" || !slices.Equal(signal.DstPorts, []string{"6881", "6969"}) {
 		t.Fatalf("nod_signals torrent signal = %+v", signal)
 	}
-	// an event from an agent that predates the evidence: no evidence, no ports
-	if signal := byNode["nod_other"]; signal.UserID != "usr_active" || signal.Count != 1 || !signal.LastAt.Equal(now.Add(-3*time.Hour)) ||
-		signal.Evidence != "" || len(signal.DstPorts) != 0 {
-		t.Fatalf("nod_other torrent signal = %+v", signal)
+	if _, ok := byNode["nod_other"]; ok {
+		t.Fatalf("events without evidence fed the people signal: %+v", byNode["nod_other"])
 	}
 }
 

@@ -153,21 +153,14 @@ func TestTorrentAlertNamesNodesAndIgnoresWhoCannotBeAlerted(t *testing.T) {
 	}
 }
 
-// An agent that predates the evidence still raises the alert, without the two parameters.
-func TestTorrentAlertWithoutEvidenceFromAnOlderAgent(t *testing.T) {
+// An agent that predates the evidence still produces a node event, but cannot name a person in Health.
+func TestTorrentAlertIgnoresEventsWithoutEvidenceFromAnOlderAgent(t *testing.T) {
 	e := newEnv(t)
 	e.node("node1", "provider", true)
 	user := addHealthUser(e, "alice", "active", time.Time{}, time.Time{}, time.Time{})
 	addTorrentAttempt(e, "node1", user, e.clock.Now().Add(-time.Hour), "", "")
 	e.evaluate()
-	got := e.active()["torrent//"+user]
-	if got.ID == "" {
-		t.Fatalf("no alert: %+v", e.active())
-	}
-	if _, ok := got.Params["evidence"]; ok {
-		t.Errorf("params = %v", got.Params)
-	}
-	if _, ok := got.Params["ports"]; ok {
-		t.Errorf("params = %v", got.Params)
+	if got := e.active()["torrent//"+user]; got.ID != "" {
+		t.Fatalf("event without evidence raised a people alert: %+v", got)
 	}
 }

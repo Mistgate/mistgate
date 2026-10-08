@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -52,6 +53,65 @@ func TestEngineTorrentEventsAreRateLimitedPerUserAndInbound(t *testing.T) {
 	}
 	if queued := b.out.after(0); len(queued) != 1 || len(queued[0].GetEvent().Params) != 1 {
 		t.Fatalf("unattributed events = %v", queued)
+	}
+}
+
+func TestEngineUTPSynNeedsRepeatedDetectionsAcrossPorts(t *testing.T) {
+	a := &Agent{out: newOutbox(32, 1<<20), torrentEvents: map[string]time.Time{}}
+	send := func(inbound, user, port string) {
+		a.engineEvent(engine.Event{Code: "torrent_attempt", InboundID: inbound, Warning: true, Params: map[string]string{
+			"user_id": user, "protocol": "udp", "torrent_protocol": "bittorrent_utp", "evidence": "utp_syn", "dst_port": port,
+		}})
+	}
+	for _, port := range []string{"6881", "6882", "6881", "6883"} {
+		send("in-1", "user-1", port)
+	}
+	for _, port := range []string{"6881", "6882", "6881", "6882", "6881"} {
+		send("in-3", "user-1", port)
+	}
+	send("in-2", "user-1", "6884")
+	send("in-1", "user-2", "6884")
+	if got := len(a.out.after(0)); got != 0 {
+		t.Fatalf("weak uTP events before five detections for one inbound/user = %d, want 0", got)
+	}
+	send("in-1", "user-1", "6881")
+	if got := len(a.out.after(0)); got != 1 {
+		t.Fatalf("weak uTP events after five detections across three ports = %d, want 1", got)
+	}
+	send("in-1", "user-1", "6882")
+	if got := len(a.out.after(0)); got != 1 {
+		t.Fatalf("weak uTP event bypassed the five-minute throttle: queued %d", got)
+	}
+	a.offset.Add(301)
+	send("in-1", "user-1", "6883")
+	if got := len(a.out.after(0)); got != 2 {
+		t.Fatalf("qualified weak uTP event after the throttle = %d, want 2", got)
+	}
+	a.offset.Add(601)
+	for _, port := range []string{"6881", "6882", "6881", "6883"} {
+		send("in-1", "user-1", port)
+	}
+	if got := len(a.out.after(0)); got != 2 {
+		t.Fatalf("expired detections qualified the weak-evidence window: queued %d", got)
+	}
+	send("in-1", "user-1", "6881")
+	if got := len(a.out.after(0)); got != 3 {
+		t.Fatalf("fresh qualified weak uTP event = %d, want 3", got)
+	}
+}
+
+func TestEngineUTPSynStateStaysBounded(t *testing.T) {
+	a := &Agent{out: newOutbox(32, 1<<20), torrentEvents: map[string]time.Time{}}
+	for i := 0; i < 4097; i++ {
+		a.engineEvent(engine.Event{Code: "torrent_attempt", InboundID: strconv.Itoa(i), Params: map[string]string{
+			"user_id": "user-1", "evidence": "utp_syn", "dst_port": "6881",
+		}})
+	}
+	if len(a.torrentUTPSyn) != 4096 {
+		t.Fatalf("uTP evidence states = %d, want the 4096-entry bound", len(a.torrentUTPSyn))
+	}
+	if queued := a.out.after(0); len(queued) != 0 {
+		t.Fatalf("unqualified weak events were queued: %d", len(queued))
 	}
 }
 

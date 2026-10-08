@@ -336,8 +336,8 @@ func TestD1HealthSignalsUsesOneReadBatch(t *testing.T) {
 	if len(got.Users) != 3 || len(got.AWGDevices) != 1 || len(got.NodeHours) != 8 {
 		t.Fatalf("signals = users %d, AWG devices %d, node hours %d", len(got.Users), len(got.AWGDevices), len(got.NodeHours))
 	}
-	if len(got.Torrents) != 2 {
-		t.Fatalf("torrent signals = %+v, want usr_active on two nodes", got.Torrents)
+	if len(got.Torrents) != 1 || got.Torrents[0].NodeID != "nod_signals" || got.Torrents[0].Count != 2 {
+		t.Fatalf("torrent signals = %+v, want only evidence-qualified attempts on nod_signals", got.Torrents)
 	}
 }
 

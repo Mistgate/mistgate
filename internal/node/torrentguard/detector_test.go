@@ -2,6 +2,8 @@ package torrentguard
 
 import (
 	"encoding/binary"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -129,11 +131,21 @@ func TestParseKRPCMessage(t *testing.T) {
 	if _, ok := ParseKRPCMessage([]byte(announce)); !ok {
 		t.Fatal("valid announce_peer query was rejected")
 	}
+	makePing := func(tx string) []byte {
+		return []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t" + strconv.Itoa(len(tx)) + ":" + tx + "1:v4:TR\x03\x001:y1:qe")
+	}
+	for _, tx := range []string{"x", "aa", "pn\x00\x01", strings.Repeat("x", 16)} {
+		parsed, ok = ParseKRPCMessage(makePing(tx))
+		if !ok || parsed.Type != KRPCQuery || parsed.TransactionID != tx {
+			t.Errorf("query with %d-byte transaction ID = %#v, %v", len(tx), parsed, ok)
+		}
+	}
 
 	for _, malformed := range []string{
 		"d1:y1:qe", // broad dictionary prefix without KRPC fields
 		"d1:ad2:id19:short e1:q4:ping1:t2:aa1:y1:qe",
-		"d1:ad2:id20:01234567890123456789e1:q4:ping1:t1:a1:y1:qe",           // wrong tx length
+		string(makePing("")),
+		string(makePing(strings.Repeat("x", 17))),
 		"d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:q",           // truncated
 		"d1:ad2:id20:01234567890123456789e1:q4:ping1:q4:ping1:t2:aa1:y1:qe", // duplicate key
 		"d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qeX",         // trailing bytes
@@ -203,14 +215,22 @@ func TestClassifyClientUDPRequestNamesWhatMatched(t *testing.T) {
 	binary.BigEndian.PutUint64(connect[:8], udpTrackerConnectionMagic)
 	syn := make([]byte, 20)
 	syn[0] = byte(UTPSyn<<4) | 1
+	binary.BigEndian.PutUint32(syn[4:8], 1)       // timestamp_microseconds
+	binary.BigEndian.PutUint32(syn[12:16], 1<<20) // wnd_size
+	libutpSyn := make([]byte, 30)
+	libutpSyn[0], libutpSyn[1] = byte(UTPSyn<<4)|1, 2 // extension bits
+	binary.BigEndian.PutUint32(libutpSyn[4:8], 1)
+	binary.BigEndian.PutUint32(libutpSyn[12:16], 1<<20)
+	libutpSyn[20], libutpSyn[21] = 0, 8 // one 8-byte extension record, then no extension
 	for name, want := range map[string]struct {
 		packet   []byte
 		protocol Protocol
 		evidence Evidence
 	}{
-		"connect": {connect, ProtocolBitTorrentTracker, EvidenceTrackerConnect},
-		"DHT":     {[]byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), ProtocolBitTorrentDHT, EvidenceDHTQuery},
-		"uTP SYN": {syn, ProtocolBitTorrentUTP, EvidenceUTPSyn},
+		"connect":            {connect, ProtocolBitTorrentTracker, EvidenceTrackerConnect},
+		"DHT":                {[]byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), ProtocolBitTorrentDHT, EvidenceDHTQuery},
+		"libtorrent uTP SYN": {syn, ProtocolBitTorrentUTP, EvidenceUTPSyn},
+		"libutp uTP SYN":     {libutpSyn, ProtocolBitTorrentUTP, EvidenceUTPSyn},
 	} {
 		for _, port := range []uint16{0, 6881, 6969, 80, 443} {
 			protocol, evidence, ok := ClassifyClientUDPRequest(want.packet, port)
@@ -265,7 +285,7 @@ func TestDNSIsNeverClassifiedAsATorrent(t *testing.T) {
 	if header, ok := ParseUTPHeader(syn); !ok || header.Type != UTPSyn || header.TimestampDiff != 0 {
 		t.Fatalf("the test query no longer reads as a uTP SYN: %#v, %v", header, ok)
 	}
-	// The announce shape is no evidence on any port. The SYN shape is, so the DNS ports are what keep it out.
+	// The announce shape is no evidence, and this 0x41xx query also has a non-zero ack_nr when read as uTP.
 	for _, port := range []uint16{0, 53, 5353, 6881} {
 		if protocol, evidence, ok := ClassifyClientUDPRequest(dns, port); ok {
 			t.Errorf("EDNS query to port %d was classified: %q, %q", port, protocol, evidence)
@@ -274,7 +294,7 @@ func TestDNSIsNeverClassifiedAsATorrent(t *testing.T) {
 	if protocol, ok := DetectClientUDPRequest(dns); ok {
 		t.Errorf("EDNS query was detected without a port: %q", protocol)
 	}
-	for _, port := range []uint16{53, 5353} {
+	for _, port := range []uint16{53, 5353, 853, 5355, 6881, 0} {
 		if protocol, evidence, ok := ClassifyClientUDPRequest(syn, port); ok {
 			t.Errorf("query with ID 0x41xx to port %d was classified: %q, %q", port, protocol, evidence)
 		}
@@ -298,7 +318,7 @@ func TestDetectClientUDPRequestRequiresOutboundSignatures(t *testing.T) {
 	response := []byte("d1:rd2:id20:01234567890123456789e1:t2:aa1:y1:re")
 	state := make([]byte, 20)
 	state[0] = byte(UTPState<<4) | 1
-	// A SYN as libutp sends it: a timestamp and a window, nothing received yet (timestamp_difference 0), ack_nr 0.
+	// A no-extension client SYN: timestamp and window set, nothing received yet, ack_nr 0.
 	syn := make([]byte, 20)
 	syn[0] = byte(UTPSyn<<4) | 1
 	binary.BigEndian.PutUint16(syn[2:4], 0x5a5a)

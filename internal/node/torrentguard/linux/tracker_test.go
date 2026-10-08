@@ -329,6 +329,9 @@ func trackerConnectRequest() []byte {
 func utpPacket(packetType torrentguard.UTPType) []byte {
 	packet := make([]byte, 20)
 	packet[0] = byte(packetType<<4) | 1
+	if packetType == torrentguard.UTPSyn {
+		binary.BigEndian.PutUint32(packet[4:8], 1) // A client SYN carries its send timestamp.
+	}
 	return packet
 }
 

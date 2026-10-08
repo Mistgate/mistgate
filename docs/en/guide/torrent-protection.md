@@ -21,9 +21,11 @@ Only plaintext BitTorrent, and only by a validated protocol structure. Ports are
 | `bittorrent_tcp` | The BitTorrent handshake at the start of a TCP stream. |
 | `bittorrent_dht` | A DHT query (a bencoded KRPC query). |
 | `bittorrent_tracker` | The connect request of a UDP tracker: 16 bytes with the protocol's fixed 64-bit magic number. |
-| `bittorrent_utp` | The start of a uTP connection: a standalone SYN with a zero timestamp difference. |
+| `bittorrent_utp` | A standalone uTP SYN with no acknowledged packet and one of the two client header shapes. |
 
 A tracker is recognized by its connect handshake only. Announce and scrape requests have no fixed marker, so their layout alone is not evidence, and a real client always connects first, which is blocked. DNS is never inspected: datagrams to ports 53 and 5353 are left alone, because a DNS query is arbitrary-looking bytes that can match a BitTorrent layout by chance.
+
+Transmission DHT queries use a four-byte transaction ID; the detector accepts that alongside the two-byte IDs used by other clients.
 
 Only what the user's client sends is classified, never what comes back from the internet. A remote peer cannot get a user blocked or reported with a crafted packet, and ordinary DHT replies, uTP data packets or QUIC traffic do not count.
 
@@ -52,9 +54,9 @@ The protection lowers the number of complaints; it does not guarantee that none 
 
 ## Events
 
-Each blocked attempt is a `torrent_attempt` warning in the node's **Events**, for example "Possible BitTorrent attempt by Alice" with "protocol: tcp / bittorrent_tcp". It names the profile, the transport (`tcp` or `udp`) and the BitTorrent protocol. It names the user only when the node can tell reliably: on Hysteria2 the user who signed in, on AmneziaWG the device whose tunnel address belongs to exactly one user of that profile. Otherwise it says "an unknown user".
+Every detected flow is still blocked. Strong matches (`tracker_connect`, `dht_query` and `tcp_handshake`) are reported at once as a `torrent_attempt` warning in the node's **Events**. A uTP SYN is weak evidence: one SYN never names a person. The agent reports it only after at least five detections to at least three destination ports for the same user and profile within 10 minutes. The five-minute event limit then applies.
 
-Each event also says what the node matched (`evidence`) and the destination port (`dst_port`), so you can tell a real torrent from a false alarm. The node sends one event per user and profile in five minutes at most, so a busy client is not a flood.
+An event names the profile, transport (`tcp` or `udp`) and BitTorrent protocol. It names the user only when the node can tell reliably: on Hysteria2 the user who signed in, on AmneziaWG the device whose tunnel address belongs to exactly one user of that profile. Otherwise it says "an unknown user". Each event also says what the node matched (`evidence`) and the destination port (`dst_port`).
 
 | `evidence` | What the node matched |
 |:--|:--|
@@ -71,6 +73,6 @@ A person who tries torrents gets one **Torrent attempts** alert on the **People*
 
 The alert is one per person, whatever the number of nodes. It stays open while attempts continue and closes after a day without any. Telegram tells it once when it opens, so a person gets at most one message a day; a continuing stream of attempts does not repeat it, and the close is silent. A person who is back after a quiet day is a new alert and a new message. The alert does not count in the alert badge. You can mute it like any other.
 
-Attempts the node cannot attribute to a user (an "unknown user" event) raise no alert in this version, and neither do users who are disabled or deleted.
+Attempts the node cannot attribute to a user (an "unknown user" event) raise no alert in this version, and neither do users who are disabled or deleted. Events from older agents without `evidence` stay in the node's **Events** but do not raise a people alert.
 
 If the AmneziaWG part cannot start on a node, for example because the kernel has no netfilter queue support, the node shows a `torrent_guard_degraded` warning event with the reason. AmneziaWG traffic on that node then passes uninspected; the Hysteria2 part works on its own.
