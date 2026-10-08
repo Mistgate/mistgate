@@ -42,7 +42,7 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 				case signalWithin(user.SubscriptionFetchAt, now, userAccessEndedFetchWindow):
 					add(cond{key: alertKey, severity: sevWarning,
 						why:    "health.alert.access_ended.why." + variant,
-						params: map[string]string{"user_name": user.Name, "since": strconv.FormatInt(user.AccessEndedAt.Unix(), 10)}})
+						params: map[string]string{"user_name": user.Name, "user_id": user.ID, "since": strconv.FormatInt(user.AccessEndedAt.Unix(), 10)}})
 				case activeKeys[alertKey] && signalWithin(user.SubscriptionFetchAt, now, userAccessEndedHoldWindow):
 					d.holdKeys[alertKey] = true
 				}
@@ -61,7 +61,7 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 			subject := user.ID
 			add(cond{key: key{kUserConnection, "", subject},
 				severity: sevInfo, why: "health.alert.user_connection.why.silent",
-				params: map[string]string{"user_name": user.Name}})
+				params: map[string]string{"user_name": user.Name, "user_id": user.ID}})
 		}
 	}
 
@@ -71,7 +71,7 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 			if age >= userNeverConnectedMinAge && age < userConnectionMaxAge {
 				add(cond{key: key{kUserConnection, "", device.DeviceID}, severity: sevInfo,
 					why:    "health.alert.user_connection.why.never_connected",
-					params: map[string]string{"user_name": device.UserName}})
+					params: map[string]string{"user_name": device.UserName, "user_id": device.UserID}})
 			}
 		}
 		// Only a key in recent use: a device abandoned for weeks says nothing about a broken connection.
@@ -80,7 +80,7 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 			device.ConfigEpoch < device.CriticalEpoch {
 			add(cond{key: key{kUserConnection, "", device.DeviceID}, severity: sevInfo,
 				why:    "health.alert.user_connection.why.stale_key",
-				params: map[string]string{"user_name": device.UserName}})
+				params: map[string]string{"user_name": device.UserName, "user_id": device.UserID}})
 		}
 	}
 

@@ -270,8 +270,9 @@ export type OverviewResponse = Message<"mistgate.admin.v1.OverviewResponse"> & {
 
   /**
    * Health badge (sidebar count, mobile dot): active alerts that are not muted and not INFO, and how many of
-   * them are CRITICAL. Same numbers HealthService.ListAlerts would give; here so the 10 s Overview poll feeds
-   * the badge without a second call.
+   * them are CRITICAL. The alerts about people (ACCESS_ENDED, USER_CONNECTION) are not counted: they are not
+   * problems of the fleet and have their own list. Here so the 10 s Overview poll feeds the badge without a
+   * second call.
    *
    * @generated from field: uint32 alerts_active = 10;
    */

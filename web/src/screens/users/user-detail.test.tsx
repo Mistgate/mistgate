@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
+import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { UserScreen } from "./user-detail";
 
@@ -13,8 +14,10 @@ const setUsersEnabled = vi.fn();
 const getUserDnsChoices = vi.fn();
 const resetUserDnsChoices = vi.fn();
 const me = vi.fn();
+const listAlerts = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
+  health: { listAlerts: (...a: unknown[]) => listAlerts(...a) },
   users: { getUser: (...a: unknown[]) => getUser(...a), updateUser: (...a: unknown[]) => updateUser(...a), setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a) },
   groups: {
     listGroups: () =>
@@ -69,7 +72,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts]) m.mockReset();
 });
 
 const user = {
@@ -110,12 +113,19 @@ const detail = {
   nodeAccess: [{ nodeId: "nod_1", nodeName: "de1", countryCode: "DE", location: "", provider: "", protocols: ["hysteria2", "awg"], nodeProtocols: ["hysteria2", "awg"], selected: true }],
 };
 
+const NOW = 1_800_000_000;
+const alert = (over: object) => ({
+  id: "alt_1", severity: AlertSeverity.WARNING, kind: AlertKind.ACCESS_ENDED, nodeId: "", nodeName: "", subject: "usr_1", titleKey: "health.alert.access_ended.title",
+  params: { user_name: "Marina", user_id: "usr_1", since: String(NOW - 86_400) }, whyKey: "health.alert.access_ended.why.expired",
+  firstSeenUnix: NOW - 7200, openedUnix: NOW - 3600, lastSeenUnix: NOW, resolvedAtUnix: 0, resolution: "", mutedUntilUnix: 0, actions: ["open_user", "mute"], ...over,
+});
 const choice = (nodeName: string, presetName: string, over: object = {}) => ({
   nodeId: `nod_${nodeName}`, nodeName, presetId: `dns_${presetName}`, presetName, offered: true, effectivePresetId: `dns_${presetName}`, effectivePresetName: presetName, updatedUnix: 0n, ...over,
 });
 
-async function mount(role = 1, choices: object[] = []) {
+async function mount(role = 1, choices: object[] = [], alerts: object[] = []) {
   me.mockResolvedValue({ admin: { id: "adm_1", role } });
+  listAlerts.mockResolvedValue({ nowUnix: NOW, active: alerts, history: [] });
   getUserDnsChoices.mockResolvedValue({ choices });
   resetUserDnsChoices.mockResolvedValue({ removed: choices.length });
   getUser.mockResolvedValue(detail);
@@ -143,6 +153,36 @@ const click = (b: Element | undefined | null) => act(async () => void b?.dispatc
 const anchor = (label: string) => [...document.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === label);
 
 describe("the user card", () => {
+  it("shows the open alerts about this person in a Connection block: title, explanation, since when", async () => {
+    await mount(
+      1,
+      [],
+      [
+        alert({}),
+        alert({ id: "alt_2", severity: AlertSeverity.INFO, kind: AlertKind.USER_CONNECTION, subject: "dev_k", titleKey: "health.alert.user_connection.title", whyKey: "health.alert.user_connection.why.stale_key", params: { user_name: "Marina", user_id: "usr_1" } }),
+        alert({ id: "alt_3", subject: "usr_2", params: { user_name: "Other", user_id: "usr_2" } }), // somebody else
+        alert({ id: "alt_4", kind: AlertKind.USERS_IMPACTED, nodeId: "nod_1", nodeName: "de1", subject: "hysteria2", params: {}, titleKey: "health.alert.users_impacted.title", whyKey: "" }), // a node
+      ],
+    );
+    const list = [...document.querySelectorAll("ul")].find((ul) => ul.textContent?.includes("Access ended"));
+    expect(list).toBeTruthy();
+    expect(list!.querySelectorAll("li")).toHaveLength(2);
+    expect(list!.textContent).toContain("Access ended, but the person keeps trying");
+    expect(list!.textContent).toContain("Marina’s subscription ended on");
+    expect(list!.textContent).toContain("for 1 h"); // from the start of the episode
+    expect(list!.textContent).toContain("Someone may not be able to connect");
+    expect(list!.textContent).toContain("AmneziaWG key is older than the last profile change");
+    expect(text()).toContain("Connection");
+    expect(text()).not.toContain("Other");
+    expect(text()).not.toContain("Connections dropped");
+  });
+
+  it("shows no Connection block when this person has no such alert", async () => {
+    await mount(1, [], [alert({ id: "alt_3", subject: "usr_2", params: { user_name: "Other", user_id: "usr_2" } })]);
+    expect(text()).not.toContain("Connection");
+    expect(text()).not.toContain("Access ended, but the person keeps trying");
+  });
+
   it("saves a separate public name while the account name stays unchanged", async () => {
     await mount();
     const field = document.querySelector<HTMLInputElement>('input[aria-label="Name shown on the subscription page"]')!;

@@ -11,7 +11,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Icon, IconChip } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
-import { StatusDot } from "@/components/ui/status";
+import { StatusDot, kindTextClass } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
@@ -19,7 +19,8 @@ import { dns, users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
-import { useCan } from "@/lib/health";
+import { useT } from "@/i18n";
+import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
 import { plain } from "@/lib/plain";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DAY, GB, agoText, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
@@ -217,6 +218,7 @@ function UserDetail({ data }: { data: DetailN }) {
 
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
+          <ConnectionPanel userId={user.id} />
           <TrafficPanel data={data} fmt={fmt} />
           <DevicesPanel
             user={user}
@@ -393,6 +395,44 @@ function DnsChoicesPanel({ user, actions }: { user: User; actions: Actions }) {
         </div>
       )}
       <ConfirmModal open={open} onOpenChange={setOpen} title={t("subs.dnsChoice.resetT")} description={t("subs.dnsChoice.resetBody", { name: user.name })} confirmLabel={t("subs.dnsChoice.reset")} danger onConfirm={reset} />
+    </Panel>
+  );
+}
+
+// ---- connection (the alerts the panel derives about this person) ----
+
+/**
+ * "Connection": the open ACCESS_ENDED and USER_CONNECTION alerts of this person, from the same query as Health (no new
+ * call): what the panel sees, why, and since when. Nothing open, nothing shown (also while the alerts load or fail).
+ */
+export function ConnectionPanel({ userId }: { userId: string }) {
+  const t = useT();
+  const fmt = useFmt();
+  const q = useQuery(alertsQuery);
+  const rows = (q.data?.active ?? []).filter((a) => alertIsAbout(a, userId)).sort((a, b) => b.severity - a.severity);
+  if (rows.length === 0) return null;
+  const now = q.data?.nowUnix ?? nowSec();
+  return (
+    <Panel title={t("users.connection")} icon="pulse" tone="rose">
+      <ul className="flex flex-col">
+        {rows.map((a) => {
+          const kind = severityKind(a.severity);
+          const why = alertWhy(t, fmt, a);
+          return (
+            <li key={a.id} className="flex flex-col gap-1 border-t border-line py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <span className={cx("flex items-center gap-[7px] text-xs font-bold", kindTextClass[kind])}>
+                  <StatusDot kind={kind} />
+                  {t(severityWord(a.severity))}
+                </span>
+                <span className="min-w-40 flex-1 text-[13px] font-bold">{alertTitle(t, a)}</span>
+                <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
+              </div>
+              {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
+            </li>
+          );
+        })}
+      </ul>
     </Panel>
   );
 }

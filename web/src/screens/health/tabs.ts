@@ -1,6 +1,6 @@
 import { validatePaging, type PagingSearch } from "@/lib/paging";
 
-export const healthTabs = ["alerts", "checks", "doctor"] as const;
+export const healthTabs = ["alerts", "people", "checks", "doctor"] as const;
 export type HealthTab = (typeof healthTabs)[number];
 
 /** Search-param validation of /health: a known tab other than the first, and the page of the alert history, stay in the URL. */

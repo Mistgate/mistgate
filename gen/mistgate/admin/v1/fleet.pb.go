@@ -522,8 +522,9 @@ type OverviewResponse struct {
 	// Top 5 by current download speed.
 	TopConsumers []*TopConsumer `protobuf:"bytes,9,rep,name=top_consumers,json=topConsumers,proto3" json:"top_consumers,omitempty"`
 	// Health badge (sidebar count, mobile dot): active alerts that are not muted and not INFO, and how many of
-	// them are CRITICAL. Same numbers HealthService.ListAlerts would give; here so the 10 s Overview poll feeds
-	// the badge without a second call.
+	// them are CRITICAL. The alerts about people (ACCESS_ENDED, USER_CONNECTION) are not counted: they are not
+	// problems of the fleet and have their own list. Here so the 10 s Overview poll feeds the badge without a
+	// second call.
 	AlertsActive   uint32 `protobuf:"varint,10,opt,name=alerts_active,json=alertsActive,proto3" json:"alerts_active,omitempty"`
 	AlertsCritical uint32 `protobuf:"varint,11,opt,name=alerts_critical,json=alertsCritical,proto3" json:"alerts_critical,omitempty"`
 	unknownFields  protoimpl.UnknownFields

@@ -187,6 +187,15 @@ func TestUserAlertsOpenHoldRefreshAndResolve(t *testing.T) {
 			t.Errorf("user connection alert for %s: %+v", subject, got)
 		}
 	}
+	// every alert about a person carries the user id, so the admin can open the user from a device alert
+	for k, userID := range map[string]string{
+		"access_ended//" + expired: expired, "access_ended//" + quota: quota,
+		"user_connection//dev_never": never, "user_connection//dev_stale": stale, "user_connection//" + silent: silent,
+	} {
+		if got := active[k].Params["user_id"]; got != userID {
+			t.Errorf("%s: params.user_id = %q, want %q", k, got, userID)
+		}
+	}
 	firstSeen := map[string]time.Time{}
 	for k, alert := range active {
 		firstSeen[k] = alert.LastSeen

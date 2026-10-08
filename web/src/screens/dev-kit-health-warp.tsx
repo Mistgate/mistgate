@@ -5,13 +5,15 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus, WarpSource, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
-import { doctorQuery, type Alert } from "@/lib/health";
+import { alertsQuery, doctorQuery, type Alert } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { AlertsTab } from "@/screens/health/alerts";
 import { DoctorTab } from "@/screens/health/doctor";
 import { useFixFlow } from "@/screens/health/fix";
+import { PeopleTab } from "@/screens/health/people";
+import { ConnectionPanel } from "@/screens/users/user-detail";
 import { NodeDoctorTab } from "@/screens/node/doctor";
 import { SettingsTab } from "@/screens/node/settings";
 import { WarpCard } from "@/screens/node/warp";
@@ -226,11 +228,84 @@ const historyAlerts: Alert[] = [
   alert({ id: "h2", params: { profile: "hy2 · WARP · 8443" }, resolvedAtUnix: NOW - 5 * h, resolution: "superseded", firstSeenUnix: NOW - 6 * h }),
 ];
 
+// alerts about people: every kind and variant, with the node alerts above mixed in to show they stay out of People
+const personAlert = (over: Partial<Alert>): Alert =>
+  alert({ nodeId: "", nodeName: "", titleKey: "health.alert.user_connection.title", actions: ["open_user", "mute"], ...over });
+const peopleAlerts: Alert[] = [
+  personAlert({
+    id: "p1",
+    kind: AlertKind.ACCESS_ENDED,
+    subject: "usr_masha",
+    titleKey: "health.alert.access_ended.title",
+    whyKey: "health.alert.access_ended.why.expired",
+    params: { user_name: "Masha", user_id: "usr_masha", since: String(NOW - 3 * 24 * h) },
+    firstSeenUnix: NOW - 5 * h,
+  }),
+  personAlert({
+    id: "p2",
+    kind: AlertKind.ACCESS_ENDED,
+    subject: "usr_dima",
+    titleKey: "health.alert.access_ended.title",
+    whyKey: "health.alert.access_ended.why.quota",
+    params: { user_name: "Dima", user_id: "usr_dima", since: String(NOW - 26 * h) },
+    firstSeenUnix: NOW - 2 * h,
+    mutedUntilUnix: NOW + 3 * h,
+  }),
+  personAlert({
+    id: "p3",
+    severity: AlertSeverity.INFO,
+    kind: AlertKind.USER_CONNECTION,
+    subject: "dev_never",
+    whyKey: "health.alert.user_connection.why.never_connected",
+    params: { user_name: "Oleg", user_id: "usr_oleg" },
+    firstSeenUnix: NOW - 20 * h,
+  }),
+  personAlert({
+    id: "p4",
+    severity: AlertSeverity.INFO,
+    kind: AlertKind.USER_CONNECTION,
+    subject: "dev_stale",
+    whyKey: "health.alert.user_connection.why.stale_key",
+    params: { user_name: "Anya", user_id: "usr_anya" },
+    firstSeenUnix: NOW - 3 * h,
+  }),
+  personAlert({
+    id: "p5",
+    severity: AlertSeverity.INFO,
+    kind: AlertKind.USER_CONNECTION,
+    subject: "usr_ivan",
+    whyKey: "health.alert.user_connection.why.silent",
+    params: { user_name: "Ivan", user_id: "usr_ivan" },
+    firstSeenUnix: NOW - 30 * h,
+  }),
+];
+// the node alert of people ("Connections dropped on the node") is about the node: it stays with the node alerts
+const usersImpacted = alert({
+  id: "a7",
+  kind: AlertKind.USERS_IMPACTED,
+  nodeId: "nod_de1",
+  nodeName: "de1",
+  subject: "hysteria2",
+  titleKey: "health.alert.users_impacted.title",
+  whyKey: "health.alert.users_impacted.why.gone",
+  params: { now: "0", usual: "6", users: "6" },
+});
+
 function Alerts() {
   const flow = useFixFlow();
   return (
     <>
-      <AlertsTab active={activeAlerts} history={historyAlerts} now={NOW} flow={flow} />
+      <AlertsTab active={[...activeAlerts, usersImpacted, ...peopleAlerts]} history={historyAlerts} now={NOW} flow={flow} />
+      {flow.modal}
+    </>
+  );
+}
+
+function People({ active = [...peopleAlerts, ...activeAlerts] }: { active?: Alert[] }) {
+  const flow = useFixFlow();
+  return (
+    <>
+      <PeopleTab active={active} now={NOW} flow={flow} />
       {flow.modal}
     </>
   );
@@ -380,9 +455,30 @@ export function HealthWarpKit() {
         </Mock>
       </Shot>
 
-      <Shot id="alerts" title="Alerts: the cause and the next step, restart by name, mute ▾, accept">
+      <Shot id="alerts" title="Alerts: the cause and the next step, restart by name, mute ▾, accept (the alerts about people are in the list but not shown: they are under People)">
         <Mock fill={() => {}}>
           <Alerts />
+        </Mock>
+      </Shot>
+
+      <Shot id="people" title="Health ▸ People: access ended (expired, quota), never connected, stale key, silent app; one muted; warnings first">
+        <Mock fill={() => {}}>
+          <People />
+        </Mock>
+      </Shot>
+
+      <Shot id="people-empty" title="Health ▸ People: nothing to show">
+        <Mock fill={() => {}}>
+          <People active={activeAlerts} />
+        </Mock>
+      </Shot>
+
+      <Shot id="user-connection" title="A user's page ▸ Connection: the open alerts of this person (nothing open: no block)">
+        <Mock fill={(c) => c.setQueryData(alertsQuery.queryKey, { nowUnix: NOW, active: [...activeAlerts, ...peopleAlerts], history: [] } as never)}>
+          <div className="flex max-w-xl flex-col gap-3">
+            <ConnectionPanel userId="usr_masha" />
+            <ConnectionPanel userId="usr_nobody" />
+          </div>
         </Mock>
       </Shot>
 

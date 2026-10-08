@@ -189,7 +189,7 @@ An alert that fires again within an hour of closing reopens with its original id
 | A user may have a connection problem | `user_connection` | Info | An AWG device has never connected or has a stale key, or an active user keeps fetching a subscription despite having no recent traffic. |
 | Connections dropped for some users | `users_impacted` | Warning | After 20 minutes in the hour, the peak is at most a quarter of the seven-day median for that hour, with a baseline of at least three users. |
 
-These alerts are derived from user, device and hourly peak data the panel already stores.
+These alerts are derived from user, device and hourly peak data the panel already stores. The alerts about a person (`access_ended`, `user_connection`) are listed on the **People** tab of Health and in the **Connection** block of the user's page, not among the node alerts, and they do not count in the alert badge; `users_impacted` is about a node and stays with the node alerts.
 
 The reason under a traffic alert names the likely cause:
 

@@ -8,6 +8,7 @@ import { healthKind } from "./fleet";
 import { makeFmt } from "./format";
 import {
   alertFix,
+  alertIsAbout,
   alertTitle,
   alertWhy,
   barsOf,
@@ -21,12 +22,14 @@ import {
   hasKey,
   isIssue,
   isLoud,
+  isPeopleAlert,
   itemFix,
   itemTitle,
   itemWhy,
   lookup,
   manualSteps,
   muteChoices,
+  peopleOrder,
   resolutionWord,
   restartConsequence,
   severityKind,
@@ -399,5 +402,25 @@ describe("the server's vocabulary is covered", () => {
         for (const m of en[key as keyof typeof en].matchAll(/\{(\w+)\}/g)) expect(params, `${key}: {${m[1]}}`).toContain(m[1]);
       }
     }
+  });
+});
+
+describe("alerts about people", () => {
+  const ended = alert({ kind: AlertKind.ACCESS_ENDED, nodeId: "", subject: "usr_1", params: { user_id: "usr_1", user_name: "alice" } });
+  const device = alert({ kind: AlertKind.USER_CONNECTION, nodeId: "", severity: AlertSeverity.INFO, subject: "dev_9", params: { user_id: "usr_2", user_name: "bob" } });
+  const silent = alert({ kind: AlertKind.USER_CONNECTION, nodeId: "", severity: AlertSeverity.INFO, subject: "usr_3", params: { user_id: "usr_3" } });
+  const impacted = alert({ kind: AlertKind.USERS_IMPACTED, subject: "hysteria2" });
+
+  it("tells them from the alerts about nodes: the dropped connections of a node are a node alert", () => {
+    expect([ended, device, silent, impacted, alert()].map(isPeopleAlert)).toEqual([true, true, true, false, false]);
+  });
+  it("puts warnings before info and leaves the node alerts out", () => {
+    expect(peopleOrder([device, impacted, ended, silent]).map((a) => a.subject)).toEqual(["usr_1", "dev_9", "usr_3"]);
+  });
+  it("finds the alerts of one user by params.user_id or the user-keyed subject, never by a device id", () => {
+    expect([ended, device, silent].map((a) => alertIsAbout(a, "usr_2"))).toEqual([false, true, false]);
+    expect(alertIsAbout({ ...silent, params: {} }, "usr_3")).toBe(true);
+    expect(alertIsAbout({ ...device, params: {} }, "usr_2")).toBe(false);
+    expect(alertIsAbout(impacted, "hysteria2")).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 func req[T any](m *T) *connect.Request[T] { return connect.NewRequest(m) }
@@ -111,6 +112,27 @@ func TestNewAlertKindsUseTheirProtoNames(t *testing.T) {
 	} {
 		if got := kindProto[tc.stored]; got != tc.proto {
 			t.Errorf("kindProto[%q] = %s, want %s", tc.stored, got, tc.proto)
+		}
+	}
+}
+
+func TestUserAlertsOfferOpenUser(t *testing.T) {
+	user := map[string]string{"user_id": "usr_1", "user_name": "Masha"}
+	for _, tc := range []struct {
+		name   string
+		alert  store.HealthAlert
+		active bool
+		want   string
+	}{
+		{"access_ended", store.HealthAlert{Kind: kAccessEnded, Subject: "usr_1", Params: user}, true, "open_user,mute"},
+		{"device alert", store.HealthAlert{Kind: kUserConnection, Subject: "dev_1", Params: user}, true, "open_user,mute"},
+		{"resolved keeps the link", store.HealthAlert{Kind: kUserConnection, Subject: "dev_1", Params: user, ResolvedAt: time.Unix(5, 0)}, false, "open_user"},
+		{"node alert", store.HealthAlert{Kind: kUsersImpacted, NodeID: "n1", Subject: "hysteria2", Params: user}, true, "open_node,mute"},
+		{"no user id", store.HealthAlert{Kind: kAccessEnded, Subject: "usr_1"}, true, "mute"},
+	} {
+		m := alertMsg(tc.alert, map[string]string{"n1": "nl1"}, func(store.HealthAlert) string { return "" })
+		if got := strings.Join(m.Actions, ","); got != tc.want {
+			t.Errorf("%s: actions %q, want %q", tc.name, got, tc.want)
 		}
 	}
 }

@@ -17,7 +17,7 @@ import { cx } from "@/lib/cx";
 import { quoteNames } from "@/lib/doctor-detail";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
-import { alertFix, alertTitle, alertWhy, muteChoices, resolutionWord, restartConsequence, severityKind, severityWord, useCan, type Alert } from "@/lib/health";
+import { alertFix, alertTitle, alertWhy, isPeopleAlert, muteChoices, resolutionWord, restartConsequence, severityKind, severityWord, useCan, type Alert } from "@/lib/health";
 import { useIsPhone } from "@/lib/media";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
@@ -25,7 +25,7 @@ import { useAcceptDoctor } from "./doctor-parts";
 import { FixControl, type FixFlow } from "./fix";
 
 /** Mute for a while, or unmute; the toast offers the opposite as "Undo". */
-function useMute() {
+export function useMute() {
   const t = useT();
   const fmt = useFmt();
   const toast = useToast();
@@ -43,7 +43,7 @@ function useMute() {
       { id: a.id, seconds },
       {
         onSuccess: (res) => {
-          const node = a.nodeName || t("hl.alerts.fleetWide");
+          const node = a.nodeName || a.params.user_name || t("hl.alerts.fleetWide");
           if (seconds > 0) {
             const until = res.alert?.mutedUntilUnix || Math.floor(Date.now() / 1000) + seconds;
             toast(t("hl.alerts.mutedToast", { node, time: fmt.stamp(until) }), { undo: () => call.mutate({ id: a.id, seconds: 0 }) });
@@ -53,9 +53,12 @@ function useMute() {
     );
 }
 
-export function AlertsTab({ active, history, now, flow }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow }) {
+/** The alerts about nodes: the alerts about people (access ended, a connection that looks broken) are in the People tab, active or closed. */
+export function AlertsTab({ active: all, history: closed, now, flow }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow }) {
   const t = useT();
   const fmt = useFmt();
+  const active = all.filter((a) => !isPeopleAlert(a));
+  const history = closed.filter((a) => !isPeopleAlert(a));
   const lastClosed = history[0]?.resolvedAtUnix;
   return (
     <div className="flex flex-col gap-3.5">
@@ -99,6 +102,9 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
   const go = a.nodeId ? (a.actions.includes("open_profiles") ? "profiles" : a.actions.includes("open_warp") ? "warp" : null) : null;
   // the main action is the first one this role can take
   const goMain = !(target && can.fix) && !restart;
+  // an alert about a person: their name stands where a node's would, and the button leads to their page
+  const person = isPeopleAlert(a) ? (a.params.user_name ?? "") : "";
+  const userId = isPeopleAlert(a) && a.actions.includes("open_user") ? (a.params.user_id ?? "") : "";
 
   return (
     <article
@@ -117,6 +123,8 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
           <Link to="/nodes/$id" params={{ id: a.nodeId }} className="font-mono text-xs font-bold underline decoration-dotted underline-offset-2 hover:text-accent-text">
             {a.nodeName}
           </Link>
+        ) : person ? (
+          <b className="min-w-0 text-xs font-bold break-words">{person}</b>
         ) : (
           <Chip>{t("hl.alerts.fleetWide")}</Chip>
         )}
@@ -140,6 +148,11 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
         {go === "warp" && (
           <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "settings" }} hash="warp" className={buttonClass(goMain ? "primary" : "secondary", "md")}>
             {t("warp.open")}
+          </Link>
+        )}
+        {userId && (
+          <Link to="/users/$id" params={{ id: userId }} className={buttonClass("primary", "md")}>
+            {t("hl.alerts.openUser")}
           </Link>
         )}
         {a.kind === AlertKind.UPDATE_FAILED && (

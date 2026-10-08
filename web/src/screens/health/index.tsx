@@ -12,17 +12,18 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { problemCount, useFleetSummary } from "@/lib/fleet";
 import { useNow } from "@/lib/time";
-import { alertsQuery, checksQuery, doctorQuery, isLoud } from "@/lib/health";
+import { alertsQuery, checksQuery, doctorQuery, isLoud, isPeopleAlert } from "@/lib/health";
 import { isProblem, nodeKind, useNodeStatus } from "@/lib/node-status";
 import { overviewQuery } from "@/lib/queries";
 import { AlertsTab } from "./alerts";
 import { ChecksTab } from "./checks";
 import { DoctorTab } from "./doctor";
+import { PeopleTab } from "./people";
 import { useFixFlow } from "./fix";
 import type { HealthTab } from "./tabs";
 import { AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 
-/** Health: Alerts (what is wrong now and what was), Checks (the client's view of every profile), Doctor (host checks with fixes). */
+/** Health: Alerts (what is wrong with the nodes now and what was), People (the same for people), Checks (the client's view of every profile), Doctor (host checks with fixes). */
 export function HealthScreen() {
   const t = useT();
   const addNode = useAddNode();
@@ -40,7 +41,9 @@ export function HealthScreen() {
   const clock = useNow();
   const now = alerts.data?.nowUnix ?? Math.floor(clock / 1000);
   const active = alerts.data?.active ?? [];
-  const loudAlerts = active.filter((a) => isLoud(a, now));
+  // alerts about people are not problems of a node: they have their own tab and count, and stay out of the node count and the nodes named below
+  const loudAlerts = active.filter((a) => !isPeopleAlert(a) && isLoud(a, now));
+  const loudPeople = active.filter((a) => isPeopleAlert(a) && isLoud(a, now)).length;
   const critical = loudAlerts.filter((a) => a.severity === AlertSeverity.CRITICAL).length;
   const min = Math.max(1, Math.round((checks.data?.intervalS ?? 300) / 60));
   // the number of the header and the menu; the alerts tab counts its own rows
@@ -85,6 +88,16 @@ export function HealthScreen() {
         </>
       ),
       content: alerts.data ? <AlertsTab active={active} history={alerts.data.history} now={now} flow={flow} /> : alerts.isError ? failed(alerts) : loading,
+    },
+    {
+      value: "people",
+      label: (
+        <>
+          {t("hl.tab.people")}
+          {loudPeople > 0 && <TabCount n={loudPeople} danger={false} />}
+        </>
+      ),
+      content: alerts.data ? <PeopleTab active={active} now={now} flow={flow} /> : alerts.isError ? failed(alerts) : loading,
     },
     {
       value: "checks",

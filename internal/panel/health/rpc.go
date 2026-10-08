@@ -74,6 +74,9 @@ func alertMsg(a store.HealthAlert, names map[string]string, fixable func(store.H
 	if a.NodeID != "" {
 		m.Actions = append(m.Actions, "open_node")
 	}
+	if (a.Kind == kAccessEnded || a.Kind == kUserConnection) && a.Params["user_id"] != "" {
+		m.Actions = append(m.Actions, "open_user")
+	}
 	if active {
 		if a.Kind == kDoctorWarn {
 			m.Actions = append(m.Actions, "accept")

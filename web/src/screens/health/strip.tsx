@@ -10,7 +10,7 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { useNow } from "@/lib/time";
 import { countNodes, healthKind, problemCount } from "@/lib/fleet";
-import { alertsQuery, alertTitle, isLoud, type Alert } from "@/lib/health";
+import { alertsQuery, alertTitle, isLoud, isPeopleAlert, type Alert } from "@/lib/health";
 import { isProblem, nodeKind, statusLine } from "@/lib/node-status";
 import type { Plain } from "@/lib/plain";
 
@@ -134,7 +134,8 @@ export function HealthStrip({
   const q = useQuery({ ...alertsQuery, enabled: alertCount > 0 });
   const nowMs = useNow();
   const now = q.data?.nowUnix ?? Math.floor(nowMs / 1000);
-  const alerts = (q.data?.active ?? []).filter((a) => isLoud(a, now));
+  // the strip names nodes: an alert about a person is not one of them (and the server leaves it out of alertCount)
+  const alerts = (q.data?.active ?? []).filter((a) => !isPeopleAlert(a) && isLoud(a, now));
   const v = stripView(t, fmt.clock, { cards, usersOnline, alertCount, criticalCount, alerts, now: nowMs });
   if (onboarding && countNodes(cards).connected === 0 && alertCount === 0) return null;
   if (onboarding && (v.target?.action === "newCommand" || v.target?.action === "profiles")) v.target = null;

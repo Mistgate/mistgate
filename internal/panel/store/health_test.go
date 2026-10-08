@@ -74,6 +74,13 @@ func TestAlertLifecycleInStore(t *testing.T) {
 	if n, crit, _ := s.AlertCounts(ctx, t0.Add(3*time.Hour)); n != 1 || crit != 1 {
 		t.Fatalf("counts after the mute ended: %d %d", n, crit)
 	}
+	// a warning about a person is not a problem of the fleet: the badge leaves it out
+	if _, _, err := s.OpenAlert(ctx, HealthAlert{Kind: "access_ended", Severity: 2, Subject: "usr_1", TitleKey: "t", WhyKey: "w"}, time.Hour, t0.Add(3*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if n, crit, _ := s.AlertCounts(ctx, t0.Add(3*time.Hour)); n != 1 || crit != 1 {
+		t.Fatalf("alerts about people counted: %d %d", n, crit)
+	}
 	// after more than an hour a new row is made
 	if _, err := s.ResolveAlert(ctx, again.ID, "cleared", t0.Add(40*time.Minute)); err != nil {
 		t.Fatal(err)

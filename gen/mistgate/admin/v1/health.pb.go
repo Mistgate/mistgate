@@ -340,7 +340,8 @@ type Alert struct {
 	// doctor result still carries that fix_id and the agent is connected), "restart_inbound" (NodeService.RestartInbounds
 	// of the alert's inbound, params.inbound; params.online = its open sessions now), "restart_inbounds" (every profile
 	// of the node), "open_profiles" (the node's Profiles tab: a port or a certificate to change there), "open_warp" (the
-	// node's WARP card), "open_node" (go to the node page), "accept" (a doctor warning: AcceptDoctorItem), "mute".
+	// node's WARP card), "open_node" (go to the node page), "open_user" (go to the user page, params.user_id; only
+	// ACCESS_ENDED and USER_CONNECTION), "accept" (a doctor warning: AcceptDoctorItem), "mute".
 	// Unknown entries are ignored by the SPA.
 	Actions []string `protobuf:"bytes,15,rep,name=actions,proto3" json:"actions,omitempty"`
 	// Start of the current episode: equals first_seen_unix until the alert is re-opened (see id), then the time of the

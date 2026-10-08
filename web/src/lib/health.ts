@@ -183,6 +183,19 @@ export const resolutionWord = (r: string): MessageKey => {
   return hasKey(k) ? k : "hl.res.unknown";
 };
 
+/**
+ * An alert about a person (the panel derives it from its own database), not about a node: it has its own list (Health ▸
+ * People) and the user's page, and stays out of the node alerts, their counts and the strip. USERS_IMPACTED is about a
+ * node and is not one of these.
+ */
+export const isPeopleAlert = (a: Pick<Alert, "kind">) => a.kind === AlertKind.ACCESS_ENDED || a.kind === AlertKind.USER_CONNECTION;
+
+/** Whether an alert about a person is about this user: params.user_id, or the subject for the alerts keyed by user (a device alert's subject is the device). */
+export const alertIsAbout = (a: Alert, userId: string) => isPeopleAlert(a) && (a.params.user_id === userId || a.subject === userId);
+
+/** Warnings first, then info; each group keeps the server's order (newest first). */
+export const peopleOrder = (alerts: readonly Alert[]): Alert[] => alerts.filter(isPeopleAlert).sort((a, b) => b.severity - a.severity);
+
 /** Alerts that count for the badge and the strip: not muted, not info. */
 export function isLoud(a: Alert, now: number): boolean {
   return a.severity >= AlertSeverity.WARNING && a.mutedUntilUnix <= now;
