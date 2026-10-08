@@ -9,7 +9,7 @@ import { StatusPill, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
-import { InboundState, type Inbound } from "@/gen/mistgate/admin/v1/common_pb";
+import { InboundState, NodeStatus, type Inbound } from "@/gen/mistgate/admin/v1/common_pb";
 import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
@@ -21,6 +21,7 @@ import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { doctorQuery } from "@/lib/health";
 import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
+import { portNotes, withNotes } from "@/lib/port-check";
 import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
 import { useNow } from "@/lib/time";
@@ -28,6 +29,8 @@ import { profileListQuery } from "@/screens/users/rpc";
 import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { LossyNotice, lossyRefusal } from "./port-lossy";
+import { UdpPorts } from "./udp-ports";
 
 export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }> = {
   [InboundState.UNSPECIFIED]: { kind: "off", word: "node.inbound.off" },
@@ -218,6 +221,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         );
       })}
 
+      {/* the UDP delivery check of the ports above: with profiles on the node, or results from before */}
+      {node.status !== NodeStatus.RETIRED && (data.inbounds.length > 0 || (data.portChecks?.length ?? 0) > 0) && <UdpPorts data={data} />}
+
       <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />
       {editing && (
         <EditInbound key={editing.inbound.id} inbound={editing.inbound} focus={editing.focus} nodeId={node.id} nodeAddress={node.address} onClose={() => setEditing(null)} />
@@ -256,21 +262,26 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
 
   const save = useMutation({
     // only what was touched goes out: an untouched field keeps whatever the server has (profile default or override)
-    mutationFn: () =>
+    mutationFn: (allowLossy: boolean) =>
       profilesApi.updateInbound({
         inboundId: inbound.id,
         portOverride: touched.port ? (port ? Number(port) : 0) : undefined,
         tlsServerNameOverride: touched.sni ? sni.trim() : undefined,
         enabled: touched.enabled ? enabled : undefined,
+        ...(allowLossy && { allowLossyPort: true }),
       }),
-    onSuccess: () => {
+    onSuccess: (r) => {
       onClose();
-      toast(t("common.saved"));
+      // the UDP check could not run (port_unchecked), or the port loses packets and was kept (port_lossy)
+      const notes = portNotes(t, r?.warnings);
+      toast(withNotes(t("common.saved"), notes), notes.length > 0 ? { ms: 8000 } : undefined);
       refresh();
     },
   });
 
   const refused = check.state === "refused" ? check : null;
+  // the stored checks (before the click) or the real run (the click) found the port losing packets
+  const lossy = refused?.code === "port_lossy" ? refused.vars : lossyRefusal(save.error);
   const fieldError = (codes: string[]) => (refused && codes.includes(refused.code) ? t(`err.${refused.code}`, refused.vars) : undefined);
   const portError = !portOk(port) ? t("node.profiles.portError") : fieldError(["port_taken", "port_in_hop", "hop_taken"]);
   const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain"]);
@@ -281,14 +292,17 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (dirty && portOk(port) && !refused) save.mutate();
+          if (dirty && portOk(port) && !refused) save.mutate(false);
         }}
         className="flex flex-col gap-3.5"
       >
         <TextField
           label={t("node.profiles.portOverride")}
           value={port}
-          onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          onChange={(e) => {
+            setPort(e.target.value.replace(/\D/g, "").slice(0, 5));
+            save.reset();
+          }}
           inputMode="numeric"
           autoFocus={focus === "port"}
           placeholder={effective?.port && !port ? t("node.profiles.portFrom", { port: effective.port }) : t("node.profiles.fromProfile")}
@@ -308,6 +322,18 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
               {t("node.check.port.take", { port: refused.vars.free! })}
             </Button>
           </div>
+        )}
+        {lossy && (
+          <LossyNotice
+            vars={lossy}
+            busy={save.isPending}
+            anywayLabel={t("ports.anyway.save")}
+            onTake={(p) => {
+              setPort(String(p));
+              save.reset();
+            }}
+            onAnyway={() => save.mutate(true)}
+          />
         )}
         {!isAwg && (
           <TextField
@@ -332,7 +358,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </label>
         <WarpWarnings check={check} nodeId={nodeId} onLeave={onClose} />
-        {save.isError && (
+        {save.isError && !lossyRefusal(save.error) && (
           <Notice tone="danger" className="items-start">
             {errorText(save.error, t)}
           </Notice>
@@ -342,7 +368,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             {t("common.cancel")}
           </Button>
           <Button type="submit" variant="primary" size="md" disabled={!dirty || !portOk(port) || !!refused || save.isPending}>
-            {t("common.save")}
+            {save.isPending && touched.port && port ? t("ports.saving", { port }) : t("common.save")}
           </Button>
         </div>
       </form>

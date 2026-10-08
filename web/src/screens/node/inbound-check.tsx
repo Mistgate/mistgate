@@ -14,8 +14,8 @@ import { plain, type Plain } from "@/lib/plain";
 // field it is about, or the inbound as it would be (its real port and domain, for the placeholders), warnings and a port
 // that is free on the node.
 
-/** The refusals that stop the button: the real call would refuse the same way. */
-export const refusals = ["acme_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired"] as const;
+/** The refusals that stop the button: the real call would refuse the same way (port_lossy: from the stored UDP checks, never a run). */
+export const refusals = ["acme_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired", "port_lossy"] as const;
 export type Refusal = (typeof refusals)[number];
 
 export type InboundCheck =

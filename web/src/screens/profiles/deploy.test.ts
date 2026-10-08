@@ -27,6 +27,20 @@ describe("reading a node's refusal", () => {
     expect(refusalOf(err("port override lies inside the hop range"), t, fi1).kind).toBe("port");
   });
 
+  it("knows a port that loses UDP packets, with the clean port the same run proved", () => {
+    const at = Math.floor(Date.now() / 1000) - 120;
+    expect(refusalOf(err(`port_lossy: port=8443&node=fi1&sent=300&got=189&at=${at}&sender=de2&free=2053`, Code.FailedPrecondition), t, fi1)).toEqual({
+      kind: "port",
+      free: "2053",
+      lossy: "8443",
+      text: "Port 8443 loses 37 % of UDP packets on fi1 (checked from de2, 2 min ago). Port 2053 is clean.",
+    });
+    // no clean port found (free=0): nothing to offer, the port can still be kept
+    const none = refusalOf(err(`port_lossy: port=8443&node=fi1&sent=300&got=189&at=${at}&sender=panel&free=0`, Code.FailedPrecondition), t, fi1);
+    expect(none).toMatchObject({ kind: "port", free: undefined, lossy: "8443" });
+    expect(none.text).toContain("checked from the panel");
+  });
+
   it("knows that Let's Encrypt needs a domain, coded or as the plugin says it", () => {
     const coded = refusalOf(err("acme_needs_domain: address=198.51.100.7"), t, fi1);
     expect(coded.kind).toBe("domain");

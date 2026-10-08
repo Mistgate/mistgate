@@ -16,6 +16,7 @@ import { groups as groupsApi, profiles } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { wayOf } from "@/screens/users/groups";
+import { LossyNotice, lossyRefusal } from "@/screens/node/port-lossy";
 import { useGo } from "@/screens/users/nav";
 import { fieldErrors, isCode, protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
@@ -139,6 +140,9 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const [nameError, setNameError] = useState(false);
   const [saveProblems, setSaveProblems] = useState<Problem[]>([]);
   const [notice, setNotice] = useState<"stale" | null>(null);
+  // the UDP delivery check refused the new port on a node (port_lossy), and the admin's "save anyway" (allow_lossy_port)
+  const [lossy, setLossy] = useState<Record<string, string> | null>(null);
+  const [anyway, setAnyway] = useState(false);
   // kept after the dialog closes, so its text does not go blank while it fades out
   const [impact, setImpact] = useState<{ impact: ProfileImpact; fields: string[] } | null>(null);
   const [impactOpen, setImpactOpen] = useState(false);
@@ -171,6 +175,8 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     setSettings(next);
     setSaveProblems([]);
     setNotice(null);
+    setLossy(null);
+    setAnyway(false);
   };
   const discard = () => {
     setSettings(base);
@@ -178,6 +184,8 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     setNameError(false);
     setSaveProblems([]);
     setNotice(null);
+    setLossy(null);
+    setAnyway(false);
   };
 
   /** Where a new profile's page is, or the node it was made from. */
@@ -210,13 +218,14 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     leave(p.id);
   }
 
-  async function save(confirmed = false) {
+  async function save(confirmed = false, allowLossy = anyway) {
     if (!name.trim()) {
       setNameError(true);
       return;
     }
     setBusy(true);
     setNotice(null);
+    setLossy(null);
     try {
       if (!profile) return await create();
       const request = {
@@ -224,6 +233,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
         expectedVersion: profile.version,
         ...(nameChanged && { name: name.trim() }),
         ...(changed.length > 0 && { settingsJson }),
+        ...(allowLossy && { allowLossyPort: true }),
       };
       const critical = changed.filter((f) => f.critical);
       if (critical.length > 0 && !confirmed) {
@@ -241,7 +251,9 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     } catch (e) {
       setImpactOpen(false);
       const fe = fieldErrors(e);
-      if (isCode(e, Code.Aborted)) setNotice("stale");
+      const refusedPort = lossyRefusal(e);
+      if (refusedPort) setLossy(refusedPort);
+      else if (isCode(e, Code.Aborted)) setNotice("stale");
       else if (fe.length > 0) setSaveProblems(fe.map((x) => ({ pointer: x.pointer, code: x.code, message: x.message })));
       else toast.error(errorText(e, t));
     } finally {
@@ -293,6 +305,19 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
             {t("profiles.reload")}
           </Button>
         </Notice>
+      )}
+
+      {lossy && (
+        <LossyNotice
+          vars={lossy}
+          busy={busy}
+          anywayLabel={t("ports.anyway.save")}
+          onTake={(p) => edit(setAt(settings, ["port"], p))}
+          onAnyway={() => {
+            setAnyway(true);
+            void save(false, true);
+          }}
+        />
       )}
 
       {profile && (
@@ -366,7 +391,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
             </Button>
           )}
           <Button variant="primary" disabled={!canSave} onClick={() => void save()}>
-            {isNew ? t("profiles.createBtn") : t("profiles.save")}
+            {busy && !isNew && profile.nodeCount > 0 && changed.some((f) => f.id === "port") ? t("ports.saving", { port: String(getAt(settings, ["port"]) ?? "") }) : isNew ? t("profiles.createBtn") : t("profiles.save")}
           </Button>
         </div>
       )}

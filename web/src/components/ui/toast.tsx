@@ -4,11 +4,11 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { Icon } from "./icons";
 
-type Notify = ((message: string, options?: { undo?: () => void }) => void) & { error: (message: string) => void };
+type Notify = ((message: string, options?: { undo?: () => void; ms?: number }) => void) & { error: (message: string) => void };
 const NotifyContext = createContext<Notify>(Object.assign(() => {}, { error: () => {} }));
 
 /**
- * toast("Saved"), toast("User removed", { undo }) or toast.error(errorText(e, t)). A note goes in 3.4 s (8 s with Undo); an
+ * toast("Saved"), toast("User removed", { undo }) or toast.error(errorText(e, t)). A note goes in 3.4 s (8 s with Undo, or the `ms` it asks for, for a long text); an
  * error is red, read out at once and stays 8 s or until closed. One of each at a time: a new note replaces the note, a new
  * error the error, and a note never pushes an error out (the error sits above it).
  */
@@ -36,11 +36,11 @@ function Bridge({ children }: { children: ReactNode }) {
   const notify = useMemo<Notify>(
     () =>
       Object.assign(
-        (message: string, options?: { undo?: () => void }) =>
+        (message: string, options?: { undo?: () => void; ms?: number }) =>
           void add({
             id: "note",
             description: message,
-            timeout: options?.undo ? 8000 : 3400,
+            timeout: options?.ms ?? (options?.undo ? 8000 : 3400),
             actionProps: options?.undo ? { children: undoLabel, onClick: options.undo } : undefined,
           }),
         { error: (message: string) => void add({ id: "error", type: "error", priority: "high", timeout: 8000, description: message }) },

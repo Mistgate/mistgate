@@ -247,6 +247,40 @@ describe("putting it on nodes", () => {
     expect(createInbound).toHaveBeenCalledWith({ profileId: "prf_1", nodeId: "nod_2", portOverride: 0, tlsServerNameOverride: "fi1.example.com" });
   });
 
+  it("offers the clean port for a port that loses packets, and puts the profile on anyway when the admin keeps it", async () => {
+    listNodes.mockResolvedValue({ nodes: [node("nod_2", "fi1")] });
+    const at = Math.floor(Date.now() / 1000) - 120;
+    createInbound.mockRejectedValueOnce(new ConnectError(`port_lossy: port=8443&node=fi1&sent=300&got=189&at=${at}&sender=de2&free=2053`, Code.FailedPrecondition));
+    createInbound.mockResolvedValue({ inbound: inbound(), warnings: [{ code: "port_lossy", params: { node: "fi1", port: "8443", sent: "300", got: "189", at: String(at), sender: "de2" } }] });
+    await mount(profile({ protocol: "hysteria2" }), [], [group()]);
+    await click(button("Put on nodes"));
+    await settle();
+    await click(button("Put on 1 node"));
+    await settle();
+    expect(dialog()!.textContent).toContain("Port 8443 loses 37 % of UDP packets on fi1 (checked from de2, 2 min ago). Port 2053 is clean.");
+    // the clean port is that node's override
+    expect(dialog()!.querySelector<HTMLInputElement>('input[inputmode="numeric"]')!.value).toBe("2053");
+    // keeping the lossy one: the port goes back into the field and the next try carries allowLossyPort
+    await click(button("Put on anyway · 8443"));
+    expect(dialog()!.querySelector<HTMLInputElement>('input[inputmode="numeric"]')!.value).toBe("8443");
+    await click(button("Try 1 node again"));
+    await settle();
+    expect(createInbound).toHaveBeenLastCalledWith({ profileId: "prf_1", nodeId: "nod_2", portOverride: 8443, tlsServerNameOverride: "", allowLossyPort: true });
+    // the saved row still says the port loses packets
+    expect(dialog()!.textContent).toContain("Port 8443 loses 37 % of UDP packets on fi1");
+  });
+
+  it("says on a row that was put on that the UDP check could not run", async () => {
+    listNodes.mockResolvedValue({ nodes: [node("nod_2", "fi1")] });
+    createInbound.mockResolvedValue({ inbound: inbound(), warnings: [{ code: "port_unchecked", params: { node: "fi1", port: "443", reason: "no_sender" } }] });
+    await mount(profile({ protocol: "hysteria2" }), [], [group()]);
+    await click(button("Put on nodes"));
+    await settle();
+    await click(button("Put on 1 node"));
+    await settle();
+    expect(dialog()!.textContent).toContain("Port 443 on fi1 was not checked for UDP loss. No other node can send the test packets.");
+  });
+
   it("takes the free port a coded refusal names", async () => {
     listNodes.mockResolvedValue({ nodes: [node("nod_2", "fi1")] });
     createInbound.mockRejectedValueOnce(new ConnectError("port_taken: port=443&profile=Main&free=8443", Code.AlreadyExists));

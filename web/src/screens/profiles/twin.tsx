@@ -8,8 +8,10 @@ import { Notice } from "@/components/ui/notice";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import type { ProfileSummary, TwinProfileResponse } from "@/gen/mistgate/admin/v1/profile_pb";
+import { StatusPill } from "@/components/ui/status";
 import { profiles } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { lossPct, reasonShort } from "@/lib/port-check";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { groupsQuery } from "@/screens/users/rpc";
@@ -70,6 +72,46 @@ export function TwinPanel({ profile, egress, dirty }: { profile: ProfileSummary;
     }
   }
 
+  /**
+   * The UDP delivery check behind the port: a badge per node for the port that was chosen (checked / unchecked and why), and
+   * the candidates that were skipped because they lost packets.
+   */
+  const udp = (r: TwinProfileResponse): ReactNode => {
+    const checks = r.portChecks ?? [];
+    const chosen = checks.filter((c) => c.port === r.port);
+    const skipped = checks.filter((c) => c.port !== r.port && (c.verdict === "lossy" || c.verdict === "broken"));
+    if (chosen.length === 0 && skipped.length === 0) return null;
+    return (
+      <>
+        <dt className="text-muted">{t("twin.udp")}</dt>
+        <dd className="flex flex-col gap-1.5">
+          <ul className="flex flex-wrap gap-1.5">
+            {chosen.map((c) => {
+              const node = nodeName(c.nodeId);
+              const lost = lossPct(c.sent, c.got);
+              return (
+                <li key={c.nodeId}>
+                  {c.verdict === "ok" ? (
+                    <StatusPill kind="ok" label={t("twin.udp.ok", { node })} sm />
+                  ) : c.verdict === "lossy" || c.verdict === "broken" ? (
+                    <StatusPill kind="warn" label={t("twin.udp.lossy", { node, lost })} sm />
+                  ) : (
+                    <StatusPill kind="off" label={t("twin.udp.unchecked", { node, why: reasonShort(t, c.reason) })} sm />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {skipped.map((c) => (
+            <span key={`${c.nodeId}/${c.port}`} className="text-xs text-muted">
+              {t("twin.udp.skipped", { port: c.port, lost: lossPct(c.sent, c.got), node: nodeName(c.nodeId) })}
+            </span>
+          ))}
+        </dd>
+      </>
+    );
+  };
+
   /** What the owner must know about a plan or a result: where the twin goes, the WARP gaps, the AmneziaWG keys. */
   const details = (r: TwinProfileResponse, result: boolean): ReactNode => {
     // the plan of a WARP copy is a list to tick; the result names only the nodes it was made on
@@ -105,6 +147,7 @@ export function TwinPanel({ profile, egress, dirty }: { profile: ProfileSummary;
               r.nodeIds.map(nodeName).join(", ") || t("twin.noNodes")
             )}
           </dd>
+          {udp(r)}
           <dt className="text-muted">{t("twin.groups")}</dt>
           <dd>{r.groupIds.map(groupName).join(", ") || t("twin.noGroups")}</dd>
         </dl>
@@ -145,7 +188,7 @@ export function TwinPanel({ profile, egress, dirty }: { profile: ProfileSummary;
         confirmDisabled={!plan.data || !nodes.data}
         onConfirm={create}
       >
-        {plan.isError ? <Notice tone="danger">{errorText(plan.error, t)}</Notice> : plan.data ? details(plan.data, false) : <p className="text-sm text-muted">{t("common.loading")}</p>}
+        {plan.isError ? <Notice tone="danger">{errorText(plan.error, t)}</Notice> : plan.data ? details(plan.data, false) : <p className="text-sm text-muted">{plan.isPending && profile.nodeCount > 0 ? t.n("twin.checking", profile.nodeCount) : t("common.loading")}</p>}
       </ConfirmModal>
 
       <Modal

@@ -543,3 +543,138 @@ describe("removing a profile from the node", () => {
     expect(document.querySelector("[role=dialog] [role=alert]")?.textContent).toContain("Cannot reach the panel");
   });
 });
+
+// The UDP delivery check (design/udp-port-check.md): the refusal port_lossy next to port_taken, "add anyway", the wait on
+// the button and the warnings after saving.
+describe("a port that loses UDP packets", () => {
+  const hy = (over: Record<string, unknown> = {}) => ({ id: "prf_hy", name: "Second", protocol: "hysteria2", summary: "UDP 8443 · Salamander · Let's Encrypt", nodeCount: 0, version: 3, ...over });
+  const lossy = (port: number, free = 2053) => `port_lossy: port=${port}&node=de1&sent=300&got=190&at=${Math.floor(Date.now() / 1000) - 120}&sender=de2&free=${free}`;
+  const dialogButton = (label: string) => [...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
+  const toasts = () => document.body.textContent ?? "";
+
+  it("fills in the clean port the stored checks name, like a taken one, and says why", async () => {
+    listProfiles.mockResolvedValue({ profiles: [hy()] });
+    createInbound.mockImplementation((r: { portOverride: number }) =>
+      r.portOverride === 0 ? Promise.reject(refuse(lossy(8443), Code.FailedPrecondition)) : Promise.resolve({ inbound: { port: r.portOverride }, warnings: [] }),
+    );
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await checked();
+    expect(input("Port")?.value).toBe("2053");
+    expect(text()).toContain("Port 8443 loses 37 % of UDP packets here: 2053 is filled in instead.");
+    await submit();
+    await settle();
+    expect(adds()[0]?.[0]).toMatchObject({ portOverride: 2053 });
+    expect(adds()[0]?.[0]).not.toHaveProperty("allowLossyPort");
+  });
+
+  it("refuses the typed port with the loss, the clean port to take and 'Add anyway', which resends with allowLossyPort", async () => {
+    listProfiles.mockResolvedValue({ profiles: [hy()] });
+    createInbound.mockImplementation((r: { portOverride: number; allowLossyPort?: boolean; validateOnly?: boolean }) =>
+      r.portOverride === 8443 && !r.allowLossyPort ? Promise.reject(refuse(lossy(8443, 4443), Code.FailedPrecondition)) : Promise.resolve({ inbound: { port: r.portOverride }, warnings: [] }),
+    );
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await type(input("Port"), "8443");
+    await checked();
+    expect(text()).toContain("Port 8443 loses 37 % of UDP packets on de1 (checked from de2, 2 min ago).");
+    expect((document.querySelector("[role=dialog] button[type=submit]") as HTMLButtonElement).disabled).toBe(true);
+    expect(dialogButton("Take 4443")).toBeDefined();
+    await click(dialogButton("Add anyway"));
+    await settle();
+    expect(adds()[0]?.[0]).toMatchObject({ portOverride: 8443, allowLossyPort: true });
+    expect(toasts()).toContain("Profile added to de1");
+  });
+
+  it("shows the refusal of the real run (the stored checks knew nothing) with its proven port, and takes it", async () => {
+    listProfiles.mockResolvedValue({ profiles: [hy()] });
+    createInbound.mockImplementation((r: { validateOnly?: boolean; portOverride: number }) =>
+      r.validateOnly ? Promise.resolve({ inbound: { port: 8443 }, warnings: [] }) : r.portOverride === 4443 ? Promise.resolve({ inbound: {}, warnings: [] }) : Promise.reject(refuse(lossy(8443, 4443), Code.FailedPrecondition)),
+    );
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await submit();
+    await settle();
+    expect(document.querySelector("[role=dialog] [role=alert]")).toBeNull(); // not the plain error box: the lossy notice has the choices
+    expect(text()).toContain("Port 8443 loses 37 % of UDP packets on de1");
+    await click(dialogButton("Take 4443"));
+    expect(input("Port")?.value).toBe("4443");
+    expect(text()).not.toContain("loses 37 %");
+    await checked();
+    await submit();
+    await settle();
+    expect(adds().at(-1)?.[0]).toMatchObject({ portOverride: 4443 });
+  });
+
+  it("says 'Checking UDP to port N…' on the button while it saves, and tells afterwards that the check could not run", async () => {
+    listProfiles.mockResolvedValue({ profiles: [hy()] });
+    let finish: (v: unknown) => void = () => {};
+    createInbound.mockImplementation((r: { validateOnly?: boolean }) =>
+      r.validateOnly ? Promise.resolve({ inbound: { port: 8443 }, warnings: [] }) : new Promise((res) => (finish = res)),
+    );
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await checked();
+    await submit();
+    await settle();
+    expect(document.querySelector<HTMLButtonElement>("[role=dialog] button[type=submit]")?.textContent).toBe("Checking UDP to port 8443…");
+    await act(async () => finish({ inbound: {}, warnings: [{ code: "port_unchecked", params: { node: "de1", port: "8443", reason: "no_sender" } }] }));
+    await settle();
+    expect(toasts()).toContain("Profile added to de1. Port 8443 on de1 was not checked");
+    expect(toasts()).toContain("Port 8443 on de1 was not checked for UDP loss. No other node can send the test packets.");
+  });
+
+  it("edits a node's port the same way: the clean port, 'Save anyway' with allowLossyPort, and the wait on the button", async () => {
+    const inbound = { id: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", state: InboundState.ACTIVE, port: 443, tlsServerName: "example.com", certNotAfterUnix: 0, certPinSha256: "", lastError: "" };
+    updateInbound.mockImplementation((r: { portOverride?: number; allowLossyPort?: boolean; validateOnly?: boolean }) =>
+      r.portOverride === 8443 && !r.allowLossyPort ? Promise.reject(refuse(lossy(8443, 4443), Code.FailedPrecondition)) : Promise.resolve({ inbound: {}, warnings: [], freePort: 0 }),
+    );
+    await mount(data({ inbounds: [inbound] }));
+    await click(button("Edit"));
+    await settle();
+    await type(input("Port"), "8443");
+    await checked();
+    expect(text()).toContain("Port 8443 loses 37 % of UDP packets on de1");
+    expect((document.querySelector("[role=dialog] button[type=submit]") as HTMLButtonElement).disabled).toBe(true);
+    expect(dialogButton("Take 4443")).toBeDefined();
+    await click(dialogButton("Save anyway"));
+    await settle();
+    expect(updateInbound.mock.calls.filter(([r]) => !(r as { validateOnly?: boolean }).validateOnly).at(-1)?.[0]).toMatchObject({ inboundId: "inb_1", portOverride: 8443, allowLossyPort: true });
+  });
+
+  it("the quick profile moves to the clean port like it does for a taken one, then adds the inbound", async () => {
+    listProfiles.mockResolvedValue({ profiles: [] });
+    listGroups.mockResolvedValue({ groups: [] });
+    createProfile.mockResolvedValue({ profile: { id: "prf_new", version: 1 } });
+    updateProfile.mockResolvedValue({ profile: { id: "prf_new", version: 2 } });
+    createInbound.mockImplementation((r: { validateOnly?: boolean }) => (r.validateOnly ? Promise.reject(refuse(lossy(443, 2053), Code.FailedPrecondition)) : Promise.resolve({ inbound: {}, warnings: [] })));
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await click(button("Create Hysteria2 · 443 and put it on de1"));
+    await settle();
+    expect(updateProfile).toHaveBeenCalledWith({ profileId: "prf_new", name: "Hysteria2 · 2053", settingsJson: JSON.stringify({ port: 2053 }), expectedVersion: 1 });
+    expect(adds()).toHaveLength(1);
+  });
+
+  it("the quick profile also moves when only the real run finds the port bad (the version follows the update)", async () => {
+    listProfiles.mockResolvedValue({ profiles: [] });
+    listGroups.mockResolvedValue({ groups: [] });
+    createProfile.mockResolvedValue({ profile: { id: "prf_new", version: 1 } });
+    updateProfile.mockResolvedValue({ profile: { id: "prf_new", version: 2 } });
+    let real = 0;
+    createInbound.mockImplementation((r: { validateOnly?: boolean }) => (r.validateOnly || real++ > 0 ? Promise.resolve({ inbound: {}, warnings: [] }) : Promise.reject(refuse(lossy(443, 4443), Code.FailedPrecondition))));
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    await click(button("Create Hysteria2 · 443 and put it on de1"));
+    await settle();
+    expect(updateProfile).toHaveBeenCalledTimes(1);
+    expect(updateProfile).toHaveBeenCalledWith(expect.objectContaining({ settingsJson: JSON.stringify({ port: 4443 }), expectedVersion: 1 }));
+    expect(adds()).toHaveLength(2);
+  });
+});

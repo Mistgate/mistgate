@@ -10,6 +10,7 @@ import { ru as awgRu } from "./awg";
 import { ru as warpRu } from "./warp";
 import { ru as integrationsRu } from "./integrations";
 import { ru as telegramRu } from "./telegram";
+import { ru as portsRu } from "./ports";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
@@ -206,4 +207,4 @@ const core: CoreMessages = {
   "field.sni.invalid": "Это не похоже на домен",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu };

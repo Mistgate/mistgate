@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -187,5 +188,60 @@ describe("the twin action", () => {
     await mount(profile(), "direct", true);
     expect(button("WARP copy")?.disabled).toBe(true);
     expect(text()).toContain("Save the changes first");
+  });
+});
+
+describe("the UDP delivery check behind the twin's port", () => {
+  const pc = (over: Record<string, unknown>) => ({ nodeId: "nod_1", port: 8443, verdict: "ok", sent: 300, got: 300, checkedUnix: 1_790_000_000n, badUnix: 0n, sender: "de2", reason: "", ...over });
+
+  it("says it is checking UDP on the profile's nodes while the plan is made", async () => {
+    twinProfile.mockReturnValue(new Promise(() => {}));
+    await mount(profile());
+    await click(button("WARP copy"));
+    await settle();
+    expect(document.querySelector("[role=dialog]")!.textContent).toContain("Checking UDP on 2 nodes…");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(profile({ nodeCount: 1 }));
+    await click(button("WARP copy"));
+    await settle();
+    expect(document.querySelector("[role=dialog]")!.textContent).toContain("Checking UDP on 1 node…");
+  });
+
+  it("shows a badge per node for the chosen port (checked, or unchecked with the reason) and the candidate skipped for its loss", async () => {
+    twinProfile.mockResolvedValue(
+      plan({
+        portChecks: [pc({}), pc({ nodeId: "nod_2", verdict: "", sent: 0, got: 0, checkedUnix: 0n, sender: "", reason: "no_sender" }), pc({ nodeId: "nod_1", port: 4443, verdict: "lossy", got: 189 })],
+      }),
+    );
+    await mount(profile());
+    await click(button("WARP copy"));
+    await settle();
+    const dialog = document.querySelector("[role=dialog]")!.textContent!;
+    expect(dialog).toContain("udp/8443");
+    expect(dialog).toContain("de1: checked, no loss");
+    expect(dialog).toContain("fi1: unchecked (no sender)");
+    expect(dialog).toContain("4443 skipped: lost 37 % on de1");
+  });
+
+  it("shows the same in the result, and nothing when the server sent no checks", async () => {
+    twinProfile.mockResolvedValueOnce(plan()).mockResolvedValueOnce({ ...plan(), portChecks: [pc({})], profile: { id: "prf_2", name: "files · WARP" } });
+    await mount(profile());
+    await click(button("WARP copy"));
+    await settle();
+    expect(document.querySelector("[role=dialog]")!.textContent).not.toContain("checked, no loss");
+    await click(button("Make the copy"));
+    await settle();
+    expect(document.querySelector("[role=dialog]")!.textContent).toContain("de1: checked, no loss");
+  });
+
+  it("explains no_clean_port instead of showing a plan", async () => {
+    twinProfile.mockRejectedValue(new ConnectError("no_clean_port", Code.FailedPrecondition));
+    await mount(profile());
+    await click(button("WARP copy"));
+    await settle();
+    const dialog = document.querySelector("[role=dialog]")!;
+    expect(dialog.textContent).toContain("No port without UDP loss was found on all the nodes of this profile.");
+    expect(button("Make the copy")?.hasAttribute("disabled") || button("Make the copy")?.getAttribute("data-disabled") !== null).toBe(true);
   });
 });

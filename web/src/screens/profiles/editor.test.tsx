@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -217,5 +218,38 @@ describe("critical changes of a Hysteria2 profile", () => {
     expect(dialog).toContain("This server stops working for 12 users until their app refreshes the subscription (up to 6 h).");
     expect(dialog).toContain("Ask them to refresh the subscription by hand, or make a copy of the profile on a new port");
     expect(dialog).toContain("The profile restarts on 2 nodes.");
+  });
+});
+
+describe("a port change the UDP check refuses", () => {
+  const lossy = `port_lossy: port=9443&node=de1&sent=300&got=189&at=${Math.floor(Date.now() / 1000) - 120}&sender=de2&free=4443`;
+  const refuseUnlessAnyway = (r: { allowLossyPort?: boolean }) => (r.allowLossyPort ? Promise.resolve({}) : Promise.reject(new ConnectError(lossy, Code.FailedPrecondition)));
+
+  it("says which node loses packets, offers the clean port, and 'Save anyway' sends allowLossyPort", async () => {
+    params = { id: "p_old" };
+    updateProfile.mockImplementation(refuseUnlessAnyway);
+    await mount();
+    await type(portField(), "9443");
+    await click(button("Save"));
+    await settle();
+    expect(text()).toContain("Port 9443 loses 37 % of UDP packets on de1 (checked from de2, 2 min ago).");
+    expect(button("Take 4443")).toBeDefined();
+    expect(updateProfile.mock.calls.every(([r]) => !(r as { allowLossyPort?: boolean }).allowLossyPort)).toBe(true);
+    await click(button("Save anyway"));
+    await settle();
+    expect(updateProfile.mock.calls.at(-1)?.[0]).toMatchObject({ profileId: "p_old", allowLossyPort: true });
+    expect(text()).not.toContain("loses 37 %");
+  });
+
+  it("'Take' puts the clean port into the form and clears the refusal", async () => {
+    params = { id: "p_old" };
+    updateProfile.mockImplementation(refuseUnlessAnyway);
+    await mount();
+    await type(portField(), "9443");
+    await click(button("Save"));
+    await settle();
+    await click(button("Take 4443"));
+    expect(portField().value).toBe("4443");
+    expect(text()).not.toContain("loses 37 %");
   });
 });

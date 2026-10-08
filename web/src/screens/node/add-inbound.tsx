@@ -17,12 +17,14 @@ import { groups as groupsApi, nodes as nodesApi, profiles as profilesApi } from 
 import { codedError } from "@/lib/coded-error";
 import { cx } from "@/lib/cx";
 import { errorCode, errorText, errorVars } from "@/lib/errors";
+import { lossPct, portNotes, withNotes } from "@/lib/port-check";
 import type { Plain } from "@/lib/plain";
 import { protocolName } from "@/lib/series";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { asMode, AwgBackendChoice, canPrepare, useSaveAwgBackend, type AwgMode } from "./awg-backend";
 import { portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { LossyNotice, lossyRefusal } from "./port-lossy";
 
 type Node = NonNullable<Plain<GetNodeResponse>["node"]>;
 
@@ -116,7 +118,7 @@ function AddForm({
 
   const check = useInboundCheck(chosen && portOk(port) ? { kind: "create", nodeId: node.id, profileId: chosen, port, sni: isAwg ? "" : sni.trim() } : null);
   const refused = check.state === "refused" ? check : null;
-  if (refused?.code === "port_taken" && port === "" && !auto && Number(refused.vars.free) > 0) {
+  if ((refused?.code === "port_taken" || refused?.code === "port_lossy") && port === "" && !auto && Number(refused.vars.free) > 0) {
     setAuto(refused.vars);
     setPort(refused.vars.free!);
   }
@@ -128,7 +130,7 @@ function AddForm({
   }, [acme, chosen, sniId]);
 
   const add = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (allowLossy: boolean) => {
       // the node has one AmneziaWG backend: a new choice is saved first, so the profile starts on it
       if (isAwg && mode !== savedBackend) {
         // The kernel module on a node that builds it by itself: the setting becomes "kernel" only when the module is already
@@ -139,20 +141,24 @@ function AddForm({
         }
         await saveBackend(mode);
       }
-      return profilesApi.createInbound({ profileId: chosen, nodeId: node.id, portOverride: port ? Number(port) : 0, tlsServerNameOverride: isAwg ? "" : sni.trim() });
+      return profilesApi.createInbound({ profileId: chosen, nodeId: node.id, portOverride: port ? Number(port) : 0, tlsServerNameOverride: isAwg ? "" : sni.trim(), ...(allowLossy && { allowLossyPort: true }) });
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       onDone();
-      toast(t("node.profiles.added", { name: node.name }));
+      // the UDP check could not run (port_unchecked), or the port was added although it loses packets: said once, a bit longer
+      const notes = portNotes(t, r?.warnings);
+      toast(withNotes(t("node.profiles.added", { name: node.name }), notes), notes.length > 0 ? { ms: 8000 } : undefined);
       refresh();
     },
   });
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (chosen && portOk(port) && !refused) add.mutate();
+    if (chosen && portOk(port) && !refused) add.mutate(false);
   }
 
+  // the stored checks (before the click) or the real run (the click) found the port losing packets
+  const lossy = refused?.code === "port_lossy" ? refused.vars : lossyRefusal(add.error);
   const taken = refused?.code === "port_taken" ? refused.vars : null;
   const free = Number(taken?.free ?? 0);
   const portError = !portOk(port)
@@ -178,6 +184,7 @@ function AddForm({
             setProfileId(v);
             setPort("");
             setAuto(null);
+            add.reset();
           }}
           aria-label={t("node.profiles.profile")}
           options={available.map((p) => ({ value: p.id, label: p.name, hint: profileLine(t, p) }))}
@@ -191,13 +198,20 @@ function AddForm({
           onChange={(e) => {
             setPort(e.target.value.replace(/\D/g, "").slice(0, 5));
             setAuto(null);
+            add.reset();
           }}
           inputMode="numeric"
           placeholder={effective?.port && !port ? t("node.profiles.portFrom", { port: effective.port }) : t("node.profiles.fromProfile")}
           mono
           error={portError}
         />
-        {auto && <p className="text-xs leading-snug text-muted">{t("node.check.port.auto", { from: auto.port!, profile: auto.profile!, to: auto.free! })}</p>}
+        {auto && (
+          <p className="text-xs leading-snug text-muted">
+            {auto.profile
+              ? t("node.check.port.auto", { from: auto.port!, profile: auto.profile, to: auto.free! })
+              : t("ports.auto", { from: auto.port!, lost: lossPct(Number(auto.sent), Number(auto.got)), to: auto.free! })}
+          </p>
+        )}
         {taken && (
           <div className="flex flex-wrap items-center gap-2">
             {free > 0 ? (
@@ -210,6 +224,19 @@ function AddForm({
           </div>
         )}
       </div>
+      {lossy && (
+        <LossyNotice
+          vars={lossy}
+          busy={add.isPending}
+          anywayLabel={t("ports.anyway.add")}
+          onTake={(p) => {
+            setPort(String(p));
+            setAuto(null);
+            add.reset();
+          }}
+          onAnyway={() => add.mutate(true)}
+        />
+      )}
       {isAwg ? (
         <AwgBackendChoice data={data} mode={mode} onChange={setBackend} />
       ) : (
@@ -240,7 +267,7 @@ function AddForm({
         </Notice>
       )}
       <WarpWarnings check={check} nodeId={node.id} nodeName={node.name} onLeave={onDone} />
-      {add.isError && (
+      {add.isError && !lossyRefusal(add.error) && (
         <Notice tone="danger" className="items-start">
           {codedError(add.error, t, "awg.err")}
         </Notice>
@@ -250,7 +277,7 @@ function AddForm({
           {t("common.cancel")}
         </Button>
         <Button type="submit" variant="primary" size="md" disabled={add.isPending || !portOk(port) || !!refused || !chosen}>
-          {t("node.profiles.addDo")}
+          {add.isPending && (port || effective?.port) ? t("ports.saving", { port: port || effective!.port }) : t("node.profiles.addDo")}
         </Button>
       </div>
     </form>
@@ -352,27 +379,40 @@ function QuickProfile({ node, taken, selfSigned, onDone, onBack }: { node: Node;
       const name = freeName(t(self ? "node.quick.nameSelf" : "node.quick.name", { port }), taken);
       const made = (await profilesApi.createProfile({ protocol: "hysteria2", name, settingsJson: JSON.stringify({ tls_mode: self ? "self_signed" : "acme_domain" }) })).profile!;
       const sni = needDomain ? domain.trim() : "";
-      // 443 unless another profile of the node holds it: then the free port the server picks, and the name says it.
-      // A step that fails leaves the profile made: the dialog then lists it, with the reason next to it.
+      // 443 unless another profile of the node holds it, or the UDP check finds it losing packets: then the free (proven) port
+      // the server picks, and the name says it. A step that fails leaves the profile made: the dialog then lists it, with the
+      // reason next to it.
       let final = name;
+      let version = made.version;
+      const moveTo = async (e: unknown) => {
+        const msg = ConnectError.from(e).rawMessage;
+        const free = Number(errorVars(msg).free);
+        if (!["port_taken", "port_lossy"].includes(errorCode(msg)) || !(free > 0)) throw e;
+        final = freeName(t(self ? "node.quick.nameSelf" : "node.quick.name", { port: free }), taken);
+        version = (await profilesApi.updateProfile({ profileId: made.id, name: final, settingsJson: JSON.stringify({ port: free }), expectedVersion: version }))?.profile?.version ?? version + 1;
+      };
       try {
         await profilesApi.createInbound({ profileId: made.id, nodeId: node.id, tlsServerNameOverride: sni, validateOnly: true });
       } catch (e) {
-        const msg = ConnectError.from(e).rawMessage;
-        const free = Number(errorVars(msg).free);
-        if (errorCode(msg) !== "port_taken" || !(free > 0)) throw e;
-        final = freeName(t(self ? "node.quick.nameSelf" : "node.quick.name", { port: free }), taken);
-        await profilesApi.updateProfile({ profileId: made.id, name: final, settingsJson: JSON.stringify({ port: free }), expectedVersion: made.version });
+        await moveTo(e);
       }
-      await profilesApi.createInbound({ profileId: made.id, nodeId: node.id, tlsServerNameOverride: sni });
+      // the click proves the port with a run; a port the stored checks did not know to be bad can still be refused here
+      let added: Awaited<ReturnType<typeof profilesApi.createInbound>>;
+      try {
+        added = await profilesApi.createInbound({ profileId: made.id, nodeId: node.id, tlsServerNameOverride: sni });
+      } catch (e) {
+        if (errorCode(ConnectError.from(e).rawMessage) !== "port_lossy") throw e;
+        await moveTo(e);
+        added = await profilesApi.createInbound({ profileId: made.id, nodeId: node.id, tlsServerNameOverride: sni });
+      }
       for (const g of groups.data ?? []) {
         if (chosen.includes(g.id)) await groupsApi.updateGroup({ groupId: g.id, profileIds: { values: [...g.profileIds, made.id] } });
       }
-      return final;
+      return { name: final, notes: portNotes(t, added?.warnings) };
     },
-    onSuccess: (name) => {
+    onSuccess: ({ name, notes }) => {
       onDone();
-      toast(t("node.quick.done", { profile: name, node: node.name }));
+      toast(withNotes(t("node.quick.done", { profile: name, node: node.name }), notes), notes.length > 0 ? { ms: 8000 } : undefined);
     },
     onSettled: () => {
       for (const k of ["node", "nodes", "profiles", "groups", "users", "inbound-check"]) void qc.invalidateQueries({ queryKey: [k] });

@@ -14,6 +14,7 @@ import { codedError } from "@/lib/coded-error";
 import { cx } from "@/lib/cx";
 import { errorCode, errorVars } from "@/lib/errors";
 import { nodeKind } from "@/lib/node-status";
+import { lossyVars, portNotes } from "@/lib/port-check";
 import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { asMode, AwgBackendFields, canPrepare, type AwgMode } from "@/screens/node/awg-backend";
@@ -29,7 +30,7 @@ type NodeRow = Plain<ListNodesResponse>["nodes"][number];
 
 /** Why a node refused the profile, sorted by what the window can offer: a port field, a domain field, or just the reason. */
 export type Refusal =
-  | { kind: "port"; text: string; free?: string }
+  | { kind: "port"; text: string; free?: string; /** port_lossy: the port that loses packets, which "put on anyway" keeps */ lossy?: string }
   | { kind: "domain"; text: string }
   | { kind: "already"; text: string }
   | { kind: "other"; text: string };
@@ -45,6 +46,12 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
   const msg = ConnectError.from(e).rawMessage;
   const code = errorCode(msg);
   const v = errorVars(msg);
+  if (code === "port_lossy") {
+    // the UDP delivery check found the port losing packets on this node; free is a port the same run proved
+    const free = v.free && v.free !== "0" ? v.free : undefined;
+    const text = [t("err.port_lossy", lossyVars(t, { ...v, node: v.node || node.name })), free ? t("ports.deploy.free", { free }) : ""].filter(Boolean).join(" ");
+    return { kind: "port", free, lossy: v.port || "", text };
+  }
   const old = /UDP port (\d+) is already used by profile "(.*)" on this node/.exec(msg);
   if (code === "port_taken" || old) {
     const port = v.port ?? old?.[1] ?? "";
@@ -60,7 +67,7 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
   return { kind: "other", text: codedError(e, t, "awg.err") };
 }
 
-type Row = { state: "idle" | "busy" | "ok" | "already" | "failed"; refusal?: Refusal; port: string; sni: string; backend?: AwgMode; showBackend?: boolean };
+type Row = { state: "idle" | "busy" | "ok" | "already" | "failed"; refusal?: Refusal; port: string; sni: string; backend?: AwgMode; showBackend?: boolean; anyway?: boolean; notes?: string[] };
 
 export type DeployProfile = {
   id: string;
@@ -181,8 +188,14 @@ function DeployBody({
           }
           await nodesApi.updateNode({ nodeId: id, awgBackend: mode });
         }
-        await profilesApi.createInbound({ profileId: profile.id, nodeId: id, portOverride: r.port ? Number(r.port) : 0, tlsServerNameOverride: awg ? "" : r.sni.trim() });
-        patch(id, { state: "ok" });
+        const added = await profilesApi.createInbound({
+          profileId: profile.id,
+          nodeId: id,
+          portOverride: r.port ? Number(r.port) : 0,
+          tlsServerNameOverride: awg ? "" : r.sni.trim(),
+          ...(r.anyway && { allowLossyPort: true }),
+        });
+        patch(id, { state: "ok", notes: portNotes(t, added?.warnings) });
         ok++;
       } catch (e) {
         const ref = refusalOf(e, t, n);
@@ -190,7 +203,7 @@ function DeployBody({
           patch(id, { state: "already", refusal: ref });
           ok++;
         } else {
-          patch(id, { state: "failed", refusal: ref, ...(ref.kind === "port" && ref.free ? { port: ref.free } : {}) });
+          patch(id, { state: "failed", refusal: ref, anyway: false, ...(ref.kind === "port" && ref.free ? { port: ref.free } : {}) });
           bad++;
         }
       }
@@ -260,6 +273,7 @@ function DeployBody({
               {(r.state === "ok" || askDomain || askPort || askBackend || (r.state === "failed" && ref?.kind === "other")) && (
                 <div className="flex flex-col gap-2 border-t border-line px-3 py-2.5 text-xs leading-snug">
                   {r.state === "ok" && <span className="text-muted">{t("where.deployed")}</span>}
+                  {r.state === "ok" && r.notes?.map((note) => <span key={note} className="text-warn-text">{note}</span>)}
                   {r.state === "failed" && ref && ref.kind !== "domain" && <span className="text-danger-text">{ref.text}</span>}
                   {askDomain && (
                     <>
@@ -282,15 +296,21 @@ function DeployBody({
                       <TextField
                         label={t("where.portLabel", { node: n.name })}
                         value={r.port}
-                        onChange={(e) => patch(n.id, { port: e.target.value.replace(/\D/g, "").slice(0, 5) })}
+                        onChange={(e) => patch(n.id, { port: e.target.value.replace(/\D/g, "").slice(0, 5), anyway: false })}
                         inputMode="numeric"
                         disabled={busy}
                         mono
                         className="w-36"
                       />
                       {ref?.kind === "port" && ref.free && r.port !== ref.free && (
-                        <Button size="md" onClick={() => patch(n.id, { port: ref.free })}>
+                        <Button size="md" disabled={busy} onClick={() => patch(n.id, { port: ref.free, anyway: false })}>
                           {t("where.portTakeFree", { free: ref.free })}
+                        </Button>
+                      )}
+                      {/* a port that loses packets can still be kept: the next try goes out with allow_lossy_port */}
+                      {ref?.kind === "port" && ref.lossy && !(r.anyway && r.port === ref.lossy) && (
+                        <Button size="md" variant="ghost" disabled={busy} onClick={() => patch(n.id, { port: ref.lossy, anyway: true })}>
+                          {t("ports.anyway.put")} · {ref.lossy}
                         </Button>
                       )}
                     </div>

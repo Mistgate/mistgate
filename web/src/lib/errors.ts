@@ -1,5 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { T } from "@/i18n";
+import { lossyVars } from "./port-check";
 
 /**
  * The panel's refusal codes that have a sentence of their own, "err.<code>" (src/i18n/en.ts). The server writes "code",
@@ -25,6 +26,9 @@ export const errorCodes = [
   "sni_needs_domain",
   "sni_invalid",
   "already_on_node",
+  // the UDP delivery check (design/udp-port-check.md): a port that loses packets; a twin with no clean port on all nodes
+  "port_lossy",
+  "no_clean_port",
 ] as const;
 
 /**
@@ -46,7 +50,9 @@ export function errorVars(message: string): Record<string, string> {
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
-  return errorCodes.includes(code) ? t(`err.${code}`, errorVars(c.rawMessage)) : undefined;
+  if (!errorCodes.includes(code)) return undefined;
+  const vars = errorVars(c.rawMessage);
+  return t(`err.${code}`, code === "port_lossy" ? lossyVars(t, vars) : vars);
 }
 
 /** PermissionDenied messages from bearer policy have distinct causes; keep the actual role denial distinct too. */

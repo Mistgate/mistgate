@@ -12,6 +12,7 @@ import { en as awgEn } from "./awg";
 import { en as warpEn } from "./warp";
 import { en as integrationsEn } from "./integrations";
 import { en as telegramEn } from "./telegram";
+import { en as portsEn } from "./ports";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -213,7 +214,7 @@ const core = {
 };
 
 export type CoreMessages = typeof core;
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

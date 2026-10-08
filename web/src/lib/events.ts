@@ -3,6 +3,7 @@ import { EventSeverity, type Event } from "@/gen/mistgate/admin/v1/fleet_pb";
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { minutesText } from "./format";
+import { lossPct, senderLabel } from "./port-check";
 
 // Events carry an open vocabulary of codes (panel codes, agent codes, plugin codes). The UI owns the wording:
 // a known code gets a localized sentence, an unknown one is shown as its code, so nothing is ever hidden.
@@ -60,6 +61,7 @@ const textKeys: Record<string, MessageKey> = {
   awg_kernel_switched: "event.awg_kernel_switched",
   bandwidth_measured: "event.bandwidth_measured",
   bandwidth_upload_missing: "event.bandwidth_upload_missing",
+  port_lossy: "event.port_lossy",
 };
 
 // Dot colour by code first (a blip is grey-blue, never red), else by severity. A restart that happened is a fact, not a
@@ -105,6 +107,9 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       return { text: t(key, { span }), detail };
     case "engine_failed":
       return { text: profile ? t("event.engine_failed.named", { profile }) : t(key), detail };
+    case "port_lossy":
+      // the UDP delivery check found an enabled profile's port losing packets: {sent, got, sender} of its run
+      return { text: t(key, { profile: profile || "—", port: p.port ?? "", lost: lossPct(Number(p.sent), Number(p.got)), sender: senderLabel(t, p.sender ?? "") }), detail };
     case "tunnel_v6_fallback":
       return { text: t(p.mode === "none" ? "event.tunnel_v6_fallback.none" : key), detail };
     case "host_firewall_sync_failed":
