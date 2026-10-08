@@ -54,6 +54,7 @@ const (
 	sevCritical = 3
 
 	panelEgressSubject = "panel_egress"
+	panelProbeSubject  = "probe_path"
 	certWarnBefore     = 14 * 24 * time.Hour
 	certCritBefore     = 3 * 24 * time.Hour
 )
@@ -258,14 +259,20 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 
 	// The panel's own network: the last round failed for most probed inbounds on nodes of three providers, so the
 	// probe client is the suspect, not the nodes.
-	var allProbed, allFailed int
-	failProviders := map[string]bool{}
+	var allProbed, allFailed, freshFailed int
+	failProviders, freshProviders := map[string]bool{}, map[string]bool{}
+	freshNodes := map[string]string{}
 	for _, n := range connected {
 		for _, p := range byNode[n.ID] {
 			allProbed++
 			if p.c.streak >= 1 {
 				allFailed++
 				failProviders[providerKey(n)] = true
+			}
+			if p.c.streak >= 1 && p.c.streak <= 3 {
+				freshFailed++
+				freshProviders[providerKey(n)] = true
+				freshNodes[n.ID] = n.Name
 			}
 		}
 	}
@@ -274,31 +281,66 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 		add(cond{key: key{kCheckFailed, "", panelEgressSubject}, severity: sevWarning, why: "health.alert.check_failed.why.panel_egress",
 			params: map[string]string{"failed": strconv.Itoa(allFailed), "total": strconv.Itoa(allProbed), "providers": strconv.Itoa(len(failProviders))}})
 	}
+	// Two providers can share a short panel-path failure before the broad guard threshold is met.
+	correlated := !d.guard && len(freshProviders) >= 2
+	if correlated {
+		var names []string
+		for _, n := range connected {
+			if name, ok := freshNodes[n.ID]; ok {
+				if name == "" {
+					name = n.ID
+				}
+				names = append(names, name)
+			}
+		}
+		sort.Strings(names)
+		if len(names) > 5 {
+			names = append(names[:5], "+"+strconv.Itoa(len(names)-5))
+		}
+		add(cond{key: key{kCheckFailed, "", panelProbeSubject}, severity: sevWarning, why: "health.alert.check_failed.why.probe_path",
+			params: map[string]string{"nodes": strings.Join(names, ", "), "providers": strconv.Itoa(len(freshProviders)),
+				"failed": strconv.Itoa(freshFailed), "total": strconv.Itoa(allProbed)}})
+	}
 
 	for _, n := range connected {
 		ps := byNode[n.ID]
 		h := nodeHealth{total: len(ps), doctorFail: worstDoctorFail(docs[n.ID], d.holdDoctor[n.ID])}
-		var failing []probed
+		var failing, judgedFailing []probed
 		for _, p := range ps {
+			fresh := correlated && p.c.streak >= 1 && p.c.streak <= 3
+			if fresh {
+				d.holdKeys[key{kCheckFailed, n.ID, p.t.in.ID}] = true
+			}
 			if p.c.streak >= failStreakMin {
 				failing = append(failing, p)
+				if !fresh {
+					judgedFailing = append(judgedFailing, p)
+				}
 			}
 		}
 		h.failed = len(failing)
-		if !d.guard && len(failing) > 0 {
-			if len(failing) == len(ps) {
+		if correlated {
+			for _, p := range ps {
+				if p.c.streak >= 1 && p.c.streak <= 3 {
+					d.holdKeys[key{kNoTraffic, n.ID, ""}] = true
+					break
+				}
+			}
+		}
+		if !d.guard && len(judgedFailing) > 0 {
+			if len(judgedFailing) == len(ps) {
 				h.noTraffic = true
 				params := map[string]string{"failed": strconv.Itoa(h.failed), "total": strconv.Itoa(h.total)}
-				ports := failedPorts(failing)
+				ports := failedPorts(judgedFailing)
 				params["ports"] = strings.Join(ports, ", ")
 				if len(ports) == 1 {
 					params["port"] = ports[0]
 				}
-				add(cond{key: key{kNoTraffic, n.ID, ""}, severity: sevCritical, why: "health.alert.no_traffic.why." + allFailVariant(failing), params: params})
+				add(cond{key: key{kNoTraffic, n.ID, ""}, severity: sevCritical, why: "health.alert.no_traffic.why." + allFailVariant(judgedFailing), params: params})
 			} else {
 				// the doctor already says the node's WARP is dead: its WARP profiles failing is the same news, said once
 				warpDead := !d.holdDoctor[n.ID] && failsCheck(docs[n.ID], "warp_path")
-				for _, f := range failing {
+				for _, f := range judgedFailing {
 					variant := whyVariant(f, ps)
 					if variant == "warp_path" && warpDead {
 						continue

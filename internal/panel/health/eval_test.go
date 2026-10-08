@@ -967,7 +967,114 @@ func TestGuardNeedsThreeProviders(t *testing.T) {
 		}
 	}
 	got := e.active()
-	want(t, got, "no_traffic/n1/", "no_traffic/n2/", "no_traffic/n3/")
+	want(t, got, "check_failed//probe_path")
+}
+
+func TestCorrelatedFreshFailuresUseFleetAlertUntilStreakFour(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider-a", true)
+	e.node("node-b", "provider-b", true)
+	e.exec(`UPDATE node SET name = ? WHERE id = ?`, "alpha", "node-a")
+	e.exec(`UPDATE node SET name = ? WHERE id = ?`, "beta", "node-b")
+	a, b := e.inbound("node-a", 443), e.inbound("node-b", 443)
+
+	e.fail(a, "timeout")
+	e.fail(b, "timeout")
+	got := e.active()
+	want(t, got, "check_failed//probe_path")
+	probePath := got["check_failed//probe_path"]
+	if probePath.Severity != sevWarning || probePath.WhyKey != "health.alert.check_failed.why.probe_path" ||
+		probePath.Params["nodes"] != "alpha, beta" || probePath.Params["providers"] != "2" ||
+		probePath.Params["failed"] != "2" || probePath.Params["total"] != "2" {
+		t.Fatalf("probe path alert: %+v", probePath)
+	}
+
+	e.fail(a, "timeout")
+	e.fail(b, "timeout")
+	want(t, e.active(), "check_failed//probe_path")
+
+	for range 2 {
+		e.fail(a, "timeout")
+		e.fail(b, "timeout")
+	}
+	got = e.active()
+	want(t, got, "no_traffic/node-a/", "no_traffic/node-b/")
+	for _, alert := range e.history() {
+		if alert.ID == probePath.ID {
+			if alert.Resolution != "cleared" {
+				t.Fatalf("probe path resolution = %q, want cleared", alert.Resolution)
+			}
+			return
+		}
+	}
+	t.Fatal("resolved probe path alert is missing from history")
+}
+
+func TestCorrelatedProbeAlertCapsNodeNames(t *testing.T) {
+	e := newEnv(t)
+	var ins []string
+	for _, n := range []struct{ id, provider string }{
+		{"node-1", "provider-a"}, {"node-2", "provider-b"}, {"node-3", "provider-a"}, {"node-4", "provider-b"},
+		{"node-5", "provider-a"}, {"node-6", "provider-b"}, {"node-7", "provider-a"},
+	} {
+		e.node(n.id, n.provider, true)
+		ins = append(ins, e.inbound(n.id, 443))
+	}
+	for _, in := range ins {
+		e.fail(in, "timeout")
+	}
+
+	got := e.active()
+	want(t, got, "check_failed//probe_path")
+	if nodes := got["check_failed//probe_path"].Params["nodes"]; nodes != "node-1, node-2, node-3, node-4, node-5, +2" {
+		t.Fatalf("nodes = %q", nodes)
+	}
+}
+
+func TestCorrelatedFreshFailuresHoldAnOpenNodeAlert(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider-a", true)
+	a, aPass := e.inbound("node-a", 443), e.inbound("node-a", 8443)
+	e.node("node-b", "provider-b", true)
+	b, bPass := e.inbound("node-b", 443), e.inbound("node-b", 8443)
+	e.pass(aPass)
+	e.pass(bPass)
+
+	e.fail(a, "timeout")
+	e.fail(a, "timeout")
+	nodeAlert := e.active()["check_failed/node-a/"+a]
+	if nodeAlert.ID == "" {
+		t.Fatal("per-node check_failed alert did not open before correlation")
+	}
+
+	e.fail(b, "timeout")
+	got := e.active()
+	want(t, got, "check_failed/node-a/"+a, "check_failed//probe_path")
+	if held := got["check_failed/node-a/"+a]; held.ID != nodeAlert.ID || !held.LastSeen.Equal(nodeAlert.LastSeen) || held.WhyKey != nodeAlert.WhyKey {
+		t.Fatalf("existing per-node alert changed during correlation: before %+v, after %+v", nodeAlert, held)
+	}
+}
+
+func TestCorrelatedFreshFailuresOnOneProviderStayPerNode(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider-a", true)
+	aPass, a := e.inbound("node-a", 443), e.inbound("node-a", 8443)
+	e.node("node-b", "provider-a", true)
+	b, bPass := e.inbound("node-b", 443), e.inbound("node-b", 8443)
+	e.pass(aPass)
+	e.pass(bPass)
+
+	for range 2 {
+		e.fail(a, "timeout")
+		e.fail(b, "timeout")
+	}
+	got := e.active()
+	want(t, got, "check_failed/node-a/"+a, "check_failed/node-b/"+b)
+	for _, key := range []string{"check_failed/node-a/" + a, "check_failed/node-b/" + b} {
+		if got[key].WhyKey != "health.alert.check_failed.why.udp_blocked" {
+			t.Fatalf("%s why = %q, want udp_blocked", key, got[key].WhyKey)
+		}
+	}
 }
 
 // The agent's own view of a certificate is the fallback for agents without a doctor.

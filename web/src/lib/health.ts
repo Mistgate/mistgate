@@ -101,8 +101,8 @@ export function checkTitle(t: T, id: string): string {
 export function alertTitle(t: T, a: Alert): string {
   const params: Record<string, string> = { ...a.params };
   let key = a.titleKey;
-  // the blind-panel alert is fleet-wide and has no profile to name
-  if (a.kind === AlertKind.CHECK_FAILED && a.subject === "panel_egress") key += ".panel_egress";
+  // the blind-panel alerts are fleet-wide and have no profile to name
+  if (a.kind === AlertKind.CHECK_FAILED && (a.subject === "panel_egress" || a.subject === "probe_path")) key += "." + a.subject;
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
   return lookup(t, key, params) ?? a.titleKey;
 }

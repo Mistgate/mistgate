@@ -113,6 +113,36 @@ func TestUnknownDoctorDetailUsesLocalizedGenericLine(t *testing.T) {
 	}
 }
 
+func TestProbePathAlertIsLocalized(t *testing.T) {
+	a := store.HealthAlert{
+		Kind: "check_failed", Subject: "probe_path", WhyKey: "health.alert.check_failed.why.probe_path",
+		Params: map[string]string{"nodes": "alpha, beta", "providers": "2", "failed": "2", "total": "2"},
+	}
+	for _, tc := range []struct {
+		lang   L
+		title  string
+		reason string
+	}{
+		{
+			lang:   "en",
+			title:  "Panel probes fail across several nodes",
+			reason: "Probes from the panel failed on several nodes at once (alpha, beta), at 2 different hosters. Most likely the panel's own network, not the nodes. No per-node alerts and no port advice unless it lasts 20 minutes.",
+		},
+		{
+			lang:   "ru",
+			title:  "Проверки панели не проходят на нескольких нодах",
+			reason: "Проверки с панели провалились сразу на нескольких нодах (alpha, beta) у 2 разных хостеров. Скорее всего, сбой в сети самой панели, а не на нодах. Отдельных тревог по нодам и советов сменить порт не будет, если сбой не продлится 20 минут.",
+		},
+	} {
+		if got := alertTitle(tc.lang, a); got != tc.title {
+			t.Errorf("%s title = %q, want %q", tc.lang, got, tc.title)
+		}
+		if got := alertReason(tc.lang, a); got != tc.reason {
+			t.Errorf("%s reason = %q, want %q", tc.lang, got, tc.reason)
+		}
+	}
+}
+
 func TestUserHealthAlertsAreLocalized(t *testing.T) {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	accessEnded := store.HealthAlert{

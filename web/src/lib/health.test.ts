@@ -101,6 +101,8 @@ describe("alerts", () => {
     expect(alertTitle(t, warn)).toBe("Disk space");
     const egress = alert({ subject: "panel_egress", nodeId: "", params: { failed: "5", total: "6", providers: "3" } });
     expect(alertTitle(t, egress)).toBe(en["health.alert.check_failed.title.panel_egress"]);
+    const probe = alert({ subject: "probe_path", nodeId: "", params: { nodes: "ee, ru", providers: "2", failed: "3", total: "15" } });
+    expect(alertTitle(t, probe)).toBe(en["health.alert.check_failed.title.probe_path"]);
     expect(alertTitle(t, alert({ params: { profile: "hy2 · 443" } }))).toContain("hy2 · 443");
   });
   it("shows an unknown title key as it is and no reason for an unknown why key", () => {
@@ -323,7 +325,7 @@ describe("the server's vocabulary is covered", () => {
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
     "access_ended", "user_connection", "users_impacted"];
   const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
-  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress"];
+  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path"];
   const expected = [
     ...checks.flatMap((c) => [`doctor.${c}.title`, `health.doctor.${c}.why`]),
     "health.doctor.dstate_tasks.why.qxl_ttm",
@@ -334,6 +336,7 @@ describe("the server's vocabulary is covered", () => {
     ...errors.map((e) => `health.check.err.${e}`),
     ...kinds.map((k) => `health.alert.${k}.title`),
     "health.alert.check_failed.title.panel_egress",
+    "health.alert.check_failed.title.probe_path",
     ...whyNoTraffic.map((v) => `health.alert.no_traffic.why.${v}`),
     ...whyCheck.map((v) => `health.alert.check_failed.why.${v}`),
     "health.alert.node_down.why",
@@ -393,7 +396,7 @@ describe("the server's vocabulary is covered", () => {
     // cert_expiry {inbound|inbound_id, profile, server_name, days_left, reason}, node_down {minutes} worded as {duration}
     const sent: Record<string, string[]> = {
       no_traffic: ["failed", "total", "ports", "port"],
-      check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers"],
+      check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers", "nodes"],
       cert_expiry: ["inbound", "inbound_id", "profile", "server_name", "days_left", "reason", "server_part"],
       node_down: ["duration"],
     };

@@ -201,6 +201,7 @@ export const en = {
   "health.alert.no_traffic.title": "Alive, but no traffic",
   "health.alert.check_failed.title": "“{profile}” fails the client-eye check",
   "health.alert.check_failed.title.panel_egress": "The panel cannot reach many nodes",
+  "health.alert.check_failed.title.probe_path": "Checks failed on several nodes at once",
   "health.alert.doctor_warn.title": "{check_title}",
   "health.alert.doctor_fail.title": "{check_title}",
   "health.alert.state_drift.title": "The node’s state differs from the panel’s",
@@ -240,6 +241,8 @@ export const en = {
   "health.alert.check_failed.why.unknown": "“{profile}” fails the client-eye check. Open the node for the details.",
   "health.alert.check_failed.why.panel_egress":
     "{failed} of {total} profiles on {providers} different hosters fail at once. That is more likely the panel’s own connection than the nodes, so per-node alerts are paused until a round passes.",
+  "health.alert.check_failed.why.probe_path":
+    "The panel’s checks failed at the same time on {nodes}, at {providers} different hosters. That is more likely the panel’s own network than the nodes: no per-node alerts and no advice to change a port unless it lasts 20 minutes.",
   "health.alert.state_drift.why":
     "The node applied a different configuration than the panel holds, even after a full resend. Restart the profiles on the node; if it comes back, look at the node’s log.",
   "health.alert.cert_expiry.why":
@@ -642,6 +645,7 @@ export const ru: typeof en = {
   "health.alert.no_traffic.title": "Жива, но трафик не идёт",
   "health.alert.check_failed.title": "«{profile}» не проходит проверку глазами клиента",
   "health.alert.check_failed.title.panel_egress": "Панель не достаёт до многих нод",
+  "health.alert.check_failed.title.probe_path": "Проверки сбоят сразу на нескольких нодах",
   "health.alert.doctor_warn.title": "{check_title}",
   "health.alert.doctor_fail.title": "{check_title}",
   "health.alert.state_drift.title": "Состояние ноды разошлось с панелью",
@@ -681,6 +685,8 @@ export const ru: typeof en = {
   "health.alert.check_failed.why.unknown": "«{profile}» не проходит проверку глазами клиента. Подробности на странице ноды.",
   "health.alert.check_failed.why.panel_egress":
     "{failed} из {total} профилей у {providers} разных хостеров отказали одновременно. Скорее всего, виновато собственное соединение панели, а не ноды, поэтому алерты по нодам на паузе, пока не пройдёт круг.",
+  "health.alert.check_failed.why.probe_path":
+    "Проверки панели сбоят одновременно на {nodes}, у {providers} разных хостеров. Скорее всего, дело в сети самой панели, а не в нодах: алертов по нодам и советов сменить порт не будет, если сбой не продлится 20 минут.",
   "health.alert.state_drift.why":
     "Нода применила не ту конфигурацию, что хранит панель, даже после полной пересылки. Перезапусти профили на ноде; если вернётся, загляни в её лог.",
   "health.alert.cert_expiry.why":

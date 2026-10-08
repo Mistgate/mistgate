@@ -155,6 +155,9 @@ func alertTitle(l L, a store.HealthAlert) string {
 		if a.Subject == "panel_egress" {
 			return l.pick("The panel cannot reach many nodes", "Панель не достаёт до многих нод")
 		}
+		if a.Subject == "probe_path" {
+			return l.pick("Panel probes fail across several nodes", "Проверки панели не проходят на нескольких нодах")
+		}
 		if p["profile"] == "" {
 			return l.pick("A profile fails the check", "Профиль не проходит проверку")
 		}
@@ -196,6 +199,12 @@ func alertReason(l L, a store.HealthAlert) string {
 		}
 		return line
 	case "check_failed":
+		if a.WhyKey == "health.alert.check_failed.why.probe_path" {
+			return l.pick("Probes from the panel failed on several nodes at once ("+data(p["nodes"], 200)+"), at "+data(p["providers"], 3)+
+				" different hosters. Most likely the panel's own network, not the nodes. No per-node alerts and no port advice unless it lasts 20 minutes.",
+				"Проверки с панели провалились сразу на нескольких нодах ("+data(p["nodes"], 200)+") у "+data(p["providers"], 3)+
+					" разных хостеров. Скорее всего, сбой в сети самой панели, а не на нодах. Отдельных тревог по нодам и советов сменить порт не будет, если сбой не продлится 20 минут.")
+		}
 		if a.Subject == "panel_egress" {
 			return l.pick(data(p["failed"], 4)+" of "+data(p["total"], 4)+" checks fail across "+data(p["providers"], 3)+" providers: likely the panel’s own network.",
 				data(p["failed"], 4)+" из "+data(p["total"], 4)+" проверок не проходят у "+data(p["providers"], 3)+" провайдеров: скорее всего, виновата сеть самой панели.")
