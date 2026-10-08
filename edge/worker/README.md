@@ -42,10 +42,11 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
   session (a `closed` step, `owned: false`) and starts the new one; frames of an older generation are dropped. A socket that
   has not sent a valid LinkAuth within 10 s is closed with 1008.
 - Alarm: one alarm, the earliest of the session's own `alarmAt`, the handshake deadlines and "now" when a `poke()` is pending.
-  The session's alarm is never set closer than 1 s from now (a Go side that always answers 
-ow must not loop; alarms are billed). Nothing pending means no alarm and no timer, so the object hibernates.
-- RPC: `poke()` (desired state changed), `ask(requestId, frame, waitMs)` (a request frame and the reply a later step resolves;
-  rejects with `link lost` or `timeout`), `close(code, reason)`.
+  The session's alarm is never set closer than 1 s from now (a Go side that always answers "now" must not loop; alarms
+  are billed). Nothing pending means no alarm and no timer, so the object hibernates.
+- RPC: `poke()` (desired state changed), `ask(requestId, frame, deadlineAt)` (a request frame and the reply a later step resolves;
+  `deadlineAt` is the caller's own deadline in ms since the epoch, and a request that reaches the object after it is never
+  sent; rejects with `link lost` when there is no session or it ends, and `timeout` at the deadline), `close(code, reason)`.
 - Step contract (`LinkEvent`, `LinkStepIn`, `LinkStepOut` in `panellink.ts`): the state goes in and out as one string; the
   object writes it first, then sends the frames, delivers replies, applies the close and re-arms the alarm.
 
