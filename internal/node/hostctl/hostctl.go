@@ -1,6 +1,6 @@
 // Package hostctl is the agent's view of the machine it runs on: host facts for Hello, host metrics for
 // StatsBatch, and the only host state the agent owns: its own nftables table for
-// port-hop redirects and the SSH brute-force guard, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall,
+// port-hop redirects and the SSH brute-force guard, the UDP delivery counter, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall,
 // the fq + bbr and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
 // Linux-only behind a build tag; other OSes get a no-op stub so the whole repo still builds and vets.
 package hostctl
@@ -34,7 +34,7 @@ type Host interface {
 	// SSHPorts are the sshd ports found by the last ApplyBaseline (22 when detection found nothing):
 	// the SSH guard rate-limits them and no port-hop range may cover them.
 	SSHPorts() []uint16
-	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard and torrent queue, tagged UFW UDP rules
+	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard, UDP delivery checks and torrent queue, tagged UFW UDP rules
 	// and the UFW rules the SSH install tagged with ProvisionUFWTag, sysctl and journald drop-ins,
 	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the tunnel table
 	// "mistgate_awg" and every link named mgawg* or mgwarp). The WARP routing rules and routes are the WARP
@@ -113,13 +113,13 @@ const (
 )
 
 // OwnNftTable says whether an nft table is one the agent itself creates (all of them are inet): the firewall and
-// port hops, the AmneziaWG tunnels, WARP and the torrent guard. A new table goes here, or the doctor calls it foreign.
+// port hops, the UDP delivery check, AmneziaWG tunnels, WARP and the torrent guard. A new table goes here, or the doctor calls it foreign.
 func OwnNftTable(family, name string) bool {
 	if family != nftFamily {
 		return false
 	}
 	switch name {
-	case NftTable, NftTunnelTable, NftWarpTable, NftTorrentTable:
+	case NftTable, NftTunnelTable, NftWarpTable, NftTorrentTable, NftUDPCheckTable:
 		return true
 	}
 	return false

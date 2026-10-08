@@ -77,13 +77,13 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 		keep[t.UDPPort] = true
 	}
 	if st.applied && len(st.set) > 0 {
-		if raw, err := h.readCounters(ctx); err == nil {
+		if raw, err := h.readCounters(ctx, NftTunnelTable, "udp_"); err == nil {
 			if st.carry == nil {
 				st.carry = map[uint16]uint64{}
 			}
 			for p, v := range raw {
 				if old[p] && keep[p] { // a port that goes away and comes back starts from zero
-					st.carry[p] += v
+					st.carry[p] += v.Packets
 				}
 			}
 		}
@@ -169,13 +169,13 @@ func (h *linuxHost) TunnelCounters(ctx context.Context) (map[uint16]uint64, erro
 	if !st.applied || len(st.set) == 0 {
 		return map[uint16]uint64{}, nil
 	}
-	raw, err := h.readCounters(ctx)
+	raw, err := h.readCounters(ctx, NftTunnelTable, "udp_")
 	if err != nil {
 		return nil, err
 	}
 	out := make(map[uint16]uint64, len(raw))
 	for _, t := range st.set {
-		out[t.UDPPort] = st.carry[t.UDPPort] + raw[t.UDPPort]
+		out[t.UDPPort] = st.carry[t.UDPPort] + raw[t.UDPPort].Packets
 	}
 	return out, nil
 }
@@ -185,17 +185,18 @@ type nftCounters struct {
 		Counter *struct {
 			Name    string `json:"name"`
 			Packets uint64 `json:"packets"`
+			Bytes   uint64 `json:"bytes"`
 		} `json:"counter"`
 	} `json:"nftables"`
 }
 
-// readCounters reads the udp_<port> counters of the installed table.
-func (h *linuxHost) readCounters(ctx context.Context) (map[uint16]uint64, error) {
-	out, err := h.run(ctx, "", "nft", "-j", "list", "counters", "table", nftFamily, NftTunnelTable)
+// readCounters reads the named counters with the given prefix from one table.
+func (h *linuxHost) readCounters(ctx context.Context, table, prefix string) (map[uint16]Count, error) {
+	out, err := h.run(ctx, "", "nft", "-j", "list", "counters", "table", nftFamily, table)
 	if err != nil {
-		return nil, fmt.Errorf("nft list counters: %w: %s", err, bytes.TrimSpace(out))
+		return nil, fmt.Errorf("nft list counters %s: %w: %s", table, err, bytes.TrimSpace(out))
 	}
-	res := map[uint16]uint64{}
+	res := map[uint16]Count{}
 	if len(bytes.TrimSpace(out)) == 0 {
 		return res, nil
 	}
@@ -204,11 +205,11 @@ func (h *linuxHost) readCounters(ctx context.Context) (map[uint16]uint64, error)
 		return nil, fmt.Errorf("nft counters: %w", err)
 	}
 	for _, it := range doc.Nftables {
-		if it.Counter == nil || !strings.HasPrefix(it.Counter.Name, "udp_") {
+		if it.Counter == nil || !strings.HasPrefix(it.Counter.Name, prefix) {
 			continue
 		}
-		if p, err := strconv.ParseUint(strings.TrimPrefix(it.Counter.Name, "udp_"), 10, 16); err == nil {
-			res[uint16(p)] = it.Counter.Packets
+		if p, err := strconv.ParseUint(strings.TrimPrefix(it.Counter.Name, prefix), 10, 16); err == nil {
+			res[uint16(p)] = Count{Packets: it.Counter.Packets, Bytes: it.Counter.Bytes}
 		}
 	}
 	return res, nil

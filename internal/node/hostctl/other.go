@@ -24,6 +24,7 @@ func (stub) ApplyBaseline(context.Context) error                         { retur
 func (stub) SetPortHops(context.Context, []Hop) error                    { return nil }
 func (stub) SyncInboundUDPPorts(context.Context, []UDPInboundPort) error { return nil }
 func (stub) Cleanup(context.Context) error                               { return nil }
+func CleanupUDPCount(context.Context) error                              { return nil }
 func (stub) SSHPorts() []uint16                                          { return []uint16{22} }
 
 var _ Fixer = stub{}

@@ -109,7 +109,7 @@ package mistgate.agent.v1;
 //     (enabled "1"/"0", integers decimal, reserved lowercase hex, empty = "").
 //
 // COMMANDS
-//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel and MeasureBandwidth carry a request_id and get exactly one CommandResult. Removing a
+//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, MeasureBandwidth, UdpCount and UdpSend carry a request_id and get exactly one CommandResult. Removing a
 //   credential from the desired state implicitly kicks its sessions; the explicit Kick is for "kick now,
 //   keep access" and for diagnostics.
 //   Kick is best effort in Hysteria2: the core can only close a connection from inside a traffic callback,
@@ -326,6 +326,27 @@ package mistgate.agent.v1;
 //     (sponsor and city of an Ookla server). A panel treats the missing ones as "runs_total = runs, no failures". ok = false:
 //     error = unsupported | busy | unreachable (no endpoint gave a usable answer) | "failed: <short message>".
 //
+// UDP DELIVERY CHECK (additive, protocol api_version stays 1)
+//   Some hosters drop UDP to one destination port before the VM. To know whether datagrams to a port of a node arrive,
+//   the node being checked (the target) counts and another party sends (another node, or a VPS panel host when the
+//   fleet has no other node).
+//   - CAPABILITY GATE. An agent lists "udpcheck/1" in Hello.capabilities when its host can count (Linux nft). The panel
+//     sends UdpCount and UdpSend ONLY to a stream that listed it.
+//   - COUNT (target). UdpCount arm installs the agent's own nft table "inet mistgate_udpcheck": one chain at prerouting
+//     priority -500 (before defrag, conntrack, NAT and any firewall) with one named counter per port. A rule matches
+//     only UDP datagrams to that port whose payload starts with the 8-byte tag, counts them and drops them, so test
+//     datagrams never reach an engine and the port may be bound or not. The table is removed on stop, after hold_s,
+//     at agent start, in Cleanup and by cleanup-net. One count at a time: an arm while one is armed is "busy", a stop
+//     with another tag is "not_armed". Answers: arm -> CommandResult{ok}; stop -> CommandResult{ok,
+//     params{"p<port>": packets, "b<port>": bytes}} (bytes as well as packets: a UDP GRO super-packet counts once).
+//   - SEND (sender). UdpSend sends count datagrams of size payload bytes to every port at pps per port, one datagram
+//     to every port per tick, from 4 ephemeral source sockets in turn; every payload starts with the tag. host is
+//     resolved by the agent (IPv4 first); unspecified, multicast and broadcast destinations are refused. Hard caps:
+//     8 ports, 300 per port, 50 pps per port, 64-1200 bytes, 10 s, 4 concurrent sends. Answer after the last datagram:
+//     CommandResult{ok, params{family: "4"|"6", sent: "<per port>"}}.
+//   - ERRORS (CommandResult.error): busy (a count already armed, 4 sends running, or a bandwidth test running),
+//     not_armed, bad_params, unsupported_host, no_route (resolve or send failed), "failed: <short message>".
+//
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
@@ -431,7 +452,8 @@ message Hello {
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
-  // (NodeSettings.client_ipv6_disabled) and "ws-link/1" (signed WebSocket link transport).
+  // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport) and "udpcheck/1" (UdpCount,
+  // UdpSend; see "UDP DELIVERY CHECK").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -752,6 +774,9 @@ message ConnectResponse {
     PrepareAwgKernel prepare_awg_kernel = 23;
     // Only sent to agents with "bandwidth/1" in Hello.capabilities (see "BANDWIDTH TEST").
     MeasureBandwidth measure_bandwidth = 24;
+    // Only sent to agents with "udpcheck/1" in Hello.capabilities (see "UDP DELIVERY CHECK").
+    UdpCount udp_count = 25;
+    UdpSend udp_send = 26;
   }
 }
 
@@ -759,6 +784,37 @@ message ConnectResponse {
 // "BANDWIDTH TEST".
 message MeasureBandwidth {
   string request_id = 1;
+}
+
+// Count UDP datagrams that arrive at this node (see "UDP DELIVERY CHECK"). One CommandResult per message.
+message UdpCount {
+  string request_id = 1;
+  // 8 random bytes: only datagrams whose UDP payload starts with them are counted, and dropped.
+  bytes tag = 2;
+  // Arm: 1-8 distinct ports. Ignored with stop.
+  repeated uint32 ports = 3;
+  // Arm: the agent removes the table after this many seconds (1-60).
+  uint32 hold_s = 4;
+  // true: read the counters armed with tag and remove the table.
+  bool stop = 5;
+}
+
+// Send tagged datagrams to another node of the fleet (see "UDP DELIVERY CHECK"). One CommandResult after the last
+// datagram.
+message UdpSend {
+  string request_id = 1;
+  // The target node's address (node.address): an IP, or a name this node resolves (IPv4 first).
+  string host = 2;
+  // 1-8 ports.
+  repeated uint32 ports = 3;
+  // 8 bytes, the start of every datagram.
+  bytes tag = 4;
+  // Per port, 1-300.
+  uint32 count = 5;
+  // Per port, 1-50.
+  uint32 pps = 6;
+  // UDP payload bytes, 64-1200.
+  uint32 size = 7;
 }
 
 // Ask the node to put the AmneziaWG kernel module on itself (or, with dry_run, only say whether that is needed and

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/netip"
 	"strconv"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	panelhy2 "github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/udpcheck"
 )
 
 // dialHysteria2 is the Hysteria2 client of the checker: the hysteria core client, pointed at the node's address
@@ -37,7 +37,7 @@ func dialHysteria2(ctx context.Context, t Target, o DialOptions) (Tunnel, error)
 		return nil, errClientUnsupported
 	}
 
-	ip, err := nodeIP(ctx, t.Node.Address)
+	ip, err := udpcheck.Resolve(ctx, t.Node.Address)
 	if err != nil {
 		return nil, &ProbeError{Code: "refused", Detail: "cannot resolve the node address"}
 	}
@@ -99,23 +99,6 @@ func dialHysteria2(ctx context.Context, t Target, o DialOptions) (Tunnel, error)
 		}
 	}()
 	return nil, &ProbeError{Code: "timeout", Detail: "handshake timeout after " + strconv.Itoa(int(o.HandshakeTimeout.Seconds())) + "s"}
-}
-
-// nodeIP resolves the node's address (an IP literal or a host name) to one address, IPv4 first.
-func nodeIP(ctx context.Context, host string) (netip.Addr, error) {
-	if a, err := netip.ParseAddr(host); err == nil {
-		return a.Unmap(), nil
-	}
-	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil || len(ips) == 0 {
-		return netip.Addr{}, fmt.Errorf("resolve %s: %v", host, err)
-	}
-	for _, a := range ips {
-		if a.Unmap().Is4() {
-			return a.Unmap(), nil
-		}
-	}
-	return ips[0], nil
 }
 
 type hy2Tunnel struct{ c client.Client }

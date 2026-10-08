@@ -257,6 +257,9 @@ func TestForeignNft(t *testing.T) {
 	f2b := `{"table":{"family":"inet","name":"f2b-table","handle":5}},
 {"chain":{"family":"inet","table":"f2b-table","name":"f2b-chain","handle":1,"type":"filter","hook":"input","prio":-1,"policy":"accept"}},
 {"rule":{"family":"inet","table":"f2b-table","chain":"f2b-chain","handle":3,"expr":[{"match":{"op":"==","left":{"payload":{"protocol":"tcp","field":"dport"}},"right":{"set":[22]}}},{"drop":null}]}}`
+	udpCheck := `{"table":{"family":"inet","name":"mistgate_udpcheck","handle":6}},
+{"chain":{"family":"inet","table":"mistgate_udpcheck","name":"pre","handle":1,"type":"filter","hook":"prerouting","prio":-500,"policy":"accept"}},
+{"rule":{"family":"inet","table":"mistgate_udpcheck","chain":"pre","handle":2,"expr":[{"match":{"op":"==","left":{"payload":{"protocol":"udp","field":"dport"}},"right":443}},{"drop":null}]}}`
 	docker := `{"table":{"family":"ip","name":"nat","handle":2}},
 {"chain":{"family":"ip","table":"nat","name":"PREROUTING","handle":1,"type":"nat","hook":"prerouting","prio":-100,"policy":"accept"}}`
 	hy := func(match string) string {
@@ -275,6 +278,7 @@ func TestForeignNft(t *testing.T) {
 		code string
 	}{
 		{"only ours", nftDocument(nftOurs), OK, CodeNftClean},
+		{"udp delivery check is ours", nftDocument(nftOurs, udpCheck), OK, CodeNftClean},
 		{"a filter table that does not touch our ports", nftDocument(nftOurs, f2b), OK, CodeNftFound},
 		{"a nat table without rules is only a note", nftDocument(nftOurs, docker), Warn, CodeNftNat},
 		{"forgotten redirect inside our hop range", nftDocument(nftOurs, hy(udp(`{"range":[25000,26000]}`))), Fail, CodeNftHits},

@@ -20,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/awg/awguapi"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
+	"github.com/mistgate/mistgate/internal/udpcheck"
 )
 
 // dialAWG is the AmneziaWG client of the checker: amneziawg-go inside the panel process on a netstack TUN (a userspace
@@ -31,7 +32,7 @@ import (
 // A node never answers a peer it does not know or a packet with the wrong obfuscation, so a missing handshake cannot be
 // told apart from a blocked UDP port: both are "timeout" (hysteria2 can tell a refused credential, AWG cannot).
 func dialAWG(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
-	ip, err := nodeIP(ctx, t.Node.Address)
+	ip, err := udpcheck.Resolve(ctx, t.Node.Address)
 	if err != nil {
 		return nil, &ProbeError{Code: "refused", Detail: "cannot resolve the node address"}
 	}

@@ -24,6 +24,7 @@ const (
 	capAWG          = "awg/1"
 	capWarp         = "warp/1"
 	capTorrentGuard = "torrentguard/1"
+	capUDPCheck     = "udpcheck/1"
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
@@ -127,6 +128,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if hostctl.TorrentGuardSupported() {
 		caps = append(caps, capTorrentGuard)
+	}
+	if _, ok := a.host.(hostctl.UDPCounter); ok {
+		caps = append(caps, capUDPCheck)
 	}
 	if a.cfg.UnitGen >= 3 {
 		caps = append(caps, capUnit3)

@@ -11,8 +11,8 @@ import (
 	"github.com/mistgate/mistgate/internal/node/warp"
 )
 
-// cmdCleanupNet removes what a crashed or stopped agent leaves in the network of the host: the tunnel nft table and every
-// mgawg* / mgwarp link (hostctl.CleanupTunnels), and the WARP routes, rules, device and nft table (warp.CleanupHost). It
+// cmdCleanupNet removes what a crashed or stopped agent leaves in the network of the host: the UDP check and tunnel nft
+// tables and every mgawg* / mgwarp link, and the WARP routes, rules, device and nft table. It
 // needs no state and no panel, so the unit runs it from ExecStopPost after every stop: an orphaned "unreachable default"
 // in the WARP table would black-hole every socket still bound to the WARP device, and a kernel-backend interface
 // outlives its process. The agent re-creates all of it at its next start.
@@ -23,7 +23,7 @@ func cmdCleanupNet(args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if err := errors.Join(hostctl.CleanupTunnels(ctx), cleanupWarp(ctx)); err != nil {
+	if err := errors.Join(hostctl.CleanupTunnels(ctx), hostctl.CleanupUDPCount(ctx), cleanupWarp(ctx)); err != nil {
 		fmt.Fprintln(os.Stderr, "cleanup-net:", err)
 		return 1
 	}

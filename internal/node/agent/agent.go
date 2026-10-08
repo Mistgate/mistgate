@@ -124,7 +124,12 @@ type Agent struct {
 	dsOK         atomic.Bool                   // the last DesiredState on this stream was not refused
 	exiting      atomic.Bool                   // a re-exec is under way: the worker takes no new jobs
 
-	measuring atomic.Bool // a bandwidth test is running (one at a time)
+	measuring    atomic.Bool // a bandwidth test is running (one at a time)
+	udpMu        sync.Mutex
+	udpArmed     *udpCountArm
+	udpSends     int
+	udpAfterFunc func(time.Duration, func()) udpCountTimer
+	sendUDP      func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
 
 	doc      *doctor.Doctor
 	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
@@ -366,6 +371,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		return context.Cause(ctx)
 	}
 	a.announceStart(ctx)
+	if cleaner, ok := a.host.(hostctl.UDPCountCleaner); ok {
+		if err := cleaner.CleanupUDPCount(ctx); err != nil {
+			a.log.Warn("stale UDP check table not removed", "err", err)
+		}
+	}
 	if err := a.host.ApplyBaseline(ctx); err != nil {
 		a.log.Warn("host baseline not fully applied", "err", err)
 	}
@@ -871,6 +881,10 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.prepareAwgKernel(s, m.PrepareAwgKernel) })
 	case *pb.ConnectResponse_MeasureBandwidth:
 		a.goBusy(func() { a.measureBandwidth(s, m.MeasureBandwidth) })
+	case *pb.ConnectResponse_UdpCount:
+		a.goBusy(func() { a.udpCount(s, m.UdpCount) })
+	case *pb.ConnectResponse_UdpSend:
+		a.goBusy(func() { a.udpSend(s, m.UdpSend) })
 	case *pb.ConnectResponse_UpdateAgent:
 		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:
