@@ -29,6 +29,12 @@ service NodeService {
   // FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
   // in error_code. One measurement per node at a time.
   rpc MeasureBandwidth(MeasureBandwidthRequest) returns (MeasureBandwidthResponse);
+  // Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
+  // 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
+  // picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+  // itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
+  // (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+  rpc CheckPorts(CheckPortsRequest) returns (CheckPortsResponse);
   // "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
   // every user's access. The row stays (audit, traffic history) with status RETIRED.
   rpc RetireNode(RetireNodeRequest) returns (RetireNodeResponse);
@@ -197,6 +203,8 @@ message GetNodeResponse {
   // PENDING nodes: when the enrollment token stops working.
   int64 enrollment_expires_unix = 10 [jstype = JS_NUMBER];
   int64 created_unix = 11 [jstype = JS_NUMBER];
+  // Stored UDP delivery checks of this node's current address, by port.
+  repeated PortCheck port_checks = 12;
 }
 
 message CreateEnrollmentRequest {
@@ -329,6 +337,20 @@ message MeasureBandwidthResponse {
   repeated string run_failures = 10;
   // Which server of the provider answered: for Ookla, the sponsor and city ("MTS, Moscow"); "" for the others.
   string server_detail = 11;
+}
+
+message CheckPortsRequest {
+  string node_id = 1;
+  // At most 7; 443 is always added. Empty = the node's enabled inbound ports, then the free ports the picker prefers.
+  repeated uint32 ports = 2;
+}
+
+message CheckPortsResponse {
+  repeated PortCheck ports = 1;
+  // "" = checked. Otherwise PortCheck.reason's words; same_host and inconclusive still carry the counts in ports.
+  string error_code = 2;
+  // "panel" or the name of the node that sent.
+  string sender = 3;
 }
 
 message RetireNodeRequest {

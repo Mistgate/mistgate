@@ -239,6 +239,40 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	}
 }
 
+func TestD1PortChecksStorage(t *testing.T) {
+	portCheckStoreProof(t, openD1Store(t))
+}
+
+func TestD1PortChecksUseOneStatement(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, created_at)
+		VALUES ('nod_port_count', 'node-port-count', '203.0.113.12', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	checks := []PortCheck{
+		{NodeID: "nod_port_count", Port: 443, Address: "203.0.113.12", Sent: 300, Got: 300, Verdict: "ok", Sender: "panel", CheckedAt: time.Unix(100, 0)},
+		{NodeID: "nod_port_count", Port: 2053, Address: "203.0.113.12", Sent: 300, Got: 290, Verdict: "lossy", Sender: "nod_sender", CheckedAt: time.Unix(100, 0)},
+	}
+	binding := js.Global().Get("__d1")
+	var err error
+	calls := countD1Queries(t, binding, "PutPortChecks", func() { err = st.PutPortChecks(ctx, checks) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("PutPortChecks used %d sequential queries and %d batches, want one statement", calls.queries, calls.batches)
+	}
+	var rows []PortCheck
+	calls = countD1Queries(t, binding, "PortChecks", func() { rows, err = st.PortChecks(ctx, "nod_port_count") })
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("PortChecks() = %+v, %v", rows, err)
+	}
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("PortChecks used %d sequential queries and %d batches, want one read", calls.queries, calls.batches)
+	}
+}
+
 type d1CallCount struct{ queries, batches int }
 
 func countD1Queries(t *testing.T, binding js.Value, label string, run func()) d1CallCount {

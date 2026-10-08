@@ -159,7 +159,7 @@ case is ~0.4 MB (the D1 row limit is 2 MB).
   agent's whole frame, nil = the request is gone. Pending-request expiry produces `EffectReply{nil}`.
 - **Request kind from the frame.** It is derived through an allowlist:
   - RunDoctor → doctor; LogRequest → log;
-  - RestartInbound, ApplyFix, UpdateAgent, RollbackAgent, MeasureBandwidth, PrepareAwgKernel → command;
+  - RestartInbound, ApplyFix, UpdateAgent, RollbackAgent, MeasureBandwidth, PrepareAwgKernel, UdpCount, UdpSend → command;
   - Retire → special;
   - anything else, or any request before Hello, is refused with a nil reply.
 - **Retire.** The core sends the Retire frame, replies at once and sets `RetireAt = now + 5 s`. At that alarm the core

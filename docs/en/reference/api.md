@@ -173,6 +173,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 |---|---|---|---|
 | `FleetService.Overview`, `FleetService.ListEvents` | yes | yes | yes |
 | `NodeService.ListNodes`, `NodeService.GetNode` | yes | yes | yes |
+| `NodeService.CheckPorts` | no | yes | yes |
 | `HealthService.ListAlerts`, `GetChecks`, `GetDoctor` | yes | yes | yes |
 | `UserService.ListUsers`, `UserService.GetUser` | yes | yes | yes |
 | `GroupService.ListGroups` | yes | yes | yes |

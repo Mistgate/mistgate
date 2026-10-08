@@ -389,6 +389,63 @@ func doctorView(nodes []*adminv1.NodeDoctor, fresh bool) *DoctorV {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// node_ports
+
+type portInboundV struct {
+	InboundID string `json:"inbound_id"`
+	ProfileID string `json:"profile_id"`
+	Profile   string `json:"profile"`
+}
+
+type portCheckV struct {
+	Port     uint32         `json:"port"`
+	Verdict  string         `json:"verdict,omitempty"`
+	Sent     uint32         `json:"sent"`
+	Got      uint32         `json:"got"`
+	Checked  int64          `json:"checked_unix"`
+	Bad      int64          `json:"bad_unix"`
+	Sender   string         `json:"sender,omitempty"`
+	Reason   string         `json:"reason,omitempty"`
+	Inbounds []portInboundV `json:"inbounds"`
+}
+
+// NodePortsV is the node_ports result.
+type NodePortsV struct {
+	NodeID    string       `json:"node_id"`
+	NodeName  string       `json:"node_name"`
+	ErrorCode string       `json:"error_code,omitempty"`
+	Sender    string       `json:"sender,omitempty"`
+	Ports     []portCheckV `json:"ports"`
+}
+
+func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, inbounds []*adminv1.Inbound, errorCode, sender string) *NodePortsV {
+	v := &NodePortsV{NodeID: nodeID, NodeName: nm(nodeName), ErrorCode: clean(errorCode, 40), Sender: clean(sender, 80), Ports: []portCheckV{}}
+	for _, check := range checks {
+		if check == nil {
+			continue
+		}
+		row := portCheckV{Port: check.GetPort(), Verdict: clean(check.GetVerdict(), 16), Sent: check.GetSent(), Got: check.GetGot(),
+			Checked: check.GetCheckedUnix(), Bad: check.GetBadUnix(), Sender: clean(check.GetSender(), 80), Reason: clean(check.GetReason(), 40),
+			Inbounds: []portInboundV{}}
+		if row.Reason == "" && row.Verdict == "" {
+			row.Reason = v.ErrorCode
+		}
+		if row.Sender == "" {
+			row.Sender = v.Sender
+		}
+		for _, inbound := range inbounds {
+			if inbound == nil || inbound.GetPort() != row.Port || inbound.GetState() == adminv1.InboundState_INBOUND_STATE_DISABLED {
+				continue
+			}
+			row.Inbounds = append(row.Inbounds, portInboundV{InboundID: clean(inbound.GetId(), 80), ProfileID: clean(inbound.GetProfileId(), 80),
+				Profile: nm(inbound.GetProfileName())})
+		}
+		v.Ports = append(v.Ports, row)
+	}
+	return v
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // users
 
 type userV struct {

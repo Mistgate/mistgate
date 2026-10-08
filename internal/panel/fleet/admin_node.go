@@ -368,6 +368,14 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 		Timeouts:    &adminv1.NodeTimeouts{LivenessTimeoutS: uint32(n.LivenessTimeoutS), ApplyTimeoutS: uint32(n.ApplyTimeoutS), DialTimeoutS: uint32(n.DialTimeoutS)},
 		CreatedUnix: n.CreatedAt.Unix(),
 	}
+	portChecks, err := f.st.PortChecks(ctx, n.ID)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node UDP port checks", err)
+	}
+	resp.PortChecks, _, err = f.portCheckMessages(ctx, portChecks, "", "")
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node UDP port check senders", err)
+	}
 	view := sessionViewOf(f.session(n.ID))
 	resp.Node = f.nodeMsgView(ctx, n, protos, today[n.ID], enabled, now, view)
 	if n.State == "pending" {
@@ -406,6 +414,32 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 		resp.TopToday = append(resp.TopToday, &adminv1.TopUser{UserId: t.UserID, UserName: t.UserName, Bytes: t.Bytes})
 	}
 	return connect.NewResponse(resp), nil
+}
+
+func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv1.CheckPortsRequest]) (*connect.Response[adminv1.CheckPortsResponse], error) {
+	f := s.f
+	n, err := f.st.Node(ctx, req.Msg.NodeId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+	}
+	if err != nil {
+		return nil, internalErr(f.log.Error, "check node UDP ports", err)
+	}
+	requested := make([]uint16, 0, len(req.Msg.Ports))
+	for _, port := range req.Msg.Ports {
+		if port == 0 || port > 65535 {
+			out := portCheckOutcome{errorCode: "failed"}
+			f.auditPortCheck(ctx, n, nil, out)
+			return connect.NewResponse(&adminv1.CheckPortsResponse{ErrorCode: out.errorCode}), nil
+		}
+		requested = append(requested, uint16(port))
+	}
+	checks, sender, errorCode := f.CheckPorts(ctx, n.ID, requested)
+	rows, senderName, err := f.portCheckMessages(ctx, checks, sender, errorCode)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "check node UDP port senders", err)
+	}
+	return connect.NewResponse(&adminv1.CheckPortsResponse{Ports: rows, Sender: senderName, ErrorCode: errorCode}), nil
 }
 
 func (f *Fleet) onlineUsers(ctx context.Context, view *sessionView) ([]*adminv1.OnlineUser, error) {

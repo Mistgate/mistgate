@@ -106,6 +106,11 @@ type Fleet struct {
 	// The bandwidth test (bandwidth.go): how long a request waits for the node's answer, and how long after a node's first
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration
+
+	portCheckMu    sync.Mutex
+	portCheckLocks map[string]*portCheckLock
+	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	settleUDP      func(context.Context) error
 }
 
 // New builds the module: it loads (or creates) the panel CA. Call Run to start the background work.
@@ -142,6 +147,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		sessions:             map[string]*session{},
 		owners:               map[string]sessionOwner{},
 		stuck:                map[string]stuckSeq{},
+		portCheckLocks:       map[string]*portCheckLock{},
 		kick:                 make(chan struct{}, 1),
 		enrollLim:            cfg.Limiter,
 		unit:                 time.Second,

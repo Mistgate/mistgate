@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"unicode"
@@ -24,6 +25,7 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"node_metrics", map[string]any{"node": "de1"}},
 		{"node_doctor", map[string]any{}},
 		{"node_doctor", map[string]any{"node": "de1", "refresh": true}},
+		{"node_ports", map[string]any{"node": "de1"}},
 		{"users_search", map[string]any{"query": "a"}},
 		{"users_search", map[string]any{}},
 		{"groups_list", map[string]any{}},
@@ -182,6 +184,61 @@ func TestBadArguments(t *testing.T) {
 	// an argument the tool does not have is rejected by the schema before the handler runs
 	if _, isErr := callTool(t, s, "user_get", map[string]any{"user_id": "usr_alice", "extra": 1}); !isErr {
 		t.Error("unknown argument accepted")
+	}
+}
+
+func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
+	e := newTestEnv(t)
+	_, readonlySecret := e.token(ProfileReadonly)
+	readonly := e.session(readonlySecret)
+	stored := decode[NodePortsV](t, mustOK(t, readonly, "node_ports", map[string]any{"node": "de1"}))
+	if stored.ErrorCode != "" || len(stored.Ports) != 1 || stored.Ports[0].Port != 443 || stored.Ports[0].Verdict != "ok" ||
+		stored.Ports[0].Sender != "sender-node" || len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
+		t.Fatalf("stored UDP port checks = %+v", stored)
+	}
+	e.w.mu.Lock()
+	readonlyCalls := len(e.w.checkPortsReq)
+	e.w.mu.Unlock()
+	if readonlyCalls != 0 {
+		t.Fatalf("readonly node_ports called CheckPorts %d times", readonlyCalls)
+	}
+
+	_, operatorSecret := e.token(ProfileOperator)
+	operator := e.session(operatorSecret)
+	checked := decode[NodePortsV](t, mustOK(t, operator, "node_ports", map[string]any{"node": "de1", "check": true}))
+	if checked.ErrorCode != "" || checked.Sender != "sender-node" || len(checked.Ports) != 1 || checked.Ports[0].Verdict != "lossy" || checked.Ports[0].Got != 280 {
+		t.Fatalf("checked UDP port results = %+v", checked)
+	}
+	e.w.mu.Lock()
+	defer e.w.mu.Unlock()
+	if len(e.w.checkPortsReq) != 1 || e.w.checkPortsReq[0].GetNodeId() != nodeA {
+		t.Fatalf("operator CheckPorts calls = %+v", e.w.checkPortsReq)
+	}
+}
+
+func TestNodePortsCheckArgumentOnlyForOperators(t *testing.T) {
+	e := newTestEnv(t)
+	hasCheck := func(profile Profile) bool {
+		_, secret := e.token(profile)
+		s := e.session(secret)
+		for tool, err := range s.Tools(context.Background(), nil) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tool.Name != "node_ports" {
+				continue
+			}
+			properties := tool.InputSchema.(map[string]any)["properties"].(map[string]any)
+			return properties["check"] != nil
+		}
+		t.Fatal("no node_ports")
+		return false
+	}
+	if hasCheck(ProfileReadonly) {
+		t.Error("readonly's node_ports has check")
+	}
+	if !hasCheck(ProfileOperator) || !hasCheck(ProfileAdmin) {
+		t.Error("operator or admin lacks check")
 	}
 }
 

@@ -56,6 +56,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.NodeServiceGetNodeProcedure:          levelRead,
 	adminv1connect.NodeServiceUpdateNodeProcedure:       levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from): owner only
 	adminv1connect.NodeServiceRestartInboundsProcedure:  levelWrite,
+	adminv1connect.NodeServiceCheckPortsProcedure:       levelWrite,
 	adminv1connect.NodeServicePrepareAwgKernelProcedure: levelOwner, // installs packages on the node as root, like ApplyFix; closed to tokens (policy_tokens.go)
 	adminv1connect.NodeServiceMeasureBandwidthProcedure: levelOwner, // makes the node push up to 1 GB through a public server; closed to tokens (policy_tokens.go)
 	adminv1connect.NodeServiceCreateEnrollmentProcedure: levelOwner, // hands out the means to run an agent as a node

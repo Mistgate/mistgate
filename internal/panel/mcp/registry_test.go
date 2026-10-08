@@ -100,7 +100,7 @@ func TestRegistryShape(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 16, ProfileOperator: 34, ProfileAdmin: 62}
+	want := map[Profile]int{ProfileReadonly: 17, ProfileOperator: 35, ProfileAdmin: 63}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)

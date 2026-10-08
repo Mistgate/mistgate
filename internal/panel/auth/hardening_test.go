@@ -480,6 +480,7 @@ func TestRolePolicyIsEnforcedBySessionMiddleware(t *testing.T) {
 	}{
 		{adminv1connect.UserServiceListUsersProcedure, 200, 200, 200},
 		{adminv1connect.NodeServiceGetNodeProcedure, 200, 200, 200},
+		{adminv1connect.NodeServiceCheckPortsProcedure, 200, 200, 403},
 		{adminv1connect.AuthServiceMeProcedure, 200, 200, 200},
 		{adminv1connect.UserServiceCreateUserProcedure, 200, 200, 403},
 		{adminv1connect.UserServiceDeleteUsersProcedure, 200, 200, 403},

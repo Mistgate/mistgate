@@ -148,3 +148,20 @@ message WarpSummary {
   // "free" | "plus" | "".
   string account_type = 4;
 }
+
+// One port of a node in the UDP delivery check (design/udp-port-check.md).
+message PortCheck {
+  string node_id = 1;
+  uint32 port = 2;
+  // ok (>= 95 % delivered) | lossy (70-95 %) | broken (< 70 %); "" = not checked, see reason.
+  string verdict = 3;
+  uint32 sent = 4;
+  uint32 got = 5;
+  int64 checked_unix = 6 [jstype = JS_NUMBER];
+  // The last run in the last 30 days that lost 5 % or more; 0 = none. The port picker never offers such a port.
+  int64 bad_unix = 7 [jstype = JS_NUMBER];
+  // "panel" or the name of the node that sent.
+  string sender = 8;
+  // verdict "": node_offline | agent_too_old | no_sender | busy | inconclusive | same_host | no_route | failed.
+  string reason = 9;
+}

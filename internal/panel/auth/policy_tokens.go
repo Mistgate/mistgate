@@ -58,6 +58,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.HealthServiceMuteAlertProcedure:      TokenAccessDirect,
 	adminv1connect.HealthServiceRunChecksNowProcedure:   TokenAccessDirect,
 	adminv1connect.HealthServiceRunDoctorProcedure:      TokenAccessDirect,
+	adminv1connect.NodeServiceCheckPortsProcedure:       TokenAccessDirect,
 	// Owner level (the admin profile): the audit log, which names admins, tokens and addresses.
 	adminv1connect.AuthServiceListAuditProcedure: TokenAccessDirect,
 	// Only through the owner's approval (or, for the fix's dry run, a planning grant): see Service.WithApprovedStepUp.

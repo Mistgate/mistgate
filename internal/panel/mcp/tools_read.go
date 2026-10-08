@@ -67,6 +67,15 @@ type nodeArg struct {
 	Node string `json:"node" jsonschema:"node id or its exact name"`
 }
 
+type nodePortsArg struct {
+	Node string `json:"node" jsonschema:"node id or exact name"`
+}
+
+type nodePortsCheckArg struct {
+	Node  string `json:"node" jsonschema:"node id or exact name"`
+	Check bool   `json:"check,omitempty" jsonschema:"true: run a UDP delivery check now; false: show the stored results"`
+}
+
 type doctorArg struct {
 	Node string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every node"`
 }
@@ -185,6 +194,14 @@ func readTools() []toolDef {
 			"The doctor's report on a node, or on every node: the last stored result of its checks, each with a fix id when one exists. With refresh=true the node's agent runs its checks now "+
 				"(it only reads the host; changing anything is node_fix).",
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
+
+		readTool("node_ports", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
+			"The stored UDP delivery checks for a node: per-port verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port. This never contacts a node.",
+			func(c *call, in nodePortsArg) (any, error) { return c.nodePorts(in.Node, false) }),
+		readTool("node_ports", ProfileOperator,
+			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceCheckPortsProcedure),
+			"The stored UDP delivery checks for a node: per-port verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port. With check=true, run a bounded check now; it takes about six seconds.",
+			func(c *call, in nodePortsCheckArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),
 			"Find users by part of the name, by filter (online, expiring, over_quota) or group. Paged: pass next_page_token to continue.",
@@ -452,6 +469,27 @@ func (c *call) doctor(node string, refresh bool) (any, error) {
 		return nil, apiError(err)
 	}
 	return doctorView(r.Msg.GetNodes(), false), nil
+}
+
+func (c *call) nodePorts(node string, check bool) (any, error) {
+	id, _, err := c.nodeRef(node)
+	if err != nil {
+		return nil, err
+	}
+	stored, err := c.cl.Node.GetNode(c.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: id}))
+	if err != nil {
+		return nil, apiError(err)
+	}
+	checks := stored.Msg.GetPortChecks()
+	errorCode, sender := "", ""
+	if check {
+		result, err := c.cl.Node.CheckPorts(c.ctx, connect.NewRequest(&adminv1.CheckPortsRequest{NodeId: id}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		checks, errorCode, sender = result.Msg.GetPorts(), result.Msg.GetErrorCode(), result.Msg.GetSender()
+	}
+	return nodePortsView(id, stored.Msg.GetNode().GetName(), checks, stored.Msg.GetInbounds(), errorCode, sender), nil
 }
 
 func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {

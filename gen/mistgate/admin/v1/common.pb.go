@@ -785,6 +785,119 @@ func (x *WarpSummary) GetAccountType() string {
 	return ""
 }
 
+// One port of a node in the UDP delivery check (design/udp-port-check.md).
+type PortCheck struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Port   uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// ok (>= 95 % delivered) | lossy (70-95 %) | broken (< 70 %); "" = not checked, see reason.
+	Verdict     string `protobuf:"bytes,3,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	Sent        uint32 `protobuf:"varint,4,opt,name=sent,proto3" json:"sent,omitempty"`
+	Got         uint32 `protobuf:"varint,5,opt,name=got,proto3" json:"got,omitempty"`
+	CheckedUnix int64  `protobuf:"varint,6,opt,name=checked_unix,json=checkedUnix,proto3" json:"checked_unix,omitempty"`
+	// The last run in the last 30 days that lost 5 % or more; 0 = none. The port picker never offers such a port.
+	BadUnix int64 `protobuf:"varint,7,opt,name=bad_unix,json=badUnix,proto3" json:"bad_unix,omitempty"`
+	// "panel" or the name of the node that sent.
+	Sender string `protobuf:"bytes,8,opt,name=sender,proto3" json:"sender,omitempty"`
+	// verdict "": node_offline | agent_too_old | no_sender | busy | inconclusive | same_host | no_route | failed.
+	Reason        string `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortCheck) Reset() {
+	*x = PortCheck{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortCheck) ProtoMessage() {}
+
+func (x *PortCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortCheck.ProtoReflect.Descriptor instead.
+func (*PortCheck) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *PortCheck) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *PortCheck) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PortCheck) GetVerdict() string {
+	if x != nil {
+		return x.Verdict
+	}
+	return ""
+}
+
+func (x *PortCheck) GetSent() uint32 {
+	if x != nil {
+		return x.Sent
+	}
+	return 0
+}
+
+func (x *PortCheck) GetGot() uint32 {
+	if x != nil {
+		return x.Got
+	}
+	return 0
+}
+
+func (x *PortCheck) GetCheckedUnix() int64 {
+	if x != nil {
+		return x.CheckedUnix
+	}
+	return 0
+}
+
+func (x *PortCheck) GetBadUnix() int64 {
+	if x != nil {
+		return x.BadUnix
+	}
+	return 0
+}
+
+func (x *PortCheck) GetSender() string {
+	if x != nil {
+		return x.Sender
+	}
+	return ""
+}
+
+func (x *PortCheck) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -833,7 +946,17 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x1c.mistgate.admin.v1.WarpStateR\x05state\x125\n" +
 	"\x06source\x18\x02 \x01(\x0e2\x1d.mistgate.admin.v1.WarpSourceR\x06source\x12\x12\n" +
 	"\x04colo\x18\x03 \x01(\tR\x04colo\x12!\n" +
-	"\faccount_type\x18\x04 \x01(\tR\vaccountType*\xd5\x01\n" +
+	"\faccount_type\x18\x04 \x01(\tR\vaccountType\"\xee\x01\n" +
+	"\tPortCheck\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x12\x18\n" +
+	"\averdict\x18\x03 \x01(\tR\averdict\x12\x12\n" +
+	"\x04sent\x18\x04 \x01(\rR\x04sent\x12\x10\n" +
+	"\x03got\x18\x05 \x01(\rR\x03got\x12%\n" +
+	"\fchecked_unix\x18\x06 \x01(\x03B\x020\x02R\vcheckedUnix\x12\x1d\n" +
+	"\bbad_unix\x18\a \x01(\x03B\x020\x02R\abadUnix\x12\x16\n" +
+	"\x06sender\x18\b \x01(\tR\x06sender\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -883,7 +1006,7 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
@@ -895,10 +1018,11 @@ var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(*Inbound)(nil),          // 7: mistgate.admin.v1.Inbound
 	(*AwgInboundStatus)(nil), // 8: mistgate.admin.v1.AwgInboundStatus
 	(*WarpSummary)(nil),      // 9: mistgate.admin.v1.WarpSummary
-	nil,                      // 10: mistgate.admin.v1.StatusReason.ParamsEntry
+	(*PortCheck)(nil),        // 10: mistgate.admin.v1.PortCheck
+	nil,                      // 11: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	10, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	11, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
 	8,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
@@ -921,7 +1045,7 @@ func file_mistgate_admin_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

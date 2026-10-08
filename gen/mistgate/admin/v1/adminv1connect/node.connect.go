@@ -51,6 +51,8 @@ const (
 	// NodeServiceMeasureBandwidthProcedure is the fully-qualified name of the NodeService's
 	// MeasureBandwidth RPC.
 	NodeServiceMeasureBandwidthProcedure = "/mistgate.admin.v1.NodeService/MeasureBandwidth"
+	// NodeServiceCheckPortsProcedure is the fully-qualified name of the NodeService's CheckPorts RPC.
+	NodeServiceCheckPortsProcedure = "/mistgate.admin.v1.NodeService/CheckPorts"
 	// NodeServiceRetireNodeProcedure is the fully-qualified name of the NodeService's RetireNode RPC.
 	NodeServiceRetireNodeProcedure = "/mistgate.admin.v1.NodeService/RetireNode"
 	// NodeServiceStreamLogsProcedure is the fully-qualified name of the NodeService's StreamLogs RPC.
@@ -81,6 +83,12 @@ type NodeServiceClient interface {
 	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
 	// in error_code. One measurement per node at a time.
 	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
+	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
+	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
+	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
+	// (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -142,6 +150,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("MeasureBandwidth")),
 			connect.WithClientOptions(opts...),
 		),
+		checkPorts: connect.NewClient[v1.CheckPortsRequest, v1.CheckPortsResponse](
+			httpClient,
+			baseURL+NodeServiceCheckPortsProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("CheckPorts")),
+			connect.WithClientOptions(opts...),
+		),
 		retireNode: connect.NewClient[v1.RetireNodeRequest, v1.RetireNodeResponse](
 			httpClient,
 			baseURL+NodeServiceRetireNodeProcedure,
@@ -166,6 +180,7 @@ type nodeServiceClient struct {
 	restartInbounds  *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
 	prepareAwgKernel *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
 	measureBandwidth *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
+	checkPorts       *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
 	retireNode       *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
 	streamLogs       *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
 }
@@ -205,6 +220,11 @@ func (c *nodeServiceClient) MeasureBandwidth(ctx context.Context, req *connect.R
 	return c.measureBandwidth.CallUnary(ctx, req)
 }
 
+// CheckPorts calls mistgate.admin.v1.NodeService.CheckPorts.
+func (c *nodeServiceClient) CheckPorts(ctx context.Context, req *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error) {
+	return c.checkPorts.CallUnary(ctx, req)
+}
+
 // RetireNode calls mistgate.admin.v1.NodeService.RetireNode.
 func (c *nodeServiceClient) RetireNode(ctx context.Context, req *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error) {
 	return c.retireNode.CallUnary(ctx, req)
@@ -239,6 +259,12 @@ type NodeServiceHandler interface {
 	// FAILED_PRECONDITION "node_offline" / "agent too old"; an answer the node itself gave (busy, no server reachable...) is
 	// in error_code. One measurement per node at a time.
 	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
+	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
+	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
+	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
+	// (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -296,6 +322,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("MeasureBandwidth")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceCheckPortsHandler := connect.NewUnaryHandler(
+		NodeServiceCheckPortsProcedure,
+		svc.CheckPorts,
+		connect.WithSchema(nodeServiceMethods.ByName("CheckPorts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceRetireNodeHandler := connect.NewUnaryHandler(
 		NodeServiceRetireNodeProcedure,
 		svc.RetireNode,
@@ -324,6 +356,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServicePrepareAwgKernelHandler.ServeHTTP(w, r)
 		case NodeServiceMeasureBandwidthProcedure:
 			nodeServiceMeasureBandwidthHandler.ServeHTTP(w, r)
+		case NodeServiceCheckPortsProcedure:
+			nodeServiceCheckPortsHandler.ServeHTTP(w, r)
 		case NodeServiceRetireNodeProcedure:
 			nodeServiceRetireNodeHandler.ServeHTTP(w, r)
 		case NodeServiceStreamLogsProcedure:
@@ -363,6 +397,10 @@ func (UnimplementedNodeServiceHandler) PrepareAwgKernel(context.Context, *connec
 
 func (UnimplementedNodeServiceHandler) MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.MeasureBandwidth is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.CheckPorts is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error) {
