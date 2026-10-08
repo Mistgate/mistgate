@@ -214,12 +214,15 @@ export class NodeLink extends DurableObject<Env> {
 
   /**
    * Sends a request frame through a session step and waits for the reply a later step resolves. The wait is outside the
-   * serial block (other events must run meanwhile). Rejects with "link lost" when the session ends and "timeout" at
-   * deadlineAt, the caller's own deadline (ms since the epoch): a request that reaches the object after the caller gave up
-   * is never sent, so a command does not run behind an answer of "timeout".
+   * serial block (other events must run meanwhile). Rejects with "link lost" when there is no session or it ends, and
+   * "timeout" at deadlineAt, the caller's own deadline (ms since the epoch): a request that reaches the object after the
+   * caller gave up is never sent, so a command does not run behind an answer of "timeout".
    */
   async ask(requestId: string, frame: Uint8Array, deadlineAt: number): Promise<Uint8Array | null> {
     if (this.waiters.has(requestId)) throw new Error("duplicate request id");
+    // No session is "link lost" before the deadline is looked at: the input gate may hold this call behind the block
+    // that ended the session (its closed step) until the deadline has passed, and a node that is gone is not "timeout".
+    if (!this.liveSocket()) throw new Error("link lost");
     const waitMs = deadlineAt - Date.now();
     if (waitMs <= 0) throw new Error("timeout");
     let waiter!: Waiter;

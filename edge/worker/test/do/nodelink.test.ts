@@ -362,14 +362,21 @@ describe("NodeLink ask", () => {
   });
 
   it("rejects with link lost when the socket closes, and when there is no session", async () => {
-    answering();
+    const fake = answering();
+    const answer = fake.step;
+    // A slow closed step, as on a loaded runner: the ask after the close waits behind it at the input gate past its deadline.
+    fake.step = async (input) => {
+      if (input.event.kind === "closed") await sleep(200);
+      return answer(input);
+    };
     const id = newNode();
     const c = await login(id);
     const pending = stubFor(id).ask("r4", text("x4"), Date.now() + 5_000);
     await c.until(() => c.inbox.includes("x4"), "the request frame");
     c.ws.close(1000, "bye");
-    await expect(pending).rejects.toThrow("link lost");
-    await expect(stubFor(id).ask("r5", text("x"), Date.now() + 100)).rejects.toThrow("link lost");
+    await expect(pending).rejects.toThrow("link lost"); // before the closed step runs
+    await expect(stubFor(id).ask("r5", text("x"), Date.now() + 100)).rejects.toThrow("link lost"); // not "timeout"
+    await expect(stubFor(id).ask("r6", text("x"), Date.now() + 2_000)).rejects.toThrow("link lost"); // at once, not at the deadline
   });
 });
 
