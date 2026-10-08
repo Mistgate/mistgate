@@ -132,7 +132,8 @@ func TestApplyBaselinePreservesHigherUDPBufferValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	for f, want := range map[string]string{"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864"} {
-		if b, err := os.ReadFile(filepath.Join(h.procSys, f)); err != nil || string(b) != want {
+		// left as the kernel shows it (with its newline): a higher value is not rewritten
+		if b, err := os.ReadFile(filepath.Join(h.procSys, f)); err != nil || strings.TrimSpace(string(b)) != want {
 			t.Errorf("%s = %q, %v; want %q", f, b, err, want)
 		}
 	}

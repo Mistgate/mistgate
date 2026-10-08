@@ -677,8 +677,23 @@ install_bundle() {
   cp -r "$WORK/bundles/$1" "$DATA/dist.new" && mv "$DATA/dist.new" "$DATA/dist"
   mutate UpdateService/RescanBundle >/dev/null
 }
-# start_rollout [json]: on success the rollout id
-start_rollout() { mutate UpdateService/StartRollout "${1:-{\}}" | jq -r '.rollout.id'; }
+# start_rollout [json]: on success the rollout id. Like the admin, it names the bundle it reviewed (the version and build
+# GetUpdates shows): the panel refuses a rollout of a bundle that changed since. A panel that just started checks GitHub
+# for a node bundle and refuses rollouts meanwhile ("... is being installed"): wait that out.
+start_rollout() {
+  local pin out i
+  for i in $(seq 60); do
+    pin=$(upd | jq -c '{expectedVersion: .bundle.version, expectedBuilt: .bundle.built}')
+    if out=$(mutate UpdateService/StartRollout "$(jq -c --argjson pin "$pin" '. + $pin' <<<"${1:-{\}}")" 2>&1); then
+      jq -r '.rollout.id' <<<"$out"
+      return
+    fi
+    grep -q 'is being installed' <<<"$out" || break
+    sleep 2
+  done
+  echo "$out" >&2
+  return 1
+}
 
 EVENT_MARK=$(api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":1}" | jq -r '(.events[0].id // "0") | tonumber')
 UPD0=$(upd)
@@ -702,7 +717,7 @@ if [ -n "$OLD_NODE" ]; then
   upd_node | jq -e '(.supportsUpdate // false) == false' >/dev/null || die "old agent: supportsUpdate is true"
   OUT=$(mutate UpdateService/StartRollout 2>&1) && die "old agent: StartRollout with nothing to update succeeded: $OUT"
   grep -qi 'failed_precondition' <<<"$OUT" || die "old agent: StartRollout expected failed_precondition, got: $OUT"
-  if OUT=$(mutate UpdateService/StartRollout "{\"nodeIds\":[\"$NODE_ID\"]}" 2>&1); then
+  if OUT=$(mutate UpdateService/StartRollout "$(upd | jq -c --arg n "$NODE_ID" '{nodeIds: [$n], expectedVersion: .bundle.version, expectedBuilt: .bundle.built}')" 2>&1); then
     RID=$(jq -r .rollout.id <<<"$OUT")
     wait_for 60 "the rollout over the unsupported node to settle" ro_settled
     ro_step | jq -e '.state == "STEP_STATE_SKIPPED" and .errorKey == "updates.step.err.unsupported"' >/dev/null \
