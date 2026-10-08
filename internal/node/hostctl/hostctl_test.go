@@ -60,8 +60,13 @@ func TestRenderHopsRejects(t *testing.T) {
 	if _, err := RenderHops([]Hop{ok, {InboundID: "inb_t", Network: "tcp", From: 20000, To: 21000, Port: 443}}); err != nil {
 		t.Errorf("udp/tcp same range: %v", err)
 	}
-	if strings.Contains(sysctlFileBody, "cubic") || !strings.Contains(sysctlFileBody, "bbr") {
-		t.Error("sysctl baseline must be fq + bbr")
+}
+
+func TestSysctlBaselineBody(t *testing.T) {
+	if strings.Contains(sysctlFileBody, "cubic") || !strings.Contains(sysctlFileBody, "bbr") ||
+		!strings.Contains(sysctlFileBody, "net.core.rmem_max = 16777216") ||
+		!strings.Contains(sysctlFileBody, "net.core.wmem_max = 16777216") {
+		t.Error("sysctl baseline must be fq + bbr with 16 MiB UDP buffers")
 	}
 }
 

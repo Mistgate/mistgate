@@ -1,6 +1,7 @@
 // Package hostctl is the agent's view of the machine it runs on: host facts for Hello, host metrics for
 // StatsBatch, and the only host state the agent owns: its own nftables table for
-// port-hop redirects and the SSH brute-force guard, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall, the fq + bbr sysctl baseline and the journald size cap. The real implementation is
+// port-hop redirects and the SSH brute-force guard, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall,
+// the fq + bbr and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
 // Linux-only behind a build tag; other OSes get a no-op stub so the whole repo still builds and vets.
 package hostctl
 
@@ -22,7 +23,7 @@ type Host interface {
 	// Metrics is sampled once per stats interval; rates are averaged since the previous call.
 	Metrics() Metrics
 	// ApplyBaseline installs the sysctl and journald baseline and the SSH brute-force guard. Idempotent; a
-	// failure is returned but is never fatal for the agent (OpenVZ/LXC cannot set qdisc/congestion control).
+	// failure is returned but is never fatal for the agent (OpenVZ/LXC may not allow live sysctl writes).
 	ApplyBaseline(ctx context.Context) error
 	// SetPortHops makes the hop part of the agent's nft table match hops exactly. Atomic; the SSH guard
 	// (installed by ApplyBaseline) stays. Every hop must pass ValidateHop.
@@ -204,22 +205,30 @@ func RenderRuleset(hops []Hop, sshPorts []uint16) (string, error) {
 	return b.String(), nil
 }
 
-// Exported so the doctor's net_baseline check compares against exactly what ApplyBaseline writes.
+// Exported so the doctor's net_baseline check compares against the baseline ApplyBaseline writes.
 const (
 	SysctlFilePath   = "/etc/sysctl.d/90-mistgate.conf"
 	JournaldFilePath = "/etc/systemd/journald.conf.d/90-mistgate.conf"
 	SysctlFileBody   = sysctlFileBody
 	JournaldFileBody = journaldFileBody
+	// UDPBufferMinBytes is the minimum net.core.rmem_max and net.core.wmem_max value.
+	UDPBufferMinBytes = 16 << 20
 	// JournalCapMB is SystemMaxUse in journaldFileBody and the target of VacuumJournal.
 	JournalCapMB = 200
 )
 
 const (
-	sysctlFileBody = "# Managed by mistgate-node.\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\n"
+	sysctlFileBody = "# Managed by mistgate-node.\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\nnet.core.rmem_max = 16777216\nnet.core.wmem_max = 16777216\n"
 	// SystemMaxUse/RuntimeMaxUse only; no retention time and no conntrack tuning (add conntrack when a node is
 	// measured to need it).
 	journaldFileBody = "# Managed by mistgate-node.\n[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=200M\n"
 )
+
+// sysctlFileBodyWithBuffers keeps larger live values in the persistent baseline.
+func sysctlFileBodyWithBuffers(rmemMax, wmemMax uint64) string {
+	body := strings.Replace(sysctlFileBody, "net.core.rmem_max = 16777216", fmt.Sprintf("net.core.rmem_max = %d", rmemMax), 1)
+	return strings.Replace(body, "net.core.wmem_max = 16777216", fmt.Sprintf("net.core.wmem_max = %d", wmemMax), 1)
+}
 
 // hasGlobalIPv6 reports whether any interface carries a global unicast IPv6 address (ULA excluded).
 func hasGlobalIPv6() bool {

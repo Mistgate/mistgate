@@ -86,7 +86,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 The agent, once started:
 
-1. Applies its host baseline: the fq and BBR sysctl values, the journald size cap and the SSH guard in its own nftables table.
+1. Applies its host baseline: the fq and BBR sysctl values, UDP socket buffer maxima (`net.core.rmem_max` and `net.core.wmem_max`) of at least 16 MiB, the journald size cap and the SSH guard in its own nftables table.
 2. Brings back the last applied state from its state directory (nothing on the first start).
 3. Opens one long-lived connection to the panel with mutual TLS, reports the host's facts, and receives its settings and the desired state: which servers to run, with which users' credentials.
 4. Sends traffic, sessions and host metrics every 10 seconds, runs the doctor 30 seconds after connecting and every 10 minutes after that, and renews its certificate (with a new key) when less than 10 days are left.
@@ -135,7 +135,7 @@ If the agent is connected, it gets the order to retire and, on the server:
 3. removes its host changes: its nftables tables, its tagged UFW rules (the UDP listener rules and the 80/443 rules of an SSH install; the SSH rule stays), the AmneziaWG interfaces, the sysctl and journald files (journald is restarted, so its size cap goes at once), and the doctor's resolver fix if one was applied;
 4. deletes its state directory (the key first) and exits.
 
-What stays on the server: the binary, the unit (still enabled), the values already set in the running kernel (fq, BBR, IP forwarding) until the next reboot, and the AmneziaWG kernel module with its packages if you installed it. Remove the rest by hand:
+What stays on the server: the binary, the unit (still enabled), the values already set in the running kernel (fq, BBR, UDP buffers, IP forwarding) until the next reboot, and the AmneziaWG kernel module with its packages if you installed it. Remove the rest by hand:
 
 ```sh
 systemctl disable --now mistgate-node

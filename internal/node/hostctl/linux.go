@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -174,15 +175,31 @@ func (h *linuxHost) Metrics() Metrics {
 	return m
 }
 
+func baselineUDPBufferValue(procSys, key string) uint64 {
+	b, err := os.ReadFile(filepath.Join(procSys, key))
+	if err != nil {
+		return UDPBufferMinBytes
+	}
+	value, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil || value < UDPBufferMinBytes {
+		return UDPBufferMinBytes
+	}
+	return value
+}
+
 func (h *linuxHost) ApplyBaseline(ctx context.Context) error {
 	var errs []error
-	if _, err := writeIfChanged(h.sysctlFile, sysctlFileBody, 0o644); err != nil {
+	rmemMax := baselineUDPBufferValue(h.procSys, "net/core/rmem_max")
+	wmemMax := baselineUDPBufferValue(h.procSys, "net/core/wmem_max")
+	if _, err := writeIfChanged(h.sysctlFile, sysctlFileBodyWithBuffers(rmemMax, wmemMax), 0o644); err != nil {
 		errs = append(errs, err)
 	}
 	// Apply now without the sysctl binary. On OpenVZ/LXC these files are read-only or absent.
 	for _, kv := range [][2]string{
 		{"net/core/default_qdisc", "fq"},
 		{"net/ipv4/tcp_congestion_control", "bbr"},
+		{"net/core/rmem_max", strconv.FormatUint(rmemMax, 10)},
+		{"net/core/wmem_max", strconv.FormatUint(wmemMax, 10)},
 	} {
 		p := filepath.Join(h.procSys, kv[0])
 		if cur, err := os.ReadFile(p); err == nil && strings.TrimSpace(string(cur)) == kv[1] {

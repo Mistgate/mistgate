@@ -183,7 +183,7 @@ func fixJournald(ctx context.Context, e *Env, dry bool, params map[string]string
 	return FixOutcome{OK: true, Affected: 1, Params: pm, Detail: fmt.Sprintf("journal vacuumed from %s to %s", human(uint64(before)), human(uint64(after)))}
 }
 
-// apply_baseline: hostctl.ApplyBaseline (sysctl fq + bbr, journald cap, ssh guard). Idempotent.
+// apply_baseline: hostctl.ApplyBaseline (sysctl fq + bbr + UDP buffers, journald cap, ssh guard). Idempotent.
 func fixBaseline(ctx context.Context, e *Env, dry bool, params map[string]string) FixOutcome {
 	if !noParams(params) {
 		return FixOutcome{Err: ErrBadParams}

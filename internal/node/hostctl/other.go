@@ -12,7 +12,7 @@ import (
 // stub is the host owner on non-Linux systems (dev machines): it reports what it cheaply can and changes nothing.
 type stub struct{ log *slog.Logger }
 
-// New returns a no-op Host; nft, sysctl and journald only exist on Linux.
+// New returns a no-op Host; nft, sysctl (including UDP buffer sizing) and journald only exist on Linux.
 func New(log *slog.Logger) Host { return stub{log} }
 
 func (stub) Facts(context.Context) Facts {

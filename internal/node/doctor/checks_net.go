@@ -705,7 +705,22 @@ func baselineDiff(e *Env) (diff, fixable []string, notes []string) {
 			}
 			fixable = append(fixable, kv.name)
 		}
-		if cur, err := e.read(hostctl.SysctlFilePath); err != nil || cur != hostctl.SysctlFileBody {
+		for _, kv := range []struct{ name, file string }{
+			{"rmem_max", "/proc/sys/net/core/rmem_max"},
+			{"wmem_max", "/proc/sys/net/core/wmem_max"},
+		} {
+			cur, err := e.read(kv.file)
+			if err != nil {
+				continue
+			}
+			value, err := strconv.ParseUint(strings.TrimSpace(cur), 10, 64)
+			if err == nil && value >= hostctl.UDPBufferMinBytes {
+				continue
+			}
+			diff = append(diff, kv.name)
+			fixable = append(fixable, kv.name)
+		}
+		if cur, err := e.read(hostctl.SysctlFilePath); err != nil || !sysctlFileMatchesBaseline(cur) {
 			diff = append(diff, "sysctl_file")
 			fixable = append(fixable, "sysctl_file")
 		}
@@ -723,6 +738,90 @@ func baselineDiff(e *Env) (diff, fixable []string, notes []string) {
 	return diff, fixable, notes
 }
 
+func sysctlFileMatchesBaseline(body string) bool {
+	lines := strings.Split(body, "\n")
+	seenRmem, seenWmem := false, false
+	for i, line := range lines {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "net.core.rmem_max":
+			if seenRmem {
+				return false
+			}
+			seenRmem = true
+			bytes, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+			if err != nil || bytes < hostctl.UDPBufferMinBytes {
+				return false
+			}
+			lines[i] = fmt.Sprintf("net.core.rmem_max = %d", hostctl.UDPBufferMinBytes)
+		case "net.core.wmem_max":
+			if seenWmem {
+				return false
+			}
+			seenWmem = true
+			bytes, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+			if err != nil || bytes < hostctl.UDPBufferMinBytes {
+				return false
+			}
+			lines[i] = fmt.Sprintf("net.core.wmem_max = %d", hostctl.UDPBufferMinBytes)
+		}
+	}
+	return seenRmem && seenWmem && strings.Join(lines, "\n") == hostctl.SysctlFileBody
+}
+
+func udpBufferErrorParams(e *Env) map[string]string {
+	content, err := e.read("/proc/net/snmp")
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	for i := 0; i+1 < len(lines); i++ {
+		header, values := strings.Fields(lines[i]), strings.Fields(lines[i+1])
+		if len(header) == 0 || len(values) == 0 || header[0] != "Udp:" || values[0] != "Udp:" {
+			continue
+		}
+		if len(header) != len(values) {
+			return nil
+		}
+		params := make(map[string]string, 2)
+		for name, param := range map[string]string{
+			"RcvbufErrors": "udp_rcvbuf_errors",
+			"SndbufErrors": "udp_sndbuf_errors",
+		} {
+			found := false
+			for field := 1; field < len(header); field++ {
+				if header[field] != name {
+					continue
+				}
+				if found {
+					return nil
+				}
+				value, err := strconv.ParseUint(values[field], 10, 64)
+				if err != nil {
+					return nil
+				}
+				params[param] = strconv.FormatUint(value, 10)
+				found = true
+			}
+			if !found {
+				return nil
+			}
+		}
+		return params
+	}
+	return nil
+}
+
+func addUDPBufferErrorParams(params map[string]string, e *Env) map[string]string {
+	for key, value := range udpBufferErrorParams(e) {
+		params[key] = value
+	}
+	return params
+}
+
 func containsField(s, want string) bool {
 	for _, f := range strings.Fields(s) {
 		if f == want {
@@ -736,11 +835,11 @@ func checkNetBaseline(_ context.Context, e *Env) Result {
 	diff, fixable, notes := baselineDiff(e)
 	if len(diff) == 0 {
 		if len(notes) > 0 {
-			return Result{Status: OK, Code: CodeBaselineNotes, Params: p("notes", strings.Join(notes, ",")), Detail: noteText(notes)}
+			return Result{Status: OK, Code: CodeBaselineNotes, Params: addUDPBufferErrorParams(p("notes", strings.Join(notes, ",")), e), Detail: noteText(notes)}
 		}
-		return Result{Status: OK, Code: CodeBaselineOK, Params: p(), Detail: "fq, bbr and the journald cap are in place"}
+		return Result{Status: OK, Code: CodeBaselineOK, Params: addUDPBufferErrorParams(p(), e), Detail: "fq, bbr, UDP buffers and the journald cap are in place"}
 	}
-	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: p("differs", strings.Join(diff, ","), "notes", strings.Join(notes, ","))}
+	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: addUDPBufferErrorParams(p("differs", strings.Join(diff, ","), "notes", strings.Join(notes, ",")), e)}
 	r.Detail = "baseline differs: " + strings.Join(diff, ", ")
 	if len(notes) > 0 {
 		r.Detail += "; " + noteText(notes)

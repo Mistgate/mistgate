@@ -31,12 +31,16 @@ func testHost(t *testing.T) (*linuxHost, *[]call) {
 			return nil, nil
 		},
 	}
-	for _, f := range []string{"net/core/default_qdisc", "net/ipv4/tcp_congestion_control"} {
+	for _, f := range []string{"net/core/default_qdisc", "net/ipv4/tcp_congestion_control", "net/core/rmem_max", "net/core/wmem_max"} {
 		p := filepath.Join(h.procSys, f)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(p, []byte("fq_codel\n"), 0o644); err != nil {
+		value := "fq_codel\n"
+		if f == "net/core/rmem_max" || f == "net/core/wmem_max" {
+			value = "4096\n"
+		}
+		if err := os.WriteFile(p, []byte(value), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -49,7 +53,12 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 	if err := h.ApplyBaseline(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for f, want := range map[string]string{"net/core/default_qdisc": "fq", "net/ipv4/tcp_congestion_control": "bbr"} {
+	for f, want := range map[string]string{
+		"net/core/default_qdisc":          "fq",
+		"net/ipv4/tcp_congestion_control": "bbr",
+		"net/core/rmem_max":               "16777216",
+		"net/core/wmem_max":               "16777216",
+	} {
 		if b, _ := os.ReadFile(filepath.Join(h.procSys, f)); string(b) != want {
 			t.Errorf("%s = %q, want %q", f, b, want)
 		}
@@ -109,6 +118,49 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 	}
 	if restarts() != 2 {
 		t.Fatalf("a cleanup with no drop-in restarted journald: %+v", *calls)
+	}
+}
+
+func TestApplyBaselinePreservesHigherUDPBufferValues(t *testing.T) {
+	h, _ := testHost(t)
+	for f, want := range map[string]string{"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864"} {
+		if err := os.WriteFile(filepath.Join(h.procSys, f), []byte(want+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.ApplyBaseline(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for f, want := range map[string]string{"net/core/rmem_max": "33554432", "net/core/wmem_max": "67108864"} {
+		if b, err := os.ReadFile(filepath.Join(h.procSys, f)); err != nil || string(b) != want {
+			t.Errorf("%s = %q, %v; want %q", f, b, err, want)
+		}
+	}
+	wantFile := strings.Replace(sysctlFileBody, "net.core.rmem_max = 16777216", "net.core.rmem_max = 33554432", 1)
+	wantFile = strings.Replace(wantFile, "net.core.wmem_max = 16777216", "net.core.wmem_max = 67108864", 1)
+	if b, err := os.ReadFile(h.sysctlFile); err != nil || string(b) != wantFile {
+		t.Errorf("sysctl.d = %q, %v; want %q", b, err, wantFile)
+	}
+}
+
+func TestApplyBaselineToleratesUnwritableUDPBufferKey(t *testing.T) {
+	h, _ := testHost(t)
+	wmem := filepath.Join(h.procSys, "net/core/wmem_max")
+	if err := os.Remove(wmem); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(wmem, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := h.ApplyBaseline(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "net.core.wmem_max=16777216") {
+		t.Fatalf("err = %v", err)
+	}
+	if b, readErr := os.ReadFile(filepath.Join(h.procSys, "net/core/rmem_max")); readErr != nil || string(b) != "16777216" {
+		t.Errorf("writable sibling key was skipped: %q, %v", b, readErr)
+	}
+	if _, statErr := os.Stat(h.sysctlFile); statErr != nil {
+		t.Errorf("sysctl drop-in was not written: %v", statErr)
 	}
 }
 

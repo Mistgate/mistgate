@@ -429,6 +429,8 @@ func TestNetBaseline(t *testing.T) {
 	good := func(f *fake) {
 		f.put("/proc/sys/net/core/default_qdisc", "fq\n")
 		f.put("/proc/sys/net/ipv4/tcp_congestion_control", "bbr\n")
+		f.put("/proc/sys/net/core/rmem_max", "16777216\n")
+		f.put("/proc/sys/net/core/wmem_max", "16777216\n")
 		f.put("/proc/sys/net/ipv4/tcp_available_congestion_control", "reno cubic bbr\n")
 		f.put(hostctl.SysctlFilePath, hostctl.SysctlFileBody)
 		f.put(hostctl.JournaldFilePath, hostctl.JournaldFileBody)
@@ -439,6 +441,60 @@ func TestNetBaseline(t *testing.T) {
 	r := run(t, f.doctor(), CheckNetBaseline)
 	want(t, r, OK, "")
 	code(t, r, CodeBaselineOK)
+
+	f.put("/proc/net/snmp", "Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors\nUdp: 10 11 12 13 14 15\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, OK, "")
+	param(t, r, "udp_rcvbuf_errors", "14")
+	param(t, r, "udp_sndbuf_errors", "15")
+
+	f.put("/proc/net/snmp", "Udp: InDatagrams NoPorts RcvbufErrors SndbufErrors\nUdp: 1 2 malformed 4\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, OK, "")
+	if _, ok := r.Params["udp_rcvbuf_errors"]; ok {
+		t.Errorf("malformed SNMP data added params: %v", r.Params)
+	}
+	if _, ok := r.Params["udp_sndbuf_errors"]; ok {
+		t.Errorf("malformed SNMP data added params: %v", r.Params)
+	}
+	f.put("/proc/net/snmp", "Udp: InDatagrams NoPorts RcvbufErrors\nUdp: 1 2 3\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, OK, "")
+	if _, ok := r.Params["udp_rcvbuf_errors"]; ok {
+		t.Errorf("missing SNMP field added params: %v", r.Params)
+	}
+	if _, ok := r.Params["udp_sndbuf_errors"]; ok {
+		t.Errorf("missing SNMP field added params: %v", r.Params)
+	}
+	f.remove("/proc/net/snmp")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, OK, "")
+	if _, ok := r.Params["udp_rcvbuf_errors"]; ok {
+		t.Errorf("missing SNMP file added params: %v", r.Params)
+	}
+	if _, ok := r.Params["udp_sndbuf_errors"]; ok {
+		t.Errorf("missing SNMP file added params: %v", r.Params)
+	}
+
+	f.put("/proc/sys/net/core/rmem_max", "16777215\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, Warn, FixApplyBaseline)
+	param(t, r, "differs", "rmem_max")
+	code(t, r, CodeBaselineDiff)
+
+	good(f)
+	f.put("/proc/sys/net/core/wmem_max", "16777215\n")
+	r = run(t, f.doctor(), CheckNetBaseline)
+	want(t, r, Warn, FixApplyBaseline)
+	param(t, r, "differs", "wmem_max")
+
+	good(f)
+	f.put("/proc/sys/net/core/rmem_max", "33554432\n")
+	f.put("/proc/sys/net/core/wmem_max", "67108864\n")
+	file := strings.Replace(hostctl.SysctlFileBody, "net.core.rmem_max = 16777216", "net.core.rmem_max = 33554432", 1)
+	file = strings.Replace(file, "net.core.wmem_max = 16777216", "net.core.wmem_max = 67108864", 1)
+	f.put(hostctl.SysctlFilePath, file)
+	want(t, run(t, f.doctor(), CheckNetBaseline), OK, "")
 
 	f.put("/proc/sys/net/core/default_qdisc", "fq_codel\n")
 	r = run(t, f.doctor(), CheckNetBaseline)
