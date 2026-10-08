@@ -612,3 +612,33 @@ func TestRunStopsCleanly(t *testing.T) {
 	e.tg.srv.CloseClientConnections()
 	waitFor(t, "goroutines to end", func() bool { return goroutines() <= before })
 }
+
+// A person who keeps trying torrents is told once: the alert stays open, so repeated reports add nothing; the end of the
+// quiet day is silent too; the next episode is a new message.
+func TestTorrentAlertIsOneMessagePerEpisodeAndResolvesSilently(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 777)
+	e.run()
+
+	a := alert("torrent", "", 2)
+	a.Subject = "usr_a"
+	a.Params = map[string]string{"user_id": "usr_a", "user_name": "alice", "nodes": "EE", "count": "3"}
+	e.svc.AlertTransition(a, false)
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "the torrent message", func() bool { return len(e.tg.sentTo(777)) == 1 })
+	e.quiet(1, 150*time.Millisecond)
+	if got := e.tg.sentTo(777)[0]; !strings.Contains(got, "alice is trying to use torrents on EE") {
+		t.Errorf("torrent message = %q", got)
+	}
+
+	before := e.tg.total()
+	a.Resolution, a.ResolvedAt = "cleared", e.clk.now()
+	e.svc.AlertTransition(a, true)
+	e.quiet(before, 150*time.Millisecond)
+
+	a.Resolution, a.ResolvedAt = "", time.Time{}
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "the next episode's message", func() bool { return len(e.tg.sentTo(777)) == 2 })
+}

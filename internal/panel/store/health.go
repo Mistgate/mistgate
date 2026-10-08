@@ -180,11 +180,11 @@ func (s *Store) MuteAlert(ctx context.Context, id string, until time.Time) (Heal
 }
 
 // AlertCounts counts the active alerts that feed the badge: not muted, severity warning or critical. Alerts about
-// people (access_ended, user_connection) are not problems of a node and have their own list on Health, so they are
+// people (access_ended, user_connection, torrent) are not problems of a node and have their own list on Health, so they are
 // left out: the badge is the number of problems of the fleet.
 func (s *Store) AlertCounts(ctx context.Context, now time.Time) (active, critical int, err error) {
 	err = s.R.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(severity = 3), 0) FROM health_alert
-		WHERE resolved_at = 0 AND severity >= 2 AND muted_until <= ? AND kind NOT IN ('access_ended', 'user_connection')`, unix(now)).Scan(&active, &critical)
+		WHERE resolved_at = 0 AND severity >= 2 AND muted_until <= ? AND kind NOT IN ('access_ended', 'user_connection', 'torrent')`, unix(now)).Scan(&active, &critical)
 	return active, critical, err
 }
 

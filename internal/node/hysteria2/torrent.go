@@ -3,6 +3,7 @@ package hysteria2
 import (
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -112,13 +113,35 @@ func writeAll(conn net.Conn, p []byte) error {
 
 type torrentUDPConn struct {
 	server.UDPConn
-	attempt func(torrentguard.Protocol)
+	attempt func(protocol torrentguard.Protocol, evidence torrentguard.Evidence, addr string)
+}
+
+// torrentPort is the port of a "host:port" destination as decimal digits, "" when it has none. Only the port is
+// reported; the host never is.
+func torrentPort(addr string) string {
+	if port := destPort(addr); port != 0 {
+		return strconv.Itoa(int(port))
+	}
+	return ""
+}
+
+// destPort is the port of a "host:port" destination, 0 when it has none.
+func destPort(addr string) uint16 {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return 0
+	}
+	return uint16(n)
 }
 
 func (c torrentUDPConn) WriteTo(p []byte, addr string) (int, error) {
-	if protocol, ok := torrentguard.DetectClientUDPRequest(p); ok {
+	if protocol, evidence, ok := torrentguard.ClassifyClientUDPRequest(p, destPort(addr)); ok {
 		if c.attempt != nil {
-			c.attempt(protocol)
+			c.attempt(protocol, evidence, addr)
 		}
 		// Drop only the datagram that carried a validated BitTorrent signature. Other UDP traffic on this
 		// Hysteria session continues normally.

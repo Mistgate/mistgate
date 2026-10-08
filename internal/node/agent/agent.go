@@ -919,7 +919,8 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 
 // engineEvent accepts engine signals and rate-limits torrent detections before they enter the reliable event queue:
 // one per inbound and user every 5 minutes (one per inbound for detections without a known user), so a noisy client
-// cannot fill the durable queue. Only the fixed parameters leave the node: never a client address or a destination.
+// cannot fill the durable queue. Only the fixed parameters leave the node: never a client address or a destination
+// address (the destination port and what matched are fixed parameters).
 func (a *Agent) engineEvent(ev engine.Event) {
 	if ev.Code != "torrent_attempt" {
 		return
@@ -955,8 +956,8 @@ func (a *Agent) engineEvent(ev engine.Event) {
 	a.torrentEvents[key] = now
 	a.torrentEventsMu.Unlock()
 
-	params := make(map[string]string, 3)
-	for _, k := range []string{"protocol", "torrent_protocol", "user_id"} {
+	params := make(map[string]string, 5)
+	for _, k := range []string{"protocol", "torrent_protocol", "evidence", "dst_port", "user_id"} {
 		if v := ev.Params[k]; v != "" && len(v) <= 256 {
 			params[k] = v
 		}

@@ -29,10 +29,12 @@ const (
 const tcpHandshakePrefix = "\x13BitTorrent protocol"
 
 // Detection is one BitTorrent request a tunnel client sent. It names who (the tunnel address, which the agent maps to a
-// user and does not report), never where to.
+// user and does not report), what matched and the destination port; never the destination address.
 type Detection struct {
 	L4Protocol  string
 	Signature   torrentguard.Protocol
+	Evidence    torrentguard.Evidence
+	DstPort     uint16
 	TunnelIface string
 	TunnelIP    netip.Addr
 }
@@ -76,13 +78,13 @@ func (t *flowTracker) classify(packet packetInfo, tunnelIface string, tunnelIP n
 	d := Detection{TunnelIface: tunnelIface, TunnelIP: tunnelIP}
 	switch packet.key.protocol {
 	case protocolUDP:
-		protocol, ok := torrentguard.DetectClientUDPRequest(packet.payload)
-		d.L4Protocol, d.Signature = "udp", protocol
+		protocol, evidence, ok := torrentguard.ClassifyClientUDPRequest(packet.payload, packet.key.destPort)
+		d.L4Protocol, d.Signature, d.Evidence, d.DstPort = "udp", protocol, evidence, packet.key.destPort
 		return d, ok
 	case protocolTCP:
 		packet.key.tunnelIface = tunnelIface
 		if t.feedTCP(packet, now) {
-			d.L4Protocol, d.Signature = "tcp", torrentguard.ProtocolBitTorrentTCP
+			d.L4Protocol, d.Signature, d.Evidence, d.DstPort = "tcp", torrentguard.ProtocolBitTorrentTCP, torrentguard.EvidenceTCPHandshake, packet.key.destPort
 			return d, true
 		}
 	}

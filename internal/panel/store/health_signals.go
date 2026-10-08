@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -27,11 +28,22 @@ type HealthNodeHourSignal struct {
 	PeakUsers        uint64
 }
 
+// HealthTorrentSignal is the torrent_attempt events of one user on one node in the last 24 hours: how many, when the
+// last was, what the last one matched (Evidence, "" from an older agent) and the distinct destination ports seen.
+type HealthTorrentSignal struct {
+	UserID, NodeID string
+	Count          int
+	LastAt         time.Time
+	Evidence       string
+	DstPorts       []string
+}
+
 // HealthSignalBatch contains the stored inputs for user and fleet impact alerts.
 type HealthSignalBatch struct {
 	Users      []HealthUserSignal
 	AWGDevices []HealthAWGSignal
 	NodeHours  []HealthNodeHourSignal
+	Torrents   []HealthTorrentSignal
 }
 
 func scanHealthUserSignal(r rowScanner) (HealthUserSignal, error) {
@@ -74,7 +86,36 @@ func scanHealthNodeHour(r rowScanner) (HealthNodeHourSignal, error) {
 	return signal, nil
 }
 
-// HealthSignals reads the user, AWG and hourly fleet inputs in one read batch.
+func scanHealthTorrent(r rowScanner) (HealthTorrentSignal, error) {
+	var signal HealthTorrentSignal
+	var lastAt int64
+	var ports string
+	err := r.Scan(&signal.UserID, &signal.NodeID, &signal.Count, &lastAt, &signal.Evidence, &ports)
+	if err != nil {
+		return HealthTorrentSignal{}, err
+	}
+	signal.LastAt = fleetTime(lastAt)
+	if ports != "" {
+		signal.DstPorts = strings.Split(ports, ",")
+	}
+	return signal, nil
+}
+
+// healthTorrentSQL reads the last day of torrent_attempt events, one row per user and node. It is served by
+// event_retention (severity, ts): the guard writes warnings, so only the last day of severity 2 and 3 is read, not the
+// whole table (TestHealthSignalsTorrentQueryUsesTheSeverityTimeIndex holds the plan). The user is in params_json (the
+// event's user_id column stays empty for the guard); an event without one is skipped. With a single max(), SQLite takes
+// the bare column (the evidence) from the row that holds the maximum: the last attempt.
+const healthTorrentSQL = `
+	SELECT json_extract(params_json, '$.user_id') AS user_id, node_id AS node_id, count(*) AS attempts, max(ts) AS last_at,
+	       coalesce(json_extract(params_json, '$.evidence'), '') AS evidence,
+	       coalesce(group_concat(DISTINCT json_extract(params_json, '$.dst_port')), '') AS dst_ports
+	FROM event
+	WHERE severity IN (2, 3) AND ts >= ? AND code = 'torrent_attempt' AND node_id IS NOT NULL
+	  AND coalesce(json_extract(params_json, '$.user_id'), '') <> ''
+	GROUP BY 1, 2`
+
+// HealthSignals reads the user, AWG, hourly fleet and torrent inputs in one read batch.
 func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalBatch, error) {
 	var out HealthSignalBatch
 	currentHour := now.UTC().Truncate(time.Hour).Unix()
@@ -105,6 +146,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		SELECT node_id AS node_id, protocol AS protocol, hour_start AS hour_start, peak_users AS peak_users
 		FROM node_traffic_hour
 		WHERE hour_start IN (?, ?, ?, ?, ?, ?, ?, ?)`, hourStarts...)
+	reads.add(appendRows(&out.Torrents, scanHealthTorrent), healthTorrentSQL, now.Add(-24*time.Hour).Unix())
 	if err := reads.run(ctx, s); err != nil {
 		return HealthSignalBatch{}, err
 	}

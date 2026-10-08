@@ -198,6 +198,99 @@ func TestParseUTPHeader(t *testing.T) {
 	}
 }
 
+func TestClassifyClientUDPRequestNamesWhatMatched(t *testing.T) {
+	connect := make([]byte, 16)
+	binary.BigEndian.PutUint64(connect[:8], udpTrackerConnectionMagic)
+	syn := make([]byte, 20)
+	syn[0] = byte(UTPSyn<<4) | 1
+	for name, want := range map[string]struct {
+		packet   []byte
+		protocol Protocol
+		evidence Evidence
+	}{
+		"connect": {connect, ProtocolBitTorrentTracker, EvidenceTrackerConnect},
+		"DHT":     {[]byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), ProtocolBitTorrentDHT, EvidenceDHTQuery},
+		"uTP SYN": {syn, ProtocolBitTorrentUTP, EvidenceUTPSyn},
+	} {
+		for _, port := range []uint16{0, 6881, 6969, 80, 443} {
+			protocol, evidence, ok := ClassifyClientUDPRequest(want.packet, port)
+			if !ok || protocol != want.protocol || evidence != want.evidence {
+				t.Errorf("%s to port %d = %q, %q, %v; want %q, %q", name, port, protocol, evidence, ok, want.protocol, want.evidence)
+			}
+		}
+		for _, port := range []uint16{53, 5353} {
+			if protocol, evidence, ok := ClassifyClientUDPRequest(want.packet, port); ok {
+				t.Errorf("%s to DNS port %d was classified: %q, %q", name, port, protocol, evidence)
+			}
+		}
+	}
+	if protocol, evidence, ok := ClassifyClientUDPRequest([]byte("ordinary UDP payload"), 6881); ok || protocol != "" || evidence != "" {
+		t.Errorf("ordinary payload = %q, %q, %v", protocol, evidence, ok)
+	}
+}
+
+// dnsQueryWithEDNSCookie is a plain 98-byte DNS query: ID 0x1234, RD, one question (a 59-byte name, A/IN) and an EDNS OPT
+// record (UDP size 1232, no flags) with a COOKIE option. Its NSCOUNT/ARCOUNT read as a BEP 15 announce action (1), its OPT
+// TTL as the event (0) and the cookie as num_want: the exact 98-byte announce layout, by chance.
+func dnsQueryWithEDNSCookie() []byte {
+	packet := []byte{0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 1}
+	for _, label := range []int{20, 20, 15} {
+		packet = append(packet, byte(label))
+		for i := 0; i < label; i++ {
+			packet = append(packet, 'a'+byte(i%26))
+		}
+	}
+	packet = append(packet, 0, 0, 1, 0, 1)                           // root, type A, class IN
+	packet = append(packet, 0, 0, 41, 0x04, 0xd0, 0, 0, 0, 0, 0, 12) // OPT: root name, type, size 1232, TTL 0, rdlen 12
+	packet = append(packet, 0, 10, 0, 8, 1, 2, 3, 4, 5, 6, 7, 8)     // COOKIE: code 10, length 8, 8 bytes
+	return packet
+}
+
+// A DNS query without EDNS and an ID that starts with 0x41: version 1, type SYN, no extension, and NSCOUNT/ARCOUNT zero
+// as the timestamp difference. "ab." is 20 bytes, the size of a bare uTP header.
+func dnsQueryReadingAsUTPSyn() []byte {
+	return []byte{0x41, 0x00, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0, 2, 'a', 'b', 0, 0, 1, 0, 1}
+}
+
+func TestDNSIsNeverClassifiedAsATorrent(t *testing.T) {
+	dns := dnsQueryWithEDNSCookie()
+	if len(dns) != 98 {
+		t.Fatalf("test DNS query has %d bytes, want 98", len(dns))
+	}
+	// The layout alone is a valid announce: that is the false alarm. It is no longer evidence.
+	if parsed, ok := ParseUDPTrackerRequest(dns); !ok || parsed.Action != UDPTrackerAnnounce {
+		t.Fatalf("the test query no longer has the announce layout: %#v, %v", parsed, ok)
+	}
+	syn := dnsQueryReadingAsUTPSyn()
+	if header, ok := ParseUTPHeader(syn); !ok || header.Type != UTPSyn || header.TimestampDiff != 0 {
+		t.Fatalf("the test query no longer reads as a uTP SYN: %#v, %v", header, ok)
+	}
+	// The announce shape is no evidence on any port. The SYN shape is, so the DNS ports are what keep it out.
+	for _, port := range []uint16{0, 53, 5353, 6881} {
+		if protocol, evidence, ok := ClassifyClientUDPRequest(dns, port); ok {
+			t.Errorf("EDNS query to port %d was classified: %q, %q", port, protocol, evidence)
+		}
+	}
+	if protocol, ok := DetectClientUDPRequest(dns); ok {
+		t.Errorf("EDNS query was detected without a port: %q", protocol)
+	}
+	for _, port := range []uint16{53, 5353} {
+		if protocol, evidence, ok := ClassifyClientUDPRequest(syn, port); ok {
+			t.Errorf("query with ID 0x41xx to port %d was classified: %q, %q", port, protocol, evidence)
+		}
+	}
+	// A real tracker announce is not enough alone either: only the connect handshake is evidence.
+	announce := make([]byte, 98)
+	binary.BigEndian.PutUint32(announce[8:12], uint32(UDPTrackerAnnounce))
+	scrape := make([]byte, 36)
+	binary.BigEndian.PutUint32(scrape[8:12], uint32(UDPTrackerScrape))
+	for name, packet := range map[string][]byte{"announce": announce, "scrape": scrape} {
+		if protocol, evidence, ok := ClassifyClientUDPRequest(packet, 6969); ok {
+			t.Errorf("%s alone was classified: %q, %q", name, protocol, evidence)
+		}
+	}
+}
+
 func TestDetectClientUDPRequestRequiresOutboundSignatures(t *testing.T) {
 	tracker := make([]byte, 16)
 	binary.BigEndian.PutUint64(tracker[:8], udpTrackerConnectionMagic)

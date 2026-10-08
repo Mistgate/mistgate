@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +82,25 @@ func TestTorrentBlockerSettingRequiresCapabilityAndPropagates(t *testing.T) {
 	}
 }
 
+func TestTorrentEvidenceAndPortKeepTheirShapeOnly(t *testing.T) {
+	for s, want := range map[string]bool{
+		"tracker_connect": true, "dht_query": true, "": false, "203.0.113.8": false, "198.51.100.1:6881": false,
+		"Tracker": false, "1abc": false, "has space": false, "x_" + strings.Repeat("y", 40): false,
+	} {
+		if got := torrentEvidenceCode(s); got != want {
+			t.Errorf("torrentEvidenceCode(%q) = %v, want %v", s, got, want)
+		}
+	}
+	for s, want := range map[string]bool{
+		"6881": true, "1": true, "65535": true, "": false, "0": false, "65536": false, "06881": false, "-1": false,
+		"203.0.113.8": false, "203.0.113.8:6881": false, "[2001:db8::1]:80": false, "80 ": false,
+	} {
+		if got := torrentPortNumber(s); got != want {
+			t.Errorf("torrentPortNumber(%q) = %v, want %v", s, got, want)
+		}
+	}
+}
+
 func TestTorrentAttemptEventResolvesDisplayName(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("nodea")
@@ -93,6 +113,7 @@ func TestTorrentAttemptEventResolvesDisplayName(t *testing.T) {
 		TimeUnix:  time.Now().Unix(),
 		Params: map[string]string{
 			"protocol": "fakehy", "torrent_protocol": "bittorrent", "destination": "203.0.113.8:51413",
+			"evidence": "tracker_connect", "dst_port": "6969",
 			"client_ip": "203.0.113.9", "user_id": "usr_alice", "user_name": "untrusted display name", "password": "never-store",
 		},
 	}}})
@@ -111,6 +132,9 @@ func TestTorrentAttemptEventResolvesDisplayName(t *testing.T) {
 		}
 		if row.Params["protocol"] != "fakehy" || row.Params["torrent_protocol"] != "bittorrent" || row.InboundID != "inb_1" {
 			t.Fatalf("event details were lost: %+v", row)
+		}
+		if row.Params["evidence"] != "tracker_connect" || row.Params["dst_port"] != "6969" {
+			t.Fatalf("evidence and port were lost: %+v", row.Params)
 		}
 		for _, k := range []string{"password", "client_ip", "destination"} {
 			if _, exists := row.Params[k]; exists {

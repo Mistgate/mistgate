@@ -124,6 +124,11 @@ const (
 	// The current-hour peak users fell far below the same hour's usual level. WARNING.
 	// node_id = node id, subject = protocol; only the gone variant is raised in this phase, params{now, usual, users}.
 	AlertKind_ALERT_KIND_USERS_IMPACTED AlertKind = 14
+	// A user tried to use BitTorrent through a node and the node's torrent guard blocked it. WARNING.
+	// node_id = "", subject = user id, params{user_id, user_name, nodes, count, last_unix}: one alert per person over
+	// the nodes they tried on. Open while the last attempt is under 24 hours old; attempts the node cannot attribute to a
+	// user raise nothing.
+	AlertKind_ALERT_KIND_TORRENT AlertKind = 15
 )
 
 // Enum value maps for AlertKind.
@@ -144,6 +149,7 @@ var (
 		12: "ALERT_KIND_ACCESS_ENDED",
 		13: "ALERT_KIND_USER_CONNECTION",
 		14: "ALERT_KIND_USERS_IMPACTED",
+		15: "ALERT_KIND_TORRENT",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -161,6 +167,7 @@ var (
 		"ALERT_KIND_ACCESS_ENDED":                12,
 		"ALERT_KIND_USER_CONNECTION":             13,
 		"ALERT_KIND_USERS_IMPACTED":              14,
+		"ALERT_KIND_TORRENT":                     15,
 	}
 )
 
@@ -2437,7 +2444,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xbf\x03\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xd7\x03\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -2454,7 +2461,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x18ALERT_KIND_UPDATE_FAILED\x10\v\x12\x1b\n" +
 	"\x17ALERT_KIND_ACCESS_ENDED\x10\f\x12\x1e\n" +
 	"\x1aALERT_KIND_USER_CONNECTION\x10\r\x12\x1d\n" +
-	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e*\x8e\x01\n" +
+	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e\x12\x16\n" +
+	"\x12ALERT_KIND_TORRENT\x10\x0f*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

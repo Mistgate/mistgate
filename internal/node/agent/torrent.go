@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/netip"
 	"sort"
+	"strconv"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/awg"
@@ -118,7 +119,14 @@ func (a *Agent) syncTorrentGuard(ctx context.Context, next *model, accepted []ho
 			return
 		}
 		params := map[string]string{"protocol": d.L4Protocol, "torrent_protocol": string(d.Signature)}
-		// The client's tunnel address only finds the user; neither it nor the destination leaves the node.
+		if d.Evidence != "" {
+			params["evidence"] = string(d.Evidence)
+		}
+		if d.DstPort != 0 {
+			params["dst_port"] = strconv.Itoa(int(d.DstPort))
+		}
+		// The client's tunnel address only finds the user; neither it nor the destination address leaves the node,
+		// only the destination port.
 		if owner, found := clients[d.TunnelIP.Unmap()]; found && owner.inboundID == inboundID && !owner.ambiguous && owner.userID != "" {
 			params["user_id"] = owner.userID
 		}

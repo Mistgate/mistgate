@@ -4,6 +4,8 @@ package store
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,5 +49,58 @@ func TestHealthSignals(t *testing.T) {
 	}
 	if !foundCurrentHour {
 		t.Fatalf("current node hour was not returned: %+v", got.NodeHours)
+	}
+}
+
+func TestHealthSignalsTorrentAttemptsPerUserAndNode(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Date(2026, 10, 7, 12, 40, 0, 0, time.UTC)
+	seedHealthSignals(t, s, now)
+	seedTorrentEvents(t, s, now)
+
+	got, err := s.HealthSignals(ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Torrents) != 2 {
+		t.Fatalf("torrent signals = %+v, want usr_active on two nodes only", got.Torrents)
+	}
+	byNode := map[string]HealthTorrentSignal{}
+	for _, signal := range got.Torrents {
+		byNode[signal.NodeID] = signal
+	}
+	signal := byNode["nod_signals"]
+	slices.Sort(signal.DstPorts)
+	if signal.UserID != "usr_active" || signal.Count != 2 || !signal.LastAt.Equal(now.Add(-time.Hour)) ||
+		signal.Evidence != "tracker_connect" || !slices.Equal(signal.DstPorts, []string{"6881", "6969"}) {
+		t.Fatalf("nod_signals torrent signal = %+v", signal)
+	}
+	// an event from an agent that predates the evidence: no evidence, no ports
+	if signal := byNode["nod_other"]; signal.UserID != "usr_active" || signal.Count != 1 || !signal.LastAt.Equal(now.Add(-3*time.Hour)) ||
+		signal.Evidence != "" || len(signal.DstPorts) != 0 {
+		t.Fatalf("nod_other torrent signal = %+v", signal)
+	}
+}
+
+func TestHealthSignalsTorrentQueryUsesTheSeverityTimeIndex(t *testing.T) {
+	s := openTemp(t)
+	rows, err := s.R.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+healthTorrentSQL, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var plan string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan += detail + "; "
+	}
+	t.Log(plan)
+	if !strings.Contains(plan, "USING INDEX event_retention") && !strings.Contains(plan, "USING COVERING INDEX event_retention") {
+		t.Fatalf("torrent signal scans the whole event table: %s", plan)
 	}
 }

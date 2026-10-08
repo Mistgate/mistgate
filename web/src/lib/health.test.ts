@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity, CheckStatus, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
-import { fill, type T } from "@/i18n";
+import { fill, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { healthKind } from "./fleet";
@@ -41,6 +41,13 @@ import {
 
 const t = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(en[key], vars), { n: () => "" });
 const tRu = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(ru[key], vars), { n: () => "" });
+// with plurals, as useT() makes it
+const plural = (dict: Record<string, string>, lang: string) =>
+  Object.assign((key: string, vars?: Record<string, string | number>) => fill(dict[key]!, vars), {
+    n: (key: string, count: number, vars?: Record<string, string | number>) => fill(pickForm(dict[key]!, count, lang), { n: count, ...vars }),
+  }) as unknown as T;
+const tPlural = plural(en, "en");
+const tRuPlural = plural(ru, "ru");
 const fmt = makeFmt("en", t as unknown as T);
 const fmtRu = makeFmt("ru", tRu as unknown as T);
 
@@ -157,6 +164,25 @@ describe("alerts", () => {
     expect(alertWhy(t, fmt, ended)).toContain(`alice’s subscription ended on ${fmt.stamp(1700000000)}`);
     const gone = alert({ kind: AlertKind.USERS_IMPACTED, subject: "hysteria2", whyKey: "health.alert.users_impacted.why.gone", params: { now: "0", usual: "5", users: "5" } });
     expect(alertWhy(tRu, fmtRu, gone)).toMatch(/^Людей на Hysteria2: сейчас 0, обычно около 5 в этот час, а нода на связи\./);
+  });
+  it("words a torrent alert with the attempts, the evidence of the last one and the ports, and works without them", () => {
+    const torrent = (params: Record<string, string>) =>
+      alert({ kind: AlertKind.TORRENT, nodeId: "", subject: "usr_1", whyKey: "health.alert.torrent.why", params: { user_id: "usr_1", user_name: "alice", nodes: "EE, DE", count: "7", ...params } });
+    expect(alertWhy(tPlural, fmt, torrent({ evidence: "tracker_connect", ports: "6969" }))).toBe(
+      "alice is trying to use torrents on EE, DE: 7 attempts in a day, blocked. Evidence: tracker connect request (the protocol’s magic number), port 6969. It closes after a day without attempts.",
+    );
+    expect(alertWhy(tPlural, fmt, torrent({ count: "1", evidence: "dht_query", ports: "6881, 6969" }))).toContain(
+      "1 attempt in a day, blocked. Evidence: DHT query, ports 6881, 6969.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, torrent({ count: "1", evidence: "tcp_handshake", ports: "6881" }))).toBe(
+      "alice пытается качать торренты на EE, DE: 1 попытка за сутки, торренты заблокированы. Доказательство: рукопожатие BitTorrent по TCP, порт 6881. Алерт закроется после суток без попыток.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, torrent({ count: "22", evidence: "utp_syn", ports: "1, 2, 3" }))).toContain("22 попытки за сутки");
+    expect(alertWhy(tRuPlural, fmtRu, torrent({ count: "5", evidence: "utp_syn", ports: "1, 2, 3" }))).toContain("5 попыток за сутки");
+    // an agent that predates the evidence, and a code that this panel has no words for
+    expect(alertWhy(tPlural, fmt, torrent({}))).toBe("alice is trying to use torrents on EE, DE: 7 attempts in a day, blocked. It closes after a day without attempts.");
+    expect(alertWhy(tPlural, fmt, torrent({ evidence: "new_code" }))).toContain("Evidence: new_code.");
+    expect(alertTitle(tRu, alert({ kind: AlertKind.TORRENT, titleKey: "health.alert.torrent.title" }))).toBe("Попытки качать торренты");
   });
   it("offers the mute choices up to the panel's week, «until morning» to the next 08:00", () => {
     const clock = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
@@ -413,9 +439,12 @@ describe("alerts about people", () => {
   const device = alert({ kind: AlertKind.USER_CONNECTION, nodeId: "", severity: AlertSeverity.INFO, subject: "dev_9", params: { user_id: "usr_2", user_name: "bob" } });
   const silent = alert({ kind: AlertKind.USER_CONNECTION, nodeId: "", severity: AlertSeverity.INFO, subject: "usr_3", params: { user_id: "usr_3" } });
   const impacted = alert({ kind: AlertKind.USERS_IMPACTED, subject: "hysteria2" });
+  const torrent = alert({ kind: AlertKind.TORRENT, nodeId: "", subject: "usr_4", params: { user_id: "usr_4", user_name: "alice" } });
 
   it("tells them from the alerts about nodes: the dropped connections of a node are a node alert", () => {
-    expect([ended, device, silent, impacted, alert()].map(isPeopleAlert)).toEqual([true, true, true, false, false]);
+    expect([ended, device, silent, impacted, alert(), torrent].map(isPeopleAlert)).toEqual([true, true, true, false, false, true]);
+    expect(alertIsAbout(torrent, "usr_4")).toBe(true);
+    expect(alertIsAbout(torrent, "usr_1")).toBe(false);
   });
   it("puts warnings before info and leaves the node alerts out", () => {
     expect(peopleOrder([device, impacted, ended, silent]).map((a) => a.subject)).toEqual(["usr_1", "dev_9", "usr_3"]);

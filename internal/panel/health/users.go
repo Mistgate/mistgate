@@ -1,8 +1,10 @@
 package health
 
 import (
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -26,6 +28,8 @@ const (
 	userImpactOpenRatio        = 0.25
 	userImpactHoldRatio        = 0.5
 	userAlertRefreshInterval   = 5 * time.Minute
+	userTorrentMaxNodes        = 5
+	userTorrentMaxPorts        = 5
 )
 
 func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, activeKeys map[key]bool, d *derived, add func(cond)) {
@@ -85,6 +89,82 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 	}
 
 	addUsersImpacted(now, sn, signals.NodeHours, activeKeys, d, add)
+	addTorrents(sn, signals, add)
+}
+
+// addTorrents raises one TORRENT alert per person who has a torrent_attempt in the last 24 hours (the store window).
+// The alert exists while that holds, so it closes after a quiet day, and a person who is back after one is a new
+// episode: Telegram tells each episode once. Attempts the node could not attribute to a user are not in the signals, and
+// a user who is not active, expired or limited (disabled, deleted) or a node that was retired is left out.
+func addTorrents(sn *snapshot, signals store.HealthSignalBatch, add func(cond)) {
+	userNames := make(map[string]string, len(signals.Users))
+	for _, user := range signals.Users {
+		userNames[user.ID] = user.Name
+	}
+	nodeNames := make(map[string]string, len(sn.nodes))
+	for _, node := range sn.nodes {
+		nodeNames[node.ID] = node.Name
+	}
+	type person struct {
+		count    int
+		lastAt   time.Time
+		evidence string
+		nodes    map[string]int // node name -> attempts
+		ports    []int
+	}
+	people := map[string]*person{}
+	for _, signal := range signals.Torrents {
+		_, userKnown := userNames[signal.UserID]
+		nodeName, nodeKnown := nodeNames[signal.NodeID]
+		if !userKnown || !nodeKnown || signal.Count <= 0 {
+			continue
+		}
+		p := people[signal.UserID]
+		if p == nil {
+			p = &person{nodes: map[string]int{}}
+			people[signal.UserID] = p
+		}
+		p.count += signal.Count
+		p.nodes[nodeName] += signal.Count
+		if signal.LastAt.After(p.lastAt) {
+			p.lastAt, p.evidence = signal.LastAt, signal.Evidence
+		}
+		for _, text := range signal.DstPorts {
+			if port, err := strconv.Atoi(text); err == nil && !slices.Contains(p.ports, port) {
+				p.ports = append(p.ports, port)
+			}
+		}
+	}
+	for userID, p := range people {
+		names := make([]string, 0, len(p.nodes))
+		for name := range p.nodes {
+			names = append(names, name)
+		}
+		sort.Slice(names, func(i, j int) bool {
+			if p.nodes[names[i]] != p.nodes[names[j]] {
+				return p.nodes[names[i]] > p.nodes[names[j]]
+			}
+			return names[i] < names[j]
+		})
+		nodes := strings.Join(names[:min(len(names), userTorrentMaxNodes)], ", ")
+		if len(names) > userTorrentMaxNodes {
+			nodes += ", +" + strconv.Itoa(len(names)-userTorrentMaxNodes)
+		}
+		params := map[string]string{"user_id": userID, "user_name": userNames[userID], "nodes": nodes,
+			"count": strconv.Itoa(p.count), "last_unix": strconv.FormatInt(p.lastAt.Unix(), 10)}
+		if p.evidence != "" {
+			params["evidence"] = p.evidence
+		}
+		if len(p.ports) > 0 {
+			slices.Sort(p.ports)
+			ports := make([]string, 0, userTorrentMaxPorts)
+			for _, port := range p.ports[:min(len(p.ports), userTorrentMaxPorts)] {
+				ports = append(ports, strconv.Itoa(port))
+			}
+			params["ports"] = strings.Join(ports, ", ")
+		}
+		add(cond{key: key{kTorrent, "", userID}, severity: sevWarning, why: "health.alert.torrent.why", params: params})
+	}
 }
 
 func signalWithin(at, now time.Time, window time.Duration) bool {

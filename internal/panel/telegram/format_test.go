@@ -186,3 +186,51 @@ func TestUserHealthAlertsAreLocalized(t *testing.T) {
 		}
 	}
 }
+
+func TestTorrentAlertIsLocalizedWithEvidenceAndPorts(t *testing.T) {
+	alert := store.HealthAlert{
+		Kind: "torrent", Severity: 2, Subject: "usr_a", WhyKey: "health.alert.torrent.why", FirstSeen: time.Now(), OpenedAt: time.Now(),
+		Params: map[string]string{"user_id": "usr_a", "user_name": "alice <x>", "nodes": "EE, DE", "count": "7",
+			"evidence": "tracker_connect", "ports": "6881, 6969"},
+	}
+	for _, tc := range []struct {
+		lang   L
+		mutate func(map[string]string)
+		want   string
+	}{
+		{"en", nil, "alice &lt;x&gt; is trying to use torrents on EE, DE: 7 attempts in a day, blocked. Evidence: tracker connect request (the protocol’s magic number), ports 6881, 6969."},
+		{"ru", nil, "alice &lt;x&gt; пытается качать торренты на EE, DE: 7 попыток за сутки, торренты заблокированы. Доказательство: запрос подключения к трекеру (магическое число протокола), порты 6881, 6969."},
+		{"ru", func(p map[string]string) { p["count"], p["ports"], p["evidence"] = "1", "6969", "dht_query" },
+			"1 попытка за сутки, торренты заблокированы. Доказательство: запрос DHT, порт 6969."},
+		{"ru", func(p map[string]string) { p["count"], p["evidence"] = "22", "utp_syn" }, "22 попытки за сутки"},
+		{"en", func(p map[string]string) { p["count"], p["ports"], p["evidence"] = "1", "80", "tcp_handshake" },
+			"1 attempt in a day, blocked. Evidence: BitTorrent handshake over TCP, port 80."},
+		// an agent that predates the evidence says nothing of it
+		{"en", func(p map[string]string) { delete(p, "evidence"); delete(p, "ports") }, "7 attempts in a day, blocked."},
+		{"ru", func(p map[string]string) { delete(p, "evidence") }, "заблокированы. Порты 6881, 6969."},
+		// an unknown code from a newer agent is shown as data, not dropped
+		{"en", func(p map[string]string) { p["evidence"] = "new_thing<" }, "Evidence: new_thing&lt;, ports"},
+	} {
+		a := alert
+		a.Params = map[string]string{}
+		for k, v := range alert.Params {
+			a.Params[k] = v
+		}
+		if tc.mutate != nil {
+			tc.mutate(a.Params)
+		}
+		got := alertOpened(tc.lang, a, "", "")
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("%s message %q lacks %q", tc.lang, got, tc.want)
+		}
+		if strings.Contains(got, "198.51.100") {
+			t.Errorf("message has an address: %q", got)
+		}
+	}
+	if got := alertTitle("ru", alert); got != "Попытки качать торренты" {
+		t.Errorf("ru title = %q", got)
+	}
+	if got := alertTitle("en", alert); got != "Torrent attempts" {
+		t.Errorf("en title = %q", got)
+	}
+}

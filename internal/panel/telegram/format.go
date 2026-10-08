@@ -180,6 +180,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("A user may have a connection problem", "У пользователя может быть проблема с подключением")
 	case "users_impacted":
 		return l.pick("Connections dropped for some users", "У части пользователей пропало подключение")
+	case "torrent":
+		return l.pick("Torrent attempts", "Попытки качать торренты")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -251,6 +253,8 @@ func alertReason(l L, a store.HealthAlert) string {
 		}
 		return l.pick(name+" keeps trying to connect, but the subscription ended "+ago+" ago.",
 			name+" продолжает подключаться, хотя подписка закончилась "+ago+" назад.")
+	case "torrent":
+		return torrentReason(l, p)
 	case "users_impacted":
 		protocol := a.Subject
 		switch protocol {
@@ -267,6 +271,70 @@ func alertReason(l L, a store.HealthAlert) string {
 				" в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.")
 	}
 	return ""
+}
+
+// torrentEvidence say in a few words what the node's torrent guard matched (the "evidence" of a torrent_attempt event).
+var torrentEvidence = map[string][2]string{
+	"tracker_connect": {"tracker connect request (the protocol’s magic number)", "запрос подключения к трекеру (магическое число протокола)"},
+	"dht_query":       {"DHT query", "запрос DHT"},
+	"utp_syn":         {"uTP connection start", "начало соединения uTP"},
+	"tcp_handshake":   {"BitTorrent handshake over TCP", "рукопожатие BitTorrent по TCP"},
+}
+
+// torrentReason is the sentence of a TORRENT alert: who, where, how many attempts, and the evidence and port of them when
+// the node said so (an older agent does not). Values from data go through data().
+func torrentReason(l L, p map[string]string) string {
+	name, nodes := data(p["user_name"], 60), data(p["nodes"], 120)
+	count, _ := strconv.Atoi(p["count"])
+	where := ""
+	if nodes != "" {
+		where = l.pick(" on ", " на ") + nodes
+	}
+	var attempts string
+	if l == "ru" {
+		attempts = strconv.Itoa(count) + " " + ruPlural(count, "попытка", "попытки", "попыток")
+	} else {
+		attempts = strconv.Itoa(count) + " attempt"
+		if count != 1 {
+			attempts += "s"
+		}
+	}
+	line := l.pick(name+" is trying to use torrents"+where+": "+attempts+" in a day, blocked.",
+		name+" пытается качать торренты"+where+": "+attempts+" за сутки, торренты заблокированы.")
+	var proof []string
+	if text, ok := torrentEvidence[p["evidence"]]; ok {
+		proof = append(proof, l.pick(text[0], text[1]))
+	} else if p["evidence"] != "" {
+		proof = append(proof, data(p["evidence"], 40))
+	}
+	if ports := data(p["ports"], 60); ports != "" {
+		word := l.pick("port ", "порт ")
+		if strings.Contains(ports, ",") {
+			word = l.pick("ports ", "порты ")
+		}
+		proof = append(proof, word+ports)
+	}
+	if len(proof) == 0 {
+		return line
+	}
+	lead := l.pick("Evidence: ", "Доказательство: ")
+	if p["evidence"] == "" {
+		lead = ""
+	}
+	return line + " " + upperFirst(lead+strings.Join(proof, ", ")) + "."
+}
+
+// ruPlural picks the Russian form after a number: 1 попытка, 2 попытки, 5 попыток.
+func ruPlural(n int, one, few, many string) string {
+	switch {
+	case n%100 >= 11 && n%100 <= 14:
+		return many
+	case n%10 == 1:
+		return one
+	case n%10 >= 2 && n%10 <= 4:
+		return few
+	}
+	return many
 }
 
 func doctorTitle(l L, check string) string {

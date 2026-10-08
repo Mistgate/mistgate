@@ -22,6 +22,7 @@ import { plain, type Plain } from "./plain";
 import { pollMs } from "./queries";
 import { protocolName } from "./series";
 import { meQuery } from "./session";
+import { torrentEvidenceText } from "./torrent";
 import { pauseReasonText } from "./updates";
 
 // Everything the Health screens read and the small pure helpers they share (alert wording, matrix cells, bars,
@@ -120,7 +121,22 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.NODE_DOWN && a.params.minutes) params.duration = fmt.duration(Number(a.params.minutes) * 60);
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
+  if (a.kind === AlertKind.TORRENT) return lookup(t, a.whyKey, torrentParams(t, params)) ?? "";
   return lookup(t, a.whyKey, params) ?? "";
+}
+
+/** The sentence of a TORRENT alert: "N attempts", then the evidence of the last one and the ports, when the agent said so. */
+function torrentParams(t: T, params: Params): Params {
+  const count = Number(params.count) || 1;
+  const evidence = String(params.evidence ?? "");
+  const ports = String(params.ports ?? "");
+  const nPorts = ports ? ports.split(",").length : 0;
+  const proof = !evidence
+    ? ""
+    : nPorts
+      ? t.n("health.alert.torrent.proofPorts", nPorts, { evidence: torrentEvidenceText(t, evidence), ports })
+      : t("health.alert.torrent.proof", { evidence: torrentEvidenceText(t, evidence) });
+  return { ...params, attempts: t.n("health.alert.torrent.attempts", count), proof };
 }
 
 export type FixRequest = { fixId: string; params: Record<string, string> };
@@ -188,7 +204,8 @@ export const resolutionWord = (r: string): MessageKey => {
  * People) and the user's page, and stays out of the node alerts, their counts and the strip. USERS_IMPACTED is about a
  * node and is not one of these.
  */
-export const isPeopleAlert = (a: Pick<Alert, "kind">) => a.kind === AlertKind.ACCESS_ENDED || a.kind === AlertKind.USER_CONNECTION;
+export const isPeopleAlert = (a: Pick<Alert, "kind">) =>
+  a.kind === AlertKind.ACCESS_ENDED || a.kind === AlertKind.USER_CONNECTION || a.kind === AlertKind.TORRENT;
 
 /** Whether an alert about a person is about this user: params.user_id, or the subject for the alerts keyed by user (a device alert's subject is the device). */
 export const alertIsAbout = (a: Alert, userId: string) => isPeopleAlert(a) && (a.params.user_id === userId || a.subject === userId);

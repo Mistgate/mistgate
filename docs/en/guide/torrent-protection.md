@@ -20,8 +20,10 @@ Only plaintext BitTorrent, and only by a validated protocol structure. Ports are
 |:--|:--|
 | `bittorrent_tcp` | The BitTorrent handshake at the start of a TCP stream. |
 | `bittorrent_dht` | A DHT query (a bencoded KRPC query). |
-| `bittorrent_tracker` | A UDP tracker request (connect, announce or scrape). |
+| `bittorrent_tracker` | The connect request of a UDP tracker: 16 bytes with the protocol's fixed 64-bit magic number. |
 | `bittorrent_utp` | The start of a uTP connection: a standalone SYN with a zero timestamp difference. |
+
+A tracker is recognized by its connect handshake only. Announce and scrape requests have no fixed marker, so their layout alone is not evidence, and a real client always connects first, which is blocked. DNS is never inspected: datagrams to ports 53 and 5353 are left alone, because a DNS query is arbitrary-looking bytes that can match a BitTorrent layout by chance.
 
 Only what the user's client sends is classified, never what comes back from the internet. A remote peer cannot get a user blocked or reported with a crafted packet, and ordinary DHT replies, uTP data packets or QUIC traffic do not count.
 
@@ -52,6 +54,23 @@ The protection lowers the number of complaints; it does not guarantee that none 
 
 Each blocked attempt is a `torrent_attempt` warning in the node's **Events**, for example "Possible BitTorrent attempt by Alice" with "protocol: tcp / bittorrent_tcp". It names the profile, the transport (`tcp` or `udp`) and the BitTorrent protocol. It names the user only when the node can tell reliably: on Hysteria2 the user who signed in, on AmneziaWG the device whose tunnel address belongs to exactly one user of that profile. Otherwise it says "an unknown user".
 
-No address is kept: neither the client's address nor the destination leaves the node. The events can be read on the node's **Events** tab and through the API and MCP (`events_search` with the code `torrent_attempt`).
+Each event also says what the node matched (`evidence`) and the destination port (`dst_port`), so you can tell a real torrent from a false alarm. The node sends one event per user and profile in five minutes at most, so a busy client is not a flood.
+
+| `evidence` | What the node matched |
+|:--|:--|
+| `tracker_connect` | A UDP tracker connect request (the protocol's magic number). |
+| `dht_query` | A DHT query. |
+| `utp_syn` | The start of a uTP connection. |
+| `tcp_handshake` | The BitTorrent handshake at the start of a TCP stream. |
+
+Only the destination port is kept. No address is kept: neither the client's address nor the destination address leaves the node. The events can be read on the node's **Events** tab and through the API and MCP (`events_search` with the code `torrent_attempt`).
+
+## Alert and Telegram
+
+A person who tries torrents gets one **Torrent attempts** alert on the **People** tab of Health and in the **Connection** block of their page, for example "alice is trying to use torrents on EE: 7 attempts in a day, blocked". It names the nodes (at most five, then "+N"), the number of attempts in the last 24 hours, the evidence of the last attempt and the destination ports (at most five). The count is the number of recorded events, which the five-minute limit above caps.
+
+The alert is one per person, whatever the number of nodes. It stays open while attempts continue and closes after a day without any. Telegram tells it once when it opens, so a person gets at most one message a day; a continuing stream of attempts does not repeat it, and the close is silent. A person who is back after a quiet day is a new alert and a new message. The alert does not count in the alert badge. You can mute it like any other.
+
+Attempts the node cannot attribute to a user (an "unknown user" event) raise no alert in this version, and neither do users who are disabled or deleted.
 
 If the AmneziaWG part cannot start on a node, for example because the kernel has no netfilter queue support, the node shows a `torrent_guard_degraded` warning event with the reason. AmneziaWG traffic on that node then passes uninspected; the Hysteria2 part works on its own.

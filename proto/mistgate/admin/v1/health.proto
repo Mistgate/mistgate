@@ -111,6 +111,11 @@ enum AlertKind {
   // The current-hour peak users fell far below the same hour's usual level. WARNING.
   // node_id = node id, subject = protocol; only the gone variant is raised in this phase, params{now, usual, users}.
   ALERT_KIND_USERS_IMPACTED = 14;
+  // A user tried to use BitTorrent through a node and the node's torrent guard blocked it. WARNING.
+  // node_id = "", subject = user id, params{user_id, user_name, nodes, count, last_unix}: one alert per person over
+  // the nodes they tried on. Open while the last attempt is under 24 hours old; attempts the node cannot attribute to a
+  // user raise nothing.
+  ALERT_KIND_TORRENT = 15;
 }
 
 message Alert {

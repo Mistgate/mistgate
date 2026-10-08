@@ -315,7 +315,7 @@ CREATE TABLE node_port_check (
 - v1: event `port_lossy` (severity 2), raised when a conclusive run finds an enabled inbound's port bad and the stored
   row was not bad before (no spam on repeated clicks). Params: inbound, profile, port, sent, got, sender.
   Audit `node.ports_check` on every run.
-- Round 5: alert kind `ALERT_KIND_PORT_LOSSY = 15` (warning), derived in `health` from the latest verdict (not the
+- Round 5: alert kind `ALERT_KIND_PORT_LOSSY = 16` (warning), derived in `health` from the latest verdict (not the
   sticky one) of each enabled inbound's current port. It resolves when a re-check is clean or the inbound moves to
   another port. It goes to Telegram like the other alerts. The action is `open_profiles`, as for `udp_blocked`.
 

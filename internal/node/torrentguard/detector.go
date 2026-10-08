@@ -54,22 +54,53 @@ const (
 	ProtocolBitTorrentTracker Protocol = "bittorrent_tracker"
 )
 
+// Evidence names, as a stable event label, exactly what the detector matched. It reaches the panel next to the
+// destination port so the owner can tell a real torrent from a false alarm; it never carries an address.
+type Evidence string
+
+const (
+	EvidenceTrackerConnect Evidence = "tracker_connect" // BEP 15 connect request with the protocol's 64-bit magic
+	EvidenceDHTQuery       Evidence = "dht_query"       // BEP 5 KRPC query (ping, find_node, get_peers, announce_peer)
+	EvidenceUTPSyn         Evidence = "utp_syn"         // BEP 29 standalone SYN with a zero timestamp difference
+	EvidenceTCPHandshake   Evidence = "tcp_handshake"   // the 20-byte plaintext BitTorrent handshake at the stream start
+)
+
 // DetectClientUDPRequest recognizes client-to-network BitTorrent requests: call it only on datagrams the
 // client sent. It avoids treating ordinary DHT replies or arbitrary uTP DATA/STATE packets as proof (every
 // WireGuard handshake initiation, "01 00 00 00", is a structurally valid uTP DATA header). A new uTP flow
 // is recognized only by its standalone SYN, whose timestamp_difference is zero (nothing was received yet):
 // four zero bytes a QUIC short header or other random-looking datagram almost never has.
+//
+// It does not know where the datagram goes; callers that do should use ClassifyClientUDPRequest.
 func DetectClientUDPRequest(packet []byte) (Protocol, bool) {
-	if _, ok := ParseUDPTrackerRequest(packet); ok {
-		return ProtocolBitTorrentTracker, true
+	protocol, _, ok := ClassifyClientUDPRequest(packet, 0)
+	return protocol, ok
+}
+
+// isDNSPort is DNS and multicast DNS: their datagrams are never inspected. A DNS query is arbitrary-looking bytes
+// (a random ID, EDNS records with cookies) that can read as a tracker request or a uTP header by chance.
+func isDNSPort(port uint16) bool { return port == 53 || port == 5353 }
+
+// ClassifyClientUDPRequest is DetectClientUDPRequest that knows the destination port (0 = unknown) and also says what
+// matched. DNS ports are never classified.
+//
+// A tracker is recognized by its connect request only: the 16 bytes with the protocol's 64-bit magic. An announce or a
+// scrape has no fixed marker, so its layout alone is not evidence (a 98-byte DNS query with an EDNS cookie has the
+// shape of an announce), and a real client always connects first: the connect is blocked, so no announce follows it.
+func ClassifyClientUDPRequest(packet []byte, dstPort uint16) (Protocol, Evidence, bool) {
+	if isDNSPort(dstPort) {
+		return "", "", false
+	}
+	if tracker, ok := ParseUDPTrackerRequest(packet); ok && tracker.Action == UDPTrackerConnect {
+		return ProtocolBitTorrentTracker, EvidenceTrackerConnect, true
 	}
 	if message, ok := ParseKRPCMessage(packet); ok && message.Type == KRPCQuery {
-		return ProtocolBitTorrentDHT, true
+		return ProtocolBitTorrentDHT, EvidenceDHTQuery, true
 	}
 	if header, ok := ParseUTPHeader(packet); ok && header.Type == UTPSyn && header.TimestampDiff == 0 {
-		return ProtocolBitTorrentUTP, true
+		return ProtocolBitTorrentUTP, EvidenceUTPSyn, true
 	}
-	return "", false
+	return "", "", false
 }
 
 // UDPTrackerPacket contains the validated action and transaction ID from a

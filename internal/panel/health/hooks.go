@@ -31,7 +31,7 @@ func (s *Service) NodeHealth(nodeID string) (noTraffic bool, failed, total int, 
 }
 
 // AlertCounts is the badge: active alerts that are not muted and not INFO, and the critical ones among them. Alerts
-// about people (ACCESS_ENDED, USER_CONNECTION) are not counted.
+// about people (ACCESS_ENDED, USER_CONNECTION, TORRENT) are not counted.
 func (s *Service) AlertCounts(ctx context.Context) (active, critical uint32) {
 	a, c, err := s.st.AlertCounts(ctx, s.now())
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -567,6 +568,25 @@ func flushCoreAck(tr *coreTransition, now time.Time) {
 	}
 }
 
+// torrentEvidenceCode is a short snake_case code such as "tracker_connect".
+func torrentEvidenceCode(s string) bool {
+	if s == "" || len(s) > 32 || s[0] < 'a' || s[0] > 'z' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+// torrentPortNumber is a port as decimal digits, 1 to 65535, without a sign or leading zero.
+func torrentPortNumber(s string) bool {
+	n, err := strconv.ParseUint(s, 10, 16)
+	return err == nil && n > 0 && s == strconv.FormatUint(n, 10)
+}
+
 func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq uint64, ev *agentv1.Event, now time.Time) {
 	t := time.Unix(ev.TimeUnix, 0).UTC()
 	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) {
@@ -593,6 +613,14 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 			if v := ev.Params[k]; v != "" {
 				row.Params[k] = store.Clip(v, 256)
 			}
+		}
+		// What matched and the destination port, in the shape they have and nothing else: a value that could hold an
+		// address (a dot, a colon, a letter in a port) is dropped, whatever the node put there.
+		if v := ev.Params["evidence"]; torrentEvidenceCode(v) {
+			row.Params["evidence"] = v
+		}
+		if v := ev.Params["dst_port"]; torrentPortNumber(v) {
+			row.Params["dst_port"] = v
 		}
 	} else if len(ev.Params) > 0 {
 		row.Params = map[string]string{}

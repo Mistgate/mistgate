@@ -177,6 +177,13 @@ describe("the user card", () => {
     expect(text()).not.toContain("Connections dropped");
   });
 
+  it("lists a torrent alert of this person in the Connection block", async () => {
+    await mount(1, [], [alert({ id: "alt_t", kind: AlertKind.TORRENT, subject: "usr_1", titleKey: "health.alert.torrent.title", whyKey: "health.alert.torrent.why",
+      params: { user_name: "Marina", user_id: "usr_1", nodes: "EE", count: "3", evidence: "dht_query", ports: "6881" } })]);
+    expect(text()).toContain("Torrent attempts");
+    expect(text()).toContain("Marina is trying to use torrents on EE: 3 attempts in a day, blocked. Evidence: DHT query, port 6881.");
+  });
+
   it("shows no Connection block when this person has no such alert", async () => {
     await mount(1, [], [alert({ id: "alt_3", subject: "usr_2", params: { user_name: "Other", user_id: "usr_2" } })]);
     expect(text()).not.toContain("Connection");

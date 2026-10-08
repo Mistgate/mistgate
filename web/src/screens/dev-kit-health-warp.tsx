@@ -278,6 +278,15 @@ const peopleAlerts: Alert[] = [
     params: { user_name: "Ivan", user_id: "usr_ivan" },
     firstSeenUnix: NOW - 30 * h,
   }),
+  personAlert({
+    id: "p6",
+    kind: AlertKind.TORRENT,
+    subject: "usr_alice",
+    titleKey: "health.alert.torrent.title",
+    whyKey: "health.alert.torrent.why",
+    params: { user_name: "alice", user_id: "usr_alice", nodes: "EE, DE", count: "7", last_unix: String(NOW - 12 * 60), evidence: "tracker_connect", ports: "6881, 6969" },
+    firstSeenUnix: NOW - 4 * h,
+  }),
 ];
 // the node alert of people ("Connections dropped on the node") is about the node: it stays with the node alerts
 const usersImpacted = alert({

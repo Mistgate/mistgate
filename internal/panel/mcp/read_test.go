@@ -88,6 +88,7 @@ func TestAlertsListReturnsNewProtoKindNames(t *testing.T) {
 		{adminv1.AlertKind_ALERT_KIND_ACCESS_ENDED, "access_ended"},
 		{adminv1.AlertKind_ALERT_KIND_USER_CONNECTION, "user_connection"},
 		{adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED, "users_impacted"},
+		{adminv1.AlertKind_ALERT_KIND_TORRENT, "torrent"},
 	} {
 		if got := alertView(&adminv1.Alert{Kind: tc.kind}).Kind; got != tc.want {
 			t.Errorf("alert kind = %q, want %q", got, tc.want)

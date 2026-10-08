@@ -33,7 +33,7 @@ export const en = {
   "hl.alerts.openNode": "Open node",
   "hl.alerts.openUser": "Open user",
   "hl.people.quiet": "Nobody has trouble connecting.",
-  "hl.people.quietNote": "People whose access ended but whose app keeps asking, and keys or apps that look broken, show up here.",
+  "hl.people.quietNote": "People whose access ended but whose app keeps asking, people who try torrents, and keys or apps that look broken, show up here.",
   "hl.alerts.openDoctor": "Open doctor",
   "hl.alerts.openProfiles": "Open the node’s profiles",
   "hl.alerts.restartAll": "Restart the profiles",
@@ -266,6 +266,16 @@ export const en = {
   "health.alert.users_impacted.title": "Connections dropped on the node",
   "health.alert.users_impacted.why.gone":
     "People on {protocol}: now {now}, usually about {usual} at this hour, while the node is online. This looks like a block on the users’ side.",
+  "health.alert.torrent.title": "Torrent attempts",
+  "health.alert.torrent.why":
+    "{user_name} is trying to use torrents on {nodes}: {attempts} in a day, blocked.{proof} It closes after a day without attempts.",
+  "health.alert.torrent.attempts": "{n} attempt|{n} attempts",
+  "health.alert.torrent.proof": " Evidence: {evidence}.",
+  "health.alert.torrent.proofPorts": " Evidence: {evidence}, port {ports}.| Evidence: {evidence}, ports {ports}.",
+  "torrent.evidence.tracker_connect": "tracker connect request (the protocol’s magic number)",
+  "torrent.evidence.dht_query": "DHT query",
+  "torrent.evidence.utp_syn": "uTP connection start",
+  "torrent.evidence.tcp_handshake": "BitTorrent handshake over TCP",
 
   // ---- doctor titles (doctor.<check>.title), neutral: the facts come as a caption
   "doctor.disk_space.title": "Disk space",
@@ -481,7 +491,7 @@ export const ru: typeof en = {
   "hl.alerts.openNode": "Открыть ноду",
   "hl.alerts.openUser": "Открыть пользователя",
   "hl.people.quiet": "У людей всё в порядке.",
-  "hl.people.quietNote": "Здесь появятся те, у кого закончился доступ, а приложение всё равно стучится, и те, у кого, похоже, не работает подключение.",
+  "hl.people.quietNote": "Здесь появятся те, у кого закончился доступ, а приложение всё равно стучится, те, кто пытается качать торренты, и те, у кого, похоже, не работает подключение.",
   "hl.alerts.openDoctor": "Открыть доктора",
   "hl.alerts.openProfiles": "Открыть профили ноды",
   "hl.alerts.restartAll": "Перезапустить профили",
@@ -710,6 +720,16 @@ export const ru: typeof en = {
   "health.alert.users_impacted.title": "На ноде пропали подключения",
   "health.alert.users_impacted.why.gone":
     "Людей на {protocol}: сейчас {now}, обычно около {usual} в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.",
+  "health.alert.torrent.title": "Попытки качать торренты",
+  "health.alert.torrent.why":
+    "{user_name} пытается качать торренты на {nodes}: {attempts} за сутки, торренты заблокированы.{proof} Алерт закроется после суток без попыток.",
+  "health.alert.torrent.attempts": "{n} попытка|{n} попытки|{n} попыток",
+  "health.alert.torrent.proof": " Доказательство: {evidence}.",
+  "health.alert.torrent.proofPorts": " Доказательство: {evidence}, порт {ports}.| Доказательство: {evidence}, порты {ports}.| Доказательство: {evidence}, порты {ports}.",
+  "torrent.evidence.tracker_connect": "запрос подключения к трекеру (магическое число протокола)",
+  "torrent.evidence.dht_query": "запрос DHT",
+  "torrent.evidence.utp_syn": "начало соединения uTP",
+  "torrent.evidence.tcp_handshake": "рукопожатие BitTorrent по TCP",
 
   // ---- doctor titles
   "doctor.disk_space.title": "Место на диске",

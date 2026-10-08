@@ -22,10 +22,12 @@ const (
 )
 
 // TorrentDetection describes one BitTorrent request an AWG client sent. TunnelIP is
-// the client's tunnel address, used only to find the user; there is no destination.
+// the client's tunnel address, used only to find the user; the destination is only a port, never an address.
 type TorrentDetection struct {
 	L4Protocol  string
 	Signature   torrentguard.Protocol
+	Evidence    torrentguard.Evidence
+	DstPort     uint16
 	TunnelIface string
 	TunnelIP    netip.Addr
 }

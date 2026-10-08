@@ -45,7 +45,7 @@ func (h *linuxHost) SetTorrentGuard(ctx context.Context, ifaces []string, onAtte
 
 	callback := func(d torrentlinux.Detection) {
 		if onAttempt != nil {
-			onAttempt(TorrentDetection{L4Protocol: d.L4Protocol, Signature: d.Signature, TunnelIface: d.TunnelIface, TunnelIP: d.TunnelIP})
+			onAttempt(TorrentDetection{L4Protocol: d.L4Protocol, Signature: d.Signature, Evidence: d.Evidence, DstPort: d.DstPort, TunnelIface: d.TunnelIface, TunnelIP: d.TunnelIP})
 		}
 	}
 	newRuntime := h.torrent == nil

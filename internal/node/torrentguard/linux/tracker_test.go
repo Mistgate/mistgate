@@ -116,6 +116,9 @@ func TestTrackerDetectsTheInitiatorsHandshakeAndForgetsTheFlow(t *testing.T) {
 	if !hit || d.Signature != torrentguard.ProtocolBitTorrentTCP || d.L4Protocol != "tcp" || d.TunnelIface != "mgawg51820" || d.TunnelIP.String() != clientIP {
 		t.Fatalf("handshake = %#v, %v", d, hit)
 	}
+	if d.Evidence != torrentguard.EvidenceTCPHandshake || d.DstPort != peerPort {
+		t.Fatalf("handshake evidence = %q, destination port %d", d.Evidence, d.DstPort)
+	}
 	// Decided: the kernel blocks the rest by the connection's ct mark, nothing stays in userspace.
 	if len(tracker.flows) != 0 {
 		t.Fatalf("decided flow kept: %d flows", len(tracker.flows))
@@ -244,11 +247,12 @@ func TestUDPClassificationIsPerDatagram(t *testing.T) {
 		name      string
 		payload   []byte
 		signature torrentguard.Protocol
+		evidence  torrentguard.Evidence
 	}{
-		{name: "tracker", payload: trackerConnectRequest(), signature: torrentguard.ProtocolBitTorrentTracker},
-		{name: "DHT query", payload: []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), signature: torrentguard.ProtocolBitTorrentDHT},
+		{name: "tracker", payload: trackerConnectRequest(), signature: torrentguard.ProtocolBitTorrentTracker, evidence: torrentguard.EvidenceTrackerConnect},
+		{name: "DHT query", payload: []byte("d1:ad2:id20:01234567890123456789e1:q4:ping1:t2:aa1:y1:qe"), signature: torrentguard.ProtocolBitTorrentDHT, evidence: torrentguard.EvidenceDHTQuery},
 		{name: "DHT response", payload: []byte("d1:rd2:id20:01234567890123456789e1:t2:aa1:y1:re")},
-		{name: "uTP SYN", payload: utpPacket(torrentguard.UTPSyn), signature: torrentguard.ProtocolBitTorrentUTP},
+		{name: "uTP SYN", payload: utpPacket(torrentguard.UTPSyn), signature: torrentguard.ProtocolBitTorrentUTP, evidence: torrentguard.EvidenceUTPSyn},
 		{name: "uTP STATE", payload: utpPacket(torrentguard.UTPState)},
 		{name: "QUIC short header", payload: quic},
 		{name: "WireGuard initiation", payload: wireguard},
@@ -263,11 +267,55 @@ func TestUDPClassificationIsPerDatagram(t *testing.T) {
 			if hit && (d.Signature != test.signature || d.L4Protocol != "udp" || d.TunnelIP.String() != clientIP) {
 				t.Fatalf("detection = %#v", d)
 			}
+			if hit && (d.Evidence != test.evidence || d.DstPort != 51413) {
+				t.Fatalf("evidence = %q, destination port %d", d.Evidence, d.DstPort)
+			}
 			if len(tracker.flows) != 0 {
 				t.Fatal("UDP left flow state")
 			}
 		})
 	}
+}
+
+// DNS is never classified: a query is arbitrary bytes that can have the shape of a tracker announce or a uTP SYN.
+func TestDNSPortsAreNeverClassified(t *testing.T) {
+	syn := utpPacket(torrentguard.UTPSyn)
+	for _, test := range []struct {
+		name    string
+		payload []byte
+		port    uint16
+		hit     bool
+	}{
+		{"EDNS query to DNS", dnsQueryWithEDNSCookie(), 53, false},
+		{"EDNS query to a high port", dnsQueryWithEDNSCookie(), 51413, false},
+		{"uTP SYN shape to DNS", syn, 53, false},
+		{"uTP SYN shape to mDNS", syn, 5353, false},
+		{"uTP SYN to a tracker port", syn, 51413, true},
+		{"tracker connect to DNS", trackerConnectRequest(), 53, false},
+		{"tracker connect to a tracker port", trackerConnectRequest(), 6969, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, hit := classifyRaw(newFlowTracker(), makeUDP4(clientIP, peerIP, 55000, test.port, test.payload), "mgawg51820", time.Unix(4000, 0))
+			if hit != test.hit {
+				t.Fatalf("classified = %v, want %v", hit, test.hit)
+			}
+		})
+	}
+}
+
+// dnsQueryWithEDNSCookie is a plain 98-byte DNS query (ID 0x1234, one question, an EDNS OPT record with a COOKIE option).
+// Its bytes have the exact layout of a BEP 15 announce.
+func dnsQueryWithEDNSCookie() []byte {
+	packet := []byte{0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 1}
+	for _, label := range []int{20, 20, 15} {
+		packet = append(packet, byte(label))
+		for i := 0; i < label; i++ {
+			packet = append(packet, 'a'+byte(i%26))
+		}
+	}
+	packet = append(packet, 0, 0, 1, 0, 1)
+	packet = append(packet, 0, 0, 41, 0x04, 0xd0, 0, 0, 0, 0, 0, 12)
+	return append(packet, 0, 10, 0, 8, 1, 2, 3, 4, 5, 6, 7, 8)
 }
 
 func trackerConnectRequest() []byte {

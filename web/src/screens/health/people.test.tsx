@@ -91,6 +91,16 @@ const connection = (over: Partial<Alert> = {}): Alert =>
     params: { user_name: "Oleg", user_id: "usr_oleg" },
     ...over,
   });
+const torrent = (over: Partial<Alert> = {}): Alert =>
+  ended({
+    id: "alt_torrent",
+    kind: AlertKind.TORRENT,
+    subject: "usr_alice",
+    titleKey: "health.alert.torrent.title",
+    whyKey: "health.alert.torrent.why",
+    params: { user_id: "usr_alice", user_name: "alice", nodes: "EE, DE", count: "7", last_unix: String(NOW - 60), evidence: "tracker_connect", ports: "6969" },
+    ...over,
+  });
 const impacted = node({
   id: "alt_impacted",
   severity: AlertSeverity.WARNING,
@@ -144,6 +154,25 @@ describe("Health ▸ People", () => {
     expect(list[1]!.textContent).toContain("Info");
     expect(text()).not.toContain("de1");
     expect(text()).not.toContain("Connections dropped on the node");
+  });
+
+  it("shows a torrent attempt: who, where, how many, what was caught and the port, and no node alert around it", async () => {
+    await mount({ people: [connection(), torrent(), node()] });
+    const list = cards();
+    expect(list).toHaveLength(2);
+    expect(list[0]!.textContent).toContain("alice");
+    expect(list[0]!.textContent).toContain("Torrent attempts");
+    expect(list[0]!.textContent).toContain("alice is trying to use torrents on EE, DE: 7 attempts in a day, blocked.");
+    expect(list[0]!.textContent).toContain("Evidence: tracker connect request (the protocol’s magic number), port 6969.");
+    expect(list[0]!.textContent).toContain("Warning");
+    expect([...document.querySelectorAll("a")].some((a) => a.getAttribute("href") === "/users/usr_alice")).toBe(true);
+    expect(list[1]!.textContent).toContain("Oleg");
+  });
+
+  it("keeps a torrent alert out of the node alerts", async () => {
+    await mount({ alerts: [torrent(), node()] });
+    expect(cards()).toHaveLength(1);
+    expect(text()).not.toContain("alice");
   });
 
   it("opens the user from the button, by params.user_id (a device alert's subject is the device)", async () => {

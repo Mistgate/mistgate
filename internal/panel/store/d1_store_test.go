@@ -319,6 +319,7 @@ func TestD1HealthSignalsUsesOneReadBatch(t *testing.T) {
 	st := openD1Store(t)
 	now := time.Date(2026, 10, 7, 12, 40, 0, 0, time.UTC)
 	seedHealthSignals(t, st, now)
+	seedTorrentEvents(t, st, now)
 
 	binding := js.Global().Get("__d1")
 	var got HealthSignalBatch
@@ -334,6 +335,9 @@ func TestD1HealthSignalsUsesOneReadBatch(t *testing.T) {
 	}
 	if len(got.Users) != 3 || len(got.AWGDevices) != 1 || len(got.NodeHours) != 8 {
 		t.Fatalf("signals = users %d, AWG devices %d, node hours %d", len(got.Users), len(got.AWGDevices), len(got.NodeHours))
+	}
+	if len(got.Torrents) != 2 {
+		t.Fatalf("torrent signals = %+v, want usr_active on two nodes", got.Torrents)
 	}
 }
 

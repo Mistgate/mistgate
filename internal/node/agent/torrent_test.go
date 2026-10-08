@@ -55,6 +55,22 @@ func TestEngineTorrentEventsAreRateLimitedPerUserAndInbound(t *testing.T) {
 	}
 }
 
+func TestEngineTorrentEventKeepsEvidenceAndPortButNoAddress(t *testing.T) {
+	a := &Agent{out: newOutbox(32, 1<<20), torrentEvents: map[string]time.Time{}}
+	a.engineEvent(engine.Event{Code: "torrent_attempt", InboundID: "in-1", Warning: true, Params: map[string]string{
+		"user_id": "user-1", "protocol": "udp", "torrent_protocol": "bittorrent_tracker",
+		"evidence": "tracker_connect", "dst_port": "6969", "destination": "198.51.100.1:6969", "client_ip": "10.66.4.2",
+	}})
+	queued := a.out.after(0)
+	if len(queued) != 1 {
+		t.Fatalf("queued events = %d", len(queued))
+	}
+	params := queued[0].GetEvent().Params
+	if params["evidence"] != "tracker_connect" || params["dst_port"] != "6969" || len(params) != 5 {
+		t.Fatalf("event params = %v", params)
+	}
+}
+
 type torrentGuardTestHost struct {
 	*tunHost
 	ifaces []string
@@ -112,6 +128,7 @@ func TestSyncTorrentGuardScopesAWGAndResolvesClient(t *testing.T) {
 			host.cb(hostctl.TorrentDetection{
 				TunnelIface: "mgawg51820", TunnelIP: netip.MustParseAddr("10.66.4.2"),
 				L4Protocol: "tcp", Signature: torrentguard.ProtocolBitTorrentTCP,
+				Evidence: torrentguard.EvidenceTCPHandshake, DstPort: 6881,
 			})
 			queued := a.out.after(0)
 			if len(queued) != 1 {
@@ -120,6 +137,9 @@ func TestSyncTorrentGuardScopesAWGAndResolvesClient(t *testing.T) {
 			event := queued[0].GetEvent()
 			if event.InboundId != "awg-1" || event.Params["protocol"] != "tcp" || event.Params["torrent_protocol"] != string(torrentguard.ProtocolBitTorrentTCP) {
 				t.Fatalf("event identity = inbound %q params %v", event.InboundId, event.Params)
+			}
+			if event.Params["evidence"] != "tcp_handshake" || event.Params["dst_port"] != "6881" {
+				t.Fatalf("event evidence = %q, port = %q", event.Params["evidence"], event.Params["dst_port"])
 			}
 			// The client's tunnel address only finds the user; it never leaves the node.
 			for _, k := range []string{"client_ip", "destination"} {

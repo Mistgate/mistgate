@@ -540,7 +540,10 @@ func (o outbound) TCP(addr string) (net.Conn, error) {
 	if err != nil || o.in == nil || !o.in.e.torrentEnabled.Load() {
 		return c, err
 	}
-	return newTorrentTCPConn(c, func() { o.in.reportTorrent(torrentguard.ProtocolBitTorrentTCP, "tcp", userID) }), nil
+	port := torrentPort(addr)
+	return newTorrentTCPConn(c, func() {
+		o.in.reportTorrent(torrentguard.ProtocolBitTorrentTCP, torrentguard.EvidenceTCPHandshake, "tcp", userID, port)
+	}), nil
 }
 func (o outbound) CheckUDP(addr string) error { return o.e.CheckUDP(addr) }
 func (o outbound) UDP(addr string) (server.UDPConn, error) {
@@ -553,19 +556,22 @@ func (o outbound) UDP(addr string) (server.UDPConn, error) {
 		return nil, err
 	}
 	if o.in != nil && o.in.e.torrentEnabled.Load() {
-		return torrentUDPConn{UDPConn: c, attempt: func(protocol torrentguard.Protocol) {
-			o.in.reportTorrent(protocol, "udp", userID)
+		return torrentUDPConn{UDPConn: c, attempt: func(protocol torrentguard.Protocol, evidence torrentguard.Evidence, addr string) {
+			o.in.reportTorrent(protocol, evidence, "udp", userID, torrentPort(addr))
 		}}, nil
 	}
 	return c, nil
 }
 
-// reportTorrent names who tried, never where to: the destination stays on the node.
-func (in *inbound) reportTorrent(protocol torrentguard.Protocol, transport, userID string) {
+// reportTorrent names who tried, what matched and the destination port, never the destination address: that stays on the node.
+func (in *inbound) reportTorrent(protocol torrentguard.Protocol, evidence torrentguard.Evidence, transport, userID, dstPort string) {
 	if in == nil || in.e == nil || in.e.env.Event == nil {
 		return
 	}
-	params := map[string]string{"protocol": transport, "torrent_protocol": string(protocol)}
+	params := map[string]string{"protocol": transport, "torrent_protocol": string(protocol), "evidence": string(evidence)}
+	if dstPort != "" {
+		params["dst_port"] = dstPort
+	}
 	if userID != "" {
 		params["user_id"] = userID
 	}

@@ -1,6 +1,7 @@
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { describeEvent } from "@/lib/events";
+import { torrentEvidenceText } from "@/lib/torrent";
 import { reasonText } from "@/lib/updates";
 import { prepReasonText } from "./awg-kernel";
 import type { EventLine, NodeEvent } from "./event-model";
@@ -128,9 +129,16 @@ function eventTitle(t: T, e: NodeEvent, stamp?: (unix: number) => string): strin
 function eventSub(t: T, e: NodeEvent): string {
   const p = e.params;
   if (e.code === "torrent_attempt") {
-    // No addresses: the panel stores neither the client's nor the destination (fleet onEvent).
+    // No addresses: the panel stores neither the client's nor the destination (fleet onEvent), only the destination port
+    // and what the guard matched.
     const protocol = [p.protocol, p.torrent_protocol].filter(Boolean).join(" / ");
-    return protocol ? t("node.ev.torrentProtocol", { protocol }) : "";
+    return [
+      protocol ? t("node.ev.torrentProtocol", { protocol }) : "",
+      p.evidence ? t("node.ev.torrentEvidence", { evidence: torrentEvidenceText(t, p.evidence) }) : "",
+      p.dst_port ? t("node.ev.torrentPort", { port: p.dst_port }) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
   if (e.code === "update_step_failed") return p.reason ? reasonText(t, p.reason) : "";
   if (e.code === "engine_started" || e.code === "engine_restarted") return p.reason && reasonKeys[p.reason] ? t(reasonKeys[p.reason]!) : "";

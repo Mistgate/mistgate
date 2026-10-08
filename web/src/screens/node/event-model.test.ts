@@ -215,6 +215,15 @@ describe("event lines say what happened, once", () => {
       sub: "protocol: hysteria2 / bittorrent",
     });
 
+    const proved = buildLines([ev("torrent_attempt", T0, {
+      user_name: "alice", protocol: "udp", torrent_protocol: "bittorrent_tracker", evidence: "tracker_connect", dst_port: "6969",
+    })]);
+    expect(lineText(tn as never, proved[0]!).sub).toBe(
+      "protocol: udp / bittorrent_tracker · caught: tracker connect request (the protocol’s magic number) · port 6969",
+    );
+    const unknownEvidence = buildLines([ev("torrent_attempt", T0, { user_name: "alice", evidence: "new_code" })]);
+    expect(lineText(tn as never, unknownEvidence[0]!).sub).toBe("caught: new_code");
+
     const fallback = buildLines([ev("torrent_attempt", T0 + 1, { user_id: "usr_missing", torrent_protocol: "bittorrent" })]);
     expect(lineText(tn as never, fallback[0]!)).toEqual({
       title: "Possible BitTorrent attempt by usr_missing",

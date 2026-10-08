@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/torrentguard"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 func TestHysteriaRequestAttributionRejectsAmbiguousDestination(t *testing.T) {
@@ -162,9 +164,13 @@ func TestTorrentUDPConnDropsOnlyDetectedDatagrams(t *testing.T) {
 	base := &recordingUDPConn{}
 	var mu sync.Mutex
 	var detected []torrentguard.Protocol
-	guarded := torrentUDPConn{UDPConn: base, attempt: func(p torrentguard.Protocol) {
+	var evidence []torrentguard.Evidence
+	var addrs []string
+	guarded := torrentUDPConn{UDPConn: base, attempt: func(p torrentguard.Protocol, e torrentguard.Evidence, addr string) {
 		mu.Lock()
 		detected = append(detected, p)
+		evidence = append(evidence, e)
+		addrs = append(addrs, addr)
 		mu.Unlock()
 	}}
 	query := []byte("d1:ad2:id20:aaaaaaaaaaaaaaaaaaaae1:q4:ping1:t2:aa1:y1:qe")
@@ -180,6 +186,82 @@ func TestTorrentUDPConnDropsOnlyDetectedDatagrams(t *testing.T) {
 	}
 	if len(detected) != 1 || detected[0] != torrentguard.ProtocolBitTorrentDHT {
 		t.Fatalf("detected protocols = %v", detected)
+	}
+	if len(evidence) != 1 || evidence[0] != torrentguard.EvidenceDHTQuery || len(addrs) != 1 || torrentPort(addrs[0]) != "6881" {
+		t.Fatalf("evidence = %v, destinations = %v", evidence, addrs)
+	}
+}
+
+// DNS goes through untouched: a query is arbitrary bytes that can have the shape of a tracker announce or a uTP SYN.
+func TestTorrentUDPConnNeverInspectsDNS(t *testing.T) {
+	base := &recordingUDPConn{}
+	detected := 0
+	guarded := torrentUDPConn{UDPConn: base, attempt: func(torrentguard.Protocol, torrentguard.Evidence, string) { detected++ }}
+	syn := make([]byte, 20)
+	syn[0] = 0x41
+	dns := dnsQueryWithEDNSCookie()
+	for _, addr := range []string{"1.1.1.1:53", "[2606:4700::1111]:53", "224.0.0.251:5353"} {
+		for _, p := range [][]byte{dns, syn} {
+			if n, err := guarded.WriteTo(p, addr); err != nil || n != len(p) {
+				t.Fatalf("write to %s = %d, %v", addr, n, err)
+			}
+		}
+	}
+	if detected != 0 || len(base.writes) != 6 {
+		t.Fatalf("detected %d, forwarded %d datagrams; want 0 and 6", detected, len(base.writes))
+	}
+	// the same SYN shape to another port is still a uTP start
+	if _, err := guarded.WriteTo(syn, "203.0.113.5:51413"); err != nil || detected != 1 || len(base.writes) != 6 {
+		t.Fatalf("SYN to a peer port: detected %d, forwarded %d, err %v", detected, len(base.writes), err)
+	}
+}
+
+// dnsQueryWithEDNSCookie is a plain 98-byte DNS query (ID 0x1234, one question, an EDNS OPT record with a COOKIE option).
+// Its bytes have the exact layout of a BEP 15 announce.
+func dnsQueryWithEDNSCookie() []byte {
+	packet := []byte{0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 1}
+	for _, label := range []int{20, 20, 15} {
+		packet = append(packet, byte(label))
+		for i := 0; i < label; i++ {
+			packet = append(packet, 'a'+byte(i%26))
+		}
+	}
+	packet = append(packet, 0, 0, 1, 0, 1)
+	packet = append(packet, 0, 0, 41, 0x04, 0xd0, 0, 0, 0, 0, 0, 12)
+	return append(packet, 0, 10, 0, 8, 1, 2, 3, 4, 5, 6, 7, 8)
+}
+
+func TestTorrentPortKeepsOnlyTheNumber(t *testing.T) {
+	for addr, want := range map[string]string{
+		"198.51.100.3:6881":  "6881",
+		"[2001:db8::1]:6969": "6969",
+		"tracker.example:80": "80",
+		"198.51.100.3":       "",
+		"198.51.100.3:http":  "",
+		"198.51.100.3:0":     "",
+		"198.51.100.3:70000": "",
+		"":                   "",
+	} {
+		if got := torrentPort(addr); got != want {
+			t.Errorf("torrentPort(%q) = %q, want %q", addr, got, want)
+		}
+	}
+}
+
+func TestReportTorrentCarriesEvidenceAndPortNeverAddress(t *testing.T) {
+	var got engine.Event
+	e := &eng{}
+	e.env.Event = func(ev engine.Event) { got = ev }
+	in := &inbound{e: e, spec: plugin.InboundSpec{ID: "hy-1"}}
+	in.reportTorrent(torrentguard.ProtocolBitTorrentTracker, torrentguard.EvidenceTrackerConnect, "udp", "usr_a", torrentPort("198.51.100.9:6969"))
+	want := map[string]string{"protocol": "udp", "torrent_protocol": "bittorrent_tracker", "evidence": "tracker_connect", "dst_port": "6969", "user_id": "usr_a"}
+	if got.Code != "torrent_attempt" || len(got.Params) != len(want) {
+		t.Fatalf("event = %+v", got)
+	}
+	for k, v := range want {
+		if got.Params[k] != v {
+			t.Errorf("param %s = %q, want %q", k, got.Params[k], v)
+		}
 	}
 }
 
