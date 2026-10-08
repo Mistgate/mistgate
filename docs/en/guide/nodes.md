@@ -138,6 +138,8 @@ The node's own host checks, grouped into **Needs attention**, **Accepted as norm
 
 A UDP port check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
 
+On VPS installations, the panel repeats the check every six hours for each online node with the `udpcheck` capability and an enabled inbound. It immediately confirms a lossy or broken result with one more check; the alert follows the latest verdict.
+
 ### Settings
 
 The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access** card (a node installed over SSH), the **AmneziaWG backend** card, **New install command** (the owner only) and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md). **New install command** is for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md). The **SSH access** card shows the saved SSH server and login, and **Reveal password** shows the password after a fresh sign-in confirmation; how the password is kept and changed is in [Install a node over SSH](../getting-started/ssh-install.md).

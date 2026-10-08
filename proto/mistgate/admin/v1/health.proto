@@ -116,6 +116,11 @@ enum AlertKind {
   // the nodes they tried on. Open while the last attempt is under 24 hours old; attempts the node cannot attribute to a
   // user raise nothing.
   ALERT_KIND_TORRENT = 15;
+  // The UDP delivery check found the current port of an enabled inbound losing packets (design/udp-port-check.md).
+  // WARNING. node_id = node id, subject = inbound id, params{profile, port, sent, got, sender, checked_unix}. Derived
+  // from the latest verdict of that port, not the sticky one: it resolves when a re-check is clean or the inbound moves
+  // to another port.
+  ALERT_KIND_PORT_LOSSY = 16;
 }
 
 message Alert {

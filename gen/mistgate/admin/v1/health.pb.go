@@ -129,6 +129,11 @@ const (
 	// the nodes they tried on. Open while the last attempt is under 24 hours old; attempts the node cannot attribute to a
 	// user raise nothing.
 	AlertKind_ALERT_KIND_TORRENT AlertKind = 15
+	// The UDP delivery check found the current port of an enabled inbound losing packets (design/udp-port-check.md).
+	// WARNING. node_id = node id, subject = inbound id, params{profile, port, sent, got, sender, checked_unix}. Derived
+	// from the latest verdict of that port, not the sticky one: it resolves when a re-check is clean or the inbound moves
+	// to another port.
+	AlertKind_ALERT_KIND_PORT_LOSSY AlertKind = 16
 )
 
 // Enum value maps for AlertKind.
@@ -150,6 +155,7 @@ var (
 		13: "ALERT_KIND_USER_CONNECTION",
 		14: "ALERT_KIND_USERS_IMPACTED",
 		15: "ALERT_KIND_TORRENT",
+		16: "ALERT_KIND_PORT_LOSSY",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -168,6 +174,7 @@ var (
 		"ALERT_KIND_USER_CONNECTION":             13,
 		"ALERT_KIND_USERS_IMPACTED":              14,
 		"ALERT_KIND_TORRENT":                     15,
+		"ALERT_KIND_PORT_LOSSY":                  16,
 	}
 )
 
@@ -2444,7 +2451,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xd7\x03\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xf2\x03\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -2462,7 +2469,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x17ALERT_KIND_ACCESS_ENDED\x10\f\x12\x1e\n" +
 	"\x1aALERT_KIND_USER_CONNECTION\x10\r\x12\x1d\n" +
 	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e\x12\x16\n" +
-	"\x12ALERT_KIND_TORRENT\x10\x0f*\x8e\x01\n" +
+	"\x12ALERT_KIND_TORRENT\x10\x0f\x12\x19\n" +
+	"\x15ALERT_KIND_PORT_LOSSY\x10\x10*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

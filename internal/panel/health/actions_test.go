@@ -59,6 +59,7 @@ func TestAlertActionsByDiagnosis(t *testing.T) {
 		{al(kCheckFailed, "health.alert.check_failed.why.timeout", "inb_1", nil), "restart_inbound"},
 		{al(kCheckFailed, "health.alert.check_failed.why.refused", "inb_1", nil), "restart_inbound"},
 		{al(kCheckFailed, "health.alert.check_failed.why.udp_blocked", "inb_1", nil), "open_profiles"},
+		{al(kPortLossy, "health.alert.port_lossy.why", "inb_1", nil), "open_profiles"},
 		{al(kCheckFailed, "health.alert.check_failed.why.warp_path", "inb_1", nil), "open_warp"},
 		{al(kCheckFailed, "health.alert.check_failed.why.exit_unreachable", "inb_1", nil), ""},
 		{al(kNoTraffic, "health.alert.no_traffic.why.auth", "", nil), "restart_inbounds"},

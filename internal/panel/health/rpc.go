@@ -94,6 +94,8 @@ func alertActions(a store.HealthAlert) []string {
 	}
 	variant := a.WhyKey[strings.LastIndex(a.WhyKey, ".")+1:]
 	switch a.Kind {
+	case kPortLossy:
+		return []string{"open_profiles"}
 	case kCheckFailed:
 		switch variant {
 		case "timeout", "auth", "refused":

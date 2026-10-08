@@ -266,6 +266,9 @@ export const en = {
   "health.alert.users_impacted.title": "Connections dropped on the node",
   "health.alert.users_impacted.why.gone":
     "People on {protocol}: now {now}, usually about {usual} at this hour, while the node is online. This looks like a block on the users’ side.",
+  "health.alert.port_lossy.title": "UDP to port {port} loses packets",
+  "health.alert.port_lossy.why":
+    "The test packets to port {port} of “{profile}” lost {lost} % (checked from {sender}). Clients of this profile may be slow or drop. Move the profile to another port; the alert closes when a re-check is clean.",
   "health.alert.torrent.title": "Torrent attempts",
   "health.alert.torrent.why":
     "{user_name} is trying to use torrents on {nodes}: {attempts} in a day, blocked.{proof} It closes after a day without attempts.",
@@ -725,6 +728,9 @@ export const ru: typeof en = {
   "health.alert.users_impacted.title": "На ноде пропали подключения",
   "health.alert.users_impacted.why.gone":
     "Людей на {protocol}: сейчас {now}, обычно около {usual} в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.",
+  "health.alert.port_lossy.title": "UDP до порта {port} теряет пакеты",
+  "health.alert.port_lossy.why":
+    "Тестовые пакеты до порта {port} профиля «{profile}» потерялись на {lost} % (проверка с {sender}). У клиентов этого профиля может тормозить или рваться соединение. Перенеси профиль на другой порт; алерт закроется, когда перепроверка будет чистой.",
   "health.alert.torrent.title": "Попытки качать торренты",
   "health.alert.torrent.why":
     "{user_name} пытается качать торренты на {nodes}: {attempts} за сутки, торренты заблокированы.{proof} Алерт закроется после суток без попыток.",

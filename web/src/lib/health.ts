@@ -22,6 +22,7 @@ import { plain, type Plain } from "./plain";
 import { pollMs } from "./queries";
 import { protocolName } from "./series";
 import { meQuery } from "./session";
+import { lossPct, senderLabel } from "./port-check";
 import { torrentEvidenceText } from "./torrent";
 import { pauseReasonText } from "./updates";
 
@@ -122,6 +123,10 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
   if (a.kind === AlertKind.TORRENT) return lookup(t, a.whyKey, torrentParams(t, params)) ?? "";
+  if (a.kind === AlertKind.PORT_LOSSY) {
+    params.lost = String(lossPct(Number(a.params.sent), Number(a.params.got)));
+    params.sender = senderLabel(t, a.params.sender ?? "");
+  }
   return lookup(t, a.whyKey, params) ?? "";
 }
 

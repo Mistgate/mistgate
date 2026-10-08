@@ -519,14 +519,25 @@ screenshots.
 
 Risks: three dialogs share the `port_taken` handling; extend that shared handling once rather than in each.
 
-**Round 5. Later (Codex).**
+**Round 5. Periodic VPS re-check and alert (Codex). Done.**
 
-Changes: periodic re-check (6 h per node, VPS health scheduler; edge cron in step 6); `ALERT_KIND_PORT_LOSSY` and
-Telegram; v2 options (a second sender to confirm a bad verdict, sampled hop-range ports, IPv6).
+Changes: a health-loop scheduler checks each eligible VPS node at least six hours after its latest stored check.
+Nodes without a stored check receive a stable slot across the first six-hour window, spreading initial checks; later
+checks retain the six-hour cadence from their stored timestamps. It skips offline or unsupported nodes and nodes
+without enabled inbounds. A periodic lossy or broken result on a current enabled inbound port gets one immediate
+confirmation run. The `ALERT_KIND_PORT_LOSSY` warning is derived from the latest stored verdict and opens for a
+lossy or broken current port; it resolves on a clean re-check or when that port is no longer used by an enabled
+inbound. Periodic checks use the system audit actor and do not run on the edge (edge cron is step 6). Telegram has
+English and Russian alert open and resolve texts. The confirmation run uses the normal sender selection and retry
+behavior, so it may use another sender.
 
-Proof: health derive tests (open and resolve on re-check or on a port move), Telegram texts, a scheduler test.
+Proof: derive tests cover a bad verdict, disabled and unused ports, clean re-check, port move, disable/removal,
+retirement, sticky `bad_at`, and coexistence with the client-eye `check_failed` alert. Scheduler tests cover due-node
+selection, six-hour spacing, window spreading, eligibility, single-flight execution and confirmation only for a bad
+verdict. Telegram localization and MCP kind-name tests cover the public alert surfaces.
 
-Risks: alert noise from bursty loss; the alert uses the latest verdict, not the sticky one.
+Risks: bursty loss can still produce a warning if the confirmation run also sees a bad verdict; the alert follows the
+latest stored result rather than the 30-day sticky bad history. Sampled hop-range ports and IPv6 remain future work.
 
 Deployment: rounds 1-3 need the new agent on the target and on at least one other node, so a release and a rollout to
 all four nodes. Then check that node from the node page. Expected: 8443 broken, every other port ok. Move that node's HY2 WARP inbound
@@ -541,5 +552,5 @@ to the proven `free` port with a port override.
    shows it.
 4. **Thresholds and memory.** ok >= 95 % delivered, broken < 70 %; a port that lost packets is not offered for 30 days.
 5. **"Add anyway"** for a lossy port, audited.
-6. **Periodic re-check every 6 h and the alert** come in round 5, after rounds 1-4.
+6. **Periodic re-check every 6 h and the alert** were delivered in round 5, after rounds 1-4.
 7. **Who may run a check**: owner and helper, and API tokens/MCP operator directly, like the doctor.

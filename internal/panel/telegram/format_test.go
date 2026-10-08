@@ -143,6 +143,30 @@ func TestProbePathAlertIsLocalized(t *testing.T) {
 	}
 }
 
+func TestPortLossyAlertTextsAreLocalized(t *testing.T) {
+	now := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	a := store.HealthAlert{
+		Kind: "port_lossy", Severity: 2, NodeID: "node-a", Subject: "inb_1", WhyKey: "health.alert.port_lossy.why",
+		Params:    map[string]string{"profile": "profile-a", "port": "8443", "sent": "300", "got": "286"},
+		FirstSeen: now, OpenedAt: now, ResolvedAt: now.Add(5 * time.Minute),
+	}
+	for _, tc := range []struct {
+		lang  L
+		parts []string
+	}{
+		{"en", []string{"UDP packets are being lost", "Node: <b>node-a</b>", "Profile “profile-a” on port 8443 lost 5% of UDP packets in the latest check."}},
+		{"ru", []string{"Теряются UDP-пакеты", "Нода: <b>node-a</b>", "Профиль «profile-a» на порту 8443 потерял 5% UDP-пакетов при последней проверке."}},
+	} {
+		for _, message := range []string{alertOpened(tc.lang, a, "node-a", ""), alertResolved(tc.lang, a, "node-a")} {
+			for _, part := range tc.parts {
+				if !strings.Contains(message, part) {
+					t.Errorf("%s message %q lacks %q", tc.lang, message, part)
+				}
+			}
+		}
+	}
+}
+
 func TestUserHealthAlertsAreLocalized(t *testing.T) {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	accessEnded := store.HealthAlert{

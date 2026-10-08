@@ -429,7 +429,7 @@ func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv
 	for _, port := range req.Msg.Ports {
 		if port == 0 || port > 65535 {
 			out := portCheckOutcome{errorCode: "failed"}
-			f.auditPortCheck(ctx, n, nil, out)
+			f.auditPortCheck(ctx, n, nil, out, "")
 			return connect.NewResponse(&adminv1.CheckPortsResponse{ErrorCode: out.errorCode}), nil
 		}
 		requested = append(requested, uint16(port))

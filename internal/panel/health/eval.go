@@ -35,6 +35,7 @@ const (
 	kUserConnection = "user_connection"
 	kUsersImpacted  = "users_impacted"
 	kTorrent        = "torrent"
+	kPortLossy      = "port_lossy"
 )
 
 var kindProto = map[string]adminv1.AlertKind{
@@ -48,6 +49,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kUserConnection: adminv1.AlertKind_ALERT_KIND_USER_CONNECTION,
 	kUsersImpacted:  adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED,
 	kTorrent:        adminv1.AlertKind_ALERT_KIND_TORRENT,
+	kPortLossy:      adminv1.AlertKind_ALERT_KIND_PORT_LOSSY,
 }
 
 const (
@@ -112,6 +114,8 @@ func (d *derived) holds(a store.HealthAlert) bool {
 	switch {
 	case a.Kind == kUpdateFailed: // a fact about the rollout in the database, not about the node's link
 		return false
+	case a.Kind == kPortLossy: // latest stored verdict and inbound configuration remain judgeable while offline
+		return false
 	case a.Kind == kNodeDown:
 		return d.holdDown[a.NodeID]
 	case d.holdNode[a.NodeID]:
@@ -168,12 +172,17 @@ func (s *Service) evaluate(ctx context.Context) {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
+	portChecks, err := s.st.PortChecks(ctx)
+	if err != nil {
+		s.log.Warn("health: evaluate", "err", err)
+		return
+	}
 	active, err := s.st.ActiveAlerts(ctx)
 	if err != nil {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	d := s.derive(ctx, now, sn, rows, acceptsByNode(accepts), signals, active)
+	d := s.derive(ctx, now, sn, rows, acceptsByNode(accepts), signals, portChecks, active)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()
@@ -203,7 +212,7 @@ func accepted(r store.DoctorRow, acc map[string]store.DoctorAccept) (store.Docto
 
 // derive computes the conditions that hold now.
 func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
-	signals store.HealthSignalBatch, active []store.HealthAlert) *derived {
+	signals store.HealthSignalBatch, portChecks []store.PortCheck, active []store.HealthAlert) *derived {
 	d := &derived{conds: map[key]cond{}, accepted: map[key]bool{}, nodes: map[string]bool{}, holdNode: map[string]bool{}, holdDown: map[string]bool{},
 		holdDoctor: map[string]bool{}, holdSynth: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
 	docs := map[string][]store.DoctorRow{}
@@ -364,12 +373,53 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, rows 
 	for _, c := range s.extConds(ctx) { // e.g. a paused rollout (update_failed)
 		add(cond{key: key{c.Kind, c.NodeID, c.Subject}, severity: c.Severity, why: c.Why, params: c.Params})
 	}
+	addPortLossyConds(sn, portChecks, add)
 	activeKeys := make(map[key]bool, len(active))
 	for _, alert := range active {
 		activeKeys[key{alert.Kind, alert.NodeID, alert.Subject}] = true
 	}
 	userConds(now, sn, signals, activeKeys, d, add)
 	return d
+}
+
+// addPortLossyConds derives a port alert from each enabled inbound's current port and its latest stored verdict.
+// check_failed remains active alongside this alert: it describes a client-eye failure, while this check measures
+// whether tagged UDP packets arrived at the node.
+func addPortLossyConds(sn *snapshot, checks []store.PortCheck, add func(cond)) {
+	type nodePort struct {
+		node string
+		port uint16
+	}
+	latest := make(map[nodePort]store.PortCheck, len(checks))
+	for _, check := range checks {
+		latest[nodePort{node: check.NodeID, port: check.Port}] = check
+	}
+	names := make(map[string]string, len(sn.nodes))
+	for _, node := range sn.nodes {
+		names[node.ID] = node.Name
+	}
+	for _, node := range sn.nodes {
+		for _, inbound := range sn.byNode[node.ID] {
+			if !inbound.in.Enabled || inbound.err != nil {
+				continue
+			}
+			port := uint16(inbound.spec.Listen.Port)
+			check, ok := latest[nodePort{node: node.ID, port: port}]
+			if !ok || (check.Verdict != "lossy" && check.Verdict != "broken") {
+				continue
+			}
+			sender := check.Sender
+			if name := names[sender]; name != "" {
+				sender = name
+			}
+			add(cond{key: key{kPortLossy, node.ID, inbound.in.ID}, severity: sevWarning,
+				why: "health.alert.port_lossy.why", params: map[string]string{
+					"profile": inbound.in.ProfileName, "port": strconv.Itoa(int(port)),
+					"sent": strconv.FormatUint(uint64(check.Sent), 10), "got": strconv.FormatUint(uint64(check.Got), 10),
+					"sender": sender, "checked_unix": strconv.FormatInt(check.CheckedAt.Unix(), 10),
+				}})
+		}
+	}
 }
 
 // probed is an inbound that has been probed at least once, with its cell.
@@ -670,6 +720,14 @@ func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, acti
 	have := map[key]bool{}
 	for _, a := range active {
 		k := key{a.Kind, a.NodeID, a.Subject}
+		if a.Kind == kPortLossy {
+			if c, ok := d.conds[k]; ok && a.Params["port"] != c.params["port"] {
+				if err := s.resolve(ctx, a, "cleared", now); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		have[k] = true
 		if c, ok := d.conds[k]; ok {
 			refreshAfter := time.Second

@@ -66,6 +66,15 @@ type udpPortSettings struct {
 
 // CheckPorts runs one bounded UDP delivery check and returns the sending node id (or "panel") and a stable result code.
 func (f *Fleet) CheckPorts(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
+	return f.checkPorts(ctx, nodeID, requested, "")
+}
+
+// CheckPortsAsSystem runs the same check for a panel-owned schedule and audits it as the system actor.
+func (f *Fleet) CheckPortsAsSystem(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
+	return f.checkPorts(ctx, nodeID, requested, "system")
+}
+
+func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint16, auditActor string) ([]store.PortCheck, string, string) {
 	node, err := f.st.Node(ctx, nodeID)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) {
@@ -76,7 +85,7 @@ func (f *Fleet) CheckPorts(ctx context.Context, nodeID string, requested []uint1
 	lock, generation, waited, err := f.acquirePortCheck(ctx, nodeID)
 	if err != nil {
 		out := portCheckOutcome{errorCode: "failed"}
-		f.auditPortCheck(ctx, node, requested, out)
+		f.auditPortCheck(ctx, node, requested, out, auditActor)
 		return nil, "", out.errorCode
 	}
 	defer func() { <-lock.gate }()
@@ -87,7 +96,7 @@ func (f *Fleet) CheckPorts(ctx context.Context, nodeID string, requested []uint1
 		f.portCheckMu.Unlock()
 		if completed {
 			out := f.completedPortCheck(ctx, nodeID, previous)
-			f.auditPortCheck(ctx, node, requested, out)
+			f.auditPortCheck(ctx, node, requested, out, auditActor)
 			return out.checks, out.sender, out.errorCode
 		}
 	}
@@ -96,12 +105,12 @@ func (f *Fleet) CheckPorts(ctx context.Context, nodeID string, requested []uint1
 	if err != nil {
 		out := portCheckOutcome{errorCode: "failed"}
 		f.finishPortCheck(lock, out)
-		f.auditPortCheck(ctx, node, requested, out)
+		f.auditPortCheck(ctx, node, requested, out, auditActor)
 		return nil, "", out.errorCode
 	}
 	out := f.runPortCheck(ctx, node, requested)
 	f.finishPortCheck(lock, out)
-	f.auditPortCheck(ctx, node, requested, out)
+	f.auditPortCheck(ctx, node, requested, out, auditActor)
 	return out.checks, out.sender, out.errorCode
 }
 
@@ -173,7 +182,7 @@ func (f *Fleet) completedPortCheck(ctx context.Context, nodeID string, previous 
 	return previous
 }
 
-func (f *Fleet) auditPortCheck(ctx context.Context, node store.NodeRow, requested []uint16, outcome portCheckOutcome) {
+func (f *Fleet) auditPortCheck(ctx context.Context, node store.NodeRow, requested []uint16, outcome portCheckOutcome, actorOverride string) {
 	ports := requested
 	if len(outcome.checks) > 0 {
 		ports = make([]uint16, 0, len(outcome.checks))
@@ -187,10 +196,18 @@ func (f *Fleet) auditPortCheck(ctx context.Context, node store.NodeRow, requeste
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	f.audit(ctx, "node.ports_check", map[string]string{
+	params := map[string]string{
 		"node_id": node.ID, "node": node.Name, "ports": strings.Join(values, ","),
 		"sender": outcome.sender, "error_code": outcome.errorCode,
-	})
+	}
+	if actorOverride == "" {
+		f.audit(ctx, "node.ports_check", params)
+		return
+	}
+	b, _ := json.Marshal(params)
+	if err := f.st.Audit(ctx, f.now(), store.AuditEntry{Actor: actorOverride, Action: "node.ports_check", Params: string(b), Result: "ok"}); err != nil {
+		f.log.Warn("audit", "action", "node.ports_check", "err", err)
+	}
 }
 
 func (f *Fleet) runPortCheck(ctx context.Context, target store.NodeRow, requested []uint16) portCheckOutcome {

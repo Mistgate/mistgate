@@ -94,6 +94,8 @@ type Config struct {
 
 	// Actor returns the admin id for audit rows. Default: the signed-in admin from the auth interceptor.
 	Actor func(context.Context) string
+	// CheckPorts runs the fleet's bounded UDP delivery check. When set, the VPS scheduler uses it every six hours.
+	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
 	Log          *slog.Logger
@@ -134,6 +136,9 @@ type Service struct {
 
 	evalMu sync.Mutex // serialises evaluate
 	kick   chan struct{}
+
+	portCheckRun      chan struct{} // one scheduled CheckPorts run at a time
+	portCheckAttempts map[string]int64
 
 	nhMu       sync.RWMutex
 	nodeHealth map[string]nodeHealth // computed by the last evaluation
@@ -189,6 +194,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 		st: st, v: v, reg: reg, fl: fl, cfg: cfg, log: cfg.Log, now: cfg.Now, startedAt: cfg.Now(),
 		creds: map[string]store.ProbeCredRow{}, cells: map[string]*cell{}, sched: map[string]*schedule{},
 		work: make(chan string, 1024), queued: map[string]bool{}, kick: make(chan struct{}, 1),
+		portCheckRun: make(chan struct{}, 1), portCheckAttempts: map[string]int64{},
 		nodeHealth: map[string]nodeHealth{}, waiters: map[string][]chan struct{}{},
 		plans: map[string]fixPlan{}, fixBusy: map[string]bool{}, recentFix: map[string]time.Time{},
 	}
@@ -203,7 +209,7 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 func (s *Service) Run(ctx context.Context) {
 	s.startedAt = s.now()
 	var wg sync.WaitGroup
-	for _, f := range []func(context.Context){s.runChecker, s.runEvaluator, s.runRetention} {
+	for _, f := range []func(context.Context){s.runChecker, s.runEvaluator, s.runRetention, s.runPortRechecks} {
 		wg.Add(1)
 		go func() { defer wg.Done(); f(ctx) }()
 	}

@@ -172,6 +172,19 @@ func TestCheckPortsOrdersArmSendSettleStopAndFillsGetNode(t *testing.T) {
 	}
 }
 
+func TestCheckPortsAsSystemAuditsTheSystemActor(t *testing.T) {
+	x, target := newL3Env(t)
+	conn, _, _ := connectCaps(target, "ports-old-agent", capDoctor)
+	_ = conn
+	_, _, code := x.f.CheckPortsAsSystem(x.ctx, target.nodeID, nil)
+	if code != "agent_too_old" {
+		t.Fatalf("CheckPortsAsSystem error = %q, want agent_too_old", code)
+	}
+	if got := x.count(`SELECT count(*) FROM audit WHERE action = 'node.ports_check' AND actor = 'system'`); got != 1 {
+		t.Fatalf("system port-check audit rows = %d, want one", got)
+	}
+}
+
 func TestUDPPortVerdictsAndGROMath(t *testing.T) {
 	for _, test := range []struct {
 		got     uint64

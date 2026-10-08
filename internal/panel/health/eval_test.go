@@ -515,7 +515,11 @@ func TestUsersImpactedIsSuppressedByHeldActiveCheckFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := e.s.derive(e.ctx, e.clock.Now(), sn, rows, acceptsByNode(accepts), signals, mustActiveAlerts(t, e))
+	portChecks, err := e.st.PortChecks(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := e.s.derive(e.ctx, e.clock.Now(), sn, rows, acceptsByNode(accepts), signals, portChecks, mustActiveAlerts(t, e))
 	if !d.holdSynth["de1"] {
 		t.Fatal("test did not leave CHECK_FAILED in the held state")
 	}
@@ -1196,4 +1200,222 @@ func TestDoctorRowsFollowTheCheckIDOrder(t *testing.T) {
 	if want := "disk_space kernel_headers awg_backend warp_path aa_new"; strings.Join(got, " ") != want {
 		t.Fatalf("order %v, want %s", got, want)
 	}
+}
+
+func TestPortLossyAlertOpensForBadLatestInboundVerdict(t *testing.T) {
+	for _, tc := range []struct {
+		verdict string
+		got     uint32
+	}{{"lossy", 286}, {"broken", 100}} {
+		t.Run(tc.verdict, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "provider-a", true)
+			inbound := e.inbound("de1", 8443)
+			node, err := e.st.Node(e.ctx, "de1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: tc.got,
+				Verdict: tc.verdict, Sender: "panel", CheckedAt: e.clock.Now()}
+			if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
+				t.Fatal(err)
+			}
+			e.evaluate()
+
+			alert, ok := e.active()["port_lossy/de1/"+inbound]
+			if !ok || alert.Severity != sevWarning || alert.WhyKey != "health.alert.port_lossy.why" ||
+				alert.Params["profile"] == "" || alert.Params["port"] != "8443" || alert.Params["sent"] != "300" ||
+				alert.Params["got"] != strconv.FormatUint(uint64(tc.got), 10) || alert.Params["sender"] != "panel" ||
+				alert.Params["checked_unix"] != strconv.FormatInt(check.CheckedAt.Unix(), 10) {
+				t.Fatalf("port_lossy alert = %+v, found %v", alert, ok)
+			}
+		})
+	}
+}
+
+func TestPortLossyAlertUsesEnabledInboundCurrentPorts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider-a", true)
+	disabled := e.inbound("de1", 8443)
+	e.exec(`UPDATE inbound SET enabled = 0 WHERE id = ?`, disabled)
+	e.inbound("de1", 443)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{
+		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	for key := range e.active() {
+		if strings.HasPrefix(key, "port_lossy/") {
+			t.Fatalf("unexpected alert for a disabled inbound or unused port: %s", key)
+		}
+	}
+}
+
+func TestPortLossyAlertResolvesOnCleanRecheckDespiteStickyBadAt(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider-a", true)
+	inbound := e.inbound("de1", 8443)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100,
+		Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{bad}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	want(t, e.active(), "port_lossy/de1/"+inbound)
+
+	e.clock.Advance(time.Minute)
+	clean := bad
+	clean.Got, clean.Verdict, clean.CheckedAt = 300, "ok", e.clock.Now()
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{clean}); err != nil {
+		t.Fatal(err)
+	}
+	checks, err := e.st.PortChecks(e.ctx, node.ID)
+	if err != nil || len(checks) != 1 || !checks[0].Bad(e.clock.Now()) {
+		t.Fatalf("clean check lost sticky bad_at: %+v, %v", checks, err)
+	}
+	e.evaluate()
+	want(t, e.active())
+	if history := e.history(); len(history) != 1 || history[0].Kind != "port_lossy" || history[0].Resolution != "cleared" {
+		t.Fatalf("port_lossy history = %+v", history)
+	}
+}
+
+func TestPortLossyAlertResolvesWhenInboundMovesPorts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider-a", true)
+	inbound := e.inbound("de1", 8443)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
+		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	want(t, e.active(), "port_lossy/de1/"+inbound)
+	e.exec(`UPDATE inbound SET port_override = 2053 WHERE id = ?`, inbound)
+	e.s.invalidateSnapshot()
+	e.evaluate()
+	want(t, e.active())
+	if history := e.history(); len(history) != 1 || history[0].Resolution != "cleared" {
+		t.Fatalf("port move history = %+v", history)
+	}
+}
+
+func TestPortLossyAlertResolvesAndReopensWhenNewPortIsAlsoBad(t *testing.T) {
+	var transitions []Transition
+	e := newEnv(t, func(cfg *Config) {
+		cfg.OnTransition = func(transition Transition) { transitions = append(transitions, transition) }
+	})
+	e.node("de1", "provider-a", true)
+	inbound := e.inbound("de1", 8443)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{
+		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	transitions = nil
+	e.exec(`UPDATE inbound SET port_override = 2053 WHERE id = ?`, inbound)
+	e.s.invalidateSnapshot()
+	e.evaluate()
+	if len(transitions) != 2 || !transitions[0].Resolved || transitions[1].Resolved {
+		t.Fatalf("port move transitions = %+v", transitions)
+	}
+	if alert := e.active()["port_lossy/de1/"+inbound]; alert.Params["port"] != "2053" {
+		t.Fatalf("active port_lossy alert after move = %+v", alert)
+	}
+}
+
+func TestPortLossyAlertResolvesWhenNodeIsRetired(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider-a", true)
+	inbound := e.inbound("de1", 8443)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
+		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	want(t, e.active(), "port_lossy/de1/"+inbound)
+	e.exec(`UPDATE node SET state = 'retired', retired_at = ? WHERE id = ?`, e.clock.Now().Unix(), node.ID)
+	e.s.invalidateSnapshot()
+	e.evaluate()
+	want(t, e.active())
+	if history := e.history(); len(history) != 1 || history[0].Resolution != "node_retired" {
+		t.Fatalf("retirement history = %+v", history)
+	}
+}
+
+func TestPortLossyAlertResolvesWhenInboundIsDisabledOrRemoved(t *testing.T) {
+	for _, remove := range []bool{false, true} {
+		name := "disabled"
+		if remove {
+			name = "removed"
+		}
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "provider-a", true)
+			inbound := e.inbound("de1", 8443)
+			node, err := e.st.Node(e.ctx, "de1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
+				Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+				t.Fatal(err)
+			}
+			e.evaluate()
+			want(t, e.active(), "port_lossy/de1/"+inbound)
+			if remove {
+				e.exec(`DELETE FROM inbound WHERE id = ?`, inbound)
+			} else {
+				e.exec(`UPDATE inbound SET enabled = 0 WHERE id = ?`, inbound)
+			}
+			e.s.invalidateSnapshot()
+			e.evaluate()
+			want(t, e.active())
+			if history := e.history(); len(history) != 1 || history[0].Resolution != "cleared" {
+				t.Fatalf("%s history = %+v", name, history)
+			}
+		})
+	}
+}
+
+func TestPortLossyAlertCanCoexistWithClientEyeFailure(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider-a", true)
+	inbound := e.inbound("de1", 8443)
+	other := e.inbound("de1", 443)
+	e.pass(other)
+	node, err := e.st.Node(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
+		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		t.Fatal(err)
+	}
+	e.fail(inbound, "timeout")
+	e.fail(inbound, "timeout")
+	want(t, e.active(), "check_failed/de1/"+inbound, "port_lossy/de1/"+inbound)
 }

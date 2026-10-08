@@ -184,6 +184,14 @@ describe("alerts", () => {
     expect(alertWhy(tPlural, fmt, torrent({ evidence: "new_code" }))).toContain("Evidence: new_code.");
     expect(alertTitle(tRu, alert({ kind: AlertKind.TORRENT, titleKey: "health.alert.torrent.title" }))).toBe("Попытки качать торренты");
   });
+  it("words a port_lossy alert with the loss in percent and who sent the test packets", () => {
+    const lossy = (sender: string) =>
+      alert({ kind: AlertKind.PORT_LOSSY, subject: "inb_1", titleKey: "health.alert.port_lossy.title", whyKey: "health.alert.port_lossy.why",
+        params: { profile: "hy2 · WARP", port: "8443", sent: "300", got: "189", sender, checked_unix: "1790000000" } });
+    expect(alertTitle(t, lossy("de2"))).toBe("UDP to port 8443 loses packets");
+    expect(alertWhy(t, fmt, lossy("de2"))).toMatch(/^The test packets to port 8443 of “hy2 · WARP” lost 37 % \(checked from de2\)\./);
+    expect(alertWhy(tRu, fmtRu, lossy("panel"))).toMatch(/^Тестовые пакеты до порта 8443 профиля «hy2 · WARP» потерялись на 37 % \(проверка с панели\)\./);
+  });
   it("offers the mute choices up to the panel's week, «until morning» to the next 08:00", () => {
     const clock = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
     const secs = (d: Date) => muteChoices(d).map((c) => c.seconds);

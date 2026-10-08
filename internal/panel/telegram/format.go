@@ -182,6 +182,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("Connections dropped for some users", "У части пользователей пропало подключение")
 	case "torrent":
 		return l.pick("Torrent attempts", "Попытки качать торренты")
+	case "port_lossy":
+		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -255,6 +257,8 @@ func alertReason(l L, a store.HealthAlert) string {
 			name+" продолжает подключаться, хотя подписка закончилась "+ago+" назад.")
 	case "torrent":
 		return torrentReason(l, p)
+	case "port_lossy":
+		return portLossReason(l, p)
 	case "users_impacted":
 		protocol := a.Subject
 		switch protocol {
@@ -271,6 +275,19 @@ func alertReason(l L, a store.HealthAlert) string {
 				" в этот час, а нода на связи. Похоже на блокировку на стороне пользователей.")
 	}
 	return ""
+}
+
+func portLossReason(l L, p map[string]string) string {
+	profile, port := data(p["profile"], 40), data(p["port"], 6)
+	percent := "?"
+	sent, sentErr := strconv.ParseUint(p["sent"], 10, 32)
+	got, gotErr := strconv.ParseUint(p["got"], 10, 32)
+	if sentErr == nil && gotErr == nil && sent > 0 && got <= sent {
+		lost := sent - got
+		percent = strconv.FormatUint((lost*100+sent/2)/sent, 10)
+	}
+	return l.pick("Profile “"+profile+"” on port "+port+" lost "+percent+"% of UDP packets in the latest check.",
+		"Профиль «"+profile+"» на порту "+port+" потерял "+percent+"% UDP-пакетов при последней проверке.")
 }
 
 // torrentEvidence say in a few words what the node's torrent guard matched (the "evidence" of a torrent_attempt event).
@@ -465,7 +482,11 @@ func alertResolved(l L, a store.HealthAlert, node string) string {
 	case tail != "":
 		line = upperFirst(tail)
 	}
-	return join("<b>"+l.pick("Resolved: ", "Решено: ")+alertTitle(l, a)+"</b>", line, againLine(l, a))
+	reason := ""
+	if a.Kind == "port_lossy" {
+		reason = alertReason(l, a)
+	}
+	return join("<b>"+l.pick("Resolved: ", "Решено: ")+alertTitle(l, a)+"</b>", line, reason, againLine(l, a))
 }
 
 func nodeLine(l L, node string) string {
