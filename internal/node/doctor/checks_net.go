@@ -921,10 +921,14 @@ func conntrackAtCapacity(count, max uint64) bool {
 	return count >= threshold
 }
 
-func addConntrackParams(params map[string]string, snapshot conntrackSnapshot, ok bool) map[string]string {
-	if ok {
+// addConntrackParams reports the table's fill whenever it was read. The drops come from /proc/net/stat/nf_conntrack,
+// which kernels built without CONFIG_NF_CONNTRACK_PROCFS (Ubuntu's) do not have: then there is no drops param.
+func addConntrackParams(params map[string]string, snapshot conntrackSnapshot, dropsOK bool) map[string]string {
+	if snapshot.hasCountAndMax {
 		params["conntrack_count"] = strconv.FormatUint(snapshot.count, 10)
 		params["conntrack_max"] = strconv.FormatUint(snapshot.max, 10)
+	}
+	if dropsOK {
 		params["conntrack_drops"] = strconv.FormatUint(snapshot.drops, 10)
 	}
 	return params

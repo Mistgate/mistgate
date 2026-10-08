@@ -334,7 +334,12 @@ func (in *inbound) start(ctx context.Context) error {
 	}()
 
 	detail := ""
-	if cfg.tcpPort != 0 {
+	if owner := in.e.tcpMasqOwner(in, cfg.tcpPort); owner != "" {
+		// Two profiles on one node (a WARP copy next to its original) both default to TCP 443: one decoy there is
+		// enough, so the second does not fight for the port.
+		// ponytail: if the owner is removed, this inbound takes the port over only at its next restart.
+		in.e.log.Info("hysteria2 tcp masquerade served by another inbound", "inbound", spec.ID, "port", cfg.tcpPort, "by", owner)
+	} else if cfg.tcpPort != 0 {
 		// A busy TCP port must not take the VPN down: the inbound keeps serving QUIC, and the reason is in
 		// Health().Detail so the panel can show that the decoy is degraded.
 		m, err := startTCPMasq(cfg.tcpPort, cert.GetCertificate, masq, spec.Listen.Port)
@@ -347,6 +352,20 @@ func (in *inbound) start(ctx context.Context) error {
 	}
 	in.setState(plugin.RunRunning, detail)
 	return nil
+}
+
+// tcpMasqOwner is the id of another inbound of this engine already serving the HTTPS decoy on TCP port, "" when none
+// (or port is 0). The caller holds e.mu.
+func (e *eng) tcpMasqOwner(in *inbound, port int) string {
+	if port == 0 {
+		return ""
+	}
+	for id, other := range e.inbounds {
+		if other != in && other.tcp != nil && other.cfg.tcpPort == port {
+			return id
+		}
+	}
+	return ""
 }
 
 func (in *inbound) masqHandler() http.Handler {
@@ -372,6 +391,7 @@ func (in *inbound) stop(releaseCert bool) {
 	}
 	if in.tcp != nil {
 		in.tcp.Close()
+		in.tcp = nil // the port is free for another inbound's decoy (tcpMasqOwner)
 	}
 	if releaseCert && in.certHeld {
 		in.e.env.Certs.Release(in.spec.ID)

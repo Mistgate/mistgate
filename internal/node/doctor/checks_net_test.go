@@ -612,17 +612,17 @@ func TestNetBaselineConntrackParamsAndPressure(t *testing.T) {
 	f.remove("/proc/net/stat/nf_conntrack")
 	r = run(t, f.doctor(), CheckNetBaseline)
 	want(t, r, Warn, "")
-	for _, key := range []string{"conntrack_count", "conntrack_max", "conntrack_drops"} {
-		if _, ok := r.Params[key]; ok {
-			t.Errorf("missing drop stats added %s: %v", key, r.Params)
-		}
+	// Ubuntu's kernels have no /proc/net/stat/nf_conntrack: the fill is still reported, only the drops are not.
+	param(t, r, "conntrack_count", "52429")
+	param(t, r, "conntrack_max", "65536")
+	if _, ok := r.Params["conntrack_drops"]; ok {
+		t.Errorf("missing drop stats added conntrack_drops: %v", r.Params)
 	}
 	if !strings.Contains(r.Detail, "52429/65536") {
 		t.Fatalf("missing drop stats hid the count warning: %+v", r)
 	}
 
 	for _, missing := range []string{
-		"/proc/net/stat/nf_conntrack",
 		"/proc/sys/net/netfilter/nf_conntrack_count",
 		"/proc/sys/net/netfilter/nf_conntrack_max",
 	} {

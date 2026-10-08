@@ -881,6 +881,38 @@ func TestBusyTCPPortIsNotFatal(t *testing.T) {
 	}
 }
 
+// A WARP copy next to its original: both default to the same TCP decoy port. The first serves it, the second does not
+// fight for it (no degraded detail), and when the first goes the second takes the port at its next restart.
+func TestSecondInboundSharesTheTCPDecoy(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	twin := r.spec
+	twin.ID, twin.ProfileID, twin.Listen.Port = "inb_2", "prf_2", uint16(freeUDPPort(t))
+	if _, err := r.e.Apply(context.Background(), twin, []plugin.UserCred{cred("b")}); err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range r.e.Health() {
+		if h.State != plugin.RunRunning || h.Detail != "" {
+			t.Fatalf("both inbounds must run without a decoy problem: %+v", r.e.Health())
+		}
+	}
+	if err := r.e.Remove(context.Background(), r.spec.ID); err != nil {
+		t.Fatal(err)
+	}
+	twin.Version++
+	if _, err := r.e.Apply(context.Background(), twin, []plugin.UserCred{cred("b")}); err != nil {
+		t.Fatal(err)
+	}
+	if h := r.e.Health(); len(h) != 1 || h[0].Detail != "" {
+		t.Fatalf("the twin must take the free decoy port: %+v", h)
+	}
+	conn, err := net.Dial("tcp", bindAddr(r.tcpPort))
+	if err != nil {
+		t.Fatalf("no decoy on the TCP port after the twin restarted: %v", err)
+	}
+	conn.Close()
+}
+
 func TestVersionAndFactory(t *testing.T) {
 	e, err := Factory(engine.Env{Certs: certs.New(t.TempDir())})
 	if err != nil {
