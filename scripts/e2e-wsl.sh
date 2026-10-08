@@ -1000,7 +1000,9 @@ if start_client refused "$REFUSED_PORT"; then die "a new client connected althou
 REASON=$(grep -Eio 'authentication[^"]*|auth[a-z ]*(fail|error)[^"]*|forbidden|403' "$WORK/client-refused.log" | head -1 || true)
 pass "disabled user: a new client is refused (${REASON:-client exited without connecting})"
 SUB_OFF=$(fetch_sub 'Happ/3.0' "$WORK/sub-off.hdr" | base64 -d 2>/dev/null || true)
-grep -q '^hysteria2://' <<<"$SUB_OFF" && die "the subscription still lists a server for a disabled user"
+# no real server, only the entry that says why (it points at 0.0.0.0:1 and never connects)
+grep '^hysteria2://' <<<"$SUB_OFF" | grep -qv '^hysteria2://off@0\.0\.0\.0:1/' && die "the subscription still lists a server for a disabled user"
+grep -q '^hysteria2://off@0\.0\.0\.0:1/' <<<"$SUB_OFF" || die "the disabled user's subscription has no entry that says why"
 [ "$(hdr "$WORK/sub-off.hdr" profile-update-interval)" = 1 ] || note "disabled user's profile-update-interval is not the short one"
 
 api UserService/SetUsersEnabled "{\"userIds\":[\"$USER_ID\"],\"enabled\":true}" | jq -e '.users[0].status == "USER_STATUS_ACTIVE"' >/dev/null || die "SetUsersEnabled(true) did not enable"
