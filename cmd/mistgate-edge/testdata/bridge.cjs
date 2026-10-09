@@ -109,7 +109,7 @@ async function countedRequest(label, fn) {
 
 function assertQueryBudget(queries) {
   console.log(`D1 query count ${JSON.stringify(queries)}`);
-  // Target 6 (README §3.1). The AWG formats (Mihomo, .conf) measure 7: one extra round for the AWG scopes; phase 4.
+  // Target 6 (README Â§3.1). The AWG formats (Mihomo, .conf) measure 7: one extra round for the AWG scopes; phase 4.
   const budget = /^(mihomo|AWG)/.test(queries.label) ? 7 : 6;
   assert.ok(queries.sequentialQueries <= budget, `${queries.label} used ${queries.sequentialQueries} sequential D1 queries (budget ${budget})`);
 }
@@ -299,7 +299,13 @@ async function assertLinkHandshake(panel) {
     const signature = crypto.createSign("sha256").update(preimage).sign({ key, dsaEncoding: "ieee-p1363" });
     return Buffer.concat([pbField(1, Buffer.from(id)), pbField(2, nonce), pbField(3, signature)]);
   };
-  const accept = (auth) => link("accept", { nodeId: nodeID, audience, nonce: new Uint8Array(panelNonce), auth: new Uint8Array(auth) });
+  const accept = (auth) => link("accept", {
+    nodeId: nodeID,
+    audience,
+    nonce: new Uint8Array(panelNonce),
+    auth: new Uint8Array(auth),
+    until: Date.now() + 20_000,
+  });
 
   const accepted = await countedRequest("link accept", () => accept(authFrame(nodeID, nodeKey.privateKey, agentNonce)));
   console.log(`D1 query count ${JSON.stringify(accepted.queries)}`);
@@ -329,16 +335,39 @@ async function assertLinkHandshake(panel) {
     assert.deepEqual(await accept(auth), { ok: false }, `${label} is refused`);
   }
   await assert.rejects(link("accept", { nodeId: nodeID, audience }), /invalid arguments/, "accept without its bytes rejects");
-  await assert.rejects(link("step", { nodeId: nodeID }), /not implemented/);
+  const at = Date.now();
+  const opened = await link("step", {
+    nodeId: nodeID,
+    state: null,
+    until: at + 10_000,
+    event: { kind: "open", at, generation: 1, certSerial: issued.serial, certNotAfterUnix: issued.notAfter },
+  });
+  assert.equal(JSON.parse(opened.state).o, 1, "the open step stores the accepted generation");
+  assert.deepEqual(opened.frames, [], "an open step sends no frames");
+  assert.ok(opened.alarmAt > at, "the open step returns the Hello deadline");
+  await opened.waitUntil;
   await assert.rejects(link("bogus", {}), /unknown operation/);
 
-  // The marker the edge mounts under its link prefix (reachable only through the test hooks until the wiring step).
-  const markerURL = `https://example.com/__edge_bridge_test__/link/${nodeID}`;
+  const linkPrefix = await globalThis.__d1.prepare("SELECT v FROM setting WHERE k = 'link_prefix'").first("v");
+  assert.match(linkPrefix, /^\/[a-z2-7]+\/$/, "the edge stores a secret link prefix");
+  const markerURL = `https://example.com${linkPrefix}link/${nodeID}`;
   const upgrade = await panel.fetch({ method: "GET", url: markerURL, headers: [["Upgrade", "websocket"], ["Connection", "Upgrade"], ["CF-Connecting-IP", "127.0.0.1"]], body: null });
   assert.equal(upgrade.status, 204);
   assert.deepEqual(upgrade.headers.filter(([name]) => name.toLowerCase() === "x-mistgate-link"), [["X-Mistgate-Link", nodeID]]);
   const plain = await panel.fetch({ method: "GET", url: markerURL, headers: [["CF-Connecting-IP", "127.0.0.1"]], body: null });
   assert.equal(plain.status, 404, "a request without an upgrade gets no marker");
+
+  const enrollURL = `https://example.com${linkPrefix}mistgate.agent.v1.EnrollmentService/Enroll`;
+  const enroll = await panel.fetch({
+    method: "POST",
+    url: enrollURL,
+    headers: [["Content-Type", "application/json"], ["Connect-Protocol-Version", "1"], ["CF-Connecting-IP", "127.0.0.1"]],
+    body: new Uint8Array(Buffer.from("{}")),
+  });
+  // Connect sends failed_precondition as HTTP 400; the JSON code proves the Enroll handler answered, not the decoy.
+  assert.equal(enroll.status, 400, "the link enrol POST reaches EnrollmentService.Enroll");
+  assert.equal(JSON.parse(Buffer.from(enroll.body).toString("utf8")).code, "failed_precondition");
+  return { linkPrefix, nodeID };
 }
 
 async function run() {
@@ -378,6 +407,11 @@ async function run() {
       publicURL: "https://example.com",
       adminPrefix: "/test-admin/",
       subPrefix: "/test-sub/",
+      nodeLink: {
+        ask: async () => ({ error: "lost" }),
+        close: async () => {},
+        poke: async () => 0,
+      },
     };
     try {
       await assert.rejects(Promise.race([
@@ -758,12 +792,20 @@ async function run() {
     const limitedLogin = await connectRPC(secondPanel, "AuthService/BeginLogin", {}, "", loginIP);
     assert.equal(limitedLogin.message.code, "resource_exhausted", "the callback refuses login after its burst");
 
-    await assertLinkHandshake(secondPanel);
+    const { linkPrefix, nodeID } = await assertLinkHandshake(secondPanel);
 
     thirdPanel = await startIsolate(bytes, secondPanel);
     const withoutLimiter = { ...initOptions };
     delete withoutLimiter.limit;
+    delete withoutLimiter.nodeLink;
     await Promise.race([thirdPanel.init(withoutLimiter), wasmFailure]);
+    const unavailableMarker = await thirdPanel.fetch({
+      method: "GET",
+      url: `https://example.com${linkPrefix}link/${nodeID}`,
+      headers: [["Upgrade", "websocket"], ["Connection", "Upgrade"], ["CF-Connecting-IP", "127.0.0.1"]],
+      body: null,
+    });
+    assert.equal(unavailableMarker.status, 404, "the link prefix is not mounted without nodeLink");
     const missingCallback = await connectRPC(thirdPanel, "AuthService/BeginLogin", {});
     assert.equal(missingCallback.message.code, "resource_exhausted", "login fails closed without the callback");
   } finally {

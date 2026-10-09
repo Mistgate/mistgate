@@ -7,20 +7,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 )
 
 func withEdgeTestHooks(handler http.Handler, fl *fleet.Fleet) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The link marker is not mounted on the edge yet (no edge LinkPrefix until the wiring step): reachable here only.
-		if strings.HasPrefix(r.URL.Path, "/__edge_bridge_test__/link/") {
-			r2 := r.Clone(r.Context())
-			r2.URL.Path = strings.TrimPrefix(r.URL.Path, "/__edge_bridge_test__")
-			fleet.LinkMarker().ServeHTTP(w, r2)
-			return
-		}
 		// POST {nodeId, spki (base64 DER P-256 public key)}: a CA-signed node certificate row and the CA certificate.
 		if r.URL.Path == "/__edge_bridge_test__/issue-node-cert" {
 			var in struct {

@@ -38,20 +38,23 @@ var (
 	errInvalidAdminPrefix    = errors.New("adminPrefix must look like /secret/")
 	errInvalidSubPrefix      = errors.New("subPrefix must look like /secret/")
 	errInvalidLimitCallback  = errors.New("limit must be a function")
+	errInvalidNodeLink       = errors.New("nodeLink must provide ask and close functions")
 )
 
 type initOptions struct {
-	d1        js.Value
-	assets    js.Value // optional async (path) => Uint8Array | null: the SPA build in the Worker's static assets
-	limit     js.Value // optional async security-limit callback
-	masterKey []byte
-	publicURL string
-	adminHost string
-	adminPath string
-	subPath   string
-	rpID      string
-	rpOrigins []string
-	sourceURL string
+	d1          js.Value
+	assets      js.Value // optional async (path) => Uint8Array | null: the SPA build in the Worker's static assets
+	limit       js.Value // optional async security-limit callback
+	nodeLink    js.Value
+	hasNodeLink bool
+	masterKey   []byte
+	publicURL   string
+	adminHost   string
+	adminPath   string
+	subPath     string
+	rpID        string
+	rpOrigins   []string
+	sourceURL   string
 }
 
 func parseInitOptions(value js.Value) (initOptions, error) {
@@ -69,6 +72,15 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 		out.limit = limit
 	} else if limit.Type() != js.TypeUndefined && !limit.IsNull() {
 		return out, errInvalidLimitCallback
+	}
+	if optionPresent(value, "nodeLink") {
+		nodeLink := value.Get("nodeLink")
+		if nodeLink.Type() != js.TypeObject || nodeLink.IsNull() ||
+			nodeLink.Get("ask").Type() != js.TypeFunction || nodeLink.Get("close").Type() != js.TypeFunction {
+			return out, errInvalidNodeLink
+		}
+		out.nodeLink = nodeLink
+		out.hasNodeLink = true
 	}
 	var err error
 	if out.masterKey, err = masterKeyFromJS(value.Get("masterKey")); err != nil {
@@ -225,6 +237,7 @@ func newEdgeInstance(opts initOptions) (app.InstanceConfig, map[string]string, e
 	} else if in.SubPrefix, err = validatePrefix(opts.subPath, errInvalidSubPrefix); err != nil {
 		return in, nil, err
 	}
+	in.LinkPrefix = newSecretPrefix()
 	if opts.rpID != "" {
 		in.RPID = opts.rpID
 	} else if in.AdminHost != "" {
@@ -249,7 +262,7 @@ func newEdgeInstance(opts initOptions) (app.InstanceConfig, map[string]string, e
 		"public_url": in.PublicURL, "admin_host": in.AdminHost,
 		"admin_prefix": in.AdminPrefix, "admin_listen": "",
 		"rp_id": in.RPID, "rp_origins": strings.Join(in.RPOrigins, ","),
-		"agent_sni": in.AgentSNI, "sub_prefix": in.SubPrefix,
+		"agent_sni": in.AgentSNI, "sub_prefix": in.SubPrefix, "link_prefix": in.LinkPrefix,
 	}
 	return in, pending, nil
 }
@@ -292,6 +305,12 @@ func ensureEdgeSecrets(ctx context.Context, st *store.Store, in *app.InstanceCon
 	if in.SubPrefix, err = st.Setting(ctx, "sub_prefix"); errors.Is(err, store.ErrNotFound) {
 		in.SubPrefix = newSecretPrefix()
 		fill["sub_prefix"] = in.SubPrefix
+	} else if err != nil {
+		return nil, err
+	}
+	if in.LinkPrefix, err = st.Setting(ctx, "link_prefix"); errors.Is(err, store.ErrNotFound) {
+		in.LinkPrefix = newSecretPrefix()
+		fill["link_prefix"] = in.LinkPrefix
 	} else if err != nil {
 		return nil, err
 	}

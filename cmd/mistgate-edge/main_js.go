@@ -166,6 +166,9 @@ func initPanel(options js.Value) error {
 	if err != nil {
 		return err
 	}
+	if !opts.hasNodeLink {
+		in.LinkPrefix = ""
+	}
 	if in.AdminListen != "" {
 		return errSeparateAdminListener
 	}
@@ -185,6 +188,10 @@ func initPanel(options js.Value) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	limiter := newEdgeLimiter(opts.limit, log)
 	afterResponse := newEdgeTaskRunner()
+	var remote fleet.Remote
+	if opts.hasNodeLink {
+		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), close: opts.nodeLink.Get("close")}
+	}
 	authSvc, err := auth.New(st, auth.Config{
 		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,
 		Limiter: limiter,
@@ -195,6 +202,7 @@ func initPanel(options js.Value) error {
 	built, err := app.Build(app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, Limiter: limiter, MasterKey: opts.masterKey, Clock: time.Now,
 		Logger: log, Instance: in, Title: brand.BrandName(), DataDir: edgeNoFilesystemDataDir, AfterResponse: afterResponse.Run,
+		Remote: remote,
 	})
 	if err != nil {
 		return err

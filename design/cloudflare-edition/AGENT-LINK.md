@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
-Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Step 5 is designed in §6
-(5a, the driver, and 5b, the emulator test, are merged; 5c, link-only agents, is implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
+Status (2026-10-09): steps 1a-5c are merged (step 5 in §6: 5a `cbb8405`, 5b `dc72654`, 5c `34f7e7f`). Step 6 is
+designed in §7 and being implemented. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -73,8 +73,8 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4a | Write the `node_live` projection (sidecar kept, compared by a test) | merged (2026-10-08) |
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
-| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a, 5b merged; 5c implemented |
-| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
+| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | merged (§6; `cbb8405`, `dc72654`, `34f7e7f`, 2026-10-09) |
+| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a implemented |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
 query budgets unchanged (Happ 5, Mihomo 7, page 5/3/4, AWG configs 7), a manager review.
@@ -239,7 +239,7 @@ page).
 
 ## 6. Step 5 design: the stateless edge driver and link-only agents
 
-Status (2026-10-09): designed; rounds 5a (the driver) and 5b (the emulator test) are merged, 5c (link-only agents) is implemented. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
+Status (2026-10-09): rounds 5a (the driver), 5b (the emulator test) and 5c (link-only agents) are merged. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
 Lead decisions on the open questions are in §6.5.
 
 ### 6.1 The driver (`internal/panel/fleet/link_driver.go`)
@@ -555,3 +555,306 @@ budgets are untouched.
      handler runs is kept.
 - ADR 0007: the driver is a second place that creates EventDesiredChanged and runs every preparation inline.
 - SSH provisioning builds the mTLS enrol command; the edge needs the link form (phase 3).
+
+## 7. Step 6 design: wiring the edge edition
+
+Status (2026-10-09): designed against main 34f7e7f. Rounds 6a-6f are local only; 6g needs the owner's explicit OK and a
+throwaway Cloudflare account. Every round leaves the VPS edition unchanged and passes the §3 gate. Lead decisions on the
+open questions are in §7.10.
+
+### 7.0 What the code said before round 6a (gaps and contradictions)
+
+1. The `"step"` op lives in `cmd/mistgate-edge/link_js.go` (not fleet) and still returns `errLinkStep`;
+   `cmd/mistgate-edge/testdata/bridge.cjs` pins that.
+2. The edge has no link prefix: `newEdgeInstance` / `ensureEdgeSecrets` (`instance_js.go`) fill only `agent_sni` and
+   `sub_prefix`, so `app.Build` mounts no `LinkHandler`; the marker is reachable only through the test hook
+   (`hooks_test_js.go`); `initPanel` (`main_js.go`) passes no `Remote`.
+3. `StateChanged` does nothing on the edge: `Fleet.Run` never starts, the one-slot `kick` channel fills and nobody reads
+   it. Callers: the subscription path on a first fetch that creates credentials (`access/sub.go`); quota inside a stats
+   step (`session_core.go` → `agent.go` → `access.go`); the AWG kernel switch inside an event step (`awgprep.go`).
+4. `dispatchWarpAttention` (`l3.go`) starts a goroutine with a 3-minute Background ctx; nothing keeps the invocation
+   alive after the step returns (longer than the 30 s `waitUntil` grace). On js the WARP transport refuses anyway
+   (`warp/tls_js.go`), but it can still start a D1 read after its invocation ended.
+5. A stats step makes 3 D1 calls, not 2: `EffectUsage` → `OnUsage` → `acc.Recompute` reads `UserStates` inline for every
+   batch with traffic (plus 1 write per changed status), on top of the 30 s certificate recheck and the L3 health writes.
+6. `PanelLink.call` initialises the panel with the origin `"https://panel.invalid"` (`panellink.ts`): harmless for links,
+   but a cron on a fresh database would store it as `public_url`.
+7. `ResetUserPeriod` is unguarded (`store/access_user.go`: `… used_bytes = 0 … WHERE id = ?`): a sweep that read the old
+   period can zero usage a stats batch committed after another reset. The race exists on the VPS too; the edge makes it
+   likely.
+8. `nodelink.ts` is behind the driver: open carries no `generation`; `forget` is ignored; `webSocketClose` echoes the
+   close although both compatibility dates are after 2026-04-07 (`web_socket_auto_reply_to_close` default: the runtime
+   replies itself and `readyState` is already CLOSED when the close event fires — §6.6 item 2 is a real risk for the
+   `readyState` gate).
+9. Docs: ADR 0003 gives the object "its own SQLite for seq and desired state" (they live in D1: `last_seq`, `node_sent`);
+   ADR 0007 has the wasm "in the DO's isolate" and the DO "clearing `Preparing` on rehydration" (the driver never stores
+   it); `design/adr/README.md` does not list 0007.
+10. Other per-isolate in-memory paths never drained on the edge: the `health.evaluateSoon` kick; Telegram `enqueue`
+    (bounded, never sent); the evaluator grace (`startedAt` = the isolate's start). `Fleet.Run`, `closeAll`,
+    `recomputeAll` and `snapshotSessions` stay VPS-only.
+
+### 7.1 The `"step"` op (TypeScript ↔ Go)
+
+```ts
+// panellink.ts: additions only
+| { kind: "open"; at: number; generation: number; certSerial: string; certNotAfterUnix: number }
+interface LinkStepIn  { nodeId: string; state: string | null; until: number /* block's Go budget end, ms */; event: LinkEvent }
+interface LinkStepOut { …; alarmAt?: number; replies?: …; forget?: true }
+```
+
+Input (`link_js.go` `stepFromJS`): `nodeId` non-empty → `NodeID`; `state` string or null → `""`; `at`, `until`,
+`deadlineAt` finite positive integer ms → `time.UnixMilli`; `generation` (open) integer 1..2^53−1; `certNotAfterUnix` →
+`time.Unix`; `frame` (frame, request) required Uint8Array; `requestId` (request) non-empty; `owned` (closed) ignored.
+Anything else rejects with `errLinkArgs` (the object closes 1011 and writes nothing).
+
+The ctx: deadline = `min(now + 15 s, until − 2 s)`; if that is already ≤ now the call rejects "link step budget spent"
+before any D1 work. `until` is the block's end, so a closed step at the tail of a slow accept gets what is left. The 2 s
+margin covers the RPC return and the object's state write. A D1 batch already sent when the ctx expires can still
+commit; the object writes nothing and the next session ends in a full resend (§2 "Delta base"); 6g measures how often.
+The ctx carries the node id (`linkStepNode{}`) for the tripwire in §7.2. `accept` uses the same helper, with `until`
+added to its args, instead of the fixed `linkAcceptTimeout`.
+
+Output: always `state` and `frames` (`Uint8Array[]`); `close` only when set; `alarmAt` only when `!AlarmAt.IsZero()`
+(never the zero time); `replies` only when non-empty (`frame: null` for nil); `forget: true` only when set; plus
+`waitUntil: afterResponse.WaitUntil()`.
+
+`PanelLink.call`: hands `waitUntil` to `this.ctx.waitUntil` and removes it from the result (a promise cannot cross the
+RPC) — a pure `detachWaitUntil(out, ctx)` in `shell.ts`, used by every op. Its init origin becomes `""` (item 6): a fresh
+database then fails init instead of storing a placeholder.
+
+`nodelink.ts`: `authenticate` sends `generation` (the value it just stored in `gen`); `run` sends `until: this.until` and
+returns the out (undefined on failure); `dropLive`: after the closed step, `if (out?.forget) await
+this.ctx.storage.deleteAll()` — every caller of `dropLive` already calls `arm()` afterwards, which re-arms from what is
+left (handshake deadlines live in socket attachments, which `deleteAll` does not touch). `gen` restarts at 1 for a retired
+node (accepted: its `node_live` row is gone and Hello replaces it).
+
+### 7.2 The edge Remote adapter
+
+Go reaches NodeLink like it reaches Limiter: closures over `env` passed at init (the `limit` → `env.LIMITER` precedent),
+not `ctx.exports` (Go never sees a ctx), not a service binding. A stub is created per call inside whatever invocation is
+running (fetch, PanelLink, scheduled).
+
+```ts
+// panel.ts init
+nodeLink: {
+  ask:   (nodeId, requestId, frame, deadlineAt) => askNode(env.NODELINK, nodeId, requestId, frame, deadlineAt),
+  close: (nodeId, reason) => closeNode(env.NODELINK, nodeId, reason), // NodeLink.close(4000, reason)
+  poke:  (nodeIds) => pokeNodes(env.NODELINK, nodeIds),                // Promise.allSettled → failure count
+},
+```
+
+`askNode` (`shell.ts`) never rejects: it resolves `{reply: Uint8Array | null}` or `{error: "timeout" | "lost"}`
+(`"timeout"` is exactly NodeLink's own message; every other rejection — "link lost", an object reset, a network error —
+is `"lost"`). The text is matched in this one TypeScript function next to the class that throws it; Go never matches
+error text.
+
+Go: `cmd/mistgate-edge/remote_js.go`, `edgeRemote{ask, close, poke js.Value}` implements `fleet.Remote` (with `Poke`,
+§7.3) and awaits through `d1driver.Await`. `parseInitOptions` accepts `nodeLink` (an object with three functions;
+anything else is an init error). Without `nodeLink`, `Remote` stays nil and `in.LinkPrefix` is cleared before
+`app.Build`: the link is served only with its object behind it.
+
+| JS outcome | `Ask` returns | `Fleet.ask` reports |
+|---|---|---|
+| `{reply: bytes}` | the ConnectRequest (an error if it does not decode) | the reply ("link lost" on bad bytes) |
+| `{reply: null}` | `nil, nil` | no answer |
+| `{error: "timeout"}` | `context.DeadlineExceeded` | no answer |
+| `{error: "lost"}` | `errRemoteLost` | link lost |
+| caller's ctx ends first | `ctx.Err()` | `ctx.Err()` |
+| ctx tagged with the same node | `errOwnNode`, logged at Error, JS never called | link lost |
+
+`Close` clips the reason to 123 bytes and has the same tripwire; `Poke` too (never called with a step ctx, §7.3). The
+tripwire is the production twin of the emulator's own-node guard: a programming error fails at once instead of holding a
+25 s block and ending in 1011.
+
+### 7.3 Fan-out
+
+New seams: `fleet.Remote` gains `Poke(ctx, nodeIDs []string) error`; `fleet.Config` gains `AfterResponse func(func())`
+(`app.Build` passes `c.AfterResponse`; nil = a goroutine, as in access). Implementers: `edgeRemote`, `testRemote`
+(`remote_test.go`), `nodeLinkEmu` (its `poke` becomes `Poke`).
+
+`StateChanged`: with `Remote == nil` unchanged (the kick channel). With `Remote` set it calls `pokeConnected()`, which
+makes no D1 call on the caller's path (subscription budgets unchanged): under `pokeMu`, if a fan-out is already running
+set `pokeDirty` and return, else mark it running and hand `work` to `AfterResponse`. `work` loops while dirty: clear
+dirty, fresh `context.WithTimeout(context.Background(), 20 s)`, `f.Live(ctx)` (1 D1 read), `Remote.Poke(ctx, ids of
+Connected rows)` (one JS call, pokes in parallel). The ctx must be fresh, never derived from a step
+(`context.WithoutCancel` keeps the node tag and trips the guard).
+
+Which nodes: only Connected rows. The change commits before `StateChanged` and the Live read comes after it; a node
+missing from that read has not committed its NodeHello batch yet and reads desired state after it in the same call, so it
+sees the change. A poked object with no session, or before Hello, does nothing.
+
+`waitUntil` comes from fetch (already), PanelLink (§7.1) and scheduled (§7.4), each within the 30 s grace. A step's own
+`StateChanged` (quota, AWG switch) pokes its own node from that waitUntil; the poke RPC queues behind the object's block
+and is never awaited inside the step.
+
+Coalescing: per isolate (running + dirty: a burst costs at most two fan-outs); per object (the `poke` flag merges pokes
+waiting behind a block into one desired step). Duplicates across isolates are possible; a desired step with nothing new
+sends nothing.
+
+Cost per change with N connected nodes: 1 D1 read; N poke RPCs (each 1 DO request + 2 storage writes); N alarms, each one
+desired step (one PanelLink call, 3 + k D1 reads, plus one write batch when it sends). Ceilings (`ponytail:` comments):
+10,000 subrequests per invocation (~9,000 nodes per fan-out); `Live` also reads the `users` column (switch to a
+`ConnectedNodeIDs` query if that ever shows up).
+
+Lost fan-out (isolate death, the 30 s cap, a D1 error): connected nodes keep the old state until the next change or
+reconnect. Safety net: the cron calls `StateChanged()` every 10 minutes (§7.4), so revocation latency is at most 10 min.
+
+WARP attention runs through `AfterResponse` with a fresh ctx: 3 min on the VPS (unchanged), 25 s on the edge. Usage-driven
+recompute stays inline (parity): a stats step is 3 D1 calls (amend §6.1); the DO duration it adds is about 38 ms × 128 MB
+per frame, ~1,300 GB-s per node per month against 400,000 GB-s included.
+
+### 7.4 `scheduled()`
+
+Wiring: `wrangler.example.toml` gets `[triggers] crons = ["* * * * *"]` (one trigger; Go decides by time which jobs are
+due). `index.ts` exports `scheduled: scheduledPanel` (in `fetch.ts`): `getPanel(env, "")` (on a fresh database without
+`PUBLIC_URL` init fails, one line is logged, the tick is skipped); `out = await panel.cron({at:
+controller.scheduledTime})`; `ctx.waitUntil(out.waitUntil)`; errors logged, never thrown. `mgPanel.cron` (`main_js.go`)
+calls `built.EdgeTick(ctx, time.UnixMilli(at))` with a 50 s ctx; `internal/panel/app/edge_tick.go` has no build tag
+(tested on SQLite).
+
+| Job | VPS cadence | Edge | D1 per run | Idempotent because |
+|---|---|---|---|---|
+| user status `acc.Sweep` | 1 min | every tick | 1 read + 1 write per change | status is a function of stored fields; the period reset becomes `… WHERE id = ? AND period_start = ?old` (§7.0 item 7) |
+| node-down `fl.Sweep` | 30 s | every tick | 2 reads + 1 per silent active node + 1 insert per new outage | it reads the last `node_down`/`node_recovered` event |
+| health retention `hl.Retention` | 1 h | minute 17 | rollup + 2 prunes | by age |
+| desired-state safety net `fl.StateChanged()` | kick only | minute % 10 == 0 | §7.3 | no-op when nothing changed |
+
+Each job gets its own 20 s ctx; one failure does not stop the others. An overlapping tick at worst duplicates a
+`node_down` event (cosmetic). Budget on Paid (interval under 1 h): 30 s CPU and 15 min wall per invocation; a warm tick
+should take a few ms CPU and 3 D1 round trips, a cold one ~254 ms CPU more.
+
+Parity test (`app`): every name in `Panel.BackgroundJobs` is either run by `EdgeTick` or listed in `edgeDeferred` with
+its phase, so a new VPS background job fails CI until it has an edge home. Deferred: health checker and evaluator
+(NODE_DOWN alerts; phase 2, the evaluator needs a stored start time instead of the per-isolate grace); periodic UDP port
+rechecks (on-demand checks already work through `Remote`); `updates` (owner decision 2), `backups` (R2), `telegram`,
+`provision` (phase 3); `mcp-plan-sweep` (MCP is not served on the edge); log streaming (owner decision 2).
+
+### 7.5 workerd verification (`edge/worker/test/do/workerd.test.ts`, fake PanelLink)
+
+| # | Test | Emulator assumed | A different result means |
+|---|---|---|---|
+| 1 | own `close(4000)`, then `readyState` in the same turn | not OPEN at once | OPEN: `shut()` sets `att.shut` and `openSockets`/`webSocketMessage` check it; Go unchanged |
+| 2 | client sends `a`, `b` (first step slowed 100 ms), then `close(1000)` | `frame:a`, `frame:b`, `closed` | `b` dropped: replace the `readyState` gate in `nodelink.ts` with `att.shut` (set only by our own close); if workerd never delivers `b`, document that a reply sent just before the agent's own close is lost |
+| 3 | after `stub.close(4000)`, spy on `webSocketClose` | delivered when the peer answers, with its code | not delivered: no change; delivered with CLOSED: delete the echo in `webSocketClose` |
+| 4 | a pending `ask`, then reset the object | rejects "link lost" | other message: `askNode` maps it to "lost"; hangs to the deadline: Go reports "no answer", document it |
+| 5 | `close()` with 1000, 1008, 1011, 3000, 4000, 4999, 999, 1004, 1005, 1006, 1015, 5000 and a 124-byte reason | throws for 1005, 1006, 1015 and over 123 bytes | others throw: widen the map in `webSocketClose`; 1008/1011 throw: Go `closeWith` maps to 4008/4011 |
+| 6 | (a) `alarmAt = now + 1.2 s`: no earlier alarm step; (b) an alarm step returning a new `alarmAt` keeps it | armed and due only; set in its own handler is kept | (b) lost: re-arm from the next event; the emulator changes the same way |
+| 7 | closed step returns `forget` while another socket is mid-handshake | no keys left; the alarm is that handshake deadline | `deleteAll` keeps the old alarm: `arm()` overwrites it, no change |
+| 8 | the fake PanelLink's step calls `this.ctx.waitUntil(stub(ownNode).poke())` | the poke runs after the block; one desired step; no 1011 | deadlock or 1011: the fan-out must leave PanelLink |
+| 9 | a module-scope counter bumped by the object and read by PanelLink | — | local answer only; 6g gives the production one |
+
+Item 10 runs with the real wasm in wrangler dev (6f): 20 parallel subscription fetches, link steps and a cron tick in
+one isolate; pass = no hung invocation and no "Cannot perform I/O on behalf of a different request" (Go's scheduler is
+global to the isolate). If it fails: every entry point also waits on an "isolate has no Go call in flight" promise (a
+small extension of `edgeTaskRunner`).
+
+### 7.6 Local end-to-end run with a real agent
+
+`scripts/e2e-wsl.sh --edge`: the same scenario against both builds (ADR 0006), in the run's own network namespace.
+
+Build: `GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" ./cmd/mistgate-edge` into `$WORK/worker/dist` plus
+`wasm_exec.js` from the same GOROOT; copy `src/`, `package.json`, `pnpm-lock.yaml`, `tsconfig.json` to `$WORK/worker` and
+`pnpm install --frozen-lockfile` there (never into the repo's Windows `node_modules`). `web/dist` from the repo.
+
+Config: `wrangler.toml` from the template with the zero D1 id and `assets.directory = $REPO/web/dist`; `.dev.vars` with
+`MASTER_KEY`, `PUBLIC_URL=https://de1.example.com:$PUB`, random `ADMIN_PREFIX` and `SUB_PREFIX` (all into `SECRETS` for
+the log check). TLS: an openssl CA and a leaf for de1.example.com; `wrangler dev --ip 127.0.0.1 --port $PUB
+--local-protocol https --https-key-path … --https-cert-path … --persist-to $WORK/wrangler-state`; `/etc/netns/$NS/hosts`
+maps de1.example.com; the agent gets `SSL_CERT_FILE`, curl `--cacert`. The agent requires `challenge.audience ==
+base.Host`: if wrangler rewrites the host, the run fails at "node online" — check that first.
+
+No Cloudflare account is touched: `HOME=$WORK/home` (no stored login), `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`
+unset, `WRANGLER_SEND_METRICS=false`, never `--remote`, D1 id all zeros; outbound traffic only the npm install and
+miniflare's public `cf.json`.
+
+Steps (VPS numbering, differences only): (1) setup link from the Worker log, first admin; (2) `installCommand` contains
+`enroll --link-url wss://de1.example.com:$PUB/<prefix>/`; `mistgate-node enroll --link-url …` then `run`; node online in
+`node_live`, inbound running, desired state over the link; 2b doctor through `Remote.Ask`; 2c replaced: stop the agent →
+offline after liveness → start → online with Hello matching the digest and no full DesiredState; touch `src/index.ts` →
+wrangler reloads → the agent reconnects as gen + 1; 2d skipped (decision 2, no `update/1`); (3-8) used bytes grow; a
+quota overrun on alice → fan-out → her credential removed within one stats interval; disabling a user → fan-out → the
+client refused; an expiry 70 s ahead then `curl …/cdn-cgi/handler/scheduled?cron=*+*+*+*+*` → refused (the cron path);
+(9) measurement only (§7.7); (10) retire: `AgentNotified`, the agent wipes and exits, the object's SQLite under
+`--persist-to` has no `_cf_KV` rows, the `node_live` row is gone; (11) the secrets check also covers `wrangler.log`. The
+M3 tunnel steps are not run with `--edge` in step 6.
+
+Scripts: `test-edge-store.ps1` adds `./cmd/mistgate-edge/` (Go js tests of the `step`, `cron` and remote ops on the fake
+D1); `test-edge-entry.ps1` (`bridge.cjs`) keeps the budgets, adds fan-out and cron checks, and awaits
+`response.waitUntil` after each count so background queries cannot leak into the next; `pnpm test` gains
+`workerd.test.ts`.
+
+### 7.7 Measurements
+
+Local (6f): D1 calls per step kind asserted with the fake D1 counters (open 0, Hello 4 + k on a first connect and up to 6 + k on a reconnect after a gap, measured in 6a, stats 2 (+1 with usage),
+alarm 0, request 0, closed 1, +1 CertStatus when due; cron tick 3); CPU per step kind p50/p95 of 50; wasm cold start
+(instantiate and init CPU, init D1 query count; more than 10 sequential init reads → batch the settings reads); batch
+shapes (statement count and bound-value bytes for the largest IngestStats with 65,536 users and 2,000 sessions,
+NodeHello, NodeApplied, RenewCert: counts unchanged 8 / 1 / 3 / 4, largest value under 2 MB); wasm memory after the e2e
+mix and the 65,536-user batch, against 128 MB.
+
+REAL CLOUDFLARE (6g) — a separate round, only with the owner's explicit OK: a throwaway account, or at least a throwaway
+Worker and D1 named `mistgate-measure-<date>` on workers.dev only (no zone, no custom domain); never the production
+account's Workers, D1, zones or secrets; a token scoped to that account, revoked afterwards, everything deleted; the
+results go into this document. Measures: D1 batch latency p50/p95 and how often one call exceeds 2 s or 15 s (the
+abandoned-write window); D1 limits for the largest IngestStats batch (65,536 users, the 1.5 MB valve, rows read and
+written); DO billing per stats frame with 1-3 agents for an hour; whether `ctx.exports.PanelLink` runs in the object's
+isolate and is billed as a request, and a cold step inside a block; isolate memory under a request mix; cron `cpuTime`
+warm and cold; that a fan-out started through PanelLink's `waitUntil` completes; sockets across a redeploy.
+
+### 7.8 Rounds
+
+| Round | Changes | Proof | Risks |
+|---|---|---|---|
+| 6a (local) | the `step` op and the `accept` ctx helper; `remote_js.go` (Ask, Close, tripwire); the `nodeLink` init option; `link_prefix` in `newEdgeInstance`/`ensureEdgeSecrets`; the link mounted only with `Remote`; the marker test hook deleted | Go js tests: conversion both ways; generation 0 and above 2^53 refused; zero alarm leaves `alarmAt` out; `forget`; a past `until` refused before any D1 call; the §7.2 table with `js.FuncOf` fakes; the tripwire; D1 counts per kind. `bridge.cjs`: the marker under `<link_prefix>link/<id>`, the enrol POST reaches its handler, budgets unchanged | js-only files; the VPS is untouched |
+| 6b (local) | `Remote.Poke`, `Config.AfterResponse`, `pokeConnected`, WARP through the runner; `Poke` in the emulator and `testRemote` | fleet: `StateChanged` never blocks, two calls during a run cause exactly one more, only connected ids are poked, the ctx is fresh; `edge_link_test` scenario 8 (a stats batch crosses alice's quota → node-a poked after its own step → credential gone, guard silent); scenario 2's manual pokes become admin changes; `bridge.cjs`: a credential-creating fetch has 0 extra queries before the response, then 1 query and one poke in its waitUntil | duplicate pokes across isolates (cost only) |
+| 6c (local) | `nodelink.ts` (generation, `until`, forget = deleteAll + arm); `panellink.ts` types and `detachWaitUntil`; `panel.ts` `nodeLink`; `shell.ts` `askNode`, `closeNode`, `pokeNodes`; PanelLink origin `""` | vitest: open carries the stored gen; `until` is the block's end; forget leaves no keys and only the handshake alarm; an absent `alarmAt` leaves no alarm; `askNode` maps reply, null, timeout, link lost and reset; `pokeNodes` counts failures | DO tests use the fake PanelLink only |
+| 6d (local) | `workerd.test.ts` (§7.5), the fixes it calls for, ports to `nodelink_emu_test.go` | the tests; the emulator and `nodelink.ts` agree item by item | a result that changes the Go driver (row 5) or §7.3 (row 8) |
+| 6e (local) | `EdgeTick`, `edgeDeferred` and the parity test; exported `Fleet.Sweep` and `Health.Retention`; the guarded `ResetUserPeriod`; `mgPanel.cron`; `scheduledPanel`; `[triggers]` | SQLite: an expired alice → status change and one fan-out; a silent node-a → one `node_down`, none on the next tick; minute 17 prunes; minute 10 fans out; a stale reset writes nothing (also on the fake D1); a `scheduledPanel` test; `bridge.cjs` counts the cron op | the reset guard changes VPS behaviour, only in the race |
+| 6f (local) | `e2e-wsl.sh --edge`; the measurement tests; results and the §6.1 counts into this document | §7.6 passes end to end; checklist item 10; the §7.7 local table | wrangler rewriting the host; the Linux workerd install |
+| 6g (REAL CLOUDFLARE, owner OK) | nothing merged except the results | the §7.7 real table | cost (expected under $1); production resources excluded by the setup |
+
+Every round passes the §3 gate and the race tests (fleet, agent, store); bridge budgets stay at Happ 5, Mihomo 7, page
+5/3/4, AWG configs 7; D1 batch shapes unchanged; each round gets a manager review.
+
+### 7.9 ADR amendments
+
+- ADR 0007 (amended for step 6): the session state is one string in DO storage (attachments hold only handshake data and
+  the generation); admin changes reach nodes as a `NodeLink.poke` fan-out to the nodes `node_live` shows connected,
+  through the `waitUntil` of the invocation that made the change, never awaited inside a step, coalesced per isolate and
+  per object, backed by a 10-minute cron safety net; the driver is a second place that creates EventDesiredChanged and runs
+  every preparation inline, `Preparing` is never stored (replaces "clears Preparing on rehydration"); each Go call gets
+  `ctx = min(15 s, until − 2 s)`; a step never awaits its own NodeLink and a production tripwire refuses it; usage runs
+  inline (stats = 3 D1 calls); WARP attention through the runner with a 25 s bound; Retire `Forget` = deleteAll, then
+  arm; the object never runs Go; the cost of a cold PanelLink step inside the block gets the 6f/6g numbers.
+- ADR 0003: the DO holds the socket and an opaque state; seq and the sent digest live in D1 (`last_seq`, `node_sent`).
+- New ADR 0008 "Edge background work: one Cron Trigger, idempotent jobs, waitUntil fan-out": the one-minute trigger,
+  jobs chosen by `scheduledTime`, the parity test with `edgeDeferred`, the 30 s CPU / 15 min wall budget; phase-2 jobs
+  plug into it.
+- ADR 0006: `e2e-wsl.sh --edge` is the shared scenario; the workerd semantics tests are part of the edge CI job.
+- `design/adr/README.md`: list 0007 and 0008; rule: dated amendment sections for refinements, a new record for a reversal.
+
+### 7.10 Decisions on the open questions
+
+1. The 10-minute safety-net fan-out: yes (lead).
+2. NODE_DOWN alerts (the evaluator) on the edge come in phase 2 with the probes; step 6 keeps `node_down` events only. —
+   owner: PENDING
+3. Usage recompute inline, for parity (lead).
+4. The `ResetUserPeriod` guard in both editions: yes (lead).
+5. 6g timing and access (who creates the throwaway account, when; capped at one evening). — owner: PENDING
+6. `--edge` inside `e2e-wsl.sh` rather than a new script: yes (lead).
+7. WARP attention bound of 25 s on the edge, VPS kept at 3 min: yes (lead).
+
+### 7.11 Round 6a implementation notes (2026-10-09)
+
+- `step` now applies the §7.1 input and output contract, and `accept` also takes `until` for the shared 15 s / block-budget
+  context. The TypeScript side passes the end of the call (`min(block end, call start + 20 s)`) as `until` to both `accept`
+  and `step`; it refuses locally when 2 s or less remain.
+- 6a wires `Remote.Ask` and `Remote.Close` only. `nodeLink.poke` is accepted but ignored; adding `Remote.Poke` remains 6b,
+  as listed in §7.8.
+- The Await helper is in `edge/d1driver/d1.go` (there is no separate `await.go` file).
+- The bridge's existing `assertQueryBudget` allows 6 sequential queries for most labels and 7 for Mihomo/AWG. This differs
+  from the 6a proof figures (Happ 5, Mihomo 7, pages 5/3/4, AWG configs 7); the thresholds were left unchanged pending
+  lead clarification.
+- **Known pre-existing race:** two isolates on an existing database can generate different `link_prefix` values;
+  `SetSettings` is last-writer-wins, the same pattern as `sub_prefix` and `agent_sni`. This is harmless while no production
+  edge database exists. Before edge goes live, use `INSERT ... ON CONFLICT DO NOTHING` and re-read the stored value.

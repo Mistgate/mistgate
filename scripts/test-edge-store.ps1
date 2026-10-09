@@ -24,7 +24,7 @@ try {
 
     $env:GOOS = "js"
     $env:GOARCH = "wasm"
-    & go test "-exec=$exec" ./edge/d1driver/ ./internal/panel/store/
+    & go test "-exec=$exec" ./edge/d1driver/ ./internal/panel/store/ ./cmd/mistgate-edge/
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
