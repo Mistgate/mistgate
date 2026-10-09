@@ -583,7 +583,7 @@ describe("the front door forward", () => {
     open.push(c);
     await c.until(() => c.inbox.length >= 1, "the challenge");
     expect(c.inbox[0]).toBe("challenge panel.test");
-    expect(fake.calls[0]?.args).toEqual({ audience: "panel.test" });
+    expect(fake.calls.find((x) => x.op === "challenge")?.args).toEqual({ audience: "panel.test" }); // not calls[0]: an earlier test's late closed step can come first
     c.send("auth");
     await c.until(() => fake.calls.some((x) => x.op === "accept"), "the accept call");
     expect(fake.calls.find((x) => x.op === "accept")?.args).toMatchObject({ nodeId: "nod_front" }); // not the client's nod_other
