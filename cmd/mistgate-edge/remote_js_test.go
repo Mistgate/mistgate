@@ -3,8 +3,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"reflect"
 	"strings"
 	"syscall/js"
 	"testing"
@@ -178,5 +181,59 @@ func TestEdgeRemoteCloseClipsReasonAndMapsFailure(t *testing.T) {
 	defer rejectingClose.Release()
 	if err := (&edgeRemote{close: rejectingClose.Value}).Close(context.Background(), "node-a", "re-enrol"); !errors.Is(err, errRemoteLost) {
 		t.Fatalf("rejected Close() error = %v, want %v", err, errRemoteLost)
+	}
+}
+
+func TestEdgeRemotePokeCountsFailuresAndRefusesOwnNode(t *testing.T) {
+	var log bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&log, nil)))
+	defer slog.SetDefault(previousLogger)
+
+	var calls int
+	var gotNodeIDs []string
+	poke := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		calls++
+		ids := args[0]
+		gotNodeIDs = make([]string, ids.Length())
+		for i := range gotNodeIDs {
+			gotNodeIDs[i] = ids.Index(i).String()
+		}
+		return jsResolved(js.ValueOf(1))
+	})
+	defer poke.Release()
+
+	ctx, cancel, err := linkContext("node-a", time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+	if err := (&edgeRemote{poke: poke.Value}).Poke(ctx, []string{"node-a", "node-b"}); !errors.Is(err, errOwnNode) {
+		t.Fatalf("step-tagged Poke() error = %v, want %v", err, errOwnNode)
+	}
+	if calls != 0 {
+		t.Fatalf("step-tagged Poke() called JavaScript %d times, want 0", calls)
+	}
+	if got := log.String(); !strings.Contains(got, "ERROR") || !strings.Contains(got, "refusing edge Remote call to its own node") {
+		t.Fatalf("own-node refusal was not logged at error: %q", got)
+	}
+
+	log.Reset()
+	if err := (&edgeRemote{poke: poke.Value}).Poke(context.Background(), []string{"node-a", "node-b"}); err != nil {
+		t.Fatalf("untagged Poke() error = %v", err)
+	}
+	if calls != 1 || !reflect.DeepEqual(gotNodeIDs, []string{"node-a", "node-b"}) {
+		t.Fatalf("untagged Poke() JS args: calls=%d ids=%v", calls, gotNodeIDs)
+	}
+	if got := log.String(); !strings.Contains(got, "WARN") || !strings.Contains(got, "failed=1") {
+		t.Fatalf("Poke() failure count was not warned: %q", got)
+	}
+
+	rejectingPoke := js.FuncOf(func(_ js.Value, _ []js.Value) any {
+		return js.Global().Get("Promise").Call("reject", js.Global().Get("Error").New("object reset"))
+	})
+	defer rejectingPoke.Release()
+	if err := (&edgeRemote{poke: rejectingPoke.Value}).Poke(context.Background(), []string{"node-a"}); !errors.Is(err, errRemoteLost) {
+		t.Fatalf("rejected Poke() error = %v, want %v", err, errRemoteLost)
 	}
 }

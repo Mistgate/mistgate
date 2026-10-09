@@ -126,25 +126,35 @@ function reset() {
 
 reset();
 
+let batchQueue = Promise.resolve();
+
+async function runBatch(statements) {
+  batchDepth++;
+  try {
+    sqlite.exec("BEGIN");
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    sqlite.exec("COMMIT");
+    return results;
+  } catch (error) {
+    sqlite.exec("ROLLBACK");
+    throw error;
+  } finally {
+    batchDepth--;
+  }
+}
+
 globalThis.__d1 = {
   prepare(query) {
     return prepared(query);
   },
-  async batch(statements) {
+  batch(statements) {
     if (queryStats) queryStats.batchCalls++;
-    batchDepth++;
-    try {
-      sqlite.exec("BEGIN");
-      const results = [];
-      for (const statement of statements) results.push(await statement.run());
-      sqlite.exec("COMMIT");
-      return results;
-    } catch (error) {
-      sqlite.exec("ROLLBACK");
-      throw error;
-    } finally {
-      batchDepth--;
-    }
+    // D1 runs every batch as its own transaction. This fake has one SQLite connection, so two batches in flight at once
+    // (a request and its background work) would interleave BEGIN/COMMIT on it: run them one after another instead.
+    const run = batchQueue.then(() => runBatch(statements));
+    batchQueue = run.catch(() => {});
+    return run;
   },
   __holdNextRun() {
     holdNextRun = true;

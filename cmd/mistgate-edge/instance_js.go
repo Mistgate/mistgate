@@ -38,7 +38,7 @@ var (
 	errInvalidAdminPrefix    = errors.New("adminPrefix must look like /secret/")
 	errInvalidSubPrefix      = errors.New("subPrefix must look like /secret/")
 	errInvalidLimitCallback  = errors.New("limit must be a function")
-	errInvalidNodeLink       = errors.New("nodeLink must provide ask and close functions")
+	errInvalidNodeLink       = errors.New("nodeLink must provide ask, close and poke functions")
 )
 
 type initOptions struct {
@@ -76,7 +76,8 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 	if optionPresent(value, "nodeLink") {
 		nodeLink := value.Get("nodeLink")
 		if nodeLink.Type() != js.TypeObject || nodeLink.IsNull() ||
-			nodeLink.Get("ask").Type() != js.TypeFunction || nodeLink.Get("close").Type() != js.TypeFunction {
+			nodeLink.Get("ask").Type() != js.TypeFunction || nodeLink.Get("close").Type() != js.TypeFunction ||
+			nodeLink.Get("poke").Type() != js.TypeFunction {
 			return out, errInvalidNodeLink
 		}
 		out.nodeLink = nodeLink

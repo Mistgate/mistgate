@@ -45,6 +45,7 @@ const (
 type Remote interface {
 	Ask(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) (*agentv1.ConnectRequest, error)
 	Close(ctx context.Context, nodeID, reason string) error
+	Poke(ctx context.Context, nodeIDs []string) error
 }
 
 // Config configures Fleet.
@@ -60,6 +61,8 @@ type Config struct {
 	LinkServed bool
 	// Remote sends admin requests through the edge edition's node link. Nil uses the VPS stream adapter.
 	Remote Remote
+	// AfterResponse starts work that must not delay a request response. Nil uses a goroutine.
+	AfterResponse func(func())
 	// ExpectedAgentVersion is the newest agent version this panel ships (ListNodes marks older agents).
 	ExpectedAgentVersion string
 	// Debounce is the StateChanged coalescing window. Default 200 ms.
@@ -115,6 +118,9 @@ type Fleet struct {
 	liveProjectionWarnings sync.Map                // node id -> struct{}; avoids repeating oversized projection warnings
 
 	kick                 chan struct{}
+	pokeMu               sync.Mutex
+	pokeRunning          bool
+	pokeDirty            bool
 	enrollLim            securitylimit.Limiter
 	unit                 time.Duration // one "second" of per-node timeouts; a test seam, time.Second otherwise
 	certCheck            time.Duration // how often a running stream rechecks its client certificate
@@ -212,9 +218,69 @@ func adminOpts(opts []connect.HandlerOption) []connect.HandlerOption {
 // StateChanged tells the module that something that feeds desired state changed (users, profiles,
 // inbounds, nodes). It returns at once; a debounced recompute pushes the result to connected nodes.
 func (f *Fleet) StateChanged() {
+	if f.cfg.Remote != nil {
+		f.pokeConnected()
+		return
+	}
 	select {
 	case f.kick <- struct{}{}:
 	default: // one is already pending
+	}
+}
+
+func (f *Fleet) afterResponse(work func()) {
+	if f.cfg.AfterResponse != nil {
+		f.cfg.AfterResponse(work)
+		return
+	}
+	go work()
+}
+
+func (f *Fleet) pokeConnected() {
+	f.pokeMu.Lock()
+	if f.pokeRunning {
+		f.pokeDirty = true
+		f.pokeMu.Unlock()
+		return
+	}
+	f.pokeRunning = true
+	f.pokeMu.Unlock()
+	f.afterResponse(f.runPokeConnected)
+}
+
+func (f *Fleet) runPokeConnected() {
+	for {
+		f.pokeMu.Lock()
+		f.pokeDirty = false
+		f.pokeMu.Unlock()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		// ponytail: D1 allows 10,000 subrequests per invocation (~9,000 nodes per fan-out). Live also reads the `users`
+		// column; switch to a `ConnectedNodeIDs` query if that read becomes limiting.
+		rows, err := f.Live(ctx)
+		if err != nil {
+			f.log.Warn("read live nodes for remote fan-out", "err", err)
+		} else {
+			nodeIDs := make([]string, 0, len(rows))
+			for _, row := range rows {
+				if row.Connected {
+					nodeIDs = append(nodeIDs, row.NodeID)
+				}
+			}
+			if err := f.cfg.Remote.Poke(ctx, nodeIDs); err != nil {
+				f.log.Warn("poke connected remote nodes", "err", err)
+			}
+		}
+		cancel()
+
+		f.pokeMu.Lock()
+		if f.pokeDirty {
+			f.pokeMu.Unlock()
+			continue
+		}
+		f.pokeRunning = false
+		f.pokeMu.Unlock()
+		return
 	}
 }
 

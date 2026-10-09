@@ -74,7 +74,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | merged (§6; `cbb8405`, `dc72654`, `34f7e7f`, 2026-10-09) |
-| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a implemented |
+| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a, 6c merged; 6b implemented |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
 query budgets unchanged (Happ 5, Mihomo 7, page 5/3/4, AWG configs 7), a manager review.
@@ -858,3 +858,17 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
 - **Known pre-existing race:** two isolates on an existing database can generate different `link_prefix` values;
   `SetSettings` is last-writer-wins, the same pattern as `sub_prefix` and `agent_sni`. This is harmless while no production
   edge database exists. Before edge goes live, use `INSERT ... ON CONFLICT DO NOTHING` and re-read the stored value.
+
+#### Round 6b implementation notes (2026-10-09)
+
+- 6b adds `Remote.Poke` and a per-isolate dirty-bit fan-out. `StateChanged` schedules the live read and poke through
+  `AfterResponse`; the fan-out uses a fresh 20 s background context and includes only connected rows. WARP attention uses
+  the same runner with a fresh 3 min context on the VPS and 25 s on the edge.
+- `edgeTaskRunner.Run` queues work until `release()` schedules it on a later JavaScript task after `fetch` or `link` has
+  returned; the runner also releases work queued by a completed job. `waitUntil` still resolves when the active count
+  reaches zero. The 6e `cron` op needs the same release after its response.
+- The fake D1 adapter serializes `batch()` calls through a queue because real D1 runs each batch as its own transaction
+  and the fake uses one SQLite connection.
+- PanelLink passes a step's `waitUntil` to `ctx.waitUntil` only when that step succeeds. Background work scheduled by a
+  step that then fails is not held by that step; this is acceptable because the 6e ten-minute cron safety net retries a
+  lost fan-out.

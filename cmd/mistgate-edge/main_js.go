@@ -37,11 +37,12 @@ type edgeState struct {
 }
 
 // edgeTaskRunner tracks after-response work across overlapping requests in this isolate. Every request can wait on
-// the current idle promise; it resolves once all work started so far has finished.
+// the current idle promise; it resolves once all queued or running work has finished.
 type edgeTaskRunner struct {
-	mu     sync.Mutex
-	active int
-	idle   chan struct{}
+	mu      sync.Mutex
+	active  int
+	idle    chan struct{}
+	pending []func()
 }
 
 func newEdgeTaskRunner() *edgeTaskRunner {
@@ -56,19 +57,41 @@ func (r *edgeTaskRunner) Run(work func()) {
 		r.idle = make(chan struct{})
 	}
 	r.active++
+	r.pending = append(r.pending, work)
 	r.mu.Unlock()
+}
 
-	go func() {
-		defer func() {
-			r.mu.Lock()
-			r.active--
-			if r.active == 0 {
-				close(r.idle)
-			}
-			r.mu.Unlock()
-		}()
-		work()
+// release starts queued work on a later JavaScript task, after the response or job that queued it has finished.
+func (r *edgeTaskRunner) release() {
+	r.mu.Lock()
+	work := r.pending
+	r.pending = nil
+	r.mu.Unlock()
+	if len(work) == 0 {
+		return
+	}
+	var start js.Func
+	start = js.FuncOf(func(js.Value, []js.Value) any {
+		start.Release()
+		for _, w := range work {
+			go r.run(w)
+		}
+		return nil
+	})
+	js.Global().Call("setTimeout", start, 0)
+}
+
+func (r *edgeTaskRunner) run(work func()) {
+	defer func() {
+		r.release()
+		r.mu.Lock()
+		r.active--
+		if r.active == 0 {
+			close(r.idle)
+		}
+		r.mu.Unlock()
 	}()
+	work()
 }
 
 func (r *edgeTaskRunner) WaitUntil() js.Value {
@@ -125,6 +148,7 @@ func main() {
 			if current == nil {
 				return js.Undefined(), errNotInitialized
 			}
+			defer current.afterResponse.release()
 			req, err := requestFromJS(args[0])
 			if err != nil {
 				return js.Undefined(), err
@@ -190,7 +214,7 @@ func initPanel(options js.Value) error {
 	afterResponse := newEdgeTaskRunner()
 	var remote fleet.Remote
 	if opts.hasNodeLink {
-		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), close: opts.nodeLink.Get("close")}
+		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), close: opts.nodeLink.Get("close"), poke: opts.nodeLink.Get("poke")}
 	}
 	authSvc, err := auth.New(st, auth.Config{
 		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,

@@ -43,6 +43,7 @@ func link(args []js.Value) (js.Value, error) {
 	if current == nil {
 		return js.Undefined(), errNotInitialized
 	}
+	defer current.afterResponse.release()
 	in := args[1]
 	switch op := args[0].String(); op {
 	case "challenge":

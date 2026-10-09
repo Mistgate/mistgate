@@ -24,6 +24,7 @@ var (
 type edgeRemote struct {
 	ask   js.Value
 	close js.Value
+	poke  js.Value
 }
 
 var _ fleet.Remote = (*edgeRemote)(nil)
@@ -105,6 +106,49 @@ func (r *edgeRemote) Close(ctx context.Context, nodeID, reason string) error {
 			return ctx.Err()
 		}
 		return errRemoteLost
+	}
+	return nil
+}
+
+func (r *edgeRemote) Poke(ctx context.Context, nodeIDs []string) error {
+	for _, nodeID := range nodeIDs {
+		if err := r.checkNode(ctx, nodeID); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if r.poke.Type() != js.TypeFunction {
+		return errRemoteLost
+	}
+	ids := js.Global().Get("Array").New(len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		ids.SetIndex(i, nodeID)
+	}
+	promise, err := invokeRemote(r.poke, ids)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errRemoteLost
+	}
+	result, err := d1driver.Await(ctx, promise)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errRemoteLost
+	}
+	if result.Type() != js.TypeNumber {
+		return errRemoteLost
+	}
+	failed := result.Int()
+	if failed < 0 || float64(failed) != result.Float() || failed > len(nodeIDs) {
+		return errRemoteLost
+	}
+	if failed > 0 {
+		slog.Warn("edge node link pokes failed", "failed", failed)
 	}
 	return nil
 }

@@ -690,7 +690,7 @@ func (s *Service) delete(ctx context.Context, nodeID, confirmName string) (remot
 // that came from a registration and is marked revoked is replaced by a new registration, at most once an hour per
 // node. The old account stays until the new one is stored. It reports whether a new account was made.
 func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	s.mu.Lock()
 	defer s.mu.Unlock()

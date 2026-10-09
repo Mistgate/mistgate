@@ -27,7 +27,9 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -53,6 +55,7 @@ type edgeRig struct {
 	o        edgeOpts
 	st       *store.Store
 	f        *fleet.Fleet
+	acc      *access.Service
 	em       *nodeLinkEmu
 	ts       *httptest.Server
 	pool     *x509.CertPool
@@ -91,11 +94,24 @@ func newEdgeRig(t *testing.T, o edgeOpts) *edgeRig {
 			t.Logf("steps: %+v", r.em.steps(r.nodeID))
 		}
 	})
+	var acc *access.Service
 	r.f, err = fleet.New(st, v, nil, fleet.Config{AgentSNI: testSNI, PanelAddr: "127.0.0.1:443", LinkServed: true,
-		Remote: r.em, Now: r.em.now, Desired: r.desired, Log: slog.New(slog.NewTextHandler(r.logs, nil)).With("side", "panel")})
+		Remote: r.em, Now: r.em.now, Desired: r.desired, Log: slog.New(slog.NewTextHandler(r.logs, nil)).With("side", "panel"),
+		OnUsage: func(ctx context.Context, userIDs []string) {
+			if acc != nil {
+				if err := acc.Recompute(ctx, userIDs); err != nil && ctx.Err() == nil {
+					r.t.Errorf("recompute user status after usage: %v", err)
+				}
+			}
+		}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	acc, err = access.New(st, v, builtin.Registry(), r.f, r.f, access.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.acc = acc
 	r.em.bind(r.f)
 	r.seed()
 
@@ -168,11 +184,18 @@ func (r *edgeRig) seed() {
 }
 
 // desired is Config.Desired: one inbound with the current credentials.
-func (r *edgeRig) desired(context.Context, string) ([]statehash.Inbound, error) {
+func (r *edgeRig) desired(ctx context.Context, _ string) ([]statehash.Inbound, error) {
+	alice, err := r.st.Access().User(ctx, "usr_alice")
+	if err != nil {
+		return nil, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	creds := make([]plugin.UserCred, 0, len(r.creds))
 	for _, id := range r.creds {
+		if id == "crd_alice" && alice.Status != "active" {
+			continue
+		}
 		who := strings.TrimPrefix(id, "crd_")
 		creds = append(creds, plugin.UserCred{CredID: id, UserID: "usr_" + who, DeviceID: "dev_" + who, Data: []byte(`{"key":"value"}`)})
 	}
@@ -187,10 +210,20 @@ func (r *edgeRig) setCreds(ids ...string) {
 	r.mu.Unlock()
 }
 
-// poke is what step 6 does through waitUntil when desired state changes.
+func (r *edgeRig) setAliceEnabled(enabled bool) {
+	r.t.Helper()
+	_, err := r.acc.SetUsersEnabled(context.Background(), connect.NewRequest(&adminv1.SetUsersEnabledRequest{
+		UserIds: []string{"usr_alice"}, Enabled: enabled,
+	}))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+}
+
+// poke sends a direct emulator request for tests of the no-Hello deadline.
 func (r *edgeRig) poke() {
 	r.t.Helper()
-	if err := r.em.poke(context.Background(), r.nodeID); err != nil {
+	if err := r.em.Poke(context.Background(), []string{r.nodeID}); err != nil {
 		r.t.Fatal(err)
 	}
 }
@@ -535,6 +568,52 @@ func TestEdgeLinkSessionDesiredStatsAndAsk(t *testing.T) {
 	}
 }
 
+// 8. A stats step crosses Alice's quota; its own step completes before fan-out pokes the node to remove her credential.
+func TestEdgeLinkQuotaChangePokesItsOwnNodeAfterStep(t *testing.T) {
+	r := newEdgeRig(t, edgeOpts{statsEvery: 20 * time.Millisecond})
+	var mu sync.Mutex
+	var violations []string
+	r.em.onViolation(func(msg string) {
+		mu.Lock()
+		violations = append(violations, msg)
+		mu.Unlock()
+	})
+	ag := r.start(nil)
+	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.session() == 1 }, "first session and desired state")
+	quotaUpdateStep := len(r.em.steps(r.nodeID))
+	if _, err := r.st.W.ExecContext(context.Background(), `UPDATE user SET quota_bytes = 1 WHERE id = ?`, "usr_alice"); err != nil {
+		t.Fatal(err)
+	}
+	ag.eng.setEmit(true)
+	eventually(t, func() bool {
+		return !slices.Contains(ag.eng.credIDs("inb_edge"), "crd_alice")
+	}, "quota fan-out removes Alice's credential")
+	user, err := r.st.Access().User(context.Background(), "usr_alice")
+	if err != nil || user.Status != "limited" {
+		t.Fatalf("Alice status = %q, %v; want limited", user.Status, err)
+	}
+
+	steps := r.em.steps(r.nodeID)
+	statsOffset := slices.IndexFunc(steps[quotaUpdateStep:], func(s emuStep) bool { return s.Kind == fleet.LinkFrame && s.Msg == "stats" })
+	if statsOffset < 0 {
+		t.Fatal("no stats step after Alice's quota update")
+	}
+	statsAt := quotaUpdateStep + statsOffset
+	desiredOffset := slices.IndexFunc(steps[statsAt+1:], func(s emuStep) bool { return s.Kind == fleet.LinkDesired })
+	if desiredOffset < 0 {
+		t.Fatalf("no desired-state step followed the stats step: %+v", steps)
+	}
+	desiredAt := statsAt + 1 + desiredOffset
+	if steps[statsAt].Gen != 1 || steps[desiredAt].Gen != 1 || r.session() != 1 {
+		t.Fatalf("quota stats/desired steps ran outside generation 1: stats=%+v desired=%+v current session=%d", steps[statsAt], steps[desiredAt], r.session())
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(violations) != 0 {
+		t.Fatalf("own-node guard fired during fan-out: %v", violations)
+	}
+}
+
 // 2. A reconnect continues with deltas. A step that fails after its database writes committed (the real way to a stale
 // state: on workerd no state write means no frames) ends in one full resend after the reconnect, and so does a step whose
 // state alone was lost (a harsher case the platform cannot produce). The agent converges each time.
@@ -578,10 +657,10 @@ func TestEdgeLinkReconnectDeltaBaseAndStaleState(t *testing.T) {
 		t.Fatalf("generation 2 got desired states %+v, want none: the Hello matched the digest", got)
 	}
 
-	// A new credential and a poke give a delta on top of what the agent holds.
+	// An admin disabling Alice changes desired state and fans out a delta on top of what the agent holds.
 	r.setCreds("crd_alice", "crd_bob")
-	r.poke()
-	eventually(t, func() bool { return slices.Equal(ag.eng.credIDs("inb_edge"), []string{"crd_alice", "crd_bob"}) }, "credential added")
+	r.setAliceEnabled(false)
+	eventually(t, func() bool { return slices.Equal(ag.eng.credIDs("inb_edge"), []string{"crd_bob"}) }, "disabled Alice's credential is removed")
 	got := r.desiredFrames(2)
 	if len(got) != 1 || got[0].BaseRevision != first[0].Revision || got[0].Revision <= got[0].BaseRevision {
 		t.Fatalf("generation 2 desired states = %+v, want one delta on revision %d", got, first[0].Revision)
@@ -591,7 +670,7 @@ func TestEdgeLinkReconnectDeltaBaseAndStaleState(t *testing.T) {
 	// A desired step whose state is lost: its frame goes out and the database moves on, the object still has the old state.
 	r.em.loseState(r.nodeID, fleet.LinkDesired)
 	r.setCreds("crd_alice", "crd_bob", "crd_carol")
-	r.poke()
+	r.setAliceEnabled(true)
 	eventually(t, func() bool { return len(ag.eng.credIDs("inb_edge")) == 3 }, "second credential change applied")
 	got = r.desiredFrames(2)
 	if len(got) != 2 || got[1].BaseRevision != second.Revision {
@@ -600,8 +679,8 @@ func TestEdgeLinkReconnectDeltaBaseAndStaleState(t *testing.T) {
 
 	// The next step starts from the lost state: the digest is ahead of it, so the whole state is sent again.
 	r.setCreds("crd_alice", "crd_bob", "crd_carol", "crd_dave")
-	r.poke()
-	want := []string{"crd_alice", "crd_bob", "crd_carol", "crd_dave"}
+	r.setAliceEnabled(false)
+	want := []string{"crd_bob", "crd_carol", "crd_dave"}
 	eventually(t, func() bool { return slices.Equal(ag.eng.credIDs("inb_edge"), want) }, "agent converged on the full state")
 	got = r.desiredFrames(2)
 	if len(got) != 3 || got[2].BaseRevision != 0 || len(got[2].Inbounds) != 1 || got[2].Revision <= got[1].Revision {
@@ -613,10 +692,10 @@ func TestEdgeLinkReconnectDeltaBaseAndStaleState(t *testing.T) {
 	// The real path: the desired step fails after its writes committed. Nothing reaches the agent, the socket closes 1011.
 	r.setCreds("crd_alice", "crd_bob", "crd_carol", "crd_dave", "crd_erin")
 	r.em.failNext(r.nodeID, fleet.LinkDesired)
-	r.poke()
+	r.setAliceEnabled(true)
 	eventually(t, func() bool { return slices.ContainsFunc(r.em.steps(r.nodeID), func(s emuStep) bool { return s.Err }) }, "the injected failure")
 	eventually(t, func() bool { return r.session() == 3 }, "the agent reconnects as generation 3")
-	want = append(want, "crd_erin")
+	want = []string{"crd_alice", "crd_bob", "crd_carol", "crd_dave", "crd_erin"}
 	eventually(t, func() bool { return slices.Equal(ag.eng.credIDs("inb_edge"), want) }, "agent converged after the failed step")
 	if n := len(r.desiredFrames(2)); n != 3 {
 		t.Errorf("generation 2 sent %d desired states, want 3: the failed step must send nothing", n)
@@ -1065,7 +1144,7 @@ func TestEdgeLinkOwnNodeGuardFires(t *testing.T) {
 		frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: "req_own"}}}
 		_, e1 := r.em.Ask(ctx, in.NodeID, "req_own", frame, time.Now().Add(time.Second))
 		e2 := r.em.Close(ctx, in.NodeID, "own")
-		e3 := r.em.poke(ctx, in.NodeID)
+		e3 := r.em.Poke(ctx, []string{in.NodeID})
 		_, e4 := r.em.Ask(context.WithoutCancel(ctx), in.NodeID, "req_own2", frame, time.Now().Add(time.Second))
 		errs <- []error{e1, e2, e3, e4}
 	})

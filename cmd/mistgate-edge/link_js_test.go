@@ -65,6 +65,8 @@ func TestParseInitOptionsNodeLink(t *testing.T) {
 	defer ask.Release()
 	closeNode := js.FuncOf(func(js.Value, []js.Value) any { return nil })
 	defer closeNode.Release()
+	poke := js.FuncOf(func(js.Value, []js.Value) any { return 0 })
+	defer poke.Release()
 
 	without := edgeInitOptions(js.Undefined(), false)
 	parsed, err := parseInitOptions(without)
@@ -75,9 +77,10 @@ func TestParseInitOptionsNodeLink(t *testing.T) {
 	valid := js.Global().Get("Object").New()
 	valid.Set("ask", ask)
 	valid.Set("close", closeNode)
-	valid.Set("poke", "ignored until the next round")
+	valid.Set("poke", poke)
 	parsed, err = parseInitOptions(edgeInitOptions(valid, true))
-	if err != nil || !parsed.hasNodeLink || parsed.nodeLink.Get("ask").Type() != js.TypeFunction || parsed.nodeLink.Get("close").Type() != js.TypeFunction {
+	if err != nil || !parsed.hasNodeLink || parsed.nodeLink.Get("ask").Type() != js.TypeFunction ||
+		parsed.nodeLink.Get("close").Type() != js.TypeFunction || parsed.nodeLink.Get("poke").Type() != js.TypeFunction {
 		t.Fatalf("nodeLink functions: parsed=%+v err=%v", parsed, err)
 	}
 
@@ -103,6 +106,12 @@ func TestParseInitOptionsNodeLink(t *testing.T) {
 	missingClose.Set("ask", ask)
 	if _, err := parseInitOptions(edgeInitOptions(missingClose, true)); !errors.Is(err, errInvalidNodeLink) {
 		t.Fatalf("missing close error = %v, want %v", err, errInvalidNodeLink)
+	}
+	missingPoke := js.Global().Get("Object").New()
+	missingPoke.Set("ask", ask)
+	missingPoke.Set("close", closeNode)
+	if _, err := parseInitOptions(edgeInitOptions(missingPoke, true)); !errors.Is(err, errInvalidNodeLink) {
+		t.Fatalf("missing poke error = %v, want %v", err, errInvalidNodeLink)
 	}
 }
 

@@ -144,8 +144,12 @@ func (f *Fleet) dispatchWarpAttention(w Warp, nodeID, reason string) {
 	if w == nil {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	f.afterResponse(func() {
+		timeout := 3 * time.Minute
+		if f.cfg.Remote != nil {
+			timeout = 25 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		switch reason {
 		case warpReasonRefresh:
@@ -157,7 +161,7 @@ func (f *Fleet) dispatchWarpAttention(w Warp, nodeID, reason string) {
 				f.log.Info("automatic warp re-registration", "node", nodeID, "err", err)
 			}
 		}
-	}()
+	})
 }
 
 // withheldReason is what the node page shows on an inbound the panel did not send to this agent.

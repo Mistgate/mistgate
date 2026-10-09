@@ -571,6 +571,27 @@ func TestAutoReregister(t *testing.T) {
 	}
 }
 
+func TestAutoReregisterHonorsCallerDeadline(t *testing.T) {
+	e := newEnv(t)
+	node := e.addNode("de1")
+	if _, err := e.register(node); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.rpc().UpdateWarpRegistrationParams(e.ctx, connect.NewRequest(&adminv1.UpdateWarpRegistrationParamsRequest{
+		Params: &adminv1.WarpRegistrationParams{AutoReregister: true}})); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.s.NeedsAttention(e.ctx, node, "revoked"); err != nil {
+		t.Fatal(err)
+	}
+	before := e.cf.count("POST")
+	ctx, cancel := context.WithDeadline(e.ctx, time.Now().Add(-time.Second))
+	defer cancel()
+	if ok, err := e.s.AutoReregister(ctx, node); ok || e.cf.count("POST") != before {
+		t.Fatalf("expired ladder deadline re-registered: ok=%v err=%v POST count=%d, want no registration", ok, err, e.cf.count("POST"))
+	}
+}
+
 func TestStateAndSummary(t *testing.T) {
 	now := time.Unix(1_791_100_000, 0)
 	row := func(enabled bool, st agentv1.WarpState, age time.Duration) *store.WarpAccountRow {

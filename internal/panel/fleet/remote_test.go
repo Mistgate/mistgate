@@ -23,11 +23,17 @@ type remoteCloseCall struct {
 	nodeID, reason string
 }
 
+type remotePokeCall struct {
+	nodeIDs []string
+}
+
 type testRemote struct {
 	mu        sync.Mutex
 	askCalls  []remoteAskCall
 	closeCall []remoteCloseCall
+	pokeCalls []remotePokeCall
 	answer    func(context.Context, remoteAskCall) (*agentv1.ConnectRequest, error)
+	onPoke    func(context.Context, []string) error
 	closeErr  error
 }
 
@@ -50,10 +56,136 @@ func (r *testRemote) Close(_ context.Context, nodeID, reason string) error {
 	return r.closeErr
 }
 
+func (r *testRemote) Poke(ctx context.Context, nodeIDs []string) error {
+	ids := append([]string(nil), nodeIDs...)
+	r.mu.Lock()
+	r.pokeCalls = append(r.pokeCalls, remotePokeCall{nodeIDs: ids})
+	onPoke := r.onPoke
+	r.mu.Unlock()
+	if onPoke != nil {
+		return onPoke(ctx, ids)
+	}
+	return nil
+}
+
 func (r *testRemote) calls() ([]remoteAskCall, []remoteCloseCall) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]remoteAskCall(nil), r.askCalls...), append([]remoteCloseCall(nil), r.closeCall...)
+}
+
+func (r *testRemote) pokes() []remotePokeCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]remotePokeCall, len(r.pokeCalls))
+	for i, call := range r.pokeCalls {
+		out[i].nodeIDs = append([]string(nil), call.nodeIDs...)
+	}
+	return out
+}
+
+func TestFleetRemoteStateChangedSchedulesConnectedPoke(t *testing.T) {
+	e, connected, _ := remoteReadyNode(t, "doctor/1")
+	const staleNodeID = "nod_b"
+	e.exec(`INSERT INTO node_live (node_id, session) VALUES (?, ?)`, staleNodeID, 1)
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, 1, staleNodeID)
+	var lastSeen int64
+	var liveRows int
+	if err := e.st.R.QueryRowContext(context.Background(), `
+		SELECT n.last_seen_at, (SELECT COUNT(*) FROM node_live WHERE node_id = n.id)
+		FROM node n WHERE n.id = ?`, staleNodeID).Scan(&lastSeen, &liveRows); err != nil {
+		t.Fatal(err)
+	}
+	if lastSeen != 1 || liveRows != 1 {
+		t.Fatalf("stale node fixture has last_seen_at=%d and %d node_live rows, want 1 and 1", lastSeen, liveRows)
+	}
+
+	remote := &testRemote{}
+	e.f.cfg.Remote = remote
+	var work func()
+	e.f.cfg.AfterResponse = func(fn func()) { work = fn }
+
+	returned := make(chan struct{})
+	go func() {
+		e.f.StateChanged()
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("StateChanged blocked while scheduling the fan-out")
+	}
+	if work == nil {
+		t.Fatal("StateChanged did not hand work to AfterResponse")
+	}
+	if calls := remote.pokes(); len(calls) != 0 {
+		t.Fatalf("Poke ran before the after-response work: %+v", calls)
+	}
+
+	work()
+	calls := remote.pokes()
+	if len(calls) != 1 || len(calls[0].nodeIDs) != 1 || calls[0].nodeIDs[0] != connected.nodeID {
+		t.Fatalf("Poke calls = %+v, want only connected node %q", calls, connected.nodeID)
+	}
+}
+
+func TestFleetRemoteStateChangedCoalescesDuringFanout(t *testing.T) {
+	e, connected, _ := remoteReadyNode(t, "doctor/1")
+	remote := &testRemote{}
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	remote.onPoke = func(ctx context.Context, _ []string) error {
+		deadline, ok := ctx.Deadline()
+		remaining := time.Until(deadline)
+		if !ok {
+			t.Error("fan-out context has no timeout deadline")
+		} else if remaining > 20*time.Second || remaining < 19*time.Second {
+			t.Errorf("fan-out context deadline has %s remaining, want 19-20 s", remaining)
+		}
+		once.Do(func() {
+			close(started)
+			<-release
+		})
+		return nil
+	}
+	e.f.cfg.Remote = remote
+	var work func()
+	e.f.cfg.AfterResponse = func(fn func()) { work = fn }
+	e.f.StateChanged()
+	if work == nil {
+		t.Fatal("StateChanged did not hand work to AfterResponse")
+	}
+	done := make(chan struct{})
+	go func() { work(); close(done) }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("the first fan-out did not start")
+	}
+	e.f.StateChanged()
+	e.f.StateChanged()
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("the coalesced fan-out did not finish")
+	}
+
+	work = nil
+	e.f.StateChanged()
+	if work == nil {
+		t.Fatal("StateChanged did not schedule new after-response work after the prior fan-out finished")
+	}
+
+	calls := remote.pokes()
+	if len(calls) != 2 {
+		t.Fatalf("Poke calls = %d, want one active fan-out and exactly one coalesced repeat", len(calls))
+	}
+	for _, call := range calls {
+		if len(call.nodeIDs) != 1 || call.nodeIDs[0] != connected.nodeID {
+			t.Errorf("Poke ids = %v, want only connected node %q", call.nodeIDs, connected.nodeID)
+		}
+	}
 }
 
 func remoteReadyNode(t *testing.T, caps ...string) (*env, *agent, *conn) {

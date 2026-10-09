@@ -272,22 +272,24 @@ func (e *nodeLinkEmu) Close(ctx context.Context, nodeID, reason string) error {
 	return nil
 }
 
-// poke is NodeLink.poke: the step 6 fan-out of StateChanged, which a test calls by hand.
-func (e *nodeLinkEmu) poke(ctx context.Context, nodeID string) error {
-	if err := e.guard(ctx, nodeID, "Poke"); err != nil {
-		return err
-	}
-	o := e.object(nodeID)
-	if !o.do(func() {
-		o.serial(func() {
-			if o.liveSocket() == nil {
-				return // nothing is connected: the next open step reads the new state anyway
-			}
-			o.poke = true
-			o.setAlarm(e.nowMs())
-		})
-	}) {
-		return errors.New("link emulator stopped")
+// Poke is the Remote seam: NodeLink.poke fan-out of StateChanged.
+func (e *nodeLinkEmu) Poke(ctx context.Context, nodeIDs []string) error {
+	for _, nodeID := range nodeIDs {
+		if err := e.guard(ctx, nodeID, "Poke"); err != nil {
+			return err
+		}
+		o := e.object(nodeID)
+		if !o.do(func() {
+			o.serial(func() {
+				if o.liveSocket() == nil {
+					return // nothing is connected: the next open step reads the new state anyway
+				}
+				o.poke = true
+				o.setAlarm(e.nowMs())
+			})
+		}) {
+			return errors.New("link emulator stopped")
+		}
 	}
 	return nil
 }

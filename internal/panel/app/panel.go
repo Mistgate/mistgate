@@ -166,6 +166,7 @@ func Build(c Config) (*Panel, error) {
 		LinkServed:           in.LinkPrefix != "",
 		LinkURL:              linkURL(in),
 		Remote:               c.Remote,
+		AfterResponse:        c.AfterResponse,
 		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,

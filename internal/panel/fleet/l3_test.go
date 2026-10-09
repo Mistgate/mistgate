@@ -24,16 +24,17 @@ import (
 
 // fakeWarpMod is the WARP module as the fleet sees it.
 type fakeWarpMod struct {
-	mu        sync.Mutex
-	spec      *plugin.WarpSpec
-	health    []*agentv1.WarpHealth
-	attn      []string
-	refresh   int
-	rereg     int
-	refreshed chan struct{}
-	summary   adminv1.WarpState
-	specErr   error
-	storeErr  error
+	mu         sync.Mutex
+	spec       *plugin.WarpSpec
+	health     []*agentv1.WarpHealth
+	attn       []string
+	refresh    int
+	rereg      int
+	refreshed  chan struct{}
+	refreshCtx context.Context
+	summary    adminv1.WarpState
+	specErr    error
+	storeErr   error
 }
 
 func (w *fakeWarpMod) Spec(context.Context, string) (*plugin.WarpSpec, error) {
@@ -75,9 +76,10 @@ func (w *fakeWarpMod) NeedsAttention(_ context.Context, _, reason string) error 
 	return nil
 }
 
-func (w *fakeWarpMod) RefreshByNode(context.Context, string) error {
+func (w *fakeWarpMod) RefreshByNode(ctx context.Context, _ string) error {
 	w.mu.Lock()
 	w.refresh++
+	w.refreshCtx = ctx
 	refreshed := w.refreshed
 	w.mu.Unlock()
 	if refreshed != nil {
@@ -733,5 +735,48 @@ func TestWarpModuleErrorsDoNotBreakTheStream(t *testing.T) {
 	ack := c.ack()
 	if ack.UpToSeq != 1 {
 		t.Errorf("the batch was not acknowledged because the module failed: %v", ack)
+	}
+}
+
+func TestWarpAttentionUsesAfterResponseAndEditionTimeouts(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		remote  bool
+		timeout time.Duration
+	}{
+		{name: "VPS", timeout: 3 * time.Minute},
+		{name: "edge", remote: true, timeout: 25 * time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			w := &fakeWarpMod{}
+			e.f.SetWarp(w)
+			if tc.remote {
+				e.f.cfg.Remote = &testRemote{}
+			}
+			var work func()
+			e.f.cfg.AfterResponse = func(fn func()) { work = fn }
+
+			e.f.dispatchWarpAttention(w, "node-a", warpReasonRefresh)
+			if work == nil {
+				t.Fatal("WARP attention did not go through AfterResponse")
+			}
+			if _, refresh, _, _ := w.counts(); refresh != 0 {
+				t.Fatal("WARP work ran before AfterResponse")
+			}
+			work()
+
+			w.mu.Lock()
+			ctx := w.refreshCtx
+			w.mu.Unlock()
+			if ctx == nil {
+				t.Fatal("WARP refresh received no context")
+			}
+			deadline, ok := ctx.Deadline()
+			remaining := time.Until(deadline)
+			if !ok || remaining > tc.timeout || remaining < tc.timeout-time.Second {
+				t.Fatalf("WARP context deadline has %s remaining, want about %s", remaining, tc.timeout)
+			}
+		})
 	}
 }

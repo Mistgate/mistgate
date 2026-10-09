@@ -15,6 +15,9 @@ let wasmFailure;
 let rejectWasmFailure;
 const securityLimits = new Map();
 let limitMath;
+let liveProjectionQueries = 0;
+let nodePokeCalls = 0;
+const nodePokeIDs = [];
 
 const [wasmPath, wasmExecPath, oraclePath, dataDir] = process.argv.slice(2);
 if (!wasmPath || !wasmExecPath || !oraclePath || !dataDir) {
@@ -25,6 +28,14 @@ const database = path.join(dataDir, "shared.sqlite");
 process.env.MISTGATE_BRIDGE_D1_PATH = database;
 require(path.resolve(__dirname, "../../../edge/d1driver/testdata/fake-d1.cjs"));
 require(wasmExecPath);
+
+const prepareD1 = globalThis.__d1.prepare.bind(globalThis.__d1);
+globalThis.__d1.prepare = (query) => {
+  if (query.includes("n.liveness_timeout_s AS liveness_timeout_s") && query.includes("l.session AS session")) {
+    liveProjectionQueries++;
+  }
+  return prepareD1(query);
+};
 
 function reservePort() {
   return new Promise((resolve, reject) => {
@@ -100,7 +111,9 @@ async function countedRequest(label, fn) {
   globalThis.__d1.__beginQueryCount(label);
   try {
     const response = await fn();
-    return { response, queries: globalThis.__d1.__endQueryCount() };
+    const queries = globalThis.__d1.__endQueryCount();
+    if (response && response.waitUntil) await response.waitUntil;
+    return { response, queries };
   } catch (error) {
     globalThis.__d1.__endQueryCount();
     throw error;
@@ -410,7 +423,11 @@ async function run() {
       nodeLink: {
         ask: async () => ({ error: "lost" }),
         close: async () => {},
-        poke: async () => 0,
+        poke: async (nodeIDs) => {
+          nodePokeCalls++;
+          nodePokeIDs.push([...nodeIDs]);
+          return 0;
+        },
       },
     };
     try {
@@ -613,14 +630,28 @@ async function run() {
     const pagePassword = createdUser.message.pagePassword;
     assert.ok(userToken && pagePassword, "the admin API returns a link credential and page password");
 
+    // Remove the implicit device's current credentials so this subscription fetch creates them lazily and notifies the
+    // fleet. Wait for earlier admin-request background work before measuring this one request.
+    const backgroundBarrier = await bridgeRequestFor(secondPanel, "https://example.com/test-sub/brand/logo.svg");
+    await backgroundBarrier.waitUntil;
+    await globalThis.__d1.prepare("DELETE FROM device_credential WHERE user_id = ? AND revoked_at IS NULL")
+      .bind(createdUser.message.user.id).run();
     await globalThis.__d1.prepare("UPDATE device SET last_seen_at = ? WHERE user_id = ? AND hwid_hash IS NULL")
       .bind(1, createdUser.message.user.id).run();
+    liveProjectionQueries = 0;
+    nodePokeCalls = 0;
+    nodePokeIDs.length = 0;
     const touchResponse = await bridgeRequestFor(secondPanel, userSubURL, {
       headers: { "CF-Connecting-IP": "127.0.0.1", "User-Agent": "Happ/4.10.2/ios" },
     });
     assert.equal(touchResponse.status, 200, "the edge subscription fetch succeeds");
     assert.ok(touchResponse.waitUntil && typeof touchResponse.waitUntil.then === "function", "the edge response exposes its background work promise");
+    assert.equal(liveProjectionQueries, 0, "the fetch performs no Live read before the response");
+    assert.equal(nodePokeCalls, 0, "the fetch performs no poke before the response");
     await touchResponse.waitUntil;
+    assert.equal(liveProjectionQueries, 1, "the fetch waitUntil performs one fan-out Live query");
+    assert.equal(nodePokeCalls, 1, "the fetch waitUntil makes one fan-out poke call");
+    assert.deepEqual(nodePokeIDs, [[]], "the fan-out only includes connected nodes");
     const touchedAt = await globalThis.__d1.prepare("SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL")
       .bind(createdUser.message.user.id).first("last_seen_at");
     assert.ok(Number(touchedAt) > 1, "waiting on the response promise observes the device touch in D1");
