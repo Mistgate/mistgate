@@ -492,7 +492,11 @@ func randomToken() string {
 func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[adminv1.CreateEnrollmentRequest]) (*connect.Response[adminv1.CreateEnrollmentResponse], error) {
 	f := s.f
 	m := req.Msg
-	if f.cfg.PanelAddr == "" {
+	linkOnly := f.cfg.Remote != nil // the edge edition: agents enrol and run over the link (no mTLS endpoint)
+	if linkOnly && f.cfg.LinkURL == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("link address is not configured"))
+	}
+	if !linkOnly && f.cfg.PanelAddr == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel address is not configured"))
 	}
 	ttl := time.Duration(m.TtlSeconds) * time.Second
@@ -532,9 +536,13 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		return nil, internalErr(f.log.Error, "create enrollment", err)
 	}
 	f.audit(ctx, "node.create_enrollment", map[string]string{"node_id": n.ID, "name": n.Name}) // never the token
+	install := installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token)
+	if linkOnly {
+		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
+	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
 		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}),
-		InstallCommand: installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token),
+		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
 		CopyCommand:    f.copyCommand(n.Address),
@@ -549,6 +557,12 @@ const nodeBinaryPath = "/root/mistgate-node"
 func installCommand(panelAddr, sni, caFingerprint, token string) string {
 	return fmt.Sprintf("chmod +x %[1]s && %[1]s enroll --panel %[2]s --sni %[3]s --ca-sha256 %[4]s --token %[5]s && %[1]s install",
 		nodeBinaryPath, panelAddr, sni, caFingerprint, token)
+}
+
+// linkInstallCommand is installCommand for a link-only agent: it enrols over the panel's public address.
+func linkInstallCommand(linkURL, caFingerprint, token string) string {
+	return fmt.Sprintf("chmod +x %[1]s && %[1]s enroll --link-url %[2]s --ca-sha256 %[3]s --token %[4]s && %[1]s install",
+		nodeBinaryPath, linkURL, caFingerprint, token)
 }
 
 // copyCommand puts the linux/amd64 agent of the trusted update bundle on the server, run on the panel's own server;

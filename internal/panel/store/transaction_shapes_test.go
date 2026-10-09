@@ -56,6 +56,7 @@ var transactionShape2 = map[string]string{
 	"awg_prepare.go:awgPrepareTx":                  "The exact JSON and backend read by fn guard its update; stale decisions retry.",
 	"dns.go:Delete":                                "A preset guard precedes preset deletion and clearing user and group references.",
 	"fleet_ca.go:CreateEnrollment":                 "Optional node creation, token replacement, and the current-node read share one batch guarded against missing or retired nodes.",
+	"fleet_ca.go:RenewCert":                        "A guard on the presenting certificate (valid for this node, node not retired) and the hourly certificate count precedes the insert and the two updates in one batch.",
 	"fleet_ca.go:Enroll":                           "A reader batch loads the token, node, and replay certificate; signing runs outside one guarded consume-and-issue batch.",
 	"fleet_node.go:NodeHello":                      "Previous and current node rows bracket the guarded facts update and live-session replacement in one D1 batch.",
 	"fleet_node.go:NodeDisconnected":               "The matching live session guards last-seen/disconnect time and row deletion in one fixed batch.",
@@ -79,7 +80,6 @@ var transactionShape2 = map[string]string{
 }
 
 var transactionShape3 = map[string]string{
-	"fleet_ca.go:RenewCert":     "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
 	"fleet_node.go:NodeApplied": "The node row, guarded live drift update, and json_each inbound results commit in one fixed three-statement batch.",
 	"fleet_stats.go:SkipSeq":    "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
 }

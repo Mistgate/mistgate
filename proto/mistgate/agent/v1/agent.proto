@@ -362,7 +362,8 @@ service EnrollmentService {
 
   // Replace the certificate before it expires. mTLS with the current certificate. The agent renews when
   // less than 10 days remain (day 20 of 30) and generates a NEW key each time. The panel ignores the
-  // subject in the CSR and sets the URI SAN itself.
+  // subject in the CSR and sets the URI SAN itself. FAILED_PRECONDITION: the presenting certificate is no longer
+  // valid for this node, or the node already got 4 certificates in the last hour.
   rpc Renew(RenewRequest) returns (RenewResponse);
 }
 
@@ -425,6 +426,12 @@ message ConnectRequest {
     Pong pong = 16;
     // Doctor snapshot (seq = 0, see "DOCTOR"). Sent only by agents that list "doctor/1" in capabilities.
     DoctorReport doctor_report = 17;
+    // Certificate renewal over the signed link: link-only agents have no mTLS Renew call. Answered with one
+    // ConnectResponse.renew, or by closing the session (INVALID_ARGUMENT for a bad CSR, FAILED_PRECONDITION when the
+    // presenting certificate is no longer valid for this node or the hourly renewal quota is spent, INTERNAL for a
+    // store error).
+    // A panel that predates the field ignores the frame; the agent gives up after two minutes and retries later.
+    RenewRequest renew = 18;
   }
 }
 
@@ -777,6 +784,9 @@ message ConnectResponse {
     // Only sent to agents with "udpcheck/1" in Hello.capabilities (see "UDP DELIVERY CHECK").
     UdpCount udp_count = 25;
     UdpSend udp_send = 26;
+    // The answer to ConnectRequest.renew. The session keeps its old certificate serial until the old certificate's
+    // grace period ends; the agent then reconnects with the new one.
+    RenewResponse renew = 27;
   }
 }
 

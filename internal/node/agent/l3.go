@@ -138,6 +138,9 @@ func (a *Agent) capabilities() []string {
 	if a.cfg.AwgPrepare != nil && a.engines[awg.Protocol] != nil {
 		caps = append(caps, capAwgPrepare)
 	}
+	if a.linkOnly() { // FetchUpdate is an mTLS call (owner decision 2: no self-update on the edge edition yet)
+		return caps
+	}
 	return append(caps, a.upd.Capabilities()...)
 }
 

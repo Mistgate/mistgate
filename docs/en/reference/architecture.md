@@ -87,7 +87,7 @@ Enrollment:
 2. `mistgate-node enroll` makes a key and a certificate request on the node, connects with TLS 1.3 and the secret name, and accepts the server only if its chain ends in the CA with the pinned fingerprint.
 3. The panel checks the token, issues the certificate and returns it with the CA. A repeat of the same call within 10 minutes (with the same key) gets the same certificate, in case the answer was lost. Ten failed attempts within a minute from one address (IPv6: one /64) are refused for a while.
 4. From then on every call is mutual TLS. The panel checks the certificate's serial at every handshake (session tickets are off, so every handshake is a full one) and every 30 seconds on a running stream: a revoked certificate or a retired node is cut off.
-5. The agent renews its certificate with a new key when less than 10 days are left. The old certificate stays valid for 10 minutes after a renewal, in case the answer was lost.
+5. The agent renews its certificate with a new key when less than 10 days are left. The old certificate stays valid for 3 hours after a renewal, so an agent whose answer was lost can renew again (it retries every hour). Re-enrolling or retiring a node revokes its certificates at once. A node gets at most 4 certificates an hour.
 
 Agents reach the endpoint on the panel's public port: a TLS handshake with the secret name gets the agent endpoint, every other name gets the normal public site. `serve --agent-listen` gives agents a listener of their own instead.
 

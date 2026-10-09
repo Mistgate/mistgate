@@ -53,6 +53,9 @@ type Config struct {
 	AgentSNI string
 	// PanelAddr is the host:port agents dial; it goes into the install command. Required for CreateEnrollment.
 	PanelAddr string
+	// LinkURL is the base link-only agents are given (wss://host/<secret-prefix>/): the install command of an edge panel
+	// (Remote set) carries it instead of PanelAddr and the agent SNI. Empty = no link install command.
+	LinkURL string
 	// LinkServed reports whether the signed WebSocket agent link is mounted on the public listener.
 	LinkServed bool
 	// Remote sends admin requests through the edge edition's node link. Nil uses the VPS stream adapter.

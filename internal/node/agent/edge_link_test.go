@@ -37,7 +37,7 @@ import (
 
 // The edge edition's agent link with TODAY's agent: the real agent talks WebSocket to nodeLinkEmu (the Worker and the
 // NodeLink objects in Go), which drives the real Fleet.Link on SQLite. Design: design/cloudflare-edition/AGENT-LINK.md §6.3.
-// Enrolment here is still mTLS (the Enroll route of the agent endpoint); step 5c replaces it with link enrolment.
+// The agent enrols over the link route (step 5c): it is link-only, and renews over its session.
 
 const edgeNodeName = "node-a"
 
@@ -45,6 +45,7 @@ type edgeOpts struct {
 	liveness   int           // node.liveness_timeout_s, 0 = the default
 	statsEvery time.Duration // 0 = 20 ms
 	backoff    time.Duration // the reconnect delay (min = max), 0 = 20 ms
+	noEnroll   bool          // the test enrols the agent itself
 }
 
 type edgeRig struct {
@@ -53,6 +54,7 @@ type edgeRig struct {
 	st       *store.Store
 	f        *fleet.Fleet
 	em       *nodeLinkEmu
+	ts       *httptest.Server
 	pool     *x509.CertPool
 	host     string
 	prefix   string
@@ -99,34 +101,37 @@ func newEdgeRig(t *testing.T, o edgeOpts) *edgeRig {
 
 	publicCert, pool := testLinkTLSCert(t)
 	r.pool = pool
-	// The enrol route of the agent endpoint, and the Worker under the secret prefix. The edge has no mTLS agent stream.
+	// The Worker under the secret prefix. The edge has no mTLS endpoint: anything outside the prefix is a 404.
 	root := http.NewServeMux()
-	agentEndpoint := r.f.AgentHandler()
-	root.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		if strings.Contains(req.URL.Path, "AgentService") {
-			http.NotFound(w, req)
-			return
-		}
-		agentEndpoint.ServeHTTP(w, req)
-	})
 	root.Handle(r.prefix, r.em.Worker(r.prefix))
 	ts := httptest.NewUnstartedServer(root)
 	ts.EnableHTTP2 = true
-	ts.TLS = &tls.Config{GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-		if hello.ServerName == testSNI {
-			return r.f.AgentTLSConfig(hello)
-		}
-		return &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{publicCert}, NextProtos: []string{"h2", "http/1.1"}}, nil
-	}}
+	ts.TLS = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{publicCert}, NextProtos: []string{"h2", "http/1.1"}}
 	ts.StartTLS()
 	t.Cleanup(ts.Close)
+	r.ts = ts
 	r.host = strings.TrimPrefix(ts.URL, "https://")
 
 	r.stateDir = filepath.Join(t.TempDir(), "state")
-	if _, err := Enroll(ctx, EnrollConfig{StateDir: r.stateDir, Panel: r.host, SNI: testSNI, CASHA256: r.f.CAFingerprint(), Token: "edge-link-enrollment-token"}); err != nil {
-		t.Fatal(err)
+	if !o.noEnroll {
+		if _, err := r.enrol(r.f.CAFingerprint()); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return r
+}
+
+func (r *edgeRig) linkURL() string { return "wss://" + r.host + r.prefix }
+
+// publicClient is a client of the Worker's public TLS: the test listener's certificate is its only root.
+func (r *edgeRig) publicClient() *http.Client {
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.pool, ServerName: "127.0.0.1"}}}
+}
+
+// enrol is `mistgate-node enroll --link-url …` with the seeded one-time token.
+func (r *edgeRig) enrol(pin string) (Meta, error) {
+	return Enroll(context.Background(), EnrollConfig{StateDir: r.stateDir, LinkURL: r.linkURL(), CASHA256: pin,
+		Token: "edge-link-enrollment-token", httpClient: r.publicClient()})
 }
 
 // seed creates the node (one enrolment), one inbound and the user whose credential carries the traffic.
@@ -198,20 +203,18 @@ type edgeAgent struct {
 	stop     func() error
 }
 
-// start runs the real agent against the emulator. It dials the link at once: the HelloAck that advertises the link comes
-// from an mTLS session on the VPS, and the edge has none.
+// start runs the real agent against the emulator. It enrolled over the link, so it is link-only: it dials the link at
+// once, never mTLS, whatever the panel advertises.
 func (r *edgeRig) start(tune func(*Agent)) *edgeAgent {
 	r.t.Helper()
 	eng := newFakeEngine("fake")
-	a, err := New(Config{StateDir: r.stateDir, LinkURL: "wss://" + r.host + r.prefix, DoctorEnv: testDoctorEnv(r.t),
+	a, err := New(Config{StateDir: r.stateDir, DoctorEnv: testDoctorEnv(r.t),
 		Log: slog.New(slog.NewTextHandler(r.logs, nil))}, map[string]engine.Factory{"fake": eng.factory()}, &fakeHost{})
 	if err != nil {
 		r.t.Fatal(err)
 	}
 	a.linkHTTPClient = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.pool,
 		ServerName: "127.0.0.1", NextProtos: []string{"http/1.1"}}}}
-	a.linkAdvertised.Store(true)
-	a.linkHoldFor = 100 * time.Millisecond
 	backoff, stats := r.o.backoff, r.o.statsEvery
 	if backoff == 0 {
 		backoff = 20 * time.Millisecond
@@ -1086,4 +1089,132 @@ func TestEdgeLinkOwnNodeGuardFires(t *testing.T) {
 			t.Errorf("report %d = %q", i+1, reports[i])
 		}
 	}
+}
+
+// 7. Renew over the link (5c). A node enrolled 25 days ago has a certificate five days from its end: the renewal loop
+// asks for a new one on the session, the panel records it, and the session keeps running on the old serial. Once the
+// old certificate's grace is over, the recheck of the next frame ends the old session, and the agent reconnects with
+// the new certificate. The loop starts before the first session exists, so its first tries find no session and fail.
+func TestEdgeLinkRenewOverTheLink(t *testing.T) {
+	r := newEdgeRig(t, edgeOpts{liveness: 3600, noEnroll: true})
+	const age = 25 * 24 * time.Hour
+	r.em.advance(-age)
+	_, err := r.enrol(r.f.CAFingerprint())
+	r.em.advance(age)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certSerial := func() string {
+		var s string
+		if err := r.st.R.QueryRowContext(context.Background(), `SELECT coalesce(cert_serial, '') FROM node WHERE id = ?`, r.nodeID).Scan(&s); err != nil {
+			t.Errorf("node: %v", err)
+		}
+		return s
+	}
+	oldSerial := certSerial()
+	if oldSerial == "" {
+		t.Fatal("the enrolment left no certificate serial")
+	}
+
+	ag := r.start(func(a *Agent) { a.renewEvery = 20 * time.Millisecond })
+	eventually(t, func() bool { return ag.a.id.Load().cert.Leaf.SerialNumber.Text(16) != oldSerial }, "the agent holds a renewed certificate")
+	newSerial := certSerial()
+	if newSerial == oldSerial || ag.a.id.Load().cert.Leaf.SerialNumber.Text(16) != newSerial {
+		t.Fatalf("serials: panel %q, agent %q, old %q: the panel and the agent must hold the same new one", newSerial, ag.a.id.Load().cert.Leaf.SerialNumber.Text(16), oldSerial)
+	}
+	if time.Until(ag.a.id.Load().notAfter()) < 29*24*time.Hour {
+		t.Errorf("the renewed certificate ends in %v, want about 30 days", time.Until(ag.a.id.Load().notAfter()))
+	}
+	renews := func() int {
+		return countSteps(r.em.steps(r.nodeID), func(s emuStep) bool { return s.Kind == fleet.LinkFrame && s.Msg == "renew" })
+	}
+	if renews() != 1 {
+		t.Errorf("renew frames stepped = %d, want 1 (the loop stops once the certificate is fresh)", renews())
+	}
+	// The session carries on with the old serial: nothing was closed by the renewal itself.
+	if n := countSteps(r.em.steps(r.nodeID), func(s emuStep) bool { return s.Kind == fleet.LinkClosed }); n != 0 || r.session() != 1 {
+		t.Fatalf("the session ended at renewal (closed steps %d, node_live.session %d)", n, r.session())
+	}
+	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.session() == 1 }, "the first session works")
+	if sent := r.em.sent(r.nodeID); !slices.ContainsFunc(sent, func(s emuSent) bool { return s.Gen == 1 && s.Frame.GetRenew() != nil }) {
+		t.Error("no RenewResponse reached the agent")
+	}
+
+	// Past the old certificate's grace (three hours) the next frame's recheck refuses the session.
+	r.em.advance(3*time.Hour + time.Minute)
+	eventually(t, func() bool { return r.session() == 2 }, "the agent reconnects as generation 2 with the new certificate")
+	closes := r.em.closes(r.nodeID)
+	if len(closes) == 0 || closes[0].Gen != 1 || closes[0].Code != 1008 || closes[0].Reason != "client certificate revoked" {
+		t.Errorf("closes = %+v, want the recheck to end generation 1 with 1008", closes)
+	}
+	ag.eng.setEmit(true)
+	eventually(t, func() bool { up, _ := r.traffic(); return up > 0 }, "the new session carries traffic")
+	if got := ag.a.id.Load().cert.Leaf.SerialNumber.Text(16); got != newSerial {
+		t.Errorf("the agent's certificate moved to %q", got)
+	}
+	if renews() != 1 {
+		t.Errorf("renew frames stepped = %d, want still 1", renews())
+	}
+	noFailedSteps(t, r.em, r.nodeID)
+}
+
+// 7b. The answer to a renewal is lost: the panel committed the new certificate, the socket closed before the agent saw
+// it. The agent still holds the old key, whose certificate stays valid for the grace, so it reconnects, renews again on
+// it and is not locked out; when the grace is over the certificate it holds is the newest one.
+func TestEdgeLinkLostRenewAnswerDoesNotLockTheAgentOut(t *testing.T) {
+	// A quiet agent (no stats, no automatic renewal: its certificate is fresh), so that the one frame step the failure
+	// meets is the renew frame.
+	r := newEdgeRig(t, edgeOpts{liveness: 3600, statsEvery: time.Hour})
+	ag := r.start(nil)
+	eventually(t, func() bool {
+		rev, _ := r.applied()
+		return ag.eng.has("inb_edge") && rev > 0 && r.session() == 1 && agentFirstUnacked(ag.a) == 0
+	}, "connected, applied and acknowledged: the agent has nothing more to say")
+	agentSerial := func() string { return ag.a.id.Load().cert.Leaf.SerialNumber.Text(16) }
+	nodeSerial := func() string {
+		var s string
+		if err := r.st.R.QueryRowContext(context.Background(), `SELECT coalesce(cert_serial, '') FROM node WHERE id = ?`, r.nodeID).Scan(&s); err != nil {
+			t.Errorf("node: %v", err)
+		}
+		return s
+	}
+	enrolled := agentSerial()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	r.em.failNext(r.nodeID, fleet.LinkFrame)
+	if err := ag.a.renew(ctx); err == nil {
+		t.Fatal("the renewal succeeded although its answer was dropped")
+	}
+	lost := nodeSerial()
+	if lost == enrolled || agentSerial() != enrolled {
+		t.Fatalf("serials: panel %q, agent %q, enrolled %q: the panel must have committed a certificate the agent never got", lost, agentSerial(), enrolled)
+	}
+	eventually(t, func() bool { return r.session() == 2 && ag.a.cur.Load() != nil }, "the agent reconnects as generation 2 on its old certificate")
+
+	// The retry (the next renewLoop tick) runs on the old certificate, inside the grace.
+	if err := ag.a.renew(ctx); err != nil {
+		t.Fatalf("the retry on the old certificate: %v", err)
+	}
+	if got := agentSerial(); got == enrolled || got == lost || got != nodeSerial() {
+		t.Fatalf("after the retry: agent %q, panel %q, lost one %q, enrolled %q", got, nodeSerial(), lost, enrolled)
+	}
+	newest := agentSerial()
+
+	// Past the grace both older certificates are revoked; the session on the old one is ended by the next step's
+	// recheck, and the agent comes back on the newest certificate.
+	r.em.advance(3*time.Hour + time.Minute)
+	_, _ = r.f.RunDoctor(ctx, r.nodeID, nil, 5*time.Second) // any step does: this one meets the recheck
+	eventually(t, func() bool { return r.session() == 3 }, "the agent reconnects as generation 3")
+	if got := agentSerial(); got != newest {
+		t.Errorf("the agent's certificate moved to %q", got)
+	}
+	closes := r.em.closes(r.nodeID)
+	if !slices.ContainsFunc(closes, func(c emuClose) bool { return c.Gen == 2 && c.Reason == "client certificate revoked" }) {
+		t.Errorf("closes = %+v, want generation 2 refused by the recheck", closes)
+	}
+	if n := countSteps(r.em.steps(r.nodeID), func(st emuStep) bool { return st.Err }); n != 1 {
+		t.Errorf("failed steps = %d, want only the injected one", n)
+	}
+	eventually(t, func() bool { return slices.ContainsFunc(r.em.steps(r.nodeID), stepIs(3, fleet.LinkFrame, "hello")) }, "generation 3 says Hello: the agent is not locked out")
 }

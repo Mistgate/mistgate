@@ -124,29 +124,43 @@ func insertCertStmt(c CertRow) Stmt {
 		Args: []any{c.Serial, c.NodeID, c.CAID, c.PEM, unix(c.NotBefore), unix(c.NotAfter), unix(c.IssuedAt)}}
 }
 
+// ErrRenewRefused: the certificate that asked for a renewal is no longer valid for its node (revoked, expired, unknown,
+// or the node is retired), or the node already got RenewMax certificates in the last RenewWindow.
+var ErrRenewRefused = errors.New("store: certificate renewal refused")
+
+const (
+	RenewWindow = time.Hour
+	RenewMax    = 4 // certificates issued to one node (enrolment or renewal) inside RenewWindow, the new one excluded
+)
+
 // RenewCert records a certificate issued by Renew and makes it the node's current one. The node's other
 // certificates are scheduled for revocation grace after now (a lost response must not lock the agent out,
 // a stolen key must not live out its 30 days): revoked_at is set in the future and CertStatus honours it
 // from then on. A certificate that is already scheduled keeps its earlier time, so renewing again with
 // the old certificate does not extend it.
-func (s *Store) RenewCert(ctx context.Context, c CertRow, now time.Time, grace time.Duration) error {
-	tx, err := s.W.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+//
+// One guarded batch (the mTLS Renew and the link's renew frame both end here): fromSerial, the certificate that
+// presented the request, must still be valid for this node at now (a certificate inside a renewal's grace may renew:
+// the agent retries after a lost answer; a re-enrolment or retirement revokes outright, so a renewal that read its
+// clock before that commit still cannot pass), and the node must not be retired. A re-enrolment or retirement that committed
+// before this batch therefore cannot be undone by a renewal that was already in flight. The node also gets at most
+// RenewMax certificates per RenewWindow, so a stolen key cannot grow node_cert without bound. Refusal: ErrRenewRefused.
+func (s *Store) RenewCert(ctx context.Context, c CertRow, fromSerial string, now time.Time, grace time.Duration) error {
+	_, err := s.batch(ctx,
+		guard(`EXISTS (SELECT 1 FROM node_cert c JOIN node n ON n.id = c.node_id
+			WHERE c.serial = ? AND c.node_id = ? AND n.state <> 'retired' AND c.not_after > ?
+				AND (c.revoked_at IS NULL OR (c.revoke_reason = 'renewed' AND c.revoked_at > ?)))
+			AND (SELECT count(*) FROM node_cert WHERE node_id = ? AND issued_at > ?) < ?`,
+			fromSerial, c.NodeID, unix(now), unix(now), c.NodeID, unix(now.Add(-RenewWindow)), RenewMax),
+		insertCertStmt(c),
+		Stmt{Query: `UPDATE node_cert SET revoked_at = ?, revoke_reason = 'renewed' WHERE node_id = ? AND serial <> ? AND revoked_at IS NULL`,
+			Args: []any{unix(now.Add(grace)), c.NodeID, c.Serial}},
+		Stmt{Query: `UPDATE node SET cert_serial = ? WHERE id = ?`, Args: []any{c.Serial, c.NodeID}},
+	)
+	if errors.Is(err, errGuard) {
+		return ErrRenewRefused
 	}
-	defer tx.Rollback()
-	if err := insertCert(ctx, tx, c); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE node_cert SET revoked_at = ?, revoke_reason = 'renewed' WHERE node_id = ? AND serial <> ? AND revoked_at IS NULL`,
-		unix(now.Add(grace)), c.NodeID, c.Serial); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE node SET cert_serial = ? WHERE id = ?`, c.Serial, c.NodeID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
 // CertState is what the panel knows about an issued certificate.

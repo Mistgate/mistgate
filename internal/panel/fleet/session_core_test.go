@@ -1835,7 +1835,7 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 
 // A new ConnectResponse message must be either an allowlisted admin request or a frame only the panel itself sends.
 func TestSessionCoreAllowlistCoversEveryFrame(t *testing.T) {
-	notRequests := map[protoreflect.Name]bool{"hello_ack": true, "ack": true, "desired_state": true, "kick": true, "log_cancel": true, "ping": true}
+	notRequests := map[protoreflect.Name]bool{"hello_ack": true, "ack": true, "desired_state": true, "kick": true, "log_cancel": true, "ping": true, "renew": true}
 	fields := (&agentv1.ConnectResponse{}).ProtoReflect().Descriptor().Oneofs().ByName("message").Fields()
 	for i := range fields.Len() {
 		fd := fields.Get(i)

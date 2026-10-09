@@ -178,6 +178,11 @@ type Agent struct {
 	resetAfter   time.Duration // 0 = 1 min: a session that lived this long resets the reconnect delay
 
 	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
+
+	renewMu      sync.Mutex
+	renewReply   chan *pb.RenewResponse // the link renewal waiting for its answer (identity.go), nil = none
+	renewTimeout time.Duration          // 0 = 2 min: how long a link renewal waits for the answer
+	renewRetry   time.Duration          // 0 = 20 s: how soon a link renewal that found no session is tried again
 }
 
 const (
@@ -272,6 +277,12 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	id, err := loadIdentity(cfg.StateDir)
 	if err != nil {
 		return nil, err
+	}
+	if id.meta.Link != "" { // enrolled over the link: that address is the only way to the panel
+		if _, err := parseLinkBase(id.meta.Link); err != nil {
+			return nil, fmt.Errorf("%s link: %w", fileMeta, err)
+		}
+		cfg.LinkURL = id.meta.Link
 	}
 	inst := make([]byte, 16)
 	_, _ = rand.Read(inst)
@@ -463,7 +474,7 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		if errors.Is(err, errSwitchTransport) {
 			continue
 		}
-		if errors.Is(err, errLinkNotEstablished) {
+		if errors.Is(err, errLinkNotEstablished) && !a.linkOnly() {
 			// session() has noted the failure, so the next session is mTLS until the hold period is over: no backoff
 			// wait, and none of the growth it would add to the delay of later real failures.
 			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
@@ -657,7 +668,14 @@ func (s *session) writer() {
 	}
 }
 
+// linkOnly reports an agent that enrolled over the link: it always dials the link (no mTLS, no hold period, whatever
+// the panel advertises).
+func (a *Agent) linkOnly() bool { return a.meta.Link != "" }
+
 func (a *Agent) session(ctx context.Context) error {
+	if a.linkOnly() {
+		return a.linkSession(ctx)
+	}
 	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSession(ctx)
 		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
@@ -897,6 +915,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		s.cancelLog(m.LogCancel.RequestId)
 	case *pb.ConnectResponse_Ping:
 		s.send(&pb.ConnectRequest{Message: &pb.ConnectRequest_Pong{Pong: &pb.Pong{Nonce: m.Ping.Nonce}}})
+	case *pb.ConnectResponse_Renew:
+		a.onRenewReply(m.Renew)
 	case *pb.ConnectResponse_HelloAck:
 		a.log.Warn("unexpected second HelloAck ignored")
 	default:

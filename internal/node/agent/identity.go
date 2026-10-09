@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,9 @@ type Meta struct {
 	Panel  string `json:"panel"`   // host:port
 	SNI    string `json:"sni"`     // secret agent SNI
 	NodeID string `json:"node_id"` // informational; the certificate is authoritative
+	// Link is the wss://host/<secret-prefix>/ the agent enrolled through. Set = link-only: the agent never dials mTLS
+	// (Panel and SNI are empty), renews over its link session and lists no self-update.
+	Link string `json:"link,omitempty"`
 }
 
 type identity struct {
@@ -80,6 +84,11 @@ type EnrollConfig struct {
 	Force            bool   // overwrite an existing identity
 	ResumePendingKey bool   // persist and reuse the CSR key if enrollment is interrupted
 	Timeout          time.Duration
+	// LinkURL (wss://host/<secret-prefix>/) enrols over the panel's public link route instead of the pinned mTLS
+	// endpoint: system-root TLS carries the token, the CA pin then vouches for the panel. Exclusive with Panel and SNI.
+	LinkURL string
+
+	httpClient *http.Client // test seam for LinkURL; nil = system roots
 }
 
 // Enroll generates a P-256 key and a CSR, exchanges the one-time token for a node certificate over TLS
@@ -89,11 +98,27 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 	if err != nil {
 		return Meta{}, err
 	}
-	if _, _, err := net.SplitHostPort(cfg.Panel); err != nil {
-		return Meta{}, fmt.Errorf("--panel must be host:port: %w", err)
-	}
-	if cfg.SNI == "" || cfg.Token == "" || cfg.StateDir == "" {
-		return Meta{}, errors.New("panel SNI, token and state dir are required")
+	var enrollBase string // the Connect base URL; the client is chosen below
+	if cfg.LinkURL != "" {
+		if cfg.Panel != "" || cfg.SNI != "" {
+			return Meta{}, errors.New("--link-url cannot be combined with --panel or --sni")
+		}
+		u, err := parseLinkBase(cfg.LinkURL)
+		if err != nil {
+			return Meta{}, fmt.Errorf("--link-url: %w", err)
+		}
+		enrollBase = "https://" + u.Host + strings.TrimRight(u.Path, "/")
+		if cfg.Token == "" || cfg.StateDir == "" {
+			return Meta{}, errors.New("token and state dir are required")
+		}
+	} else {
+		if _, _, err := net.SplitHostPort(cfg.Panel); err != nil {
+			return Meta{}, fmt.Errorf("--panel must be host:port: %w", err)
+		}
+		if cfg.SNI == "" || cfg.Token == "" || cfg.StateDir == "" {
+			return Meta{}, errors.New("panel SNI, token and state dir are required")
+		}
+		enrollBase = "https://" + cfg.Panel
 	}
 	if cfg.Version == "" {
 		cfg.Version = buildinfo.Version
@@ -117,15 +142,31 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 		return Meta{}, err
 	}
 
-	client := newHTTPClient(pinnedTLS(cfg.SNI, pin), cfg.Timeout, nil)
+	var client *http.Client
+	if cfg.LinkURL != "" {
+		client = cfg.httpClient
+		if client == nil {
+			client = newHTTPClient(&tls.Config{MinVersion: tls.VersionTLS12}, cfg.Timeout, nil)
+		}
+		// The token is in the body: never follow a redirect with it.
+		c := *client
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		client = &c
+	} else {
+		client = newHTTPClient(pinnedTLS(cfg.SNI, pin), cfg.Timeout, nil)
+	}
 	defer client.CloseIdleConnections()
 	cctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	resp, err := agentv1connect.NewEnrollmentServiceClient(client, "https://"+cfg.Panel).Enroll(cctx,
+	resp, err := agentv1connect.NewEnrollmentServiceClient(client, enrollBase, connect.WithReadMaxBytes(1<<20)).Enroll(cctx,
 		connect.NewRequest(&pb.EnrollRequest{
 			EnrollmentToken: cfg.Token, CsrDer: csr, AgentVersion: cfg.Version, ApiVersion: apiVersion,
 		}))
 	if err != nil {
+		var urlErr *url.Error
+		if cfg.LinkURL != "" && errors.As(err, &urlErr) {
+			err = urlErr.Err // the URL holds the secret path prefix: it must not reach a terminal or a log
+		}
 		return Meta{}, fmt.Errorf("enroll: %w", err)
 	}
 	m := resp.Msg
@@ -137,7 +178,7 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 		return Meta{}, fmt.Errorf("panel CA certificate: %w", err)
 	}
 	if sum := sha256.Sum256(caCert.Raw); subtle.ConstantTimeCompare(sum[:], pin[:]) != 1 {
-		return Meta{}, errors.New("the CA returned by the panel does not match --ca-sha256")
+		return Meta{}, errors.New("the CA returned by the panel does not match --ca-sha256 (the enrolment token is used up: create a new enrolment token)")
 	}
 	pool := x509.NewCertPool()
 	pool.AddCert(caCert)
@@ -145,7 +186,7 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 		return Meta{}, fmt.Errorf("issued certificate: %w", err)
 	}
 
-	meta := Meta{Panel: cfg.Panel, SNI: cfg.SNI, NodeID: m.NodeId}
+	meta := Meta{Panel: cfg.Panel, SNI: cfg.SNI, NodeID: m.NodeId, Link: cfg.LinkURL}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return Meta{}, err
 	}
@@ -374,25 +415,40 @@ func (a *Agent) mtlsConfig() *tls.Config {
 // renewLoop renews the certificate when less than renewBefore remains. A new key is generated every time.
 func (a *Agent) renewLoop(ctx context.Context) {
 	for {
+		wait := a.renewEvery
 		if until := time.Until(a.id.Load().notAfter()); until < renewBefore {
 			if err := a.renew(ctx); err != nil {
 				a.log.Warn("certificate renewal failed", "err", err, "expires_in", until.Round(time.Minute))
+				if errors.Is(err, errNoSession) { // a link-only agent back from an outage: do not wait an hour for its session
+					wait = min(wait, a.renewNoSessionWait())
+				}
 			}
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(a.renewEvery):
+		case <-time.After(wait):
 		}
 	}
 }
 
+var errNoSession = errors.New("no panel session to renew on")
+
+func (a *Agent) renewNoSessionWait() time.Duration {
+	if a.renewRetry > 0 {
+		return a.renewRetry
+	}
+	return 20 * time.Second
+}
+
 func (a *Agent) renew(ctx context.Context) error {
+	if a.linkOnly() {
+		return a.renewOverLink(ctx)
+	}
 	key, csr, err := newKeyAndCSR()
 	if err != nil {
 		return err
 	}
-	cur := a.id.Load()
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), nil)
 	defer client.CloseIdleConnections()
@@ -403,10 +459,69 @@ func (a *Agent) renew(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := checkLeaf([]byte(resp.Msg.CertificatePem), key, cur.ca); err != nil {
+	return a.installRenewed(key, resp.Msg.CertificatePem)
+}
+
+// renewOverLink asks for a new certificate on the current link session (a link-only agent has no mTLS Renew) and
+// waits up to two minutes for the answer. With no session the hourly renewLoop tries again.
+func (a *Agent) renewOverLink(ctx context.Context) error {
+	s := a.cur.Load()
+	if s == nil {
+		return errNoSession
+	}
+	key, csr, err := newKeyAndCSR()
+	if err != nil {
+		return err
+	}
+	reply := make(chan *pb.RenewResponse, 1)
+	a.renewMu.Lock()
+	a.renewReply = reply
+	a.renewMu.Unlock()
+	defer func() {
+		a.renewMu.Lock()
+		a.renewReply = nil
+		a.renewMu.Unlock()
+	}()
+	s.send(&pb.ConnectRequest{Message: &pb.ConnectRequest_Renew{Renew: &pb.RenewRequest{CsrDer: csr}}})
+	t := time.NewTimer(a.renewWait())
+	defer t.Stop()
+	select {
+	case r := <-reply:
+		return a.installRenewed(key, r.CertificatePem)
+	case <-s.ctx.Done():
+		return errors.New("session ended before the renewed certificate arrived")
+	case <-t.C:
+		return errors.New("no renewed certificate in time")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (a *Agent) renewWait() time.Duration {
+	if a.renewTimeout > 0 {
+		return a.renewTimeout
+	}
+	return 2 * time.Minute
+}
+
+// onRenewReply hands a RenewResponse of the session to the renewal that waits for it (a late or unasked one is dropped).
+func (a *Agent) onRenewReply(r *pb.RenewResponse) {
+	a.renewMu.Lock()
+	defer a.renewMu.Unlock()
+	if a.renewReply != nil {
+		select {
+		case a.renewReply <- r:
+		default:
+		}
+	}
+}
+
+// installRenewed checks a renewed certificate against our new key, stores it and makes it current.
+func (a *Agent) installRenewed(key *ecdsa.PrivateKey, certPEM string) error {
+	if _, err := checkLeaf([]byte(certPEM), key, a.id.Load().ca); err != nil {
 		return fmt.Errorf("renewed certificate: %w", err)
 	}
-	if err := writeFileAtomic(filepath.Join(a.cfg.StateDir, fileIdentity), identityPEM(key, resp.Msg.CertificatePem), 0o600); err != nil {
+	if err := writeFileAtomic(filepath.Join(a.cfg.StateDir, fileIdentity), identityPEM(key, certPEM), 0o600); err != nil {
 		return err
 	}
 	next, err := loadIdentity(a.cfg.StateDir)

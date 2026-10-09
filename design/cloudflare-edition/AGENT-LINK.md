@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
 Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Step 5 is designed in §6
-(5a, the driver, and 5b, the emulator test, are implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
+(5a, the driver, and 5b, the emulator test, are merged; 5c, link-only agents, is implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -55,6 +55,8 @@ timer would keep all of them awake. A second slim wasm would double the build an
   - IngestStats: one read batch, then one write batch guarded on the instance and `last_seq` it read; the inbound
     certificates and AWG device touches ride in it;
   - IngestEvent, NodeHello, CreateEnrollment and RetireNode: one batch each;
+  - RenewCert (an agent renewing its certificate over the link): one 4-statement guarded batch (the guard, the new
+    certificate row, the older ones scheduled for revocation, `node.cert_serial`); the guard is described in §6.2;
   - Enroll: read, sign, then a guarded batch.
 - **Constraint.** A step must never await a call into the same node's NodeLink (deadlock until the block budget runs
   out); fan-out goes through `waitUntil`.
@@ -71,7 +73,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4a | Write the `node_live` projection (sidecar kept, compared by a test) | merged (2026-10-08) |
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
-| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a merged, 5b implemented, 5c next |
+| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a, 5b merged; 5c implemented |
 | 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
@@ -237,7 +239,7 @@ page).
 
 ## 6. Step 5 design: the stateless edge driver and link-only agents
 
-Status (2026-10-09): designed; round 5a (the driver) is merged, 5b (the emulator test) is implemented, 5c is next. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
+Status (2026-10-09): designed; rounds 5a (the driver) and 5b (the emulator test) are merged, 5c (link-only agents) is implemented. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
 Lead decisions on the open questions are in §6.5.
 
 ### 6.1 The driver (`internal/panel/fleet/link_driver.go`)
@@ -359,11 +361,21 @@ Panel:
   --ca-sha256 <fp> --token <t> && … install`, built from a new `Config.LinkURL` (`wss://` + PublicURL host + LinkPrefix).
 - mTLS enrolment is already refused on the edge (no agent SNI → `agentMiddleware` 404); a test pins this.
 - Renew over the link: proto, additive: `ConnectRequest.renew` (RenewRequest) and `ConnectResponse.renew`
-  (RenewResponse). A new `agentFrame` case runs `parseCSR`, `ca.issueNode`, `st.RenewCert(cert, now, oldCertGrace)` and
-  sends the answer. RenewCert is already one 3-statement batch on D1 (add it to the §2 "Store on D1" list). A bad CSR
-  closes with InvalidArgument, a store error with Internal. The session keeps the old serial; its recheck ends the
+  (RenewResponse). A new `agentFrame` case runs `parseCSR`, `ca.issueNode`, `st.RenewCert(cert, fromSerial, now, oldCertGrace)` and
+  sends the answer. RenewCert is one guarded 4-statement batch on D1 (§2 "Store on D1"). A bad CSR closes with
+  InvalidArgument, a refusal (below) with FailedPrecondition, a store error with Internal. The session keeps the old serial; its recheck ends the
   session when the grace runs out and the agent comes back on the new certificate (as an mTLS stream does today). An old
   panel ignores the frame; the agent times out and retries in an hour.
+- Renew guard (both paths, one place: the RenewCert batch). The certificate that presented the request (`fromSerial`: the
+  mTLS peer certificate, or the session's `PeerCertSerial`) must still be valid for the node (known, not expired, not
+  revoked; a certificate inside its renewal grace counts as valid, so a retry after a lost answer works) and the node must
+  not be retired; and the node may get at most 4 certificates (enrolment or renewal) per hour. Without the guard a renew
+  frame already queued when the owner re-enrolled the node (the edge `drop` waits behind frames) would commit a
+  certificate for an old, possibly stolen key and schedule the re-enrolment certificate for revocation. Refusal is
+  `store.ErrRenewRefused`: FailedPrecondition on both paths, nothing written.
+- Renewal grace is `oldCertGrace` = 3 hours. A renewal whose answer is lost leaves the agent with the old key only; it
+  asks again on the next renewLoop tick (an hour, 20 s without a session), so the old certificate must outlast that tick.
+  Re-enrolment and retirement still revoke every certificate at once.
 
 Agent (`cmd/mistgate-node`, `internal/node/agent`):
 - `enroll --link-url wss://de1.example.com/<prefix>/ --ca-sha256 … (--token | --token-stdin)`; `--link-url` cannot be
@@ -377,6 +389,28 @@ Agent (`cmd/mistgate-node`, `internal/node/agent`):
   the next hourly tick (10 days of slack).
 - `capabilities()` leaves out `update/1` for link-only agents (FetchUpdate is mTLS; owner decision 2).
 - VPS agents are unchanged: `Meta.Link` is empty, every branch behaves as today.
+
+Implementation notes (5c), decisions the design left open:
+- **Proto.** `ConnectRequest.renew = 18` (RenewRequest), `ConnectResponse.renew = 27` (RenewResponse); the Go code only is
+  regenerated (`go tool buf generate` with the Go plugins of `buf.gen.yaml`). `web/src/gen/.../agent_pb.ts` is the same
+  output (the lead ran it; `web/src/gen/.../agent_pb.ts` is current).
+- **Enrol route.** `Fleet.LinkHandler` answers the enrol POST first (a Connect unary handler over the same
+  `enrollmentService.Enroll`, request cap 16 KiB), then the link socket (VPS) or the marker (edge). `httpserver.agentLinkRequest`
+  admits exactly `/mistgate.agent.v1.EnrollmentService/Enroll`; any other method on it, and Renew, are 404 and become the decoy.
+- **Install command.** `fleet.Config.LinkURL` (`wss://` + PublicURL host + `LinkPrefix`, built in `app.Build`) is used only when
+  `Remote != nil`: then `CreateEnrollment` needs the link address instead of `PanelAddr`. SSH provisioning still builds the mTLS command.
+- **Renew in the core.** `Fleet.renewNodeCert` is shared by the mTLS `Renew` and the new `agentFrame` case. A bad CSR closes
+  InvalidArgument with the CSR error text (never the bytes), a store error Internal ("internal error"); the session state keeps
+  `PeerCertSerial`. A renew frame is not a request kind (it is `ConnectResponse.renew` going to the agent): the 4c allowlist test lists it with the
+  panel-sent frames.
+- **Agent.** `New` takes `meta.Link` as `Config.LinkURL` (the flag or environment link of `run` is overridden). `linkOnly()` is
+  `meta.Link != ""`: `session()` always calls `linkSession`; `connectLoop` backs off on `errLinkNotEstablished` like on any lost
+  connection. `capabilities()` leaves out `update/1` and `update-guard/1` (the guard only makes sense with the update). The enrol
+  client for `--link-url` follows no redirect (the token is in the body). A renewal whose answer is lost with the session leaves
+  the agent on the old key: the old certificate is valid for the 3-hour grace, so the next try (renewLoop, hourly) works; scenario 7b
+  covers it. A link-only agent that finds no session retries after 20 s, not an hour. The enrol client reads at most 1 MiB, the
+  panel's enrol route at most 32 KiB; a transport error is printed without the URL (its path is the secret prefix); a pin
+  mismatch says the token is used up.
 
 ### 6.3 The Go NodeLink emulator test
 
@@ -405,7 +439,7 @@ The emulator implements `fleet.Remote` and plays the Worker and NodeLink:
 Scenarios (real agent, fake engine, short stats interval):
 1. Enrol → Hello → desired → stats → ask: `node_live.session = 1`, the inbound applied, the sample in `node_live` and
    traffic rows; `f.RunDoctor` returns the agent's report through `Replies`. (5b: mTLS enrolment with the link preset;
-   5c: link enrolment.)
+   5c: link enrolment, `enroll --link-url`; every scenario below runs with a link-only agent.)
 2. Reconnect with a delta base: `reset()`, the alarm drops the session, the agent reconnects as gen 2, its Hello matches
    the digest, no DesiredState; a new credential + poke gives a delta with `BaseRevision`; a desired step that fails after
    its writes committed (`failNext`) closes 1011 and sends nothing, the agent reconnects, its Hello does not match the
@@ -421,7 +455,10 @@ Scenarios (real agent, fake engine, short stats interval):
    agent comes back as gen 3.
 6. Failed step: `failNext()` during stats → 1011, queued frames dropped, reconnect, every batch counted exactly once.
 7. (5c) Renew over the link: a new `cert_serial`; after the grace one frame's recheck closes the old session and the agent
-   reconnects with the new certificate.
+   reconnects with the new certificate. Scenario 7b: the answer is lost (the step commits, the socket closes 1011), the
+   agent reconnects on the old certificate, renews again inside the grace and is still accepted after it. The agent enrols with the emulated clock 25 days back, so its certificate is five
+   days from the end and the renewal loop (20 ms here) asks at once; its first tries come before the session exists and
+   find none.
 
 Implementation notes (5b), decisions the design left open and where the emulator differs from `nodelink.ts`:
 - **Port, not model.** Every method of the emulator's `linkObject` is a port of the method of the same name in
@@ -451,7 +488,7 @@ Implementation notes (5b), decisions the design left open and where the emulator
 - **The step log** is `[]{Gen, Kind, Msg, Err}` (`Msg` is the oneof field of the frame or request); the emulator also keeps
   the frames it sent per generation, the closes it asked for, the close events it heard, the count of dropped messages, and
   a snapshot of the object's storage.
-- **Agent set-up.** The agent is enrolled over mTLS (the Enroll route of a TLS server with the agent SNI), its
+- **Agent set-up (5b; 5c replaced it with link enrolment and a link-only agent).** The agent is enrolled over mTLS (the Enroll route of a TLS server with the agent SNI), its
   `AgentService` stream is not served (the edge has none), and it starts with `linkAdvertised` set and a 100 ms hold: the
   HelloAck that advertises the link comes from an mTLS session on the VPS. Keys of the raw clients are the agent's own.
 - **Beyond the list above**, the file also covers: a close from the panel (`Remote.Close`, the re-enrolment path), sockets
@@ -465,9 +502,9 @@ Implementation notes (5b), decisions the design left open and where the emulator
 |---|---|---|---|
 | 5a | `link_driver.go` (types, `Link`, close mapping); `LinkHandler` answers with the marker when `Remote != nil` | driver tests on SQLite: open keeps only Poison; Hello and desired in one call, HelloAck first; desired before Hello does nothing; refusal and Retire replied in the same call; CommandResult reply bytes; expiry gives a nil reply; close codes; a 300-byte reason is clipped; closed with RetireAt gives Forget; closing an old generation keeps the new row; `Preparing` is never stored; a bad frame closes 1008; a bad state is an error; JSON round trip | the Hello-then-desired order lives in two adapters; effect handling can drift between them |
 | 5b (implemented) | emulator and scenarios 1-6 with today's agent | scenarios pass under `-race`; existing VPS link tests unchanged | the emulator encodes our reading of Durable Object semantics; step 6 checks it against workerd |
-| 5c | proto renew fields; core renew case; enrol route; `Config.LinkURL` and the link install command; agent `enroll --link-url`, `Meta.Link`, link-only session, backoff, renew, capabilities; scenarios 1 and 7 on link enrolment | the enrol path reaches the handler, everything else under the prefix gets the decoy; flags cannot be combined; a pin mismatch is refused; a link-only agent never dials mTLS and backs off on a dead panel; renew with a good CSR, a bad CSR, a store error; VPS install command unchanged; mTLS enrol without SNI gets 404 | a public enrol route on the VPS (§6.5 Q1); renew against an old panel only times out |
+| 5c (implemented) | proto renew fields; core renew case; enrol route; `Config.LinkURL` and the link install command; agent `enroll --link-url`, `Meta.Link`, link-only session, backoff, renew, capabilities; scenarios 1 and 7 on link enrolment | the enrol path reaches the handler, everything else under the prefix gets the decoy; flags cannot be combined; a pin mismatch is refused; a link-only agent never dials mTLS and backs off on a dead panel; renew with a good CSR, a bad CSR, a store error; VPS install command unchanged; mTLS enrol without SNI gets 404 | a public enrol route on the VPS (§6.5 Q1); renew against an old panel only times out |
 
-Every round passes the §3 gate. The only store statements on a new path are RenewCert's existing batch; bridge query
+Every round passes the §3 gate. The only store statements on a new path are RenewCert's guarded batch; bridge query
 budgets are untouched.
 
 ### 6.5 Decisions on the open questions
@@ -477,7 +514,8 @@ budgets are untouched.
 2. An offline retire leaves under 300 B in NodeLink storage: accepted (lead).
 3. `Link` returns an error; the §3 row is amended (lead).
 4. Edge close codes 4000/1011/1008 (lead).
-5. Renew keeps the old serial until the grace runs out (one reconnect about 10 minutes after each renewal) (lead).
+5. Renew keeps the old serial until the grace runs out (one reconnect about 3 hours after each renewal; the grace was 10
+   minutes until the review of 5c, which showed a lost answer would lock the agent out) (lead).
 
 ### 6.6 Carried to step 6
 

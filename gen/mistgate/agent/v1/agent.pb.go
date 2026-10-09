@@ -681,6 +681,7 @@ type ConnectRequest struct {
 	//	*ConnectRequest_LogChunk
 	//	*ConnectRequest_Pong
 	//	*ConnectRequest_DoctorReport
+	//	*ConnectRequest_Renew
 	Message       isConnectRequest_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -802,6 +803,15 @@ func (x *ConnectRequest) GetDoctorReport() *DoctorReport {
 	return nil
 }
 
+func (x *ConnectRequest) GetRenew() *RenewRequest {
+	if x != nil {
+		if x, ok := x.Message.(*ConnectRequest_Renew); ok {
+			return x.Renew
+		}
+	}
+	return nil
+}
+
 type isConnectRequest_Message interface {
 	isConnectRequest_Message()
 }
@@ -839,6 +849,15 @@ type ConnectRequest_DoctorReport struct {
 	DoctorReport *DoctorReport `protobuf:"bytes,17,opt,name=doctor_report,json=doctorReport,proto3,oneof"`
 }
 
+type ConnectRequest_Renew struct {
+	// Certificate renewal over the signed link: link-only agents have no mTLS Renew call. Answered with one
+	// ConnectResponse.renew, or by closing the session (INVALID_ARGUMENT for a bad CSR, FAILED_PRECONDITION when the
+	// presenting certificate is no longer valid for this node or the hourly renewal quota is spent, INTERNAL for a
+	// store error).
+	// A panel that predates the field ignores the frame; the agent gives up after two minutes and retries later.
+	Renew *RenewRequest `protobuf:"bytes,18,opt,name=renew,proto3,oneof"`
+}
+
 func (*ConnectRequest_Hello) isConnectRequest_Message() {}
 
 func (*ConnectRequest_Stats) isConnectRequest_Message() {}
@@ -854,6 +873,8 @@ func (*ConnectRequest_LogChunk) isConnectRequest_Message() {}
 func (*ConnectRequest_Pong) isConnectRequest_Message() {}
 
 func (*ConnectRequest_DoctorReport) isConnectRequest_Message() {}
+
+func (*ConnectRequest_Renew) isConnectRequest_Message() {}
 
 type Hello struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2676,6 +2697,7 @@ type ConnectResponse struct {
 	//	*ConnectResponse_MeasureBandwidth
 	//	*ConnectResponse_UdpCount
 	//	*ConnectResponse_UdpSend
+	//	*ConnectResponse_Renew
 	Message       isConnectResponse_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2871,6 +2893,15 @@ func (x *ConnectResponse) GetUdpSend() *UdpSend {
 	return nil
 }
 
+func (x *ConnectResponse) GetRenew() *RenewResponse {
+	if x != nil {
+		if x, ok := x.Message.(*ConnectResponse_Renew); ok {
+			return x.Renew
+		}
+	}
+	return nil
+}
+
 type isConnectResponse_Message interface {
 	isConnectResponse_Message()
 }
@@ -2948,6 +2979,12 @@ type ConnectResponse_UdpSend struct {
 	UdpSend *UdpSend `protobuf:"bytes,26,opt,name=udp_send,json=udpSend,proto3,oneof"`
 }
 
+type ConnectResponse_Renew struct {
+	// The answer to ConnectRequest.renew. The session keeps its old certificate serial until the old certificate's
+	// grace period ends; the agent then reconnects with the new one.
+	Renew *RenewResponse `protobuf:"bytes,27,opt,name=renew,proto3,oneof"`
+}
+
 func (*ConnectResponse_HelloAck) isConnectResponse_Message() {}
 
 func (*ConnectResponse_Ack) isConnectResponse_Message() {}
@@ -2981,6 +3018,8 @@ func (*ConnectResponse_MeasureBandwidth) isConnectResponse_Message() {}
 func (*ConnectResponse_UdpCount) isConnectResponse_Message() {}
 
 func (*ConnectResponse_UdpSend) isConnectResponse_Message() {}
+
+func (*ConnectResponse_Renew) isConnectResponse_Message() {}
 
 // Ask the node to measure its download and upload speed to a public test server. Answered with one CommandResult; see
 // "BANDWIDTH TEST".
@@ -5264,7 +5303,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\rRenewResponse\x12'\n" +
 	"\x0fcertificate_pem\x18\x01 \x01(\tR\x0ecertificatePem\x12$\n" +
 	"\x0enot_after_unix\x18\x02 \x01(\x03R\fnotAfterUnix\x12(\n" +
-	"\x10renew_after_unix\x18\x03 \x01(\x03R\x0erenewAfterUnix\"\x8b\x04\n" +
+	"\x10renew_after_unix\x18\x03 \x01(\x03R\x0erenewAfterUnix\"\xc4\x04\n" +
 	"\x0eConnectRequest\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\x04R\x03seq\x120\n" +
 	"\x05hello\x18\n" +
@@ -5275,7 +5314,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0ecommand_result\x18\x0e \x01(\v2 .mistgate.agent.v1.CommandResultH\x00R\rcommandResult\x12:\n" +
 	"\tlog_chunk\x18\x0f \x01(\v2\x1b.mistgate.agent.v1.LogChunkH\x00R\blogChunk\x12-\n" +
 	"\x04pong\x18\x10 \x01(\v2\x17.mistgate.agent.v1.PongH\x00R\x04pong\x12F\n" +
-	"\rdoctor_report\x18\x11 \x01(\v2\x1f.mistgate.agent.v1.DoctorReportH\x00R\fdoctorReportB\t\n" +
+	"\rdoctor_report\x18\x11 \x01(\v2\x1f.mistgate.agent.v1.DoctorReportH\x00R\fdoctorReport\x127\n" +
+	"\x05renew\x18\x12 \x01(\v2\x1f.mistgate.agent.v1.RenewRequestH\x00R\x05renewB\t\n" +
 	"\amessage\"\x8e\x04\n" +
 	"\x05Hello\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12#\n" +
@@ -5465,7 +5505,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x1c\n" +
 	"\x04Pong\x12\x14\n" +
-	"\x05nonce\x18\x01 \x01(\x04R\x05nonce\"\xd7\b\n" +
+	"\x05nonce\x18\x01 \x01(\x04R\x05nonce\"\x91\t\n" +
 	"\x0fConnectResponse\x12:\n" +
 	"\thello_ack\x18\n" +
 	" \x01(\v2\x1b.mistgate.agent.v1.HelloAckH\x00R\bhelloAck\x12*\n" +
@@ -5487,7 +5527,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x12prepare_awg_kernel\x18\x17 \x01(\v2#.mistgate.agent.v1.PrepareAwgKernelH\x00R\x10prepareAwgKernel\x12R\n" +
 	"\x11measure_bandwidth\x18\x18 \x01(\v2#.mistgate.agent.v1.MeasureBandwidthH\x00R\x10measureBandwidth\x12:\n" +
 	"\tudp_count\x18\x19 \x01(\v2\x1b.mistgate.agent.v1.UdpCountH\x00R\budpCount\x127\n" +
-	"\budp_send\x18\x1a \x01(\v2\x1a.mistgate.agent.v1.UdpSendH\x00R\audpSendB\t\n" +
+	"\budp_send\x18\x1a \x01(\v2\x1a.mistgate.agent.v1.UdpSendH\x00R\audpSend\x128\n" +
+	"\x05renew\x18\x1b \x01(\v2 .mistgate.agent.v1.RenewResponseH\x00R\x05renewB\t\n" +
 	"\amessage\"1\n" +
 	"\x10MeasureBandwidth\x12\x1d\n" +
 	"\n" +
@@ -5829,74 +5870,76 @@ var file_mistgate_agent_v1_agent_proto_depIdxs = []int32{
 	28, // 5: mistgate.agent.v1.ConnectRequest.log_chunk:type_name -> mistgate.agent.v1.LogChunk
 	30, // 6: mistgate.agent.v1.ConnectRequest.pong:type_name -> mistgate.agent.v1.Pong
 	57, // 7: mistgate.agent.v1.ConnectRequest.doctor_report:type_name -> mistgate.agent.v1.DoctorReport
-	14, // 8: mistgate.agent.v1.Hello.engines:type_name -> mistgate.agent.v1.EngineInfo
-	15, // 9: mistgate.agent.v1.Hello.facts:type_name -> mistgate.agent.v1.HostFacts
-	13, // 10: mistgate.agent.v1.Hello.last_update:type_name -> mistgate.agent.v1.LastUpdate
-	0,  // 11: mistgate.agent.v1.LastUpdate.outcome:type_name -> mistgate.agent.v1.UpdateOutcome
-	17, // 12: mistgate.agent.v1.StatsBatch.traffic:type_name -> mistgate.agent.v1.TrafficDelta
-	18, // 13: mistgate.agent.v1.StatsBatch.sessions:type_name -> mistgate.agent.v1.Session
-	19, // 14: mistgate.agent.v1.StatsBatch.host:type_name -> mistgate.agent.v1.HostMetrics
-	20, // 15: mistgate.agent.v1.StatsBatch.health:type_name -> mistgate.agent.v1.InboundHealth
-	22, // 16: mistgate.agent.v1.StatsBatch.warp:type_name -> mistgate.agent.v1.WarpHealth
-	1,  // 17: mistgate.agent.v1.InboundHealth.state:type_name -> mistgate.agent.v1.InboundRunState
-	21, // 18: mistgate.agent.v1.InboundHealth.awg:type_name -> mistgate.agent.v1.AwgHealth
-	2,  // 19: mistgate.agent.v1.WarpHealth.state:type_name -> mistgate.agent.v1.WarpState
-	23, // 20: mistgate.agent.v1.WarpHealth.probe_cloudflare:type_name -> mistgate.agent.v1.WarpProbeResult
-	23, // 21: mistgate.agent.v1.WarpHealth.probe_other:type_name -> mistgate.agent.v1.WarpProbeResult
-	3,  // 22: mistgate.agent.v1.Event.severity:type_name -> mistgate.agent.v1.Severity
-	64, // 23: mistgate.agent.v1.Event.params:type_name -> mistgate.agent.v1.Event.ParamsEntry
-	4,  // 24: mistgate.agent.v1.ApplyResult.status:type_name -> mistgate.agent.v1.ApplyStatus
-	26, // 25: mistgate.agent.v1.ApplyResult.inbounds:type_name -> mistgate.agent.v1.InboundResult
-	1,  // 26: mistgate.agent.v1.InboundResult.state:type_name -> mistgate.agent.v1.InboundRunState
-	65, // 27: mistgate.agent.v1.CommandResult.params:type_name -> mistgate.agent.v1.CommandResult.ParamsEntry
-	29, // 28: mistgate.agent.v1.LogChunk.lines:type_name -> mistgate.agent.v1.LogLine
-	3,  // 29: mistgate.agent.v1.LogLine.level:type_name -> mistgate.agent.v1.Severity
-	66, // 30: mistgate.agent.v1.LogLine.attrs:type_name -> mistgate.agent.v1.LogLine.AttrsEntry
-	36, // 31: mistgate.agent.v1.ConnectResponse.hello_ack:type_name -> mistgate.agent.v1.HelloAck
-	40, // 32: mistgate.agent.v1.ConnectResponse.ack:type_name -> mistgate.agent.v1.Ack
-	42, // 33: mistgate.agent.v1.ConnectResponse.desired_state:type_name -> mistgate.agent.v1.DesiredState
-	50, // 34: mistgate.agent.v1.ConnectResponse.kick:type_name -> mistgate.agent.v1.Kick
-	51, // 35: mistgate.agent.v1.ConnectResponse.restart_inbound:type_name -> mistgate.agent.v1.RestartInbound
-	52, // 36: mistgate.agent.v1.ConnectResponse.retire:type_name -> mistgate.agent.v1.Retire
-	53, // 37: mistgate.agent.v1.ConnectResponse.log_request:type_name -> mistgate.agent.v1.LogRequest
-	54, // 38: mistgate.agent.v1.ConnectResponse.log_cancel:type_name -> mistgate.agent.v1.LogCancel
-	55, // 39: mistgate.agent.v1.ConnectResponse.ping:type_name -> mistgate.agent.v1.Ping
-	56, // 40: mistgate.agent.v1.ConnectResponse.run_doctor:type_name -> mistgate.agent.v1.RunDoctor
-	59, // 41: mistgate.agent.v1.ConnectResponse.apply_fix:type_name -> mistgate.agent.v1.ApplyFix
-	60, // 42: mistgate.agent.v1.ConnectResponse.update_agent:type_name -> mistgate.agent.v1.UpdateAgent
-	61, // 43: mistgate.agent.v1.ConnectResponse.rollback_agent:type_name -> mistgate.agent.v1.RollbackAgent
-	35, // 44: mistgate.agent.v1.ConnectResponse.prepare_awg_kernel:type_name -> mistgate.agent.v1.PrepareAwgKernel
-	32, // 45: mistgate.agent.v1.ConnectResponse.measure_bandwidth:type_name -> mistgate.agent.v1.MeasureBandwidth
-	33, // 46: mistgate.agent.v1.ConnectResponse.udp_count:type_name -> mistgate.agent.v1.UdpCount
-	34, // 47: mistgate.agent.v1.ConnectResponse.udp_send:type_name -> mistgate.agent.v1.UdpSend
-	41, // 48: mistgate.agent.v1.HelloAck.settings:type_name -> mistgate.agent.v1.NodeSettings
-	44, // 49: mistgate.agent.v1.DesiredState.inbounds:type_name -> mistgate.agent.v1.InboundState
-	41, // 50: mistgate.agent.v1.DesiredState.settings:type_name -> mistgate.agent.v1.NodeSettings
-	43, // 51: mistgate.agent.v1.DesiredState.warp:type_name -> mistgate.agent.v1.WarpSpec
-	45, // 52: mistgate.agent.v1.InboundState.spec:type_name -> mistgate.agent.v1.InboundSpec
-	49, // 53: mistgate.agent.v1.InboundState.creds:type_name -> mistgate.agent.v1.Credential
-	47, // 54: mistgate.agent.v1.InboundSpec.listen:type_name -> mistgate.agent.v1.Listen
-	48, // 55: mistgate.agent.v1.InboundSpec.tls:type_name -> mistgate.agent.v1.Tls
-	46, // 56: mistgate.agent.v1.InboundSpec.tunnel:type_name -> mistgate.agent.v1.Tunnel
-	5,  // 57: mistgate.agent.v1.Tls.mode:type_name -> mistgate.agent.v1.TlsMode
-	3,  // 58: mistgate.agent.v1.LogRequest.min_level:type_name -> mistgate.agent.v1.Severity
-	58, // 59: mistgate.agent.v1.DoctorReport.results:type_name -> mistgate.agent.v1.DoctorResult
-	6,  // 60: mistgate.agent.v1.DoctorResult.status:type_name -> mistgate.agent.v1.DoctorStatus
-	67, // 61: mistgate.agent.v1.DoctorResult.params:type_name -> mistgate.agent.v1.DoctorResult.ParamsEntry
-	68, // 62: mistgate.agent.v1.ApplyFix.params:type_name -> mistgate.agent.v1.ApplyFix.ParamsEntry
-	7,  // 63: mistgate.agent.v1.EnrollmentService.Enroll:input_type -> mistgate.agent.v1.EnrollRequest
-	9,  // 64: mistgate.agent.v1.EnrollmentService.Renew:input_type -> mistgate.agent.v1.RenewRequest
-	11, // 65: mistgate.agent.v1.AgentService.Connect:input_type -> mistgate.agent.v1.ConnectRequest
-	62, // 66: mistgate.agent.v1.AgentService.FetchUpdate:input_type -> mistgate.agent.v1.FetchUpdateRequest
-	8,  // 67: mistgate.agent.v1.EnrollmentService.Enroll:output_type -> mistgate.agent.v1.EnrollResponse
-	10, // 68: mistgate.agent.v1.EnrollmentService.Renew:output_type -> mistgate.agent.v1.RenewResponse
-	31, // 69: mistgate.agent.v1.AgentService.Connect:output_type -> mistgate.agent.v1.ConnectResponse
-	63, // 70: mistgate.agent.v1.AgentService.FetchUpdate:output_type -> mistgate.agent.v1.FetchUpdateResponse
-	67, // [67:71] is the sub-list for method output_type
-	63, // [63:67] is the sub-list for method input_type
-	63, // [63:63] is the sub-list for extension type_name
-	63, // [63:63] is the sub-list for extension extendee
-	0,  // [0:63] is the sub-list for field type_name
+	9,  // 8: mistgate.agent.v1.ConnectRequest.renew:type_name -> mistgate.agent.v1.RenewRequest
+	14, // 9: mistgate.agent.v1.Hello.engines:type_name -> mistgate.agent.v1.EngineInfo
+	15, // 10: mistgate.agent.v1.Hello.facts:type_name -> mistgate.agent.v1.HostFacts
+	13, // 11: mistgate.agent.v1.Hello.last_update:type_name -> mistgate.agent.v1.LastUpdate
+	0,  // 12: mistgate.agent.v1.LastUpdate.outcome:type_name -> mistgate.agent.v1.UpdateOutcome
+	17, // 13: mistgate.agent.v1.StatsBatch.traffic:type_name -> mistgate.agent.v1.TrafficDelta
+	18, // 14: mistgate.agent.v1.StatsBatch.sessions:type_name -> mistgate.agent.v1.Session
+	19, // 15: mistgate.agent.v1.StatsBatch.host:type_name -> mistgate.agent.v1.HostMetrics
+	20, // 16: mistgate.agent.v1.StatsBatch.health:type_name -> mistgate.agent.v1.InboundHealth
+	22, // 17: mistgate.agent.v1.StatsBatch.warp:type_name -> mistgate.agent.v1.WarpHealth
+	1,  // 18: mistgate.agent.v1.InboundHealth.state:type_name -> mistgate.agent.v1.InboundRunState
+	21, // 19: mistgate.agent.v1.InboundHealth.awg:type_name -> mistgate.agent.v1.AwgHealth
+	2,  // 20: mistgate.agent.v1.WarpHealth.state:type_name -> mistgate.agent.v1.WarpState
+	23, // 21: mistgate.agent.v1.WarpHealth.probe_cloudflare:type_name -> mistgate.agent.v1.WarpProbeResult
+	23, // 22: mistgate.agent.v1.WarpHealth.probe_other:type_name -> mistgate.agent.v1.WarpProbeResult
+	3,  // 23: mistgate.agent.v1.Event.severity:type_name -> mistgate.agent.v1.Severity
+	64, // 24: mistgate.agent.v1.Event.params:type_name -> mistgate.agent.v1.Event.ParamsEntry
+	4,  // 25: mistgate.agent.v1.ApplyResult.status:type_name -> mistgate.agent.v1.ApplyStatus
+	26, // 26: mistgate.agent.v1.ApplyResult.inbounds:type_name -> mistgate.agent.v1.InboundResult
+	1,  // 27: mistgate.agent.v1.InboundResult.state:type_name -> mistgate.agent.v1.InboundRunState
+	65, // 28: mistgate.agent.v1.CommandResult.params:type_name -> mistgate.agent.v1.CommandResult.ParamsEntry
+	29, // 29: mistgate.agent.v1.LogChunk.lines:type_name -> mistgate.agent.v1.LogLine
+	3,  // 30: mistgate.agent.v1.LogLine.level:type_name -> mistgate.agent.v1.Severity
+	66, // 31: mistgate.agent.v1.LogLine.attrs:type_name -> mistgate.agent.v1.LogLine.AttrsEntry
+	36, // 32: mistgate.agent.v1.ConnectResponse.hello_ack:type_name -> mistgate.agent.v1.HelloAck
+	40, // 33: mistgate.agent.v1.ConnectResponse.ack:type_name -> mistgate.agent.v1.Ack
+	42, // 34: mistgate.agent.v1.ConnectResponse.desired_state:type_name -> mistgate.agent.v1.DesiredState
+	50, // 35: mistgate.agent.v1.ConnectResponse.kick:type_name -> mistgate.agent.v1.Kick
+	51, // 36: mistgate.agent.v1.ConnectResponse.restart_inbound:type_name -> mistgate.agent.v1.RestartInbound
+	52, // 37: mistgate.agent.v1.ConnectResponse.retire:type_name -> mistgate.agent.v1.Retire
+	53, // 38: mistgate.agent.v1.ConnectResponse.log_request:type_name -> mistgate.agent.v1.LogRequest
+	54, // 39: mistgate.agent.v1.ConnectResponse.log_cancel:type_name -> mistgate.agent.v1.LogCancel
+	55, // 40: mistgate.agent.v1.ConnectResponse.ping:type_name -> mistgate.agent.v1.Ping
+	56, // 41: mistgate.agent.v1.ConnectResponse.run_doctor:type_name -> mistgate.agent.v1.RunDoctor
+	59, // 42: mistgate.agent.v1.ConnectResponse.apply_fix:type_name -> mistgate.agent.v1.ApplyFix
+	60, // 43: mistgate.agent.v1.ConnectResponse.update_agent:type_name -> mistgate.agent.v1.UpdateAgent
+	61, // 44: mistgate.agent.v1.ConnectResponse.rollback_agent:type_name -> mistgate.agent.v1.RollbackAgent
+	35, // 45: mistgate.agent.v1.ConnectResponse.prepare_awg_kernel:type_name -> mistgate.agent.v1.PrepareAwgKernel
+	32, // 46: mistgate.agent.v1.ConnectResponse.measure_bandwidth:type_name -> mistgate.agent.v1.MeasureBandwidth
+	33, // 47: mistgate.agent.v1.ConnectResponse.udp_count:type_name -> mistgate.agent.v1.UdpCount
+	34, // 48: mistgate.agent.v1.ConnectResponse.udp_send:type_name -> mistgate.agent.v1.UdpSend
+	10, // 49: mistgate.agent.v1.ConnectResponse.renew:type_name -> mistgate.agent.v1.RenewResponse
+	41, // 50: mistgate.agent.v1.HelloAck.settings:type_name -> mistgate.agent.v1.NodeSettings
+	44, // 51: mistgate.agent.v1.DesiredState.inbounds:type_name -> mistgate.agent.v1.InboundState
+	41, // 52: mistgate.agent.v1.DesiredState.settings:type_name -> mistgate.agent.v1.NodeSettings
+	43, // 53: mistgate.agent.v1.DesiredState.warp:type_name -> mistgate.agent.v1.WarpSpec
+	45, // 54: mistgate.agent.v1.InboundState.spec:type_name -> mistgate.agent.v1.InboundSpec
+	49, // 55: mistgate.agent.v1.InboundState.creds:type_name -> mistgate.agent.v1.Credential
+	47, // 56: mistgate.agent.v1.InboundSpec.listen:type_name -> mistgate.agent.v1.Listen
+	48, // 57: mistgate.agent.v1.InboundSpec.tls:type_name -> mistgate.agent.v1.Tls
+	46, // 58: mistgate.agent.v1.InboundSpec.tunnel:type_name -> mistgate.agent.v1.Tunnel
+	5,  // 59: mistgate.agent.v1.Tls.mode:type_name -> mistgate.agent.v1.TlsMode
+	3,  // 60: mistgate.agent.v1.LogRequest.min_level:type_name -> mistgate.agent.v1.Severity
+	58, // 61: mistgate.agent.v1.DoctorReport.results:type_name -> mistgate.agent.v1.DoctorResult
+	6,  // 62: mistgate.agent.v1.DoctorResult.status:type_name -> mistgate.agent.v1.DoctorStatus
+	67, // 63: mistgate.agent.v1.DoctorResult.params:type_name -> mistgate.agent.v1.DoctorResult.ParamsEntry
+	68, // 64: mistgate.agent.v1.ApplyFix.params:type_name -> mistgate.agent.v1.ApplyFix.ParamsEntry
+	7,  // 65: mistgate.agent.v1.EnrollmentService.Enroll:input_type -> mistgate.agent.v1.EnrollRequest
+	9,  // 66: mistgate.agent.v1.EnrollmentService.Renew:input_type -> mistgate.agent.v1.RenewRequest
+	11, // 67: mistgate.agent.v1.AgentService.Connect:input_type -> mistgate.agent.v1.ConnectRequest
+	62, // 68: mistgate.agent.v1.AgentService.FetchUpdate:input_type -> mistgate.agent.v1.FetchUpdateRequest
+	8,  // 69: mistgate.agent.v1.EnrollmentService.Enroll:output_type -> mistgate.agent.v1.EnrollResponse
+	10, // 70: mistgate.agent.v1.EnrollmentService.Renew:output_type -> mistgate.agent.v1.RenewResponse
+	31, // 71: mistgate.agent.v1.AgentService.Connect:output_type -> mistgate.agent.v1.ConnectResponse
+	63, // 72: mistgate.agent.v1.AgentService.FetchUpdate:output_type -> mistgate.agent.v1.FetchUpdateResponse
+	69, // [69:73] is the sub-list for method output_type
+	65, // [65:69] is the sub-list for method input_type
+	65, // [65:65] is the sub-list for extension type_name
+	65, // [65:65] is the sub-list for extension extendee
+	0,  // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_agent_v1_agent_proto_init() }
@@ -5913,6 +5956,7 @@ func file_mistgate_agent_v1_agent_proto_init() {
 		(*ConnectRequest_LogChunk)(nil),
 		(*ConnectRequest_Pong)(nil),
 		(*ConnectRequest_DoctorReport)(nil),
+		(*ConnectRequest_Renew)(nil),
 	}
 	file_mistgate_agent_v1_agent_proto_msgTypes[24].OneofWrappers = []any{
 		(*ConnectResponse_HelloAck)(nil),
@@ -5932,6 +5976,7 @@ func file_mistgate_agent_v1_agent_proto_init() {
 		(*ConnectResponse_MeasureBandwidth)(nil),
 		(*ConnectResponse_UdpCount)(nil),
 		(*ConnectResponse_UdpSend)(nil),
+		(*ConnectResponse_Renew)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

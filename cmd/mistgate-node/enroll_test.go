@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -43,5 +44,27 @@ func TestResolveEnrollmentTokenUsesEnvironmentOnlyWhenFlagIsEmpty(t *testing.T) 
 	got, err := resolveEnrollmentToken(strings.NewReader("unused"), "", "env-token", false)
 	if err != nil || got != "env-token" {
 		t.Fatalf("environment token = %q, err %v", got, err)
+	}
+}
+
+func TestEnrollLinkURLFlags(t *testing.T) {
+	link := "wss://de1.example.com/" + strings.Repeat("p", 24) + "/"
+	dir := filepath.Join(t.TempDir(), "s")
+	for name, args := range map[string][]string{
+		"with --panel":       {"enroll", "--link-url", link, "--panel", "p:1", "--ca-sha256", "zz", "--token", "t", "--state-dir", dir},
+		"with --sni":         {"enroll", "--link-url", link, "--sni", "x.invalid", "--ca-sha256", "zz", "--token", "t", "--state-dir", dir},
+		"without a pin":      {"enroll", "--link-url", link, "--token", "t", "--state-dir", dir},
+		"without a token":    {"enroll", "--link-url", link, "--ca-sha256", "zz", "--state-dir", dir},
+		"mTLS without --sni": {"enroll", "--panel", "p:1", "--ca-sha256", "zz", "--token", "t", "--state-dir", dir},
+	} {
+		if got := dispatch(args); got != 2 {
+			t.Errorf("%s: exit %d, want 2", name, got)
+		}
+	}
+	// A panel address in the environment is not a request to combine; the run gets as far as the bad pin.
+	t.Setenv("MISTGATE_PANEL", "p:1")
+	t.Setenv("MISTGATE_AGENT_SNI", "x.invalid")
+	if got := dispatch([]string{"enroll", "--link-url", link, "--ca-sha256", "zz", "--token", "t", "--state-dir", dir}); got != 1 {
+		t.Errorf("link enrol with MISTGATE_PANEL set: exit %d, want 1 (bad pin)", got)
 	}
 }

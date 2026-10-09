@@ -424,6 +424,21 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 		}
 		deletePending(tr.state, r.RequestId)
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: r.RequestId, Reply: event.Frame})
+	case m.GetRenew() != nil:
+		// Link-only agents renew over the session (mTLS Renew needs a client certificate). The session keeps its
+		// old serial: its recheck ends it once the old certificate's grace is over, and the agent comes back on the new one.
+		resp, err := c.f.renewNodeCert(ctx, tr.state.NodeID, tr.state.PeerCertSerial, m.GetRenew().CsrDer)
+		var bad *badCSRError
+		switch {
+		case errors.As(err, &bad):
+			tr.Close = &SessionClose{Class: CloseInvalidArgument, Reason: bad.Error()}
+		case errors.Is(err, store.ErrRenewRefused):
+			tr.Close = &SessionClose{Class: CloseFailedPrecondition, Reason: "certificate renewal refused"}
+		case err != nil:
+			tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
+		default:
+			tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Renew{Renew: resp}})
+		}
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
 		pending, ok := tr.state.Pending[chunk.RequestId]

@@ -85,6 +85,47 @@ func TestAgentLinkUsesOnlyItsSecretPath(t *testing.T) {
 	}
 }
 
+// Link-only agents enrol with one POST under the secret prefix; every other path there (Renew, the other service, a
+// near-miss spelling) gets the decoy without reaching the handler, and so does the enrol path with another method.
+func TestAgentLinkAdmitsOnlyTheEnrolPathBesidesLinks(t *testing.T) {
+	prefix := "/" + strings.Repeat("l", 24) + "/"
+	enrol := "mistgate.agent.v1.EnrollmentService/Enroll"
+	var hits atomic.Int32
+	var gotPath string
+	e := newTestEnv(t, func(c *Config) {
+		c.AgentLinkPrefix = prefix
+		c.AgentLinkHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			gotPath = r.URL.Path
+			if r.Method != http.MethodPost || r.URL.Path != "/"+enrol {
+				http.NotFound(w, r) // what the real handler does
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+	})
+	if r := do(t, http.MethodPost, e.public.URL, prefix+enrol, nil); r.status != http.StatusNoContent || gotPath != "/"+enrol || hits.Load() != 1 {
+		t.Fatalf("enrol route: status=%d path=%q hits=%d", r.status, gotPath, hits.Load())
+	}
+	decoy := do(t, http.MethodGet, e.public.URL, "/nothing-here", nil)
+	for _, path := range []string{
+		prefix + "mistgate.agent.v1.EnrollmentService/Renew",
+		prefix + "mistgate.agent.v1.AgentService/Connect",
+		prefix + enrol + "/",
+		prefix + "mistgate.agent.v1.EnrollmentService/enroll",
+		prefix + "x/" + enrol,
+		"/" + enrol,
+	} {
+		before := hits.Load()
+		sameResponse(t, "POST "+path, decoy, do(t, http.MethodPost, e.public.URL, path, nil))
+		if hits.Load() != before {
+			t.Errorf("%q reached the link handler", path)
+		}
+	}
+	// The enrol path with a method the handler refuses is answered exactly like the decoy.
+	sameResponse(t, "GET enrol path", decoy, do(t, http.MethodGet, e.public.URL, prefix+enrol, nil))
+}
+
 func TestAgentLinkPrefixMustBeSeparateAndSecret(t *testing.T) {
 	for name, mutate := range map[string]func(*Config){
 		"short":         func(c *Config) { c.AgentLinkPrefix = "/short/" },

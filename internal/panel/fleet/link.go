@@ -16,6 +16,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/coder/websocket"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"google.golang.org/protobuf/proto"
 )
@@ -70,9 +71,25 @@ func (s websocketSessionStream) Send(m *agentv1.ConnectResponse) error {
 // With Config.Remote set (the edge edition) it answers with the LinkMarker instead: the node's Durable Object holds the
 // socket there, so both editions share this one mount.
 func (f *Fleet) LinkHandler() http.Handler {
+	// Link-only agents enrol here: the same Enroll as the mTLS endpoint (limiter, one-time token, CSR). Renew is not
+	// routed (it needs a node identity); a renewing link agent sends ConnectRequest.renew on its session.
+	enroll := connect.NewUnaryHandler(agentv1connect.EnrollmentServiceEnrollProcedure, enrollmentService{f}.Enroll,
+		connect.WithReadMaxBytes(16<<10))
+	var sessions http.Handler = f.linkSocketHandler()
 	if f.cfg.Remote != nil {
-		return LinkMarker()
+		sessions = LinkMarker()
 	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == agentv1connect.EnrollmentServiceEnrollProcedure {
+			r.Body = http.MaxBytesReader(w, r.Body, 32<<10) // WithReadMaxBytes rejects, but Connect then drains the rest
+			enroll.ServeHTTP(w, r)
+			return
+		}
+		sessions.ServeHTTP(w, r)
+	})
+}
+
+func (f *Fleet) linkSocketHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := linkNodePath(r.URL.Path)
 		if !ok || r.Method != http.MethodGet {

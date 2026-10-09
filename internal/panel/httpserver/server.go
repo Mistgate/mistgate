@@ -424,6 +424,9 @@ func (s *Server) agentLinkRequest(r *http.Request) bool {
 		return false
 	}
 	rel := strings.TrimPrefix(r.URL.Path, strings.TrimSuffix(s.cfg.AgentLinkPrefix, "/"))
+	if rel == agentv1connect.EnrollmentServiceEnrollProcedure { // link-only agents enrol here; nothing else but /link/<id>
+		return true
+	}
 	return strings.HasPrefix(rel, "/link/") && len(strings.TrimPrefix(rel, "/link/")) > 0 &&
 		!strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
 }

@@ -254,9 +254,27 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if err := st.SkipSeq(ctx, enrolled.ID, "d1-instance", 3, now); err != nil {
 		t.Fatalf("write-only SkipSeq batch on D1: %v", err)
 	}
-	if err := st.RenewCert(ctx, CertRow{Serial: "serial-renewed", NodeID: enrolled.ID, CAID: "cas_d1", PEM: "renewed",
-		NotBefore: now, NotAfter: now.Add(48 * time.Hour), IssuedAt: now}, now, time.Minute); err != nil {
-		t.Fatalf("write-only RenewCert transaction on D1: %v", err)
+	renewed := CertRow{Serial: "serial-renewed", NodeID: enrolled.ID, CAID: "cas_d1", PEM: "renewed", NotBefore: now, NotAfter: now.Add(48 * time.Hour), IssuedAt: now}
+	calls = countD1Queries(t, binding, "RenewCert", func() { err = st.RenewCert(ctx, renewed, "serial-d1", now, time.Minute) })
+	if err != nil {
+		t.Fatalf("guarded RenewCert batch on D1: %v", err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("RenewCert used %d D1 calls in %d batches, want 1 call in 1 batch (guard + insert + two updates)", calls.queries, calls.batches)
+	}
+	// A refusal (the presenting certificate is not valid for the node) is one batch too, writes nothing and maps to ErrRenewRefused.
+	refused := renewed
+	refused.Serial = "serial-refused"
+	calls = countD1Queries(t, binding, "RenewCertRefused", func() { err = st.RenewCert(ctx, refused, "serial-unknown", now, time.Minute) })
+	if !errors.Is(err, ErrRenewRefused) {
+		t.Fatalf("RenewCert from an unknown certificate = %v, want ErrRenewRefused", err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("refused RenewCert used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
+	}
+	var written int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM node_cert WHERE serial = 'serial-refused'`).Scan(&written); err != nil || written != 0 {
+		t.Fatalf("refused certificate rows = %d, %v, want 0", written, err)
 	}
 	calls = countD1Queries(t, binding, "RetireNode", func() { err = st.RetireNode(ctx, enrolled.ID, now) })
 	if err != nil {

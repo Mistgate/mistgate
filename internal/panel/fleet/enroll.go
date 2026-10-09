@@ -107,29 +107,55 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 	}), nil
 }
 
-// Renew issues a new certificate over mTLS with the current one. The CSR subject is ignored.
-func (s enrollmentService) Renew(ctx context.Context, req *connect.Request[agentv1.RenewRequest]) (*connect.Response[agentv1.RenewResponse], error) {
-	f := s.f
-	id, ok := nodeID(ctx)
-	if !ok {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no node certificate"))
-	}
-	pub, err := parseCSR(req.Msg.CsrDer)
+// badCSRError marks a certificate request the panel refuses (the caller's fault, not an internal failure).
+type badCSRError struct{ error }
+
+// renewNodeCert issues a new certificate for node id from a CSR and makes it current (the old ones get oldCertGrace).
+// fromSerial is the certificate that presented the request: the store refuses the renewal (store.ErrRenewRefused) when
+// it is no longer valid for the node or the node already got its hourly quota. It serves the mTLS Renew call and the
+// link's ConnectRequest.renew. The CSR subject is ignored. Errors other than *badCSRError and store.ErrRenewRefused
+// are logged here and are internal.
+func (f *Fleet) renewNodeCert(ctx context.Context, id, fromSerial string, csrDER []byte) (*agentv1.RenewResponse, error) {
+	pub, err := parseCSR(csrDER)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, &badCSRError{err}
 	}
 	now := f.now().UTC()
 	cert, err := f.ca.issueNode(id, pub, now)
 	if err == nil {
-		err = f.st.RenewCert(ctx, cert, now, oldCertGrace)
+		err = f.st.RenewCert(ctx, cert, fromSerial, now, oldCertGrace)
+	}
+	if errors.Is(err, store.ErrRenewRefused) {
+		f.log.Warn("renew refused", "node", id)
+		return nil, err
 	}
 	if err != nil {
 		f.log.Error("renew", "node", id, "err", err)
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, err
 	}
-	return connect.NewResponse(&agentv1.RenewResponse{
+	return &agentv1.RenewResponse{
 		CertificatePem: cert.PEM,
 		NotAfterUnix:   cert.NotAfter.Unix(),
 		RenewAfterUnix: cert.NotAfter.Add(-renewBefore).Unix(),
-	}), nil
+	}, nil
+}
+
+// Renew issues a new certificate over mTLS with the current one. The CSR subject is ignored.
+func (s enrollmentService) Renew(ctx context.Context, req *connect.Request[agentv1.RenewRequest]) (*connect.Response[agentv1.RenewResponse], error) {
+	id, ok := nodeID(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no node certificate"))
+	}
+	pc, _ := peerCertFrom(ctx)
+	resp, err := s.f.renewNodeCert(ctx, id, pc.serial, req.Msg.CsrDer)
+	var bad *badCSRError
+	switch {
+	case errors.As(err, &bad):
+		return nil, connect.NewError(connect.CodeInvalidArgument, bad.error)
+	case errors.Is(err, store.ErrRenewRefused):
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("certificate renewal refused"))
+	case err != nil:
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	return connect.NewResponse(resp), nil
 }

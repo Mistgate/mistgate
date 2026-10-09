@@ -27,9 +27,10 @@ const (
 	serverCertTTL = 90 * 24 * time.Hour
 	serverRenewAt = 30 * 24 * time.Hour // rebuild the in-memory server cert when less than this remains
 	certBackdate  = 10 * time.Minute    // tolerate a node clock that runs a little behind
-	// oldCertGrace is how long the certificate a node renewed away from stays valid: long enough for an
-	// agent whose Renew response got lost to retry, short enough that a stolen key dies soon after.
-	oldCertGrace = 10 * time.Minute
+	// oldCertGrace is how long the certificate a node renewed away from stays valid. It must outlast the agent's retry
+	// interval (an hour: renewLoop): when the answer to a renewal is lost, the agent still holds only the old key and asks
+	// again on the old certificate at its next tick. Re-enrolment and retirement revoke at once, not after the grace.
+	oldCertGrace = 3 * time.Hour
 	// The certificates must not name the product: anyone who knows the agent SNI can handshake with the
 	// listener and read the server certificate and its issuer. Node identity is a SPIFFE-style URI SAN.
 	nodeURIScheme = "spiffe"

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -44,6 +45,16 @@ type InstanceConfig struct {
 	AgentSNI    string
 	SubPrefix   string
 	LinkPrefix  string // secret path prefix of the signed agent WebSocket link; empty = not served by this handler
+}
+
+// linkURL is the base of the signed agent link (and of link-only enrolment): wss:// + the public host + the secret
+// prefix. "" when the panel has no public URL or no link prefix.
+func linkURL(in InstanceConfig) string {
+	u, err := url.Parse(in.PublicURL)
+	if err != nil || u.Host == "" || in.LinkPrefix == "" {
+		return ""
+	}
+	return "wss://" + u.Host + in.LinkPrefix
 }
 
 // AdminURL is the address the owner opens in a browser.
@@ -153,6 +164,7 @@ func Build(c Config) (*Panel, error) {
 	fl, err := fleet.New(st, vlt, reg, fleet.Config{
 		AgentSNI:             in.AgentSNI,
 		LinkServed:           in.LinkPrefix != "",
+		LinkURL:              linkURL(in),
 		Remote:               c.Remote,
 		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,

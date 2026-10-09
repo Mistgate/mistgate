@@ -57,7 +57,8 @@ type EnrollmentServiceClient interface {
 	Enroll(context.Context, *connect.Request[v1.EnrollRequest]) (*connect.Response[v1.EnrollResponse], error)
 	// Replace the certificate before it expires. mTLS with the current certificate. The agent renews when
 	// less than 10 days remain (day 20 of 30) and generates a NEW key each time. The panel ignores the
-	// subject in the CSR and sets the URI SAN itself.
+	// subject in the CSR and sets the URI SAN itself. FAILED_PRECONDITION: the presenting certificate is no longer
+	// valid for this node, or the node already got 4 certificates in the last hour.
 	Renew(context.Context, *connect.Request[v1.RenewRequest]) (*connect.Response[v1.RenewResponse], error)
 }
 
@@ -113,7 +114,8 @@ type EnrollmentServiceHandler interface {
 	Enroll(context.Context, *connect.Request[v1.EnrollRequest]) (*connect.Response[v1.EnrollResponse], error)
 	// Replace the certificate before it expires. mTLS with the current certificate. The agent renews when
 	// less than 10 days remain (day 20 of 30) and generates a NEW key each time. The panel ignores the
-	// subject in the CSR and sets the URI SAN itself.
+	// subject in the CSR and sets the URI SAN itself. FAILED_PRECONDITION: the presenting certificate is no longer
+	// valid for this node, or the node already got 4 certificates in the last hour.
 	Renew(context.Context, *connect.Request[v1.RenewRequest]) (*connect.Response[v1.RenewResponse], error)
 }
 
