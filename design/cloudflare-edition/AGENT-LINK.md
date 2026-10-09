@@ -74,7 +74,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | merged (§6; `cbb8405`, `dc72654`, `34f7e7f`, 2026-10-09) |
-| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a-6c merged; 6d and 6e local |
+| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a-6e merged; 6f done locally (§7.6, §7.7 results); 6g needs the owner's OK |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
 query budgets unchanged (Happ 5, Mihomo 7, page 5/3/4, AWG configs 7), a manager review.
@@ -347,6 +347,12 @@ audience, generation). Poison lives inside `state`.
 D1 calls per event: open 0; Hello about 6 + k (NodeHello batch, Node, connect-event read and insert,
 NodeWithSentDigest, k access reads, NodeDesired); stats 2; alarm and request 0, plus 1 CertStatus when the 30 s recheck
 is due; closed 1.
+
+Measured in 6f on the fake D1 (§7.7; asserted by `TestLinkD1CallsPerStepKind` and `bridge.cjs`): open 0; desired, alarm and
+request before Hello 0; Hello on a first connect with no inbounds 4 (NodeHello batch, Node, NodeWithSentDigest, NodeDesired;
+the connect-event read and insert and k access reads come on top); a stats frame without usage 2 (a read batch of 4 and a
+write batch of 8 statements), with usage one more read (§7.0 item 5; not re-measured in 6f); closed 1; link accept 1; cron
+tick 3, minute %10 4, minute 17 9.
 
 ### 6.2 Link-only agents
 
@@ -769,6 +775,11 @@ one isolate; pass = no hung invocation and no "Cannot perform I/O on behalf of a
 global to the isolate). If it fails: every entry point also waits on an "isolate has no Go call in flight" promise (a
 small extension of `edgeTaskRunner`).
 
+**Result (6f, `e2e-wsl.sh --edge` step 5, twice):** 20 parallel subscription fetches (all HTTP 200), a cron tick through
+`/cdn-cgi/handler/scheduled` (200) and two admin fan-outs (disable, enable) ran in one isolate while the agent's stats frames
+arrived: every request finished, and the Worker log (wrangler's stdout and file log, whole run) has no "Cannot perform I/O on
+behalf of a different request" and no hung-invocation message. The `edgeTaskRunner` extension is not needed.
+
 ### 7.6 Local end-to-end run with a real agent
 
 `scripts/e2e-wsl.sh --edge`: the same scenario against both builds (ADR 0006), in the run's own network namespace.
@@ -804,6 +815,40 @@ D1); `test-edge-entry.ps1` (`bridge.cjs`) keeps the budgets, adds fan-out and cr
 `response.waitUntil` after each count so background queries cannot leak into the next; `pnpm test` gains
 `workerd.test.ts`.
 
+**Result (6f, 2026-10-09; Ubuntu in WSL2, 16 vCPU, Node 22, wrangler 4.147, workerd 1.20261001).** `scripts/e2e-wsl.sh --edge`
+(sourcing `scripts/e2e/edge.sh`) passed twice in a row (248 s and 288 s); `--m3` (565 s) still passes. Steps as written above, plus
+what differs from the VPS run: the setup link is read from the Worker's log; the admin API sits under the secret prefix of the
+public URL; there is no `--panel`/mTLS path, so the agent is link-only (`enroll --link-url`, `run`); the node is named `node-a`,
+the user `alice`, the host `de1.example.com` (a namespace `hosts` file). Skipped, with the reason: CheckPorts `same_host` (the
+panel's UDP probe cannot run in a Worker), the synthetic-check rounds and the NODE_DOWN alert (health checker and evaluator are
+phase 2, `edgeDeferred`), the self-update steps (no `update/1` on link-only agents), the masquerade and tunnel steps, the panel
+restarts (replaced by the agent restart and the Worker reload). The quota, disable and expiry steps check that the fan-out reaches a
+running session (the client logs the closed stream) and that a new client is refused.
+Timings over the runs: LIMITED 2.2-12.4 s after the quota change (the wait for the next stats batch), the session kicked 2-3.5 s
+after that (15.9 s in all in the slowest run: one 10 s stats interval plus the fan-out); disable to kick 2.4-6.2 s; the cron tick to
+EXPIRED 0.2-0.5 s and to the kick 1.4-4.2 s. A stopped agent shows offline at once (0 s): the socket's close runs the closed step,
+which deletes the `node_live` row; the 90 s liveness only covers a crash-style end. After an agent restart and after a Worker reload
+(wrangler restarts the runtime; the object keeps its storage; the agent reconnects as generation + 1) the agent log shows "restored
+persisted state", "connected to panel" and no full DesiredState: the Hello matched the digest in `node_sent`.
+Retire: the object's `_cf_KV` has rows before (checked) and none after, `node_live` has no row, the agent exited 0 and removed its
+files. The secrets check covers the Worker's output, wrangler's file log and the node and client logs, and found nothing.
+
+What wrangler (4.147, `wrangler dev --local-protocol https`) did that the design did not expect:
+- **Host is kept.** The Worker sees `Host: de1.example.com:<port>`; the agent's challenge audience check passed. No rewrite.
+- **`/cdn-cgi/handler/scheduled` answers 403 to a non-local Host** (`de1.example.com`) and 200 to `127.0.0.1`; the leaf certificate has
+  `IP:127.0.0.1` and `localhost` SANs for that, and the script calls the trigger on 127.0.0.1.
+- **A client that sends no `Accept-Encoding` gets a gzip body** (`Content-Encoding: gzip`) from the panel; with `Accept-Encoding: identity`
+  it gets plain JSON. The dev proxy hop apparently adds `Accept-Encoding: gzip` to the request the Worker sees, so Connect compresses
+  although the client never asked. Go and browser clients are unaffected (they decode), `curl` without `--compressed` is not (the script
+  uses it). Whether Cloudflare's edge does the same for a Worker is a 6g question.
+- **wrangler logs every request path**, secret prefixes and subscription token included, to stdout and to its file log
+  (`[wrangler:info] POST /<admin prefix>/...`). The script's log check therefore filters wrangler's own request lines and the
+  setup-link lines (the setup link is printed on purpose) and checks the rest.
+- pnpm (10.33.2, picked by `packageManager`) ignores the build scripts of esbuild and workerd; `wrangler dev` runs without them.
+- Every isolate start logs `level=WARN msg="release key is unusable, node updates are off" err="... /edge-unavailable/release.pub: not implemented on js"`
+  (the edge has no release key by design; the warning is noise on every cold start).
+- No login and no network were needed: the only outbound traffic was the npm install.
+
 ### 7.7 Measurements
 
 Local (6f): D1 calls per step kind asserted with the fake D1 counters (open 0, Hello 4 + k on a first connect and up to 6 + k on a reconnect after a gap, measured in 6a, stats 2 (+1 with usage),
@@ -813,6 +858,23 @@ shapes (statement count and bound-value bytes for the largest IngestStats with 6
 NodeHello, NodeApplied, RenewCert: counts unchanged 8 / 1 / 3 / 4, largest value under 2 MB); wasm memory after the e2e
 mix and the 65,536-user batch, against 128 MB.
 
+**Local results (6f, 2026-10-09)** — Node 22 and workerd on a WSL2 VM, the fake D1 (SQLite in the same process, so the Go side is
+reported without the time spent in it). Indicative; the Worker numbers are 6g's. Tests: `internal/panel/store/measure_d1_js_test.go`
+(batch shapes; `GOMEASURE=1` adds the 65,536-user batch), `cmd/mistgate-edge/measure_js_test.go` (CPU per step kind),
+`cmd/mistgate-edge/testdata/coldstart.cjs` (`node coldstart.cjs <panel.wasm> <wasm_exec.js>`), `scripts/e2e-wsl.sh --edge` step 9 (memory).
+
+| What | Result |
+|---|---|
+| D1 calls per step kind | open 0; desired, alarm, request before Hello 0; Hello 4 (first connect, no inbounds); stats 2 (+1 with usage); closed 1; link accept 1; cron tick 3 / minute %10 4 / minute 17 9 |
+| CPU per step, wall p50 / p95 of 50 runs, ms (Go side only) | open 0.08 / 0.17; desired 0.08 / 0.18 (after Hello 0.60 / 0.99, Go 0.49 / 0.84); alarm 0.10 / 0.16 (after Hello 0.12 / 0.20); request 0.13 / 0.27; **Hello 1.74 / 7.12** (Go 1.25 / 6.55); **stats (empty) 0.99 / 1.99** (Go 0.60 / 1.47); closed 0.32 / 0.79 (Go 0.25 / 0.72). The Hello p95 is the first runs of a fresh isolate. A stats frame with real traffic costs more |
+| Wasm file | 50,112,591 bytes (47.8 MiB; the Worker limit is 64 MiB); gzip -9 10,586,649 bytes (10.1 MiB) |
+| Cold start (Node, per isolate, CPU) | `WebAssembly.compile` 155 ms (a Worker receives the module precompiled); instantiate 26-31 ms; Go runtime to `mgPanel` published 32-37 ms; `mgPanel.init` on a migrated database 60-64 ms; first `GET /` under 1 ms. Sum about 125 ms (design estimate 254 ms). A first init on an empty database: 63 D1 calls (50 batches, 286 statements: migrations), 514 ms CPU |
+| Init D1 reads on a migrated database | **17 sequential before 6f** (3 migration-state reads, 10 single-key `setting` reads, a settings batch, the panel CA, the update rollout row, the setup-token status): over the 10-read rule, so `loadEdgeInstance` now reads its nine settings in one `SettingValues` call: **9 reads** |
+| Batch shapes (statements per batch) | IngestStats: read batch 4 + write batch 8, 2 calls; NodeHello: 1 batch of 5, 1 call; NodeApplied: 1 batch of 3; RenewCert: 1 batch of 4. The write batch of IngestStats is 8 statements however many users |
+| IngestStats, 5,000 users and 500 sessions | largest bound value 0.69 MB (the bucket list), 1.35 MB bound in all; Go memory 5 -> 18 MB |
+| **IngestStats, 65,536 users and 2,000 sessions (live projection at its 1.5 MB valve)** | still 2 calls and 12 statements, but the largest bound value is **9.04 MB** (138 bytes per user; D1 refuses a string or BLOB over 2,000,000 bytes, reached at about **14,500 users in one batch**), 18.8 MB bound in all, 5.1 s wall (0.55 s in SQLite), Go memory 9 -> **233 MB** (over the 128 MB isolate limit). Such a batch cannot be stored on D1 (refused twice, then dropped as `stats_dropped`/`database_refused`). The guard admits up to `maxStatsDeltas` = 65,536 deltas; the design target is 5,000 users on 50 nodes. **Not changed in 6f**: the fix is a lower cap on the edge (about 12,000 deltas) or chunking the three JSON-array statements, a design decision for §7.10 |
+| Wasm memory after the e2e mix | 42-44.5 MB of linear memory in the Worker's isolate (limit 128 MB); the whole `workerd` process (all isolates, dev tooling) is 420 MB RSS, not comparable |
+
 REAL CLOUDFLARE (6g) — a separate round, only with the owner's explicit OK: a throwaway account, or at least a throwaway
 Worker and D1 named `mistgate-measure-<date>` on workers.dev only (no zone, no custom domain); never the production
 account's Workers, D1, zones or secrets; a token scoped to that account, revoked afterwards, everything deleted; the
@@ -820,7 +882,9 @@ results go into this document. Measures: D1 batch latency p50/p95 and how often 
 abandoned-write window); D1 limits for the largest IngestStats batch (65,536 users, the 1.5 MB valve, rows read and
 written); DO billing per stats frame with 1-3 agents for an hour; whether `ctx.exports.PanelLink` runs in the object's
 isolate and is billed as a request, and a cold step inside a block; isolate memory under a request mix; cron `cpuTime`
-warm and cold; that a fan-out started through PanelLink's `waitUntil` completes; sockets across a redeploy.
+warm and cold; that a fan-out started through PanelLink's `waitUntil` completes; sockets across a redeploy. Before the first
+request: Workers Logs, Logpush and Tail stay off on the throwaway Worker, or the run checks that they do not keep request URLs (the
+admin prefix and subscription tokens are in the path, as wrangler's dev log showed in 6f).
 
 Cron call counts asserted by the fake-D1 Go test and `bridge.cjs`: 3 D1 calls on a normal minute, 4 at minute %10, and 9
 at minute 17 (the 3 shared tick calls plus 6 retention calls).
@@ -834,7 +898,7 @@ at minute 17 (the 3 shared tick calls plus 6 retention calls).
 | 6c (local) | `nodelink.ts` (generation, `until`, forget = deleteAll + arm); `panellink.ts` types and `detachWaitUntil`; `panel.ts` `nodeLink`; `shell.ts` `askNode`, `closeNode`, `pokeNodes`; PanelLink origin `""` | vitest: open carries the stored gen; `until` is the block's end; forget leaves no keys and only the handshake alarm; an absent `alarmAt` leaves no alarm; `askNode` maps reply, null, timeout, link lost and reset; `pokeNodes` counts failures | DO tests use the fake PanelLink only |
 | 6d (local) | `workerd.test.ts` (§7.5), the fixes it calls for, ports to `nodelink_emu_test.go` | the tests; the emulator and `nodelink.ts` agree item by item | a result that changes the Go driver (row 5) or §7.3 (row 8) |
 | 6e (local) | `EdgeTick`, `edgeDeferred` and the parity test; exported `Fleet.Sweep` and `Health.Retention`; the guarded `ResetUserPeriod`; `mgPanel.cron`; `scheduledPanel`; `[triggers]` | SQLite: an expired alice → status change and one fan-out; a silent node-a → one `node_down`, none on the next tick; minute 17 prunes; minute 10 fans out; a stale reset writes nothing (also on the fake D1); a `scheduledPanel` test; `bridge.cjs` counts the cron op | the reset guard changes VPS behaviour, only in the race |
-| 6f (local) | `e2e-wsl.sh --edge`; the measurement tests; results and the §6.1 counts into this document | §7.6 passes end to end; checklist item 10; the §7.7 local table | wrangler rewriting the host; the Linux workerd install |
+| 6f (local, done 2026-10-09) | `e2e-wsl.sh --edge`; the measurement tests; results and the §6.1 counts into this document | §7.6 passes end to end (twice in a row, 248 s and 288 s; `--m3` still passes, 565 s); checklist item 10 passed; the §7.7 local table | wrangler rewriting the host (it does not); the Linux workerd install (works; pnpm ignores its build script) |
 | 6g (REAL CLOUDFLARE, owner OK) | nothing merged except the results | the §7.7 real table | cost (expected under $1); production resources excluded by the setup |
 
 Every round passes the §3 gate and the race tests (fleet, agent, store); bridge budgets stay at Happ 5, Mihomo 7, page
@@ -912,3 +976,19 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
   the cron call. `scheduledPanel` uses an empty origin, passes the scheduled time and keeps failures in the Worker log.
 - Two small VPS behavior changes accompany the edge work: a status sweep notifies after a partial write failure, and an
   admin traffic reset clears usage and status without changing `period_start`; the guarded sweep reset is unchanged.
+
+#### Round 6f implementation notes (2026-10-09)
+
+- `scripts/e2e-wsl.sh --edge` branches before step 0 into `scripts/e2e/edge.sh` (`edge_run`); the shared helpers were reused (`api` got
+  `--cacert`/`--compressed` through `CURL_CA`, `build_hysteria` was extracted, `tail_logs` and `cleanup` know wrangler: `edge_reap`
+  kills a `workerd` or `node` that outlived wrangler, only inside the run's namespace). The Worker is copied to `$WORK/worker` and installed
+  there with its own pnpm store; the repo's `edge/worker` is never written to. `wrangler.toml` is the template with the zero D1 id,
+  `main = src/measure.ts` (a run-local wrapper that serves `/__mgmem`, the Go program's linear memory, and hands everything else to the
+  unmodified `src/index.ts`) and `assets.directory = <repo>/web/dist`.
+- `fake-d1.cjs` now also counts bound-value bytes, time inside SQLite and the statements of each batch (`maxBoundBytes`, `totalBoundBytes`,
+  `dbMillis`, `batchSizes`); nothing else about it changed.
+- **Changed in production code:** `loadEdgeInstance` (`cmd/mistgate-edge/instance_js.go`) reads its nine settings in one `SettingValues`
+  call and `ensureEdgeSecrets` reads its three in one (17 -> 9 D1 reads on a cold start); `TestLoadEdgeInstanceReadsSettingsInOneCall` pins the
+  count and the generated `link_prefix` of an older database.
+- **Found, not changed:** a stats batch with more than about 14,500 users exceeds D1's 2 MB value limit, and 65,536 users also exceed the
+  128 MB isolate (§7.7); wrangler's request log prints secret paths; Connect gzips for a client that sent no `Accept-Encoding` (§7.6).

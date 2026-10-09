@@ -176,36 +176,41 @@ func masterKeyFromJS(value js.Value) ([]byte, error) {
 	return key, nil
 }
 
+// edgeInstanceKeys are the settings an initialised instance is made of; one D1 read fetches them all (a cold isolate
+// does this on every start, and a D1 round trip is milliseconds: §7.7 counted nine sequential reads here).
+var edgeInstanceKeys = []string{
+	"rp_id", "rp_origins", "public_url", "admin_host", "admin_prefix", "admin_listen", "agent_sni", "sub_prefix", "link_prefix",
+}
+
 func loadEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (app.InstanceConfig, map[string]string, error) {
-	rpID, err := st.Setting(ctx, "rp_id")
-	if errors.Is(err, store.ErrNotFound) {
-		return newEdgeInstance(opts)
-	}
+	values, err := st.SettingValues(ctx, edgeInstanceKeys)
 	if err != nil {
 		return app.InstanceConfig{}, nil, err
 	}
+	rpID, ok := values["rp_id"]
+	if !ok {
+		return newEdgeInstance(opts)
+	}
 	in := app.InstanceConfig{RPID: rpID}
-	if origins, err := st.Setting(ctx, "rp_origins"); err != nil {
-		return in, nil, err
-	} else if in.RPOrigins = splitList(origins); len(in.RPOrigins) == 0 {
+	origins, ok := values["rp_origins"]
+	if !ok {
+		return in, nil, store.ErrNotFound
+	}
+	if in.RPOrigins = splitList(origins); len(in.RPOrigins) == 0 {
 		return in, nil, errors.New("stored rp_origins setting is empty")
 	}
 	for key, target := range map[string]*string{
 		"public_url": &in.PublicURL, "admin_host": &in.AdminHost,
 		"admin_prefix": &in.AdminPrefix, "admin_listen": &in.AdminListen,
 	} {
-		if *target, err = st.Setting(ctx, key); err != nil {
-			return in, nil, err
+		if *target, ok = values[key]; !ok {
+			return in, nil, store.ErrNotFound
 		}
 	}
 	if in.AdminListen != "" && (in.AdminHost != "" || in.AdminPrefix != "/") {
 		return in, nil, errors.New("stored settings combine a separate admin listener with an admin host or path prefix")
 	}
-	pending, err := ensureEdgeSecrets(ctx, st, &in)
-	if err != nil {
-		return in, nil, err
-	}
-	return in, pending, nil
+	return in, fillEdgeSecrets(values, &in), nil
 }
 
 func newEdgeInstance(opts initOptions) (app.InstanceConfig, map[string]string, error) {
@@ -295,27 +300,31 @@ func validatePrefix(raw string, errInvalid error) (string, error) {
 }
 
 func ensureEdgeSecrets(ctx context.Context, st *store.Store, in *app.InstanceConfig) (map[string]string, error) {
+	values, err := st.SettingValues(ctx, []string{"agent_sni", "sub_prefix", "link_prefix"})
+	if err != nil {
+		return nil, err
+	}
+	return fillEdgeSecrets(values, in), nil
+}
+
+// fillEdgeSecrets takes the stored agent_sni, sub_prefix and link_prefix from values, generates the ones that are
+// missing (an older database) and returns those to be stored.
+func fillEdgeSecrets(values map[string]string, in *app.InstanceConfig) map[string]string {
 	fill := map[string]string{}
-	var err error
-	if in.AgentSNI, err = st.Setting(ctx, "agent_sni"); errors.Is(err, store.ErrNotFound) {
+	var ok bool
+	if in.AgentSNI, ok = values["agent_sni"]; !ok {
 		in.AgentSNI = newAgentSNI(hostFromURL(in.PublicURL))
 		fill["agent_sni"] = in.AgentSNI
-	} else if err != nil {
-		return nil, err
 	}
-	if in.SubPrefix, err = st.Setting(ctx, "sub_prefix"); errors.Is(err, store.ErrNotFound) {
+	if in.SubPrefix, ok = values["sub_prefix"]; !ok {
 		in.SubPrefix = newSecretPrefix()
 		fill["sub_prefix"] = in.SubPrefix
-	} else if err != nil {
-		return nil, err
 	}
-	if in.LinkPrefix, err = st.Setting(ctx, "link_prefix"); errors.Is(err, store.ErrNotFound) {
+	if in.LinkPrefix, ok = values["link_prefix"]; !ok {
 		in.LinkPrefix = newSecretPrefix()
 		fill["link_prefix"] = in.LinkPrefix
-	} else if err != nil {
-		return nil, err
 	}
-	return fill, nil
+	return fill
 }
 
 func hostFromURL(raw string) string {

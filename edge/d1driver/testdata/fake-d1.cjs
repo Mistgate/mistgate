@@ -14,6 +14,24 @@ function countExecution() {
   else queryStats.sequentialExecutions++;
 }
 
+// Measurement only: the bytes of one bound value (strings as UTF-8, blobs as their length).
+function boundBytes(value) {
+  if (typeof value === "string") return Buffer.byteLength(value);
+  if (value instanceof Uint8Array || Array.isArray(value)) return value.length;
+  return 8;
+}
+
+// Measurement only: wall time spent inside SQLite, so a test can separate the Go side from the database.
+function timed(fn) {
+  if (!queryStats) return fn();
+  const start = performance.now();
+  try {
+    return fn();
+  } finally {
+    queryStats.dbMillis += performance.now() - start;
+  }
+}
+
 function resultMeta(changes = 0, lastInsertRowid = 0) {
   return {
     success: true,
@@ -51,14 +69,23 @@ function d1Promise(promise) {
 function prepared(query, bound = []) {
   return {
     bind(...args) {
+      if (queryStats) {
+        for (const value of args) {
+          const bytes = boundBytes(value);
+          queryStats.totalBoundBytes += bytes;
+          if (bytes > queryStats.maxBoundBytes) queryStats.maxBoundBytes = bytes;
+        }
+      }
       return prepared(query, args);
     },
     all() {
       countExecution();
       try {
-        const statement = sqlite.prepare(query);
-        statement.setReadBigInts(true);
-        const rows = statement.all(...bound).map(d1Row);
+        const rows = timed(() => {
+          const statement = sqlite.prepare(query);
+          statement.setReadBigInts(true);
+          return statement.all(...bound).map(d1Row);
+        });
         return d1Promise(Promise.resolve({
           success: true,
           results: rows,
@@ -71,11 +98,13 @@ function prepared(query, bound = []) {
     raw(options) {
       countExecution();
       try {
-        const statement = sqlite.prepare(query);
-        statement.setReadBigInts(true);
-        const columnNames = statement.columns().map((column) => column.name);
-        statement.setReturnArrays(true);
-        const rows = statement.all(...bound).map((row) => row.map(d1Value));
+        const [columnNames, rows] = timed(() => {
+          const statement = sqlite.prepare(query);
+          statement.setReadBigInts(true);
+          const names = statement.columns().map((column) => column.name);
+          statement.setReturnArrays(true);
+          return [names, statement.all(...bound).map((row) => row.map(d1Value))];
+        });
         const result = options?.columnNames ? [columnNames, ...rows] : rows;
         return d1Promise(Promise.resolve(result));
       } catch (error) {
@@ -89,22 +118,24 @@ function prepared(query, bound = []) {
         return d1Promise(new Promise(() => {}));
       }
       try {
-        const statement = sqlite.prepare(query);
-        statement.setReadBigInts(true);
-        if (statement.columns().length > 0) {
-          const rows = statement.all(...bound).map(d1Row);
-          const changes = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(query)
-            ? Number(sqlite.prepare("SELECT changes() AS value").get().value)
-            : 0;
-          const lastInsertRowid = Number(sqlite.prepare("SELECT last_insert_rowid() AS value").get().value);
-          return d1Promise(Promise.resolve({
-            success: true,
-            results: rows,
-            meta: { changes, last_row_id: lastInsertRowid },
-          }));
-        }
-        const result = statement.run(...bound);
-        return d1Promise(Promise.resolve(resultMeta(result.changes, result.lastInsertRowid)));
+        return timed(() => {
+          const statement = sqlite.prepare(query);
+          statement.setReadBigInts(true);
+          if (statement.columns().length > 0) {
+            const rows = statement.all(...bound).map(d1Row);
+            const changes = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(query)
+              ? Number(sqlite.prepare("SELECT changes() AS value").get().value)
+              : 0;
+            const lastInsertRowid = Number(sqlite.prepare("SELECT last_insert_rowid() AS value").get().value);
+            return d1Promise(Promise.resolve({
+              success: true,
+              results: rows,
+              meta: { changes, last_row_id: lastInsertRowid },
+            }));
+          }
+          const result = statement.run(...bound);
+          return d1Promise(Promise.resolve(resultMeta(result.changes, result.lastInsertRowid)));
+        });
       } catch (error) {
         return d1Promise(Promise.reject(error));
       }
@@ -149,7 +180,10 @@ globalThis.__d1 = {
     return prepared(query);
   },
   batch(statements) {
-    if (queryStats) queryStats.batchCalls++;
+    if (queryStats) {
+      queryStats.batchCalls++;
+      queryStats.batchSizes.push(statements.length);
+    }
     // D1 runs every batch as its own transaction. This fake has one SQLite connection, so two batches in flight at once
     // (a request and its background work) would interleave BEGIN/COMMIT on it: run them one after another instead.
     const run = batchQueue.then(() => runBatch(statements));
@@ -164,7 +198,10 @@ globalThis.__d1 = {
   },
   __beginQueryCount(label) {
     if (queryStats) throw new Error("a D1 query count is already active");
-    queryStats = { label, prepareExecutions: 0, sequentialExecutions: 0, batchedExecutions: 0, batchCalls: 0 };
+    queryStats = {
+      label, prepareExecutions: 0, sequentialExecutions: 0, batchedExecutions: 0, batchCalls: 0,
+      maxBoundBytes: 0, totalBoundBytes: 0, dbMillis: 0, batchSizes: [],
+    };
   },
   __endQueryCount() {
     if (!queryStats) throw new Error("no D1 query count is active");

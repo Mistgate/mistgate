@@ -30,6 +30,12 @@
 # agent_too_old, device and WARP calls are refused, the old node stays untouched. The retire step also checks that no
 # AWG/WARP link, table, rule or route is left.
 #
+# --edge runs the Cloudflare edition instead (scripts/e2e/edge.sh): the panel is the Go js/wasm build inside a local
+# `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a
+# link-only agent that enrols and connects over the Worker's public WebSocket link, and the steps are the edge subset of
+# this scenario (no self-update, no tunnel steps, no panel restarts) plus the edge-specific ones: fan-out, the cron
+# path, an object reset. It needs node 22 and pnpm, and builds into the work directory only.
+#
 # ISOLATION. A node agent owns things that exist once per host: TCP 443 (masquerade), the nft table
 # mistgate_node, /etc/sysctl.d/90-mistgate.conf and the journald drop-in. So the whole run happens in a private
 # network namespace (an ipvlan slave of the default interface gives it internet access without forwarding, which
@@ -47,7 +53,7 @@ OLD_NODE=""
 # scenario and takes what it always took.
 # --m3 is all three; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_ONLY=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_ONLY="" EDGE=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
@@ -57,6 +63,7 @@ while [ $# -gt 0 ]; do
     --warp) M3_WARP=1 ;;
     --mihomo) M3_MIHOMO=1 M3_AWG=1 ;;
     --m3-only) M3_ONLY=1 ;;
+    --edge) EDGE=1 ;;
     --old-node) OLD_NODE=${2:?--old-node needs a path}; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -68,10 +75,17 @@ set -- "${ARGS[@]}"
 M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
+[ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
 [ "$(id -u)" = 0 ] || { echo "run as root (wsl -d Ubuntu -u root)" >&2; exit 2; }
 for tool in go curl jq python3 openssl nft ip mount; do
   command -v "$tool" >/dev/null || { echo "missing tool: $tool" >&2; exit 2; }
 done
+if [ -n "$EDGE" ]; then
+  for tool in node pnpm gzip; do
+    command -v "$tool" >/dev/null || { echo "missing tool for --edge: $tool" >&2; exit 2; }
+  done
+  [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 22 ] || { echo "--edge needs node 22 or newer" >&2; exit 2; }
+fi
 if [ -n "$M3_LIVE" ]; then
   for tool in nsenter unshare ss ping base64; do
     command -v "$tool" >/dev/null || { echo "missing tool for the tunnel steps: $tool" >&2; exit 2; }
@@ -113,6 +127,8 @@ PY
   ip -n "$NS" route add default via "$gw"
   mkdir -p "/etc/netns/$NS"
   printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' >"/etc/netns/$NS/resolv.conf"
+  # --edge: the Worker answers on de1.example.com, a name that exists only inside this namespace
+  [ -z "$EDGE" ] || printf '127.0.0.1 localhost\n127.0.0.1 de1.example.com\n' >"/etc/netns/$NS/hosts"
   echo "network namespace $NS: $nic $addr via $dev, gateway $gw"
   MG_E2E_INNER=1 ip netns exec "$NS" bash "${BASH_SOURCE[0]}" "$@" || rc=$?
   return "$rc"
@@ -170,7 +186,7 @@ sys.stdout.write(t)'
 
 tail_logs() {
   local f
-  for f in panel node client; do
+  for f in panel wrangler node client; do
     for l in "$WORK"/$f*.log; do
       [ -s "$l" ] || continue
       echo "--- tail $(basename "$l")"
@@ -213,6 +229,7 @@ cleanup() {
   fi
   [ -e "$WORK/sampling" ] && rm -f "$WORK/sampling"
   for ((p = ${#PIDS[@]} - 1; p >= 0; p--)); do stop_pid "${PIDS[$p]}"; done
+  ! declare -F edge_reap >/dev/null || edge_reap # workerd and the wrangler processes that outlived their parent
   # Nothing to undo on the host: the nft table lives in the namespace and the agent's files on private tmpfs
   # mounts, both gone when the last process here exits.
   if [ -n "${KEEP:-}" ]; then say "work directory kept: $WORK"; else rm -rf "$WORK"; fi
@@ -259,7 +276,7 @@ vmrss_mb() { awk '/^VmRSS:/ {printf "%.1f", $2 / 1024}' "/proc/$1/status"; }
 
 api() { # <Service/Method> [json]  -> response body on stdout; non-200 is an error
   local out code
-  out=$(curl -sS -m 40 -w $'\n%{http_code}' -X POST "$ADMIN/api/mistgate.admin.v1.$1" \
+  out=$(curl -sS -m 40 ${CURL_CA:+--cacert "$CURL_CA" --compressed} -w $'\n%{http_code}' -X POST "$ADMIN/api/mistgate.admin.v1.$1" \
     -H 'Content-Type: application/json' ${COOKIE:+-H "Cookie: $COOKIE"} -d "${2:-{\}}") || return 1
   code=${out##*$'\n'}
   out=${out%$'\n'*}
@@ -408,6 +425,29 @@ burst() {
   PEAK_NODE=$(sort -n "$WORK/peak.node" | tail -1)
 }
 
+# build_hysteria: the Hysteria2 client, built from source, never downloaded. `go install ...app/v2@version` is refused
+# (the app module's go.mod has replace directives pointing at ../core and ../extras), so build it from a scratch
+# module that requires the app and pins core and extras to the same published tag.
+HYV=v2.12.3 HYM=github.com/apernet/hysteria
+build_hysteria() {
+  mkdir "$WORK/hy"
+  (
+    cd "$WORK/hy"
+    go mod init hyclient >/dev/null 2>&1
+    go mod edit -go="$(sed -n 's/^toolchain go//p' "$REPO/go.mod")" -require="$HYM/app/v2@$HYV" -replace="$HYM/core/v2=$HYM/core/v2@$HYV" -replace="$HYM/extras/v2=$HYM/extras/v2@$HYV"
+    GOFLAGS="-mod=mod -buildvcs=false" go build -trimpath -o "$BIN/hysteria" "$HYM/app/v2"
+  )
+  "$BIN/hysteria" version 2>&1 | head -3 | sed 's/^/    /'
+}
+
+# ---------------------------------------------------------------- the Cloudflare edition (--edge)
+if [ -n "$EDGE" ]; then
+  # shellcheck source=e2e/edge.sh
+  . "$REPO/scripts/e2e/edge.sh"
+  edge_run
+  exit 0
+fi
+
 # ================================================================ 0. prerequisites
 step "0. build (linux binaries, hysteria client from source)"
 cd "$REPO"
@@ -462,18 +502,7 @@ if [ -n "$OLD_NODE" ]; then
   NODE_BIN=$BIN/mistgate-node-old
   say "COMPATIBILITY RUN: the node agent is the older build $("$NODE_BIN" version 2>&1 | head -1)"
 fi
-# The hysteria client is built from source, never downloaded. `go install ...app/v2@version` is refused (the
-# app module's go.mod has replace directives pointing at ../core and ../extras), so build it from a scratch
-# module that requires the app and pins core and extras to the same published tag.
-HYV=v2.12.3 HYM=github.com/apernet/hysteria
-mkdir "$WORK/hy"
-(
-  cd "$WORK/hy"
-  go mod init hyclient >/dev/null 2>&1
-  go mod edit -go="$(sed -n 's/^toolchain go//p' "$REPO/go.mod")" -require="$HYM/app/v2@$HYV" -replace="$HYM/core/v2=$HYM/core/v2@$HYV" -replace="$HYM/extras/v2=$HYM/extras/v2@$HYV"
-  GOFLAGS="-mod=mod -buildvcs=false" go build -trimpath -o "$BIN/hysteria" "$HYM/app/v2"
-)
-"$BIN/hysteria" version 2>&1 | head -3 | sed 's/^/    /'
+build_hysteria
 pass "built mistgate, mistgate-node, h3get and hysteria v2.12.3 ($(du -h "$BIN/mistgate" | cut -f1) panel, $(du -h "$BIN/mistgate-node" | cut -f1) node)"
 
 PUB=$(free_port tcp) ADM=$(free_port tcp) HY2=$(free_port udp) HY2_PLAIN=$(free_port udp)
