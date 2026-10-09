@@ -22,6 +22,7 @@ import (
 // Capabilities this build can list in Hello.capabilities besides "doctor/1" and the update ones.
 const (
 	capAWG          = "awg/1"
+	capVLESS        = "vless/1"
 	capWarp         = "warp/1"
 	capTorrentGuard = "torrentguard/1"
 	capUDPCheck     = "udpcheck/1"
@@ -122,6 +123,9 @@ func (a *Agent) capabilities() []string {
 	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
+	}
+	if _, ok := a.engines["vless"]; ok {
+		caps = append(caps, capVLESS)
 	}
 	if a.cfg.Warp != nil {
 		caps = append(caps, capWarp)

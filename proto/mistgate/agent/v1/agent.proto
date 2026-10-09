@@ -259,6 +259,7 @@ package mistgate.agent.v1;
 //     trust class.
 //   - Credential.data_json for awg is {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],
 //     "psk":"<base64>"} in that field order (the bytes are hashed). The client's private key never reaches a node.
+//   - Credential.data_json for vless is {"id":"<uuid>"}; the UUID reaches the node in clear (design decision 5).
 //   - Session for awg: connected_at_unix = the peer's last handshake. A peer is a session while its last handshake
 //     is younger than 190 s.
 //   - TrafficDelta for awg: bytes_up = the peer's received bytes (client -> internet), bytes_down = its

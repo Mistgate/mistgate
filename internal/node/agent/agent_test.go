@@ -27,6 +27,13 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
+	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
+	if !slices.Contains(a.capabilities(), "vless/1") {
+		t.Fatal("Hello.capabilities does not advertise vless/1 for a registered engine")
+	}
+}
+
 func TestConfiguredLinkUsesMTLSWhenPanelDoesNotAdvertiseSupport(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.LinkURL = "wss://example.com/abcdefghijklmnop" }})
 	h.waitConnected()

@@ -126,7 +126,7 @@ func TestWireHasTheL3PartsAndNoSilentDirectExit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{"hysteria2", "awg"} {
+	for _, p := range []string{"hysteria2", "awg", "vless"} {
 		if engines[p] == nil {
 			t.Errorf("no %s engine in this build", p)
 		}

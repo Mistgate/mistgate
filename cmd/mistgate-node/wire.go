@@ -14,6 +14,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hysteria2"
+	"github.com/mistgate/mistgate/internal/node/vless"
 	"github.com/mistgate/mistgate/internal/node/warp"
 )
 
@@ -75,6 +76,7 @@ func wire(stateDir string, log *slog.Logger, hooks *agentHooks) (agent.Config, m
 			Masquerade: func(string) http.Handler { return decoy.Handler() },
 		}, map[string]engine.Factory{
 			"hysteria2": hysteria2.Factory,
+			"vless":     vless.Factory,
 			awg.Protocol: func(env engine.Env) (engine.Engine, error) {
 				mode := func() string {
 					if hooks.awgMode == nil {

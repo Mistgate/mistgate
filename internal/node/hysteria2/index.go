@@ -1,7 +1,6 @@
 package hysteria2
 
 import (
-	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -12,8 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/time/rate"
-
+	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -27,7 +25,7 @@ type credState struct {
 	owner     atomic.Pointer[credIdentity]
 
 	validUntil atomic.Int64 // unix seconds, 0 = never
-	limit      atomic.Pointer[limiter]
+	limit      atomic.Pointer[ratelimit.Limiter]
 	up, down   atomic.Uint64 // user's view: core tx = up, core rx = down
 	conns      atomic.Int32  // open QUIC connections
 	kicks      atomic.Int32  // connections still to be closed at their next packet (see takeKick)
@@ -37,26 +35,6 @@ type credState struct {
 }
 
 type credIdentity struct{ userID string }
-
-// limiter is a token bucket per direction, in bytes.
-type limiter struct {
-	bps    uint64 // as configured (bits per second), to detect changes
-	tx, rx *rate.Limiter
-}
-
-const minBurst = 64 * 1024 // above the largest TCP copy chunk (32 KiB) and any UDP datagram
-
-func newLimiter(bps uint64) *limiter {
-	bytes := bps / 8
-	if bytes == 0 {
-		bytes = 1
-	}
-	burst := int(bytes)
-	if burst < minBurst {
-		burst = minBurst
-	}
-	return &limiter{bps: bps, tx: rate.NewLimiter(rate.Limit(bytes), burst), rx: rate.NewLimiter(rate.Limit(bytes), burst)}
-}
 
 // index is an immutable view of the credentials of one inbound, swapped as a whole.
 type index struct {
@@ -127,8 +105,8 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred) (*index, 
 		switch cur := cs.limit.Load(); {
 		case p.c.RateLimitBps == 0:
 			cs.limit.Store(nil)
-		case cur == nil || cur.bps != p.c.RateLimitBps:
-			cs.limit.Store(newLimiter(p.c.RateLimitBps))
+		case cur == nil || cur.BPS() != p.c.RateLimitBps:
+			cs.limit.Store(ratelimit.New(p.c.RateLimitBps))
 		}
 		ix.byHash[p.hash] = cs
 		ix.byID[p.c.CredID] = cs
@@ -170,23 +148,13 @@ func (in *inbound) LogTraffic(id string, tx, rx uint64) bool {
 	if l := cs.limit.Load(); l != nil {
 		// One bucket per direction; for UDP this stalls the connection's single receive loop,
 		// which is acceptable for an experimental limit. Waits end when the inbound stops.
-		if !wait(in.ctx, l.tx, tx) || !wait(in.ctx, l.rx, rx) {
+		if !l.WaitUp(in.ctx, tx) || !l.WaitDown(in.ctx, rx) {
 			return false
 		}
 	}
 	cs.up.Add(tx)
 	cs.down.Add(rx)
 	return true
-}
-
-func wait(ctx context.Context, l *rate.Limiter, n uint64) bool {
-	if n == 0 {
-		return true
-	}
-	if n > uint64(l.Burst()) {
-		n = uint64(l.Burst())
-	}
-	return l.WaitN(ctx, int(n)) == nil
 }
 
 // Kick model. LogTraffic only sees the credential id, never which connection is speaking, so Kick hands out

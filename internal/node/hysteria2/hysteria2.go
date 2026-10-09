@@ -632,7 +632,7 @@ func (o outbound) TCP(addr string) (net.Conn, error) {
 		return c, err
 	}
 	port := torrentPort(addr)
-	return newTorrentTCPConn(c, func() {
+	return torrentguard.WrapTCP(c, func() {
 		o.in.reportTorrent(torrentguard.ProtocolBitTorrentTCP, torrentguard.EvidenceTCPHandshake, "tcp", userID, port)
 	}), nil
 }
@@ -647,9 +647,9 @@ func (o outbound) UDP(addr string) (server.UDPConn, error) {
 		return nil, err
 	}
 	if o.in != nil && o.in.e.torrentEnabled.Load() {
-		return torrentUDPConn{UDPConn: c, attempt: func(protocol torrentguard.Protocol, evidence torrentguard.Evidence, addr string) {
+		return torrentguard.WrapUDP(c, func(protocol torrentguard.Protocol, evidence torrentguard.Evidence, addr string) {
 			o.in.reportTorrent(protocol, evidence, "udp", userID, torrentPort(addr))
-		}}, nil
+		}), nil
 	}
 	return c, nil
 }
