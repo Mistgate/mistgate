@@ -80,7 +80,7 @@ var transactionShape2 = map[string]string{
 
 var transactionShape3 = map[string]string{
 	"fleet_ca.go:RenewCert":     "Writes only inside a transaction; D1 stages the writes and commits them as one batch.",
-	"fleet_node.go:NodeApplied": "The guarded live drift update and node/inbound apply records commit in one batch.",
+	"fleet_node.go:NodeApplied": "The node row, guarded live drift update, and json_each inbound results commit in one fixed three-statement batch.",
 	"fleet_stats.go:SkipSeq":    "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
 }
 

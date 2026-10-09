@@ -235,8 +235,21 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if err != nil || result.NodeID != enrolled.ID || result.Replay {
 		t.Fatalf("Enroll() = %+v, %v", result, err)
 	}
-	if err := st.NodeApplied(ctx, enrolled.ID, 1, false, 1, "hash", nil, now); err != nil {
-		t.Fatalf("write-only NodeApplied transaction on D1: %v", err)
+	profileID := "prf_d1_applied"
+	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: profileID, Protocol: "awg", Name: "d1-applied", SettingsJSON: "{}", CreatedAt: now}); err != nil {
+		t.Fatalf("CreateProfile() for NodeApplied: %v", err)
+	}
+	if err := st.Access().CreateInbound(ctx, AccessInbound{ID: "inb_d1_applied", ProfileID: profileID, NodeID: enrolled.ID, Enabled: true, CreatedAt: now}); err != nil {
+		t.Fatalf("CreateInbound() for NodeApplied: %v", err)
+	}
+	calls = countD1Queries(t, binding, "NodeApplied", func() {
+		err = st.NodeApplied(ctx, enrolled.ID, 1, false, 1, "hash", []InboundApplied{{ID: "inb_d1_applied", State: "active", Error: "", SpecHash: "d1-spec"}}, now)
+	})
+	if err != nil {
+		t.Fatalf("NodeApplied transaction on D1: %v", err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("NodeApplied used %d D1 calls in %d batches, want 1 call in 1 batch", calls.queries, calls.batches)
 	}
 	if err := st.SkipSeq(ctx, enrolled.ID, "d1-instance", 3, now); err != nil {
 		t.Fatalf("write-only SkipSeq batch on D1: %v", err)

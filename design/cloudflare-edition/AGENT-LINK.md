@@ -227,8 +227,9 @@ page).
 - **D1 batch size.** The IngestStats write batch is a fixed eight statements (json_each, including the guarded
   `node_live` UPDATE, whether or not the projection applies); before step 6, still measure the largest batch on real D1
   (parameter size, rows read).
-- **NodeApplied batch size.** It currently has 2 + inbounds statements, with the number of inbounds set by the agent;
-  move those updates to `json_each` before step 6.
+- **NodeApplied batch size.** Resolved: one inbound-result UPDATE reads from `json_each`; every call is exactly three
+  statements (node row, session-guarded `node_live` drift, and inbound results). The store caps input at 256 results and
+  a 1 MiB JSON parameter.
 - **Projection size.** A StatsBatch may name up to 65 536 users, so the `users` column can exceed D1's 2 MB row limit;
   the 1.5 MB valve in section 4.3 keeps the previous row when that would happen. `live_json` keeps the 2000 highest
   per-user download rates (ties by user id), like the 2000 sessions. The admin view only shows top consumers.

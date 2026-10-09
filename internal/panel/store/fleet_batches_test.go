@@ -330,6 +330,157 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 		users, sessions, certificates, before, len(stmts))
 }
 
+func TestNodeAppliedWriteBatchStatementCount(t *testing.T) {
+	for _, count := range []int{0, 1, 50} {
+		in := make([]InboundApplied, count)
+		for i := range in {
+			in[i] = InboundApplied{ID: fmt.Sprintf("inb_%03d", i), State: "active"}
+		}
+		stmts, err := nodeAppliedStmts("nod_statement_count", 1, false, 1, "hash", in, time.Unix(1_700_000_000, 0).UTC())
+		if err != nil {
+			t.Fatalf("NodeApplied statements for %d inbounds: %v", count, err)
+		}
+		if len(stmts) != 3 {
+			t.Errorf("NodeApplied statements with %d inbounds = %d, want 3", count, len(stmts))
+		}
+		if !strings.Contains(stmts[2].Query, "json_each(?1)") || len(stmts[2].Args) != 3 {
+			t.Errorf("NodeApplied inbound statement does not use one bounded JSON input: query=%q args=%d", stmts[2].Query, len(stmts[2].Args))
+		}
+	}
+}
+
+func TestNodeAppliedWritesInboundResultsAndKeepsGuards(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	f := newFleetBatchFixture(t, s, "node_applied")
+	other := newFleetBatchFixture(t, s, "node_applied_other")
+	if _, _, err := s.NodeHello(ctx, f.nodeID, 42, HelloInfo{Instance: "instance"}, f.now); err != nil {
+		t.Fatal(err)
+	}
+
+	inboundIDs := []string{f.inboundID}
+	for i := 1; i < 50; i++ {
+		profileID := fmt.Sprintf("prf_apply_%03d", i)
+		inboundID := fmt.Sprintf("inb_apply_%03d", i)
+		if err := s.Access().CreateProfile(ctx, AccessProfile{ID: profileID, Protocol: "awg", Name: profileID, SettingsJSON: "{}", CreatedAt: f.now}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Access().CreateInbound(ctx, AccessInbound{ID: inboundID, ProfileID: profileID, NodeID: f.nodeID, Enabled: true, CreatedAt: f.now}); err != nil {
+			t.Fatal(err)
+		}
+		inboundIDs = append(inboundIDs, inboundID)
+	}
+
+	const disabledID = "inb_apply_disabled"
+	const disabledProfileID = "prf_apply_disabled"
+	if err := s.Access().CreateProfile(ctx, AccessProfile{ID: disabledProfileID, Protocol: "awg", Name: disabledProfileID, SettingsJSON: "{}", CreatedAt: f.now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Access().CreateInbound(ctx, AccessInbound{ID: disabledID, ProfileID: disabledProfileID, NodeID: f.nodeID, Enabled: false, CreatedAt: f.now}); err != nil {
+		t.Fatal(err)
+	}
+
+	readInbound := func(id string) (state, lastError, specHash, pin string, notAfter, updatedAt int64) {
+		t.Helper()
+		if err := s.R.QueryRowContext(ctx, `SELECT state, last_error, applied_spec_hash, cert_pin_sha256, cert_not_after, updated_at
+			FROM inbound WHERE id = ?`, id).Scan(&state, &lastError, &specHash, &pin, &notAfter, &updatedAt); err != nil {
+			t.Fatalf("read inbound %q: %v", id, err)
+		}
+		return
+	}
+	readNode := func() (int64, string) {
+		t.Helper()
+		var rev int64
+		var hash string
+		if err := s.R.QueryRowContext(ctx, `SELECT applied_revision, applied_hash FROM node WHERE id = ?`, f.nodeID).Scan(&rev, &hash); err != nil {
+			t.Fatal(err)
+		}
+		return rev, hash
+	}
+
+	if err := s.NodeApplied(ctx, f.nodeID, 42, true, 1, "empty", nil, f.now); err != nil {
+		t.Fatalf("NodeApplied with no inbounds: %v", err)
+	}
+	if rev, hash := readNode(); rev != 1 || hash != "empty" {
+		t.Fatalf("node after empty result = (%d, %q), want (1, empty)", rev, hash)
+	}
+	if got := queryInt(t, s, `SELECT drift FROM node_live WHERE node_id = ?`, f.nodeID); got != 1 {
+		t.Fatalf("node_live drift after current-session result = %d, want 1", got)
+	}
+
+	if err := s.NodeApplied(ctx, f.nodeID, 42, true, 2, "one", []InboundApplied{{ID: f.inboundID, State: "active", Error: "single error",
+		SpecHash: "single spec", CertPin: "single pin"}}, f.now.Add(time.Second)); err != nil {
+		t.Fatalf("NodeApplied with one inbound: %v", err)
+	}
+	if state, lastError, specHash, pin, notAfter, updatedAt := readInbound(f.inboundID); state != "active" || lastError != "single error" ||
+		specHash != "single spec" || pin != "single pin" || notAfter != 0 || updatedAt != f.now.Add(time.Second).Unix() {
+		t.Fatalf("single inbound result = (%q, %q, %q, %q, %d, %d)", state, lastError, specHash, pin, notAfter, updatedAt)
+	}
+
+	const appliedAt = 1_700_000_002
+	applyTime := time.Unix(appliedAt, 0).UTC()
+	many := make([]InboundApplied, 0, 54)
+	want := make(map[string]InboundApplied, len(inboundIDs))
+	for i, id := range inboundIDs {
+		state := "active"
+		if i%2 == 0 {
+			state = "failed"
+		}
+		result := InboundApplied{ID: id, State: state, Error: fmt.Sprintf("error_%03d", i), SpecHash: fmt.Sprintf("spec_%03d", i),
+			CertPin: fmt.Sprintf("pin_%03d", i), CertNotAfter: f.now.Add(time.Duration(i+1) * time.Hour)}
+		many = append(many, result)
+		want[id] = result
+	}
+	many = append(many,
+		InboundApplied{ID: disabledID, State: "failed", Error: "disabled", SpecHash: "disabled", CertPin: "disabled", CertNotAfter: f.now.Add(time.Hour)},
+		InboundApplied{ID: other.inboundID, State: "failed", Error: "foreign", SpecHash: "foreign", CertPin: "foreign", CertNotAfter: f.now.Add(time.Hour)},
+		InboundApplied{ID: f.inboundID, State: "active", Error: "first duplicate", SpecHash: "first duplicate", CertPin: "first duplicate", CertNotAfter: f.now.Add(2 * time.Hour)},
+		InboundApplied{ID: f.inboundID, State: "failed", Error: "last duplicate", SpecHash: "last duplicate", CertPin: "last duplicate", CertNotAfter: f.now.Add(3 * time.Hour)},
+	)
+	want[f.inboundID] = many[len(many)-1]
+	if err := s.NodeApplied(ctx, f.nodeID, 42, false, 3, "many", many, applyTime); err != nil {
+		t.Fatalf("NodeApplied with many inbounds: %v", err)
+	}
+	if rev, hash := readNode(); rev != 3 || hash != "many" {
+		t.Fatalf("node after many results = (%d, %q), want (3, many)", rev, hash)
+	}
+	for _, id := range inboundIDs {
+		expected := want[id]
+		state, lastError, specHash, pin, notAfter, updatedAt := readInbound(id)
+		if state != expected.State || lastError != expected.Error || specHash != expected.SpecHash || pin != expected.CertPin ||
+			notAfter != fleetUnix(expected.CertNotAfter) || updatedAt != appliedAt {
+			t.Errorf("inbound %q = (%q, %q, %q, %q, %d, %d), want (%q, %q, %q, %q, %d, %d)", id,
+				state, lastError, specHash, pin, notAfter, updatedAt, expected.State, expected.Error, expected.SpecHash,
+				expected.CertPin, fleetUnix(expected.CertNotAfter), appliedAt)
+		}
+	}
+	for _, id := range []string{disabledID, other.inboundID} {
+		state, lastError, specHash, pin, notAfter, updatedAt := readInbound(id)
+		if state != "pending" || lastError != "" || specHash != "" || pin != "" || notAfter != 0 || updatedAt != f.now.Unix() {
+			t.Errorf("guarded inbound %q changed: (%q, %q, %q, %q, %d, %d)", id, state, lastError, specHash, pin, notAfter, updatedAt)
+		}
+	}
+
+	if err := s.NodeApplied(ctx, f.nodeID, 41, true, 4, "foreign-session", nil, applyTime.Add(time.Second)); err != nil {
+		t.Fatalf("NodeApplied from a foreign session: %v", err)
+	}
+	if got := queryInt(t, s, `SELECT drift FROM node_live WHERE node_id = ?`, f.nodeID); got != 0 {
+		t.Fatalf("foreign-session NodeApplied changed drift to %d, want 0", got)
+	}
+}
+
+func TestNodeAppliedBoundsInboundJSON(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0).UTC()
+	if err := s.NodeApplied(ctx, "nod_missing", 1, false, 1, "", make([]InboundApplied, maxNodeAppliedInbounds+1), now); err == nil {
+		t.Fatal("NodeApplied accepted more than the inbound count limit")
+	}
+	if err := s.NodeApplied(ctx, "nod_missing", 1, false, 1, "", []InboundApplied{{ID: strings.Repeat("x", maxNodeAppliedJSONBytes)}}, now); err == nil {
+		t.Fatal("NodeApplied accepted a JSON parameter larger than the byte limit")
+	}
+}
+
 func TestEnrollmentBatchReplayAndFleetErrors(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()

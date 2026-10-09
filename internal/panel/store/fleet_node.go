@@ -359,23 +359,75 @@ type InboundApplied struct {
 	CertNotAfter                        time.Time
 }
 
+// Bound both update work and serialized size because inbound identifiers are not clipped by the result handler.
+const (
+	maxNodeAppliedInbounds  = 256
+	maxNodeAppliedJSONBytes = 1 << 20
+)
+
+type inboundAppliedJSON struct {
+	ID           string `json:"id"`
+	State        string `json:"state"`
+	Error        string `json:"error"`
+	SpecHash     string `json:"spec_hash"`
+	CertPin      string `json:"cert_pin"`
+	CertNotAfter int64  `json:"cert_not_after"`
+}
+
 // NodeApplied records an ApplyResult: the node's applied revision/hash and per-inbound outcome.
 func (s *Store) NodeApplied(ctx context.Context, id string, session uint64, drift bool, rev uint64, hash string, in []InboundApplied, now time.Time) error {
 	sessionID, err := nodeSessionValue(session)
 	if err != nil {
 		return err
 	}
-	stmts := []Stmt{
-		{Query: `UPDATE node SET applied_revision = ?, applied_hash = ? WHERE id = ?`, Args: []any{int64(rev), hash, id}},
-		{Query: `UPDATE node_live SET drift = ? WHERE node_id = ? AND session = ?`, Args: []any{boolInt(drift), id, sessionID}},
-	}
-	for _, r := range in {
-		stmts = append(stmts, Stmt{Query: `
-			UPDATE inbound SET state = ?, last_error = ?, applied_spec_hash = ?, cert_pin_sha256 = ?, cert_not_after = ?, updated_at = ?
-			WHERE id = ? AND node_id = ? AND enabled = 1`, Args: []any{r.State, r.Error, r.SpecHash, r.CertPin, fleetUnix(r.CertNotAfter), unix(now), r.ID, id}})
+	stmts, err := nodeAppliedStmts(id, sessionID, drift, rev, hash, in, now)
+	if err != nil {
+		return err
 	}
 	_, err = s.batch(ctx, stmts...)
 	return err
+}
+
+func nodeAppliedStmts(id string, sessionID int64, drift bool, rev uint64, hash string, in []InboundApplied, now time.Time) ([]Stmt, error) {
+	if len(in) > maxNodeAppliedInbounds {
+		return nil, errors.New("store: too many applied inbounds")
+	}
+	rows := make([]inboundAppliedJSON, 0, len(in))
+	for _, r := range in {
+		rows = append(rows, inboundAppliedJSON{ID: r.ID, State: r.State, Error: r.Error, SpecHash: r.SpecHash, CertPin: r.CertPin,
+			CertNotAfter: fleetUnix(r.CertNotAfter)})
+	}
+	jsonRows, err := json.Marshal(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(jsonRows) > maxNodeAppliedJSONBytes {
+		return nil, errors.New("store: applied inbound results exceed size limit")
+	}
+	return []Stmt{
+		{Query: `UPDATE node SET applied_revision = ?, applied_hash = ? WHERE id = ?`, Args: []any{int64(rev), hash, id}},
+		{Query: `UPDATE node_live SET drift = ? WHERE node_id = ? AND session = ?`, Args: []any{boolInt(drift), id, sessionID}},
+		{Query: `WITH applied AS (
+			SELECT CAST(item.key AS INTEGER) AS ordinal,
+				json_extract(item.value, '$.id') AS inbound_id,
+				json_extract(item.value, '$.state') AS state,
+				json_extract(item.value, '$.error') AS last_error,
+				json_extract(item.value, '$.spec_hash') AS applied_spec_hash,
+				json_extract(item.value, '$.cert_pin') AS cert_pin_sha256,
+				json_extract(item.value, '$.cert_not_after') AS cert_not_after
+			FROM json_each(?1) AS item
+		)
+		UPDATE inbound
+		SET (state, last_error, applied_spec_hash, cert_pin_sha256, cert_not_after, updated_at) = (
+			SELECT r.state, r.last_error, r.applied_spec_hash, r.cert_pin_sha256, r.cert_not_after, ?2
+			FROM applied AS r
+			WHERE r.inbound_id = inbound.id
+			ORDER BY r.ordinal DESC
+			LIMIT 1
+		)
+		WHERE inbound.node_id = ?3 AND inbound.enabled = 1
+			AND inbound.id IN (SELECT inbound_id FROM applied)`, Args: []any{string(jsonRows), unix(now), id}},
+	}, nil
 }
 
 // SetInboundCert stores the certificate an inbound serves as the node's stats report it (an ACME certificate appears and
