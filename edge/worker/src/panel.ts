@@ -1,7 +1,7 @@
 import "../dist/wasm_exec.js";
 import panelModule from "../dist/panel.wasm";
 import type { Env } from "./env";
-import { type FetchRequest, type FetchResponse, memoizeRetry, readAsset, routeLimit } from "./shell";
+import { askNode, closeNode, pokeNodes, type FetchRequest, type FetchResponse, memoizeRetry, readAsset, routeLimit } from "./shell";
 
 /** The object the Go program publishes as globalThis.mgPanel (cmd/mistgate-edge). */
 interface PanelApi {
@@ -48,6 +48,11 @@ async function init(env: Env, origin: string): Promise<PanelApi> {
     assets: (path: string) => readAsset(env.ASSETS, path),
     // Resolves {ok, retryAfterMs, remaining, first}; a rejection makes the panel refuse the guarded request.
     limit: (request: { name: string; key: string }) => routeLimit(env.LIMITER, request),
+    nodeLink: {
+      ask: (nodeId: string, requestId: string, frame: Uint8Array, deadlineAt: number) => askNode(env.NODELINK, nodeId, requestId, frame, deadlineAt),
+      close: (nodeId: string, reason: string) => closeNode(env.NODELINK, nodeId, reason),
+      poke: (nodeIds: string[]) => pokeNodes(env.NODELINK, nodeIds),
+    },
     // Used only while the database is empty; the panel keeps what it stored afterwards.
     publicURL: env.PUBLIC_URL || origin,
     adminHost: env.ADMIN_HOST || undefined,

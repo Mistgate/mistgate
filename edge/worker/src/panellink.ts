@@ -1,6 +1,7 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import type { Env } from "./env";
 import { getPanel } from "./panel";
+import { detachWaitUntil, type WaitUntilOutput } from "./shell";
 
 // The Go side of the agent link. A NodeLink object holds the socket and an opaque state string and reaches Go through
 // this entrypoint (this.ctx.exports.PanelLink, a loopback call into the Worker): the Go panel wasm lives in the Worker's
@@ -15,7 +16,7 @@ import { getPanel } from "./panel";
 
 /** What happened to the session; Go's step answers each one. `at` is the object's clock (Date.now()). */
 export type LinkEvent =
-  | { kind: "open"; at: number; certSerial: string; certNotAfterUnix: number }
+  | { kind: "open"; at: number; generation: number; certSerial: string; certNotAfterUnix: number }
   | { kind: "frame"; at: number; frame: Uint8Array }
   | { kind: "alarm"; at: number }
   | { kind: "desired"; at: number }
@@ -26,6 +27,8 @@ export interface LinkStepIn {
   nodeId: string;
   /** What the previous step returned; null before the first one. */
   state: string | null;
+  /** End of this Go call's budget (ms since the epoch). */
+  until: number;
   event: LinkEvent;
 }
 
@@ -38,6 +41,8 @@ export interface LinkStepOut {
   alarmAt?: number;
   /** An answer for a pending `ask`; a null frame means the request is gone. */
   replies?: { requestId: string; frame: Uint8Array | null }[];
+  /** The node was retired; NodeLink deletes its stored session after this closed step. */
+  forget?: true;
 }
 
 export interface LinkChallenge {
@@ -49,21 +54,20 @@ export type LinkAccept = { ok: true; frame: Uint8Array; certSerial: string; cert
 
 export class PanelLink extends WorkerEntrypoint<Env> {
   challenge(audience: string): Promise<LinkChallenge> {
-    return this.call("challenge", { audience }) as Promise<LinkChallenge>;
+    return this.call<LinkChallenge>("challenge", { audience });
   }
 
-  accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array): Promise<LinkAccept> {
-    return this.call("accept", { nodeId, audience, nonce, auth }) as Promise<LinkAccept>;
+  accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array, until: number): Promise<LinkAccept> {
+    return this.call<LinkAccept>("accept", { nodeId, audience, nonce, auth, until });
   }
 
   step(input: LinkStepIn): Promise<LinkStepOut> {
-    return this.call("step", input as unknown as Record<string, unknown>) as Promise<LinkStepOut>;
+    return this.call<LinkStepOut>("step", input as unknown as Record<string, unknown>);
   }
 
-  private async call(op: string, args: Record<string, unknown>): Promise<unknown> {
-    // The origin only fills publicURL while the database is empty, and a node link cannot exist before the panel has
-    // run once (the link prefix is made then), so this placeholder is never stored.
-    const panel = await getPanel(this.env, this.env.PUBLIC_URL || "https://panel.invalid");
-    return panel.link(op, args);
+  // The Go op's answer is the shape its caller names; only its waitUntil is taken off before it crosses the RPC.
+  private async call<T>(op: string, args: Record<string, unknown>): Promise<T> {
+    const panel = await getPanel(this.env, this.env.PUBLIC_URL || "");
+    return detachWaitUntil((await panel.link(op, args)) as WaitUntilOutput, this.ctx) as unknown as T;
   }
 }

@@ -103,14 +103,32 @@ const seen = (fake: FakePanel) =>
 
 describe("NodeLink handshake", () => {
   it("sends the challenge from Go with the host as audience, then accept, then runs the open step", async () => {
-    const fake = script();
-    const id = newNode();
-    const c = await login(id);
-    expect(c.inbox).toEqual(["challenge link.test", "accept"]);
-    expect(fake.calls.map((x) => x.op)).toEqual(["challenge", "accept", "step"]);
-    expect(steps(fake)[0]?.args).toMatchObject({ nodeId: id, state: null, event: { kind: "open", certSerial: "c1", certNotAfterUnix: 2_000_000_000 } });
-    expect(fake.calls[0]?.args).toEqual({ audience: "link.test" });
-    expect(fake.calls[1]?.args).toMatchObject({ nodeId: id, audience: "link.test" }); // the node id is the object's name
+    const realNow = Date.now;
+    const at = realNow();
+    Date.now = () => at;
+    try {
+      const fake = script();
+      const id = newNode();
+      const c = await login(id);
+      expect(c.inbox).toEqual(["challenge link.test", "accept"]);
+      const calls = fake.calls.filter((call) => call.op !== "challenge" && (call.args as { nodeId: string }).nodeId === id);
+      expect(calls.map((call) => call.op)).toEqual(["accept", "step"]);
+      const acceptCall = calls.find((call) => call.op === "accept");
+      const acceptArgs = acceptCall?.args as { nodeId: string; audience: string; until: number } | undefined;
+      expect(acceptArgs).toMatchObject({ nodeId: id, audience: "link.test", until: at + 20_000 });
+      const opened = steps(fake)[0]?.args as LinkStepIn;
+      expect(opened).toMatchObject({ nodeId: id, state: null, event: { kind: "open", generation: 1, certSerial: "c1", certNotAfterUnix: 2_000_000_000 } });
+      expect(await runInDurableObject(stubFor(id), (_o, state) => state.storage.kv.get("gen"))).toBe((opened.event as { generation: number }).generation);
+      expect(opened.until).toBe(at + 20_000);
+      expect(opened.until).toBe(acceptArgs?.until);
+      for (const call of calls) {
+        const until = (call.args as { until: number }).until;
+        expect(until).toBeLessThanOrEqual(at + 25_000);
+        expect(until).toBeLessThanOrEqual(call.start + 20_000);
+      }
+    } finally {
+      Date.now = realNow;
+    }
   });
 
   it("completes the close handshake when the agent closes", async () => {
@@ -321,6 +339,51 @@ describe("NodeLink alarm", () => {
       globalThis.clearTimeout = realClear;
     }
   });
+
+  it("forgets retired session storage and re-arms only a pending handshake deadline", async () => {
+    const fake = script({
+      step: (input) => input.event.kind === "closed" ? { state: "closed", frames: [], forget: true } : defaultPanel().step(input),
+    });
+    const id = newNode();
+    const live = await login(id);
+    const handshaking = await connect(id);
+    const handshakeDeadline = await runInDurableObject(stubFor(id), (_o, state) => {
+      const pending = state.getWebSockets().find((ws) => (ws.deserializeAttachment() as { generation: number }).generation === 0);
+      return (pending?.deserializeAttachment() as { deadline: number } | undefined)?.deadline ?? null;
+    });
+    expect(handshakeDeadline).not.toBeNull();
+
+    await stubFor(id).close(4000, "retired");
+    await live.until(() => live.closed !== undefined, "the live socket close");
+    await live.until(() => kinds(fake).includes("closed"), "the closed step");
+
+    expect(handshaking.closed).toBeUndefined();
+    expect(await keysOf(id)).toEqual([]);
+    expect(await alarmOf(id)).toBe(handshakeDeadline);
+  });
+
+  it("keeps the generation and closed state when a session ends without forget, and clears its alarm", async () => {
+    const fake = script({
+      step: (input) => ({ state: input.event.kind, frames: [], alarmAt: Date.now() + 60_000 }),
+    });
+    const id = newNode();
+    const c = await login(id);
+    expect((await keysOf(id)).sort()).toEqual(["alarmAt", "gen", "live", "state"]);
+
+    await stubFor(id).close(4000, "disconnected");
+    await c.until(() => c.closed !== undefined, "the live socket close");
+    await c.until(() => steps(fake).some((call) => (call.args as LinkStepIn).event.kind === "closed"), "the closed step");
+
+    const stored = await runInDurableObject(stubFor(id), (_o, state) => ({
+      gen: state.storage.kv.get("gen"),
+      state: state.storage.kv.get("state"),
+      live: state.storage.kv.get("live"),
+      alarmAt: state.storage.kv.get("alarmAt"),
+      keys: [...state.storage.kv.list()].map(([key]) => key).sort(),
+    }));
+    expect(stored).toEqual({ gen: 1, state: "closed", live: undefined, alarmAt: undefined, keys: ["gen", "state"] });
+    expect(await alarmOf(id)).toBeNull();
+  });
 });
 
 describe("NodeLink ask", () => {
@@ -458,25 +521,28 @@ describe("NodeLink failures", () => {
     open.push(new Client(res.webSocket!));
   });
 
-  it("makes no Go call once a block has spent its budget, and the step counts as failed", async () => {
-    // One block may make several Go calls; blockConcurrencyWhile resets the object at 30 s. The clock is moved past the
-    // block's 25 s while accept runs, so the open step that follows has nothing left.
+  it("makes no Go call when the open step has only two seconds left, and the step counts as failed", async () => {
+    // One block may make several Go calls; blockConcurrencyWhile resets the object at 30 s. The clock moves to within
+    // two seconds of its 25 s budget while accept runs, so the open step is refused locally.
     let skew = 0;
     const realNow = Date.now;
     Date.now = () => realNow() + skew;
     try {
       const fake = script({
-        accept: (n, a, nonce, auth) => {
-          skew += 26_000;
-          return defaultPanel().accept(n, a, nonce, auth);
+        accept: (n, a, nonce, auth, until) => {
+          skew = until - realNow() + 3_001;
+          return defaultPanel().accept(n, a, nonce, auth, until);
         },
       });
-      const c = await connect(newNode());
+      const id = newNode();
+      const c = await connect(id);
       c.send("auth");
       await c.until(() => c.closed !== undefined, "the close");
       expect(c.closed?.code).toBe(1011);
       await c.until(() => kinds(fake).includes("closed"), "the closed step"); // a fresh block, a fresh budget
-      expect(seen(fake)).toEqual(["closed"]); // no open step reached Go
+      const calls = fake.calls.filter((call) => call.op !== "challenge" && (call.args as { nodeId: string }).nodeId === id);
+      expect(calls.map((call) => call.op)).toEqual(["accept", "step"]);
+      expect((calls[1]?.args as LinkStepIn).event.kind).toBe("closed"); // no open step reached Go
     } finally {
       Date.now = realNow;
     }

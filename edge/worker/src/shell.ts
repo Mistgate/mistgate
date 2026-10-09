@@ -22,6 +22,16 @@ export interface FetchResponse {
   waitUntil: Promise<void>;
 }
 
+/** A Go panel link result may carry work that must outlive the current request. */
+export type WaitUntilOutput = Record<string, unknown> & { waitUntil?: Promise<void> };
+
+/** Moves after-response work to the Worker context without sending its promise over the PanelLink RPC. */
+export function detachWaitUntil<T extends WaitUntilOutput>(out: T, ctx: Pick<ExecutionContext, "waitUntil">): Omit<T, "waitUntil"> {
+  const { waitUntil, ...result } = out;
+  if (waitUntil !== undefined) ctx.waitUntil(waitUntil);
+  return result;
+}
+
 /**
  * The panel only accepts absolute https URLs. Cloudflare terminates TLS, so a Worker request is https in production;
  * a local `wrangler dev` may be plain http, and the panel (cookies, origin checks) must see the same shape.
@@ -91,6 +101,35 @@ export async function readAsset(assets: Fetcher, path: string): Promise<Uint8Arr
 export async function routeLimit(ns: DurableObjectNamespace<Limiter>, request: { name: string; key: string }): Promise<LimitReply> {
   // async on purpose: a synchronous throw would reach Go as a js.Invoke panic instead of a rejected promise.
   return ns.get(ns.idFromName(`${request.name}\u0000${request.key}`)).limit(request);
+}
+
+export type AskNodeResult = { reply: Uint8Array | null } | { error: "timeout" | "lost" };
+
+/** Routes one panel request to its node and turns every failure into the result shape expected by Go. */
+export async function askNode(
+  ns: DurableObjectNamespace<NodeLink>,
+  nodeId: string,
+  requestId: string,
+  frame: Uint8Array,
+  deadlineAt: number,
+): Promise<AskNodeResult> {
+  try {
+    const reply = await ns.get(ns.idFromName(nodeId)).ask(requestId, frame, deadlineAt);
+    return { reply };
+  } catch (error) {
+    return { error: error instanceof Error && error.message === "timeout" ? "timeout" : "lost" };
+  }
+}
+
+/** Closes the node's current link session, if it has one. */
+export function closeNode(ns: DurableObjectNamespace<NodeLink>, nodeId: string, reason: string): Promise<void> {
+  return ns.get(ns.idFromName(nodeId)).close(4000, reason);
+}
+
+/** Pokes all named nodes and returns how many object calls failed. */
+export async function pokeNodes(ns: DurableObjectNamespace<NodeLink>, nodeIds: string[]): Promise<number> {
+  const results = await Promise.allSettled(nodeIds.map(async (nodeId) => ns.get(ns.idFromName(nodeId)).poke()));
+  return results.filter((result) => result.status === "rejected").length;
 }
 
 /**

@@ -9,8 +9,8 @@ import type { LinkAccept, LinkEvent, LinkStepOut, PanelLink } from "./panellink"
 // Ordering: every entry point runs inside blockConcurrencyWhile, so one event is handled at a time, in arrival order,
 // RPC methods included. blockConcurrencyWhile resets the object after 30 s, and one event can make several Go calls
 // (accept, closed, open, closed), so each block has a 25 s budget that its Go calls share (20 s at most for one); a call
-// with nothing left of the budget is not made and counts as failed. A failed or timed-out step closes the socket with
-// 1011 and the agent reconnects; a socket that is no longer open is not heard (its queued frames are dropped).
+// with 2 s or less left is not made and counts as failed. A failed or timed-out step closes the socket with 1011 and the
+// agent reconnects; a socket that is no longer open is not heard (its queued frames are dropped).
 //
 // Hibernation: nothing is kept in memory but the waiters of `ask` (a pending ask keeps the object alive anyway), and
 // no timer is left running when nothing is pending: the one alarm is the earliest of the session's own alarm, the
@@ -102,11 +102,13 @@ export class NodeLink extends DurableObject<Env> {
     });
   }
 
-  /** A Go call inside a serial block: at most STEP_MS, at most what the block has left, and none at all when that is gone. */
-  private call<T>(make: () => Promise<T>): Promise<T> {
-    const left = Math.min(STEP_MS, this.until - Date.now());
-    if (left <= 0) return Promise.reject(new Error("panel link budget spent"));
-    return within(make(), left);
+  /** A Go call inside a serial block; reserve 2 s before its deadline for the wasm side's context. */
+  private call<T>(make: (until: number) => Promise<T>): Promise<T> {
+    const startedAt = Date.now();
+    const until = Math.min(this.until, startedAt + STEP_MS);
+    const left = until - startedAt;
+    if (left <= 2_000) return Promise.reject(new Error("panel link budget spent"));
+    return within(make(until), left);
   }
 
   private attachment(ws: WebSocket): Attachment | null {
@@ -267,7 +269,7 @@ export class NodeLink extends DurableObject<Env> {
   private async authenticate(ws: WebSocket, att: Attachment, auth: ArrayBuffer): Promise<void> {
     let res: LinkAccept;
     try {
-      res = await this.call<LinkAccept>(() => this.panel.accept(this.nodeId, att.audience, att.nonce, new Uint8Array(auth)));
+      res = await this.call<LinkAccept>((until) => this.panel.accept(this.nodeId, att.audience, att.nonce, new Uint8Array(auth), until));
     } catch (error) {
       console.error("link accept failed:", error instanceof Error ? error.message : String(error));
       shut(ws, 1011, "link error");
@@ -288,7 +290,7 @@ export class NodeLink extends DurableObject<Env> {
     await this.dropLive(false);
     this.kv.put("live", generation);
     send(ws, res.frame);
-    await this.run(ws, { kind: "open", at: Date.now(), certSerial: res.certSerial, certNotAfterUnix: res.certNotAfterUnix });
+    await this.run(ws, { kind: "open", at: Date.now(), generation, certSerial: res.certSerial, certNotAfterUnix: res.certNotAfterUnix });
   }
 
   /**
@@ -296,16 +298,16 @@ export class NodeLink extends DurableObject<Env> {
    * first: the output gate holds every send below until it is durable, so a frame the agent sees is never ahead of the
    * state that produced it.
    */
-  private async run(ws: WebSocket | undefined, event: LinkEvent): Promise<void> {
+  private async run(ws: WebSocket | undefined, event: LinkEvent): Promise<LinkStepOut | undefined> {
     let out: LinkStepOut;
     try {
-      out = await this.call(() => this.panel.step({ nodeId: this.nodeId, state: this.kv.get<string>("state") ?? null, event }));
+      out = await this.call((until) => this.panel.step({ nodeId: this.nodeId, state: this.kv.get<string>("state") ?? null, until, event }));
     } catch (error) {
       console.error("link step failed:", error instanceof Error ? error.message : String(error));
       // The session stays "live" until the socket's close event (or the next accept) runs its closed step.
       if (ws) shut(ws, 1011, "link error");
       this.rejectWaiters();
-      return;
+      return undefined;
     }
     this.kv.put("state", out.state);
     if (ws) for (const frame of out.frames) send(ws, frame);
@@ -316,6 +318,7 @@ export class NodeLink extends DurableObject<Env> {
       shut(ws, out.close.code, out.close.reason);
       await this.dropLive(true);
     }
+    return out;
   }
 
   /** The open session is over: its waiters fail, its alarm goes, and Go gets the closed step (owned = this socket's close). */
@@ -323,8 +326,9 @@ export class NodeLink extends DurableObject<Env> {
     if (!this.kv.get("live")) return;
     this.kv.delete("live");
     this.rejectWaiters();
-    await this.run(undefined, { kind: "closed", at: Date.now(), owned });
-    this.kv.delete("alarmAt");
+    const out = await this.run(undefined, { kind: "closed", at: Date.now(), owned });
+    if (out?.forget) await this.ctx.storage.deleteAll();
+    else this.kv.delete("alarmAt");
   }
 
   /** A socket closed or failed; only the open session's socket matters. */

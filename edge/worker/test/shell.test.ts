@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { forwardLink, memoizeRetry, panelURL, readAsset, toFetchRequest, toResponse } from "../src/shell";
+import { askNode, closeNode, detachWaitUntil, forwardLink, memoizeRetry, panelURL, pokeNodes, readAsset, toFetchRequest, toResponse } from "../src/shell";
 
 describe("toFetchRequest", () => {
   it("forces https and keeps the path, query and port", async () => {
@@ -148,5 +148,68 @@ describe("forwardLink", () => {
     expect(forwardLink(f.ns, request, answer(200, [["X-Mistgate-Link", "nod_1"]]))).toBeUndefined();
     expect(forwardLink(f.ns, request, answer(204, [["X-Mistgate-Link", ""]]))).toBeUndefined();
     expect(f.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("NodeLink shell calls", () => {
+  const namespace = (getNode: (id: string) => object) => {
+    const idFromName = vi.fn((name: string) => name);
+    const get = vi.fn((id: string) => getNode(id));
+    return {
+      ns: { idFromName, get } as unknown as Parameters<typeof askNode>[0],
+      idFromName,
+      get,
+    };
+  };
+
+  it("maps ask replies, null, the exact timeout error, link loss, and object resets without rejecting", async () => {
+    const frame = new Uint8Array([1, 2]);
+    const reply = new Uint8Array([3, 4]);
+    const ask = vi.fn().mockResolvedValue(reply);
+    const f = namespace(() => ({ ask }));
+    expect(await askNode(f.ns, "node-a", "request-1", frame, 1234)).toEqual({ reply });
+    expect(f.idFromName).toHaveBeenCalledWith("node-a");
+    expect(f.get).toHaveBeenCalledWith("node-a");
+    expect(ask).toHaveBeenCalledWith("request-1", frame, 1234);
+
+    ask.mockResolvedValueOnce(null);
+    expect(await askNode(f.ns, "node-a", "request-2", frame, 1234)).toEqual({ reply: null });
+
+    for (const [failure, result] of [
+      [new Error("timeout"), { error: "timeout" }],
+      [new Error("link lost"), { error: "lost" }],
+      [{ message: "object reset" }, { error: "lost" }],
+    ] as const) {
+      ask.mockRejectedValueOnce(failure);
+      await expect(askNode(f.ns, "node-a", "request-3", frame, 1234)).resolves.toEqual(result);
+    }
+  });
+
+  it("closes through code 4000 with the supplied reason", async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const f = namespace(() => ({ close }));
+    await closeNode(f.ns, "node-a", "retired");
+    expect(close).toHaveBeenCalledWith(4000, "retired");
+  });
+
+  it("counts rejected and synchronously failing poke calls", async () => {
+    const f = namespace((id: string) => ({
+      poke: () => {
+        if (id === "node-b") return Promise.reject(new Error("reset"));
+        if (id === "node-c") throw new Error("unavailable");
+        return Promise.resolve();
+      },
+    }));
+    expect(await pokeNodes(f.ns, ["node-a", "node-b", "node-c"])).toBe(2);
+  });
+
+  it("moves waitUntil to the execution context and strips it from the output", () => {
+    const waitUntil = Promise.resolve();
+    const ctx = { waitUntil: vi.fn() } as unknown as Pick<ExecutionContext, "waitUntil">;
+    const out = detachWaitUntil({ state: "s", waitUntil }, ctx);
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    expect(ctx.waitUntil).toHaveBeenCalledWith(waitUntil);
+    expect(out).toEqual({ state: "s" });
+    expect(out).not.toHaveProperty("waitUntil");
   });
 });

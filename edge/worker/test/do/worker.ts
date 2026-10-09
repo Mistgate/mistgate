@@ -14,7 +14,7 @@ const text = (s: string) => new TextEncoder().encode(s);
 export interface FakePanel {
   calls: { op: "challenge" | "accept" | "step"; args: unknown; start: number; end?: number }[];
   challenge: (audience: string) => LinkChallenge | Promise<LinkChallenge>;
-  accept: (nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array) => LinkAccept | Promise<LinkAccept>;
+  accept: (nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array, until: number) => LinkAccept | Promise<LinkAccept>;
   step: (input: LinkStepIn) => LinkStepOut | Promise<LinkStepOut>;
 }
 
@@ -57,8 +57,8 @@ export class PanelLink extends WorkerEntrypoint {
   challenge(audience: string): Promise<LinkChallenge> {
     return record("challenge", { audience }, () => panel().challenge(audience));
   }
-  accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array): Promise<LinkAccept> {
-    return record("accept", { nodeId, audience, nonce, auth }, () => panel().accept(nodeId, audience, nonce, auth));
+  accept(nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array, until: number): Promise<LinkAccept> {
+    return record("accept", { nodeId, audience, nonce, auth, until }, () => panel().accept(nodeId, audience, nonce, auth, until));
   }
   step(input: LinkStepIn): Promise<LinkStepOut> {
     return record("step", input, () => panel().step(input));
