@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { fetchPanelRequest } from "./fetch";
+import { fetchPanelRequest, scheduledPanel } from "./fetch";
 
 // The Durable Object classes behind the LIMITER and NODELINK bindings must be exported from the Worker's entry module,
 // and so must PanelLink, the entrypoint through which a NodeLink object calls the panel (ctx.exports).
@@ -12,4 +12,5 @@ export { PanelLink } from "./panellink";
 // hands an agent link upgrade, which the panel marks instead of serving, to the node's NodeLink object.
 export default {
   fetch: fetchPanelRequest,
+  scheduled: scheduledPanel,
 } satisfies ExportedHandler<Env>;

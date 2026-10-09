@@ -64,6 +64,15 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 On a fresh database the panel prints the one-time setup link (it holds the secret admin path) to the Worker log once;
 a later isolate only says that a link was already issued.
 
+## Scheduled background work
+
+The Wrangler template schedules the Worker once a minute. Each tick sweeps user status and silent nodes; at UTC minute 17
+it also runs health retention, and at minutes divisible by 10 it runs the desired-state safety net.
+
+With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database and
+print the one-time setup link in that cron invocation's log. Run `wrangler tail` before the first deploy to capture it;
+the link is only re-issued after it expires.
+
 ## Build and run locally
 
 ```powershell

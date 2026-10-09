@@ -120,6 +120,19 @@ async function countedRequest(label, fn) {
   }
 }
 
+async function countedJob(label, fn) {
+  globalThis.__d1.__beginQueryCount(label);
+  try {
+    const output = await fn();
+    if (output && output.waitUntil) await output.waitUntil;
+    const queries = globalThis.__d1.__endQueryCount();
+    return { output, queries };
+  } catch (error) {
+    globalThis.__d1.__endQueryCount();
+    throw error;
+  }
+}
+
 function assertQueryBudget(queries) {
   console.log(`D1 query count ${JSON.stringify(queries)}`);
   // Target 6 (README Â§3.1). The AWG formats (Mihomo, .conf) measure 7: one extra round for the AWG scopes; phase 4.
@@ -824,6 +837,49 @@ async function run() {
     assert.equal(limitedLogin.message.code, "resource_exhausted", "the callback refuses login after its burst");
 
     const { linkPrefix, nodeID } = await assertLinkHandshake(secondPanel);
+
+    const baseCronDate = new Date();
+    const normalCronDate = new Date(baseCronDate);
+    normalCronDate.setUTCMinutes(3, 0, 0);
+    const { queries: normalCronQueries } = await countedJob("cron normal tick", () =>
+      Promise.race([secondPanel.cron({ at: normalCronDate.getTime() }), wasmFailure]),
+    );
+    console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
+    assert.equal(
+      normalCronQueries.sequentialQueries,
+      3,
+      "a normal cron tick costs 3 D1 calls: status, node list and node live",
+    );
+
+    liveProjectionQueries = 0;
+    nodePokeCalls = 0;
+    nodePokeIDs.length = 0;
+    const cronDate = new Date(baseCronDate);
+    cronDate.setUTCMinutes(10, 0, 0);
+    const { output: cron, queries: cronQueries } = await countedJob("cron tick", () =>
+      Promise.race([secondPanel.cron({ at: cronDate.getTime() }), wasmFailure]),
+    );
+    console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
+    assert.equal(
+      cronQueries.sequentialQueries,
+      4,
+      "one cron tick costs 4 D1 calls: status, node list, node live, fan-out live",
+    );
+    assert.equal(liveProjectionQueries, 2, "the node-down sweep and ten-minute safety net each read live nodes once");
+    assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
+    assert.deepEqual(nodePokeIDs, [[]], "the fan-out only includes connected nodes");
+
+    const retentionDate = new Date(baseCronDate);
+    retentionDate.setUTCMinutes(17, 0, 0);
+    const { queries: retentionQueries } = await countedJob("cron minute 17", () =>
+      Promise.race([secondPanel.cron({ at: retentionDate.getTime() }), wasmFailure]),
+    );
+    console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
+    assert.equal(
+      retentionQueries.sequentialQueries,
+      9,
+      "a minute 17 cron tick costs 9 D1 calls: 3 normal and 6 retention",
+    );
 
     thirdPanel = await startIsolate(bytes, secondPanel);
     const withoutLimiter = { ...initOptions };

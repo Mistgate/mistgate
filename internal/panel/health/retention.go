@@ -34,6 +34,9 @@ func (s *Service) runRetention(ctx context.Context) {
 	}
 }
 
+// Retention runs one retention pass for scheduled callers.
+func (s *Service) Retention(ctx context.Context) { s.sweep(ctx) }
+
 // sweep runs every retention job once; a failure of one does not stop the others.
 func (s *Service) sweep(ctx context.Context) {
 	now := s.now()

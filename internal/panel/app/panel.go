@@ -73,7 +73,7 @@ func (in InstanceConfig) MuxPrefix() string {
 	return in.AdminPrefix
 }
 
-// BackgroundJob is one long-lived VPS worker. Edge callers receive the list but do not run it.
+// BackgroundJob is one long-lived VPS worker. The edge runs only the bounded phases listed in edge_tick.go.
 type BackgroundJob struct {
 	Name string
 	Run  func(context.Context)

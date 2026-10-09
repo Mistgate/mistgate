@@ -380,9 +380,17 @@ func (a Access) SetUserStatus(ctx context.Context, id, status string) error {
 	return err
 }
 
-// ResetUserPeriod starts a new quota period: usage back to zero, status as given.
-func (a Access) ResetUserPeriod(ctx context.Context, id string, periodStart time.Time, status string) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET period_start = ?, used_bytes = 0, status = ? WHERE id = ?`, unix(periodStart), status, id)
+// ResetUserPeriod starts a new quota period only if it is still the period the caller read. Usage added after a
+// concurrent reset is left intact.
+func (a Access) ResetUserPeriod(ctx context.Context, id string, oldPeriodStart, periodStart time.Time, status string) error {
+	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET period_start = ?, used_bytes = 0, status = ? WHERE id = ? AND period_start = ?`,
+		unix(periodStart), status, id, unix(oldPeriodStart))
+	return err
+}
+
+// ResetUserTraffic clears current usage and stores a recomputed status without changing period_start.
+func (a Access) ResetUserTraffic(ctx context.Context, id, status string) error {
+	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET used_bytes = 0, status = ? WHERE id = ?`, status, id)
 	return err
 }
 

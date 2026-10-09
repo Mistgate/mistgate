@@ -5,6 +5,11 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
 
+[triggers]
+# With PUBLIC_URL set, the first cron tick (within about 60 seconds) may initialize D1 and log the one-time setup link.
+# Run `wrangler tail` before the first deploy to capture it; the link is re-issued only after it expires.
+crons = ["* * * * *"]
+
 # The Go panel is imported by src/panel.ts as a precompiled WebAssembly module.
 [[rules]]
 type = "CompiledWasm"

@@ -7,6 +7,7 @@ import { askNode, closeNode, pokeNodes, type FetchRequest, type FetchResponse, m
 interface PanelApi {
   init(options: Record<string, unknown>): Promise<unknown>;
   fetch(request: FetchRequest): Promise<FetchResponse>;
+  cron(request: { at: number }): Promise<{ waitUntil: Promise<void> }>;
   /** One step of the agent link (cmd/mistgate-edge/link_js.go); bytes are Uint8Array. */
   link(op: string, args: Record<string, unknown>): Promise<unknown>;
 }

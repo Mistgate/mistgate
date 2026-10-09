@@ -352,6 +352,36 @@ func TestResetUserTraffic(t *testing.T) {
 	wantCode(t, err, connect.CodeInvalidArgument)
 }
 
+func TestSweepFailureNotifiesAfterPartialStatusChanges(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	e.user("first", f.group, func(m *adminv1.CreateUserRequest) { m.TermDays = 1 })
+	e.user("second", f.group, func(m *adminv1.CreateUserRequest) { m.TermDays = 1 })
+	e.clock = e.clock.Add(48 * time.Hour)
+	e.sql(`CREATE TRIGGER fail_after_first_expired BEFORE UPDATE OF status ON user
+		WHEN NEW.status = 'expired' AND (SELECT count(*) FROM user WHERE status = 'expired') > 0
+		BEGIN SELECT RAISE(FAIL, 'stop after first expired user'); END`)
+	e.resetNotify()
+
+	changed, err := e.s.Sweep(e.ctx)
+	if err == nil {
+		t.Fatal("sweep succeeded after a status write failed")
+	}
+	if changed != 1 {
+		t.Fatalf("sweep changed %d users before failure, want 1", changed)
+	}
+	if got := e.notify.n.Load(); got != 1 {
+		t.Fatalf("StateChanged called %d times after partial sweep, want 1", got)
+	}
+	var expired int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM user WHERE status = 'expired'`).Scan(&expired); err != nil {
+		t.Fatal(err)
+	}
+	if expired != 1 {
+		t.Fatalf("expired users after partial sweep = %d, want 1", expired)
+	}
+}
+
 func TestSweepExpiry(t *testing.T) {
 	f := newFixture(t)
 	e := f.e

@@ -74,7 +74,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | merged (§6; `cbb8405`, `dc72654`, `34f7e7f`, 2026-10-09) |
-| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a, 6c merged; 6b implemented |
+| 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | designed (§7); 6a-6c merged; 6d and 6e local |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
 query budgets unchanged (Happ 5, Mihomo 7, page 5/3/4, AWG configs 7), a manager review.
@@ -593,6 +593,10 @@ open questions are in §7.10.
 10. Other per-isolate in-memory paths never drained on the edge: the `health.evaluateSoon` kick; Telegram `enqueue`
     (bounded, never sent); the evaluator grace (`startedAt` = the isolate's start). `Fleet.Run`, `closeAll`,
     `recomputeAll` and `snapshotSessions` stay VPS-only.
+11. Two adjacent stale-read races remain after 6e. `UpdateUser` writes back the `period_start` and derived `status` it
+    read earlier, so a concurrent sweep or period change can be overwritten; the next sweep recomputes them.
+12. `SetUserStatus` in the status sweep updates by user ID without checking the status it read. A stale `expired` result
+    can overwrite a just-made `ExtendUsers`; the next sweep recomputes the status. Neither race is fixed in 6e.
 
 ### 7.1 The `"step"` op (TypeScript ↔ Go)
 
@@ -818,6 +822,9 @@ written); DO billing per stats frame with 1-3 agents for an hour; whether `ctx.e
 isolate and is billed as a request, and a cold step inside a block; isolate memory under a request mix; cron `cpuTime`
 warm and cold; that a fan-out started through PanelLink's `waitUntil` completes; sockets across a redeploy.
 
+Cron call counts asserted by the fake-D1 Go test and `bridge.cjs`: 3 D1 calls on a normal minute, 4 at minute %10, and 9
+at minute 17 (the 3 shared tick calls plus 6 retention calls).
+
 ### 7.8 Rounds
 
 | Round | Changes | Proof | Risks |
@@ -883,9 +890,25 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
   the same runner with a fresh 3 min context on the VPS and 25 s on the edge.
 - `edgeTaskRunner.Run` queues work until `release()` schedules it on a later JavaScript task after `fetch` or `link` has
   returned; the runner also releases work queued by a completed job. `waitUntil` still resolves when the active count
-  reaches zero. The 6e `cron` op needs the same release after its response.
+  reaches zero. The 6e `cron` op releases queued work after its response in the same way.
 - The fake D1 adapter serializes `batch()` calls through a queue because real D1 runs each batch as its own transaction
   and the fake uses one SQLite connection.
 - PanelLink passes a step's `waitUntil` to `ctx.waitUntil` only when that step succeeds. Background work scheduled by a
   step that then fails is not held by that step; this is acceptable because the 6e ten-minute cron safety net retries a
   lost fan-out.
+
+#### Round 6e implementation notes (2026-10-09)
+
+- `Panel.EdgeTick` runs the user status sweep and node-down sweep each minute, health retention at minute 17, and the
+  desired-state safety net every ten minutes. Every pass gets its own 20 s context; an error in one pass does not stop
+  the following passes. `Fleet.Sweep` and `Health.Retention` expose the existing one-pass work without changing their VPS
+  loops.
+- The edge job parity test compares `Panel.BackgroundJobs` with the work run by `EdgeTick` and `edgeDeferred`. Fleet's
+  event-driven run loop and local session cleanup remain VPS-only; health checks/evaluation and periodic UDP port
+  rechecks, updates, backups, Telegram delivery, provisioning and MCP plan expiry remain deferred.
+- `ResetUserPeriod` now checks the period start the caller read before it changes the period, status and usage. A stale
+  reset affects no rows, so it cannot clear usage recorded after a newer reset.
+- `mgPanel.cron` runs the tick with a 50 s context, returns the after-response promise and releases queued work after
+  the cron call. `scheduledPanel` uses an empty origin, passes the scheduled time and keeps failures in the Worker log.
+- Two small VPS behavior changes accompany the edge work: a status sweep notifies after a partial write failure, and an
+  admin traffic reset clears usage and status without changing `period_start`; the guarded sweep reset is unchanged.

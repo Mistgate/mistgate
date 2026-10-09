@@ -19,3 +19,19 @@ export async function fetchPanelRequest(request: Request, env: Env, ctx: Executi
     return new Response("Internal Server Error", { status: 500 });
   }
 }
+
+export async function scheduledPanel(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  let panel;
+  try {
+    panel = await getPanel(env, "");
+  } catch (error) {
+    console.error("panel init failed:", error instanceof Error ? error.message : String(error));
+    return;
+  }
+  try {
+    const out = await panel.cron({ at: controller.scheduledTime });
+    ctx.waitUntil(out.waitUntil);
+  } catch (error) {
+    console.error("panel cron failed:", error instanceof Error ? error.message : String(error));
+  }
+}

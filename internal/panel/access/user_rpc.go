@@ -693,7 +693,7 @@ func (s *Service) ResetUserTraffic(ctx context.Context, req *connect.Request[adm
 	ids := make([]string, 0, len(us))
 	for _, u := range us {
 		status := ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, 0, now)
-		if err := a.ResetUserPeriod(ctx, u.ID, u.PeriodStart, status); err != nil {
+		if err := a.ResetUserTraffic(ctx, u.ID, status); err != nil {
 			return nil, s.internal("reset traffic", err)
 		}
 		changed = changed || status != u.Status

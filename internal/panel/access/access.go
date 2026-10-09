@@ -210,13 +210,14 @@ func (s *Service) refresh(ctx context.Context, states []store.AccessUserState) (
 		var err error
 		switch {
 		case reset:
-			err = a.ResetUserPeriod(ctx, u.ID, ps, status)
+			err = a.ResetUserPeriod(ctx, u.ID, u.PeriodStart, ps, status)
 		case status != u.Status:
 			err = a.SetUserStatus(ctx, u.ID, status)
 		default:
 			continue
 		}
 		if err != nil {
+			s.notify.StateChanged()
 			return changed, err
 		}
 		if status != u.Status {

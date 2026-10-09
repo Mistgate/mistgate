@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -32,9 +33,15 @@ import (
 type edgeState struct {
 	store         *store.Store
 	fleet         *fleet.Fleet
+	panel         *app.Panel
 	handler       http.Handler
 	afterResponse *edgeTaskRunner
 }
+
+var (
+	errCronRequest = errors.New("mgPanel.cron requires an object with an at timestamp")
+	errCronArgs    = errors.New("mgPanel.cron requires an integer at timestamp")
+)
 
 // edgeTaskRunner tracks after-response work across overlapping requests in this isolate. Every request can wait on
 // the current idle promise; it resolves once all queued or running work has finished.
@@ -159,9 +166,37 @@ func main() {
 			return out, nil
 		})
 	}))
+	api.Set("cron", js.FuncOf(func(_ js.Value, args []js.Value) any {
+		return promise(func() (js.Value, error) { return cron(args) })
+	}))
 	api.Set("link", linkFunc())
 	js.Global().Set("mgPanel", api)
 	select {}
+}
+
+func cron(args []js.Value) (js.Value, error) {
+	if len(args) != 1 || args[0].Type() != js.TypeObject || args[0].IsNull() {
+		return js.Undefined(), errCronRequest
+	}
+	at, err := integerInt64(args[0].Get("at"))
+	if err != nil {
+		return js.Undefined(), errCronArgs
+	}
+	stateMu.RLock()
+	current := state
+	stateMu.RUnlock()
+	if current == nil {
+		return js.Undefined(), errNotInitialized
+	}
+	defer current.afterResponse.release()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+	if err := current.panel.EdgeTick(ctx, time.UnixMilli(at)); err != nil {
+		js.Global().Get("console").Call("error", "edge tick failed:", err.Error())
+	}
+	out := js.Global().Get("Object").New()
+	out.Set("waitUntil", current.afterResponse.WaitUntil())
+	return out, nil
 }
 
 func initPanel(options js.Value) error {
@@ -253,15 +288,8 @@ func initPanel(options js.Value) error {
 			js.Global().Get("console").Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+url)
 		}
 	}
-	// TODO(phase-2): Cron/alarm expires MCP plans.
-	// TODO(phase-2): Cron/alarm invokes the fleet reconciliation background job.
-	// TODO(phase-2): Cron/alarm invokes the access cleanup background job.
-	// TODO(phase-2): Cron/alarm invokes health checks, evaluation and retention.
-	// TODO(phase-2): Cron/alarm invokes update checks, rollout advancement and pruning.
-	// TODO(phase-2): Cron/alarm invokes backup scheduling.
-	// TODO(phase-2): Cron/alarm invokes Telegram polling and delivery.
-	// TODO(phase-2): Cron/alarm invokes provisioning workers. A Worker isolate starts none of these jobs.
-	state = &edgeState{store: st, fleet: built.Fleet, handler: withEdgeTestHooks(built.Handler, built.Fleet), afterResponse: afterResponse}
+	// EdgeTick owns the bounded edge phases; app.edgeDeferred records the VPS phases still deferred on the Worker.
+	state = &edgeState{store: st, fleet: built.Fleet, panel: built, handler: withEdgeTestHooks(built.Handler, built.Fleet), afterResponse: afterResponse}
 	keepStore = true
 	return nil
 }

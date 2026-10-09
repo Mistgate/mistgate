@@ -417,6 +417,9 @@ func (f *Fleet) recomputeAll(ctx context.Context) {
 	wg.Wait()
 }
 
+// Sweep runs one node-down pass for scheduled callers.
+func (f *Fleet) Sweep(ctx context.Context) { f.sweep(ctx) }
+
 // sweep emits node_down once per outage for nodes that have been silent for longer than the blip window.
 func (f *Fleet) sweep(ctx context.Context) {
 	nodes, err := f.st.Nodes(ctx, false)
