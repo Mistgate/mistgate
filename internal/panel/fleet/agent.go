@@ -116,11 +116,13 @@ func (s *session) runDesiredPreparation(ctx context.Context) (Transition, error)
 	if !s.canApplyPrepared() {
 		return Transition{}, nil
 	}
-	prepared, prepareErr := s.f.prepareDesiredState(ctx, s.nodeID)
+	event := s.f.preparedEvent(ctx, s.nodeID)
 	if !s.canApplyPrepared() {
 		return Transition{}, nil
 	}
-	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventDesiredPrepared, At: s.f.now(), Prepared: prepared, Err: prepareErr})
+	prepareErr := event.Err
+	event.At = s.f.now()
+	tr, err := s.stepCore(ctx, event)
 	if prepareErr != nil && ctx.Err() == nil {
 		s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", prepareErr)
 	}
@@ -190,25 +192,41 @@ func (s *session) dispatchCoreEffects(ctx context.Context, effects []SessionEffe
 
 func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) {
 	switch effect.Kind {
-	case EffectUsage:
-		if s.f.cfg.OnUsage != nil {
-			s.f.cfg.OnUsage(ctx, effect.Users)
-		}
 	case EffectReply:
 		s.deliverReply(effect.RequestID, effect.Reply)
 	case EffectLogChunk:
 		s.deliverLog(effect.LogChunk)
+	case EffectPrepareDesired:
+		s.startDesiredPreparation()
+	default:
+		s.f.runSharedEffect(ctx, s.nodeID, effect)
+	}
+}
+
+// runSharedEffect performs the effects that both adapters (the VPS session and the edge driver) run the same way:
+// usage, WARP attention and the connect events. Replies, log chunks and desired-state preparation depend on the adapter.
+func (f *Fleet) runSharedEffect(ctx context.Context, nodeID string, effect SessionEffect) {
+	switch effect.Kind {
+	case EffectUsage:
+		if f.cfg.OnUsage != nil {
+			f.cfg.OnUsage(ctx, effect.Users)
+		}
 	case EffectWarpAttention:
-		if w := s.f.warpModule(); w != nil {
-			s.f.dispatchWarpAttention(w, s.nodeID, effect.WarpReason)
+		if w := f.warpModule(); w != nil {
+			f.dispatchWarpAttention(w, nodeID, effect.WarpReason)
 		}
 	case EffectConnectEvents:
 		if effect.PreviousNode != nil {
-			s.f.connectEvents(ctx, s.nodeID, *effect.PreviousNode, effect.BootAt.UTC(), effect.At.UTC())
+			f.connectEvents(ctx, nodeID, *effect.PreviousNode, effect.BootAt.UTC(), effect.At.UTC())
 		}
-	case EffectPrepareDesired:
-		s.startDesiredPreparation()
 	}
+}
+
+// preparedEvent reads the node's desired state and wraps the result, or the error, as the core's EventDesiredPrepared.
+// The caller sets At.
+func (f *Fleet) preparedEvent(ctx context.Context, nodeID string) SessionEvent {
+	prepared, err := f.prepareDesiredState(ctx, nodeID)
+	return SessionEvent{Kind: EventDesiredPrepared, Prepared: prepared, Err: err}
 }
 
 func (s *session) persistPoison(poison *PoisonBatch) {

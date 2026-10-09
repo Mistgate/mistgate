@@ -67,7 +67,12 @@ func (s websocketSessionStream) Send(m *agentv1.ConnectResponse) error {
 }
 
 // LinkHandler serves the public, signed WebSocket transport. Mount it only beneath the stored secret path prefix.
+// With Config.Remote set (the edge edition) it answers with the LinkMarker instead: the node's Durable Object holds the
+// socket there, so both editions share this one mount.
 func (f *Fleet) LinkHandler() http.Handler {
+	if f.cfg.Remote != nil {
+		return LinkMarker()
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := linkNodePath(r.URL.Path)
 		if !ok || r.Method != http.MethodGet {
@@ -179,7 +184,7 @@ func (f *Fleet) LinkAccept(ctx context.Context, nodeID, audience string, nonce, 
 	return pc.serial, pc.notAfter, frame, ok
 }
 
-// LinkMarker is what the edge mounts under its link prefix instead of LinkHandler: a Worker cannot keep a WebSocket in
+// LinkMarker is what LinkHandler answers with on the edge (Config.Remote set): a Worker cannot keep a WebSocket in
 // the panel's wasm, so a GET with an upgrade is answered 204 with the node's id, and the Worker hands the original
 // request to that node's Durable Object.
 func LinkMarker() http.Handler {

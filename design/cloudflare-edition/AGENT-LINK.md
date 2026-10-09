@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
-Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Steps 5-6 are designed
-below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
+Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Step 5 is designed in §6
+(5a, the driver, is implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -71,7 +71,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4a | Write the `node_live` projection (sidecar kept, compared by a test) | merged (2026-10-08) |
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
-| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) LinkOut`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | planned |
+| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a implemented, 5b and 5c next |
 | 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
@@ -217,10 +217,8 @@ page).
 
 ## 5. Notes for steps 5 and 6
 
-- **Open event.** It carries the object's generation (the `node_live` session id). A new session starts from a clean
-  `SessionState` and carries over only `Poison`; a stale `SentRevision` would otherwise disable the Hello shortcut.
-- **Retire on the edge.** It also deletes the node's NodeLink storage (`ctx.storage.deleteAll()`), or its state lives
-  forever.
+- **Open event** and **Retire on the edge**: designed in §6.1 (open carries the generation and keeps only `Poison`;
+  retire returns `Forget`, and the object deletes its storage).
 - **Where Go runs.** `ctx.exports.PanelLink` most likely runs on the object's own thread and isolate. A cold panel start
   then lands inside an object's block, and the 128 MB is shared with NodeLink and Limiter. Measure this in step 6;
   ADR 0007 says "outside the object's request context".
@@ -236,3 +234,224 @@ page).
 - **Billing.** Each stats frame costs about 3 billed row writes on the object (state, alarmAt, setAlarm).
 - **Resolved in 4b.** AWG device creation reads `agent_caps` and `last_seen_at` from the existing node rows, so the
   awg/1 check no longer depends on the unimplemented `CapabilitySource`.
+
+## 6. Step 5 design: the stateless edge driver and link-only agents
+
+Status (2026-10-09): designed; round 5a (the driver) is implemented, 5b and 5c are next. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
+Lead decisions on the open questions are in §6.5.
+
+### 6.1 The driver (`internal/panel/fleet/link_driver.go`)
+
+```go
+type LinkKind string // "open" | "frame" | "alarm" | "desired" | "request" | "closed" (panellink.ts LinkEvent.kind)
+
+// LinkIn is one NodeLink event, filled from the object's name, storage and clock.
+type LinkIn struct {
+	NodeID       string    // ctx.id.name
+	State        string    // the previous LinkOut.State; "" before the node's first session
+	Kind         LinkKind
+	At           time.Time // the object's Date.now()
+	Generation   uint64    // open: the generation the accepted LinkAuth stored = OwnerGeneration = node_live.session
+	CertSerial   string    // open: from LinkAccept
+	CertNotAfter time.Time // open
+	Frame        []byte    // frame: one ConnectRequest; request: one ConnectResponse
+	RequestID    string    // request
+	DeadlineAt   time.Time // request: the caller's absolute deadline
+}
+
+type LinkOut struct {
+	State   string      // written by the object before it sends Frames
+	Frames  [][]byte    // ConnectResponse, in order
+	Close   *LinkClose  // after Frames; the object then runs the closed step
+	AlarmAt time.Time   // zero = no session alarm
+	Replies []LinkReply // Frame nil = refused, expired or gone
+	Forget  bool        // the node is retired: delete all storage and the alarm after this block
+}
+type LinkClose struct { Code uint16; Reason string } // Reason at most 123 bytes
+type LinkReply struct { RequestID string; Frame []byte }
+
+func (f *Fleet) Link(ctx context.Context, in LinkIn) (LinkOut, error)
+```
+
+`Link` returns an error (the object's existing "close 1011, write nothing" path, `edge/worker/src/nodelink.ts`) when the
+state does not decode, `Generation` is 0 on open, a non-open event arrives on an empty or Disconnected state, the core
+returns an error, or one call needs more than 4 core steps. Folding errors into `LinkOut` would let the object save a
+half-applied state.
+
+One call runs one or more `SessionCore.Step`:
+
+| Kind | Core | Notes |
+|---|---|---|
+| open | a fresh `SessionState{NodeID, OwnerGeneration: Generation, PeerCert*, Poison: old.Poison}`, then EventOpen | only Poison carries over; HelloDeadline becomes AlarmAt |
+| frame | EventHello while `InstanceID == ""`, else EventAgentFrame; an accepted Hello is followed by EventDesiredChanged | HelloAck before DesiredState, as on the VPS; a bad proto closes with 1008 |
+| alarm | EventAlarm | |
+| desired | EventDesiredChanged; nothing before Hello | the VPS pokes only sessions registered after Hello; a poke between LinkAuth and Hello must not send state before HelloAck |
+| request | EventAdminCommand{RequestID, DeadlineAt, frame}; a bad proto gets a nil reply | refusals and Retire are answered in the same call |
+| closed | EventDisconnected; nothing on an empty or Disconnected state | NodeDisconnected is guarded by session; `Forget` = `RetireAt` was set |
+
+Effects run inside the call:
+- EffectPrepareDesired: `f.prepareDesiredState` inline, then EventDesiredPrepared. No event can arrive during a
+  preparation inside one call, so there is one round per trigger and `Preparing` is never stored. A real call needs at
+  most 3 steps (Hello, desired, prepared); the cap of 4 turns a future core loop into a 1011.
+- EffectReply → `Replies`. EffectUsage and EffectConnectEvents inline, as on the VPS. EffectWarpAttention →
+  `dispatchWarpAttention` (own goroutine). EffectLogChunk is dropped (log streaming is Unimplemented on the edge).
+
+Close and alarm: a transition that closes keeps none of its frames and ends the call. `AlarmAt` is the last
+transition's NextAlarm. Close codes: CloseConflict → 4000, CloseInternal → 1011, everything else → 1008 (the agent
+ignores codes). The reason is clipped to 123 bytes (`store.Clip`): above that WebSocket `close()` throws and the socket
+would stay open after its closed step.
+
+Admin requests: `Fleet.ask` → `Remote.Ask` → `NodeLink.ask` (waiter in memory, waits outside the serial block) →
+request step. The agent's CommandResult or DoctorReport arrives as a frame step; its `EffectReply` becomes
+`LinkOut.Replies`, which the object resolves after writing the state and sending the frames. The core's alarm expires a
+request with a nil reply; the object's own timer rejects at the deadline ("timeout" → `context.DeadlineExceeded` in the
+step 6 adapter). A 1011 or an object reset rejects every waiter with "link lost". `Remote.Close` → `NodeLink.close(4000,
+reason)` → closed step.
+
+Retire: `notifyRetire` sends a request; the request step queues Retire, replies nil at once and sets `RetireAt`; the
+agent closes the socket or the alarm closes it with 1008 "node retired"; the closed step sees `RetireAt` and returns
+`Forget`; the object calls `deleteAll()` and `deleteAlarm()` after the block. `store.RetireNode` commits before the frame
+is sent, so `RetireAt` always means "retired". A node retired while offline keeps `gen` and its closed state in the
+object (under 300 B): an accepted ceiling.
+
+Implementation notes (5a), decisions the design left open:
+- **One call keeps the alarm.** `AlarmAt` starts as the alarm of the state as it was (`nextSessionAlarm`) and every core
+  step overwrites it. A step that does nothing (desired before Hello, an undecodable request) must still return the
+  alarm: the object deletes `alarmAt` when `LinkOut.AlarmAt` is zero, which would lose the Hello deadline.
+- **Closed is the exception to "non-open event on an empty or Disconnected state is an error".** The table says the closed
+  step does nothing there, and the object runs it once per socket, so it returns the state unchanged. Every other kind
+  (frame, alarm, desired, request) on such a state is an error. A state that names another node, an empty node id and an
+  unknown kind are errors too.
+- **A closing transition drops its effects, not only its frames**, like `session.step` on the VPS (a pending request then
+  fails with "link lost" through the object's waiters, not with a nil reply). Earlier transitions of the same call keep
+  their frames (HelloAck stays when the desired step closes).
+- **Bad bytes.** An undecodable frame closes with 1008 ("invalid ConnectRequest frame"); an undecodable request frame gets
+  a nil reply and no step.
+- **A state the driver cannot use** (undecodable, or naming another node) fails every kind but `open`: open logs a
+  warning (node id and a reason, no content) and starts clean without Poison, so a new LinkAuth repairs a corrupt object.
+- **A call past its context writes nothing**: `finish` returns the context error, so the object keeps its old state.
+- **A request already past its deadline** (`At >= DeadlineAt`) gets a nil reply and is never stepped or sent.
+- **Preparation errors** go to the core as `EventDesiredPrepared{Err}` (retry in 3 s through the alarm), as on the VPS;
+  `Preparing` is cleared on the way out of a closing call too.
+- **Shared with the VPS adapter** (`agent.go`): `Fleet.runSharedEffect` (usage, WARP attention, connect events) and
+  `Fleet.preparedEvent` (read the desired state, build the core event). Not shared: the Hello-then-desired order, reply
+  delivery, log chunks and the preparation trigger (goroutine on the VPS, inline here).
+- **`LinkHandler` / `LinkMarker`.** `app.Build` already mounts `LinkHandler` under the link prefix; it now returns
+  `LinkMarker` when `Config.Remote` is set. `LinkMarker` stays exported for the edge entry test hook.
+
+Object storage is unchanged from step 2 (kv: `gen`, `live`, `state`, `alarmAt`, `poke`; attachment: nonce, deadline,
+audience, generation). Poison lives inside `state`.
+
+D1 calls per event: open 0; Hello about 6 + k (NodeHello batch, Node, connect-event read and insert,
+NodeWithSentDigest, k access reads, NodeDesired); stats 2; alarm and request 0, plus 1 CertStatus when the 30 s recheck
+is due; closed 1.
+
+### 6.2 Link-only agents
+
+Panel:
+- Enrol route: `<link prefix>/mistgate.agent.v1.EnrollmentService/Enroll`, a Connect unary POST with the same
+  EnrollRequest/EnrollResponse and the same `enrollmentService.Enroll` (limiter, one-time token, P-256 CSR,
+  `store.Enroll`, re-enrolment calls `f.drop`). `LinkHandler` checks this path before `/link/<id>`;
+  `httpserver.agentLinkRequest` admits this one extra path. Renew is not routed here (it needs a node identity).
+- One mount for both editions: `LinkHandler` answers with the marker when `Remote != nil`, else serves the socket. Step 6
+  then only stores `link_prefix` on the edge and sets `Remote`.
+- Install command: when `Remote != nil`, `CreateEnrollment` returns `… enroll --link-url wss://de1.example.com/<prefix>/
+  --ca-sha256 <fp> --token <t> && … install`, built from a new `Config.LinkURL` (`wss://` + PublicURL host + LinkPrefix).
+- mTLS enrolment is already refused on the edge (no agent SNI → `agentMiddleware` 404); a test pins this.
+- Renew over the link: proto, additive: `ConnectRequest.renew` (RenewRequest) and `ConnectResponse.renew`
+  (RenewResponse). A new `agentFrame` case runs `parseCSR`, `ca.issueNode`, `st.RenewCert(cert, now, oldCertGrace)` and
+  sends the answer. RenewCert is already one 3-statement batch on D1 (add it to the §2 "Store on D1" list). A bad CSR
+  closes with InvalidArgument, a store error with Internal. The session keeps the old serial; its recheck ends the
+  session when the grace runs out and the agent comes back on the new certificate (as an mTLS stream does today). An old
+  panel ignores the frame; the agent times out and retries in an hour.
+
+Agent (`cmd/mistgate-node`, `internal/node/agent`):
+- `enroll --link-url wss://de1.example.com/<prefix>/ --ca-sha256 … (--token | --token-stdin)`; `--link-url` cannot be
+  combined with `--panel` or `--sni`. The agent POSTs over public TLS (system roots), then runs the existing checks: the
+  returned CA's hash equals the pin, the leaf is ours and chains to it. Public TLS only protects the token; trust in the
+  panel comes from the pin and then from LinkAccept.
+- `Meta.Link` is saved as `"link"` in agent.json (Panel and SNI empty); `linkOnly := meta.Link != ""`.
+- A link-only agent always dials the link: no mTLS, no hold period, `linkAdvertised` ignored; it keeps the reconnect
+  backoff on `errLinkNotEstablished` (no hot loop against a dead panel).
+- Renewal sends `ConnectRequest.renew` on the current session and waits up to 2 minutes; with no session it retries at
+  the next hourly tick (10 days of slack).
+- `capabilities()` leaves out `update/1` for link-only agents (FetchUpdate is mTLS; owner decision 2).
+- VPS agents are unchanged: `Meta.Link` is empty, every branch behaves as today.
+
+### 6.3 The Go NodeLink emulator test
+
+Files: `internal/node/agent/nodelink_emu_test.go` (the emulator) and `internal/node/agent/edge_link_test.go` (the
+scenarios), next to `link_test.go`; driver unit tests with raw frames in `internal/panel/fleet/link_driver_test.go`.
+
+The emulator implements `fleet.Remote` and plays the Worker and NodeLink:
+- Worker: `<prefix>/…` goes to `f.LinkHandler()` with `Remote` set; a 204 with `X-Mistgate-Link` hands the upgrade to that
+  node's object (like `forwardLink`); the enrol POST is answered directly.
+- Serial block: one goroutine per object draining a FIFO, events in arrival order; `ask` waits outside the block. A block
+  budget (25 s, shortened in tests): `f.Link` runs raced against what is left; a late result is thrown away.
+- fetch: `LinkChallenge` outside the block; inside: accept, attachment `{nonce, deadline, audience, generation: 0}`,
+  challenge, arm.
+- message: from a closed socket dropped; generation 0 → `LinkAccept`, `gen++`, other authenticated sockets closed 4000,
+  `live = gen`, accept frame, open step; generation == `live` → frame step; else dropped.
+- run: write the state, send the frames, apply the replies, set `alarmAt` (≥ now + 1 s), then close if asked. An error or
+  a spent budget closes 1011, rejects waiters "link lost", writes nothing. `Forget` clears storage and the timer.
+- One alarm timer re-armed after every block from `alarmAt`, handshake deadlines and `poke`, like `arm()`.
+- Clock: `time.Now()` plus an offset, also `fleet.Config.Now`; `advance(d)` and `runAlarm(node)`.
+- Own-node guard: `f.Link` gets a ctx tagged with its node; `Remote.Ask`/`Close`/`Poke` for that node with that ctx fails
+  the test (a step must never await its own NodeLink).
+- Faults: `failNext()`, `reset()` (sockets vanish without close events, waiters dropped, storage kept), `loseState()`.
+- A step log `[]{gen, kind}` for assertions.
+
+Scenarios (real agent, fake engine, short stats interval):
+1. Enrol → Hello → desired → stats → ask: `node_live.session = 1`, the inbound applied, the sample in `node_live` and
+   traffic rows; `f.RunDoctor` returns the agent's report through `Replies`. (5b: mTLS enrolment with the link preset;
+   5c: link enrolment.)
+2. Reconnect with a delta base: `reset()`, the alarm drops the session, the agent reconnects as gen 2, its Hello matches
+   the digest, no DesiredState; a new credential + poke gives a delta with `BaseRevision`; `loseState()` after a desired
+   step ends in a full resend and the agent converges.
+3. Liveness: `advance(liveness + 1 s)` + `runAlarm` closes with 1008; the `node_live` row is gone; the agent reconnects as
+   gen + 1.
+4. Retire: `AgentNotified`, the agent wipes its state and `Run` returns `ErrRetired`; `Forget` leaves no storage and no
+   alarm; also the 5 s alarm path with a raw client that never closes.
+5. Superseded socket: a raw client signs LinkAuth with the agent's key; the agent's socket gets 4000 and its later frames
+   are not stepped; the closed step of the old generation leaves the new row; the agent comes back as gen 3.
+6. Failed step: `failNext()` during stats → 1011, queued frames dropped, reconnect, every batch counted exactly once.
+7. (5c) Renew over the link: a new `cert_serial`; after the grace one frame's recheck closes the old session and the agent
+   reconnects with the new certificate.
+
+### 6.4 Rounds
+
+| Round | Changes | Proof | Risks |
+|---|---|---|---|
+| 5a | `link_driver.go` (types, `Link`, close mapping); `LinkHandler` answers with the marker when `Remote != nil` | driver tests on SQLite: open keeps only Poison; Hello and desired in one call, HelloAck first; desired before Hello does nothing; refusal and Retire replied in the same call; CommandResult reply bytes; expiry gives a nil reply; close codes; a 300-byte reason is clipped; closed with RetireAt gives Forget; closing an old generation keeps the new row; `Preparing` is never stored; a bad frame closes 1008; a bad state is an error; JSON round trip | the Hello-then-desired order lives in two adapters; effect handling can drift between them |
+| 5b | emulator and scenarios 1-6 with today's agent | scenarios pass under `-race`; existing VPS link tests unchanged | the emulator encodes our reading of Durable Object semantics; step 6 checks it against workerd |
+| 5c | proto renew fields; core renew case; enrol route; `Config.LinkURL` and the link install command; agent `enroll --link-url`, `Meta.Link`, link-only session, backoff, renew, capabilities; scenarios 1 and 7 on link enrolment | the enrol path reaches the handler, everything else under the prefix gets the decoy; flags cannot be combined; a pin mismatch is refused; a link-only agent never dials mTLS and backs off on a dead panel; renew with a good CSR, a bad CSR, a store error; VPS install command unchanged; mTLS enrol without SNI gets 404 | a public enrol route on the VPS (§6.5 Q1); renew against an old panel only times out |
+
+Every round passes the §3 gate. The only store statements on a new path are RenewCert's existing batch; bridge query
+budgets are untouched.
+
+### 6.5 Decisions on the open questions
+
+1. The VPS also serves the link enrol route (same code and protection: secret prefix, one-time token, limiter); an edge
+   fleet moving to a VPS needs it. The VPS UI keeps the mTLS command. — owner: yes (2026-10-09)
+2. An offline retire leaves under 300 B in NodeLink storage: accepted (lead).
+3. `Link` returns an error; the §3 row is amended (lead).
+4. Edge close codes 4000/1011/1008 (lead).
+5. Renew keeps the old serial until the grace runs out (one reconnect about 10 minutes after each renewal) (lead).
+
+### 6.6 Carried to step 6
+
+- TypeScript: the open event gains `generation` (`nodelink.ts` sends none today; the driver refuses 0); `LinkStepOut`
+  gains `forget`; the `"step"` operation in `link_js.go` still returns `errLinkStep` and must convert `LinkIn`/`LinkOut`
+  under a 15 s ctx (the object allows 20 s per call).
+- `LinkOut.AlarmAt` is the zero time when no alarm is wanted: the `"step"` conversion must turn it into `undefined`
+  (`alarmAt` absent), not `UnixMilli()` of the zero time, or the object would arm an alarm in the year 1.
+- Edge Remote adapter: `Ask` → `NodeLink.ask(proto bytes, deadline ms)`, "timeout" → `context.DeadlineExceeded`;
+  `Close` → `close(4000, reason)`.
+- StateChanged reaches no node on the edge: `recomputeAll` walks in-memory sessions only. Step 6 fans out
+  `NodeLink.poke` to connected nodes through `waitUntil`, never awaited inside a step; the same for
+  `dispatchWarpAttention` and OnUsage → Recompute → StateChanged.
+- Abandoned steps can still write: after the object gives up at 20 s the Go call may still land D1 writes (a late
+  NodeHello could restore a superseded `node_live` row until the next Hello). The 15 s ctx means this needs a single D1
+  call over 15 s; measure it.
+- ADR 0007: the driver is a second place that creates EventDesiredChanged and runs every preparation inline.
+- SSH provisioning builds the mTLS enrol command; the edge needs the link form (phase 3).
