@@ -1036,6 +1036,9 @@ func TestSubscriptionLinkNeedsBase(t *testing.T) {
 
 func TestListenOverlap(t *testing.T) {
 	l := func(port, from, to uint16) plugin.Listen { return plugin.Listen{Port: port, HopFrom: from, HopTo: to} }
+	ln := func(network string, port, from, to uint16) plugin.Listen {
+		return plugin.Listen{Network: network, Port: port, HopFrom: from, HopTo: to}
+	}
 	for _, c := range []struct {
 		name string
 		a, b plugin.Listen
@@ -1049,6 +1052,9 @@ func TestListenOverlap(t *testing.T) {
 		{"overlapping hop ranges", l(443, 20000, 30000), l(8443, 25000, 35000), true},
 		{"disjoint hop ranges", l(443, 20000, 30000), l(8443, 30001, 35000), false},
 		{"a hop range that covers the other port", l(443, 8000, 9000), l(8443, 0, 0), true},
+		{"same port on different networks", ln("tcp", 443, 0, 0), ln("udp", 443, 0, 0), false},
+		{"tcp overlaps tcp", ln("tcp", 443, 0, 0), ln("tcp", 443, 0, 0), true},
+		{"udp hop range does not cover tcp port", ln("tcp", 25000, 0, 0), ln("udp", 8443, 20000, 30000), false},
 	} {
 		if got := listenOverlap(c.a, c.b); got != c.want {
 			t.Errorf("%s: listenOverlap = %v, want %v", c.name, got, c.want)

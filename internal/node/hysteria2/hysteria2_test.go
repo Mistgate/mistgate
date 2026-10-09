@@ -1,6 +1,7 @@
 package hysteria2
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -9,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -185,12 +187,17 @@ func (r *rig) now() time.Time {
 // newRig builds an engine (self-signed certs, loopback-friendly egress, a fake DNS that knows app.example.test)
 // and a spec for one inbound. Nothing is applied yet.
 func newRig(t *testing.T, settingsJSON string) *rig {
+	return newRigWithLogger(t, settingsJSON, nil)
+}
+
+func newRigWithLogger(t *testing.T, settingsJSON string, logger *slog.Logger) *rig {
 	t.Helper()
 	r := &rig{t: t, echo: tcpEcho(t), udpPort: freeUDPPort(t), tcpPort: freeTCPPort(t)}
 	dns := fakeDNS(t, map[string]string{"app.example.test.": "127.0.0.1"})
 	resolvers := func() []string { return []string{dns} }
 	direct := egress.New(resolvers, egress.AllowPrivate())
 	e, err := New(engine.Env{
+		Log:    logger,
 		Certs:  certs.New(t.TempDir()),
 		Egress: func(string) (engine.Egress, error) { return direct, nil },
 		DNS:    resolvers,
@@ -878,6 +885,214 @@ func TestBusyTCPPortIsNotFatal(t *testing.T) {
 	}
 	if err := echoOnce(r.mustDial("a"), r.echo, payload(32)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTCPClaimsReleaseAndRebindTCPDecoy(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		claimBeforeApply bool
+	}{
+		{name: "claim during removal", claimBeforeApply: true},
+		{name: "claim during apply", claimBeforeApply: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRig(t, "")
+			claims := r.e.(engine.TCPPortUser)
+			claimed := map[uint16]string{uint16(r.tcpPort): "inb_tcp"}
+			if tc.claimBeforeApply {
+				claims.TCPClaims(context.Background(), claimed)
+				r.apply(cred("a"))
+			} else {
+				r.apply(cred("a"))
+				claims.TCPClaims(context.Background(), claimed)
+			}
+
+			wantDetail := fmt.Sprintf("masq_tcp: port %d serves inbound inb_tcp", r.tcpPort)
+			if health := r.e.Health(); len(health) != 1 || health[0].Detail != wantDetail {
+				t.Fatalf("claimed decoy detail = %+v, want %q", health, wantDetail)
+			}
+			if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err != nil {
+				t.Fatalf("claimed TCP decoy still holds the port: %v", err)
+			} else {
+				ln.Close()
+			}
+			if err := echoOnce(r.mustDial("a"), r.echo, payload(32)); err != nil {
+				t.Fatalf("TCP claim interrupted QUIC: %v", err)
+			}
+
+			claims.TCPClaims(context.Background(), nil)
+			if health := r.e.Health(); len(health) != 1 || health[0].Detail != "" {
+				t.Fatalf("released decoy detail = %+v, want empty", health)
+			}
+			if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err == nil {
+				ln.Close()
+				t.Fatal("released claim did not rebind the TCP decoy")
+			}
+		})
+	}
+}
+
+func TestTCPClaimsWithoutClaimsLeavesTCPDecoyAlone(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	r.e.(engine.TCPPortUser).TCPClaims(context.Background(), nil)
+	if health := r.e.Health(); len(health) != 1 || health[0].Detail != "" {
+		t.Fatalf("unclaimed decoy health = %+v, want running with no detail", health)
+	}
+	if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err == nil {
+		ln.Close()
+		t.Fatal("an empty claim set closed the TCP decoy")
+	}
+}
+
+func TestTCPClaimsRebindAfterDisabledClaimantStops(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	claims := r.e.(engine.TCPPortUser)
+	claims.TCPClaims(context.Background(), map[uint16]string{uint16(r.tcpPort): "inb_vless"})
+
+	vless, err := net.Listen("tcp", bindAddr(r.tcpPort))
+	if err != nil {
+		t.Fatalf("TCP claimant could not bind the released decoy port: %v", err)
+	}
+	if err := vless.Close(); err != nil {
+		t.Fatal(err)
+	}
+	claims.TCPClaims(context.Background(), nil)
+
+	if health := r.e.Health(); len(health) != 1 || health[0].Detail != "" {
+		t.Fatalf("released decoy detail = %+v, want empty", health)
+	}
+	if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err == nil {
+		ln.Close()
+		t.Fatal("decoy was not rebound after the TCP claimant stopped")
+	}
+}
+
+func TestTCPClaimsRebindClearsMasqTCPError(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	claims := r.e.(engine.TCPPortUser)
+	claims.TCPClaims(context.Background(), map[uint16]string{uint16(r.tcpPort): "inb_vless"})
+
+	vless, err := net.Listen("tcp", bindAddr(r.tcpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := map[uint16]string{8443: "inb_vless"}
+	claims.TCPClaims(context.Background(), next)
+	if health := r.e.Health(); len(health) != 1 || !strings.HasPrefix(health[0].Detail, "masq_tcp:") {
+		t.Fatalf("busy decoy detail = %+v, want masq_tcp error", health)
+	}
+	if err := vless.Close(); err != nil {
+		t.Fatal(err)
+	}
+	claims.TCPClaims(context.Background(), next)
+
+	if health := r.e.Health(); len(health) != 1 || health[0].Detail != "" {
+		t.Fatalf("rebound decoy detail = %+v, want empty", health)
+	}
+	if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err == nil {
+		ln.Close()
+		t.Fatal("decoy was not rebound after the TCP claimant moved")
+	}
+}
+
+func TestTCPClaimsOnlyWarnWhenMasqTCPDetailChanges(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	r := newRigWithLogger(t, "", logger)
+	foreign, err := net.Listen("tcp", bindAddr(r.tcpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	r.apply(cred("a"))
+	claims := r.e.(engine.TCPPortUser)
+	for range 3 {
+		claims.TCPClaims(context.Background(), map[uint16]string{1: "inb_vless"})
+	}
+	if got := strings.Count(logs.String(), "hysteria2 tcp masquerade unavailable"); got != 1 {
+		t.Fatalf("TCP masquerade warning count = %d, want one; logs: %s", got, logs.String())
+	}
+}
+
+func TestTCPClaimsFreeFailedOrStoppedInboundPortWithoutRebinding(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		state  plugin.RunState
+		detail string
+	}{
+		{name: "failed", state: plugin.RunFailed, detail: "serve: test failure"},
+		{name: "stopped", state: plugin.RunStopped},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRig(t, "")
+			r.apply(cred("a"))
+			in := r.e.(*eng).inbounds[r.spec.ID]
+			in.setState(tc.state, tc.detail)
+
+			claims := r.e.(engine.TCPPortUser)
+			claims.TCPClaims(context.Background(), map[uint16]string{uint16(r.tcpPort): "inb_vless"})
+			if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err != nil {
+				t.Fatalf("claimed port is still held by a decoy: %v", err)
+			} else {
+				ln.Close()
+			}
+			claims.TCPClaims(context.Background(), nil)
+
+			if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err != nil {
+				t.Fatalf("stopped inbound rebound its TCP decoy: %v", err)
+			} else {
+				ln.Close()
+			}
+			if health := r.e.Health(); len(health) != 1 || health[0].Detail != tc.detail {
+				t.Fatalf("inbound health = %+v, want detail %q", health, tc.detail)
+			}
+		})
+	}
+}
+
+func TestTCPClaimsShareDecoyAcrossClaimAndRelease(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	twin := r.spec
+	twin.ID, twin.ProfileID, twin.Listen.Port = "inb_2", "prf_2", uint16(freeUDPPort(t))
+	if _, err := r.e.Apply(context.Background(), twin, []plugin.UserCred{cred("b")}); err != nil {
+		t.Fatal(err)
+	}
+	claims := r.e.(engine.TCPPortUser)
+	claims.TCPClaims(context.Background(), map[uint16]string{uint16(r.tcpPort): "inb_vless"})
+	if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err != nil {
+		t.Fatalf("claimed shared decoy still holds the port: %v", err)
+	} else {
+		ln.Close()
+	}
+
+	health := r.e.Health()
+	if len(health) != 2 {
+		t.Fatalf("inbound health count = %d, want two", len(health))
+	}
+	wantClaimDetail := fmt.Sprintf("masq_tcp: port %d serves inbound inb_vless", r.tcpPort)
+	for _, h := range health {
+		if h.Detail != wantClaimDetail {
+			t.Fatalf("claimed shared decoy detail = %+v, want %q", h, wantClaimDetail)
+		}
+	}
+	claims.TCPClaims(context.Background(), nil)
+	health = r.e.Health()
+	if len(health) != 2 {
+		t.Fatalf("inbound health count = %d after release, want two", len(health))
+	}
+	for _, health := range health {
+		if health.Detail != "" {
+			t.Fatalf("released shared decoy detail = %+v, want empty", health)
+		}
+	}
+	if ln, err := net.Listen("tcp", bindAddr(r.tcpPort)); err == nil {
+		ln.Close()
+		t.Fatal("shared decoy was not rebound after claim release")
 	}
 }
 

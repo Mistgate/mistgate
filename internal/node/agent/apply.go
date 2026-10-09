@@ -126,6 +126,8 @@ func diffModels(cur, next *model) (added, removed, changed, creds int) {
 // the others. force lists inbounds that must be applied even if unchanged (restart).
 func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]bool) []*pb.InboundResult {
 	prev := a.snapshotModel()
+	nextTCP := tcpPortClaims(next)
+	claimedTCP := mergeTCPPortClaims(tcpPortClaims(prev), nextTCP)
 	// The host side of the L3 protocols comes first (l3.go): WARP, then the routes and the firewall of the tunnel
 	// interfaces, then the engines that create those interfaces. An inbound that depends on a step that failed is
 	// blocked (a.blocked) instead of started.
@@ -144,19 +146,53 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		}
 		delete(a.held, id)
 	}
+	a.syncTCPClaims(ctx, claimedTCP)
 	now := a.now()
 	results := make([]*pb.InboundResult, 0, len(next.inbounds))
 	for _, id := range next.ids() {
 		results = append(results, a.applyInbound(ctx, next.inbounds[id], now, force[id]))
 	}
+	a.syncTCPClaims(ctx, nextTCP)
 	// NFQUEUE rules are installed before an AWG interface is created. Refresh its interface-index map now that
 	// the engines have applied, so packets use exact active interface identities from this point on.
 	a.syncTorrentGuardApplied(ctx, next, results)
 	active := successfullyAppliedEnabledInbounds(results)
 	hops := a.syncHops(ctx, next, results, active)
-	a.syncInboundUDPPorts(ctx, next, active, hops)
+	a.syncInboundPorts(ctx, next, active, hops)
 	a.noteCerts(results)
 	return results
+}
+
+func tcpPortClaims(next *model) map[uint16]string {
+	claimed := make(map[uint16]string)
+	for _, id := range next.ids() {
+		spec := next.inbounds[id].spec
+		if spec.Enabled && spec.Listen.Network == "tcp" {
+			if _, exists := claimed[spec.Listen.Port]; !exists { // ids are sorted; keep the same lower-id winner as hop checks
+				claimed[spec.Listen.Port] = id
+			}
+		}
+	}
+	return claimed
+}
+
+func mergeTCPPortClaims(prev, next map[uint16]string) map[uint16]string {
+	claimed := make(map[uint16]string, len(prev)+len(next))
+	for port, id := range prev {
+		claimed[port] = id
+	}
+	for port, id := range next {
+		claimed[port] = id
+	}
+	return claimed
+}
+
+func (a *Agent) syncTCPClaims(ctx context.Context, claimed map[uint16]string) {
+	for _, protocol := range a.protocols {
+		if user, ok := a.engines[protocol].(engine.TCPPortUser); ok {
+			user.TCPClaims(ctx, claimed)
+		}
+	}
 }
 
 func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, force bool) *pb.InboundResult {
@@ -319,48 +355,63 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	return hops
 }
 
-// syncInboundUDPPorts mirrors only enabled UDP listeners whose engine apply succeeded. Hop ranges are
-// included only after their exact nft redirect was accepted and installed. A failure is a node-level warning, not an
-// inbound error: the listener runs, and the host firewall may well be open by the owner's own rules.
-func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) {
+// syncInboundPorts mirrors only enabled listeners whose engine apply succeeded. UDP hop ranges are included only after
+// their exact nft redirect was accepted and installed. A failure is a node-level warning, not an inbound error: the
+// listener runs, and the host firewall may well be open by the owner's own rules.
+func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) {
 	byHop := make(map[string]hostctl.Hop, len(hops))
 	for _, h := range hops {
 		byHop[h.InboundID] = h
 	}
-	set := make(map[hostctl.UDPInboundPort]struct{})
+	udpSet := make(map[hostctl.UDPInboundPort]struct{})
+	tcpSet := make(map[uint16]struct{})
 	var errs []error
 	for _, id := range next.ids() {
 		s := next.inbounds[id].spec
-		if !s.Enabled || !active[id] || s.Listen.Network != "udp" {
+		if !s.Enabled || !active[id] {
 			continue
 		}
-		if s.Listen.Port == 0 || s.Listen.Port > 65535 {
-			errs = append(errs, fmt.Errorf("inbound %s has an invalid UDP listener port %d", id, s.Listen.Port))
-			continue
-		}
-		set[hostctl.UDPInboundPort{Port: uint16(s.Listen.Port)}] = struct{}{}
-		if h, ok := byHop[id]; ok && h.Network == "udp" {
-			set[hostctl.UDPInboundPort{From: h.From, To: h.To}] = struct{}{}
+		switch s.Listen.Network {
+		case "udp":
+			if s.Listen.Port == 0 {
+				errs = append(errs, fmt.Errorf("inbound %s has an invalid UDP listener port %d", id, s.Listen.Port))
+				continue
+			}
+			udpSet[hostctl.UDPInboundPort{Port: s.Listen.Port}] = struct{}{}
+			if h, ok := byHop[id]; ok && h.Network == "udp" {
+				udpSet[hostctl.UDPInboundPort{From: h.From, To: h.To}] = struct{}{}
+			}
+		case "tcp":
+			if s.Listen.Port == 0 {
+				errs = append(errs, fmt.Errorf("inbound %s has an invalid TCP listener port %d", id, s.Listen.Port))
+				continue
+			}
+			tcpSet[s.Listen.Port] = struct{}{}
 		}
 	}
-	ports := make([]hostctl.UDPInboundPort, 0, len(set))
-	for port := range set {
-		ports = append(ports, port)
+	udp := make([]hostctl.UDPInboundPort, 0, len(udpSet))
+	for port := range udpSet {
+		udp = append(udp, port)
 	}
-	sort.Slice(ports, func(i, j int) bool {
-		if ports[i].Port != ports[j].Port {
-			return ports[i].Port < ports[j].Port
+	sort.Slice(udp, func(i, j int) bool {
+		if udp[i].Port != udp[j].Port {
+			return udp[i].Port < udp[j].Port
 		}
-		if ports[i].From != ports[j].From {
-			return ports[i].From < ports[j].From
+		if udp[i].From != udp[j].From {
+			return udp[i].From < udp[j].From
 		}
-		return ports[i].To < ports[j].To
+		return udp[i].To < udp[j].To
 	})
-	if err := a.host.SyncInboundUDPPorts(ctx, ports); err != nil {
+	tcp := make([]uint16, 0, len(tcpSet))
+	for port := range tcpSet {
+		tcp = append(tcp, port)
+	}
+	sort.Slice(tcp, func(i, j int) bool { return tcp[i] < tcp[j] })
+	if err := a.host.SyncInboundPorts(ctx, udp, tcp); err != nil {
 		errs = append(errs, err)
 	}
 	if err := errors.Join(errs...); err != nil {
-		a.markHostFirewallSyncFailure(err, ports)
+		a.markHostFirewallSyncFailure(err, udp, tcp)
 	} else {
 		a.clearHostFirewallSyncFailure()
 	}
@@ -368,18 +419,25 @@ func (a *Agent) syncInboundUDPPorts(ctx context.Context, next *model, active map
 
 // markHostFirewallSyncFailure reports one warning per distinct failure; the same failure on later reconciles is quiet.
 // "ports" lists the UDP ports and hop ranges the server's firewall has to let in ("443, 20000-20010"), for the owner.
-func (a *Agent) markHostFirewallSyncFailure(err error, ports []hostctl.UDPInboundPort) {
+func (a *Agent) markHostFirewallSyncFailure(err error, udp []hostctl.UDPInboundPort, tcp []uint16) {
 	errMsg := err.Error()
 	if a.hostFirewallErr != errMsg {
 		a.hostFirewallErr = errMsg
-		a.log.Warn("host firewall UDP rules were not fully reconciled", "err", err)
-		list := make([]string, len(ports))
-		for i, p := range ports {
+		a.log.Warn("host firewall inbound rules were not fully reconciled", "err", err)
+		list := make([]string, len(udp))
+		for i, p := range udp {
 			if p.Port != 0 {
 				list[i] = strconv.Itoa(int(p.Port))
 			} else {
 				list[i] = fmt.Sprintf("%d-%d", p.From, p.To)
 			}
+		}
+		if len(tcp) > 0 {
+			tcpPorts := make([]string, len(tcp))
+			for i, port := range tcp {
+				tcpPorts[i] = strconv.Itoa(int(port))
+			}
+			list = append(list, "tcp:"+strings.Join(tcpPorts, ","))
 		}
 		a.event(pb.Severity_SEVERITY_WARNING, "host_firewall_sync_failed", "", map[string]string{"error": errMsg, "ports": strings.Join(list, ", ")})
 	}

@@ -59,6 +59,12 @@ type Engine interface {
 	Close(ctx context.Context) error
 }
 
+// TCPPortUser lets an engine give up a TCP side listener when another inbound claims that port. claimed maps
+// enabled TCP listener ports to their inbound ids and must be treated as read-only.
+type TCPPortUser interface {
+	TCPClaims(ctx context.Context, claimed map[uint16]string)
+}
+
 type Capabilities struct {
 	RateLimitPerCred bool // honours UserCred.RateLimitBps
 	HardExpiry       bool // honours UserCred.ValidUntil itself (the agent also enforces it, this is an optimisation)

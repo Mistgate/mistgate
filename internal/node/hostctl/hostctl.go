@@ -1,6 +1,6 @@
 // Package hostctl is the agent's view of the machine it runs on: host facts for Hello, host metrics for
 // StatsBatch, and the only host state the agent owns: its own nftables table for
-// port-hop redirects and the SSH brute-force guard, the UDP delivery counter, the fail-open torrent queue, exact UDP inbound rules in an active UFW firewall,
+// port-hop redirects and the SSH brute-force guard, the UDP delivery counter, the fail-open torrent queue, exact UDP/TCP inbound rules in an active UFW firewall,
 // the fq + bbr, conntrack and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
 // Linux-only behind a build tag; other OSes get a no-op stub so the whole repo still builds and vets.
 package hostctl
@@ -28,13 +28,13 @@ type Host interface {
 	// SetPortHops makes the hop part of the agent's nft table match hops exactly. Atomic; the SSH guard
 	// (installed by ApplyBaseline) stays. Every hop must pass ValidateHop.
 	SetPortHops(ctx context.Context, hops []Hop) error
-	// SyncInboundUDPPorts reconciles exact Mistgate UDP listener ports and hop ranges in a supported,
+	// SyncInboundPorts reconciles exact Mistgate UDP listener ports and hop ranges and TCP listener ports in a supported,
 	// already-active host firewall. It never enables a firewall or edits provider-level rules.
-	SyncInboundUDPPorts(ctx context.Context, ports []UDPInboundPort) error
+	SyncInboundPorts(ctx context.Context, udp []UDPInboundPort, tcp []uint16) error
 	// SSHPorts are the sshd ports found by the last ApplyBaseline (22 when detection found nothing):
 	// the SSH guard rate-limits them and no port-hop range may cover them.
 	SSHPorts() []uint16
-	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard, UDP delivery checks and torrent queue, tagged UFW UDP rules
+	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard, UDP delivery checks and torrent queue, tagged UFW inbound rules
 	// and the UFW rules the SSH install tagged with ProvisionUFWTag, sysctl and journald drop-ins,
 	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the tunnel table
 	// "mistgate_awg" and every link named mgawg* or mgwarp). The WARP routing rules and routes are the WARP

@@ -55,11 +55,11 @@ type linuxHost struct {
 	hops     []Hop
 	sshPorts []uint16
 	// UFW inbound sync (firewall_linux.go): ufw.conf ("" = UFW is never run), and the last sync's key, result and time.
-	ufwConf   string
-	udpSynced bool
-	udpKey    string
-	udpErr    error
-	udpAt     time.Time
+	ufwConf       string
+	inboundSynced bool
+	inboundKey    string
+	inboundErr    error
+	inboundAt     time.Time
 
 	// The tunnel table of the L3 protocols (tunnel_linux.go) and the deletion of our links; nil links = none (tests).
 	tun   tunnelState
@@ -376,7 +376,7 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 
 func (h *linuxHost) Cleanup(ctx context.Context) error {
 	errs := []error{h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx), h.CleanupUDPCount(ctx)} // owned tables and links
-	errs = append(errs, h.SyncInboundUDPPorts(ctx, nil))                                             // only UFW rules with Mistgate's exact ownership tag
+	errs = append(errs, h.SyncInboundPorts(ctx, nil, nil))                                           // only UFW rules with Mistgate's exact ownership tags
 	errs = append(errs, h.removeProvisionUFWRules(ctx))                                              // and the 80/443 rules the SSH install tagged
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()

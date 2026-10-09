@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,20 +68,22 @@ type eng struct {
 	torrentEnabled atomic.Bool
 	torrentVersion uint64 // guards inbound generations under mu so toggles replace existing outbound flows
 
-	mu       sync.Mutex // guards everything below; never taken on the data path
-	inbounds map[string]*inbound
-	retired  []*credState // dropped credentials with counters not yet reported
-	closed   bool
+	mu        sync.Mutex // guards everything below; never taken on the data path
+	inbounds  map[string]*inbound
+	tcpClaims map[uint16]string
+	retired   []*credState // dropped credentials with counters not yet reported
+	closed    bool
 }
 
 var _ engine.Engine = (*eng)(nil)
+var _ engine.TCPPortUser = (*eng)(nil)
 
 // New builds the engine. Env.Certs is required; Env.Egress defaults to egress.New(Env.DNS) for "direct".
 func New(env engine.Env) (engine.Engine, error) {
 	if env.Certs == nil {
 		return nil, errors.New("hysteria2: Env.Certs is required")
 	}
-	e := &eng{env: env, log: env.Log, now: env.Now, out: env.Egress, inbounds: map[string]*inbound{}}
+	e := &eng{env: env, log: env.Log, now: env.Now, out: env.Egress, inbounds: map[string]*inbound{}, tcpClaims: map[uint16]string{}}
 	if e.log == nil {
 		e.log = slog.Default()
 	}
@@ -334,20 +337,24 @@ func (in *inbound) start(ctx context.Context) error {
 	}()
 
 	detail := ""
-	if owner := in.e.tcpMasqOwner(in, cfg.tcpPort); owner != "" {
-		// Two profiles on one node (a WARP copy next to its original) both default to TCP 443: one decoy there is
-		// enough, so the second does not fight for the port.
-		// ponytail: if the owner is removed, this inbound takes the port over only at its next restart.
-		in.e.log.Info("hysteria2 tcp masquerade served by another inbound", "inbound", spec.ID, "port", cfg.tcpPort, "by", owner)
-	} else if cfg.tcpPort != 0 {
-		// A busy TCP port must not take the VPN down: the inbound keeps serving QUIC, and the reason is in
-		// Health().Detail so the panel can show that the decoy is degraded.
-		m, err := startTCPMasq(cfg.tcpPort, cert.GetCertificate, masq, spec.Listen.Port)
-		if err != nil {
-			detail = fmt.Sprintf("masq_tcp: %v", err)
-			in.e.log.Warn("hysteria2 tcp masquerade unavailable", "inbound", spec.ID, "port", cfg.tcpPort, "err", err)
+	if cfg.tcpPort != 0 {
+		if claimant := in.e.tcpClaims[uint16(cfg.tcpPort)]; claimant != "" {
+			detail = fmt.Sprintf("masq_tcp: port %d serves inbound %s", cfg.tcpPort, claimant)
+		} else if owner := in.e.tcpMasqOwner(in, cfg.tcpPort); owner != "" {
+			// Two profiles on one node (a WARP copy next to its original) both default to TCP 443: one decoy there is
+			// enough, so the second does not fight for the port.
+			// ponytail: if the owner is removed, this inbound takes the port over only at its next restart.
+			in.e.log.Info("hysteria2 tcp masquerade served by another inbound", "inbound", spec.ID, "port", cfg.tcpPort, "by", owner)
 		} else {
-			in.tcp = m
+			// A busy TCP port must not take the VPN down: the inbound keeps serving QUIC, and the reason is in
+			// Health().Detail so the panel can show that the decoy is degraded.
+			m, err := startTCPMasq(cfg.tcpPort, cert.GetCertificate, masq, spec.Listen.Port)
+			if err != nil {
+				detail = fmt.Sprintf("masq_tcp: %v", err)
+				in.e.log.Warn("hysteria2 tcp masquerade unavailable", "inbound", spec.ID, "port", cfg.tcpPort, "err", err)
+			} else {
+				in.tcp = m
+			}
 		}
 	}
 	in.setState(plugin.RunRunning, detail)
@@ -366,6 +373,70 @@ func (e *eng) tcpMasqOwner(in *inbound, port int) string {
 		}
 	}
 	return ""
+}
+
+// TCPClaims closes decoys covered by another protocol's listeners and restores them when those ports are released.
+// An empty map before any claim is the common case and deliberately leaves today's decoy ownership unchanged.
+func (e *eng) TCPClaims(_ context.Context, claimed map[uint16]string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed || (len(claimed) == 0 && len(e.tcpClaims) == 0) {
+		return
+	}
+
+	next := make(map[uint16]string, len(claimed))
+	for port, id := range claimed {
+		next[port] = id
+	}
+	e.tcpClaims = next
+
+	for _, in := range e.sortedInbounds() {
+		if !in.spec.Enabled || in.cfg.tcpPort == 0 {
+			continue
+		}
+		port := uint16(in.cfg.tcpPort)
+		if claimant := claimed[port]; claimant != "" {
+			if in.tcp != nil {
+				in.tcp.Close()
+				in.tcp = nil
+			}
+			in.mu.Lock()
+			if in.state == plugin.RunRunning {
+				in.detail = fmt.Sprintf("masq_tcp: port %d serves inbound %s", port, claimant)
+			}
+			in.mu.Unlock()
+			continue
+		}
+
+		in.mu.Lock()
+		running := in.state == plugin.RunRunning
+		previousDetail := in.detail
+		if running && strings.HasPrefix(in.detail, "masq_tcp:") {
+			in.detail = ""
+		}
+		in.mu.Unlock()
+		if !running {
+			continue
+		}
+		if in.tcp != nil || e.tcpMasqOwner(in, in.cfg.tcpPort) != "" {
+			continue
+		}
+		m, err := startTCPMasq(in.cfg.tcpPort, in.cert.GetCertificate, in.masqHandler(), in.spec.Listen.Port)
+		if err != nil {
+			detail := fmt.Sprintf("masq_tcp: %v", err)
+			in.mu.Lock()
+			changed := in.state == plugin.RunRunning && previousDetail != detail
+			if in.state == plugin.RunRunning {
+				in.detail = detail
+			}
+			in.mu.Unlock()
+			if changed {
+				in.e.log.Warn("hysteria2 tcp masquerade unavailable", "inbound", in.spec.ID, "port", in.cfg.tcpPort, "err", err)
+			}
+			continue
+		}
+		in.tcp = m
+	}
 }
 
 func (in *inbound) masqHandler() http.Handler {

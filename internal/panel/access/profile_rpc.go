@@ -650,13 +650,15 @@ func (s *Service) loadFull(ctx context.Context, inboundID string) (store.AccessI
 	return f, merged, err
 }
 
-// nodeListen is another inbound of a node as the port check sees it: its profile and the UDP ports it takes.
+// nodeListen is another inbound of a node as the port check sees it: its profile, protocol and listener ports.
 type nodeListen struct {
-	profile string
-	l       plugin.Listen
+	profile  string
+	protocol string
+	enabled  bool
+	l        plugin.Listen
 }
 
-// nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed): the UDP ports each
+// nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed): the listener ports each
 // one takes, and which profiles are there. A neighbour whose spec does not build has no ports here: it is reported on
 // its own.
 func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listens []nodeListen, profiles map[string]bool, err error) {
@@ -675,13 +677,13 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 			return nil, nil, s.internal("open profile secrets", err)
 		}
 		if os, err := s.buildSpec(o, merged); err == nil {
-			listens = append(listens, nodeListen{profile: o.Profile.Name, l: os.Listen})
+			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen})
 		}
 	}
 	return listens, profiles, nil
 }
 
-// clashOf is the first neighbour that fights l over a UDP port (listenOverlap), or nil.
+// clashOf is the first neighbour that fights l over a listener port (listenOverlap), or nil.
 func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
 	for i := range others {
 		if listenOverlap(l, others[i].l) {
@@ -743,11 +745,21 @@ func buildRefusal(err error, node string) error {
 }
 
 // inboundWarnings is what the admin should know before adding or switching on an inbound although it does not stop it:
-// an exit through WARP on a node whose WARP account is missing, paused, or down by its last report ("warp_missing",
-// state "none" | "paused" | "down").
-func (s *Service) inboundWarnings(ctx context.Context, nodeID string, spec plugin.InboundSpec) ([]*adminv1.StatusReason, error) {
+// a TCP listener that takes the default Hysteria2 decoy port, or a WARP exit whose account is missing, paused, or down.
+func (s *Service) inboundWarnings(ctx context.Context, nodeID string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
+	var warnings []*adminv1.StatusReason
+	if spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
+		for _, other := range others {
+			if other.enabled && other.protocol == "hysteria2" {
+				warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_moves", Params: map[string]string{
+					"port": "443", "profile": other.profile,
+				}})
+				break
+			}
+		}
+	}
 	if spec.Egress != "warp" {
-		return nil, nil
+		return warnings, nil
 	}
 	state := ""
 	switch a, err := s.st.WarpAccount(ctx, nodeID); {
@@ -760,9 +772,10 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID string, spec plugi
 	case warpDown(a.HealthJSON):
 		state = "down"
 	default:
-		return nil, nil
+		return warnings, nil
 	}
-	return []*adminv1.StatusReason{{Code: "warp_missing", Params: map[string]string{"state": state}}}, nil
+	warnings = append(warnings, &adminv1.StatusReason{Code: "warp_missing", Params: map[string]string{"state": state}})
+	return warnings, nil
 }
 
 // warpDown: the node's last WARP report says the tunnel does not work (down, or no backend to run it on).
@@ -774,10 +787,13 @@ func warpDown(healthJSON string) bool {
 	return h.State == agentv1.WarpState_WARP_STATE_DOWN || h.State == agentv1.WarpState_WARP_STATE_UNAVAILABLE
 }
 
-// listenOverlap reports whether two inbounds fight over a UDP port: the same listen port, one listen port inside
-// the other's hop range (the node's redirect would steal its packets), or overlapping hop ranges. The gap between
+// listenOverlap reports whether two inbounds fight over a port on the same network: the same listen port, one listen
+// port inside the other's hop range (the node's redirect would steal its packets), or overlapping hop ranges. The gap between
 // a listen port and its own hop range is free: port 443 with hop 20000-40000 leaves 8443 alone.
 func listenOverlap(a, b plugin.Listen) bool {
+	if a.Network != b.Network {
+		return false
+	}
 	span := func(l plugin.Listen) [][2]uint16 {
 		s := [][2]uint16{{l.Port, l.Port}}
 		if l.HopFrom != 0 {
@@ -884,7 +900,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
-	warnings, err := s.inboundWarnings(ctx, f.Node.ID, spec)
+	warnings, err := s.inboundWarnings(ctx, f.Node.ID, spec, others)
 	if err != nil {
 		return nil, err
 	}
@@ -982,7 +998,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		if err := portRefusal(f.Profile.Protocol, f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 			return nil, err
 		}
-		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, spec); err != nil {
+		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, spec, others); err != nil {
 			return nil, err
 		}
 		portChanged := oldSpec.Listen.Port != spec.Listen.Port

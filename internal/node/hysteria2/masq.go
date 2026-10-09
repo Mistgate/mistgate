@@ -22,6 +22,7 @@ import (
 // Alt-Svc for the QUIC port). Its plain-HTTP half is not used: :80 belongs to certs (ACME HTTP-01).
 type tcpMasq struct {
 	srv *http.Server
+	ln  net.Listener // closed directly too: srv.Close misses a listener ServeTLS has not registered yet
 }
 
 func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler, quicPort uint16) (*tcpMasq, error) {
@@ -50,7 +51,11 @@ func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate
 		ErrorLog:          log.New(io.Discard, "", 0),
 	}
 	go srv.ServeTLS(ln, "", "")
-	return &tcpMasq{srv: srv}, nil
+	return &tcpMasq{srv: srv, ln: ln}, nil
 }
 
-func (m *tcpMasq) Close() { m.srv.Close() }
+// Close frees the port at once, even right after start (before the ServeTLS goroutine has run).
+func (m *tcpMasq) Close() {
+	m.srv.Close()
+	m.ln.Close()
+}

@@ -9,6 +9,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The add-profile dialog asks CreateInbound / UpdateInbound with validate_only on every change: the same refusals as the
@@ -202,6 +203,44 @@ func TestInboundWarpWarning(t *testing.T) {
 	r := must(e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{ProfileId: viaWarp.Id, NodeId: "nod_de1"}))).Msg
 	if len(r.Warnings) != 1 || r.Inbound.Id == "" {
 		t.Errorf("real call: %+v", r)
+	}
+}
+
+func TestHysteriaDecoyWarningForTCPListener(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	hy2 := e.profile("hy2", "")
+	e.inbound(hy2.Id, "nod_de1")
+	others, _, err := e.s.nodeInbounds(e.ctx, "nod_de1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcp := plugin.InboundSpec{Listen: plugin.Listen{Network: "tcp", Port: 443}}
+	warnings, err := e.s.inboundWarnings(e.ctx, "nod_de1", tcp, others)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 1 || warnings[0].Code != "hy2_decoy_moves" ||
+		warnings[0].Params["port"] != "443" || warnings[0].Params["profile"] != "hy2" {
+		t.Fatalf("TCP listener warning = %+v", warnings)
+	}
+
+	tcp.Listen.Port = 8443
+	warnings, err = e.s.inboundWarnings(e.ctx, "nod_de1", tcp, others)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unclaimed TCP port warned: %+v", warnings)
+	}
+	udp := plugin.InboundSpec{Listen: plugin.Listen{Network: "udp", Port: 443}}
+	warnings, err = e.s.inboundWarnings(e.ctx, "nod_de1", udp, others)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("UDP listener warned about the TCP decoy: %+v", warnings)
 	}
 }
 

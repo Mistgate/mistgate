@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	ufwInboundCommentPrefix = "mistgate-node-managed-udp-v1-"
-	defaultUFWConf          = "/etc/ufw/ufw.conf"
+	ufwInboundCommentPrefix    = "mistgate-node-managed-udp-v1-"
+	ufwInboundTCPCommentPrefix = "mistgate-node-managed-tcp-v1-"
+	defaultUFWConf             = "/etc/ufw/ufw.conf"
 	// firewallCmdTimeout bounds every host firewall command: a hung ufw or a held xtables lock must not stall the
 	// agent's single apply worker. A ufw run outside the sandbox is also stopped by systemd a little earlier.
 	firewallCmdTimeout = 30 * time.Second
@@ -25,19 +26,23 @@ const (
 	firewallRetry = 5 * time.Minute
 )
 
-// ufwSimpleUDPRule is a rule `ufw show added` prints for "ufw <action> <port>/udp": UFW treats it as the same rule as
-// ours whatever its action or comment, so adding ours over it would rewrite the owner's rule ("Rule updated").
-var ufwSimpleUDPRule = regexp.MustCompile(`^ufw (allow|deny|reject|limit)(?: in)?(?: log| log-all)? (\d+(?::\d+)?)/udp(?: comment .*)?$`)
+// ufwSimpleInboundRule is a rule `ufw show added` prints for a simple UDP/TCP port rule. UFW treats it as the same rule
+// as ours whatever its action or comment, so adding ours over it would rewrite the owner's rule ("Rule updated").
+var ufwSimpleInboundRule = regexp.MustCompile(`^ufw (allow|deny|reject|limit)(?: in)?(?: log| log-all)? (\d+(?::\d+)?)/(udp|tcp)(?: comment .*)?$`)
 
-// SyncInboundUDPPorts manages only UFW rules carrying Mistgate's private comment tag, and never adds one over a rule
-// for the same port that is not ours. It leaves an inactive firewall untouched. firewalld is only checked, never
-// edited: its CLI has no runtime-only, per-rule ownership marker, and activating a custom service requires a global
-// reload that would discard unrelated runtime-only changes.
+// SyncInboundPorts manages only UFW rules carrying Mistgate's private comment tags, and never adds one over a rule
+// for the same protocol and port that is not ours. It leaves an inactive firewall untouched. firewalld is only checked,
+// never edited: its CLI has no runtime-only, per-rule ownership marker, and activating a custom service requires a
+// global reload that would discard unrelated runtime-only changes.
 //
 // An unchanged desired set with an unchanged UFW state does nothing after a success and retries a failure at most
 // every firewallRetry: the agent calls this on every reconcile, including the periodic sweep.
-func (h *linuxHost) SyncInboundUDPPorts(ctx context.Context, ports []UDPInboundPort) error {
-	desired, err := normalizeUDPInboundPorts(ports)
+func (h *linuxHost) SyncInboundPorts(ctx context.Context, udp []UDPInboundPort, tcp []uint16) error {
+	desiredUDP, err := normalizeUDPInboundPorts(udp)
+	if err != nil {
+		return err
+	}
+	desiredTCP, err := normalizeTCPInboundPorts(tcp)
 	if err != nil {
 		return err
 	}
@@ -45,23 +50,28 @@ func (h *linuxHost) SyncInboundUDPPorts(ctx context.Context, ports []UDPInboundP
 	defer h.fw.Unlock()
 
 	ufwOn := ufwEnabled(h.ufwConf)
-	key := fmt.Sprint(ufwOn, desired)
-	if h.udpSynced && h.udpKey == key && (h.udpErr == nil || time.Since(h.udpAt) < firewallRetry) {
-		return h.udpErr
+	key := fmt.Sprint(ufwOn, desiredUDP, desiredTCP)
+	if h.inboundSynced && h.inboundKey == key && (h.inboundErr == nil || time.Since(h.inboundAt) < firewallRetry) {
+		return h.inboundErr
 	}
 	var errs []error
 	if ufwOn {
-		if err := h.syncUFWInboundUDPPorts(ctx, desired); err != nil {
+		if err := h.syncUFWInboundPorts(ctx, desiredUDP, desiredTCP); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	if len(desired) > 0 {
-		if err := h.checkFirewalldInboundUDPPorts(ctx, desired); err != nil {
+	if len(desiredUDP) > 0 {
+		if err := h.checkFirewalldInboundPorts(ctx, "udp", desiredUDP); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	h.udpSynced, h.udpKey, h.udpErr, h.udpAt = true, key, errors.Join(errs...), time.Now()
-	return h.udpErr
+	if len(desiredTCP) > 0 {
+		if err := h.checkFirewalldInboundPorts(ctx, "tcp", desiredTCP); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	h.inboundSynced, h.inboundKey, h.inboundErr, h.inboundAt = true, key, errors.Join(errs...), time.Now()
+	return h.inboundErr
 }
 
 // ufwEnabled reads ENABLED= from ufw.conf, which `ufw enable` and `ufw disable` set. No file (UFW not installed) or
@@ -99,6 +109,22 @@ func normalizeUDPInboundPorts(ports []UDPInboundPort) ([]string, error) {
 	return out, nil
 }
 
+func normalizeTCPInboundPorts(ports []uint16) ([]string, error) {
+	set := make(map[string]struct{}, len(ports))
+	for _, port := range ports {
+		if port == 0 {
+			return nil, fmt.Errorf("invalid managed TCP port %d", port)
+		}
+		set[strconv.Itoa(int(port))] = struct{}{}
+	}
+	out := make([]string, 0, len(set))
+	for expr := range set {
+		out = append(out, expr)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
 func (p UDPInboundPort) expression() (string, error) {
 	switch {
 	case p.Port != 0 && p.From == 0 && p.To == 0:
@@ -125,7 +151,22 @@ func (h *linuxHost) ufw(ctx context.Context, args ...string) ([]byte, error) {
 	return h.run(ctx, "", "systemd-run", run...)
 }
 
-func (h *linuxHost) syncUFWInboundUDPPorts(ctx context.Context, desired []string) error {
+type ufwInboundRule struct {
+	protocol string
+	expr     string
+}
+
+func ufwInboundRuleKey(protocol, expr string) string { return protocol + "/" + expr }
+
+func splitUFWInboundRuleKey(key string) (ufwInboundRule, bool) {
+	protocol, expr, ok := strings.Cut(key, "/")
+	if !ok || (protocol != "udp" && protocol != "tcp") || expr == "" {
+		return ufwInboundRule{}, false
+	}
+	return ufwInboundRule{protocol: protocol, expr: expr}, true
+}
+
+func (h *linuxHost) syncUFWInboundPorts(ctx context.Context, desiredUDP, desiredTCP []string) error {
 	out, err := h.ufw(ctx, "status")
 	if err != nil {
 		return fmt.Errorf("check UFW status: %w: %s", err, strings.TrimSpace(string(out)))
@@ -143,38 +184,59 @@ func (h *linuxHost) syncUFWInboundUDPPorts(ctx context.Context, desired []string
 	if err != nil {
 		return err
 	}
+	desired := make([]ufwInboundRule, 0, len(desiredUDP)+len(desiredTCP))
+	for _, expr := range desiredUDP {
+		desired = append(desired, ufwInboundRule{protocol: "udp", expr: expr})
+	}
+	for _, expr := range desiredTCP {
+		desired = append(desired, ufwInboundRule{protocol: "tcp", expr: expr})
+	}
+	sort.Slice(desired, func(i, j int) bool {
+		if desired[i].protocol != desired[j].protocol {
+			return desired[i].protocol < desired[j].protocol
+		}
+		return desired[i].expr < desired[j].expr
+	})
 	wanted := make(map[string]struct{}, len(desired))
-	for _, expr := range desired {
-		wanted[expr] = struct{}{}
+	for _, rule := range desired {
+		wanted[ufwInboundRuleKey(rule.protocol, rule.expr)] = struct{}{}
 	}
 
 	// Remove stale Mistgate-tagged rules before adding new ones. UFW accepts the same exact command
 	// shape with a leading "delete", so untagged and pre-existing user rules are never selected.
-	var stale []string
-	for expr := range owned {
-		if _, ok := wanted[expr]; !ok {
-			stale = append(stale, expr)
+	var stale []ufwInboundRule
+	for key := range owned {
+		if _, ok := wanted[key]; !ok {
+			if rule, ok := splitUFWInboundRuleKey(key); ok {
+				stale = append(stale, rule)
+			}
 		}
 	}
-	sort.Strings(stale)
-	for _, expr := range stale {
-		if err := h.runUFWRule(ctx, "delete", expr); err != nil {
+	sort.Slice(stale, func(i, j int) bool {
+		if stale[i].protocol != stale[j].protocol {
+			return stale[i].protocol < stale[j].protocol
+		}
+		return stale[i].expr < stale[j].expr
+	})
+	for _, rule := range stale {
+		if err := h.runUFWRule(ctx, "delete", rule.protocol, rule.expr); err != nil {
 			return err
 		}
 	}
 	var blocked []string
-	for _, expr := range desired {
-		if _, ok := owned[expr]; ok {
+	for _, rule := range desired {
+		key := ufwInboundRuleKey(rule.protocol, rule.expr)
+		if _, ok := owned[key]; ok {
 			continue
 		}
-		if action, ok := foreign[expr]; ok {
+		if action, ok := foreign[key]; ok {
 			// The owner's (or the installer's) own rule for this port: never rewrite or later delete it.
 			if action == "deny" || action == "reject" {
-				blocked = append(blocked, fmt.Sprintf("%s %s/udp", action, expr))
+				blocked = append(blocked, fmt.Sprintf("%s %s/%s", action, rule.expr, rule.protocol))
 			}
 			continue
 		}
-		if err := h.runUFWRule(ctx, "allow", expr); err != nil {
+		if err := h.runUFWRule(ctx, "allow", rule.protocol, rule.expr); err != nil {
 			return err
 		}
 	}
@@ -184,15 +246,19 @@ func (h *linuxHost) syncUFWInboundUDPPorts(ctx context.Context, desired []string
 	return nil
 }
 
-func (h *linuxHost) runUFWRule(ctx context.Context, action, expr string) error {
-	comment := ufwInboundCommentPrefix + expr
-	args := []string{"allow", expr + "/udp", "comment", comment}
+func (h *linuxHost) runUFWRule(ctx context.Context, action, protocol, expr string) error {
+	prefix := ufwInboundCommentPrefix
+	if protocol == "tcp" {
+		prefix = ufwInboundTCPCommentPrefix
+	}
+	comment := prefix + expr
+	args := []string{"allow", expr + "/" + protocol, "comment", comment}
 	if action == "delete" {
 		args = append([]string{"delete"}, args...)
 	}
 	out, err := h.ufw(ctx, args...)
 	if err != nil {
-		return fmt.Errorf("ufw %s %s/udp: %w: %s", action, expr, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("ufw %s %s/%s: %w: %s", action, expr, protocol, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -213,28 +279,36 @@ func ufwIsActive(out []byte) (bool, error) {
 	}
 }
 
-// parseUFWRules returns the port expressions of Mistgate's tagged rules and, for every other simple
-// "<action> <port>/udp" rule, its action.
+// parseUFWRules returns the protocol/port expressions of Mistgate's tagged rules and, for every other simple
+// "<action> <port>/<protocol>" rule, its action.
 func parseUFWRules(output string) (owned map[string]struct{}, foreign map[string]string, err error) {
 	owned, foreign = map[string]struct{}{}, map[string]string{}
 	for _, raw := range strings.Split(output, "\n") {
 		line := strings.TrimSpace(raw)
-		if !strings.Contains(line, ufwInboundCommentPrefix) {
-			if m := ufwSimpleUDPRule.FindStringSubmatch(line); m != nil {
-				foreign[m[2]] = m[1]
+		markedUDP := strings.Contains(line, ufwInboundCommentPrefix)
+		markedTCP := strings.Contains(line, ufwInboundTCPCommentPrefix)
+		if !markedUDP && !markedTCP {
+			if m := ufwSimpleInboundRule.FindStringSubmatch(line); m != nil {
+				foreign[ufwInboundRuleKey(m[3], m[2])] = m[1]
 			}
 			continue
 		}
 		comment, ok := ufwRuleComment(line)
-		if !ok || !strings.HasPrefix(comment, ufwInboundCommentPrefix) {
+		if !ok {
 			return nil, nil, fmt.Errorf("cannot safely identify a Mistgate UFW rule in %q", line)
 		}
-		expr := strings.TrimPrefix(comment, ufwInboundCommentPrefix)
-		canonical, err := normalizeUFWPortExpression(expr)
-		if err != nil || canonical != expr || !isUFWAllowUDPLine(line, expr) {
+		protocol, prefix := "udp", ufwInboundCommentPrefix
+		if strings.HasPrefix(comment, ufwInboundTCPCommentPrefix) {
+			protocol, prefix = "tcp", ufwInboundTCPCommentPrefix
+		} else if !strings.HasPrefix(comment, ufwInboundCommentPrefix) {
+			return nil, nil, fmt.Errorf("cannot safely identify a Mistgate UFW rule in %q", line)
+		}
+		expr := strings.TrimPrefix(comment, prefix)
+		canonical, err := normalizeUFWPortExpression(expr, protocol)
+		if err != nil || canonical != expr || !isUFWAllowInboundLine(line, expr, protocol) {
 			return nil, nil, fmt.Errorf("cannot safely reconcile Mistgate UFW rule %q", line)
 		}
-		owned[expr] = struct{}{}
+		owned[ufwInboundRuleKey(protocol, expr)] = struct{}{}
 	}
 	return owned, foreign, nil
 }
@@ -262,18 +336,18 @@ func ufwRuleComment(line string) (string, bool) {
 	return tail, true
 }
 
-func isUFWAllowUDPLine(line, expr string) bool {
+func isUFWAllowInboundLine(line, expr, protocol string) bool {
 	if !strings.HasPrefix(line, "ufw allow ") {
 		return false
 	}
 	fields := strings.Fields(line)
 	for i := 1; i < len(fields); i++ {
-		if fields[i] == expr+"/udp" {
+		if fields[i] == expr+"/"+protocol {
 			return true
 		}
 		if fields[i] == "port" && i+2 < len(fields) && fields[i+1] == expr && fields[i+2] == "comment" {
 			for j := 1; j+1 < len(fields); j++ {
-				if fields[j] == "proto" && fields[j+1] == "udp" {
+				if fields[j] == "proto" && fields[j+1] == protocol {
 					return true
 				}
 			}
@@ -282,30 +356,31 @@ func isUFWAllowUDPLine(line, expr string) bool {
 	return false
 }
 
-func normalizeUFWPortExpression(expr string) (string, error) {
+func normalizeUFWPortExpression(expr, protocol string) (string, error) {
+	network := strings.ToUpper(protocol)
 	parts := strings.Split(expr, ":")
 	if len(parts) == 1 {
 		port, err := strconv.Atoi(parts[0])
 		if err != nil || port < 1 || port > 65535 {
-			return "", fmt.Errorf("invalid UDP port expression %q", expr)
+			return "", fmt.Errorf("invalid %s port expression %q", network, expr)
 		}
 		return strconv.Itoa(port), nil
 	}
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid UDP range expression %q", expr)
+	if len(parts) != 2 || protocol != "udp" {
+		return "", fmt.Errorf("invalid %s range expression %q", network, expr)
 	}
 	from, errFrom := strconv.Atoi(parts[0])
 	to, errTo := strconv.Atoi(parts[1])
 	if errFrom != nil || errTo != nil || from < 1 || to > 65535 || to < from {
-		return "", fmt.Errorf("invalid UDP range expression %q", expr)
+		return "", fmt.Errorf("invalid %s range expression %q", network, expr)
 	}
 	port := UDPInboundPort{From: uint16(from), To: uint16(to)}
 	return port.expression()
 }
 
-// checkFirewalldInboundUDPPorts asks a running firewalld whether its default zone opens each listener and reports only
-// the ones it does not: Mistgate never edits firewalld (see SyncInboundUDPPorts).
-func (h *linuxHost) checkFirewalldInboundUDPPorts(ctx context.Context, desired []string) error {
+// checkFirewalldInboundPorts asks a running firewalld whether its default zone opens each listener and reports only
+// the ones it does not: Mistgate never edits firewalld (see SyncInboundPorts).
+func (h *linuxHost) checkFirewalldInboundPorts(ctx context.Context, protocol string, desired []string) error {
 	ctx, cancel := context.WithTimeout(ctx, firewallCmdTimeout)
 	defer cancel()
 	out, err := h.run(ctx, "", "firewall-cmd", "--state")
@@ -320,7 +395,7 @@ func (h *linuxHost) checkFirewalldInboundUDPPorts(ctx context.Context, desired [
 	}
 	var missing []string
 	for _, expr := range desired {
-		port := strings.ReplaceAll(expr, ":", "-") + "/udp"
+		port := strings.ReplaceAll(expr, ":", "-") + "/" + protocol
 		// "yes" (exit 0) or "no" (exit 1); anything else is an error worth showing.
 		out, err := h.run(ctx, "", "firewall-cmd", "--query-port="+port)
 		switch strings.TrimSpace(string(out)) {
@@ -334,7 +409,7 @@ func (h *linuxHost) checkFirewalldInboundUDPPorts(ctx context.Context, desired [
 	if len(missing) == 0 {
 		return nil
 	}
-	return fmt.Errorf("firewalld is active and its default zone does not open %s; Mistgate does not edit firewalld rules, add these UDP ports to the active zone(s) by hand", strings.Join(missing, ", "))
+	return fmt.Errorf("firewalld is active and its default zone does not open %s; Mistgate does not edit firewalld rules, add these %s ports to the active zone(s) by hand", strings.Join(missing, ", "), strings.ToUpper(protocol))
 }
 
 func commandMissing(err error) bool {

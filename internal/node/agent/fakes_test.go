@@ -202,6 +202,7 @@ type fakeHost struct {
 	hopCalls  [][]hostctl.Hop
 	hopErr    error
 	udpCalls  [][]hostctl.UDPInboundPort
+	tcpCalls  [][]uint16
 	udpErr    error
 	ssh       []uint16
 	cleaned   bool
@@ -226,10 +227,11 @@ func (h *fakeHost) SetPortHops(_ context.Context, hops []hostctl.Hop) error {
 	h.hopCalls = append(h.hopCalls, append([]hostctl.Hop(nil), hops...))
 	return h.hopErr
 }
-func (h *fakeHost) SyncInboundUDPPorts(_ context.Context, ports []hostctl.UDPInboundPort) error {
+func (h *fakeHost) SyncInboundPorts(_ context.Context, udp []hostctl.UDPInboundPort, tcp []uint16) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.udpCalls = append(h.udpCalls, append([]hostctl.UDPInboundPort(nil), ports...))
+	h.udpCalls = append(h.udpCalls, append([]hostctl.UDPInboundPort(nil), udp...))
+	h.tcpCalls = append(h.tcpCalls, append([]uint16(nil), tcp...))
 	return h.udpErr
 }
 func (h *fakeHost) SSHPorts() []uint16 { return h.ssh }
@@ -248,6 +250,11 @@ func (h *fakeHost) udpPorts() [][]hostctl.UDPInboundPort {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return append([][]hostctl.UDPInboundPort(nil), h.udpCalls...)
+}
+func (h *fakeHost) tcpPorts() [][]uint16 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([][]uint16(nil), h.tcpCalls...)
 }
 
 var errBoom = errors.New("bind: address already in use")
