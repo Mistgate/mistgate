@@ -30,7 +30,7 @@ func TestSubViewListsNodesOnlyMihomoAppsCanUse(t *testing.T) {
 	if c := conns["nod_nl1"]; len(c) != 1 || c[0].Way != "link" || !c[0].MihomoOnly {
 		t.Errorf("nl1 (gecko only): %+v", c)
 	}
-	if c := conns["nod_de1"]; len(c) != 2 || c[0].MihomoOnly || c[0].Server != 0 || !c[1].MihomoOnly {
+	if c := conns["nod_de1"]; len(c) != 2 || !c[0].MihomoOnly || c[1].MihomoOnly || c[1].Server != 0 {
 		t.Errorf("de1 (one link for every app, one for Mihomo apps): %+v", c)
 	}
 }

@@ -99,6 +99,10 @@ type SubServer struct {
 	Location    string
 	Profile     string // profile name
 	Exit        string // "direct" | "warp"
+	// Made is the inbound's rank in creation order. Servers are listed by country and protocol, but a repeated name is
+	// numbered in creation order, so a server added later never takes the name of an older one (a Mihomo select group
+	// remembers the chosen server by name).
+	Made int
 	// LoadPercent is the larger of this node's RX/TX rates as a percentage of its configured symmetric capacity.
 	// It is nil when capacity is unknown or the node has no fresh sample. The rates themselves stay out of the view:
 	// whatever reaches a user must not tell when the other person on a node streams.
@@ -212,6 +216,57 @@ func credKey(protocol, profileID string) string {
 	return protocol + "/" + profileID
 }
 
+func subscriptionProtocolRank(protocol string) int {
+	switch protocol {
+	case "hysteria2":
+		return 0
+	case "vless":
+		return 1
+	case "awg":
+		return 2
+	default:
+		return 3
+	}
+}
+
+func compareSubscriptionInbounds(a, b store.AccessInboundFull) int {
+	if a.Node.CountryCode == "" && b.Node.CountryCode != "" {
+		return 1
+	}
+	if a.Node.CountryCode != "" && b.Node.CountryCode == "" {
+		return -1
+	}
+	if c := strings.Compare(a.Node.CountryCode, b.Node.CountryCode); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Node.Location, b.Node.Location); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Node.Name, b.Node.Name); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Node.ID, b.Node.ID); c != 0 {
+		return c
+	}
+	if ar, br := subscriptionProtocolRank(a.Profile.Protocol), subscriptionProtocolRank(b.Profile.Protocol); ar != br {
+		return ar - br
+	} else if ar == 3 {
+		if c := strings.Compare(a.Profile.Protocol, b.Profile.Protocol); c != 0 {
+			return c
+		}
+	}
+	if c := strings.Compare(egressOf(json.RawMessage(a.Profile.SettingsJSON)), egressOf(json.RawMessage(b.Profile.SettingsJSON))); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Profile.Name, b.Profile.Name); c != 0 {
+		return c
+	}
+	if c := a.Inbound.CreatedAt.Compare(b.Inbound.CreatedAt); c != 0 {
+		return c
+	}
+	return strings.Compare(a.Inbound.ID, b.Inbound.ID)
+}
+
 // subView builds the view of one user; touch records the fetch on the implicit device (real fetches only).
 func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, opt SubOptions) (SubView, error) {
 	a := s.st.Access()
@@ -230,6 +285,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	if err != nil {
 		return SubView{}, err
 	}
+	made := make(map[string]int, len(data.Inbounds)) // the store returns creation order: SubServer.Made
+	for i, f := range data.Inbounds {
+		made[f.Inbound.ID] = i
+	}
+	slices.SortStableFunc(data.Inbounds, compareSubscriptionInbounds)
 	liveByNode := make(map[string]store.NodeLiveRow, len(data.LiveNodes))
 	userOnline := false
 	for _, live := range data.LiveNodes {
@@ -384,7 +444,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
 		srv := SubServer{NodeID: f.Node.ID, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
-			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged)}
+			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged), Made: made[f.Inbound.ID]}
 		if usage, ok := networkUsage[f.Node.ID]; ok {
 			srv.LoadPercent = usage.LoadPercent
 		}

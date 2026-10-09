@@ -260,8 +260,8 @@ func TestServerNamesInTheSubscription(t *testing.T) {
 	}
 }
 
-// A server added later never takes the name of an older one: names are numbered in the order the servers were made, not
-// by node name (here the new node's name sorts first) nor by random id (both are made within the same second).
+// A server added later never takes the name of an older one: the list is sorted by country and node name (here the new
+// nodes' names sort first), but repeated names are numbered in the order the servers were made.
 func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	const de = "\U0001F1E9\U0001F1EA"
 	r := newRig(t, "/k3xq8")
@@ -281,12 +281,12 @@ func TestServerNamesKeepTheirNumberWhenAServerIsAdded(t *testing.T) {
 	}
 	_, tok = r.user("bob", nil) // a token whose data is not cached yet
 	got := fragmentsOf(t, fetch(h, "/"+tok, curlUA))
-	if strings.Join(got, "|") != de+" DE · p|"+de+" DE · p 2|"+de+" DE · p 3" {
+	if strings.Join(got, "|") != de+" DE · p 2|"+de+" DE · p 3|"+de+" DE · p" {
 		t.Fatalf("after two servers were added: %q", got)
 	}
-	// in the order they came: the old one first, then the first of the two new ones
+	// listed by node name: the new servers before the old one, which kept its name
 	lines := strings.Split(decode(t, fetch(h, "/"+tok, curlUA).Body.String()), "\n")
-	if len(lines) != 3 || !strings.Contains(lines[0], "@de1.example.com") || !strings.Contains(lines[1], "@ade0.example.com") || !strings.Contains(lines[2], "@ade00.example.com") {
+	if len(lines) != 3 || !strings.Contains(lines[0], "@ade0.example.com") || !strings.Contains(lines[1], "@ade00.example.com") || !strings.Contains(lines[2], "@de1.example.com") {
 		t.Fatalf("order: %q", lines)
 	}
 }

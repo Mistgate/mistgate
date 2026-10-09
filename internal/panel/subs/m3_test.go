@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -217,6 +218,136 @@ func TestMihomoCoreAcceptsTheServedProfile(t *testing.T) {
 func decodeList(t *testing.T, body string) []string {
 	t.Helper()
 	return strings.Split(strings.TrimSpace(decode(t, body)), "\n")
+}
+
+func TestSubscriptionOrderByLocationAndProtocol(t *testing.T) {
+	m := newM3Rig(t)
+	m.st.W.Exec(`UPDATE node SET country_code = 'DE', location = 'Berlin' WHERE id = 'nod_1'`)
+	for _, n := range []struct{ id, name, country string }{
+		{"nod_nl1", "nl1", "NL"},
+		{"nod_d", "node-d", "RU"},
+		{"nod_b", "node-b", "EE"},
+	} {
+		if _, err := m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at)
+			VALUES (?, ?, ?, ?, 'active', 1)`, n.id, n.name, n.name+".example.com", n.country); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := m.st.W.Exec(`UPDATE profile SET name = 'HY2 · 443' WHERE id = ?`, m.profile); err != nil {
+		t.Fatal(err)
+	}
+	direct := m.profile
+	warp := must(m.svc.CreateProfile(m.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "hysteria2", Name: "HY2 · WARP", SettingsJson: `{"egress":"warp","port":8444}`,
+	}))).Msg.Profile.Id
+	m.group2 = must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{
+		Name: "ordered", ProfileIds: []string{direct, warp, m.awg},
+	}))).Msg.Group.Id
+
+	addInbound := func(profileID, nodeID string) {
+		t.Helper()
+		must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: profileID, NodeId: nodeID})))
+	}
+	// Deliberately create inbounds in a different order from the desired display order.
+	for _, nodeID := range []string{"nod_d", "nod_nl1", "nod_b"} {
+		addInbound(m.awg, nodeID)
+	}
+	addInbound(direct, "nod_d")
+	addInbound(warp, "nod_nl1")
+	addInbound(direct, "nod_nl1")
+	addInbound(direct, "nod_b")
+	addInbound(warp, "nod_1")
+
+	_, token := m.newUser("alice", nil)
+	view := must(m.svc.SubscriptionWith(m.ctx, token, access.SubOptions{NoTouch: true, NoPageData: true}))
+	if len(view.AWGProfiles) != 1 || !slices.Equal(view.AWGProfiles[0].Countries, []string{"DE", "EE", "NL", "RU"}) {
+		t.Errorf("AWG countries = %+v", view.AWGProfiles)
+	}
+
+	h, cache := m.handler(func(c *subs.Config) { c.MinInterval = -1 })
+	settings := subsettings.Defaults()
+	settings.ServerNameTemplate = "{node} · {profile}"
+	if _, err := cache.Update(m.ctx, settings); err != nil {
+		t.Fatal(err)
+	}
+	wantURI := []string{
+		"de1 · HY2 · 443", "de1 · HY2 · WARP", "node-b · HY2 · 443",
+		"nl1 · HY2 · 443", "nl1 · HY2 · WARP", "node-d · HY2 · 443",
+	}
+	list := fetch(h, "/"+token, happUA)
+	if list.Code != http.StatusOK {
+		t.Fatalf("Happ status %d: %s", list.Code, list.Body.String())
+	}
+	var gotURI []string
+	for _, line := range decodeList(t, list.Body.String()) {
+		u, err := url.Parse(line)
+		if err != nil {
+			t.Fatalf("parse URI %q: %v", line, err)
+		}
+		gotURI = append(gotURI, u.Fragment)
+	}
+	if !slices.Equal(gotURI, wantURI) {
+		t.Errorf("Happ URI order = %v, want %v", gotURI, wantURI)
+	}
+
+	const (
+		de = "de1"
+		ee = "node-b"
+		nl = "nl1"
+		ru = "node-d"
+	)
+	wantProxies := []string{
+		de + " · HY2 · 443", de + " · HY2 · WARP", de + " · awg31",
+		ee + " · HY2 · 443", ee + " · awg31",
+		nl + " · HY2 · 443", nl + " · HY2 · WARP", nl + " · awg31",
+		ru + " · HY2 · 443", ru + " · awg31",
+	}
+	mihomo := fetch(h, "/"+token, mihomoUA)
+	if mihomo.Code != http.StatusOK {
+		t.Fatalf("Mihomo status %d: %s", mihomo.Code, mihomo.Body.String())
+	}
+	p := parseYAML(t, mihomo.Body.Bytes())
+	var gotProxies []string
+	for _, proxy := range p.Proxies {
+		name, _ := proxy["name"].(string)
+		gotProxies = append(gotProxies, name)
+	}
+	if !slices.Equal(gotProxies, wantProxies) {
+		t.Errorf("Mihomo proxy order = %v, want %v", gotProxies, wantProxies)
+	}
+	wantGroup := append(slices.Clone(wantProxies), "DIRECT")
+	if len(p.Groups) != 1 || !slices.Equal(p.Groups[0].Proxies, wantGroup) {
+		t.Errorf("Mihomo select group = %+v, want %v", p.Groups, wantGroup)
+	}
+
+	page := fetch(h, "/"+token, chrome)
+	if page.Code != http.StatusOK {
+		t.Fatalf("page status %d: %s", page.Code, page.Body.String())
+	}
+	_, payload, ok := strings.Cut(page.Body.String(), `<script type="application/json" id="mg-data">`)
+	if !ok {
+		t.Fatal("page data marker is missing")
+	}
+	payload, _, ok = strings.Cut(payload, "</script>")
+	if !ok {
+		t.Fatal("page data script is not closed")
+	}
+	var pageData struct {
+		Servers []struct {
+			ID string `json:"id"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal([]byte(payload), &pageData); err != nil {
+		t.Fatalf("decode page data: %v", err)
+	}
+	var gotNodes []string
+	for _, server := range pageData.Servers {
+		gotNodes = append(gotNodes, server.ID)
+	}
+	if want := []string{"nod_1", "nod_b", "nod_nl1", "nod_d"}; !slices.Equal(gotNodes, want) {
+		t.Errorf("page node order = %v, want %v", gotNodes, want)
+	}
 }
 
 // A fetch inside MinInterval is answered from the cache of its own format: a Mihomo client is never given the base64

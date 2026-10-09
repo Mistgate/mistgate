@@ -49,7 +49,13 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 	}
 	names := make([]string, len(servers))
 	taken := map[string]bool{}
-	for i, s := range servers {
+	made := make([]int, len(servers)) // numbers go out in creation order (SubServer.Made), not in list order
+	for i := range made {
+		made[i] = i
+	}
+	slices.SortStableFunc(made, func(a, b int) int { return servers[a].Made - servers[b].Made })
+	for _, i := range made {
+		s := servers[i]
 		country := access.CountryName(s.CountryCode, lang)
 		if flagEmoji(s.CountryCode) != "" {
 			country = strings.ToUpper(strings.TrimSpace(s.CountryCode))
