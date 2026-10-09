@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
 Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Step 5 is designed in §6
-(5a, the driver, is implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
+(5a, the driver, and 5b, the emulator test, are implemented); step 6 is outlined in §5 and §6.6. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -71,7 +71,7 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 4a | Write the `node_live` projection (sidecar kept, compared by a test) | merged (2026-10-08) |
 | 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
 | 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
-| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a implemented, 5b and 5c next |
+| 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) (LinkOut, error)`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | designed (§6); 5a merged, 5b implemented, 5c next |
 | 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
 
 Every step: green gate (`go test -p 2 ./...`, wasm build, worker and web tests), race (fleet, agent, store), bridge
@@ -237,7 +237,7 @@ page).
 
 ## 6. Step 5 design: the stateless edge driver and link-only agents
 
-Status (2026-10-09): designed; round 5a (the driver) is implemented, 5b and 5c are next. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
+Status (2026-10-09): designed; round 5a (the driver) is merged, 5b (the emulator test) is implemented, 5c is next. §6.1 answers the §5 notes "Open event" and "Retire on the edge".
 Lead decisions on the open questions are in §6.5.
 
 ### 6.1 The driver (`internal/panel/fleet/link_driver.go`)
@@ -398,7 +398,8 @@ The emulator implements `fleet.Remote` and plays the Worker and NodeLink:
 - Clock: `time.Now()` plus an offset, also `fleet.Config.Now`; `advance(d)` and `runAlarm(node)`.
 - Own-node guard: `f.Link` gets a ctx tagged with its node; `Remote.Ask`/`Close`/`Poke` for that node with that ctx fails
   the test (a step must never await its own NodeLink).
-- Faults: `failNext()`, `reset()` (sockets vanish without close events, waiters dropped, storage kept), `loseState()`.
+- Faults: `failNext()`, `reset()` (sockets vanish without close events, waiters dropped, storage kept), `loseState()` (the
+  harsher case, see the 5b notes).
 - A step log `[]{gen, kind}` for assertions.
 
 Scenarios (real agent, fake engine, short stats interval):
@@ -406,24 +407,64 @@ Scenarios (real agent, fake engine, short stats interval):
    traffic rows; `f.RunDoctor` returns the agent's report through `Replies`. (5b: mTLS enrolment with the link preset;
    5c: link enrolment.)
 2. Reconnect with a delta base: `reset()`, the alarm drops the session, the agent reconnects as gen 2, its Hello matches
-   the digest, no DesiredState; a new credential + poke gives a delta with `BaseRevision`; `loseState()` after a desired
-   step ends in a full resend and the agent converges.
+   the digest, no DesiredState; a new credential + poke gives a delta with `BaseRevision`; a desired step that fails after
+   its writes committed (`failNext`) closes 1011 and sends nothing, the agent reconnects, its Hello does not match the
+   digest, exactly one full DesiredState follows and the agent converges (hash matches); `loseState()` after a desired
+   step also ends in a full resend.
 3. Liveness: `advance(liveness + 1 s)` + `runAlarm` closes with 1008; the `node_live` row is gone; the agent reconnects as
    gen + 1.
 4. Retire: `AgentNotified`, the agent wipes its state and `Run` returns `ErrRetired`; `Forget` leaves no storage and no
    alarm; also the 5 s alarm path with a raw client that never closes.
 5. Superseded socket: a raw client signs LinkAuth with the agent's key; the agent's socket gets 4000 and its later frames
-   are not stepped; the closed step of the old generation leaves the new row; the agent comes back as gen 3.
+   are not stepped (and some were queued: the test asserts they were dropped); the old generation's closed step runs inside the
+   takeover, before the new Hello, so the session guard of `NodeDisconnected` is covered by the 5a driver tests, not here; the
+   agent comes back as gen 3.
 6. Failed step: `failNext()` during stats → 1011, queued frames dropped, reconnect, every batch counted exactly once.
 7. (5c) Renew over the link: a new `cert_serial`; after the grace one frame's recheck closes the old session and the agent
    reconnects with the new certificate.
+
+Implementation notes (5b), decisions the design left open and where the emulator differs from `nodelink.ts`:
+- **Port, not model.** Every method of the emulator's `linkObject` is a port of the method of the same name in
+  `nodelink.ts` (fetch, webSocketMessage, webSocketClose, alarm, poke, ask, close, authenticate, run, dropLive, lost, arm,
+  rejectWaiters). The Worker is `Worker(prefix)`: the panel's marker handler picks the node, the object takes the upgrade.
+- **Differences from `nodelink.ts` (step 6 closes them in TypeScript).** The emulator sends `Generation` on the open event
+  and honours `LinkOut.Forget` (`deleteAll` and `deleteAlarm` after the block); `nodelink.ts` does neither yet (§6.6).
+  `webSocketError` is not emulated: a failed read is a close event with code 1006.
+- **What the platform decides, here chosen.** A socket stops being open when the object closes it, or when its close event
+  is delivered (frames that arrived before a peer's close are still stepped; after the object's own close they are dropped).
+  `ws.close()` throws, and the socket stays open, for a reserved code (1005, 1006, 1015) and for a reason over 123 bytes,
+  as in workerd. `reset()` fails the RPCs of waiting `ask` calls with "link lost" (an object reset breaks its callers'
+  RPCs). The alarm is a real timer in emulated time; `advance` does not re-arm it. `runAlarm` is the platform calling
+  `alarm()`: it fails the test unless an alarm is armed and due (so a missing `arm()` shows), and `advanceToAlarm` moves
+  the clock to the armed time first. Only the budget and the step limit can be shortened (`setLimits`), for the moment a
+  test makes a step run out of time.
+- **Faults are per kind.** `failNext(node, kind)` runs the step, lets its database writes commit, then throws the result
+  away: the object closes 1011, sends no frame and writes nothing, which is what an error in the step does on workerd.
+  `loseState(node, kind)` applies frames, replies and alarm and does not write the returned state; this cannot happen on
+  workerd (the output gate holds the frames until the state write is durable: no state write, no frames), so it is kept
+  only as the harsher case that shows the core recovers from a state that is behind the database. Both consume themselves
+  on the next step of that kind. A hook (`setBefore`) runs inside a step's (and the accept's) Go call, so a test can make a
+  step outlive the budget or hold a block while frames queue behind it.
+- **Forget** deletes the stored keys and then re-arms from what is left: the handshake deadline of a socket that has not
+  authenticated yet survives it (a test pins this). The own-node guard has its own test (a step calling `Ask`, `Close` or
+  `poke` for its own node, also with `context.WithoutCancel` of the step context, is reported and refused).
+- **The step log** is `[]{Gen, Kind, Msg, Err}` (`Msg` is the oneof field of the frame or request); the emulator also keeps
+  the frames it sent per generation, the closes it asked for, the close events it heard, the count of dropped messages, and
+  a snapshot of the object's storage.
+- **Agent set-up.** The agent is enrolled over mTLS (the Enroll route of a TLS server with the agent SNI), its
+  `AgentService` stream is not served (the edge has none), and it starts with `linkAdvertised` set and a 100 ms hold: the
+  HelloAck that advertises the link comes from an mTLS session on the VPS. Keys of the raw clients are the agent's own.
+- **Beyond the list above**, the file also covers: a close from the panel (`Remote.Close`, the re-enrolment path), sockets
+  that never authenticate (silent, wrong signature, text frame: nothing stored, no Go step), a session that never says Hello
+  (a poke keeps its deadline; the alarm closes it), and a step that outlives the block budget (1011, waiters rejected, the
+  next connection works).
 
 ### 6.4 Rounds
 
 | Round | Changes | Proof | Risks |
 |---|---|---|---|
 | 5a | `link_driver.go` (types, `Link`, close mapping); `LinkHandler` answers with the marker when `Remote != nil` | driver tests on SQLite: open keeps only Poison; Hello and desired in one call, HelloAck first; desired before Hello does nothing; refusal and Retire replied in the same call; CommandResult reply bytes; expiry gives a nil reply; close codes; a 300-byte reason is clipped; closed with RetireAt gives Forget; closing an old generation keeps the new row; `Preparing` is never stored; a bad frame closes 1008; a bad state is an error; JSON round trip | the Hello-then-desired order lives in two adapters; effect handling can drift between them |
-| 5b | emulator and scenarios 1-6 with today's agent | scenarios pass under `-race`; existing VPS link tests unchanged | the emulator encodes our reading of Durable Object semantics; step 6 checks it against workerd |
+| 5b (implemented) | emulator and scenarios 1-6 with today's agent | scenarios pass under `-race`; existing VPS link tests unchanged | the emulator encodes our reading of Durable Object semantics; step 6 checks it against workerd |
 | 5c | proto renew fields; core renew case; enrol route; `Config.LinkURL` and the link install command; agent `enroll --link-url`, `Meta.Link`, link-only session, backoff, renew, capabilities; scenarios 1 and 7 on link enrolment | the enrol path reaches the handler, everything else under the prefix gets the decoy; flags cannot be combined; a pin mismatch is refused; a link-only agent never dials mTLS and backs off on a dead panel; renew with a good CSR, a bad CSR, a store error; VPS install command unchanged; mTLS enrol without SNI gets 404 | a public enrol route on the VPS (§6.5 Q1); renew against an old panel only times out |
 
 Every round passes the §3 gate. The only store statements on a new path are RenewCert's existing batch; bridge query
@@ -441,8 +482,14 @@ budgets are untouched.
 ### 6.6 Carried to step 6
 
 - TypeScript: the open event gains `generation` (`nodelink.ts` sends none today; the driver refuses 0); `LinkStepOut`
-  gains `forget`; the `"step"` operation in `link_js.go` still returns `errLinkStep` and must convert `LinkIn`/`LinkOut`
-  under a 15 s ctx (the object allows 20 s per call).
+  gains `forget`; the `"step"` operation in `link_js.go` still returns `errLinkStep` and must convert `LinkIn`/`LinkOut`.
+  Its ctx is not a fixed 15 s: the emulator (like `call()` in `nodelink.ts`) gives a Go call `min(20 s, block deadline -
+  now)`, and a fixed 15 s is right only for the first call of a block (a slow accept leaves the closed step less than that
+  while Go would still have 15 s, so a D1 write could land after the object gave up with 1011). The `"step"` operation
+  must pass the block deadline (`until`, as an absolute time) and the adapter uses `ctx = min(15 s, deadline - margin)`.
+- `forget`: after `deleteAll()` the object must `arm()` again, not `deleteAlarm()`: a socket that has not authenticated
+  keeps its handshake deadline. A fan-out through `waitUntil` must use a fresh context: `context.WithoutCancel` keeps the
+  node tag of the step context and trips the own-node guard (or, on workerd, deadlocks).
 - `LinkOut.AlarmAt` is the zero time when no alarm is wanted: the `"step"` conversion must turn it into `undefined`
   (`alarmAt` absent), not `UnixMilli()` of the zero time, or the object would arm an alarm in the year 1.
 - Edge Remote adapter: `Ask` → `NodeLink.ask(proto bytes, deadline ms)`, "timeout" → `context.DeadlineExceeded`;
@@ -453,5 +500,20 @@ budgets are untouched.
 - Abandoned steps can still write: after the object gives up at 20 s the Go call may still land D1 writes (a late
   NodeHello could restore a superseded `node_live` row until the next Hello). The 15 s ctx means this needs a single D1
   call over 15 s; measure it.
+- **Verify on workerd** (the emulator chose these; step 6 checks each against the real runtime and fixes the emulator or
+  `nodelink.ts`):
+  1. `readyState` right after our own `close()`: closing at once, so `openSockets()` and `webSocketMessage` already treat
+     the socket as not open (the emulator does).
+  2. Frames that arrived before a peer's close frame: the emulator still steps them. If workerd marks the socket closed
+     before the queued message events are delivered, `nodelink.ts:155` drops them, and an earlier CommandResult or
+     DoctorReport (an admin reply) becomes a timeout, and the last stats batch is lost (resent after the reconnect).
+  3. Whether `webSocketClose` is delivered after our own `close()` (the emulator delivers it when the peer answers) and
+     with which code.
+  4. How an `ask` RPC fails when the object is reset (the emulator rejects with "link lost"; the adapter must map it to
+     the same error, not to a timeout).
+  5. Whether `close()` throws for 1004 and the other reserved codes (the emulator throws for 1005, 1006, 1015 and for a
+     reason over 123 bytes, and leaves the socket open); `nodelink.ts` maps only 1005, 1006, 1015 to 1000.
+  6. That an alarm is only called when armed and due (`runAlarm` enforces it here), and that an alarm set while its own
+     handler runs is kept.
 - ADR 0007: the driver is a second place that creates EventDesiredChanged and runs every preparation inline.
 - SSH provisioning builds the mTLS enrol command; the edge needs the link form (phase 3).
