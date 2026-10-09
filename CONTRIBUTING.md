@@ -2,9 +2,60 @@
 
 Thank you for helping. Small, focused pull requests are easiest to review; for a larger change, open an issue first.
 
+## Development
+
+You need Go 1.27 (the `toolchain` line in go.mod; `GOTOOLCHAIN=auto` fetches it), Node.js 22+, pnpm 10, make and a
+POSIX shell (Git Bash or WSL on Windows).
+
+```text
+cmd/mistgate/            panel: serve, setup, backup, auth, mcp (stdio proxy), release, version
+cmd/mistgate-node/       node agent: enroll, install, run, cleanup-net, awg prepare-kernel, version
+proto/mistgate/          admin API and panel <-> agent API (Connect-RPC)
+gen/, web/src/gen/       generated from proto/ (never edit by hand)
+internal/panel/          panel modules: store, vault, auth, fleet, access, subs, protocols, health, update, provision, backup, warp, mcp, httpserver ...
+internal/node/           agent modules: agent, engine, hysteria2, awg, warp, hostctl, doctor, torrentguard, update ...
+web/                     admin SPA (Vite, React, TypeScript, TanStack Router/Query, Tailwind) and the user page
+docs/, site/             the documentation (en, ru) and the static site built from it
+scripts/                 end-to-end tests
+```
+
+Linux-only code (nftables, netlink, AmneziaWG, systemd) sits behind `//go:build linux` with stubs, so `go build ./...`,
+`go vet ./...` and `go test ./...` work on Windows and macOS too.
+
+```sh
+make build                            # bin/mistgate-linux-{amd64,arm64}, bin/mistgate-node-linux-{amd64,arm64}
+make dev                              # the panel in dev mode: decoy :8080, admin :8081, agent endpoint :8082, data in ./.data
+cd web && pnpm install && pnpm dev    # Vite on http://localhost:5173 with hot reload, proxied to the admin on :8081
+make test                             # go vet, go test, then pnpm typecheck, lint and vitest
+make gen                              # buf lint + buf generate after editing proto/ (remote plugins: needs internet)
+```
+
+- On first start the dev panel prints a one-time setup link (`http://localhost:8081/setup#...`). Reset everything by
+  stopping it and deleting `./.data`.
+- If 8081 is taken, run the panel with `--admin-listen 127.0.0.1:<port>` and Vite with
+  `MISTGATE_PANEL=http://127.0.0.1:<port> pnpm dev`.
+- To try a node against the dev panel, run both in WSL (or a Linux VM): `mistgate serve --dev`, add the node in the
+  admin, then `mistgate-node enroll ... --state-dir /tmp/node` and `mistgate-node run --state-dir /tmp/node` as root.
+  The agent never dials private addresses, so test traffic against a public site.
+- A binary built without `RELEASE_KEY` cannot update itself or its nodes; see
+  [Releases and signing](docs/en/operations/releases.md).
+
+End-to-end tests:
+
+- `scripts/e2e-wsl.sh [--keep] [--m3 | --awg | --warp | --mihomo | --m3-only | --old-node <path>]`: the panel, a node,
+  a real Hysteria2 client and self-update, optionally AmneziaWG clients, a fake WARP peer and a real mihomo. Runs as
+  root in WSL in its own network namespace (`wsl -d Ubuntu -u root -- bash scripts/e2e-wsl.sh` from the repo root);
+  needs go, curl, jq, python3 (with yaml for the tunnel steps), openssl, nft, ip, and internet access. 3 to 10 minutes.
+- `scripts/e2e-mcp.sh [-mode listener|prefix|both] [-keep]`: API tokens and MCP against a real panel on loopback, any
+  OS, no internet, about a minute.
+
+Every stable tag builds a draft release in GitHub Actions; a maintainer rebuilds it from the tag on a machine with the
+offline release key and signs only binaries that rebuild byte for byte. The whole procedure:
+[Releases and signing](docs/en/operations/releases.md).
+
 ## Checks
 
-Run what CI runs before you open a pull request (see [README.md](README.md#development) for the toolchain):
+Run what CI runs before you open a pull request (the toolchain is listed under [Development](#development)):
 
 ```sh
 go vet ./... && go test ./...          # also passes on Windows and macOS: Linux-only code has stubs

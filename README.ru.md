@@ -1,52 +1,71 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/banner-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./.github/assets/banner-light.svg">
-    <img alt="Mistgate — лёгкая панель для собственного VPN" src="./.github/assets/banner-dark.svg" width="100%">
-  </picture>
 
-  <p><a href="README.md">English</a> · <b>Русский</b> · <a href="https://mistgate.app/ru/">Документация</a></p>
+<img src="web/public/favicon.svg" width="96" height="96" alt="Логотип Mistgate">
+
+<h1>Mistgate</h1>
+
+<h3>Свой VPN для своих людей — без возни с серверами.</h3>
+
+<p>Для семьи, друзей, сообщества или небольшой команды.<br>
+Hysteria2 и AmneziaWG на ваших серверах, VLESS REALITY на подходе: сервер добавляется из браузера, каждому человеку — одна ссылка, о сбое вы узнаёте первыми.</p>
+
+<p>
+<a href="https://github.com/Mistgate/mistgate/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/Mistgate/mistgate?sort=semver&color=b8acf2"></a>
+<a href="LICENSE"><img alt="Лицензия AGPL-3.0" src="https://img.shields.io/github/license/Mistgate/mistgate?color=b8acf2"></a>
+<a href="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+<a href="go.mod"><img alt="Версия Go" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
+</p>
+
+<p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#скриншоты"><b>Скриншоты</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a></p>
+
 </div>
 
-**Mistgate** — лёгкая панель для собственного VPN-флота: один бинарь на Go для панели, один для агента ноды, без Docker. Hysteria2 и AmneziaWG живут рядом — в одной подписке и в одной админке. Панель хранит пользователей, профили и ноды; агент на каждой ноде запускает протоколы и держит хост в том состоянии, которое задала панель.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-ru.webp">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-ru.webp">
+  <img alt="Админка Mistgate: шесть нод со статусом и нагрузкой, одна открытая проблема, последние события" src="docs/images/readme/overview-dark-ru.webp" width="100%">
+</picture>
 
-> **Установка с AI-агентом.** Claude Code, Codex CLI или любой агент, который умеет запускать `ssh` на вашем компьютере, может поставить панель за вас: скопируйте промпт установки из [инструкции для AI-агента](docs/ru/getting-started/ai-agents.md#установка-mistgate-с-ai-агентом). Он спрашивает перед каждым изменением и отдаёт вам ссылку настройки; аккаунт владельца вы создаёте сами.
+## Зачем Mistgate
 
-## Зачем ещё одна панель
+Mistgate для тех, кто держит VPN для других людей: семьи, друзей, сообщества или небольшой команды. Вы ставите одну панель, добавляете в неё серверы и отправляете каждому человеку ссылку. Дальше панель сама держит серверы настроенными и проверяет их.
 
-- **Лёгкая.** SQLite, systemd, два статических бинаря. Без Docker и без отдельного сервера БД. Цель по памяти для панели в простое — 80 МБ (пока цель, а не замер).
-- **Пользователи AmneziaWG на виду.** Каждое устройство AmneziaWG — пир, о котором панель знает: кто онлайн, трафик по пользователям и по устройствам.
-- **Доктор, который знает хостеров.** Заполненный диск и журналы, резолвер, который не резолвит, уход часов, занятые порты, сетевые настройки, отошедшие от базовых (fq, BBR). Находит, объясняет простыми словами и, где это безопасно, исправляет одним подтверждённым нажатием.
-- **Взгляд со стороны клиента.** Панель подключается к каждому профилю на каждой ноде так же, как настоящий клиент (Hysteria2 и AmneziaWG), поэтому нода «зелёная», только если трафик действительно идёт.
-- **Скрыта по умолчанию.** На публичном адресе — сайт-ширма (встроенный или ваш каталог). Админка живёт под секретным префиксом пути, на секретном хосте или на отдельном адресе, а неизвестные токены подписок получают ту же ширму.
-- **Удобна и для ИИ-агентов.** API-токены и MCP-сервер: изменения по схеме «план → применить», всё рискованное ждёт одобрения владельца; готовые промпты для установки и работы с флотом.
+**Одна ссылка на человека, несколько протоколов.**
+Приложения на ядре Clash/Mihomo (kl!ck, FlClash, Clash Verge Rev) получают по одной ссылке и серверы Hysteria2, и серверы AmneziaWG. Если в сети у человека заблокируют один протокол, второй уже есть в приложении. Happ получает серверы Hysteria2, а AmneziaVPN берёт ключ для каждого устройства со страницы человека. [Приложения-клиенты](docs/ru/guide/client-apps.md)
 
-## Что внутри
+**Сервер добавляется из браузера.**
+Введите IP и пароль root. Панель запомнит SSH-ключ сервера, проверит его, откроет порты во включённом UFW или firewalld, поставит подписанный агент и дождётся, пока он подключится. Сертификат Let's Encrypt нода получает сама, а кнопка **Включить WARP** даёт ей выход через Cloudflare. [Установка ноды по SSH](docs/ru/getting-started/ssh-install.md)
 
-| Флот | Доступ и инструменты |
-|:--|:--|
-| <img src="./.github/assets/icons/zap.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Hysteria2](docs/ru/guide/hysteria2.md) и [AmneziaWG](docs/ru/guide/amneziawg.md)**<br>Hysteria2 на официальном ядре с Salamander; AmneziaWG 2.0 / 3.1 — по умолчанию в userspace, модулем ядра — по выбору для отдельной ноды. Несколько профилей на ноду. Протоколы — плагины с редактором по схеме. | <img src="./.github/assets/icons/qr.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Подписки](docs/ru/guide/subscriptions.md)**<br>Одна ссылка на человека. Каждое приложение получает формат, который умеет читать, по правилам User-Agent: список URI для приложений вроде Happ, профиль Mihomo YAML для [kl!ck](docs/ru/guide/client-apps.md#klck) (десктопное приложение, которое рекомендует Mistgate), Clash Verge или FlClash. Браузер получает страницу человека, AmneziaVPN — ключ `vpn://` на каждое устройство. См. [Приложения-клиенты](docs/ru/guide/client-apps.md). |
-| <img src="./.github/assets/icons/globe.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Выход через WARP](docs/ru/guide/warp.md)**<br>Трафик профиля можно пустить через Cloudflare WARP. Если связь с WARP пропала, профиль закрывается, а не уходит напрямую. | <img src="./.github/assets/icons/users.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Пользователи и устройства](docs/ru/guide/users-and-groups.md)**<br>Группы, свой пир на каждое устройство, лимиты трафика, [DNS-пресеты](docs/ru/guide/dns.md) для пользователя или группы. [Страница пользователя](docs/ru/guide/user-page.md) с инструкциями под платформу, QR-кодом, трафиком и сроком, под своим паролем; если разрешить, человек сам добавляет там устройства AmneziaWG. |
-| <img src="./.github/assets/icons/pulse.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Доктор флота](docs/ru/operations/health.md)**<br>Самопроверки нод с безопасными исправлениями, проверки глазами клиента, алерты с полным жизненным циклом и [защита от торрентов](docs/ru/guide/torrent-protection.md) на каждой ноде: распознанный BitTorrent блокируется в ядре, адреса не записываются. | <img src="./.github/assets/icons/window.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Админка](docs/ru/operations/security.md)**<br>Русский и английский, тёмная и светлая темы. Вход по passkey или паролю с кодом из приложения-аутентификатора, по желанию Cloudflare Turnstile, журнал аудита. |
-| <img src="./.github/assets/icons/terminal.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Установка по SSH](docs/ru/getting-started/ssh-install.md)**<br>Подтвердите host key, введите пароль — и смотрите, как нода подключается. Панель сначала проверяет сервер, настраивает активный firewall и хранит SSH-доступ зашифрованным, с проверенной сменой пароля. | <img src="./.github/assets/icons/archive.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Зашифрованные бэкапы](docs/ru/operations/backups.md)**<br>Бэкапы по расписанию в ваш бакет Cloudflare R2, зашифрованные офлайн-ключом восстановления ещё до отправки, со сроком хранения и офлайн-восстановлением. |
-| <img src="./.github/assets/icons/shield.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Подписанные обновления](docs/ru/operations/updates.md)**<br>Агенты нод и панель ставят только релизы, подписанные ключом релиза. Ноду можно обновить сейчас или по расписанию, с проверкой здоровья и автоматическим откатом. | <img src="./.github/assets/icons/spark.svg" width="32" height="32" align="absmiddle" alt="">&nbsp; **[Доступ для агентов](docs/ru/getting-started/ai-agents.md)**<br>Скрипты ходят в тот же [Connect API](docs/ru/reference/api.md), что и админка, с токенами readonly, operator и admin. ИИ-агенты работают через встроенный [MCP-сервер](docs/ru/reference/mcp.md); изменения идут через «план → применить», рискованные ждут владельца. |
+**Вы узнаёте первым.**
+Каждые 5 минут панель подключается к каждому серверу так же, как приложение, и открывает через туннель тестовую страницу. На каждой ноде доктор делает 16 проверок хоста (диск, журнал, резолвер, часы, порты, BBR) и предлагает пять исправлений. Ни одно не запускается без вашего подтверждения. Предупреждения приходят в Telegram. [Здоровье](docs/ru/operations/health.md)
 
-## Статус
+**Лёгкая и незаметная.**
+Два статических бинарника на Go: панель и агент ноды. SQLite и systemd, без Docker и без сервера БД. У автора панель занимает около 150 МБ памяти на VPS с 1 vCPU и 1 ГБ RAM, на ней 16 человек и 4 ноды. Посторонний по адресу панели видит сайт-ширму, а админка спрятана за секретным путём или именем хоста. Релизы воспроизводимые и подписаны офлайн-ключом, ноды ставят только подписанные сборки. Защита от торрентов блокирует открытый BitTorrent на ноде; в событии остаются признак и порт назначения, а адреса с ноды не уходят. [Безопасность](docs/ru/operations/security.md) · [Релизы и подпись](docs/ru/operations/releases.md)
+<!-- TODO(benchmarks): заменить цифру с одной установки результатами бенчмарков (RSS панели и ноды в простое и под нагрузкой, рядом с другими панелями), когда они появятся. -->
 
-Mistgate выпускается в ранних версиях; текущая — [`v0.1.15`](https://github.com/Mistgate/mistgate/releases/latest). Автор использует его в работе, но до 1.0 API, хранимые настройки и протокол ноды ещё могут меняться. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest); для других платформ собирайте из исходников.
+**ИИ-агент в помощь.**
+В панель встроен MCP-сервер. Claude Code, Codex или другой агент видит флот и меняет его по схеме «план → применить». Установка ноды, исправление доктора и смена пароля сервера ждут, пока вы одобрите их в админке. Ссылки подписок, ключи устройств и пароли агент не получает. [Инструкция для AI-агента](docs/ru/getting-started/ai-agents.md) · [MCP-сервер](docs/ru/reference/mcp.md)
 
-| Этап | Что |
-|:--|:--|
-| **Готово** | Панель и агент ноды по mTLS · Hysteria2 · AmneziaWG 2.0 / 3.1 · выход через WARP · подписки и страница пользователя · DNS-пресеты · доктор, проверки глазами клиента, алерты, алерты в Telegram · защита от торрентов на ноде · установка по SSH из админки и через MCP с одобрением владельца · сохранённый SSH-доступ с проверенной сменой пароля · зашифрованные бэкапы в Cloudflare R2 и восстановление · подписанные обновления нод сейчас или по расписанию, с проверкой здоровья и откатом · самообновление панели из подписанных релизов · воспроизводимые релизы с офлайн-подписью · API-токены и MCP-сервер · админка на русском и английском |
-| **Сейчас** | Проверка `v0.1.15` в боевой работе: защита от торрентов, установка по SSH и восстановление, подписанные релизы панели и нод |
-| **Дальше** | Telegram-бот сверх алертов (флот и пользователи) · новые форматы подписок (Xray JSON, sing-box) и зеркала подписок · установка одной командой |
-| **Потом** | VLESS REALITY как первый внешний плагин протокола |
+> **Скоро, в релизах этого пока нет:** VLESS REALITY и XHTTP (движок для ноды уже в основной ветке), подписки в форматах Xray JSON и sing-box, установка одной командой, полноценный Telegram-бот для флота и пользователей и бесплатная версия панели на Cloudflare Workers (в разработке).
 
-Подробности и известные ограничения — в разделе [Статус и план развития](docs/ru/roadmap/status.md). Часть настроек по умолчанию рассчитана на пользователей в России (Яндекс DNS для нод в России, контрольные домены доктора, пресеты split-DNS); всё это меняется в настройках.
+## Скриншоты
+
+<table>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-ru.webp"><img alt="Страница ноды: статус, выход через WARP, CPU, память, диск и трафик за сутки" src="docs/images/readme/node-dark-ru.webp" width="100%"></picture><br><sub><b>Нода.</b> Статус, выход через WARP, нагрузка и трафик за сутки.</sub></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-ru.webp"><img alt="Проверки глазами клиента: таблица нод и протоколов с задержкой через каждый туннель" src="docs/images/readme/health-dark-ru.webp" width="100%"></picture><br><sub><b>Проверки глазами клиента.</b> Каждый протокол на каждой ноде, задержка через туннель.</sub></td>
+</tr>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/user-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/user-light-ru.webp"><img alt="Карточка пользователя: квота, срок, лимит устройств, ключи AmneziaVPN и трафик в счёт квоты" src="docs/images/readme/user-dark-ru.webp" width="100%"></picture><br><sub><b>Человек.</b> Квота, срок, устройства и трафик в счёт квоты.</sub></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/phone-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/phone-light-ru.webp"><img alt="Страница человека на телефоне: сколько дней осталось, трафик и серверы в его приложении" src="docs/images/readme/phone-dark-ru.webp" width="100%"></picture><br><sub><b>Его ссылка в браузере.</b> Сколько дней осталось, трафик и серверы.</sub></td>
+</tr>
+</table>
+
+На скриншотах выдуманные демо-данные.
 
 ## Быстрый старт
 
-Нужен Linux-сервер с systemd и домен, который на него указывает (здесь `panel.example.com`), со свободными TCP 80 и 443. На сервере, от root:
+Нужен Linux-сервер (amd64 или arm64) с systemd, домен, который на него указывает (здесь `panel.example.com`), и свободные TCP-порты 80 и 443. На сервере, от root:
 
 ```sh
 ARCH=amd64    # arm64 на сервере с ARM
@@ -55,94 +74,65 @@ for f in "mistgate-linux-$ARCH" SHA256SUMS; do
 done
 sha256sum --check --ignore-missing SHA256SUMS
 install -m 0755 "mistgate-linux-$ARCH" /usr/local/bin/mistgate
-mistgate setup --public-url https://panel.example.com
-#   печатает адрес админки (https://panel.example.com/<секретный префикс>/) и одноразовую ссылку настройки
-mistgate serve --listen :443 --acme-domain panel.example.com    # первый запуск — вручную
+mistgate setup --public-url https://panel.example.com             # печатает адрес админки и одноразовую ссылку настройки
+mistgate serve --listen :443 --acme-domain panel.example.com      # первый запуск вручную
 ```
 
-Затем запустите `serve` под systemd с юнитом из [Установки панели](docs/ru/getting-started/install-panel.md), откройте ссылку настройки и создайте владельца (passkey или пароль с кодом аутентификатора). На той же странице — что доказывает контрольная сумма и чего не доказывает, секретный хост админки или отдельный адрес (`setup --admin-host`, `--admin-listen`), свой сертификат (`--tls-cert`, `--tls-key`) и свой сайт-ширма (`--decoy-dir`). `mistgate serve -h` показывает все флаги, у каждого есть переменная окружения `MISTGATE_*`.
+Затем:
 
-Ноды добавляются в **Ноды → Добавить ноду**:
+1. Запустите `serve` под systemd с юнитом из [Установки панели](docs/ru/getting-started/install-panel.md). Там же описаны секретный хост админки, свой сертификат и свой сайт-ширма.
+2. Откройте ссылку настройки и создайте владельца: passkey или пароль с кодом из приложения-аутентификатора.
+3. Добавьте серверы в **Ноды → Добавить ноду**, по SSH или одноразовой командой ([Добавление ноды](docs/ru/getting-started/add-node.md)), и дальше по шагам из [Первых пользователей](docs/ru/getting-started/first-users.md).
 
-- **Запустить автоустановку по SSH**: введите адрес сервера, подтвердите его host key, введите пароль; панель проверит сервер, поставит агента и дождётся его. См. [Установку ноды по SSH](docs/ru/getting-started/ssh-install.md).
-- **Получить команду для ручной установки**: скопируйте `mistgate-node` на сервер и выполните одноразовую команду от root. См. [Добавление ноды](docs/ru/getting-started/add-node.md).
+**Или поручите установку ИИ-агенту.** Claude Code, Codex CLI или любой агент, который умеет запускать `ssh` на вашем компьютере, пройдёт эти шаги сам: скопируйте промпт установки из [инструкции для AI-агента](docs/ru/getting-started/ai-agents.md#установка-mistgate-с-ai-агентом). Он спрашивает перед каждым изменением, а аккаунт владельца вы создаёте сами.
 
-```sh
-chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example.com:443 --sni <секретное имя> \
-  --ca-sha256 <отпечаток> --token <одноразовый токен> && /root/mistgate-node install
-```
+## Сравнение с другими панелями
 
-Дальше — профиль, профиль на ноду, профиль в группу и пользователи; чек-лист первого запуска на «Обзоре» проводит по шагам ([Первые пользователи](docs/ru/getting-started/first-users.md)).
+| | Mistgate | 3x-ui | Remnawave | Hiddify | PasarGuard | s-ui |
+|:--|:--|:--|:--|:--|:--|:--|
+| Работает без Docker | ✅ | ✅ | ❌ | ✅ | частично | ✅ |
+| База данных | SQLite | SQLite или PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB или PostgreSQL | SQLite |
+| Память панели | ~150 МБ на деле¹ | ? | от 2 ГБ, реком. 4 ГБ² | ? | от 1 ГБ, реком. 2 ГБ² | ? |
+| Установка одной командой | скоро | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Ноду можно добавить из панели (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
+| Hysteria2 | ✅ | ✅ | частично | ✅ | ✅ | ✅ |
+| AmneziaWG | ✅ 2.0 и 3.1 | ✅ 3.1 | ? | ? | ? | ? |
+| VLESS REALITY | скоро | ✅ | ✅ | ✅ | ✅ | ? |
+| VMess, Trojan, Shadowsocks | ❌ | ✅ | частично | ✅ | ✅ | ✅ |
+| Подписки Xray JSON или sing-box | скоро | Xray JSON | ✅ обе | ✅ обе | sing-box | sing-box |
+| Проверки и алерты | ✅ проверки глазами клиента, доктор с исправлениями | ✅ монитор туннеля (включается отдельно) | ✅ статус, Prometheus | частично | частично | ? |
+| Telegram-бот | только алерты, полный бот скоро | ✅ | частично | ✅ | ✅ | ? |
+| Лимит устройств по HWID | только число устройств | ✅ | ✅ | ? | ✅ | ? |
+| Встроенный MCP-сервер для ИИ-агентов | ✅ | ? | ❌ | ? | ? | ? |
 
-> **Важно:** в API способ «по подписке» — это значение enum `HAPP` (и `access.happ`, `users.apps.happ`). Оно означает «по ссылке подписки», каким бы приложением её ни открыли; `AMNEZIA` — «по ключу AmneziaWG».
+<!-- TODO(benchmarks): в строке про память замер одной установки стоит рядом с требованиями из документации других проектов; заменить результатами бенчмарков, когда они появятся. -->
+¹ Замер на панели автора: VPS с 1 vCPU и 1 ГБ, 16 человек, 4 ноды. Это не бенчмарк. ² Требования из документации проекта. «?» значит, что в README и документации проекта об этом не сказано.
+
+Другие панели впереди по числу протоколов, размеру сообщества, лимитам по HWID и полноценным Telegram-ботам. Полная таблица с источниками, проверенная 9 октября 2026 года, лежит на странице [Сравнение с другими панелями](docs/ru/reference/comparison.md).
+
+## Статус и планы
+
+Проект молодой. Текущий релиз [`v0.1.32`](https://github.com/Mistgate/mistgate/releases/latest), автор пользуется им в боевой работе. До версии 1.0 ещё могут меняться API, хранимые настройки и протокол ноды. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+
+Дальше: VLESS REALITY и XHTTP, подписки Xray JSON и sing-box, установка одной командой, Telegram-бот для флота и пользователей и версия для Cloudflare Workers. Часть настроек по умолчанию рассчитана на пользователей в России (Яндекс DNS для нод в России, контрольные домены доктора, пресеты split-DNS); всё это меняется в настройках. Подробности и известные ограничения: [Статус и план развития](docs/ru/roadmap/status.md).
 
 ## Документация
 
-Полная документация — на [mistgate.app/ru](https://mistgate.app/ru/) (английская версия: [mistgate.app](https://mistgate.app/)); её исходники — в [`docs/`](docs/README.md), на GitHub они читаются так же. С чего начать:
+Вся документация на [mistgate.app/ru](https://mistgate.app/ru/), те же страницы лежат в [`docs/`](docs/README.md). С чего начать:
 
-- [Обзор](docs/ru/getting-started/overview.md) и [Требования](docs/ru/getting-started/requirements.md): основные понятия и что понадобится.
-- [Установка панели](docs/ru/getting-started/install-panel.md), [установка ноды по SSH](docs/ru/getting-started/ssh-install.md), [первые пользователи](docs/ru/getting-started/first-users.md).
-- [Инструкция для AI-агента](docs/ru/getting-started/ai-agents.md): промпты, чтобы установить панель, вести флот через MCP и дорабатывать код.
-- [Здоровье](docs/ru/operations/health.md), [обновления](docs/ru/operations/updates.md), [зашифрованные бэкапы](docs/ru/operations/backups.md), [безопасность](docs/ru/operations/security.md), [решение проблем](docs/ru/operations/troubleshooting.md).
-- [CLI](docs/ru/reference/cli.md), [конфигурация](docs/ru/reference/configuration.md), [API](docs/ru/reference/api.md), [MCP](docs/ru/reference/mcp.md), [архитектура](docs/ru/reference/architecture.md).
+- [Обзор](docs/ru/getting-started/overview.md) и [Требования](docs/ru/getting-started/requirements.md)
+- [Установка панели](docs/ru/getting-started/install-panel.md), [Установка ноды по SSH](docs/ru/getting-started/ssh-install.md), [Первые пользователи](docs/ru/getting-started/first-users.md)
+- [Здоровье](docs/ru/operations/health.md), [Обновления](docs/ru/operations/updates.md), [Зашифрованные бэкапы](docs/ru/operations/backups.md), [Решение проблем](docs/ru/operations/troubleshooting.md)
+- [CLI](docs/ru/reference/cli.md), [API](docs/ru/reference/api.md), [MCP-сервер](docs/ru/reference/mcp.md), [Архитектура](docs/ru/reference/architecture.md)
 
-Coding-агентам — [`AGENTS.md`](AGENTS.md); опубликованный сайт отдаёт и [`llms.txt`](https://mistgate.app/llms.txt).
+## Участие в разработке
 
-## Требования
-
-- **Панель:** Linux (amd64 или arm64) с systemd, доменное имя, порты 443 (и 80 для Let's Encrypt). Данные — в SQLite в `/var/lib/mistgate`.
-- **Ноды:** Linux с systemd (Ubuntu 22.04+ или Debian 12+), root или беспарольный `sudo`, публичный адрес, открытые UDP-порты ваших профилей. Агент сам подключается к панели, входящий порт управления на ноде не нужен.
-- **Сборка:** Go 1.27 (строка `toolchain` в go.mod; `GOTOOLCHAIN=auto` скачает его), Node.js 22+, pnpm 10, make и POSIX-shell (Git Bash или WSL на Windows).
-
-## Разработка
-
-```
-cmd/mistgate/            панель: serve, setup, backup, auth, mcp (stdio-прокси), release, version
-cmd/mistgate-node/       агент ноды: enroll, install, run, cleanup-net, awg prepare-kernel, version
-proto/mistgate/          admin API и API панель <-> агент (Connect-RPC)
-gen/, web/src/gen/       сгенерировано из proto/ (не править вручную)
-internal/panel/          модули панели: store, vault, auth, fleet, access, subs, protocols, health, update, provision, backup, warp, mcp, httpserver ...
-internal/node/           модули агента: agent, engine, hysteria2, awg, warp, hostctl, doctor, torrentguard, update ...
-web/                     SPA админки (Vite, React, TypeScript, TanStack Router/Query, Tailwind) и страница пользователя
-docs/, site/             документация (en, ru) и статический сайт, который из неё собирается
-scripts/                 сквозные тесты
-```
-
-Код только для Linux (nftables, netlink, AmneziaWG, systemd) закрыт `//go:build linux` и имеет заглушки, поэтому `go build ./...`, `go vet ./...` и `go test ./...` работают и на Windows, и на macOS.
-
-```sh
-make build                            # bin/mistgate-linux-{amd64,arm64}, bin/mistgate-node-linux-{amd64,arm64}
-make dev                              # панель в режиме разработки: ширма :8080, админка :8081, агентам :8082, данные в ./.data
-cd web && pnpm install && pnpm dev    # Vite на http://localhost:5173 с горячей перезагрузкой, прокси на админку :8081
-make test                             # go vet, go test, затем pnpm typecheck, lint и vitest
-make gen                              # buf lint + buf generate после правки proto/ (удалённые плагины: нужен интернет)
-```
-
-- При первом запуске dev-панель печатает одноразовую ссылку настройки (`http://localhost:8081/setup#...`). Сбросить всё: остановить панель и удалить `./.data`.
-- Если порт 8081 занят, запустите панель с `--admin-listen 127.0.0.1:<порт>`, а Vite — с `MISTGATE_PANEL=http://127.0.0.1:<порт> pnpm dev`.
-- Чтобы попробовать ноду против dev-панели, запустите обе в WSL (или в Linux-VM): `mistgate serve --dev`, добавьте ноду в админке, затем от root `mistgate-node enroll ... --state-dir /tmp/node` и `mistgate-node run --state-dir /tmp/node`. Агент не ходит на приватные адреса, поэтому проверяйте трафик на публичном сайте.
-- Бинарник, собранный без `RELEASE_KEY`, не умеет обновлять ни себя, ни ноды; см. [Релизы и подпись](docs/ru/operations/releases.md).
-
-Сквозные тесты:
-
-- `scripts/e2e-wsl.sh [--keep] [--m3 | --awg | --warp | --mihomo | --m3-only | --old-node <путь>]`: панель, нода, настоящий клиент Hysteria2 и самообновление, по флагам — клиенты AmneziaWG, поддельный пир WARP и настоящий mihomo. Запускается от root в WSL в своём сетевом namespace (`wsl -d Ubuntu -u root -- bash scripts/e2e-wsl.sh` из корня репозитория); нужны go, curl, jq, python3 (с yaml для шагов туннелей), openssl, nft, ip и интернет. От 3 до 10 минут.
-- `scripts/e2e-mcp.sh [-mode listener|prefix|both] [-keep]`: API-токены и MCP против настоящей панели на loopback, любая ОС, без интернета, около минуты.
-
-> **Внимание:** тесты, которым нужен root (`MG_ROOT_TESTS=1`), и e2e-скрипты меняют сетевое состояние хоста. Запускайте их в WSL или на одноразовой VM и никогда — на боевой ноде или панели.
-
-Соглашения — в [CONTRIBUTING.md](CONTRIBUTING.md); если работаете с coding-агентом, возьмите [промпт для доработки кода](docs/ru/getting-started/ai-agents.md#доработка-кода-с-coding-агентом).
-
-## Релизы
-
-Каждый стабильный тег собирает черновик релиза в GitHub Actions. Мейнтейнер пересобирает бинарники из тега на машине с офлайн-ключом релиза, а `mistgate release sign` подписывает только бинарники, которые пересобираются байт в байт; подписанные манифесты загружаются, и черновик публикуется. После этого панели сами скачивают подписанный пакет нод и предлагают обновление панели на странице «Обновления». Вся процедура, сборка со своим ключом и смена ключа — в разделе [Релизы и подпись](docs/ru/operations/releases.md).
+Баг-репорты, исправления и правки документации приветствуются. В [CONTRIBUTING.md](CONTRIBUTING.md) (на английском) описаны сборка, устройство кода, проверки CI и соглашения. Coding-агентам начинать с [`AGENTS.md`](AGENTS.md), а в [инструкции для AI-агента](docs/ru/getting-started/ai-agents.md#доработка-кода-с-coding-агентом) есть готовый промпт для доработки кода.
 
 ## Безопасность
 
-- Делайте резервные копии каталога данных панели (`/var/lib/mistgate`): там база, мастер-ключ, которым зашифрованы хранимые секреты, и CA панели, которому доверяют ноды. Без него все ноды придётся подключать заново. [Зашифрованные бэкапы в R2](docs/ru/operations/backups.md) делают это по расписанию.
-- Держите админку за секретным префиксом, на секретном хосте или на отдельном адресе и не публикуйте её адрес.
-- API-токены и MCP никогда не получают ссылки подписок, ключи устройств, пароли страниц и пароли серверов; и всё же давайте агентам самый узкий профиль, которого хватает.
-- Об уязвимостях сообщайте закрыто, см. [SECURITY.md](SECURITY.md).
+Об уязвимостях сообщайте закрыто, см. [SECURITY.md](SECURITY.md). Делайте резервные копии каталога данных панели (`/var/lib/mistgate`): там база, мастер-ключ и CA, которому доверяют ноды. [Зашифрованные бэкапы](docs/ru/operations/backups.md) в Cloudflare R2 делают это по расписанию.
 
 ## Лицензия
 
-Mistgate — свободное ПО под [GNU Affero General Public License v3.0 only](LICENSE). Если вы запускаете изменённую панель для других, ссылка «Исходный код» в её админке (`serve --source-url`) должна вести на ваши исходники.
+Mistgate распространяется как свободное ПО под [GNU Affero General Public License v3.0 only](LICENSE). Если вы запускаете изменённую панель для других, ссылка «Исходный код» в её админке (`serve --source-url`) должна вести на ваши исходники.

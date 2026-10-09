@@ -74,3 +74,4 @@ Mistgate — панель для собственного VPN-флота: оди
 - [MCP](reference/mcp.md): MCP-сервер, stdio-прокси, инструменты, «план → применить» и одобрения.
 - [Архитектура](reference/architecture.md): как панель, агенты и клиенты общаются друг с другом.
 - [FAQ](reference/faq.md): короткие ответы на частые вопросы.
+- [Сравнение с другими панелями](reference/comparison.md): Mistgate рядом с 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager и s-ui, с источниками.

@@ -3,7 +3,7 @@ title: Status and roadmap
 description: What Mistgate does in the current release, what is being tested now, what comes next, and the known limits.
 ---
 
-Mistgate is in early releases; the current one is `v0.1.15`. It runs in production for its author, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today.
+Mistgate is in early releases; the current one is `v0.1.32`. It runs in production for its author, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today.
 
 ## Done
 
@@ -37,17 +37,15 @@ Mistgate is in early releases; the current one is `v0.1.15`. It runs in producti
 
 ## Now
 
-- Field testing of `v0.1.15` in production: torrent protection, the SSH installation and recovery, signed panel and node releases.
+- Field testing of the current releases in production: torrent protection, the SSH installation and recovery, signed panel and node releases.
+- VLESS REALITY with RAW + Vision and with XHTTP: the node engine on xray-core is merged; VLESS profiles and subscriptions in the panel are **Planned**.
+- A free edition of the panel that runs on Cloudflare Workers: in development, not in a release.
 
 ## Next
 
 - A Telegram bot beyond alerts: for the fleet and for users.
 - More subscription formats (Xray JSON, sing-box) and subscription mirrors.
 - A one-line installer.
-
-## Later
-
-- VLESS REALITY as the first external protocol plugin.
 
 ## Known limits
 
