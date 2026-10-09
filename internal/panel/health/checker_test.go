@@ -341,7 +341,8 @@ func TestScheduleDueAndNextRunAfterARound(t *testing.T) {
 	}
 	f.dial = func(Target) (Tunnel, error) { return f.probe.tunnel(), nil }
 	f.s.runRound(f.ctx, f.in)
-	if got := f.s.sched[f.in].next.Sub(f.clock.Now()); got <= 0 || got > 300*time.Second+jitter {
+	// nextRun lands on the next phase point after now+jitter (up to interval+jitter away), then adds up to +jitter.
+	if got := f.s.sched[f.in].next.Sub(f.clock.Now()); got <= 0 || got > 300*time.Second+2*jitter {
 		t.Fatalf("after a good round the next is in %v", got)
 	}
 
