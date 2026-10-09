@@ -52,9 +52,9 @@ type portCheckLock struct {
 }
 
 type portSender struct {
-	node    store.NodeRow
-	session *session
-	panel   bool
+	node  store.NodeRow
+	live  store.NodeLiveRow
+	panel bool
 }
 
 type udpPortSettings struct {
@@ -229,8 +229,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	if !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
 		return portCheckOutcome{errorCode: "agent_too_old"}
 	}
-	targetSession := f.session(target.ID)
-	if targetSession == nil {
+	if f.cfg.Remote == nil && f.session(target.ID) == nil {
 		return portCheckOutcome{errorCode: "node_offline"}
 	}
 
@@ -276,7 +275,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	}
 	var result portCheckOutcome
 	for i, sender := range senders {
-		result = f.runPortCheckAttempt(ctx, target, targetSession, sender, ports)
+		result = f.runPortCheckAttempt(ctx, target, targetLive, sender, ports)
 		if result.errorCode != "inconclusive" || i != 0 || len(senders) < 2 {
 			break
 		}
@@ -310,7 +309,6 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 
 func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow) []portSender {
 	var eligible []store.NodeRow
-	sessions := make(map[string]*session)
 	for _, node := range nodes {
 		if node.ID == target.ID {
 			continue
@@ -318,17 +316,15 @@ func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live ma
 		if current := live[node.ID]; !current.Connected || !slices.Contains(current.AgentCaps, capUDPCheck) {
 			continue
 		}
-		sess := f.session(node.ID)
-		if sess == nil {
+		if f.cfg.Remote == nil && f.session(node.ID) == nil {
 			continue
 		}
 		eligible = append(eligible, node)
-		sessions[node.ID] = sess
 	}
 	ordered := udpPortSenderOrder(target, eligible)
 	candidates := make([]portSender, 0, len(ordered))
 	for _, node := range ordered {
-		candidates = append(candidates, portSender{node: node, session: sessions[node.ID]})
+		candidates = append(candidates, portSender{node: node, live: live[node.ID]})
 	}
 	return candidates
 }
@@ -383,7 +379,7 @@ func udpPortUsed(port uint16, settings []udpPortSettings) bool {
 	return false
 }
 
-func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, targetSession *session, sender portSender, ports []uint16) portCheckOutcome {
+func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, targetLive store.NodeLiveRow, sender portSender, ports []uint16) portCheckOutcome {
 	var tag [8]byte
 	if _, err := rand.Read(tag[:]); err != nil {
 		f.log.Warn("make UDP port check tag", "node", target.ID, "err", err)
@@ -393,11 +389,11 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 	for i, port := range ports {
 		portNumbers[i] = uint32(port)
 	}
-	armed, err := targetSession.roundtrip(ctx, udpCheckWait, func(reqID string) *agentv1.ConnectResponse {
+	armed, err := f.commandWithLive(ctx, target.ID, udpCheckWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpCount{UdpCount: &agentv1.UdpCount{
 			RequestId: reqID, Tag: tag[:], Ports: portNumbers, HoldS: 30,
 		}}}
-	})
+	}, &targetLive)
 	if err != nil {
 		return portCheckOutcome{sender: portSenderID(sender), errorCode: "failed"}
 	}
@@ -413,11 +409,11 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 	}
 	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), udpCheckStopWait)
 	defer cancel()
-	counts, stopErr := targetSession.roundtrip(stopCtx, udpCheckStopWait, func(reqID string) *agentv1.ConnectResponse {
+	counts, stopErr := f.commandWithLive(stopCtx, target.ID, udpCheckStopWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpCount{UdpCount: &agentv1.UdpCount{
 			RequestId: reqID, Tag: tag[:], Stop: true,
 		}}}
-	})
+	}, &targetLive)
 	if stopErr != nil {
 		return portCheckOutcome{sender: portSenderID(sender), errorCode: "failed"}
 	}
@@ -493,12 +489,12 @@ func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender 
 		}
 		return family, sent, ""
 	}
-	result, err := sender.session.roundtrip(ctx, udpCheckWait, func(reqID string) *agentv1.ConnectResponse {
+	result, err := f.commandWithLive(ctx, sender.node.ID, udpCheckWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpSend{UdpSend: &agentv1.UdpSend{
 			RequestId: reqID, Host: target.Address, Ports: uint32Ports(ports), Tag: tag[:],
 			Count: udpCheckSendCount, Pps: udpCheckPPS, Size: udpCheckSize,
 		}}}
-	})
+	}, &sender.live)
 	if err != nil {
 		return "", 0, "failed"
 	}

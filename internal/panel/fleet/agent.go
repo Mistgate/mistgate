@@ -52,10 +52,9 @@ type session struct {
 	coreState SessionState
 
 	// Only request waiters need their own lock; core state is protected by coreMu.
-	waitMu sync.Mutex
-	cmds   map[string]chan *agentv1.CommandResult
-	docs   map[string]chan *agentv1.DoctorReport // RunDoctor requests in flight (health.go)
-	logs   map[string]*logSub
+	waitMu  sync.Mutex
+	replies map[string]chan *agentv1.ConnectRequest
+	logs    map[string]*logSub
 }
 
 func (s *session) stepCore(ctx context.Context, event SessionEvent) (Transition, error) {
@@ -195,10 +194,8 @@ func (s *session) dispatchCoreEffect(ctx context.Context, effect SessionEffect) 
 		if s.f.cfg.OnUsage != nil {
 			s.f.cfg.OnUsage(ctx, effect.Users)
 		}
-	case EffectCommandResult:
-		s.deliverCommand(effect.CommandResult)
-	case EffectDoctorReport:
-		s.deliverDoctor(effect.DoctorReport)
+	case EffectReply:
+		s.deliverReply(effect.RequestID, effect.Reply)
 	case EffectLogChunk:
 		s.deliverLog(effect.LogChunk)
 	case EffectWarpAttention:
@@ -424,8 +421,8 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 
 	s := &session{f: f, nodeID: id, owner: owner, ctx: sctx, cancel: cancel,
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
-		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{},
-		logs: map[string]*logSub{}, core: core, coreState: state, alarmTimer: alarmTimer}
+		replies: map[string]chan *agentv1.ConnectRequest{},
+		logs:    map[string]*logSub{}, core: core, coreState: state, alarmTimer: alarmTimer}
 	s.coreMu.Lock()
 	if !f.register(s) {
 		s.coreMu.Unlock()
@@ -450,7 +447,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	s.dispatchCoreEffects(sctx, tr.Effects)
-	// Core-mediated admin frames wait until HelloAck is queued; Retire remains a direct send.
+	// Core-mediated admin frames wait until HelloAck is queued.
 	tr, err = s.stepDesired(sctx)
 	if err != nil {
 		return errOrCause(sctx)
@@ -641,21 +638,20 @@ var (
 	errLinkLost = connect.NewError(connect.CodeUnavailable, errors.New("the node link dropped"))
 )
 
-// roundtrip sends a command built with a fresh request id and waits for its CommandResult.
-func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse) (*agentv1.CommandResult, error) {
-	id := store.NewID("req_")
-	ch := make(chan *agentv1.CommandResult, 1)
+// ask sends one allowlisted request and waits for the agent's whole reply frame.
+func (s *session) ask(ctx context.Context, id string, wait time.Duration, frame *agentv1.ConnectResponse) (*agentv1.ConnectRequest, error) {
+	ch := make(chan *agentv1.ConnectRequest, 1)
 	s.waitMu.Lock()
-	s.cmds[id] = ch
+	s.replies[id] = ch
 	s.waitMu.Unlock()
 	defer func() {
 		s.waitMu.Lock()
-		delete(s.cmds, id)
+		delete(s.replies, id)
 		s.waitMu.Unlock()
 	}()
 	requestAt := s.f.now()
 	tr, err := s.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
-		RequestID: id, Deadline: requestAt.Add(wait), Frame: build(id), Kind: PendingCommand,
+		RequestID: id, Deadline: requestAt.Add(wait), Frame: frame,
 	}})
 	if err != nil {
 		return nil, errLinkLost
@@ -667,12 +663,18 @@ func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(
 	defer t.Stop()
 	select {
 	case r := <-ch:
+		if r == nil {
+			return nil, errNoAnswer
+		}
 		return r, nil
 	case <-t.C:
 		return nil, errNoAnswer
 	case <-s.done:
 		select { // an answer that arrived just before the stream ended (UpdateAgent: the agent re-executes) still counts
 		case r := <-ch:
+			if r == nil {
+				return nil, errNoAnswer
+			}
 			return r, nil
 		default:
 		}
@@ -682,13 +684,125 @@ func (s *session) roundtrip(ctx context.Context, wait time.Duration, build func(
 	}
 }
 
-func (s *session) deliverCommand(r *agentv1.CommandResult) {
+func (f *Fleet) ask(ctx context.Context, nodeID string, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse) (*agentv1.ConnectRequest, error) {
+	return f.askWithLive(ctx, nodeID, wait, build, nil)
+}
+
+func (f *Fleet) askWithLive(ctx context.Context, nodeID string, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse, knownLive *store.NodeLiveRow) (*agentv1.ConnectRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	id := store.NewID("req_")
+	var frame *agentv1.ConnectResponse
+	if build != nil {
+		frame = build(id)
+	}
+	if requestKind(frame) == 0 {
+		return nil, errNoAnswer
+	}
+	if _, err := f.readyForRequest(ctx, nodeID, frame, knownLive); err != nil {
+		return nil, err
+	}
+	deadline := f.now().Add(wait)
+	if f.cfg.Remote != nil {
+		reply, err := f.cfg.Remote.Ask(ctx, nodeID, id, frame, deadline)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if remoteTimedOut(err) {
+				return nil, errNoAnswer
+			}
+			return nil, errLinkLost
+		}
+		if reply == nil {
+			return nil, errNoAnswer
+		}
+		return reply, nil
+	}
+	s := f.session(nodeID)
+	if s == nil {
+		return nil, requestOfflineError(frame)
+	}
+	return s.ask(ctx, id, wait, frame)
+}
+
+func (f *Fleet) command(ctx context.Context, nodeID string, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse) (*agentv1.CommandResult, error) {
+	return f.commandWithLive(ctx, nodeID, wait, build, nil)
+}
+
+func (f *Fleet) commandWithLive(ctx context.Context, nodeID string, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse, live *store.NodeLiveRow) (*agentv1.CommandResult, error) {
+	reply, err := f.askWithLive(ctx, nodeID, wait, build, live)
+	if err != nil {
+		return nil, err
+	}
+	if result := reply.GetCommandResult(); result != nil {
+		return result, nil
+	}
+	return nil, errLinkLost
+}
+
+func requestOfflineError(frame *agentv1.ConnectResponse) error {
+	if frame != nil && (frame.GetUpdateAgent() != nil || frame.GetRollbackAgent() != nil) {
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	return errNodeOffline
+}
+
+func requestCapability(frame *agentv1.ConnectResponse) (capability, message string) {
+	switch {
+	case frame == nil:
+		return "", ""
+	case frame.GetRunDoctor() != nil, frame.GetApplyFix() != nil:
+		return capDoctor, "agent too old"
+	case frame.GetUpdateAgent() != nil, frame.GetRollbackAgent() != nil:
+		return capUpdate, "node cannot update itself"
+	case frame.GetMeasureBandwidth() != nil:
+		return capBandwidth, "agent too old"
+	case frame.GetPrepareAwgKernel() != nil:
+		return capAwgPrepare, "agent too old"
+	case frame.GetUdpCount() != nil, frame.GetUdpSend() != nil:
+		return capUDPCheck, "agent too old"
+	default:
+		return "", ""
+	}
+}
+
+func (f *Fleet) readyForRequest(ctx context.Context, nodeID string, frame *agentv1.ConnectResponse, knownLive *store.NodeLiveRow) (store.NodeLiveRow, error) {
+	var live store.NodeLiveRow
+	if knownLive != nil {
+		live = *knownLive
+	} else {
+		var err error
+		live, err = f.liveRowsForNode(ctx, nodeID, false)
+		if err != nil {
+			return store.NodeLiveRow{}, internalErr(f.log.Error, "read node live projection", err)
+		}
+	}
+	if !live.Connected {
+		return live, requestOfflineError(frame)
+	}
+	if capability, message := requestCapability(frame); capability != "" && !slices.Contains(live.AgentCaps, capability) {
+		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
+	}
+	return live, nil
+}
+
+func remoteTimedOut(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ce *connect.Error
+	return errors.As(err, &ce) && ce.Code() == connect.CodeDeadlineExceeded
+}
+
+func (s *session) deliverReply(id string, reply *agentv1.ConnectRequest) {
 	s.waitMu.Lock()
-	ch := s.cmds[r.RequestId]
+	ch := s.replies[id]
 	s.waitMu.Unlock()
 	if ch != nil {
 		select {
-		case ch <- r:
+		case ch <- reply:
 		default:
 		}
 	}

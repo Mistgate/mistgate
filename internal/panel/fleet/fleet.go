@@ -18,6 +18,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
@@ -38,6 +39,14 @@ const (
 	blipWindow               = 10 * time.Minute // stream lost for less than this is a "blip", not an outage
 )
 
+// Remote sends requests through the edge edition's external node link. Ask receives an absolute deadline so a queued
+// request can be refused before it reaches the session core. A request that got no answer is (nil, nil) or an error
+// that is context.DeadlineExceeded or carries connect.CodeDeadlineExceeded ("no answer"); any other error is "link lost".
+type Remote interface {
+	Ask(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) (*agentv1.ConnectRequest, error)
+	Close(ctx context.Context, nodeID, reason string) error
+}
+
 // Config configures Fleet.
 type Config struct {
 	// AgentSNI is the secret server name of the agent endpoint (e.g. "q3m8x2kd7w.invalid"). Required.
@@ -46,6 +55,8 @@ type Config struct {
 	PanelAddr string
 	// LinkServed reports whether the signed WebSocket agent link is mounted on the public listener.
 	LinkServed bool
+	// Remote sends admin requests through the edge edition's node link. Nil uses the VPS stream adapter.
+	Remote Remote
 	// ExpectedAgentVersion is the newest agent version this panel ships (ListNodes marks older agents).
 	ExpectedAgentVersion string
 	// Debounce is the StateChanged coalescing window. Default 200 ms.
@@ -299,6 +310,18 @@ func (f *Fleet) session(nodeID string) *session {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.sessions[nodeID]
+}
+
+func (f *Fleet) drop(ctx context.Context, nodeID, reason string) {
+	if f.cfg.Remote != nil {
+		if err := f.cfg.Remote.Close(ctx, nodeID, reason); err != nil {
+			f.log.Warn("close remote node link", "node", nodeID, "err", err)
+		}
+		return
+	}
+	if s := f.session(nodeID); s != nil {
+		s.cancel(connect.NewError(connect.CodeAborted, errors.New(reason)))
+	}
 }
 
 func (f *Fleet) closeAll() {

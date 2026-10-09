@@ -920,6 +920,27 @@ func TestLivenessIsJudgedByReceivedMessages(t *testing.T) {
 	}
 }
 
+// RetireNode revokes the certificate before it tells the agent: a certificate re-check that is due at that moment must not
+// close the stream before the Retire frame is queued.
+func TestRetireWhenCertRecheckIsDue(t *testing.T) {
+	e := newEnv(t)
+	e.f.certCheck = 40 * time.Millisecond
+	a := e.enroll("nodea")
+	c := a.open()
+	c.send(0, hello("i", 0, ""))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
+	time.Sleep(150 * time.Millisecond) // the re-check is now due
+	resp, err := nodeService{e.f}.RetireNode(e.ctx, connect.NewRequest(&adminv1.RetireNodeRequest{NodeId: a.nodeID, ConfirmName: "nodea"}))
+	if err != nil || !resp.Msg.AgentNotified {
+		t.Fatalf("RetireNode: %v %+v", err, resp)
+	}
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetRetire() != nil })
+	c.st.CloseRequest()
+	if err := c.ended(); err == nil {
+		t.Fatal("stream remained open after the agent disconnected")
+	}
+}
+
 func TestRetire(t *testing.T) {
 	e := newEnv(t)
 	e.run()
@@ -942,10 +963,16 @@ func TestRetire(t *testing.T) {
 		done <- result{r, err}
 	}()
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetRetire() != nil })
-	c.st.CloseRequest() // the agent exits
 	r := <-done
 	if r.err != nil || !r.resp.Msg.AgentNotified {
 		t.Fatalf("RetireNode: %v %+v", r.err, r.resp)
+	}
+	if e.f.session(a.nodeID) == nil {
+		t.Fatal("RetireNode waited for the session to close")
+	}
+	c.st.CloseRequest() // the agent exits
+	if err := c.ended(); err == nil {
+		t.Fatal("stream remained open after the agent disconnected")
 	}
 
 	n, _ := e.st.Node(e.ctx, a.nodeID)

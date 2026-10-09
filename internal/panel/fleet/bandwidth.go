@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -28,21 +27,7 @@ const maxBandwidthMbps = 1_000_000
 // measureBandwidth asks the node's live stream for one measurement. The errors are the admin API's (offline, too old, link
 // lost, no answer); what the node itself answered (busy, nothing reachable) is in the response's error_code.
 func (f *Fleet) measureBandwidth(ctx context.Context, n store.NodeRow) (*adminv1.MeasureBandwidthResponse, error) {
-	live, err := f.liveRowsForNode(ctx, n.ID, false)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "read node live projection", err)
-	}
-	if !live.Connected {
-		return nil, errNodeOffline
-	}
-	sess := f.session(n.ID)
-	if sess == nil {
-		return nil, errNodeOffline
-	}
-	if !slices.Contains(live.AgentCaps, capBandwidth) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
-	}
-	res, err := sess.roundtrip(ctx, f.measureWait, func(reqID string) *agentv1.ConnectResponse {
+	res, err := f.command(ctx, n.ID, f.measureWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_MeasureBandwidth{MeasureBandwidth: &agentv1.MeasureBandwidth{RequestId: reqID}}}
 	})
 	if err != nil {

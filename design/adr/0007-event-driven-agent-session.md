@@ -1,6 +1,6 @@
 # 0007. The agent session is an event-driven core; on the edge a hibernating Durable Object drives it
 
-Status: accepted, 2026-10-06.
+Status: accepted, 2026-10-06; amended for step 4c, 2026-10-09.
 
 ## Context
 
@@ -28,7 +28,9 @@ against 0.4 million included in Workers Paid.
 - Store calls run inline in the core, including on the edge where D1 is available. The core writes the admin live view
   to the `node_live` projection inline with stats processing; readers use that row, with no in-memory sidecar or
   adapter-published view. Effects are reserved for work that differs by edition: delivering results to waiters,
-  Cloudflare calls, and the cross-module usage callback. Desired-state
+  Cloudflare calls, and the cross-module usage callback. Request results use one `EffectReply` containing the request id
+  and the full agent `ConnectRequest` frame; a nil reply removes the waiter. The VPS adapter uses one reply-waiter map
+  for commands and doctor reports. Desired-state
   reads use a single in-flight preparation with a dirty bit: the effect starts its own session preparation, while
   `stepDesired` (the one caller that creates the desired-state-changed event) runs the first reconcile round's read inline
   instead of through the effect.
@@ -41,6 +43,11 @@ against 0.4 million included in Workers Paid.
 - Edge: a `NodeLink` DO per node (`idFromName(node_id)`) accepts the WebSocket with the hibernation API, does the
   signed handshake through the same Go code, keeps the small session state in the socket attachment or DO storage,
   calls the core per event, and turns "next alarm" into a DO alarm. Admin changes reach it as a call from the Worker.
+- Admin requests are allowlisted by their `ConnectResponse` frame type and refused before Hello. `Fleet.ask` checks the
+  `node_live` projection and `node.agent_caps`, then uses either the VPS session or `Config.Remote`. The remote ask takes
+  an absolute deadline; a nil reply or timeout is "no answer", while another link error is "link lost". Retire sends
+  its frame, replies immediately, and closes the session at its five-second alarm. Re-enrol drops the active link;
+  remote close failures are logged without undoing the completed re-enrolment. Edge log streaming is Unimplemented.
 - Session data that must outlive a connection stays where it is today (D1: `last_seq`, applied revision, certificates, and the `node_sent` digest).
   The DO-side SQLite stats buffer from the original plan is deferred: one D1 write set per batch is well within the
   included D1 writes for a small fleet; revisit if D1 latency or cost says so (phase 4).

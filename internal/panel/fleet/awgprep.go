@@ -87,11 +87,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	if !live.Connected {
 		return nil, errNodeOffline
 	}
-	sess := f.session(n.ID)
-	if sess == nil {
-		return nil, errNodeOffline
-	}
-	if !slices.Contains(live.AgentCaps, capAwgPrepare) {
+	if !slices.Contains(live.AgentCaps, capAwgPrepare) { // before the wish is recorded: an old agent leaves no trace
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	confirm := req.Msg.Confirm
@@ -112,10 +108,10 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 			return nil, internalErr(f.log.Error, "prepare awg kernel", err)
 		}
 	}
-	res, err := sess.roundtrip(ctx, time.Duration(n.ApplyTimeoutS)*f.unit, func(reqID string) *agentv1.ConnectResponse {
+	res, err := f.commandWithLive(ctx, n.ID, time.Duration(n.ApplyTimeoutS)*f.unit, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_PrepareAwgKernel{
 			PrepareAwgKernel: &agentv1.PrepareAwgKernel{RequestId: reqID, DryRun: !confirm}}}
-	})
+	}, &live)
 	if err == nil && !res.Ok {
 		f.log.Warn("agent failed to prepare the awg kernel module", "node", n.ID, "error", res.Error)
 		err = connect.NewError(connect.CodeInternal, errors.New("the agent could not prepare: "+clip(res.Error, 200)))

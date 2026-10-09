@@ -86,6 +86,7 @@ type Config struct {
 	HealthBlipWindow   time.Duration
 	BackgroundStarters []BackgroundJob
 	AfterResponse      access.AfterResponseRunner
+	Remote             fleet.Remote
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.
@@ -152,6 +153,7 @@ func Build(c Config) (*Panel, error) {
 	fl, err := fleet.New(st, vlt, reg, fleet.Config{
 		AgentSNI:             in.AgentSNI,
 		LinkServed:           in.LinkPrefix != "",
+		Remote:               c.Remote,
 		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,

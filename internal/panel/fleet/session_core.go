@@ -37,6 +37,7 @@ type SessionState struct {
 	// LivenessDeadline keeps Go's monotonic reading on the VPS: a wall-clock step cannot close a live session.
 	LivenessDeadline      time.Time                 `json:"d,omitzero"`
 	AutoBandwidthDeadline time.Time                 `json:"b,omitzero"`
+	RetireAt              time.Time                 `json:"rt,omitzero"`
 	NextAckTick           time.Time                 `json:"a,omitzero"`
 	NextCertCheck         time.Time                 `json:"x,omitzero"`
 	AckPending            uint64                    `json:"p,omitempty"`
@@ -85,6 +86,7 @@ const (
 	PendingDoctor
 	PendingLog
 	PendingAutoBandwidth
+	PendingRetire
 )
 
 // EventKind identifies one input that the session core can process.
@@ -109,7 +111,6 @@ type AdminRequest struct {
 	RequestID string
 	Deadline  time.Time
 	Frame     *agentv1.ConnectResponse
-	Kind      PendingRequestKind
 }
 
 // SessionEvent is a timestamped input to SessionCore.Step.
@@ -127,8 +128,7 @@ type EffectKind uint8
 
 const (
 	EffectUsage EffectKind = iota + 1
-	EffectCommandResult
-	EffectDoctorReport
+	EffectReply
 	EffectLogChunk
 	EffectWarpAttention
 	EffectPrepareDesired
@@ -137,16 +137,15 @@ const (
 
 // SessionEffect asks the adapter to perform work requested by a core transition.
 type SessionEffect struct {
-	Kind          EffectKind
-	RequestID     string
-	PreviousNode  *store.NodeRow
-	BootAt        time.Time
-	At            time.Time
-	CommandResult *agentv1.CommandResult
-	DoctorReport  *agentv1.DoctorReport
-	LogChunk      *agentv1.LogChunk
-	Users         []string
-	WarpReason    string
+	Kind         EffectKind
+	RequestID    string
+	Reply        *agentv1.ConnectRequest
+	PreviousNode *store.NodeRow
+	BootAt       time.Time
+	At           time.Time
+	LogChunk     *agentv1.LogChunk
+	Users        []string
+	WarpReason   string
 }
 
 // CloseClass identifies why a session should terminate.
@@ -212,7 +211,9 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, event Sessi
 	if tr.state.Disconnected {
 		return tr.Transition, nil
 	}
-	if event.Kind != EventOpen && event.Kind != EventDisconnected && event.Kind != EventOwnerSuperseded && deadlineDue(tr.state.NextCertCheck, event.At) {
+	// Retire revokes the certificate first: a due re-check must not swallow the frame that tells the agent to clean up.
+	retire := event.Kind == EventAdminCommand && event.Request != nil && requestKind(event.Request.Frame) == PendingRetire
+	if event.Kind != EventOpen && event.Kind != EventDisconnected && event.Kind != EventOwnerSuperseded && !retire && deadlineDue(tr.state.NextCertCheck, event.At) {
 		cert := peerCert{serial: tr.state.PeerCertSerial, notAfter: tr.state.PeerCertNotAfter}
 		if err := c.f.recheckCertAt(ctx, cert, event.At); err != nil {
 			tr.Close = &SessionClose{Class: CloseUnauthenticated, Reason: err.Error()}
@@ -242,9 +243,9 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, event Sessi
 			return tr.Transition, err
 		}
 	case EventAdminCommand:
-		c.request(&tr, event.Request, event.At, PendingCommand)
+		c.request(&tr, event.Request, event.At)
 	case EventLogStart:
-		c.request(&tr, event.Request, event.At, PendingLog)
+		c.request(&tr, event.Request, event.At)
 	case EventLogCancel:
 		id := ""
 		if event.Request != nil {
@@ -263,6 +264,7 @@ func (c *SessionCore) Step(ctx context.Context, state *SessionState, event Sessi
 		tr.state.Disconnected = true
 		tr.state.Pending = nil
 		tr.state.AutoBandwidthDeadline = time.Time{}
+		tr.state.RetireAt = time.Time{}
 	case EventOwnerSuperseded:
 		tr.Close = &SessionClose{Class: CloseConflict, Reason: "superseded by a newer stream"}
 	default:
@@ -328,23 +330,55 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	return nil
 }
 
-func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time.Time, fallback PendingRequestKind) {
-	if request == nil || request.RequestID == "" || request.Frame == nil {
+func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
+	if frame == nil {
+		return 0
+	}
+	switch {
+	case frame.GetRunDoctor() != nil:
+		return PendingDoctor
+	case frame.GetLogRequest() != nil:
+		return PendingLog
+	case frame.GetRestartInbound() != nil,
+		frame.GetApplyFix() != nil,
+		frame.GetUpdateAgent() != nil,
+		frame.GetRollbackAgent() != nil,
+		frame.GetMeasureBandwidth() != nil,
+		frame.GetPrepareAwgKernel() != nil,
+		frame.GetUdpCount() != nil,
+		frame.GetUdpSend() != nil:
+		return PendingCommand
+	case frame.GetRetire() != nil:
+		return PendingRetire
+	default:
+		return 0
+	}
+}
+
+func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time.Time) {
+	if request == nil || request.RequestID == "" {
 		return
 	}
-	kind := request.Kind
-	if kind == 0 {
-		kind = fallback
+	kind := requestKind(request.Frame)
+	if kind == 0 || tr.state.InstanceID == "" {
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: request.RequestID})
+		return
 	}
 	deadline := request.Deadline
 	if deadline.IsZero() {
 		deadline = at
 	}
-	if tr.state.Pending == nil {
-		tr.state.Pending = map[string]PendingRequest{}
+	if kind != PendingRetire {
+		if tr.state.Pending == nil {
+			tr.state.Pending = map[string]PendingRequest{}
+		}
+		tr.state.Pending[request.RequestID] = PendingRequest{Kind: kind, Deadline: deadline}
 	}
-	tr.state.Pending[request.RequestID] = PendingRequest{Kind: kind, Deadline: deadline}
 	tr.Frames = append(tr.Frames, request.Frame)
+	if kind == PendingRetire {
+		tr.state.RetireAt = at.Add(5 * time.Second)
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: request.RequestID})
+	}
 }
 
 func deletePending(state *SessionState, id string) {
@@ -389,7 +423,7 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 			return
 		}
 		deletePending(tr.state, r.RequestId)
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectCommandResult, RequestID: r.RequestId, CommandResult: r})
+		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: r.RequestId, Reply: event.Frame})
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
 		pending, ok := tr.state.Pending[chunk.RequestId]
@@ -409,8 +443,8 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 				return
 			}
 			deletePending(tr.state, r.RequestId)
+			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: r.RequestId, Reply: event.Frame})
 		}
-		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectDoctorReport, RequestID: r.RequestId, DoctorReport: r})
 	}
 }
 
@@ -965,6 +999,10 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 		tr.Close = &SessionClose{Class: CloseDeadline, Reason: "no Hello"}
 		return nil
 	}
+	if deadlineDue(tr.state.RetireAt, now) {
+		tr.Close = &SessionClose{Class: CloseFailedPrecondition, Reason: "node retired"}
+		return nil
+	}
 	if deadlineDue(tr.state.AutoBandwidthDeadline, now) {
 		const requestID = "auto-bandwidth"
 		tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_MeasureBandwidth{MeasureBandwidth: &agentv1.MeasureBandwidth{RequestId: requestID}}})
@@ -977,11 +1015,18 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 	if deadlineDue(tr.state.NextAckTick, now) {
 		flushCoreAck(tr, now)
 	}
-	for id, req := range tr.state.Pending {
+	pendingIDs := make([]string, 0, len(tr.state.Pending))
+	for id := range tr.state.Pending {
+		pendingIDs = append(pendingIDs, id)
+	}
+	slices.Sort(pendingIDs)
+	for _, id := range pendingIDs {
+		req := tr.state.Pending[id]
 		if deadlineDue(req.Deadline, now) {
 			if req.Kind == PendingAutoBandwidth {
 				c.f.log.Info("first bandwidth measurement did not work", "node", tr.state.NodeID, "code", "timeout")
 			}
+			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: id})
 			deletePending(tr.state, id)
 		}
 	}
@@ -1024,7 +1069,7 @@ func nextSessionAlarm(state SessionState, now time.Time) *time.Time {
 			delay, found = wait, true
 		}
 	}
-	for _, deadline := range []time.Time{state.HelloDeadline, state.AutoBandwidthDeadline,
+	for _, deadline := range []time.Time{state.HelloDeadline, state.AutoBandwidthDeadline, state.RetireAt,
 		state.NextAckTick, state.PrepareRetryAt} {
 		if !deadline.IsZero() {
 			add(deadline)

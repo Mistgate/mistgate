@@ -158,11 +158,15 @@ func TestCommandSessionLiveReadErrorsAreInternal(t *testing.T) {
 		call func(*Fleet, context.Context, string) error
 	}{
 		{name: "update", call: func(f *Fleet, ctx context.Context, id string) error {
-			_, err := f.updateSession(ctx, id)
+			_, err := f.command(ctx, id, time.Millisecond, func(reqID string) *agentv1.ConnectResponse {
+				return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: reqID}}}
+			})
 			return err
 		}},
 		{name: "doctor", call: func(f *Fleet, ctx context.Context, id string) error {
-			_, err := f.doctorSession(ctx, id)
+			_, err := f.ask(ctx, id, time.Millisecond, func(reqID string) *agentv1.ConnectResponse {
+				return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: reqID}}}
+			})
 			return err
 		}},
 	} {

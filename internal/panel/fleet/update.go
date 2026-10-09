@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strconv"
 	"time"
 
@@ -69,35 +68,11 @@ func (a agentService) FetchUpdate(ctx context.Context, req *connect.Request[agen
 	})
 }
 
-// updateSession returns the node's stream if it can update itself, else the error the admin API answers. Nothing is
-// ever sent to a node that did not list "update/1".
-func (f *Fleet) updateSession(ctx context.Context, nodeID string) (*session, error) {
-	live, err := f.liveRowsForNode(ctx, nodeID, false)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "read node live projection", err)
-	}
-	if !live.Connected {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
-	}
-	if !slices.Contains(live.AgentCaps, capUpdate) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node cannot update itself"))
-	}
-	s := f.session(nodeID)
-	if s == nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
-	}
-	return s, nil
-}
-
 // UpdateAgent sends a signed manifest to a connected node with the update capability and waits up to wait for the
 // CommandResult (the download is part of it). The agent answers before it re-executes; a stream that drops right
 // after the answer still delivers it.
 func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error) {
-	s, err := f.updateSession(ctx, nodeID)
-	if err != nil {
-		return nil, err
-	}
-	return s.roundtrip(ctx, wait, func(reqID string) *agentv1.ConnectResponse {
+	return f.command(ctx, nodeID, wait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{
 			UpdateAgent: &agentv1.UpdateAgent{RequestId: reqID, Manifest: manifest, Signature: signature}}}
 	})
@@ -105,11 +80,7 @@ func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signat
 
 // RollbackAgent asks a connected node with the update capability to put its previous binary back.
 func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error) {
-	s, err := f.updateSession(ctx, nodeID)
-	if err != nil {
-		return nil, err
-	}
-	return s.roundtrip(ctx, wait, func(reqID string) *agentv1.ConnectResponse {
+	return f.command(ctx, nodeID, wait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RollbackAgent{
 			RollbackAgent: &agentv1.RollbackAgent{RequestId: reqID}}}
 	})

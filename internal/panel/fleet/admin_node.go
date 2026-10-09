@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -757,11 +758,7 @@ func (s nodeService) RestartInbounds(ctx context.Context, req *connect.Request[a
 			return nil, connect.NewError(connect.CodeNotFound, errors.New("inbound not found on this node"))
 		}
 	}
-	sess := f.session(n.ID)
-	if sess == nil {
-		return nil, errNodeOffline
-	}
-	res, err := sess.roundtrip(ctx, time.Duration(n.ApplyTimeoutS)*f.unit, func(reqID string) *agentv1.ConnectResponse {
+	res, err := f.command(ctx, n.ID, time.Duration(n.ApplyTimeoutS)*f.unit, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RestartInbound{
 			RestartInbound: &agentv1.RestartInbound{RequestId: reqID, InboundId: req.Msg.InboundId}}}
 	})
@@ -794,33 +791,55 @@ func (s nodeService) RetireNode(ctx context.Context, req *connect.Request[adminv
 	if req.Msg.ConfirmName != n.Name {
 		return nil, invalid("confirm_name does not match the node name")
 	}
+	live, err := f.liveRowsForNode(ctx, n.ID, false)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node live projection", err)
+	}
 	switch err := f.st.RetireNode(ctx, n.ID, f.now().UTC()); {
 	case errors.Is(err, store.ErrNodeRetired):
 		return nil, errNodeRetired
 	case err != nil:
 		return nil, internalErr(f.log.Error, "retire node", err)
 	}
-	notified := false
-	if sess := f.session(n.ID); sess != nil {
-		notified = sess.enqueue(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Retire{
-			Retire: &agentv1.Retire{RequestId: store.NewID("req_")}}})
-		if notified {
-			// The agent exits on Retire and closes the stream; give it a moment, then cut the stream.
-			select {
-			case <-sess.done:
-			case <-time.After(5 * time.Second):
-			case <-ctx.Done():
-			}
-		}
-		sess.cancel(connect.NewError(connect.CodeCanceled, errors.New("node retired")))
-	}
+	notified := f.notifyRetire(ctx, n.ID, live)
 	f.event(ctx, 1, "node_retired", n.ID, map[string]string{"actor": f.cfg.Actor(ctx)})
 	f.audit(ctx, "node.retire", map[string]string{"node_id": n.ID, "name": n.Name})
 	return connect.NewResponse(&adminv1.RetireNodeResponse{AgentNotified: notified}), nil
 }
 
+// notifyRetire sends Retire; the core closes the session five seconds later. On the edge the core answers nil both when
+// it queued the frame and when it refused it, so AgentNotified there means "the link took the request".
+func (f *Fleet) notifyRetire(ctx context.Context, nodeID string, live store.NodeLiveRow) bool {
+	requestAt := f.now()
+	requestID := store.NewID("req_")
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Retire{
+		Retire: &agentv1.Retire{RequestId: requestID}}}
+	if f.cfg.Remote != nil {
+		if !live.Connected {
+			return false
+		}
+		_, err := f.cfg.Remote.Ask(ctx, nodeID, requestID, frame, requestAt.Add(5*time.Second))
+		return err == nil
+	}
+	sess := f.session(nodeID) // a live stream is told even when the projection already says offline
+	if sess == nil {
+		return false
+	}
+	tr, err := sess.stepCore(ctx, SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
+		RequestID: requestID, Deadline: requestAt.Add(5 * time.Second), Frame: frame,
+	}})
+	if err == nil && tr.Close == nil && slices.ContainsFunc(tr.Frames, func(m *agentv1.ConnectResponse) bool { return m.GetRetire() != nil }) {
+		return true
+	}
+	sess.cancel(connect.NewError(connect.CodeCanceled, errors.New("node retired"))) // not told: the stream still goes
+	return false
+}
+
 func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv1.StreamLogsRequest], stream *connect.ServerStream[adminv1.StreamLogsResponse]) error {
 	f := s.f
+	if f.cfg.Remote != nil {
+		return connect.NewError(connect.CodeUnimplemented, errors.New("log streaming is not available in this edition yet"))
+	}
 	m := req.Msg
 	n, err := f.st.Node(ctx, m.NodeId)
 	if errors.Is(err, store.ErrNotFound) {
@@ -856,7 +875,7 @@ func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv
 	}()
 	requestAt := f.now()
 	tr, err := sess.stepCore(ctx, SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
-		RequestID: reqID, Deadline: requestAt.Add(wait), Kind: PendingLog,
+		RequestID: reqID, Deadline: requestAt.Add(wait),
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{
 			RequestId: reqID, Sources: m.Sources, TailLines: tail, Follow: m.Follow, FollowMaxSeconds: followMax,
 			MinLevel: agentv1.Severity(m.MinLevel)}}},

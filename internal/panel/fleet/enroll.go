@@ -96,9 +96,7 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 	if !res.Replay {
 		f.event(ctx, 1, "node_enrolled", res.NodeID, map[string]string{"agent_version": m.AgentVersion})
 		// Re-enrollment revoked the older certificates: a stream that still runs on one of them must go.
-		if old := f.session(res.NodeID); old != nil {
-			old.cancel(connect.NewError(connect.CodeAborted, errors.New("node re-enrolled")))
-		}
+		f.drop(ctx, res.NodeID, "node re-enrolled")
 	}
 	return connect.NewResponse(&agentv1.EnrollResponse{
 		NodeId:           res.NodeID,

@@ -1,7 +1,7 @@
 # Edge edition: the agent link and the session core (phase 1, step 6b-3)
 
-Status (2026-10-08): steps 1a, 1b, 2 and 3 and their review follow-up are merged; steps 4a and 4b are implemented in this
-worktree. Steps 4c-6 are designed below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
+Status (2026-10-09): steps 1a, 1b, 2, 3 and their review follow-up, 4a, 4b and 4c are merged. Steps 5-6 are designed
+below, not implemented. Read with [`README.md`](README.md) (the edition plan) and
 [ADR 0007](../adr/0007-event-driven-agent-session.md) (the event-driven session core).
 
 ## 1. Design in one paragraph
@@ -68,9 +68,9 @@ timer would keep all of them awake. A second slim wasm would double the build an
 | 2 | NodeLink Durable Object, PanelLink loopback, shared handshake (`LinkChallenge`/`linkAccept`), marker routing | merged |
 | 3 | Agent store paths as atomic batches, safe on D1 (stats 2 D1 calls, event 1, Hello 1) | merged |
 | — | Review follow-up: delta base also checks the hash; IngestStats write batch with a fixed statement count; state round-trip test over every field; duplicate SQL | merged |
-| 4a | Write the `node_live` projection (sidecar kept, compared by a test) | implemented (2026-10-08) |
-| 4b | Every reader on the projection; delete `SessionSidecar` | implemented in this worktree (2026-10-08) |
-| 4c | `ask`/`retire`/`drop` seam, `Config.Remote`, remove `SessionState.Capabilities` | designed (§4) |
+| 4a | Write the `node_live` projection (sidecar kept, compared by a test) | merged (2026-10-08) |
+| 4b | Every reader on the projection; delete `SessionSidecar` | merged (`c44e0b3`, 2026-10-08) |
+| 4c | `ask`/`retire`/`drop` seam, `Config.Remote` | merged (2026-10-09) |
 | 5 | Stateless edge driver `(*Fleet).Link(ctx, LinkIn) LinkOut`; link-only agents (Enroll under the link prefix, renew over the link); Go DO emulator test with the real agent | planned |
 | 6 | Wire up on Cloudflare (ops, cron, `scheduled()`, `Remote` callback), local end-to-end run with a real agent, measurements, ADR amendments | planned |
 
@@ -180,13 +180,19 @@ user and is unbounded. `buildFleetLive` leaves the previous row in place when `l
 - **Fleet.** `Fleet.ask(ctx, nodeID, wait, build)` and `command(...)`:
   - VPS: the live session, with one `replies` map instead of `cmds` and `docs`. A reply that arrived just before a
     drop still counts.
-  - Edge: `Config.Remote.Ask(ctx, nodeID, requestID, frame, deadline)` and `Close(ctx, nodeID, reason)`. nil and a
-    remote timeout map to "no answer", anything else to "link lost". The JavaScript side comes in step 6.
+  - Edge: `Config.Remote.Ask(ctx, nodeID, requestID, frame, deadline)` returns the agent's whole
+    `ConnectRequest` reply and an error; `Close(ctx, nodeID, reason)` returns an error. The deadline is absolute. A nil
+    reply or a `context`/Connect deadline error maps to "no answer"; any other remote error maps to "link lost" (the
+    step 6 adapter turns NodeLink's `timeout` into `context.DeadlineExceeded`; error text is never matched). On the edge
+    the core answers nil both when it queues Retire and when it refuses it, so `AgentNotified` there means "the link
+    took the request". The JavaScript side comes in step 6.
   - The offline and "agent too old" checks read the projection in both editions, with the same error texts.
 - **Re-enrol** calls `f.drop(ctx, id, reason)`: on the VPS it cancels the session; on the edge it calls `Remote.Close`.
+  A remote close error is logged and does not undo the completed re-enrolment.
 - **Logs.** `StreamLogs` with `Remote != nil` answers Unimplemented.
 - **Capabilities.** `session.caps` is gone. Capability checks read `node.agent_caps`; `SessionState.Capabilities`
-  remains until the 4c seam removes it.
+  was removed in 4b. The request-kind allowlist above was checked against every production admin request builder,
+  including the UDP count/send requests; session control frames are not admin requests.
 
 ### 4.6 Sidecar removal
 

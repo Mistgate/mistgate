@@ -23,6 +23,7 @@ import (
 	"github.com/mistgate/mistgate/internal/statehash"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func coreFixture(t *testing.T, name string) (*env, *SessionCore, context.Context, SessionState, time.Time) {
@@ -208,7 +209,7 @@ func newTestSession(e *env, parent context.Context, core *SessionCore, state Ses
 	}
 	return &session{f: e.f, nodeID: state.NodeID, owner: state.OwnerGeneration,
 		ctx: ctx, cancel: cancel, done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
-		cmds: map[string]chan *agentv1.CommandResult{}, docs: map[string]chan *agentv1.DoctorReport{}, logs: map[string]*logSub{},
+		replies: map[string]chan *agentv1.ConnectRequest{}, logs: map[string]*logSub{},
 		core: core, coreState: state, alarmTimer: timer}
 }
 
@@ -537,18 +538,18 @@ func TestSessionCoreRehydratesStateBetweenEvents(t *testing.T) {
 	commandResult := &agentv1.CommandResult{RequestId: "admin-command", Ok: true}
 	commandDone, _ := run("admin command result", SessionEvent{Kind: EventAgentFrame, At: commandAt.Add(time.Second),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: commandResult}}}, false)
-	if !hasEffect(commandDone, EffectCommandResult) {
+	if !hasEffect(commandDone, EffectReply) {
 		t.Fatalf("admin command result was not routed: %+v", commandDone.Effects)
 	}
 
 	requestAt := base.Add(166 * time.Second)
 	requestDeadline := base.Add(170 * time.Second)
 	run("doctor request", SessionEvent{Kind: EventAdminCommand, At: requestAt, Request: &AdminRequest{
-		RequestID: "doctor", Deadline: requestDeadline, Kind: PendingDoctor,
+		RequestID: "doctor", Deadline: requestDeadline,
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: "doctor"}}},
 	}}, false)
 	run("log request", SessionEvent{Kind: EventLogStart, At: requestAt, Request: &AdminRequest{
-		RequestID: "log", Deadline: requestDeadline, Kind: PendingLog,
+		RequestID: "log", Deadline: requestDeadline,
 		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "log"}}},
 	}}, false)
 	wrongKind, _ := run("doctor ignores command result", SessionEvent{Kind: EventAgentFrame, At: requestAt.Add(time.Second),
@@ -1769,16 +1770,28 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 		t.Fatalf("command transition = state %+v frames %#v", tr.State, tr.Frames)
 	}
 	result := &agentv1.CommandResult{RequestId: "req-command", Ok: true}
-	beforeClose, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
-		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
+	replyFrame := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}
+	beforeClose, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: replyFrame})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !hasEffect(beforeClose, EffectCommandResult) || beforeClose.Effects[0].RequestID != "req-command" {
+	if !hasEffect(beforeClose, EffectReply) || beforeClose.Effects[0].RequestID != "req-command" || beforeClose.Effects[0].Reply != replyFrame {
 		t.Fatalf("command result effects = %+v", beforeClose.Effects)
 	}
 	if len(beforeClose.State.Pending) != 0 {
 		t.Fatalf("command result left a pending request: %+v", beforeClose.State.Pending)
+	}
+	doctorRequest := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: "req-doctor"}}}
+	doctorStart, err := coreStep(ctx, core, beforeClose.State, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+		RequestID: "req-doctor", Deadline: now.Add(time.Minute), Frame: doctorRequest,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doctorReply := &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_DoctorReport{DoctorReport: &agentv1.DoctorReport{RequestId: "req-doctor"}}}
+	doctorDone, err := coreStep(ctx, core, doctorStart.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second), Frame: doctorReply})
+	if err != nil || len(doctorDone.Effects) != 1 || doctorDone.Effects[0].Kind != EffectReply || doctorDone.Effects[0].Reply != doctorReply {
+		t.Fatalf("doctor reply effect = %+v, err %v", doctorDone.Effects, err)
 	}
 	disconnected, err := coreStep(ctx, core, beforeClose.State, SessionEvent{Kind: EventDisconnected, At: now.Add(2 * time.Second)})
 	if err != nil || len(disconnected.State.Pending) != 0 {
@@ -1786,7 +1799,7 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	}
 	duplicate, err := coreStep(ctx, core, disconnected.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second),
 		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
-	if err != nil || hasEffect(duplicate, EffectCommandResult) {
+	if err != nil || hasEffect(duplicate, EffectReply) {
 		t.Fatalf("disconnected session emitted a second command result: %+v, err %v", duplicate.Effects, err)
 	}
 	logFrame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "req-log"}}}
@@ -1820,6 +1833,103 @@ func TestSessionCoreCommandLogsAndSupersede(t *testing.T) {
 	}
 }
 
+// A new ConnectResponse message must be either an allowlisted admin request or a frame only the panel itself sends.
+func TestSessionCoreAllowlistCoversEveryFrame(t *testing.T) {
+	notRequests := map[protoreflect.Name]bool{"hello_ack": true, "ack": true, "desired_state": true, "kick": true, "log_cancel": true, "ping": true}
+	fields := (&agentv1.ConnectResponse{}).ProtoReflect().Descriptor().Oneofs().ByName("message").Fields()
+	for i := range fields.Len() {
+		fd := fields.Get(i)
+		frame := (&agentv1.ConnectResponse{}).ProtoReflect()
+		frame.Set(fd, frame.NewField(fd))
+		allowed := requestKind(frame.Interface().(*agentv1.ConnectResponse)) != 0
+		if allowed == notRequests[fd.Name()] {
+			t.Errorf("%s: allowlisted %v, listed as not a request %v; it must be exactly one", fd.Name(), allowed, notRequests[fd.Name()])
+		}
+	}
+}
+
+func TestSessionCoreRequestKindsComeFromAllowlistedFrames(t *testing.T) {
+	_, core, ctx, state, now := coreFixture(t, "core-request-allowlist")
+	beforeHello, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+		RequestID: "req-before-hello", Deadline: now.Add(time.Minute),
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "req-before-hello"}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beforeHello.Frames) != 0 || len(beforeHello.State.Pending) != 0 || len(beforeHello.Effects) != 1 || beforeHello.Effects[0].Kind != EffectReply || beforeHello.Effects[0].RequestID != "req-before-hello" || beforeHello.Effects[0].Reply != nil {
+		t.Fatalf("request before Hello was not refused with a nil reply: %+v", beforeHello)
+	}
+
+	tr := stepHello(t, core, ctx, beforeHello.State, now, hello("instance-allowlist", 0, "").GetHello())
+	state = tr.State
+	cases := []struct {
+		id   string
+		kind EventKind
+		want PendingRequestKind
+		msg  *agentv1.ConnectResponse
+	}{
+		{"doctor", EventAdminCommand, PendingDoctor, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RunDoctor{RunDoctor: &agentv1.RunDoctor{RequestId: "doctor"}}}},
+		{"log", EventLogStart, PendingLog, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "log"}}}},
+		{"restart", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RestartInbound{RestartInbound: &agentv1.RestartInbound{RequestId: "restart"}}}},
+		{"fix", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_ApplyFix{ApplyFix: &agentv1.ApplyFix{RequestId: "fix"}}}},
+		{"update", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "update"}}}},
+		{"rollback", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RollbackAgent{RollbackAgent: &agentv1.RollbackAgent{RequestId: "rollback"}}}},
+		{"bandwidth", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_MeasureBandwidth{MeasureBandwidth: &agentv1.MeasureBandwidth{RequestId: "bandwidth"}}}},
+		{"awg", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_PrepareAwgKernel{PrepareAwgKernel: &agentv1.PrepareAwgKernel{RequestId: "awg"}}}},
+		{"udp-count", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpCount{UdpCount: &agentv1.UdpCount{RequestId: "udp-count"}}}},
+		{"udp-send", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpSend{UdpSend: &agentv1.UdpSend{RequestId: "udp-send"}}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.id, func(t *testing.T) {
+			tr, err := coreStep(ctx, core, state, SessionEvent{Kind: tc.kind, At: now, Request: &AdminRequest{
+				RequestID: tc.id, Deadline: now.Add(time.Minute), Frame: tc.msg,
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(tr.Frames) != 1 || tr.State.Pending[tc.id].Kind != tc.want {
+				t.Fatalf("request kind = %v, frames %d; want %v and one frame", tr.State.Pending[tc.id].Kind, len(tr.Frames), tc.want)
+			}
+		})
+	}
+
+	unknown, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+		RequestID: "req-unknown", Deadline: now.Add(time.Minute),
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Ack{Ack: &agentv1.Ack{UpToSeq: 1}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unknown.Frames) != 0 || len(unknown.State.Pending) != 0 || len(unknown.Effects) != 1 || unknown.Effects[0].Kind != EffectReply || unknown.Effects[0].RequestID != "req-unknown" || unknown.Effects[0].Reply != nil {
+		t.Fatalf("unknown request was not refused with a nil reply: %+v", unknown)
+	}
+}
+
+func TestSessionCoreRetireRepliesBeforeClosingAtAlarm(t *testing.T) {
+	_, core, ctx, state, now := coreFixture(t, "core-retire")
+	tr := stepHello(t, core, ctx, state, now, hello("instance-retire", 0, "").GetHello())
+	requestID := "req-retire"
+	retire, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+		RequestID: requestID, Deadline: now.Add(time.Minute),
+		Frame: &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Retire{Retire: &agentv1.Retire{RequestId: requestID}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAlarm := now.Add(5 * time.Second)
+	if len(retire.Frames) != 1 || retire.Frames[0].GetRetire() == nil || retire.NextAlarm == nil || !retire.NextAlarm.Equal(wantAlarm) {
+		t.Fatalf("retire transition = frames %v, next alarm %v; want Retire and %v", retire.Frames, retire.NextAlarm, wantAlarm)
+	}
+	if len(retire.Effects) != 1 || retire.Effects[0].Kind != EffectReply || retire.Effects[0].RequestID != requestID || retire.Effects[0].Reply != nil {
+		t.Fatalf("retire did not reply immediately: %+v", retire.Effects)
+	}
+	closed, err := coreStep(ctx, core, retire.State, SessionEvent{Kind: EventAlarm, At: wantAlarm})
+	if err != nil || closed.Close == nil || closed.Close.Reason != "node retired" {
+		t.Fatalf("retire alarm close = %+v, err %v", closed.Close, err)
+	}
+}
+
 func TestSessionCorePendingRequestExpiresAtNextAlarm(t *testing.T) {
 	_, core, ctx, state, now := coreFixture(t, "core-request-expiry")
 	tr := stepHello(t, core, ctx, state, now, hello("instance-request-expiry", 0, "").GetHello())
@@ -1840,6 +1950,9 @@ func TestSessionCorePendingRequestExpiresAtNextAlarm(t *testing.T) {
 	}
 	if len(expired.State.Pending) != 0 {
 		t.Fatalf("expired request is still pending: %+v", expired.State.Pending)
+	}
+	if len(expired.Effects) != 1 || expired.Effects[0].Kind != EffectReply || expired.Effects[0].RequestID != "req-expiry" || expired.Effects[0].Reply != nil {
+		t.Fatalf("expired request did not produce a nil reply: %+v", expired.Effects)
 	}
 }
 
