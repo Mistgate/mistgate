@@ -10,7 +10,8 @@ import type { LinkAccept, LinkEvent, LinkStepOut, PanelLink } from "./panellink"
 // RPC methods included. blockConcurrencyWhile resets the object after 30 s, and one event can make several Go calls
 // (accept, closed, open, closed), so each block has a 25 s budget that its Go calls share (20 s at most for one); a call
 // with 2 s or less left is not made and counts as failed. A failed or timed-out step closes the socket with 1011 and the
-// agent reconnects; a socket that is no longer open is not heard (its queued frames are dropped).
+// agent reconnects; a socket this object has closed (att.shut) is not heard (its queued frames are dropped). A socket the
+// agent closed is still heard: workerd reports it CLOSING before the frames it sent earlier are delivered (workerd.test.ts).
 //
 // Hibernation: nothing is kept in memory but the waiters of `ask` (a pending ask keeps the object alive anyway), and
 // no timer is left running when nothing is pending: the one alarm is the earliest of the session's own alarm, the
@@ -35,6 +36,8 @@ interface Attachment {
   deadline: number;
   audience: string;
   generation: number;
+  /** Set by shut(): this object closed the socket, so its queued frames are dropped. The peer's close does not set it. */
+  shut?: true;
 }
 
 interface Waiter {
@@ -60,9 +63,21 @@ function send(ws: WebSocket, data: ArrayBuffer | ArrayBufferView): void {
   }
 }
 
+/** What ws.close() accepts, as measured on workerd: 1000-4999 except 1004, 1005, 1006 and 1015 (those throw). Anything else goes out as 1000. */
+function sendableCode(code: number): number {
+  return code >= 1000 && code <= 4999 && code !== 1004 && code !== 1005 && code !== 1006 && code !== 1015 ? code : 1000;
+}
+
+/** Closes our side and marks the socket, so a frame of it still queued behind this event is not stepped. */
 function shut(ws: WebSocket, code: number, reason: string): void {
   try {
-    ws.close(code, reason);
+    const att = ws.deserializeAttachment() as Attachment | null;
+    if (att !== null) ws.serializeAttachment({ ...att, shut: true });
+  } catch {
+    // no attachment to mark: the socket is not one of ours
+  }
+  try {
+    ws.close(sendableCode(code), reason);
   } catch {
     // already closing
   }
@@ -153,10 +168,10 @@ export class NodeLink extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await this.serial(async () => {
-      // A socket that is not open any more no longer speaks: after a failed step (1011) its queued frames must not reach Go.
-      if (ws.readyState !== WebSocket.READY_STATE_OPEN) return;
+      // A socket we closed no longer speaks: after a failed step (1011) its queued frames must not reach Go. Not readyState:
+      // when the agent sends frames and then closes, they are delivered with the socket already CLOSING, and they count.
       const att = this.attachment(ws);
-      if (att === null) return;
+      if (att === null || att.shut) return;
       if (att.generation === 0) {
         // The first message of a socket is its LinkAuth. Anything else, or anything late, is refused.
         if (typeof message === "string" || Date.now() > att.deadline) shut(ws, 1008, "handshake");
@@ -172,8 +187,9 @@ export class NodeLink extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket, code: number): Promise<void> {
-    // The agent's close frame is answered here; 1005, 1006 and 1015 only describe a close and cannot be sent.
-    shut(ws, code === 1005 || code === 1006 || code === 1015 ? 1000 : code, "");
+    // The agent's close frame is answered here (workerd leaves the socket CLOSING until we close it); 1005, 1006 and 1015
+    // only describe a close and cannot be sent. After our own close() the socket is already CLOSED and this does nothing.
+    shut(ws, code, "");
     await this.serial(() => this.lost(ws));
   }
 

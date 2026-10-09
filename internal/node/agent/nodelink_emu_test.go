@@ -488,7 +488,12 @@ type linkSocket struct {
 	conn     *websocket.Conn
 	state    atomic.Int32 // readyState
 	vanished atomic.Bool  // reset(): gone without a trace
-	att      linkAttachment
+	// peerClosed: the agent's close frame has been read. workerd then reports readyState CLOSING while the messages the
+	// agent sent earlier are still being delivered (and heard); nothing can be sent any more and the socket is no longer
+	// the session's live socket. state stays emuOpen until the close event itself, as in nodelink.ts (att.shut is ours only).
+	peerClosed atomic.Bool
+	sentCode   atomic.Int32 // the code of our own close(): workerd's close event carries it, not the code the peer answers with
+	att        linkAttachment
 }
 
 type emuReply struct {
@@ -643,7 +648,7 @@ func (o *linkObject) openSockets() []*linkSocket {
 		if s.state.Load() != emuClosed {
 			keep = append(keep, s)
 		}
-		if s.state.Load() == emuOpen && !s.vanished.Load() {
+		if s.state.Load() == emuOpen && !s.vanished.Load() && !s.peerClosed.Load() {
 			out = append(out, s)
 		}
 	}
@@ -665,7 +670,7 @@ func (o *linkObject) liveSocket() *linkSocket {
 
 // send is ws.send: a socket that is not open drops the frame (the real one throws and the event goes on).
 func (o *linkObject) send(s *linkSocket, data []byte) bool {
-	if s.state.Load() != emuOpen || s.vanished.Load() {
+	if s.state.Load() != emuOpen || s.vanished.Load() || s.peerClosed.Load() {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(o.e.ctx, 5*time.Second)
@@ -673,8 +678,9 @@ func (o *linkObject) send(s *linkSocket, data []byte) bool {
 	return s.conn.Write(ctx, websocket.MessageBinary, data) == nil
 }
 
+// validCloseCode is what ws.close() accepts on workerd (measured, workerd.test.ts): 1000-4999 except 1004, 1005, 1006 and 1015.
 func validCloseCode(code int) bool {
-	return code >= 1000 && code <= 4999 && code != 1005 && code != 1006 && code != 1015
+	return code >= 1000 && code <= 4999 && code != 1004 && code != 1005 && code != 1006 && code != 1015
 }
 
 // shut is ws.close: it throws (and the socket stays open) for a reserved code or a reason over 123 bytes; a socket that is
@@ -686,6 +692,7 @@ func (o *linkObject) shut(s *linkSocket, code int, reason string) {
 	if !s.state.CompareAndSwap(emuOpen, emuClosing) {
 		return
 	}
+	s.sentCode.Store(int32(code))
 	o.logMu.Lock()
 	o.closeLog = append(o.closeLog, emuClose{Gen: s.att.generation, Code: code, Reason: reason})
 	o.logMu.Unlock()
@@ -709,6 +716,10 @@ func (o *linkObject) read(s *linkSocket) {
 			if code < 0 {
 				code = 1006
 			}
+			if sent := int(s.sentCode.Load()); sent != 0 {
+				code = sent // the event of our own close() carries our code, whatever the peer answered
+			}
+			s.peerClosed.Store(true)
 			o.enqueue(func() { o.webSocketClose(s, code) })
 			return
 		}

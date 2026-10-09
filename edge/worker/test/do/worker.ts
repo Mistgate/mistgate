@@ -2,11 +2,19 @@
 // and a scripted fake of PanelLink in their place. NodeLink reaches PanelLink through ctx.exports, so the object under
 // test runs the code it runs in production against this fake.
 import { WorkerEntrypoint } from "cloudflare:workers";
+import { NodeLink as RealNodeLink } from "../../src/nodelink";
 import type { LinkAccept, LinkChallenge, LinkStepIn, LinkStepOut } from "../../src/panellink";
 import { forwardLink } from "../../src/shell";
 
 export { Limiter } from "../../src/limiter";
-export { NodeLink } from "../../src/nodelink";
+
+// The object under test, plus one method for workerd.test.ts (item 9): a module-scope counter that PanelLink also reads.
+let moduleCounter = 0;
+export class NodeLink extends RealNodeLink {
+  bumpModuleCounter(): number {
+    return ++moduleCounter;
+  }
+}
 
 const text = (s: string) => new TextEncoder().encode(s);
 
@@ -15,7 +23,8 @@ export interface FakePanel {
   calls: { op: "challenge" | "accept" | "step"; args: unknown; start: number; end?: number }[];
   challenge: (audience: string) => LinkChallenge | Promise<LinkChallenge>;
   accept: (nodeId: string, audience: string, nonce: Uint8Array, auth: Uint8Array, until: number) => LinkAccept | Promise<LinkAccept>;
-  step: (input: LinkStepIn) => LinkStepOut | Promise<LinkStepOut>;
+  /** `ctx` is the PanelLink invocation's own, for a step that hands work to waitUntil as the real one does (workerd.test.ts item 8). */
+  step: (input: LinkStepIn, ctx?: ExecutionContext) => LinkStepOut | Promise<LinkStepOut>;
 }
 
 declare global {
@@ -61,7 +70,10 @@ export class PanelLink extends WorkerEntrypoint {
     return record("accept", { nodeId, audience, nonce, auth, until }, () => panel().accept(nodeId, audience, nonce, auth, until));
   }
   step(input: LinkStepIn): Promise<LinkStepOut> {
-    return record("step", input, () => panel().step(input));
+    return record("step", input, () => panel().step(input, this.ctx));
+  }
+  moduleCounter(): number {
+    return moduleCounter;
   }
 }
 

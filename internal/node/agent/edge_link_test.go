@@ -913,6 +913,59 @@ func TestEdgeLinkSupersededSocket(t *testing.T) {
 	noFailedSteps(t, r.em, r.nodeID)
 }
 
+// The agent sends frames and closes in one go: workerd delivers them with the socket already CLOSING (peerClosed here), and
+// they are stepped, in order, before the closed step (workerd.test.ts items 2 and 2b). Our own close is different: its queued
+// frames are dropped (scenario 5, 6). The close event of our own close carries our code (item 3).
+func TestEdgeLinkFramesBeforeThePeersCloseAreStepped(t *testing.T) {
+	r := newEdgeRig(t, edgeOpts{})
+	c := r.dialRaw(r.agentKey())
+	c.hello("inst-raw")
+	var slow atomic.Bool
+	slow.Store(true)
+	r.em.setBefore(func(ctx context.Context, in fleet.LinkIn) {
+		if in.Kind == fleet.LinkFrame && slow.CompareAndSwap(true, false) {
+			select {
+			case <-time.After(150 * time.Millisecond):
+			case <-ctx.Done():
+			}
+		}
+	})
+	for seq := uint64(1); seq <= 2; seq++ {
+		c.send(&agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{}}})
+	}
+	_ = c.ws.Close(websocket.StatusNormalClosure, "bye")
+	eventually(t, func() bool { return countSteps(r.em.steps(r.nodeID), stepIs(1, fleet.LinkClosed, "")) == 1 }, "the closed step")
+	if n := countSteps(r.em.steps(r.nodeID), stepIs(1, fleet.LinkFrame, "stats")); n != 2 {
+		t.Errorf("stats frames stepped = %d, want both frames sent before the close: %+v", n, r.em.steps(r.nodeID))
+	}
+	if n := r.em.dropped(r.nodeID); n != 0 {
+		t.Errorf("%d messages dropped, want none: the agent's close does not make its earlier frames unheard", n)
+	}
+	noFailedSteps(t, r.em, r.nodeID)
+
+	// Our own close: the event carries our code, not what the peer answered.
+	d := r.dialRaw(r.agentKey())
+	d.hello("inst-raw2")
+	if err := r.em.Close(context.Background(), r.nodeID, "mine"); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		_, err := d.next()
+		if err == nil {
+			continue
+		}
+		if code := websocket.CloseStatus(err); code != 4000 {
+			t.Fatalf("the raw client was closed with %v (%v), want 4000", code, err)
+		}
+		break
+	}
+	_ = d.ws.Close(websocket.StatusNormalClosure, "")
+	eventually(t, func() bool {
+		return slices.ContainsFunc(r.em.closeEvents(r.nodeID), func(e emuCloseEvent) bool { return e.Gen == 2 && e.Code == 4000 })
+	}, "the close event of generation 2 with code 4000")
+	noFailedSteps(t, r.em, r.nodeID)
+}
+
 // 6. A failed step closes the socket 1011 and writes nothing; frames queued behind it are dropped; after the reconnect every
 // stats batch is counted exactly once, also the one whose step failed after its database write committed.
 func TestEdgeLinkFailedStepCountsEveryBatchOnce(t *testing.T) {

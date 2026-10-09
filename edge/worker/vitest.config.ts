@@ -8,7 +8,12 @@ export default defineConfig({
     // it; the malformed-request test and the failing `ask` calls throw on purpose. Only an error that came out of a
     // Durable Object (`remote`; one thrown by the test code itself has no such mark) with one of those messages is let
     // through. workerd gives no way to say "this one is expected" per call, so this is as narrow as it gets.
-    onUnhandledError: (error) => (error.remote === true && /^(limiter: |timeout$|link lost$|duplicate request id$)/.test(error.message) ? false : undefined),
+    onUnhandledError: (error) =>
+      (error.remote === true && /^(limiter: |timeout$|link lost$|duplicate request id$)/.test(error.message)) ||
+      // workerd.test.ts resets an object on purpose (ctx.abort) and reports that as an unhandled rejection too.
+      (error.durableObjectReset === true && error.message === "reset by the test")
+        ? false
+        : undefined,
     projects: [
       { test: { name: "node", include: ["test/*.test.ts"] } },
       {

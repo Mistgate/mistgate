@@ -467,11 +467,12 @@ Implementation notes (5b), decisions the design left open and where the emulator
 - **Differences from `nodelink.ts` (step 6 closes them in TypeScript).** The emulator sends `Generation` on the open event
   and honours `LinkOut.Forget` (`deleteAll` and `deleteAlarm` after the block); `nodelink.ts` does neither yet (§6.6).
   `webSocketError` is not emulated: a failed read is a close event with code 1006.
-- **What the platform decides, here chosen.** A socket stops being open when the object closes it, or when its close event
-  is delivered (frames that arrived before a peer's close are still stepped; after the object's own close they are dropped).
-  `ws.close()` throws, and the socket stays open, for a reserved code (1005, 1006, 1015) and for a reason over 123 bytes,
-  as in workerd. `reset()` fails the RPCs of waiting `ask` calls with "link lost" (an object reset breaks its callers'
-  RPCs). The alarm is a real timer in emulated time; `advance` does not re-arm it. `runAlarm` is the platform calling
+- **What the platform decides, here chosen.** A socket stops being open when the object closes it (frames queued behind that
+  are dropped), or when the agent's close frame is read (`peerClosed`: nothing can be sent and it is no longer the live
+  socket, but the frames it sent earlier are still stepped, until its close event is delivered). `ws.close()` throws, and
+  the socket stays open, for 1004, 1005, 1006, 1015 and a reason over 123 bytes. The close event of our own close carries
+  our code. All of this was checked on workerd in round 6d (§7.5, "workerd results"). `reset()` fails the RPCs of waiting
+  `ask` calls with "link lost" (on workerd the message is the reset's own; the adapter maps anything but "timeout" to lost). The alarm is a real timer in emulated time; `advance` does not re-arm it. `runAlarm` is the platform calling
   `alarm()`: it fails the test unless an alarm is armed and due (so a missing `arm()` shows), and `advanceToAlarm` moves
   the clock to the armed time first. Only the budget and the step limit can be shortened (`setLimits`), for the moment a
   test makes a step run out of time.
@@ -538,8 +539,8 @@ budgets are untouched.
 - Abandoned steps can still write: after the object gives up at 20 s the Go call may still land D1 writes (a late
   NodeHello could restore a superseded `node_live` row until the next Hello). The 15 s ctx means this needs a single D1
   call over 15 s; measure it.
-- **Verify on workerd** (the emulator chose these; step 6 checks each against the real runtime and fixes the emulator or
-  `nodelink.ts`):
+- **Verify on workerd** (done in round 6d, results in §7.5; items 2 and 5 differed and were fixed in `nodelink.ts` and the
+  emulator). The emulator chose these; step 6 checked each against the real runtime:
   1. `readyState` right after our own `close()`: closing at once, so `openSockets()` and `webSocketMessage` already treat
      the socket as not open (the emulator does).
   2. Frames that arrived before a peer's close frame: the emulator still steps them. If workerd marks the socket closed
@@ -742,6 +743,22 @@ rechecks (on-demand checks already work through `Remote`); `updates` (owner deci
 | 7 | closed step returns `forget` while another socket is mid-handshake | no keys left; the alarm is that handshake deadline | `deleteAll` keeps the old alarm: `arm()` overwrites it, no change |
 | 8 | the fake PanelLink's step calls `this.ctx.waitUntil(stub(ownNode).poke())` | the poke runs after the block; one desired step; no 1011 | deadlock or 1011: the fan-out must leave PanelLink |
 | 9 | a module-scope counter bumped by the object and read by PanelLink | — | local answer only; 6g gives the production one |
+
+**workerd results (6d)** (round 6d, `edge/worker/test/do/workerd.test.ts`, the workerd bundled with
+`@cloudflare/vitest-pool-workers` at `compatibility_date` 2026-08-01; re-run the file when either moves). Rows 2 and 5
+differed from the emulator and are fixed in `nodelink.ts` and in the Go emulator; the rest matched.
+
+| # | Observed on workerd | Change |
+|---|---|---|
+| 1 | `readyState` is OPEN (1) before and CLOSING (2) right after our own `close()`, in the same turn | none (as assumed) |
+| 2 | The agent sends `a`, `b`, `close(1000)`: both messages are delivered, but with `readyState` CLOSING (2), as is the close event. The old `readyState` gate dropped them: the session saw only `open`, `closed`. An admin reply sent just before the agent's own close would have become "link lost" | `nodelink.ts`: `shut()` sets `att.shut` (also on the echo), `webSocketMessage` drops only a socket we closed; the peer's close no longer drops its earlier frames. The emulator already stepped them; it now also models the CLOSING window (`peerClosed`: not the live socket, nothing is sent) |
+| 3 | After `stub.close(4000)` the object's `webSocketClose` is called once, with our code 4000 (not the 1000 the client answered), `readyState` CLOSED (3), whether or not the client calls `close()` itself. It runs no second closed step (`dropLive` had ended the session). For the agent's own close the handler sees CLOSING (2) and workerd does not answer by itself: the echo is needed there, and is a no-op after our own close (`close()` on a CLOSED socket does not throw) | none in `nodelink.ts`; the emulator's close event for our own close now carries our code |
+| 4 | An `ask` pending at an object reset (`ctx.abort(msg)`) rejects within milliseconds with `Error(msg)` (a real reset has a runtime message); it is not "link lost" and not a timeout. `askNode` maps every message but `timeout` to `lost` | none (the Go adapter treats any non-timeout error as link lost already); `vitest.config.ts` lets the test's own reset through as an unhandled rejection |
+| 5 | `close()` throws "Invalid WebSocket close code" for 999, 1004, 1005, 1006, 1015 and 5000, and for a reason over 123 bytes, and leaves the socket OPEN. 1000, 1001, 1003, 1008, 1011, 1014, 2999, 3000, 4000, 4999 and a 123-byte reason are sent as given. So 1008/1011 do not throw: `closeWith` needs no change (no 4008/4011 mapping) | `nodelink.ts`: `sendableCode()` sends 1004 and anything outside 1000-4999 as 1000 (the echo, and a close Go asks for); the emulator's `validCloseCode` adds 1004 (it had 1005, 1006, 1015) |
+| 6 | (a) An alarm 1.2 s away: no alarm step before it (checked at 1.0 s), it ran about 10 ms late, never early. (b) The alarm step's own `alarmAt` is kept (`getAlarm()` set when the handler returns, the second step ran 1.2 s later); with none returned, nothing is armed and nothing fires | none |
+| 7 | `deleteAll()` also deletes the alarm (the emulator assumed it stays). With another socket mid-handshake the closed step's `forget` leaves no keys and the alarm is that socket's deadline (not the session's alarm a minute away); with no other socket, no alarm | none: `arm()` after `deleteAll()` decides either way |
+| 8 | A step calling `this.ctx.waitUntil(stub(ownNode).poke())` does not deadlock: the poke RPC settles after the block, one `desired` step follows the frame step, no 1011, the socket stays open | none |
+| 9 | A module-scope counter bumped by two different objects is read by PanelLink with the sum: one variable, in the test pool's single isolate. Local answer only | none; 6g measures the production answer |
 
 Item 10 runs with the real wasm in wrangler dev (6f): 20 parallel subscription fetches, link steps and a cron tick in
 one isolate; pass = no hung invocation and no "Cannot perform I/O on behalf of a different request" (Go's scheduler is
