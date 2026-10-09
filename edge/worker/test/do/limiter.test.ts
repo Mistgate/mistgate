@@ -1,11 +1,32 @@
 import { env } from "cloudflare:workers";
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import type { Bucket, WindowState } from "../../src/limitmath";
 
 // The Limiter class itself, in workerd with real SQLite-backed storage: RPC, per-key isolation, validation, alarm cleanup.
 
 const stubFor = (name: string, key: string) => env.LIMITER.get(env.LIMITER.idFromName(`${name}\u0000${key}`));
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+type Stub = ReturnType<typeof stubFor>;
+
+// The alarm tests set the clock instead of racing it: the objects run in this isolate, so their Date.now is this one (as
+// in nodelink.test.ts). Their deadlines are an hour out, so the runtime never fires an alarm by itself mid-test.
+/** When the object's bucket is full again, when its window ends, and when its alarm is set for. */
+const held = (s: Stub) =>
+  runInDurableObject(s, async (_o, state) => ({
+    full: state.storage.kv.get<Bucket>("b")?.fullAt,
+    end: state.storage.kv.get<WindowState>("w")?.end,
+    alarm: await state.storage.getAlarm(),
+  }));
+/** Runs the object's alarm with its clock reading `now`; false if none was set. */
+async function alarmAt(s: Stub, now: number): Promise<boolean> {
+  const realNow = Date.now;
+  Date.now = () => now;
+  try {
+    return await runDurableObjectAlarm(s);
+  } finally {
+    Date.now = realNow;
+  }
+}
 
 describe("Limiter Durable Object", () => {
   it("allows the burst of a token bucket over RPC, then refuses; another key has its own bucket", async () => {
@@ -52,21 +73,21 @@ describe("Limiter Durable Object", () => {
 
   it("deletes its state and alarm once a window has ended", async () => {
     const s = stubFor("page-password", "t:do-alarm");
-    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, spanMs: 2_000, lockoutMs: 0 }); // the first check must come well before the alarm
-    expect(await runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null])).toEqual([true, true]);
-    // The alarm fires by itself once the window is over; nothing is left behind (poll: its timing is the runtime's).
-    const left = () => runInDurableObject(s, async (_o, state) => [state.storage.kv.get("w") !== undefined, (await state.storage.getAlarm()) !== null]);
-    for (let i = 0; i < 300 && (await left()).includes(true); i++) await sleep(20);
-    expect(await left()).toEqual([false, false]);
+    await s.limit({ operation: "record", name: "page-password", key: "t:do-alarm", limit: 5, spanMs: 3_600_000, lockoutMs: 0 });
+    const end = (await held(s)).end!;
+    expect(await held(s)).toEqual({ end, alarm: end }); // armed for the moment the window ends
+    expect(await alarmAt(s, end)).toBe(true);
+    expect(await held(s)).toEqual({ alarm: null }); // nothing is left behind
   });
 
   it("deletes a bucket once it is full again, and keeps it before that", async () => {
     const s = stubFor("auth", "do-alarm-bucket");
-    const held = () => runInDurableObject(s, async (_o, state) => [state.storage.kv.get("b") !== undefined, (await state.storage.getAlarm()) !== null]);
-    await s.limit({ operation: "take", name: "auth", key: "do-alarm-bucket", burst: 2, refillMs: 400 }); // full again after 400 ms
-    await runDurableObjectAlarm(s); // far too early: it runs, finds the bucket not yet full, keeps it and sets the alarm again
-    expect(await held()).toEqual([true, true]);
-    for (let i = 0; i < 100 && (await held()).includes(true); i++) await sleep(20);
-    expect(await held()).toEqual([false, false]);
+    await s.limit({ operation: "take", name: "auth", key: "do-alarm-bucket", burst: 2, refillMs: 3_600_000 });
+    const full = (await held(s)).full!;
+    expect(await held(s)).toEqual({ full, alarm: full }); // armed for the moment it is full again
+    expect(await alarmAt(s, full - 1)).toBe(true); // a millisecond early: kept, armed again
+    expect(await held(s)).toEqual({ full, alarm: full });
+    expect(await alarmAt(s, full)).toBe(true);
+    expect(await held(s)).toEqual({ alarm: null });
   });
 });
