@@ -119,7 +119,7 @@ Without anything else the panel shows a built-in "Coming soon" page. Every insta
 - `robots.txt`, when absent, is a built-in one that turns away known AI crawlers.
 - Only GET and HEAD are served. Files and directories whose name starts with a dot are never served, and responses carry no Last-Modified or ETag headers.
 
-The panel only reads this directory. With the systemd unit below, keep it outside `/home` and `/root` (for example in `/srv/mistgate-decoy`).
+The panel only reads this directory. With the systemd unit below, keep it outside `/home` and `/root` (for example in `/srv/mistgate-decoy`). [Your own decoy site](../guide/decoy-site.md) says what a good one looks like and has a prompt that has an AI agent invent a unique site.
 
 ## 6. Try it in the foreground
 

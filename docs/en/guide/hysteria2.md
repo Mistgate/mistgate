@@ -35,7 +35,7 @@ Changing the type or the password breaks the server for everyone until their app
 
 ## Masquerade
 
-Anything that connects without being a Hysteria2 client sees a web site. With **Built-in site** the node serves a neutral built-in site over HTTP/3 on the UDP port and over HTTPS on TCP 443 next to it, and advertises the UDP port as HTTP/3, like a real site does. With **Nothing (404)** every such request gets a plain 404.
+Anything that connects without being a Hysteria2 client sees a web site. With **Built-in site** the node serves a neutral built-in site over HTTP/3 on the UDP port and over HTTPS on TCP 443 next to it, and advertises the UDP port as HTTP/3, like a real site does. With **Nothing (404)** every such request gets a plain 404. The built-in site is the same on every installation; a site of your own for the nodes is **Planned**: see [Your own decoy site](decoy-site.md).
 
 TCP 443 is also where the node answers Let's Encrypt, so keep it free on nodes with Let's Encrypt profiles.
 

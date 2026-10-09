@@ -13,7 +13,7 @@ Mistgate is built to be run with AI agents as well as by hand. This page gives t
 
 ## Install Mistgate with an AI agent
 
-For an agent that runs on your computer and can reach a fresh Linux server with `ssh` (as root, or as a user with `sudo`). You need a domain whose A record (and AAAA record, if it has one) points at the server, and TCP ports 80 and 443 free on it. The agent follows [Install the panel](install-panel.md): it checks the server, downloads the latest release from GitHub and verifies it, installs the binary, runs `mistgate setup`, writes the systemd unit, starts the panel, checks that the decoy site and the admin answer, and gives you the admin address and the one-time setup link. It takes about ten minutes.
+For an agent that runs on your computer and can reach a fresh Linux server with `ssh` (as root, or as a user with `sudo`). You need a domain whose A record (and AAAA record, if it has one) points at the server, and TCP ports 80 and 443 free on it. The agent follows [Install the panel](install-panel.md): it checks the server, downloads the latest release from GitHub and verifies it, installs the binary, runs `mistgate setup`, writes the systemd unit, starts the panel, checks that the decoy site and the admin answer, optionally makes a decoy site of your own for you (see [Your own decoy site](../guide/decoy-site.md)), and gives you the admin address and the one-time setup link. It takes about ten minutes.
 
 You create the owner account yourself, in your browser; the agent never does. It asks before every change on the server, never touches the SSH configuration and keeps a log of what it changed. The setup link passes through the agent's session, so open it soon: it works once and expires after 30 minutes, and `mistgate setup` prints a new one while no owner exists.
 
@@ -89,7 +89,17 @@ LANGUAGE:    English             # the language you talk to me in
      ssh -N -L command to reach it.
    - journalctl -u mistgate | grep -i "node bundle" shows whether the panel downloaded the
      signed node agents from GitHub (needed for installing nodes over SSH).
-8. Final message:
+8. Optional, a decoy site of my own. Ask me whether to generate a unique decoy site for
+   DOMAIN instead of the built-in "Coming soon" page. If I say no, skip this step. If I say
+   yes, follow the prompt in https://mistgate.app/guide/decoy-site/ with DOMAIN, LANGUAGE
+   and DIR=/srv/mistgate-decoy (keep the files outside /home and /root), writing them on the
+   server only after my "yes". Then show me the line to add to ExecStart,
+   --decoy-dir /srv/mistgate-decoy, and after my "yes" run
+   systemctl daemon-reload && systemctl restart mistgate. Verify: https://DOMAIN/ answers 200
+   with the new site and a random path answers 404 with its 404.html; the admin URL still
+   answers 200 with the page title "Mistgate"; journalctl -u mistgate -n 50 --no-pager shows
+   no errors. Put the new files and the changed unit into the log of changes.
+9. Final message:
    - the admin URL and the one-time setup link, with: open the link yourself within
      30 minutes and create the owner (a passkey, or a password with an authenticator code);
      if it expires, ask me to run "mistgate setup" again for a new link;

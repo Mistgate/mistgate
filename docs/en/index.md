@@ -49,6 +49,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [User page](guide/user-page.md): the person's own page with instructions, a QR code and traffic.
 - [DNS](guide/dns.md): DNS presets for users and groups, and the DNS of the nodes.
 - [Torrent protection](guide/torrent-protection.md): the per-node BitTorrent blocker, what it catches and what its events show.
+- [Your own decoy site](guide/decoy-site.md): replace the built-in decoy page with a small site of your own, and a ready prompt for an AI agent that invents a unique one.
 
 ### Operations
 
