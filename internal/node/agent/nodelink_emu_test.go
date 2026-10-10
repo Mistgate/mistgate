@@ -496,6 +496,11 @@ type linkSocket struct {
 	att        linkAttachment
 }
 
+// writable: ws.send would put a frame on this socket.
+func (s *linkSocket) writable() bool {
+	return s.state.Load() == emuOpen && !s.vanished.Load() && !s.peerClosed.Load()
+}
+
 type emuReply struct {
 	frame []byte
 	err   error
@@ -648,7 +653,7 @@ func (o *linkObject) openSockets() []*linkSocket {
 		if s.state.Load() != emuClosed {
 			keep = append(keep, s)
 		}
-		if s.state.Load() == emuOpen && !s.vanished.Load() && !s.peerClosed.Load() {
+		if s.writable() {
 			out = append(out, s)
 		}
 	}
@@ -670,7 +675,7 @@ func (o *linkObject) liveSocket() *linkSocket {
 
 // send is ws.send: a socket that is not open drops the frame (the real one throws and the event goes on).
 func (o *linkObject) send(s *linkSocket, data []byte) bool {
-	if s.state.Load() != emuOpen || s.vanished.Load() || s.peerClosed.Load() {
+	if !s.writable() {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(o.e.ctx, 5*time.Second)
@@ -1056,15 +1061,15 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) {
 	}
 	if s != nil {
 		for _, raw := range out.Frames {
-			if !o.send(s, raw) {
-				continue
-			}
+			// Logged before the write: the agent acts on a frame as soon as it reads it, and a test that has seen it act
+			// must find the frame in the log.
 			var m agentv1.ConnectResponse
-			if proto.Unmarshal(raw, &m) == nil {
+			if s.writable() && proto.Unmarshal(raw, &m) == nil {
 				o.logMu.Lock()
 				o.sentLog = append(o.sentLog, emuSent{Gen: gen, Frame: &m})
 				o.logMu.Unlock()
 			}
+			o.send(s, raw)
 		}
 	}
 	for _, r := range out.Replies {
