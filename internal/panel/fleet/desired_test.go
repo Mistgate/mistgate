@@ -59,6 +59,114 @@ func TestDiffStateDigestMatchesLegacy(t *testing.T) {
 	}
 }
 
+func TestCredentialHashMatchesWireFields(t *testing.T) {
+	base := plugin.UserCred{
+		CredID: "crd_base", UserID: "usr_base", DeviceID: "dev_base", Data: json.RawMessage(`{"auth":"base"}`),
+		RateLimitBps: 1000, ValidUntil: time.Unix(2_000_000_000, 0).UTC(),
+	}
+	baseHash := credentialHash(base)
+	for name, mutate := range map[string]func(*plugin.UserCred){
+		"credential id": func(c *plugin.UserCred) { c.CredID += "_changed" },
+		"user id":       func(c *plugin.UserCred) { c.UserID += "_changed" },
+		"device id":     func(c *plugin.UserCred) { c.DeviceID += "_changed" },
+		"data":          func(c *plugin.UserCred) { c.Data = json.RawMessage(`{"auth":"changed"}`) },
+		"rate limit":    func(c *plugin.UserCred) { c.RateLimitBps++ },
+		"expiry second": func(c *plugin.UserCred) { c.ValidUntil = c.ValidUntil.Add(time.Second) },
+	} {
+		changed := base
+		mutate(&changed)
+		if got := credentialHash(changed); got == baseHash {
+			t.Errorf("%s changed a wire field without changing the credential hash", name)
+		}
+	}
+
+	for name, equivalent := range map[string]plugin.UserCred{
+		"subsecond expiry": func() plugin.UserCred {
+			c := base
+			c.ValidUntil = c.ValidUntil.Add(123 * time.Millisecond)
+			return c
+		}(),
+		"expiry location": func() plugin.UserCred {
+			c := base
+			c.ValidUntil = c.ValidUntil.In(time.FixedZone("other", 3600))
+			return c
+		}(),
+	} {
+		if got := credentialHash(equivalent); got != baseHash {
+			t.Errorf("%s changed the credential hash for equivalent wire fields", name)
+		}
+	}
+	emptyData := base
+	emptyData.Data = nil
+	emptyDataHash := credentialHash(emptyData)
+	emptyData.Data = []byte{}
+	if got := credentialHash(emptyData); got != emptyDataHash {
+		t.Error("nil and empty data changed the credential hash for equivalent wire fields")
+	}
+	zeroExpiry, unixEpoch := base, base
+	zeroExpiry.ValidUntil = time.Time{}
+	unixEpoch.ValidUntil = time.Unix(0, 0).UTC()
+	if credentialHash(zeroExpiry) != credentialHash(unixEpoch) {
+		t.Error("zero expiry and unix epoch changed the credential hash for equivalent wire fields")
+	}
+}
+
+func TestDiffStateIgnoresSubsecondExpiryChanges(t *testing.T) {
+	cred := plugin.UserCred{
+		CredID: "crd_expiring", UserID: "usr_example", DeviceID: "dev_example",
+		Data: json.RawMessage(`{"auth":"synthetic"}`), ValidUntil: time.Unix(2_000_000_000, 0).UTC(),
+	}
+	old := &nodeState{in: map[string]*inboundState{
+		"inb_example": {specHash: "spec", creds: []plugin.UserCred{cred}},
+	}}
+	nextCred := cred
+	nextCred.ValidUntil = nextCred.ValidUntil.Add(500 * time.Millisecond)
+	next := &nodeState{in: map[string]*inboundState{
+		"inb_example": {specHash: "spec", creds: []plugin.UserCred{nextCred}},
+	}}
+	changed, removed := diffState(sentDigestFor(old, 1), next)
+	if len(changed) != 0 || len(removed) != 0 {
+		t.Fatalf("subsecond expiry change sent a delta: changed=%v removed=%v", changed, removed)
+	}
+
+	nextCred.ValidUntil = nextCred.ValidUntil.Add(time.Second)
+	next.in["inb_example"].creds[0] = nextCred
+	changed, removed = diffState(sentDigestFor(old, 1), next)
+	if len(changed) != 1 || len(removed) != 0 || len(changed[0].Creds) != 1 {
+		t.Fatalf("expiry second change did not send one credential upsert: changed=%v removed=%v", changed, removed)
+	}
+}
+
+func BenchmarkDiffStateOneCredentialChange(b *testing.B) {
+	for _, count := range []int{1000, 10000} {
+		b.Run(fmt.Sprintf("users_%d", count), func(b *testing.B) {
+			initialCreds := make([]plugin.UserCred, count)
+			for i := range initialCreds {
+				initialCreds[i] = plugin.UserCred{
+					CredID: fmt.Sprintf("crd_%05d", i), UserID: "usr_example", DeviceID: fmt.Sprintf("dev_%05d", i),
+					Data: json.RawMessage(`{"auth":"synthetic"}`), RateLimitBps: 1_000_000,
+					ValidUntil: time.Unix(2_000_000_000, 0).UTC(),
+				}
+			}
+			initial := &nodeState{in: map[string]*inboundState{
+				"inb_example": {specHash: "spec", creds: initialCreds},
+			}}
+			nextCreds := append([]plugin.UserCred(nil), initialCreds...)
+			nextCreds[count/2].Data = json.RawMessage(`{"auth":"changed"}`)
+			next := &nodeState{in: map[string]*inboundState{
+				"inb_example": {specHash: "spec", creds: nextCreds},
+			}}
+			old := sentDigestFor(initial, 1)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				diffState(old, next)
+			}
+		})
+	}
+}
+
 type digestMutation struct {
 	state          *nodeState
 	timezoneNoops  int

@@ -31,15 +31,15 @@ func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 		release.mu.Unlock()
 	})
 
-	s, _, _ := newTestService(t)
 	runtime.GC()
 	debug.FreeOSMemory()
 	base := retained()
 
-	var hash string // (not verified here: a second hash would allocate outside the measured window)
-	if err := s.hashed(context.Background(), func() { hash = hashPassword("a password of sufficient length"); _ = hash }); err != nil {
+	hash, err := hashPassword(context.Background(), "a password of sufficient length") // not verified here: a second hash would allocate outside the measured window
+	if err != nil {
 		t.Fatal(err)
 	}
+	_ = hash
 	peak := retained()
 	if peak < base+48<<20 {
 		t.Fatalf("the heap grew by only %d MiB during the hash: this test does not measure what it should", (peak-base)>>20)
@@ -57,7 +57,9 @@ func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 
 	// A burst of hashes causes one release after the burst, not one per hash: the timer is pushed back.
 	for i := 0; i < 3; i++ {
-		s.hashed(context.Background(), func() { hashPassword("another password of sufficient length") })
+		if _, err := hashPassword(context.Background(), "another password of sufficient length"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	deadline = time.Now().Add(5 * time.Second)
 	for retained() > base+16<<20 {

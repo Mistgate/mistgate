@@ -208,8 +208,8 @@ func (s *Service) beginSetupPassword(ctx context.Context, m *adminv1.BeginSetupR
 	if err := checkPasswordPolicy(m.Password); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	var pwHash string
-	if err := s.hashed(ctx, func() { pwHash = hashPassword(m.Password) }); err != nil {
+	pwHash, err := hashPassword(ctx, m.Password)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	secret := newTOTPSecret()
@@ -482,12 +482,17 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 		return nil, errInternal(err)
 	}
 	ok, step := false, int64(0)
-	hash := spoofHash()
+	var hash string
 	if found {
 		hash = cred.Hash
+	} else {
+		hash, err = spoofHash(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
+		}
 	}
-	var pwOK bool
-	if err := s.hashed(ctx, func() { pwOK = verifyPassword(hash, req.Msg.Password) }); err != nil {
+	pwOK, err := verifyPassword(ctx, hash, req.Msg.Password)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	if found && s.vault != nil {

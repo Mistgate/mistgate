@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // RFC 6238 default; every authenticator app speaks SHA-1
@@ -13,7 +14,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -27,60 +28,117 @@ var argon = struct {
 }{3, 64 << 10, 2}
 
 const (
-	minPasswordRunes = 12
-	maxPasswordBytes = 256 // bounds the hashing work an unauthenticated caller can ask for
-	minLogin         = 3
-	maxLogin         = 64
+	minPasswordRunes          = 12
+	maxPasswordBytes          = 256 // bounds the hashing work an unauthenticated caller can ask for
+	minLogin                  = 3
+	maxLogin                  = 64
+	maxConcurrentArgon2IDKeys = 1
 
 	totpDigits = 6
 	totpPeriod = 30 // seconds
 	totpWindow = 1  // steps accepted on either side of now (clock skew)
 )
 
+var (
+	argon2Slots = make(chan struct{}, maxConcurrentArgon2IDKeys)
+	argon2IDKey = argon2.IDKey
+	// argon2BeforeAcquireForTest lets tests know a verification reached the cancellable queue.
+	argon2BeforeAcquireForTest func()
+)
+
+func deriveArgon2IDKey(ctx context.Context, password, salt []byte, timeCost, memoryKiB uint32, threads uint8, keyLen uint32) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if hook := argon2BeforeAcquireForTest; hook != nil {
+		hook()
+	}
+	select {
+	case argon2Slots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if err := ctx.Err(); err != nil {
+		<-argon2Slots
+		return nil, err
+	}
+	defer func() {
+		<-argon2Slots
+		scheduleMemoryRelease()
+	}()
+	return argon2IDKey(password, salt, timeCost, memoryKiB, threads, keyLen), nil
+}
+
 // hashPassword returns an argon2id PHC string with a fresh random salt.
-func hashPassword(pw string) string {
+func hashPassword(ctx context.Context, pw string) (string, error) {
 	salt := make([]byte, 16)
 	rand.Read(salt) // never fails on supported platforms
-	key := argon2.IDKey([]byte(pw), salt, argon.time, argon.memKiB, argon.threads, 32)
+	key, err := deriveArgon2IDKey(ctx, []byte(pw), salt, argon.time, argon.memKiB, argon.threads, 32)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, argon.memKiB, argon.time, argon.threads,
-		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key))
+		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
 }
 
 // verifyPassword checks pw against a hashPassword string in constant time. A malformed
 // or absurdly expensive hash never matches.
-func verifyPassword(encoded, pw string) bool {
+func verifyPassword(ctx context.Context, encoded, pw string) (bool, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v="+strconv.Itoa(argon2.Version) {
-		return false
+		return false, nil
 	}
 	var m, t uint32
 	var p uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &p); err != nil || m == 0 || m > 1<<20 || t == 0 || t > 16 || p == 0 {
-		return false
+		return false, nil
 	}
 	salt, err1 := base64.RawStdEncoding.DecodeString(parts[4])
 	want, err2 := base64.RawStdEncoding.DecodeString(parts[5])
 	if err1 != nil || err2 != nil || len(want) == 0 {
-		return false
+		return false, nil
 	}
-	got := argon2.IDKey([]byte(pw), salt, t, m, p, uint32(len(want)))
-	return subtle.ConstantTimeCompare(got, want) == 1
+	got, err := deriveArgon2IDKey(ctx, []byte(pw), salt, t, m, p, uint32(len(want)))
+	if err != nil {
+		return false, err
+	}
+	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 
-var (
-	dummyOnce sync.Once
-	dummyHash string
-)
+type spoofHashEntry struct {
+	ready chan struct{}
+	hash  string
+	err   error
+}
+
+var spoofHashCache atomic.Pointer[spoofHashEntry]
 
 // spoofHash is a valid hash of a random password, verified against when the login does
 // not exist so that unknown and known logins cost the same time.
-func spoofHash() string {
-	dummyOnce.Do(func() {
+
+func spoofHash(ctx context.Context) (string, error) {
+	for {
+		if cached := spoofHashCache.Load(); cached != nil {
+			select {
+			case <-cached.ready:
+				return cached.hash, cached.err
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}
+		entry := &spoofHashEntry{ready: make(chan struct{})}
+		if !spoofHashCache.CompareAndSwap(nil, entry) {
+			continue
+		}
 		b := make([]byte, 16)
 		rand.Read(b)
-		dummyHash = hashPassword(string(b))
-	})
-	return dummyHash
+		entry.hash, entry.err = hashPassword(ctx, string(b))
+		if entry.err != nil {
+			spoofHashCache.CompareAndSwap(entry, nil)
+		}
+		close(entry.ready)
+		return entry.hash, entry.err
+	}
 }
 
 // checkPasswordPolicy and normLogin validate what a new admin typed.

@@ -87,8 +87,8 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 	if len(m.CurrentPassword) > maxPasswordBytes {
 		m.CurrentPassword = "" // never matches; the hash is not asked to chew on a megabyte
 	}
-	var ok bool
-	if err := s.hashed(ctx, func() { ok = verifyPassword(cred.Hash, m.CurrentPassword) }); err != nil {
+	ok, err := verifyPassword(ctx, cred.Hash, m.CurrentPassword)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	if !ok {
@@ -98,8 +98,8 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 		s.audit(ctx, admin.ID, "password_change", "fail", ip, map[string]any{"reason": "wrong current password"})
 		return nil, codedErr(connect.CodeInvalidArgument, "wrong_password")
 	}
-	var hash string
-	if err := s.hashed(ctx, func() { hash = hashPassword(m.NewPassword) }); err != nil {
+	hash, err := hashPassword(ctx, m.NewPassword)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	if err := s.st.SetPasswordHash(ctx, admin.ID, hash); err != nil {
@@ -158,7 +158,8 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 			s.log.Error("password lookup", "err", err)
 			return nil, errInternal(err)
 		}
-		if err := s.hashed(ctx, func() { c.pwHash = hashPassword(m.Password) }); err != nil {
+		c.pwHash, err = hashPassword(ctx, m.Password)
+		if err != nil {
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 		}
 	default:
@@ -332,7 +333,10 @@ func ResetLogin(ctx context.Context, st *store.Store, v *vault.Vault, in ResetLo
 
 	out.Admin, out.Login, out.Password = target.Admin, login, randomPassword()
 	secret := newTOTPSecret()
-	hash := hashPassword(out.Password)
+	hash, err := hashPassword(ctx, out.Password)
+	if err != nil {
+		return out, err
+	}
 	brand := instance.DefaultBrandHead + instance.DefaultBrandTail
 	if set, err := instance.Load(ctx, st); err == nil {
 		brand = set.BrandName()

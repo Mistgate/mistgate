@@ -50,7 +50,6 @@ const (
 	maxCeremonies          = 2048
 	maxCeremoniesPerSource = 8  // pending ceremonies one client (IPv4 address or IPv6 /64) may hold
 	maxSetupCodeTries      = 5  // wrong TOTP codes tolerated on one password-setup ceremony
-	maxConcurrentHashes    = 4  // argon2 runs at once: each takes 64 MiB
 	maxPasskeyName         = 64 // characters
 )
 
@@ -89,7 +88,6 @@ type Service struct {
 
 	tsURL    string       // Turnstile siteverify endpoint
 	tsClient *http.Client // and the client that calls it
-	hashSem  chan struct{}
 	hook     atomic.Pointer[func(Event)]
 
 	// API tokens (bearer.go): the per-token request limiter, and the once-a-minute gates that keep a polling
@@ -160,7 +158,6 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		lim:        cfg.Limiter,
 		trust:      NewProxyTrust(cfg.TrustedProxies),
 		now:        time.Now,
-		hashSem:    make(chan struct{}, maxConcurrentHashes),
 		tokTouched: map[string]time.Time{},
 		tokAudited: map[string]time.Time{},
 	}
@@ -402,19 +399,6 @@ func (s *Service) brandName(ctx context.Context) string {
 		return instance.DefaultBrandHead + instance.DefaultBrandTail
 	}
 	return set.BrandName()
-}
-
-// hashed runs fn (an argon2 computation) while holding one of maxConcurrentHashes slots.
-func (s *Service) hashed(ctx context.Context, fn func()) error {
-	select {
-	case s.hashSem <- struct{}{}:
-		defer func() { <-s.hashSem }()
-		defer scheduleMemoryRelease() // the 64 MiB buffer is garbage now; hand it back once things are quiet
-		fn()
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // resolve is resolveSession for callers that only need the admin.

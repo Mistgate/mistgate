@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
@@ -144,20 +145,50 @@ func appendDigestPart(dst, part []byte) []byte {
 	return append(dst, part...)
 }
 
+func appendDigestString(dst []byte, part string) []byte {
+	var size [8]byte
+	binary.BigEndian.PutUint64(size[:], uint64(len(part)))
+	dst = append(dst, size[:]...)
+	return append(dst, part...)
+}
+
 func credentialHash(c plugin.UserCred) string {
-	var data []byte
-	data = appendDigestPart(data, []byte(c.CredID))
-	data = appendDigestPart(data, []byte(c.UserID))
-	data = appendDigestPart(data, []byte(c.DeviceID))
+	hash, _ := credentialHashWithBuffer(c, make([]byte, 0, 256))
+	return hash
+}
+
+func credentialHashWithBuffer(c plugin.UserCred, data []byte) (string, []byte) {
+	data = data[:0]
+	data = appendDigestString(data, c.CredID)
+	data = appendDigestString(data, c.UserID)
+	data = appendDigestString(data, c.DeviceID)
 	data = appendDigestPart(data, c.Data) // bytes.Equal treats nil and empty data as the same.
 	var value [8]byte
 	binary.BigEndian.PutUint64(value[:], c.RateLimitBps)
 	data = append(data, value[:]...)
-	binary.BigEndian.PutUint64(value[:], uint64(c.ValidUntil.Unix()))
+	binary.BigEndian.PutUint64(value[:], uint64(credentialHashValidUntilUnix(c)))
 	data = append(data, value[:]...)
-	binary.BigEndian.PutUint64(value[:], uint64(c.ValidUntil.Nanosecond()))
+	// Credentials go over the wire with second precision; keep this field zero in the
+	// existing digest layout so old hashes remain stable for second-aligned expiries.
+	clear(value[:])
 	data = append(data, value[:]...)
-	return shortHash(data)
+	return shortHash(data), data
+}
+
+func credentialValidUntilUnix(c plugin.UserCred) int64 {
+	if c.ValidUntil.IsZero() {
+		return 0
+	}
+	return c.ValidUntil.Unix()
+}
+
+func credentialHashValidUntilUnix(c plugin.UserCred) int64 {
+	unix := credentialValidUntilUnix(c)
+	if unix == 0 {
+		// Keep the legacy zero-time encoding while treating every wire value of 0 alike.
+		return time.Time{}.Unix()
+	}
+	return unix
 }
 
 // warpHash tells WarpSpecs apart as reflect.DeepEqual did: the JSON of the struct keeps nil and empty slices apart.
@@ -178,8 +209,11 @@ func sentDigestFor(s *nodeState, revision uint64) *sentDigest {
 		sent := sentInbound{Spec: inbound.specHash}
 		if len(inbound.creds) > 0 {
 			sent.Creds = make(map[string]string, len(inbound.creds))
+			var data []byte
 			for _, cred := range inbound.creds {
-				sent.Creds[cred.CredID] = credentialHash(cred)
+				var hash string
+				hash, data = credentialHashWithBuffer(cred, data)
+				sent.Creds[cred.CredID] = hash
 			}
 		}
 		digest.In[id] = sent
@@ -301,12 +335,8 @@ func warpProto(w *plugin.WarpSpec) *agentv1.WarpSpec {
 }
 
 func credProto(c plugin.UserCred) *agentv1.Credential {
-	var vu int64
-	if !c.ValidUntil.IsZero() {
-		vu = c.ValidUntil.Unix()
-	}
 	return &agentv1.Credential{CredId: c.CredID, UserId: c.UserID, DeviceId: c.DeviceID, DataJson: string(c.Data),
-		RateLimitBps: c.RateLimitBps, ValidUntilUnix: vu}
+		RateLimitBps: c.RateLimitBps, ValidUntilUnix: credentialValidUntilUnix(c)}
 }
 
 func credsProto(cs []plugin.UserCred) []*agentv1.Credential {
@@ -339,9 +369,12 @@ func diffState(old *sentDigest, next *nodeState) (changed []*agentv1.InboundStat
 		}
 		var up []*agentv1.Credential
 		seen := make(map[string]bool, len(n.creds))
+		var data []byte
 		for _, c := range n.creds {
 			seen[c.CredID] = true
-			if oldHash, ok := o.Creds[c.CredID]; !ok || oldHash != credentialHash(c) {
+			var hash string
+			hash, data = credentialHashWithBuffer(c, data)
+			if oldHash, ok := o.Creds[c.CredID]; !ok || oldHash != hash {
 				up = append(up, credProto(c))
 			}
 		}
