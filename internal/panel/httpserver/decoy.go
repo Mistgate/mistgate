@@ -127,7 +127,7 @@ func (d *decoy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // robots is the built-in robots.txt, used when the decoy dir has none of its own.
 func (d *decoy) robots(w http.ResponseWriter, r *http.Request) {
-	writeBody(w, r, http.StatusOK, "text/plain; charset=utf-8", robotsTXT)
+	writeBody(w, r, http.StatusOK, headerContentTypePlainText[:1:1], robotsTXT)
 }
 
 // notFound answers with 404.html from the decoy dir if there is one, else the built-in page. It does not
@@ -177,12 +177,12 @@ func hasDotSegment(name string) bool {
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, status int, body string) {
-	writeBody(w, r, status, "text/html; charset=utf-8", body)
+	writeBody(w, r, status, headerContentTypeHTML[:1:1], body)
 }
 
-func writeBody(w http.ResponseWriter, r *http.Request, status int, contentType, body string) {
+func writeBody(w http.ResponseWriter, r *http.Request, status int, contentType []string, body string) {
 	h := w.Header()
-	h.Set("Content-Type", contentType)
+	h["Content-Type"] = contentType[:1:1]
 	h.Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {

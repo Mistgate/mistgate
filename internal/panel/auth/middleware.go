@@ -46,7 +46,12 @@ func (s *Service) ClientIP(r *http.Request) netip.Addr {
 // does this for the admin API; the public listener does it for everything it dispatches
 // (subscription mounts, the agent endpoint).
 func (s *Service) WithClientIP(r *http.Request) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), clientIPKey{}, s.ClientIP(r)))
+	return r.WithContext(s.ContextWithClientIP(r.Context(), r))
+}
+
+// ContextWithClientIP returns ctx carrying r's client address for ClientIPFrom.
+func (s *Service) ContextWithClientIP(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, clientIPKey{}, s.ClientIP(r))
 }
 
 // WithAdmin returns ctx carrying a as RequireSession would put it, for tests of modules that read AdminFrom. A request

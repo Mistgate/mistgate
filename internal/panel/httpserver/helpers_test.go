@@ -40,13 +40,13 @@ type testEnv struct {
 	admin  *httptest.Server // separate admin listener
 }
 
-func newTestEnv(t *testing.T, mutate ...func(*Config)) *testEnv {
+func newTestEnv(t testing.TB, mutate ...func(*Config)) *testEnv {
 	t.Helper()
 	return newTestEnvAuth(t, nil, mutate...)
 }
 
 // newTestEnvAuth is newTestEnv with a say in the auth service configuration.
-func newTestEnvAuth(t *testing.T, authMutate func(*auth.Config), mutate ...func(*Config)) *testEnv {
+func newTestEnvAuth(t testing.TB, authMutate func(*auth.Config), mutate ...func(*Config)) *testEnv {
 	t.Helper()
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {

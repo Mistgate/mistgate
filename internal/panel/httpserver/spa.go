@@ -32,7 +32,7 @@ func (s *Server) spa(base string) http.Handler {
 				defer f.Close()
 				if st, err := f.Stat(); err == nil && !st.IsDir() {
 					if strings.HasPrefix(name, "assets/") {
-						w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+						w.Header()["Cache-Control"] = headerCacheImmutable[:1:1]
 					}
 					if serveFile(w, r, name, f) {
 						return
@@ -53,7 +53,7 @@ func (s *Server) spa(base string) http.Handler {
 			index = bytes.Replace(index, []byte(`<base href="/">`), []byte(`<base href="`+base+`">`), 1)
 		}
 		h := w.Header()
-		h.Set("Content-Type", "text/html; charset=utf-8")
+		h["Content-Type"] = headerContentTypeHTML[:1:1]
 		w.WriteHeader(http.StatusOK)
 		if r.Method != http.MethodHead {
 			w.Write(index)

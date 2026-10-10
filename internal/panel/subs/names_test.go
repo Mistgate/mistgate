@@ -27,6 +27,13 @@ func TestFlagEmoji(t *testing.T) {
 	}
 }
 
+func TestRenderRemarkTemplateUsesOriginalTemplateOnly(t *testing.T) {
+	got := renderRemarkTemplate("{node}|{profile}|{country}|{flag}|{other}", "flag", "country", "{flag}", "{node}")
+	if want := "{flag}|{node}|country|flag|{other}"; got != want {
+		t.Fatalf("renderRemarkTemplate() = %q, want %q", got, want)
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	for _, c := range []struct{ cc, lang, want string }{
 		{"DE", "en", "Germany"}, {"DE", "ru", "Германия"}, {"nl", "ru", "Нидерланды"}, {"ZZ", "en", "ZZ"}, {"x", "en", "X"}, {"", "en", ""},

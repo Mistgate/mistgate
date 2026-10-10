@@ -174,6 +174,13 @@ type Server struct {
 	pubLim, adminLim, agentLim *ratelimit.Limiter
 }
 
+// withPublicContext adds both public-listener values before cloning the request once.
+func withPublicContext(r *http.Request, a *auth.Service) *http.Request {
+	ctx := a.ContextWithClientIP(r.Context(), r)
+	ctx = context.WithValue(ctx, startKey{}, time.Now())
+	return r.WithContext(ctx)
+}
+
 type mount struct {
 	prefix  string
 	handler http.Handler // prefix stripped
@@ -374,7 +381,7 @@ func (s *Server) allow(l *ratelimit.Limiter, w http.ResponseWriter, r *http.Requ
 // paths all get the decoy.
 func (s *Server) Public() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r = withStart(s.auth.WithClientIP(r)) // auth.ClientIPFrom for the mounts and the agent endpoint
+		r = withPublicContext(r, s.auth) // auth.ClientIPFrom for the mounts and the agent endpoint
 		if s.agentRequest(r) {
 			s.serveAgent(w, r) // its own limit
 			return
@@ -512,14 +519,14 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		h.Set("Content-Security-Policy", "default-src 'self'; "+script+frame+"style-src 'self' 'unsafe-inline'; "+
 			"img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "+
 			"base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Cross-Origin-Opener-Policy", "same-origin")
-		h.Set("X-Robots-Tag", "noindex, nofollow")
-		h.Set("Cache-Control", "no-store")
+		h["X-Content-Type-Options"] = headerNoSniff[:1:1]
+		h["X-Frame-Options"] = headerFrameDeny[:1:1]
+		h["Referrer-Policy"] = headerNoReferrer[:1:1]
+		h["Cross-Origin-Opener-Policy"] = headerCOOPSameOrigin[:1:1]
+		h["X-Robots-Tag"] = headerRobotsNoIndex[:1:1]
+		h["Cache-Control"] = headerCacheNoStore[:1:1]
 		if r.TLS != nil {
-			h.Set("Strict-Transport-Security", "max-age=31536000")
+			h["Strict-Transport-Security"] = headerHSTS[:1:1]
 		}
 		next.ServeHTTP(w, r)
 	})

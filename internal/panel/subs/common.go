@@ -142,16 +142,16 @@ func (c *common) writeData(w http.ResponseWriter, r *http.Request, d pageData, a
 		return
 	}
 	hd := w.Header()
-	hd.Set("Content-Type", "text/html; charset=utf-8")
-	hd.Set("Cache-Control", "no-store")
-	hd.Set("X-Content-Type-Options", "nosniff")
-	hd.Set("Referrer-Policy", "no-referrer")
-	hd.Set("X-Robots-Tag", "noindex, nofollow")
+	hd["Content-Type"] = headerContentTypeHTML[:1:1]
+	hd["Cache-Control"] = headerCacheNoStore[:1:1]
+	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
+	hd["Referrer-Policy"] = headerNoReferrer[:1:1]
+	hd["X-Robots-Tag"] = headerRobotsNoIndex[:1:1]
 	hd.Set("Content-Security-Policy", c.page.csp(ancestors))
 	if ancestors == "'self'" {
-		hd.Set("X-Frame-Options", "SAMEORIGIN") // replaces the admin's DENY
+		hd["X-Frame-Options"] = headerFrameSameOrigin[:1:1] // replaces the admin's DENY
 	} else {
-		hd.Set("X-Frame-Options", "DENY")
+		hd["X-Frame-Options"] = headerFrameDeny[:1:1]
 	}
 	w.Write(html)
 }

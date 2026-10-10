@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 
@@ -211,10 +213,20 @@ func acceptsGzip(r *http.Request) bool {
 }
 
 // gzipped compresses b.
+var mihomoGzipWriters = sync.Pool{New: func() any {
+	w, err := gzip.NewWriterLevel(io.Discard, gzip.BestCompression)
+	if err != nil {
+		panic(err) // gzip.BestCompression is a valid level.
+	}
+	return w
+}}
+
 func gzipped(b []byte) []byte {
 	var buf bytes.Buffer
-	zw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression) // a valid level
-	zw.Write(b)
-	zw.Close()
+	zw := mihomoGzipWriters.Get().(*gzip.Writer)
+	zw.Reset(&buf)
+	_, _ = zw.Write(b)
+	_ = zw.Close()
+	mihomoGzipWriters.Put(zw)
 	return buf.Bytes()
 }

@@ -564,10 +564,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 		status, b = http.StatusInternalServerError, []byte(`{"error":"internal"}`)
 	}
 	hd := w.Header()
-	hd.Set("Content-Type", "application/json; charset=utf-8")
-	hd.Set("Cache-Control", "no-store")
-	hd.Set("X-Content-Type-Options", "nosniff")
-	hd.Set("Referrer-Policy", "no-referrer")
+	hd["Content-Type"] = headerContentTypeJSON[:1:1]
+	hd["Cache-Control"] = headerCacheNoStore[:1:1]
+	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
+	hd["Referrer-Policy"] = headerNoReferrer[:1:1]
 	w.WriteHeader(status)
 	w.Write(b)
 }

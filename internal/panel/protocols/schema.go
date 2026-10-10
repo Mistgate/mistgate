@@ -46,13 +46,14 @@ func FlaggedPointers(schema []byte, flag string) ([]string, error) {
 	return out, nil
 }
 
-func escapePointer(s string) string {
-	return strings.NewReplacer("~", "~0", "/", "~1").Replace(s)
-}
+var (
+	escapePointerReplacer   = strings.NewReplacer("~", "~0", "/", "~1")
+	unescapePointerReplacer = strings.NewReplacer("~1", "/", "~0", "~")
+)
 
-func unescapePointer(s string) string {
-	return strings.NewReplacer("~1", "/", "~0", "~").Replace(s)
-}
+func escapePointer(s string) string { return escapePointerReplacer.Replace(s) }
+
+func unescapePointer(s string) string { return unescapePointerReplacer.Replace(s) }
 
 func decodeObject(raw json.RawMessage) (map[string]any, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {

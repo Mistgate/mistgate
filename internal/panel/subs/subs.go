@@ -408,8 +408,8 @@ func (h *handler) respond(w http.ResponseWriter, r *http.Request, token string, 
 func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings) {
 	ctx := r.Context()
 	hd := w.Header()
-	hd.Set("Cache-Control", "no-store")
-	hd.Set("X-Content-Type-Options", "nosniff")
+	hd["Cache-Control"] = headerCacheNoStore[:1:1]
+	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
 	hd.Set("Profile-Title", b64(h.title(set, b)))
 	hd.Set("Subscription-Userinfo", userinfo(v))
 	hours := int(set.GetUpdateIntervalHours())
@@ -473,12 +473,16 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	}
 	h.headers(w, r, token, v, set, b)
 	hd := w.Header()
-	hd.Set("Content-Type", "text/yaml; charset=utf-8")
+	hd["Content-Type"] = headerContentTypeYAML[:1:1]
 	hd.Set("Content-Disposition", "attachment; filename*=UTF-8''"+pctEncode(title))
-	hd.Add("Vary", "Accept-Encoding")
+	if _, ok := hd["Vary"]; ok {
+		hd.Add("Vary", "Accept-Encoding")
+	} else {
+		hd["Vary"] = headerVaryAcceptEncoding[:1:1]
+	}
 	if acceptsGzip(r) {
 		body = gzipped(body)
-		hd.Set("Content-Encoding", "gzip")
+		hd["Content-Encoding"] = headerContentEncodingGzip[:1:1]
 	}
 	w.Write(body)
 }
@@ -487,7 +491,7 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
 	h.headers(w, r, token, v, set, b)
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header()["Content-Type"] = headerContentTypePlainText[:1:1]
 	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b, isHapp(r.UserAgent())), "\n")))))
 }
 

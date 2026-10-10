@@ -125,10 +125,10 @@ func NewLogoHandler(st *store.Store, log *slog.Logger) http.Handler {
 			return
 		}
 		h := w.Header()
-		h.Set("Content-Type", "image/svg+xml")
-		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Cache-Control", "no-cache")
+		h["Content-Type"] = headerContentTypeSVG[:1:1]
+		h["Content-Security-Policy"] = headerLogoCSP[:1:1]
+		h["X-Content-Type-Options"] = headerNoSniff[:1:1]
+		h["Cache-Control"] = headerCacheNoCache[:1:1]
 		h.Set("ETag", `"`+logoETag(s.LogoSVG)+`"`)
 		http.ServeContent(w, r, "", time.Time{}, bytes.NewReader([]byte(s.LogoSVG)))
 	})

@@ -60,9 +60,7 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 		if flagEmoji(s.CountryCode) != "" {
 			country = strings.ToUpper(strings.TrimSpace(s.CountryCode))
 		}
-		rep := strings.NewReplacer("{flag}", flagEmoji(s.CountryCode), "{country}", country,
-			"{node}", s.Node, "{profile}", s.Profile)
-		n := clean(rep.Replace(template))
+		n := clean(renderRemarkTemplate(template, flagEmoji(s.CountryCode), country, s.Node, s.Profile))
 		if n == "" {
 			n = clean(s.Node)
 		}
@@ -86,6 +84,42 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 		names[i] = name
 	}
 	return names
+}
+
+func renderRemarkTemplate(template, flag, country, node, profile string) string {
+	if !strings.Contains(template, "{flag}") && !strings.Contains(template, "{country}") &&
+		!strings.Contains(template, "{node}") && !strings.Contains(template, "{profile}") {
+		return template
+	}
+
+	var out strings.Builder
+	out.Grow(len(template))
+	for len(template) > 0 {
+		i := strings.IndexByte(template, '{')
+		if i < 0 {
+			out.WriteString(template)
+			break
+		}
+		out.WriteString(template[:i])
+		template = template[i:]
+		var value string
+		switch {
+		case strings.HasPrefix(template, "{flag}"):
+			value, template = flag, template[len("{flag}"):]
+		case strings.HasPrefix(template, "{country}"):
+			value, template = country, template[len("{country}"):]
+		case strings.HasPrefix(template, "{node}"):
+			value, template = node, template[len("{node}"):]
+		case strings.HasPrefix(template, "{profile}"):
+			value, template = profile, template[len("{profile}"):]
+		default:
+			out.WriteByte(template[0])
+			template = template[1:]
+			continue
+		}
+		out.WriteString(value)
+	}
+	return out.String()
 }
 
 func namedRemark(base, suffix, profile string, limitHapp bool) string {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/auth"
 )
@@ -12,15 +13,16 @@ import (
 // client address through auth.ClientIPFrom, resolved by the same trusted-proxy rules.
 func TestClientIPReachesPublicMounts(t *testing.T) {
 	report := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, auth.ClientIPFrom(r.Context()))
+		_, hasStart := r.Context().Value(startKey{}).(time.Time)
+		fmt.Fprintf(w, "%s|%t", auth.ClientIPFrom(r.Context()), hasStart)
 	})
 	e := newTestEnvAuth(t, func(c *auth.Config) { c.TrustedProxies = loopback() }, func(c *Config) {
 		c.PublicMounts = map[string]http.Handler{subPrefix: report}
 	})
 	for _, tc := range []struct{ hdr, want string }{
-		{"", "127.0.0.1"},
-		{"203.0.113.77", "203.0.113.77"},
-		{"9.9.9.9, 2001:db8::5", "2001:db8::5"},
+		{"", "127.0.0.1|true"},
+		{"203.0.113.77", "203.0.113.77|true"},
+		{"9.9.9.9, 2001:db8::5", "2001:db8::5|true"},
 	} {
 		hdr := map[string]string{}
 		if tc.hdr != "" {
@@ -32,7 +34,7 @@ func TestClientIPReachesPublicMounts(t *testing.T) {
 	}
 	// Without a trusted proxy the header is not believed.
 	e = newTestEnv(t, func(c *Config) { c.PublicMounts = map[string]http.Handler{subPrefix: report} })
-	if r := do(t, http.MethodGet, e.public.URL, subPrefix+"x", map[string]string{"X-Forwarded-For": "203.0.113.77"}); r.body != "127.0.0.1" {
+	if r := do(t, http.MethodGet, e.public.URL, subPrefix+"x", map[string]string{"X-Forwarded-For": "203.0.113.77"}); r.body != "127.0.0.1|true" {
 		t.Errorf("untrusted header believed: %q", r.body)
 	}
 }

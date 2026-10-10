@@ -218,6 +218,26 @@ func TestAcceptsGzip(t *testing.T) {
 	}
 }
 
+func TestGzippedMatchesFreshWriter(t *testing.T) {
+	input := []byte("profile-name: de1 · Hysteria2\n")
+	var want bytes.Buffer
+	zw, err := gzip.NewWriterLevel(&want, gzip.BestCompression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zw.Write(input); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if got := gzipped(input); !bytes.Equal(got, want.Bytes()) {
+			t.Fatalf("gzip output changed on call %d", i+1)
+		}
+	}
+}
+
 // A burst of requests cannot get more than the budget through.
 func TestWriteAdmitConcurrent(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
