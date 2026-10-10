@@ -17,6 +17,8 @@ import (
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
 )
 
+const sqliteReaderPoolSize = 4
+
 // Open opens (creating if needed) the database at path and applies migrations. The
 // database file is created with mode 0600 (SQLite gives the -wal and -shm files the
 // same mode); an existing file with wider permissions is tightened.
@@ -28,12 +30,12 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := openDB(path, 4, true)
+	r, err := openDB(path, sqliteReaderPoolSize, true)
 	if err != nil {
 		w.Close()
 		return nil, err
 	}
-	s := &Store{W: w, R: r}
+	s := &Store{W: w, R: r, readGate: make(chan struct{}, sqliteReaderPoolSize)}
 	if err := s.migrate(ctx); err != nil {
 		s.Close()
 		return nil, err
@@ -89,6 +91,7 @@ func openDB(path string, maxConns int, readOnly bool) (*sql.DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(maxConns)
+	db.SetMaxIdleConns(maxConns)
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("open %s: %w", path, err)

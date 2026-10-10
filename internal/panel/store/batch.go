@@ -6,7 +6,81 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"unicode"
+	"unicode/utf8"
 )
+
+const maxCachedBatchStatements = 256
+
+// batchStmtCache keeps a bounded set of DB statements whose connection-specific
+// prepared forms are reused by transactions through Tx.StmtContext.
+type batchStmtCache struct {
+	mu         sync.Mutex
+	statements map[string]*sql.Stmt
+	closed     bool
+}
+
+func (c *batchStmtCache) prepare(ctx context.Context, db *sql.DB, query string) (*sql.Stmt, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return nil, sql.ErrConnDone
+	}
+	if stmt := c.statements[query]; stmt != nil {
+		return stmt, nil
+	}
+	if len(c.statements) >= maxCachedBatchStatements {
+		return nil, nil
+	}
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	if c.statements == nil {
+		c.statements = make(map[string]*sql.Stmt)
+	}
+	c.statements[query] = stmt
+	return stmt, nil
+}
+
+func (c *batchStmtCache) close() error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil
+	}
+	c.closed = true
+	stmts := make([]*sql.Stmt, 0, len(c.statements))
+	for _, stmt := range c.statements {
+		stmts = append(stmts, stmt)
+	}
+	c.statements = nil
+	c.mu.Unlock()
+
+	var errs []error
+	for _, stmt := range stmts {
+		if err := stmt.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func hasSQLPrefix(query, prefix string) bool {
+	query = strings.TrimSpace(query)
+	for _, want := range prefix {
+		if query == "" {
+			return false
+		}
+		r, size := utf8.DecodeRuneInString(query)
+		if unicode.ToUpper(r) != want {
+			return false
+		}
+		query = query[size:]
+	}
+	return true
+}
 
 // errGuard: a guard statement of the batch found its condition false; nothing in the batch was written.
 var errGuard = errors.New("store: batch guard failed")
@@ -240,8 +314,7 @@ func (s *Store) batch(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) 
 // read runs a read-only batch on the reader pool. D1 uses the same binding as writes.
 func (s *Store) read(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
 	for _, stmt := range stmts {
-		query := strings.ToUpper(strings.TrimSpace(stmt.Query))
-		if !stmt.Returning || !strings.HasPrefix(query, "SELECT") {
+		if !stmt.Returning || !hasSQLPrefix(stmt.Query, "SELECT") {
 			return nil, errors.New("store: read batch requires SELECT statements")
 		}
 	}

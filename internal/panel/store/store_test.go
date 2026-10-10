@@ -4,6 +4,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -52,6 +53,37 @@ func TestMigrationsAndPragmas(t *testing.T) {
 			t.Fatal(err)
 		}
 		s2.Close()
+	}
+}
+
+func TestOpenDBKeepsPoolConnectionsIdle(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	conns := make([]*sql.Conn, sqliteReaderPoolSize)
+	for i := range conns {
+		conn, err := s.R.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conns[i] = conn
+	}
+	for _, conn := range conns {
+		if err := conn.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if stats := s.R.Stats(); stats.OpenConnections != sqliteReaderPoolSize || stats.Idle != sqliteReaderPoolSize {
+		t.Fatalf("reader pool stats after returning connections = %+v, want %d open and idle", stats, sqliteReaderPoolSize)
+	}
+	conn, err := s.W.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if stats := s.W.Stats(); stats.OpenConnections != 1 || stats.Idle != 1 {
+		t.Fatalf("writer pool stats after returning connection = %+v, want 1 open and idle", stats)
 	}
 }
 

@@ -29,6 +29,9 @@ var (
 // and a read pool; the D1 backend uses the same binding for both pools.
 type Store struct {
 	W, R           *sql.DB
+	readGate       chan struct{}
+	readStmtCache  batchStmtCache
+	writeStmtCache batchStmtCache
 	batchRetry     chan struct{} // Serializes local retries after concurrent batches fail their guards.
 	batchRetryOnce sync.Once
 }
@@ -53,7 +56,7 @@ func (s *Store) unlockBatchRetry() { <-s.batchRetry }
 
 // Close closes both pools.
 func (s *Store) Close() error {
-	return errors.Join(s.R.Close(), s.W.Close())
+	return errors.Join(s.readStmtCache.close(), s.writeStmtCache.close(), s.R.Close(), s.W.Close())
 }
 
 // NewID returns prefix + 128 random bits as lowercase base32 (e.g. "adm_…").

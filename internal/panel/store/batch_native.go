@@ -5,18 +5,49 @@ package store
 import (
 	"context"
 	"database/sql"
-	"strings"
 )
 
 func (s *Store) batchStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
-	return runSQLBatch(ctx, s.W, stmts...)
+	return runSQLBatch(ctx, s.W, &s.writeStmtCache, stmts...)
 }
 
 func (s *Store) readStore(ctx context.Context, stmts ...Stmt) ([]StmtResult, error) {
-	return runSQLBatch(ctx, s.R, stmts...)
+	if s.readGate != nil {
+		if err := s.acquireReader(ctx); err != nil {
+			return nil, err
+		}
+		defer func() { <-s.readGate }()
+	}
+	return runSQLBatch(ctx, s.R, &s.readStmtCache, stmts...)
 }
 
-func runSQLBatch(ctx context.Context, db *sql.DB, stmts ...Stmt) ([]StmtResult, error) {
+func (s *Store) acquireReader(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case s.readGate <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-s.readGate
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func runSQLBatch(ctx context.Context, db *sql.DB, cache *batchStmtCache, stmts ...Stmt) ([]StmtResult, error) {
+	prepared := make([]*sql.Stmt, len(stmts))
+	if cache != nil {
+		for i, stmt := range stmts {
+			var err error
+			prepared[i], err = cache.prepare(ctx, db, stmt.Query)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -26,7 +57,12 @@ func runSQLBatch(ctx context.Context, db *sql.DB, stmts ...Stmt) ([]StmtResult, 
 	results := make([]StmtResult, len(stmts))
 	for i, stmt := range stmts {
 		if stmt.Returning {
-			rows, err := tx.QueryContext(ctx, stmt.Query, stmt.Args...)
+			var rows *sql.Rows
+			if prepared[i] != nil {
+				rows, err = tx.StmtContext(ctx, prepared[i]).QueryContext(ctx, stmt.Args...)
+			} else {
+				rows, err = tx.QueryContext(ctx, stmt.Query, stmt.Args...)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -39,12 +75,17 @@ func runSQLBatch(ctx context.Context, db *sql.DB, stmts ...Stmt) ([]StmtResult, 
 				return nil, closeErr
 			}
 			results[i].Rows = values
-			if !strings.HasPrefix(strings.ToUpper(strings.TrimSpace(stmt.Query)), "SELECT") {
+			if !hasSQLPrefix(stmt.Query, "SELECT") {
 				results[i].RowsAffected = int64(len(values))
 			}
 			continue
 		}
-		res, err := tx.ExecContext(ctx, stmt.Query, stmt.Args...)
+		var res sql.Result
+		if prepared[i] != nil {
+			res, err = tx.StmtContext(ctx, prepared[i]).ExecContext(ctx, stmt.Args...)
+		} else {
+			res, err = tx.ExecContext(ctx, stmt.Query, stmt.Args...)
+		}
 		if err != nil {
 			return nil, err
 		}
