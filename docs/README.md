@@ -12,7 +12,7 @@ The user and operator documentation of [Mistgate](../README.md), a self-hosted p
 | Guide | [en/guide](en/guide/nodes.md) | [ru/guide](ru/guide/nodes.md) | Day-to-day work in the admin: nodes, profiles, Hysteria2, AmneziaWG, WARP, users, subscriptions, the user page, DNS, torrent protection. |
 | Operations | [en/operations](en/operations/health.md) | [ru/operations](ru/operations/health.md) | Health, Telegram alerts, updates, releases and signing, encrypted backups, security, troubleshooting. |
 | Roadmap | [en/roadmap](en/roadmap/status.md) | [ru/roadmap](ru/roadmap/status.md) | What is done, what comes next, the known limits. |
-| Reference | [en/reference](en/reference/cli.md) | [ru/reference](ru/reference/cli.md) | Every command and flag, the configuration, the API, the MCP server, the architecture, the FAQ, the comparison with other panels. |
+| Reference | [en/reference](en/reference/cli.md) | [ru/reference](ru/reference/cli.md) | Every command and flag, the configuration, the API, the MCP server, the architecture, the FAQ, the comparison with other panels, the benchmarks. |
 
 The full page list, in reading order, is in [en/index.md](en/index.md) and [ru/index.md](ru/index.md).
 

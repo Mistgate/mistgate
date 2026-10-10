@@ -1,0 +1,25 @@
+# 3x-ui v3.9.0, one-server scenario: same image and settings as the panel benchmark, on the isolated bench-box network
+# (fixed address so the Hysteria2 client can reach the xray core inside), inside the 2 vCPU / 2 GB slice.
+services:
+  3xui:
+    image: ghcr.io/mhsanaei/3x-ui:v3.9.0
+    container_name: bench_3xui_box
+    cgroup_parent: bench-box.slice
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ${BENCH_ROOT:-/root/bench}/data/box-3xui/db/:/etc/x-ui/
+      - ${BENCH_ROOT:-/root/bench}/data/box-3xui/cert/:/root/cert/
+      - ${BENCH_ROOT:-/root/bench}/data/box-3xui/acme/:/root/.acme.sh/
+    environment:
+      XRAY_VMESS_AEAD_FORCED: "false"
+      XUI_ENABLE_FAIL2BAN: "true"
+    tty: true
+    networks:
+      bench-box:
+        ipv4_address: 11.11.0.20
+    restart: "no"
+networks:
+  bench-box:
+    external: true

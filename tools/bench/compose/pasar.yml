@@ -1,0 +1,13 @@
+# PasarGuard panel v5.4.1, default (SQLite) install: the project's docker-compose.yml (what `pasarguard.sh install`
+# fetches) with the image pinned to v5.4.1, cgroup_parent (shared 1 vCPU / 1 GB budget) and the data path moved.
+# network_mode: host is kept as the project ships it; .env sets UVICORN_HOST to 127.0.0.1.
+services:
+  pasarguard:
+    image: pasarguard/panel:v5.4.1
+    container_name: bench_pasarguard
+    restart: "no"
+    cgroup_parent: bench-panel.slice
+    env_file: ${BENCH_ROOT:-/root/bench}/pasar/.env
+    network_mode: host
+    volumes:
+      - ${BENCH_ROOT:-/root/bench}/data/pasar:/var/lib/pasarguard

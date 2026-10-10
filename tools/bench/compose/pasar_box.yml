@@ -1,0 +1,37 @@
+# PasarGuard v5.4.1 one-server scenario: the default (SQLite) panel container exactly as the project ships it (host network,
+# UVICORN_HOST=127.0.0.1 in the env file) and the official node image (pasarguard/node v0.5.4, Xray core inside) on the isolated
+# bench-box network with a fixed address. Both containers are in the one 2 vCPU / 2 GB slice.
+services:
+  pasarguard:
+    image: pasarguard/panel:v5.4.1
+    container_name: bench_pasarguard_box
+    restart: "no"
+    cgroup_parent: bench-box.slice
+    env_file: ${BENCH_ROOT:-/root/bench}/pasar/box.env
+    network_mode: host
+    volumes:
+      - ${BENCH_ROOT:-/root/bench}/data/box-pasar:/var/lib/pasarguard
+      - ${BENCH_ROOT:-/root/bench}/data/box-pasar-cert:/certs:ro
+  pasarguard-node:
+    image: pasarguard/node:v0.5.4
+    container_name: bench_pasarguard_node_box
+    restart: "no"
+    cgroup_parent: bench-box.slice
+    cap_add:
+      - NET_ADMIN
+    environment:
+      SERVICE_PORT: 62050
+      SERVICE_PROTOCOL: "grpc"
+      SSL_CERT_FILE: "/var/lib/pg-node/certs/ssl_cert.pem"
+      SSL_KEY_FILE: "/var/lib/pg-node/certs/ssl_key.pem"
+      API_KEY: "${PG_NODE_API_KEY}"
+      GENERATED_CONFIG_PATH: "/var/lib/pg-node/generated"
+    volumes:
+      - ${BENCH_ROOT:-/root/bench}/data/box-pasar-node:/var/lib/pg-node
+      - ${BENCH_ROOT:-/root/bench}/data/box-pasar-cert:/certs:ro
+    networks:
+      bench-box:
+        ipv4_address: 11.11.0.41
+networks:
+  bench-box:
+    external: true

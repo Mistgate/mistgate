@@ -75,3 +75,4 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Architecture](reference/architecture.md): how the panel, the agents and the clients talk to each other.
 - [FAQ](reference/faq.md): short answers to common questions.
 - [Comparison with other panels](reference/comparison.md): Mistgate next to 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager and s-ui, with sources.
+- [Benchmarks](reference/benchmarks.md): memory, CPU, start time and load of Mistgate next to 3x-ui, Remnawave and PasarGuard on the same small server, with the method and the limits.

@@ -40,8 +40,7 @@ Type its IP and root password. The panel pins the SSH host key, checks the serve
 Every 5 minutes the panel connects to every server the way an app does and loads a test page through the tunnel. On each node a doctor runs 16 host checks (disk, journal, resolver, clock, ports, BBR) and offers five fixes that run only after you confirm. Warnings go to Telegram. [Health](docs/en/operations/health.md)
 
 **Light and hidden.**
-Two static Go binaries, one for the panel and one for the node agent. SQLite and systemd: no Docker, no database server. On the author's own install the panel uses about 150 MB of RAM on a 1 vCPU / 1 GB VPS, serving 16 people and 4 nodes. A stranger who opens the panel's address sees a decoy site; the admin sits behind a secret path or host name. Releases are reproducible and signed offline, and nodes install only signed builds. Torrent protection blocks plaintext BitTorrent on the node; its events keep what matched and the destination port, and no address leaves the node. [Security](docs/en/operations/security.md) · [Releases and signing](docs/en/operations/releases.md)
-<!-- TODO(benchmarks): replace the one-install figure with benchmark results (panel and node RSS, idle and under load, next to other panels) once they exist. -->
+Two static Go binaries, one for the panel and one for the node agent. SQLite and systemd: no Docker, no database server. On a small test server (1 vCPU / 1 GB) the panel alone idles at 16-20 MiB of private memory (3x-ui 68-74, PasarGuard 262-265, Remnawave 426-454); panel, node and database together on one 2 vCPU / 2 GB server take 57 MiB (the same three: 84, 299 and 707). In that test, adding and removing users and restarting the panel dropped no connections, while 3x-ui restarts its core when users change. A stranger who opens the panel's address sees a decoy site; the admin sits behind a secret path or host name. Releases are reproducible and signed offline, and nodes install only signed builds. Torrent protection blocks plaintext BitTorrent on the node; its events keep what matched and the destination port, and no address leaves the node. [Security](docs/en/operations/security.md) · [Releases and signing](docs/en/operations/releases.md) · [Benchmarks, including where Mistgate is slower](docs/en/reference/benchmarks.md)
 
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
@@ -92,7 +91,7 @@ Then:
 |:--|:--|:--|:--|:--|:--|:--|
 | Runs without Docker | ✅ | ✅ | ❌ | ✅ | partial | ✅ |
 | Database | SQLite | SQLite or PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB or PostgreSQL | SQLite |
-| Panel RAM | ~150 MB in use¹ | ? | 2 GB min, 4 GB rec.² | ? | 1 GB min, 2 GB rec.² | ? |
+| Panel RAM, idle | 16-20 MiB¹ | 68-74 MiB¹ | 426-454 MiB¹ | not measured | 262-265 MiB¹ | not measured |
 | One-line installer | soon | ✅ | ❌ | ✅ | ✅ | ✅ |
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | partial | ✅ | ✅ | ✅ |
@@ -105,8 +104,7 @@ Then:
 | HWID device limit | device count only | ✅ | ✅ | ? | ✅ | ? |
 | Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |
 
-<!-- TODO(benchmarks): the RAM row compares one measured install with other projects' documented requirements; replace it with benchmark results once they exist. -->
-¹ Measured on the author's own panel: 1 vCPU / 1 GB VPS, 16 people, 4 nodes. Not a benchmark. ² The project's documented requirements. "?" means the project's own README and docs do not say.
+¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say.
 
 Others are ahead in protocol breadth, community size, HWID limits and full Telegram bots. The full table with sources, checked on 2026-10-09, is in [Comparison with other panels](docs/en/reference/comparison.md).
 

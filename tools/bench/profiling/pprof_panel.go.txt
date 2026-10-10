@@ -1,0 +1,20 @@
+// Overlay file (never written into the repository). Serves net/http/pprof on a loopback port and switches on the mutex and block
+// profilers. Build: go build -overlay overlay.json -o mistgate-prof ./cmd/mistgate
+package main
+
+import (
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"runtime"
+)
+
+func init() {
+	addr := os.Getenv("BENCH_PPROF_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:6060"
+	}
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(10000) // one sample per 10 µs spent blocked
+	go http.ListenAndServe(addr, nil)
+}

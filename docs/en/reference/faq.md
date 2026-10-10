@@ -9,7 +9,7 @@ Mistgate is two static Go binaries: the panel with an embedded SQLite database a
 
 ## How much memory does it use?
 
-- **Panel:** the target is about 80 MB of RAM when idle (a target, not a measurement). A password sign-in briefly takes 64 MiB more for the password hash.
+- **Panel:** 16-20 MiB of private memory idle on a 1 vCPU / 1 GB test server, 0 to 200 users (see [Benchmarks](benchmarks.md); a long-running install with traffic, logs and caches uses more). A password sign-in briefly takes 64 MiB more for the password hash.
 - **Node agent:** its systemd unit sizes the limits from the server's RAM: the Go runtime aims at about 60% of RAM, systemd throttles the agent above about 70% and stops it above about 85%. The doctor's **Memory** check warns when the host runs short (see [Health](../operations/health.md)).
 
 ## Which apps work?

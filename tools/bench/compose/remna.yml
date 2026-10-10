@@ -1,0 +1,103 @@
+# Remnawave panel 3.4.5: the official docker-compose-prod.yml (tag 3.4.5), with three changes: images pinned
+# (backend 3 -> 3.4.5), cgroup_parent on every service (the shared 1 vCPU / 1 GB budget), host paths for the env file.
+x-common: &common
+  ulimits:
+    nofile:
+      soft: 1048576
+      hard: 1048576
+  restart: "no"
+  cgroup_parent: bench-panel.slice
+  networks:
+    - remnawave-network
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100m
+      max-file: 5
+
+x-env: &env
+  env_file: ${BENCH_ROOT:-/root/bench}/remna/.env
+
+services:
+  remnawave:
+    image: remnawave/backend:3.4.5
+    container_name: remnawave
+    hostname: remnawave
+    <<: [*common, *logging, *env]
+    volumes:
+      - valkey-socket:/var/run/valkey
+    ports:
+      - 127.0.0.1:3000:${APP_PORT:-3000}
+      - 127.0.0.1:3001:${METRICS_PORT:-3001}
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:${METRICS_PORT:-3001}/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      remnawave-db:
+        condition: service_healthy
+      remnawave-redis:
+        condition: service_healthy
+
+  remnawave-db:
+    image: postgres:18.4
+    container_name: remnawave-db
+    hostname: remnawave-db
+    shm_size: 512mb
+    <<: [*common, *logging, *env]
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=UTC # DO NOT CHANGE DATABASE TIMEZONE. IT MUST BE UTC.
+    ports:
+      - 127.0.0.1:6767:5432
+    volumes:
+      - remnawave-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 3s
+      timeout: 10s
+      retries: 3
+
+  remnawave-redis:
+    image: valkey/valkey:9-alpine
+    container_name: remnawave-redis
+    hostname: remnawave-redis
+    <<: [*common, *logging]
+    volumes:
+      - valkey-socket:/var/run/valkey
+    command: >
+      valkey-server
+      --save ""
+      --appendonly no
+      --maxmemory-policy noeviction
+      --loglevel warning
+      --unixsocket /var/run/valkey/valkey.sock
+      --unixsocketperm 777
+      --port 0
+    healthcheck:
+      test: ['CMD', 'valkey-cli', '-s', '/var/run/valkey/valkey.sock', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    driver: bridge
+    external: false
+
+volumes:
+  remnawave-db-data:
+    name: remnawave-db-data
+    driver: local
+    external: false
+  valkey-socket:
+    name: valkey-socket
+    driver: local
+    external: false

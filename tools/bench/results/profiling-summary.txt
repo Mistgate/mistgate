@@ -1,0 +1,69 @@
+Note: the .pprof files, the top listings and the directories named below (storm/, nocache/, box/) were not published; this file is the written analysis.
+Mistgate v0.1.32 profiling pass (pprof builds via go build -overlay; the repository is untouched). Not part of the published numbers.
+Builds: mistgate-prof (panel, pprof 127.0.0.1:6060), mistgate-node-prof (pprof 0.0.0.0:6061 inside the node container on the isolated network),
+mistgate-nolimit-nocache-prof (panel with the diff in ../mistgate-bench-variants.diff). Mutex fraction 5, block rate 10 us, GODEBUG=gctrace=1.
+Files: storm/ (default build under the subscription hammer; storm/idle = idle), nocache/ (limits off + cache off), box/ (one-server: B64, C, D for panel and node).
+Every *.pprof has *.top.txt next to it (top 15; heap and allocs in inuse / alloc_space / alloc_objects views). *_gctrace.txt = GODEBUG=gctrace=1 lines.
+
+== Question 1: what allocates on the 429 path? (storm/)
+Run: default build, 200 links, 50 clients, X-Forwarded-For per link, 60 s: 2.00 M requests, 12,000 answered 200, 1.99 M answered 429.
+- Anon memory did NOT grow from 16 to 79 MiB because of the 429s. In the three main repetitions anon was 20 MiB before the load and 27 MiB during and after (flat, +7 MiB).
+  The 79-80 MiB anon peak is at t=2 s of the run, i.e. when the harness creates the owner with a password: BeginSetup hashes with argon2id, 64 MiB
+  (alloc profile: golang.org/x/crypto/argon2.initBlocks 64 MB = 60 % of all allocation until then). It falls back to 16 MiB afterwards.
+- GC on the 429 storm: 4.3 collections per second, heap goal 16 MB, heap in use at the end 8 MB, longest stop-the-world 0.26 ms, GC about 1 % of CPU. GOMAXPROCS is 1 (cgroup CPU limit).
+- CPU: 49 % of the samples are in socket syscalls (httpserver.(*errConn).Write is 40 % cumulative: the kernel send of the 429), Public handler 14.5 % cumulative:
+  allow() 5.5 % (client IP from X-Forwarded-For 3.5 %, token bucket 1.1 %), tooMany/writeHTML 3.1 %, secret-prefix compare 1.7 %. About 37 us of CPU per refused request, nearly all of it in the kernel.
+- Allocation: 6.51 GB for 2.0 M requests = 3.2 KB per refused request. By site:
+    net/http request parsing (readRequest/readMIMEHeader/url.parse)  41 %   (standard library, unavoidable)
+    Request.WithContext (auth.WithClientIP 633 MB + httpserver.withStart 618 MB)  19 %   <- two copies of the request per request
+    http.Header.Clone in response.WriteHeader  12.8 %   (copying the response header map)
+    textproto.MIMEHeader.Set (http.Header.Set)  11.6 %   <- one small slice per header set in the response
+    context.WithValue (withStart, WithClientIP)  2.8 %;  netip.ParseAddr (X-Forwarded-For)  3 %.
+
+== Question 2: cost of one subscription render, with and without the cache
+- With the cache on and limits off: 19,580 requests/s at 100 % of one vCPU = 51 us of CPU per request, p99 7 ms.
+- With the cache off: 1,630 requests/s at 100 % = 614 us of CPU per request (12 times more), about 62 KB and 900 objects allocated per request (6.13 GB over the run).
+  CPU: 75 % of the handler is store.read -> runSQLBatch; 49.8 % of all CPU is sqlite3_prepare_v2 (parsing and planning the same statements again for every request:
+  database/sql Tx.QueryContext -> modernc sqlite newStmt -> _sqlite3Parser/_yy_reduce); strings.ToUpper 4.7 %.
+  Allocation: strings.ToUpper 989 MB = 16 % (called twice per statement: store/batch_native.go runSQLBatch and Store.read, only to test whether the query starts with SELECT),
+  sqlite rows/columns 12 %, strings.NewReplacer rebuilt per request 4 % (protocols.unescapePointer, subs.renderRemarks), reflect map assigns 3 %.
+- Tail latency of the uncached path (p99 1.7 s while p50 4 ms and p95 6.6 ms): about 25 requests every second, constant through the run, take over 500 ms (tail_diag.json).
+  With GOMAXPROCS=4 the slow requests disappear (p99 86 ms) at the same throughput (1,553 against 1,641 requests/s). GC is not the cause (longest stop-the-world 0.26 ms),
+  and the mutex and block profiles show no lock wait of the store. The read pool is 4 connections (store/open_sqlite.go:31) behind 50 concurrent requests;
+  with one P a share of the requests waits for a connection about 1.7 s. database/sql gives a freed connection to a RANDOM waiter (sql.go: db.connRequests.TakeRandom()),
+  so with 46 waiting requests a few wait many turns. This explains the shape (constant small share, long wait); the exact queue was not traced.
+
+== Lock contention
+- Panel (idle, 429 storm, uncached, one-server B/C/D): mutex wait in total below 1.2 s per 30 s window (D: 1.13 s, sync.Mutex.Unlock/runtime.unlock under connect handlers); no store lock in the top.
+  Block profile: idle waits only (HTTP keep-alive reader abort, select in background jobs, agent stream).
+- Node (hysteria core): 0.5 s (B64, 25 s) to 5.8 s (D, 30 s) of contended mutex time, all under hysteria core internal/utils.(*QStream).Write <- server.copyBufferLog:
+  the 64 proxied streams of one QUIC connection write through one mutex. Library code (apernet/hysteria core and quic-go), not Mistgate code.
+
+== GC (gctrace)
+- Panel in the one-server run: 1,702 collections in 291 s (5.9/s), longest STW 46 ms, total STW 302 ms, heap peak 73 MB.
+- Node: 623 collections in 274 s (2.3/s), longest STW 49 ms, total STW 473 ms, heap peak 64 MB.
+  Pauses of 46-49 ms occur while the group is held at its CPU quota (CFS throttling); in the panel-only runs the longest STW was 0.26 ms.
+
+== Node CPU (one server, 64 streams, 25 s window, 168 % of one vCPU busy)
+- 52 % in syscalls: UDP sendmsg (37 % cumulative, GSO in use: sendPacketsWithGSO 24 %) and recvmsg; AES-GCM 5 %; quic-go packet packing 19 %; BBR bookkeeping <1 %.
+- Allocation (1.03 GB in the window): quic-go ackhandler.ReceivedAck 37 %, framer.Append 21 %, SentPacket 12 %: all in apernet/quic-go.
+
+== Ranked fixes (largest expected gain first; each backed by the profiles above)
+1. Cache prepared statements for the store's reads (store/batch_native.go runSQLBatch, called from Store.read; keep one *sql.Stmt per query string, use tx.StmtContext).
+   Evidence: 49.8 % of all CPU on the uncached path is sqlite3_prepare_v2; 614 us per request. Expected: 40-50 % less CPU per uncached subscription and per API read,
+   uncached throughput 1,630 -> about 2,800-3,200 requests/s on one vCPU; also lowers admin latency during churn (D: 48 % of panel CPU in store.read).
+2. Make reads fair: a FIFO queue (ticketed semaphore) in front of the 4 read connections (store/open_sqlite.go:31), because database/sql hands freed connections to random waiters;
+   or at least keep GOMAXPROCS at 2 or more (cmd/mistgate main: runtime.GOMAXPROCS(max(2, n))).
+   Evidence: about 25 requests per second wait over 500 ms at GOMAXPROCS=1; none at 4. Expected: p99 of the uncached path 1.7 s -> under 100 ms; throughput unchanged.
+3. Stop upper-casing whole SQL strings to test for "SELECT" (store/batch_native.go:42 and Store.read: use a case-insensitive check of the first 6 bytes).
+   Evidence: 989 MB = 16 % of allocation and 4.7 % of CPU on the uncached path. Expected: -16 % allocation, -5 % CPU, trivial change.
+4. Build the request context once in Public() (httpserver/server.go withStart + auth.WithClientIP: two Request.WithContext copies and two context.WithValue per request).
+   Evidence: 1.25 GB + 0.19 GB = 22 % of the 429-path allocation (3.2 KB per request). Expected: about -20 % allocation on every public request.
+5. Set constant response headers with shared slices (h["Cache-Control"] = noStore) instead of h.Set in the decoy/429/security-header code (httpserver/decoy.go writeHTML, tooMany).
+   Evidence: MIMEHeader.Set 771 MB (11.6 %) of the 429-path allocation, Header.Clone in WriteHeader 850 MB (12.8 %) grows with the header count. Expected: -10 % allocation.
+6. Hoist strings.NewReplacer out of protocols.unescapePointer and subs.renderRemarks (package-level var). Evidence: makeGenericReplacer + trie 243 MB (4 %) per request on the uncached path.
+7. fleet.credentialHash / appendDigestPart rebuilt for every user on each change (fleet.recomputeAll): make the digest incremental.
+   Evidence in D: 183 MB = 8.9 % of allocation and about 5 % of panel CPU while one user is added and one removed per second; cost grows with the number of users.
+8. Pool gzip writers (compress/gzip Writer.Write -> flate.NewWriter 182 MB = 8.9 % of allocation in D).
+9. Limit concurrent argon2id hashes to one (auth/password.go:44; 64 MiB each): one password sign-in raises anon from 16 to 79 MiB; five at once would use 320 MiB of a 1 GB host.
+10. Node: nothing in Mistgate's own code shows up; the cost is UDP syscalls, AES-GCM and apernet/quic-go. Report to upstream: ackhandler.ReceivedAck allocates 37 % of the node's allocation; QStream.Write mutex.

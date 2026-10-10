@@ -1,0 +1,24 @@
+# Modifications of the supplementary Mistgate builds (NOT the shipped build), applied to the v0.1.32 tag. The repository is untouched.
+# mistgate-nolimit-nocache = both files as below; mistgate-nolimit = server.go as below and panel.go with only 'MaxPerHour: -1' (MinInterval left at its default).
+--- a/internal/panel/app/panel.go
++++ b/internal/panel/app/panel.go
+@@ -278,7 +278,7 @@
+ 	subCfg := subs.Config{
+ 		Title: c.Title, BaseURL: subBase, Settings: cache, Brand: brand,
+ 		Routing: subs.HappRouting(dnsSvc), Events: st, Log: log,
+-		Limiter: limiter, AfterResponse: c.AfterResponse,
++		Limiter: limiter, AfterResponse: c.AfterResponse, MaxPerHour: -1, MinInterval: -1, // BENCH PATCH: per-link fetch cap off, render cache off
+ 		PageKey: vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
+ 	}
+ 	sub := http.NewServeMux()
+--- a/internal/panel/httpserver/server.go
++++ b/internal/panel/httpserver/server.go
+@@ -235,7 +235,7 @@
+ 	}
+ 	cfg.AdminHost = strings.ToLower(strings.TrimSuffix(cfg.AdminHost, "."))
+ 	s := &Server{cfg: cfg, auth: a, st: st, decoy: newDecoy(cfg.DecoyDir), dist: cfg.Dist, cop: http.NewCrossOriginProtection()}
+-	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: 10, Burst: 60})
++	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: -1, Burst: 60}) // BENCH PATCH: public per-client bucket off
+ 	s.adminLim = cfg.Limits.limiter(cfg.Limits.Admin, Rate{PerSecond: 30, Burst: 200}) // a page load and its polling
+ 	s.agentLim = cfg.Limits.limiter(cfg.Limits.Agent, Rate{PerSecond: 5, Burst: 30})
+ 	if s.dist == nil {
