@@ -106,17 +106,19 @@ type Agent struct {
 	torrentEvents   map[string]time.Time
 	torrentUTPSyn   map[string]*torrentUTPSynWindow
 
-	instanceID     string
-	out            *outbox
-	jobs           chan job
-	settings       atomic.Pointer[pb.NodeSettings]
-	linkAdvertised atomic.Bool               // the last HelloAck advertised the signed link
-	linkRetryAt    atomic.Pointer[time.Time] // a link attempt failed before it was established: the link is not tried again before this
-	linkHTTPClient *http.Client              // test seam; nil uses normal system-root TLS verification
-	offset         atomic.Int64              // seconds: panel clock minus local clock, measured at Hello
-	skewed         atomic.Bool
-	cur            atomic.Pointer[session]
-	cancel         context.CancelCauseFunc
+	instanceID              string
+	out                     *outbox
+	jobs                    chan job
+	settings                atomic.Pointer[pb.NodeSettings]
+	clientIPv6DoctorPending atomic.Bool
+	clientIPv6DoctorRunning atomic.Bool
+	linkAdvertised          atomic.Bool               // the last HelloAck advertised the signed link
+	linkRetryAt             atomic.Pointer[time.Time] // a link attempt failed before it was established: the link is not tried again before this
+	linkHTTPClient          *http.Client              // test seam; nil uses normal system-root TLS verification
+	offset                  atomic.Int64              // seconds: panel clock minus local clock, measured at Hello
+	skewed                  atomic.Bool
+	cur                     atomic.Pointer[session]
+	cancel                  context.CancelCauseFunc
 
 	upd          *update.Updater
 	helloOutcome atomic.Pointer[pb.LastUpdate] // the last_update the current Hello carried; acked by the HelloAck
@@ -787,6 +789,9 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	}
 	a.cur.Store(s)
 	defer a.cur.CompareAndSwap(s, nil)
+	if a.clientIPv6DoctorPending.Load() {
+		a.submit(s, job{sweep: true}) // apply HelloAck settings before their doctor re-check
+	}
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() { defer wg.Done(); s.writer() }()
@@ -860,10 +865,7 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 		changed := ack.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled()
 		a.settings.Store(ack.Settings)
 		if changed {
-			select {
-			case a.jobs <- job{sweep: true}:
-			default: // the worker is busy and its queue is full: the next sweep will do
-			}
+			a.clientIPv6DoctorPending.Store(true)
 		}
 	}
 	a.out.ack(ack.AckedSeq)
@@ -1151,9 +1153,14 @@ func (a *Agent) handle(ctx context.Context, j job) {
 	}
 	switch {
 	case j.ds != nil:
+		clientIPv6Changed := j.ds.Settings != nil &&
+			j.ds.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled()
 		r := a.applyDesired(ctx, j.ds)
 		if r != nil {
 			reply(&pb.ConnectRequest{Message: &pb.ConnectRequest_ApplyResult{ApplyResult: r}})
+			if clientIPv6Changed && (r.Status == pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Status == pb.ApplyStatus_APPLY_STATUS_PARTIAL) {
+				a.clientIPv6SettingsChanged(j.s)
+			}
 		}
 		// An ignored old delta (nil) and APPLIED/PARTIAL count as applied; REJECTED and BASE_MISMATCH do not (the panel resends).
 		a.dsOK.Store(r == nil || r.Status == pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Status == pb.ApplyStatus_APPLY_STATUS_PARTIAL)
@@ -1182,6 +1189,9 @@ func (a *Agent) handle(ctx context.Context, j job) {
 	case j.sweep:
 		if m := a.snapshotModel(); m.revision != 0 {
 			a.reconcile(ctx, m, nil)
+		}
+		if a.clientIPv6DoctorPending.Load() {
+			a.startClientIPv6Doctor(j.s)
 		}
 	}
 }

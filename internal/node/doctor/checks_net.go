@@ -198,8 +198,13 @@ func checkIPv6(ctx context.Context, e *Env) Result {
 			return Result{Status: OK, Code: CodeIPv6OK, Params: p("ipv6", "yes", "connect", "ok"), Detail: "global IPv6 address, outbound connect works"}
 		}
 	}
-	return Result{Status: Warn, Code: CodeIPv6Stalls, Params: p("ipv6", "yes", "connect", "failed"),
-		Detail: "global IPv6 address but an outbound IPv6 connect fails; clients that get AAAA answers will stall"}
+	if e.Settings().ClientIPv6Disabled {
+		return Result{Status: OK, Code: CodeIPv6ClientOff, Params: p("ipv6", "yes", "connect", "failed", "client_ipv6", "off"),
+			Detail: "outbound IPv6 fails, IPv6 for clients is off: clients use IPv4"}
+	}
+	return Result{Status: Warn, Code: CodeIPv6Stalls,
+		Detail: "global IPv6 address but an outbound IPv6 connect fails; clients that get AAAA answers will stall",
+		Params: p("ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off")}
 }
 
 // hasGlobalInet6 reads /proc/net/if_inet6 ("<32 hex> ifindex prefixlen scope flags name"): scope 00 is global;

@@ -13,10 +13,11 @@ import { useFixFlow } from "./fix";
 const muteAlert = vi.fn();
 const acceptDoctorItem = vi.fn();
 const restartInbounds = vi.fn();
+const updateNode = vi.fn();
 let role = Role.OWNER;
 vi.mock("@/lib/api", () => ({
   health: { muteAlert: (...a: unknown[]) => muteAlert(...a), acceptDoctorItem: (...a: unknown[]) => acceptDoctorItem(...a), applyFix: vi.fn() },
-  nodes: { restartInbounds: (...a: unknown[]) => restartInbounds(...a) },
+  nodes: { restartInbounds: (...a: unknown[]) => restartInbounds(...a), updateNode: (...a: unknown[]) => updateNode(...a) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   fleet: {},
   users: {},
@@ -45,7 +46,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const f of [muteAlert, acceptDoctorItem, restartInbounds]) f.mockReset();
+  for (const f of [muteAlert, acceptDoctorItem, restartInbounds, updateNode]) f.mockReset();
 });
 
 const NOW = 2_000_000_000;
@@ -161,6 +162,37 @@ describe("an alert that a restart can fix", () => {
     await mount(timeout);
     expect(button("Restart “hy2 · WARP · 8443”")).toBeUndefined();
     expect(text()).toContain("“hy2 · WARP · 8443” does not complete the handshake on port 8443");
+  });
+});
+
+describe("outbound IPv6 that does not work", () => {
+  const ipv6 = alert({
+    kind: AlertKind.DOCTOR_WARN,
+    subject: "ipv6",
+    titleKey: "doctor.ipv6.title",
+    whyKey: "health.doctor.ipv6.why",
+    params: { check: "ipv6", ipv6: "yes", connect: "failed", suggest: "client_ipv6_off" },
+    actions: ["open_node", "accept", "mute"],
+  });
+
+  it("offers to turn off IPv6 for clients, asks first and changes only that setting", async () => {
+    updateNode.mockResolvedValue({});
+    await mount(ipv6);
+    const off = button("Turn off IPv6 for clients")!;
+    expect(off.className).toContain("bg-accent");
+    await click(off);
+    expect(updateNode).not.toHaveBeenCalled();
+    expect(dialog().textContent).toContain("Turn off IPv6 for clients on de1?");
+    expect(dialog().textContent).toContain("Nothing changes on the server itself");
+    await click(button("Turn off", dialog()));
+    expect(updateNode).toHaveBeenCalledWith({ nodeId: "nod_1", clientIpv6: false });
+    expect(text()).toContain("de1: IPv6 for clients is off");
+  });
+
+  it("is only for the owner", async () => {
+    role = Role.HELPER;
+    await mount(ipv6);
+    expect(button("Turn off IPv6 for clients")).toBeUndefined();
   });
 });
 

@@ -35,6 +35,7 @@ const samples: Record<string, Record<string, string>> = {
   "ipv6.none_warp_ipv4": { ipv6: "no", warp_inbounds: "inb_1" }, // the panel's own code (health/doctor.go reassess)
   "ipv6.ok": { ipv6: "yes", connect: "ok" },
   "ipv6.connect_failed": { ipv6: "yes", connect: "failed" },
+  "ipv6.client_off": { ipv6: "yes", connect: "failed", client_ipv6: "off" },
   "foreign_vpn.none": {},
   "foreign_vpn.found": { names: "unit:x-ui,docker:amnezia", count: "2" },
   "foreign_vpn.clash": { names: "proc:xray", count: "1", on_our_ports: "xray:udp/443" },

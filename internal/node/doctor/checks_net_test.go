@@ -142,6 +142,11 @@ func TestIPv6(t *testing.T) {
 			return []Inbound{{ID: "inb_w", Enabled: true, Egress: "warp"}, {ID: "inb_d", Enabled: true, Egress: "direct"}}
 		}
 	}
+	clientIPv6 := func(disabled bool) func(*Env) {
+		return func(e *Env) {
+			e.Settings = func() Settings { return Settings{ClientIPv6Disabled: disabled} }
+		}
+	}
 
 	// No IPv6: fine unless a WARP inbound needs it.
 	f.put("/proc/net/if_inet6", ula+tentative)
@@ -150,13 +155,26 @@ func TestIPv6(t *testing.T) {
 	want(t, r, Warn, "")
 	param(t, r, "warp_inbounds", "inb_w")
 
-	// IPv6 and the connect works.
+	// IPv6 and the connect works, regardless of the client setting.
 	f.put("/proc/net/if_inet6", global)
-	want(t, run(t, f.doctor(dial(true)), CheckIPv6), OK, "")
-	// IPv6 but the connect fails: clients that get AAAA will stall.
-	r = run(t, f.doctor(dial(false)), CheckIPv6)
+	for _, disabled := range []bool{false, true} {
+		r = run(t, f.doctor(dial(true), clientIPv6(disabled)), CheckIPv6)
+		want(t, r, OK, "")
+		param(t, r, "connect", "ok")
+	}
+
+	// A broken outbound connect is a warning while IPv6 for clients is on.
+	r = run(t, f.doctor(dial(false), clientIPv6(false)), CheckIPv6)
 	want(t, r, Warn, "")
-	param(t, r, "connect", "failed")
+	code(t, r, CodeIPv6Stalls, "connect", "failed", "suggest", "client_ipv6_off")
+
+	// With IPv6 for clients off, the same host problem no longer affects clients.
+	r = run(t, f.doctor(dial(false), clientIPv6(true)), CheckIPv6)
+	want(t, r, OK, "")
+	code(t, r, CodeIPv6ClientOff, "connect", "failed", "client_ipv6", "off")
+	if r.Detail != "outbound IPv6 fails, IPv6 for clients is off: clients use IPv4" {
+		t.Errorf("disabled setting detail = %q", r.Detail)
+	}
 
 	// No table at all (IPv6 disabled in the kernel) is "no IPv6".
 	f.remove("/proc/net/if_inet6")

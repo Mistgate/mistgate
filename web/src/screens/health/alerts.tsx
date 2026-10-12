@@ -100,8 +100,11 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
   const target = fix && a.nodeId ? { ...fix, nodeId: a.nodeId, nodeName: a.nodeName, key: `${a.nodeId}/${check}/${inbound}`, profile: a.params.profile } : null;
   const restart = a.nodeId && can.run ? (a.actions.includes("restart_inbound") && a.params.inbound ? "one" : a.actions.includes("restart_inbounds") ? "all" : null) : null;
   const go = a.nodeId ? (a.actions.includes("open_profiles") ? "profiles" : a.actions.includes("open_warp") ? "warp" : null) : null;
+  // outbound IPv6 is broken on the node: the remedy is the node's "IPv6 for clients" setting, which only the owner changes
+  const ipv6Off = Boolean(a.nodeId) && a.params.suggest === "client_ipv6_off" && can.fix;
+  const [turningOff, setTurningOff] = useState(false);
   // the main action is the first one this role can take
-  const goMain = !(target && can.fix) && !restart;
+  const goMain = !(target && can.fix) && !restart && !ipv6Off;
   // an alert about a person: their name stands where a node's would, and the button leads to their page
   const person = isPeopleAlert(a) ? (a.params.user_name ?? "") : "";
   const userId = isPeopleAlert(a) && a.actions.includes("open_user") ? (a.params.user_id ?? "") : "";
@@ -138,6 +141,11 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
         {restart && (
           <Button variant={target && can.fix ? "secondary" : "primary"} size="md" onClick={() => setRestarting(true)}>
             {restart === "one" ? t("hl.fix.restartNamed", { profile: a.params.profile || a.params.inbound || "" }) : t("hl.alerts.restartAll")}
+          </Button>
+        )}
+        {ipv6Off && (
+          <Button variant={(target && can.fix) || restart ? "secondary" : "primary"} size="md" onClick={() => setTurningOff(true)}>
+            {t("hl.ipv6Off.button")}
           </Button>
         )}
         {go === "profiles" && (
@@ -192,6 +200,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
           ))}
       </div>
       {restart && <RestartDialog open={restarting} onOpenChange={setRestarting} alert={a} scope={restart} />}
+      {ipv6Off && <ClientIPv6OffDialog open={turningOff} onOpenChange={setTurningOff} alert={a} />}
     </article>
   );
 }
@@ -266,6 +275,46 @@ function RestartDialog({ open, onOpenChange, alert: a, scope }: { open: boolean;
       }
     >
       <p className="text-[13px] leading-normal text-pretty">{body}</p>
+      {error && <Notice tone="danger">{error}</Notice>}
+    </Modal>
+  );
+}
+
+/** Turns the node's "IPv6 for clients" off (the same switch as in the node's settings); the agent re-runs its IPv6 check. */
+function ClientIPv6OffDialog({ open, onOpenChange, alert: a }: { open: boolean; onOpenChange: (o: boolean) => void; alert: Alert }) {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [error, setError] = useState("");
+  const call = useMutation({
+    mutationFn: () => nodesApi.updateNode({ nodeId: a.nodeId, clientIpv6: false }),
+    onSuccess: () => {
+      onOpenChange(false);
+      toast(t("hl.ipv6Off.done", { node: a.nodeName }));
+      for (const k of ["health", "node", "nodes"]) void qc.invalidateQueries({ queryKey: [k] });
+    },
+    onError: (e) => setError(errorText(e, t)),
+  });
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(o) => {
+        if (!call.isPending) onOpenChange(o);
+        if (!o) setError("");
+      }}
+      title={t("hl.ipv6Off.title", { node: a.nodeName })}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={call.isPending} onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" size="md" disabled={call.isPending} onClick={() => call.mutate()}>
+            {t("hl.ipv6Off.do")}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] leading-normal text-pretty">{t("hl.ipv6Off.body")}</p>
       {error && <Notice tone="danger">{error}</Notice>}
     </Modal>
   );

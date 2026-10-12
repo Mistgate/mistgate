@@ -57,6 +57,11 @@ export const en = {
   "hl.restart.all": "Connections through the node’s profiles (now {online}) drop for a couple of seconds and come back by themselves.",
   "hl.restart.allIdle": "Nobody is connected to this node now: the restart drops no one.",
   "hl.restart.do": "Restart",
+  "hl.ipv6Off.button": "Turn off IPv6 for clients",
+  "hl.ipv6Off.title": "Turn off IPv6 for clients on {node}?",
+  "hl.ipv6Off.body": "Outbound IPv6 does not work on this server, so an app that gets an IPv6 address for a site waits before it falls back. With IPv6 for clients off, the node turns their IPv6 away at once and apps use IPv4. Nothing changes on the server itself; turn it back on in the node's settings.",
+  "hl.ipv6Off.do": "Turn off",
+  "hl.ipv6Off.done": "{node}: IPv6 for clients is off",
   "hl.alerts.fleetWide": "fleet",
   "hl.alerts.since": "for {duration}",
   "hl.alerts.history": "History · 7 days",
@@ -310,7 +315,7 @@ export const en = {
   "health.doctor.resolver.why":
     "The server’s own resolver fails for {failed} or answers slowly ({median_ms} ms). apt, certificate renewal and the WARP exit depend on it. On Russian nodes a public resolver also breaks gosuslugi.ru, so the fix picks Yandex DNS there. The DNS for user traffic is set in the node’s settings.",
   "health.doctor.ipv6.why":
-    "IPv6 on this host: {ipv6}; an outbound IPv6 connection: {connect}. An IPv6 address that cannot connect makes sites with IPv6 records stall. Nothing here is fixed automatically.",
+    "IPv6 on this host: {ipv6}; an outbound IPv6 connection: {connect}. An IPv6 address that cannot connect makes sites with IPv6 records stall. Turning off IPv6 for clients makes apps use IPv4 at once.",
   "health.doctor.foreign_vpn.why":
     "Leftovers of other VPN software are on this host: {names}. They can hold our ports or rewrite traffic. The panel does not delete them: decide by hand.",
   "health.doctor.foreign_nft.why":
@@ -348,6 +353,7 @@ export const en = {
   "doctor.detail.ipv6.none_warp_ipv4": "No IPv6; WARP goes through its IPv4 address, which is fine",
   "doctor.detail.ipv6.ok": "IPv6 address present, outbound connections work",
   "doctor.detail.ipv6.connect_failed": "IPv6 address present, but outbound connections fail",
+  "doctor.detail.ipv6.client_off": "Outbound IPv6 fails, but IPv6 for clients is off, so clients use IPv4",
   "doctor.detail.foreign_vpn.none": "No other VPN software found",
   "doctor.detail.foreign_vpn.found": "Found: {names}",
   "doctor.detail.foreign_vpn.clash": "Found: {names}; on our ports: {on_our_ports}",
@@ -522,6 +528,11 @@ export const ru: typeof en = {
   "hl.restart.all": "Подключения через профили ноды (сейчас {online}) оборвутся на пару секунд и восстановятся сами.",
   "hl.restart.allIdle": "Сейчас к этой ноде никто не подключён: перезапуск никого не оборвёт.",
   "hl.restart.do": "Перезапустить",
+  "hl.ipv6Off.button": "Выключить IPv6 для клиентов",
+  "hl.ipv6Off.title": "Выключить IPv6 для клиентов на {node}?",
+  "hl.ipv6Off.body": "На этом сервере не работает исходящий IPv6, поэтому приложение, получившее для сайта IPv6-адрес, подвисает, прежде чем перейти на IPv4. Если выключить IPv6 для клиентов, нода сразу отклонит их IPv6, и приложения пойдут по IPv4. На самом сервере ничего не меняется; включить обратно можно в настройках ноды.",
+  "hl.ipv6Off.do": "Выключить",
+  "hl.ipv6Off.done": "{node}: IPv6 для клиентов выключен",
   "hl.alerts.fleetWide": "флот",
   "hl.alerts.since": "уже {duration}",
   "hl.alerts.history": "История · 7 дней",
@@ -772,7 +783,7 @@ export const ru: typeof en = {
   "health.doctor.resolver.why":
     "Собственный резолвер сервера не отвечает для {failed} или отвечает медленно ({median_ms} мс). От него зависят apt, продление сертификатов и выход через WARP. На российских нодах публичный резолвер ещё и ломает gosuslugi.ru, поэтому там исправление выберет Яндекс DNS. DNS для трафика пользователей задаётся в настройках ноды.",
   "health.doctor.ipv6.why":
-    "IPv6 на хосте: {ipv6}; исходящее соединение по IPv6: {connect}. Адрес IPv6, который не соединяется, заставляет подвисать сайты с IPv6-записями. Автоматически это не чинится.",
+    "IPv6 на хосте: {ipv6}; исходящее соединение по IPv6: {connect}. Адрес IPv6, который не соединяется, заставляет подвисать сайты с IPv6-записями. Если выключить IPv6 для клиентов, приложения сразу пойдут по IPv4.",
   "health.doctor.foreign_vpn.why":
     "На хосте остались следы другого VPN-софта: {names}. Они могут занимать наши порты или переписывать трафик. Панель их не удаляет: реши сам.",
   "health.doctor.foreign_nft.why":
@@ -810,6 +821,7 @@ export const ru: typeof en = {
   "doctor.detail.ipv6.none_warp_ipv4": "IPv6 нет; WARP ходит через IPv4-адрес — это нормально",
   "doctor.detail.ipv6.ok": "IPv6-адрес есть, исходящие соединения работают",
   "doctor.detail.ipv6.connect_failed": "IPv6-адрес есть, но исходящие соединения не проходят",
+  "doctor.detail.ipv6.client_off": "Исходящий IPv6 не работает, но IPv6 для клиентов выключен, поэтому клиенты ходят по IPv4",
   "doctor.detail.foreign_vpn.none": "Другого VPN-софта не найдено",
   "doctor.detail.foreign_vpn.found": "Найдено: {names}",
   "doctor.detail.foreign_vpn.clash": "Найдено: {names}; на наших портах: {on_our_ports}",

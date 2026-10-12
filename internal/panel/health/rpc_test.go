@@ -399,6 +399,35 @@ func TestGetDoctorViews(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound, "node")
 }
 
+func TestIPv6SuggestionFlowsToDoctorAPIAndAlert(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	ipv6 := res("ipv6", dWarn, "", "ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off")
+	ipv6.DetailCode = "ipv6.connect_failed"
+	e.report("de1", false, ipv6)
+
+	resp, err := rpc{e.s}.GetDoctor(e.ctx, req(&adminv1.GetDoctorRequest{NodeId: "de1"}))
+	if err != nil || len(resp.Msg.Nodes) != 1 || len(resp.Msg.Nodes[0].Items) != 1 {
+		t.Fatalf("GetDoctor: %+v, %v", resp, err)
+	}
+	item := resp.Msg.Nodes[0].Items[0]
+	if item.Id != "ipv6" || item.Params["connect"] != "failed" || item.Params["suggest"] != "client_ipv6_off" {
+		t.Fatalf("IPv6 doctor item params: %+v", item)
+	}
+
+	alert := e.active()["doctor_warn/de1/ipv6"]
+	if alert.Params["connect"] != "failed" || alert.Params["suggest"] != "client_ipv6_off" {
+		t.Fatalf("IPv6 doctor alert params: %+v", alert.Params)
+	}
+
+	cleared := res("ipv6", dOK, "", "ipv6", "yes", "connect", "failed", "client_ipv6", "off")
+	cleared.DetailCode = "ipv6.connect_failed"
+	e.report("de1", true, cleared)
+	if _, ok := e.active()["doctor_warn/de1/ipv6"]; ok {
+		t.Fatal("the IPv6 alert stayed active after a partial OK report")
+	}
+}
+
 func TestRunDoctor(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

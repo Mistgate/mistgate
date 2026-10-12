@@ -187,11 +187,14 @@ func readTools() []toolDef {
 
 		// node_doctor: the stored report for everybody; operators and admins also get `refresh`.
 		readTool("node_doctor", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceGetDoctorProcedure),
-			"The doctor's report on a node, or on every node: the last stored result of its checks (never contacts a node), each with a fix id when one exists.",
+			"The doctor's report on a node, or on every node: the last stored result of its checks (never contacts a node), each with detail params and a fix id when one exists. "+
+				"For IPv6, suggest=client_ipv6_off means the owner can turn off IPv6 for clients in the panel; it is a panel setting, not a node fix.",
 			func(c *call, in doctorArg) (any, error) { return c.doctor(in.Node, false) }),
 		readTool("node_doctor", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceGetDoctorProcedure, adminv1connect.HealthServiceRunDoctorProcedure),
-			"The doctor's report on a node, or on every node: the last stored result of its checks, each with a fix id when one exists. With refresh=true the node's agent runs its checks now "+
+			"The doctor's report on a node, or on every node: the last stored result of its checks, each with detail params and a fix id when one exists. "+
+				"For IPv6, suggest=client_ipv6_off means the owner can turn off IPv6 for clients in the panel; it is a panel setting, not a node fix. "+
+				"With refresh=true the node's agent runs its checks now "+
 				"(it only reads the host; changing anything is node_fix).",
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
 

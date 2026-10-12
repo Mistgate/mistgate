@@ -100,8 +100,9 @@ type FSStat struct {
 
 // Settings is the part of NodeSettings the doctor needs.
 type Settings struct {
-	Country   string   // ISO 3166-1 alpha-2, "" = unknown
-	Resolvers []string // NodeSettings.dns_resolvers
+	Country            string   // ISO 3166-1 alpha-2, "" = unknown
+	Resolvers          []string // NodeSettings.dns_resolvers
+	ClientIPv6Disabled bool     // NodeSettings.client_ipv6_disabled
 }
 
 // Inbound is one inbound as the doctor sees it.

@@ -41,7 +41,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 	e.Now = a.now
 	e.Settings = func() doctor.Settings {
 		st := a.settings.Load()
-		return doctor.Settings{Country: st.CountryCode, Resolvers: st.DnsResolvers}
+		return doctor.Settings{Country: st.CountryCode, Resolvers: st.DnsResolvers, ClientIPv6Disabled: st.GetClientIpv6Disabled()}
 	}
 	e.Inbounds = a.doctorInbounds
 	e.Samples = func(w time.Duration) []doctor.Sample { return a.hostRing.Since(a.now(), w) }
@@ -246,6 +246,47 @@ func reportMsg(requestID string, rep *doctor.Report, errText string) *pb.Connect
 		}
 	}
 	return &pb.ConnectRequest{Message: &pb.ConnectRequest_DoctorReport{DoctorReport: m}}
+}
+
+// clientIPv6SettingsChanged schedules just the IPv6 check. A one-bit pending flag coalesces repeated setting changes,
+// and Run's busy response is retried once a second so a settings change during the periodic report is not lost.
+func (a *Agent) clientIPv6SettingsChanged(s *session) {
+	a.clientIPv6DoctorPending.Store(true)
+	a.startClientIPv6Doctor(s)
+}
+
+func (a *Agent) startClientIPv6Doctor(s *session) {
+	if s == nil || s.ctx.Err() != nil || !a.clientIPv6DoctorRunning.CompareAndSwap(false, true) {
+		return
+	}
+	a.goBusy(func() {
+		defer func() {
+			a.clientIPv6DoctorRunning.Store(false)
+			// A reconnect can start while the previous stream's check is finishing. Keep a queued refresh for it.
+			if a.clientIPv6DoctorPending.Load() {
+				a.startClientIPv6Doctor(a.cur.Load())
+			}
+		}()
+		for a.clientIPv6DoctorPending.Swap(false) {
+			rep, err := a.doc.Run(s.ctx, []string{doctor.CheckIPv6})
+			if err != nil {
+				a.clientIPv6DoctorPending.Store(true)
+				if !errors.Is(err, doctor.ErrBusy) || s.ctx.Err() != nil {
+					return
+				}
+				sleepCtx(s.ctx, time.Second)
+				if s.ctx.Err() != nil {
+					return
+				}
+				continue
+			}
+			if s.ctx.Err() != nil {
+				a.clientIPv6DoctorPending.Store(true)
+				return
+			}
+			s.send(reportMsg("", rep, ""))
+		}
+	})
 }
 
 // runDoctor answers a RunDoctor with one DoctorReport echoing its request_id ("busy" while another run is on).

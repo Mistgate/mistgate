@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +129,51 @@ func TestRunDoctorEchoesTheRequest(t *testing.T) {
 	}
 	if r.Results[0].Status != pb.DoctorStatus_DOCTOR_STATUS_OK { // 50% used in the canned statfs
 		t.Errorf("disk_space: %+v", r.Results[0])
+	}
+}
+
+func TestClientIPv6SettingsChangeRerunsOnlyIPv6DoctorCheck(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "proc", "net"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	global := "2a010db800000000000000000000abcd 02 40 00 80 eth0\n"
+	if err := os.WriteFile(filepath.Join(root, "proc", "net", "if_inet6"), []byte(global), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := testDoctorEnv(t)
+	h := newHarness(t, harnessOpts{doctorEnv: func(e doctor.Env) doctor.Env {
+		e = base(e)
+		e.Root = root
+		return e
+	}})
+	h.waitConnected()
+
+	if r := mustApply(t, h.panel, &pb.DesiredState{Revision: 1, Settings: &pb.NodeSettings{}}); r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED {
+		t.Fatalf("initial settings apply: %+v", r)
+	}
+	if r := mustApply(t, h.panel, &pb.DesiredState{Revision: 2, BaseRevision: 1, Settings: &pb.NodeSettings{ClientIpv6Disabled: true}}); r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED {
+		t.Fatalf("client IPv6 settings apply: %+v", r)
+	}
+
+	r := nextDoctor(t, h)
+	if !r.Partial || resultIDs(r) != doctor.CheckIPv6 {
+		t.Fatalf("settings change report should contain only ipv6: %+v", r)
+	}
+	if got := r.Results[0]; got.Status != pb.DoctorStatus_DOCTOR_STATUS_OK || got.Detail != "outbound IPv6 fails, IPv6 for clients is off: clients use IPv4" ||
+		got.Params["connect"] != "failed" || got.Params["client_ipv6"] != "off" {
+		t.Fatalf("IPv6 result after settings change: %+v", got)
+	}
+
+	// The panel can also change this setting while the agent is offline. HelloAck applies it before the first check.
+	conns := h.panel.connCount()
+	h.panel.settings.Store(&pb.NodeSettings{})
+	h.panel.dropConn()
+	eventually(t, func() bool { return h.panel.connCount() > conns }, "the agent reconnects")
+	r = nextDoctor(t, h)
+	if !r.Partial || resultIDs(r) != doctor.CheckIPv6 || r.Results[0].Status != pb.DoctorStatus_DOCTOR_STATUS_WARN ||
+		r.Results[0].Params["suggest"] != "client_ipv6_off" {
+		t.Fatalf("IPv6 result after offline setting change: %+v", r)
 	}
 }
 
