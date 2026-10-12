@@ -6,3 +6,5 @@ dist/
 wrangler.toml
 wrangler.dev.toml
 .dev.vars
+wrangler.provision.toml
+wrangler.provision.dev.toml

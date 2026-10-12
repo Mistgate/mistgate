@@ -28,9 +28,7 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 	if !slices.Equal(jobs, mapped) {
 		t.Fatalf("deferred jobs %v, jobs mapped to features %v: map every deferred job (and only those) in edgeDeferredFeatures", jobs, mapped)
 	}
-	// The Provisioner runs the installs, but the admin keeps saying "unavailable" until its Worker is wired in (edge round
-	// S6, which deletes this line and the id in edition.edgeUnavailable together).
-	covered := map[string]bool{edition.Provision: true}
+	covered := map[string]bool{}
 	for job, ids := range edgeDeferredFeatures {
 		if len(ids) == 0 {
 			t.Errorf("deferred job %q is mapped to no feature id", job)
@@ -72,6 +70,9 @@ func TestBuildEditionDecidesMe(t *testing.T) {
 	if m := me(edgeAuth); m.Edition != edition.Edge || !slices.Equal(m.Unavailable, edition.Unavailable(true)) {
 		t.Errorf("edge Me = %q %v", m.Edition, m.Unavailable)
 	}
+	if m := me(edgeAuth); slices.Contains(m.Unavailable, "provision") {
+		t.Errorf("edge Me lists SSH installs as unavailable: %v", m.Unavailable)
+	}
 	_, vpsAuth := buildPanel(t, nil)
 	if m := me(vpsAuth); m.Edition != edition.VPS || len(m.Unavailable) != 0 {
 		t.Errorf("VPS Me = %q %v", m.Edition, m.Unavailable)
@@ -95,10 +96,6 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 		feature string
 		call    func(p *Panel, a *auth.Service) error
 	}{
-		"StartNodeProvision": {edition.Provision, func(p *Panel, _ *auth.Service) error {
-			_, err := p.Provision.StartNodeProvision(auth.WithAdmin(ctx, owner), connect.NewRequest(&adminv1.StartNodeProvisionRequest{}))
-			return err
-		}},
 		"SendTelegramTest": {edition.Telegram, func(p *Panel, _ *auth.Service) error {
 			base, hc := serve(p.Telegram.Handler())
 			_, err := adminv1connect.NewTelegramServiceClient(hc, base).SendTelegramTest(ctx, connect.NewRequest(&adminv1.SendTelegramTestRequest{}))

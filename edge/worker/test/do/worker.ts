@@ -4,9 +4,12 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { NodeLink as RealNodeLink } from "../../src/nodelink";
 import type { LinkAccept, LinkChallenge, LinkStepIn, LinkStepOut } from "../../src/panellink";
-import { forwardLink } from "../../src/shell";
+import type { PanelApi } from "../../src/panel";
+import { wireProvisioner } from "../../src/provisioner";
+import { type FetchRequest, type FetchResponse, forwardLink } from "../../src/shell";
 
 export { Limiter } from "../../src/limiter";
+export { Provisioner } from "../../src/provisioner";
 
 // The object under test, plus one method for workerd.test.ts (item 9): a module-scope counter that PanelLink also reads.
 let moduleCounter = 0;
@@ -27,10 +30,32 @@ export interface FakePanel {
   step: (input: LinkStepIn, ctx?: ExecutionContext) => LinkStepOut | Promise<LinkStepOut>;
 }
 
+/** What a test scripts of the panel the Provisioner serves; `kick` is the one the Provisioner gave the loader. */
+export interface FakeServe {
+  loads: number;
+  fetch?: (request: FetchRequest) => FetchResponse | Promise<FetchResponse>;
+  provision?: (kick: () => Promise<void>) => { more: boolean; busy: boolean; waitUntil?: Promise<void> } | Promise<{ more: boolean; busy: boolean; waitUntil?: Promise<void> }>;
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __fakePanel: FakePanel | undefined;
+  // eslint-disable-next-line no-var
+  var __fakeServe: FakeServe | undefined;
 }
+
+// The Provisioner gets its panel from a loader; here it is a scripted fake in place of the wasm.
+wireProvisioner(async (_env, kick) => {
+  const serve = (globalThis.__fakeServe ??= { loads: 0 });
+  serve.loads++;
+  return {
+    fetch: (request: FetchRequest) => (serve.fetch ? Promise.resolve(serve.fetch(request)) : Promise.reject(new Error("no fetch scripted"))),
+    provision: async () => {
+      const out = serve.provision ? await serve.provision(kick) : { more: false, busy: false };
+      return { waitUntil: Promise.resolve(), ...out };
+    },
+  } as unknown as PanelApi;
+});
 
 /** Default behaviour: a fixed challenge, accept unless the auth bytes say "bad", and a step that echoes frames and requests. */
 export function defaultPanel(): FakePanel {

@@ -2,7 +2,10 @@
 #   1. the admin SPA and the user page (pnpm --dir web build), served to the panel by the Worker's static assets;
 #   2. the panel for js/wasm -> edge/worker/dist/panel.wasm;
 #   3. wasm_exec.js from the Go toolchain that built the wasm (the two must match) -> edge/worker/dist/wasm_exec.js;
-#   4. edge/worker/wrangler.dev.toml (git-ignored): wrangler.example.toml with a dummy D1 id, for `wrangler dev --local`.
+#   4. edge/worker/wrangler.dev.toml and wrangler.provision.dev.toml (git-ignored): the two scripts' templates with a dummy D1 id,
+#      for `wrangler dev --local -c wrangler.dev.toml -c wrangler.provision.dev.toml` (pnpm dev). The second script, the
+#      Provisioner that installs nodes over SSH, bundles the same dist/panel.wasm through its own entry
+#      (src/provision-index.ts) and needs no build step of its own.
 # wasm_exec.js is a generated copy, so dist/ is git-ignored and this script is the only way it is produced.
 param([switch]$SkipWeb)
 $ErrorActionPreference = "Stop"
@@ -42,6 +45,10 @@ Copy-Item -LiteralPath (Join-Path $goRoot "lib/wasm/wasm_exec.js") -Destination 
 $template = Get-Content -LiteralPath (Join-Path $worker "wrangler.example.toml") -Raw
 $local = $template -replace 'replace-with-your-d1-database-id', '00000000-0000-0000-0000-000000000000'
 [IO.File]::WriteAllText((Join-Path $worker "wrangler.dev.toml"), $local, (New-Object Text.UTF8Encoding $false))
+
+$provisionTemplate = Get-Content -LiteralPath (Join-Path $worker "wrangler.provision.example.toml") -Raw
+$provisionLocal = $provisionTemplate -replace 'replace-with-your-d1-database-id', '00000000-0000-0000-0000-000000000000'
+[IO.File]::WriteAllText((Join-Path $worker "wrangler.provision.dev.toml"), $provisionLocal, (New-Object Text.UTF8Encoding $false))
 
 $bytes = (Get-Item -LiteralPath $wasm).Length
 "edge wasm: {0} bytes ({1:N1} MiB, limit in CI 52428800, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (52428800 - $bytes), ((52428800 - $bytes) / 1KB)

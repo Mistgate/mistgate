@@ -4,6 +4,7 @@
 import type { Limiter } from "./limiter";
 import type { LimitReply } from "./limitmath";
 import type { NodeLink } from "./nodelink";
+import type { Provisioner } from "./provisioner";
 
 /** Header pairs keep repeated names (Set-Cookie) as separate entries. */
 export type HeaderPairs = [string, string][];
@@ -144,5 +145,137 @@ export function memoizeRetry<A extends unknown[], T>(start: (...args: A) => Prom
       if (current === attempt) current = undefined;
     });
     return attempt;
+  };
+}
+
+/** The header of the panel's answer to an SSH-install request (provision.ForwardHeader): "provision;v=<build>". */
+export const PROVISION_MARKER = "x-mistgate-forward";
+/** The header that carries the main script's build to the Provisioner (cmd/mistgate-edge: requireBuild). */
+export const BUILD_HEADER = "x-mistgate-build";
+/** The one Provisioner object: SSH installs are serialized by the process anyway. */
+export const PROVISIONER_NAME = "provisioner";
+
+function provisionerUnavailable(): Response {
+  return new Response(JSON.stringify({ code: "unavailable", message: "provisioner_unavailable" }), {
+    status: 503,
+    headers: { "Content-Type": "application/json", "Retry-After": "5" },
+  });
+}
+
+/**
+ * The panel of the main script cannot hold an SSH socket, so it answers an SSH-install request (the ProvisioningService
+ * and the install page, behind the sign-in check) with 204 and the marker. The request, whose body the panel has already
+ * read, then goes to the Provisioner object of the second script, with the build named by the marker in X-Mistgate-Build (a
+ * header the client sent is dropped). The object's answer is the answer; the marker never reaches the client. Undefined for
+ * any other panel answer. With no binding, or when the object cannot be reached, the answer is 503 (the Provisioner script
+ * is not deployed, or being deployed: Connect clients read it as "unavailable").
+ */
+export function forwardProvision(
+  ns: DurableObjectNamespace<Provisioner> | undefined,
+  request: FetchRequest,
+  answer: FetchResponse,
+): Promise<Response> | undefined {
+  const marker = answer.status === 204 ? answer.headers.find(([name]) => name.toLowerCase() === PROVISION_MARKER)?.[1] : undefined;
+  const build = marker?.match(/^provision;v=(.+)$/)?.[1];
+  if (!build) return undefined;
+  if (!ns) return Promise.resolve(provisionerUnavailable());
+  const headers = new Headers();
+  for (const [name, value] of request.headers) {
+    const lower = name.toLowerCase();
+    if (lower !== BUILD_HEADER && lower !== "content-length") headers.append(name, value);
+  }
+  headers.set("X-Mistgate-Build", build);
+  const body = request.method === "GET" || request.method === "HEAD" ? undefined : (request.body ?? undefined);
+  return (async () => {
+    try {
+      return await ns.get(ns.idFromName(PROVISIONER_NAME)).fetch(new Request(request.url, { method: request.method, headers, body }));
+    } catch (error) {
+      console.error("provisioner request failed:", error instanceof Error ? error.message : String(error));
+      return provisionerUnavailable();
+    }
+  })();
+}
+
+/** Wakes the Provisioner (sets its alarm); the panel's `provision.kick` option. Rejects when the object cannot be reached. */
+export async function kickProvisioner(ns: DurableObjectNamespace<Provisioner>): Promise<void> {
+  await ns.get(ns.idFromName(PROVISIONER_NAME)).kick();
+}
+
+/** What `connect()` of cloudflare:sockets is, so that this file runs under plain Node in the tests. */
+export type Connect = (address: SocketAddress | string, options?: SocketOptions) => Socket;
+
+/** The socket object the panel's sshConnect hands to Go (cmd/mistgate-edge/sshconn_js.go). */
+export type SshSocket =
+  | { ok: true; read(): Promise<Uint8Array | null>; write(bytes: Uint8Array): Promise<void>; close(): void }
+  | { ok: false; error: "refused" | "failed" | "timeout" };
+
+/**
+ * What a Worker's connect() says when it will not open an address (a Cloudflare, private or loopback address) and, as measured
+ * on a local workerd, when nothing listens there. The two cannot be told apart, so Go words both as "refused or unreachable".
+ * The text a production Worker gives for a Cloudflare address is still to be seen (design §2.7).
+ */
+const REFUSED = /proxy request failed|cannot connect to the specified address/i;
+
+class OpenTimeout extends Error {}
+
+/**
+ * Opens a TCP socket for the panel's SSH client. Opening is bounded by timeoutMs (Go derives it from its own deadline), so a
+ * socket nobody waits for any more does not hold one of the Worker's six outgoing connections: it is closed when the limit
+ * passes. read() ends with null at the end of the stream, and neither read nor write throws once close() was called (a closed
+ * socket rejects the read that was waiting; that is not news to the caller that closed it).
+ */
+export async function openSocket(connect: Connect, host: string, port: number, timeoutMs: number): Promise<SshSocket> {
+  let socket: Socket | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    socket = connect({ hostname: host, port }, { secureTransport: "off", allowHalfOpen: false });
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new OpenTimeout()), timeoutMs);
+    });
+    await Promise.race([socket.opened, late]);
+  } catch (error) {
+    try {
+      void socket?.close().catch(() => {});
+    } catch {
+      // nothing to close
+    }
+    if (error instanceof OpenTimeout) return { ok: false, error: "timeout" };
+    return { ok: false, error: REFUSED.test(error instanceof Error ? error.message : String(error)) ? "refused" : "failed" };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+  const open = socket;
+  const reader = open.readable.getReader();
+  const writer = open.writable.getWriter();
+  let closed = false;
+  return {
+    ok: true,
+    async read() {
+      if (closed) return null;
+      try {
+        const chunk = await reader.read();
+        return chunk.done ? null : chunk.value;
+      } catch (error) {
+        if (closed) return null;
+        throw error;
+      }
+    },
+    async write(bytes) {
+      try {
+        await writer.write(bytes);
+      } catch (error) {
+        if (closed) return;
+        throw error;
+      }
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      try {
+        void open.close().catch(() => {});
+      } catch {
+        // already closed
+      }
+    },
   };
 }

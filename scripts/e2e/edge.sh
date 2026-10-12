@@ -10,6 +10,9 @@
 # configuration is all zeros. The only outbound traffic is the npm install and miniflare's public cf.json.
 #
 # The Worker is copied into $WORK/worker and installed there: the repo's own edge/worker is never written to.
+#
+# Two scripts run in the one `wrangler dev`: the main Worker and mistgate-edge-provision (the Provisioner Durable Object that
+# installs nodes over SSH). Step 2d drives the SSH wizard through both against a real OpenSSH sshd in this namespace.
 
 EDGE_HOST=de1.example.com
 EDGE_NS=""
@@ -20,6 +23,7 @@ edge_note_ns() { EDGE_NS=$(ip netns identify $$); }
 # its workerd behind). Only processes of those two programs, never anything else.
 edge_reap() {
   local p exe
+  [ -z "${EDGE_RUN_SSHD_MADE:-}" ] || rmdir /run/sshd 2>/dev/null || true # the privilege separation directory sshd insists on
   [ -n "$EDGE_NS" ] || return 0
   for p in $(ip netns pids "$EDGE_NS" 2>/dev/null); do
     [ "$p" != $$ ] || continue
@@ -126,6 +130,9 @@ TS
     -e "s|^directory = .*|directory = \"$REPO/web/dist\"|" \
     -e 's|^main = .*|main = "src/measure.ts"|' "$src/wrangler.example.toml" >"$w/wrangler.toml"
   grep -q '00000000-0000-0000-0000-000000000000' "$w/wrangler.toml" || die "wrangler.toml: the zero D1 id was not set"
+  sed -e 's/replace-with-your-d1-database-id/00000000-0000-0000-0000-000000000000/' "$src/wrangler.provision.example.toml" >"$w/wrangler.provision.toml"
+  grep -q '00000000-0000-0000-0000-000000000000' "$w/wrangler.provision.toml" || die "wrangler.provision.toml: the zero D1 id was not set"
+  grep -q '^main = "src/provision-index.ts"' "$w/wrangler.provision.toml" || die "wrangler.provision.toml: unexpected main (template changed?)"
   grep -q '^main = "src/measure.ts"' "$w/wrangler.toml" || die "wrangler.toml: main was not replaced (template changed?)"
   grep -q "^directory = \"$REPO/web/dist\"" "$w/wrangler.toml" || die "wrangler.toml: assets directory was not set (template changed?)"
   MASTER_KEY=$(openssl rand -hex 32)
@@ -152,7 +159,7 @@ edge_start_worker() {
   spawn env -C "$WORK/worker" -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID -u CLOUDFLARE_API_KEY -u CLOUDFLARE_EMAIL \
     HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" XDG_CACHE_HOME="$WORK/home/.cache" XDG_DATA_HOME="$WORK/home/.local/share" \
     WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH="$WORK/wrangler-logs" CI=true \
-    node_modules/.bin/wrangler dev --ip 127.0.0.1 --port "$PUB" --local-protocol https \
+    node_modules/.bin/wrangler dev -c wrangler.toml -c wrangler.provision.toml --ip 127.0.0.1 --port "$PUB" --local-protocol https \
     --https-key-path "$WORK/tls/leaf.key" --https-cert-path "$WORK/tls/leaf.pem" --persist-to "$WORK/wrangler-state" \
     </dev/null >>"$WORK/wrangler.log" 2>&1
   WRANGLER_PID=$LAST_PID
@@ -174,6 +181,51 @@ edge_workerd_rss() { vmrss_mb "$(edge_workerd_pid)"; }
 # The Worker's own log with wrangler's per-request lines taken out: wrangler prints the path of every request, and a
 # path holds the secret prefixes. That is wrangler's dev server, not the panel; the rest is what the panel logs.
 edge_worker_log() { grep -vE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" || true; }
+
+# ---------------------------------------------------------------- a real sshd for the SSH wizard
+
+EDGE_SSH_IP=45.67.89.10 # a public-looking address (the panel refuses private ones); it lives on this namespace's lo only
+EDGE_SSH_USER=mgsshtest # a login of this run: private copies of passwd and shadow are mounted over the real ones, in this mount namespace only
+
+# edge_ssh_up: OpenSSH on $EDGE_SSH_IP:22 with password login for one throwaway user. The system sshd stays as it is (masked):
+# this one has a configuration file of its own, runs in this network namespace and dies with it.
+edge_ssh_up() {
+  local d=$WORK/sshd
+  [ -x /usr/sbin/sshd ] || die "step 2d needs openssh-server (/usr/sbin/sshd); apt-get install openssh-server (the system service stays masked)"
+  mkdir -p "$d"
+  ssh-keygen -q -t ed25519 -N '' -f "$d/host_ed25519" || die "ssh-keygen failed"
+  EDGE_SSH_FP=$(ssh-keygen -lf "$d/host_ed25519.pub" | awk '{print $2}')
+  EDGE_SSH_PASS=$(openssl rand -hex 12)
+  SECRETS+=("$EDGE_SSH_PASS")
+  cp /etc/passwd "$d/passwd"
+  cp /etc/shadow "$d/shadow"
+  printf '%s:x:61999:65534::%s:/bin/sh\n' "$EDGE_SSH_USER" "$d" >>"$d/passwd"
+  printf '%s:%s:19000:0:99999:7:::\n' "$EDGE_SSH_USER" "$(printf %s "$EDGE_SSH_PASS" | openssl passwd -6 -stdin)" >>"$d/shadow"
+  mount --bind "$d/passwd" /etc/passwd
+  mount --bind "$d/shadow" /etc/shadow
+  [ -d /run/sshd ] || { mkdir -p /run/sshd && EDGE_RUN_SSHD_MADE=1; }
+  cat >"$d/sshd_config" <<CONF
+Port 22
+ListenAddress $EDGE_SSH_IP
+HostKey $d/host_ed25519
+PidFile $d/sshd.pid
+AuthorizedKeysFile none
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+PubkeyAuthentication no
+UsePAM no
+PermitRootLogin no
+AllowUsers $EDGE_SSH_USER
+StrictModes no
+LogLevel VERBOSE
+CONF
+  ip addr add "$EDGE_SSH_IP/32" dev lo
+  /usr/sbin/sshd -t -f "$d/sshd_config" || die "the sshd configuration is not valid"
+  spawn /usr/sbin/sshd -D -e -f "$d/sshd_config" -E "$WORK/sshd.log"
+  EDGE_SSHD_PID=$LAST_PID
+  sshd_listens() { ss -ltn "sport = :22" | grep -q "$EDGE_SSH_IP:22"; }
+  wait_for 15 "sshd to listen on $EDGE_SSH_IP:22" sshd_listens || { tail -n 10 "$WORK/sshd.log" 2>/dev/null; die "sshd did not start"; }
+}
 
 # ---------------------------------------------------------------- scenario
 
@@ -321,6 +373,34 @@ PY
   inbounds_active 1 >/dev/null || wait_for 60 "the inbound ACTIVE after the reload" inbounds_active 1 || die "inbound not ACTIVE after the reload"
   PANEL_PID=$(edge_workerd_pid)
   pass "Worker source touched: wrangler reloaded, the agent reconnected as generation $((GEN_BEFORE + 1)), still no full DesiredState, inbound ACTIVE"
+
+  step "2d. install over SSH: the wizard reaches a real OpenSSH through the Worker, the Provisioner object and connect()"
+  edge_ssh_up
+  ssh_attempts() { grep -c 'Failed password\|Accepted password' "$WORK/sshd.log" || true; }
+  # marker (main Worker) -> Provisioner object (second script) -> Go -> connect() -> sshd: the host key, with no login sent
+  FP_GOT=$(api ProvisioningService/GetSSHFingerprint "{\"host\":\"$EDGE_SSH_IP\",\"port\":22}" | jq -r .fingerprint) || die "GetSSHFingerprint failed through the Provisioner"
+  [ "$FP_GOT" = "$EDGE_SSH_FP" ] || die "the wizard read host key '$FP_GOT', sshd has '$EDGE_SSH_FP'"
+  [ "$(ssh_attempts)" = 0 ] || die "reading the host key sent a login to sshd"
+  # a closed port: the platform's socket cannot tell it from a refusal, and says so
+  ERR=$(api ProvisioningService/GetSSHFingerprint "{\"host\":\"$EDGE_SSH_IP\",\"port\":2299}" 2>&1 >/dev/null || true)
+  grep -q 'ssh_target_refused' <<<"$ERR" || die "a closed port did not answer ssh_target_refused: $ERR"
+  # the login, with the owner's step-up: a wrong password is refused by sshd, the right one gets in (and stops at the
+  # preflight: the throwaway user is not root and has no sudo), a wrong host key never gets the password
+  stepup || die "step-up failed"
+  check_ssh() { # <fingerprint> <password>
+    jq -nc --arg h "$EDGE_SSH_IP" --arg f "$1" --arg u "$EDGE_SSH_USER" --arg p "$2" '{host:$h, port:22, fingerprint:$f, username:$u, password:$p}'
+  }
+  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "$EDGE_SSH_FP" "wrong-$(openssl rand -hex 6)")" 2>&1 >/dev/null || true)
+  grep -q 'ssh_authentication_failed' <<<"$ERR" || die "a wrong password did not answer ssh_authentication_failed: $ERR"
+  [ "$(ssh_attempts)" = 1 ] || die "sshd saw $(ssh_attempts) login attempts after the wrong password, want 1"
+  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "$EDGE_SSH_FP" "$EDGE_SSH_PASS")" 2>&1 >/dev/null || true)
+  grep -q 'Accepted password for '"$EDGE_SSH_USER" "$WORK/sshd.log" || die "sshd never accepted the password of the right login: $ERR"
+  ! grep -q 'ssh_authentication_failed\|ssh_connection\|ssh_target' <<<"$ERR" || die "the right password did not get through the login: $ERR"
+  ATTEMPTS=$(ssh_attempts)
+  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "SHA256:$(printf 'A%.0s' $(seq 43))" "$EDGE_SSH_PASS")" 2>&1 >/dev/null || true)
+  grep -q 'ssh_host_key_changed' <<<"$ERR" || die "a wrong host key did not answer ssh_host_key_changed: $ERR"
+  [ "$(ssh_attempts)" = "$ATTEMPTS" ] || die "the password was sent to a host whose key did not match"
+  pass "SSH wizard through the Provisioner Worker: the host key read over a Worker socket matches sshd's, a closed port is ssh_target_refused, a wrong password is refused by sshd, the right one logs in (preflight is the next step), a wrong host key never gets the password"
 
   step "3. user, subscription"
   GROUP_ID=$(api GroupService/CreateGroup "{\"name\":\"e2e\",\"profileIds\":[\"$PROFILE_ID\"]}" | jq -r .group.id)

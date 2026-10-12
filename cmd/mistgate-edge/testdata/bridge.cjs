@@ -815,6 +815,7 @@ async function run() {
     const me = await connectRPC(secondPanel, "AuthService/Me", {}, adminCookie);
     assert.equal(me.message.edition, "edge", "Me names the edge edition");
     assert.ok(me.message.unavailable.includes("backups") && me.message.unavailable.includes("mcp"), "Me lists the features the edge lacks");
+    assert.ok(!me.message.unavailable.includes("provision"), "SSH installs run on the edge: Me does not list them as unavailable");
 
     const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
     assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");

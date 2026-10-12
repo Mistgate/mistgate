@@ -12,7 +12,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "wrangler dev --local --local-protocol https --config wrangler.dev.toml"
+    "dev": "wrangler dev --local --local-protocol https -c wrangler.dev.toml -c wrangler.provision.dev.toml"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",

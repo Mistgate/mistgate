@@ -293,8 +293,7 @@ func Build(c Config) (*Panel, error) {
 		binaries = c.NodeBinaries
 	}
 	provCfg := nodeprovision.Config{
-		// The panel that has an SSH client is the one that runs the installs, so it does not refuse them as an edge.
-		Edge: edge && c.SSHClient == nil, StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: binaries, SSH: c.SSHClient,
+		StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: binaries, SSH: c.SSHClient,
 		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(edge, in), AgentSNI: in.AgentSNI, Log: log,
 	}
 	if c.ProvisionKick != nil {

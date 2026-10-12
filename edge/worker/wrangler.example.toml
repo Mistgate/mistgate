@@ -36,6 +36,15 @@ class_name = "Limiter"
 name = "NODELINK"
 class_name = "NodeLink"
 
+# SSH installs of nodes run in a second Worker script, mistgate-edge-provision (wrangler.provision.example.toml), in one
+# Durable Object that holds the sockets: this Worker marks the install requests, forwards them there and wakes it from the
+# cron. The binding needs that script deployed first (deploy the Provisioner before this Worker, and again before every
+# update of this one); a request that finds no Provisioner is answered 503.
+[[durable_objects.bindings]]
+name = "PROVISIONER"
+class_name = "Provisioner"
+script_name = "mistgate-edge-provision"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Limiter"]
@@ -59,6 +68,8 @@ enabled = false
 
 # Required secret, never a value in this file: 32 random bytes as 64 hex characters.
 #   openssl rand -hex 32 | wrangler secret put MASTER_KEY
+# The Provisioner script needs the same secret (wrangler secret put MASTER_KEY --name mistgate-edge-provision, same value);
+# when you change the key, change it in both.
 # Locally, put MASTER_KEY=<64 hex> in the git-ignored .dev.vars. Losing this key makes everything the panel encrypted in
 # D1 unreadable, so keep a copy in a password manager.
 #

@@ -11,6 +11,7 @@ to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`.
 - `src/shell.ts`: the pure parts (request/response conversion, static-asset reader, init de-duplication, routing of limit calls); tested by `pnpm test`.
 - `src/limiter.ts`, `src/limitmath.ts`: the `Limiter` Durable Object (see below) and its pure math.
 - `src/nodelink.ts`, `src/panellink.ts`: the agent link shell (`NodeLink` Durable Object) and the entrypoint through which it reaches Go (see below).
+- `src/provisioner.ts`, `src/provision-index.ts`, `wrangler.provision.example.toml`: the second script, `mistgate-edge-provision`, with the `Provisioner` Durable Object that installs nodes over SSH (see below).
 
 ## Security limits (`Limiter` Durable Object)
 
@@ -50,6 +51,26 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 - Step contract (`LinkEvent`, `LinkStepIn`, `LinkStepOut` in `panellink.ts`): the state goes in and out as one string; the
   object writes it first, then sends the frames, delivers replies, applies the close and re-arms the alarm.
 
+## SSH installs (`Provisioner` Durable Object, second script)
+
+Installing a node over SSH needs a TCP socket that lives as long as the install, and a socket belongs to the I/O context it was
+opened in, while the Go panel resumes on any JavaScript event of its isolate. So the installs run in a **second Worker script**,
+`mistgate-edge-provision`, whose isolate serves one object: the same `panel.wasm`, in its `serve` role. Deploy it **before** the
+main Worker (which binds to it), with the same `MASTER_KEY` secret and the same D1 database. It has no route and no workers.dev
+name; its own `fetch` answers 404 without starting Go.
+
+- Main Worker: behind the sign-in check the panel answers the ProvisioningService and the install page with 204 and
+  `X-Mistgate-Forward: provision;v=<build>` (`provision.ForwardMarker`); `forwardProvision` (`shell.ts`) sends the request, with the body the panel
+  already read and the build in `X-Mistgate-Build`, to the one `Provisioner` (`idFromName("provisioner")`). No binding, or an object that cannot be
+  reached: 503 `provisioner_unavailable`. The cron wakes the object (`kick`) while an install is queued, running or being cancelled.
+- `Provisioner`: `fetch` runs the same panel handler (sign-in and step-up are checked again; a request of another build gets 503 `panel_updating`),
+  `kick()` sets the alarm to now unless one is set earlier, `alarm()` calls `mgPanel.provision()` (one install per pass, 14 minutes at most) and
+  sets the alarm again: in a second when another install waits, in 30 s when a pass was already running, in 60 s after an error. The object stores
+  nothing but its alarm; the install is in D1, and an evicted pass is requeued (three interruptions fail the install).
+- `openSocket` (`shell.ts`) is the `sshConnect` option of the serve role: `connect()` with an opening limit, `read`, `write`, `close`; the
+  platform's refusal text is `refused`.
+- Local development runs both scripts: `pnpm dev` (`wrangler dev -c wrangler.dev.toml -c wrangler.provision.dev.toml`, written by `scripts/build-edge.ps1`).
+
 ## Init contract (`mgPanel.init`)
 
 | option | value |
@@ -59,6 +80,7 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 | `assets` | `async (path) => Uint8Array \| null`: reads one file of `web/dist` through the `ASSETS` binding (exact 200 hit, else null); the panel caches what it reads |
 | `publicURL` | `PUBLIC_URL`, or the origin of the first request (https). Used only while the database is empty |
 | `limit` | `async (request) => {ok, retryAfterMs, remaining, first}`: one call to the `Limiter` object of the request's (name, key); a rejection makes the panel refuse the request |
+| `provision` | `{role: "forward" \| "serve", kick?, sshConnect?}`: the main Worker is a `forward` role (with `kick` when `PROVISIONER` is bound); the Provisioner script is `serve` and needs both functions |
 | `adminHost`, `adminPrefix`, `subPrefix` | optional `ADMIN_HOST`, `ADMIN_PREFIX`, `SUB_PREFIX`, first run only |
 | `setupTokenSHA256` | optional `SETUP_TOKEN_SHA256` secret: 64 lowercase hex characters, the SHA-256 of a setup token the deployer chose (see below); anything else makes `init` fail before it writes |
 

@@ -1,5 +1,6 @@
-# Test-only configuration for @cloudflare/vitest-pool-workers: the Limiter and NodeLink objects with a scripted fake of
-# PanelLink, nothing of the panel.
+# Test-only configuration for @cloudflare/vitest-pool-workers: the Limiter, NodeLink and Provisioner objects with a scripted
+# fake of PanelLink and of the panel the Provisioner serves, nothing of the wasm. AUX_PROVISIONER is an object of another
+# script (the auxiliary worker of vitest.config.ts), to prove a request reaches an object across scripts.
 name = "do-test"
 main = "worker.ts"
 # Older than the Worker's own date on purpose: the workerd that ships with the test pool lags behind wrangler's.
@@ -13,6 +14,15 @@ class_name = "Limiter"
 name = "NODELINK"
 class_name = "NodeLink"
 
+[[durable_objects.bindings]]
+name = "PROVISIONER"
+class_name = "Provisioner"
+
+[[durable_objects.bindings]]
+name = "AUX_PROVISIONER"
+class_name = "AuxProvisioner"
+script_name = "provision-aux"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Limiter"]
@@ -20,3 +30,7 @@ new_sqlite_classes = ["Limiter"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["NodeLink"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Provisioner"]

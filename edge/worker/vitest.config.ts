@@ -1,7 +1,30 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
-// Two projects: the pure code runs under plain Node; the Durable Object class runs in workerd (test/do).
+// What the Provisioner's script looks like to the main Worker, as plain JavaScript (an auxiliary worker is not bundled): one
+// Durable Object that answers a request with what it received and counts kicks. test/do/provision-forward.test.ts sends the
+// main Worker's forwarded request to it across the script boundary, the way the binding in wrangler.example.toml does.
+const provisionAux = `
+import { DurableObject } from "cloudflare:workers";
+export class AuxProvisioner extends DurableObject {
+  async fetch(request) {
+    const path = new URL(request.url).pathname;
+    if (path.endsWith("/gzip")) {
+      const gzip = new Blob([JSON.stringify({ hello: "gzip" })]).stream().pipeThrough(new CompressionStream("gzip"));
+      const bytes = await new Response(gzip).arrayBuffer();
+      return new Response(bytes, { status: 200, headers: { "Content-Encoding": "gzip", "Content-Type": "application/json" }, encodeBody: "manual" });
+    }
+    const body = [...new Uint8Array(await request.arrayBuffer())];
+    return Response.json({ method: request.method, url: request.url, headers: [...request.headers], body, kicks: (await this.ctx.storage.get("kicks")) ?? 0 }, { status: 201 });
+  }
+  async kick() {
+    await this.ctx.storage.put("kicks", ((await this.ctx.storage.get("kicks")) ?? 0) + 1);
+  }
+}
+export default { fetch: () => new Response("Not Found", { status: 404 }) };
+`;
+
+// Two projects: the pure code runs under plain Node; the Durable Object classes run in workerd (test/do).
 export default defineConfig({
   test: {
     // workerd reports an exception thrown inside a Durable Object as an unhandled rejection even when the caller catches
@@ -17,7 +40,23 @@ export default defineConfig({
     projects: [
       { test: { name: "node", include: ["test/*.test.ts"] } },
       {
-        plugins: [cloudflareTest({ main: "./test/do/worker.ts", wrangler: { configPath: "./test/do/wrangler.test.toml" } })],
+        plugins: [
+          cloudflareTest({
+            main: "./test/do/worker.ts",
+            wrangler: { configPath: "./test/do/wrangler.test.toml" },
+            miniflare: {
+              workers: [
+                {
+                  name: "provision-aux",
+                  modules: true,
+                  script: provisionAux,
+                  compatibilityDate: "2026-08-01",
+                  durableObjects: { AUX: { className: "AuxProvisioner", useSQLite: true } },
+                },
+              ],
+            },
+          }),
+        ],
         test: { name: "workers", include: ["test/do/*.test.ts"] },
       },
     ],

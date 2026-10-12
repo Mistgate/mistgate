@@ -13,9 +13,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/buildinfo"
-	"github.com/mistgate/mistgate/internal/panel/auth"
 	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -128,24 +126,5 @@ func TestForwardMountsAreTheMarkerOrTheService(t *testing.T) {
 	}
 	if page := call(forwardPage(false, http.NotFoundHandler())); page.Code != http.StatusNotFound {
 		t.Fatalf("served page: %d", page.Code)
-	}
-}
-
-// The panel that has an SSH client is the one that runs installs: it does not refuse them as an edge, and the panel that
-// does not have one still does (until the edition list drops them).
-func TestPanelWithAnSSHClientServesInstalls(t *testing.T) {
-	owner := store.Admin{ID: "adm_owner", Role: store.RoleOwner}
-	ctx := auth.WithAdmin(context.Background(), owner)
-	fingerprint := func(p *Panel) error {
-		_, err := p.Provision.GetSSHFingerprint(ctx, connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: "127.0.0.1", Port: 22}))
-		return err
-	}
-	refusing, _ := buildPanel(t, &edgeTickRemote{})
-	if err := fingerprint(refusing); err == nil || !strings.Contains(err.Error(), "unavailable_in_edition") {
-		t.Fatalf("an edge panel without an SSH client = %v, want the edition refusal", err)
-	}
-	serving, _ := buildPanelWith(t, &edgeTickRemote{}, func(c *Config) { c.SSHClient = nodeprovision.NewClient() })
-	if err := fingerprint(serving); err != nil && strings.Contains(err.Error(), "unavailable_in_edition") {
-		t.Fatalf("a panel with an SSH client refused: %v", err)
 	}
 }
