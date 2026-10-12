@@ -60,7 +60,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 
 ¹ Measured by this project on one test machine: private memory (anon) of the whole panel group, idle, with 0 to 200 users and no node connected, on a 1 vCPU / 1 GB server (3x-ui includes its Xray core and fail2ban). Marzban, Hiddify Manager and s-ui were not measured.
 
-On a 2 vCPU / 2 GB server with the VPN core, the database and Hysteria2 traffic, Mistgate (panel and node) held 57 MiB idle and 66 MiB at 64 parallel streams; the same figures were 84 and 93 MiB for 3x-ui, 299 and 315 MiB for PasarGuard, 707 and 598 MiB for Remnawave. The method, the versions and where Mistgate is slower are on the [Benchmarks](benchmarks.md) page. The end-to-end test checks the panel's idle memory against 80 MB and the node agent's against 100 MB.
+On a 2 vCPU / 2 GB server with the VPN core, the database and Hysteria2 traffic, Mistgate (panel and node) held 57 MiB idle and 80 MiB on a "bad day" (64 tunnel streams, 300 subscription requests per second and one user added and one removed per second); the same figures were 74 and 129 MiB for 3x-ui, 297 and 347 MiB for PasarGuard, 761 and 1,114 MiB for Remnawave. The method, the versions and where Mistgate is slower are on the [Benchmarks](benchmarks.md) page. The end-to-end test checks the panel's idle memory against 80 MB and the node agent's against 100 MB.
 
 Marzban gets maintenance only (its last release is from January 2025), and its users are moving to PasarGuard, a successor developed in a separate repository rather than a GitHub fork. Marzneshin is dormant.
 

@@ -14,6 +14,7 @@ from bench import sh, log, Client, totp, ROOT, BIN, DATA, UA
 NET, SUBNET, GW = "bench-box", "11.11.0.0/16", "11.11.0.1"
 SINK_ADDR = GW + ":19000"
 HYLOAD = BIN + "/hyload"
+PROBE = "100ms"   # interval of the small request through the tunnel in phase B/D/E; --probe 97ms drifts against the 100 ms quota period
 BOXSLICE = "bench-box.slice"
 BOXCG = "/sys/fs/cgroup/bench.slice/bench-box.slice"
 CLICG = "/sys/fs/cgroup/bench.slice/bench-client.slice"
@@ -143,7 +144,7 @@ class MistBox(Box):
     PANEL = ("11.11.0.1", 18080)
     D = DATA + "/box-mg"
     NODE_STATE = DATA + "/box-mg-node"
-    NODE_IMAGE = "bench/mgnode:0.1.32"
+    NODE_IMAGE = "bench/mgnode:0.1.33"
     NODE_ENV = ""
     core_restart_on_user_change = "no: the node agent adds and removes users in the running Hysteria2 server"
 
@@ -452,7 +453,7 @@ class PgBox(Box):
 
     def setup(self, n):
         D = self.DD
-        sh("sed -e 's|^UVICORN_HOST = .*|UVICORN_HOST = \"127.0.0.1\"|' @R@/pasar/.env > @R@/pasar/box.env")
+        sh("sed -e 's|^UVICORN_HOST = .*|UVICORN_HOST = \"127.0.0.1\"|' %s/pasar/.env > %s/pasar/box.env" % (ROOT, ROOT))
         sh("openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout %s/box-pasar-node/certs/ssl_key.pem -out %s/box-pasar-node/certs/ssl_cert.pem -days 30 -subj /CN=%s -addext subjectAltName=IP:%s 2>/dev/null" % (D, D, self.NODE_IP, self.NODE_IP))
         sh("openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout %s/box-pasar-cert/key.pem -out %s/box-pasar-cert/cert.pem -days 30 -subj /CN=bench.test 2>/dev/null; chmod 644 %s/box-pasar-cert/*" % (D, D, D))
         import uuid
@@ -567,7 +568,7 @@ def stop_sink():
 
 
 def phase_tp(box, sm, streams, dur, user=0):
-    r = Run("tp -server %s -auth '%s' -sink %s -streams %d -d %ds -probe 100ms" % (box.server, box.auths[user], SINK_ADDR, streams, dur), dur, sm).go()
+    r = Run("tp -server %s -auth '%s' -sink %s -streams %d -d %ds -probe %s" % (box.server, box.auths[user], SINK_ADDR, streams, dur, PROBE), dur, sm).go()
     r["cpu_pct_box"] = r["box"].get("cpu_pct_of_1vcpu")
     if r.get("gbit_s") is not None and r["cpu_pct_box"]:
         r["mbit_per_cpu_sec"] = r["gbit_s"] * 1000 / (r["cpu_pct_box"] / 100)
@@ -627,7 +628,7 @@ def phase_D(box, sm, args, res):
         out["conntrack_limit"] = int(open("/proc/sys/net/netfilter/nf_conntrack_max").read())
 
     def tunnel():
-        out["tp"] = Run("tp -server %s -auth '%s' -sink %s -streams 64 -d %ds -probe 100ms" % (box.server, box.auths[1], SINK_ADDR, dur), dur, sm).go()
+        out["tp"] = Run("tp -server %s -auth '%s' -sink %s -streams 64 -d %ds -probe %s" % (box.server, box.auths[1], SINK_ADDR, dur, PROBE), dur, sm).go()
 
     full0 = sh("dmesg | grep -c 'table full'", check=False).strip() or "0"
     ths = [threading.Thread(target=f) for f in (tunnel, storm, churn, conntrack)]
@@ -677,7 +678,7 @@ def phase_E(box, sm, args):
 
     th = threading.Thread(target=restarter)
     th.start()
-    r = Run("tp -server %s -auth '%s' -sink %s -streams 64 -d %ds -probe 100ms" % (box.server, box.auths[2], SINK_ADDR, dur), dur, sm).go()
+    r = Run("tp -server %s -auth '%s' -sink %s -streams 64 -d %ds -probe %s" % (box.server, box.auths[2], SINK_ADDR, dur, PROBE), dur, sm).go()
     th.join()
     res["tp"] = r
     series = r.get("mbit_s_per_second") or []
@@ -775,14 +776,17 @@ def main():
     ap.add_argument("--storm-rate", type=int, default=300, dest="storm_rate", help="subscription storm, requests/s over all users (open loop); 0 = as fast as possible")
     ap.add_argument("--restart-dur", type=int, default=60, dest="restart_dur")
     ap.add_argument("--tag", default="box")
-    ap.add_argument("--pin", default="", help="host CPUs for the box, e.g. 14-15 (sensitivity check); clients then run on 0-13")
+    ap.add_argument("--pin", default="", help="host CPUs for the box, e.g. 14-15 (sensitivity check); clients then run on --client-cpus")
+    ap.add_argument("--client-cpus", default="0-13", dest="client_cpus", help="with --pin: host CPUs for the clients and the sink, e.g. 2-7,10-15")
+    ap.add_argument("--probe", default="100ms", help="interval of the small request through the tunnel (97ms: the phase drifts against the 100 ms CFS period)")
     ap.add_argument("--keep", action="store_true", help="debug: leave the box running")
     ap.add_argument("--skip-done", action="store_true")
     args = ap.parse_args()
-    global PIN, CLIENT_PREFIX
+    global PIN, CLIENT_PREFIX, PROBE
+    PROBE = args.probe
     PIN = args.pin
     if PIN:
-        CLIENT_PREFIX = "taskset -c 0-13 "
+        CLIENT_PREFIX = "taskset -c %s " % args.client_cpus
     outdir = "%s/out/%s" % (ROOT, args.tag)
     os.makedirs(outdir, exist_ok=True)
     prepare_infra()
