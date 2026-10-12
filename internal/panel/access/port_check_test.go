@@ -572,6 +572,48 @@ func TestTwinPortChecksCandidatesInParallelAndSkipsBad(t *testing.T) {
 	}
 }
 
+func TestTwinVLESSPortsFollowTCPNetwork(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+
+	hy2 := e.profile("hy2", "")
+	e.inbound(hy2.Id, "nod_de1") // UDP 443
+	vless := must(e.s.CreateProfile(e.ctx, req(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "vless", SettingsJson: `{"port":9443,"reality":{"target":"www.example.org:443"}}`,
+	}))).Msg.Profile
+	e.inbound(vless.Id, "nod_de1")
+	tcpTaken := must(e.s.CreateProfile(e.ctx, req(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "tcp-taken", SettingsJson: `{"port":8443,"reality":{"target":"www.example.org:443"}}`,
+	}))).Msg.Profile
+	e.inbound(tcpTaken.Id, "nod_de1")
+	savePortResult(t, e, portResult(e, "nod_de1", 4443, "broken", 300, 100))
+	checker := usePortChecker(e, nil, "")
+
+	_, err := e.twin(vless.Id, "warp", true, 8443)
+	if err == nil || connect.CodeOf(err) != connect.CodeAlreadyExists || !strings.Contains(err.Error(), "TCP port 8443") {
+		t.Fatalf("TwinProfile want=8443 error = %v, want TCP port 8443 already taken", err)
+	}
+
+	explicit, err := e.twin(vless.Id, "warp", true, 443)
+	if err != nil {
+		t.Fatalf("TwinProfile want=443: %v", err)
+	}
+	if explicit.Port != 443 || len(explicit.PortChecks) != 0 {
+		t.Fatalf("explicit twin = port %d, checks %+v; want port 443 with no UDP checks", explicit.Port, explicit.PortChecks)
+	}
+
+	automatic, err := e.twin(vless.Id, "warp", true, 0)
+	if err != nil {
+		t.Fatalf("automatic TwinProfile: %v", err)
+	}
+	if automatic.Port != 4443 || len(automatic.PortChecks) != 0 {
+		t.Fatalf("automatic twin = port %d, checks %+v; want bad-UDP-result port 4443 with no UDP checks", automatic.Port, automatic.PortChecks)
+	}
+	if calls, _ := checker.snapshot(); len(calls) != 0 {
+		t.Fatalf("TCP TwinProfile called the UDP checker: %+v", calls)
+	}
+}
+
 func TestTwinPortSkipsNodeWithFourFreshResults(t *testing.T) {
 	e := newEnv(t)
 	e.node("nod_de1", "de1", "de1.example.com", "active")

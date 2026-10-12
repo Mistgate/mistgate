@@ -143,8 +143,8 @@ type twinPortNodeChecks struct {
 	reason string
 }
 
-// twinPort chooses a port that is free on every node and has no bad delivery result on any of them.
-func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.AccessNode, want uint32) (uint16, []*adminv1.PortCheck, error) {
+// twinPort chooses a port that is free on every node and, for UDP, has no bad delivery result on any of them.
+func (s *Service) twinPort(ctx context.Context, protocol, network string, nodes []store.AccessNode, want uint32) (uint16, []*adminv1.PortCheck, error) {
 	if want > 65535 {
 		return 0, nil, invalid("port must be 1-65535")
 	}
@@ -157,16 +157,20 @@ func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.A
 			return 0, nil, err
 		}
 	}
-	cache, err := s.readPortChecks(ctx, nodeIDs...)
-	if err != nil {
-		return 0, nil, s.internal("read UDP port checks", err)
+	var cache portCheckCache
+	if network == "udp" {
+		var err error
+		cache, err = s.readPortChecks(ctx, nodeIDs...)
+		if err != nil {
+			return 0, nil, s.internal("read UDP port checks", err)
+		}
 	}
 	now := s.now()
 	// takenOn says why a port is taken on one of the nodes ("" = free on all of them)
 	takenOn := func(port uint16) string {
 		for i, n := range nodes {
-			if c := clashOf(plugin.Listen{Network: "udp", Port: port}, listens[i]); c != nil {
-				return fmt.Sprintf("UDP port %d is already used by profile %q on node %s", port, c.profile, n.Name)
+			if c := clashOf(plugin.Listen{Network: network, Port: port}, listens[i]); c != nil {
+				return fmt.Sprintf("%s port %d is already used by profile %q on node %s", strings.ToUpper(network), port, c.profile, n.Name)
 			}
 		}
 		return ""
@@ -175,9 +179,12 @@ func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.A
 		if why := takenOn(uint16(want)); why != "" {
 			return 0, nil, connect.NewError(connect.CodeAlreadyExists, errors.New(why))
 		}
+		if network != "udp" {
+			return uint16(want), nil, nil
+		}
 		for _, n := range nodes {
 			if bad, ok := cachedPortLossy(cache[n.ID], uint16(want), now); ok {
-				free := s.twinFreePort(protocol, nodes, listens, cache, now)
+				free := s.twinFreePort(protocol, network, nodes, listens, cache, now)
 				return 0, nil, portLossyRefusal(ctx, s, n.Name, bad, free)
 			}
 		}
@@ -186,6 +193,12 @@ func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.A
 	}
 
 	candidates := freePorts(protocol, len(twinPreferred)+64, func(p uint16) bool { return takenOn(p) == "" })
+	if network != "udp" {
+		if len(candidates) == 0 {
+			return 0, nil, coded(connect.CodeFailedPrecondition, "no_clean_port")
+		}
+		return candidates[0], nil, nil
+	}
 	var skipped []store.PortCheck
 	var clean []uint16
 	for _, candidate := range candidates {
@@ -246,10 +259,10 @@ func (s *Service) twinPort(ctx context.Context, protocol string, nodes []store.A
 	return 0, nil, coded(connect.CodeFailedPrecondition, "no_clean_port")
 }
 
-func (s *Service) twinFreePort(protocol string, nodes []store.AccessNode, listens [][]nodeListen, cache portCheckCache, now time.Time) uint16 {
+func (s *Service) twinFreePort(protocol, network string, nodes []store.AccessNode, listens [][]nodeListen, cache portCheckCache, now time.Time) uint16 {
 	takenOn := func(port uint16) bool {
 		for i := range nodes {
-			if clashOf(plugin.Listen{Network: "udp", Port: port}, listens[i]) != nil {
+			if clashOf(plugin.Listen{Network: network, Port: port}, listens[i]) != nil {
 				return true
 			}
 			if check, ok := cachedPortLossy(cache[nodes[i].ID], port, now); ok {
@@ -416,10 +429,18 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 		return nil, s.internal("inbounds", err)
 	}
 	var nodes []store.AccessNode
+	network := ""
 	sni := map[string]string{}
 	resp := &adminv1.TwinProfileResponse{Egress: to}
 	for _, f := range full {
 		if f.Profile.ID == p.ID && f.Inbound.Enabled && !slices.Contains(m.SkipNodeIds, f.Node.ID) {
+			if network == "" { // one profile, one listener network: the first node's built spec tells it
+				spec, err := s.buildSpec(f, merged)
+				if err != nil {
+					return nil, s.internal("build twin listener", err)
+				}
+				network = spec.Listen.Network
+			}
 			nodes = append(nodes, f.Node)
 			sni[f.Node.ID] = f.Inbound.TLSServerNameOverride
 			resp.NodeIds = append(resp.NodeIds, f.Node.ID)
@@ -442,7 +463,10 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 		taken[o.Name] = true
 	}
 
-	port, portChecks, err := s.twinPort(ctx, p.Protocol, nodes, m.Port)
+	if network == "" {
+		network = "udp" // no node to build on: nothing to clash with or check either way
+	}
+	port, portChecks, err := s.twinPort(ctx, p.Protocol, network, nodes, m.Port)
 	if err != nil {
 		return nil, err
 	}
