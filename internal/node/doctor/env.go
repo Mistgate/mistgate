@@ -120,8 +120,10 @@ type Inbound struct {
 	ServerName string
 	State      string // "starting" | "running" | "failed" | "stopped"
 	Error      string // why it is not running
-	// CertNotAfter is what the engine reported when the inbound was last applied; zero = unknown. It can be
-	// stale for ACME (renewal happens later), so it is only trusted for self-signed certificates.
+	// CertNotAfter is the later of what the engine reported when the inbound was last applied and what it reports now
+	// (the leaf last handed to a client); zero = unknown. For ACME it can lag a background renewal that no client has
+	// triggered since, so it is only used when the served certificate cannot be read (a false "expiring" warning is
+	// the worst case, cleared by the next client).
 	CertNotAfter time.Time
 	// TLSPort is the TCP port of the inbound's HTTPS listener (decoy and ACME), 0 = none. The served certificate
 	// is read there, but only if the listener is ours (see TLSDown and the socket table).

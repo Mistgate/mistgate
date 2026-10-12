@@ -715,12 +715,19 @@ func TestCertExpiry(t *testing.T) {
 	want(t, r, OK, "")
 	code(t, r, CodeCertOK, "checked", "1")
 
-	// No listener to read: the apply-time expiry is trusted for self-signed only.
+	// No listener to read: the expiry the engine reports is judged, for ACME as well (a VLESS site behind REALITY, or a
+	// Hysteria2 site whose port VLESS holds). An ACME inbound has no fix; with nothing reported the certificate is unknown.
 	ss := ib("self_signed", 0)
 	ss.CertNotAfter = t0.Add(2 * day)
 	want(t, run(t, f.doctor(with(ss)), CheckCertExpiry), Fail, FixRestartInbound)
 	acme := ib("acme_domain", 0)
-	acme.CertNotAfter = t0.Add(2 * day) // stale by construction: never judged
+	acme.CertNotAfter = t0.Add(2 * day)
+	r = run(t, f.doctor(with(acme)), CheckCertExpiry)
+	want(t, r, Fail, "")
+	code(t, r, CodeCertInbound, "reason", "expiring", "days_left", "2", "server_name", "example.com")
+	acme.CertNotAfter = t0.Add(30 * day)
+	want(t, run(t, f.doctor(with(acme)), CheckCertExpiry), OK, "")
+	acme.CertNotAfter = time.Time{}
 	code(t, run(t, f.doctor(with(acme)), CheckCertExpiry), CodeCertUnreadable, "inbounds", "inb_1")
 
 	// Worst inbound wins.

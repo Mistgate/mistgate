@@ -110,8 +110,11 @@ func (a *Agent) doctorInbounds() []doctor.Inbound {
 			HopFrom: int(sp.Listen.HopFrom), HopTo: int(sp.Listen.HopTo), Enabled: sp.Enabled, Egress: sp.Egress,
 			TLSMode: tlsModeName(sp.TLS.Mode), ServerName: sp.TLS.ServerName, State: "stopped", CertNotAfter: na[id],
 		}
-		in.TLSPort = hy2TCPPort(sp)
+		in.TLSPort = tlsPortOf(sp)
 		if h, ok := health[id]; ok {
+			if h.CertNotAfter.After(in.CertNotAfter) { // an ACME leaf issued or renewed after the last apply
+				in.CertNotAfter = h.CertNotAfter
+			}
 			in.State = runStateName(h.State)
 			if h.State == plugin.RunFailed {
 				in.Error = h.Detail
@@ -151,25 +154,41 @@ func runStateName(s plugin.RunState) string {
 	return "stopped"
 }
 
-// hy2TCPPort is the TCP port of a Hysteria2 inbound's HTTPS masquerade listener: settings.masquerade.tcp_port,
-// 443 when absent, 0 = none (hysteria2/settings.go). The agent peeks into one engine's settings; an
-// engine-provided accessor replaces this when a second protocol has a TLS listener.
-func hy2TCPPort(sp plugin.InboundSpec) int {
-	if sp.Protocol != "hysteria2" || sp.TLS.Mode == 0 {
+// tlsPortOf is the TCP port whose served certificate the doctor can read, 0 = none. Hysteria2: its HTTPS masquerade
+// listener, settings.masquerade.tcp_port, 443 when absent, 0 = none (hysteria2/settings.go). VLESS with security tls: the
+// inbound's own port. VLESS with REALITY, whatever its target: nothing, because the certificate of a "self" site is behind
+// REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
+// issuance that site shows a self-signed certificate that would read as a healthy 10-year one; the engine reports the
+// issued certificate instead (Inbound.CertNotAfter). The agent peeks into the engines' settings; an engine-provided
+// accessor replaces this when a third protocol has a TLS listener.
+func tlsPortOf(sp plugin.InboundSpec) int {
+	if sp.TLS.Mode == 0 {
 		return 0
 	}
-	var j struct {
-		Masquerade struct {
-			TCPPort *int `json:"tcp_port"`
-		} `json:"masquerade"`
+	switch sp.Protocol {
+	case "hysteria2":
+		var j struct {
+			Masquerade struct {
+				TCPPort *int `json:"tcp_port"`
+			} `json:"masquerade"`
+		}
+		if len(sp.Settings) > 0 && json.Unmarshal(sp.Settings, &j) != nil {
+			return 0
+		}
+		if p := j.Masquerade.TCPPort; p != nil {
+			return max(*p, 0)
+		}
+		return 443
+	case "vless":
+		var j struct {
+			Security string `json:"security"`
+		}
+		if json.Unmarshal(sp.Settings, &j) != nil || j.Security != "tls" {
+			return 0
+		}
+		return int(sp.Listen.Port)
 	}
-	if len(sp.Settings) > 0 && json.Unmarshal(sp.Settings, &j) != nil {
-		return 0
-	}
-	if p := j.Masquerade.TCPPort; p != nil {
-		return max(*p, 0)
-	}
-	return 443
+	return 0
 }
 
 // noteCerts keeps the certificate expiry of the last apply for the doctor (the engines do not expose it later).

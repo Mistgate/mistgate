@@ -10,8 +10,9 @@ import (
 // cert_expiry: the certificate expires soon or does not match the SNI.
 //
 // For every enabled inbound with TLS the certificate actually served is read from the inbound's TCP listener
-// (Inbound.TLSPort, hysteria2's masquerade port), so an ACME renewal is seen as it happens; the apply-time
-// expiry the engine reported is used only for self-signed certificates (it never changes there). The agent's
+// (Inbound.TLSPort, hysteria2's masquerade port), so an ACME renewal is seen as it happens. When there is no listener
+// of ours to read (VLESS holds the port, or the inbound is VLESS with REALITY), the expiry the engine reported is used:
+// exact for self-signed, the leaf last handed to a client for ACME. The agent's
 // own mTLS certificate is checked too. Fix: restart_inbound for a self-signed inbound (a restart regenerates a
 // stale self-signed certificate); ACME renews by itself, so there is no fix for it.
 func checkCertExpiry(ctx context.Context, e *Env) Result {
@@ -42,7 +43,7 @@ func checkCertExpiry(ctx context.Context, e *Env) Result {
 				}
 			}
 		}
-		if notAfter.IsZero() && in.TLSMode == "self_signed" {
+		if notAfter.IsZero() { // no listener of ours to read: what the engine reported (see Inbound.CertNotAfter)
 			notAfter = in.CertNotAfter
 		}
 		if notAfter.IsZero() {

@@ -13,6 +13,7 @@ import (
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/doctor"
+	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -303,7 +304,26 @@ func TestDoctorInboundsDescribeTheAppliedState(t *testing.T) {
 	}
 }
 
-func TestHy2TCPPort(t *testing.T) {
+// An ACME certificate that arrives (or renews) after the last apply is judged by the live value the engine reports, for the
+// inbounds whose certificate the doctor cannot read itself (design/vless.md section 7.3).
+func TestDoctorInboundsTakeTheLiveCertificateExpiry(t *testing.T) {
+	h := newHarness(t, harnessOpts{})
+	h.eng.lateCert = true
+	h.waitConnected()
+	h.panel.push(fullState(1, inb("inb_1", 0, 0, cred("crd_a"))))
+	h.panel.nextApply()
+	if got := h.a.doctorInbounds()[0].CertNotAfter; !got.IsZero() {
+		t.Fatalf("no certificate yet, the doctor sees %v", got)
+	}
+	h.eng.mu.Lock()
+	h.eng.leaf = engine.CertInfo{PinSHA256: "bb", NotAfter: time.Unix(2100000000, 0)}
+	h.eng.mu.Unlock()
+	if got := h.a.doctorInbounds()[0].CertNotAfter; got.Unix() != 2100000000 {
+		t.Fatalf("live expiry = %v, want 2100000000", got)
+	}
+}
+
+func TestTLSPortOf(t *testing.T) {
 	mk := func(proto, settings string, tls plugin.TLSMode) plugin.InboundSpec {
 		return plugin.InboundSpec{Protocol: proto, Settings: json.RawMessage(settings), TLS: plugin.TLS{Mode: tls}}
 	}
@@ -319,8 +339,17 @@ func TestHy2TCPPort(t *testing.T) {
 		{mk("hysteria2", `not json`, plugin.TLSSelfSigned), 0},
 		{mk("awg", `{}`, plugin.TLSSelfSigned), 0},
 		{mk("hysteria2", `{}`, 0), 0},
+		// VLESS: its own port with TLS; nothing readable behind REALITY, with the node's own site or another
+		{func() plugin.InboundSpec {
+			sp := mk("vless", `{"security":"tls"}`, plugin.TLSAcmeDomain)
+			sp.Listen.Port = 8443
+			return sp
+		}(), 8443},
+		{mk("vless", `{"security":"reality","reality":{"target":"self"}}`, plugin.TLSAcmeDomain), 0},
+		{mk("vless", `{"security":"reality","reality":{"target":"www.example.org:443"}}`, 0), 0},
+		{mk("vless", `not json`, plugin.TLSAcmeDomain), 0},
 	} {
-		if got := hy2TCPPort(tc.spec); got != tc.want {
+		if got := tlsPortOf(tc.spec); got != tc.want {
 			t.Errorf("%s %s mode %d: %d, want %d", tc.spec.Protocol, tc.spec.Settings, tc.spec.TLS.Mode, got, tc.want)
 		}
 	}
