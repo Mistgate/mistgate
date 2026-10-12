@@ -3,7 +3,7 @@ title: Status and roadmap
 description: What Mistgate does in the current release, what is being tested now, what comes next, and the known limits.
 ---
 
-Mistgate is in early releases; the current one is `v0.1.32`. It runs in production for its author, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today.
+Mistgate is in **beta**; the current release is `v0.1.33`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today.
 
 ## Done
 

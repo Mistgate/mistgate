@@ -10,6 +10,7 @@
 Hysteria2 and AmneziaWG on your own servers, VLESS REALITY on the way: add a server from the browser, give each person one link, and hear about an outage first.</p>
 
 <p>
+<img alt="Status: beta" src="https://img.shields.io/badge/status-beta-f2c46b">
 <a href="https://github.com/Mistgate/mistgate/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Mistgate/mistgate?sort=semver&color=b8acf2"></a>
 <a href="LICENSE"><img alt="Licence: AGPL-3.0" src="https://img.shields.io/github/license/Mistgate/mistgate?color=b8acf2"></a>
 <a href="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml/badge.svg?branch=main"></a>
@@ -17,6 +18,8 @@ Hysteria2 and AmneziaWG on your own servers, VLESS REALITY on the way: add a ser
 </p>
 
 <p><a href="https://mistgate.app/"><b>Docs</b></a> · <a href="#quick-start"><b>Install</b></a> · <a href="#screenshots"><b>Screenshots</b></a> · <a href="#compared-with-other-panels"><b>Compare</b></a> · <a href="README.ru.md">Русский</a></p>
+
+<p><sub><b>Beta.</b> Mistgate runs in production, but until 1.0 expect rough edges, and the API, the stored settings and the node protocol may still change. <a href="https://mistgate.app/roadmap/status/">Status and roadmap</a></sub></p>
 
 </div>
 
@@ -110,7 +113,7 @@ Others are ahead in protocol breadth, community size, HWID limits and full Teleg
 
 ## Status and roadmap
 
-Mistgate is young. The current release is [`v0.1.32`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production for its author. The API, the stored settings and the node protocol may still change before 1.0. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+Mistgate is in beta. The current release is [`v0.1.33`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
 Next: VLESS REALITY and XHTTP, Xray JSON and sing-box subscriptions, a one-line installer, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 

@@ -14,7 +14,7 @@ const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 export const LANDING = {
   en: {
     meta: "Mistgate is a self-hosted VPN panel for family, friends, a community or a small team: Hysteria2 and AmneziaWG on your own servers, one link per person, every server checked the way an app sees it.",
-    eyebrow: "Self-hosted · open source · AGPL-3.0",
+    eyebrow: "Beta · self-hosted · open source · AGPL-3.0",
     h1: "Your own VPN for your people, without babysitting servers.",
     lead: "For family, friends, a community or a small team. Install one panel, add your servers from the browser and send each person one link. Mistgate keeps the servers configured and checks them the way an app does, so you hear about an outage first.",
     install: "Install the panel", how: "How it works",
@@ -60,12 +60,12 @@ export const LANDING = {
       settings: "Admins, security, backups and domains.",
     },
     refDesc: "Commands, flags, variables, the architecture and answers to common questions.",
-    status: "Mistgate is young: releases are 0.1.x, and the API, the stored settings and the node protocol may still change before 1.0.",
+    status: "Mistgate is in beta: releases are 0.1.x, and until 1.0 the API, the stored settings and the node protocol may still change.",
     statusLink: "Status and roadmap",
   },
   ru: {
     meta: "Mistgate — панель для своего VPN для семьи, друзей, сообщества или небольшой команды: Hysteria2 и AmneziaWG на ваших серверах, одна ссылка на человека, каждый сервер проверяется так же, как его видит приложение.",
-    eyebrow: "На своих серверах · открытый код · AGPL-3.0",
+    eyebrow: "Бета · на своих серверах · открытый код · AGPL-3.0",
     h1: "Свой VPN для своих людей — без возни с серверами.",
     lead: "Для семьи, друзей, сообщества или небольшой команды. Вы ставите одну панель, добавляете серверы из браузера и отправляете каждому человеку одну ссылку. Mistgate держит серверы настроенными и проверяет их так же, как приложение, поэтому о сбое вы узнаёте первыми.",
     install: "Установить панель", how: "Как это устроено",
@@ -111,7 +111,7 @@ export const LANDING = {
       settings: "Админы, безопасность, бэкапы и домены.",
     },
     refDesc: "Команды, флаги, переменные, архитектура и ответы на частые вопросы.",
-    status: "Mistgate молод: сейчас выходят релизы 0.1.x, и до 1.0 API, хранимые настройки и протокол нод ещё могут меняться.",
+    status: "Mistgate в бете: сейчас выходят релизы 0.1.x, и до 1.0 API, хранимые настройки и протокол нод ещё могут меняться.",
     statusLink: "Статус и план развития",
   },
 };

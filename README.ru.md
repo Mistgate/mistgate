@@ -10,6 +10,7 @@
 Hysteria2 и AmneziaWG на ваших серверах, VLESS REALITY на подходе: сервер добавляется из браузера, каждому человеку — одна ссылка, о сбое вы узнаёте первыми.</p>
 
 <p>
+<img alt="Статус: бета" src="https://img.shields.io/badge/%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81-%D0%B1%D0%B5%D1%82%D0%B0-f2c46b">
 <a href="https://github.com/Mistgate/mistgate/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/Mistgate/mistgate?sort=semver&color=b8acf2"></a>
 <a href="LICENSE"><img alt="Лицензия AGPL-3.0" src="https://img.shields.io/github/license/Mistgate/mistgate?color=b8acf2"></a>
 <a href="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Mistgate/mistgate/actions/workflows/ci.yml/badge.svg?branch=main"></a>
@@ -17,6 +18,8 @@ Hysteria2 и AmneziaWG на ваших серверах, VLESS REALITY на по
 </p>
 
 <p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#скриншоты"><b>Скриншоты</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a></p>
+
+<p><sub><b>Бета.</b> Mistgate уже работает в продакшене, но до 1.0 возможны шероховатости, а API, хранимые настройки и протокол ноды ещё могут меняться. <a href="https://mistgate.app/ru/roadmap/status/">Статус и план</a></sub></p>
 
 </div>
 
@@ -110,7 +113,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com      # первый
 
 ## Статус и планы
 
-Проект молодой. Текущий релиз [`v0.1.32`](https://github.com/Mistgate/mistgate/releases/latest), автор пользуется им в боевой работе. До версии 1.0 ещё могут меняться API, хранимые настройки и протокол ноды. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+Проект в бете. Текущий релиз [`v0.1.33`](https://github.com/Mistgate/mistgate/releases/latest), он уже работает в продакшене. До версии 1.0 ещё могут меняться API, хранимые настройки и протокол ноды. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
 Дальше: VLESS REALITY и XHTTP, подписки Xray JSON и sing-box, установка одной командой, Telegram-бот для флота и пользователей и версия для Cloudflare Workers. Часть настроек по умолчанию рассчитана на пользователей в России (Яндекс DNS для нод в России, контрольные домены доктора, пресеты split-DNS); всё это меняется в настройках. Подробности и известные ограничения: [Статус и план развития](docs/ru/roadmap/status.md).
 
