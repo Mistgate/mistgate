@@ -19,19 +19,18 @@ import (
 	"github.com/mistgate/mistgate/internal/release"
 )
 
-const (
-	githubAPIBase      = "https://api.github.com"
-	githubDownloadBase = "https://github.com/Mistgate/mistgate/releases/download"
-)
+const githubDownloadBase = "https://github.com/Mistgate/mistgate/releases/download"
 
 type bundle struct {
 	manifest *release.EdgeManifest
 	config   release.EdgeConfig
 	files    map[string][]byte
-	sha256   string
 }
 
 func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now time.Time) (*bundle, error) {
+	if opts.InsecureSkipSignature && opts.BundleDir == "" {
+		return nil, errors.New("--insecure-skip-signature is only available with --bundle DIR")
+	}
 	var manifestBytes, signature, tarball []byte
 	if opts.BundleDir != "" {
 		var err error
@@ -49,7 +48,7 @@ func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now 
 		}
 	} else {
 		var err error
-		manifestBytes, signature, tarball, err = downloadBundle(ctx, opts.Version, httpClient, opts.GitHubAPIBaseURL, opts.GitHubDownloadBaseURL)
+		manifestBytes, signature, tarball, err = downloadBundle(ctx, opts.Version, httpClient, opts.GitHubDownloadBaseURL)
 		if err != nil {
 			return nil, err
 		}
@@ -58,25 +57,24 @@ func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now 
 	if len(manifestBytes) == 0 {
 		return nil, errors.New("edge bundle has no edge-manifest.json")
 	}
+	// A signature that is there is always verified when the binary has a release key, even with --insecure-skip-signature.
 	var manifest *release.EdgeManifest
-	if len(signature) == 0 && !opts.InsecureSkipSignature {
-		return nil, errors.New("edge bundle has no edge-manifest.sig; use --insecure-skip-signature only for a development bundle")
-	}
-	if opts.InsecureSkipSignature {
-		var err error
-		manifest, err = release.ParseEdge(manifestBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse edge manifest: %w", err)
-		}
-	} else {
-		if len(opts.PublicKey) != ed25519.PublicKeySize {
-			return nil, errors.New("this binary has no valid compiled-in release key; use a signed release binary or an unsigned development bundle with --insecure-skip-signature")
-		}
-		var err error
+	var err error
+	switch {
+	case len(signature) != 0 && len(opts.PublicKey) == ed25519.PublicKeySize:
 		manifest, err = release.VerifyEdge(opts.PublicKey, manifestBytes, signature)
 		if err != nil {
 			return nil, fmt.Errorf("verify edge manifest: %w", err)
 		}
+	case opts.InsecureSkipSignature:
+		manifest, err = release.ParseEdge(manifestBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse edge manifest: %w", err)
+		}
+	case len(signature) == 0:
+		return nil, errors.New("edge bundle has no edge-manifest.sig; use --insecure-skip-signature only for a development bundle")
+	default:
+		return nil, errors.New("this binary has no valid compiled-in release key; use a signed release binary or an unsigned development bundle with --insecure-skip-signature")
 	}
 	if err := manifest.Check(now); err != nil {
 		return nil, fmt.Errorf("edge bundle: %w", err)
@@ -111,17 +109,9 @@ func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now 
 	if !reflect.DeepEqual(config, release.NewEdgeConfig(manifest.Version)) {
 		return nil, errors.New("edge.json bindings, migrations, or script modules do not match the release contract")
 	}
-	if len(config.Scripts) != 2 || config.Scripts[0].Role != "provision" || config.Scripts[1].Role != "main" {
-		return nil, errors.New("edge.json must describe the provision and main Worker scripts in contract order")
-	}
-	for _, script := range config.Scripts {
-		if script.DefaultName == "" || script.MainModule == "" || len(script.Modules) == 0 {
-			return nil, fmt.Errorf("edge.json has an incomplete %s script", script.Role)
-		}
-		for _, module := range script.Modules {
-			if _, ok := files[module.Name]; !ok {
-				return nil, fmt.Errorf("edge bundle is missing module %s", module.Name)
-			}
+	for _, name := range []string{"worker.js", "provision.js", "panel.wasm"} {
+		if _, ok := files[name]; !ok {
+			return nil, fmt.Errorf("edge bundle is missing %s", name)
 		}
 	}
 	for name := range files {
@@ -129,7 +119,7 @@ func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now 
 			return nil, fmt.Errorf("edge bundle contains unexpected file %s", name)
 		}
 	}
-	return &bundle{manifest: manifest, config: config, files: files, sha256: manifest.SHA256}, nil
+	return &bundle{manifest: manifest, config: config, files: files}, nil
 }
 
 func readLimitedFile(path string, limit int64) ([]byte, error) {
@@ -148,29 +138,17 @@ func readLimitedFile(path string, limit int64) ([]byte, error) {
 	return b, nil
 }
 
-func downloadBundle(ctx context.Context, version string, client *http.Client, apiBase, downloadBase string) ([]byte, []byte, []byte, error) {
-	if client == nil {
-		client = http.DefaultClient
+func downloadBundle(ctx context.Context, version string, client *http.Client, downloadBase string) ([]byte, []byte, []byte, error) {
+	if version == "" {
+		return nil, nil, nil, errors.New("no edge release version to download")
 	}
-	if apiBase == "" {
-		apiBase = githubAPIBase
+	if client == nil {
+		client = newHTTPClient()
 	}
 	if downloadBase == "" {
 		downloadBase = githubDownloadBase
 	}
-	if version == "" {
-		var latest struct {
-			TagName string `json:"tag_name"`
-		}
-		if err := githubGetJSON(ctx, client, strings.TrimRight(apiBase, "/")+"/repos/Mistgate/mistgate/releases/latest", &latest); err != nil {
-			return nil, nil, nil, fmt.Errorf("find latest edge release: %w", err)
-		}
-		version = latest.TagName
-		if version == "" {
-			return nil, nil, nil, errors.New("latest GitHub release has no tag")
-		}
-	}
-	base := strings.TrimRight(downloadBase, "/") + "/" + urlPathSegment(version) + "/"
+	base := strings.TrimRight(downloadBase, "/") + "/" + url.PathEscape(version) + "/"
 	manifest, err := githubGet(ctx, client, base+release.EdgeManifestName, release.MaxManifestBytes)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("download edge manifest: %w", err)
@@ -184,19 +162,6 @@ func downloadBundle(ctx context.Context, version string, client *http.Client, ap
 		return nil, nil, nil, fmt.Errorf("download edge bundle: %w", err)
 	}
 	return manifest, signature, tarball, nil
-}
-
-func urlPathSegment(s string) string { return url.PathEscape(s) }
-
-func githubGetJSON(ctx context.Context, client *http.Client, rawURL string, out any) error {
-	b, err := githubGet(ctx, client, rawURL, 1<<20)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(b, out); err != nil {
-		return fmt.Errorf("decode GitHub release response: %w", err)
-	}
-	return nil
 }
 
 func githubGet(ctx context.Context, client *http.Client, rawURL string, limit int64) ([]byte, error) {

@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
-const cloudflareAPI = "https://api.cloudflare.com/client/v4"
+// cloudflareAPI is the API host; every path below is appended to /client/v4.
+const cloudflareAPI = "https://api.cloudflare.com"
 
 const maxAPIResponse = 8 << 20
 
@@ -38,12 +40,21 @@ func (e *httpStatusError) Error() string {
 	return fmt.Sprintf("Cloudflare API returned HTTP %d: %s", e.status, e.text)
 }
 
+// newHTTPClient has no overall Client.Timeout: that would cut a ~40 MB script upload (or the bundle download) short. The
+// connection phases are bounded by the transport and the whole call by the caller's context.
+func newHTTPClient() *http.Client {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.TLSHandshakeTimeout = 15 * time.Second
+	t.ResponseHeaderTimeout = 2 * time.Minute
+	return &http.Client{Transport: t}
+}
+
 func newCFClient(base, token string, client *http.Client) *cfClient {
 	if base == "" {
 		base = cloudflareAPI
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
+		client = newHTTPClient()
 	}
 	return &cfClient{base: strings.TrimRight(base, "/"), token: token, redactions: []string{token}, http: client}
 }
@@ -67,131 +78,24 @@ func (c *cfClient) redactError(err error) error {
 	if err == nil {
 		return nil
 	}
+	var statusErr *httpStatusError
+	if errors.As(err, &statusErr) {
+		return err // its text was redacted when it was built
+	}
 	return errors.New(c.redactString(err.Error()))
 }
 
-func (c *cfClient) endpoint(path string) string {
-	if strings.HasSuffix(c.base, "/client/v4") {
-		return c.base + path
-	}
-	return c.base + "/client/v4" + path
-}
-
-func (c *cfClient) request(ctx context.Context, method, path, contentType string, body io.Reader) ([]byte, error) {
-	return c.requestWithHeaders(ctx, method, path, contentType, body, nil)
-}
-
-func (c *cfClient) requestWithHeaders(ctx context.Context, method, path, contentType string, body io.Reader, extra http.Header) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.endpoint(path), body)
-	if err != nil {
-		return nil, c.redactError(err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	for name, values := range extra {
-		for _, value := range values {
-			req.Header.Add(name, value)
-		}
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, c.redactError(err)
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponse+1))
-	if err != nil {
-		return nil, c.redactError(err)
-	}
-	if len(data) > maxAPIResponse {
-		return nil, errors.New("Cloudflare API response exceeded the size limit")
-	}
-	data = []byte(c.redactString(string(data)))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &httpStatusError{status: resp.StatusCode, text: c.redactString(cfErrorText(data))}
-	}
-	if err := checkCFSuccess(data); err != nil {
-		return nil, c.redactError(err)
-	}
-	return data, nil
-}
-
-func checkCFSuccess(data []byte) error {
-	trimmed := bytes.TrimSpace(data)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return nil
-	}
-	var env struct {
-		Success *bool        `json:"success"`
-		Errors  []cfAPIError `json:"errors"`
-	}
-	if json.Unmarshal(trimmed, &env) != nil {
-		return nil
-	}
-	if (env.Success != nil && !*env.Success) || len(env.Errors) != 0 {
-		return errors.New(cfErrorMessages(env.Errors))
-	}
-	return nil
-}
-
-func (c *cfClient) json(ctx context.Context, method, path string, in any, out any) error {
-	var body io.Reader
-	if in != nil {
-		b, err := json.Marshal(in)
-		if err != nil {
-			return err
-		}
-		body = bytes.NewReader(b)
-	}
-	contentType := ""
-	if in != nil {
-		contentType = "application/json"
-	}
-	data, err := c.request(ctx, method, path, contentType, body)
-	if err != nil {
-		return err
-	}
-	var env struct {
-		Success *bool           `json:"success"`
-		Errors  []cfAPIError    `json:"errors"`
-		Result  json.RawMessage `json:"result"`
-	}
-	if err := json.Unmarshal(data, &env); err != nil {
-		return fmt.Errorf("decode Cloudflare API response: %w", err)
-	}
-	if (env.Success != nil && !*env.Success) || len(env.Errors) != 0 {
-		return errors.New(c.redactString(cfErrorMessages(env.Errors)))
-	}
-	if out == nil || len(env.Result) == 0 || string(env.Result) == "null" {
-		return nil
-	}
-	if err := json.Unmarshal(env.Result, out); err != nil {
-		return fmt.Errorf("decode Cloudflare API result: %w", err)
-	}
-	return nil
-}
-
 type cfAPIError struct {
-	Code    json.RawMessage `json:"code"`
-	Message string          `json:"message"`
+	Message string `json:"message"`
 }
 
-func cfErrorText(data []byte) string {
-	var env struct {
-		Errors []cfAPIError `json:"errors"`
-	}
-	if json.Unmarshal(data, &env) == nil && len(env.Errors) != 0 {
-		return cfErrorMessages(env.Errors)
-	}
-	return ""
+type cfEnvelope struct {
+	Success *bool           `json:"success"`
+	Errors  []cfAPIError    `json:"errors"`
+	Result  json.RawMessage `json:"result"`
 }
 
 func cfErrorMessages(errs []cfAPIError) string {
-	if len(errs) == 0 {
-		return "Cloudflare API request failed"
-	}
 	msgs := make([]string, 0, len(errs))
 	for _, e := range errs {
 		if e.Message != "" {
@@ -204,30 +108,97 @@ func cfErrorMessages(errs []cfAPIError) string {
 	return strings.Join(msgs, "; ")
 }
 
-func (c *cfClient) verifyToken(ctx context.Context) error {
-	var result struct {
-		Status string `json:"status"`
+// call sends one request, checks the status and Cloudflare's envelope, and decodes the envelope's result into out (if any).
+// bearer is the token to send; "" means the API token (the asset upload sends its own session token instead).
+func (c *cfClient) call(ctx context.Context, method, path, contentType string, body io.Reader, bearer string, out any) error {
+	return c.redactError(c.do(ctx, method, path, contentType, body, bearer, out))
+}
+
+func (c *cfClient) do(ctx context.Context, method, path, contentType string, body io.Reader, bearer string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, method, c.base+"/client/v4"+path, body)
+	if err != nil {
+		return err
 	}
-	if err := c.json(ctx, http.MethodGet, "/user/tokens/verify", nil, &result); err != nil {
-		return fmt.Errorf("verify Cloudflare API token: %w", err)
+	if bearer == "" {
+		bearer = c.token
 	}
-	if !strings.EqualFold(result.Status, "active") {
-		return errors.New("Cloudflare API token is not active")
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	req.Header.Set("Accept", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponse+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxAPIResponse {
+		return errors.New("Cloudflare API response exceeded the size limit")
+	}
+	var env cfEnvelope
+	envErr := json.Unmarshal(data, &env)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		text := ""
+		if envErr == nil && len(env.Errors) != 0 {
+			text = c.redactString(cfErrorMessages(env.Errors))
+		}
+		return &httpStatusError{status: resp.StatusCode, text: text}
+	}
+	if envErr != nil {
+		return fmt.Errorf("decode Cloudflare API response: %w", envErr)
+	}
+	if (env.Success != nil && !*env.Success) || len(env.Errors) != 0 {
+		return errors.New(cfErrorMessages(env.Errors))
+	}
+	if out == nil || len(env.Result) == 0 || string(env.Result) == "null" {
+		return nil
+	}
+	if err := json.Unmarshal(env.Result, out); err != nil {
+		return fmt.Errorf("decode Cloudflare API result: %w", err)
 	}
 	return nil
+}
+
+func (c *cfClient) json(ctx context.Context, method, path string, in any, out any) error {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	return c.call(ctx, method, path, "application/json", bytes.NewReader(b), "", out)
+}
+
+func (c *cfClient) get(ctx context.Context, path string, out any) error {
+	return c.call(ctx, http.MethodGet, path, "", nil, "", out)
+}
+
+// authFailure turns a 401/403 into a message that says what to check; any other error passes through.
+func authFailure(err error) error {
+	var statusErr *httpStatusError
+	if errors.As(err, &statusErr) && (statusErr.status == http.StatusUnauthorized || statusErr.status == http.StatusForbidden) {
+		msg := fmt.Sprintf("Cloudflare rejected the API token (HTTP %d): check CLOUDFLARE_API_TOKEN, that it has not expired, and that it may read accounts and zones and edit Workers scripts, Workers routes and D1", statusErr.status)
+		if statusErr.text != "" {
+			msg += " (" + statusErr.text + ")"
+		}
+		return errors.New(msg)
+	}
+	return err
 }
 
 type account struct {
 	ID string `json:"id"`
 }
 
+// accounts is the first request of a deploy, so it is also the token check (GET /user/tokens/verify refuses account-owned tokens).
 func (c *cfClient) accounts(ctx context.Context) ([]account, error) {
 	var all []account
 	for page := 1; page <= 100; page++ {
 		var result []account
-		path := fmt.Sprintf("/accounts?per_page=50&page=%d", page)
-		if err := c.json(ctx, http.MethodGet, path, nil, &result); err != nil {
-			return nil, fmt.Errorf("list Cloudflare accounts: %w", err)
+		if err := c.get(ctx, fmt.Sprintf("/accounts?per_page=50&page=%d", page), &result); err != nil {
+			return nil, fmt.Errorf("list Cloudflare accounts: %w", authFailure(err))
 		}
 		all = append(all, result...)
 		if len(result) < 50 {
@@ -249,52 +220,67 @@ func (c *cfClient) zones(ctx context.Context, accountID, name string) ([]zone, e
 	q.Set("account.id", accountID)
 	q.Set("per_page", "50")
 	var result []zone
-	path := "/zones?" + q.Encode()
-	if err := c.json(ctx, http.MethodGet, path, nil, &result); err != nil {
-		return nil, fmt.Errorf("list Cloudflare zones for host suffix %s: %w", name, err)
+	if err := c.get(ctx, "/zones?"+q.Encode(), &result); err != nil {
+		return nil, fmt.Errorf("list Cloudflare zones for host suffix %s: %w", name, authFailure(err))
 	}
 	return result, nil
 }
 
 type d1Database struct {
-	UUID     string `json:"uuid"`
-	Name     string `json:"name"`
-	Location string `json:"location"`
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
 }
 
+// databases lists the D1 databases whose name is exactly name. The API's name filter is not documented as exact, so the
+// result is filtered here.
 func (c *cfClient) databases(ctx context.Context, accountID, name string) ([]d1Database, error) {
-	q := url.Values{}
-	q.Set("name", name)
-	q.Set("per_page", "100")
-	var result []d1Database
-	path := "/accounts/" + url.PathEscape(accountID) + "/d1/database?" + q.Encode()
-	if err := c.json(ctx, http.MethodGet, path, nil, &result); err != nil {
-		return nil, fmt.Errorf("find D1 database: %w", err)
+	const perPage = 100
+	var exact []d1Database
+	for page := 1; page <= 50; page++ {
+		q := url.Values{}
+		q.Set("name", name)
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		var result []d1Database
+		if err := c.get(ctx, "/accounts/"+url.PathEscape(accountID)+"/d1/database?"+q.Encode(), &result); err != nil {
+			return nil, fmt.Errorf("find D1 database: %w", err)
+		}
+		for _, db := range result {
+			if db.Name == name {
+				exact = append(exact, db)
+			}
+		}
+		if len(result) < perPage {
+			return exact, nil
+		}
 	}
-	return result, nil
+	return nil, errors.New("find D1 database: too many results")
 }
 
 func (c *cfClient) createDatabase(ctx context.Context, accountID, name, location string) (d1Database, error) {
 	var result d1Database
-	path := "/accounts/" + url.PathEscape(accountID) + "/d1/database"
-	body := map[string]string{"name": name, "location": location}
-	if err := c.json(ctx, http.MethodPost, path, body, &result); err != nil {
+	body := map[string]string{"name": name, "primary_location_hint": location}
+	if err := c.json(ctx, http.MethodPost, "/accounts/"+url.PathEscape(accountID)+"/d1/database", body, &result); err != nil {
 		return d1Database{}, fmt.Errorf("create D1 database: %w", err)
 	}
 	return result, nil
 }
 
-func (c *cfClient) scriptExists(ctx context.Context, accountID, name string) (bool, error) {
-	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(name)
-	_, err := c.request(ctx, http.MethodGet, path, "", nil)
-	if err == nil {
-		return true, nil
+// scripts maps the name of every Worker script of the account to its migration tag ("" if it has none). One list call
+// replaces a GET per script: GET .../scripts/{name} returns the script's source, not JSON.
+func (c *cfClient) scripts(ctx context.Context, accountID string) (map[string]string, error) {
+	var result []struct {
+		ID           string `json:"id"`
+		MigrationTag string `json:"migration_tag"`
 	}
-	var statusErr *httpStatusError
-	if errors.As(err, &statusErr) && statusErr.status == http.StatusNotFound {
-		return false, nil
+	if err := c.get(ctx, "/accounts/"+url.PathEscape(accountID)+"/workers/scripts", &result); err != nil {
+		return nil, fmt.Errorf("list Worker scripts: %w", err)
 	}
-	return false, fmt.Errorf("check Worker script %s: %w", name, err)
+	tags := make(map[string]string, len(result))
+	for _, s := range result {
+		tags[s.ID] = s.MigrationTag
+	}
+	return tags, nil
 }
 
 type uploadSession struct {
@@ -302,44 +288,72 @@ type uploadSession struct {
 	Buckets [][]string `json:"buckets"`
 }
 
-func (c *cfClient) assetSession(ctx context.Context, accountID, mainName string, manifest map[string]assetManifestEntry) (uploadSession, error) {
-	var result uploadSession
-	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(mainName) + "/assets-upload-session"
-	if err := c.json(ctx, http.MethodPost, path, map[string]any{"manifest": manifest}, &result); err != nil {
-		return uploadSession{}, fmt.Errorf("create Worker assets upload session: %w", err)
+// uploadAssets runs the direct-upload flow for the main script and returns the completion token that its next PUT carries
+// in assets.jwt. It is called before every PUT of the main script: a hash Cloudflare already has is not asked for again,
+// so the second call usually has no buckets and the session token is itself the completion token.
+func (c *cfClient) uploadAssets(ctx context.Context, accountID, script string, manifest map[string]assetManifestEntry, contents map[string]assetContent) (string, error) {
+	var session uploadSession
+	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(script) + "/assets-upload-session"
+	if err := c.json(ctx, http.MethodPost, path, map[string]any{"manifest": manifest}, &session); err != nil {
+		return "", fmt.Errorf("create Worker assets upload session: %w", err)
 	}
-	return result, nil
+	if session.JWT == "" {
+		return "", errors.New("Cloudflare assets upload session returned no token")
+	}
+	c.addSecrets(session.JWT)
+	completion, uploaded := "", false
+	for _, bucket := range session.Buckets {
+		if len(bucket) == 0 {
+			continue
+		}
+		uploaded = true
+		var err error
+		if completion, err = c.uploadAssetBucket(ctx, accountID, session.JWT, bucket, contents); err != nil {
+			return "", err
+		}
+		c.addSecrets(completion)
+	}
+	if !uploaded {
+		return session.JWT, nil
+	}
+	if completion == "" {
+		return "", errors.New("Cloudflare returned no completion token after the last asset upload")
+	}
+	return completion, nil
 }
 
-func (c *cfClient) uploadAssetBucket(ctx context.Context, accountID, jwt string, bucket []string, assets map[string]assetContent) error {
+// uploadAssetBucket posts one bucket, authenticated with the session token (never the API token). The response of the
+// upload that completes the manifest carries the completion token; the others carry none.
+func (c *cfClient) uploadAssetBucket(ctx context.Context, accountID, sessionJWT string, bucket []string, assets map[string]assetContent) (string, error) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
-	bucketJSON, err := json.Marshal(bucket)
-	if err != nil {
-		return err
-	}
-	if err := w.WriteField("bucket", string(bucketJSON)); err != nil {
-		return err
-	}
 	for _, hash := range bucket {
 		asset, ok := assets[hash]
 		if !ok {
-			return fmt.Errorf("Cloudflare requested unknown asset hash %s", hash)
+			return "", fmt.Errorf("Cloudflare requested unknown asset hash %s", hash)
 		}
-		if err := w.WriteField(hash, asset.base64); err != nil {
-			return err
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, hash, hash))
+		header.Set("Content-Type", asset.contentType)
+		part, err := w.CreatePart(header)
+		if err != nil {
+			return "", err
+		}
+		if _, err := io.WriteString(part, asset.base64); err != nil {
+			return "", err
 		}
 	}
 	if err := w.Close(); err != nil {
-		return err
+		return "", err
+	}
+	var result struct {
+		JWT string `json:"jwt"`
 	}
 	path := "/accounts/" + url.PathEscape(accountID) + "/workers/assets/upload?base64=true"
-	headers := make(http.Header)
-	headers.Set("CF-Worker-Assets-Token", jwt)
-	if _, err := c.requestWithHeaders(ctx, http.MethodPost, path, w.FormDataContentType(), &buf, headers); err != nil {
-		return fmt.Errorf("upload Worker asset bucket: %w", err)
+	if err := c.call(ctx, http.MethodPost, path, w.FormDataContentType(), &buf, sessionJWT, &result); err != nil {
+		return "", fmt.Errorf("upload Worker asset bucket: %w", err)
 	}
-	return nil
+	return result.JWT, nil
 }
 
 func (c *cfClient) putScript(ctx context.Context, accountID, name string, metadata scriptMetadata, modules map[string][]byte) error {
@@ -386,43 +400,47 @@ func (c *cfClient) putScript(ctx context.Context, accountID, name string, metada
 		return err
 	}
 	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(name)
-	if _, err := c.request(ctx, http.MethodPut, path, w.FormDataContentType(), &buf); err != nil {
+	if err := c.call(ctx, http.MethodPut, path, w.FormDataContentType(), &buf, "", nil); err != nil {
 		return fmt.Errorf("upload Worker script %s: %w", name, err)
 	}
 	return nil
 }
 
+// putSchedules replaces the cron triggers; the body is a bare JSON array.
 func (c *cfClient) putSchedules(ctx context.Context, accountID, name string, crons []string) error {
 	schedules := make([]map[string]string, 0, len(crons))
 	for _, cron := range crons {
 		schedules = append(schedules, map[string]string{"cron": cron})
 	}
 	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(name) + "/schedules"
-	if err := c.json(ctx, http.MethodPut, path, map[string]any{"schedules": schedules}, nil); err != nil {
+	if err := c.json(ctx, http.MethodPut, path, schedules, nil); err != nil {
 		return fmt.Errorf("set Worker schedules: %w", err)
 	}
 	return nil
 }
 
-func (c *cfClient) putSubdomain(ctx context.Context, accountID, name string) error {
+// disableSubdomain turns off the script's workers.dev name and its preview URLs (POST, not PUT).
+func (c *cfClient) disableSubdomain(ctx context.Context, accountID, name string) error {
 	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(name) + "/subdomain"
 	body := map[string]bool{"enabled": false, "previews_enabled": false}
-	if err := c.json(ctx, http.MethodPut, path, body, nil); err != nil {
+	if err := c.json(ctx, http.MethodPost, path, body, nil); err != nil {
 		return fmt.Errorf("disable Worker subdomain for %s: %w", name, err)
 	}
 	return nil
 }
 
-func (c *cfClient) putDomain(ctx context.Context, accountID, host, service string) error {
-	path := "/accounts/" + url.PathEscape(accountID) + "/workers/domains"
-	body := map[string]string{"hostname": host, "service": service, "environment": "production"}
-	if err := c.json(ctx, http.MethodPut, path, body, nil); err != nil {
+func (c *cfClient) putDomain(ctx context.Context, accountID, zoneID, host, service string) error {
+	body := map[string]string{"hostname": host, "service": service, "zone_id": zoneID}
+	if err := c.json(ctx, http.MethodPut, "/accounts/"+url.PathEscape(accountID)+"/workers/domains", body, nil); err != nil {
 		return fmt.Errorf("attach custom domain: %w", err)
 	}
 	return nil
 }
 
+// publicGet fetches the public decoy page once; a stalled server is cut off after 15 seconds.
 func publicGet(ctx context.Context, client *http.Client, rawURL string) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return 0, err
