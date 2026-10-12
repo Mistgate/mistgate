@@ -216,3 +216,28 @@ func TestPeriodicPortChecksRunOneAtATime(t *testing.T) {
 		t.Fatalf("CheckPorts calls = %d, want one", calls)
 	}
 }
+
+func TestPeriodicPortCheckConfirmationIsUDPOnly(t *testing.T) {
+	e := newEnv(t)
+	now := portCheckTimeFor("node-a", e.clock.Now())
+	e.clock.Advance(now.Sub(e.clock.Now()))
+	e.node("node-a", "provider-a", true)
+	e.inbound("node-a", 8443)
+	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	var full, udpOnly int
+	lossy := func(nodeID string) []store.PortCheck {
+		return []store.PortCheck{{NodeID: nodeID, Address: nodeID + ".example.com", Port: 8443, Sent: 300, Got: 100,
+			Verdict: "lossy", Sender: "panel", CheckedAt: e.clock.Now()}}
+	}
+	e.s.cfg.CheckPorts = func(_ context.Context, nodeID string, _ []uint16) ([]store.PortCheck, string, string) {
+		full++
+		return lossy(nodeID), "panel", ""
+	}
+	e.s.cfg.CheckPortsUDP = func(_ context.Context, nodeID string, _ []uint16) ([]store.PortCheck, string, string) {
+		udpOnly++
+		return lossy(nodeID), "panel", ""
+	}
+	if !e.s.runOnePortRecheck(e.ctx) || full != 1 || udpOnly != 1 {
+		t.Fatalf("full runs %d, UDP-only confirmations %d, want one of each", full, udpOnly)
+	}
+}

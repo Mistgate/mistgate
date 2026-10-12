@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -215,7 +216,7 @@ func TestCheckPortsProbesTCPAfterUDPAndStoresTheRows(t *testing.T) {
 
 	driveUDPPart(targetConn, senderConn)
 	mark := waitHTTPMark(targetConn)
-	if len(mark.Token) != 16 || len(mark.Answer) != 16 || mark.HoldS != 30 {
+	if len(mark.Token) != tcpcheck.MarkSize || len(mark.Answer) != tcpcheck.MarkSize || mark.HoldS != 30 {
 		t.Fatalf("mark = %+v", mark)
 	}
 	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
@@ -274,16 +275,33 @@ func TestCheckPortsSaveTimeRunLeavesTheTCPHalfOut(t *testing.T) {
 		x.f.CheckPorts(x.ctx, target.nodeID, []uint16{2053})
 	}()
 	driveUDPPart(targetConn, senderConn)
-	<-done
+	// no TCP timeout is waited for: the call returns as soon as the UDP part is done
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("CheckPorts did not return after the UDP part")
+	}
 	if rows, err := x.st.TCPChecks(x.ctx, target.nodeID); err != nil || len(rows) != 0 {
 		t.Fatalf("CheckPorts stored TCP rows: %+v, %v", rows, err)
 	}
-	select {
-	case m := <-targetConn.in:
-		if m.GetHttpMark() != nil {
-			t.Fatal("CheckPorts armed a mark")
+	assertNoPortCommands(t, targetConn, senderConn)
+}
+
+// assertNoPortCommands drains what is queued for the connections and fails on a port check command (UDP or TCP).
+func assertNoPortCommands(t *testing.T, conns ...*conn) {
+	t.Helper()
+	for _, c := range conns {
+		for {
+			select {
+			case m := <-c.in:
+				if m.GetHttpMark() != nil || m.GetTcpProbe() != nil || m.GetUdpCount() != nil || m.GetUdpSend() != nil {
+					t.Fatalf("a port check command was sent: %+v", m)
+				}
+				continue
+			default:
+			}
+			break
 		}
-	default:
 	}
 }
 
@@ -533,5 +551,266 @@ func TestTCPCheckPanelOnTheTargetsHostAnswersButStoresNothing(t *testing.T) {
 	}
 	if stored, err := x.st.TCPChecks(x.ctx, target.nodeID); err != nil || len(stored) != 0 {
 		t.Fatalf("a hairpin result was stored: %+v, %v", stored, err)
+	}
+}
+
+func TestTCPCheckDoesNotReuseTheMarkAfterAnAmbiguousFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		firstError string
+		marked     bool // port 80 goes to the second sender
+	}{
+		{"a lost sender may have made its GET", "failed: link lost", false},
+		{"a sender that never left", "no_route", true},
+		{"a busy sender", "busy", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x, target, targetConn := tcpCheckTarget(t)
+			_, firstConn := addPortCheckPeer(x, "sender-a", "provider-b", "DE", capUDPCheck, capTCPCheck)
+			second, secondConn := addPortCheckPeer(x, "sender-b", "provider-c", "FR", capUDPCheck, capTCPCheck)
+			node, err := x.st.Node(x.ctx, target.nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan []storeTCP, 1)
+			go func() {
+				rows, _ := x.f.runTCPCheck(x.ctx, node, false)
+				done <- rows
+			}()
+			mark := waitHTTPMark(targetConn)
+			replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
+			probe := waitTCPProbe(firstConn)
+			if len(probe.Targets) != 3 || probe.Targets[0].Port != 80 {
+				t.Fatalf("first probe = %+v", probe.Targets)
+			}
+			replyPortCommand(firstConn, probe.RequestId, &agentv1.CommandResult{Error: tc.firstError})
+			probe = waitTCPProbe(secondConn)
+			if has80 := probe.Targets[0].Port == 80; has80 != tc.marked {
+				t.Fatalf("second probe = %+v, port 80 expected: %v", probe.Targets, tc.marked)
+			}
+			params := map[string]string{"family": "4", "t443": "ours", "t8443": "ours"}
+			if tc.marked {
+				params["t80"] = "ours"
+			}
+			replyPortCommand(secondConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: params})
+			rows := <-done
+			if len(rows) != 3 || rows[0].Port != 80 {
+				t.Fatalf("rows = %+v", rows)
+			}
+			if tc.marked {
+				if rows[0].Verdict != "ours" || rows[0].Sender != second.nodeID {
+					t.Fatalf("port 80 row = %+v, want ours from the second sender", rows[0])
+				}
+			} else if rows[0].Verdict != "" || rows[0].Reason != "failed" {
+				t.Fatalf("port 80 row = %+v, want no verdict and reason failed (never a false 'other')", rows[0])
+			}
+			if rows[1].Verdict != "ours" || rows[1].Sender != second.nodeID {
+				t.Fatalf("port 443 row = %+v", rows[1])
+			}
+			if stored, err := x.st.TCPChecks(x.ctx, target.nodeID); err != nil || len(stored) != 3 {
+				t.Fatalf("stored rows = %+v, %v", stored, err)
+			}
+		})
+	}
+}
+
+func TestTCPCheckClearsRowsWhenNoTCPPortIsLeft(t *testing.T) {
+	x, target, _ := tcpCheckTarget(t)
+	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, []storeTCP{{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()}}); err != nil {
+		t.Fatal(err)
+	}
+	node, err := x.st.Node(x.ctx, target.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// every inbound is switched off: no sender and no live agent are needed to see that the rows describe nothing
+	x.exec(`UPDATE inbound SET enabled = 0 WHERE node_id = ?`, target.nodeID)
+	if rows, ran := x.f.runTCPCheck(x.ctx, node, false); ran || len(rows) != 0 {
+		t.Fatalf("rows %+v ran %v", rows, ran)
+	}
+	if stored, err := x.st.TCPChecks(x.ctx, target.nodeID); err != nil || len(stored) != 0 {
+		t.Fatalf("stale rows stay: %+v, %v", stored, err)
+	}
+}
+
+// onlyPort80Target leaves the target with a single TCP target, port 80: the Hysteria2 site is switched off, VLESS is
+// disabled, and an old site row is stored.
+func onlyPort80Target(t *testing.T) (*l3Env, store.NodeRow, *conn) {
+	t.Helper()
+	x, target, targetConn := tcpCheckTarget(t)
+	addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	x.exec(`UPDATE profile SET settings_json = '{"port":443,"network":"udp","tls":"acme","name":"node-a.example.com","masquerade":{"tcp_port":0}}' WHERE id = 'prf_hy2'`)
+	x.exec(`UPDATE inbound SET enabled = 0 WHERE id = 'inb_vless'`)
+	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, []storeTCP{{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()}}); err != nil {
+		t.Fatal(err)
+	}
+	node, err := x.st.Node(x.ctx, target.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return x, node, targetConn
+}
+
+func TestTCPCheckPort80FallingAwayIsFinal(t *testing.T) {
+	x, node, targetConn := onlyPort80Target(t)
+	done := make(chan []storeTCP, 1)
+	go func() {
+		rows, _ := x.f.runTCPCheck(x.ctx, node, false)
+		done <- rows
+	}()
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "off"}})
+	if rows := <-done; len(rows) != 0 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if stored, err := x.st.TCPChecks(x.ctx, node.ID); err != nil || len(stored) != 0 {
+		t.Fatalf("the old site row stays: %+v, %v", stored, err)
+	}
+}
+
+func TestTCPCheckBusyPort80IsTheWholeResultWhenNothingElseIsProbed(t *testing.T) {
+	x, node, targetConn := onlyPort80Target(t)
+	done := make(chan []storeTCP, 1)
+	go func() {
+		rows, _ := x.f.runTCPCheck(x.ctx, node, false)
+		done <- rows
+	}()
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "busy"}})
+	<-done
+	stored, err := x.st.TCPChecks(x.ctx, node.ID)
+	if err != nil || len(stored) != 1 || stored[0].Port != 80 || stored[0].Verdict != "busy" {
+		t.Fatalf("stored rows = %+v, %v", stored, err)
+	}
+}
+
+func TestTCPCheckBusyPort80DoesNotReplaceGoodTLSRows(t *testing.T) {
+	x, target, targetConn := tcpCheckTarget(t)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	good := []storeTCP{
+		{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()},
+		{Port: 8443, Role: "vless", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()},
+	}
+	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, good); err != nil {
+		t.Fatal(err)
+	}
+	node, err := x.st.Node(x.ctx, target.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan []storeTCP, 1)
+	go func() {
+		rows, _ := x.f.runTCPCheck(x.ctx, node, false)
+		done <- rows
+	}()
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "busy"}})
+	probe := waitTCPProbe(senderConn)
+	replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Error: "no_route"}) // the TLS ports were not probed
+	rows := <-done
+	if len(rows) != 3 || rows[0].Verdict != "busy" || rows[1].Verdict != "" || rows[1].Reason != "no_route" {
+		t.Fatalf("rows = %+v", rows)
+	}
+	stored, err := x.st.TCPChecks(x.ctx, target.nodeID)
+	if err != nil || len(stored) != 2 || stored[0].Port != 443 || stored[0].Verdict != "ours" || stored[1].Verdict != "ours" {
+		t.Fatalf("a busy port 80 replaced the stored TLS rows: %+v, %v", stored, err)
+	}
+}
+
+func TestCheckPortsAdminCallWaitingBehindASaveTimeRunRunsItsOwnTCPHalf(t *testing.T) {
+	x, target, targetConn := tcpCheckTarget(t)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	saved := make(chan struct{})
+	go func() {
+		defer close(saved)
+		x.f.CheckPorts(x.ctx, target.nodeID, []uint16{2053}) // the save-time run: UDP only
+	}()
+	arm := waitUDPCount(targetConn, false)
+	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+	admin := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	waitPortCheckWaiter(t, x.f, target.nodeID)
+	send := waitUDPSend(senderConn)
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	stop := waitUDPCount(targetConn, true)
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	<-saved
+
+	// the waiter may not take the UDP-only result: it runs UDP and TCP of its own
+	driveUDPPart(targetConn, senderConn)
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
+	probe := waitTCPProbe(senderConn)
+	replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t80": "ours", "t443": "ours", "t8443": "ours"}})
+	got := <-admin
+	if got.err != nil || got.response.ErrorCode != "" || len(got.response.Tcp) != 3 || got.response.Tcp[0].Verdict != "ours" {
+		t.Fatalf("admin response = %+v, %v", got.response, got.err)
+	}
+}
+
+func TestCheckPortsSaveTimeCallWaitingBehindAFullRunTakesItsResult(t *testing.T) {
+	x, target, targetConn := tcpCheckTarget(t)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	full := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	arm := waitUDPCount(targetConn, false)
+	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+	saved := make(chan portCheckFleetResult, 1)
+	go func() {
+		checks, sender, code := x.f.CheckPorts(x.ctx, target.nodeID, []uint16{2053})
+		saved <- portCheckFleetResult{checks, sender, code}
+	}()
+	waitPortCheckWaiter(t, x.f, target.nodeID)
+	send := waitUDPSend(senderConn)
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	stop := waitUDPCount(targetConn, true)
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
+	probe := waitTCPProbe(senderConn)
+	replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t80": "ours", "t443": "ours", "t8443": "ours"}})
+	if got := <-full; got.err != nil || len(got.response.Tcp) != 3 {
+		t.Fatalf("full run = %+v, %v", got.response, got.err)
+	}
+	select {
+	case got := <-saved:
+		if got.code != "" || got.sender != sender.nodeID || len(got.checks) != 2 {
+			t.Fatalf("save-time result = %+v", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the save-time call did not take the finished run's result")
+	}
+	assertNoPortCommands(t, targetConn, senderConn)
+	if calls := x.count(`SELECT count(*) FROM audit WHERE action = 'node.ports_check'`); calls != 2 {
+		t.Errorf("audited calls = %d, want both", calls)
+	}
+}
+
+func TestGetNodeNamesTheSendersOfUDPAndTCPRows(t *testing.T) {
+	x, target, _ := tcpCheckTarget(t)
+	peer, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	node, err := x.st.Node(x.ctx, target.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := x.st.PutPortChecks(x.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 443, Sent: 300, Got: 300,
+		Verdict: "ok", Sender: peer.nodeID, CheckedAt: x.f.now()}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := x.st.PutTCPChecks(x.ctx, node.ID, []storeTCP{
+		{Port: 443, Role: "site", Verdict: "ours", Sender: peer.nodeID, CheckedAt: x.f.now()},
+		{Port: 8443, Role: "vless", Verdict: "ours", Sender: "nod_gone", CheckedAt: x.f.now()},
+		{Port: 9443, Role: "vless", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (nodeService{x.f}).GetNode(x.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: node.ID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Msg.PortChecks) != 1 || got.Msg.PortChecks[0].Sender != "sender" {
+		t.Errorf("UDP rows = %+v", got.Msg.PortChecks)
+	}
+	tcp := got.Msg.TcpChecks
+	if len(tcp) != 3 || tcp[0].Sender != "sender" || tcp[1].Sender != "unknown" || tcp[2].Sender != "panel" {
+		t.Errorf("TCP rows = %+v", tcp)
 	}
 }

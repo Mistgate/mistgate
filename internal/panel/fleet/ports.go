@@ -83,6 +83,12 @@ func (f *Fleet) CheckPortsAsSystem(ctx context.Context, nodeID string, requested
 	return out.checks, out.sender, out.errorCode
 }
 
+// CheckPortsAsSystemUDP is CheckPortsAsSystem without the TCP half: the confirming second sample after UDP loss.
+func (f *Fleet) CheckPortsAsSystemUDP(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
+	out := f.checkPorts(ctx, nodeID, requested, "system", false)
+	return out.checks, out.sender, out.errorCode
+}
+
 func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint16, auditActor string, withTCP bool) portCheckOutcome {
 	node, err := f.st.Node(ctx, nodeID)
 	if err != nil {
@@ -704,17 +710,23 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 	}
 }
 
-func (f *Fleet) portCheckMessages(ctx context.Context, checks []store.PortCheck, sender, errorCode string) ([]*adminv1.PortCheck, string, error) {
-	if len(checks) == 0 && sender == "" {
-		return nil, "", nil
-	}
+// nodeNames maps every node id (retired ones too) to its name, for naming the senders of port checks.
+func (f *Fleet) nodeNames(ctx context.Context) (map[string]string, error) {
 	nodes, err := f.st.Nodes(ctx, true)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	names := make(map[string]string, len(nodes))
 	for _, node := range nodes {
 		names[node.ID] = node.Name
+	}
+	return names, nil
+}
+
+// portCheckMessages builds the admin rows of the UDP check; names (node id to name) names the senders.
+func portCheckMessages(names map[string]string, checks []store.PortCheck, sender, errorCode string) ([]*adminv1.PortCheck, string) {
+	if len(checks) == 0 && sender == "" {
+		return nil, ""
 	}
 	senderName := sender
 	if sender != "" && sender != "panel" {
@@ -743,7 +755,7 @@ func (f *Fleet) portCheckMessages(ctx context.Context, checks []store.PortCheck,
 		out = append(out, &adminv1.PortCheck{NodeId: check.NodeID, Port: uint32(check.Port), Verdict: check.Verdict,
 			Sent: check.Sent, Got: check.Got, CheckedUnix: check.CheckedAt.Unix(), BadUnix: badAt, Sender: rowSender, Reason: reason})
 	}
-	return out, senderName, nil
+	return out, senderName
 }
 
 func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow) []store.NodeRow {

@@ -197,7 +197,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
-	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem,
+	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
 		OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	hl = health.New(st, vlt, reg, fl, hcfg)
 	fl.SetHealth(hl)

@@ -100,6 +100,8 @@ type Config struct {
 	Actor func(context.Context) string
 	// CheckPorts runs the fleet's bounded UDP delivery check. When set, the VPS scheduler uses it every six hours.
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
+	// CheckPortsUDP is the same without the TCP half, for the confirming second sample after UDP loss. nil = CheckPorts.
+	CheckPortsUDP func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
 	Log          *slog.Logger

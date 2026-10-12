@@ -106,8 +106,13 @@ func (s *Service) runOnePortRecheck(ctx context.Context) bool {
 	s.portCheckAttempts[nodeID] = period
 	checked, _, errorCode := s.cfg.CheckPorts(ctx, nodeID, nil)
 	if errorCode == "" && portCheckFoundBadInbound(sn.byNode[nodeID], checked) {
-		// A second sample confirms bursty loss; the latest stored verdict drives the alert.
-		_, _, _ = s.cfg.CheckPorts(ctx, nodeID, nil)
+		// A second sample confirms bursty loss; the latest stored verdict drives the alert. It is UDP only: the TCP
+		// half has just run and its rows do not depend on the loss.
+		confirm := s.cfg.CheckPortsUDP
+		if confirm == nil {
+			confirm = s.cfg.CheckPorts
+		}
+		_, _, _ = confirm(ctx, nodeID, nil)
 	}
 	s.evaluateSoon()
 	return true

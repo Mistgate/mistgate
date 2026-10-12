@@ -30,7 +30,7 @@ const (
 	capTCPCheck = "tcpcheck/1"
 	// tcpMarkHold is how long the target keeps the mark; the probe follows at once and takes at most 8 s.
 	tcpMarkHold = 30
-	tcpMarkWait = 10 * time.Second
+	tcpMarkWait = 5 * time.Second
 	// tcpProbeWait covers the 5 s connect and 8 s per port limits of the prober, in parallel, plus the name lookup.
 	tcpProbeWait = 15 * time.Second
 
@@ -209,6 +209,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 	}
 	targets := tcpTargets(specs, pins)
 	if len(targets) == 0 {
+		f.clearTCPChecks(ctx, target.ID) // the last inbound that had a TCP port is gone: its old rows describe nothing
 		return nil, false
 	}
 
@@ -246,7 +247,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 
 	// Port 80 needs the target to arm a mark first; a target that cannot, or has nothing serving, drops out of the probe.
 	checkedAt := f.now().UTC()
-	var token, answer [16]byte
+	var token, answer [tcpcheck.MarkSize]byte
 	rows = make([]store.TCPCheck, 0, len(targets))
 	probed := make([]tcpTarget, 0, len(targets))
 	for _, t := range targets {
@@ -265,16 +266,31 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		}
 	}
 
+	if len(probed) == 0 && len(rows) == 0 {
+		// the only target was port 80 and the node has no ACME name to answer it: there is nothing left to say
+		f.clearTCPChecks(ctx, target.ID)
+		return nil, true
+	}
+
 	var sender portSender
 	var verdicts map[uint16]string
+	var spent *tcpTarget // port 80, when a sender that failed may have used up its mark
 	errorCode := ""
-	if len(probed) > 0 {
-		// a second sender takes over when the first could not run the probe (busy, no route, lost)
+	nothingSent := len(probed) == 0
+	if !nothingSent {
+		// A second sender takes over when the first did not run the probe: busy or no_route are answered before any
+		// request leaves it, so the mark is still good. After any other failure the first sender may already have
+		// made its GET and used the mark up, so the second probes the TLS ports only and port 80 reads "failed".
 		for i, candidate := range senders {
 			sender = candidate
 			verdicts, errorCode = f.probeTCPTargets(ctx, target, sender, probed, token[:], answer[:])
 			if errorCode == "" || i == len(senders)-1 {
 				break
+			}
+			if errorCode != "busy" && errorCode != "no_route" {
+				if probed, spent = withoutMark(probed); len(probed) == 0 {
+					break
+				}
 			}
 		}
 	}
@@ -287,12 +303,17 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		}
 		rows = append(rows, tcpRow(target.ID, t, verdict, reason, portSenderID(sender), checkedAt))
 	}
+	if spent != nil {
+		rows = append(rows, tcpRow(target.ID, *spent, "", "failed", "", checkedAt))
+	}
 	sort.Slice(rows, func(i, j int) bool { return tcpRowOrder(rows[i].Port) < tcpRowOrder(rows[j].Port) })
 
 	// Nothing answered at all (every sender failed): keep the last stored result, the rows above only carry the reason.
+	// The target's own "busy" for port 80 is no answer about the TLS ports, so it does not replace their stored rows;
+	// it is the whole result only when nothing went to a sender.
 	conclusive := false
 	for _, row := range rows {
-		conclusive = conclusive || row.Verdict != ""
+		conclusive = conclusive || validTCPVerdict(row.Verdict) || (nothingSent && row.Verdict != "")
 	}
 	if conclusive && !sameHost {
 		if err := f.st.PutTCPChecks(ctx, target.ID, rows); err != nil {
@@ -300,6 +321,28 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		}
 	}
 	return rows, true
+}
+
+// withoutMark splits the HTTP-01 mark target off the list.
+func withoutMark(targets []tcpTarget) (rest []tcpTarget, mark *tcpTarget) {
+	for _, t := range targets {
+		if t.Kind == tcpcheck.KindHTTPMark {
+			mark = &t
+			continue
+		}
+		rest = append(rest, t)
+	}
+	return rest, mark
+}
+
+// clearTCPChecks drops a node's stored TCP rows, with a read first so that the common case (none stored) costs no write.
+func (f *Fleet) clearTCPChecks(ctx context.Context, nodeID string) {
+	if rows, err := f.st.TCPChecks(ctx, nodeID); err == nil && len(rows) == 0 {
+		return
+	}
+	if err := f.st.PutTCPChecks(ctx, nodeID, nil); err != nil {
+		f.log.Warn("clear TCP port checks", "node", nodeID, "err", err)
+	}
 }
 
 func tcpRowOrder(port uint16) int {
@@ -324,7 +367,7 @@ func validTCPVerdict(v string) bool {
 
 // armTCPMark asks the target to answer one marked request on port 80. It returns "serving" when armed, "off" when the node
 // has no ACME name, "busy" when another program holds port 80 (a verdict of the row), or "" with the reason for the row.
-func (f *Fleet) armTCPMark(ctx context.Context, target store.NodeRow, live store.NodeLiveRow, token, answer *[16]byte) (verdict, reason string) {
+func (f *Fleet) armTCPMark(ctx context.Context, target store.NodeRow, live store.NodeLiveRow, token, answer *[tcpcheck.MarkSize]byte) (verdict, reason string) {
 	if !slices.Contains(live.AgentCaps, capTCPCheck) {
 		return "", "agent_too_old"
 	}
@@ -406,23 +449,12 @@ func tcpProbeErrorCode(err error) string {
 	}
 }
 
-// tcpCheckMessages turns stored or fresh rows into the admin messages, naming the sending node.
-func (f *Fleet) tcpCheckMessages(ctx context.Context, rows []store.TCPCheck) ([]*adminv1.TcpCheck, error) {
-	var names map[string]string
+// tcpCheckMessages turns stored or fresh rows into the admin messages, naming the sending node (names: node id to name).
+func tcpCheckMessages(names map[string]string, rows []store.TCPCheck) []*adminv1.TcpCheck {
 	out := make([]*adminv1.TcpCheck, 0, len(rows))
 	for _, row := range rows {
 		sender := row.Sender
 		if sender != "" && sender != "panel" {
-			if names == nil {
-				nodes, err := f.st.Nodes(ctx, true)
-				if err != nil {
-					return nil, err
-				}
-				names = make(map[string]string, len(nodes))
-				for _, node := range nodes {
-					names[node.ID] = node.Name
-				}
-			}
 			if sender = names[row.Sender]; sender == "" {
 				sender = "unknown"
 			}
@@ -430,5 +462,5 @@ func (f *Fleet) tcpCheckMessages(ctx context.Context, rows []store.TCPCheck) ([]
 		out = append(out, &adminv1.TcpCheck{Port: uint32(row.Port), Role: row.Role, Alpn: row.ALPN, Profile: row.Profile,
 			Verdict: row.Verdict, Reason: row.Reason, Sender: sender, CheckedUnix: row.CheckedAt.Unix()})
 	}
-	return out, nil
+	return out
 }
