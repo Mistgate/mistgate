@@ -7,7 +7,7 @@ import { ru } from "@/i18n/ru";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
-import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, reasons, reasonText } from "./port-check";
+import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, reasons, reasonText, renewalOf, renewalText } from "./port-check";
 
 const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
@@ -103,5 +103,40 @@ describe("a VLESS profile on the Hysteria2 site's TCP port (hy2_decoy_paused)", 
 
   it("goes into what a saved inbound owes the admin (the toast, the rows of 'Put on nodes')", () => {
     expect(portNotes(t, [{ code: "hy2_decoy_paused", params }])).toEqual([decoyNote(t, params)]);
+  });
+});
+
+describe("whether the certificates of a node renew", () => {
+  const row = (over: Partial<{ port: number; role: string; alpn: boolean; profile: string; verdict: string }>) => ({ port: 80, role: "acme", alpn: false, profile: "", verdict: "ours", ...over });
+  const site443 = row({ port: 443, role: "site", alpn: true, profile: "hy2" });
+  const reality443 = row({ port: 443, role: "vless", profile: "VLESS 443" });
+
+  it("is ok80 when port 80 is ours, whatever 443 says", () => {
+    expect(renewalOf([row({}), reality443])).toEqual({ kind: "ok80" });
+  });
+
+  it("is ok443 when port 80 is not ours and an alpn row on 443 is ours", () => {
+    for (const verdict of ["other", "busy", "refused", "timeout"]) expect(renewalOf([row({ verdict }), site443])).toEqual({ kind: "ok443" });
+    expect(renewalOf([row({ verdict: "refused" }), row({ port: 8443, alpn: true, role: "site" })])).toMatchObject({ kind: "risk" });
+  });
+
+  it("is a risk otherwise, with the VLESS profile that holds 443 with another site's REALITY", () => {
+    expect(renewalOf([row({ verdict: "timeout" }), reality443])).toEqual({ kind: "risk", profile: "VLESS 443" });
+    expect(renewalOf([row({ verdict: "timeout" }), { ...site443, verdict: "other" }])).toEqual({ kind: "risk", profile: "" });
+    expect(renewalOf([row({ verdict: "refused" })])).toEqual({ kind: "risk", profile: "" });
+  });
+
+  it("is nothing without a row for port 80 (no ACME name) or with a port 80 that was not probed", () => {
+    expect(renewalOf([])).toBeNull();
+    expect(renewalOf([site443, reality443])).toBeNull();
+    expect(renewalOf([row({ verdict: "" }), site443])).toBeNull();
+  });
+
+  it("reads in both languages as the design lists it", () => {
+    const tRu = tOf("ru");
+    expect(renewalText(t, { kind: "ok80" })).toBe("Port 80 is open: Let’s Encrypt certificates on this node renew.");
+    expect(renewalText(tRu, { kind: "ok443" })).toBe("Порт 80 закрыт, но TCP 443 отвечает Let’s Encrypt — сертификаты обновляются.");
+    expect(renewalText(t, { kind: "risk", profile: "" })).toBe("Port 80 is closed and TCP 443 does not answer Let’s Encrypt: certificates on this node will stop renewing. Open TCP 80 at the provider, move VLESS to 8443, or make its REALITY target “This node’s site”.");
+    expect(renewalText(tRu, { kind: "risk", profile: "VLESS 443" })).toBe("Порт 80 закрыт, а TCP 443 не отвечает Let’s Encrypt (его занимает «VLESS 443» — REALITY с другим сайтом) — сертификаты на этой ноде перестанут обновляться. Открой TCP 80 у провайдера, перенеси VLESS на 8443 или поставь ему цель REALITY «Сайт этой ноды».");
   });
 });

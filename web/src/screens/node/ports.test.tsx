@@ -6,7 +6,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
 import { reasons } from "@/lib/port-check";
-import { UdpPorts } from "./udp-ports";
+import { Ports } from "./ports";
 
 const checkPorts = vi.fn();
 let role = Role.OWNER;
@@ -34,6 +34,7 @@ afterEach(() => {
 
 const now = Math.floor(Date.now() / 1000);
 const check = (over: Record<string, unknown>) => ({ nodeId: "nod_1", port: 443, verdict: "ok", sent: 300, got: 300, checkedUnix: now - 120, badUnix: 0, sender: "de2", reason: "", ...over });
+const tcp = (over: Record<string, unknown>) => ({ nodeId: "nod_1", port: 80, role: "acme", alpn: false, profile: "", verdict: "ours", reason: "", sender: "de2", checkedUnix: now - 120, ...over });
 const inbound = (over: Record<string, unknown>) => ({ id: "inb_1", profileId: "prf_1", profileName: "hy2 · 443", port: 443, ...over });
 const data = (over: Record<string, unknown> = {}) => ({ node: { id: "nod_1", name: "de1", status: NodeStatus.ONLINE }, inbounds: [inbound({})], portChecks: [], ...over }) as never;
 
@@ -45,7 +46,7 @@ async function mount(d: never) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <UdpPorts data={d} />
+        <Ports data={d} />
       </QueryClientProvider>,
     ),
   );
@@ -62,7 +63,7 @@ const rows = () => [...document.querySelectorAll("li")].map((li) => li.textConte
 describe("the stored results", () => {
   it("says it was never checked, and offers the check", async () => {
     await mount(data());
-    expect(text()).toContain("UDP ports");
+    expect(text()).toContain("Ports");
     expect(text()).toContain(en["ports.never"]);
     expect(rows()).toEqual([]);
     expect(button("Check ports")).toBeDefined();
@@ -117,6 +118,79 @@ describe("the stored results", () => {
   });
 });
 
+describe("the TCP rows and the renewal line", () => {
+  const vless = inbound({ id: "inb_v", profileName: "VLESS · 443", port: 443, protocol: "vless" });
+
+  it("shows each verdict, who answered, and what listens, after the UDP rows", async () => {
+    await mount(
+      data({
+        inbounds: [inbound({}), vless],
+        portChecks: [check({})],
+        tcpChecks: [
+          tcp({}),
+          tcp({ port: 443, role: "vless", alpn: true, profile: "VLESS · 443", verdict: "other", sender: "panel" }),
+          tcp({ port: 8443, role: "site", profile: "hy2 · 8443", verdict: "busy" }),
+          tcp({ port: 2053, role: "vless", profile: "VLESS · 2053", verdict: "refused" }),
+          tcp({ port: 2083, role: "vless", profile: "VLESS · 2083", verdict: "timeout" }),
+        ],
+      }),
+    );
+    const r = rows();
+    expect(r[0]).toContain("udp/443");
+    expect(r[1]).toContain("tcp/80");
+    expect(r[1]).toContain(en["ports.tcp.ours"]);
+    expect(r[1]).toContain("2 min ago · from de2");
+    expect(r[1]).toContain(en["ports.tcp.role.acme"]);
+    expect(r[2]).toContain("tcp/443");
+    expect(r[2]).toContain(en["ports.tcp.other"]);
+    expect(r[2]).toContain("from the panel");
+    expect(r[2]).toContain("VLESS · 443");
+    expect(r[3]).toContain(en["ports.tcp.refused"]);
+    expect(r[4]).toContain(en["ports.tcp.timeout"]);
+    expect(r[5]).toContain(en["ports.tcp.busy"]);
+    expect(r[5]).toContain("Hysteria2 site · hy2 · 8443");
+  });
+
+  it("shows only TCP rows when there are no UDP ones, and is no longer 'never checked'", async () => {
+    await mount(data({ inbounds: [vless], tcpChecks: [tcp({})] }));
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toContain("tcp/80");
+    expect(text()).not.toContain(en["ports.never"]);
+  });
+
+  it("names the reason of a row that could not be probed", async () => {
+    await mount(data({ tcpChecks: [tcp({ verdict: "", reason: "agent_too_old", sender: "" })] }));
+    expect(rows()[0]).toContain(en["ports.unchecked"]);
+    expect(rows()[0]).toContain(en["ports.short.agent_too_old"]);
+  });
+
+  it("says the certificates renew when port 80 is ours", async () => {
+    await mount(data({ tcpChecks: [tcp({})] }));
+    expect(text()).toContain(en["ports.renewal.ok80"]);
+  });
+
+  it("says they renew over 443 when port 80 is closed and an alpn listener there is ours", async () => {
+    await mount(data({ tcpChecks: [tcp({ verdict: "refused" }), tcp({ port: 443, role: "site", alpn: true, profile: "hy2 · 443" })] }));
+    expect(text()).toContain(en["ports.renewal.ok443"]);
+    expect(document.querySelector("[role=status]")).toBeNull();
+  });
+
+  it("warns that certificates will stop renewing, naming the VLESS profile that holds 443", async () => {
+    await mount(data({ tcpChecks: [tcp({ verdict: "timeout" }), tcp({ port: 443, role: "vless", profile: "VLESS · 443", verdict: "ours" })] }));
+    expect(text()).toContain("Port 80 is closed and TCP 443 does not answer Let’s Encrypt (it goes to “VLESS · 443”, REALITY with another site): certificates on this node will stop renewing.");
+    expect(document.querySelector("[role=status]")).not.toBeNull();
+  });
+
+  it("says nothing about renewal when port 80 was not probed or has no row", async () => {
+    await mount(data({ tcpChecks: [tcp({ verdict: "", reason: "agent_too_old" })] }));
+    expect(text()).not.toContain("renew");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(data({ tcpChecks: [tcp({ port: 443, role: "vless", profile: "VLESS · 443" })] }));
+    expect(text()).not.toContain("renew");
+  });
+});
+
 describe("running the check", () => {
   it("shows a progress state while it runs, then the call is made for the node", async () => {
     let done: (v: unknown) => void = () => {};
@@ -154,6 +228,23 @@ describe("running the check", () => {
     await settle();
     expect(text()).toContain("even the best port got only 40 %");
     expect(text()).toContain("443: 120/300 · 8443: 90/300");
+  });
+
+  it("on same_host explains that nothing was saved and does not show the run's unsaved TCP rows", async () => {
+    checkPorts.mockResolvedValue({ ports: [{ port: 443, verdict: "", sent: 300, got: 300, reason: "same_host" }], tcp: [tcp({ port: 80, verdict: "ours" })], errorCode: "same_host", sender: "panel" });
+    await mount(data());
+    await click(button("Check ports"));
+    await settle();
+    expect(text()).toContain(en["ports.why.same_host"]);
+    expect(rows()).toEqual([]);
+  });
+
+  it("says why when the TCP part of a run could not probe anything", async () => {
+    checkPorts.mockResolvedValue({ ports: [check({})], tcp: [tcp({ verdict: "", reason: "agent_too_old", sender: "" })], errorCode: "", sender: "de2" });
+    await mount(data({ portChecks: [check({})] }));
+    await click(button("Check ports"));
+    await settle();
+    expect(text()).toContain(en["ports.why.agent_too_old"]);
   });
 
   it("shows a refused call (an RPC error) in words, not as a verdict", async () => {

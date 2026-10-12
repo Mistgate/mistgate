@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode"
@@ -198,6 +199,13 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 		stored.Ports[0].Sender != "sender-node" || len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
 		t.Fatalf("stored UDP port checks = %+v", stored)
 	}
+	wantStored := []tcpCheckV{
+		{Port: 80, Role: "acme", Verdict: "ours", Sender: "sender-node", Checked: 1700000000},
+		{Port: 443, Role: "vless", ALPN: true, Profile: "Main", Verdict: "timeout", Sender: "panel", Checked: 1700000000},
+	}
+	if !reflect.DeepEqual(stored.TCP, wantStored) {
+		t.Fatalf("stored TCP port checks = %+v, want %+v", stored.TCP, wantStored)
+	}
 	e.w.mu.Lock()
 	readonlyCalls := len(e.w.checkPortsReq)
 	e.w.mu.Unlock()
@@ -210,6 +218,14 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 	checked := decode[NodePortsV](t, mustOK(t, operator, "node_ports", map[string]any{"node": "de1", "check": true}))
 	if checked.ErrorCode != "" || checked.Sender != "sender-node" || len(checked.Ports) != 1 || checked.Ports[0].Verdict != "lossy" || checked.Ports[0].Got != 280 {
 		t.Fatalf("checked UDP port results = %+v", checked)
+	}
+	// the TCP rows of the run, including one that could not be probed (empty verdict, with its reason)
+	wantChecked := []tcpCheckV{
+		{Port: 80, Role: "acme", Reason: "agent_too_old", Sender: "sender-node", Checked: 1700003600},
+		{Port: 8443, Role: "site", Profile: "Main", Verdict: "other", Sender: "sender-node", Checked: 1700003600},
+	}
+	if !reflect.DeepEqual(checked.TCP, wantChecked) {
+		t.Fatalf("checked TCP port results = %+v, want %+v", checked.TCP, wantChecked)
 	}
 	e.w.mu.Lock()
 	defer e.w.mu.Unlock()

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -251,5 +252,52 @@ func TestDeviceProtocolsFollowServers(t *testing.T) {
 	must(e.s.UpdateUser(e.ctx, req(&adminv1.UpdateUserRequest{UserId: user.Id, Nodes: &adminv1.NodeSelection{NodeIds: []string{"nod_de1"}}})))
 	if got := protocols(); !slices.Equal(got, []string{"hysteria2"}) {
 		t.Errorf("only de1 selected: protocols = %v", got)
+	}
+}
+
+// port80 of the decoy warning is the stored TCP check of port 80 on that node: open when it reaches Mistgate, closed for
+// another server, a busy, closed or filtered port, and unchecked with no row or a row that has no verdict.
+func TestDecoyPausedPort80FromStoredCheck(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	e.node("nod_fi1", "fi1", "fi1.example.com", "active")
+	vless := plugin.InboundSpec{Protocol: "vless", Listen: plugin.Listen{Network: "tcp", Port: 443},
+		Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}
+	hySpec := plugin.InboundSpec{Protocol: "hysteria2", Listen: plugin.Listen{Network: "udp", Port: 443}, TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain}, Settings: []byte(`{}`)}
+	hy2 := nodeListen{profile: "hy2", protocol: "hysteria2", enabled: true, l: hySpec.Listen, spec: hySpec}
+	put := func(node string, rows ...store.TCPCheck) {
+		t.Helper()
+		if err := e.st.PutTCPChecks(e.ctx, node, rows); err != nil {
+			t.Fatal(err)
+		}
+	}
+	row := func(port uint16, role, verdict string) store.TCPCheck {
+		return store.TCPCheck{Port: port, Role: role, Verdict: verdict, CheckedAt: e.clock}
+	}
+	put("nod_fi1", row(80, "acme", "ours")) // another node's row says nothing about de1
+	for _, tt := range []struct {
+		name string
+		rows []store.TCPCheck
+		want string
+	}{
+		{"no rows", nil, "unchecked"},
+		{"only a 443 row", []store.TCPCheck{row(443, "site", "ours")}, "unchecked"},
+		{"ours", []store.TCPCheck{row(80, "acme", "ours")}, "open"},
+		{"another server", []store.TCPCheck{row(80, "acme", "other")}, "closed"},
+		{"busy", []store.TCPCheck{row(80, "acme", "busy")}, "closed"},
+		{"closed", []store.TCPCheck{row(80, "acme", "refused")}, "closed"},
+		{"filtered", []store.TCPCheck{row(80, "acme", "timeout")}, "closed"},
+		{"not probed", []store.TCPCheck{{Port: 80, Role: "acme", Reason: "agent_too_old", CheckedAt: e.clock}}, "unchecked"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			put("nod_de1", tt.rows...)
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, []nodeListen{hy2})
+			if err != nil || len(got) != 1 {
+				t.Fatalf("%v %+v", err, got)
+			}
+			if p := got[0].Params["port80"]; p != tt.want {
+				t.Errorf("port80 = %q, want %q", p, tt.want)
+			}
+		})
 	}
 }

@@ -134,11 +134,33 @@ The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **D
 
 The node's own host checks, grouped into **Needs attention**, **Accepted as normal**, **All good** and **Not checked**, with the fixes the panel can apply and the manual steps for the rest. **Run again** asks the node for a fresh report. The first report comes about 30 seconds after the agent connects; an agent that is too old for the doctor gets a link to **Updates**. See [Health](../operations/health.md).
 
-### UDP ports
+### Ports
 
-A UDP port check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
+**Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
 
-On VPS installations, the panel repeats the check every six hours for each online node with the `udpcheck` capability and an enabled inbound. It immediately confirms a lossy or broken result with one more check; the alert follows the latest verdict.
+**UDP.** The check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
+
+**TCP.** The check opens a real connection to each TCP port the node should answer and asks whether it reached Mistgate itself, not another server in front of it. Port 80 is checked when the node has an ACME certificate name: the agent arms a one-time token and the sender requests it the way Let's Encrypt does. The Hysteria2 site port and each VLESS TCP port get a TLS handshake for the expected name. A VLESS profile that fronts another site's REALITY target is judged by that target's certificate.
+
+| Verdict | Meaning |
+|:--|:--|
+| **Reaches Mistgate** | The connection got to Mistgate on this node. |
+| **Another server answers** | Something else answered: a provider filter that replies, a proxy or a web server in front of the node. |
+| **Held by another program on the node** | Port 80 only: another program on the node already listens there, so Mistgate cannot answer on it. |
+| **Closed** | The connection was refused. |
+| **No answer (filtered)** | The connection timed out, which usually means a firewall that drops it. |
+
+A row with **Not checked** and a short reason could not be probed (the agent is too old, the sender has no route to the node, another check is running, or it failed). When no sender can probe at all, the last stored result stays. A sender on the node's own host proves nothing about the provider's filter, so the panel says so and saves nothing.
+
+Under the rows, one line says whether the node's Let's Encrypt certificates renew:
+
+- **Port 80 is open**: they renew over port 80.
+- **Port 80 is closed, but TCP 443 answers Let's Encrypt**: they renew over TLS on 443. This needs a listener that answers on 443, such as the Hysteria2 site or a VLESS profile whose REALITY target is **This node's site**.
+- **Port 80 is closed and TCP 443 does not answer Let's Encrypt**: the certificates will stop renewing. The line names the VLESS profile that holds 443 with another site, if there is one. Open TCP 80 at the provider, move VLESS to 8443, or make its REALITY target **This node's site**.
+
+There is no line for a node without an ACME certificate name, or when port 80 could not be probed. The same port 80 result decides the certificate sentence in the warning you get when a VLESS profile pauses a Hysteria2 site: [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
+
+On VPS installations, the panel repeats the check every six hours for each online node with the `udpcheck` capability and an enabled inbound. It immediately confirms a lossy or broken result with one more check; the alert follows the latest verdict. The TCP rows are refreshed by the same scheduled run; they raise no alert of their own.
 
 ### Settings
 

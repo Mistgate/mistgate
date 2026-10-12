@@ -30,7 +30,7 @@ import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
-import { UdpPorts } from "./udp-ports";
+import { Ports } from "./ports";
 
 export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }> = {
   [InboundState.UNSPECIFIED]: { kind: "off", word: "node.inbound.off" },
@@ -222,7 +222,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
       })}
 
       {/* the UDP delivery check of the ports above: with profiles on the node, or results from before */}
-      {node.status !== NodeStatus.RETIRED && (data.inbounds.length > 0 || (data.portChecks?.length ?? 0) > 0) && <UdpPorts data={data} />}
+      {node.status !== NodeStatus.RETIRED && (data.inbounds.length > 0 || (data.portChecks?.length ?? 0) > 0 || (data.tcpChecks?.length ?? 0) > 0) && <Ports data={data} />}
 
       <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />
       {editing && (

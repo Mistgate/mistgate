@@ -1,4 +1,4 @@
-// The UDP delivery check (design/udp-port-check.md): the "UDP ports" block on a node, the refusal and the warnings of
+// The port check (design/udp-port-check.md, design/vless.md section 7.4): the "Ports" block on a node, the refusal and the warnings of
 // CreateInbound / UpdateInbound / UpdateProfile, the twin's per-node badges, the event. English is the source of truth: `ru`
 // is type-checked against it. The admin speaks «ты». "a|b" is a plural.
 export const en = {
@@ -10,9 +10,9 @@ export const en = {
   "ports.whenUnknown": "earlier",
 
   // the block on the node's Profiles tab
-  "ports.title": "UDP ports",
-  "ports.intro": "Another node sends test packets to this node’s ports and counts how many arrive. A port that loses packets makes a profile slow or drop.",
-  "ports.never": "Not checked yet. Check the ports to see whether UDP reaches them.",
+  "ports.title": "Ports",
+  "ports.intro": "Another node sends test packets to this node’s UDP ports and counts how many arrive: a port that loses packets makes a profile slow or drop. TCP ports are checked with a connection: does it reach Mistgate.",
+  "ports.never": "Not checked yet. Check the ports to see whether UDP and TCP reach them.",
   "ports.check": "Check ports",
   "ports.checking": "Checking…",
   "ports.checkingNote": "About 8 seconds: test packets go to the node’s ports.",
@@ -26,13 +26,28 @@ export const en = {
   "ports.row.cleanNow": "Lost packets {when}, clean now.",
   "ports.row.noProfile": "no profile on it",
 
+  // the TCP rows (design/vless.md section 7.4): the verdict of a connection to the port
+  "ports.tcp.ours": "Reaches Mistgate",
+  "ports.tcp.other": "Another server answers",
+  "ports.tcp.busy": "Held by another program on the node",
+  "ports.tcp.refused": "Closed",
+  "ports.tcp.timeout": "No answer (filtered)",
+  "ports.tcp.role.acme": "Let’s Encrypt certificates",
+  "ports.tcp.role.site": "Hysteria2 site",
+
+  // one line on whether the node's certificates renew (renewalOf in src/lib/port-check.ts)
+  "ports.renewal.ok80": "Port 80 is open: Let’s Encrypt certificates on this node renew.",
+  "ports.renewal.ok443": "Port 80 is closed, but TCP 443 answers Let’s Encrypt: certificates renew.",
+  "ports.renewal.risk": "Port 80 is closed and TCP 443 does not answer Let’s Encrypt{why}: certificates on this node will stop renewing. Open TCP 80 at the provider, move VLESS to 8443, or make its REALITY target “This node’s site”.",
+  "ports.renewal.risk.vless": " (it goes to “{profile}”, REALITY with another site)",
+
   // why a check could not run: the one-line explanation (PortCheck.reason / CheckPortsResponse.error_code)
   "ports.why.node_offline": "The node is offline: a check needs its agent to be connected.",
   "ports.why.agent_too_old": "The agent on this node is too old for the check. Update it on the Updates page.",
   "ports.why.no_sender": "No other node can send the test packets. A second node can check this one.",
   "ports.why.busy": "A check of this node is already running. Try again in a minute.",
   "ports.why.inconclusive": "Inconclusive: even the best port got only {best} % of the packets, so the path from the sender is lossy and says nothing about single ports. Try again later.",
-  "ports.why.same_host": "The panel and the node are on one host: the packets never left the machine, so nothing was saved.",
+  "ports.why.same_host": "The panel and the node are on one host: the packets and connections never left the machine, so nothing was saved.",
   "ports.why.no_route": "The sender has no route to this node’s address.",
   "ports.why.failed": "The check failed. Try again; if it repeats, the node’s Logs tab may say why.",
 
@@ -80,9 +95,9 @@ export const ru: typeof en = {
   "ports.senderPanel": "панели",
   "ports.whenUnknown": "ранее",
 
-  "ports.title": "UDP-порты",
-  "ports.intro": "Другая нода шлёт на порты этой ноды тестовые пакеты и считает, сколько дошло. Порт с потерями делает профиль медленным или рвёт соединение.",
-  "ports.never": "Ещё не проверялось. Проверь порты — так видно, доходит ли до них UDP.",
+  "ports.title": "Порты",
+  "ports.intro": "Другая нода шлёт на UDP-порты этой ноды тестовые пакеты и считает, сколько дошло: порт с потерями делает профиль медленным или рвёт соединение. TCP-порты проверяются соединением — доходит ли оно до Mistgate.",
+  "ports.never": "Ещё не проверялось. Проверь порты — так видно, доходят ли до них UDP и TCP.",
   "ports.check": "Проверить порты",
   "ports.checking": "Проверяю…",
   "ports.checkingNote": "Около 8 секунд: на порты ноды идут тестовые пакеты.",
@@ -96,12 +111,25 @@ export const ru: typeof en = {
   "ports.row.cleanNow": "Пакеты терялись {when}, сейчас чисто.",
   "ports.row.noProfile": "профиля на нём нет",
 
+  "ports.tcp.ours": "Доходит до Mistgate",
+  "ports.tcp.other": "Отвечает чужой сервер",
+  "ports.tcp.busy": "Занят другой программой на ноде",
+  "ports.tcp.refused": "Закрыт",
+  "ports.tcp.timeout": "Нет ответа (фильтруется)",
+  "ports.tcp.role.acme": "Сертификаты Let’s Encrypt",
+  "ports.tcp.role.site": "Сайт Hysteria2",
+
+  "ports.renewal.ok80": "Порт 80 открыт — сертификаты Let’s Encrypt на этой ноде обновляются.",
+  "ports.renewal.ok443": "Порт 80 закрыт, но TCP 443 отвечает Let’s Encrypt — сертификаты обновляются.",
+  "ports.renewal.risk": "Порт 80 закрыт, а TCP 443 не отвечает Let’s Encrypt{why} — сертификаты на этой ноде перестанут обновляться. Открой TCP 80 у провайдера, перенеси VLESS на 8443 или поставь ему цель REALITY «Сайт этой ноды».",
+  "ports.renewal.risk.vless": " (его занимает «{profile}» — REALITY с другим сайтом)",
+
   "ports.why.node_offline": "Нода не на связи — для проверки нужен подключённый агент.",
   "ports.why.agent_too_old": "Агент на этой ноде слишком старый для проверки. Обнови его на странице «Обновления».",
   "ports.why.no_sender": "Тестовые пакеты некому слать. Проверить эту ноду сможет вторая нода.",
   "ports.why.busy": "Эту ноду уже проверяют. Попробуй через минуту.",
   "ports.why.inconclusive": "Неясно: даже лучший порт получил лишь {best} % пакетов — путь от отправителя теряет сам, и про отдельные порты это ничего не говорит. Попробуй позже.",
-  "ports.why.same_host": "Панель и нода на одном сервере: пакеты не выходили из машины, поэтому ничего не сохранено.",
+  "ports.why.same_host": "Панель и нода на одном сервере: пакеты и соединения не выходили из машины, поэтому ничего не сохранено.",
   "ports.why.no_route": "У отправителя нет пути до адреса этой ноды.",
   "ports.why.failed": "Проверка не удалась. Попробуй ещё раз; если повторится, причину может подсказать вкладка «Логи» ноды.",
 

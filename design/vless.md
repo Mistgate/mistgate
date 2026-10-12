@@ -443,12 +443,19 @@ R4.1 as built (2026-10-12), where it adds to the text above:
   the next run.
 - The scheduled run still keys on the UDP rows (`LastCheckedAt`), so TCP is refreshed every six hours with it.
 
-R4.1 not built yet (TODO), so the web and the other readers are still behind the data:
-- The `Ports` block and `renewalOf` in `web/src/lib/port-check.ts` (the renewal line of this section) are not built; the rows
-  are stored and sent (`GetNodeResponse.tcp_checks`, `CheckPortsResponse.tcp`) but nothing in the UI reads them.
-- `port80` of the access warnings is not read from the stored port-80 row: `access` still sends `unchecked`.
-- The MCP `node_ports` tool (`internal/panel/mcp/tools_read.go`, `nodePorts`) reads only the UDP rows and drops the TCP ones.
-- The docs section for the TCP check is not written.
+R4.1 UI, access, MCP and docs (2026-10-12), built:
+- `web/src/screens/node/ports.tsx` (was `udp-ports.tsx`) is the "Ports" block: UDP rows, then the TCP rows of `GetNodeResponse.tcp_checks`
+  (pill by verdict; a row without a verdict says its reason with the UDP short texts), then the renewal line. `renewalOf` and
+  `renewalText` are in `web/src/lib/port-check.ts`, the texts in `web/src/i18n/ports.ts`. Refinement: no line when port 80 has no
+  row or no verdict (not probed): a warning there would be a guess. `risk` is a notice, `ok80`/`ok443` a quiet line. A
+  `same_host` run shows its reason and none of the unsaved TCP rows; a run whose TCP part could not probe anything shows the
+  reason of its rows.
+- `port80` of `hy2_decoy_paused` is read from the stored port-80 row of the node (`access.port80State`): `ours` is `open`;
+  `other`, `busy`, `refused`, `timeout` are `closed`; no row or no verdict is `unchecked`. The three values and the texts of
+  `node.check.decoy.port80.*` stay as in section 7.1.
+- MCP `node_ports` returns `tcp` rows beside `ports` (stored, or those of `check=true`).
+- Docs: "Ports" in `docs/{en,ru}/guide/nodes.md`; the limit in `vless.md` points to it.
+- Not built: `scripts/e2e/m3.sh` does not assert the 80 and 443 rows yet.
 - Small: `hy2SitePort` duplicates the node's rule in `internal/node/hysteria2/settings.go`; after an agent restart the `Live`
   row is read again for the sender; `runTCPCheck` still returns a `ran` flag that no caller uses; a few reads (inbounds,
   nodes, live) repeat between the UDP and the TCP half.

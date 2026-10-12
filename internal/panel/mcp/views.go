@@ -409,6 +409,18 @@ type portCheckV struct {
 	Inbounds []portInboundV `json:"inbounds"`
 }
 
+// tcpCheckV is one row of the TCP part of the port check: does a connection to Port reach Mistgate itself.
+type tcpCheckV struct {
+	Port    uint32 `json:"port"`
+	Role    string `json:"role"`
+	ALPN    bool   `json:"alpn"`
+	Profile string `json:"profile,omitempty"`
+	Verdict string `json:"verdict,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Sender  string `json:"sender,omitempty"`
+	Checked int64  `json:"checked_unix"`
+}
+
 // NodePortsV is the node_ports result.
 type NodePortsV struct {
 	NodeID    string       `json:"node_id"`
@@ -416,10 +428,17 @@ type NodePortsV struct {
 	ErrorCode string       `json:"error_code,omitempty"`
 	Sender    string       `json:"sender,omitempty"`
 	Ports     []portCheckV `json:"ports"`
+	TCP       []tcpCheckV  `json:"tcp"`
 }
 
-func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, inbounds []*adminv1.Inbound, errorCode, sender string) *NodePortsV {
-	v := &NodePortsV{NodeID: nodeID, NodeName: nm(nodeName), ErrorCode: clean(errorCode, 40), Sender: clean(sender, 80), Ports: []portCheckV{}}
+func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*adminv1.TcpCheck, inbounds []*adminv1.Inbound, errorCode, sender string) *NodePortsV {
+	v := &NodePortsV{NodeID: nodeID, NodeName: nm(nodeName), ErrorCode: clean(errorCode, 40), Sender: clean(sender, 80), Ports: []portCheckV{}, TCP: []tcpCheckV{}}
+	for _, row := range tcp {
+		if row != nil {
+			v.TCP = append(v.TCP, tcpCheckV{Port: row.GetPort(), Role: clean(row.GetRole(), 16), ALPN: row.GetAlpn(), Profile: nm(row.GetProfile()),
+				Verdict: clean(row.GetVerdict(), 16), Reason: clean(row.GetReason(), 40), Sender: clean(row.GetSender(), 80), Checked: row.GetCheckedUnix()})
+		}
+	}
 	for _, check := range checks {
 		if check == nil {
 			continue

@@ -199,11 +199,11 @@ func readTools() []toolDef {
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
 
 		readTool("node_ports", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The stored UDP delivery checks for a node: per-port verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port. This never contacts a node.",
+			"The stored port checks for a node. ports: the UDP delivery per port (verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port). tcp: whether a connection to each TCP port (80 for Let's Encrypt, the Hysteria2 site, VLESS) reaches Mistgate: role, verdict (ours, other, busy, refused, timeout; empty with a reason when it could not be probed), alpn, profile, sender, check time. This never contacts a node.",
 			func(c *call, in nodePortsArg) (any, error) { return c.nodePorts(in.Node, false) }),
 		readTool("node_ports", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceCheckPortsProcedure),
-			"The stored UDP delivery checks for a node: per-port verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port. With check=true, run a bounded check now; it takes about six seconds.",
+			"The stored port checks for a node. ports: the UDP delivery per port (verdict, sent and received counts, check time, last bad time, sender, and the inbound/profile on that port). tcp: whether a connection to each TCP port (80 for Let's Encrypt, the Hysteria2 site, VLESS) reaches Mistgate: role, verdict (ours, other, busy, refused, timeout; empty with a reason when it could not be probed), alpn, profile, sender, check time. With check=true, run a bounded check now; it takes about fifteen seconds.",
 			func(c *call, in nodePortsCheckArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),
@@ -483,16 +483,16 @@ func (c *call) nodePorts(node string, check bool) (any, error) {
 	if err != nil {
 		return nil, apiError(err)
 	}
-	checks := stored.Msg.GetPortChecks()
+	checks, tcp := stored.Msg.GetPortChecks(), stored.Msg.GetTcpChecks()
 	errorCode, sender := "", ""
 	if check {
 		result, err := c.cl.Node.CheckPorts(c.ctx, connect.NewRequest(&adminv1.CheckPortsRequest{NodeId: id}))
 		if err != nil {
 			return nil, apiError(err)
 		}
-		checks, errorCode, sender = result.Msg.GetPorts(), result.Msg.GetErrorCode(), result.Msg.GetSender()
+		checks, tcp, errorCode, sender = result.Msg.GetPorts(), result.Msg.GetTcp(), result.Msg.GetErrorCode(), result.Msg.GetSender()
 	}
-	return nodePortsView(id, stored.Msg.GetNode().GetName(), checks, stored.Msg.GetInbounds(), errorCode, sender), nil
+	return nodePortsView(id, stored.Msg.GetNode().GetName(), checks, tcp, stored.Msg.GetInbounds(), errorCode, sender), nil
 }
 
 func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {

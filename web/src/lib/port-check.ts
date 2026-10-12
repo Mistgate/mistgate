@@ -72,3 +72,28 @@ export function portNotes(t: T, warnings: readonly Warning[] | undefined): strin
   }
   return out;
 }
+
+/** The fields of a stored TCP row that the renewal line reads. */
+type TcpRow = { port: number; role: string; alpn: boolean; profile: string; verdict: string };
+
+export type Renewal = { kind: "ok80" } | { kind: "ok443" } | { kind: "risk"; profile: string };
+
+/**
+ * Whether the node's Let's Encrypt certificates renew (design/vless.md section 7.4): through port 80 when it is ours, else
+ * through TLS-ALPN on 443 when an alpn listener there is ours, else not (risk; `profile` is the VLESS profile that holds
+ * 443 with another site's REALITY, "" when there is none). null when there is nothing to say: no row for port 80 (no ACME
+ * name), or port 80 was not probed (no verdict), where a warning would be a guess.
+ */
+export function renewalOf(rows: readonly TcpRow[]): Renewal | null {
+  const p80 = rows.find((r) => r.port === 80);
+  if (!p80?.verdict) return null;
+  if (p80.verdict === "ours") return { kind: "ok80" };
+  if (rows.some((r) => r.port === 443 && r.alpn && r.verdict === "ours")) return { kind: "ok443" };
+  return { kind: "risk", profile: rows.find((r) => r.port === 443 && r.role === "vless" && !r.alpn)?.profile ?? "" };
+}
+
+/** The renewal line in words. */
+export function renewalText(t: T, r: Renewal): string {
+  if (r.kind !== "risk") return t(`ports.renewal.${r.kind}`);
+  return t("ports.renewal.risk", { why: r.profile ? t("ports.renewal.risk.vless", { profile: r.profile }) : "" });
+}

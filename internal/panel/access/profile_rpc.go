@@ -753,11 +753,12 @@ func buildRefusal(err error, node string) error {
 // a VLESS listener that pauses a Hysteria2 site, or a WARP exit whose account is missing, paused, or down.
 func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profileName string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
 	var warnings []*adminv1.StatusReason
+	var port80Err error
 	appendDecoyWarning := func(port int, hy2, vless, target string, hy2Spec plugin.InboundSpec) {
 		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": "site", "target": target}
 		// only an ACME certificate renews through the site port, so only then does TCP 80 become its sole way (§7.1)
 		if m := hy2Spec.TLS.Mode; m == plugin.TLSAcmeDomain || m == plugin.TLSAcmeIP {
-			params["port80"] = "unchecked"
+			params["port80"], port80Err = s.port80State(ctx, nodeID)
 		}
 		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: params})
 	}
@@ -781,6 +782,9 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 			}
 		}
 	}
+	if port80Err != nil {
+		return nil, port80Err
+	}
 	if spec.Egress != "warp" {
 		return warnings, nil
 	}
@@ -799,6 +803,28 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 	}
 	warnings = append(warnings, &adminv1.StatusReason{Code: "warp_missing", Params: map[string]string{"state": state}})
 	return warnings, nil
+}
+
+// port80State reads the node's stored TCP check of port 80 (design/vless.md §7.4) for the decoy warning: open when a
+// connection reaches Mistgate; closed when another server answers, another program holds the port, or it is closed or
+// filtered; unchecked when there is no row, or the row has no verdict.
+func (s *Service) port80State(ctx context.Context, nodeID string) (string, error) {
+	rows, err := s.st.TCPChecks(ctx, nodeID)
+	if err != nil {
+		return "", s.internal("tcp checks", err)
+	}
+	for _, r := range rows {
+		if r.Port != 80 {
+			continue
+		}
+		switch r.Verdict {
+		case "ours":
+			return "open", nil
+		case "other", "busy", "refused", "timeout":
+			return "closed", nil
+		}
+	}
+	return "unchecked", nil
 }
 
 // hy2TCPPort matches the node's Hysteria2 site rule: omitted means 443 and zero disables the site.

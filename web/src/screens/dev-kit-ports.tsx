@@ -13,13 +13,13 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { AddInbound } from "@/screens/node/add-inbound";
 import { ProfilesTab } from "@/screens/node/profiles";
-import { UdpPorts } from "@/screens/node/udp-ports";
+import { Ports } from "@/screens/node/ports";
 import { DeployDialog } from "@/screens/profiles/deploy";
 import { TwinPanel, twinPlanKey } from "@/screens/profiles/twin";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 
-// Development only, part of /dev-kit: the UDP delivery check (design/udp-port-check.md) on made-up data — the node's "UDP
-// ports" block in every state, the refusal port_lossy in the add / edit / quick-profile dialogs and the deploy window, the
+// Development only, part of /dev-kit: the port check (design/udp-port-check.md, design/vless.md §7.4) on made-up data — the node's
+// "Ports" block in every state, the refusal port_lossy in the add / edit / quick-profile dialogs and the deploy window, the
 // twin's badges, no_clean_port. The calls a dialog makes are answered here (like the deploy demo), refusing as the panel does.
 
 const now = Math.floor(Date.now() / 1000);
@@ -35,6 +35,10 @@ const kitNodes = [
   { id: "nod_de2", name: "de2", status: NodeStatus.ONLINE, countryCode: "DE", address: "de2.example.com", protocols: [], awgBackend: "auto" },
   { id: "nod_se1", name: "se1", status: NodeStatus.ONLINE, countryCode: "SE", address: "se1.example.com", protocols: [], awgBackend: "auto" },
 ];
+
+// a TCP row of the check; port 80 is the certificates' (role acme), 443 a VLESS listener
+const tcp = (over: object) => ({ port: 80, role: "acme", alpn: false, profile: "", verdict: "ours", reason: "", sender: "de2", checkedUnix: now - 3600, ...over });
+const tcpOk = [tcp({}), tcp({ port: 443, role: "vless", profile: "VLESS · 443 · Vision", alpn: true })];
 
 const baseNode = (over: object = {}) => ({
   ...kitNodes[0],
@@ -137,9 +141,9 @@ function fakePorts() {
   (nodesApi as unknown as Record<string, unknown>).checkPorts = async () => {
     await wait(7000);
     const ports = [check({}), check({ port: 8443, verdict: "lossy", got: 270, badUnix: now })];
-    if (!checkCode || checkCode === "ok") return { ports, errorCode: "", sender: "de2" };
+    if (!checkCode || checkCode === "ok") return { ports, tcp: tcpOk, errorCode: "", sender: "de2" };
     // the counts that did arrive come with inconclusive and same_host
-    return { ports: checkCode === "inconclusive" || checkCode === "same_host" ? [check({ verdict: "", got: 120, reason: checkCode }), check({ port: 8443, verdict: "", got: 90, reason: checkCode })] : [], errorCode: checkCode, sender: "" };
+    return { ports: checkCode === "inconclusive" || checkCode === "same_host" ? [check({ verdict: "", got: 120, reason: checkCode }), check({ port: 8443, verdict: "", got: 90, reason: checkCode })] : [], tcp: [], errorCode: checkCode, sender: "" };
   };
 }
 let quickRun = false;
@@ -157,7 +161,7 @@ function RunDemo() {
               setCode(v);
             }} options={["ok", ...reasons].map((r) => ({ value: r, label: r }))} />
         </div>
-        <UdpPorts data={{ node: baseNode(), inbounds: twoInbounds, portChecks: [check({ checkedUnix: now - 3600 }), check({ port: 8443, verdict: "lossy", got: 270 })] } as never} />
+        <Ports data={{ node: baseNode(), inbounds: twoInbounds, portChecks: [check({ checkedUnix: now - 3600 }), check({ port: 8443, verdict: "lossy", got: 270 })], tcpChecks: tcpOk } as never} />
       </div>
     </Cache>
   );
@@ -264,13 +268,29 @@ export function PortsKit() {
         <RunDemo />
       </Demo>
 
+      <Demo title="TCP ports and the renewal line: port 80 is ours / 80 closed, 443 answers Let's Encrypt / 80 closed, a REALITY with another site holds 443 / other server and busy / not probed (agent too old)">
+        <div className="flex flex-col gap-3">
+          {[
+            { id: "a", rows: tcpOk },
+            { id: "b", rows: [tcp({ verdict: "refused" }), tcp({ port: 443, role: "site", profile: "hy2 · 443 · Salamander", alpn: true })] },
+            { id: "c", rows: [tcp({ verdict: "timeout" }), tcp({ port: 443, role: "vless", profile: "VLESS · 443 · REALITY", verdict: "ours" })] },
+            { id: "d", rows: [tcp({ verdict: "busy" }), tcp({ port: 8443, role: "vless", profile: "VLESS · 8443", verdict: "other" })] },
+            { id: "e", rows: [tcp({ verdict: "", reason: "agent_too_old", sender: "" }), tcp({ port: 443, role: "vless", profile: "VLESS · 443 · Vision", verdict: "ours" })] },
+          ].map((c) => (
+            <Cache key={c.id}>
+              <Ports data={{ node: baseNode(), inbounds: twoInbounds, portChecks: [check({})], tcpChecks: c.rows } as never} />
+            </Cache>
+          ))}
+        </div>
+      </Demo>
+
       <Demo title="UDP ports: the agent is offline / a read-only admin">
         <div className="flex flex-col gap-3">
           <Cache>
-            <UdpPorts data={{ node: baseNode({ status: NodeStatus.DOWN }), inbounds: twoInbounds, portChecks: [check({}), check({ port: 8443, verdict: "broken", got: 100 })] } as never} />
+            <Ports data={{ node: baseNode({ status: NodeStatus.DOWN }), inbounds: twoInbounds, portChecks: [check({}), check({ port: 8443, verdict: "broken", got: 100 })] } as never} />
           </Cache>
           <Cache role={Role.READONLY}>
-            <UdpPorts data={{ node: baseNode(), inbounds: twoInbounds, portChecks: [check({})] } as never} />
+            <Ports data={{ node: baseNode(), inbounds: twoInbounds, portChecks: [check({})] } as never} />
           </Cache>
         </div>
       </Demo>

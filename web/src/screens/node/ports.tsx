@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
@@ -10,15 +10,17 @@ import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
-import { bestDelivered, lossPct, reasonShort, reasonText, senderLabel } from "@/lib/port-check";
+import { bestDelivered, lossPct, reasonShort, reasonText, renewalOf, renewalText, senderLabel } from "@/lib/port-check";
 import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
 
-// "UDP ports" under the profiles of a node (design/udp-port-check.md §6.6): what the delivery check found for each port, when
-// and from where, which profile listens there, and the button that runs it (about 8 seconds). It sits with the profiles
-// because a port is a profile's: the row names the profile, the profile card names the port.
+// "Ports" under the profiles of a node (design/udp-port-check.md §6.6, design/vless.md §7.4): what the delivery check found
+// for each UDP port and each TCP port (does a connection reach Mistgate), when and from where, which profile listens there,
+// one line on whether the certificates renew, and the button that runs the check (about 8 seconds). It sits with the
+// profiles because a port is a profile's: the row names the profile, the profile card names the port.
 
 type Check = Plain<GetNodeResponse>["portChecks"][number];
+type TcpCheck = Plain<GetNodeResponse>["tcpChecks"][number];
 
 /** How a stored verdict reads: the pill and its tone. "" (not checked) and anything unknown read as not checked. */
 export function verdictPill(t: T, c: Pick<Check, "verdict" | "sent" | "got">): { kind: StatusKind; label: string } {
@@ -30,6 +32,22 @@ export function verdictPill(t: T, c: Pick<Check, "verdict" | "sent" | "got">): {
       return { kind: "warn", label: t("ports.lossy", { lost }) };
     case "broken":
       return { kind: "bad", label: t("ports.broken", { lost }) };
+    default:
+      return { kind: "off", label: t("ports.unchecked") };
+  }
+}
+
+/** How a stored TCP verdict reads: the pill and its tone. "" (not probed, see the reason) and anything unknown read as not checked. */
+export function tcpPill(t: T, verdict: string): { kind: StatusKind; label: string } {
+  switch (verdict) {
+    case "ours":
+      return { kind: "ok", label: t("ports.tcp.ours") };
+    case "other":
+    case "busy":
+      return { kind: "warn", label: t(`ports.tcp.${verdict}`) };
+    case "refused":
+    case "timeout":
+      return { kind: "bad", label: t(`ports.tcp.${verdict}`) };
     default:
       return { kind: "off", label: t("ports.unchecked") };
   }
@@ -49,7 +67,7 @@ function Progress({ label }: { label: string }) {
   );
 }
 
-export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
+export function Ports({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
   const fmt = useFmt();
   const qc = useQueryClient();
@@ -63,6 +81,8 @@ export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
   });
 
   const stored = data.portChecks ?? [];
+  const tcp = [...(data.tcpChecks ?? [])].sort((a, b) => a.port - b.port);
+  const renewal = renewalOf(tcp);
   const profilesOn = (port: number) => data.inbounds.filter((i) => i.port === port).map((i) => i.profileName);
   // the ports of the profiles come first (the stored ones, then any that were never checked), then the others
   const unchecked: Check[] = [];
@@ -74,14 +94,17 @@ export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
   const rows = [...stored, ...unchecked].sort((a, b) => Number(profilesOn(b.port).length > 0) - Number(profilesOn(a.port).length > 0) || a.port - b.port);
 
   const result = run.data;
-  const why = run.error ? errorText(run.error, t) : result?.errorCode ? reasonText(t, result.errorCode, { best: bestDelivered(result.ports) }) : "";
+  // a run whose TCP part could not probe anything stores nothing, so its reason would otherwise go unsaid
+  const tcpRun = result && !result.errorCode ? (result.tcp ?? []) : [];
+  const tcpReason = tcpRun.length > 0 && tcpRun.every((r) => !r.verdict) ? (tcpRun.find((r) => r.reason)?.reason ?? "") : "";
+  const why = run.error ? errorText(run.error, t) : result?.errorCode ? reasonText(t, result.errorCode, { best: bestDelivered(result.ports) }) : tcpReason ? reasonText(t, tcpReason) : "";
   // the counts of a run that could not tell (inconclusive) or stayed on one host: what did arrive
   const counts = result?.errorCode && (result.errorCode === "inconclusive" || result.errorCode === "same_host") ? result.ports.map((p) => `${p.port}: ${p.got}/${p.sent}`).join(" · ") : "";
 
   return (
-    <section aria-labelledby="udp-ports-title" className="mt-2 flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
+    <section aria-labelledby="ports-title" className="mt-2 flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 id="udp-ports-title" className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
+        <h2 id="ports-title" className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
           {t("ports.title")}
         </h2>
         {may && (
@@ -92,7 +115,7 @@ export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
           </span>
         )}
       </div>
-      <p className="text-xs leading-snug text-pretty text-muted">{run.isPending ? t("ports.checkingNote") : !linked ? t("ports.offline") : stored.length === 0 ? t("ports.never") : t("ports.intro")}</p>
+      <p className="text-xs leading-snug text-pretty text-muted">{run.isPending ? t("ports.checkingNote") : !linked ? t("ports.offline") : stored.length + tcp.length === 0 ? t("ports.never") : t("ports.intro")}</p>
       {run.isPending && <Progress label={t("ports.checking")} />}
       {why && !run.isPending && (
         <Notice className="items-start">
@@ -102,7 +125,7 @@ export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
           </span>
         </Notice>
       )}
-      {rows.length > 0 && (
+      {rows.length + tcp.length > 0 && (
         <ul className="flex flex-col">
           {rows.map((c) => {
             const pill = verdictPill(t, c);
@@ -129,8 +152,42 @@ export function UdpPorts({ data }: { data: Plain<GetNodeResponse> }) {
               </li>
             );
           })}
+          {tcp.map((c) => (
+            <TcpRow key={c.port} c={c} />
+          ))}
         </ul>
       )}
+      {renewal && (renewal.kind === "risk" ? <Notice>{renewalText(t, renewal)}</Notice> : <RenewalLine text={renewalText(t, renewal)} />)}
     </section>
+  );
+}
+
+/** One TCP port: the pill, when and from where (or why it could not be probed), and what listens there. */
+function TcpRow({ c }: { c: TcpCheck }) {
+  const t = useT();
+  const fmt = useFmt();
+  const pill = tcpPill(t, c.verdict);
+  const detail = [!c.verdict && c.reason ? reasonShort(t, c.reason) : "", c.checkedUnix > 0 ? fmt.ago(c.checkedUnix) : "", c.checkedUnix > 0 && c.sender ? t("ports.row.from", { sender: senderLabel(t, c.sender) }) : ""]
+    .filter(Boolean)
+    .join(" · ");
+  // port 80 belongs to no profile: it is the certificates'; a site is the Hysteria2 profile's
+  const owner = c.role === "acme" ? t("ports.tcp.role.acme") : [c.role === "site" ? t("ports.tcp.role.site") : "", c.profile].filter(Boolean).join(" · ");
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 first:border-t-0">
+      <span className="w-[72px] font-mono text-[13px] font-bold">tcp/{c.port}</span>
+      <StatusPill kind={pill.kind} label={pill.label} sm />
+      <span className="min-w-[160px] flex-1 text-xs leading-snug text-muted">{detail}</span>
+      <span className="min-w-0 text-xs break-words">{owner || <span className="text-muted">{t("ports.row.noProfile")}</span>}</span>
+    </li>
+  );
+}
+
+/** The renewal line when all is well: quiet, with the green dot. */
+function RenewalLine({ text }: { text: string }) {
+  return (
+    <p className="flex items-start gap-2 text-xs leading-snug text-pretty text-muted">
+      <span className="mt-[5px] flex"><StatusDot kind="ok" /></span>
+      {text}
+    </p>
   );
 }
