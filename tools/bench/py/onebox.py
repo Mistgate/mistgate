@@ -30,6 +30,10 @@ CLIENT_PREFIX = ""
 
 
 def box_limits(vcpu, mem):
+    # The slice quota is invisible from inside a container (private cgroup namespace), so a Go core there sizes
+    # GOMAXPROCS by the host CPUs, burns the quota early in every 100 ms CFS period and is frozen for the rest of it.
+    # Every core container gets GOMAXPROCS=vcpu instead: what its runtime would pick on a real server with vcpu vCPUs.
+    os.environ["BOX_VCPU"] = str(vcpu)
     sh("systemctl stop %s 2>/dev/null; true" % BOXSLICE, check=False)
     unit = "[Unit]\nDescription=bench one-server box\n[Slice]\nCPUQuota=%d%%\nMemoryMax=%s\nMemoryHigh=infinity\nMemorySwapMax=0\nTasksMax=infinity\n" % (vcpu * 100, mem)
     if PIN:
@@ -198,7 +202,7 @@ class MistBox(Box):
         nid = b["node"]["id"]
         a = {k: re.search(r"--%s (\S+)" % k, b["installCommand"]).group(1) for k in ("panel", "sni", "ca-sha256", "token")}
         sh("docker run --rm --network %s -v %s:/state %s enroll --panel %s --sni %s --ca-sha256 %s --token %s --state-dir /state" % (NET, self.NODE_STATE, self.NODE_IMAGE, a["panel"], a["sni"], a["ca-sha256"], a["token"]))
-        sh("docker run -d --name bench_mgnode_box --network %s --ip %s --cgroup-parent %s --cap-add NET_ADMIN %s -v %s:/state %s run --state-dir /state" % (NET, self.NODE_IP, BOXSLICE, self.NODE_ENV, self.NODE_STATE, self.NODE_IMAGE))
+        sh("docker run -d --name bench_mgnode_box --network %s --ip %s --cgroup-parent %s -e GOMAXPROCS=%s --cap-add NET_ADMIN %s -v %s:/state %s run --state-dir /state" % (NET, self.NODE_IP, BOXSLICE, os.environ["BOX_VCPU"], self.NODE_ENV, self.NODE_STATE, self.NODE_IMAGE))
         st, b, _ = self.rpc("ProfileService", "CreateInbound", {"profileId": pid, "nodeId": nid})
         assert st == 200, (st, b)
         st, b, _ = self.rpc("GroupService", "CreateGroup", {"name": "everyone", "profileIds": [pid]})

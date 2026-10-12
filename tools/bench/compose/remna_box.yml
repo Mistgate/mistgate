@@ -97,6 +97,7 @@ services:
       - NET_ADMIN
     environment:
       - NODE_PORT=2222
+      - GOMAXPROCS=${BOX_VCPU:-2}  # the box vCPUs; see onebox.py box_limits
       - SECRET_KEY=${NODE_SECRET_KEY}
     volumes:
       - ${BENCH_ROOT:-/root/bench}/data/box-rw/cert:/certs:ro

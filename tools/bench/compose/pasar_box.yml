@@ -21,6 +21,7 @@ services:
       - NET_ADMIN
     environment:
       SERVICE_PORT: 62050
+      GOMAXPROCS: ${BOX_VCPU:-2}  # the box vCPUs; see onebox.py box_limits
       SERVICE_PROTOCOL: "grpc"
       SSL_CERT_FILE: "/var/lib/pg-node/certs/ssl_cert.pem"
       SSL_KEY_FILE: "/var/lib/pg-node/certs/ssl_key.pem"
