@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // disk_space: logs or disk over 80%; journals of 1-4 GB and a 1.1 GB btmp have filled disks.
@@ -55,13 +56,13 @@ func checkDiskSpace(ctx context.Context, e *Env) Result {
 	}
 	j := journal(e)
 	params := p("mount", w.mount, "used_pct", strconv.Itoa(w.usedPct), "free_mb", strconv.Itoa(w.freeMB),
-		"inode_pct", strconv.Itoa(w.inodePct), "journal_mb", strconv.Itoa(int(j.bytes>>20)))
+		"inode_pct", strconv.Itoa(w.inodePct), "journal_mb", strconv.Itoa(int(j.totalBytes()>>20)))
 	if fi, err := e.stat("/var/log/btmp"); err == nil && fi.Size() >= 1<<20 {
 		params["btmp_mb"] = strconv.Itoa(int(fi.Size() >> 20)) // named only: truncating it is not in the safe set
 	}
 	r := Result{Status: w.st, Params: params, Code: CodeDiskUsage,
 		Detail: fmt.Sprintf("%s %d%% used, %s free, inodes %d%%", w.mount, w.usedPct, human(uint64(w.freeMB)<<20), w.inodePct)}
-	if w.st != OK && j.bytes >= diskVacuumMin && e.has("journalctl") {
+	if w.st != OK && j.totalBytes() >= diskVacuumMin && e.has("journalctl") {
 		r.FixID = FixJournaldVacuum
 	}
 	return r
@@ -100,17 +101,37 @@ func checkJournaldSize(ctx context.Context, e *Env) Result {
 	if !j.found {
 		return skip(CodeJournalNone, "no systemd journal directory")
 	}
-	mb := strconv.Itoa(int(j.bytes >> 20))
-	r := Result{Status: OK, Params: p("journal_mb", mb, "cap_mb", strconv.Itoa(journalCap>>20)), Code: CodeJournalSize,
-		Detail: "journal " + human(uint64(j.bytes)) + " on disk"}
-	switch {
-	case j.bytes > journalFail:
-		r.Status = Fail
-	case j.bytes > journalWarn:
-		r.Status = Warn
-	}
+	mb := strconv.Itoa(int(j.maxBytes() >> 20))
+	r := Result{Status: journalStatus(j), Params: p(
+		"journal_mb", mb,
+		"system_mb", strconv.Itoa(int(j.systemBytes>>20)),
+		"runtime_mb", strconv.Itoa(int(j.runtimeBytes>>20)),
+		"cap_mb", strconv.Itoa(journalCap>>20)),
+		Code: CodeJournalSize, Detail: journalDetail(j)}
 	if r.Status != OK && e.has("journalctl") {
 		r.FixID = FixJournaldVacuum
 	}
 	return r
+}
+
+func journalStatus(j journalInfo) Status {
+	switch {
+	case j.maxBytes() > journalFail:
+		return Fail
+	case j.maxBytes() > journalWarn:
+		return Warn
+	default:
+		return OK
+	}
+}
+
+func journalDetail(j journalInfo) string {
+	var parts []string
+	if j.systemFound {
+		parts = append(parts, "system "+human(uint64(j.systemBytes)))
+	}
+	if j.runtimeFound {
+		parts = append(parts, "runtime "+human(uint64(j.runtimeBytes)))
+	}
+	return "journal " + strings.Join(parts, ", ") + " on disk"
 }

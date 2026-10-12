@@ -218,7 +218,7 @@ const (
 	// ConntrackMaxMin and ConntrackBucketsMin size the connection tracking table for relayed user traffic.
 	ConntrackMaxMin     = 65536
 	ConntrackBucketsMin = 16384
-	// JournalCapMB is SystemMaxUse in journaldFileBody and the target of VacuumJournal.
+	// JournalCapMB is the journal cap in journaldFileBody and the target of VacuumJournal.
 	JournalCapMB = 200
 )
 
@@ -227,8 +227,8 @@ const (
 	// leading "-" tells systemd-sysctl to skip a missing key instead of failing; the agent applies them after its nft
 	// rules load the module.
 	sysctlFileBody = "# Managed by mistgate-node.\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\nnet.core.rmem_max = 16777216\nnet.core.wmem_max = 16777216\nnet.core.rmem_default = 1048576\nnet.core.wmem_default = 1048576\n-net.netfilter.nf_conntrack_max = 65536\n-net.netfilter.nf_conntrack_buckets = 16384\n"
-	// SystemMaxUse/RuntimeMaxUse only; there is no retention-time override.
-	journaldFileBody = "# Managed by mistgate-node.\n[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=200M\n"
+	// The cap and retention match the doctor's vacuum policy.
+	journaldFileBody = "# Managed by mistgate-node.\n[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=200M\nMaxRetentionSec=7day\n"
 )
 
 // sysctlFileBodyWithValues keeps larger live values in the persistent baseline.

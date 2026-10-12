@@ -20,13 +20,15 @@ const (
 	diskWarnFree     = 1 << 30   // bytes
 	diskFailFree     = 300 << 20 // bytes
 	diskFailInodePct = 95
-	// A fix is offered when the journal is at least this big (vacuuming a small one frees nothing).
+	// A disk-space fix is offered when total allocated journal bytes reaches this size.
 	diskVacuumMin = 300 << 20
 
-	// journald_size: the cap baseline installs is 200 MiB, so above 300 MiB the cap is not effective.
-	journalWarn = 300 << 20
-	journalFail = 1 << 30
+	// journald_size: warn only when either directory is more than 25% over its individual cap.
 	journalCap  = hostctl.JournalCapMB << 20
+	journalWarn = journalCap * 5 / 4
+	journalFail = 1 << 30
+	// Changes of 1 MiB or less are within allocated-block measurement noise for a vacuum.
+	journalVacuumEpsilon = 1 << 20
 
 	// dstate_tasks: a task must sit in D in every sample to count as stuck.
 	dstateSamples   = 3

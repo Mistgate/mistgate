@@ -165,9 +165,11 @@ func fixJournald(ctx context.Context, e *Env, dry bool, params map[string]string
 	if !e.has("journalctl") || !journal(e).found {
 		return FixOutcome{Err: ErrNotApplicable}
 	}
-	before := journal(e).bytes
+	before := journal(e).totalBytes()
 	if before <= journalCap {
-		return noop("journal is " + human(uint64(before)) + ", within the cap")
+		out := noop("journal is " + human(uint64(before)) + ", within the cap")
+		out.Params["before_mb"], out.Params["after_mb"] = mb(before), mb(before)
+		return out
 	}
 	pm := p("before_mb", mb(before), "target_mb", strconv.Itoa(journalCap>>20))
 	if dry {
@@ -178,8 +180,14 @@ func fixJournald(ctx context.Context, e *Env, dry bool, params map[string]string
 	}
 	fresh := *e
 	fresh.memo = &memo{}
-	after := journal(&fresh).bytes
+	after := journal(&fresh).totalBytes()
 	pm["after_mb"] = mb(after)
+	if after >= before-journalVacuumEpsilon {
+		out := noop("journal vacuum did not reduce allocated size by more than 1 MB")
+		out.Params = pm
+		out.Params["noop"] = "1"
+		return out
+	}
 	return FixOutcome{OK: true, Affected: 1, Params: pm, Detail: fmt.Sprintf("journal vacuumed from %s to %s", human(uint64(before)), human(uint64(after)))}
 }
 

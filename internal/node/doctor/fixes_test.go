@@ -276,6 +276,14 @@ func TestApplyJournaldVacuum(t *testing.T) {
 	}
 }
 
+func TestApplyJournaldVacuumNoOpWhenUnchanged(t *testing.T) {
+	r, mk := newFixRig(t)
+	out := mk().Apply(context.Background(), FixJournaldVacuum, false, nil)
+	if !out.OK || out.Affected != 0 || out.Params["noop"] != "1" || out.Params["before_mb"] != "400" || out.Params["after_mb"] != "400" || r.fx.vacuum != 1 {
+		t.Fatalf("unchanged journal result=%+v vacuum=%d", out, r.fx.vacuum)
+	}
+}
+
 func TestApplyBaseline(t *testing.T) {
 	r, mk := newFixRig(t)
 	out := mk().Apply(context.Background(), FixApplyBaseline, false, nil)

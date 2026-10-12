@@ -14,26 +14,43 @@ import (
 // ---- journal size ----
 
 type journalInfo struct {
-	bytes int64
-	found bool // at least one journal directory exists
+	systemBytes  int64
+	runtimeBytes int64
+	systemFound  bool
+	runtimeFound bool
+	found        bool // at least one journal directory exists
 }
 
-// journal sums the size of the persistent and the volatile journal.
+func (j journalInfo) totalBytes() int64 { return j.systemBytes + j.runtimeBytes }
+
+// maxBytes returns the larger journal because journald applies a separate cap to each directory.
+func (j journalInfo) maxBytes() int64 { return max(j.systemBytes, j.runtimeBytes) }
+
+// journal measures the persistent and volatile journals separately.
 func journal(e *Env) journalInfo {
 	return e.memo.journal.get(func() journalInfo {
 		var ji journalInfo
-		for _, dir := range []string{"/var/log/journal", "/run/log/journal"} {
+		for _, entry := range []struct {
+			dir   string
+			bytes *int64
+			found *bool
+		}{
+			{"/var/log/journal", &ji.systemBytes, &ji.systemFound},
+			{"/run/log/journal", &ji.runtimeBytes, &ji.runtimeFound},
+		} {
+			dir := entry.dir
 			if _, err := e.stat(dir); err != nil {
 				continue
 			}
 			ji.found = true
-			ji.bytes += dirSize(e, dir)
+			*entry.found = true
+			*entry.bytes = dirSize(e, dir)
 		}
 		return ji
 	})
 }
 
-// dirSize adds up the regular files below dir (one level of machine-id directories, but any depth works).
+// dirSize adds up allocated bytes for regular files below dir (one level of machine-id directories, but any depth works).
 func dirSize(e *Env, dir string) int64 {
 	var n int64
 	ents, err := e.readDir(dir)
@@ -45,7 +62,11 @@ func dirSize(e *Env, dir string) int64 {
 		if ent.IsDir() {
 			n += dirSize(e, sub)
 		} else if fi, err := ent.Info(); err == nil && fi.Mode().IsRegular() {
-			n += fi.Size()
+			if e.Root != "" { // the rooted fake filesystem uses apparent lengths for deterministic fixtures
+				n += fi.Size()
+			} else {
+				n += allocatedSize(fi)
+			}
 		}
 	}
 	return n

@@ -136,6 +136,36 @@ func TestApplyBaselineAndCleanup(t *testing.T) {
 	}
 }
 
+func TestApplyBaselineRestartsWhenJournaldRetentionChanges(t *testing.T) {
+	h, calls := testHost(t)
+	if err := os.MkdirAll(filepath.Dir(h.journaldFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := "# Managed by mistgate-node.\n[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=200M\n"
+	if err := os.WriteFile(h.journaldFile, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.ApplyBaseline(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(h.journaldFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "MaxRetentionSec=7day") {
+		t.Fatalf("updated journald drop-in = %q", b)
+	}
+	restarts := 0
+	for _, c := range *calls {
+		if c.name == "systemctl" && c.args == "restart systemd-journald" {
+			restarts++
+		}
+	}
+	if restarts != 1 {
+		t.Fatalf("got %d journald restarts, calls: %+v", restarts, *calls)
+	}
+}
+
 func TestApplyBaselinePreservesHigherSysctlValues(t *testing.T) {
 	h, _ := testHost(t)
 	higher := map[string]string{

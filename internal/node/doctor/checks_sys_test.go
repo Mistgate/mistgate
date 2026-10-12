@@ -2,7 +2,7 @@ package doctor
 
 import (
 	"fmt"
-	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -72,23 +72,39 @@ func TestDiskSpaceWorstMountAndJournalFix(t *testing.T) {
 func TestJournaldSizeThresholds(t *testing.T) {
 	const mib = 1 << 20
 	tests := []struct {
-		size int64
-		want Status
-		fix  string
+		name            string
+		system, runtime int64
+		want            Status
+		fix             string
 	}{
-		{200 * mib, OK, ""},
-		{300 * mib, OK, ""},
-		{300*mib + 1, Warn, FixJournaldVacuum},
-		{1 << 30, Warn, FixJournaldVacuum},
-		{1<<30 + 1, Fail, FixJournaldVacuum},
+		{"at system cap", 200 * mib, 0, OK, ""},
+		{"at warning threshold", 250 * mib, 0, OK, ""},
+		{"above system warning threshold", 250*mib + 1, 0, Warn, FixJournaldVacuum},
+		{"above runtime warning threshold", 0, 250*mib + 1, Warn, FixJournaldVacuum},
+		{"separate caps are not added", 200 * mib, 200 * mib, OK, ""},
+		{"large system journal", 1 << 30, 0, Warn, FixJournaldVacuum},
+		{"oversized system journal", 1<<30 + 1, 0, Fail, FixJournaldVacuum},
 	}
 	for _, tc := range tests {
-		t.Run(strconv.FormatInt(tc.size, 10), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			f := newFake(t)
 			f.bin("journalctl")
-			f.putSized("/var/log/journal/m/a.journal", tc.size/2)
-			f.putSized("/run/log/journal/m/b.journal", tc.size-tc.size/2) // persistent + volatile add up
-			want(t, run(t, f.doctor(), CheckJournaldSize), tc.want, tc.fix)
+			if tc.system > 0 {
+				f.putSized("/var/log/journal/m/a.journal", tc.system)
+			}
+			if tc.runtime > 0 {
+				f.putSized("/run/log/journal/m/b.journal", tc.runtime)
+			}
+			r := run(t, f.doctor(), CheckJournaldSize)
+			want(t, r, tc.want, tc.fix)
+			if tc.system > 0 && tc.runtime > 0 {
+				param(t, r, "journal_mb", "200")
+				param(t, r, "system_mb", "200")
+				param(t, r, "runtime_mb", "200")
+				if !strings.Contains(r.Detail, "system 200 MB") || !strings.Contains(r.Detail, "runtime 200 MB") {
+					t.Errorf("journal detail does not show both directories: %q", r.Detail)
+				}
+			}
 		})
 	}
 	f := newFake(t)

@@ -65,7 +65,7 @@ func TestBaselineBodiesAreExportedUnchanged(t *testing.T) {
 	if SysctlFileBody != sysctlFileBody || JournaldFileBody != journaldFileBody {
 		t.Fatal("the doctor would compare against something ApplyBaseline does not write")
 	}
-	if !strings.Contains(JournaldFileBody, "SystemMaxUse=200M") || JournalCapMB != 200 {
+	if !strings.Contains(JournaldFileBody, "SystemMaxUse=200M") || !strings.Contains(JournaldFileBody, "MaxRetentionSec=7day") || JournalCapMB != 200 {
 		t.Errorf("journal cap: %d in %q", JournalCapMB, JournaldFileBody)
 	}
 }
