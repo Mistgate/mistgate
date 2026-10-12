@@ -130,9 +130,13 @@ TS
   grep -q "^directory = \"$REPO/web/dist\"" "$w/wrangler.toml" || die "wrangler.toml: assets directory was not set (template changed?)"
   MASTER_KEY=$(openssl rand -hex 32)
   ADMIN_SECRET=$(openssl rand -hex 12) SUB_SECRET=$(openssl rand -hex 12)
-  SECRETS+=("$MASTER_KEY" "$ADMIN_SECRET" "$SUB_SECRET")
+  # the setup token is the deployer's: the Worker gets its hash only (SETUP_TOKEN_SHA256) and never prints a link
+  SETUP_TOKEN=$(openssl rand -hex 32)
+  SETUP_HASH=$(printf %s "$SETUP_TOKEN" | sha256sum | cut -d' ' -f1)
+  SECRETS+=("$MASTER_KEY" "$ADMIN_SECRET" "$SUB_SECRET" "$SETUP_TOKEN" "$SETUP_HASH")
   {
     echo "MASTER_KEY=$MASTER_KEY"
+    echo "SETUP_TOKEN_SHA256=$SETUP_HASH"
     echo "PUBLIC_URL=https://$EDGE_HOST:$PUB"
     echo "ADMIN_PREFIX=/$ADMIN_SECRET/"
     echo "SUB_PREFIX=/$SUB_SECRET/"
@@ -169,7 +173,7 @@ edge_workerd_rss() { vmrss_mb "$(edge_workerd_pid)"; }
 
 # The Worker's own log with wrangler's per-request lines taken out: wrangler prints the path of every request, and a
 # path holds the secret prefixes. That is wrangler's dev server, not the panel; the rest is what the panel logs.
-edge_worker_log() { grep -vE '^\[wrangler:info\] [A-Z]+ |/setup#|^No admin yet' "$WORK/wrangler.log" || true; }
+edge_worker_log() { grep -vE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" || true; }
 
 # ---------------------------------------------------------------- scenario
 
@@ -191,19 +195,20 @@ edge_run() {
   build_hysteria
   pass "built the wasm panel ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped), the Worker copy (installed in the work directory, zero D1 id), the node agent and the hysteria client"
 
-  step "1. wrangler dev: the Worker answers on $EDGE_HOST:$PUB, first admin from the setup link in its log"
+  step "1. wrangler dev: the Worker answers on $EDGE_HOST:$PUB, first admin from the setup token given as SETUP_TOKEN_SHA256 (no link in the log)"
   edge_start_worker
   PANEL_PID=$(edge_workerd_pid)
   # the link audience: the agent requires challenge.audience == the host of its link URL; the Worker takes it from the
   # request URL. A wrangler that rewrote the host would show here as a node that never comes online (step 2).
   CODE=$(edge_get -o "$WORK/root.html" -w '%{http_code}' "$(edge_url /)") || die "the Worker did not answer"
   [ "$CODE" = 200 ] && grep -q 'Coming soon' "$WORK/root.html" || die "GET / is not the decoy page (HTTP $CODE)"
-  wait_for 30 "the setup link in the Worker log" grep -q '/setup#' "$WORK/wrangler.log" || die "no setup link in the Worker log"
-  SETUP_LINE=$(grep -m1 -o 'https://[^ ]*/setup#[^ ]*' "$WORK/wrangler.log")
-  SETUP_TOKEN=${SETUP_LINE##*#}
-  [ -n "$SETUP_TOKEN" ] && [ "$SETUP_LINE" = "https://$EDGE_HOST:$PUB/$ADMIN_SECRET/setup#$SETUP_TOKEN" ] || die "the setup link does not point at the configured admin prefix"
-  # the link is printed on purpose (it is how the operator gets it); it is not a leak to look for in the log
+  wait_for 30 "the setup token expiry in the Worker log" grep -q 'setup token of SETUP_TOKEN_SHA256 is accepted until' "$WORK/wrangler.log" \
+    || die "the Worker did not offer the setup token (no expiry line in its log)"
+  ! grep -q '/setup#' "$WORK/wrangler.log" || die "the Worker printed a setup link although SETUP_TOKEN_SHA256 is set"
   ADMIN=https://$EDGE_HOST:$PUB/$ADMIN_SECRET
+  # the setup link a deploy tool builds itself is $ADMIN/setup#<token>; the token it chose is the credential, a stranger's is not
+  ! api AuthService/BeginSetup "$(jq -nc --arg t "$(openssl rand -hex 32)" '{setupToken:$t, displayName:"E2E admin", method:"SETUP_METHOD_PASSWORD", login:"stranger", password:"stranger-password-1"}')" >/dev/null 2>&1 \
+    || die "BeginSetup accepted a token nobody offered"
   ADMIN_LOGIN=e2e-admin ADMIN_PASSWORD=$(openssl rand -hex 16)
   SECRETS+=("$ADMIN_PASSWORD")
   BEGIN=$(api AuthService/BeginSetup "$(jq -nc --arg t "$SETUP_TOKEN" --arg l "$ADMIN_LOGIN" --arg p "$ADMIN_PASSWORD" \
@@ -239,7 +244,7 @@ PY
     STEPUP_UNTIL=$(jq -r '.stepUpUntilUnix | tonumber' <<<"$out")
   }
   mutate() { stepup && api "$@"; }
-  pass "the Worker serves the decoy at /, the setup link in its log works once, first admin created, the session works (admin under the secret prefix)"
+  pass "the Worker serves the decoy at /, logs only the setup token's expiry (no link, no token), the token chosen by the deployer creates the first admin once, a token nobody offered is refused, the session works (admin under the secret prefix)"
 
   step "2. enrolment over the link, node online, inbound running, desired state over the link"
   ENROLL=$(api NodeService/CreateEnrollment "{\"name\":\"$NODE_NAME\",\"address\":\"127.0.0.1\"}")
@@ -523,7 +528,7 @@ PY
   step "11. secrets never reach the logs (Worker log without wrangler's own request lines; wrangler's file log; node and client logs)"
   LEAKS=0
   edge_worker_log >"$WORK/wrangler-worker-output.txt"
-  cat "$WORK"/wrangler-logs/* 2>/dev/null | grep -vE '^\[wrangler:info\] [A-Z]+ |/setup#' >"$WORK/wrangler-file-log.txt" || true
+  cat "$WORK"/wrangler-logs/* 2>/dev/null | grep -vE '^\[wrangler:info\] [A-Z]+ ' >"$WORK/wrangler-file-log.txt" || true
   for s in "${SECRETS[@]}"; do
     [ ${#s} -ge 8 ] || continue
     for f in "$WORK"/*.log "$WORK/wrangler-worker-output.txt" "$WORK/wrangler-file-log.txt" "$WORK"/pnpm-install.out; do

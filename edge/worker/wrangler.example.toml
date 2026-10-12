@@ -69,3 +69,11 @@ enabled = false
 # ADMIN_HOST = "admin.example.com"   # admin on its own host instead of a secret path
 # ADMIN_PREFIX = "/some-secret/"     # fixes the secret admin path (default: random, shown in the one-time setup link)
 # SUB_PREFIX = "/another-secret/"    # fixes the subscription path (default: random)
+#
+# Optional secret for an unattended first deploy: the SHA-256 of a setup token you choose (64 lowercase hex characters).
+# While no admin exists the panel accepts that token for 30 minutes from its first start and logs only the expiry; without it
+# the panel mints a random token and prints the whole setup link to the Worker log. Set ADMIN_HOST or ADMIN_PREFIX too: the
+# log no longer shows the admin address. See README.md ("Unattended first deploy").
+#   TOKEN=$(openssl rand -hex 32)
+#   printf %s "$TOKEN" | sha256sum | cut -d' ' -f1 | wrangler secret put SETUP_TOKEN_SHA256
+# Locally: SETUP_TOKEN_SHA256=<hex> in the git-ignored .dev.vars.

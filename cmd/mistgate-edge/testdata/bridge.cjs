@@ -451,8 +451,58 @@ async function run() {
       // The VPS oracle shares this database; its own start writes the subscription-rules marker (subsettings.MigrateM3).
       const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k <> 'sub_rules_m3'").first("n");
       assert.equal(Number(settingsAfterFailure), 0, "failed first init leaves no settings behind");
+
+      // A setup token hash from the deployer (SETUP_TOKEN_SHA256): the panel offers it, logs only its expiry, and never
+      // revives an expired one. The database is emptied again afterwards, so the random-token flow below starts clean.
+      const scenarioStart = logs.length;
+      const deployerToken = randomBytes(32).toString("hex");
+      const deployerHash = crypto.createHash("sha256").update(deployerToken).digest("hex");
+      const setupIP = "198.51.100.90";
+      const beginWith = (panel, token) => connectRPC(panel, "AuthService/BeginSetup", {
+        setupToken: token, displayName: "Deployer Owner", method: "SETUP_METHOD_PASSWORD", login: "deployer", password: "test-password-1234",
+      }, "", setupIP);
+      const hashPanel = await startIsolate(bytes, firstPanel);
+      await assert.rejects(Promise.race([
+        hashPanel.init({ ...initOptions, setupTokenSHA256: deployerHash.toUpperCase() }),
+        wasmFailure,
+      ]), /setupTokenSHA256/, "an uppercase or malformed hash is refused");
+      assert.equal(Number(await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k <> 'sub_rules_m3'").first("n")), 0,
+        "a refused hash leaves no settings behind");
+      let mark = logs.length;
+      await Promise.race([hashPanel.init({ ...initOptions, setupTokenSHA256: deployerHash }), wasmFailure]);
+      const offerLogs = logs.slice(mark).map((args) => args.map(String).join(" "));
+      assert.ok(offerLogs.some((line) => line.startsWith("No admin yet.") && line.includes("accepted until")), "the first start logs the expiry of the offered token");
+      for (const line of offerLogs) {
+        assert.ok(!line.includes(deployerToken) && !line.includes(deployerHash) && !line.includes("/setup#") && !line.includes("test-admin"),
+          "the log shows neither the token, nor its hash, nor an address");
+      }
+      const offered = await globalThis.__d1.prepare("SELECT lower(hex(hash)) AS hash, expires_at FROM setup_token").all();
+      assert.deepEqual(offered.results.map((row) => row.hash), [deployerHash], "the panel stored the offered hash and minted no token of its own");
+      const stranger = await beginWith(hashPanel, randomBytes(32).toString("hex"));
+      assert.notEqual(stranger.response.status, 200, "a token nobody offered is refused");
+      const offeredBegin = await beginWith(hashPanel, deployerToken);
+      assert.equal(offeredBegin.response.status, 200, "BeginSetup accepts the token the deployer chose");
+
+      // An expired token is not revived by the next isolate's start.
+      await globalThis.__d1.prepare("UPDATE setup_token SET expires_at = ?").bind(Math.floor(Date.now() / 1000) - 3600).run();
+      const expiredPanel = await startIsolate(bytes, hashPanel);
+      mark = logs.length;
+      await Promise.race([expiredPanel.init({ ...initOptions, setupTokenSHA256: deployerHash }), wasmFailure]);
+      assert.ok(logs.slice(mark).some((args) => String(args[0]).startsWith("No admin yet.") && String(args[0]).includes("expired")), "the next start says the token expired");
+      const afterExpiry = await globalThis.__d1.prepare("SELECT count(*) AS n, min(expires_at) AS expires_at FROM setup_token").first();
+      assert.equal(Number(afterExpiry.n), 1, "the expired token is still one row");
+      assert.ok(Number(afterExpiry.expires_at) < Math.floor(Date.now() / 1000), "the expired token was not given a new expiry");
+      const revived = await beginWith(expiredPanel, deployerToken);
+      assert.notEqual(revived.response.status, 200, "an expired token is not revived");
+      for (const line of logs.slice(scenarioStart).map((args) => args.map(String).join(" "))) {
+        assert.ok(!line.includes(deployerToken) && !line.includes(deployerHash), "no log line shows the token or its hash");
+      }
+      logs.length = 0;
+      for (const table of ["setup_token", "auth_ceremony"]) await globalThis.__d1.prepare(`DELETE FROM ${table}`).run();
+      await globalThis.__d1.prepare("DELETE FROM setting WHERE k <> 'sub_rules_m3'").run();
+
       firstInstance = await Promise.race([firstPanel.init(initOptions), wasmFailure]);
-      secondPanel = await startIsolate(bytes, firstPanel);
+      secondPanel = await startIsolate(bytes, expiredPanel);
       secondInstance = await Promise.race([secondPanel.init(initOptions), wasmFailure]);
     } finally {
       console.log = consoleLog;

@@ -60,9 +60,33 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 | `publicURL` | `PUBLIC_URL`, or the origin of the first request (https). Used only while the database is empty |
 | `limit` | `async (request) => {ok, retryAfterMs, remaining, first}`: one call to the `Limiter` object of the request's (name, key); a rejection makes the panel refuse the request |
 | `adminHost`, `adminPrefix`, `subPrefix` | optional `ADMIN_HOST`, `ADMIN_PREFIX`, `SUB_PREFIX`, first run only |
+| `setupTokenSHA256` | optional `SETUP_TOKEN_SHA256` secret: 64 lowercase hex characters, the SHA-256 of a setup token the deployer chose (see below); anything else makes `init` fail before it writes |
 
 On a fresh database the panel prints the one-time setup link (it holds the secret admin path) to the Worker log once;
 a later isolate only says that a link was already issued.
+
+The first-run settings (prefixes, agent SNI, RP ID and origins) are stored with "insert if absent" and read back, so isolates
+that start on an empty database at the same time all build from the values of the first write.
+
+## Unattended first deploy (`SETUP_TOKEN_SHA256`)
+
+The random setup link above ends up in Cloudflare's log and a deploy tool cannot read it. With the secret set, the deployer
+picks the token instead and the panel only ever sees its hash:
+
+```sh
+TOKEN=$(openssl rand -hex 32)        # keep it; it is the credential
+printf %s "$TOKEN" | sha256sum | cut -d' ' -f1 | wrangler secret put SETUP_TOKEN_SHA256
+```
+
+- Also set `ADMIN_HOST` or `ADMIN_PREFIX` yourself: with this secret the log shows no address, so a random admin path would be unknown to you.
+- While no admin exists, the first isolate that starts offers the hash as the setup token and the log says only
+  `No admin yet. The setup token of SETUP_TOKEN_SHA256 is accepted until <time>`. The token is valid for 30 minutes from that first offer;
+  later isolates keep the first expiry. An expired or used token is never revived: set a new `SETUP_TOKEN_SHA256` and deploy again.
+- The setup link is the admin address plus `setup#` and the token: `https://<ADMIN_HOST>/setup#<TOKEN>` with an admin host, or
+  `<PUBLIC_URL><ADMIN_PREFIX>setup#<TOKEN>` with a secret path (for example `https://panel.example.com/some-secret/setup#<TOKEN>`).
+  The `#` part never reaches a server log. A deploy tool can also call `AuthService/BeginSetup` with the token as `setupToken`.
+- After the first admin exists the secret does nothing; remove it.
+- If `SETUP_TOKEN_SHA256` is not set nothing changes: a random token and a printed link.
 
 ## Scheduled background work
 
@@ -71,7 +95,7 @@ it also runs health retention, and at minutes divisible by 10 it runs the desire
 
 With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database and
 print the one-time setup link in that cron invocation's log. Run `wrangler tail` before the first deploy to capture it;
-the link is only re-issued after it expires.
+the link is only re-issued after it expires. With `SETUP_TOKEN_SHA256` set (above) nothing is printed but the expiry.
 
 ## Build and run locally
 

@@ -16,6 +16,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"sync"
 	"syscall/js"
@@ -228,11 +229,8 @@ func initPanel(options js.Value) error {
 	if !opts.hasNodeLink {
 		in.LinkPrefix = ""
 	}
-	if in.AdminListen != "" {
-		return errSeparateAdminListener
-	}
-	if in.AdminHost == "" && (in.AdminPrefix == "" || in.AdminPrefix == "/") {
-		return errMissingEdgeAdminPath
+	if err := checkEdgeAdminAddress(in); err != nil {
+		return err
 	}
 
 	vlt, err := vault.New(opts.masterKey)
@@ -251,12 +249,33 @@ func initPanel(options js.Value) error {
 	if opts.hasNodeLink {
 		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), close: opts.nodeLink.Get("close"), poke: opts.nodeLink.Get("poke")}
 	}
-	authSvc, err := auth.New(st, auth.Config{
-		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,
-		Limiter: limiter,
-	}, log)
+	newAuth := func(in app.InstanceConfig) (*auth.Service, error) {
+		return auth.New(st, auth.Config{
+			RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, SourceURL: opts.sourceURL,
+			Limiter: limiter,
+		}, log)
+	}
+	// Everything that can refuse these settings runs before the first write: a failed first init stores nothing.
+	authSvc, err := newAuth(in)
 	if err != nil {
 		return err
+	}
+	if len(pendingSettings) != 0 {
+		rpID, rpOrigins := in.RPID, in.RPOrigins
+		if in, err = settleEdgeInstance(context.Background(), st, in, pendingSettings); err != nil {
+			return err
+		}
+		if !opts.hasNodeLink {
+			in.LinkPrefix = ""
+		}
+		if err := checkEdgeAdminAddress(in); err != nil {
+			return err
+		}
+		if in.RPID != rpID || !slices.Equal(in.RPOrigins, rpOrigins) {
+			if authSvc, err = newAuth(in); err != nil {
+				return err
+			}
+		}
 	}
 	built, err := app.Build(app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, Limiter: limiter, MasterKey: opts.masterKey, Clock: time.Now,
@@ -266,31 +285,56 @@ func initPanel(options js.Value) error {
 	if err != nil {
 		return err
 	}
-	if len(pendingSettings) != 0 {
-		if err := st.SetSettings(context.Background(), pendingSettings); err != nil {
-			return err
-		}
-	}
-
-	adminExists, expiry, tokenExists, err := st.SetupTokenStatus(context.Background(), time.Now())
-	if err != nil {
+	if err := offerSetup(context.Background(), st, opts, in, time.Now()); err != nil {
 		return err
-	}
-	if !adminExists {
-		if tokenExists {
-			js.Global().Get("console").Call("log", "No admin yet. A setup link was already issued; expires at "+expiry.UTC().Format(time.RFC3339))
-		} else {
-			token, err := auth.IssueSetupToken(context.Background(), st, time.Now())
-			if err != nil {
-				return err
-			}
-			url := in.AdminURL() + "setup#" + token
-			js.Global().Get("console").Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+url)
-		}
 	}
 	// EdgeTick owns the bounded edge phases; app.edgeDeferred records the VPS phases still deferred on the Worker.
 	state = &edgeState{store: st, fleet: built.Fleet, panel: built, handler: withEdgeTestHooks(built.Handler, built.Fleet), afterResponse: afterResponse}
 	keepStore = true
+	return nil
+}
+
+func checkEdgeAdminAddress(in app.InstanceConfig) error {
+	if in.AdminListen != "" {
+		return errSeparateAdminListener
+	}
+	if in.AdminHost == "" && (in.AdminPrefix == "" || in.AdminPrefix == "/") {
+		return errMissingEdgeAdminPath
+	}
+	return nil
+}
+
+// offerSetup makes sure an owner can still create the first admin. With a setup token hash from the deployer
+// (SETUP_TOKEN_SHA256) the panel offers that hash and logs nothing but its expiry; otherwise it prints a link with a
+// random token once.
+func offerSetup(ctx context.Context, st *store.Store, opts initOptions, in app.InstanceConfig, now time.Time) error {
+	console := js.Global().Get("console")
+	if opts.setupTokenHash != nil {
+		offer, err := st.OfferSetupToken(ctx, opts.setupTokenHash, now.Add(auth.SetupTokenTTL))
+		if err != nil || offer.AdminExists {
+			return err
+		}
+		when := offer.Expires.UTC().Format(time.RFC3339)
+		if offer.Used || !offer.Expires.After(now) {
+			console.Call("log", "No admin yet. The setup token of SETUP_TOKEN_SHA256 has expired or was used (at "+when+"); set a new SETUP_TOKEN_SHA256 and deploy again")
+		} else {
+			console.Call("log", "No admin yet. The setup token of SETUP_TOKEN_SHA256 is accepted until "+when)
+		}
+		return nil
+	}
+	adminExists, expiry, tokenExists, err := st.SetupTokenStatus(ctx, now)
+	if err != nil || adminExists {
+		return err
+	}
+	if tokenExists {
+		console.Call("log", "No admin yet. A setup link was already issued; expires at "+expiry.UTC().Format(time.RFC3339))
+		return nil
+	}
+	token, err := auth.IssueSetupToken(ctx, st, now)
+	if err != nil {
+		return err
+	}
+	console.Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+in.AdminURL()+"setup#"+token)
 	return nil
 }
 

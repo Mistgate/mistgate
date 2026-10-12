@@ -16,4 +16,9 @@ export interface Env {
   ADMIN_HOST?: string;
   ADMIN_PREFIX?: string;
   SUB_PREFIX?: string;
+  /**
+   * Optional secret: the SHA-256 of a setup token the deployer chose, 64 lowercase hex characters. While no admin exists the
+   * panel offers it as the setup token (valid 30 minutes from the first start) instead of printing a random link to the log.
+   */
+  SETUP_TOKEN_SHA256?: string;
 }

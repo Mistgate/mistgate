@@ -59,6 +59,8 @@ async function init(env: Env, origin: string): Promise<PanelApi> {
     adminHost: env.ADMIN_HOST || undefined,
     adminPrefix: env.ADMIN_PREFIX || undefined,
     subPrefix: env.SUB_PREFIX || undefined,
+    // The deployer's setup token (hash only); without it the panel mints a random one and prints its link once.
+    setupTokenSHA256: env.SETUP_TOKEN_SHA256?.trim() || undefined,
   });
   return panel;
 }

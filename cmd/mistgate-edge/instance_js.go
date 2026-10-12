@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
@@ -39,6 +40,7 @@ var (
 	errInvalidSubPrefix      = errors.New("subPrefix must look like /secret/")
 	errInvalidLimitCallback  = errors.New("limit must be a function")
 	errInvalidNodeLink       = errors.New("nodeLink must provide ask, close and poke functions")
+	errInvalidSetupHash      = errors.New("setupTokenSHA256 must be 64 lowercase hex characters (the SHA-256 of the setup token)")
 )
 
 type initOptions struct {
@@ -55,6 +57,8 @@ type initOptions struct {
 	rpID        string
 	rpOrigins   []string
 	sourceURL   string
+	// setupTokenHash is the SHA-256 of a setup token chosen by whoever deploys (SETUP_TOKEN_SHA256); nil: the panel mints a random one.
+	setupTokenHash []byte
 }
 
 func parseInitOptions(value js.Value) (initOptions, error) {
@@ -128,6 +132,15 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 			return out, errors.New("rpOrigins is empty")
 		}
 	}
+	hash, err := stringOption(value, "setupTokenSHA256")
+	if err != nil {
+		return out, err
+	}
+	if hash != "" {
+		if out.setupTokenHash, err = parseSetupTokenHash(hash); err != nil {
+			return out, err
+		}
+	}
 	if optionPresent(value, "sourceURL") {
 		if out.sourceURL, err = stringOption(value, "sourceURL"); err != nil {
 			return out, err
@@ -136,6 +149,18 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 		out.sourceURL = "https://github.com/Mistgate/mistgate"
 	}
 	return out, nil
+}
+
+// parseSetupTokenHash accepts exactly what `sha256sum` prints for the token: 64 lowercase hex characters.
+func parseSetupTokenHash(raw string) ([]byte, error) {
+	if len(raw) != 2*sha256.Size || strings.ToLower(raw) != raw {
+		return nil, errInvalidSetupHash
+	}
+	hash, err := hex.DecodeString(raw)
+	if err != nil {
+		return nil, errInvalidSetupHash
+	}
+	return hash, nil
 }
 
 func stringOption(object js.Value, name string) (string, error) {
@@ -180,6 +205,46 @@ func masterKeyFromJS(value js.Value) ([]byte, error) {
 // does this on every start, and a D1 round trip is milliseconds: §7.7 counted nine sequential reads here).
 var edgeInstanceKeys = []string{
 	"rp_id", "rp_origins", "public_url", "admin_host", "admin_prefix", "admin_listen", "agent_sni", "sub_prefix", "link_prefix",
+}
+
+// applyStoredInstance sets the fields of in that the stored settings in values name.
+func applyStoredInstance(in *app.InstanceConfig, values map[string]string) error {
+	for key, value := range values {
+		switch key {
+		case "rp_id":
+			in.RPID = value
+		case "rp_origins":
+			if in.RPOrigins = splitList(value); len(in.RPOrigins) == 0 {
+				return errors.New("stored rp_origins setting is empty")
+			}
+		case "public_url":
+			in.PublicURL = value
+		case "admin_host":
+			in.AdminHost = value
+		case "admin_prefix":
+			in.AdminPrefix = value
+		case "admin_listen":
+			in.AdminListen = value
+		case "agent_sni":
+			in.AgentSNI = value
+		case "sub_prefix":
+			in.SubPrefix = value
+		case "link_prefix":
+			in.LinkPrefix = value
+		}
+	}
+	return nil
+}
+
+// settleEdgeInstance stores the generated settings unless another isolate stored its own first (isolates that start on an
+// empty database at the same time each generate their own prefixes and agent SNI) and returns the instance as stored, so
+// every isolate builds from the same values.
+func settleEdgeInstance(ctx context.Context, st *store.Store, in app.InstanceConfig, generated map[string]string) (app.InstanceConfig, error) {
+	stored, err := st.SetSettingsIfAbsent(ctx, generated)
+	if err != nil {
+		return in, err
+	}
+	return in, applyStoredInstance(&in, stored)
 }
 
 func loadEdgeInstance(ctx context.Context, st *store.Store, opts initOptions) (app.InstanceConfig, map[string]string, error) {
