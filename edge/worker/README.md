@@ -12,6 +12,7 @@ to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`.
 - `src/limiter.ts`, `src/limitmath.ts`: the `Limiter` Durable Object (see below) and its pure math.
 - `src/nodelink.ts`, `src/panellink.ts`: the agent link shell (`NodeLink` Durable Object) and the entrypoint through which it reaches Go (see below).
 - `src/provisioner.ts`, `src/provision-index.ts`, `wrangler.provision.example.toml`: the second script, `mistgate-edge-provision`, with the `Provisioner` Durable Object that installs nodes over SSH (see below).
+- `build-bundle.mjs`, `test/bundle/`: the release build of both scripts (`mistgate release build mistgate-edge.tar.gz`, see Releases and signing in the docs): esbuild, pinned in `package.json`, bundles `src/index.ts` and `src/provision-index.ts` into `worker.js` and `provision.js`, with `panel.wasm` left as a separate CompiledWasm module. `scripts/test-edge-bundle.ps1` builds the tarball twice, loads it in workerd (Miniflare) and prints each script's `wrangler deploy --dry-run` upload size against Cloudflare's 64 MiB limit.
 
 ## Security limits (`Limiter` Durable Object)
 

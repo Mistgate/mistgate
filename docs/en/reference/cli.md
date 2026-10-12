@@ -20,7 +20,7 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `mcp` | A local stdio proxy to the panel's MCP endpoint, for agent clients that cannot speak HTTP. |
 | `release keygen` | Makes the owner's release key. |
 | `release build` | Builds release binaries the one reproducible way (CI and `make build` use it). |
-| `release sign` | Rebuilds the binaries from the release tag, then signs the node bundle and the panel manifest. |
+| `release sign` | Rebuilds the binaries and the edge bundle from the release tag, then signs the node bundle, the panel manifest and the edge manifest. |
 | `release trust-key` | On the panel server, after a key rotation: makes the binary's release key the installation's key. |
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
@@ -185,7 +185,7 @@ mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] 
 | `--source` | `.` | The source checkout. |
 | `--out` | none | Directory for the binaries. |
 
-`NAME` is `mistgate-linux-amd64`, `mistgate-linux-arm64`, `mistgate-node-linux-amd64` or `mistgate-node-linux-arm64`. The build is reproducible: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, the Go toolchain named in `go.mod` (downloaded when the local Go is another version), `GOAMD64=v1`/`GOARM64=v8.0` and the version, build time and key as the only `-ldflags` values. The panel binary embeds `web/dist`: build the SPA first (`cd web && pnpm install --frozen-lockfile && pnpm build`). The release workflow and `make build` call this command; it prints the SHA-256 of every binary.
+`NAME` is `mistgate-linux-amd64`, `mistgate-linux-arm64`, `mistgate-node-linux-amd64`, `mistgate-node-linux-arm64` or `mistgate-edge.tar.gz` (the Cloudflare edition: `panel.wasm`, the two Worker scripts bundled with the pinned esbuild, `web/dist` and `edge.json`, in a deterministic tarball; it needs `pnpm install --frozen-lockfile` in `edge/worker` besides the SPA). The build is reproducible: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, the Go toolchain named in `go.mod` (downloaded when the local Go is another version), `GOAMD64=v1`/`GOARM64=v8.0` and the version, build time and key as the only `-ldflags` values. The panel binary embeds `web/dist`: build the SPA first (`cd web && pnpm install --frozen-lockfile && pnpm build`). The release workflow and `make build` call this command; it prints the SHA-256 of every binary.
 
 ### mistgate release sign
 
@@ -202,7 +202,7 @@ mistgate release sign --key FILE --version V [--built UNIX] [--expires 30d] [--s
 | `--source` | `.` | A clean checkout of the tag `--version` (local changes to tracked files are refused). |
 | `--out` | none | Directory for the manifests, their signatures and the copies of the binaries. |
 
-The binaries are named `<name>-<os>-<arch>`: `mistgate-node-linux-*` go into the node bundle (`manifest.json`, `manifest.sig`), `mistgate-linux-*` into the panel manifest (`panel-manifest.json`, `panel-manifest.sig`, signed in a separate Ed25519 context so neither verifies as the other). Before signing, the command rebuilds every binary from `--source` with `release build` and the public half of `--key`, and refuses any binary that differs byte for byte: you sign what the tag builds to, not what a CI runner uploaded. Flags may come after the binaries. The command verifies what it wrote and prints every file with its size and the key fingerprint. A signer built locally from any version works: `go build -o mistgate ./cmd/mistgate`.
+The binaries are named `<name>-<os>-<arch>`: `mistgate-node-linux-*` go into the node bundle (`manifest.json`, `manifest.sig`), `mistgate-linux-*` into the panel manifest (`panel-manifest.json`, `panel-manifest.sig`, signed in a separate Ed25519 context so neither verifies as the other). Before signing, the command rebuilds every binary from `--source` with `release build` and the public half of `--key`, and refuses any binary that differs byte for byte: you sign what the tag builds to, not what a CI runner uploaded. `mistgate-edge.tar.gz` given too is rebuilt the same way and gets its own `edge-manifest.json` and `edge-manifest.sig`, signed in a third context. Flags may come after the binaries. The command verifies what it wrote and prints every file with its size and the key fingerprint. A signer built locally from any version works: `go build -o mistgate ./cmd/mistgate`.
 
 ```sh
 mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --source ~/src/mistgate \

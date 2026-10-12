@@ -24,7 +24,8 @@ export class AuxProvisioner extends DurableObject {
 export default { fetch: () => new Response("Not Found", { status: 404 }) };
 `;
 
-// Two projects: the pure code runs under plain Node; the Durable Object classes run in workerd (test/do).
+// Three projects: the pure code runs under plain Node; the Durable Object classes run in workerd (test/do); the built bundle
+// runs in a workerd of its own (test/bundle).
 export default defineConfig({
   test: {
     // workerd reports an exception thrown inside a Durable Object as an unhandled rejection even when the caller catches
@@ -39,6 +40,8 @@ export default defineConfig({
         : undefined,
     projects: [
       { test: { name: "node", include: ["test/*.test.ts"] } },
+      // The scripts of a built edge bundle in workerd (Miniflare); skipped unless MISTGATE_EDGE_BUNDLE names the extracted tarball.
+      { test: { name: "bundle", include: ["test/bundle/*.test.ts"] } },
       {
         plugins: [
           cloudflareTest({

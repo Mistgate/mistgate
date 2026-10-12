@@ -20,7 +20,7 @@ description: Все команды mistgate и mistgate-node с флагами, 
 | `mcp` | Локальный stdio-прокси к MCP панели для агентов, которые не умеют HTTP. |
 | `release keygen` | Создаёт ключ релиза владельца. |
 | `release build` | Собирает бинарники релиза единственным воспроизводимым способом (его используют CI и `make build`). |
-| `release sign` | Пересобирает бинарники из тега релиза и подписывает пакет нод и манифест панели. |
+| `release sign` | Пересобирает бинарники и пакет edge из тега релиза и подписывает пакет нод, манифест панели и манифест edge. |
 | `release trust-key` | На сервере панели после смены ключа: делает ключ бинарника ключом установки. |
 | `version` | Печатает версию, время сборки и отпечаток ключа релиза. |
 
@@ -185,7 +185,7 @@ mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] 
 | `--source` | `.` | Каталог с исходниками (рабочая копия git). |
 | `--out` | нет | Каталог для бинарников. |
 
-`NAME` — `mistgate-linux-amd64`, `mistgate-linux-arm64`, `mistgate-node-linux-amd64` или `mistgate-node-linux-arm64`. Сборка воспроизводима: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, тулчейн Go из `go.mod` (скачивается, если локальный Go другой версии), `GOAMD64=v1`/`GOARM64=v8.0`, а в `-ldflags` — только версия, время сборки и ключ. Бинарник панели содержит `web/dist`: сначала соберите SPA (`cd web && pnpm install --frozen-lockfile && pnpm build`). Эту команду вызывают workflow релиза и `make build`; она печатает SHA-256 каждого бинарника.
+`NAME` — `mistgate-linux-amd64`, `mistgate-linux-arm64`, `mistgate-node-linux-amd64`, `mistgate-node-linux-arm64` или `mistgate-edge.tar.gz` (облачная редакция: `panel.wasm`, два скрипта Worker, собранные закреплённым esbuild, `web/dist` и `edge.json` в детерминированном архиве; кроме SPA нужен `pnpm install --frozen-lockfile` в `edge/worker`). Сборка воспроизводима: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, тулчейн Go из `go.mod` (скачивается, если локальный Go другой версии), `GOAMD64=v1`/`GOARM64=v8.0`, а в `-ldflags` — только версия, время сборки и ключ. Бинарник панели содержит `web/dist`: сначала соберите SPA (`cd web && pnpm install --frozen-lockfile && pnpm build`). Эту команду вызывают workflow релиза и `make build`; она печатает SHA-256 каждого бинарника.
 
 ### mistgate release sign
 
@@ -202,7 +202,7 @@ mistgate release sign --key FILE --version V [--built UNIX] [--expires 30d] [--s
 | `--source` | `.` | Чистая рабочая копия тега `--version` (локальные изменения отслеживаемых файлов не допускаются). |
 | `--out` | нет | Каталог для манифестов, их подписей и копий бинарников. |
 
-Бинарники называются `<имя>-<ос>-<архитектура>`: `mistgate-node-linux-*` попадают в пакет нод (`manifest.json`, `manifest.sig`), `mistgate-linux-*` — в манифест панели (`panel-manifest.json`, `panel-manifest.sig`; он подписывается в отдельном контексте Ed25519, поэтому одна подпись не проходит за другую). Перед подписью команда пересобирает каждый бинарник из `--source` через `release build` с открытой половиной `--key` и отказывается, если хоть один байт отличается: вы подписываете то, во что собирается тег, а не то, что загрузил CI. Флаги можно писать и после бинарников. Команда проверяет записанное и печатает каждый файл с размером и отпечаток ключа. Подписывать можно локально собранным бинарником любой версии: `go build -o mistgate ./cmd/mistgate`.
+Бинарники называются `<имя>-<ос>-<архитектура>`: `mistgate-node-linux-*` попадают в пакет нод (`manifest.json`, `manifest.sig`), `mistgate-linux-*` — в манифест панели (`panel-manifest.json`, `panel-manifest.sig`; он подписывается в отдельном контексте Ed25519, поэтому одна подпись не проходит за другую). Перед подписью команда пересобирает каждый бинарник из `--source` через `release build` с открытой половиной `--key` и отказывается, если хоть один байт отличается: вы подписываете то, во что собирается тег, а не то, что загрузил CI. Переданный вместе с ними `mistgate-edge.tar.gz` пересобирается так же и получает собственные `edge-manifest.json` и `edge-manifest.sig` в третьем контексте подписи. Флаги можно писать и после бинарников. Команда проверяет записанное и печатает каждый файл с размером и отпечаток ключа. Подписывать можно локально собранным бинарником любой версии: `go build -o mistgate ./cmd/mistgate`.
 
 ```sh
 mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --source ~/src/mistgate \

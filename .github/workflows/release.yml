@@ -96,8 +96,56 @@ jobs:
           path: release/
           if-no-files-found: error
 
+  # The Cloudflare edition: the panel for js/wasm, the two Worker scripts (esbuild, pinned in edge/worker/package.json) and the
+  # admin SPA in one deterministic tarball, mistgate-edge.tar.gz. It runs pnpm (third-party code), so read-only too; the
+  # bundle is loaded in workerd before it is uploaded. The owner signs it later (edge-manifest.json, edge-manifest.sig).
+  edge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Build the admin panel and install the pinned esbuild
+        run: |
+          (cd web && pnpm install --frozen-lockfile && pnpm build)
+          (cd edge/worker && pnpm install --frozen-lockfile)
+      - name: Build the edge bundle
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          RELEASE_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          go run ./cmd/mistgate release build --version "$TAG" --key "$RELEASE_KEY" --out release mistgate-edge.tar.gz
+      - name: Load the bundle in workerd
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/edge-bundle"
+          tar -xzf release/mistgate-edge.tar.gz -C "$RUNNER_TEMP/edge-bundle"
+          cd edge/worker
+          MISTGATE_EDGE_BUNDLE="$RUNNER_TEMP/edge-bundle" pnpm exec vitest run --project bundle
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: edge
+          path: release/
+          if-no-files-found: error
+
   publish:
-    needs: [node, panel]
+    needs: [node, panel, edge]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -119,8 +167,8 @@ jobs:
         run: |
           set -euo pipefail
           cd release
-          bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64)
+          bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64 mistgate-edge.tar.gz)
           sha256sum "${bins[@]}" > SHA256SUMS
           gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO install.sh --repo "$GITHUB_REPOSITORY" --verify-tag \
             --draft --title "$TAG" --generate-notes
-          echo "::notice::The release stays a draft until the owner rebuilds the binaries from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig and panel-manifest.sshsig. Publish it only after all five are attached."
+          echo "::notice::The release stays a draft until the owner rebuilds the binaries and the edge bundle from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig, panel-manifest.sshsig, edge-manifest.json and edge-manifest.sig. Publish it only after all seven are attached."

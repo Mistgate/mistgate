@@ -14,6 +14,12 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^5.20261005.1
         version: 5.20261006.1
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      miniflare:
+        specifier: 5.20261001.0-alpha
+        version: 5.20261001.0-alpha
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

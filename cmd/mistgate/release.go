@@ -29,13 +29,18 @@ const releaseUsage = `usage:
 
   keygen  make the owner's release key: the private key goes to FILE (mode 0600, never overwritten), the public key and
           its fingerprint are printed. Put the public key into the build (RELEASE_KEY=<public key> make build).
-  build   build release binaries (mistgate-linux-<arch>, mistgate-node-linux-<arch>) from the checkout --source (default
+  build   build release binaries (mistgate-linux-<arch>, mistgate-node-linux-<arch>) or the edge bundle from the checkout --source (default
           .) the one reproducible way; CI and make build use it. --built defaults to the commit time of the checkout.
   sign    rebuild every binary from --source, which must be a clean checkout of the tag --version, refuse any binary
           that does not come out byte for byte the same, then write DIR/manifest.json and DIR/manifest.sig for the node
           binaries, DIR/panel-manifest.json, DIR/panel-manifest.sig and DIR/panel-manifest.sshsig for the panel
           binaries, and copy the binaries into DIR. Signing a panel binary needs the SPA built in --source first (cd web && pnpm install
           --frozen-lockfile && pnpm build).
+          The edge bundle (below) given to sign is rebuilt the same way and gets DIR/edge-manifest.json and
+          DIR/edge-manifest.sig, signed in a context of its own.
+  edge bundle  the Cloudflare edition: the name mistgate-edge.tar.gz given to build or sign. It holds panel.wasm, the two
+          Worker scripts, the SPA and edge.json, in a deterministic tarball. It needs the SPA built in --source and the pinned
+          esbuild installed there (cd edge/worker && pnpm install --frozen-lockfile).
   trust-key  after a key rotation: make the release key compiled into this binary the installation's key
           (<data-dir>/release.pub). Until then a panel whose compiled key differs from release.pub trusts no bundle.
           Restart the panel afterwards.
@@ -162,30 +167,47 @@ func goBuildRelease(src, name, version string, built int64, key, out string) err
 	if !ok || goos != "linux" || (goarch != "amd64" && goarch != "arm64") {
 		return fmt.Errorf("%s: release binaries are mistgate-linux-{amd64,arm64} and mistgate-node-linux-{amd64,arm64}", name)
 	}
-	modBytes, err := os.ReadFile(filepath.Join(src, "go.mod"))
+	toolchain, err := releaseToolchain(src)
 	if err != nil {
 		return err
-	}
-	mod, err := modfile.Parse("go.mod", modBytes, nil)
-	if err != nil || mod.Go == nil {
-		return fmt.Errorf("%s/go.mod: no go version", src)
-	}
-	toolchain := "go" + mod.Go.Version
-	if mod.Toolchain != nil {
-		toolchain = mod.Toolchain.Name
 	}
 	out, err = filepath.Abs(out)
 	if err != nil {
 		return err
 	}
-	const bi = "github.com/mistgate/mistgate/internal/buildinfo"
-	ldflags := fmt.Sprintf("-s -w -X %s.Version=%s -X %s.Built=%d -X %s.ReleaseKey=%s", bi, version, bi, built, bi, key)
-	cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-ldflags", ldflags, "-o", out, pkg)
+	cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key), "-o", out, pkg)
 	cmd.Dir = src
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+goarch, "GOAMD64=v1", "GOARM64=v8.0",
-		"GOFLAGS=", "GOEXPERIMENT=", "GOWORK=off", "GOTOOLCHAIN="+toolchain)
+	cmd.Env = releaseEnv(toolchain, "GOOS=linux", "GOARCH="+goarch)
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	return cmd.Run()
+}
+
+// releaseToolchain is the Go version that builds src: go.mod's toolchain line, whatever Go runs this.
+func releaseToolchain(src string) (string, error) {
+	modBytes, err := os.ReadFile(filepath.Join(src, "go.mod"))
+	if err != nil {
+		return "", err
+	}
+	mod, err := modfile.Parse("go.mod", modBytes, nil)
+	if err != nil || mod.Go == nil {
+		return "", fmt.Errorf("%s/go.mod: no go version", src)
+	}
+	if mod.Toolchain != nil {
+		return mod.Toolchain.Name, nil
+	}
+	return "go" + mod.Go.Version, nil
+}
+
+// releaseLdflags stamps the version, the commit time and the release public key; the same flags for every release build.
+func releaseLdflags(version string, built int64, key string) string {
+	const bi = "github.com/mistgate/mistgate/internal/buildinfo"
+	return fmt.Sprintf("-s -w -X %s.Version=%s -X %s.Built=%d -X %s.ReleaseKey=%s", bi, version, bi, built, bi, key)
+}
+
+// releaseEnv is the fixed environment of a release build, with the target (GOOS, GOARCH) given by the caller.
+func releaseEnv(toolchain string, target ...string) []string {
+	return append(append(os.Environ(), "CGO_ENABLED=0", "GOAMD64=v1", "GOARM64=v8.0",
+		"GOFLAGS=", "GOEXPERIMENT=", "GOWORK=off", "GOTOOLCHAIN="+toolchain), target...)
 }
 
 func gitOut(src string, args ...string) (string, error) {
@@ -237,25 +259,31 @@ func checkReproduced(src, version string, built int64, key string, bins []string
 	defer os.RemoveAll(tmp)
 	for _, b := range bins {
 		name := filepath.Base(b)
-		if base, _, _, _ := release.ParseBinaryName(name); base == "mistgate" {
+		base, _, _, _ := release.ParseBinaryName(name)
+		if base == "mistgate" || name == release.EdgeBundleName {
 			if _, err := os.Stat(filepath.Join(src, "web", "dist", "index.html")); err != nil {
 				return fmt.Errorf("%s embeds the admin SPA: build it in %s first (cd web && pnpm install --frozen-lockfile && pnpm build)", name, src)
 			}
 		}
 		rebuilt := filepath.Join(tmp, name)
-		if err := releaseRebuild(src, name, version, built, key, rebuilt); err != nil {
+		if name == release.EdgeBundleName {
+			err = edgeRebuild(src, version, built, key, rebuilt)
+		} else {
+			err = releaseRebuild(src, name, version, built, key, rebuilt)
+		}
+		if err != nil {
 			return fmt.Errorf("rebuild %s: %w", name, err)
 		}
-		want, err := release.FileFromPath(b)
+		wantSize, wantSum, err := release.HashFile(b)
 		if err != nil {
 			return err
 		}
-		got, err := release.FileFromPath(rebuilt)
+		gotSize, gotSum, err := release.HashFile(rebuilt)
 		if err != nil {
 			return err
 		}
-		if want.SHA256 != got.SHA256 || want.Size != got.Size {
-			return fmt.Errorf("%s does not match its rebuild from %s (sha256 %s, rebuilt %s): refusing to sign it", b, version, want.SHA256[:12], got.SHA256[:12])
+		if wantSum != gotSum || wantSize != gotSize {
+			return fmt.Errorf("%s does not match its rebuild from %s (sha256 %s, rebuilt %s): refusing to sign it", b, version, wantSum[:12], gotSum[:12])
 		}
 	}
 	return nil
@@ -291,14 +319,25 @@ func releaseBuild(args []string, out io.Writer) error {
 	}
 	for _, name := range names {
 		p := filepath.Join(*outDir, name)
-		if err := releaseRebuild(*source, name, *version, *built, *key, p); err != nil {
-			return fmt.Errorf("build %s: %w", name, err)
+		var sum string
+		if name == release.EdgeBundleName {
+			if err := edgeRebuild(*source, *version, *built, *key, p); err != nil {
+				return fmt.Errorf("build %s: %w", name, err)
+			}
+			if _, sum, err = release.HashFile(p); err != nil {
+				return err
+			}
+		} else {
+			if err := releaseRebuild(*source, name, *version, *built, *key, p); err != nil {
+				return fmt.Errorf("build %s: %w", name, err)
+			}
+			f, err := release.FileFromPath(p)
+			if err != nil {
+				return err
+			}
+			sum = f.SHA256
 		}
-		f, err := release.FileFromPath(p)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s  %s\n", f.SHA256, p)
+		fmt.Fprintf(out, "%s  %s\n", sum, p)
 	}
 	return nil
 }
@@ -351,8 +390,10 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 	}
 
 	// Node binaries go into the node bundle (manifest.json), panel binaries into the panel's own manifest.
+	var edgeBody, edgeSig []byte
 	node := &release.Manifest{Schema: release.Schema, Version: *version, Built: commitBuilt, Expires: now.Add(life).Unix()}
 	panel := *node
+	var edge *release.EdgeManifest
 	for _, b := range bins {
 		fi, err := os.Stat(b)
 		if err != nil {
@@ -360,6 +401,15 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		}
 		if !fi.Mode().IsRegular() {
 			return fmt.Errorf("%s is not a regular file", b)
+		}
+		if filepath.Base(b) == release.EdgeBundleName { // the edge bundle has a manifest of its own
+			if edge != nil {
+				return fmt.Errorf("%s is given twice", release.EdgeBundleName)
+			}
+			if edge, err = release.EdgeManifestFor(b, *version, commitBuilt, node.Expires); err != nil {
+				return err
+			}
+			continue
 		}
 		f, err := release.FileFromPath(b) // the name must be <name>-<os>-<arch>
 		if err != nil {
@@ -374,6 +424,13 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		default:
 			return fmt.Errorf("%s: only mistgate-node-<os>-<arch> and mistgate-<os>-<arch> binaries are signed", b)
 		}
+	}
+	if edge != nil {
+		body, err := edge.Marshal() // validates: version, size, hash
+		if err != nil {
+			return err
+		}
+		edgeBody, edgeSig = body, release.SignEdge(priv, body)
 	}
 	type signed struct {
 		name, sigName, sshsigName string
@@ -408,7 +465,11 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		return err
 	}
 	for _, b := range bins {
-		if err := copyInto(b, filepath.Join(*outDir, filepath.Base(b))); err != nil {
+		mode := os.FileMode(0o755)
+		if filepath.Base(b) == release.EdgeBundleName {
+			mode = 0o644 // not an executable
+		}
+		if err := copyInto(b, filepath.Join(*outDir, filepath.Base(b)), mode); err != nil {
 			return err
 		}
 	}
@@ -425,10 +486,27 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 			}
 		}
 	}
+	if edge != nil {
+		if err := writeAtomic(filepath.Join(*outDir, release.EdgeManifestName), edgeBody, 0o644); err != nil {
+			return err
+		}
+		if err := writeAtomic(filepath.Join(*outDir, release.EdgeSignatureName), edgeSig, 0o644); err != nil {
+			return err
+		}
+	}
 	// What was written must verify with the public key of the key file, file by file.
-	manifests, err := verifyBundle(*outDir, pub)
-	if err != nil {
-		return fmt.Errorf("the bundle written to %s does not verify: %w", *outDir, err)
+	var manifests []*release.Manifest
+	if len(node.Files)+len(panel.Files) > 0 {
+		if manifests, err = verifyBundle(*outDir, pub); err != nil {
+			return fmt.Errorf("the bundle written to %s does not verify: %w", *outDir, err)
+		}
+	}
+	if edge != nil {
+		if edge, err = verifyEdgeBundle(*outDir, pub); err != nil {
+			return fmt.Errorf("the edge bundle written to %s does not verify: %w", *outDir, err)
+		}
+		fmt.Fprintf(out, "edge version %s, built %d, expires %s\n  %-32s %10d bytes  sha256 %s\n", edge.Version, edge.Built,
+			time.Unix(edge.Expires, 0).UTC().Format("2006-01-02"), edge.File, edge.Size, edge.SHA256[:12])
 	}
 	for _, got := range manifests {
 		fmt.Fprintf(out, "version %s, built %d, expires %s\n", got.Version, got.Built, time.Unix(got.Expires, 0).UTC().Format("2006-01-02"))
@@ -439,6 +517,31 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 	fmt.Fprintf(out, "rebuilt from %s and signed with key %s\nUpload the manifests and signatures, including %s, in %s to the release, or copy the node bundle to <data-dir>/dist on the panel.\n",
 		*version, buildinfo.KeyFingerprint(pub), release.PanelSSHSIGName, *outDir)
 	return nil
+}
+
+// verifyEdgeBundle reads the edge manifest, its signature and the tarball of dir back the way `edge deploy` does.
+func verifyEdgeBundle(dir string, pub ed25519.PublicKey) (*release.EdgeManifest, error) {
+	body, err := os.ReadFile(filepath.Join(dir, release.EdgeManifestName))
+	if err != nil {
+		return nil, err
+	}
+	sig, err := os.ReadFile(filepath.Join(dir, release.EdgeSignatureName))
+	if err != nil {
+		return nil, err
+	}
+	m, err := release.VerifyEdge(pub, body, sig)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", release.EdgeManifestName, err)
+	}
+	fh, err := os.Open(filepath.Join(dir, m.File))
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	if err := m.VerifyFile(fh); err != nil {
+		return nil, fmt.Errorf("%s: %w", m.File, err)
+	}
+	return m, nil
 }
 
 // verifyBundle reads dir back the way a consumer would: the node bundle and the panel manifest, whichever are there
@@ -502,9 +605,9 @@ func verifyFiles(dir string, m *release.Manifest) error {
 	return nil
 }
 
-// copyInto copies src to dst (mode 0755) through a temporary file, so a reader never sees half a binary. Copying a
+// copyInto copies src to dst with the given mode through a temporary file, so a reader never sees half a binary. Copying a
 // file onto itself (--out is the directory the binary is already in) is a no-op.
-func copyInto(src, dst string) error {
+func copyInto(src, dst string, mode os.FileMode) error {
 	if a, err := os.Stat(src); err == nil {
 		if b, err := os.Stat(dst); err == nil && os.SameFile(a, b) {
 			return nil
@@ -524,7 +627,7 @@ func copyInto(src, dst string) error {
 		tmp.Close()
 		return err
 	}
-	if err := tmp.Chmod(0o755); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		tmp.Close()
 		return err
 	}
