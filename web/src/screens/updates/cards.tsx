@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
@@ -8,6 +9,7 @@ import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
 
@@ -219,6 +221,7 @@ function PanelHow() {
 export function PanelCard({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
   const t = useT();
   const fmt = useFmt();
+  const off = useEdition().off("panel_update"); // the edition has no binary to swap: no install, no systemd steps
   const { p, update, label, kind } = panelUpdate(t, data);
   return (
     <section className={card}>
@@ -273,15 +276,15 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
             <Icon name="refresh" size={12} />
             {t("up.panel.check")}
           </Button>
-          {owner && update?.available && update.installable && (
+          {owner && !off && update?.available && update.installable && (
             <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel({ version: update.version, sha256: update.sha256 })}>
               {t("up.panel.install")}
             </Button>
           )}
         </div>
-        <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>
+        {off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
       </div>
-      {!update?.supported && (
+      {!update?.supported && !off && (
         <div className="border-t border-line pt-3">
           <PanelHow />
         </div>
@@ -298,9 +301,10 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
 export function PanelBar({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
   const t = useT();
   const fmt = useFmt();
+  const off = useEdition().off("panel_update");
   const { p, update, label, kind } = panelUpdate(t, data);
   const [touched, setTouched] = useState<boolean | null>(null);
-  const open = touched ?? !update?.supported;
+  const open = touched ?? (!update?.supported && !off);
   const offer = !!update?.available && !update.installing;
   return (
     <section className={cx("flex min-w-0 flex-col gap-3 rounded-card-lg border p-4", offer ? "border-accent-line bg-accent-soft" : "border-line bg-surface")}>
@@ -316,13 +320,14 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
           <Icon name="refresh" size={12} />
           {t("up.panel.check")}
         </Button>
-        {owner && update?.available && update.installable && (
+        {owner && !off && update?.available && update.installable && (
           <Button variant="primary" size="md" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel({ version: update.version, sha256: update.sha256 })}>
             {t("up.panel.install")}
           </Button>
         )}
         <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.panel.details")} controls="up-panel-details" />
       </div>
+      <EditionNotice feature="panel_update" />
       {open && (
         <div id="up-panel-details" className="flex flex-col gap-3 border-t border-line pt-3">
           <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -348,8 +353,8 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
               {p?.hasReleaseKey ? <span className="font-mono text-xs">{p.releaseKeyFingerprint}</span> : <span className="font-semibold text-warn-text">{t("up.panel.noKey")}</span>}
             </Row>
           </dl>
-          <p className="text-xs leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>
-          {!update?.supported && <PanelHow />}
+          {!off && <p className="text-xs leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
+          {!update?.supported && !off && <PanelHow />}
         </div>
       )}
     </section>

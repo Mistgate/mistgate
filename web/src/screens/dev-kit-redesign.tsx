@@ -274,7 +274,7 @@ const lastRollout = {
   pauseParams: {},
   steps: [doneStep("nod_nl1", "nl1", 0, 2 * H), doneStep("nod_se1", "se1", 1, 5400)],
 };
-const available = page({
+export const available = page({
   nodes: [
     upNode({ nodeId: "nod_de1", name: "de1", version: V_OLD, built: B_OLD, state: NodeUpdateState.OUTDATED, onlineUsers: 5, lastUpdate: lastOk("v0.1.22", V_OLD, 9 * H) }),
     upNode({ nodeId: "nod_fi1", name: "fi1", version: V_OLD, built: B_OLD, state: NodeUpdateState.OUTDATED, onlineUsers: 1, address: "fi1.example.com", lastUpdate: lastOk("v0.1.22", V_OLD, 9 * H) }),
@@ -309,7 +309,7 @@ const running = page({
     ],
   },
 });
-const panelOffer = page({
+export const panelOffer = page({
   panel: {
     version: "v0.1.24",
     built: B_NEW,

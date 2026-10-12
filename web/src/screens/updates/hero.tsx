@@ -4,6 +4,7 @@ import { StatusDot } from "@/components/ui/status";
 import type { StatusKind } from "@/components/ui/status";
 import { StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
+import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import {
@@ -151,6 +152,7 @@ export function HeroCard({
 }) {
   const t = useT();
   const fmt = useFmt();
+  const noUpdates = useEdition().off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
   const hero = heroOf(data);
   const l = look(t, fmt, data, hero);
   const active = hero.id === "running" || hero.id === "paused" ? hero.rollout : null;
@@ -208,7 +210,7 @@ export function HeroCard({
           )}
         </div>
         {active ? <RolloutBar rollout={active} /> : data.nodes.length > 0 && <FleetBar nodes={data.nodes} />}
-        {!owner && (hero.id === "available" || active) && <p className="text-xs text-muted">{t("up.ownerOnly")}</p>}
+        {!owner && !noUpdates && (hero.id === "available" || active) && <p className="text-xs text-muted">{t("up.ownerOnly")}</p>}
       </div>
       <BundleStrip data={data} owner={owner} actions={actions} />
     </section>

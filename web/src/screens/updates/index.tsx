@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { PageTitle } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
+import { useEdition } from "@/lib/edition";
 import {
   heroOf,
   isActive,
@@ -46,7 +48,9 @@ function subtitle(t: T, d?: Updates): string {
 export function UpdatesScreen() {
   const t = useT();
   const q = useUpdates();
-  const owner = useIsOwner();
+  // no update, schedule, roll back or bundle rescan there: the buttons go and the nodes stay listed
+  const isOwner = useIsOwner();
+  const owner = !useEdition().off("agent_updates") && isOwner;
   const actions = useUpdateActions();
   const [dialog, setDialog] = useState<Dialog>(null);
   const d = q.data;
@@ -88,6 +92,7 @@ export function UpdatesScreen() {
   return (
     <div className="flex flex-col gap-3.5">
       {header}
+      <EditionNotice feature="agent_updates" />
       <HeroCard
         data={d}
         owner={owner}
@@ -97,7 +102,7 @@ export function UpdatesScreen() {
       />
       {/* a rollout in progress sits right under the hero; the last finished one is history, after the nodes */}
       {activeRollout && <RolloutCard rollout={activeRollout} />}
-      <PanelBar data={d} owner={owner} actions={actions} />
+      <PanelBar data={d} owner={isOwner} actions={actions} />
       <NodeTable
         nodes={d.nodes}
         data={d}

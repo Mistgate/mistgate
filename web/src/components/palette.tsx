@@ -8,6 +8,7 @@ import { useT } from "@/i18n";
 import { en, type MessageKey } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { useNodeStatus } from "@/lib/node-status";
 import { nodesQuery, userSearchQuery } from "@/lib/queries";
@@ -95,6 +96,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
   const st = useNodeStatus();
   const navigate = useNavigate();
   const addNode = useAddNode();
+  const noToken = useEdition().off("mcp"); // no way to a new token there, so no shortcut to it
   const signOut = useSignOut();
   const listId = useId();
   const [query, setQuery] = useState("");
@@ -193,10 +195,10 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
       { title: "palette.nodes", items: [...nodeItems, ...tabItems] },
       { title: "palette.users", items: userItems },
       { title: "palette.places", items: placeItems },
-      { title: "palette.actions", items: actions.filter((a) => !q || `${a.label} ${a.words}`.toLowerCase().includes(q)) },
+      { title: "palette.actions", items: actions.filter((a) => !(noToken && a.id === "new-token") && (!q || `${a.label} ${a.words}`.toLowerCase().includes(q))) },
     ];
     return all.filter((g) => g.items.length > 0);
-  }, [q, asked, nodes.data, users.data, fmt, st, t, navigate, onOpenChange, addNode, signOut]);
+  }, [q, asked, nodes.data, users.data, fmt, st, t, navigate, onOpenChange, addNode, signOut, noToken]);
 
   const flat = groups.flatMap((g) => g.items);
   const current = Math.min(active, flat.length - 1);

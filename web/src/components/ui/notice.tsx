@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import type { StatusKind } from "./status";
 
-/** Inline notice: amber by default, red for errors. A blinking dot, a bold lead-in and the text. */
+/** Inline notice: amber by default, red for errors, grey and still for "nothing is wrong, this just is not here". A dot, a bold lead-in and the text. */
 export function Notice({
   title,
   children,
@@ -11,22 +11,23 @@ export function Notice({
 }: {
   title?: ReactNode;
   children?: ReactNode;
-  tone?: "warn" | "danger";
+  tone?: "warn" | "danger" | "quiet";
   className?: string;
 }) {
   const danger = tone === "danger";
+  const quiet = tone === "quiet";
   return (
     <div
       role={danger ? "alert" : "status"}
       className={cx(
         "screen-enter flex items-center gap-2.5 rounded-field border px-3 py-2.5",
-        danger ? "border-[color-mix(in_oklch,var(--danger)_45%,var(--border))] bg-danger-soft" : "border-warn-line bg-warn-soft",
+        danger ? "border-[color-mix(in_oklch,var(--danger)_45%,var(--border))] bg-danger-soft" : quiet ? "border-line bg-surface-2" : "border-warn-line bg-warn-soft",
         className,
       )}
     >
       <span
         aria-hidden
-        className={cx("size-2 flex-none animate-[mg-ui-blink_1s_infinite] rounded-full", danger ? "bg-danger" : "bg-warn")}
+        className={cx("size-2 flex-none rounded-full", quiet ? "bg-faint" : cx("animate-[mg-ui-blink_1s_infinite]", danger ? "bg-danger" : "bg-warn"))}
       />
       <div className="text-xs leading-snug text-fg">
         {title && <b>{title} </b>}

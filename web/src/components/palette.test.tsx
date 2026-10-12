@@ -15,7 +15,7 @@ let userSearch: (q: string) => Promise<{ users: { id: string; name: string; grou
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
 vi.mock("@/components/add-node", () => ({ useAddNode: () => addNode }));
 vi.mock("@/lib/node-status", () => ({ useNodeStatus: () => ({ word: () => "Healthy" }) }));
-vi.mock("@/lib/session", () => ({ useSignOut: () => signOut }));
+vi.mock("@/lib/session", () => ({ useSignOut: () => signOut, meQuery: { queryKey: ["me"], queryFn: async () => ({}), staleTime: Infinity } }));
 vi.mock("@/lib/queries", () => ({
   nodesQuery: { queryKey: ["nodes"], queryFn: async () => ({ nodes: [{ id: "n1", name: "de1", countryCode: "DE", location: "Frankfurt", provider: "", address: "" }] }) },
   userSearchQuery: (q: string) => ({ queryKey: ["users", q], queryFn: () => userSearch(q) }),
@@ -38,11 +38,12 @@ afterEach(() => {
 const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
 const text = () => document.body.textContent ?? "";
 const field = () => document.querySelector<HTMLInputElement>("input[role=combobox]")!;
-async function mount() {
+async function mount(me: object = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(["me"], me);
   await act(async () => root!.render(<QueryClientProvider client={qc}><Palette open onOpenChange={() => {}} /></QueryClientProvider>));
   await wait(0);
 }
@@ -121,5 +122,14 @@ describe("the palette", () => {
     await wait(250);
     await enter();
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer a new API token where the edition cannot create one", async () => {
+    await mount({ edition: "edge", unavailable: ["mcp"] });
+    await type("токен");
+    await wait(250);
+    const options = [...document.querySelectorAll("[role=option]")].map((o) => o.textContent ?? "");
+    expect(options.some((o) => o.includes(en["palette.newToken"]))).toBe(false);
+    expect(options.some((o) => o.includes(en["int.tok.title"]))).toBe(true); // the section itself is still found
   });
 });

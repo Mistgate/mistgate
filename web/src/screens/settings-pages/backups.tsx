@@ -1,6 +1,7 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { backups } from "@/lib/api";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain, type Plain } from "@/lib/plain";
@@ -97,13 +99,22 @@ function backupTime(unix: number) {
 export function BackupsPage() {
   const t = useT();
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
+  const unavailable = useEdition().off("backups");
   const settingsQuery = useQuery({
     queryKey: settingsKey,
     queryFn: async ({ signal }) => plain(await backups.getBackupSettings({}, { signal })).settings,
-    enabled: owner,
+    enabled: owner && !unavailable,
     refetchInterval: (q) => (q.state.data?.running ? 3000 : false), // a running backup reports through the settings
   });
   const stored = settingsQuery.data;
+  if (unavailable) {
+    return (
+      <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
+        <SectionLabel as="h2" icon="shield" tone="lavender">{t("set.backups.title")}</SectionLabel>
+        <EditionNotice feature="backups" />
+      </section>
+    );
+  }
   if (!owner) {
     return (
       <section className="rounded-card-lg border border-line bg-surface p-4">

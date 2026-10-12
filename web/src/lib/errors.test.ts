@@ -28,6 +28,14 @@ describe("the panel's refusal codes", () => {
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });
 
+  it("name the feature an edition cannot run, in the page's language", () => {
+    const refused = "unavailable_in_edition: feature=backups"; // internal/panel/edition.Refuse
+    expect(say(refused, Code.FailedPrecondition)).toBe("Not available in the Cloudflare edition yet: Backups.");
+    expect(say(refused, Code.FailedPrecondition, "ru")).toBe("Пока недоступно в Cloudflare-версии: Резервные копии.");
+    expect(say("unavailable_in_edition: feature=agent_logs", Code.FailedPrecondition, "ru")).toContain(ru["edition.feature.agent_logs"]);
+    expect(say("unavailable_in_edition: feature=brand_new", Code.FailedPrecondition)).toBe("Not available in the Cloudflare edition yet: brand_new."); // an id from a newer panel reads as sent
+  });
+
   it("localizes known API-token denial reasons and keeps role denial separate", () => {
     const cases = [
       ["this call is not available to API tokens", "err.apiTokenCallUnavailable"],

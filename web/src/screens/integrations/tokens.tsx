@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { EditionNotice } from "@/components/edition-notice";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
@@ -15,6 +16,7 @@ import { TextField } from "@/components/ui/text-field";
 import { TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import {
   defaultRate,
@@ -243,12 +245,13 @@ export function TokensCard() {
   const q = useQuery(tokensQuery);
   const { create, revoke } = useTokenActions();
   const [creating, setCreating] = useState(false);
+  const noCreate = useEdition().off("mcp"); // the edition refuses CreateApiToken: the list stays, the way to a new token goes
   // "?new=token" (the palette's "New API token") opens the form, then leaves the address
   const wantsNew = (useSearch({ strict: false }) as { new?: string }).new === "token";
   const [seenNew, setSeenNew] = useState(false);
   if (wantsNew !== seenNew) {
     setSeenNew(wantsNew);
-    if (wantsNew) setCreating(true);
+    if (wantsNew && !noCreate) setCreating(true);
   }
   const navigate = useNavigate();
   useEffect(() => {
@@ -270,7 +273,7 @@ export function TokensCard() {
         <SectionLabel as="h2" icon="key" tone="lavender" className="min-w-32 flex-1">
           {t("int.tok.title")}
         </SectionLabel>
-        {!creating && (
+        {!creating && !noCreate && (
           <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
             <Icon name="plus" size={12} />
             {t("int.tok.new")}
@@ -278,6 +281,7 @@ export function TokensCard() {
         )}
       </div>
       <p className="text-xs leading-normal text-pretty text-muted">{t("int.tok.lead")}</p>
+      <EditionNotice feature="mcp">{t("edition.hint.mcp")}</EditionNotice>
       {creating && <CreateForm busy={create.isPending} onCreate={onCreate} onCancel={() => setCreating(false)} />}
       {q.isPending && <Pending compact />}
       {q.isError && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
@@ -287,9 +291,11 @@ export function TokensCard() {
             title={t("int.tok.none")}
             className="py-7"
             action={
-              <Button variant="primary" size="md" onClick={() => setCreating(true)}>
-                {t("int.tok.create")}
-              </Button>
+              noCreate ? undefined : (
+                <Button variant="primary" size="md" onClick={() => setCreating(true)}>
+                  {t("int.tok.create")}
+                </Button>
+              )
             }
           >
             {t("int.tok.none.text")}

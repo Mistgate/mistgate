@@ -8,6 +8,7 @@ import { CheckStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { health } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { barsOf, checkError, useCan, type Bar, type CheckCell } from "@/lib/health";
@@ -122,6 +123,7 @@ export function useRunChecks(nodeId = "") {
   const toast = useToast();
   const qc = useQueryClient();
   const can = useCan();
+  const off = useEdition().off("health_checks"); // no checker runs there: a round asked for would never happen
   const m = useMutation({
     mutationFn: async () => plain(await health.runChecksNow({ nodeId })),
     onSuccess: (r) => {
@@ -131,5 +133,5 @@ export function useRunChecks(nodeId = "") {
     },
     onError: (e) => toast.error(ConnectError.from(e).code === Code.ResourceExhausted ? t("hl.checks.tooSoon") : errorText(e, t)),
   });
-  return { run: () => m.mutate(), running: m.isPending, can: can.run };
+  return { run: () => m.mutate(), running: m.isPending, can: can.run && !off };
 }

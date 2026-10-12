@@ -1,5 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { T } from "@/i18n";
+import { editionFeatures, type EditionFeature } from "@/i18n/edition";
 import { lossyVars } from "./port-check";
 
 /**
@@ -29,6 +30,8 @@ export const errorCodes = [
   // the UDP delivery check (design/udp-port-check.md): a port that loses packets; a twin with no clean port on all nodes
   "port_lossy",
   "no_clean_port",
+  // an RPC that would start work the Cloudflare edition does not run yet (internal/panel/edition), "feature=<id>"
+  "unavailable_in_edition",
 ] as const;
 
 /**
@@ -47,12 +50,18 @@ export function errorVars(message: string): Record<string, string> {
   return { ...Object.fromEntries(new URLSearchParams(detail)), detail };
 }
 
+/** The feature id of "unavailable_in_edition: feature=backups" as the admin names it; an id this page does not know reads as sent. */
+function editionVars(t: T, vars: Record<string, string>): Record<string, string> {
+  const id = vars.feature ?? "";
+  return { ...vars, feature: (editionFeatures as readonly string[]).includes(id) ? t(`edition.feature.${id as EditionFeature}`) : id };
+}
+
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
   if (!errorCodes.includes(code)) return undefined;
   const vars = errorVars(c.rawMessage);
-  return t(`err.${code}`, code === "port_lossy" ? lossyVars(t, vars) : vars);
+  return t(`err.${code}`, code === "port_lossy" ? lossyVars(t, vars) : code === "unavailable_in_edition" ? editionVars(t, vars) : vars);
 }
 
 /** PermissionDenied messages from bearer policy have distinct causes; keep the actual role denial distinct too. */

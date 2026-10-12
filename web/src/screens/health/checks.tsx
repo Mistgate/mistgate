@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
@@ -80,6 +81,7 @@ export function ChecksTab({ data }: { data: Checks }) {
             </Button>
           )}
         </div>
+        <EditionNotice feature="health_checks" />
         {/* the padding gives the selection ring and the hover scale room inside the scrolling box */}
         <div className="no-scrollbar -m-1 overflow-x-auto p-1 max-md:hidden">
           <div className="grid gap-1.5" style={{ gridTemplateColumns: `90px repeat(${cols.length}, minmax(90px, 1fr))`, minWidth: min }}>

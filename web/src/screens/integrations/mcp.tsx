@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { EditionNotice } from "@/components/edition-notice";
 import { FilterChips } from "@/components/ui/chips";
 import { SectionLabel } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
+import { useEdition } from "@/lib/edition";
 import { adminUrl, clients, mcpUrl, snippet, type Client } from "@/lib/integrations";
 import { card, CodeBlock } from "./parts";
 
@@ -30,15 +32,28 @@ export function McpCard() {
   const [client, setClient] = useState<Client>("code");
   const mcp = mcpUrl();
   const text = snippet(client, mcp, adminUrl());
+  const unavailable = useEdition().off("mcp");
+
+  const head = (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+      <SectionLabel as="h2" icon="plug" tone="sky">
+        {t("int.mcp.title")}
+      </SectionLabel>
+      <span className="text-xs text-muted">{t("int.mcp.sub")}</span>
+    </div>
+  );
+  // the endpoint is not served there, so no snippet to paste: the notice stands in for the whole card
+  if (unavailable)
+    return (
+      <section className={card}>
+        {head}
+        <EditionNotice feature="mcp" />
+      </section>
+    );
 
   return (
     <section className={card}>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-        <SectionLabel as="h2" icon="plug" tone="sky">
-          {t("int.mcp.title")}
-        </SectionLabel>
-        <span className="text-xs text-muted">{t("int.mcp.sub")}</span>
-      </div>
+      {head}
       <p className="text-xs leading-normal text-pretty text-muted">{t("int.mcp.lead")}</p>
       <div className="flex flex-col gap-1.5">
         <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("int.mcp.url")}</span>

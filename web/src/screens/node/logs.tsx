@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
 import { TextField } from "@/components/ui/text-field";
@@ -9,6 +10,7 @@ import { useT } from "@/i18n";
 import type { Plain } from "@/lib/plain";
 import { nodes as nodesApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
 
@@ -40,6 +42,7 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
   const fmt = useFmt();
   const toast = useToast();
   const node = data.node!;
+  const off = useEdition().off("agent_logs"); // the edition does not relay the agent's log: no stream to open
   const online = agentLinked(node.status); // "no traffic" still has the agent on the line, and its logs are what tells why
   const [lines, setLines] = useState<Line[]>([]);
   const [link, setLink] = useState<Link>("connecting");
@@ -50,7 +53,7 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
   const stick = useRef(true);
 
   useEffect(() => {
-    if (!online) return;
+    if (!online || off) return;
     const ac = new AbortController();
     void (async () => {
       while (!ac.signal.aborted) {
@@ -78,7 +81,7 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
       }
     })();
     return () => ac.abort();
-  }, [node.id, online]);
+  }, [node.id, online, off]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -90,6 +93,8 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
     const el = box.current;
     if (el && shown.length > 0 && stick.current && !frozen) el.scrollTop = el.scrollHeight;
   }, [shown, frozen]);
+
+  if (off) return <EditionNotice feature="agent_logs" />;
 
   function download() {
     const text = lines

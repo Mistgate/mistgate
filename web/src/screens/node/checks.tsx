@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
+import { EditionNotice } from "@/components/edition-notice";
 import { SectionLabel } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { StatusDot } from "@/components/ui/status";
@@ -90,6 +91,7 @@ export function NodeChecks({ nodeId }: { nodeId: string }) {
           {newest > 0 ? t("hl.pills.when", { ago: fmt.ago(newest) }) : q.data ? t("hl.pills.interval", { min: Math.max(1, Math.round(q.data.intervalS / 60)) }) : ""}
         </span>
       </div>
+      <EditionNotice feature="health_checks" />
       {q.isPending && <Pending compact />}
       {q.isError && !q.data && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
       {q.data && deployed.length === 0 && <p className="rounded-field border border-dashed border-line p-3.5 text-[13px] text-muted">{t("hl.checks.noneOnNode")}</p>}

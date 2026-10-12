@@ -11,6 +11,7 @@ import { ru as warpRu } from "./warp";
 import { ru as integrationsRu } from "./integrations";
 import { ru as telegramRu } from "./telegram";
 import { ru as portsRu } from "./ports";
+import { ru as editionRu } from "./edition";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
@@ -212,4 +213,4 @@ const core: CoreMessages = {
   "field.reality.short_ids.duplicate": "Каждое значение — только один раз",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu };

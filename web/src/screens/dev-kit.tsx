@@ -49,6 +49,7 @@ import type { ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
 import { FleetKit } from "./dev-kit-fleet";
 import { SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
+import { EdgeKit } from "./dev-kit-edge";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
 
@@ -502,6 +503,7 @@ export default function DevKit() {
       <FleetKit />
       <SettingsDemos />
       <PolishKit />
+      <EdgeKit />
 
       <LinkModal
         target={
