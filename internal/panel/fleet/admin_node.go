@@ -363,6 +363,13 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node UDP port check senders", err)
 	}
+	tcpChecks, err := f.st.TCPChecks(ctx, n.ID)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node TCP port checks", err)
+	}
+	if resp.TcpChecks, err = f.tcpCheckMessages(ctx, tcpChecks); err != nil {
+		return nil, internalErr(f.log.Error, "node TCP port check senders", err)
+	}
 	live, err := f.liveRowsForNode(ctx, n.ID, true)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node live", err)
@@ -424,12 +431,16 @@ func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv
 		}
 		requested = append(requested, uint16(port))
 	}
-	checks, sender, errorCode := f.CheckPorts(ctx, n.ID, requested)
-	rows, senderName, err := f.portCheckMessages(ctx, checks, sender, errorCode)
+	out := f.checkPorts(ctx, n.ID, requested, "", true)
+	rows, senderName, err := f.portCheckMessages(ctx, out.checks, out.sender, out.errorCode)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "check node UDP port senders", err)
 	}
-	return connect.NewResponse(&adminv1.CheckPortsResponse{Ports: rows, Sender: senderName, ErrorCode: errorCode}), nil
+	tcp, err := f.tcpCheckMessages(ctx, out.tcp)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "check node TCP port senders", err)
+	}
+	return connect.NewResponse(&adminv1.CheckPortsResponse{Ports: rows, Sender: senderName, ErrorCode: out.errorCode, Tcp: tcp}), nil
 }
 
 func (f *Fleet) onlineUsers(ctx context.Context, view liveJSONView) ([]*adminv1.OnlineUser, error) {

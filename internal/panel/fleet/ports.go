@@ -40,6 +40,10 @@ type portCheckOutcome struct {
 	checks    []store.PortCheck
 	sender    string
 	errorCode string
+	// tcp are the rows of the TCP half (ports_tcp.go); tcpRan says the run included that half (it may have had nothing
+	// to probe), so a caller that waited for it can take the rows over.
+	tcp    []store.TCPCheck
+	tcpRan bool
 }
 
 // portCheckLock is one node's check gate. A caller that waited finds generation moved on and returns the run it waited
@@ -66,28 +70,32 @@ type udpPortSettings struct {
 }
 
 // CheckPorts runs one bounded UDP delivery check and returns the sending node id (or "panel") and a stable result code.
+// It leaves the TCP half out: callers that save a port wait for this and need only the UDP verdict.
 func (f *Fleet) CheckPorts(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
-	return f.checkPorts(ctx, nodeID, requested, "")
+	out := f.checkPorts(ctx, nodeID, requested, "", false)
+	return out.checks, out.sender, out.errorCode
 }
 
-// CheckPortsAsSystem runs the same check for a panel-owned schedule and audits it as the system actor.
+// CheckPortsAsSystem runs the same check for a panel-owned schedule and audits it as the system actor. It probes the TCP
+// ports too (design/vless.md section 7.4).
 func (f *Fleet) CheckPortsAsSystem(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
-	return f.checkPorts(ctx, nodeID, requested, "system")
+	out := f.checkPorts(ctx, nodeID, requested, "system", true)
+	return out.checks, out.sender, out.errorCode
 }
 
-func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint16, auditActor string) ([]store.PortCheck, string, string) {
+func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint16, auditActor string, withTCP bool) portCheckOutcome {
 	node, err := f.st.Node(ctx, nodeID)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) {
 			f.log.Warn("get node for UDP port check", "node", nodeID, "err", err)
 		}
-		return nil, "", "failed"
+		return portCheckOutcome{errorCode: "failed"}
 	}
 	lock, generation, waited, err := f.acquirePortCheck(ctx, nodeID)
 	if err != nil {
 		out := portCheckOutcome{errorCode: "failed"}
 		f.auditPortCheck(ctx, node, requested, out, auditActor)
-		return nil, "", out.errorCode
+		return out
 	}
 	defer func() { <-lock.gate }()
 
@@ -95,10 +103,11 @@ func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint1
 		f.portCheckMu.Lock()
 		previous, completed := lock.last, lock.generation != generation
 		f.portCheckMu.Unlock()
-		if completed {
+		// a run without the TCP half does not answer a caller that wants it
+		if completed && (!withTCP || previous.tcpRan) {
 			out := f.completedPortCheck(ctx, nodeID, previous)
 			f.auditPortCheck(ctx, node, requested, out, auditActor)
-			return out.checks, out.sender, out.errorCode
+			return out
 		}
 	}
 
@@ -107,12 +116,12 @@ func (f *Fleet) checkPorts(ctx context.Context, nodeID string, requested []uint1
 		out := portCheckOutcome{errorCode: "failed"}
 		f.finishPortCheck(lock, out)
 		f.auditPortCheck(ctx, node, requested, out, auditActor)
-		return nil, "", out.errorCode
+		return out
 	}
-	out := f.runPortCheck(ctx, node, requested)
+	out := f.runPortCheck(ctx, node, requested, withTCP)
 	f.finishPortCheck(lock, out)
 	f.auditPortCheck(ctx, node, requested, out, auditActor)
-	return out.checks, out.sender, out.errorCode
+	return out
 }
 
 func (f *Fleet) acquirePortCheck(ctx context.Context, nodeID string) (*portCheckLock, uint64, bool, error) {
@@ -158,6 +167,7 @@ func (f *Fleet) finishPortCheck(lock *portCheckLock, outcome portCheckOutcome) {
 
 func clonePortCheckOutcome(outcome portCheckOutcome) portCheckOutcome {
 	outcome.checks = append([]store.PortCheck(nil), outcome.checks...)
+	outcome.tcp = append([]store.TCPCheck(nil), outcome.tcp...)
 	return outcome
 }
 
@@ -201,6 +211,13 @@ func (f *Fleet) auditPortCheck(ctx context.Context, node store.NodeRow, requeste
 		"node_id": node.ID, "node": node.Name, "ports": strings.Join(values, ","),
 		"sender": outcome.sender, "error_code": outcome.errorCode,
 	}
+	if len(outcome.tcp) > 0 {
+		tcpPorts := make([]string, len(outcome.tcp))
+		for i, check := range outcome.tcp {
+			tcpPorts[i] = strconv.Itoa(int(check.Port))
+		}
+		params["tcp_ports"] = strings.Join(tcpPorts, ",")
+	}
 	if actorOverride == "" {
 		f.audit(ctx, "node.ports_check", params)
 		return
@@ -211,8 +228,15 @@ func (f *Fleet) auditPortCheck(ctx context.Context, node store.NodeRow, requeste
 	}
 }
 
-func (f *Fleet) runPortCheck(ctx context.Context, target store.NodeRow, requested []uint16) portCheckOutcome {
-	return f.runPortCheckForEdition(ctx, target, requested, panelSendsUDP)
+// runPortCheck is the UDP part and then, with withTCP, the TCP part of one check. The TCP part has its own senders and
+// its own errors; only an offline node stops it, because the target's agent has to arm port 80.
+func (f *Fleet) runPortCheck(ctx context.Context, target store.NodeRow, requested []uint16, withTCP bool) portCheckOutcome {
+	out := f.runPortCheckForEdition(ctx, target, requested, panelSendsUDP)
+	if withTCP && out.errorCode != "node_offline" {
+		out.tcp, _ = f.runTCPCheck(ctx, target, panelSendsUDP)
+		out.tcpRan = true
+	}
+	return out
 }
 
 func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow, requested []uint16, allowPanel bool) portCheckOutcome {
@@ -238,7 +262,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		f.log.Warn("list nodes for UDP port check", "node", target.ID, "err", err)
 		return portCheckOutcome{errorCode: "failed"}
 	}
-	candidates := f.portSenders(target, allNodes, live)
+	candidates := f.portSenders(target, allNodes, live, capUDPCheck)
 	if len(candidates) == 0 && !allowPanel {
 		return portCheckOutcome{errorCode: "no_sender"}
 	}
@@ -307,13 +331,13 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	return result
 }
 
-func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow) []portSender {
+func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow, capability string) []portSender {
 	var eligible []store.NodeRow
 	for _, node := range nodes {
 		if node.ID == target.ID {
 			continue
 		}
-		if current := live[node.ID]; !current.Connected || !slices.Contains(current.AgentCaps, capUDPCheck) {
+		if current := live[node.ID]; !current.Connected || !slices.Contains(current.AgentCaps, capability) {
 			continue
 		}
 		if f.cfg.Remote == nil && f.session(node.ID) == nil {

@@ -1879,6 +1879,8 @@ func TestSessionCoreRequestKindsComeFromAllowlistedFrames(t *testing.T) {
 		{"awg", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_PrepareAwgKernel{PrepareAwgKernel: &agentv1.PrepareAwgKernel{RequestId: "awg"}}}},
 		{"udp-count", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpCount{UdpCount: &agentv1.UdpCount{RequestId: "udp-count"}}}},
 		{"udp-send", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpSend{UdpSend: &agentv1.UdpSend{RequestId: "udp-send"}}}},
+		{"http-mark", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_HttpMark{HttpMark: &agentv1.HttpMark{RequestId: "http-mark"}}}},
+		{"tcp-probe", EventAdminCommand, PendingCommand, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_TcpProbe{TcpProbe: &agentv1.TcpProbe{RequestId: "tcp-probe"}}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {

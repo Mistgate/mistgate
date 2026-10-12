@@ -781,6 +781,8 @@ func requestCapability(frame *agentv1.ConnectResponse) (capability, message stri
 		return capAwgPrepare, "agent too old"
 	case frame.GetUdpCount() != nil, frame.GetUdpSend() != nil:
 		return capUDPCheck, "agent too old"
+	case frame.GetHttpMark() != nil, frame.GetTcpProbe() != nil:
+		return capTCPCheck, "agent too old"
 	default:
 		return "", ""
 	}

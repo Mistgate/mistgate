@@ -346,7 +346,9 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetMeasureBandwidth() != nil,
 		frame.GetPrepareAwgKernel() != nil,
 		frame.GetUdpCount() != nil,
-		frame.GetUdpSend() != nil:
+		frame.GetUdpSend() != nil,
+		frame.GetHttpMark() != nil,
+		frame.GetTcpProbe() != nil:
 		return PendingCommand
 	case frame.GetRetire() != nil:
 		return PendingRetire

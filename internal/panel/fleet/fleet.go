@@ -26,6 +26,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/statehash"
+	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
 
 // APIVersion is the agent wire API version this panel serves (Hello.api_version, EnrollRequest.api_version).
@@ -132,6 +133,7 @@ type Fleet struct {
 	portCheckMu    sync.Mutex
 	portCheckLocks map[string]*portCheckLock
 	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	probeTCP       func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
 	settleUDP      func(context.Context) error
 }
 
