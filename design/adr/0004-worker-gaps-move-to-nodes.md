@@ -1,6 +1,6 @@
 # 0004. What a Worker cannot do moves to the nodes, in both editions
 
-Status: accepted, 2026-10-06.
+Status: accepted, 2026-10-06; the SSH bullet is detailed by [0008](0008-ssh-installs-in-a-second-worker.md).
 
 ## Context
 
@@ -18,7 +18,7 @@ real client), control over the TLS ClientHello (WARP registration imitates the A
   state and the encrypted account.
 - **SSH installation of a node** stays in the panel: on the edge it uses an adapter over `cloudflare:sockets connect()`
   (outbound TCP works; Cloudflare's own IPs are refused, so a server behind Cloudflare is installed with the one-line
-  command instead).
+  command instead). It runs in a second Worker script with one Durable Object (0008).
 - The panel's own self-update, ACME and listeners are VPS-only by nature and have edge equivalents (upload through the
   Cloudflare API, Cloudflare's certificates, the Worker's fetch handler); they are not features a user loses.
 

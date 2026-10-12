@@ -11,5 +11,7 @@ new record that supersedes the old one, not by editing history.
 | [0004](0004-worker-gaps-move-to-nodes.md) | What a Worker cannot do moves to the nodes, in both editions | Accepted |
 | [0005](0005-one-password-profile.md) | One password hashing profile for both editions | Accepted |
 | [0006](0006-parity-by-tests.md) | Parity between the editions is enforced by tests | Accepted |
+| [0007](0007-event-driven-agent-session.md) | The agent session is an event-driven core; on the edge a hibernating Durable Object drives it | Accepted |
+| [0008](0008-ssh-installs-in-a-second-worker.md) | SSH installs on the edge run in a second Worker script, in one Durable Object | Accepted |
 
 The plan they serve: [`../cloudflare-edition/README.md`](../cloudflare-edition/README.md).

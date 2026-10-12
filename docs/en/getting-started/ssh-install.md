@@ -79,11 +79,23 @@ After a successful installation the panel keeps the SSH login and password, encr
 - **A password the panel generated.** Only the panel knows it, and the card says so. Reveal it and keep a copy before you retire the node.
 - **A retired node.** Its SSH access card stays: the panel no longer changes that server, but you can still reveal the password. **Forget saved access**, asked twice and with a fresh sign-in confirmation, deletes it for good. Only a retired node's access can be forgotten.
 
+## On the Cloudflare edition
+
+The edge edition (the panel on Cloudflare Workers) installs nodes over SSH too. The wizard, the steps, the install manager and the saved access are the same; the installs run in a second Worker script, `mistgate-edge-provision`, that is deployed with the panel (see `edge/worker/README.md`). What differs:
+
+- **The panel connects from Cloudflare's network**, not from a server you know and not from your computer. For the time of the install SSH on the new server must accept inbound TCP from the internet on its port, in the provider firewall or security group and in the host firewall. A rule that allows only your own IP, or one fixed panel address, makes the check time out: Cloudflare does not publish the addresses a Worker connects from. You change or reveal the saved password later over SSH too, so open it again for that.
+- **The agent comes from the signed release on GitHub** that matches the panel's version, and the node enrols over the panel's public address. A panel build that is not a release has no trusted agent and the wizard says so.
+- **"Refused or unreachable"** (the wizard says "The panel's network refused this address, or the server cannot be reached from it") means that Cloudflare's network did not connect the panel to that address. From a Worker a refusal by the platform and a closed port look the same, so the panel cannot say which it was. Look for: an address that belongs to Cloudflare, or a name that Cloudflare proxies (an orange cloud in the DNS list), where you need the server's own address or a DNS-only name; a private network or a server reachable only through a VPN or a bastion; a wrong port or no SSH service on it.
+
+When the panel cannot reach the server this way, or the server takes SSH keys only, install the node with the manual command: the wizard offers **Use the manual command** next to this error, and [Add a node](add-node.md) describes it. An install that Cloudflare interrupts three times in a row stops as failed; retry it or use the manual command.
+
 ## When it fails
 
 | The wizard says | What to do |
 |:--|:--|
 | The panel could not reach this SSH address and port in time | Check that SSH runs on that port, and allow inbound TCP from the panel server's egress address in the provider firewall. If the host firewall blocks SSH, open it through the provider's console. |
+| The panel's network refused this address, or the server cannot be reached from it | Edge edition only: see "On the Cloudflare edition" above. Use the server's own public address, or the [manual install](add-node.md). |
+| The panel got no answer from this SSH address and port in time, and the text names Cloudflare's network | Edge edition: allow inbound TCP on the SSH port from the internet for the install, not only from your own IP; or use the [manual install](add-node.md). |
 | The panel could not read an SSH key from this address | Check the host, the port and the SSH service. |
 | Enter a public server address that can be reached over SSH | The address is private, loopback or link-local, or does not resolve. Use the server's public address. |
 | The server rejected this SSH login or password | Check both; the panel supports password login only. |

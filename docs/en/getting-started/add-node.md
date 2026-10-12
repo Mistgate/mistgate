@@ -8,7 +8,7 @@ A node joins the fleet when its agent gets a certificate from the panel, install
 | Way | What you do | When to pick it |
 |:--|:--|:--|
 | **Install automatically over SSH** | Enter the server's address, confirm its SSH host key, type the password; the panel does the rest. | The usual way. Described in [Install a node over SSH](ssh-install.md). |
-| **Get a manual install command** | Copy the agent to the server and run a one-time command as root. | The panel cannot reach the server over SSH, the server allows only key login, or you want to run the commands yourself. Described on this page. |
+| **Get a manual install command** | Copy the agent to the server and run a one-time command as root. | The panel cannot reach the server over SSH (on the Cloudflare edition: the address is Cloudflare's or proxied by it, the network is private, or SSH is open only to your own IP), the server allows only key login, or you want to run the commands yourself. Described on this page. |
 
 An AI agent can also start an SSH installation through MCP; you approve it and type the password on the approval screen: see the [AI agent guide](ai-agents.md). This page also explains how to remove a node. If the dialog opens directly on the name, country and address fields, the panel predates the SSH installation: update it first (see [panel updates](../operations/updates.md)).
 

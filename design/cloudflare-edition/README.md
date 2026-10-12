@@ -1,6 +1,6 @@
 # Mistgate edition on Cloudflare: specification
 
-Status: ACCEPTED as the plan (2026-10-06); phase 1 in progress. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
+Status: ACCEPTED as the plan (2026-10-06); phase 1 in progress; the phase 3 item "SSH provisioning" is built (2026-10-12, [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)), pending a real Cloudflare deploy. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
 Decisions with their reasons: [`../adr/`](../adr/). The agent link and session core (step 6b-3), with its status and the
 next steps: [`AGENT-LINK.md`](AGENT-LINK.md). A FULL Cloudflare edition kept in parity with the VPS edition: same
 features, same release, ONE version number. This document says how to get there; it is not an implementation.
@@ -119,7 +119,7 @@ the build above 50 MB so growth is noticed early. Levers, in the order of cost-b
 and drop the embed (-2.4 MB); (2) `//go:build !js` on the AWS SDK (backup uses the R2 binding on the edge) and on `health`
 dialers, `hysteria/core`, `quic-go`, `awg` tunnel code once probes live on nodes (the biggest single cut; measure
 before relying on it); (3) `wasm-opt -Oz` (not installed here, typically 10-15 %); (4) split rarely used areas
-(provision, MCP, backup) into separate Workers behind service bindings. The pure core (render, issue, validate) is 7.3 MB / 2.1 MB
+(MCP, backup) into separate Workers behind service bindings (provision already is one, for the I/O context and not for size: ADR 0008). The pure core (render, issue, validate) is 7.3 MB / 2.1 MB
 gzip and is the fallback if the full panel ever stops fitting.
 
 Memory is the other budget: 128 MB per isolate including WASM memory; a warm full-panel instance must stay well below it
@@ -213,7 +213,7 @@ choice" above).
 |---|---|---|
 | Tunnel health probes (hysteria2 / AWG client dialers, UDP) | the panel dials its own inbounds from the panel host | the agent embeds the dialers from `internal/panel/health` (`Dialers` is already injectable). Each node probes ITSELF and OTHER nodes (cross-node: path quality between datacentres); the panel schedules and stores results (same `health_*` tables). Workers cannot open UDP, and TURN is unreachable (measured). Cloudflare Containers stay optional and out of the core |
 | WARP registration | panel registers | the node does it (`internal/node/warp/cfapi` already exists), reports the account/key hash; the panel keeps desired-state ownership |
-| SSH provisioning | panel `x/crypto/ssh` over `net.Dialer` | VPS: unchanged. Edge: `provision`'s `contextDialer` gets an adapter over `cloudflare:sockets connect()`; works for non-Cloudflare IPs (github.com:22 banner measured), refused for Cloudflare IPs; a node behind Cloudflare is provisioned manually (install command) |
+| SSH provisioning | panel `x/crypto/ssh` over `net.Dialer` | VPS: unchanged. Edge (built): `provision`'s dialer is a socket from `cloudflare:sockets connect()`, held by a `Provisioner` Durable Object in a second Worker script (a socket belongs to its I/O context and Go resumes on any event of its isolate: [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)); job state stays in D1, the agent binary is streamed from the signed GitHub release into the SSH upload, the node enrols over the link. Refused for Cloudflare IPs and private networks (`ssh_target_refused`, "refused or unreachable"); those nodes are installed with the manual command |
 | Doctor, speedtest, bandwidth, update guard | already on nodes | unchanged |
 
 ## 6. Update and release parity
@@ -307,8 +307,8 @@ test suite passing on each.
 nodes; doctor; update bundles in R2, rollouts on Cron/alarms; backups to R2; Telegram alerts via Cron/Queues; MCP
 (stateless or DO sessions).
 
-**Phase 3: parity and migration.** SSH provisioning via `connect()`; panel self-update through the
-Cloudflare API; `SetPanelAddress`; backup archive v2; the VPS<->edge round-trip test in CI; install docs, the
+**Phase 3: parity and migration.** SSH provisioning via `connect()` (built: second script `mistgate-edge-provision`, wizard and install page on the edge; to verify in the first real deploy: `connect()` to a bare IP and to port 22, the platform's refusal text, CPU and time of an install, a redeploy in the middle of a job); panel self-update through the
+Cloudflare API (it uploads both scripts, the Provisioner first; the installer sets `MASTER_KEY` in both); `SetPanelAddress`; backup archive v2; the VPS<->edge round-trip test in CI; install docs, the
 domain/zone warning.
 
 **Phase 4: hardening.** Load test with a realistic fleet; cost guards; observability; WebSocket behaviour across Cloudflare
