@@ -75,7 +75,25 @@ type runtimeFixture struct {
 	engine     *eng
 	target     *httptest.Server
 	targetAddr string
-	logs       *bytes.Buffer
+	logs       *lockedLogBuffer
+}
+
+// lockedLogBuffer can be read while the inbound's background goroutines (the REALITY target probe) still log to it.
+type lockedLogBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (b *lockedLogBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *lockedLogBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.String()
 }
 
 func newRuntimeFixture(t *testing.T, useRealEgress bool) *runtimeFixture {
@@ -97,7 +115,7 @@ func newRuntimeFixture(t *testing.T, useRealEgress bool) *runtimeFixture {
 		xtlsreality.GlobalPostHandshakeRecordsLens.Store(address+" localhost "+strconv.Itoa(alpn), []int{})
 	}
 
-	logs := &bytes.Buffer{}
+	logs := &lockedLogBuffer{}
 	logger := slog.New(slog.NewTextHandler(logs, nil))
 	env := engine.Env{Log: logger}
 	if useRealEgress {
