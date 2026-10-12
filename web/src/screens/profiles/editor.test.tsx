@@ -29,7 +29,7 @@ const awgSchema = JSON.stringify({
     subnet6: { type: "string", title: "Client network (IPv6)", "x-group": "basics", "x-order": 60 },
   },
 });
-const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
+const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target_kind: "self", target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
 const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
 vi.mock("@/lib/api", async (orig) => ({
@@ -228,10 +228,30 @@ describe("a new VLESS profile", () => {
     expect(field("Path")).not.toBeNull();
   });
 
-  it("says under port 443 what happens next to Hysteria2, with the guide, and nothing on another port", async () => {
+  it("shows the node's own site as the target at first, without the fields of another site, and brings them with the other segment", async () => {
     await mount();
     await click(radio("VLESS"));
     await settle();
+    expect(radio("This node’s site")?.getAttribute("aria-checked")).toBe("true");
+    expect(radio("Another site")?.getAttribute("aria-checked")).toBe("false");
+    expect(field("Target host:port")).toBeNull();
+    expect(text()).not.toContain("Server names");
+    expect(text()).toContain("Short IDs"); // the rest of the group stays
+    await click(radio("Another site"));
+    expect(field("Target host:port")).not.toBeNull();
+    expect(text()).toContain("Server names");
+    await click(radio("This node’s site"));
+    expect(field("Target host:port")).toBeNull();
+  });
+
+  it("says under port 443 what happens next to Hysteria2 for the node's own site, with the guide, and what it takes for another site", async () => {
+    await mount();
+    await click(radio("VLESS"));
+    await settle();
+    const own = "On a node with Hysteria2 this profile takes TCP 443 from its site and shows the same site through REALITY. Nodes need a domain.";
+    expect(text()).toContain(own);
+    await click(radio("Another site"));
+    expect(text()).not.toContain(own);
     const hint = "On a node with Hysteria2 this profile takes TCP 443: the Hysteria2 site there is off while it does";
     expect(text()).toContain(hint);
     expect(document.querySelector('a[href="https://mistgate.app/guide/vless-and-hysteria2/"]')?.textContent).toBe("VLESS and Hysteria2 on one node");

@@ -50,6 +50,14 @@ describe("reading a node's refusal", () => {
     expect(old.text).toContain("203.0.113.10");
   });
 
+  it("knows that the node's own site behind REALITY needs a domain, and says its other way out", () => {
+    const refused = refusalOf(err("reality_needs_domain: address=198.51.100.7&node=fi1"), t, fi1);
+    expect(refused.kind).toBe("domain");
+    expect(refused.text).toBe(
+      "This node’s site needs a Let’s Encrypt certificate, which is issued for domains only, and the address of fi1 is the IP 198.51.100.7. Enter a domain whose A record points to this IP, or use a profile whose REALITY target is another site.",
+    );
+  });
+
   it("treats a profile already on the node as done, and reads anything else as the panel says it", () => {
     expect(refusalOf(err("this profile is already deployed on the node", Code.AlreadyExists), t, fi1).kind).toBe("already");
     expect(refusalOf(err("already_on_node", Code.AlreadyExists), t, fi1).kind).toBe("already");

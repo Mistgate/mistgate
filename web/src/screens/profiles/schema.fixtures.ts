@@ -87,15 +87,22 @@ export const vless = String.raw`{
     "reality": {
       "type": "object", "title": "REALITY", "x-group": "basics", "x-order": 30,
       "properties": {
+        "target_kind": {
+          "type": "string", "enum": ["self", "site"], "default": "self",
+          "x-enum-labels": {"self": "This node's site", "site": "Another site"},
+          "title": "Site shown to everyone else",
+          "description": "What anyone who is not a client sees on this port. This node's site is the node's own site with its own Let's Encrypt certificate (the node needs a domain). Another site is a real site you name, and the node passes visitors on to it.",
+          "x-widget": "segmented", "x-order": 5, "x-critical": true
+        },
         "target": {
           "type": "string", "minLength": 3, "title": "Target host:port",
-          "description": "A real site the node shows to anyone who is not a client, for example www.example.org:443. It must serve TLS 1.3 with X25519MLKEM768; a site in the same network (ASN) as the node is best.",
+          "description": "Another site's address, for example www.example.org:443. It must serve TLS 1.3 with X25519MLKEM768; a site in the same network (ASN) as the node is best.",
           "x-order": 10, "x-critical": true
         },
         "server_names": {
           "type": "array", "maxItems": 8, "uniqueItems": true,
           "items": {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"},
-          "title": "Server names", "description": "Names the target's certificate is valid for, up to 8. Empty = the host of the target. Needed when the target is an IP address.",
+          "title": "Server names", "description": "Names the other site's certificate is valid for, up to 8. Empty = the host of the target. Needed when the target is an IP address.",
           "x-group": "obfuscation", "x-widget": "string-list", "x-order": 20, "x-critical": true
         },
         "short_ids": {

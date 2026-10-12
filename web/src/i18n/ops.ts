@@ -41,6 +41,7 @@ export const en = {
   "err.notFound": "Not found. It may have been removed: reload the page.",
   // a profile on a node (CreateInbound / UpdateInbound refusals, src/lib/errors.ts)
   "err.acme_needs_domain": "Let’s Encrypt issues certificates for domains only, and the address of {node} is the IP {address}. Enter a domain whose A record points to this IP, or use a self-signed certificate.",
+  "err.reality_needs_domain": "This node’s site needs a Let’s Encrypt certificate, which is issued for domains only, and the address of {node} is the IP {address}. Enter a domain whose A record points to this IP, or use a profile whose REALITY target is another site.",
   "err.port_taken": "Port {port} on {node} is already taken by the profile “{profile}”.",
   "err.hop_taken": "The hop range {from}–{to} of this profile overlaps the profile “{profile}” on {node}. Change the range in the profile.",
   "err.port_in_hop": "The port must be outside the profile’s hop range ({from}–{to}).",
@@ -1049,6 +1050,7 @@ export const ru: typeof en = {
   "err.apiOwnerApprovalRequired": "Для этого нужно подтверждение владельца; через API это действие недоступно.",
   "err.notFound": "Не найдено. Возможно, это уже удалили: обнови страницу.",
   "err.acme_needs_domain": "Let's Encrypt выдаёт сертификат только на домен, а у {node} адрес — IP {address}. Впиши домен, у которого A-запись указывает на этот IP, или возьми самоподписанный сертификат.",
+  "err.reality_needs_domain": "Сайту этой ноды нужен сертификат Let's Encrypt, а его выдают только на домен; у {node} же адрес — IP {address}. Впиши домен, у которого A-запись указывает на этот IP, или возьми профиль, где цель REALITY — другой сайт.",
   "err.port_taken": "Порт {port} на {node} уже занят профилем «{profile}».",
   "err.hop_taken": "Диапазон прыжков {from}–{to} этого профиля пересекается с профилем «{profile}» на {node}. Поменяй диапазон в профиле.",
   "err.port_in_hop": "Порт должен быть вне диапазона прыжков профиля ({from}–{to}).",

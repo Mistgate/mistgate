@@ -35,6 +35,18 @@ import { EgressNote } from "./egress-note";
 import { SchemaForm, type Problem } from "./schema-form";
 import { WherePanel } from "./where";
 
+/** VLESS: the fields that belong to "another site" as the REALITY target; the node's own site (the default) has no use for them. */
+const vlessSiteFields = ["reality.target", "reality.server_names"];
+
+/**
+ * What "Put on nodes" must know to ask for a domain before the click, where Let's Encrypt cannot work on an IP: Hysteria2's
+ * certificate mode and domain, or the node's own site behind VLESS REALITY, which always has a Let's Encrypt certificate.
+ */
+function certOfSettings(protocol: string, settings: Settings): Pick<DeployProfile, "tlsMode" | "sni"> {
+  if (protocol === "vless") return { tlsMode: getAt(settings, ["reality", "target_kind"]) === "self" ? "acme_domain" : "", sni: "" };
+  return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
+}
+
 /** /profiles/new and /profiles/$id: one editor, the same form; a new profile starts from the plugin's defaults. */
 export function ProfileEditorScreen() {
   const { id } = useParams({ strict: false }) as { id?: string };
@@ -213,7 +225,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     await Promise.all(["profiles", "groups", "users", "subs"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
     const nodeIds = plan.nodesOn ? plan.nodeIds.filter((id) => after.nodes.some((n) => n.id === id)) : [];
     if (nodeIds.length > 0) {
-      setDeploy({ profile: { id: p.id, name: p.name, protocol: p.protocol, tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") }, nodeIds });
+      setDeploy({ profile: { id: p.id, name: p.name, protocol: p.protocol, ...certOfSettings(p.protocol, settings) }, nodeIds });
       return;
     }
     toast(t("profiles.created"));
@@ -267,10 +279,17 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const isAwg = info.id === "awg";
   const locked = isAwg && inbounds.length > 0;
   const readOnly = useMemo<ReadonlySet<string>>(() => (locked ? new Set(["subnet4", "subnet6"]) : new Set()), [locked]);
-  // VLESS: the XHTTP block means nothing to the tcp transport
+  // VLESS: the XHTTP block means nothing to the tcp transport, and the target and its names belong to "another site"
   const isVless = info.id === "vless";
-  const xhttp = useMemo<ReadonlySet<string>>(() => new Set(fields.filter((f) => f.path[0] === "xhttp").map((f) => f.id)), [fields]);
-  const hidden = isAwg ? awgHidden : isVless && getAt(settings, ["transport"]) === "tcp" ? xhttp : undefined;
+  const tcp = isVless && getAt(settings, ["transport"]) === "tcp";
+  const ownSite = isVless && getAt(settings, ["reality", "target_kind"]) === "self";
+  const vlessHidden = useMemo<ReadonlySet<string>>(() => {
+    const ids = new Set<string>();
+    if (tcp) for (const f of fields) if (f.path[0] === "xhttp") ids.add(f.id);
+    if (ownSite) for (const id of vlessSiteFields) ids.add(id);
+    return ids;
+  }, [fields, tcp, ownSite]);
+  const hidden = isAwg ? awgHidden : isVless && vlessHidden.size > 0 ? vlessHidden : undefined;
   const extra = (f: Field): ReactNode => {
     if (isNew && isAwg && (f.id === "subnet4" || f.id === "subnet6") && !getAt(settings, f.path)) {
       return <span className="text-[11px] leading-snug text-muted">{t("awg.subnet.auto")}</span>;
@@ -307,7 +326,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   // an empty name does not grey the button out: the click says what is missing, at the field
   const canSave = !busy && problems.length === 0 && (isNew || count > 0);
   const nodes = profile ? `${profile.nodeCount} ${t.n("profiles.nodes", profile.nodeCount)} · ${profile.userCount} ${t.n("profiles.users", profile.userCount)}` : info.displayName;
-  const certOf = fields.some((f) => f.id === "tls_mode") ? { tlsMode: String(getAt(base, ["tls_mode"]) ?? ""), sni: String(getAt(base, ["sni"]) ?? "") } : undefined;
+  const certOf = fields.some((f) => f.id === "tls_mode" || f.id === "reality.target_kind") ? certOfSettings(info.id, base) : undefined;
 
   return (
     <div className="flex flex-col gap-3.5">

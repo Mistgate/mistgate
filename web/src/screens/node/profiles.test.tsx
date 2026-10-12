@@ -300,6 +300,30 @@ describe("the check before the click", () => {
     expect(adds()[0]?.[0]).toMatchObject({ profileId: "prf_hy", tlsServerNameOverride: "vpn.example.com" });
   });
 
+  it("asks for a domain when the node's own site behind REALITY lands on an IP node, and has no self-signed way out", async () => {
+    listProfiles.mockResolvedValue({ profiles: [{ id: "prf_vl", name: "VLESS", protocol: "vless", summary: "XHTTP 443 · REALITY", nodeCount: 0, version: 1 }] });
+    createInbound.mockImplementation((r: { validateOnly?: boolean; tlsServerNameOverride: string }) =>
+      r.tlsServerNameOverride ? Promise.resolve({ inbound: { port: 443, tlsServerName: r.tlsServerNameOverride }, warnings: [] }) : Promise.reject(refuse("reality_needs_domain: address=203.0.113.10&node=ip1")),
+    );
+    await mount(ipNode);
+    await click(button("Add profile"));
+    await settle();
+
+    // the field a VLESS profile does not have otherwise is there now, with the sentence of the refusal
+    expect(text()).toContain("This node’s site needs a Let’s Encrypt certificate, which is issued for domains only, and the address of ip1 is the IP 203.0.113.10.");
+    expect(text()).not.toContain("self-signed");
+    expect(document.activeElement).toBe(input("Domain (SNI)"));
+    expect((document.querySelector("[role=dialog] button[type=submit]") as HTMLButtonElement).disabled).toBe(true);
+
+    await type(input("Domain (SNI)"), "vpn.example.com");
+    await checked();
+    expect(text()).not.toContain("needs a Let’s Encrypt certificate");
+    expect(input("Domain (SNI)")).not.toBeNull(); // the field stays once it was asked for
+    await submit();
+    await settle();
+    expect(adds()[0]?.[0]).toMatchObject({ profileId: "prf_vl", tlsServerNameOverride: "vpn.example.com" });
+  });
+
   it("on a profile that already runs elsewhere, offers a self-signed profile for this node instead of switching it", async () => {
     listProfiles.mockResolvedValue({ profiles: [hy({ nodeCount: 2 })] });
     createInbound.mockRejectedValue(refuse("acme_needs_domain: address=203.0.113.10&node=ip1"));

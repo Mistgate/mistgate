@@ -21,6 +21,7 @@ export const errorCodes = [
   "preset_builtin",
   // a profile on a node (CreateInbound / UpdateInbound)
   "acme_needs_domain",
+  "reality_needs_domain",
   "port_taken",
   "hop_taken",
   "port_in_hop",

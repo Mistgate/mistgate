@@ -16,7 +16,7 @@ import { decoyNote } from "@/lib/port-check";
 // that is free on the node.
 
 /** The refusals that stop the button: the real call would refuse the same way (port_lossy: from the stored UDP checks, never a run). */
-export const refusals = ["acme_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired", "port_lossy"] as const;
+export const refusals = ["acme_needs_domain", "reality_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired", "port_lossy"] as const;
 export type Refusal = (typeof refusals)[number];
 
 export type InboundCheck =

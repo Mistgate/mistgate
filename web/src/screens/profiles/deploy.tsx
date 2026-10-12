@@ -62,6 +62,8 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
   if (code === "acme_needs_domain" || /host name is required for a Let's Encrypt certificate/.test(msg)) {
     return { kind: "domain", text: t("where.domainNeed", { node: node.name, address: v.address || node.address }) };
   }
+  // the node's own site behind VLESS REALITY is Let's Encrypt too, and its other way out is another site, not a self-signed certificate
+  if (code === "reality_needs_domain") return { kind: "domain", text: t("err.reality_needs_domain", { node: v.node || node.name, address: v.address || node.address }) };
   if (code === "already_on_node" || /already deployed on the node/.test(msg)) return { kind: "already", text: t("where.already") };
   if (/port override lies inside the hop range/.test(msg)) return { kind: "port", text: t("where.portPrompt", { node: node.name }) };
   return { kind: "other", text: codedError(e, t, "awg.err") };
@@ -288,7 +290,7 @@ function DeployBody({
                         autoCapitalize="off"
                         spellCheck={false}
                       />
-                      <span className="text-muted">{t("where.domainOrSelf")}</span>
+                      <span className="text-muted">{t(profile.protocol === "vless" ? "where.domainOrSite" : "where.domainOrSelf")}</span>
                     </>
                   )}
                   {askPort && (

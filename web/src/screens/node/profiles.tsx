@@ -284,7 +284,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const lossy = refused?.code === "port_lossy" ? refused.vars : lossyRefusal(save.error);
   const fieldError = (codes: string[]) => (refused && codes.includes(refused.code) ? t(`err.${refused.code}`, refused.vars) : undefined);
   const portError = !portOk(port) ? t("node.profiles.portError") : fieldError(["port_taken", "port_in_hop", "hop_taken"]);
-  const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain"]);
+  const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain", "reality_needs_domain"]);
   const effective = check.state === "ok" ? check.inbound : undefined;
   const dirty = touched.port || touched.sni || touched.enabled;
   return (

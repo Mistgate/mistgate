@@ -106,6 +106,8 @@ function AddForm({
   const [profileId, setProfileId] = useState("");
   const [port, setPort] = useState("");
   const [sni, setSni] = useState("");
+  // the profile for which the check said the node's own site (VLESS REALITY) has no domain to get a certificate for
+  const [domainFor, setDomainFor] = useState("");
   const [backend, setBackend] = useState<AwgMode | null>(null);
   // the port the check found taken, and the free one put into the field instead (decision: say it, offer a free port)
   const [auto, setAuto] = useState<Record<string, string> | null>(null);
@@ -113,8 +115,9 @@ function AddForm({
   const chosen = profileId || available.find((p) => p.id === initialProfile)?.id || available[0]?.id || "";
   const profile = available.find((p) => p.id === chosen);
   const isAwg = profile?.protocol === "awg";
-  // VLESS REALITY has no certificate name of its own: the names clients send are the profile's server names
-  const noSni = isAwg || profile?.protocol === "vless";
+  // VLESS REALITY with another site has no certificate name of its own: the names clients send are the profile's server names.
+  // The node's own site has one, the node's domain; the field shows up only when the node has none (below).
+  const noSni = isAwg || (profile?.protocol === "vless" && domainFor !== chosen);
   const savedBackend = asMode(node.awgBackend);
   const mode = backend ?? savedBackend;
 
@@ -127,6 +130,8 @@ function AddForm({
   // a Let's Encrypt profile on an IP node: the domain field is where it gets fixed, so the cursor goes there (unless the
   // admin is typing in another field)
   const acme = refused?.code === "acme_needs_domain";
+  const realityDomain = refused?.code === "reality_needs_domain";
+  if (realityDomain && domainFor !== chosen) setDomainFor(chosen);
   useEffect(() => {
     if (acme && chosen && !(document.activeElement instanceof HTMLInputElement)) document.getElementById(sniId)?.focus();
   }, [acme, chosen, sniId]);
@@ -247,14 +252,16 @@ function AddForm({
           label={t("node.profiles.tlsOverride")}
           value={sni}
           onChange={(e) => setSni(e.target.value)}
-          placeholder={acme ? "vpn.example.com" : sniPlaceholder(t, effective?.tlsServerName, node.address)}
-          hint={acme ? undefined : t("node.profiles.tlsHint")}
+          placeholder={acme || realityDomain ? "vpn.example.com" : sniPlaceholder(t, effective?.tlsServerName, node.address)}
+          hint={acme || realityDomain ? undefined : t("node.profiles.tlsHint")}
           error={sniError}
           mono
+          autoFocus={realityDomain} // the field of the node's own site appears with the refusal: the cursor goes there as it does
           autoCapitalize="off"
           spellCheck={false}
         />
       )}
+      {realityDomain && <Notice tone="danger">{t("err.reality_needs_domain", refused.vars)}</Notice>}
       {acme && profile && <AcmeBlock vars={refused.vars} profile={profile} nodeName={node.name} onEnter={() => document.getElementById(sniId)?.focus()} onSelfSigned={onSelfSigned} />}
       {blocking && (
         <Notice tone="danger" className="items-start">
