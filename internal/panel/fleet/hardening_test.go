@@ -327,7 +327,8 @@ func TestRenewedOutCertificateExpiresAfterGraceAndClosesStream(t *testing.T) {
 	fresh = e.identity(a.nodeID, key2, rr2.Msg.CertificatePem)
 
 	offset.Store(int64(oldCertGrace/time.Second) + 60)
-	old.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
+	// the 40 ms recheck may close the stream before this nudge, so its send error is no failure; ended() decides
+	_ = old.st.Send(&agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_Pong{Pong: &agentv1.Pong{Nonce: 1}}})
 	if err := old.ended(); code(err) != connect.CodeUnauthenticated {
 		t.Errorf("stream on the renewed-out certificate: %v, want UNAUTHENTICATED", err)
 	}
