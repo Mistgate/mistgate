@@ -74,15 +74,19 @@ function Label({ children }: { children: string }) {
 }
 
 function ProfileCard({ p, t, protocol, inGroup }: { p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; inGroup?: boolean }) {
-  // accent for the protocol Happ consumes (the primary one), grey for the rest (HY2 / AWG)
-  const accent = protocol?.apps.includes(App.HAPP) ?? false;
+  // VLESS in its own tone, so it does not read as Hysteria2; accent for the other protocol Happ consumes; grey for AWG
+  const tone = p.protocol === "vless" ? "sky" : undefined;
+  const accent = !tone && (protocol?.apps.includes(App.HAPP) ?? false);
   const labels = [p.nodeCount === 0 && t("profiles.label.nowhere"), inGroup === false && t("profiles.label.noGroup")].filter((x): x is string => !!x);
   return (
     <AppLink to="/profiles/$id" params={{ id: p.id }} className="block rounded-card-lg outline-offset-2">
       <Card lg lift className="flex h-full flex-col gap-3 p-4">
         <div className="flex items-center gap-2">
           <b className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.01em]">{p.name}</b>
-          <span className={cx("flex h-[22px] items-center rounded-[7px] px-2 font-mono text-[10px] font-bold uppercase", accent ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-fg")}>
+          <span
+            data-tone={tone}
+            className={cx("flex h-[22px] items-center rounded-[7px] px-2 font-mono text-[10px] font-bold uppercase", tone ? "tone-chip" : accent ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-fg")}
+          >
             {protocol?.displayName ?? p.protocol}
           </span>
         </div>
