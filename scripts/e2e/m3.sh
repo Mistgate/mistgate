@@ -1008,6 +1008,13 @@ m3_vless() {
   NODE_SSL_CERT_FILE=$WORK/node-ca.pem
   restart_node
   pass "REALITY target tlsdest on 127.0.0.1:$TD_PORT (TLS 1.3, X25519MLKEM768); the node agent restarted with a trust file that holds its certificate"
+  # the panel is the only sender of the TCP port check here (one node, on the panel's host): it needs the same trust file
+  PANEL_SSL_CERT_FILE=$WORK/node-ca.pem
+  stop_pid "$PANEL_PID"
+  start_panel
+  wait_for 90 "the node ONLINE at the restarted panel" node_online || die "the node did not come back after the panel restart (status: $(node_status))"
+  sleep 3
+  wait_for 90 "every inbound ACTIVE again" inbounds_active_all || die "inbounds after the panel restart: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | select(.state != "INBOUND_STATE_ACTIVE") | {protocol, state, lastError}')"
 
   # ---- three inbounds: XHTTP, RAW + Vision, XHTTP packet-up with another padding and fingerprint (xhttp+tls is not in the
   # product yet: design/vless.md R3 has the TLS front, the panel plugin refuses security tls)
@@ -1028,7 +1035,36 @@ m3_vless() {
   for i in $vports; do listening "$i" || die "nothing listens on TCP $i"; done
   ! grep -q 'REALITY target probe warning' "$WORK/node.log" || die "the node's probe of the REALITY target warns: $(grep 'REALITY target probe warning' "$WORK/node.log" | head -1)"
   pass "three vless inbounds ACTIVE on TCP $vports; the node's probe of the target found TLS 1.3 with X25519MLKEM768 (no warning)"
-  # TODO(R4.1): assert that the Check ports rows for 80 and 443 are "ours" once the TCP port check exists (design/vless.md §7.8, R5).
+
+  # ---- Check ports, the TCP half (design/vless.md §7.4, R4.1). The panel sits on the node's host, so it answers (error_code
+  # same_host, as for UDP) and stores nothing. The e2e node has no ACME name, so there is no port 80 row; a REALITY port that
+  # forwards to a site with a valid chain, and the Hysteria2 site (self-signed, matched by the pin the node reported), are "ours".
+  local pc tcp_rows
+  mutate_to pc NodeService/CheckPorts "{\"nodeId\":\"$NODE_ID\"}" || die "CheckPorts failed: $pc"
+  jq -e '[.tcp[] | select(.port == 80)] | length == 0' <<<"$pc" >/dev/null || die "a port 80 row on a node without an ACME name: $(jq -c .tcp <<<"$pc")"
+  jq -e '[.tcp[] | select(.role == "site" and .port == 443 and .verdict == "ours")] | length == 1' <<<"$pc" >/dev/null \
+    || die "the Hysteria2 site on TCP 443 is not ours: $(jq -c .tcp <<<"$pc")"
+  for i in $vports; do
+    jq -e --argjson p "$i" '[.tcp[] | select(.role == "vless" and .port == $p and .verdict == "ours")] | length == 1' <<<"$pc" >/dev/null \
+      || die "VLESS TCP $i is not ours in the port check: $(jq -c .tcp <<<"$pc")"
+  done
+  tcp_rows=$(jq -r '[.tcp[] | "\(.port) \(.role) \(.verdict)"] | join(", ")' <<<"$pc")
+  pass "Check ports (TCP): $tcp_rows"
+
+  # a VLESS inbound on 443 takes the Hysteria2 site's port: the site row goes, the VLESS row says what answers
+  local pv iv
+  pv=$(make_profile vless e2e-vless-443 "$(vless_settings 443 xhttp www.example.net)")
+  [ -n "$pv" ] && [ "$pv" != null ] || die "CreateProfile(vless on 443) returned no id"
+  make_inbound "$pv"
+  wait_for 60 "the VLESS inbound on 443 ACTIVE" inbounds_active_all || die "the VLESS inbound on 443 did not become ACTIVE"
+  iv=$(inbound_of "$pv" | jq -r .state)
+  [ "$iv" = INBOUND_STATE_ACTIVE ] || die "the VLESS inbound on 443 is $iv"
+  mutate_to pc NodeService/CheckPorts "{\"nodeId\":\"$NODE_ID\"}" || die "CheckPorts failed: $pc"
+  jq -e '[.tcp[] | select(.port == 443)] | length == 1 and .[0].role == "vless" and .[0].verdict == "ours"' <<<"$pc" >/dev/null \
+    || die "with VLESS on 443 the row is not a vless row that is ours: $(jq -c .tcp <<<"$pc")"
+  pass "Check ports (TCP): VLESS on 443 claims the site port and answers (443 vless ours, no site row)"
+  api ProfileService/DeleteInbound "{\"inboundId\":\"$(inbound_of "$pv" | jq -r .id)\"}" >/dev/null || die "DeleteInbound of the 443 inbound failed"
+  wait_for 60 "the three vless inbounds ACTIVE after the 443 inbound is gone" inbounds_active "$want" || die "inbounds after deleting the 443 inbound: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | {protocol, port, state}')"
 
   # ---- a user and the Happ subscription: three vless:// lines
   local vera vera_url lines

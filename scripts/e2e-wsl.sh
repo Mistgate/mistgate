@@ -32,7 +32,9 @@
 #
 # --vless: three VLESS REALITY inbounds (XHTTP, RAW + Vision, XHTTP packet-up) behind a local TLS 1.3 target
 # (scripts/e2e/tlsdest), real xray-core and mihomo clients, traffic accounting, disable/enable, node RSS, and the delay of
-# the first REALITY handshake after an agent start. xhttp+tls is not in the product yet (design/vless.md R3).
+# the first REALITY handshake after an agent start, and Check ports (TCP): the Hysteria2 site and the REALITY ports are
+# "ours", then a VLESS inbound on 443 claims the site port. The panel sends that check itself (one node, same host), so
+# the step restarts it with the trust file of the REALITY target. xhttp+tls is not in the product yet (design/vless.md R3).
 #
 # --edge runs the Cloudflare edition instead (scripts/e2e/edge.sh): the panel is the Go js/wasm build inside a local
 # `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a
@@ -306,10 +308,12 @@ panel_up() { curl -sf -m 3 -o /dev/null "$ADMIN/api/mistgate.admin.v1.AuthServic
 # verifies the target's certificate against the system roots.
 start_node() { spawn env ${NODE_SSL_CERT_FILE:+SSL_CERT_FILE=$NODE_SSL_CERT_FILE} "$NODE_BIN" run --state-dir "$NODE_STATE" >>"$WORK/node.log" 2>&1; }
 
+# PANEL_SSL_CERT_FILE (set by the VLESS step) is the panel's trust file: the panel is the sender of the TCP port check when
+# the fleet has no other node, and it validates the REALITY target's certificate against the system roots.
 start_panel() {
   # The health test hook: a silence of 3 s already counts as an outage (production: 10 min), so the stopped
   # agent of step 2c opens NODE_DOWN within a couple of evaluations.
-  MISTGATE_HEALTH_BLIP_WINDOW=3s spawn "${PANEL_BIN:-$BIN/mistgate}" serve --data-dir "$DATA" --listen "127.0.0.1:$PUB" \
+  MISTGATE_HEALTH_BLIP_WINDOW=3s spawn ${PANEL_SSL_CERT_FILE:+env SSL_CERT_FILE=$PANEL_SSL_CERT_FILE} "${PANEL_BIN:-$BIN/mistgate}" serve --data-dir "$DATA" --listen "127.0.0.1:$PUB" \
     --tls-cert "$WORK/pub.crt" --tls-key "$WORK/pub.key" --agent-addr "127.0.0.1:$PUB" >>"$WORK/panel.log" 2>&1
   PANEL_PID=$LAST_PID
   wait_for 30 "the panel to answer" panel_up || die "panel did not start"
