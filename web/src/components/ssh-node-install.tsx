@@ -406,7 +406,6 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
               onChange={(event) => setHost(event.target.value)}
               placeholder="de1.example.com"
               mono
-              hint={hostHint}
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
