@@ -164,6 +164,34 @@ func TestPasswordCredential(t *testing.T) {
 	}
 }
 
+func TestUpgradePasswordHashIsCompareAndSwap(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	a := firstAdmin(t, s, now)
+	if err := s.AddPassword(ctx, PasswordCred{AdminID: a.ID, Login: "owner", Hash: "old", TOTPSecret: []byte("sealed")}, now); err != nil {
+		t.Fatal(err)
+	}
+
+	if changed, err := s.UpgradePasswordHash(ctx, a.ID, "wrong", "new"); err != nil || changed {
+		t.Fatalf("wrong old hash: changed=%v err=%v", changed, err)
+	}
+	c, err := s.PasswordByAdmin(ctx, a.ID)
+	if err != nil || c.Hash != "old" {
+		t.Fatalf("hash after wrong compare: %q err=%v", c.Hash, err)
+	}
+	if changed, err := s.UpgradePasswordHash(ctx, a.ID, "old", "new"); err != nil || !changed {
+		t.Fatalf("right old hash: changed=%v err=%v", changed, err)
+	}
+	c, err = s.PasswordByAdmin(ctx, a.ID)
+	if err != nil || c.Hash != "new" {
+		t.Fatalf("hash after upgrade: %q err=%v", c.Hash, err)
+	}
+	if changed, err := s.UpgradePasswordHash(ctx, "adm_unknown", "old", "new"); err != nil || changed {
+		t.Fatalf("unknown admin: changed=%v err=%v", changed, err)
+	}
+}
+
 func TestPasskeyAddRemove(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()

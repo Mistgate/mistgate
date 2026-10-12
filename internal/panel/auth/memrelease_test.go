@@ -16,11 +16,11 @@ func retained() uint64 {
 	return m.HeapSys - m.HeapReleased
 }
 
-// A sign-in hashes with 64 MiB of argon2 memory. The panel must not stay that much bigger afterwards: the
+// A sign-in hashes with 19 MiB of argon2 memory. The panel must not stay that much bigger afterwards: the
 // idle target is 80 MB resident.
 func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 	saved := argon
-	argon.time, argon.memKiB, argon.threads = 3, 64<<10, 2 // the real production cost
+	argon = productionArgon
 	release.mu.Lock()
 	release.delay = 50 * time.Millisecond
 	release.mu.Unlock()
@@ -34,20 +34,21 @@ func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 	runtime.GC()
 	debug.FreeOSMemory()
 	base := retained()
+	argonMemory := uint64(productionArgon.memKiB) << 10
 
-	hash, err := hashPassword(context.Background(), "a password of sufficient length") // not verified here: a second hash would allocate outside the measured window
+	hash, err := hashPassword(context.Background(), nil, "a password of sufficient length") // not verified here: a second hash would allocate outside the measured window
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = hash
 	peak := retained()
-	if peak < base+48<<20 {
+	if peak < base+argonMemory*3/4 {
 		t.Fatalf("the heap grew by only %d MiB during the hash: this test does not measure what it should", (peak-base)>>20)
 	}
 
 	// Once things are quiet the memory goes back: within the delay plus one collection.
 	deadline := time.Now().Add(5 * time.Second)
-	for retained() > base+16<<20 {
+	for retained() > base+argonMemory/4 {
 		if time.Now().After(deadline) {
 			t.Fatalf("after hashing the heap still holds %d MiB more than before (peak +%d MiB)", (retained()-base)>>20, (peak-base)>>20)
 		}
@@ -57,12 +58,12 @@ func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 
 	// A burst of hashes causes one release after the burst, not one per hash: the timer is pushed back.
 	for i := 0; i < 3; i++ {
-		if _, err := hashPassword(context.Background(), "another password of sufficient length"); err != nil {
+		if _, err := hashPassword(context.Background(), nil, "another password of sufficient length"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	deadline = time.Now().Add(5 * time.Second)
-	for retained() > base+16<<20 {
+	for retained() > base+argonMemory/4 {
 		if time.Now().After(deadline) {
 			t.Fatalf("after a burst the heap still holds %d MiB more than before", (retained()-base)>>20)
 		}

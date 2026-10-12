@@ -87,7 +87,7 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 	if len(m.CurrentPassword) > maxPasswordBytes {
 		m.CurrentPassword = "" // never matches; the hash is not asked to chew on a megabyte
 	}
-	ok, err := verifyPassword(ctx, cred.Hash, m.CurrentPassword)
+	ok, err := verifyPassword(ctx, s.pepper, cred.Hash, m.CurrentPassword)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
@@ -98,7 +98,7 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 		s.audit(ctx, admin.ID, "password_change", "fail", ip, map[string]any{"reason": "wrong current password"})
 		return nil, codedErr(connect.CodeInvalidArgument, "wrong_password")
 	}
-	hash, err := hashPassword(ctx, m.NewPassword)
+	hash, err := hashPassword(ctx, s.pepper, m.NewPassword)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
@@ -158,7 +158,7 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 			s.log.Error("password lookup", "err", err)
 			return nil, errInternal(err)
 		}
-		c.pwHash, err = hashPassword(ctx, m.Password)
+		c.pwHash, err = hashPassword(ctx, s.pepper, m.Password)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 		}
@@ -333,7 +333,7 @@ func ResetLogin(ctx context.Context, st *store.Store, v *vault.Vault, in ResetLo
 
 	out.Admin, out.Login, out.Password = target.Admin, login, randomPassword()
 	secret := newTOTPSecret()
-	hash, err := hashPassword(ctx, out.Password)
+	hash, err := hashPassword(ctx, passwordPepper(v), out.Password)
 	if err != nil {
 		return out, err
 	}

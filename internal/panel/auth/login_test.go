@@ -221,6 +221,53 @@ func TestPasswordSetupAndLogin(t *testing.T) {
 	}
 }
 
+func TestPasswordLoginUpgradesALegacyHash(t *testing.T) {
+	s, st, clock := newTestService(t)
+	ctx := context.Background()
+	adminID, secret := passwordAdmin(t, s, st, "ada")
+	legacy, err := hashPassword(ctx, nil, testPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetPasswordHash(ctx, adminID, legacy); err != nil {
+		t.Fatal(err)
+	}
+	var sessionsBefore int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE admin_id = ?`, adminID).Scan(&sessionsBefore); err != nil {
+		t.Fatal(err)
+	}
+
+	*clock = clock.Add(totpPeriod * time.Second)
+	resp, err := login(s, "ada", testPassword, totpCode(secret, totpStep(*clock)))
+	if err != nil || resp.Header().Get("Set-Cookie") == "" {
+		t.Fatalf("legacy sign-in: response=%v err=%v", resp, err)
+	}
+	stored, err := st.PasswordByAdmin(ctx, adminID)
+	if err != nil || !strings.Contains(stored.Hash, ",keyid=pepper$") {
+		t.Fatalf("upgraded password hash: %q err=%v", stored.Hash, err)
+	}
+	if ok, err := verifyPassword(ctx, s.pepper, stored.Hash, testPassword); err != nil || !ok {
+		t.Fatalf("upgraded hash does not verify: matched=%v err=%v", ok, err)
+	}
+	var sessionsAfter int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE admin_id = ?`, adminID).Scan(&sessionsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if sessionsAfter != sessionsBefore+1 {
+		t.Fatalf("sessions after upgrade = %d, before = %d; want the prior session plus the new one", sessionsAfter, sessionsBefore)
+	}
+
+	firstHash := stored.Hash
+	*clock = clock.Add(totpPeriod * time.Second)
+	if resp, err := login(s, "ada", testPassword, totpCode(secret, totpStep(*clock))); err != nil || resp.Header().Get("Set-Cookie") == "" {
+		t.Fatalf("second sign-in: response=%v err=%v", resp, err)
+	}
+	stored, err = st.PasswordByAdmin(ctx, adminID)
+	if err != nil || stored.Hash != firstHash {
+		t.Fatalf("current profile changed on second sign-in: hash changed=%v err=%v", stored.Hash != firstHash, err)
+	}
+}
+
 func TestConcurrentWrongAndCorrectSetupCodes(t *testing.T) {
 	s, st, clock := newTestService(t)
 	ctx := context.Background()

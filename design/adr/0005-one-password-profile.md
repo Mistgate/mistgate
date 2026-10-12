@@ -1,6 +1,6 @@
 # 0005. One password hashing profile for both editions
 
-Status: accepted, 2026-10-06.
+Status: accepted, 2026-10-06; implemented 2026-10-12 (pepper marker `keyid=pepper` in the PHC string; verification ceiling m <= 64 MiB, t <= 4, p <= 4).
 
 ## Context
 

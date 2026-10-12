@@ -632,6 +632,23 @@ func TestD1RewrittenAuthStoreMethods(t *testing.T) {
 			t.Fatalf("existing credential: %v", err)
 		}
 	})
+	t.Run("UpgradePasswordHash", func(t *testing.T) {
+		if changed, err := st.UpgradePasswordHash(ctx, a.ID, "wrong", "hash-wrong"); err != nil || changed {
+			t.Fatalf("wrong old hash: changed=%v err=%v", changed, err)
+		}
+		if got, err := st.PasswordByAdmin(ctx, a.ID); err != nil || got.Hash != "hash-one" {
+			t.Fatalf("credential after wrong old hash: %+v err=%v", got, err)
+		}
+		if changed, err := st.UpgradePasswordHash(ctx, a.ID, "hash-one", "hash-upgraded"); err != nil || !changed {
+			t.Fatalf("right old hash: changed=%v err=%v", changed, err)
+		}
+		if got, err := st.PasswordByAdmin(ctx, a.ID); err != nil || got.Hash != "hash-upgraded" {
+			t.Fatalf("credential after upgrade: %+v err=%v", got, err)
+		}
+		if changed, err := st.UpgradePasswordHash(ctx, "adm_unknown", "hash-one", "hash-upgraded"); err != nil || changed {
+			t.Fatalf("unknown admin: changed=%v err=%v", changed, err)
+		}
+	})
 	t.Run("RecordLoginFailure", func(t *testing.T) {
 		if _, err := st.RecordLoginFailure(ctx, "owner", now, 3, time.Hour, time.Minute); err != nil {
 			t.Fatal(err)

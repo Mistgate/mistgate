@@ -70,6 +70,20 @@ func (s *Store) SetPasswordHash(ctx context.Context, adminID, hash string) error
 	return nil
 }
 
+// UpgradePasswordHash replaces the hash of an admin's password login with newHash only while it is still oldHash
+// (re-hashing an older profile at sign-in must not undo a password change made meanwhile). One statement: safe on D1.
+func (s *Store) UpgradePasswordHash(ctx context.Context, adminID, oldHash, newHash string) (bool, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE admin_password SET hash = ? WHERE admin_id = ? AND hash = ?`, newHash, adminID, oldHash)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
+}
+
 // SetTOTPSecret replaces the authenticator secret (sealed by the caller) of an admin's password login. The last
 // accepted step never goes back, so a code that was used once stays used. ErrNotFound if the admin has none.
 func (s *Store) SetTOTPSecret(ctx context.Context, adminID string, sealed []byte, step int64) error {

@@ -23,7 +23,7 @@ The owner is created with the one-time link that `mistgate setup` prints (valid 
 
 **Passkey.** Sign in with a fingerprint, a face or a security key. No login field: the browser offers the passkeys it holds for this panel. User verification (PIN or biometrics) is required every time. A passkey is bound to the admin's address (the WebAuthn relying party set at setup), so it works only there.
 
-**Password and authenticator code.** A login (3 to 64 characters of `a-z 0-9 . _ @ -`), a password (at least 12 characters, at most 256 bytes) and a 6-digit code from an authenticator app (time-based, 30-second steps). Passwords are stored as argon2id hashes; the authenticator secret is encrypted with the master key, so a panel without a master key cannot offer this way. A code works once.
+**Password and authenticator code.** A login (3 to 64 characters of `a-z 0-9 . _ @ -`), a password (at least 12 characters, at most 256 bytes) and a 6-digit code from an authenticator app (time-based, 30-second steps). Passwords are stored as argon2id hashes (19 MiB, 2 passes) with a pepper derived from the master key, so a copy of the database alone is not enough to test guesses offline; an older hash is upgraded at the next sign-in; the authenticator secret is encrypted with the master key, so a panel without a master key cannot offer this way. A code works once.
 
 Limits on password sign-in:
 

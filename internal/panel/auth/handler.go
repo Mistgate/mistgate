@@ -208,7 +208,7 @@ func (s *Service) beginSetupPassword(ctx context.Context, m *adminv1.BeginSetupR
 	if err := checkPasswordPolicy(m.Password); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	pwHash, err := hashPassword(ctx, m.Password)
+	pwHash, err := hashPassword(ctx, s.pepper, m.Password)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
@@ -491,7 +491,7 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 		}
 	}
-	pwOK, err := verifyPassword(ctx, hash, req.Msg.Password)
+	pwOK, err := verifyPassword(ctx, s.pepper, hash, req.Msg.Password)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
@@ -530,11 +530,25 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 		s.log.Error("create session", "err", err)
 		return nil, errInternal(err)
 	}
+	if found && s.pepper != nil && needsRehash(cred.Hash) {
+		s.upgradePasswordHash(ctx, cred, req.Msg.Password)
+	}
 	s.audit(ctx, admin.ID, "login", "ok", ip, map[string]any{"method": "password"})
 	s.emit(Event{Kind: EventSignIn, AdminID: admin.ID, Login: login, Method: "password", IP: ip.String()})
 	resp := connect.NewResponse(&adminv1.PasswordLoginResponse{Admin: toProtoAdmin(admin)})
 	resp.Header().Add("Set-Cookie", cookie.String())
 	return resp, nil
+}
+
+func (s *Service) upgradePasswordHash(ctx context.Context, cred store.PasswordCred, pw string) {
+	newHash, err := hashPassword(ctx, s.pepper, pw)
+	if err != nil {
+		s.log.Warn("upgrade password hash", "admin", cred.AdminID, "err", err)
+		return
+	}
+	if _, err := s.st.UpgradePasswordHash(ctx, cred.AdminID, cred.Hash, newHash); err != nil {
+		s.log.Warn("upgrade password hash", "admin", cred.AdminID, "err", err)
+	}
 }
 
 // passwordFailed counts a failed password sign-in and builds the error. Only real

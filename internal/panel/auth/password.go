@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // RFC 6238 default; every authenticator app speaks SHA-1
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/base64"
@@ -19,13 +20,21 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
-// Argon2id cost (RFC 9106 second recommended option: 64 MiB, 3 passes). Tests lower it.
-var argon = struct {
+type argonParams struct {
 	time, memKiB uint32
 	threads      uint8
-}{3, 64 << 10, 2}
+}
+
+// productionArgon is ADR 0005's profile (OWASP minimum), the same in both editions.
+var productionArgon = argonParams{time: 2, memKiB: 19 << 10, threads: 1}
+
+var argon = productionArgon // tests lower it
+
+const pepperLabel = "admin-password-pepper"
 
 const (
 	minPasswordRunes          = 12
@@ -69,40 +78,133 @@ func deriveArgon2IDKey(ctx context.Context, password, salt []byte, timeCost, mem
 	return argon2IDKey(password, salt, timeCost, memoryKiB, threads, keyLen), nil
 }
 
-// hashPassword returns an argon2id PHC string with a fresh random salt.
-func hashPassword(ctx context.Context, pw string) (string, error) {
+// passwordPepper is the secret mixed into every new password hash, derived from the master key (ADR 0005).
+func passwordPepper(v *vault.Vault) []byte {
+	if v == nil {
+		return nil
+	}
+	return v.Derive(pepperLabel)
+}
+
+// passwordInput is what argon2id hashes: HMAC-SHA256(pepper, pw), or the raw password for a hash without a pepper.
+func passwordInput(pepper []byte, pw string) []byte {
+	if len(pepper) == 0 {
+		return []byte(pw)
+	}
+	m := hmac.New(sha256.New, pepper)
+	_, _ = m.Write([]byte(pw))
+	return m.Sum(nil)
+}
+
+// hashPassword returns an argon2id PHC string with a fresh random salt; with a pepper it carries keyid=pepper.
+func hashPassword(ctx context.Context, pepper []byte, pw string) (string, error) {
 	salt := make([]byte, 16)
 	rand.Read(salt) // never fails on supported platforms
-	key, err := deriveArgon2IDKey(ctx, []byte(pw), salt, argon.time, argon.memKiB, argon.threads, 32)
+	key, err := deriveArgon2IDKey(ctx, passwordInput(pepper, pw), salt, argon.time, argon.memKiB, argon.threads, 32)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, argon.memKiB, argon.time, argon.threads,
+	params := fmt.Sprintf("m=%d,t=%d,p=%d", argon.memKiB, argon.time, argon.threads)
+	if len(pepper) != 0 {
+		params += ",keyid=pepper"
+	}
+	return fmt.Sprintf("$argon2id$v=%d$%s$%s$%s", argon2.Version, params,
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
+}
+
+type parsedPasswordHash struct {
+	params   argonParams
+	peppered bool
+	salt     []byte
+	key      []byte
+}
+
+// parsePasswordHash accepts exactly what hashPassword writes, today's and older profiles; anything else is malformed.
+func parsePasswordHash(encoded string) (parsedPasswordHash, bool) {
+	parts := strings.Split(encoded, "$")
+	if len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v="+strconv.Itoa(argon2.Version) {
+		return parsedPasswordHash{}, false
+	}
+	fields := strings.Split(parts[3], ",")
+	if len(fields) != 3 && len(fields) != 4 {
+		return parsedPasswordHash{}, false
+	}
+	m, okM := parseArgonParam(fields[0], "m=", 32)
+	t, okT := parseArgonParam(fields[1], "t=", 32)
+	p, okP := parseArgonParam(fields[2], "p=", 8)
+	if !okM || !okT || !okP {
+		return parsedPasswordHash{}, false
+	}
+	peppered := len(fields) == 4
+	if peppered && fields[3] != "keyid=pepper" {
+		return parsedPasswordHash{}, false
+	}
+	if len(parts[4]) != base64.RawStdEncoding.EncodedLen(16) || len(parts[5]) != base64.RawStdEncoding.EncodedLen(32) {
+		return parsedPasswordHash{}, false
+	}
+	salt, errSalt := base64.RawStdEncoding.DecodeString(parts[4])
+	key, errKey := base64.RawStdEncoding.DecodeString(parts[5])
+	if errSalt != nil || errKey != nil || len(salt) != 16 || len(key) != 32 {
+		return parsedPasswordHash{}, false
+	}
+	return parsedPasswordHash{
+		params:   argonParams{time: uint32(t), memKiB: uint32(m), threads: uint8(p)},
+		peppered: peppered,
+		salt:     salt,
+		key:      key,
+	}, true
+}
+
+func parseArgonParam(field, prefix string, bitSize int) (uint64, bool) {
+	if !strings.HasPrefix(field, prefix) {
+		return 0, false
+	}
+	value := strings.TrimPrefix(field, prefix)
+	if value == "" {
+		return 0, false
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] < '0' || value[i] > '9' {
+			return 0, false
+		}
+	}
+	n, err := strconv.ParseUint(value, 10, bitSize)
+	return n, err == nil
+}
+
+func validArgonParams(params argonParams) bool {
+	return params.memKiB >= 1 && params.memKiB <= 65536 &&
+		params.time >= 1 && params.time <= 4 &&
+		params.threads >= 1 && params.threads <= 4
 }
 
 // verifyPassword checks pw against a hashPassword string in constant time. A malformed
 // or absurdly expensive hash never matches.
-func verifyPassword(ctx context.Context, encoded, pw string) (bool, error) {
-	parts := strings.Split(encoded, "$")
-	if len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v="+strconv.Itoa(argon2.Version) {
+func verifyPassword(ctx context.Context, pepper []byte, encoded, pw string) (bool, error) {
+	parsed, ok := parsePasswordHash(encoded)
+	if !ok || !validArgonParams(parsed.params) {
 		return false, nil
 	}
-	var m, t uint32
-	var p uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &p); err != nil || m == 0 || m > 1<<20 || t == 0 || t > 16 || p == 0 {
+	if parsed.peppered && len(pepper) == 0 {
 		return false, nil
 	}
-	salt, err1 := base64.RawStdEncoding.DecodeString(parts[4])
-	want, err2 := base64.RawStdEncoding.DecodeString(parts[5])
-	if err1 != nil || err2 != nil || len(want) == 0 {
-		return false, nil
+	var input []byte
+	if parsed.peppered {
+		input = passwordInput(pepper, pw)
+	} else {
+		input = []byte(pw)
 	}
-	got, err := deriveArgon2IDKey(ctx, []byte(pw), salt, t, m, p, uint32(len(want)))
+	got, err := deriveArgon2IDKey(ctx, input, parsed.salt, parsed.params.time, parsed.params.memKiB, parsed.params.threads, uint32(len(parsed.key)))
 	if err != nil {
 		return false, err
 	}
-	return subtle.ConstantTimeCompare(got, want) == 1, nil
+	return subtle.ConstantTimeCompare(got, parsed.key) == 1, nil
+}
+
+// needsRehash reports whether a hash that just verified should be re-hashed with the current profile and the pepper.
+func needsRehash(encoded string) bool {
+	parsed, ok := parsePasswordHash(encoded)
+	return !ok || !validArgonParams(parsed.params) || !parsed.peppered || parsed.params != argon
 }
 
 type spoofHashEntry struct {
@@ -132,7 +234,7 @@ func spoofHash(ctx context.Context) (string, error) {
 		}
 		b := make([]byte, 16)
 		rand.Read(b)
-		entry.hash, entry.err = hashPassword(ctx, string(b))
+		entry.hash, entry.err = hashPassword(ctx, nil, string(b))
 		if entry.err != nil {
 			spoofHashCache.CompareAndSwap(entry, nil)
 		}

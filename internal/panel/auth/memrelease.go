@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// An argon2id hash takes a 64 MiB block array. Go frees it at the next garbage collection, but an idle panel
+// An argon2id hash takes a 19 MiB block array. Go frees it at the next garbage collection, but an idle panel
 // allocates so little that the next collection can be minutes away, and even after it the runtime's background
-// scavenger hands the pages back to the OS only slowly: the panel would sit at 100+ MB resident for a long time
-// after one sign-in, against the 80 MB idle target.
+// scavenger hands the pages back to the OS only slowly: pages used by one sign-in can stay resident long after
+// the hash finishes.
 //
 // scheduleMemoryRelease runs debug.FreeOSMemory (a collection plus an immediate return of free pages to the OS)
 // once, releaseDelay after the last hash finished. The timer is pushed back by every hash that ends before it

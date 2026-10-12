@@ -344,6 +344,13 @@ func TestResetLogin(t *testing.T) {
 	if err != nil || r.Created || r.Login != "ada" || r.Admin.ID != adminID || r.SessionsEnded != 2 || len(r.Password) != 24 { // setup's and the sign-in's
 		t.Fatalf("reset: %+v %v", r, err)
 	}
+	cred, err := st.PasswordByLogin(ctx, "ada")
+	if err != nil || !strings.Contains(cred.Hash, ",keyid=pepper$") {
+		t.Fatalf("reset password hash is not peppered: %q err=%v", cred.Hash, err)
+	}
+	if ok, err := verifyPassword(ctx, passwordPepper(s.vault), cred.Hash, r.Password); err != nil || !ok {
+		t.Fatalf("reset password hash does not verify: matched=%v err=%v", ok, err)
+	}
 	newSecret := secretOf(t, r.TOTPSecret)
 	if _, err := s.resolve(ctx, cookie); err == nil {
 		t.Error("a session survived the reset (a lost phone may hold one)")
