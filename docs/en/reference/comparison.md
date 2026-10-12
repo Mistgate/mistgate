@@ -22,7 +22,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 - **Community and maturity.** 3x-ui has about 47.7k GitHub stars, s-ui about 10.0k, Hiddify Manager about 9.3k. Mistgate is a new project in early releases.
 - **Device limits.** 3x-ui, PasarGuard and Remnawave limit devices by HWID. Mistgate counts devices.
 - **Telegram.** 3x-ui, Marzban, PasarGuard and Hiddify Manager have full Telegram bots. Mistgate sends alerts; a full bot is **Planned**.
-- **Installation.** Most others install with one command. Mistgate's one-line installer is **Planned**.
+- **Installation.** Mistgate's one-line installer verifies the signed panel manifest before installing the panel.
 
 ## The full table
 
@@ -32,7 +32,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Database | SQLite | SQLite or PostgreSQL | SQLite, MySQL or MariaDB | SQLite, MySQL, MariaDB, PostgreSQL or TimescaleDB | PostgreSQL, Redis | MySQL, Redis | SQLite |
 | Licence | AGPL-3.0 | GPL-3.0 | AGPL-3.0 | AGPL-3.0 | AGPL-3.0 | GPL-3.0 | GPL-3.0 |
 | Docker | not used: systemd, static binaries | optional | partial: the installer uses Compose; a manual install is documented | partial: Compose | required for the panel and the node | optional | optional |
-| One-line installer | **Planned** | yes | yes | yes | no: Compose, community scripts | yes | yes |
+| One-line installer | yes | yes | yes | yes | no: Compose, community scripts | yes | yes |
 | Memory | panel: 16-20 MiB idle, measured¹; node: the SSH installer needs 256 MB | 68-74 MiB idle, measured¹ | ? | 262-265 MiB idle, measured¹; documented: 1 GB minimum, 2 GB recommended | 426-454 MiB idle, measured¹; documented: panel 2 GB minimum, 4 GB recommended; node 1 GB minimum | ? | ? |
 | Core | Hysteria2; AmneziaWG in userspace or the kernel; xray-core for VLESS (**Planned**) | Xray, TUIC in process, AmneziaWG | Xray | Xray, a WireGuard core; a sing-box node announced | Xray | Xray and sing-box | sing-box |
 | VLESS REALITY / XHTTP | **Planned** (the node engine is merged) | yes / yes | yes / ? | yes / ? | yes / yes | yes / yes | ? (VLESS is in the source) |

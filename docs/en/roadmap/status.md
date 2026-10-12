@@ -21,6 +21,7 @@ Mistgate is in **beta**; the current release is `v0.1.33`. It runs in production
 - [SSH installation](../getting-started/ssh-install.md) from the admin, and through MCP with the owner's approval: root or `sudo -n`, a pinned host key, checks before any change, the host firewall prepared.
 - Install jobs that can be cancelled, retried and resumed after an interruption.
 - Saved SSH access, encrypted, with a verified password change; the access outlives a retired node until the owner forgets it.
+- The one-line panel installer verifies the signed release before setup and systemd installation.
 - [Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention and back-off, and an offline restore.
 - [Telegram alerts](../operations/telegram-alerts.md): health alerts, releases, failed backups, plans waiting for approval and sign-in security, sent to the admins who link their chat.
 
@@ -45,7 +46,6 @@ Mistgate is in **beta**; the current release is `v0.1.33`. It runs in production
 
 - A Telegram bot beyond alerts: for the fleet and for users.
 - More subscription formats (Xray JSON, sing-box) and subscription mirrors.
-- A one-line installer.
 
 ## Known limits
 

@@ -53,6 +53,22 @@ jobs:
       - run: cd web && pnpm install --frozen-lockfile && pnpm build # the panel embeds web/dist
       - run: go vet ./...
       - run: go test ./...
+      - run: shellcheck scripts/install.sh
+      # Debian trixie exercises the OpenSSL fallback, including releases without panel-manifest.sshsig.
+      - name: Installer tests (Debian trixie OpenSSL fallback)
+        env:
+          MISTGATE_RELEASE_PUBLIC_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
+        run: |
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/scripts.test" ./scripts
+          docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP/scripts.test:/scripts.test:ro" -w /w/scripts \
+            -e MISTGATE_INSTALL_REQUIRE_OPENSSL=1 -e MISTGATE_RELEASE_PUBLIC_KEY \
+            debian:trixie-slim sh -c 'apt-get update -qq && apt-get install -y -qq bash curl openssl openssh-client >/dev/null && /scripts.test -test.v -test.count=1'
+      # Ubuntu's OpenSSL 3.0 cannot verify Ed25519ctx, so this proves the SSHSIG path is used.
+      - name: Installer tests (Ubuntu ssh-keygen)
+        env:
+          MISTGATE_INSTALL_REQUIRE_SSH_KEYGEN: "1"
+          MISTGATE_RELEASE_PUBLIC_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
+        run: go test -count=1 ./scripts
       - run: go build ./...
       # GO-2026-5288 (an OOM in hysteria's QUIC sniffer) is fixed upstream by apernet/hysteria#1547, which v2.12.3
       # includes, but the vulnerability database names no fixed version; it is skipped, any other called one fails.

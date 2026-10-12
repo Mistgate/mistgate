@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const siteRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const repositoryRoot = dirname(siteRoot);
 const dist = join(siteRoot, "dist");
 
 function page(lang, key) {
@@ -12,6 +13,14 @@ function page(lang, key) {
   const path = key === "index" ? `${prefix}index.html` : `${prefix}${key}/index.html`;
   return readFileSync(join(dist, path), "utf8");
 }
+
+test("the install script is published at the stable URL as plain text", () => {
+  const published = readFileSync(join(dist, "install.sh"));
+  const source = readFileSync(join(repositoryRoot, "scripts", "install.sh"));
+  const headers = readFileSync(join(dist, "_headers"), "utf8");
+  assert.deepEqual(published, source);
+  assert.ok(headers.includes("/install.sh\n  Content-Type: text/plain; charset=utf-8"));
+});
 
 test("the status page replaces the M2 roadmap page in both languages", () => {
   const en = page("en", "roadmap/status");

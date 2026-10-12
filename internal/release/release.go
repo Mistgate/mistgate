@@ -12,7 +12,9 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -23,6 +25,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -36,8 +40,10 @@ const (
 	SignatureName = "manifest.sig"
 	// PanelManifestName and PanelSignatureName are the panel's own signed release (the mistgate-linux-* binaries),
 	// uploaded to the GitHub release next to the node bundle. Same format, signed in its own context (SignPanel).
-	PanelManifestName  = "panel-manifest.json"
-	PanelSignatureName = "panel-manifest.sig"
+	PanelManifestName    = "panel-manifest.json"
+	PanelSignatureName   = "panel-manifest.sig"
+	PanelSSHSIGName      = "panel-manifest.sshsig"
+	PanelSSHSIGNamespace = "mistgate-panel-manifest-v1"
 	// MaxManifestBytes bounds what a parser will read (the panel sends it inside a command).
 	MaxManifestBytes = 64 << 10
 )
@@ -226,6 +232,162 @@ func VerifyPanel(pub ed25519.PublicKey, manifest, sig []byte) (*Manifest, error)
 		return nil, ErrBadSignature
 	}
 	return Parse(manifest)
+}
+
+// SignPanelSSHSIG returns an OpenSSH SSHSIG signature of a panel manifest.
+func SignPanelSSHSIG(priv ed25519.PrivateKey, manifest []byte) ([]byte, error) {
+	if len(priv) != ed25519.PrivateKeySize {
+		return nil, errors.New("release: invalid Ed25519 private key")
+	}
+	signer, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		return nil, fmt.Errorf("release: create SSH signer: %w", err)
+	}
+	signedData := panelSSHSIGSignedData(manifest)
+	signature, err := signer.Sign(rand.Reader, signedData)
+	if err != nil {
+		return nil, fmt.Errorf("release: sign SSHSIG: %w", err)
+	}
+	publicKey := signer.PublicKey().Marshal()
+	signatureWire := appendSSHString(nil, []byte(signature.Format))
+	signatureWire = appendSSHString(signatureWire, signature.Blob)
+
+	wire := []byte("SSHSIG")
+	wire = binary.BigEndian.AppendUint32(wire, 1)
+	wire = appendSSHString(wire, publicKey)
+	wire = appendSSHString(wire, []byte(PanelSSHSIGNamespace))
+	wire = appendSSHString(wire, nil)
+	wire = appendSSHString(wire, []byte("sha512"))
+	wire = appendSSHString(wire, signatureWire)
+	return armorSSHSIG(wire), nil
+}
+
+// VerifyPanelSSHSIG verifies an armored SSHSIG signature and parses its panel manifest.
+func VerifyPanelSSHSIG(pub ed25519.PublicKey, manifest, armored []byte) (*Manifest, error) {
+	if len(pub) != ed25519.PublicKeySize {
+		return nil, ErrBadSignature
+	}
+	wire, err := unarmorSSHSIG(armored)
+	if err != nil {
+		return nil, ErrBadSignature
+	}
+	if len(wire) < len("SSHSIG")+4 || string(wire[:len("SSHSIG")]) != "SSHSIG" {
+		return nil, ErrBadSignature
+	}
+	wire = wire[len("SSHSIG"):]
+	version := binary.BigEndian.Uint32(wire[:4])
+	if version != 1 {
+		return nil, ErrBadSignature
+	}
+	wire = wire[4:]
+	publicKeyWire, wire, ok := readSSHString(wire)
+	if !ok {
+		return nil, ErrBadSignature
+	}
+	namespace, wire, ok := readSSHString(wire)
+	if !ok || string(namespace) != PanelSSHSIGNamespace {
+		return nil, ErrBadSignature
+	}
+	reserved, wire, ok := readSSHString(wire)
+	if !ok || len(reserved) != 0 {
+		return nil, ErrBadSignature
+	}
+	hashAlgorithm, wire, ok := readSSHString(wire)
+	if !ok || string(hashAlgorithm) != "sha512" {
+		return nil, ErrBadSignature
+	}
+	signatureWire, wire, ok := readSSHString(wire)
+	if !ok || len(wire) != 0 {
+		return nil, ErrBadSignature
+	}
+	publicKey, err := ssh.ParsePublicKey(publicKeyWire)
+	if err != nil || publicKey.Type() != ssh.KeyAlgoED25519 {
+		return nil, ErrBadSignature
+	}
+	expectedKey, err := ssh.NewPublicKey(pub)
+	if err != nil || !bytes.Equal(publicKey.Marshal(), expectedKey.Marshal()) {
+		return nil, ErrBadSignature
+	}
+	algorithm, signatureWire, ok := readSSHString(signatureWire)
+	if !ok || string(algorithm) != ssh.KeyAlgoED25519 {
+		return nil, ErrBadSignature
+	}
+	signature, signatureWire, ok := readSSHString(signatureWire)
+	if !ok || len(signatureWire) != 0 {
+		return nil, ErrBadSignature
+	}
+	signedSignature := &ssh.Signature{Format: string(algorithm), Blob: signature}
+	if err := publicKey.Verify(panelSSHSIGSignedData(manifest), signedSignature); err != nil {
+		return nil, ErrBadSignature
+	}
+	return Parse(manifest)
+}
+
+func panelSSHSIGSignedData(manifest []byte) []byte {
+	digest := sha512.Sum512(manifest)
+	signed := []byte("SSHSIG")
+	signed = appendSSHString(signed, []byte(PanelSSHSIGNamespace))
+	signed = appendSSHString(signed, nil)
+	signed = appendSSHString(signed, []byte("sha512"))
+	return appendSSHString(signed, digest[:])
+}
+
+func appendSSHString(dst, value []byte) []byte {
+	dst = binary.BigEndian.AppendUint32(dst, uint32(len(value)))
+	return append(dst, value...)
+}
+
+func readSSHString(wire []byte) ([]byte, []byte, bool) {
+	if len(wire) < 4 {
+		return nil, nil, false
+	}
+	size := binary.BigEndian.Uint32(wire[:4])
+	wire = wire[4:]
+	if uint64(size) > uint64(len(wire)) {
+		return nil, nil, false
+	}
+	return wire[:size], wire[size:], true
+}
+
+func armorSSHSIG(wire []byte) []byte {
+	encoded := base64.StdEncoding.EncodeToString(wire)
+	var armored strings.Builder
+	armored.WriteString("-----BEGIN SSH SIGNATURE-----\n")
+	for len(encoded) > 0 {
+		line := encoded
+		if len(line) > 70 {
+			line = line[:70]
+		}
+		armored.WriteString(line)
+		armored.WriteByte('\n')
+		encoded = encoded[len(line):]
+	}
+	armored.WriteString("-----END SSH SIGNATURE-----\n")
+	return []byte(armored.String())
+}
+
+func unarmorSSHSIG(armored []byte) ([]byte, error) {
+	text := strings.ReplaceAll(string(armored), "\r\n", "\n")
+	if strings.ContainsRune(text, '\r') {
+		return nil, errors.New("release: invalid SSHSIG armor")
+	}
+	text = strings.TrimSuffix(text, "\n")
+	lines := strings.Split(text, "\n")
+	if len(lines) < 3 || lines[0] != "-----BEGIN SSH SIGNATURE-----" || lines[len(lines)-1] != "-----END SSH SIGNATURE-----" {
+		return nil, errors.New("release: invalid SSHSIG armor")
+	}
+	var encoded strings.Builder
+	for i, line := range lines[1 : len(lines)-1] {
+		if len(line) == 0 || len(line) > 70 || (i < len(lines)-3 && len(line) != 70) {
+			return nil, errors.New("release: invalid SSHSIG armor")
+		}
+		encoded.WriteString(line)
+	}
+	wire, err := base64.StdEncoding.Strict().DecodeString(encoded.String())
+	if err != nil {
+		return nil, fmt.Errorf("release: invalid SSHSIG base64: %w", err)
+	}
+	return wire, nil
 }
 
 // Check decides whether a manifest may be installed by a build whose Built is ownBuilt, at time now: ErrExpired,

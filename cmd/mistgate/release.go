@@ -33,8 +33,8 @@ const releaseUsage = `usage:
           .) the one reproducible way; CI and make build use it. --built defaults to the commit time of the checkout.
   sign    rebuild every binary from --source, which must be a clean checkout of the tag --version, refuse any binary
           that does not come out byte for byte the same, then write DIR/manifest.json and DIR/manifest.sig for the node
-          binaries, DIR/panel-manifest.json and DIR/panel-manifest.sig for the panel binaries, and copy the binaries
-          into DIR. Signing a panel binary needs the SPA built in --source first (cd web && pnpm install
+          binaries, DIR/panel-manifest.json, DIR/panel-manifest.sig and DIR/panel-manifest.sshsig for the panel
+          binaries, and copy the binaries into DIR. Signing a panel binary needs the SPA built in --source first (cd web && pnpm install
           --frozen-lockfile && pnpm build).
   trust-key  after a key rotation: make the release key compiled into this binary the installation's key
           (<data-dir>/release.pub). Until then a panel whose compiled key differs from release.pub trusts no bundle.
@@ -376,8 +376,8 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		}
 	}
 	type signed struct {
-		name, sigName string
-		body, sig     []byte
+		name, sigName, sshsigName string
+		body, sig, sshsig         []byte
 	}
 	var outputs []signed
 	if len(node.Files) > 0 {
@@ -385,14 +385,21 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		outputs = append(outputs, signed{release.ManifestName, release.SignatureName, body, release.Sign(priv, body)})
+		outputs = append(outputs, signed{name: release.ManifestName, sigName: release.SignatureName, body: body, sig: release.Sign(priv, body)})
 	}
 	if len(panel.Files) > 0 {
 		body, err := panel.Marshal()
 		if err != nil {
 			return err
 		}
-		outputs = append(outputs, signed{release.PanelManifestName, release.PanelSignatureName, body, release.SignPanel(priv, body)})
+		sshsig, err := release.SignPanelSSHSIG(priv, body)
+		if err != nil {
+			return err
+		}
+		outputs = append(outputs, signed{
+			name: release.PanelManifestName, sigName: release.PanelSignatureName,
+			sshsigName: release.PanelSSHSIGName, body: body, sig: release.SignPanel(priv, body), sshsig: sshsig,
+		})
 	}
 	if err := checkReproduced(*source, *version, commitBuilt, release.EncodePublicKey(pub), bins); err != nil {
 		return err
@@ -412,6 +419,11 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		if err := writeAtomic(filepath.Join(*outDir, o.sigName), o.sig, 0o644); err != nil {
 			return err
 		}
+		if o.sshsigName != "" {
+			if err := writeAtomic(filepath.Join(*outDir, o.sshsigName), o.sshsig, 0o644); err != nil {
+				return err
+			}
+		}
 	}
 	// What was written must verify with the public key of the key file, file by file.
 	manifests, err := verifyBundle(*outDir, pub)
@@ -424,8 +436,8 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 			fmt.Fprintf(out, "  %-32s %10d bytes  sha256 %s\n", f.Name, f.Size, f.SHA256[:12])
 		}
 	}
-	fmt.Fprintf(out, "rebuilt from %s and signed with key %s\nUpload the manifests and signatures in %s to the release, or copy the node bundle to <data-dir>/dist on the panel.\n",
-		*version, buildinfo.KeyFingerprint(pub), *outDir)
+	fmt.Fprintf(out, "rebuilt from %s and signed with key %s\nUpload the manifests and signatures, including %s, in %s to the release, or copy the node bundle to <data-dir>/dist on the panel.\n",
+		*version, buildinfo.KeyFingerprint(pub), release.PanelSSHSIGName, *outDir)
 	return nil
 }
 
@@ -454,6 +466,15 @@ func verifyBundle(dir string, pub ed25519.PublicKey) ([]*release.Manifest, error
 		m, err := kind.verify(pub, body, sig)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", kind.name, err)
+		}
+		if kind.name == release.PanelManifestName {
+			sshsig, err := os.ReadFile(filepath.Join(dir, release.PanelSSHSIGName))
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", release.PanelSSHSIGName, err)
+			}
+			if _, err := release.VerifyPanelSSHSIG(pub, body, sshsig); err != nil {
+				return nil, fmt.Errorf("%s: %w", release.PanelSSHSIGName, err)
+			}
 		}
 		if err := verifyFiles(dir, m); err != nil {
 			return nil, err

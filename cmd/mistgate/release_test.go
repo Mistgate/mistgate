@@ -196,6 +196,13 @@ func TestReleaseSignRoundTrip(t *testing.T) {
 	if err != nil || len(pm.Files) != 1 || pm.Files[0].Name != "mistgate-linux-amd64" || pm.Built != testCommitTime {
 		t.Fatalf("panel manifest %+v: %v", pm, err)
 	}
+	panelSSHSIG, err := os.ReadFile(filepath.Join(outDir, release.PanelSSHSIGName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := release.VerifyPanelSSHSIG(pub, panelBody, panelSSHSIG); err != nil {
+		t.Fatalf("panel SSHSIG does not verify with the printed key: %v", err)
+	}
 	for _, f := range m.Files {
 		fh, err := os.Open(filepath.Join(outDir, f.Name))
 		if err != nil {
@@ -207,7 +214,7 @@ func TestReleaseSignRoundTrip(t *testing.T) {
 			t.Fatalf("copied file %s: %v", f.Name, err)
 		}
 	}
-	for _, want := range []string{"version v0.1.4", "mistgate-node-linux-amd64", "mistgate-linux-amd64", "signed with key " + buildinfo.KeyFingerprint(pub)} {
+	for _, want := range []string{"version v0.1.4", "mistgate-node-linux-amd64", "mistgate-linux-amd64", release.PanelSSHSIGName, "signed with key " + buildinfo.KeyFingerprint(pub)} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}

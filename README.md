@@ -48,7 +48,7 @@ Two static Go binaries, one for the panel and one for the node agent. SQLite and
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
 
-> **Coming soon, not in a release yet:** VLESS REALITY and XHTTP (the node engine is merged), Xray JSON and sing-box subscriptions, a one-line installer, a full Telegram bot for the fleet and for users, and a free edition of the panel that runs on Cloudflare Workers (in development).
+> **Coming soon, not in a release yet:** VLESS REALITY and XHTTP (the node engine is merged), Xray JSON and sing-box subscriptions, a full Telegram bot for the fleet and for users, and a free edition of the panel that runs on Cloudflare Workers (in development).
 
 ## Screenshots
 
@@ -67,24 +67,19 @@ The screenshots use invented demo data.
 
 ## Quick start
 
-You need a Linux server (amd64 or arm64) with systemd, a domain that points at it (here `panel.example.com`), and TCP ports 80 and 443 free. On the server, as root:
+You need a fresh Linux server (amd64 or arm64) with systemd, a domain that points directly at it (here `panel.example.com`), TCP ports 80 and 443 free, and either `openssh-client` with `ssh-keygen -Y verify` support or OpenSSL 3.2 or newer. On the server, run:
 
 ```sh
-ARCH=amd64    # arm64 on an ARM server
-for f in "mistgate-linux-$ARCH" SHA256SUMS; do
-  curl -fsSLO "https://github.com/Mistgate/mistgate/releases/latest/download/$f"
-done
-sha256sum --check --ignore-missing SHA256SUMS
-install -m 0755 "mistgate-linux-$ARCH" /usr/local/bin/mistgate
-mistgate setup --public-url https://panel.example.com             # prints the admin URL and a one-time setup link
-mistgate serve --listen :443 --acme-domain panel.example.com      # a first run in the foreground
+curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
 ```
+
+The installer verifies the signed panel manifest, runs setup and starts Mistgate under systemd. It prints the admin URL and a one-time setup link that expires in 30 minutes. It does not change firewall rules. Add `--yes` for a non-interactive run or `--dry-run` to verify the release without changing the server. See [Install the panel](docs/en/getting-started/install-panel.md) for manual installation and the other options.
 
 Then:
 
-1. Run `serve` under systemd with the unit from [Install the panel](docs/en/getting-started/install-panel.md). That page also covers the hidden admin host, your own certificate and your own decoy site.
-2. Open the setup link and create the owner: a passkey, or a password with an authenticator code.
-3. Add servers in **Nodes → Add node**, over SSH or with a one-time command ([Add a node](docs/en/getting-started/add-node.md)), then follow [First users](docs/en/getting-started/first-users.md).
+1. Open the setup link and create the owner: a passkey, or a password with an authenticator code.
+2. Add servers in **Nodes → Add node**, over SSH or with a one-time command ([Add a node](docs/en/getting-started/add-node.md)).
+3. Follow [First users](docs/en/getting-started/first-users.md). [Install the panel](docs/en/getting-started/install-panel.md) also covers manual installation, the hidden admin host, your own certificate and your own decoy site.
 
 **Or let an AI agent install it.** Claude Code, Codex CLI or any agent that can run `ssh` on your computer can do the steps above: copy the install prompt from the [AI agent guide](docs/en/getting-started/ai-agents.md#install-mistgate-with-an-ai-agent). It asks before every change, and you create the owner account yourself.
 
@@ -95,7 +90,7 @@ Then:
 | Runs without Docker | ✅ | ✅ | ❌ | ✅ | partial | ✅ |
 | Database | SQLite | SQLite or PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB or PostgreSQL | SQLite |
 | Panel RAM, idle | 16-20 MiB¹ | 68-74 MiB¹ | 426-454 MiB¹ | not measured | 262-265 MiB¹ | not measured |
-| One-line installer | soon | ✅ | ❌ | ✅ | ✅ | ✅ |
+| One-line installer | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | partial | ✅ | ✅ | ✅ |
 | AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ? | ? | ? | ? |
@@ -115,7 +110,7 @@ Others are ahead in protocol breadth, community size, HWID limits and full Teleg
 
 Mistgate is in beta. The current release is [`v0.1.33`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
-Next: VLESS REALITY and XHTTP, Xray JSON and sing-box subscriptions, a one-line installer, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
+Next: VLESS REALITY and XHTTP, Xray JSON and sing-box subscriptions, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 
 ## Documentation
 

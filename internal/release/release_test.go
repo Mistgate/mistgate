@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func testKey(t *testing.T, b byte) (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -89,6 +94,118 @@ func TestPanelSignatureIsSeparateFromNodeSignature(t *testing.T) {
 	}
 	if _, err := VerifyPanel(pub, b, Sign(priv, b)); !errors.Is(err, ErrBadSignature) {
 		t.Errorf("a node signature verified as a panel manifest: %v", err)
+	}
+}
+
+func TestPanelSSHSIGGoldenRoundTrip(t *testing.T) {
+	const golden = `-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgiojj3XQJ8ZX9UtstPLpdcspnCb
+8dlBIb83SIAbQPb1wAAAAabWlzdGdhdGUtcGFuZWwtbWFuaWZlc3QtdjEAAAAAAAAABnNo
+YTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAe/k/vmm1yZ24vx/5D3MlgyDnU3eVnLEvjH
+oRcfw8aRK8upbIniYSy3WDeLRpiTG7yZHuLHzVt3LphJ57TtKMCw==
+-----END SSH SIGNATURE-----
+`
+	pub, priv := testKey(t, 1)
+	m := sampleManifest()
+	manifest, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := SignPanelSSHSIG(priv, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(got, []byte("-----BEGIN SSH SIGNATURE-----\n")) || !bytes.HasSuffix(got, []byte("-----END SSH SIGNATURE-----\n")) {
+		t.Fatalf("unexpected SSHSIG armor: %q", got)
+	}
+	if string(got) != golden {
+		t.Fatalf("golden SSHSIG mismatch:\n%s", got)
+	}
+	for _, line := range strings.Split(strings.TrimSuffix(string(got), "\n"), "\n")[1:] {
+		if line == "-----END SSH SIGNATURE-----" {
+			break
+		}
+		if len(line) > 70 {
+			t.Fatalf("armor line has %d columns, want at most 70", len(line))
+		}
+	}
+	parsed, err := VerifyPanelSSHSIG(pub, manifest, got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Version != sampleManifest().Version || parsed.Built != sampleManifest().Built {
+		t.Fatalf("parsed manifest %+v", parsed)
+	}
+}
+
+func TestPanelSSHSIGRejectsWrongNamespaceKeyAndMessage(t *testing.T) {
+	pub, priv := testKey(t, 1)
+	otherPub, _ := testKey(t, 2)
+	m := sampleManifest()
+	manifest, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := SignPanelSSHSIG(priv, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire, err := unarmorSSHSIG(sig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongNamespaceWire := bytes.Replace(wire, []byte(PanelSSHSIGNamespace), []byte(strings.Repeat("x", len(PanelSSHSIGNamespace))), 1)
+	wrongNamespace := armorSSHSIG(wrongNamespaceWire)
+	tampered := bytes.Replace(manifest, []byte("0.2.0"), []byte("0.9.0"), 1)
+	for name, tc := range map[string]struct {
+		pub       ed25519.PublicKey
+		manifest  []byte
+		signature []byte
+	}{
+		"wrong namespace":  {pub, manifest, wrongNamespace},
+		"wrong key":        {otherPub, manifest, sig},
+		"tampered message": {pub, tampered, sig},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := VerifyPanelSSHSIG(tc.pub, tc.manifest, tc.signature); !errors.Is(err, ErrBadSignature) {
+				t.Fatalf("err = %v, want ErrBadSignature", err)
+			}
+		})
+	}
+}
+
+func TestPanelSSHSIGVerifiesWithSSHKeygen(t *testing.T) {
+	sshKeygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("ssh-keygen is not installed")
+	}
+	pub, priv := testKey(t, 3)
+	m := sampleManifest()
+	manifest, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := SignPanelSSHSIG(priv, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	allowedSigners := filepath.Join(dir, "allowed_signers")
+	if err := os.WriteFile(allowedSigners, []byte(fmt.Sprintf("mistgate-release %s %s\n", key.Type(), base64.StdEncoding.EncodeToString(key.Marshal()))), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	signature := filepath.Join(dir, "panel-manifest.sshsig")
+	if err := os.WriteFile(signature, sig, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(sshKeygen, "-Y", "verify", "-f", allowedSigners, "-I", "mistgate-release", "-n", PanelSSHSIGNamespace, "-s", signature)
+	cmd.Stdin = bytes.NewReader(manifest)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen rejected the SSHSIG: %v\n%s", err, output)
 	}
 }
 

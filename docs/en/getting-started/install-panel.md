@@ -5,13 +5,27 @@ description: Download or build Mistgate, prepare the panel with mistgate setup, 
 
 This page takes a fresh Linux server to a running panel with an owner account. The examples use `panel.example.com`; check [Requirements](requirements.md) first. Commands on the panel server run as root. An AI agent with SSH access to the server can do the same steps for you: see the install prompt in the [AI agent guide](ai-agents.md).
 
-## 1. Get the binary
+## One-line install
+
+For a fresh Linux server on amd64 or arm64 with systemd, run this as root. The domain must point directly at the server and TCP ports 80 and 443 must be free. Signature verification needs either `openssh-client` with `ssh-keygen -Y verify` support or OpenSSL 3.2 or newer. The installer downloads the latest release, checks the binary against `SHA256SUMS` and the signed panel manifest, then runs setup and installs the systemd service. It does not change firewall rules; if UFW or firewalld is active, it prints the rules to add.
+
+```sh
+curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
+```
+
+The installer requests a Let's Encrypt certificate for the URL host by default. It asks before making changes; add `--yes` for a non-interactive run. Use `--dry-run` to download and verify a release without changing the host, or `--version vX.Y.Z` to install a pinned release. `--admin-host`, `--admin-listen`, `--acme-domain` and `--data-dir` select the setup and service options described below.
+
+When it finishes, open the one-time setup link in a browser and create the owner account. The link expires in 30 minutes. Then add a node from **Nodes → Add node**.
+
+## Manual install
+
+### 1. Get the binary
 
 The panel is one static Linux binary for amd64 or arm64, with the admin web app built in. Use the official release unless you have a reason to build your own.
 
-### From GitHub Releases (recommended)
+#### From GitHub Releases (recommended)
 
-Every release on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) carries the panel (`mistgate-linux-amd64`, `mistgate-linux-arm64`), the node agent (`mistgate-node-linux-amd64`, `mistgate-node-linux-arm64`), `SHA256SUMS`, `BUILDINFO` and two signed manifests: `manifest.json` with `manifest.sig` for the node agents and `panel-manifest.json` with `panel-manifest.sig` for the panel. The official binaries carry the project's release key, so a panel installed from them downloads the signed node agents by itself and can update itself from later releases (see [Updates](../operations/updates.md)).
+Every release on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) carries the panel (`mistgate-linux-amd64`, `mistgate-linux-arm64`), the node agent (`mistgate-node-linux-amd64`, `mistgate-node-linux-arm64`), `SHA256SUMS`, `BUILDINFO` and two signed manifests: `manifest.json` with `manifest.sig` for the node agents and `panel-manifest.json` with `panel-manifest.sig` and `panel-manifest.sshsig` for the panel. The official binaries carry the project's release key, so a panel installed from them downloads the signed node agents by itself and can update itself from later releases (see [Updates](../operations/updates.md)).
 
 On the panel server, as root (`uname -m` prints `x86_64` for amd64 and `aarch64` for arm64):
 
@@ -30,10 +44,10 @@ mistgate version
 What these checks prove, and what they do not:
 
 - `sha256sum --check` proves the file arrived intact and matches the checksums published with the release. `SHA256SUMS` is written by the release workflow and is not signed, so it does not prove who built the binary.
-- The same SHA-256 is listed in `panel-manifest.json`, which the maintainer signs offline with the release key after rebuilding every binary from the tag. Mistgate has no command that checks this signature for you, and common tools cannot check its Ed25519ctx signature, so the `grep` is a consistency check only.
+- The same SHA-256 is listed in `panel-manifest.json`, which the maintainer signs offline with the release key after rebuilding every binary from the tag. The one-line installer prefers `panel-manifest.sshsig` with `ssh-keygen -Y verify`, and falls back to `panel-manifest.sig` with OpenSSL 3.2 or newer. For this manual path, the `grep` is a consistency check only.
 - From then on the panel checks signatures itself: it installs a panel release, and hands a node bundle to the agents, only when the signature verifies with the release key compiled into it. `mistgate version` prints the version and that key's fingerprint.
 
-### From source
+#### From source
 
 On a build machine with the tools listed in [Requirements](requirements.md):
 
@@ -49,7 +63,7 @@ ssh root@panel.example.com 'install -m 0755 /root/mistgate-linux-amd64 /usr/loca
 
 > **Warning:** a build without `RELEASE_KEY` has no release key: its node agents never update themselves, the panel cannot install panel releases, and the SSH installation has no trusted agent bundle to install. A build with your own key trusts only releases you sign. Make the key before the first build: see [Releases and signing](../operations/releases.md).
 
-## 2. Choose how the admin is reached
+### 2. Choose how the admin is reached
 
 The public address shows a decoy site to everyone. The admin is reached in one of three ways, chosen once, when you run `mistgate setup`:
 
@@ -73,7 +87,7 @@ The public address shows a decoy site to everyone. The admin is reached in one o
 
 > **Warning:** setup stores these addresses once. Running it again keeps them, and Mistgate has no command to change them later. Choose before you go on; starting over means a new data directory and enrolling every node again.
 
-## 3. Run setup
+### 3. Run setup
 
 ```sh
 mistgate setup --public-url https://panel.example.com
@@ -98,7 +112,7 @@ What setup does:
 
 Keep the admin URL to yourself. Setup is safe to run again: it keeps the existing configuration and, as long as no admin exists, prints a fresh setup link.
 
-## 4. Choose the certificate
+### 4. Choose the certificate
 
 | Option | Flags of `serve` | What happens |
 |:--|:--|:--|
@@ -110,7 +124,7 @@ Keep the admin URL to yourself. Setup is safe to run again: it keeps the existin
 
 > **Note:** a Let's Encrypt certificate for a secret admin host puts that name into public Certificate Transparency logs. To keep it secret, cover it with a wildcard certificate of your own.
 
-## 5. The decoy site
+### 5. The decoy site
 
 Without anything else the panel shows a built-in "Coming soon" page. Every installation ships the same page, so it is recognisable; your own site is better. Put static files in a directory and pass `--decoy-dir`:
 
@@ -121,7 +135,7 @@ Without anything else the panel shows a built-in "Coming soon" page. Every insta
 
 The panel only reads this directory. With the systemd unit below, keep it outside `/home` and `/root` (for example in `/srv/mistgate-decoy`). [Your own decoy site](../guide/decoy-site.md) says what a good one looks like and has a prompt that has an AI agent invent a unique site.
 
-## 6. Try it in the foreground
+### 6. Try it in the foreground
 
 ```sh
 mistgate serve --listen :443 --acme-domain panel.example.com
@@ -129,7 +143,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 
 `--listen` defaults to `127.0.0.1:8080`, so pass `--listen :443` on a real server. The log goes to stderr; look for `listening` lines for the public listener (and `acme-http` for port 80). Stop it with Ctrl+C once it works.
 
-## 7. Run it under systemd
+### 7. Run it under systemd
 
 Save this as `/etc/systemd/system/mistgate.service` and change `ExecStart` to the flags you chose:
 
@@ -186,7 +200,7 @@ Why it looks like this:
 - Every flag has a `MISTGATE_*` environment variable, so you can move the flags to `Environment=` lines or an `EnvironmentFile=`. See [Configuration](../reference/configuration.md).
 - With `--decoy-dir`, `--tls-cert` or `--tls-key`, the files only need to be readable.
 
-### Behind a reverse proxy
+#### Behind a reverse proxy
 
 If another web server must own port 443 on this host, Mistgate can run behind it:
 
@@ -196,7 +210,7 @@ If another web server must own port 443 on this host, Mistgate can run behind it
 
 The agent port is then a port of its own that answers only the secret TLS name; on the shared port 443 it hides behind the decoy site. Prefer the plain setup above when you can.
 
-## 8. Sign in for the first time
+### 8. Sign in for the first time
 
 Open the setup link from step 3 in a browser, the whole link including the part after `#`.
 
@@ -214,7 +228,7 @@ The first admin is the owner. The setup wizard also creates an empty group "Ever
 
 Later you sign in at the admin URL with **Sign in with passkey**, or with **another way**: login, password and code. Five wrong passwords within an hour lock that login for 15 minutes. Lost your phone or your passkey: [Security](../operations/security.md) explains `mistgate auth reset-login`.
 
-## 9. Back up right away
+### 9. Back up right away
 
 Everything the panel knows lives in the data directory:
 

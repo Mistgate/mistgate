@@ -12,6 +12,7 @@ import { SITE, LANGS, pageUrl } from "./src/urls.mjs";
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DOCS = join(ROOT, "..", "docs");
 const DIST = join(ROOT, "dist");
+const INSTALLER = join(ROOT, "..", "scripts", "install.sh");
 const SRC = join(ROOT, "src");
 const BRAND = join(ROOT, "..", "web", "src");
 const warnings = [];
@@ -33,6 +34,7 @@ for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f))
 // the admin screenshot on the home page: the README's own pictures, light and dark, per language
 const SHOTS = join(ROOT, "..", "docs", "images", "readme");
 for (const f of readdirSync(SHOTS)) if (/^overview-(light|dark)-(en|ru)\.webp$/.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
+out("install.sh", readFileSync(INSTALLER));
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));
 out("mistgate-badge.svg", badge);
 out("favicon.svg", badge);
@@ -155,6 +157,10 @@ out("_headers", `/*
 
 /fonts/*
   Cache-Control: public, max-age=2592000
+
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300
 `);
 
 // ---- link check: every internal href/src must land on a written page, asset or anchor ----

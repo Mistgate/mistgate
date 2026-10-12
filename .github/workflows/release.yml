@@ -37,6 +37,11 @@ jobs:
             echo "Set the repository variable MISTGATE_RELEASE_PUBLIC_KEY (a base64 Ed25519 public key) before creating a release" >&2
             exit 1
           fi
+          INSTALLER_KEY=$(sed -n 's/^readonly RELEASE_PUBLIC_KEY_BASE64="\([^"]*\)"$/\1/p' scripts/install.sh)
+          if [[ "$RELEASE_KEY" != "$INSTALLER_KEY" ]]; then
+            echo "scripts/install.sh release key differs from MISTGATE_RELEASE_PUBLIC_KEY" >&2
+            exit 1
+          fi
       - name: Build node binaries
         shell: bash
         env:
@@ -97,10 +102,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release
           merge-multiple: true
+      - name: Add the installer to the release
+        run: cp scripts/install.sh release/install.sh
       - name: Publish the draft release
         shell: bash
         env:
@@ -111,6 +121,6 @@ jobs:
           cd release
           bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64)
           sha256sum "${bins[@]}" > SHA256SUMS
-          gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO --repo "$GITHUB_REPOSITORY" --verify-tag \
+          gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO install.sh --repo "$GITHUB_REPOSITORY" --verify-tag \
             --draft --title "$TAG" --generate-notes
-          echo "::notice::The release stays a draft until the owner rebuilds the binaries from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json and panel-manifest.sig. Publish it only after all four are attached."
+          echo "::notice::The release stays a draft until the owner rebuilds the binaries from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig and panel-manifest.sshsig. Publish it only after all five are attached."

@@ -34,7 +34,7 @@ This builds `bin/mistgate-linux-{amd64,arm64}` and `bin/mistgate-node-linux-{amd
 
 For every stable tag `vMAJOR.MINOR.PATCH`, `.github/workflows/release.yml` runs three jobs. `node` builds both Linux node agents with Go only (no Node.js, no npm packages); `panel` builds the admin SPA with pnpm and then the two panel binaries. Both have read-only access to the repository. `publish`, the only job that may write and the only one that runs no build code, creates a **draft** release with the four binaries, `BUILDINFO` and `SHA256SUMS`. Every action is pinned to a commit SHA. A draft is not visible to panels as the latest release. The workflow requires the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` and stamps it into all four binaries; if it is missing or invalid, the workflow fails instead of publishing a release that cannot be signed.
 
-The private key never goes to Actions, and you do not have to trust the CI's binaries: on a machine that holds the key, you build the release from the tag yourself, and `mistgate release sign` signs only binaries that your build reproduces byte for byte. Then you upload the four manifest and signature files and publish the draft. Within 10 minutes panels download and verify the node bundle (nodes stay on their builds until the owner updates or schedules them), and **Check GitHub** offers the panel release.
+The private key never goes to Actions, and you do not have to trust the CI's binaries: on a machine that holds the key, you build the release from the tag yourself, and `mistgate release sign` signs only binaries that your build reproduces byte for byte. Then upload the five manifest and signature files, including `panel-manifest.sshsig`, and publish the draft. Within 10 minutes panels download and verify the node bundle (nodes stay on their builds until the owner updates or schedules them), and **Check GitHub** offers the panel release.
 
 ```sh
 VERSION=v0.1.6
@@ -48,11 +48,12 @@ gh release download "$VERSION" --repo Mistgate/mistgate \
   ../downloaded/mistgate-node-linux-amd64 ../downloaded/mistgate-node-linux-arm64 \
   ../downloaded/mistgate-linux-amd64 ../downloaded/mistgate-linux-arm64 --out ../signed
 gh release upload "$VERSION" ../signed/manifest.json ../signed/manifest.sig \
-  ../signed/panel-manifest.json ../signed/panel-manifest.sig --repo Mistgate/mistgate --clobber
+  ../signed/panel-manifest.json ../signed/panel-manifest.sig ../signed/panel-manifest.sshsig \
+  --repo Mistgate/mistgate --clobber
 gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 ```
 
-`release sign` refuses unless the checkout is exactly the tag without local changes, then rebuilds every binary with `mistgate release build` and the public half of your key and compares it with the downloaded one. The last command publishes the draft: do not publish it before all four files have uploaded.
+`release sign` refuses unless the checkout is exactly the tag without local changes, then rebuilds every binary with `mistgate release build` and the public half of your key and compares it with the downloaded one. The last command publishes the draft: do not publish it before all five files have uploaded.
 
 If signing refuses because a binary does not match its rebuild, do not sign: find out why first. The usual causes are a different key in `MISTGATE_RELEASE_PUBLIC_KEY`, a tag moved after the build, or a toolchain difference (below); an unexplained difference may mean a compromised runner.
 
@@ -69,7 +70,7 @@ The check proves that the CI built what the tag says. It does not vet the tag's 
 
 ### Keep the signature short-lived
 
-`--expires` (default `30d`) is how long both manifests can be installed; a captured old manifest stops working when it runs out. Use a short lifetime such as `90d` and renew it before it ends: run the same `release sign` command for the same tag with a new `--expires` and upload the four files again with `--clobber`. Panels refresh the node bundle of the same build without updating nodes again, and they read the panel manifest anew at every check. A panel that finds an expired panel manifest says so and does not install the release; an expired node bundle can no longer be rolled out or used by the SSH installation.
+`--expires` (default `30d`) is how long both manifests can be installed; a captured old manifest stops working when it runs out. Use a short lifetime such as `90d` and renew it before it ends: run the same `release sign` command for the same tag with a new `--expires` and upload the five files again with `--clobber`. Panels refresh the node bundle of the same build without updating nodes again, and they read the panel manifest anew at every check. A panel that finds an expired panel manifest says so and does not install the release; an expired node bundle can no longer be rolled out or used by the SSH installation.
 
 ## Use a bundle of your own
 
