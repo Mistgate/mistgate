@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -12,7 +13,9 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/statehash"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -24,6 +27,8 @@ func TestRequiredProtocolCapability(t *testing.T) {
 	}{
 		{name: "AWG", spec: plugin.InboundSpec{Protocol: "awg"}, want: capAWG},
 		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: capVLESS},
+		{name: "VLESS, another site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}, want: capVLESS},
+		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: capVLESSSelf},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
 		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
 	}
@@ -478,4 +483,40 @@ func legacyDiffState(old, next *nodeState) (changed []*agentv1.InboundState, rem
 func legacySameCred(a, b plugin.UserCred) bool {
 	return a.CredID == b.CredID && a.UserID == b.UserID && a.DeviceID == b.DeviceID &&
 		bytes.Equal(a.Data, b.Data) && a.RateLimitBps == b.RateLimitBps && a.ValidUntil.Equal(b.ValidUntil)
+}
+
+// Self is the default target of a new VLESS profile, and an agent of v0.1.33/v0.1.34 (vless/1 only) rejects it with the
+// whole state: it is withheld from that agent like an awg inbound from one without awg/1 (the inbound row says
+// agent_too_old), while a site-target inbound still goes out.
+func TestVLESSSelfInboundIsWithheldFromAnAgentWithoutTheCapability(t *testing.T) {
+	site := plugin.InboundSpec{ID: "inb_site", Protocol: "vless", Enabled: true, Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}
+	self := plugin.InboundSpec{ID: "inb_self", Protocol: "vless", Enabled: true, Settings: []byte(`{"reality":{"target":"self"}}`)}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: site}, {Spec: self}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	for _, tc := range []struct {
+		name     string
+		caps     []string
+		held     []string
+		withheld []string
+	}{
+		{"agent v0.1.34: vless/1 only", []string{"vless/1"}, []string{"inb_site"}, []string{"inb_self"}},
+		{"agent with the capability", []string{"vless/1", "vless-self/1"}, []string{"inb_self", "inb_site"}, nil},
+		{"no VLESS at all", nil, nil, []string{"inb_self", "inb_site"}},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held []string
+		for id := range st.in {
+			held = append(held, id)
+		}
+		sort.Strings(held)
+		if !slices.Equal(held, tc.held) || !slices.Equal(st.withheld, tc.withheld) {
+			t.Errorf("%s: held %v withheld %v, want %v and %v", tc.name, held, st.withheld, tc.held, tc.withheld)
+		}
+	}
 }

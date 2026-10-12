@@ -34,6 +34,22 @@ func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
 	}
 }
 
+// vless-self/1 says the engine can serve the node's own site: it needs the certificate source, and an agent that has vless/1
+// only (v0.1.33/v0.1.34) rejects target "self".
+func TestCapabilitiesAdvertiseVLESSSelfWithACertificateSource(t *testing.T) {
+	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
+	if slices.Contains(a.capabilities(), "vless-self/1") {
+		t.Fatal("vless-self/1 is advertised without a certificate source")
+	}
+	a.cfg.Certs = &markCerts{}
+	if caps := a.capabilities(); !slices.Contains(caps, "vless-self/1") || !slices.Contains(caps, "vless/1") {
+		t.Fatalf("capabilities %v lack vless/1 or vless-self/1", caps)
+	}
+	if slices.Contains((&Agent{cfg: Config{Certs: &markCerts{}}, engines: map[string]engine.Engine{}}).capabilities(), "vless-self/1") {
+		t.Fatal("vless-self/1 is advertised without a VLESS engine")
+	}
+}
+
 func TestConfiguredLinkUsesMTLSWhenPanelDoesNotAdvertiseSupport(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.LinkURL = "wss://example.com/abcdefghijklmnop" }})
 	h.waitConnected()

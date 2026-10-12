@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -23,7 +24,10 @@ import (
 const (
 	capAWG   = "awg/1"
 	capVLESS = "vless/1"
-	capWarp  = "warp/1"
+	// capVLESSSelf: an agent that can serve the node's own site behind REALITY (target "self"). An older vless/1 agent
+	// rejects that target, and self is the default of a new VLESS profile.
+	capVLESSSelf = "vless-self/1"
+	capWarp      = "warp/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
@@ -35,9 +39,22 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capAWG
 	}
 	if s.Protocol == "vless" {
+		if vlessTargetSelf(s) {
+			return capVLESSSelf
+		}
 		return capVLESS
 	}
 	return ""
+}
+
+// vlessTargetSelf: the REALITY target of a VLESS inbound is the node's own site (wire value "self").
+func vlessTargetSelf(s plugin.InboundSpec) bool {
+	var settings struct {
+		Reality struct {
+			Target string `json:"target"`
+		} `json:"reality"`
+	}
+	return json.Unmarshal(s.Settings, &settings) == nil && strings.TrimSpace(settings.Reality.Target) == "self"
 }
 
 // inboundState is one inbound as the node must hold it.
