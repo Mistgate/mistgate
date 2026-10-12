@@ -249,6 +249,29 @@ func TestFetchesAreServedFromACache(t *testing.T) {
 	}
 }
 
+// The cached data of a token goes MinInterval after its last fetch, with no further request: a token whose app
+// refreshes hourly must not hold its view for as long as the panel runs.
+func TestCachedViewIsDroppedAfterTheInterval(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.Now, c.MinInterval = time.Now, 50*time.Millisecond })
+	if rec := r.get("203.0.113.1", tokA); rec.Code != 200 {
+		t.Fatalf("%d", rec.Code)
+	}
+	st, _ := r.h.(*handler).tokens.Get(tokA)
+	views := func() int {
+		st.mu.Lock()
+		defer st.mu.Unlock()
+		return len(st.cached)
+	}
+	if views() != 1 {
+		t.Fatalf("%d views right after the fetch", views())
+	}
+	for deadline := time.Now().Add(5 * time.Second); views() != 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the view is still cached 5 s after the interval")
+		}
+	}
+}
+
 // A hard cap per token per hour: cached answers count, the next one is a 429 with Retry-After, and the
 // hour after the first fetch of the window opens it again. Other tokens are not affected.
 func TestHourlyCapPerToken(t *testing.T) {

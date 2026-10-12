@@ -203,6 +203,7 @@ type tokenState struct {
 	userName string
 
 	cached map[plugin.ClientFormat]cachedView // the data of the last fetch per view format, reused for MinInterval
+	expire *time.Timer                        // empties cached MinInterval after the last fetch (see remember)
 
 	winStart time.Time // start of the current hour; hits counts the fetches in it
 	hits     int
@@ -345,7 +346,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.suspect(suspect)
 		}
 	}
-	st.remember(v, format, now, app)
+	st.remember(v, format, now, app, h.cfg.MinInterval)
 	h.respond(w, r, token, v, set, sf, format)
 }
 
@@ -362,15 +363,25 @@ func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientF
 	})
 }
 
-// remember keeps the user name and the data of a fetch (for MinInterval, per view format); app: an app's fetch made it.
-func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now time.Time, app bool) {
+// remember keeps the user name and, for keep (MinInterval), the data of a fetch per view format; app: an app's fetch
+// made it. The data is dropped keep after the last fetch: it is never served later, and a token that is not fetched
+// again soon (apps refresh about hourly) would hold it, a few KB per user, for as long as the panel runs.
+func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now time.Time, app bool, keep time.Duration) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.userName = v.UserName
+	if keep <= 0 {
+		return
+	}
 	if st.cached == nil {
 		st.cached = map[plugin.ClientFormat]cachedView{}
 	}
 	st.cached[format] = cachedView{v: &v, at: now, app: app}
+	if st.expire == nil {
+		st.expire = time.AfterFunc(keep, st.drop)
+	} else {
+		st.expire.Reset(keep) // a timer firing during this call may drop this view early: one more render, never a stale answer
+	}
 }
 
 // respond renders the answer for a valid token from its data, the settings and the brand of this moment
