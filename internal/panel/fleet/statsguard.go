@@ -15,8 +15,6 @@ const (
 	// A batch covers 10 s normally; the agent coalesces up to one UTC hour (agent.proto), so no interval is
 	// believed to be longer than that.
 	maxBatchSpan = time.Hour
-	// maxStatsDeltas bounds the work of one batch: a node cannot have more credentials than this.
-	maxStatsDeltas = 1 << 16
 	// rejectEventEvery limits the stats_rejected events of one stream (the table has no retention).
 	rejectEventEvery = time.Minute
 )

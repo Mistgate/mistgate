@@ -44,4 +44,4 @@ $local = $template -replace 'replace-with-your-d1-database-id', '00000000-0000-0
 [IO.File]::WriteAllText((Join-Path $worker "wrangler.dev.toml"), $local, (New-Object Text.UTF8Encoding $false))
 
 $bytes = (Get-Item -LiteralPath $wasm).Length
-"edge wasm: {0} bytes ({1:N1} MiB, limit in CI 52428800)" -f $bytes, ($bytes / 1MB)
+"edge wasm: {0} bytes ({1:N1} MiB, limit in CI 52428800, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (52428800 - $bytes), ((52428800 - $bytes) / 1KB)

@@ -799,7 +799,7 @@ No Cloudflare account is touched: `HOME=$WORK/home` (no stored login), `CLOUDFLA
 unset, `WRANGLER_SEND_METRICS=false`, never `--remote`, D1 id all zeros; outbound traffic only the npm install and
 miniflare's public `cf.json`.
 
-Steps (VPS numbering, differences only): (1) setup link from the Worker log, first admin; (2) `installCommand` contains
+Steps (VPS numbering, differences only): (1) first admin from the setup token the script chose (`SETUP_TOKEN_SHA256` in `.dev.vars`; no link in the log, E2); (2) `installCommand` contains
 `enroll --link-url wss://de1.example.com:$PUB/<prefix>/`; `mistgate-node enroll --link-url …` then `run`; node online in
 `node_live`, inbound running, desired state over the link; 2b doctor through `Remote.Ask`; 2c replaced: stop the agent →
 offline after liveness → start → online with Hello matching the digest and no full DesiredState; touch `src/index.ts` →
@@ -817,7 +817,7 @@ D1); `test-edge-entry.ps1` (`bridge.cjs`) keeps the budgets, adds fan-out and cr
 
 **Result (6f, 2026-10-09; Ubuntu in WSL2, 16 vCPU, Node 22, wrangler 4.147, workerd 1.20261001).** `scripts/e2e-wsl.sh --edge`
 (sourcing `scripts/e2e/edge.sh`) passed twice in a row (248 s and 288 s); `--m3` (565 s) still passes. Steps as written above, plus
-what differs from the VPS run: the setup link is read from the Worker's log; the admin API sits under the secret prefix of the
+what differs from the VPS run: the setup link is read from the Worker's log (since E2 the script chooses the token and passes its hash instead); the admin API sits under the secret prefix of the
 public URL; there is no `--panel`/mTLS path, so the agent is link-only (`enroll --link-url`, `run`); the node is named `node-a`,
 the user `alice`, the host `de1.example.com` (a namespace `hosts` file). Skipped, with the reason: CheckPorts `same_host` (the
 panel's UDP probe cannot run in a Worker), the synthetic-check rounds and the NODE_DOWN alert (health checker and evaluator are
@@ -843,7 +843,7 @@ What wrangler (4.147, `wrangler dev --local-protocol https`) did that the design
   uses it). Whether Cloudflare's edge does the same for a Worker is a 6g question.
 - **wrangler logs every request path**, secret prefixes and subscription token included, to stdout and to its file log
   (`[wrangler:info] POST /<admin prefix>/...`). The script's log check therefore filters wrangler's own request lines and the
-  setup-link lines (the setup link is printed on purpose) and checks the rest.
+  setup-link lines (the setup link was printed on purpose; since E2 nothing prints it, and the lines are checked too) and checks the rest.
 - pnpm (10.33.2, picked by `packageManager`) ignores the build scripts of esbuild and workerd; `wrangler dev` runs without them.
 - Every isolate start logs `level=WARN msg="release key is unusable, node updates are off" err="... /edge-unavailable/release.pub: not implemented on js"`
   (the edge has no release key by design; the warning is noise on every cold start).
@@ -872,7 +872,7 @@ reported without the time spent in it). Indicative; the Worker numbers are 6g's.
 | Init D1 reads on a migrated database | **17 sequential before 6f** (3 migration-state reads, 10 single-key `setting` reads, a settings batch, the panel CA, the update rollout row, the setup-token status): over the 10-read rule, so `loadEdgeInstance` now reads its nine settings in one `SettingValues` call: **9 reads** |
 | Batch shapes (statements per batch) | IngestStats: read batch 4 + write batch 8, 2 calls; NodeHello: 1 batch of 5, 1 call; NodeApplied: 1 batch of 3; RenewCert: 1 batch of 4. The write batch of IngestStats is 8 statements however many users |
 | IngestStats, 5,000 users and 500 sessions | largest bound value 0.69 MB (the bucket list), 1.35 MB bound in all; Go memory 5 -> 18 MB |
-| **IngestStats, 65,536 users and 2,000 sessions (live projection at its 1.5 MB valve)** | still 2 calls and 12 statements, but the largest bound value is **9.04 MB** (138 bytes per user; D1 refuses a string or BLOB over 2,000,000 bytes, reached at about **14,500 users in one batch**), 18.8 MB bound in all, 5.1 s wall (0.55 s in SQLite), Go memory 9 -> **233 MB** (over the 128 MB isolate limit). Such a batch cannot be stored on D1 (refused twice, then dropped as `stats_dropped`/`database_refused`). The guard admits up to `maxStatsDeltas` = 65,536 deltas; the design target is 5,000 users on 50 nodes. **Not changed in 6f**: the fix is a lower cap on the edge (about 12,000 deltas) or chunking the three JSON-array statements, a design decision for §7.10 |
+| **IngestStats, 65,536 users and 2,000 sessions (live projection at its 1.5 MB valve)** | still 2 calls and 12 statements, but the largest bound value is **9.04 MB** (138 bytes per user; D1 refuses a string or BLOB over 2,000,000 bytes, reached at about **14,500 users in one batch**), 18.8 MB bound in all, 5.1 s wall (0.55 s in SQLite), Go memory 9 -> **233 MB** (over the 128 MB isolate limit). Such a batch cannot be stored on D1 (refused twice, then dropped as `stats_dropped`/`database_refused`). The guard admitted up to `maxStatsDeltas` = 65,536 deltas; the design target is 5,000 users on 50 nodes. **Fixed in E3 (2026-10-12)**: the js build caps a batch at `maxStatsDeltas` = 10,000 (the VPS keeps 65,536); see "Rounds E2 and E3" below |
 | Wasm memory after the e2e mix | 42-44.5 MB of linear memory in the Worker's isolate (limit 128 MB); the whole `workerd` process (all isolates, dev tooling) is 420 MB RSS, not comparable |
 
 REAL CLOUDFLARE (6g) — a separate round, only with the owner's explicit OK: a throwaway account, or at least a throwaway
@@ -943,9 +943,9 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
 - The bridge's existing `assertQueryBudget` allows 6 sequential queries for most labels and 7 for Mihomo/AWG. This differs
   from the 6a proof figures (Happ 5, Mihomo 7, pages 5/3/4, AWG configs 7); the thresholds were left unchanged pending
   lead clarification.
-- **Known pre-existing race:** two isolates on an existing database can generate different `link_prefix` values;
-  `SetSettings` is last-writer-wins, the same pattern as `sub_prefix` and `agent_sni`. This is harmless while no production
-  edge database exists. Before edge goes live, use `INSERT ... ON CONFLICT DO NOTHING` and re-read the stored value.
+- **Known pre-existing race (fixed in E2):** two isolates on an existing database could generate different `link_prefix` values;
+  `SetSettings` was last-writer-wins, the same pattern as `sub_prefix` and `agent_sni`. First init and the fill of missing secrets
+  now use `INSERT ... ON CONFLICT DO NOTHING` and build from the stored values (see "Rounds E2 and E3" below).
 
 #### Round 6b implementation notes (2026-10-09)
 
@@ -992,3 +992,50 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
   count and the generated `link_prefix` of an older database.
 - **Found, not changed:** a stats batch with more than about 14,500 users exceeds D1's 2 MB value limit, and 65,536 users also exceed the
   128 MB isolate (§7.7); wrangler's request log prints secret paths; Connect gzips for a client that sent no `Accept-Encoding` (§7.6).
+
+#### Rounds E2 and E3 implementation notes (2026-10-12)
+
+**E2, unattended first init.**
+- `SETUP_TOKEN_SHA256` (secret, 64 lowercase hex characters, the SHA-256 of a token the deployer chose; init option `setupTokenSHA256`;
+  anything else fails `init` before any write). While no admin exists the panel offers that hash through `store.OfferSetupToken`: one
+  batch, `INSERT INTO setup_token ... SELECT ... WHERE NOT EXISTS (SELECT 1 FROM admin) ON CONFLICT(hash) DO NOTHING` plus a read-back of
+  the admin count, `expires_at` and `used_at`. The row is created once with the usual 30-minute lifetime; later isolates keep the first
+  expiry, and an expired or used token is never revived (the log says so and the deployer must set a new hash). The log shows only
+  the expiry: no token, no hash, no address (set `ADMIN_HOST` or `ADMIN_PREFIX` yourself). Without the secret nothing changes.
+  The setup link is `<admin address>setup#<token>`; `edge/worker/README.md` has the recipe.
+- `store.SetSettingsIfAbsent` writes the nine generated first-run keys (and the keys an older database lacks) with
+  `ON CONFLICT(k) DO NOTHING` and returns the stored values in the same batch. Init validates (`auth.New`, the admin address checks)
+  before any write, then writes, adopts the stored values (`settleEdgeInstance`) and only then runs `app.Build`; the WebAuthn config
+  is rebuilt only if the stored RP ID or origins differ from the validated ones. A failed first init still leaves no settings behind
+  (`bridge.cjs`); `app.Build` failures after the write do leave them (they are internal wiring errors, and the next start reads
+  the stored values).
+- Proof: native store tests (offer: no admin, admin present, same hash twice, expired, used; settings: absent written, present kept);
+  js tests on the fake D1 (four concurrent first inits end with identical secrets, the missing-`link_prefix` fill agrees, the offer log
+  shows only the expiry and an expired token stays dead); `bridge.cjs` (a malformed hash is refused without writes, the log has neither
+  token nor hash, `BeginSetup` accepts the token and refuses a stranger's, an expired token is not revived); `e2e-wsl.sh --edge` creates its first
+  admin with a token it chose.
+
+**E3, budgets.**
+- The bridge records the linear memory of every isolate and fails above 96 MiB (about 32 MB of the 128 MB stay for JavaScript). Measured
+  on the full bridge run (13 isolates): maximum 51.0 MiB (the two isolates that ran the whole mix; the others 32-34 MiB).
+- Stats batch cap: the biggest bound value of `IngestStats` is the JSON list of traffic buckets. The longest bucket a real node can send
+  (30-character node and user ids, `hysteria2`, 9-digit byte counts) is 179 bytes, so on the js build `maxStatsDeltas` is 10,000
+  (`internal/panel/fleet/statscap_js.go`; `statscap_native.go` keeps 65,536):
+
+  | users in one batch | largest bound value | Go memory from the OS |
+  |---|---|---|
+  | 10,000 (the cap) | 1.79 MB | 40 MB |
+  | 11,000 | 1.97 MB | 41 MB |
+  | 12,000 | 2.15 MB, over D1's 2,000,000 bytes | 44 MB |
+  | 65,536 (VPS cap) | 9.04 MB | 233 MB |
+
+  The memory is far below the 64 MiB target at every size that fits D1, so the 2,000,000-byte value is what binds. The first measurement
+  (§7.7) used shorter node ids and protocol names (138 bytes per bucket, about 14,500 users); with real ids 12,000 does not fit. Above the
+  cap the batch is rejected whole (`stats_rejected`, reason `too_many_deltas`; sessions are cut at the cap). `TestD1IngestStatsAtEdgeCap`
+  (always runs) stores the capped batch on the fake D1 and asserts the value is under 2,000,000 bytes and the memory under 64 MiB;
+  `TestGuardStatsRejectsABatchAboveTheCap` pins the rejection; the two copies of the number are checked against each other.
+  Upgrade path (`ponytail:` in the source): chunk the three JSON arrays over several statements of one batch.
+- `debug.SetMemoryLimit` was not added. With the capped batch the Go memory from the OS was 40 MB with no limit and with limits of 64 and 48 MiB,
+  and 42 MB with limits of 40 and 32 MiB: the peak is live data (the batch, its JSON and bound arguments), which a GC limit cannot
+  free, and a limit near the live set only adds collection work.
+- CI's wasm size step and `scripts/build-edge.ps1` print the remaining headroom under the unchanged 50 MiB limit.

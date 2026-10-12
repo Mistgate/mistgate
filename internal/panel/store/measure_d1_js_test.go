@@ -52,9 +52,14 @@ type shapeFixture struct {
 	enrolledID    string
 	now           time.Time
 	inbound, prof string
+	protocol      string
 }
 
-func newShapeFixture(t *testing.T) shapeFixture {
+func newShapeFixture(t *testing.T) shapeFixture { return newShapeFixtureFor(t, "nod_shape", "awg") }
+
+// newShapeFixtureFor is the fixture with the node id and the protocol of the profile chosen by the caller (both are
+// written into every traffic bucket of a stats batch, so their length is part of the batch size).
+func newShapeFixtureFor(t *testing.T, nodeID, protocol string) shapeFixture {
 	t.Helper()
 	st := openD1Store(t)
 	ctx := context.Background()
@@ -63,11 +68,11 @@ func newShapeFixture(t *testing.T) shapeFixture {
 		NotBefore: now.Add(-time.Hour), NotAfter: now.AddDate(1, 0, 0)}, now); err != nil {
 		t.Fatal(err)
 	}
-	node, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_shape", Name: "node-a", Address: "node-a.example.com"}, "", []byte("shape-token"), "adm_test", now, now.Add(time.Hour))
+	node, err := st.CreateEnrollment(ctx, &NodeRow{ID: nodeID, Name: "node-a", Address: "node-a.example.com"}, "", []byte("shape-token"), "adm_test", now, now.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: "prf_shape", Protocol: "awg", Name: "shape", SettingsJSON: "{}", CreatedAt: now}); err != nil {
+	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: "prf_shape", Protocol: protocol, Name: "shape", SettingsJSON: "{}", CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.Access().CreateInbound(ctx, AccessInbound{ID: "inb_shape", ProfileID: "prf_shape", NodeID: node.ID, Enabled: true, CreatedAt: now}); err != nil {
@@ -89,14 +94,14 @@ func newShapeFixture(t *testing.T) shapeFixture {
 	if err := st.Access().CreateInbound(ctx, AccessInbound{ID: "inb_shape2", ProfileID: "prf_shape", NodeID: enrolled.ID, Enabled: true, CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
-	return shapeFixture{st: st, nodeID: node.ID, enrolledID: enrolled.ID, now: now, inbound: "inb_shape", prof: "prf_shape"}
+	return shapeFixture{st: st, nodeID: node.ID, enrolledID: enrolled.ID, now: now, inbound: "inb_shape", prof: "prf_shape", protocol: protocol}
 }
 
 // seedUsers inserts n users with one AWG device and one credential each, in three statements.
 func (f shapeFixture) seedUsers(t *testing.T, n int) {
 	t.Helper()
 	ctx := context.Background()
-	for _, q := range []string{
+	for qi, q := range []string{
 		`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?1)
 		 INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at)
 		 SELECT 'usr_' || printf('%026d', i), 'user-' || i, 'grp_shape', ?2, CAST('h' || i AS BLOB), x'01', ?2 FROM n`,
@@ -105,9 +110,13 @@ func (f shapeFixture) seedUsers(t *testing.T, n int) {
 		 SELECT 'dev_' || printf('%026d', i), 'usr_' || printf('%026d', i), CAST('w' || i AS BLOB), 0, 0, ?2 FROM n`,
 		`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?1)
 		 INSERT INTO device_credential (id, device_id, user_id, protocol, secret_enc, data_json, created_at, profile_id, config_epoch)
-		 SELECT 'crd_' || printf('%026d', i), 'dev_' || printf('%026d', i), 'usr_' || printf('%026d', i), 'awg', x'01', '{}', ?2, 'prf_shape', 0 FROM n`,
+		 SELECT 'crd_' || printf('%026d', i), 'dev_' || printf('%026d', i), 'usr_' || printf('%026d', i), ?3, x'01', '{}', ?2, 'prf_shape', 0 FROM n`,
 	} {
-		if _, err := f.st.W.ExecContext(ctx, q, n, f.now.Unix()); err != nil {
+		args := []any{n, f.now.Unix()}
+		if qi == 2 { // only the credential insert names the protocol
+			args = append(args, f.protocol)
+		}
+		if _, err := f.st.W.ExecContext(ctx, q, args...); err != nil {
 			t.Fatalf("seed: %v", err)
 		}
 	}
@@ -186,7 +195,7 @@ func TestD1BatchShapes(t *testing.T) {
 }
 
 // TestD1LargeIngestStats: a node of the size the project plans for (5,000 users) must keep every bound value well under
-// D1's 2,000,000-byte string limit; the 65,536-user batch the stats guard still admits is measured below.
+// D1's 2,000,000-byte string limit; the 65,536-user batch the VPS cap admits (the edge cap is lower) is measured below.
 func TestD1LargeIngestStats(t *testing.T) {
 	f := newShapeFixture(t)
 	ctx := context.Background()
@@ -210,7 +219,7 @@ func TestD1LargeIngestStats(t *testing.T) {
 	}
 }
 
-// TestD1LargestIngestStats is the worst case the stats guard admits: 65,536 deltas (maxStatsDeltas in fleet) from as many
+// TestD1LargestIngestStats is the worst case the stats guard admits on the VPS: 65,536 deltas (maxStatsDeltas there) from as many
 // users, 2,000 open sessions, and a live projection at its 1.5 MB valve. It only records numbers (see §7.7: the batch is
 // larger than D1 accepts); run it with GOMEASURE=1, it takes a few seconds.
 func TestD1LargestIngestStats(t *testing.T) {
@@ -246,4 +255,52 @@ func TestD1LargestIngestStats(t *testing.T) {
 	// the biggest value is the bucket list, linear in the users: where D1's limit is crossed
 	perUser := float64(shape.MaxValueBytes) / users
 	t.Logf("largest value %.0f bytes per user: D1's %d-byte limit is reached at about %.0f users per batch", perUser, d1MaxValueBytes, d1MaxValueBytes/perUser)
+}
+
+// edgeStatsDeltaCap mirrors maxStatsDeltas of the js build in internal/panel/fleet/statscap_js.go (fleet imports this
+// package, so the number is repeated here; fleet's own test pins the other copy). The largest stats batch the edge admits
+// is this many users, 2,000 open sessions and a live projection at its 1.5 MB valve.
+const edgeStatsDeltaCap = 10_000
+
+// TestD1IngestStatsAtEdgeCap runs without GOMEASURE: the batch at the edge's cap must be storable (every bound value under
+// D1's 2,000,000 bytes) and must not take the isolate's memory (wasm memory never shrinks, so the Go side's total from the
+// OS after the batch is the peak). The batch is the longest one a real node can send: 30-character node ids (NewID), the
+// longest protocol name and 9-digit byte counts (the guard's budget of 10 Gbit/s over an hour is 4.5e12 bytes for all
+// the users of a batch together, which is 9 digits for each of 10,000 users on average).
+func TestD1IngestStatsAtEdgeCap(t *testing.T) {
+	f := newShapeFixtureFor(t, "nod_"+strings.Repeat("n", 26), "hysteria2")
+	ctx := context.Background()
+	binding := js.Global().Get("__d1")
+	const users, sessions = edgeStatsDeltaCap, 2_000
+	f.seedUsers(t, users)
+	if _, _, err := f.st.NodeHello(ctx, f.nodeID, 1, HelloInfo{AgentVersion: "test", Instance: "shape-instance"}, f.now); err != nil {
+		t.Fatal(err)
+	}
+	userMap := make([]string, sessions)
+	for i := range userMap {
+		userMap[i] = fmt.Sprintf(`"usr_%026d":1699999940`, i+1)
+	}
+	usersJSON := "{" + strings.Join(userMap, ",") + "}"
+	live := FleetLive{Apply: true, SampleAt: f.now.Unix(), UsersJSON: usersJSON,
+		LiveJSON: `{"pad":"` + strings.Repeat("x", 1_500_000-len(usersJSON)-len(`{"pad":""}`)) + `"}`}
+	in := f.statsIn(users, sessions, live)
+	for i := range in.Traffic {
+		in.Traffic[i].Up, in.Traffic[i].Down = 123_456_789, 987_654_321
+	}
+	before := memSys()
+	var err error
+	var out FleetStatsOut
+	shape := measureD1(binding, "IngestStats at the edge cap", func() { out, err = f.st.IngestStats(ctx, in) })
+	if err != nil || out.Duplicate {
+		t.Fatalf("IngestStats = %+v, %v", out, err)
+	}
+	after := memSys()
+	t.Logf("IngestStats at the cap (%d users, %d sessions): %s", users, sessions, shape)
+	t.Logf("Go memory from the OS %.0f MB -> %.0f MB", before, after)
+	if shape.MaxValueBytes >= d1MaxValueBytes {
+		t.Errorf("largest bound value is %d bytes at the cap of %d users: D1 refuses a value over %d", shape.MaxValueBytes, users, d1MaxValueBytes)
+	}
+	if after >= 64 {
+		t.Errorf("Go memory from the OS is %.0f MB after the batch at the cap, want under 64 MiB", after)
+	}
 }

@@ -18,6 +18,10 @@ let limitMath;
 let liveProjectionQueries = 0;
 let nodePokeCalls = 0;
 const nodePokeIDs = [];
+// The linear memory of every wasm instance (one per modelled isolate). A Worker isolate has 128 MB in all; what the Go
+// heap may use is capped here so that about 32 MB stay for the JavaScript side.
+const wasmMemories = [];
+const WASM_MEMORY_BUDGET_MIB = 96;
 
 const [wasmPath, wasmExecPath, oraclePath, dataDir] = process.argv.slice(2);
 if (!wasmPath || !wasmExecPath || !oraclePath || !dataDir) {
@@ -159,6 +163,7 @@ async function compareHandlerBytes(label, panel, port, url, init = {}) {
 async function startIsolate(bytes, previousPanel) {
   const go = new Go();
   const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
+  wasmMemories.push(instance.exports.mem);
   void go.run(instance).catch(rejectWasmFailure);
   return Promise.race([(async () => {
     while (!globalThis.mgPanel || globalThis.mgPanel === previousPanel) {
@@ -949,6 +954,13 @@ async function run() {
     assert.equal(unavailableMarker.status, 404, "the link prefix is not mounted without nodeLink");
     const missingCallback = await connectRPC(thirdPanel, "AuthService/BeginLogin", {});
     assert.equal(missingCallback.message.code, "resource_exhausted", "login fails closed without the callback");
+
+    // Memory budget: the largest linear memory of any isolate (wasm memory never shrinks, so this is the peak) must leave
+    // about 32 MB of the 128 MB isolate to JavaScript.
+    const memoryMiB = wasmMemories.map((memory) => memory.buffer.byteLength / (1024 * 1024));
+    const peakMiB = Math.max(...memoryMiB);
+    console.log(`wasm linear memory: maximum ${peakMiB.toFixed(1)} MiB over ${memoryMiB.length} isolates (budget ${WASM_MEMORY_BUDGET_MIB} MiB; each: ${memoryMiB.map((m) => m.toFixed(0)).join(", ")})`);
+    assert.ok(peakMiB <= WASM_MEMORY_BUDGET_MIB, `wasm memory reached ${peakMiB.toFixed(1)} MiB, over the ${WASM_MEMORY_BUDGET_MIB} MiB budget`);
   } finally {
     oracle.child.kill();
   }
