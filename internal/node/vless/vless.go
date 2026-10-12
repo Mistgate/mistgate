@@ -72,6 +72,11 @@ type inbound struct {
 	userManager proxy.UserManager
 	connTracker *tcpConnTracker
 
+	// target "self": the node's own site behind REALITY, and the ACME certificate claim it holds (front.go).
+	site     *site
+	cert     engine.Cert
+	certHeld bool
+
 	mu        sync.Mutex
 	state     plugin.RunState
 	detail    string
@@ -193,7 +198,10 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 		if restarted {
 			in.restarts++
 		}
-		old.stop()
+		// The certificate claim of a site that stays a site is kept across the restart: its entry holds the issued leaf.
+		keepCert := spec.Enabled && cfg.reality.self && old.cfg.reality.self
+		old.stop(!keepCert)
+		in.certHeld = keepCert && old.certHeld
 		e.retireMissing(oldIdx, ix)
 	}
 	e.inbounds[spec.ID] = in
@@ -224,8 +232,20 @@ func (in *inbound) start(ctx context.Context) error {
 			if in.connTracker == tracker {
 				in.connTracker = nil
 			}
+			in.closeSite()
+			in.releaseCert()
 		}
 	}()
+	if in.cfg.reality.self {
+		// The site must listen before the REALITY listener starts (see startSite), and it is not optional: with no target
+		// REALITY drops every connection, so a site that cannot listen fails the inbound.
+		s, cert, err := in.startSelfSite(ctx)
+		if err != nil {
+			return fmt.Errorf("site: %w", err)
+		}
+		in.site, in.cert = s, cert
+		in.cfg.reality.dialNet, in.cfg.reality.dialAddr = s.network, s.addr
+	}
 	inst, err := core.New(buildCoreConfig(in.spec, in.cfg, in.idx.Load(), tracker))
 	if err != nil {
 		return err
@@ -269,8 +289,31 @@ func (in *inbound) start(ctx context.Context) error {
 	in.mu.Lock()
 	in.state, in.detail, in.since, in.everServe = plugin.RunRunning, "", in.e.now(), true
 	in.mu.Unlock()
-	go in.probeTarget()
+	if in.cfg.reality.self {
+		// The node's own site is local and always up: there is nothing to probe, but REALITY cannot measure it (see
+		// measureSiteRecords).
+		go measureSiteRecords(in.ctx, in.site, in.cfg.reality.serverNames[0])
+	} else {
+		go in.probeTarget()
+	}
 	return nil
+}
+
+// closeSite closes the node's own site, if the inbound has one. It runs after the Xray instance is closed: until then
+// REALITY may still forward a connection to it.
+func (in *inbound) closeSite() {
+	if in.site != nil {
+		in.site.Close()
+		in.site = nil
+	}
+}
+
+// releaseCert gives the inbound's ACME claim back (the last claim of a name stops its renewals).
+func (in *inbound) releaseCert() {
+	if in.certHeld {
+		in.e.env.Certs.Release(in.spec.ID)
+		in.certHeld = false
+	}
 }
 
 func syncUsers(ctx context.Context, um proxy.UserManager, old, next *credentialIndex, flow string) error {
@@ -323,7 +366,9 @@ func syncUsers(ctx context.Context, um proxy.UserManager, old, next *credentialI
 	return nil
 }
 
-func (in *inbound) stop() {
+// stop ends the inbound. releaseCert gives the certificate claim of a self site back; a restart that keeps the site passes
+// false, so the issued leaf survives it.
+func (in *inbound) stop(releaseCert bool) {
 	if in.cancel != nil {
 		in.cancel()
 	}
@@ -340,6 +385,10 @@ func (in *inbound) stop() {
 		_ = in.instance.Close()
 		in.instance = nil
 		in.userManager = nil
+	}
+	in.closeSite()
+	if releaseCert {
+		in.releaseCert()
 	}
 	in.mu.Lock()
 	in.state, in.since = plugin.RunStopped, in.e.now()
@@ -365,7 +414,11 @@ func (in *inbound) setState(state plugin.RunState, detail string) {
 }
 
 func (e *eng) report(in *inbound, n int, restarted bool) engine.ApplyReport {
-	return engine.ApplyReport{SpecHash: in.specHash, CredCount: n, Restarted: restarted}
+	r := engine.ApplyReport{SpecHash: in.specHash, CredCount: n, Restarted: restarted}
+	if in.cert.Info != nil {
+		r.Cert = in.cert.Info()
+	}
+	return r
 }
 
 func (e *eng) retireMissing(old, next *credentialIndex) {
@@ -383,7 +436,7 @@ func (e *eng) Remove(_ context.Context, inboundID string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if in := e.inbounds[inboundID]; in != nil {
-		in.stop()
+		in.stop(true)
 		if ix := in.idx.Load(); ix != nil {
 			for _, cs := range ix.byID {
 				if cs.retire() {
@@ -472,8 +525,13 @@ func (e *eng) Health() []plugin.EngineHealth {
 	out := make([]plugin.EngineHealth, 0, len(e.inbounds))
 	for _, in := range e.sortedInbounds() {
 		in.mu.Lock()
-		out = append(out, plugin.EngineHealth{InboundID: in.spec.ID, State: in.state, Detail: in.detail, Restarts: in.restarts, Since: in.since})
+		h := plugin.EngineHealth{InboundID: in.spec.ID, State: in.state, Detail: in.detail, Restarts: in.restarts, Since: in.since}
 		in.mu.Unlock()
+		if in.cert.Info != nil { // a self site: known once Let's Encrypt has issued the certificate, so Apply could not report it
+			ci := in.cert.Info()
+			h.CertPinSHA256, h.CertNotAfter = ci.PinSHA256, ci.NotAfter
+		}
+		out = append(out, h)
 	}
 	return out
 }
@@ -483,7 +541,7 @@ func (e *eng) Close(context.Context) error {
 	defer e.mu.Unlock()
 	e.closed = true
 	for _, in := range e.sortedInbounds() {
-		in.stop()
+		in.stop(true)
 		if ix := in.idx.Load(); ix != nil {
 			for _, cs := range ix.byID {
 				if cs.retire() {

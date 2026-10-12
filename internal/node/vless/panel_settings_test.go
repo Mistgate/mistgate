@@ -53,6 +53,11 @@ func TestPanelBuildInboundSettingsAcceptedByNodeParser(t *testing.T) {
 				t.Errorf("parsed = %+v", got)
 			}
 		}},
+		{"the node's own site", func(s *panelvless.Settings) { s.Reality.TargetKind, s.Reality.Target = "self", "" }, func(t *testing.T, got settings) {
+			if !got.reality.self || got.reality.target != "self" || len(got.reality.serverNames) != 1 || got.reality.serverNames[0] != "de1.example.com" {
+				t.Errorf("parsed = %+v", got)
+			}
+		}},
 		{"names follow the target", func(s *panelvless.Settings) { s.Reality.ServerNames = nil }, func(t *testing.T, got settings) {
 			if len(got.reality.serverNames) != 1 || got.reality.serverNames[0] != "www.example.org" {
 				t.Errorf("parsed = %+v", got)
@@ -68,7 +73,7 @@ func TestPanelBuildInboundSettingsAcceptedByNodeParser(t *testing.T) {
 			if err := json.Unmarshal(defaults, &s); err != nil {
 				t.Fatal(err)
 			}
-			s.Reality.Target = "www.example.org:443"
+			s.Reality.TargetKind, s.Reality.Target = "site", "www.example.org:443"
 			tc.mutate(&s)
 			raw, err := json.Marshal(s)
 			if err != nil {

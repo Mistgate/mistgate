@@ -498,6 +498,21 @@ Node (R3, `internal/node/vless/front.go`, reusing the R3 TLS listener code):
 - No `reality_target` probe for self; Health reports cert pin and expiry from `cert.Info()` (zero until issued).
 - `parseSpec`: `reality.target == "self"` requires `TLS{acme_domain, server_name}` and `server_names == [server_name]`.
 
+As built (node, `internal/node/vless/front.go`; the first test said something the design did not expect):
+- REALITY's own measurement of its target uses a client that verifies the certificate against the system roots. It can never
+  measure the self-signed fallback certificate: it stores "no records" for the life of the process
+  (`TestRealityCannotMeasureASelfSignedSite`). So the engine measures the site itself right after it starts: the same exchange
+  with the same client fingerprints, once per ALPN class, without verification (the socket is our own), storing over the
+  empty lengths (`measureSiteRecords`). The first connection after a start does not wait (REALITY stored "none" at once).
+- The lengths do not depend on the certificate: a self-signed P-256 certificate, a P-256 chain and an RSA-2048 chain give
+  the same lengths (`TestSiteRecordLengthsDoNotDependOnTheCertificate`; only the h2 class has records, 67 bytes). So one
+  measurement at start is enough and nothing is measured again after the first issuance. If a future Go changes that, the
+  test fails and the measurement must be repeated after issuance, storing over the old lengths, never deleting them.
+- "Issued" for the choice of the site's certificate is "the ACME entry has handed out a leaf" (`Info().NotAfter` set), not "a
+  leaf valid now": a leaf that went stale with no visitor for months is still read through the ACME entry, which holds the
+  renewed one in its cache.
+- The socket name is the inbound id when it is short and plain, else a hash of it (an abstract name has 107 bytes at most).
+
 Wire settings: `"reality":{"target":"self","server_names":["de1.example.com"],"short_ids":[...],"private_key":"..."}` plus
 `Tls{acme_domain, "de1.example.com"}`.
 

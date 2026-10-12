@@ -46,10 +46,14 @@ type settings struct {
 }
 
 type realitySettings struct {
-	target      string
-	serverNames []string
-	shortIDs    [][]byte
-	privateKey  []byte
+	self bool // target "self": the node's own site behind REALITY
+	// dialNet and dialAddr are where REALITY forwards non-clients: the target for a site, the inbound's own site socket for
+	// self (filled in when the inbound starts).
+	dialNet, dialAddr string
+	target            string
+	serverNames       []string
+	shortIDs          [][]byte
+	privateKey        []byte
 }
 
 type xhttpSettings struct {
@@ -96,34 +100,50 @@ func parseSpec(spec plugin.InboundSpec) (settings, error) {
 	if raw.Transport != "tcp" && raw.Transport != "xhttp" {
 		return out, fmt.Errorf("transport %q is not supported in R2", raw.Transport)
 	}
-	if spec.TLS.Mode != 0 || spec.TLS.ServerName != "" {
-		return out, errors.New("TLS fields are only supported with security tls; tls needs R3")
-	}
-
 	out.transport, out.security = raw.Transport, raw.Security
 	out.flow = ""
 	if raw.Transport == "tcp" {
 		out.flow = "xtls-rprx-vision"
 	}
 	out.reality.target = strings.TrimSpace(raw.Reality.Target)
-	if err := validateTarget(out.reality.target); err != nil {
-		return settings{}, fmt.Errorf("reality.target: %w", err)
-	}
-	if len(raw.Reality.ServerNames) == 0 || len(raw.Reality.ServerNames) > 8 {
-		return settings{}, errors.New("reality.server_names must contain 1-8 names")
-	}
-	seenNames := make(map[string]struct{}, len(raw.Reality.ServerNames))
-	for _, name := range raw.Reality.ServerNames {
-		name = strings.TrimSpace(name)
-		if !validServerName(name) {
-			return settings{}, errors.New("reality.server_names contains an invalid name")
+	if out.reality.target == selfTarget {
+		// The node's own site: its name is the TLS name of the inbound, the one certificate name and the only REALITY
+		// server name (design/vless.md section 7.5).
+		out.reality.self = true
+		if spec.TLS.Mode != plugin.TLSAcmeDomain {
+			return settings{}, errors.New("reality.target self needs tls mode acme_domain")
 		}
-		key := strings.ToLower(name)
-		if _, ok := seenNames[key]; ok {
-			return settings{}, errors.New("reality.server_names contains a duplicate name")
+		name := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(spec.TLS.ServerName), "."))
+		if name == "" || !validServerName(name) || net.ParseIP(name) != nil || !strings.Contains(name, ".") {
+			return settings{}, errors.New("reality.target self needs a tls server name that is a domain")
 		}
-		seenNames[key] = struct{}{}
-		out.reality.serverNames = append(out.reality.serverNames, name)
+		if len(raw.Reality.ServerNames) != 1 || !strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(raw.Reality.ServerNames[0]), "."), name) {
+			return settings{}, errors.New("reality.server_names must be exactly the tls server name for target self")
+		}
+		out.reality.serverNames = []string{name}
+	} else {
+		if spec.TLS.Mode != 0 || spec.TLS.ServerName != "" {
+			return out, errors.New("TLS fields are only supported with security tls or reality target self")
+		}
+		if err := validateTarget(out.reality.target); err != nil {
+			return settings{}, fmt.Errorf("reality.target: %w", err)
+		}
+		if len(raw.Reality.ServerNames) == 0 || len(raw.Reality.ServerNames) > 8 {
+			return settings{}, errors.New("reality.server_names must contain 1-8 names")
+		}
+		seenNames := make(map[string]struct{}, len(raw.Reality.ServerNames))
+		for _, name := range raw.Reality.ServerNames {
+			name = strings.TrimSpace(name)
+			if !validServerName(name) {
+				return settings{}, errors.New("reality.server_names contains an invalid name")
+			}
+			key := strings.ToLower(name)
+			if _, ok := seenNames[key]; ok {
+				return settings{}, errors.New("reality.server_names contains a duplicate name")
+			}
+			seenNames[key] = struct{}{}
+			out.reality.serverNames = append(out.reality.serverNames, name)
+		}
 	}
 	if len(raw.Reality.ShortIDs) == 0 || len(raw.Reality.ShortIDs) > 8 {
 		return settings{}, errors.New("reality.short_ids must contain 1-8 values")

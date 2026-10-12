@@ -224,6 +224,12 @@ func newXrayMuxClient(t *testing.T, serverPort uint16, transport, credID, userID
 
 func newXrayClientWithOptions(t *testing.T, serverPort uint16, transport, credID, userID, flow string, mux bool) *xrayClient {
 	t.Helper()
+	return newXrayClientSNI(t, "localhost", serverPort, transport, credID, userID, flow, mux)
+}
+
+// newXrayClientSNI is the in-process client with the REALITY server name of its choice.
+func newXrayClientSNI(t *testing.T, serverName string, serverPort uint16, transport, credID, userID, flow string, mux bool) *xrayClient {
+	t.Helper()
 	socksPort := reservePort(t)
 	transportName := "tcp"
 	var transportSettings []*internet.TransportConfig
@@ -249,7 +255,7 @@ func newXrayClientWithOptions(t *testing.T, serverPort uint16, transport, credID
 		TransportSettings: transportSettings,
 		SecurityType:      serial.GetMessageType(&reality.Config{}),
 		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
-			Fingerprint: "chrome", ServerName: "localhost", PublicKey: publicKey, ShortId: shortID, SpiderX: "/",
+			Fingerprint: "chrome", ServerName: serverName, PublicKey: publicKey, ShortId: shortID, SpiderX: "/",
 		})},
 	}
 	sender := &proxyman.SenderConfig{StreamSettings: stream}

@@ -21,6 +21,10 @@ import (
 )
 
 func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialIndex, tracker *tcpConnTracker) *core.Config {
+	dest, network := cfg.reality.target, "tcp"
+	if cfg.reality.dialAddr != "" {
+		dest, network = cfg.reality.dialAddr, cfg.reality.dialNet
+	}
 	clients := make([]*protocol.User, 0, len(creds.byID))
 	for _, id := range sortedCredentialIDs(creds) {
 		cs := creds.byID[id]
@@ -31,7 +35,7 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 		ProtocolName: "tcp",
 		SecurityType: serial.GetMessageType(&reality.Config{}),
 		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
-			Dest: cfg.reality.target, Type: "tcp", ServerNames: append([]string(nil), cfg.reality.serverNames...),
+			Dest: dest, Type: network, ServerNames: append([]string(nil), cfg.reality.serverNames...),
 			PrivateKey: append([]byte(nil), cfg.reality.privateKey...), ShortIds: cloneByteSlices(cfg.reality.shortIDs),
 		})},
 	}
