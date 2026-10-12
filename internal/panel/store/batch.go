@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"strings"
@@ -64,6 +65,51 @@ func (c *batchStmtCache) close() error {
 			errs = append(errs, err)
 		}
 	}
+	return errors.Join(errs...)
+}
+
+// reader is one connection of the read pool that read batches keep for themselves, with the statements prepared
+// on it (see readStore). conn is nil until the first batch, and after a failed one.
+type reader struct {
+	conn  *sql.Conn
+	stmts map[string]*sql.Stmt
+}
+
+// closeReaders hands every reader's connection back to the read pool, waiting for batches in flight, so that closing
+// the pool closes them. The readers stay, without connections: a read after Close fails on the closed pool.
+func (s *Store) closeReaders() error {
+	for range cap(s.readGate) {
+		s.readGate <- struct{}{}
+	}
+	defer func() {
+		for range cap(s.readGate) {
+			<-s.readGate
+		}
+	}()
+	s.readMu.Lock()
+	defer s.readMu.Unlock()
+	var errs []error
+	for _, rd := range s.readers {
+		if rd.conn != nil {
+			errs = append(errs, rd.release(false))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// release closes the reader's statements (database/sql leaves the statements of a Conn to its owner, and SQLite keeps
+// a connection with unfinalized statements open) and gives up the connection: back to the pool, or closed when bad.
+func (rd *reader) release(bad bool) error {
+	var errs []error
+	for _, st := range rd.stmts {
+		errs = append(errs, st.Close())
+	}
+	if bad {
+		rd.conn.Raw(func(any) error { return driver.ErrBadConn }) // database/sql closes the connection
+	} else {
+		errs = append(errs, rd.conn.Close())
+	}
+	rd.conn, rd.stmts = nil, nil
 	return errors.Join(errs...)
 }
 

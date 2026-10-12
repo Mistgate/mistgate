@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"runtime/metrics"
 	"sync"
 	"testing"
 )
@@ -164,6 +165,69 @@ func TestReadGateHonorsCanceledContext(t *testing.T) {
 	if len(s.readGate) != cap(s.readGate) {
 		t.Fatalf("canceled read acquired a gate slot: %d of %d", len(s.readGate), cap(s.readGate))
 	}
+	for range cap(s.readGate) {
+		<-s.readGate
+	}
+}
+
+func TestSequentialReadsKeepOneReaderConnection(t *testing.T) {
+	s := openTemp(t)
+	for range 10 {
+		if _, err := s.read(context.Background(), Stmt{Query: `SELECT 1`, Returning: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(s.readers) != 1 || s.readers[0].conn == nil {
+		t.Fatalf("sequential reads left %d readers, want one with a connection", len(s.readers))
+	}
+}
+
+// A database/sql transaction and the driver start a goroutine per transaction and per query to watch a cancellable
+// context; at GOMAXPROCS=1 that churn stalled connections for up to a second (readStore).
+func TestReadBatchStartsNoGoroutines(t *testing.T) {
+	s := openTemp(t)
+	ctx, cancel := context.WithCancel(context.Background()) // cancellable, like a request's
+	defer cancel()
+	read := func() {
+		if _, err := s.read(ctx, Stmt{Query: `SELECT 1`, Returning: true}, Stmt{Query: `SELECT 2`, Returning: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read()
+	created := []metrics.Sample{{Name: "/sched/goroutines-created:goroutines"}}
+	metrics.Read(created)
+	before := created[0].Value.Uint64()
+	for range 100 {
+		read()
+	}
+	metrics.Read(created)
+	if n := created[0].Value.Uint64() - before; n > 50 {
+		t.Fatalf("100 read batches started %d goroutines, want about none", n)
+	}
+}
+
+func TestFailedReadBatchLeavesNoOpenTransaction(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	if _, err := s.read(ctx, Stmt{Query: `SELECT 1`, Returning: true}, Stmt{Query: `SELECT nope FROM missing_table`, Returning: true}); err == nil {
+		t.Fatal("read of a missing table succeeded")
+	}
+	if err := s.SetSettings(ctx, map[string]string{"read-after-failure": "fresh"}); err != nil {
+		t.Fatal(err)
+	}
+	// Neither the reader nor any pooled connection may still sit in the failed batch's transaction (stale snapshot).
+	for range 2 * (sqliteReaderPoolSize + 2) {
+		results, err := s.read(ctx, Stmt{Query: `SELECT v FROM setting WHERE k = ?`, Args: []any{"read-after-failure"}, Returning: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(results[0].Rows) != 1 || results[0].Rows[0][0] != "fresh" {
+			t.Fatalf("batch read after a failed batch = %#v, want the new value", results[0].Rows)
+		}
+		if v, err := s.Setting(ctx, "read-after-failure"); err != nil || v != "fresh" {
+			t.Fatalf("pooled read after a failed batch = %q, %v; want the new value", v, err)
+		}
+	}
 }
 
 func TestStoreCloseClosesBatchStatementCaches(t *testing.T) {
@@ -178,13 +242,19 @@ func TestStoreCloseClosesBatchStatementCaches(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	for name, cache := range map[string]*batchStmtCache{"reader": &s.readStmtCache, "writer": &s.writeStmtCache} {
-		cache.mu.Lock()
-		closed, count := cache.closed, len(cache.statements)
-		cache.mu.Unlock()
-		if !closed || count != 0 {
-			t.Errorf("%s cache closed=%v statements=%d, want closed and empty", name, closed, count)
+	s.writeStmtCache.mu.Lock()
+	closed, count := s.writeStmtCache.closed, len(s.writeStmtCache.statements)
+	s.writeStmtCache.mu.Unlock()
+	if !closed || count != 0 {
+		t.Errorf("writer cache closed=%v statements=%d, want closed and empty", closed, count)
+	}
+	for _, rd := range s.readers {
+		if rd.conn != nil {
+			t.Error("a reader kept its connection after Close")
 		}
+	}
+	if stats := s.R.Stats(); stats.OpenConnections != 0 {
+		t.Errorf("read pool has %d open connections after Close", stats.OpenConnections)
 	}
 }
 

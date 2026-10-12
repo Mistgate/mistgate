@@ -30,7 +30,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := openDB(path, sqliteReaderPoolSize, true)
+	// The read batches keep sqliteReaderPoolSize connections of the pool for themselves; two more serve the
+	// single-statement reads on s.R.
+	r, err := openDB(path, sqliteReaderPoolSize+2, true)
 	if err != nil {
 		w.Close()
 		return nil, err
