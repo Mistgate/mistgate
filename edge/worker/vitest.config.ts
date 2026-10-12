@@ -9,6 +9,10 @@ import { DurableObject } from "cloudflare:workers";
 export class AuxProvisioner extends DurableObject {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if (path.endsWith("/see-other")) {
+      // what the installer page answers a form post with: a 303 to the job's page (relative, like provision/ui.go's)
+      return new Response(null, { status: 303, headers: { Location: "?job=prv_1&cancelled=1" } });
+    }
     if (path.endsWith("/gzip")) {
       const gzip = new Blob([JSON.stringify({ hello: "gzip" })]).stream().pipeThrough(new CompressionStream("gzip"));
       const bytes = await new Response(gzip).arrayBuffer();

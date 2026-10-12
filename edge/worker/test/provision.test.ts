@@ -50,6 +50,7 @@ describe("forwardProvision", () => {
     expect(sent.headers.get("x-mistgate-build")).toBe("0.9.0"); // the marker's build, not the client's
     expect(sent.headers.get("content-length")).not.toBe("99");
     expect(sent.headers.has("x-mistgate-forward")).toBe(false);
+    expect(sent.redirect).toBe("manual"); // the installer page's 303 reaches the browser instead of being followed here
   });
 
   it("sends a GET without a body, and finds the marker whatever its case", async () => {

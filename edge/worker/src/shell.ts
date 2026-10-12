@@ -188,7 +188,9 @@ export function forwardProvision(
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : (request.body ?? undefined);
   return (async () => {
     try {
-      return await ns.get(ns.idFromName(PROVISIONER_NAME)).fetch(new Request(request.url, { method: request.method, headers, body }));
+      // redirect "manual": a page answers a form post with a 303 to the job's page, and that is for the browser to follow (a
+      // stub's fetch follows redirects like fetch() does, and the POST would be answered with the page it redirects to)
+      return await ns.get(ns.idFromName(PROVISIONER_NAME)).fetch(new Request(request.url, { method: request.method, headers, body, redirect: "manual" }));
     } catch (error) {
       console.error("provisioner request failed:", error instanceof Error ? error.message : String(error));
       return provisionerUnavailable();

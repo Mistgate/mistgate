@@ -46,6 +46,21 @@ describe("forwardProvision across scripts", () => {
     expect(await response!.json()).toEqual({ hello: "gzip" }); // a body compressed twice, or not at all, would not decode to this
   });
 
+  it("hands a 303 of the object to the caller as it is: the browser follows it, the Worker does not", async () => {
+    const response = await forwardProvision(
+      ns(),
+      {
+        method: "POST",
+        url: "https://example.com/admin/nodes/install/see-other",
+        headers: [["content-type", "application/x-www-form-urlencoded"]],
+        body: new TextEncoder().encode("action=cancel&job_id=prv_1"),
+      },
+      answer(marker("1")),
+    );
+    expect(response?.status).toBe(303);
+    expect(response?.headers.get("location")).toBe("?job=prv_1&cancelled=1");
+  });
+
   it("wakes the object of the other script with kick()", async () => {
     await kickProvisioner(ns()!);
     await kickProvisioner(ns()!);
