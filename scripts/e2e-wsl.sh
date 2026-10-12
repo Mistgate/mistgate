@@ -22,13 +22,17 @@
 # another key: the agent refuses it). With --old-node the node is a build without update/1 and the step checks that
 # it is shown as UNSUPPORTED and never sent an update.
 #
-# The tunnel steps (AmneziaWG, WARP, Mihomo; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
-# --warp, --mihomo one by one, run after step 9 and before the retire; --m3-only runs them without the base and
+# The tunnel steps (AmneziaWG, WARP, Mihomo, VLESS; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
+# --warp, --mihomo, --vless one by one, run after step 9 and before the retire; --m3-only runs them without the base and
 # self-update steps between. Clients and a fake internet sit in anonymous namespaces inside the run's namespace (`unshare -n`, a veth
 # each, interfaces mg3*): real amneziawg-go clients (3.1 and 2.0), a real mihomo, a kernel WireGuard peer that plays
 # WARP. With --old-node the tunnel steps are replaced by a compatibility step: an awg inbound is refused as
 # agent_too_old, device and WARP calls are refused, the old node stays untouched. The retire step also checks that no
 # AWG/WARP link, table, rule or route is left.
+#
+# --vless: three VLESS REALITY inbounds (XHTTP, RAW + Vision, XHTTP packet-up) behind a local TLS 1.3 target
+# (scripts/e2e/tlsdest), real xray-core and mihomo clients, traffic accounting, disable/enable, node RSS, and the delay of
+# the first REALITY handshake after an agent start. xhttp+tls is not in the product yet (design/vless.md R3).
 #
 # --edge runs the Cloudflare edition instead (scripts/e2e/edge.sh): the panel is the Go js/wasm build inside a local
 # `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a
@@ -51,17 +55,18 @@ set -Eeuo pipefail
 OLD_NODE=""
 # The tunnel steps (AmneziaWG, WARP, Mihomo) are opt-in: without these flags the run is the base and self-update
 # scenario and takes what it always took.
-# --m3 is all three; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
+# --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_ONLY="" EDGE=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_ONLY="" EDGE=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
     --keep) KEEP=1 ;;
-    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 ;;
+    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 ;;
     --awg) M3_AWG=1 ;;
     --warp) M3_WARP=1 ;;
     --mihomo) M3_MIHOMO=1 M3_AWG=1 ;;
+    --vless) M3_VLESS=1 ;;
     --m3-only) M3_ONLY=1 ;;
     --edge) EDGE=1 ;;
     --old-node) OLD_NODE=${2:?--old-node needs a path}; shift ;;
@@ -71,8 +76,8 @@ while [ $# -gt 0 ]; do
 done
 set -- "${ARGS[@]}"
 [ -z "$OLD_NODE" ] || [ -x "$OLD_NODE" ] || [ -f "$OLD_NODE" ] || { echo "--old-node: no such file: $OLD_NODE" >&2; exit 2; }
-[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1; }
-M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO"
+[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1; }
+M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
 [ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
@@ -297,7 +302,9 @@ used_bytes() { user_json | jq -r '(.user.usedBytes // 0) | tonumber'; }
 used_ge() { [ "$(used_bytes)" -ge "$1" ]; }
 panel_up() { curl -sf -m 3 -o /dev/null "$ADMIN/api/mistgate.admin.v1.AuthService/GetLoginInfo" -H 'Content-Type: application/json' -d '{}'; }
 
-start_node() { spawn "$NODE_BIN" run --state-dir "$NODE_STATE" >>"$WORK/node.log" 2>&1; }
+# NODE_SSL_CERT_FILE (set by the VLESS steps) is the trust file of the agent: REALITY's own handshake to its target
+# verifies the target's certificate against the system roots.
+start_node() { spawn env ${NODE_SSL_CERT_FILE:+SSL_CERT_FILE=$NODE_SSL_CERT_FILE} "$NODE_BIN" run --state-dir "$NODE_STATE" >>"$WORK/node.log" 2>&1; }
 
 start_panel() {
   # The health test hook: a silence of 3 s already counts as an outage (production: 10 min), so the stopped
@@ -1156,6 +1163,7 @@ if [ -n "$M3_LIVE" ]; then
     m3_awg_signatures
   fi
   [ -z "$M3_MIHOMO" ] || m3_mihomo
+  [ -z "$M3_VLESS" ] || m3_vless
   [ -z "$M3_WARP" ] || m3_warp
 fi
 
@@ -1195,4 +1203,4 @@ for s in "${SECRETS[@]}"; do
   fi
 done
 [ "$LEAKS" = 0 ] || die "$LEAKS secret(s) found in logs"
-pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials) in any log"
+pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials, VLESS user ids) in any log"
