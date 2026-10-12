@@ -86,8 +86,10 @@ type NodeServiceClient interface {
 	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
 	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
 	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
-	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
-	// (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
+	// The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
+	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
+	// GetNodeResponse.tcp_checks. Owner or helper; API tokens directly (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
 	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
@@ -262,8 +264,10 @@ type NodeServiceHandler interface {
 	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
 	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
 	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
-	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
-	// (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
+	// The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
+	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
+	// GetNodeResponse.tcp_checks. Owner or helper; API tokens directly (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
 	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.

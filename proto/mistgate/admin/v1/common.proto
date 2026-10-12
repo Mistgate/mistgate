@@ -165,3 +165,23 @@ message PortCheck {
   // verdict "": node_offline | agent_too_old | no_sender | busy | inconclusive | same_host | no_route | failed.
   string reason = 9;
 }
+
+// One TCP port of a node in the port check (design/vless.md section 7.4): does a connection reach Mistgate itself.
+message TcpCheck {
+  uint32 port = 1;
+  // acme (TCP 80, Let's Encrypt HTTP-01) | site (the Hysteria2 HTTPS decoy) | vless (a VLESS listener).
+  string role = 2;
+  // The listener on this port answers TLS-ALPN-01 (acme-tls/1): a site, a TLS front or a "this node's site" REALITY on 443.
+  // The panel needs it to say whether certificates renew without port 80.
+  bool alpn = 3;
+  // The profile that owns the port; "" for acme.
+  string profile = 4;
+  // ours | other (something else answers) | busy (port 80 is held by another program on the node) | refused (closed)
+  // | timeout (filtered); "" = not checked, see reason.
+  string verdict = 5;
+  // verdict "": agent_too_old | failed | busy | no_route.
+  string reason = 6;
+  // "panel" or the name of the node that probed.
+  string sender = 7;
+  int64 checked_unix = 8 [jstype = JS_NUMBER];
+}

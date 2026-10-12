@@ -32,8 +32,10 @@ service NodeService {
   // Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
   // 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
   // picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
-  // itself. Conclusive results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly
-  // (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
+  // itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
+  // The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
+  // ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
+  // GetNodeResponse.tcp_checks. Owner or helper; API tokens directly (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
   rpc CheckPorts(CheckPortsRequest) returns (CheckPortsResponse);
   // "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
   // every user's access. The row stays (audit, traffic history) with status RETIRED.
@@ -205,6 +207,8 @@ message GetNodeResponse {
   int64 created_unix = 11 [jstype = JS_NUMBER];
   // Stored UDP delivery checks of this node's current address, by port.
   repeated PortCheck port_checks = 12;
+  // Stored TCP checks of this node (the last run), by port.
+  repeated TcpCheck tcp_checks = 13;
 }
 
 message CreateEnrollmentRequest {
@@ -351,6 +355,10 @@ message CheckPortsResponse {
   string error_code = 2;
   // "panel" or the name of the node that sent.
   string sender = 3;
+  // The TCP half of the same run (design/vless.md section 7.4): port 80 when the node has an ACME name, the Hysteria2
+  // site port, and the VLESS ports, at most 8, 80 first. Empty when the node has nothing to probe, or the UDP part
+  // stopped the run (node_offline, no_sender). A row that could not be probed has verdict "" and a reason.
+  repeated TcpCheck tcp = 4;
 }
 
 message RetireNodeRequest {

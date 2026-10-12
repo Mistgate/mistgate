@@ -1143,7 +1143,9 @@ type GetNodeResponse struct {
 	EnrollmentExpiresUnix int64 `protobuf:"varint,10,opt,name=enrollment_expires_unix,json=enrollmentExpiresUnix,proto3" json:"enrollment_expires_unix,omitempty"`
 	CreatedUnix           int64 `protobuf:"varint,11,opt,name=created_unix,json=createdUnix,proto3" json:"created_unix,omitempty"`
 	// Stored UDP delivery checks of this node's current address, by port.
-	PortChecks    []*PortCheck `protobuf:"bytes,12,rep,name=port_checks,json=portChecks,proto3" json:"port_checks,omitempty"`
+	PortChecks []*PortCheck `protobuf:"bytes,12,rep,name=port_checks,json=portChecks,proto3" json:"port_checks,omitempty"`
+	// Stored TCP checks of this node (the last run), by port.
+	TcpChecks     []*TcpCheck `protobuf:"bytes,13,rep,name=tcp_checks,json=tcpChecks,proto3" json:"tcp_checks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1258,6 +1260,13 @@ func (x *GetNodeResponse) GetCreatedUnix() int64 {
 func (x *GetNodeResponse) GetPortChecks() []*PortCheck {
 	if x != nil {
 		return x.PortChecks
+	}
+	return nil
+}
+
+func (x *GetNodeResponse) GetTcpChecks() []*TcpCheck {
+	if x != nil {
+		return x.TcpChecks
 	}
 	return nil
 }
@@ -2138,7 +2147,11 @@ type CheckPortsResponse struct {
 	// "" = checked. Otherwise PortCheck.reason's words; same_host and inconclusive still carry the counts in ports.
 	ErrorCode string `protobuf:"bytes,2,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
 	// "panel" or the name of the node that sent.
-	Sender        string `protobuf:"bytes,3,opt,name=sender,proto3" json:"sender,omitempty"`
+	Sender string `protobuf:"bytes,3,opt,name=sender,proto3" json:"sender,omitempty"`
+	// The TCP half of the same run (design/vless.md section 7.4): port 80 when the node has an ACME name, the Hysteria2
+	// site port, and the VLESS ports, at most 8, 80 first. Empty when the node has nothing to probe, or the UDP part
+	// stopped the run (node_offline, no_sender). A row that could not be probed has verdict "" and a reason.
+	Tcp           []*TcpCheck `protobuf:"bytes,4,rep,name=tcp,proto3" json:"tcp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2192,6 +2205,13 @@ func (x *CheckPortsResponse) GetSender() string {
 		return x.Sender
 	}
 	return ""
+}
+
+func (x *CheckPortsResponse) GetTcp() []*TcpCheck {
+	if x != nil {
+		return x.Tcp
+	}
+	return nil
 }
 
 type RetireNodeRequest struct {
@@ -2601,7 +2621,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\aTopUser\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tuser_name\x18\x02 \x01(\tR\buserName\x12\x18\n" +
-	"\x05bytes\x18\x03 \x01(\x04B\x020\x02R\x05bytes\"\xf9\x04\n" +
+	"\x05bytes\x18\x03 \x01(\x04B\x020\x02R\x05bytes\"\xb5\x05\n" +
 	"\x0fGetNodeResponse\x12+\n" +
 	"\x04node\x18\x01 \x01(\v2\x17.mistgate.admin.v1.NodeR\x04node\x128\n" +
 	"\ametrics\x18\x02 \x01(\v2\x1e.mistgate.admin.v1.NodeMetricsR\ametrics\x122\n" +
@@ -2616,7 +2636,9 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	" \x01(\x03B\x020\x02R\x15enrollmentExpiresUnix\x12%\n" +
 	"\fcreated_unix\x18\v \x01(\x03B\x020\x02R\vcreatedUnix\x12=\n" +
 	"\vport_checks\x18\f \x03(\v2\x1c.mistgate.admin.v1.PortCheckR\n" +
-	"portChecks\"\xdc\x01\n" +
+	"portChecks\x12:\n" +
+	"\n" +
+	"tcp_checks\x18\r \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\ttcpChecks\"\xdc\x01\n" +
 	"\x17CreateEnrollmentRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -2701,12 +2723,13 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\rserver_detail\x18\v \x01(\tR\fserverDetail\"B\n" +
 	"\x11CheckPortsRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
-	"\x05ports\x18\x02 \x03(\rR\x05ports\"\x7f\n" +
+	"\x05ports\x18\x02 \x03(\rR\x05ports\"\xae\x01\n" +
 	"\x12CheckPortsResponse\x122\n" +
 	"\x05ports\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.PortCheckR\x05ports\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x02 \x01(\tR\terrorCode\x12\x16\n" +
-	"\x06sender\x18\x03 \x01(\tR\x06sender\"O\n" +
+	"\x06sender\x18\x03 \x01(\tR\x06sender\x12-\n" +
+	"\x03tcp\x18\x04 \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\x03tcp\"O\n" +
 	"\x11RetireNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
 	"\fconfirm_name\x18\x02 \x01(\tR\vconfirmName\";\n" +
@@ -2817,6 +2840,7 @@ var file_mistgate_admin_v1_node_proto_goTypes = []any{
 	(*WarpSummary)(nil),              // 35: mistgate.admin.v1.WarpSummary
 	(*Inbound)(nil),                  // 36: mistgate.admin.v1.Inbound
 	(*PortCheck)(nil),                // 37: mistgate.admin.v1.PortCheck
+	(*TcpCheck)(nil),                 // 38: mistgate.admin.v1.TcpCheck
 }
 var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
 	32, // 0: mistgate.admin.v1.Node.status:type_name -> mistgate.admin.v1.NodeStatus
@@ -2834,41 +2858,43 @@ var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
 	12, // 12: mistgate.admin.v1.GetNodeResponse.top_today:type_name -> mistgate.admin.v1.TopUser
 	10, // 13: mistgate.admin.v1.GetNodeResponse.timeouts:type_name -> mistgate.admin.v1.NodeTimeouts
 	37, // 14: mistgate.admin.v1.GetNodeResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
-	3,  // 15: mistgate.admin.v1.CreateEnrollmentResponse.node:type_name -> mistgate.admin.v1.Node
-	17, // 16: mistgate.admin.v1.UpdateNodeRequest.dns_resolvers:type_name -> mistgate.admin.v1.DnsResolvers
-	10, // 17: mistgate.admin.v1.UpdateNodeRequest.timeouts:type_name -> mistgate.admin.v1.NodeTimeouts
-	3,  // 18: mistgate.admin.v1.UpdateNodeResponse.node:type_name -> mistgate.admin.v1.Node
-	1,  // 19: mistgate.admin.v1.PrepareAwgKernelResponse.outcome:type_name -> mistgate.admin.v1.PrepareAwgOutcome
-	3,  // 20: mistgate.admin.v1.PrepareAwgKernelResponse.node:type_name -> mistgate.admin.v1.Node
-	37, // 21: mistgate.admin.v1.CheckPortsResponse.ports:type_name -> mistgate.admin.v1.PortCheck
-	2,  // 22: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
-	2,  // 23: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
-	30, // 24: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
-	5,  // 25: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
-	7,  // 26: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
-	14, // 27: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
-	16, // 28: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
-	19, // 29: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
-	21, // 30: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
-	23, // 31: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
-	25, // 32: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
-	27, // 33: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
-	29, // 34: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
-	6,  // 35: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
-	13, // 36: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
-	15, // 37: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
-	18, // 38: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
-	20, // 39: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
-	22, // 40: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
-	24, // 41: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
-	26, // 42: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
-	28, // 43: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
-	31, // 44: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
-	35, // [35:45] is the sub-list for method output_type
-	25, // [25:35] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	38, // 15: mistgate.admin.v1.GetNodeResponse.tcp_checks:type_name -> mistgate.admin.v1.TcpCheck
+	3,  // 16: mistgate.admin.v1.CreateEnrollmentResponse.node:type_name -> mistgate.admin.v1.Node
+	17, // 17: mistgate.admin.v1.UpdateNodeRequest.dns_resolvers:type_name -> mistgate.admin.v1.DnsResolvers
+	10, // 18: mistgate.admin.v1.UpdateNodeRequest.timeouts:type_name -> mistgate.admin.v1.NodeTimeouts
+	3,  // 19: mistgate.admin.v1.UpdateNodeResponse.node:type_name -> mistgate.admin.v1.Node
+	1,  // 20: mistgate.admin.v1.PrepareAwgKernelResponse.outcome:type_name -> mistgate.admin.v1.PrepareAwgOutcome
+	3,  // 21: mistgate.admin.v1.PrepareAwgKernelResponse.node:type_name -> mistgate.admin.v1.Node
+	37, // 22: mistgate.admin.v1.CheckPortsResponse.ports:type_name -> mistgate.admin.v1.PortCheck
+	38, // 23: mistgate.admin.v1.CheckPortsResponse.tcp:type_name -> mistgate.admin.v1.TcpCheck
+	2,  // 24: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
+	2,  // 25: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
+	30, // 26: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
+	5,  // 27: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
+	7,  // 28: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
+	14, // 29: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
+	16, // 30: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
+	19, // 31: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
+	21, // 32: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
+	23, // 33: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
+	25, // 34: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
+	27, // 35: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
+	29, // 36: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
+	6,  // 37: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
+	13, // 38: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
+	15, // 39: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
+	18, // 40: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
+	20, // 41: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
+	22, // 42: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
+	24, // 43: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
+	26, // 44: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
+	28, // 45: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
+	31, // 46: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
+	37, // [37:47] is the sub-list for method output_type
+	27, // [27:37] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_node_proto_init() }

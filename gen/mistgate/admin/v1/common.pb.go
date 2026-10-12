@@ -898,6 +898,115 @@ func (x *PortCheck) GetReason() string {
 	return ""
 }
 
+// One TCP port of a node in the port check (design/vless.md section 7.4): does a connection reach Mistgate itself.
+type TcpCheck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Port  uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	// acme (TCP 80, Let's Encrypt HTTP-01) | site (the Hysteria2 HTTPS decoy) | vless (a VLESS listener).
+	Role string `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
+	// The listener on this port answers TLS-ALPN-01 (acme-tls/1): a site, a TLS front or a "this node's site" REALITY on 443.
+	// The panel needs it to say whether certificates renew without port 80.
+	Alpn bool `protobuf:"varint,3,opt,name=alpn,proto3" json:"alpn,omitempty"`
+	// The profile that owns the port; "" for acme.
+	Profile string `protobuf:"bytes,4,opt,name=profile,proto3" json:"profile,omitempty"`
+	// ours | other (something else answers) | busy (port 80 is held by another program on the node) | refused (closed)
+	// | timeout (filtered); "" = not checked, see reason.
+	Verdict string `protobuf:"bytes,5,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	// verdict "": agent_too_old | failed | busy | no_route.
+	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	// "panel" or the name of the node that probed.
+	Sender        string `protobuf:"bytes,7,opt,name=sender,proto3" json:"sender,omitempty"`
+	CheckedUnix   int64  `protobuf:"varint,8,opt,name=checked_unix,json=checkedUnix,proto3" json:"checked_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TcpCheck) Reset() {
+	*x = TcpCheck{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TcpCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TcpCheck) ProtoMessage() {}
+
+func (x *TcpCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TcpCheck.ProtoReflect.Descriptor instead.
+func (*TcpCheck) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TcpCheck) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *TcpCheck) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *TcpCheck) GetAlpn() bool {
+	if x != nil {
+		return x.Alpn
+	}
+	return false
+}
+
+func (x *TcpCheck) GetProfile() string {
+	if x != nil {
+		return x.Profile
+	}
+	return ""
+}
+
+func (x *TcpCheck) GetVerdict() string {
+	if x != nil {
+		return x.Verdict
+	}
+	return ""
+}
+
+func (x *TcpCheck) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *TcpCheck) GetSender() string {
+	if x != nil {
+		return x.Sender
+	}
+	return ""
+}
+
+func (x *TcpCheck) GetCheckedUnix() int64 {
+	if x != nil {
+		return x.CheckedUnix
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -956,7 +1065,16 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\fchecked_unix\x18\x06 \x01(\x03B\x020\x02R\vcheckedUnix\x12\x1d\n" +
 	"\bbad_unix\x18\a \x01(\x03B\x020\x02R\abadUnix\x12\x16\n" +
 	"\x06sender\x18\b \x01(\tR\x06sender\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason*\xd5\x01\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\"\xd1\x01\n" +
+	"\bTcpCheck\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\x12\x12\n" +
+	"\x04role\x18\x02 \x01(\tR\x04role\x12\x12\n" +
+	"\x04alpn\x18\x03 \x01(\bR\x04alpn\x12\x18\n" +
+	"\aprofile\x18\x04 \x01(\tR\aprofile\x12\x18\n" +
+	"\averdict\x18\x05 \x01(\tR\averdict\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
+	"\x06sender\x18\a \x01(\tR\x06sender\x12%\n" +
+	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -1006,7 +1124,7 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
@@ -1019,10 +1137,11 @@ var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(*AwgInboundStatus)(nil), // 8: mistgate.admin.v1.AwgInboundStatus
 	(*WarpSummary)(nil),      // 9: mistgate.admin.v1.WarpSummary
 	(*PortCheck)(nil),        // 10: mistgate.admin.v1.PortCheck
-	nil,                      // 11: mistgate.admin.v1.StatusReason.ParamsEntry
+	(*TcpCheck)(nil),         // 11: mistgate.admin.v1.TcpCheck
+	nil,                      // 12: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	11, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	12, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
 	8,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
@@ -1045,7 +1164,7 @@ func file_mistgate_admin_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

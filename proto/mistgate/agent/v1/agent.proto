@@ -109,7 +109,7 @@ package mistgate.agent.v1;
 //     (enabled "1"/"0", integers decimal, reserved lowercase hex, empty = "").
 //
 // COMMANDS
-//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, MeasureBandwidth, UdpCount and UdpSend carry a request_id and get exactly one CommandResult. Removing a
+//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, MeasureBandwidth, UdpCount, UdpSend, HttpMark and TcpProbe carry a request_id and get exactly one CommandResult. Removing a
 //   credential from the desired state implicitly kicks its sessions; the explicit Kick is for "kick now,
 //   keep access" and for diagnostics.
 //   Kick is best effort in Hysteria2: the core can only close a connection from inside a traffic callback,
@@ -348,6 +348,27 @@ package mistgate.agent.v1;
 //   - ERRORS (CommandResult.error): busy (a count already armed, 4 sends running, or a bandwidth test running),
 //     not_armed, bad_params, unsupported_host, no_route (resolve or send failed), "failed: <short message>".
 //
+// TCP DELIVERY CHECK (additive, protocol api_version stays 1)
+//   The TCP half of the same check (design/vless.md section 7.4): does a connection to a TCP port of a node reach
+//   Mistgate itself, and not a provider filter or another program? The node being checked (the target) arms, another
+//   party probes (the sender: another node, or the VPS panel host when the fleet has no other node).
+//   - CAPABILITY GATE. An agent lists "tcpcheck/1" in Hello.capabilities. The panel sends HttpMark to the target and
+//     TcpProbe to the sender ONLY to a stream that listed it.
+//   - ARM (target, port 80). HttpMark arms ONE one-shot mark in the agent's HTTP-01 listener: a request for
+//     /.well-known/acme-challenge/<hex of token>, whatever its Host, is answered 200 with the answer bytes once, then the
+//     mark is gone; it also expires after hold_s. That is Let's Encrypt's own path, so a provider filter on it shows up
+//     too, and no fixed path marks the node. Answer: CommandResult{ok, params{"http01": "serving" | "busy" | "off"}}.
+//     busy = the node has an ACME name but another program holds :80; off = the node has no ACME name, :80 is unused.
+//     A second arm while a mark is armed is ok=false, error busy. A mark lost to an agent restart reads as "other".
+//   - PROBE (sender). TcpProbe resolves host (IPv4 first; unspecified, multicast and broadcast are refused) and tests
+//     every target in parallel: kind "http_mark" sends the GET above (Host = host) and is "ours" only on status 200 with
+//     exactly the answer; kind "tls" does a TLS handshake with SNI = sni and is "ours" when the chain is valid for the
+//     SNI (system roots), or when the leaf sha256 equals pin_sha256 (a self-signed listener). Redirects are not followed.
+//     Verdicts per port: ours | other (answered, but not us) | refused | timeout. Caps: 1-8 targets, 5 s to connect,
+//     8 s per port, 4 concurrent probes. Answer: CommandResult{ok, params{"family": "4" | "6", "t<port>": verdict}}.
+//   - ERRORS (CommandResult.error): busy (a mark already armed, 4 probes running, or a bandwidth test running),
+//     bad_params, unsupported_host, no_route (resolve failed), "failed: <short message>".
+//
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
@@ -460,8 +481,8 @@ message Hello {
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
-  // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport) and "udpcheck/1" (UdpCount,
-  // UdpSend; see "UDP DELIVERY CHECK").
+  // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
+  // UdpSend; see "UDP DELIVERY CHECK") and "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -788,6 +809,9 @@ message ConnectResponse {
     // The answer to ConnectRequest.renew. The session keeps its old certificate serial until the old certificate's
     // grace period ends; the agent then reconnects with the new one.
     RenewResponse renew = 27;
+    // Only sent to agents with "tcpcheck/1" in Hello.capabilities (see "TCP DELIVERY CHECK").
+    HttpMark http_mark = 28;
+    TcpProbe tcp_probe = 29;
   }
 }
 
@@ -826,6 +850,42 @@ message UdpSend {
   uint32 pps = 6;
   // UDP payload bytes, 64-1200.
   uint32 size = 7;
+}
+
+// Arm one one-shot answer to an HTTP-01 shaped request on this node's TCP 80 (see "TCP DELIVERY CHECK"). One
+// CommandResult: ok with params{"http01": "serving" | "busy" | "off"}, or error busy while another mark is armed.
+message HttpMark {
+  string request_id = 1;
+  // 16 random bytes: the request path is /.well-known/acme-challenge/<lower-case hex of token>.
+  bytes token = 2;
+  // 16 random bytes: the response body, status 200.
+  bytes answer = 3;
+  // The mark expires after this many seconds (1-60).
+  uint32 hold_s = 4;
+}
+
+// Probe TCP ports of another node of the fleet (see "TCP DELIVERY CHECK"). One CommandResult after the last port.
+message TcpProbe {
+  string request_id = 1;
+  // The target node's address (node.address): an IP, or a name this node resolves (IPv4 first). It is also the Host header
+  // of an http_mark request.
+  string host = 2;
+  // 1-8 distinct ports.
+  repeated TcpTarget targets = 3;
+}
+
+message TcpTarget {
+  uint32 port = 1;
+  // "http_mark": GET the mark path (token and answer set). "tls": TLS handshake (sni set).
+  string kind = 2;
+  // tls: the server name to send and to verify.
+  string sni = 3;
+  // tls: lower-case hex sha256 of the leaf certificate the node reported; "" = trust only a valid chain.
+  string pin_sha256 = 4;
+  // http_mark: 16 bytes.
+  bytes token = 5;
+  // http_mark: 16 bytes, the expected body.
+  bytes answer = 6;
 }
 
 // Ask the node to put the AmneziaWG kernel module on itself (or, with dry_run, only say whether that is needed and
