@@ -1017,11 +1017,11 @@ func TestAWGLegacyEmptyImplicitDevice(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM device_credential WHERE device_id = 'dev_legacy' AND revoked_at IS NULL`); n != 1 {
 		t.Errorf("the legacy device did not get the credential: %d", n)
 	}
-	// A user of both apps keeps one implicit device: its hysteria2 credential as before, and the VLESS one every device holds.
+	// A user of both apps keeps one implicit device; it lists hysteria2 only, the protocol the group gives (see TestDeviceProtocolsFollowServers).
 	f2 := newFixture(t)
 	both := f2.e.user("both", f2.group, nil).User
 	got := must(f2.e.s.GetUser(f2.e.ctx, req(&adminv1.GetUserRequest{UserId: both.Id}))).Msg
-	if len(got.Devices) != 1 || got.Devices[0].AwgProfileId != "" || !slices.Equal(got.Devices[0].Protocols, []string{"hysteria2", "vless"}) {
+	if len(got.Devices) != 1 || got.Devices[0].AwgProfileId != "" || !slices.Equal(got.Devices[0].Protocols, []string{"hysteria2"}) {
 		t.Errorf("hysteria2 user devices = %+v", got.Devices)
 	}
 }

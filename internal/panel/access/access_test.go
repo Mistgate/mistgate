@@ -493,7 +493,7 @@ func TestUserRules(t *testing.T) {
 
 	// Revoking the device drops its credential from the nodes; the next fetch issues a fresh device.
 	devs := must(e.s.GetUser(ctx, req(&adminv1.GetUserRequest{UserId: u.Id}))).Msg.Devices
-	if len(devs) != 1 || !slices.Equal(devs[0].Protocols, []string{"hysteria2", "vless"}) {
+	if len(devs) != 1 || !slices.Equal(devs[0].Protocols, []string{"hysteria2"}) {
 		t.Fatalf("devices = %+v", devs)
 	}
 	e.resetNotify()

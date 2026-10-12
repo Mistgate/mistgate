@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { Segmented } from "@/components/ui/segmented";
@@ -7,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { cx } from "@/lib/cx";
 import { useTx, type Tx } from "@/screens/users/t";
 import { Card, SectionLabel } from "@/components/ui/bits";
-import { errorsOf, getAt, isChanged, makeSecret, MASK, setAt, type Field, type Group, type Settings } from "./schema";
+import { errorsOf, getAt, isChanged, listIssues, makeSecret, MASK, setAt, type Field, type Group, type Settings } from "./schema";
 
 /** What a schema group is about: basics sand, the disguise sage, the rest of the protocol's knobs sky. */
 const groupMarks: Record<string, { icon: IconName; tone: Tone }> = {
@@ -105,6 +107,11 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
   const unit = f.unit ? (t.opt(`profiles.unit.${f.unit}`) ?? f.unit) : "";
   const invalid = problems.length > 0;
   const choices = f.choices.map((c) => ({ ...c, label: copy(`enum.${c.value}`) ?? c.label }));
+  const errId = useId();
+  const describedBy = invalid ? errId : undefined;
+  // a list shows a bad item's problem under that item; the server's sentence about the whole list would repeat it
+  const onItem = f.kind === "list" ? new Set<string>(listIssues(asList(getAt(settings, f.path)), f.pattern).filter((x) => x !== null)) : null;
+  const shown = onItem ? problems.filter((p) => !(p.pointer === f.key && p.code && onItem.has(p.code))) : problems;
 
   let control: ReactNode = null;
   switch (f.kind) {
@@ -126,7 +133,7 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
     case "number":
       control = (
         <>
-          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} onChange={(v) => onChange(f.path, v)} className="w-24 text-right" />
+          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} onChange={(v) => onChange(f.path, v)} className="w-24 text-right" />
           {unit && <span className="min-w-10 text-xs text-muted">{unit}</span>}
         </>
       );
@@ -152,6 +159,7 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
         <input
           aria-label={label}
           aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           autoComplete="off"
           spellCheck={false}
           disabled={locked}
@@ -161,6 +169,9 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
           className={cx(inputCls, "w-[220px] max-w-full px-3 disabled:opacity-60")}
         />
       );
+      break;
+    case "list":
+      control = <StringList f={f} label={label} t={t} value={getAt(settings, f.path)} describedBy={shown.length > 0 ? errId : undefined} onChange={(v) => onChange(f.path, v)} />;
       break;
   }
 
@@ -173,11 +184,15 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
         </span>
         {hint && <span className="text-[11px] leading-snug text-muted">{hint}</span>}
         {extra}
-        {problems.map((p, i) => (
-          <span key={i} role="alert" className="text-[11px] leading-snug text-danger-text">
-            {(p.code && t.opt(`field${p.pointer.replaceAll("/", ".")}.${p.code}`)) || p.message}
+        {shown.length > 0 && (
+          <span id={errId} className="flex flex-col">
+            {shown.map((p, i) => (
+              <span key={i} role="alert" className="text-[11px] leading-snug text-danger-text">
+                {(p.code && t.opt(`field${p.pointer.replaceAll("/", ".")}.${p.code}`)) || p.message}
+              </span>
+            ))}
           </span>
-        ))}
+        )}
       </div>
       <div className="flex max-w-full min-w-0 flex-none items-center justify-end gap-1.5">{control}</div>
     </div>
@@ -185,11 +200,12 @@ function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, on
 }
 
 /** Digits only (plus one dot for a non-integer); an empty box stays empty and the server names the problem. */
-function NumberInput({ label, value, integer, invalid, onChange, className }: { label: string; value: unknown; integer: boolean; invalid: boolean; onChange: (v: number | string) => void; className?: string }) {
+function NumberInput({ label, value, integer, invalid, describedBy, onChange, className }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string }) {
   return (
     <input
       aria-label={label}
       aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       inputMode={integer ? "numeric" : "decimal"}
       autoComplete="off"
       value={value === undefined || value === null ? "" : String(value)}
@@ -199,6 +215,95 @@ function NumberInput({ label, value, integer, invalid, onChange, className }: { 
       }}
       className={cx(inputCls, "px-3", className)}
     />
+  );
+}
+
+const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+
+/**
+ * A list of strings (REALITY server names, short ids): one box per value with a remove button, "Add" under them up to
+ * the schema's limit, and a bad value's problem right under its box. An empty box stays on screen while it is being
+ * filled but is not part of the value, so a fresh "Add" never turns into a server error.
+ */
+function StringList({ f, label, t, value, describedBy, onChange }: { f: Field; label: string; t: Tx; value: unknown; describedBy?: string; onChange: (v: string[]) => void }) {
+  const values = asList(value);
+  const [rows, setRows] = useState(values);
+  const id = useId();
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const addBtn = useRef<HTMLButtonElement>(null);
+  const focusAt = useRef<number | null>(null);
+  // the value changed elsewhere (Discard, a reload): the boxes follow it
+  if (JSON.stringify(rows.filter((r) => r !== "")) !== JSON.stringify(values)) setRows(values);
+  useEffect(() => {
+    if (focusAt.current === null) return;
+    (inputs.current[focusAt.current] ?? addBtn.current)?.focus();
+    focusAt.current = null;
+  });
+
+  const full = f.max > 0 && rows.length >= f.max;
+  const issues = listIssues(rows, f.pattern);
+  const put = (next: string[], focus?: number) => {
+    if (focus !== undefined) focusAt.current = focus;
+    setRows(next);
+    onChange(next.filter((r) => r !== ""));
+  };
+  const add = () => !full && put([...rows, ""], rows.length);
+  // focus goes to the box that took the removed one's place, else to the one above, else to "Add"
+  const remove = (i: number) => put(rows.filter((_, k) => k !== i), Math.min(i, rows.length - 2));
+
+  return (
+    <div role="group" aria-label={label} aria-describedby={describedBy} className="flex w-[260px] max-w-full flex-col gap-1.5">
+      {rows.map((r, i) => {
+        const issue = issues[i];
+        const name = t("profiles.list.item", { label, n: i + 1 });
+        const drop = t("profiles.list.remove", { item: r || name });
+        return (
+          <div key={i} className="flex flex-col gap-1">
+            <div className="flex items-center gap-1">
+              <input
+                ref={(el) => {
+                  inputs.current[i] = el;
+                }}
+                aria-label={name}
+                aria-invalid={issue ? true : undefined}
+                aria-describedby={issue ? `${id}-${i}` : undefined}
+                autoComplete="off"
+                spellCheck={false}
+                value={r}
+                onChange={(e) => put(rows.map((x, k) => (k === i ? e.target.value : x)))}
+                onKeyDown={(e) => {
+                  // Enter in the last filled box opens the next one
+                  if (e.key === "Enter" && i === rows.length - 1 && r !== "") {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
+                className={cx(inputCls, "min-w-0 flex-1 px-3")}
+              />
+              <IconButton variant="flat" aria-label={drop} title={drop} onClick={() => remove(i)}>
+                <Icon name="x" size={14} />
+              </IconButton>
+            </div>
+            {issue && (
+              <span id={`${id}-${i}`} className="text-[11px] leading-snug text-danger-text">
+                {t.opt(`field.${f.id}.${issue}`) ?? t(`profiles.list.${issue}`)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+      <div className="flex items-center gap-2">
+        <Button ref={addBtn} size="sm" disabled={full} onClick={add}>
+          <Icon name="plus" size={12} />
+          {t("profiles.list.add")}
+        </Button>
+        {f.max > 0 && (
+          <span className="font-mono text-[11px] text-muted">
+            {rows.length} / {f.max}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

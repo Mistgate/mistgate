@@ -470,6 +470,15 @@ export const en = {
   "node.check.warp.down": "WARP on {node} does not work now — the profile will not pass traffic until WARP is back.",
   "node.check.warp.open": "Set up WARP on {node}",
   "node.check.warp.goto": "Open WARP on {node}",
+  // hy2_decoy_paused (lib/port-check.ts decoyNote): the main sentence by `via`, then the certificate one by `port80`
+  "node.check.decoy.self": "TCP {port} on {node} goes to “{vless}”. The site of “{hy2}” stays there: REALITY shows it with the node’s own certificate, and that certificate keeps renewing.",
+  "node.check.decoy.tls": "TCP {port} on {node} goes to “{vless}”. The site of “{hy2}” is off while it does and comes back when the port is free; meanwhile TCP {port} answers a plain 404. The certificate keeps renewing through “{vless}”.",
+  "node.check.decoy.site": "TCP {port} on {node} goes to “{vless}”. The site of “{hy2}” is off while it does and comes back when the port is free; visitors of TCP {port} see {target} instead (REALITY passes them on).",
+  "node.check.decoy.port80.open": "Port 80 reaches Mistgate here, so the Hysteria2 certificate renews over it.",
+  "node.check.decoy.port80.closed": "Port 80 does not reach Mistgate here, so the Hysteria2 certificate will stop renewing. Open TCP 80 at the provider, move “{vless}” to 8443, or make its REALITY target “This node’s site”.",
+  "node.check.decoy.port80.unchecked": "The Hysteria2 certificate now renews only through TCP 80. Check the ports on the node’s Profiles tab to see whether it is open.",
+  "docs.vlessHy2": "VLESS and Hysteria2 on one node",
+  "docs.vlessHy2.url": "https://mistgate.app/guide/vless-and-hysteria2/",
   "node.check.openProfile": "Open the profile",
 
   // no profile in the panel yet: make one and put it on the node in one go
@@ -716,8 +725,8 @@ export const en = {
   "event.warp_needs_attention": "WARP is not set up",
   "event.torrent_guard_degraded":
     "torrent protection does not check AmneziaWG traffic: the netfilter packet queue did not start (Hysteria2 is still checked). The server’s kernel needs netfilter queue support (nfnetlink_queue)",
-  "event.host_firewall_sync_failed": "the server’s firewall may block UDP {ports}: allow these ports in UFW, or add them to the active firewalld zone by hand",
-  "event.host_firewall_sync_failed.plain": "the server’s firewall may block the profiles’ UDP ports: check UFW or the active firewalld zone",
+  "event.host_firewall_sync_failed": "the server’s firewall may block these ports: {ports} (plain numbers and ranges are UDP, “tcp:” is TCP): allow them in UFW, or add them to the active firewalld zone by hand",
+  "event.host_firewall_sync_failed.plain": "the server’s firewall may block the profiles’ ports: check UFW or the active firewalld zone",
   "event.host_firewall_sync_recovered": "the server’s firewall rules for the UDP ports are in order again",
   "event.subscription_shared_suspect": "a subscription link is used from {networks} networks a day",
   "event.user_created": "created",
@@ -1459,6 +1468,14 @@ export const ru: typeof en = {
   "node.check.warp.down": "WARP на {node} сейчас не работает — профиль не пропустит трафик, пока WARP не поднимется.",
   "node.check.warp.open": "Включить WARP на {node}",
   "node.check.warp.goto": "Открыть WARP на {node}",
+  "node.check.decoy.self": "TCP {port} на {node} отходит «{vless}». Сайт «{hy2}» там остаётся: его показывает REALITY с собственным сертификатом ноды, и сертификат продолжает обновляться.",
+  "node.check.decoy.tls": "TCP {port} на {node} отходит «{vless}». Сайт «{hy2}» на это время выключается и вернётся, когда порт освободится; пока TCP {port} отвечает пустой страницей 404. Сертификат продолжает обновляться через «{vless}».",
+  "node.check.decoy.site": "TCP {port} на {node} отходит «{vless}». Сайт «{hy2}» на это время выключается и вернётся, когда порт освободится; на TCP {port} вместо него откроется {target} — REALITY передаёт посетителей туда.",
+  "node.check.decoy.port80.open": "Порт 80 до Mistgate здесь доходит — сертификат Hysteria2 обновится через него.",
+  "node.check.decoy.port80.closed": "Порт 80 до Mistgate здесь не доходит — сертификат Hysteria2 перестанет обновляться. Открой TCP 80 у провайдера, перенеси «{vless}» на 8443 или поставь ему цель REALITY «Сайт этой ноды».",
+  "node.check.decoy.port80.unchecked": "Сертификат Hysteria2 теперь обновляется только через TCP 80. Проверь порты на вкладке «Профили» ноды — открыт ли он.",
+  "docs.vlessHy2": "VLESS и Hysteria2 на одной ноде",
+  "docs.vlessHy2.url": "https://mistgate.app/ru/guide/vless-and-hysteria2/",
   "node.check.openProfile": "Открыть профиль",
 
   "node.quick.title": "Профилей пока нет",
@@ -1703,8 +1720,8 @@ export const ru: typeof en = {
   "event.warp_needs_attention": "WARP не настроился",
   "event.torrent_guard_degraded":
     "защита от торрентов не проверяет трафик AmneziaWG: очередь пакетов netfilter не запустилась (Hysteria2 проверяется). Ядру сервера нужна поддержка очереди netfilter (nfnetlink_queue)",
-  "event.host_firewall_sync_failed": "файрвол сервера может не пропускать UDP {ports}: разреши эти порты в UFW или вручную добавь их в активную зону firewalld",
-  "event.host_firewall_sync_failed.plain": "файрвол сервера может не пропускать UDP-порты профилей: проверь UFW или активную зону firewalld",
+  "event.host_firewall_sync_failed": "файрвол сервера может не пропускать порты {ports} (числа и диапазоны — UDP, «tcp:» — TCP): разреши их в UFW или вручную добавь в активную зону firewalld",
+  "event.host_firewall_sync_failed.plain": "файрвол сервера может не пропускать порты профилей: проверь UFW или активную зону firewalld",
   "event.host_firewall_sync_recovered": "правила файрвола сервера для UDP-портов снова в порядке",
   "event.subscription_shared_suspect": "ссылкой подписки пользуются из {networks} сетей за сутки",
   "event.user_created": "создан",

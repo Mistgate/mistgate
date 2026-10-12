@@ -1,10 +1,10 @@
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { hy2, other } from "./schema.fixtures";
+import { hy2, other, vless } from "./schema.fixtures";
 import { ToastProvider } from "@/components/ui/toast";
 import { en } from "@/i18n/en";
-import { MASK, parseSchema, parseSettings } from "./schema";
+import { MASK, parseSchema, parseSettings, type Settings } from "./schema";
 import { SchemaForm } from "./schema-form";
 
 beforeAll(() => {
@@ -124,5 +124,95 @@ describe("SchemaForm", () => {
     expect(el.textContent).toContain(en["field.hop.from.invalid"]);
     expect(el.textContent).not.toContain("the port must be outside the hop range");
     expect(el.textContent).toContain("something new");
+  });
+});
+
+describe("string list (VLESS server names)", () => {
+  const settingsWith = (names: string[]): Settings => ({ port: 443, transport: "xhttp", reality: { target: "www.example.org:443", server_names: names, short_ids: ["ab12"], fingerprint: "chrome" } });
+  // the form as the editor holds it: every change is kept and reported
+  function Live({ initial, problems = [], onValue }: { initial: Settings; problems?: { pointer: string; code?: string; message: string }[]; onValue: (s: Settings) => void }) {
+    const [s, setS] = useState(initial);
+    return (
+      <SchemaForm
+        protocol="vless"
+        groups={parseSchema(vless)}
+        settings={s}
+        base={initial}
+        problems={problems}
+        onChange={(n) => {
+          setS(n);
+          onValue(n);
+        }}
+      />
+    );
+  }
+  const form = (names: string[], problems?: { pointer: string; code?: string; message: string }[]) => {
+    const onValue = vi.fn();
+    const el = mount(<Live initial={settingsWith(names)} problems={problems} onValue={onValue} />);
+    const group = el.querySelector('[role=group][aria-label="Server names"]') as HTMLElement;
+    return { el, group, onValue };
+  };
+  const boxes = (group: HTMLElement) => [...group.querySelectorAll<HTMLInputElement>("input")];
+  const addBtn = (group: HTMLElement) => [...group.querySelectorAll("button")].find((b) => b.textContent === "Add") as HTMLButtonElement;
+  const names = (onValue: ReturnType<typeof vi.fn>) => (onValue.mock.calls.at(-1)![0] as { reality: { server_names: string[] } }).reality.server_names;
+  const typeInto = (input: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+  it("adds a box, focused, that joins the value only once it is filled; Enter in the last filled box opens the next", () => {
+    const { group, onValue } = form(["www.example.org"]);
+    act(() => addBtn(group).click());
+    expect(boxes(group).map((b) => b.value)).toEqual(["www.example.org", ""]);
+    expect(document.activeElement).toBe(boxes(group)[1]);
+    expect(names(onValue)).toEqual(["www.example.org"]);
+    expect(boxes(group)[1]!.getAttribute("aria-label")).toBe("Server names 2");
+    typeInto(boxes(group)[1]!, "cdn.example.org");
+    expect(names(onValue)).toEqual(["www.example.org", "cdn.example.org"]);
+    act(() => boxes(group)[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(boxes(group)).toHaveLength(3);
+    expect(document.activeElement).toBe(boxes(group)[2]);
+  });
+
+  it("removes a value with the button named after it and moves the focus to the box that took its place", () => {
+    const { group, onValue } = form(["a.example.org", "b.example.org"]);
+    act(() => (group.querySelector('button[aria-label="Remove a.example.org"]') as HTMLButtonElement).click());
+    expect(names(onValue)).toEqual(["b.example.org"]);
+    expect(document.activeElement).toBe(boxes(group)[0]);
+    act(() => (group.querySelector('button[aria-label="Remove b.example.org"]') as HTMLButtonElement).click());
+    expect(names(onValue)).toEqual([]);
+    expect(boxes(group)).toHaveLength(0);
+    expect(document.activeElement).toBe(addBtn(group));
+  });
+
+  it("stops at the schema's 8 values and says how many there are", () => {
+    const seven = Array.from({ length: 7 }, (_, i) => `n${i}.example.org`);
+    const { group } = form(seven);
+    expect(group.textContent).toContain("7 / 8");
+    expect(addBtn(group).disabled).toBe(false);
+    act(() => addBtn(group).click());
+    expect(boxes(group)).toHaveLength(8);
+    expect(group.textContent).toContain("8 / 8");
+    expect(addBtn(group).disabled).toBe(true);
+    act(() => addBtn(group).click());
+    expect(boxes(group)).toHaveLength(8);
+  });
+
+  it("puts a bad value's problem under that value, bound to its box, and does not repeat the server's sentence about the list", () => {
+    const { el, group } = form(["www.example.org", "*.example.org", "WWW.example.org"], [{ pointer: "/reality/server_names", code: "invalid", message: "names must be host names without wildcards" }]);
+    const [ok, wild, twice] = boxes(group);
+    expect(ok!.getAttribute("aria-invalid")).toBeNull();
+    expect(wild!.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(wild!.getAttribute("aria-describedby")!)?.textContent).toBe(en["field.reality.server_names.invalid"]);
+    expect(document.getElementById(twice!.getAttribute("aria-describedby")!)?.textContent).toBe(en["field.reality.server_names.duplicate"]);
+    expect(el.textContent).not.toContain("names must be host names without wildcards");
+    expect(el.textContent).toContain("1 error");
+  });
+
+  it("shows a problem of the whole list under its title, bound to the list", () => {
+    const { el, group } = form([], [{ pointer: "/reality/server_names", code: "required", message: "the target is an IP address: list the host names its certificate is valid for" }]);
+    expect(el.textContent).toContain(en["field.reality.server_names.required"]);
+    expect(document.getElementById(group.getAttribute("aria-describedby")!)?.textContent).toBe(en["field.reality.server_names.required"]);
   });
 });

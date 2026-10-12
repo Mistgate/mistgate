@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +194,62 @@ func TestDecoyPausedRules(t *testing.T) {
 				t.Errorf("profile names = %q, %q", p["hy2"], p["vless"])
 			}
 		})
+	}
+}
+
+// port80 belongs only to an ACME certificate: a self-signed Hysteria2 does not renew through the site port at all.
+func TestDecoyPausedPort80OnlyForACME(t *testing.T) {
+	e := newEnv(t)
+	vless := plugin.InboundSpec{Protocol: "vless", Listen: plugin.Listen{Network: "tcp", Port: 443},
+		Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}
+	for mode, want := range map[plugin.TLSMode]bool{plugin.TLSAcmeDomain: true, plugin.TLSAcmeIP: true, plugin.TLSSelfSigned: false} {
+		spec := plugin.InboundSpec{Protocol: "hysteria2", Listen: plugin.Listen{Network: "udp", Port: 443}, TLS: plugin.TLS{Mode: mode}, Settings: []byte(`{}`)}
+		hy2 := nodeListen{profile: "hy2", protocol: "hysteria2", enabled: true, l: spec.Listen, spec: spec}
+		got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, []nodeListen{hy2})
+		if err != nil || len(got) != 1 {
+			t.Fatalf("mode %d: %v %+v", mode, err, got)
+		}
+		if _, has := got[0].Params["port80"]; has != want {
+			t.Errorf("mode %d: port80 present = %v, want %v (%v)", mode, has, want, got[0].Params)
+		}
+	}
+}
+
+// Every subscription device holds a VLESS credential (newCreds mints one for each protocol the apps allow), but the user
+// card lists only the protocols the person has servers for: the group's, deployed on a node they use.
+func TestDeviceProtocolsFollowServers(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	e.node("nod_fi1", "fi1", "fi1.example.com", "active")
+	hy2 := e.profile("hy2", "")
+	e.inbound(hy2.Id, "nod_de1")
+	vless := e.vlessProfile("vless")
+	e.inbound(vless.Id, "nod_fi1")
+	group := e.group("hy2-only", hy2.Id)
+	user := e.user("alice", group, nil).User
+	protocols := func() []string {
+		t.Helper()
+		devs := must(e.s.GetUser(e.ctx, req(&adminv1.GetUserRequest{UserId: user.Id}))).Msg.Devices
+		if len(devs) != 1 {
+			t.Fatalf("devices = %+v", devs)
+		}
+		return devs[0].Protocols
+	}
+	if n := e.count(`SELECT count(*) FROM device_credential WHERE user_id = '` + user.Id + `' AND protocol = 'vless' AND revoked_at IS NULL`); n != 1 {
+		t.Fatalf("vless credentials = %d, want the one every device holds", n)
+	}
+	if got := protocols(); !slices.Equal(got, []string{"hysteria2"}) {
+		t.Errorf("a group without VLESS: protocols = %v", got)
+	}
+
+	must(e.s.UpdateGroup(e.ctx, req(&adminv1.UpdateGroupRequest{GroupId: group, ProfileIds: &adminv1.ProfileIds{Values: []string{hy2.Id, vless.Id}}})))
+	if got := protocols(); !slices.Equal(got, []string{"hysteria2", "vless"}) {
+		t.Errorf("the group gives VLESS: protocols = %v", got)
+	}
+
+	// VLESS runs only on fi1: a person limited to de1 has no VLESS server.
+	must(e.s.UpdateUser(e.ctx, req(&adminv1.UpdateUserRequest{UserId: user.Id, Nodes: &adminv1.NodeSelection{NodeIds: []string{"nod_de1"}}})))
+	if got := protocols(); !slices.Equal(got, []string{"hysteria2"}) {
+		t.Errorf("only de1 selected: protocols = %v", got)
 	}
 }

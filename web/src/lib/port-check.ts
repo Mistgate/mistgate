@@ -48,14 +48,27 @@ export const withNotes = (base: string, notes: readonly string[]) => (notes.leng
 type Warning = { code: string; params: Record<string, string> };
 
 /**
- * The sentences a saved inbound owes the admin about its port: the check could not run (port_unchecked), or the port loses
- * packets and was saved anyway or did not change (port_lossy). Empty when there is nothing to say.
+ * hy2_decoy_paused in words ({node, port, hy2, vless, via, target, port80}): who takes the TCP port and what becomes of the
+ * Hysteria2 site (by `via`: self, tls, site), then what that means for its certificate (by `port80`, when sent).
+ */
+export function decoyNote(t: T, p: Record<string, string | undefined>): string {
+  const vars = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v ?? ""]));
+  const via = p.via === "self" || p.via === "tls" ? p.via : "site";
+  const port80 = p.port80 === "open" || p.port80 === "closed" || p.port80 === "unchecked" ? t(`node.check.decoy.port80.${p.port80}`, vars) : "";
+  return [t(`node.check.decoy.${via}`, vars), port80].filter(Boolean).join(" ");
+}
+
+/**
+ * The sentences a saved inbound owes the admin about its port: the check could not run (port_unchecked), the port loses
+ * packets and was saved anyway or did not change (port_lossy), or a VLESS profile took the Hysteria2 site's TCP port
+ * (hy2_decoy_paused). Empty when there is nothing to say.
  */
 export function portNotes(t: T, warnings: readonly Warning[] | undefined): string[] {
   const out: string[] = [];
   for (const w of warnings ?? []) {
     if (w.code === "port_unchecked") out.push(t("ports.unchecked.saved", { port: w.params.port ?? "", node: w.params.node ?? "", why: reasonText(t, w.params.reason ?? "") }));
     if (w.code === "port_lossy") out.push(t("err.port_lossy", lossyVars(t, w.params)));
+    if (w.code === "hy2_decoy_paused") out.push(decoyNote(t, w.params));
   }
   return out;
 }

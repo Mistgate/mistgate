@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foldDays, niceCeil, protocolShort, smoothPath, sortProtocols, tail, toSeries } from "./series";
+import { foldDays, niceCeil, protocolName, protocolShort, smoothPath, sortProtocols, tail, toSeries } from "./series";
 
 describe("protocolShort", () => {
   it("writes the tags the owner uses, never a cut word", () => {
@@ -76,7 +76,12 @@ describe("smoothPath", () => {
 });
 
 describe("sortProtocols", () => {
-  it("knows Hysteria2 and AmneziaWG, then alphabetical", () => {
-    expect(sortProtocols(["zeta", "awg", "alpha", "hysteria2", "awg"])).toEqual(["hysteria2", "awg", "alpha", "zeta"]);
+  it("knows Hysteria2, VLESS and AmneziaWG, then alphabetical", () => {
+    expect(sortProtocols(["zeta", "awg", "vless", "alpha", "hysteria2", "awg"])).toEqual(["hysteria2", "vless", "awg", "alpha", "zeta"]);
+    expect(sortProtocols(["amneziawg", "vless"])).toEqual(["vless", "amneziawg"]);
+  });
+  it("names VLESS like its plugin does", () => {
+    expect(protocolName("vless")).toBe("VLESS");
+    expect(protocolShort("vless")).toBe("VLESS");
   });
 });

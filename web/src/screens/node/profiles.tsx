@@ -28,7 +28,7 @@ import { useNow } from "@/lib/time";
 import { profileListQuery } from "@/screens/users/rpc";
 import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
-import { portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 import { UdpPorts } from "./udp-ports";
 
@@ -60,7 +60,7 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
  * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
 function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell[] {
-  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `udp/${i.port}` : "", mono: true };
+  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${i.protocol === "vless" ? "tcp" : "udp"}/${i.port}` : "", mono: true };
   const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
@@ -335,7 +335,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             onAnyway={() => save.mutate(true)}
           />
         )}
-        {!isAwg && (
+        {!isAwg && inbound.protocol !== "vless" && (
           <TextField
             id={sniId}
             label={t("node.profiles.tlsOverride")}
@@ -358,6 +358,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </label>
         <WarpWarnings check={check} nodeId={nodeId} onLeave={onClose} />
+        <DecoyNotice check={check} />
         {save.isError && !lossyRefusal(save.error) && (
           <Notice tone="danger" className="items-start">
             {errorText(save.error, t)}

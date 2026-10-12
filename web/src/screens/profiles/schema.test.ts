@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hy2, other } from "./schema.fixtures";
-import { allFields, changedFields, errorsOf, getAt, isChanged, MASK, parseSchema, parseSettings, pointerOf, setAt, withGeneratedSecrets } from "./schema";
+import { hy2, other, vless } from "./schema.fixtures";
+import { allFields, changedFields, errorsOf, getAt, isChanged, listIssues, MASK, parseSchema, parseSettings, pointerOf, setAt, withGeneratedSecrets } from "./schema";
 
 describe("parseSchema", () => {
   const groups = parseSchema(hy2);
@@ -95,5 +95,24 @@ describe("withGeneratedSecrets", () => {
   it("creates a secret that is missing, keeps one that is set", () => {
     expect(getAt(withGeneratedSecrets({}, fields, () => "x"), ["obfs", "password"])).toBe("x");
     expect(getAt(withGeneratedSecrets({ obfs: { password: "mine" } }, fields, () => "x"), ["obfs", "password"])).toBe("mine");
+  });
+});
+
+describe("a list of strings (VLESS server names and short ids)", () => {
+  const fields = allFields(parseSchema(vless));
+  const by = (key: string) => fields.find((f) => f.key === key)!;
+
+  it("is a field with its limit and the item pattern, in the group the schema names", () => {
+    expect(by("/reality/server_names")).toMatchObject({ kind: "list", max: 8, critical: true, id: "reality.server_names" });
+    expect(by("/reality/short_ids")).toMatchObject({ kind: "list", max: 8, pattern: "^([0-9A-Fa-f]{2}){0,8}$" });
+    expect(parseSchema(vless).find((g) => g.id === "obfuscation")!.fields.map((f) => f.id)).toEqual(["reality.server_names", "reality.short_ids", "reality.fingerprint"]);
+  });
+
+  it("finds a value the pattern refuses and a repeated one (letter case aside), and leaves an empty box alone", () => {
+    const pattern = by("/reality/short_ids").pattern;
+    expect(listIssues(["ab12", "abc", "", "AB12", "0123456789abcdef"], pattern)).toEqual([null, "invalid", null, "duplicate", null]);
+    expect(listIssues(["*.example.org", "www.example.org"], by("/reality/server_names").pattern)).toEqual(["invalid", null]);
+    expect(listIssues(["x", "x"], "")).toEqual([null, "duplicate"]);
+    expect(listIssues(["x"], "(")).toEqual([null]); // a pattern the browser cannot read checks nothing
   });
 });

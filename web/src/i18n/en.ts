@@ -211,6 +211,11 @@ const core = {
   "field.hop.to.too_wide": "The range holds at most 20,000 ports",
   "field.obfs.password.length": "The password is 8 to 128 characters",
   "field.sni.invalid": "This doesn’t look like a domain",
+  "field.reality.server_names.required": "The target is an IP address: list the names from its certificate",
+  "field.reality.server_names.invalid": "A host name without wildcards, like www.example.org",
+  "field.reality.server_names.duplicate": "Each name only once",
+  "field.reality.short_ids.invalid": "Hex digits, an even number of them, at most 16",
+  "field.reality.short_ids.duplicate": "Each value only once",
 };
 
 export type CoreMessages = typeof core;

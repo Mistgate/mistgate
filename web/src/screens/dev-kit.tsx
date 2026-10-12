@@ -33,6 +33,7 @@ import { TextsTab } from "@/screens/subscriptions/texts";
 import { LinkModal } from "@/screens/users/link-modal";
 import { NodeDemos } from "@/screens/dev-kit-node";
 import { PortsKit } from "@/screens/dev-kit-ports";
+import { VlessKit } from "@/screens/dev-kit-vless";
 import { useT } from "@/i18n";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
@@ -486,6 +487,7 @@ export default function DevKit() {
 
       <NodeDemos />
       <PortsKit />
+      <VlessKit />
 
       <HealthWarpKit />
       <PagingKit />

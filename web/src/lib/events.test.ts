@@ -45,8 +45,8 @@ describe("events", () => {
       text: en["event.torrent_guard_degraded"],
       detail: "nfqueue: operation not supported",
     });
-    const fw = describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "firewalld is active", ports: "20000-20010, 443" } });
-    expect(fw.text).toBe("the server’s firewall may block UDP 20000-20010, 443: allow these ports in UFW, or add them to the active firewalld zone by hand");
+    const fw = describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "firewalld is active", ports: "20000-20010, 443, tcp:8443" } });
+    expect(fw.text).toBe("the server’s firewall may block these ports: 20000-20010, 443, tcp:8443 (plain numbers and ranges are UDP, “tcp:” is TCP): allow them in UFW, or add them to the active firewalld zone by hand");
     expect(fw.detail).toBe("firewalld is active");
     // an older agent names no ports
     expect(describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "x" } }).text).toBe(en["event.host_firewall_sync_failed.plain"]);

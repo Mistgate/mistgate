@@ -9,7 +9,7 @@ import { generateSecret } from "@/lib/secret";
 
 export type Choice ={ value: string; label: string; raw: unknown };
 
-export type FieldKind = "text" | "number" | "toggle" | "choice" | "range" | "generate" | "secret";
+export type FieldKind = "text" | "number" | "toggle" | "choice" | "range" | "generate" | "secret" | "list";
 
 export type Field = {
   /** JSON pointer of the field ("/obfs/type"); a port range is the pointer of its object ("/hop"). */
@@ -29,6 +29,9 @@ export type Field = {
   parts: [string[], string[]] | null;
   critical: boolean;
   secret: boolean;
+  /** A list of strings (widget "string-list"): at most `max` items (0 = no limit), each matching `pattern` ("" = any). */
+  max: number;
+  pattern: string;
 };
 
 export type Group = { id: string; fields: Field[] };
@@ -39,6 +42,9 @@ type Node = {
   description?: string;
   enum?: unknown[];
   properties?: Record<string, Node>;
+  items?: Node;
+  maxItems?: number;
+  pattern?: string;
   "x-unit"?: string;
   "x-group"?: string;
   "x-widget"?: string;
@@ -91,7 +97,8 @@ function collect(node: Node, path: string[], ctx: Ctx, out: Array<Field & { grou
   else if (node.type === "boolean") kind = "toggle";
   else if (node.type === "integer" || node.type === "number") kind = "number";
   else if (node.type === "string") kind = node["x-secret"] ? (widget === "generate" ? "generate" : "secret") : "text";
-  else return; // arrays, null, untyped: not something this form can edit
+  else if (node.type === "array" && node.items?.type === "string") kind = "list";
+  else return; // other arrays, null, untyped: not something this form can edit
   out.push({ ...leaf(node, path, ctx, kind), critical, group: group ?? "advanced" });
 }
 
@@ -112,6 +119,8 @@ function leaf(node: Node, path: string[], ctx: Ctx, kind: FieldKind): Field {
     parts: null,
     critical: false,
     secret: node["x-secret"] === true,
+    max: node.maxItems ?? 0,
+    pattern: node.items?.pattern ?? "",
   };
 }
 
@@ -171,6 +180,27 @@ export const changedFields = (fields: Field[], cur: Settings, base: Settings) =>
 /** The problems that belong to `f`: an error on the field itself or, for a port range, on one of its ends. */
 export function errorsOf<E extends { pointer: string }>(f: Field, errors: readonly E[]): E[] {
   return errors.filter((e) => e.pointer === f.key || e.pointer.startsWith(f.key + "/"));
+}
+
+/**
+ * What is wrong with each item of a string list: "invalid" when the item pattern refuses it, "duplicate" when the same
+ * value (letter case aside) is above it. An empty item is not judged: it is a box still being filled.
+ */
+export function listIssues(items: readonly string[], pattern: string): Array<"invalid" | "duplicate" | null> {
+  let re: RegExp | null = null;
+  try {
+    re = pattern ? new RegExp(pattern) : null;
+  } catch {
+    // a pattern this browser cannot read checks nothing; the server still does
+  }
+  const seen = new Set<string>();
+  return items.map((v) => {
+    if (v === "") return null;
+    if (re && !re.test(v)) return "invalid";
+    if (seen.has(v.toLowerCase())) return "duplicate";
+    seen.add(v.toLowerCase());
+    return null;
+  });
 }
 
 export function parseSettings(json: string): Settings {

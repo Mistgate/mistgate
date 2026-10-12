@@ -7,7 +7,7 @@ import { ru } from "@/i18n/ru";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
-import { bestDelivered, lossPct, lossyVars, portNotes, reasons, reasonText } from "./port-check";
+import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, reasons, reasonText } from "./port-check";
 
 const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
@@ -77,5 +77,31 @@ describe("the event and the audit rows", () => {
   it("words the check and the 'save anyway' choice", () => {
     expect(describeAudit(t, { action: "node.ports_check", paramsJson: JSON.stringify({ node: "de1", ports: "443,8443" }) })).toBe("checked UDP delivery on de1: ports 443,8443");
     expect(describeAudit(t, { action: "port_lossy_override", paramsJson: JSON.stringify({ node: "de1", port: 8443 }) })).toBe("saved the port 8443 on de1 although it loses UDP packets");
+  });
+});
+
+describe("a VLESS profile on the Hysteria2 site's TCP port (hy2_decoy_paused)", () => {
+  const params = { node: "de1", port: "443", hy2: "Main", vless: "vless 443", via: "site", target: "www.example.org", port80: "unchecked" };
+
+  it("says who takes the port, where visitors go, and how the certificate renews, in both languages", () => {
+    expect(decoyNote(t, params)).toBe(
+      "TCP 443 on de1 goes to “vless 443”. The site of “Main” is off while it does and comes back when the port is free; visitors of TCP 443 see www.example.org instead (REALITY passes them on). The Hysteria2 certificate now renews only through TCP 80. Check the ports on the node’s Profiles tab to see whether it is open.",
+    );
+    expect(decoyNote(tOf("ru"), params)).toBe(
+      "TCP 443 на de1 отходит «vless 443». Сайт «Main» на это время выключается и вернётся, когда порт освободится; на TCP 443 вместо него откроется www.example.org — REALITY передаёт посетителей туда. Сертификат Hysteria2 теперь обновляется только через TCP 80. Проверь порты на вкладке «Профили» ноды — открыт ли он.",
+    );
+  });
+
+  it("words each way of sharing and each port 80 state, and leaves the certificate sentence out when port80 is not sent", () => {
+    expect(decoyNote(t, { ...params, via: "self", port80: undefined })).toBe(fill(en["node.check.decoy.self"], params));
+    expect(decoyNote(t, { ...params, via: "tls", port80: undefined })).toBe(fill(en["node.check.decoy.tls"], params));
+    expect(decoyNote(t, { ...params, port80: "closed" })).toContain("will stop renewing. Open TCP 80 at the provider, move “vless 443” to 8443");
+    expect(decoyNote(t, { ...params, port80: "open" })).toContain("Port 80 reaches Mistgate here");
+    // a value this page does not know reads as the plain REALITY case
+    expect(decoyNote(t, { ...params, via: "later", port80: "maybe" })).toBe(fill(en["node.check.decoy.site"], params));
+  });
+
+  it("goes into what a saved inbound owes the admin (the toast, the rows of 'Put on nodes')", () => {
+    expect(portNotes(t, [{ code: "hy2_decoy_paused", params }])).toEqual([decoyNote(t, params)]);
   });
 });

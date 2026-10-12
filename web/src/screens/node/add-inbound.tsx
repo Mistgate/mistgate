@@ -23,7 +23,7 @@ import { protocolName } from "@/lib/series";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { asMode, AwgBackendChoice, canPrepare, useSaveAwgBackend, type AwgMode } from "./awg-backend";
-import { portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 
 type Node = NonNullable<Plain<GetNodeResponse>["node"]>;
@@ -113,10 +113,12 @@ function AddForm({
   const chosen = profileId || available.find((p) => p.id === initialProfile)?.id || available[0]?.id || "";
   const profile = available.find((p) => p.id === chosen);
   const isAwg = profile?.protocol === "awg";
+  // VLESS REALITY has no certificate name of its own: the names clients send are the profile's server names
+  const noSni = isAwg || profile?.protocol === "vless";
   const savedBackend = asMode(node.awgBackend);
   const mode = backend ?? savedBackend;
 
-  const check = useInboundCheck(chosen && portOk(port) ? { kind: "create", nodeId: node.id, profileId: chosen, port, sni: isAwg ? "" : sni.trim() } : null);
+  const check = useInboundCheck(chosen && portOk(port) ? { kind: "create", nodeId: node.id, profileId: chosen, port, sni: noSni ? "" : sni.trim() } : null);
   const refused = check.state === "refused" ? check : null;
   if ((refused?.code === "port_taken" || refused?.code === "port_lossy") && port === "" && !auto && Number(refused.vars.free) > 0) {
     setAuto(refused.vars);
@@ -141,7 +143,7 @@ function AddForm({
         }
         await saveBackend(mode);
       }
-      return profilesApi.createInbound({ profileId: chosen, nodeId: node.id, portOverride: port ? Number(port) : 0, tlsServerNameOverride: isAwg ? "" : sni.trim(), ...(allowLossy && { allowLossyPort: true }) });
+      return profilesApi.createInbound({ profileId: chosen, nodeId: node.id, portOverride: port ? Number(port) : 0, tlsServerNameOverride: noSni ? "" : sni.trim(), ...(allowLossy && { allowLossyPort: true }) });
     },
     onSuccess: (r) => {
       onDone();
@@ -239,7 +241,7 @@ function AddForm({
       )}
       {isAwg ? (
         <AwgBackendChoice data={data} mode={mode} onChange={setBackend} />
-      ) : (
+      ) : noSni ? null : (
         <TextField
           id={sniId}
           label={t("node.profiles.tlsOverride")}
@@ -267,6 +269,7 @@ function AddForm({
         </Notice>
       )}
       <WarpWarnings check={check} nodeId={node.id} nodeName={node.name} onLeave={onDone} />
+      <DecoyNotice check={check} />
       {add.isError && !lossyRefusal(add.error) && (
         <Notice tone="danger" className="items-start">
           {codedError(add.error, t, "awg.err")}

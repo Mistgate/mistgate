@@ -13,10 +13,12 @@ import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { groups as groupsApi, profiles } from "@/lib/api";
+import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { wayOf } from "@/screens/users/groups";
 import { LossyNotice, lossyRefusal } from "@/screens/node/port-lossy";
+import { VlessHy2Docs } from "@/screens/node/inbound-check";
 import { useGo } from "@/screens/users/nav";
 import { fieldErrors, isCode, protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
@@ -265,6 +267,10 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const isAwg = info.id === "awg";
   const locked = isAwg && inbounds.length > 0;
   const readOnly = useMemo<ReadonlySet<string>>(() => (locked ? new Set(["subnet4", "subnet6"]) : new Set()), [locked]);
+  // VLESS: the XHTTP block means nothing to the tcp transport
+  const isVless = info.id === "vless";
+  const xhttp = useMemo<ReadonlySet<string>>(() => new Set(fields.filter((f) => f.path[0] === "xhttp").map((f) => f.id)), [fields]);
+  const hidden = isAwg ? awgHidden : isVless && getAt(settings, ["transport"]) === "tcp" ? xhttp : undefined;
   const extra = (f: Field): ReactNode => {
     if (isNew && isAwg && (f.id === "subnet4" || f.id === "subnet6") && !getAt(settings, f.path)) {
       return <span className="text-[11px] leading-snug text-muted">{t("awg.subnet.auto")}</span>;
@@ -278,6 +284,23 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     }
     if (locked && (f.id === "subnet4" || f.id === "subnet6")) return <span className="text-[11px] leading-snug text-warn-text">{t("awg.subnet.locked")}</span>;
     if (f.id === "egress" && getAt(settings, f.path) === "warp") return <EgressNote nodeIds={[...new Set(inbounds.map((i) => i.nodeId))]} />;
+    // TCP 443 is also where a Hysteria2 profile on the same node keeps its site (design/vless.md §7.2)
+    if (isVless && f.id === "port" && Number(getAt(settings, f.path)) === 443) {
+      const self = getAt(settings, ["reality", "target_kind"]) === "self";
+      return (
+        <span className={cx("flex flex-col items-start gap-0.5 text-[11px] leading-snug", self ? "text-muted" : "text-warn-text")}>
+          {t(self ? "profiles.vless.port443.self" : "profiles.vless.port443.site")}
+          <VlessHy2Docs />
+        </span>
+      );
+    }
+    if (info.id === "hysteria2" && f.id === "masquerade.type") {
+      return (
+        <span className="text-[11px] leading-snug">
+          <VlessHy2Docs />
+        </span>
+      );
+    }
     return null;
   };
 
@@ -358,7 +381,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
           </Card>
           {isNew && <AfterCreate a={after} info={info} settings={settings} />}
           {isAwg && <AwgPanel settings={settings} onChange={edit} advice={preview.data && preview.data.errors.length === 0 ? { warnings: preview.data.warnings, score: preview.data.obfuscationScore } : undefined} />}
-          <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : edit} hidden={isAwg ? awgHidden : undefined} readOnly={readOnly} extra={extra} />
+          <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : edit} hidden={hidden} readOnly={readOnly} extra={extra} />
           {profile && <DeleteSection profile={profile} inbounds={inbounds} />}
         </div>
 

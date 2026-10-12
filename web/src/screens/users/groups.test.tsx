@@ -184,9 +184,10 @@ describe("the default group and the two ways", () => {
   });
 
   it("puts a protocol only AmneziaVPN takes on the keys side and the rest on the link", () => {
-    const ps = [{ id: "awg", apps: [App.AMNEZIA] }, { id: "hysteria2", apps: [App.HAPP] }];
+    const ps = [{ id: "awg", apps: [App.AMNEZIA] }, { id: "hysteria2", apps: [App.HAPP] }, { id: "vless", apps: [App.HAPP] }];
     expect(wayOf("awg", ps)).toBe("awg");
     expect(wayOf("hysteria2", ps)).toBe("sub");
+    expect(wayOf("vless", ps)).toBe("sub"); // VLESS rides the link next to Hysteria2
     expect(wayOf("awg", undefined)).toBe("awg");
     expect(wayOf("vless", undefined)).toBe("sub");
   });

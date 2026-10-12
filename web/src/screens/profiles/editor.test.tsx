@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { hy2 } from "./schema.fixtures";
+import { hy2, vless } from "./schema.fixtures";
 import { ProfileEditorScreen } from "./editor";
 
 const createProfile = vi.fn();
@@ -29,6 +29,7 @@ const awgSchema = JSON.stringify({
     subnet6: { type: "string", title: "Client network (IPv6)", "x-group": "basics", "x-order": 60 },
   },
 });
+const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
 const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
 vi.mock("@/lib/api", async (orig) => ({
@@ -37,6 +38,7 @@ vi.mock("@/lib/api", async (orig) => ({
     listProtocols: () => Promise.resolve({ protocols: [
       { id: "hysteria2", displayName: "Hysteria2", settingsSchemaJson: schema, defaultSettingsJson: defaults, apps: [App.HAPP] },
       { id: "awg", displayName: "AmneziaWG", settingsSchemaJson: awgSchema, defaultSettingsJson: awgDefaults, apps: [App.AMNEZIA] },
+      { id: "vless", displayName: "VLESS", settingsSchemaJson: vless, defaultSettingsJson: vlessDefaults, apps: [App.HAPP] },
     ] }),
     listProfiles: () => Promise.resolve({ profiles: [{ id: "p_old", name: "hy2 · 443", protocol: "hysteria2" }] }),
     previewProfile: () => Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list" }),
@@ -203,6 +205,39 @@ describe("a new profile", () => {
     expect(request.protocol).toBe("awg");
     expect(settings).not.toHaveProperty("subnet4");
     expect(settings).not.toHaveProperty("subnet6");
+  });
+});
+
+describe("a new VLESS profile", () => {
+  const field = (label: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  const openAdvanced = () => click(button("Advanced"));
+
+  it("hides the XHTTP block when the transport is TCP, and brings it back for XHTTP", async () => {
+    await mount();
+    await click(radio("VLESS"));
+    await settle();
+    await openAdvanced();
+    expect(field("Path")).not.toBeNull();
+    expect(field("Padding bytes")).not.toBeNull();
+    await click(radio("TCP (RAW + Vision)"));
+    expect(field("Path")).toBeNull();
+    expect(field("Host header")).toBeNull();
+    expect(field("Padding bytes")).toBeNull();
+    expect(text()).toContain("Exit"); // the rest of the group stays
+    await click(radio("XHTTP"));
+    expect(field("Path")).not.toBeNull();
+  });
+
+  it("says under port 443 what happens next to Hysteria2, with the guide, and nothing on another port", async () => {
+    await mount();
+    await click(radio("VLESS"));
+    await settle();
+    const hint = "On a node with Hysteria2 this profile takes TCP 443: the Hysteria2 site there is off while it does";
+    expect(text()).toContain(hint);
+    expect(document.querySelector('a[href="https://mistgate.app/guide/vless-and-hysteria2/"]')?.textContent).toBe("VLESS and Hysteria2 on one node");
+    await type(field("TCP port")!, "8443");
+    expect(text()).not.toContain(hint);
+    expect(document.querySelector('a[href="https://mistgate.app/guide/vless-and-hysteria2/"]')).toBeNull();
   });
 });
 

@@ -750,18 +750,20 @@ func buildRefusal(err error, node string) error {
 // a VLESS listener that pauses a Hysteria2 site, or a WARP exit whose account is missing, paused, or down.
 func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profileName string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
 	var warnings []*adminv1.StatusReason
-	appendDecoyWarning := func(port int, hy2, vless, target string) {
-		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: map[string]string{
-			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless,
-			"via": "site", "target": target, "port80": "unchecked",
-		}})
+	appendDecoyWarning := func(port int, hy2, vless, target string, hy2Spec plugin.InboundSpec) {
+		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": "site", "target": target}
+		// only an ACME certificate renews through the site port, so only then does TCP 80 become its sole way (§7.1)
+		if m := hy2Spec.TLS.Mode; m == plugin.TLSAcmeDomain || m == plugin.TLSAcmeIP {
+			params["port80"] = "unchecked"
+		}
+		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: params})
 	}
 	if spec.Protocol == "vless" && spec.Listen.Network == "tcp" {
 		for _, other := range others {
 			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
 				continue
 			}
-			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, vlessTargetHost(spec))
+			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, vlessTargetHost(spec), other.spec)
 			break
 		}
 	} else if spec.Protocol == "hysteria2" {
@@ -771,7 +773,7 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 				if !other.enabled || other.protocol != "vless" || other.l.Network != "tcp" || int(other.l.Port) != port {
 					continue
 				}
-				appendDecoyWarning(port, profileName, other.profile, vlessTargetHost(other.spec))
+				appendDecoyWarning(port, profileName, other.profile, vlessTargetHost(other.spec), spec)
 				break
 			}
 		}

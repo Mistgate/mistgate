@@ -356,6 +356,25 @@ describe("the check before the click", () => {
     expect((document.querySelector("[role=dialog] button[type=submit]") as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("warns, without stopping, that a VLESS profile takes the Hysteria2 site's TCP port, with the certificate sentence and the guide", async () => {
+    listProfiles.mockResolvedValue({ profiles: [hy({ id: "prf_vl", name: "vless 443", protocol: "vless", summary: "TCP 443 · XHTTP · REALITY" })] });
+    const params = { node: "de1", port: "443", hy2: "Main", vless: "vless 443", via: "site", target: "www.example.org", port80: "unchecked" };
+    createInbound.mockResolvedValue({ inbound: { port: 443, nodeName: "de1" }, warnings: [{ code: "hy2_decoy_paused", params }] });
+    await mount(data());
+    await click(button("Add profile"));
+    await settle();
+    expect(text()).toContain(
+      "TCP 443 on de1 goes to “vless 443”. The site of “Main” is off while it does and comes back when the port is free; visitors of TCP 443 see www.example.org instead (REALITY passes them on). The Hysteria2 certificate now renews only through TCP 80.",
+    );
+    const guide = document.querySelector<HTMLAnchorElement>('a[href="https://mistgate.app/guide/vless-and-hysteria2/"]');
+    expect(guide?.textContent).toBe("VLESS and Hysteria2 on one node");
+    expect(guide?.target).toBe("_blank");
+    expect((document.querySelector("[role=dialog] button[type=submit]") as HTMLButtonElement).disabled).toBe(false);
+    // REALITY has no certificate name to override: the domain field is not offered, and none is sent
+    expect(document.querySelector("[role=dialog]")?.textContent).not.toContain("Domain (SNI)");
+    expect(createInbound).toHaveBeenLastCalledWith(expect.objectContaining({ tlsServerNameOverride: "", validateOnly: true }), expect.anything());
+  });
+
   it("says when the node's WARP is there but down by its last report", async () => {
     listProfiles.mockResolvedValue({ profiles: [hy({ summary: "UDP 8443 · Salamander · Let's Encrypt · WARP" })] });
     createInbound.mockResolvedValue({ inbound: { port: 8443, nodeName: "de1" }, warnings: [{ code: "warp_missing", params: { state: "down" } }] });

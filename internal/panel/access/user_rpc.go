@@ -471,6 +471,19 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		}
 		resp.NodeAccess = append(resp.NodeAccess, na)
 	}
+	// A subscription device holds a credential for every protocol the apps allow (newCreds), a group that gives none
+	// included. It lists only the protocols the person has servers for: the group's, on the nodes they use.
+	has := map[string]bool{}
+	for _, na := range resp.NodeAccess {
+		for _, p := range na.Protocols {
+			has[p] = has[p] || na.Selected
+		}
+	}
+	for _, d := range resp.Devices {
+		if d.AwgProfileId == "" {
+			d.Protocols = slices.DeleteFunc(slices.Clone(d.Protocols), func(p string) bool { return !has[p] })
+		}
+	}
 	return connect.NewResponse(resp), nil
 }
 

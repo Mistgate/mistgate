@@ -205,6 +205,11 @@ const core: CoreMessages = {
   "field.hop.to.too_wide": "В диапазоне не больше 20 000 портов",
   "field.obfs.password.length": "Пароль — от 8 до 128 символов",
   "field.sni.invalid": "Это не похоже на домен",
+  "field.reality.server_names.required": "Цель — IP-адрес: перечисли имена из её сертификата",
+  "field.reality.server_names.invalid": "Нужно имя хоста без звёздочек, например www.example.org",
+  "field.reality.server_names.duplicate": "Каждое имя — только один раз",
+  "field.reality.short_ids.invalid": "Шестнадцатеричные цифры, чётное число, не больше 16",
+  "field.reality.short_ids.duplicate": "Каждое значение — только один раз",
 };
 
 export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu };
