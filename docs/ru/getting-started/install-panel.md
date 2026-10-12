@@ -133,7 +133,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 
 Сохраните это как `/etc/systemd/system/mistgate.service` и поправьте `ExecStart` под выбранные флаги:
 
-```ini
+```ini /etc/systemd/system/mistgate.service
 [Unit]
 Description=Mistgate panel
 After=network-online.target

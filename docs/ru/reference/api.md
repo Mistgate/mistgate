@@ -173,6 +173,7 @@ func main() {
 |---|---|---|---|
 | `FleetService.Overview`, `FleetService.ListEvents` | да | да | да |
 | `NodeService.ListNodes`, `NodeService.GetNode` | да | да | да |
+| `NodeService.CheckPorts` | нет | да | да |
 | `HealthService.ListAlerts`, `GetChecks`, `GetDoctor` | да | да | да |
 | `UserService.ListUsers`, `UserService.GetUser` | да | да | да |
 | `GroupService.ListGroups` | да | да | да |

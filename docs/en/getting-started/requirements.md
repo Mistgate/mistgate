@@ -17,7 +17,7 @@ Mistgate needs one Linux server for the panel, one or more Linux servers for the
 | Storage | The data directory, `/var/lib/mistgate` by default: one SQLite database, the master key, the node bundle and a few small files. |
 | Other software | None. The panel is one static binary. Only its self-update calls systemd (`systemctl`, `systemd-run`). |
 
-> **Note:** keep the panel on a server of its own. A node on the same host would compete with the panel for TCP 443 (Hysteria2 runs an HTTPS site there by default) and TCP 80.
+> **Tip:** keep the panel on a server of its own. A node on the same host would compete with the panel for TCP 443 (Hysteria2 runs an HTTPS site there by default) and TCP 80.
 
 ## Node servers
 
@@ -32,6 +32,8 @@ Mistgate needs one Linux server for the panel, one or more Linux servers for the
 | Inbound ports | The UDP port of each server on the node: Hysteria2 starts at 443, an AmneziaWG profile gets a random port between 10000 and 60000. The port-hopping range of a Hysteria2 profile when you turn it on (from 1024 up, at most 20000 ports). TCP 443 for the HTTPS site Hysteria2 shows to everyone who is not a client, and for Let's Encrypt. TCP 80 for Let's Encrypt when nothing else holds it. |
 | Outbound | TCP to the panel (usually 443). Let's Encrypt, DNS, and Cloudflare's WARP endpoints when the node uses WARP. HTTPS to `www.speedtest.net` and the nearest Ookla speed servers (port 8080), or, as fallbacks, `speed.cloudflare.com`, `proof.ovh.net` and `cachefly.net`, only while the owner measures the node's network capacity, and once for a new node: see [Nodes](../guide/nodes.md). |
 | No management port | The agent dials the panel. Nothing on the node has to accept connections from the panel. |
+
+![The ports of a node: inbound UDP for Hysteria2, its hop range and AmneziaWG, TCP 443 for the HTTPS site, TCP 80 for Let's Encrypt and rate-limited SSH; outbound the agent's connection to the panel, Let's Encrypt and DNS, WARP and the speed test; no management port](../diagrams/node-ports.svg)
 
 Good to know:
 

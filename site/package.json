@@ -5,18 +5,23 @@
   "type": "module",
   "description": "Static site generator for the Mistgate documentation (docs/ -> dist/)",
   "license": "AGPL-3.0-only",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "node build.mjs",
     "serve": "node serve.mjs",
     "wiki": "node wiki.mjs",
-    "test": "node --test test/docs.test.mjs wiki.test.mjs"
+    "test": "node --test test/docs.test.mjs test/parity.test.mjs test/brand.test.mjs test/diagrams.test.mjs wiki.test.mjs"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",
     "markdown-it-anchor": "^9.2.0",
     "shiki": "^3.0.0",
     "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "beautiful-mermaid": "1.1.3"
   }
 }

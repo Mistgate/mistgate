@@ -51,24 +51,7 @@ How they relate:
 
 ## How a person's app reaches a node
 
-```text
-  person's app                    panel (mistgate)                     node de1 (mistgate-node)
-  ------------                    ----------------                     ------------------------
-  1. fetch the link
-     https://panel.example.com/<secret>/<token>
-     ------------------------------------>  public listener, TCP 443
-     <------------------------------------  list of servers (one per profile on a node)
-
-  2. connect to a server, for example de1.example.com, UDP 443 (Hysteria2)
-     ---------------------------------------------------------------->  engine  ---->  internet
-                                                                                 (direct or WARP)
-
-  3. management, always started by the node:
-                                    <---------------------------------  agent dials TCP 443,
-                                                                        secret TLS name, mutual TLS
-                                    desired state  ------------------>
-                                    <------------------  traffic, sessions, health, events
-```
+![How Mistgate fits together: you use the admin, a person's app fetches its link from the panel, VPN traffic goes from the app to the node and out to the internet, and the node keeps one connection to the panel](../diagrams/how-it-fits.svg)
 
 The app talks to the panel only to fetch the link. VPN traffic goes straight from the app to the node and out to the internet; it never passes through the panel.
 

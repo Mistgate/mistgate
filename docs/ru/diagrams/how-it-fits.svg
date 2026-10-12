@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 524" width="720" height="524" role="img" aria-labelledby="title desc">
+<title id="title">Как устроен Mistgate</title>
+<desc id="desc">1. Вы управляете всем в админке на секретном адресе. 2. Приложение человека получает по одной ссылке список серверов. 3. VPN-трафик идёт прямо на ноду и в интернет, мимо панели. 4. Нода сама подключается к панели: получает настройки и отчитывается.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="523" rx="16"/>
+<rect class="card" x="24" y="82" width="180" height="48" rx="11"/>
+<g class="lav"><rect class="chip" x="36" y="95" width="22" height="22" rx="7"/><svg x="40.5" y="99.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></g>
+<text class="t" x="68" y="104">Вы</text>
+<text class="m" x="68" y="119">владелец</text>
+<rect class="card" x="24" y="138" width="180" height="48" rx="11"/>
+<g class="mint"><rect class="chip" x="36" y="151" width="22" height="22" rx="7"/><svg x="40.5" y="155.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M7 3h10v18H7zM11 18h2"/></svg></g>
+<text class="t" x="68" y="160">Приложение</text>
+<text class="m" x="68" y="175">Happ, kl!ck, …</text>
+<rect class="card" x="276" y="24" width="420" height="178" rx="16"/>
+<g class="lav"><rect class="chip" x="292" y="40" width="26" height="26" rx="7"/><svg x="297" y="45" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M3 3h8v10H3zM13 3h8v6h-8zM13 13h8v8h-8zM3 17h8v4H3z"/></svg></g>
+<text class="h" x="328" y="58">Панель</text>
+<text class="m" x="680" y="57" text-anchor="end">panel.example.com</text>
+<rect class="pill" x="292" y="82" width="192" height="48" rx="11"/>
+<g class="lav"><rect class="chip" x="304" y="95" width="22" height="22" rx="7"/><svg x="308.5" y="99.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></g>
+<text class="t" x="336" y="104">Админка</text>
+<text class="m" x="336" y="119">секретный адрес</text>
+<rect class="pill" x="492" y="82" width="192" height="48" rx="11"/>
+<g class="sage"><rect class="chip" x="504" y="95" width="22" height="22" rx="7"/><svg x="508.5" y="99.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 6c3 1 5 1 8 0 3 1 5 1 8 0v6c0 4-3.5 7-8 8-4.5-1-8-4-8-8V6zM8.5 11h.01M15.5 11h.01M9 15c1.5 1 4.5 1 6 0"/></svg></g>
+<text class="t" x="536" y="104">Сайт-ширма</text>
+<text class="m" x="536" y="119">для всех остальных</text>
+<rect class="pill" x="292" y="138" width="192" height="48" rx="11"/>
+<g class="mint"><rect class="chip" x="304" y="151" width="22" height="22" rx="7"/><svg x="308.5" y="155.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></g>
+<text class="t" x="336" y="160">Подписки</text>
+<text class="m" x="336" y="175">ссылка на человека</text>
+<rect class="pill" x="492" y="138" width="192" height="48" rx="11"/>
+<g class="sky"><rect class="chip" x="504" y="151" width="22" height="22" rx="7"/><svg x="508.5" y="155.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM9 12l2.2 2.2L15.5 10"/></svg></g>
+<text class="t" x="536" y="160">Агенты нод</text>
+<text class="m" x="536" y="175">взаимный TLS</text>
+<rect class="card" x="276" y="262" width="290" height="122" rx="16"/>
+<g class="sky"><rect class="chip" x="292" y="278" width="26" height="26" rx="7"/><svg x="297" y="283" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></g>
+<text class="h" x="328" y="296">Нода</text>
+<text class="m" x="550" y="295" text-anchor="end">de1.example.com</text>
+<rect class="pill" x="292" y="320" width="125" height="48" rx="11"/>
+<g class="sky"><rect class="chip" x="304" y="333" width="22" height="22" rx="7"/><svg x="308.5" y="337.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></g>
+<text class="t" x="336" y="342">Hysteria2</text>
+<text class="m" x="336" y="357">UDP 443</text>
+<rect class="pill" x="425" y="320" width="125" height="48" rx="11"/>
+<g class="sky"><rect class="chip" x="437" y="333" width="22" height="22" rx="7"/><svg x="441.5" y="337.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2"/></svg></g>
+<text class="t" x="469" y="342">AmneziaWG</text>
+<text class="m" x="469" y="357">UDP-порты</text>
+<rect class="card" x="594" y="290" width="102" height="102" rx="16"/>
+<g class="grey"><rect class="chip" x="633" y="304" width="24" height="24" rx="7"/><svg x="638" y="309" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="645" y="348" text-anchor="middle">Интернет</text>
+<text class="m" x="645" y="364" text-anchor="middle">напрямую</text>
+<text class="m" x="645" y="378" text-anchor="middle">или WARP</text>
+<g class="lav"><path class="flow " d="M204 106L285 106"/><path class="head" d="M292 106l-8 -4.5v9z"/></g>
+<g class="mint"><path class="flow " d="M204 162L285 162"/><path class="head" d="M292 162l-8 -4.5v9z"/></g>
+<g class="sky"><path class="flow wide" d="M114 186L114 344L285 344"/><path class="head" d="M292 344l-8 -4.5v9z"/></g>
+<g class="sky"><path class="flow wide" d="M550 344L587 344"/><path class="head" d="M594 344l-8 -4.5v9z"/></g>
+<g class="lav"><path class="flow dash" d="M534 255L534 193"/><path class="head" d="M534 186l-4.5 8h9z"/><path class="head" d="M534 262l-4.5 -8h9z"/></g>
+<g class="lav"><circle class="badge" cx="248" cy="106" r="10"/><text class="bn" x="248" y="110">1</text></g>
+<g class="mint"><circle class="badge" cx="248" cy="162" r="10"/><text class="bn" x="248" y="166">2</text></g>
+<g class="sky"><circle class="badge" cx="200" cy="344" r="10"/><text class="bn" x="200" y="348">3</text></g>
+<g class="lav"><circle class="badge" cx="534" cy="232" r="10"/><text class="bn" x="534" y="236">4</text></g>
+<line class="rule" x1="24" y1="414" x2="696" y2="414"/>
+<g class="lav"><circle class="badge" cx="34" cy="440" r="10"/><text class="bn" x="34" y="444">1</text></g>
+<text class="s" x="54" y="444">Вы управляете всем в админке</text>
+<text class="s" x="54" y="462">на секретном адресе.</text>
+<g class="mint"><circle class="badge" cx="382" cy="440" r="10"/><text class="bn" x="382" y="444">2</text></g>
+<text class="s" x="402" y="444">Приложение человека получает</text>
+<text class="s" x="402" y="462">по одной ссылке список серверов.</text>
+<g class="sky"><circle class="badge" cx="34" cy="484" r="10"/><text class="bn" x="34" y="488">3</text></g>
+<text class="s" x="54" y="488">VPN-трафик идёт прямо на ноду</text>
+<text class="s" x="54" y="506">и в интернет, мимо панели.</text>
+<g class="lav"><circle class="badge" cx="382" cy="484" r="10"/><text class="bn" x="382" y="488">4</text></g>
+<text class="s" x="402" y="488">Нода сама подключается к панели:</text>
+<text class="s" x="402" y="506">получает настройки и отчитывается.</text>
+</svg>

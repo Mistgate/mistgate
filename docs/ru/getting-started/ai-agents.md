@@ -169,7 +169,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 Codex CLI берёт тот же прокси в `~/.codex/config.toml`:
 
-```toml
+```toml ~/.codex/config.toml
 [mcp_servers.mistgate]
 command = "/path/to/mistgate"
 args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "/path/to/token"]

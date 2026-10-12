@@ -165,7 +165,7 @@ Clients that can only start a command, such as Claude Desktop, use the stdio pro
 
 Codex CLI takes the same proxy in `~/.codex/config.toml`:
 
-```toml
+```toml ~/.codex/config.toml
 [mcp_servers.mistgate]
 command = "/path/to/mistgate"
 args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "/path/to/token"]

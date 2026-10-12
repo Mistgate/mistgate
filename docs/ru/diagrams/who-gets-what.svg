@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 452" width="720" height="452" role="img" aria-labelledby="title desc">
+<title id="title">Кто какой сервер получает</title>
+<desc id="desc">Алиса активна, в группе «Семья», ей можно пользоваться всеми нодами, переключатель Happ у неё включён, AmneziaVPN выключен. В группе «Семья» профили Hysteria2 и AmneziaWG. На de1 оба профиля включены, на nl1 Hysteria2 выключен. Алиса получает Hysteria2 на de1; не получает Hysteria2 на nl1, он выключен, и не получает AmneziaWG, потому что ни одно её включённое приложение его не читает.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="451" rx="16"/>
+<rect class="card" x="24" y="24" width="212" height="214" rx="16"/>
+<g class="sand"><rect class="chip" x="40" y="40" width="26" height="26" rx="7"/><svg x="45" y="45" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></g>
+<text class="h" x="76" y="58">Алиса</text>
+<text class="m" x="220" y="57" text-anchor="end">пользователь</text>
+<text class="s" x="40" y="99">Статус</text>
+<g class="mint"><rect class="chip" x="145" y="80" width="75" height="22" rx="11"/><circle class="badge" cx="157" cy="91" r="7"/><path d="M154.5 91l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text class="tt" x="169" y="95" font-size="11" font-weight="700">Активен</text></g>
+<text class="s" x="40" y="129">Группа</text>
+<text class="t" x="220" y="129" text-anchor="end">Семья</text>
+<text class="s" x="40" y="159">Ноды</text>
+<text class="t" x="220" y="159" text-anchor="end">все</text>
+<text class="s" x="40" y="189">Happ</text>
+<g class="mint"><rect class="chip" x="171" y="170" width="49" height="22" rx="11"/><circle class="badge" cx="183" cy="181" r="7"/><path d="M180.5 181l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text class="tt" x="195" y="185" font-size="11" font-weight="700">вкл</text></g>
+<text class="s" x="40" y="219">AmneziaVPN</text>
+<g class="grey"><rect class="chip" x="164" y="200" width="56" height="22" rx="11"/><circle class="badge" cx="176" cy="211" r="7"/><path d="M173.5 211h5" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round"/><text class="tt" x="188" y="215" font-size="11" font-weight="700">выкл</text></g>
+<rect class="card" x="254" y="24" width="212" height="214" rx="16"/>
+<g class="sand"><rect class="chip" x="270" y="40" width="26" height="26" rx="7"/><svg x="275" y="45" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M15 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM21 20v-1.5a4 4 0 0 0-3-3.9M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg></g>
+<text class="h" x="306" y="58">Семья</text>
+<text class="m" x="450" y="57" text-anchor="end">группа</text>
+<rect class="pill" x="270" y="84" width="180" height="44" rx="11"/>
+<g class="sage"><rect class="chip" x="282" y="95" width="22" height="22" rx="7"/><svg x="286.5" y="99.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/></svg></g>
+<text class="t" x="314" y="110.5">Hysteria2</text>
+<rect class="pill" x="270" y="136" width="180" height="44" rx="11"/>
+<g class="sage"><rect class="chip" x="282" y="147" width="22" height="22" rx="7"/><svg x="286.5" y="151.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/></svg></g>
+<text class="t" x="314" y="162.5">AmneziaWG</text>
+<text class="m" x="270" y="210">профили группы</text>
+<rect class="card" x="484" y="24" width="212" height="214" rx="16"/>
+<g class="sky"><rect class="chip" x="500" y="40" width="26" height="26" rx="7"/><svg x="505" y="45" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></g>
+<text class="t" x="536" y="57">Серверы на нодах</text>
+<text class="s" x="500" y="99">de1 · Hysteria2</text>
+<g class="mint"><rect class="chip" x="631" y="80" width="49" height="22" rx="11"/><circle class="badge" cx="643" cy="91" r="7"/><path d="M640.5 91l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text class="tt" x="655" y="95" font-size="11" font-weight="700">вкл</text></g>
+<text class="s" x="500" y="139">de1 · AmneziaWG</text>
+<g class="mint"><rect class="chip" x="631" y="120" width="49" height="22" rx="11"/><circle class="badge" cx="643" cy="131" r="7"/><path d="M640.5 131l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text class="tt" x="655" y="135" font-size="11" font-weight="700">вкл</text></g>
+<text class="s" x="500" y="179">nl1 · Hysteria2</text>
+<g class="grey"><rect class="chip" x="624" y="160" width="56" height="22" rx="11"/><circle class="badge" cx="636" cy="171" r="7"/><path d="M633.5 171h5" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round"/><text class="tt" x="648" y="175" font-size="11" font-weight="700">выкл</text></g>
+<g class="grey"><path class="flow" d="M130 238V254M360 238V254M590 238V254M130 254H590"/></g>
+<g class="grey"><path class="flow " d="M360 254L360 275"/><path class="head" d="M360 282l-4.5 -8h9z"/></g>
+<rect class="card" x="24" y="282" width="672" height="154" rx="16"/>
+<g class="mint"><rect class="chip" x="40" y="298" width="26" height="26" rx="7"/><svg x="45" y="303" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M5 12.5l4.5 4.5L19 7.5"/></svg></g>
+<text class="h" x="76" y="316">Что получает Алиса</text>
+<g class="mint"><rect class="chip" x="40" y="340" width="43" height="22" rx="11"/><circle class="badge" cx="52" cy="351" r="7"/><path d="M49.5 351l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text class="tt" x="64" y="355" font-size="11" font-weight="700">да</text></g>
+<text class="t" x="98" y="355">Hysteria2 на de1</text>
+<g class="grey"><rect class="chip" x="40" y="370" width="49" height="22" rx="11"/><circle class="badge" cx="52" cy="381" r="7"/><path d="M49.5 381h5" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round"/><text class="tt" x="64" y="385" font-size="11" font-weight="700">нет</text></g>
+<text class="s" x="98" y="385">Hysteria2 на nl1: выключен на ноде</text>
+<g class="grey"><rect class="chip" x="40" y="400" width="49" height="22" rx="11"/><circle class="badge" cx="52" cy="411" r="7"/><path d="M49.5 411h5" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round"/><text class="tt" x="64" y="415" font-size="11" font-weight="700">нет</text></g>
+<text class="s" x="98" y="415">AmneziaWG на de1: его не читает ни одно её приложение, AmneziaVPN выключен</text>
+</svg>

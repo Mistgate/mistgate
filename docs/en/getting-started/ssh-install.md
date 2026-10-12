@@ -21,6 +21,28 @@ With an SSH installation the panel itself connects to a new server, checks it, i
 3. **Check.** Review **System**, **Architecture**, **Kernel**, **Processors**, **Memory**, **Free disk**, **systemd** and **Panel connection**. Enter the password again, tick "Install the Mistgate agent and create this node" and press **Start installation**. The server is unchanged until this point.
 4. **Install.** The job runs in the panel, phase by phase: connecting over SSH, checking the server, preparing the host firewall, sending the agent, registering the node, starting the agent, waiting for the node to connect. **Close; keep running in background** closes the window; the job goes on. When the agent connects, the window says "Node installed and connected" and offers **Open node**. If the job fails, the window says why and offers **Retry installation** with the password, or **Open install manager**.
 
+```mermaid
+sequenceDiagram
+  accTitle: Installing a node over SSH
+  accDescr: You give the server address and confirm its host key; the panel logs in with that key only, checks the server, opens the ports, sends the signed agent, enrolls it with a one-time token, installs the service and waits for the agent to connect.
+  participant Y as You
+  participant P as Panel
+  participant S as Server de1
+  Y->>P: server address
+  P->>S: read the SSH host key
+  P-->>Y: fingerprint to compare
+  Y->>P: confirm, node details, password
+  P->>S: log in with that key only, run checks
+  P-->>Y: system, memory, link to the panel
+  Y->>P: Start installation
+  P->>S: open ports in an active firewall
+  P->>S: send the signed agent
+  P->>S: enroll with a one-time token
+  P->>S: install the systemd service
+  S->>P: the agent connects (mutual TLS)
+  P-->>Y: Node installed and connected
+```
+
 The new node then has no profile yet: go on with [First users](first-users.md).
 
 ## What the panel does on the server

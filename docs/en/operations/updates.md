@@ -74,6 +74,28 @@ From top to bottom, by what needs you:
 
 **Update N nodes** in the top card opens a window with every node that can be updated: each has a tick (all ticked by default) and the canary is named, the node with the fewest people online. The window says that the canary is checked for 5 minutes, that the rest go in batches (one at a time while fewer than five nodes are to be updated, else two), and that a node that fails its checks gets its previous version back and the rollout pauses. Nothing happens until you press **Start rollout**. The call is pinned to the bundle the page showed, like the update of one node, and asks for a fresh step-up. The button is absent while a rollout runs, without a trusted bundle, and for anyone but the owner; a node to be updated at a set time is scheduled one by one (below).
 
+```mermaid
+sequenceDiagram
+  accTitle: A staged node update
+  accDescr: The canary node updates first and must pass the gate; then the other nodes go in batches. A node that fails the gate gets its previous build back and the rollout pauses.
+  participant Y as You
+  participant P as Panel
+  participant C as Canary node
+  participant N as Other nodes
+  Y->>P: Start rollout
+  P->>C: signed manifest
+  C->>C: check, download, restart
+  C-->>P: back on the new build
+  Note over P,C: the gate, up to 5 minutes
+  alt the gate passes
+    P->>N: next batch, one or two nodes
+    N-->>P: each passes its own gate
+  else the gate fails
+    P->>C: roll back to the previous build
+    P-->>Y: rollout paused, alert
+  end
+```
+
 ### Now, with the running rollout, or later
 
 **Update** in a node's row opens a dialog with two choices:

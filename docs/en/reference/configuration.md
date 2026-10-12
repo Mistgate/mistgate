@@ -146,7 +146,7 @@ The panel updater also writes next to the data directory and the binary: `<data-
 
 The database is migrated forward automatically whenever `serve`, `setup`, an `auth` command or `backup restore` opens it.
 
-> **Warning:** losing `master.key` makes every encrypted secret unreadable, the panel CA's key and the saved SSH passwords of nodes included; losing the whole directory means enrolling every node again. Back it up as described in [Install the panel](../getting-started/install-panel.md), step 9, and set up [encrypted backups](../operations/backups.md).
+> **Danger:** losing `master.key` makes every encrypted secret unreadable, the panel CA's key and the saved SSH passwords of nodes included; losing the whole directory means enrolling every node again. Back it up as described in [Install the panel](../getting-started/install-panel.md), step 9, and set up [encrypted backups](../operations/backups.md).
 
 ## The node's state directory
 

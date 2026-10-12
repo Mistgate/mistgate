@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { createHl, createRenderer, parseNav } from "./src/markdown.mjs";
-import { T, renderDoc, render404, groupStyle, THEME_INIT } from "./src/layout.mjs";
+import { T, renderDoc, render404, THEME_INIT } from "./src/layout.mjs";
 import { SITE, LANGS, pageUrl } from "./src/urls.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -68,7 +68,7 @@ for (const lang of LANGS) {
   const keyOf = (href) => posix.normalize(href.replace(/\.md(#.*)?$/, ""));
   const listed = new Set(["index"]);
   const nav = [];
-  parseNav(pages.get("index").body).forEach((g, n) => {
+  parseNav(pages.get("index").body).forEach((g) => {
     const items = [];
     for (const l of g.links) {
       if (!/\.md(#.*)?$/.test(l.href) || /^[a-z]+:/i.test(l.href)) continue;
@@ -78,12 +78,12 @@ for (const lang of LANGS) {
       listed.add(key);
       items.push({ key, title: pages.get(key).title, url: pageUrl(lang, key) });
     }
-    if (items.length) { const [icon, tone] = groupStyle(items[0].key.split("/")[0], n); nav.push({ title: g.title, icon, tone, items }); }
+    if (items.length) nav.push({ title: g.title, items });
   });
   const orphans = [...pages.keys()].filter((k) => !listed.has(k));
   if (orphans.length) {
     orphans.forEach((k) => warn(`${lang}/${k}.md exists but is not listed in ${lang}/index.md (put into "${T[lang].other}")`));
-    nav.push({ title: T[lang].other, icon: "tag", tone: "sage", items: orphans.map((key) => ({ key, title: pages.get(key).title, url: pageUrl(lang, key) })) });
+    nav.push({ title: T[lang].other, items: orphans.map((key) => ({ key, title: pages.get(key).title, url: pageUrl(lang, key) })) });
   }
   const seq = [{ key: "index", title: pages.get("index").title, url: pageUrl(lang, "index") }, ...nav.flatMap((g) => g.items)];
   site[lang] = { pages, nav, seq };
@@ -99,9 +99,11 @@ for (const lang of Object.keys(site)) {
   searchIdx[lang] = [];
   for (const page of pages.values()) {
     page.headings = [];
+    page.codes = new Map();
     const w = (m) => warn(`${lang}/${page.key}.md: ${m}`);
-    page.html = render(page.body, { lang, key: page.key, pages, warn: w, headings: page.headings });
-    if (page.key === "index") page.lead = /^<p>([\s\S]*?)<\/p>\n/.exec(page.html)?.[1];
+    const env = { lang, key: page.key, dir: dirname(join(DOCS, lang, page.key)), pages, warn: w, headings: page.headings, codes: page.codes, answersFrom: lang === "en" ? null : site.en?.pages.get(page.key)?.answers };
+    page.html = render(page.body, env);
+    page.answers = env.answers;
     const i = seq.findIndex((s) => s.key === page.key);
     const others = LANGS.filter((l) => l !== lang && site[l]?.pages.has(page.key));
     const switchLang = LANGS.find((l) => l !== lang);
@@ -115,7 +117,7 @@ for (const lang of Object.keys(site)) {
     out(page.url.slice(1) + "index.html", html);
     written.set(page.url, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])));
     page.alternates = alternates;
-    searchIdx[lang].push({ t: page.title, d: page.description, g: crumbGroup ?? "", u: page.url, h: page.headings.filter((h) => h.level <= 3).map((h) => [h.title, h.id]) });
+    searchIdx[lang].push({ t: page.title, d: page.description, g: crumbGroup ?? "", u: page.url, h: page.key === "index" ? [] : page.headings.filter((h) => h.level <= 3).map((h) => [h.title, h.id]), k: page.key === "index" ? [] : [...page.codes].map(([c, x]) => (x.def ? [c, x.id, 1] : [c, x.id])) });
   }
   out(pageUrl(lang, "search-index.json").slice(1).replace(/\/$/, ""), JSON.stringify(searchIdx[lang]));
 }

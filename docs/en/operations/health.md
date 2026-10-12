@@ -172,6 +172,8 @@ When the panel cannot judge a condition, the alert stays as it is instead of clo
 
 An alert that fires again within an hour of closing reopens with its original id and start time. During the first 90 seconds after the panel starts, no "Node is unreachable" opens: the agents are still reconnecting.
 
+![The life of an alert: it opens while its condition holds, Mute hides it for up to 7 days, it closes when the condition is gone, reopens if the condition returns within an hour, and is kept 90 days](../diagrams/alert-lifecycle.svg)
+
 ### Kinds of alerts
 
 | Title in the admin | Kind | Severity | Opens when |

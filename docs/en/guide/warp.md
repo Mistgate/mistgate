@@ -7,6 +7,8 @@ By default a profile's traffic leaves a node from the node's own address. With W
 
 ## How it fits together
 
+![One node with three profiles: Hysteria2 with the Direct exit leaves from the node's address; a WARP copy of it and an AmneziaWG profile with the WARP exit leave through the node's one WARP account; without working WARP those carry no traffic](../diagrams/node-exits.svg)
+
 - **The exit is a profile setting.** **Exit** (in **Advanced** for Hysteria2, in **Basics** for AmneziaWG) is **Direct** or **WARP**.
 - **The account belongs to a node.** It is set up on the WARP card of the node: node → **Settings**, the first card. The WARP chip in the node's header leads there too.
 - **A profile with the WARP exit needs an account on every node it runs on.** The editor lists the nodes of the profile that have no working WARP, each a link to its WARP card.

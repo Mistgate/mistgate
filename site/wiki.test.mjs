@@ -11,7 +11,7 @@ const get = (r, name) => { const t = r.files.get(name); assert.ok(t, `no file ${
 const en = {
   index: idx({ "Getting started": ["start/one", "start/two"], Guide: ["guide/nodes"] }),
   "start/one": page("Install the panel", "See [two](two.md#second-part), [nodes](../guide/nodes.md), [self](#first-part), [`code` link](two.md).\n\n## First part\n\nText.\n\n```sh\n# [no](two.md) inside a fence\n```\n\nInline `[no](two.md)` code.\n"),
-  "start/two": page("Add: a node?", "Body.\n\n## Second part\n\n## Second part\n\nSee [license](../../../LICENSE), [agents](../../../AGENTS.md#x), [dir](../../../web/), [site](https://example.com/a.md), ![shot](../img/a.png).\n"),
+  "start/two": page("Add: a node?", "Body.\n\n## Second part\n\n## Second part\n\nSee [license](../../../LICENSE), [agents](../../../AGENTS.md#x), [dir](../../../web/), [site](https://example.com/a.md), ![shot](../img/a.png), ![d](../diagrams/fit.svg).\n"),
   "guide/nodes": page("Nodes", "> **Note:** one line.\n> second line.\n\n> **Warning:** careful.\n\n> plain quote\n\n```md\n> **Note:** in a fence\n```\n"),
   "guide/lonely": page("Lonely", "Not listed in the index."),
 };
@@ -49,6 +49,7 @@ test("links to repo files outside docs/, directories, images and external links"
   assert.match(t, /\[dir\]\(https:\/\/github\.com\/Mistgate\/mistgate\/tree\/main\/web\)/);
   assert.match(t, /\[site\]\(https:\/\/example\.com\/a\.md\)/);
   assert.match(t, /!\[shot\]\(https:\/\/raw\.githubusercontent\.com\/Mistgate\/mistgate\/main\/docs\/en\/img\/a\.png\)/);
+  assert.match(t, /!\[d\]\(https:\/\/raw\.githubusercontent\.com\/Mistgate\/mistgate\/main\/docs\/en\/diagrams\/fit\.svg\?sanitize=true\)/);
 });
 
 test("page layout: italic lead, no front matter, edit and site links", () => {

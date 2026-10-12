@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 496" width="720" height="496" role="img" aria-labelledby="title desc">
+<title id="title">The ports of a node</title>
+<desc id="desc">A node listens on UDP for its servers: Hysteria2 on 443, an optional Hysteria2 port-hopping range from 1024 up, AmneziaWG on a port between 10000 and 60000. TCP 443 serves the HTTPS site Hysteria2 shows to everyone who is not a client, TCP 80 is for Let's Encrypt, and new SSH connections are rate-limited. Out of the node go the agent's connection to the panel, Let's Encrypt and DNS, Cloudflare WARP when a profile uses it, and a speed test only when you measure. The panel needs no port on the node.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="495" rx="16"/>
+<text class="m" x="24" y="56" font-weight="700" letter-spacing="1">INBOUND</text>
+<text class="m" x="696" y="56" font-weight="700" letter-spacing="1" text-anchor="end">OUTBOUND</text>
+<rect class="card" x="196" y="36" width="300" height="352" rx="16"/>
+<g class="sky"><rect class="chip" x="212" y="52" width="26" height="26" rx="7"/><svg x="217" y="57" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></g>
+<text class="h" x="248" y="70">Node</text>
+<text class="m" x="480" y="69" text-anchor="end">de1</text>
+<rect class="pill" x="212" y="92" width="268" height="42" rx="11"/>
+<g class="sky"><rect class="chip" x="224" y="102" width="22" height="22" rx="7"/><svg x="228.5" y="106.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></g>
+<text class="t" x="256" y="111">Hysteria2</text>
+<text class="m" x="256" y="126">UDP 443</text>
+<text class="s" x="24" y="117">apps</text>
+<g class="grey"><path class="flow " d="M136 113L205 113"/><path class="head" d="M212 113l-8 -4.5v9z"/></g>
+<rect class="pill" x="212" y="142" width="268" height="42" rx="11"/>
+<g class="sky"><rect class="chip" x="224" y="152" width="22" height="22" rx="7"/><svg x="228.5" y="156.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></g>
+<text class="t" x="256" y="161">Hop range</text>
+<text class="m" x="256" y="176">UDP, from 1024, optional</text>
+<text class="s" x="24" y="167">apps</text>
+<g class="grey"><path class="flow " d="M136 163L205 163"/><path class="head" d="M212 163l-8 -4.5v9z"/></g>
+<rect class="pill" x="212" y="192" width="268" height="42" rx="11"/>
+<g class="sky"><rect class="chip" x="224" y="202" width="22" height="22" rx="7"/><svg x="228.5" y="206.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2"/></svg></g>
+<text class="t" x="256" y="211">AmneziaWG</text>
+<text class="m" x="256" y="226">UDP 10000–60000</text>
+<text class="s" x="24" y="217">apps</text>
+<g class="grey"><path class="flow " d="M136 213L205 213"/><path class="head" d="M212 213l-8 -4.5v9z"/></g>
+<rect class="pill" x="212" y="242" width="268" height="42" rx="11"/>
+<g class="sage"><rect class="chip" x="224" y="252" width="22" height="22" rx="7"/><svg x="228.5" y="256.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 6c3 1 5 1 8 0 3 1 5 1 8 0v6c0 4-3.5 7-8 8-4.5-1-8-4-8-8V6zM8.5 11h.01M15.5 11h.01M9 15c1.5 1 4.5 1 6 0"/></svg></g>
+<text class="t" x="256" y="261">HTTPS site</text>
+<text class="m" x="256" y="276">TCP 443, for non-clients</text>
+<text class="s" x="24" y="267">browsers</text>
+<g class="grey"><path class="flow " d="M136 263L205 263"/><path class="head" d="M212 263l-8 -4.5v9z"/></g>
+<rect class="pill" x="212" y="292" width="268" height="42" rx="11"/>
+<g class="sand"><rect class="chip" x="224" y="302" width="22" height="22" rx="7"/><svg x="228.5" y="306.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></g>
+<text class="t" x="256" y="311">Let's Encrypt</text>
+<text class="m" x="256" y="326">TCP 80, when free</text>
+<text class="s" x="24" y="317">Let's Encrypt</text>
+<g class="grey"><path class="flow " d="M136 313L205 313"/><path class="head" d="M212 313l-8 -4.5v9z"/></g>
+<rect class="pill" x="212" y="342" width="268" height="42" rx="11"/>
+<g class="grey"><rect class="chip" x="224" y="352" width="22" height="22" rx="7"/><svg x="228.5" y="356.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v14H4zM8 10l3 2-3 2M13 14h3"/></svg></g>
+<text class="t" x="256" y="361">SSH</text>
+<text class="m" x="256" y="376">new connections limited</text>
+<text class="s" x="24" y="367">you</text>
+<g class="grey"><path class="flow " d="M136 363L205 363"/><path class="head" d="M212 363l-8 -4.5v9z"/></g>
+<g class="lav"><path class="flow " d="M496 120L525 120"/><path class="head" d="M532 120l-8 -4.5v9z"/></g>
+<rect class="card" x="532" y="96" width="164" height="48" rx="11"/>
+<g class="lav"><rect class="chip" x="544" y="109" width="22" height="22" rx="7"/><svg x="548.5" y="113.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M3 3h8v10H3zM13 3h8v6h-8zM13 13h8v8h-8zM3 17h8v4H3z"/></svg></g>
+<text class="t" x="576" y="118">Panel</text>
+<text class="m" x="576" y="133">TCP 443</text>
+<g class="grey"><path class="flow " d="M496 192L525 192"/><path class="head" d="M532 192l-8 -4.5v9z"/></g>
+<rect class="card" x="532" y="168" width="164" height="48" rx="11"/>
+<g class="grey"><rect class="chip" x="544" y="181" width="22" height="22" rx="7"/><svg x="548.5" y="185.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="576" y="196.5">Let's Encrypt, DNS</text>
+<g class="sky"><path class="flow " d="M496 264L525 264"/><path class="head" d="M532 264l-8 -4.5v9z"/></g>
+<rect class="card" x="532" y="240" width="164" height="48" rx="11"/>
+<g class="sky"><rect class="chip" x="544" y="253" width="22" height="22" rx="7"/><svg x="548.5" y="257.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="576" y="262">Cloudflare WARP</text>
+<text class="m" x="576" y="277">if used</text>
+<g class="grey"><path class="flow " d="M496 336L525 336"/><path class="head" d="M532 336l-8 -4.5v9z"/></g>
+<rect class="card" x="532" y="312" width="164" height="48" rx="11"/>
+<g class="grey"><rect class="chip" x="544" y="325" width="22" height="22" rx="7"/><svg x="548.5" y="329.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 17a8 8 0 1 1 16 0M12 17l4-5M7 17h.01"/></svg></g>
+<text class="t" x="576" y="334">Speed test</text>
+<text class="m" x="576" y="349">on request</text>
+<rect class="card" x="24" y="404" width="672" height="76" rx="14"/>
+<g class="grey"><rect class="chip" x="38" y="420" width="24" height="24" rx="7"/><svg x="43" y="425" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM9 12l2.2 2.2L15.5 10"/></svg></g>
+<text class="t" x="72" y="437">No management port</text>
+<text class="s" x="72" y="456">The agent dials the panel; the panel never connects to the node.</text>
+<text class="s" x="72" y="473">An active UFW gets tagged rules for the UDP ports; firewalld is only checked.</text>
+</svg>

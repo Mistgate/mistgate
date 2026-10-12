@@ -17,6 +17,8 @@ A person gets a server when all of this holds:
 
 Any change to these is pushed to the nodes at once.
 
+![An example: Alice is active, in the group Family with the profiles Hysteria2 and AmneziaWG, with the Happ switch on and AmneziaVPN off; she gets Hysteria2 on de1, not Hysteria2 on nl1, which is switched off there, and not AmneziaWG, which none of her apps reads](../diagrams/who-gets-what.svg)
+
 ## Two ways to connect
 
 | | By subscription link | By AmneziaWG key |

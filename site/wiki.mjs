@@ -26,7 +26,7 @@ const T = {
   },
 };
 
-const ALERTS = { note: "NOTE", warning: "WARNING", "важно": "NOTE", "внимание": "WARNING" };
+const ALERTS = { note: "NOTE", tip: "TIP", warning: "WARNING", danger: "CAUTION", "важно": "NOTE", "совет": "TIP", "внимание": "WARNING", "опасно": "CAUTION" };
 
 // ---- naming ----------------------------------------------------------------------------------
 
@@ -157,7 +157,8 @@ export function rewriteBody(body, ctx) {
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
     const repoPath = posix.normalize(posix.join("docs", ctx.lang, dir, href.split(/[?#]/)[0]));
     if (repoPath.startsWith("..")) { ctx.problems.push(`${here()}: image ${href} points outside the repository`); return href; }
-    return `${RAW}/main/${repoPath}`;
+    // raw.githubusercontent.com serves an SVG as an image only with ?sanitize=true
+    return `${RAW}/main/${repoPath}${repoPath.endsWith(".svg") ? "?sanitize=true" : ""}`;
   };
 
   let prevQuote = false;

@@ -7,35 +7,7 @@ Mistgate is two Go programs: the panel (`mistgate`) and the node agent (`mistgat
 
 ## Components
 
-```text
-                       browsers, subscription apps, scripts, AI agents
-                                         |
-                                     TCP 443
-                                         |
-  +--------------------------------------v---------------------------------------------+
-  | panel: mistgate serve                                                              |
-  |                                                                                    |
-  |  public listener --+-- decoy site (everything that matches nothing else)           |
-  |                    +-- <secret prefix>/...  subscriptions, user pages, self-service |
-  |                    +-- admin: secret prefix or secret host (or its own listener)   |
-  |                    |     /api  Connect API (session cookie or API token)            |
-  |                    |     /mcp  MCP server (API token)                              |
-  |                    +-- secret TLS name -> agent endpoint (mutual TLS)              |
-  |                                                                                    |
-  |  modules: auth, fleet, access, protocols, subs, dns, health, update, warp, mcp ... |
-  |  store: SQLite + migrations        vault: master key, encrypted secrets            |
-  +--------------------------------------^---------------------------------------------+
-                                         |  one stream per node, opened by the node
-  +--------------------------------------+---------------------------------------------+
-  | node: mistgate-node run                                                            |
-  |  agent core: connection, worker, reliable outbox, reconcile                        |
-  |  engines: hysteria2 (in-process core), awg (userspace or kernel module)            |
-  |  host: nftables, sysctl, journald, tunnels; WARP manager; certificates; doctor;    |
-  |        self-update                                                                 |
-  +------------------------------------------------------------------------------------+
-                                         |
-                           VPN traffic from the apps, out to the internet
-```
+![The components of Mistgate: clients reach the panel's public listener on TCP 443, which routes to the decoy site, subscriptions and user pages, the admin with /api and /mcp, or the agent endpoint; each node keeps one stream to the panel; on the node the agent core drives the engines and the host](../diagrams/components.svg)
 
 ### Panel modules
 

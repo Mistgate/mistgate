@@ -134,7 +134,7 @@ The node agent does not send VPN client IP addresses in session reports, and the
 
 The stored secrets include profile secrets and device keys, the authenticator secrets, the Turnstile secret key, WARP keys, saved SSH passwords and the R2 secret access key of the backups. The users' page passwords are not stored: they are derived from the master key. A new master key therefore changes every page password and makes every stored secret unreadable. Losing the data directory means enrolling every node again (the nodes trust the panel's CA) and giving users new links.
 
-> **Warning:** A lost `master.key` cannot be replaced by a new one: put it back from a backup. `mistgate serve` and `mistgate setup` refuse to make a new key next to an existing database.
+> **Danger:** A lost `master.key` cannot be replaced by a new one: put it back from a backup. `mistgate serve` and `mistgate setup` refuse to make a new key next to an existing database.
 
 ### Backups
 

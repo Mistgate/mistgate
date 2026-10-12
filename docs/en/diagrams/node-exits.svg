@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 392" width="720" height="392" role="img" aria-labelledby="title desc">
+<title id="title">One node with Hysteria2, AmneziaWG and WARP</title>
+<desc id="desc">Each profile on a node has its own exit. A profile with the Direct exit leaves from the node's address; a profile with the WARP exit leaves through the node's one WARP account, so sites see a Cloudflare address. Without working WARP the WARP-exit profiles carry no traffic and never fall back to the node's address.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="391" rx="16"/>
+<rect class="card" x="24" y="128" width="150" height="84" rx="14"/>
+<g class="mint"><rect class="chip" x="38" y="142" width="24" height="24" rx="7"/><svg x="43" y="147" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M7 3h10v18H7zM11 18h2"/></svg></g>
+<text class="t" x="70" y="159">Apps</text>
+<text class="m" x="38" y="184">Happ, kl!ck,</text>
+<text class="m" x="38" y="199">AmneziaVPN</text>
+<rect class="card" x="196" y="40" width="400" height="240" rx="16"/>
+<g class="sky"><rect class="chip" x="212" y="56" width="26" height="26" rx="7"/><svg x="217" y="61" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></g>
+<text class="h" x="248" y="74">Node</text>
+<text class="m" x="580" y="73" text-anchor="end">de1.example.com</text>
+<rect class="pill" x="212" y="96" width="210" height="46" rx="11"/>
+<g class="sage"><rect class="chip" x="224" y="108" width="22" height="22" rx="7"/><svg x="228.5" y="112.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/></svg></g>
+<text class="t" x="256" y="117">Hysteria2</text>
+<text class="m" x="256" y="132">Exit: Direct</text>
+<rect class="pill" x="212" y="156" width="210" height="46" rx="11"/>
+<g class="sage"><rect class="chip" x="224" y="168" width="22" height="22" rx="7"/><svg x="228.5" y="172.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/></svg></g>
+<text class="t" x="256" y="177">Hysteria2, WARP copy</text>
+<text class="m" x="256" y="192">Exit: WARP</text>
+<rect class="pill" x="212" y="216" width="210" height="46" rx="11"/>
+<g class="sage"><rect class="chip" x="224" y="228" width="22" height="22" rx="7"/><svg x="228.5" y="232.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/></svg></g>
+<text class="t" x="256" y="237">AmneziaWG</text>
+<text class="m" x="256" y="252">Exit: WARP</text>
+<rect class="pill" x="446" y="96" width="134" height="46" rx="11"/>
+<g class="grey"><rect class="chip" x="458" y="108" width="22" height="22" rx="7"/><svg x="462.5" y="112.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v5H4zM4 14h16v5H4zM7.5 7.5h.01M7.5 16.5h.01"/></svg></g>
+<text class="t" x="490" y="117">Direct</text>
+<text class="m" x="490" y="132">node's IP</text>
+<rect class="pill" x="446" y="176" width="134" height="46" rx="11"/>
+<g class="sky"><rect class="chip" x="458" y="188" width="22" height="22" rx="7"/><svg x="462.5" y="192.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="490" y="197">WARP</text>
+<text class="m" x="490" y="212">one account</text>
+<g class="grey"><path class="flow" d="M174 170H190M190 119V239"/></g>
+<g class="grey"><path class="flow " d="M190 119L205 119"/><path class="head" d="M212 119l-8 -4.5v9z"/></g>
+<g class="grey"><path class="flow " d="M190 179L205 179"/><path class="head" d="M212 179l-8 -4.5v9z"/></g>
+<g class="grey"><path class="flow " d="M190 239L205 239"/><path class="head" d="M212 239l-8 -4.5v9z"/></g>
+<g class="grey"><path class="flow " d="M422 119L439 119"/><path class="head" d="M446 119l-8 -4.5v9z"/></g>
+<g class="sky"><path class="flow" d="M422 179H434V239H422"/></g>
+<g class="sky"><path class="flow " d="M434 199L439 199"/><path class="head" d="M446 199l-8 -4.5v9z"/></g>
+<g class="grey"><path class="flow wide" d="M580 119L605 119"/><path class="head" d="M612 119l-8 -4.5v9z"/></g>
+<text class="s" x="620" y="114">sites see</text>
+<text class="s" x="620" y="130">the node's IP</text>
+<g class="sky"><path class="flow wide" d="M580 199L605 199"/><path class="head" d="M612 199l-8 -4.5v9z"/></g>
+<text class="s" x="620" y="194">sites see</text>
+<text class="s" x="620" y="210">a Cloudflare IP</text>
+<rect class="card" x="24" y="296" width="672" height="76" rx="14"/>
+<g class="rose"><rect class="chip" x="38" y="312" width="24" height="24" rx="7"/><svg x="43" y="317" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M5 6.6V11c0 4.5 3 8 7 10 1.4-.6 2.6-1.5 3.6-2.7M8.8 4.4L12 3l7 3v5c0 1.6-.4 3-1 4.3M3 3l18 18"/></svg></g>
+<text class="t" x="72" y="329">Fail-closed</text>
+<text class="s" x="72" y="348">Without working WARP, the WARP-exit profiles carry no traffic:</text>
+<text class="s" x="72" y="365">they never fall back to the node's own address.</text>
+</svg>

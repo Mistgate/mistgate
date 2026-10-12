@@ -26,6 +26,22 @@ https://sub.example.com/<secret prefix>/<token>
 | **Mihomo YAML** | A ready config for Mihomo and Clash Meta with every protocol the person has. | Apps on the mihomo core (kl!ck, Clash Meta, FlClash, Clash Verge), by the rules `mihomo` and `clash`. |
 | **Fake 404** | Pretends the link does not exist. Handy to shut out a scraper by its User-Agent. | Nobody, until you add a rule for it. |
 
+```mermaid
+sequenceDiagram
+  accTitle: What each app gets from the same link
+  accDescr: An app on the mihomo core gets a Mihomo YAML with every protocol the person has, Happ and other apps get the link list, a browser gets the person's page.
+  participant M as kl!ck, FlClash
+  participant H as Happ, v2rayNG
+  participant B as Browser
+  participant P as Panel
+  M->>P: the link, User-Agent with mihomo or clash
+  P-->>M: Mihomo YAML with every protocol
+  H->>P: the link
+  P-->>H: link list (base64)
+  B->>P: the link
+  P-->>B: the person's page
+```
+
 The **Apps & formats** tab lists the apps the protocols work with and what each reads: Happ reads the link list, Mihomo / Clash Meta (kl!ck and the other apps on the mihomo core) reads the Mihomo YAML, and AmneziaVPN does not read the subscription at all (it takes a `vpn://` key from the person's page).
 
 **Planned:** more formats (Xray JSON, sing-box) and subscription mirrors.

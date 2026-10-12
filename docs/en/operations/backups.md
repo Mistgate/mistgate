@@ -34,6 +34,17 @@ The panel takes a consistent SQLite snapshot, includes the other files of the da
 
 The work happens in a temporary directory inside the data directory, so that disk needs free space for one more copy of the database plus the encrypted archive; the other files are read in place. After a failed scheduled run the next attempt waits 2 minutes, then 4, 8 and so on, never longer than the interval. Saving the settings ends the wait.
 
+```mermaid
+flowchart TD
+  accTitle: Encrypted backup and restore
+  accDescr: The panel encrypts a snapshot of its data directory and master key with age and uploads the ciphertext to your R2 bucket. A restore needs the archive and the recovery identity you keep offline, and writes a new data directory.
+  data["Snapshot of the data directory and master.key"] --> enc["Encrypted with age on the panel"]
+  enc --> r2[("Your R2 bucket: ciphertext")]
+  r2 --> restore["backup restore into a new data directory"]
+  key["Recovery identity, kept offline"] --> restore
+  restore --> panel["New panel: nodes keep working"]
+```
+
 ## Restore on a new panel
 
 Download the encrypted object from R2 and copy it, the recovery identity, and the `mistgate` binary to the new panel host. Stop Mistgate if it is already running. Restore into a **new, non-existing** data directory; the command refuses to overwrite files:

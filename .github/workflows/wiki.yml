@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "site/wiki.mjs"
+      - "site/src/markdown.mjs"
       - "site/src/urls.mjs"
       - ".github/workflows/wiki.yml"
   workflow_dispatch:
