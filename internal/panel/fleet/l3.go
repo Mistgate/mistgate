@@ -164,8 +164,8 @@ func (f *Fleet) dispatchWarpAttention(w Warp, nodeID, reason string) {
 	})
 }
 
-// withheldReason is what the node page shows on an inbound the panel did not send to this agent.
-const withheldReason = "agent_too_old: this node's agent does not list awg/1, update the agent (mistgate-node install, or the self-update)"
+// withheldReason is what the node page shows when the agent lacks a protocol capability.
+const withheldReason = "agent_too_old: this node's agent does not list a required protocol capability, update the agent (mistgate-node install, or the self-update)"
 
 // withheldApplied are the inbound results the panel writes for inbounds it did not send to this agent.
 func withheldApplied(ids []string) []store.InboundApplied {

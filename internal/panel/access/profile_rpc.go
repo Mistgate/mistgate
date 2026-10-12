@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"slices"
 	"strconv"
 	"strings"
@@ -548,7 +549,7 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 	}
 	frag, ok := proto.Render(protocols.RenderInput{
 		Format: format, Settings: merged, UserName: "user", MaskSecrets: true,
-		Inbound: inboundView(nodeView(node), spec, ""), NodeAddr: node.Address,
+		Inbound: inboundView(nodeView(node), spec, ""), InboundPublic: in.PluginPublic, NodeAddr: node.Address,
 	})
 	if ok {
 		resp.ClientPreview = string(frag.Data)
@@ -656,6 +657,7 @@ type nodeListen struct {
 	protocol string
 	enabled  bool
 	l        plugin.Listen
+	spec     plugin.InboundSpec
 }
 
 // nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed): the listener ports each
@@ -677,7 +679,7 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 			return nil, nil, s.internal("open profile secrets", err)
 		}
 		if os, err := s.buildSpec(o, merged); err == nil {
-			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen})
+			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, spec: os})
 		}
 	}
 	return listens, profiles, nil
@@ -745,15 +747,31 @@ func buildRefusal(err error, node string) error {
 }
 
 // inboundWarnings is what the admin should know before adding or switching on an inbound although it does not stop it:
-// a TCP listener that takes the default Hysteria2 decoy port, or a WARP exit whose account is missing, paused, or down.
-func (s *Service) inboundWarnings(ctx context.Context, nodeID string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
+// a VLESS listener that pauses a Hysteria2 site, or a WARP exit whose account is missing, paused, or down.
+func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profileName string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
 	var warnings []*adminv1.StatusReason
-	if spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
+	appendDecoyWarning := func(port int, hy2, vless, target string) {
+		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: map[string]string{
+			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless,
+			"via": "site", "target": target, "port80": "unchecked",
+		}})
+	}
+	if spec.Protocol == "vless" && spec.Listen.Network == "tcp" {
 		for _, other := range others {
-			if other.enabled && other.protocol == "hysteria2" {
-				warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_moves", Params: map[string]string{
-					"port": "443", "profile": other.profile,
-				}})
+			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
+				continue
+			}
+			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, vlessTargetHost(spec))
+			break
+		}
+	} else if spec.Protocol == "hysteria2" {
+		port := hy2TCPPort(spec)
+		if port > 0 {
+			for _, other := range others {
+				if !other.enabled || other.protocol != "vless" || other.l.Network != "tcp" || int(other.l.Port) != port {
+					continue
+				}
+				appendDecoyWarning(port, profileName, other.profile, vlessTargetHost(other.spec))
 				break
 			}
 		}
@@ -776,6 +794,44 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID string, spec plugi
 	}
 	warnings = append(warnings, &adminv1.StatusReason{Code: "warp_missing", Params: map[string]string{"state": state}})
 	return warnings, nil
+}
+
+// hy2TCPPort matches the node's Hysteria2 site rule: omitted means 443 and zero disables the site.
+func hy2TCPPort(spec plugin.InboundSpec) int {
+	if spec.Protocol != "hysteria2" || spec.TLS.Mode == 0 {
+		return 0
+	}
+	var settings struct {
+		Masquerade struct {
+			TCPPort *int `json:"tcp_port"`
+		} `json:"masquerade"`
+	}
+	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+		return 0
+	}
+	if settings.Masquerade.TCPPort != nil {
+		return max(*settings.Masquerade.TCPPort, 0)
+	}
+	return 443
+}
+
+func vlessTargetHost(spec plugin.InboundSpec) string {
+	if spec.Protocol != "vless" {
+		return ""
+	}
+	var settings struct {
+		Reality struct {
+			Target string `json:"target"`
+		} `json:"reality"`
+	}
+	if json.Unmarshal(spec.Settings, &settings) != nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(settings.Reality.Target))
+	if err != nil {
+		return ""
+	}
+	return strings.Trim(host, "[]")
 }
 
 // warpDown: the node's last WARP report says the tunnel does not work (down, or no backend to run it on).
@@ -900,7 +956,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
-	warnings, err := s.inboundWarnings(ctx, f.Node.ID, spec, others)
+	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
 	if err != nil {
 		return nil, err
 	}
@@ -998,7 +1054,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		if err := portRefusal(f.Profile.Protocol, f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 			return nil, err
 		}
-		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, spec, others); err != nil {
+		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {
 			return nil, err
 		}
 		portChanged := oldSpec.Listen.Port != spec.Listen.Port

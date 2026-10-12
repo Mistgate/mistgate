@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -492,7 +493,7 @@ func TestUserRules(t *testing.T) {
 
 	// Revoking the device drops its credential from the nodes; the next fetch issues a fresh device.
 	devs := must(e.s.GetUser(ctx, req(&adminv1.GetUserRequest{UserId: u.Id}))).Msg.Devices
-	if len(devs) != 1 || len(devs[0].Protocols) != 1 || devs[0].Protocols[0] != "hysteria2" {
+	if len(devs) != 1 || !slices.Equal(devs[0].Protocols, []string{"hysteria2", "vless"}) {
 		t.Fatalf("devices = %+v", devs)
 	}
 	e.resetNotify()
@@ -857,7 +858,7 @@ func TestPreviewProfile(t *testing.T) {
 			ps = append(ps, p)
 		}
 	}
-	if len(all) != 2 || len(ps) != 1 || len(ps[0].Apps) != 1 || ps[0].Apps[0] != adminv1.App_APP_HAPP ||
+	if len(all) != 3 || len(ps) != 1 || len(ps[0].Apps) != 1 || ps[0].Apps[0] != adminv1.App_APP_HAPP ||
 		!strings.Contains(ps[0].DefaultSettingsJson, `"password":"••••"`) || !json.Valid([]byte(ps[0].SettingsSchemaJson)) {
 		t.Errorf("protocols = %+v", ps)
 	}

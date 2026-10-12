@@ -1,0 +1,1 @@
+vless://8a3b5c2d-1e4f-4a6b-8c0d-123456789abc@de1.example.com:443?encryption=none&extra=%7B%22xPaddingBytes%22%3A%22120-360%22%7D&fp=firefox&host=cover.example.org&mode=packet-up&path=%2Fq8x2kd7w&pbk=B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw&security=reality&sid=ab&sni=second.example.org&spx=%2F57999bb8&type=xhttp#de1%20%C2%B7%20vless%20%C2%B7%20443

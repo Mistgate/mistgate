@@ -266,6 +266,8 @@ func alertReason(l L, a store.HealthAlert) string {
 			protocol = "AmneziaWG"
 		case "hysteria2":
 			protocol = "Hysteria2"
+		case "vless":
+			protocol = "VLESS"
 		default:
 			protocol = data(protocol, 32)
 		}

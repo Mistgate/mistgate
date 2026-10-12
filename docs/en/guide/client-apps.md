@@ -21,10 +21,10 @@ One subscription link serves every app. The panel picks the format by the app's 
 
 | App | Format | What is in it |
 |:--|:--|:--|
-| kl!ck | Mihomo YAML (kl!ck sends `User-Agent: mihomo/…`, which the default rule `mihomo` takes) | Hysteria2 servers and AmneziaWG servers, one server group, a `dns:` section from the person's DNS preset. |
+| kl!ck | Mihomo YAML (kl!ck sends `User-Agent: mihomo/…`, which the default rule `mihomo` takes) | Hysteria2, VLESS and AmneziaWG servers, one server group, a `dns:` section from the person's DNS preset. |
 | Clash Verge Rev, FlClash, Clash Meta for Android | Mihomo YAML, when the app's User-Agent contains `clash` or `mihomo` (the two default rules) | The same as for kl!ck. An app that matches no rule gets the link list: add a rule with part of its User-Agent. |
-| Happ | Link list (base64) | Hysteria2 servers only: Happ cannot carry AmneziaWG. Happ alone also gets the `Routing` header with the DNS preset and the load in the server names. |
-| Hiddify, v2rayNG and other apps of that family | Link list (base64), unless a rule of yours matches them | Hysteria2 servers only. Whether the app reads `hysteria2://` links depends on its version. |
+| Happ | Link list (base64) | Hysteria2 and VLESS servers: Happ cannot carry AmneziaWG. Happ alone also gets the `Routing` header with the DNS preset and the load in the server names. |
+| Hiddify, v2rayNG and other apps of that family | Link list (base64), unless a rule of yours matches them | Hysteria2 and VLESS servers. Whether the app reads `hysteria2://` and `vless://` (REALITY, XHTTP) links depends on its version. |
 | AmneziaVPN, AmneziaWG apps | No subscription: a key per device (`vpn://`, a `.conf` file or a QR code) from the person's page | AmneziaWG only. |
 
 The AmneziaWG servers reach an app on the mihomo core only when the person has the AmneziaVPN way switched on (**Apps in the subscription** on the user card or the group) and the group has an AmneziaWG profile on a node. The first fetch gives the person's implicit device its AmneziaWG keys. The core must be new enough: the panel lists Mihomo 1.19.30 or newer for AmneziaWG 3.1 and 1.19.14 for 2.0, next to every key ([AmneziaWG](amneziawg.md)).

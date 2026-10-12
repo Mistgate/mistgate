@@ -451,6 +451,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		in := protocols.RenderInput{
 			Format: format, Settings: merged, Inbound: inboundView(nodeView(f.Node), spec, f.Inbound.CertPinSHA256),
 			UserID: u.ID, UserName: u.Name, DeviceID: dev.ID, Secret: secret,
+			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON),
 		}
 		if protocols.IsPerDevice(proto) {
 			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none; the URI list has no AWG.)
@@ -458,7 +459,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if format == plugin.FormatMihomo {
 				dnsServers, _ = dnsOf().awg(f.Node.ID)
 			}
-			in.Peer, in.InboundPublic, in.DNS, in.NodeAddr = json.RawMessage(secret), json.RawMessage(f.Inbound.PluginPublicJSON), dnsServers, f.Node.Address
+			in.Peer, in.DNS, in.NodeAddr = json.RawMessage(secret), dnsServers, f.Node.Address
 		}
 		if opt.Name != nil {
 			in.DisplayName = opt.Name(srv)

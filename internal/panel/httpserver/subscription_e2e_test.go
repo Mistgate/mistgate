@@ -181,7 +181,7 @@ func TestListClientsFromTheRegistry(t *testing.T) {
 			c = x
 		}
 	}
-	if c.Id != "happ" || c.Name != "Happ" || len(c.Protocols) != 1 || c.Protocols[0] != "hysteria2" || len(c.Formats) != 1 || c.Formats[0] != adminv1.SubFormat_SUB_FORMAT_BASE64_URIS {
+	if c.Id != "happ" || c.Name != "Happ" || len(c.Protocols) != 2 || c.Protocols[0] != "hysteria2" || c.Protocols[1] != "vless" || len(c.Formats) != 1 || c.Formats[0] != adminv1.SubFormat_SUB_FORMAT_BASE64_URIS {
 		t.Errorf("client: %v", c)
 	}
 }

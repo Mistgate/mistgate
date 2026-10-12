@@ -41,6 +41,8 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Nodes](guide/nodes.md): node settings, status and what the agent does on the host.
 - [Profiles](guide/profiles.md): what a profile is and how it becomes a server on a node.
 - [Hysteria2](guide/hysteria2.md): Hysteria2 profile settings, certificates and obfuscation.
+- [VLESS REALITY](guide/vless.md): VLESS profiles over TCP and XHTTP, when to choose them over Hysteria2, how to pick a REALITY target, ports and apps.
+- [VLESS and Hysteria2 on one node](guide/vless-and-hysteria2.md): who listens where, what happens to the Hysteria2 site and to Let's Encrypt when VLESS takes TCP 443, and how to try VLESS with a few people.
 - [AmneziaWG](guide/amneziawg.md): AmneziaWG 2.0 and 3.1 profiles, userspace or the kernel module, devices and keys.
 - [WARP](guide/warp.md): sending a profile's traffic out through Cloudflare WARP.
 - [Users and groups](guide/users-and-groups.md): users, groups, devices, traffic limits and terms.

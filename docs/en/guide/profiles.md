@@ -3,7 +3,7 @@ title: Profiles
 description: What a profile is, how the editor works, how a profile is put on nodes with its port and certificate, and which changes break existing users.
 ---
 
-A profile is a protocol setup with a name: "Hysteria2 · 443 with Salamander and Let's Encrypt", "AmneziaWG 3.1 that looks like DNS". You make it once and put it on as many nodes as you like; each placement is a server on a node. People get a profile through their group. This page covers the **Profiles** section, the profile editor and placing profiles on nodes; the settings of each protocol are on [Hysteria2](hysteria2.md) and [AmneziaWG](amneziawg.md).
+A profile is a protocol setup with a name: "Hysteria2 · 443 with Salamander and Let's Encrypt", "AmneziaWG 3.1 that looks like DNS". You make it once and put it on as many nodes as you like; each placement is a server on a node. People get a profile through their group. This page covers the **Profiles** section, the profile editor and placing profiles on nodes; the settings of each protocol are on [Hysteria2](hysteria2.md), [VLESS REALITY](vless.md) and [AmneziaWG](amneziawg.md).
 
 ## Profiles, nodes and groups
 
@@ -17,7 +17,7 @@ A person gets a server when all of these hold: the profile is in their group, it
 
 ## Protocols are plugins
 
-Each protocol is a plugin of the panel: today Hysteria2 and AmneziaWG. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
+Each protocol is a plugin of the panel: today Hysteria2, VLESS and AmneziaWG. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
 
 - fields are grouped into **Basics**, **Obfuscation** and **Advanced**; a group header counts what you changed ("2 changed") and what is wrong ("1 error");
 - numbers carry their unit (Mbit/s, s, bytes);
@@ -74,14 +74,14 @@ A port can also be held by a program outside Mistgate. The panel cannot see that
 
 ### Certificates
 
-AmneziaWG has no certificate. A Hysteria2 profile has one of two:
+AmneziaWG has no certificate, and neither has VLESS REALITY: it borrows the one of its target site. A Hysteria2 profile has one of two:
 
 | Certificate | Needs | How the app checks it |
 |:--|:--|:--|
 | **Let's Encrypt** | A domain whose A record points to the node, and ports 80 and 443 reachable from the internet. | The usual way: the domain and the chain of trust. |
 | **Self-signed (pinned)** | Nothing: it works on an IP. | By the certificate's SHA-256 fingerprint (the pin), which the subscription carries. |
 
-The node gets Let's Encrypt certificates by itself and renews them about a month before they expire. It answers the challenge on TCP 443 (where the Hysteria2 profile also serves its masquerade site), and on port 80 when that port is free. A self-signed certificate is made on the node, valid for 10 years; the node makes a new one, with a new pin, when less than 30 days are left or when the domain (SNI) changes. A new pin reaches people with their next subscription update.
+The node gets Let's Encrypt certificates by itself and renews them about a month before they expire. It answers the challenge on TCP 443 (where the Hysteria2 profile also serves its masquerade site), and on port 80 when that port is free. A VLESS profile on TCP 443 of the same node takes the first away: see [VLESS and Hysteria2 on one node](vless-and-hysteria2.md). A self-signed certificate is made on the node, valid for 10 years; the node makes a new one, with a new pin, when less than 30 days are left or when the domain (SNI) changes. A new pin reaches people with their next subscription update.
 
 Which server name the certificate is for: the node's **Domain (SNI)**, else the profile's **Domain (SNI)**, else the node address if it is a domain. For a self-signed certificate on an IP node the IP goes into the certificate.
 
@@ -109,7 +109,10 @@ While you fill in the add-profile dialog (and the per-node edit dialog), the pan
 
 The UDP delivery check runs when you save a new or changed port and can take about 8 seconds; **validate only** stays cache-only. If the selected port loses packets, saving stops and offers a port that passed the same check. You can choose **Add anyway** to save it, and Mistgate records that choice in the audit log. The picker hides ports that lost packets in the last 30 days, so they are not offered; a fresh passing result is suggested first, then unchecked ports.
 
-A warning does not stop the button. Today there is one: `warp_missing`, when the profile exits through WARP and the node has no WARP account, WARP is paused there, or the node's last report says the tunnel is down. The dialog says that the profile will not pass traffic there and links to the node's WARP card.
+A warning does not stop the button. Today there are two:
+
+- `warp_missing`, when the profile exits through WARP and the node has no WARP account, WARP is paused there, or the node's last report says the tunnel is down. The dialog says that the profile will not pass traffic there and links to the node's WARP card.
+- `hy2_decoy_paused`, when a VLESS profile on a TCP port is added next to a Hysteria2 profile whose site uses that port (TCP 443 by default), or the other way round. The dialog names both profiles and says that the Hysteria2 site is off while VLESS holds the port. See [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
 
 The same codes come back from the API and the MCP server, as "code: key=value&key=value", so scripts can read them too. See [API](../reference/api.md).
 
@@ -137,9 +140,10 @@ Some fields are critical: the node and the app must agree on them, so the config
 | Protocol | Critical fields | What happens |
 |:--|:--|:--|
 | Hysteria2 | Port, port hopping, domain (SNI), certificate, obfuscation type and password | The server stops working for every user of the profile until their app updates the subscription (up to the refresh interval, 12 h by default). The window lists the affected users. |
+| VLESS | Port, transport, REALITY target, server names, short IDs, XHTTP path, host header and padding | The server stops working for every user of the profile until their app updates the subscription, like Hysteria2. The window lists the affected users. |
 | AmneziaWG | Protocol version, port, client networks, S1–S4, H1–H4, header protection key, random trailers | Every device of the profile stops working and is marked outdated: each needs its config again. The button reads **Change and reissue keys**. |
 
-For a Hysteria2 change the window gives the two ways around it: ask people to update the subscription by hand, or make a copy of the profile on a new port and remove the old one later.
+For a Hysteria2 or VLESS change the window gives the two ways around it: ask people to update the subscription by hand, or make a copy of the profile on a new port and remove the old one later.
 
 Changing the port of an AmneziaWG profile on one node (in the node's **Profiles** tab) also marks that profile's devices outdated, because their configs hold the old port. So does changing a node's **Address** (in its **Settings**), for every AmneziaWG profile on that node: the configs hold the old address.
 

@@ -9,7 +9,6 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The add-profile dialog asks CreateInbound / UpdateInbound with validate_only on every change: the same refusals as the
@@ -206,42 +205,64 @@ func TestInboundWarpWarning(t *testing.T) {
 	}
 }
 
-func TestHysteriaDecoyWarningForTCPListener(t *testing.T) {
-	e := newEnv(t)
-	e.node("nod_de1", "de1", "de1.example.com", "active")
-	hy2 := e.profile("hy2", "")
-	e.inbound(hy2.Id, "nod_de1")
-	others, _, err := e.s.nodeInbounds(e.ctx, "nod_de1", "")
-	if err != nil {
-		t.Fatal(err)
+func TestVLESSPausesHysteria2SiteInBothDirections(t *testing.T) {
+	want := map[string]string{
+		"node": "de1", "port": "443", "hy2": "hy2", "vless": "vless",
+		"via": "site", "target": "www.example.org", "port80": "unchecked",
+	}
+	assertWarning := func(t *testing.T, got []*adminv1.StatusReason) {
+		t.Helper()
+		if len(got) != 1 || got[0].Code != "hy2_decoy_paused" {
+			t.Fatalf("warnings = %+v", got)
+		}
+		for key, value := range want {
+			if got[0].Params[key] != value {
+				t.Errorf("param %s = %q, want %q", key, got[0].Params[key], value)
+			}
+		}
 	}
 
-	tcp := plugin.InboundSpec{Listen: plugin.Listen{Network: "tcp", Port: 443}}
-	warnings, err := e.s.inboundWarnings(e.ctx, "nod_de1", tcp, others)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(warnings) != 1 || warnings[0].Code != "hy2_decoy_moves" ||
-		warnings[0].Params["port"] != "443" || warnings[0].Params["profile"] != "hy2" {
-		t.Fatalf("TCP listener warning = %+v", warnings)
-	}
+	t.Run("adding VLESS beside Hysteria2", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		e.inbound(hy2.Id, "nod_de1")
+		vless := e.vlessProfile("vless")
+		checked, err := e.check(&adminv1.CreateInboundRequest{ProfileId: vless.Id, NodeId: "nod_de1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertWarning(t, checked.Warnings)
+	})
 
-	tcp.Listen.Port = 8443
-	warnings, err = e.s.inboundWarnings(e.ctx, "nod_de1", tcp, others)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(warnings) != 0 {
-		t.Fatalf("unclaimed TCP port warned: %+v", warnings)
-	}
-	udp := plugin.InboundSpec{Listen: plugin.Listen{Network: "udp", Port: 443}}
-	warnings, err = e.s.inboundWarnings(e.ctx, "nod_de1", udp, others)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(warnings) != 0 {
-		t.Fatalf("UDP listener warned about the TCP decoy: %+v", warnings)
-	}
+	t.Run("adding Hysteria2 beside VLESS", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		vless := e.vlessProfile("vless")
+		e.inbound(vless.Id, "nod_de1")
+		hy2 := e.profile("hy2", "")
+		checked, err := e.check(&adminv1.CreateInboundRequest{ProfileId: hy2.Id, NodeId: "nod_de1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertWarning(t, checked.Warnings)
+	})
+
+	t.Run("disabled Hysteria2 neighbor", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		in := e.inbound(hy2.Id, "nod_de1")
+		e.sql(`UPDATE inbound SET enabled = 0 WHERE id = ?`, in.Id)
+		vless := e.vlessProfile("vless")
+		checked, err := e.check(&adminv1.CreateInboundRequest{ProfileId: vless.Id, NodeId: "nod_de1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(checked.Warnings) != 0 {
+			t.Fatalf("disabled neighbor warned: %+v", checked.Warnings)
+		}
+	})
 }
 
 // An AmneziaWG check builds the inbound with a throwaway key: no key is kept, and a key parked by a removal stays parked

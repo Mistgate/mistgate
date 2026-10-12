@@ -41,6 +41,8 @@ Mistgate — панель для собственного VPN-флота: оди
 - [Ноды](guide/nodes.md): настройки ноды, её состояние и что агент делает на хосте.
 - [Профили](guide/profiles.md): что такое профиль и как он становится сервером на ноде.
 - [Hysteria2](guide/hysteria2.md): настройки профиля Hysteria2, сертификаты и обфускация.
+- [VLESS REALITY](guide/vless.md): профили VLESS по TCP и XHTTP, когда выбирать их вместо Hysteria2, как выбрать цель REALITY, порты и приложения.
+- [VLESS и Hysteria2 на одной ноде](guide/vless-and-hysteria2.md): кто где слушает, что происходит с сайтом Hysteria2 и с Let's Encrypt, когда VLESS занимает TCP 443, и как попробовать VLESS на нескольких людях.
 - [AmneziaWG](guide/amneziawg.md): профили AmneziaWG 2.0 и 3.1, userspace или модуль ядра, устройства и ключи.
 - [WARP](guide/warp.md): как пустить трафик профиля через Cloudflare WARP.
 - [Пользователи и группы](guide/users-and-groups.md): пользователи, группы, устройства, лимиты трафика и сроки.

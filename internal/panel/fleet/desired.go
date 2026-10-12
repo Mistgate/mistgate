@@ -21,15 +21,24 @@ import (
 // Hello.capabilities strings of the L3 additions (agent.proto "AWG AND WARP"). The panel puts an awg inbound or a
 // WarpSpec into the desired state of a stream ONLY when the stream listed the string.
 const (
-	capAWG  = "awg/1"
-	capWarp = "warp/1"
+	capAWG   = "awg/1"
+	capVLESS = "vless/1"
+	capWarp  = "warp/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
 const protocolAWG = "awg"
 
-// needsAWG says whether the agent must list "awg/1" to take this inbound.
-func needsAWG(s plugin.InboundSpec) bool { return s.Protocol == protocolAWG || !s.Tunnel.IsZero() }
+// requiredCap is the node capability required before the panel can send this inbound to the agent.
+func requiredCap(s plugin.InboundSpec) string {
+	if s.Protocol == protocolAWG || !s.Tunnel.IsZero() {
+		return capAWG
+	}
+	if s.Protocol == "vless" {
+		return capVLESS
+	}
+	return ""
+}
 
 // inboundState is one inbound as the node must hold it.
 type inboundState struct {
@@ -83,7 +92,7 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			return nil, err
 		}
 		for _, x := range list {
-			if needsAWG(x.Spec) && !slices.Contains(caps, capAWG) {
+			if required := requiredCap(x.Spec); required != "" && !slices.Contains(caps, required) {
 				st.withheld = append(st.withheld, x.Spec.ID)
 				continue
 			}

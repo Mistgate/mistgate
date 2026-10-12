@@ -3,6 +3,7 @@ package access
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1016,11 +1017,11 @@ func TestAWGLegacyEmptyImplicitDevice(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM device_credential WHERE device_id = 'dev_legacy' AND revoked_at IS NULL`); n != 1 {
 		t.Errorf("the legacy device did not get the credential: %d", n)
 	}
-	// A user of both apps keeps his hysteria2 device exactly as before: one implicit device, hysteria2 only.
+	// A user of both apps keeps one implicit device: its hysteria2 credential as before, and the VLESS one every device holds.
 	f2 := newFixture(t)
 	both := f2.e.user("both", f2.group, nil).User
 	got := must(f2.e.s.GetUser(f2.e.ctx, req(&adminv1.GetUserRequest{UserId: both.Id}))).Msg
-	if len(got.Devices) != 1 || got.Devices[0].AwgProfileId != "" || len(got.Devices[0].Protocols) != 1 || got.Devices[0].Protocols[0] != "hysteria2" {
+	if len(got.Devices) != 1 || got.Devices[0].AwgProfileId != "" || !slices.Equal(got.Devices[0].Protocols, []string{"hysteria2", "vless"}) {
 		t.Errorf("hysteria2 user devices = %+v", got.Devices)
 	}
 }

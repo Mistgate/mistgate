@@ -16,6 +16,26 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestRequiredProtocolCapability(t *testing.T) {
+	tests := []struct {
+		name string
+		spec plugin.InboundSpec
+		want string
+	}{
+		{name: "AWG", spec: plugin.InboundSpec{Protocol: "awg"}, want: capAWG},
+		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: capVLESS},
+		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
+		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := requiredCap(tt.spec); got != tt.want {
+				t.Errorf("requiredCap() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDiffStateDigestMatchesLegacy(t *testing.T) {
 	rng := rand.New(rand.NewSource(0x6b3))
 	var coverage digestTestCoverage
