@@ -801,3 +801,18 @@ func (l pageLang) bytes(value uint64) string {
 	}
 	return fmt.Sprintf("%.1f %s", float64(value)/float64(div), units[exp+1])
 }
+
+// ForwardHeader marks a request that the panel answers with 204 instead of serving: the edge Worker cannot hold an SSH
+// socket, so it sends the original request to the Provisioner Worker. The value is "provision;v=<build>"; the Worker
+// strips the header and tells the Provisioner which build asked, so that two Workers of different builds do not run
+// one request between them.
+const ForwardHeader = "X-Mistgate-Forward"
+
+// ForwardMarker answers every request with that marker. It stands where the ProvisioningService and the install page
+// would be served, inside the admin's sign-in check: a visitor who is not signed in never gets it.
+func ForwardMarker(build string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(ForwardHeader, "provision;v="+build)
+		w.WriteHeader(http.StatusNoContent)
+	})
+}

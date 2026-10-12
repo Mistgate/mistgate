@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
 
 // A platform that refuses the connection (or cannot reach the target) is its own public code, whichever way the error
@@ -47,5 +48,21 @@ func TestClientReportsAPlatformRefusal(t *testing.T) {
 	fingerprint := "SHA256:" + strings.Repeat("A", 43)
 	if _, err := client.DialAs(ctx, target, "root", "secret-pass", fingerprint); publicSSHCode(err) != "ssh_target_refused" {
 		t.Fatalf("DialAs: %v (%q)", err, publicSSHCode(err))
+	}
+}
+
+// The wizard's first step, reading the host key, answers the same code, not the generic "unavailable".
+func TestGetSSHFingerprintNamesAPlatformRefusal(t *testing.T) {
+	client := NewClientWith(
+		func(context.Context, string, string) (net.Conn, error) {
+			return nil, fmt.Errorf("sshConnect: %w", ErrPlatformRefused)
+		},
+		func(context.Context, string) ([]netip.Addr, error) { return nil, errors.New("no lookup in this test") },
+	)
+	svc := drainService(t, drainStore(t), Config{SSH: client})
+	_, err := svc.GetSSHFingerprint(context.Background(), connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: "45.67.89.11", Port: 22}))
+	var connectErr *connect.Error
+	if !errors.As(err, &connectErr) || connectErr.Code() != connect.CodeFailedPrecondition || connectErr.Message() != "ssh_target_refused" {
+		t.Fatalf("GetSSHFingerprint = %v", err)
 	}
 }

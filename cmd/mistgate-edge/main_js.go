@@ -37,6 +37,7 @@ type edgeState struct {
 	panel         *app.Panel
 	handler       http.Handler
 	afterResponse *edgeTaskRunner
+	serve         bool // the Provisioner role: runs SSH installs (mgPanel.provision) and refuses requests of another build
 }
 
 var (
@@ -170,6 +171,9 @@ func main() {
 	api.Set("cron", js.FuncOf(func(_ js.Value, args []js.Value) any {
 		return promise(func() (js.Value, error) { return cron(args) })
 	}))
+	api.Set("provision", js.FuncOf(func(js.Value, []js.Value) any {
+		return promise(provisionPass)
+	}))
 	api.Set("link", linkFunc())
 	js.Global().Set("mgPanel", api)
 	select {}
@@ -223,6 +227,10 @@ func initPanel(options js.Value) error {
 	}()
 
 	in, pendingSettings, err := loadEdgeInstance(context.Background(), st, opts)
+	if opts.provision.serve && (errors.Is(err, errFreshPublicURL) || err == nil && pendingSettings["rp_id"] != "") {
+		// The Provisioner never creates an instance: the main Worker does, and this one reads what it stored.
+		return errProvisionerNoPanel
+	}
 	if err != nil {
 		return err
 	}
@@ -277,19 +285,32 @@ func initPanel(options js.Value) error {
 			}
 		}
 	}
-	built, err := app.Build(app.Config{
+	cfg := app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, Limiter: limiter, MasterKey: opts.masterKey, Clock: time.Now,
 		Logger: log, Instance: in, Title: brand.BrandName(), DataDir: edgeNoFilesystemDataDir, AfterResponse: afterResponse.Run,
-		Remote: remote,
-	})
+		Remote: remote, ProvisionForward: !opts.provision.serve,
+	}
+	if opts.provision.kick.Type() == js.TypeFunction {
+		cfg.ProvisionKick = opts.provision.wake
+	}
+	if opts.provision.serve {
+		cfg.SSHClient, cfg.NodeBinaries = newSSHClient(opts.provision.sshConnect), releaseNodeBinaries()
+	}
+	built, err := app.Build(cfg)
 	if err != nil {
 		return err
 	}
-	if err := offerSetup(context.Background(), st, opts, in, time.Now()); err != nil {
-		return err
+	if !opts.provision.serve { // the Provisioner never offers a setup token
+		if err := offerSetup(context.Background(), st, opts, in, time.Now()); err != nil {
+			return err
+		}
+	}
+	handler := withEdgeTestHooks(built.Handler, built.Fleet)
+	if opts.provision.serve {
+		handler = requireBuild(handler)
 	}
 	// EdgeTick owns the bounded edge phases; app.edgeDeferred records the VPS phases still deferred on the Worker.
-	state = &edgeState{store: st, fleet: built.Fleet, panel: built, handler: withEdgeTestHooks(built.Handler, built.Fleet), afterResponse: afterResponse}
+	state = &edgeState{store: st, fleet: built.Fleet, panel: built, handler: handler, afterResponse: afterResponse, serve: opts.provision.serve}
 	keepStore = true
 	return nil
 }

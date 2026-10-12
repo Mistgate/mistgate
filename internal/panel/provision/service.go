@@ -173,6 +173,9 @@ func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[ad
 		if errors.Is(err, ErrUnsafeTarget) || errors.Is(err, ErrNoAddress) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("ssh_target_not_public"))
 		}
+		if errors.Is(err, ErrPlatformRefused) {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_target_refused"))
+		}
 		if errors.Is(err, context.Canceled) {
 			return nil, connect.NewError(connect.CodeCanceled, errors.New("ssh_fingerprint_canceled"))
 		}

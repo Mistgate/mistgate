@@ -10,6 +10,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { createHmac } = crypto;
 const { pathToFileURL } = require("node:url");
+require("./sshconnect.cjs"); // globalThis.__sshConnect: the Worker's sshConnect over node:net, to the fake SSH server
 
 let wasmFailure;
 let rejectWasmFailure;
@@ -17,6 +18,7 @@ const securityLimits = new Map();
 let limitMath;
 let liveProjectionQueries = 0;
 let nodePokeCalls = 0;
+let provisionKicks = 0;
 const nodePokeIDs = [];
 // The linear memory of every wasm instance (one per modelled isolate). A Worker isolate has 128 MB in all; what the Go
 // heap may use is capped here so that about 32 MB stay for the JavaScript side.
@@ -401,6 +403,153 @@ async function assertLinkHandshake(panel) {
   return { linkPrefix, nodeID };
 }
 
+// The Provisioner role (SSH installs on the edge). The main Worker's panel does not serve the ProvisioningService or the
+// install page: behind the sign-in check it answers a marker (X-Mistgate-Forward), which the Worker turns into a request
+// to the Provisioner object. The Provisioner's panel (role "serve") is the same wasm with sshConnect: here the Node
+// stand-in of the Worker's socket, to the fake SSH server of scripts/fakesshd.ps1.
+async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, baseCronDate) {
+  const fake = Object.fromEntries(["ADDR", "FP", "USER", "PASS"].map((name) => [name, process.env[`MG_FAKESSHD_${name}`]]));
+  assert.ok(fake.ADDR && fake.FP && fake.USER && fake.PASS, "run this through scripts/test-edge-entry.ps1: it starts the fake SSH server");
+  const api = "https://example.com/test-admin/api/mistgate.admin.v1.ProvisioningService/";
+  const call = (panel, method, body, headers = {}) => bridgeRequestFor(panel, api + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1", "CF-Connecting-IP": "127.0.0.1", Origin: "https://example.com", ...headers },
+    body: JSON.stringify(body),
+  });
+  const page = (panel, cookie) => bridgeRequestFor(panel, "https://example.com/test-admin/nodes/install", {
+    headers: { "CF-Connecting-IP": "127.0.0.1", ...(cookie ? { Cookie: cookie } : {}) },
+  });
+  const header = (response, name) => response.headers.find(([key]) => key.toLowerCase() === name)?.[1];
+  const json = (response) => JSON.parse(Buffer.from(response.body).toString("utf8"));
+  const signedIn = { Cookie: adminCookie };
+
+  // The forwarding panel: a marker for the signed-in owner, the ordinary refusal for anyone else.
+  let build = "";
+  for (const method of ["GetSSHFingerprint", "CheckSSH", "StartNodeProvision", "GetNodeProvision", "ListNodeProvisions"]) {
+    const marked = await call(forwardPanel, method, {}, signedIn);
+    assert.equal(marked.status, 204, `${method} is marked for the Provisioner`);
+    const value = header(marked, "x-mistgate-forward");
+    assert.match(value, /^provision;v=\S+$/, `${method} carries the build in the marker`);
+    build = value.slice("provision;v=".length);
+    const anonymous = await call(forwardPanel, method, {});
+    assert.notEqual(anonymous.status, 204, `${method} is not marked for a visitor who is not signed in`);
+    assert.equal(header(anonymous, "x-mistgate-forward"), undefined, `${method} leaks no marker to a visitor`);
+  }
+  const markedPage = await page(forwardPanel, adminCookie);
+  assert.equal(markedPage.status, 204, "the install page is marked for the Provisioner");
+  assert.equal(header(markedPage, "x-mistgate-forward"), `provision;v=${build}`);
+  const anonymousPage = await page(forwardPanel);
+  assert.notEqual(anonymousPage.status, 204, "the install page is not marked for a visitor");
+  assert.equal(header(anonymousPage, "x-mistgate-forward"), undefined);
+  await assert.rejects(forwardPanel.provision(), /serve role/, "a forwarding panel runs no installs");
+
+  // The cron pass wakes the Provisioner while an install is waiting, running or being cancelled, and costs one D1 query for it.
+  const insertJob = (id, state) => globalThis.__d1.prepare(
+    `INSERT INTO node_provision_job (id, node_id, name, address, country_code, location, provider, ssh_host, ssh_port, host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, '198.51.100.9', '', '', '', '45.67.89.10', 22, 'SHA256:pin', X'01', ?, 'queued', '', 'adm_test', 1, 1)`,
+  ).bind(id, `nod_${id}`, id.replace("_", "-"), state).run();
+  const tick = (minute) => {
+    const at = new Date(baseCronDate);
+    at.setUTCMinutes(minute, 0, 0);
+    return countedJob("cron tick with installs", () => Promise.race([forwardPanel.cron({ at: at.getTime() }), wasmFailure]));
+  };
+  await insertJob("prv_done", "failed");
+  assert.equal((await tick(3)).queries.sequentialQueries, 4);
+  assert.equal(provisionKicks, 0, "a finished install wakes nothing");
+  for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
+    await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
+    await insertJob("prv_open", state);
+    assert.equal((await tick(3)).queries.sequentialQueries, 4, "waking costs no query beyond the look");
+    assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
+  }
+  await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
+  provisionKicks = 0;
+
+  // The Provisioner's panel.
+  const serveKicks = { n: 0 };
+  const servePanel = await startIsolate(bytes, forwardPanel);
+  await assert.rejects(Promise.race([
+    servePanel.init({ d1: globalThis.__d1, masterKey: initOptions.masterKey, provision: { role: "serve", kick: async () => {}, sshConnect: null } }),
+    wasmFailure,
+  ]), /provision must be/, "a serve role without sshConnect is refused");
+  await Promise.race([servePanel.init({
+    d1: globalThis.__d1,
+    limit: securityLimit,
+    masterKey: initOptions.masterKey, // no public URL, no admin path, no assets: all of it is read from D1
+    nodeLink: initOptions.nodeLink,
+    provision: { role: "serve", kick: async () => { serveKicks.n++; }, sshConnect: globalThis.__sshConnect },
+  }), wasmFailure]);
+  const asBuild = (value) => ({ "X-Mistgate-Build": value });
+
+  const noBuild = await call(servePanel, "ListNodeProvisions", {}, signedIn);
+  assert.equal(noBuild.status, 503, "a request that names no build is not served");
+  assert.match(Buffer.from(noBuild.body).toString("utf8"), /panel_updating/);
+  assert.equal((await call(servePanel, "ListNodeProvisions", {}, { ...signedIn, ...asBuild("0.0.0-old") })).status, 503, "nor is one of another build");
+  const listed = await call(servePanel, "ListNodeProvisions", {}, { ...signedIn, ...asBuild(build) });
+  assert.equal(listed.status, 200, "the Provisioner serves the ProvisioningService for this build");
+  const stranger = await call(servePanel, "ListNodeProvisions", {}, asBuild(build));
+  assert.equal(stranger.status, 401, "and checks the sign-in again");
+  assert.equal((await page(servePanel, adminCookie)).status, 503, "the page needs the build too");
+  const servedPage = await bridgeRequestFor(servePanel, "https://example.com/test-admin/nodes/install", {
+    headers: { "CF-Connecting-IP": "127.0.0.1", Cookie: adminCookie, ...asBuild(build) },
+  });
+  assert.equal(servedPage.status, 200, "the install page is rendered by the Provisioner");
+  assert.ok(!header(servedPage, "x-mistgate-forward"));
+
+  // Through the real stack: host key over a socket, the platform's refusal, and a job each way a login can go.
+  const asOwner = { ...signedIn, ...asBuild(build) };
+  const fingerprint = await call(servePanel, "GetSSHFingerprint", { host: "45.67.89.10", port: 22 }, asOwner);
+  assert.equal(fingerprint.status, 200);
+  assert.equal(json(fingerprint).fingerprint, fake.FP, "the host key arrives through sshConnect");
+  const refused = await call(servePanel, "GetSSHFingerprint", { host: "45.67.89.11", port: 22 }, asOwner);
+  assert.equal(json(refused).message, "ssh_target_refused", "the platform's refusal has its own code");
+
+  const rightPassword = fake.PASS;
+  const wrongPassword = `wrong-${randomBytes(8).toString("hex")}`;
+  const jobs = [
+    ["right-login", "45.67.89.10", rightPassword, "ssh_preflight_failed"], // logs in; the fake server has no preflight script
+    ["wrong-login", "45.67.89.10", wrongPassword, "ssh_authentication_failed"],
+    ["no-route", "45.67.89.11", rightPassword, "ssh_target_refused"],
+  ];
+  for (const [index, [name, host, password]] of jobs.entries()) {
+    const started = await call(servePanel, "StartNodeProvision", {
+      confirmInstall: true, name, address: `198.51.100.${20 + index}`, countryCode: "NL", sshHost: host, sshPort: 22,
+      fingerprint: fake.FP, password, sshUsername: fake.USER,
+    }, asOwner);
+    assert.equal(started.status, 200, `StartNodeProvision ${name}: ${Buffer.from(started.body).toString("utf8")}`);
+  }
+  assert.equal(serveKicks.n, jobs.length, "each queued install wakes the Provisioner");
+
+  const passes = [];
+  for (let i = 0; i < jobs.length; i++) {
+    const pass = await Promise.race([servePanel.provision(), wasmFailure]);
+    await pass.waitUntil;
+    passes.push([pass.more, pass.busy]);
+  }
+  assert.deepEqual(passes, [[true, false], [true, false], [false, false]], "a pass runs one install and says whether another waits");
+  const rows = (await globalThis.__d1.prepare("SELECT name, state, error_code, length(secret) AS secret_bytes FROM node_provision_job").all()).results;
+  for (const [name, , , code] of jobs) {
+    const row = rows.find((r) => r.name === name);
+    assert.ok(row, `job ${name}`);
+    assert.equal(row.state, "failed", `${name} ended`);
+    assert.equal(row.error_code, code, `${name} ended with its own code`);
+    assert.equal(Number(row.secret_bytes), 0, `${name}: the sealed login is erased when the job ends`);
+  }
+  const idle = await servePanel.provision();
+  assert.deepEqual([idle.more, idle.busy], [false, false], "a pass with nothing queued does nothing");
+  await idle.waitUntil;
+
+  // Nothing the job stored or wrote down holds a password.
+  const stored = JSON.stringify([
+    (await globalThis.__d1.prepare("SELECT * FROM node_provision_job").all()).results,
+    (await globalThis.__d1.prepare("SELECT * FROM node_provision_event").all()).results,
+  ]);
+  for (const password of [rightPassword, wrongPassword]) assert.ok(!stored.includes(password), "a login password was stored");
+  await globalThis.__d1.prepare("DELETE FROM node_provision_event").run();
+  await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
+  return servePanel;
+}
+
 async function run() {
   limitMath = await import(pathToFileURL(path.resolve(__dirname, "../../../edge/worker/src/limitmath.ts")).href);
   await assertSharedLimitVectors();
@@ -438,6 +587,7 @@ async function run() {
       publicURL: "https://example.com",
       adminPrefix: "/test-admin/",
       subPrefix: "/test-sub/",
+      provision: { role: "forward", kick: async () => { provisionKicks++; } },
       nodeLink: {
         ask: async () => ({ error: "lost" }),
         close: async () => {},
@@ -906,8 +1056,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      3,
-      "a normal cron tick costs 3 D1 calls: status, node list and node live",
+      4,
+      "a normal cron tick costs 4 D1 calls: status, node list, node live and the look for pending installs",
     );
 
     liveProjectionQueries = 0;
@@ -921,8 +1071,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      4,
-      "one cron tick costs 4 D1 calls: status, node list, node live, fan-out live",
+      5,
+      "one cron tick costs 5 D1 calls: status, node list, node live, pending installs, fan-out live",
     );
     assert.equal(liveProjectionQueries, 2, "the node-down sweep and ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
@@ -936,9 +1086,12 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      9,
-      "a minute 17 cron tick costs 9 D1 calls: 3 normal and 6 retention",
+      10,
+      "a minute 17 cron tick costs 10 D1 calls: 4 normal and 6 retention",
     );
+
+    assert.equal(provisionKicks, 0, "cron ticks without an install wake no Provisioner");
+    await assertProvisioner(bytes, secondPanel, adminCookie, initOptions, baseCronDate);
 
     thirdPanel = await startIsolate(bytes, secondPanel);
     const withoutLimiter = { ...initOptions };

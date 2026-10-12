@@ -12,9 +12,10 @@ import (
 const edgeTickJobTimeout = 20 * time.Second
 
 var edgeTickJobs = map[string]string{
-	"access": "user status sweep every tick",
-	"fleet":  "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health": "health retention at minute 17",
+	"access":    "user status sweep every tick",
+	"fleet":     "node-down sweep every tick and desired-state safety net every 10 minutes",
+	"health":    "health retention at minute 17",
+	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 }
 
 var edgeDeferred = map[string]string{
@@ -23,7 +24,6 @@ var edgeDeferred = map[string]string{
 	"updates":        "owner decision 2",
 	"backups":        "R2",
 	"telegram":       "enqueue remains local and messages are not delivered on edge",
-	"provision":      "phase 3",
 	"mcp-plan-sweep": "MCP is not served on the edge",
 }
 
@@ -36,7 +36,6 @@ var edgeDeferredFeatures = map[string][]string{
 	"updates":        {edition.AgentUpdates, edition.PanelUpdate},
 	"backups":        {edition.Backups},
 	"telegram":       {edition.Telegram},
-	"provision":      {edition.Provision},
 	"mcp-plan-sweep": {edition.MCP},
 }
 
@@ -60,6 +59,16 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		p.Fleet.Sweep(ctx)
 		return nil
 	})
+	if p.provisionKick != nil {
+		// The installs run in the Provisioner Worker; this is the net under its alarm (an evicted object, a redeploy).
+		run("provision wake", func(ctx context.Context) error {
+			pending, err := p.Store.NodeProvisionJobsPending(ctx)
+			if err != nil || !pending {
+				return err
+			}
+			return p.provisionKick(ctx)
+		})
+	}
 	if now.UTC().Minute() == 17 {
 		run("health retention", func(ctx context.Context) error {
 			p.Health.Retention(ctx)

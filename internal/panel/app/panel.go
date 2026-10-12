@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
+
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/access"
@@ -66,6 +68,24 @@ func provisionLinkURL(edge bool, in InstanceConfig) string {
 	return linkURL(in)
 }
 
+// forwardProvision is the ProvisioningService mount: the marker that sends the call to the Provisioner when forwarding, else
+// the service itself.
+func forwardProvision(forward bool, service func(opts ...connect.HandlerOption) (string, http.Handler)) (string, http.Handler) {
+	path, handler := service()
+	if forward {
+		handler = nodeprovision.ForwardMarker(buildinfo.Version)
+	}
+	return path, handler
+}
+
+// forwardPage is the install page mount, likewise.
+func forwardPage(forward bool, page http.Handler) http.Handler {
+	if forward {
+		return nodeprovision.ForwardMarker(buildinfo.Version)
+	}
+	return page
+}
+
 // AdminURL is the address the owner opens in a browser.
 func (in InstanceConfig) AdminURL() string {
 	if len(in.RPOrigins) == 0 {
@@ -109,6 +129,18 @@ type Config struct {
 	// Remote is the edge edition's node link. Setting it makes this the edge edition (fleet does the same): Me says so,
 	// and the RPCs that start work the edge does not run yet refuse with unavailable_in_edition.
 	Remote fleet.Remote
+	// ProvisionForward makes this panel hand SSH installs to the Provisioner (the edge Worker that holds the sockets): the
+	// ProvisioningService calls and the install page are answered, after the sign-in check, with a marker that the Worker
+	// turns into a request to that object. Without it, and without SSHClient, they are served here (and refused on the edge).
+	ProvisionForward bool
+	// ProvisionKick wakes the Provisioner (edge: set its alarm). The cron pass calls it while installs are pending; a
+	// Provisioner calls it when an install is queued. Nil: nothing to wake.
+	ProvisionKick func(context.Context) error
+	// SSHClient makes this panel the one that runs the installs (the Provisioner): it dials through it. Nil: the default
+	// client of the VPS edition.
+	SSHClient *nodeprovision.Client
+	// NodeBinaries is where an install gets the agent binary; nil: the update service (the signed bundle on disk).
+	NodeBinaries nodeprovision.BinarySource
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.
@@ -126,6 +158,8 @@ type Panel struct {
 	Store          *store.Store
 	Desired        func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
 	BackgroundJobs []BackgroundJob
+	// provisionKick is Config.ProvisionKick; EdgeTick uses it.
+	provisionKick func(context.Context) error
 }
 
 // Build wires services into the HTTP handler shared by the VPS and edge editions.
@@ -254,10 +288,25 @@ func Build(c Config) (*Panel, error) {
 		},
 		OutdatedAgents: upd.OutdatedAgents,
 	})
-	prov, err := nodeprovision.NewService(st, vlt, nodeprovision.Config{
-		Edge: edge, StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
+	var binaries nodeprovision.BinarySource = upd
+	if c.NodeBinaries != nil {
+		binaries = c.NodeBinaries
+	}
+	provCfg := nodeprovision.Config{
+		// The panel that has an SSH client is the one that runs the installs, so it does not refuse them as an edge.
+		Edge: edge && c.SSHClient == nil, StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: binaries, SSH: c.SSHClient,
 		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(edge, in), AgentSNI: in.AgentSNI, Log: log,
-	})
+	}
+	if c.ProvisionKick != nil {
+		provCfg.Kick = func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := c.ProvisionKick(ctx); err != nil {
+				log.Warn("wake the provisioner", "err", err)
+			}
+		}
+	}
+	prov, err := nodeprovision.NewService(st, vlt, provCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +354,7 @@ func Build(c Config) (*Panel, error) {
 		func() (string, http.Handler) { return fl.FleetHandler() },
 		acc.ProfileHandler, acc.UserHandler, acc.GroupHandler, acc.DeviceHandler, acc.AwgHandler, subSvc.Handler, dnsSvc.Handler,
 		func() (string, http.Handler) { return wsv.Handler() },
-		func() (string, http.Handler) { return prov.Handler() },
+		func() (string, http.Handler) { return forwardProvision(c.ProvisionForward, prov.Handler) },
 		func() (string, http.Handler) { return hl.Handler() },
 		func() (string, http.Handler) { return upd.Handler() },
 		func() (string, http.Handler) { return bkp.Handler() },
@@ -328,7 +377,7 @@ func Build(c Config) (*Panel, error) {
 		TrustedOrigins:   in.RPOrigins,
 		Log:              log,
 		AdminHandlers:    admin,
-		AdminPages:       []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: prov.PageHandler()}},
+		AdminPages:       []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: forwardPage(c.ProvisionForward, prov.PageHandler())}},
 		MCP:              mcpEndpoint(authSvc, st, log, tg.PlanWaiting, c.Clock),
 		PublicMounts:     map[string]http.Handler{in.SubPrefix: sub},
 		AgentSNI:         in.AgentSNI,
@@ -369,7 +418,7 @@ func Build(c Config) (*Panel, error) {
 	return &Panel{
 		Handler: srv.Public(), Server: srv, Fleet: fl, Access: acc, Health: hl, Update: upd,
 		Warp: wsv, Provision: prov, Backup: bkp, Telegram: tg, Store: st, Desired: desired,
-		BackgroundJobs: jobs,
+		BackgroundJobs: jobs, provisionKick: c.ProvisionKick,
 	}, nil
 }
 

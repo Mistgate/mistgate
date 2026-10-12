@@ -51,6 +51,12 @@ func buildEdgeTickPanel(t *testing.T, remote fleet.Remote) *Panel {
 // buildPanel assembles a panel on a fresh store: the edge edition when remote is set, the VPS one when it is nil.
 func buildPanel(t *testing.T, remote fleet.Remote) (*Panel, *auth.Service) {
 	t.Helper()
+	return buildPanelWith(t, remote, nil)
+}
+
+// buildPanelWith is buildPanel with a last look at the config before Build.
+func buildPanelWith(t *testing.T, remote fleet.Remote, tweak func(*Config)) (*Panel, *auth.Service) {
+	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
 	if err != nil {
@@ -71,7 +77,7 @@ func buildPanel(t *testing.T, remote fleet.Remote) (*Panel, *auth.Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := Build(Config{
+	cfg := Config{
 		Store: st, Vault: vlt, Auth: authSvc, Clock: time.Now, Logger: log,
 		Instance: InstanceConfig{
 			PublicURL: "https://example.com", AdminPrefix: "/admin/", RPID: "example.com",
@@ -79,7 +85,11 @@ func buildPanel(t *testing.T, remote fleet.Remote) (*Panel, *auth.Service) {
 		},
 		DataDir: t.TempDir(), MasterKey: key, Remote: remote,
 		AfterResponse: func(work func()) { work() },
-	})
+	}
+	if tweak != nil {
+		tweak(&cfg)
+	}
+	p, err := Build(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

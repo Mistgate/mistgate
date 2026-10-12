@@ -49,6 +49,7 @@ type initOptions struct {
 	limit       js.Value // optional async security-limit callback
 	nodeLink    js.Value
 	hasNodeLink bool
+	provision   provisionOptions
 	masterKey   []byte
 	publicURL   string
 	adminHost   string
@@ -88,6 +89,9 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 		out.hasNodeLink = true
 	}
 	var err error
+	if out.provision, err = parseProvisionOptions(value); err != nil {
+		return out, err
+	}
 	if out.masterKey, err = masterKeyFromJS(value.Get("masterKey")); err != nil {
 		return out, err
 	}

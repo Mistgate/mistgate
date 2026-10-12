@@ -28,7 +28,9 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 	if !slices.Equal(jobs, mapped) {
 		t.Fatalf("deferred jobs %v, jobs mapped to features %v: map every deferred job (and only those) in edgeDeferredFeatures", jobs, mapped)
 	}
-	covered := map[string]bool{}
+	// The Provisioner runs the installs, but the admin keeps saying "unavailable" until its Worker is wired in (edge round
+	// S6, which deletes this line and the id in edition.edgeUnavailable together).
+	covered := map[string]bool{edition.Provision: true}
 	for job, ids := range edgeDeferredFeatures {
 		if len(ids) == 0 {
 			t.Errorf("deferred job %q is mapped to no feature id", job)

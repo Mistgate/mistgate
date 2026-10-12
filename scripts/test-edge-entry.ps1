@@ -1,5 +1,8 @@
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "fakesshd.ps1")
+$previousFakeSshd = Save-FakeSshdEnv
+$fakeSshd = $null
 $previousGoos = $env:GOOS
 $previousGoarch = $env:GOARCH
 $tempRoot = (Resolve-Path ([IO.Path]::GetTempPath())).Path
@@ -12,6 +15,10 @@ try {
     if (-not $resolvedTempDir.StartsWith($tempRootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Edge entry test output directory is outside the OS temp directory."
     }
+
+    # The bridge test reads a host key through the Provisioner role of the panel, from a fake SSH server. The server is
+    # native, so it is built before GOOS=js is set.
+    $fakeSshd = Start-FakeSshd $repoRoot $resolvedTempDir
 
     $wasm = Join-Path $resolvedTempDir "panel.wasm"
     $oracle = Join-Path $resolvedTempDir "vps-oracle.exe"
@@ -52,6 +59,8 @@ try {
 } finally {
     $env:GOOS = $previousGoos
     $env:GOARCH = $previousGoarch
+    Restore-FakeSshdEnv $previousFakeSshd
+    Stop-FakeSshd $fakeSshd
     if (Test-Path $tempDir) {
         $cleanupTarget = (Resolve-Path -LiteralPath $tempDir).Path
         if (-not $cleanupTarget.StartsWith($tempRootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
