@@ -31,6 +31,10 @@ var (
 	// ErrNoPasswordAuth reports that the server offers neither password nor keyboard-interactive login (key-only
 	// sshd): the password was never sent, so no password can fix it.
 	ErrNoPasswordAuth = errors.New("provision: SSH server offers no password login")
+	// ErrPlatformRefused reports that the network the panel connects from refused the connection or could not reach the
+	// target. The edge edition's sockets cannot tell a refusing platform (Cloudflare addresses, private ranges) from a
+	// closed port, so the word is "refused or unreachable"; the owner can still install the node by hand.
+	ErrPlatformRefused = errors.New("provision: the connection to the SSH target was refused or the target is unreachable from the panel network")
 )
 
 type contextDialer interface {

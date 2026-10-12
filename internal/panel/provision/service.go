@@ -743,7 +743,7 @@ func sshConnectError(err error) error {
 	switch code {
 	case "ssh_target_not_public":
 		status = connect.CodeInvalidArgument
-	case "ssh_host_key_changed", "ssh_password_auth_unavailable":
+	case "ssh_target_refused", "ssh_host_key_changed", "ssh_password_auth_unavailable":
 		status = connect.CodeFailedPrecondition
 	case "ssh_connection_canceled":
 		status = connect.CodeCanceled

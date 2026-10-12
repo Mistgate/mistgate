@@ -802,6 +802,8 @@ func publicSSHCode(err error) string {
 	switch {
 	case errors.Is(err, ErrUnsafeTarget), errors.Is(err, ErrNoAddress):
 		return "ssh_target_not_public"
+	case errors.Is(err, ErrPlatformRefused):
+		return "ssh_target_refused"
 	case errors.Is(err, ErrHostKey):
 		return "ssh_host_key_changed"
 	case errors.Is(err, ErrAuthRejected):
