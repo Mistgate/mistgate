@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -267,6 +268,36 @@ func TestReadEdgeBundleRefusesUnsafePaths(t *testing.T) {
 		if _, err := ReadEdgeBundle(&buf); err == nil {
 			t.Errorf("%q accepted", name)
 		}
+	}
+}
+
+// The compressed size is bounded by MaxEdgeBundle; the unpacked size has its own bound, so a tiny gzip bomb is refused.
+func TestReadEdgeBundleBoundsTheUnpackedSize(t *testing.T) {
+	old := maxEdgeUnpacked
+	maxEdgeUnpacked = 1000
+	defer func() { maxEdgeUnpacked = old }()
+	pack := func(sizes ...int) *bytes.Buffer {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		tw := tar.NewWriter(zw)
+		for i, n := range sizes {
+			if err := tw.WriteHeader(&tar.Header{Name: fmt.Sprintf("f%d", i), Mode: 0o644, Size: int64(n), Typeflag: tar.TypeReg}); err != nil {
+				t.Fatal(err)
+			}
+			tw.Write(make([]byte, n))
+		}
+		tw.Close()
+		zw.Close()
+		return &buf
+	}
+	if _, err := ReadEdgeBundle(pack(400, 600)); err != nil {
+		t.Fatalf("a bundle of exactly the limit: %v", err)
+	}
+	if _, err := ReadEdgeBundle(pack(400, 601)); err == nil {
+		t.Fatal("accepted a bundle that unpacks past the limit")
+	}
+	if _, err := ReadEdgeBundle(pack(5000)); err == nil {
+		t.Fatal("accepted one file larger than the limit")
 	}
 }
 

@@ -36,6 +36,10 @@ const (
 	MaxEdgeBundle = 256 << 20
 )
 
+// maxEdgeUnpacked bounds the sum of all file sizes in a tarball that ReadEdgeBundle returns. MaxEdgeBundle bounds the
+// compressed bytes, which a gzip bomb stays far below. A variable so that a test can lower it.
+var maxEdgeUnpacked int64 = 256 << 20
+
 // edgeContext is the Ed25519ctx context of an edge manifest, next to panelContext: the same key, another context.
 var edgeContext = &ed25519.Options{Context: "mistgate edge manifest v1"}
 
@@ -392,6 +396,7 @@ func ReadEdgeBundle(r io.Reader) (map[string][]byte, error) {
 	}
 	tr := tar.NewReader(zr)
 	files := map[string][]byte{}
+	remaining := maxEdgeUnpacked
 	for {
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -413,9 +418,12 @@ func ReadEdgeBundle(r io.Reader) (map[string][]byte, error) {
 		if _, dup := files[name]; dup {
 			return nil, fmt.Errorf("release: %q is listed twice in the edge bundle", name)
 		}
-		b, err := io.ReadAll(io.LimitReader(tr, MaxEdgeBundle))
+		b, err := io.ReadAll(io.LimitReader(tr, remaining+1))
 		if err != nil {
 			return nil, err
+		}
+		if remaining -= int64(len(b)); remaining < 0 {
+			return nil, fmt.Errorf("release: the edge bundle unpacks to more than %d bytes", maxEdgeUnpacked)
 		}
 		files[name] = b
 	}
