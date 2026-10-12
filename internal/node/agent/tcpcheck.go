@@ -29,7 +29,7 @@ type tcpProbeState struct {
 
 // httpMark handles one HttpMark command: arm the node's HTTP-01 listener for one request (agent.proto "TCP DELIVERY CHECK").
 func (a *Agent) httpMark(s *session, r *pb.HttpMark) {
-	if len(r.Token) != 16 || len(r.Answer) != 16 || r.HoldS < 1 || r.HoldS > 60 {
+	if len(r.Token) != tcpcheck.MarkSize || len(r.Answer) != tcpcheck.MarkSize || r.HoldS < 1 || r.HoldS > 60 {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "bad_params"}))
 		return
 	}

@@ -81,8 +81,8 @@ func askTCPProbe(h *harness, id, host string, targets ...*pb.TcpTarget) *pb.Comm
 }
 
 var (
-	markToken  = []byte("0123456789abcdef")
-	markAnswer = []byte("fedcba9876543210")
+	markToken  = []byte("0123456789abcdef0123456789abcdef")
+	markAnswer = []byte("fedcba9876543210fedcba9876543210")
 )
 
 func TestTCPCheckCapabilityIsAlwaysAdvertised(t *testing.T) {
@@ -106,7 +106,7 @@ func TestHTTPMarkArmsOnceAndReportsTheListener(t *testing.T) {
 	if !armed || until.Before(before.Add(29*time.Second)) || until.After(time.Now().Add(31*time.Second)) {
 		t.Fatalf("mark armed=%v until=%v", armed, until)
 	}
-	if r := askHTTPMark(h, "mark_2", []byte("abcdef0123456789"), markAnswer, 30); r.Ok || r.Error != "busy" {
+	if r := askHTTPMark(h, "mark_2", []byte("abcdef0123456789abcdef0123456789"), markAnswer, 30); r.Ok || r.Error != "busy" {
 		t.Fatalf("second arm: %+v", r)
 	}
 }
@@ -140,8 +140,8 @@ func TestHTTPMarkBadParams(t *testing.T) {
 		token, answer []byte
 		hold          uint32
 	}{
-		"short token":  {markToken[:15], markAnswer, 30},
-		"short answer": {markToken, markAnswer[:15], 30},
+		"short token":  {markToken[:16], markAnswer, 30},
+		"short answer": {markToken, markAnswer[:16], 30},
 		"zero hold":    {markToken, markAnswer, 0},
 		"long hold":    {markToken, markAnswer, 61},
 	} {
@@ -237,10 +237,10 @@ func TestTCPProbeMapsErrors(t *testing.T) {
 }
 
 func TestTCPProbeReachesALocalMarkListener(t *testing.T) {
-	path := "/.well-known/acme-challenge/" + hex.EncodeToString(markToken)
+	path := tcpcheck.MarkPath(markToken)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == path {
-			_, _ = w.Write(markAnswer)
+			_, _ = w.Write(tcpcheck.MarkBody(markToken, markAnswer))
 			return
 		}
 		http.NotFound(w, r)

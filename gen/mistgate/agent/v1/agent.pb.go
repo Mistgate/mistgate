@@ -3286,9 +3286,10 @@ func (x *UdpSend) GetSize() uint32 {
 type HttpMark struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 16 random bytes: the request path is /.well-known/acme-challenge/<lower-case hex of token>.
+	// 32 random bytes: the request path is /.well-known/acme-challenge/<base64url of token>, unpadded (Let's Encrypt's own
+	// token size and alphabet).
 	Token []byte `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
-	// 16 random bytes: the response body, status 200.
+	// 32 random bytes: the response body, status 200, is <base64url of token>.<base64url of answer>.
 	Answer []byte `protobuf:"bytes,3,opt,name=answer,proto3" json:"answer,omitempty"`
 	// The mark expires after this many seconds (1-60).
 	HoldS         uint32 `protobuf:"varint,4,opt,name=hold_s,json=holdS,proto3" json:"hold_s,omitempty"`
@@ -3427,9 +3428,9 @@ type TcpTarget struct {
 	Sni string `protobuf:"bytes,3,opt,name=sni,proto3" json:"sni,omitempty"`
 	// tls: lower-case hex sha256 of the leaf certificate the node reported; "" = trust only a valid chain.
 	PinSha256 string `protobuf:"bytes,4,opt,name=pin_sha256,json=pinSha256,proto3" json:"pin_sha256,omitempty"`
-	// http_mark: 16 bytes.
+	// http_mark: 32 bytes.
 	Token []byte `protobuf:"bytes,5,opt,name=token,proto3" json:"token,omitempty"`
-	// http_mark: 16 bytes, the expected body.
+	// http_mark: 32 bytes; the expected body is <base64url of token>.<base64url of answer>.
 	Answer        []byte `protobuf:"bytes,6,opt,name=answer,proto3" json:"answer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

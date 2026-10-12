@@ -38,6 +38,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
 
 const (
@@ -63,10 +64,11 @@ type Source struct {
 	httpMark *http01Mark
 }
 
+// http01Mark is the one armed mark: the request path to answer, the body to answer with, and when it expires.
 type http01Mark struct {
-	token  []byte
-	answer []byte
-	until  time.Time
+	path  string
+	body  []byte
+	until time.Time
 }
 
 var _ engine.CertSource = (*Source)(nil)
@@ -107,9 +109,10 @@ func (s *Source) Release(inboundID string) {
 	s.releaseLocked(inboundID)
 }
 
-// Mark arms one one-shot HTTP-01 delivery mark. The token and answer are held only in memory and the mark expires at until.
+// Mark arms one one-shot HTTP-01 delivery mark: a GET for the challenge path of token is answered once with the key
+// authorization shaped body (tcpcheck.MarkPath, tcpcheck.MarkBody). It is held only in memory and expires at until.
 func (s *Source) Mark(token, answer []byte, until time.Time) bool {
-	if len(token) != 16 || len(answer) != 16 {
+	if len(token) != tcpcheck.MarkSize || len(answer) != tcpcheck.MarkSize {
 		return false
 	}
 	s.mu.Lock()
@@ -120,7 +123,7 @@ func (s *Source) Mark(token, answer []byte, until time.Time) bool {
 	if s.httpMark != nil {
 		return false
 	}
-	s.httpMark = &http01Mark{token: append([]byte(nil), token...), answer: append([]byte(nil), answer...), until: until}
+	s.httpMark = &http01Mark{path: tcpcheck.MarkPath(token), body: tcpcheck.MarkBody(token, answer), until: until}
 	return true
 }
 
@@ -148,11 +151,11 @@ func (s *Source) takeHTTPMark(path string) ([]byte, bool) {
 		s.httpMark = nil
 		return nil, false
 	}
-	if path != "/.well-known/acme-challenge/"+hex.EncodeToString(mark.token) {
+	if path != mark.path {
 		return nil, false
 	}
 	s.httpMark = nil
-	return append([]byte(nil), mark.answer...), true
+	return mark.body, true
 }
 
 func (s *Source) releaseLocked(inboundID string) {

@@ -18,32 +18,43 @@ import (
 
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/tcpcheck"
+)
+
+var (
+	testMarkToken  = []byte("0123456789abcdef0123456789abcdef")
+	testMarkAnswer = []byte("fedcba9876543210fedcba9876543210")
 )
 
 func TestHTTP01MarkIsOneShotAndBypassesHostRouting(t *testing.T) {
 	s, url := markTestSource(t)
-	token, answer := []byte("0123456789abcdef"), []byte("fedcba9876543210")
-	if !s.Mark(token, answer, time.Now().Add(time.Minute)) {
+	if !s.Mark(testMarkToken, testMarkAnswer, time.Now().Add(time.Minute)) {
 		t.Fatal("Mark rejected a fresh mark")
 	}
-	path := "/.well-known/acme-challenge/" + hex.EncodeToString(token)
-	for i, wantStatus := range []int{http.StatusOK, http.StatusNotFound} {
-		req, err := http.NewRequest(http.MethodGet, url+path, nil)
-		if err != nil {
-			t.Fatal(err)
+	// Host example.com has its own HTTP-01 handler (204): the mark is answered before that routing, once, and then
+	// the request goes to the handler again.
+	for i, want := range []int{http.StatusOK, http.StatusNoContent} {
+		status, body := getMark(t, url, "example.com", tcpcheck.MarkPath(testMarkToken))
+		if status != want {
+			t.Fatalf("request %d: status %d, body %q, want %d", i, status, body, want)
 		}
-		req.Host = "unmatched.example"
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
+		if i == 0 && body != string(tcpcheck.MarkBody(testMarkToken, testMarkAnswer)) {
+			t.Fatalf("mark body = %q, want the key authorization shaped answer", body)
 		}
-		body, readErr := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if readErr != nil || resp.StatusCode != wantStatus {
-			t.Fatalf("request %d: status %d, body %q, err %v", i, resp.StatusCode, body, readErr)
-		}
-		if i == 0 && string(body) != string(answer) {
-			t.Fatalf("mark body = %q, want exact answer", body)
+	}
+}
+
+func TestHTTP01MarkAnswersTheProber(t *testing.T) {
+	s, _ := markTestSource(t)
+	port := uint16(s.http.addr.(*net.TCPAddr).Port)
+	target := []tcpcheck.Target{{Port: port, Kind: tcpcheck.KindHTTPMark, Token: testMarkToken, Answer: testMarkAnswer}}
+	if !s.Mark(testMarkToken, testMarkAnswer, time.Now().Add(time.Minute)) {
+		t.Fatal("Mark rejected a fresh mark")
+	}
+	for i, want := range []string{tcpcheck.VerdictOurs, tcpcheck.VerdictOther} { // the mark is spent by the first probe
+		_, got, err := tcpcheck.Probe(context.Background(), "127.0.0.1", target)
+		if err != nil || got[port] != want {
+			t.Fatalf("probe %d = %v, %v; want %q", i, got, err, want)
 		}
 	}
 }
@@ -61,39 +72,54 @@ func TestHTTP01MarkExpiresAndHTTP01State(t *testing.T) {
 	if got := s.HTTP01State(); got != "serving" {
 		t.Fatalf("bound HTTP-01 listener HTTP01State() = %q", got)
 	}
-	token, answer := []byte("0123456789abcdef"), []byte("fedcba9876543210")
-	if !s.Mark(token, answer, time.Now().Add(time.Minute)) {
+	if !s.Mark(testMarkToken, testMarkAnswer, time.Now().Add(time.Minute)) {
 		t.Fatal("Mark rejected a fresh mark")
 	}
 	s.mu.Lock()
 	s.httpMark.until = time.Now().Add(-time.Second)
 	s.mu.Unlock()
-	req, err := http.NewRequest(http.MethodGet, url+"/.well-known/acme-challenge/"+hex.EncodeToString(token), nil)
-	if err != nil {
-		t.Fatal(err)
+	if status, _ := getMark(t, url, "unmatched.example", tcpcheck.MarkPath(testMarkToken)); status != http.StatusNotFound {
+		t.Fatalf("expired mark status = %d, want 404", status)
 	}
-	req.Host = "unmatched.example"
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expired mark status = %d, want 404", resp.StatusCode)
-	}
-	if !s.Mark([]byte("abcdef0123456789"), answer, time.Now().Add(time.Minute)) {
+	if !s.Mark([]byte("abcdef0123456789abcdef0123456789"), testMarkAnswer, time.Now().Add(time.Minute)) {
 		t.Fatal("expired mark kept the one-mark slot busy")
 	}
 }
 
 func TestHTTP01MarkBusyWhileAnotherMarkIsActive(t *testing.T) {
 	s, _ := markTestSource(t)
-	if !s.Mark([]byte("0123456789abcdef"), []byte("fedcba9876543210"), time.Now().Add(time.Minute)) {
+	if !s.Mark(testMarkToken, testMarkAnswer, time.Now().Add(time.Minute)) {
 		t.Fatal("first mark was rejected")
 	}
-	if s.Mark([]byte("abcdef0123456789"), []byte("0123456789abcdef"), time.Now().Add(time.Minute)) {
+	if s.Mark([]byte("abcdef0123456789abcdef0123456789"), testMarkAnswer, time.Now().Add(time.Minute)) {
 		t.Fatal("second concurrent mark replaced the first")
 	}
+}
+
+func TestHTTP01MarkRejectsTheWrongSize(t *testing.T) {
+	s, _ := markTestSource(t)
+	if s.Mark(testMarkToken[:16], testMarkAnswer[:16], time.Now().Add(time.Minute)) {
+		t.Fatal("a 16 byte mark was armed")
+	}
+}
+
+func getMark(t *testing.T, baseURL, host, path string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, baseURL+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = host
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, string(body)
 }
 
 func markTestSource(t *testing.T) (*Source, string) {

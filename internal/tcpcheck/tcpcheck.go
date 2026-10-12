@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,8 +33,19 @@ const (
 	VerdictRefused = "refused"
 	VerdictTimeout = "timeout"
 	MaxTargets     = 8
-	markSize       = 16
+	// MarkSize is the length of a mark's token and of its answer in bytes (Let's Encrypt's token is 32 bytes).
+	MarkSize = 32
 )
+
+// MarkPath is the request path of an HTTP-01 mark: Let's Encrypt's own, with the base64url token.
+func MarkPath(token []byte) string {
+	return "/.well-known/acme-challenge/" + base64.RawURLEncoding.EncodeToString(token)
+}
+
+// MarkBody is the response body of a mark, shaped like an ACME key authorization: <token>.<base64url of the answer>.
+func MarkBody(token, answer []byte) []byte {
+	return []byte(base64.RawURLEncoding.EncodeToString(token) + "." + base64.RawURLEncoding.EncodeToString(answer))
+}
 
 var (
 	ErrBadParams       = errors.New("tcpcheck: bad parameters")
@@ -56,6 +68,7 @@ type Target struct {
 }
 
 type probeOptions struct {
+	resolve        func(context.Context, string) (netip.Addr, error) // nil = resolve
 	rootCAs        *x509.CertPool
 	connectTimeout time.Duration
 	requestTimeout time.Duration
@@ -77,7 +90,7 @@ func Validate(host string, targets []Target) error {
 		seen[target.Port] = struct{}{}
 		switch target.Kind {
 		case KindHTTPMark:
-			if len(target.Token) != markSize || len(target.Answer) != markSize || target.SNI != "" || target.PinSHA256 != "" {
+			if len(target.Token) != MarkSize || len(target.Answer) != MarkSize || target.SNI != "" || target.PinSHA256 != "" {
 				return ErrBadParams
 			}
 		case KindTLS:
@@ -119,7 +132,13 @@ func probe(ctx context.Context, host string, targets []Target, options probeOpti
 	if options.requestTimeout <= 0 {
 		options.requestTimeout = defaultRequestTimeout
 	}
-	ip, err := resolve(ctx, host)
+	lookup := options.resolve
+	if lookup == nil {
+		lookup = resolve
+	}
+	resolveCtx, stopResolve := context.WithTimeout(ctx, options.connectTimeout)
+	ip, err := lookup(resolveCtx, host)
+	stopResolve()
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", nil, ctx.Err()
@@ -149,6 +168,10 @@ func probe(ctx context.Context, host string, targets []Target, options probeOpti
 		}()
 	}
 	wg.Wait()
+	// a cancelled run has only timeouts to show, and those are not verdicts about the port
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
 	return family, verdicts, nil
 }
 
@@ -169,7 +192,7 @@ func probeHTTPMark(ctx context.Context, dialer *net.Dialer, addr, host string, t
 	}}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	u := url.URL{Scheme: "http", Host: addr, Path: "/.well-known/acme-challenge/" + hex.EncodeToString(target.Token)}
+	u := url.URL{Scheme: "http", Host: addr, Path: MarkPath(target.Token)}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return VerdictOther
@@ -181,11 +204,12 @@ func probeHTTPMark(ctx context.Context, dialer *net.Dialer, addr, host string, t
 		return verdictForError(err)
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(target.Answer)+1)))
+	want := MarkBody(target.Token, target.Answer)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(want)+1)))
 	if err != nil {
 		return verdictForError(err)
 	}
-	if resp.StatusCode == http.StatusOK && bytes.Equal(body, target.Answer) {
+	if resp.StatusCode == http.StatusOK && bytes.Equal(body, want) {
 		return VerdictOurs
 	}
 	return VerdictOther
@@ -269,6 +293,9 @@ func resolve(ctx context.Context, host string) (netip.Addr, error) {
 	return ips[0].Unmap(), nil
 }
 
+// unsupportedDestination refuses addresses that are no node: unspecified, multicast, broadcast and link-local unicast
+// (169.254.0.0/16 holds cloud metadata services). Loopback stays: the panel may run on the node's own host.
 func unsupportedDestination(ip netip.Addr) bool {
-	return !ip.IsValid() || ip.IsUnspecified() || ip.IsMulticast() || ip == netip.AddrFrom4([4]byte{255, 255, 255, 255})
+	return !ip.IsValid() || ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() ||
+		ip == netip.AddrFrom4([4]byte{255, 255, 255, 255})
 }

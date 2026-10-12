@@ -355,14 +355,15 @@ package mistgate.agent.v1;
 //   - CAPABILITY GATE. An agent lists "tcpcheck/1" in Hello.capabilities. The panel sends HttpMark to the target and
 //     TcpProbe to the sender ONLY to a stream that listed it.
 //   - ARM (target, port 80). HttpMark arms ONE one-shot mark in the agent's HTTP-01 listener: a request for
-//     /.well-known/acme-challenge/<hex of token>, whatever its Host, is answered 200 with the answer bytes once, then the
-//     mark is gone; it also expires after hold_s. That is Let's Encrypt's own path, so a provider filter on it shows up
+//     /.well-known/acme-challenge/<base64url of token>, whatever its Host, is answered 200 once with the body
+//     <base64url of token>.<base64url of answer> (the shape of an ACME key authorization, unpadded), then the mark is
+//     gone; it also expires after hold_s. That is Let's Encrypt's own path and shape, so a provider filter on it shows up
 //     too, and no fixed path marks the node. Answer: CommandResult{ok, params{"http01": "serving" | "busy" | "off"}}.
 //     busy = the node has an ACME name but another program holds :80; off = the node has no ACME name, :80 is unused.
 //     A second arm while a mark is armed is ok=false, error busy. A mark lost to an agent restart reads as "other".
-//   - PROBE (sender). TcpProbe resolves host (IPv4 first; unspecified, multicast and broadcast are refused) and tests
-//     every target in parallel: kind "http_mark" sends the GET above (Host = host) and is "ours" only on status 200 with
-//     exactly the answer; kind "tls" does a TLS handshake with SNI = sni and is "ours" when the chain is valid for the
+//   - PROBE (sender). TcpProbe resolves host (IPv4 first, within 5 s; unspecified, multicast, broadcast and link-local
+//     unicast are refused) and tests every target in parallel: kind "http_mark" sends the GET above (Host = host) and is
+//     "ours" only on status 200 with exactly the body above; kind "tls" does a TLS handshake with SNI = sni and is "ours" when the chain is valid for the
 //     SNI (system roots), or when the leaf sha256 equals pin_sha256 (a self-signed listener). Redirects are not followed.
 //     Verdicts per port: ours | other (answered, but not us) | refused | timeout. Caps: 1-8 targets, 5 s to connect,
 //     8 s per port, 4 concurrent probes. Answer: CommandResult{ok, params{"family": "4" | "6", "t<port>": verdict}}.
@@ -856,9 +857,10 @@ message UdpSend {
 // CommandResult: ok with params{"http01": "serving" | "busy" | "off"}, or error busy while another mark is armed.
 message HttpMark {
   string request_id = 1;
-  // 16 random bytes: the request path is /.well-known/acme-challenge/<lower-case hex of token>.
+  // 32 random bytes: the request path is /.well-known/acme-challenge/<base64url of token>, unpadded (Let's Encrypt's own
+  // token size and alphabet).
   bytes token = 2;
-  // 16 random bytes: the response body, status 200.
+  // 32 random bytes: the response body, status 200, is <base64url of token>.<base64url of answer>.
   bytes answer = 3;
   // The mark expires after this many seconds (1-60).
   uint32 hold_s = 4;
@@ -882,9 +884,9 @@ message TcpTarget {
   string sni = 3;
   // tls: lower-case hex sha256 of the leaf certificate the node reported; "" = trust only a valid chain.
   string pin_sha256 = 4;
-  // http_mark: 16 bytes.
+  // http_mark: 32 bytes.
   bytes token = 5;
-  // http_mark: 16 bytes, the expected body.
+  // http_mark: 32 bytes; the expected body is <base64url of token>.<base64url of answer>.
   bytes answer = 6;
 }
 

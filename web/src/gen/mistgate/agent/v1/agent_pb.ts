@@ -1523,14 +1523,15 @@ export type HttpMark = Message<"mistgate.agent.v1.HttpMark"> & {
   requestId: string;
 
   /**
-   * 16 random bytes: the request path is /.well-known/acme-challenge/<lower-case hex of token>.
+   * 32 random bytes: the request path is /.well-known/acme-challenge/<base64url of token>, unpadded (Let's Encrypt's own
+   * token size and alphabet).
    *
    * @generated from field: bytes token = 2;
    */
   token: Uint8Array;
 
   /**
-   * 16 random bytes: the response body, status 200.
+   * 32 random bytes: the response body, status 200, is <base64url of token>.<base64url of answer>.
    *
    * @generated from field: bytes answer = 3;
    */
@@ -1616,14 +1617,14 @@ export type TcpTarget = Message<"mistgate.agent.v1.TcpTarget"> & {
   pinSha256: string;
 
   /**
-   * http_mark: 16 bytes.
+   * http_mark: 32 bytes.
    *
    * @generated from field: bytes token = 5;
    */
   token: Uint8Array;
 
   /**
-   * http_mark: 16 bytes, the expected body.
+   * http_mark: 32 bytes; the expected body is <base64url of token>.<base64url of answer>.
    *
    * @generated from field: bytes answer = 6;
    */

@@ -1110,8 +1110,9 @@ export type CheckPortsResponse = Message<"mistgate.admin.v1.CheckPortsResponse">
 
   /**
    * The TCP half of the same run (design/vless.md section 7.4): port 80 when the node has an ACME name, the Hysteria2
-   * site port, and the VLESS ports, at most 8, 80 first. Empty when the node has nothing to probe, or the UDP part
-   * stopped the run (node_offline, no_sender). A row that could not be probed has verdict "" and a reason.
+   * site port, and the VLESS ports, at most 8, 80 first. Empty when the node has nothing to probe, is offline, or has no
+   * sender for the TCP part (no other node lists "tcpcheck/1" and the panel does not send); the UDP part's error_code
+   * does not decide it, except node_offline. A row that could not be probed has verdict "" and a reason.
    *
    * @generated from field: repeated mistgate.admin.v1.TcpCheck tcp = 4;
    */
