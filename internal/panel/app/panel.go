@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"time"
 
@@ -248,8 +249,11 @@ func Build(c Config) (*Panel, error) {
 	// Node-agent updates: the signed bundle in <data-dir>/dist, its distribution through the agent endpoint and
 	// the staged rollout. The installation's release key is kept in dataDir; a binary with another compiled-in key
 	// trusts nothing until the owner runs `mistgate release trust-key`.
+	// The edge (and any js build, with or without a node link) has no data directory: its DataDir is a placeholder that
+	// does not exist. It uses the compiled-in key as it is and never tries release.pub.
+	onEdge := edge || runtime.GOOS == "js"
 	relKey, err := buildinfo.ReleasePublicKey()
-	if c.DataDir != "" {
+	if c.DataDir != "" && !onEdge {
 		relKey, err = buildinfo.LoadReleasePublicKey(c.DataDir)
 	}
 	switch {
@@ -267,6 +271,11 @@ func Build(c Config) (*Panel, error) {
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
 	var nodeBundleSource update.NodeBundleSource
+	if onEdge {
+		// Node updates are not available on the edge: neither the updates service nor the bundle source gets the key,
+		// so no rollout or bundle sync can start there by accident (the RPCs refuse as well).
+		relKey = nil
+	}
 	if len(relKey) > 0 && c.DataDir != "" {
 		nodeBundleSource = update.NewGitHubNodeBundleSource(update.GitHubNodeBundleConfig{
 			DataDir: c.DataDir, Key: relKey, Log: log,
