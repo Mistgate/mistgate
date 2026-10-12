@@ -18,7 +18,7 @@ Mistgate — панель для собственного VPN-флота: оди
 ## С чего начать новому администратору
 
 1. [Обзор](getting-started/overview.md) и [Требования](getting-started/requirements.md): что такое панель, нода и профиль и какие серверы нужны.
-2. [Установка панели](getting-started/install-panel.md) из официального релиза — вручную или промптом установки из [инструкции для AI-агента](getting-started/ai-agents.md).
+2. [Установка панели](getting-started/install-panel.md) из официального релиза — вручную или промптом установки из [инструкции для AI-агента](getting-started/ai-agents.md). Или, в предварительной версии, [на Cloudflare Workers](getting-started/install-edge.md) без собственного сервера.
 3. [Установка ноды по SSH](getting-started/ssh-install.md) или [добавление ноды](getting-started/add-node.md) командой, которую вы выполните сами.
 4. [Первые пользователи](getting-started/first-users.md): профиль на ноде, группа, пользователь, ссылка подписки.
 5. [Здоровье](operations/health.md), [Безопасность](operations/security.md) и [зашифрованные бэкапы](operations/backups.md) — до того, как раздавать ссылки другим людям.
@@ -31,6 +31,7 @@ Mistgate — панель для собственного VPN-флота: оди
 - [Обзор](getting-started/overview.md): что такое Mistgate и его понятия: панель, нода, профиль, сервер на ноде, пользователь, группа, устройство, подписка, страница пользователя.
 - [Требования](getting-started/requirements.md): что нужно панели и нодам и что нужно для сборки из исходников.
 - [Установка панели](getting-started/install-panel.md): от чистого Linux-сервера до аккаунта владельца в админке.
+- [Установка Cloudflare-версии](getting-started/install-edge.md): панель на Cloudflare Workers вместо сервера, командой `mistgate edge deploy` (предварительная версия).
 - [Добавление ноды](getting-started/add-node.md): два способа добавить ноду, команда для ручной установки и удаление ноды.
 - [Установка ноды по SSH](getting-started/ssh-install.md): панель сама ставит агента; задания установки и сохранённый SSH-доступ.
 - [Инструкция для AI-агента](getting-started/ai-agents.md): готовые промпты, чтобы установить панель, вести флот через MCP и дорабатывать код.

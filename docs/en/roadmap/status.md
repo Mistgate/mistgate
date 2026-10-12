@@ -40,7 +40,7 @@ Mistgate is in **beta**; the current release is `v0.1.33`. It runs in production
 
 - Field testing of the current releases in production: torrent protection, the SSH installation and recovery, signed panel and node releases.
 - VLESS REALITY with RAW + Vision and with XHTTP: the node engine on xray-core is merged; VLESS profiles and subscriptions in the panel are **Planned**.
-- A free edition of the panel that runs on Cloudflare Workers: in development, not in a release.
+- The edition of the panel that runs on Cloudflare Workers: a preview, not in a release. `mistgate edge deploy` installs it and is tested against a simulated Cloudflare; the first run on a real account is still ahead. Backups, Telegram alerts, MCP, tunnel checks and node and panel updates are not available in it yet. See [Install the Cloudflare edition](../getting-started/install-edge.md).
 
 ## Next
 

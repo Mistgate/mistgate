@@ -5,6 +5,8 @@ description: Download or build Mistgate, prepare the panel with mistgate setup, 
 
 This page takes a fresh Linux server to a running panel with an owner account. The examples use `panel.example.com`; check [Requirements](requirements.md) first. Commands on the panel server run as root. An AI agent with SSH access to the server can do the same steps for you: see the install prompt in the [AI agent guide](ai-agents.md).
 
+> **Note:** this page is for a panel on a server of your own. To run the panel on Cloudflare Workers instead, with no server (a preview), see [Install the Cloudflare edition](install-edge.md).
+
 ## One-line install
 
 For a fresh Linux server on amd64 or arm64 with systemd, run this as root. The domain must point directly at the server and TCP ports 80 and 443 must be free. Signature verification needs either `openssh-client` with `ssh-keygen -Y verify` support or OpenSSL 3.2 or newer. The installer downloads the latest release, checks the binary against `SHA256SUMS` and the signed panel manifest, then runs setup and installs the systemd service. It does not change firewall rules; if UFW or firewalld is active, it prints the rules to add.

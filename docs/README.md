@@ -21,7 +21,7 @@ The full page list, in reading order, is in [en/index.md](en/index.md) and [ru/i
 **I want to install Mistgate.**
 
 1. [Overview](en/getting-started/overview.md) ([ru](ru/getting-started/overview.md)) and [Requirements](en/getting-started/requirements.md) ([ru](ru/getting-started/requirements.md)).
-2. [Install the panel](en/getting-started/install-panel.md) ([ru](ru/getting-started/install-panel.md)) from the official release, or let an agent do it with the install prompt in the [AI agent guide](en/getting-started/ai-agents.md#install-mistgate-with-an-ai-agent) ([ru](ru/getting-started/ai-agents.md)).
+2. [Install the panel](en/getting-started/install-panel.md) ([ru](ru/getting-started/install-panel.md)) from the official release, or let an agent do it with the install prompt in the [AI agent guide](en/getting-started/ai-agents.md#install-mistgate-with-an-ai-agent) ([ru](ru/getting-started/ai-agents.md)). To run the panel on Cloudflare Workers instead of a server (a preview), see [Install the Cloudflare edition](en/getting-started/install-edge.md) ([ru](ru/getting-started/install-edge.md)).
 3. [Install a node over SSH](en/getting-started/ssh-install.md) ([ru](ru/getting-started/ssh-install.md)), or [add a node by hand](en/getting-started/add-node.md) ([ru](ru/getting-started/add-node.md)).
 4. [First users](en/getting-started/first-users.md) ([ru](ru/getting-started/first-users.md)), then [Security](en/operations/security.md) ([ru](ru/operations/security.md)) and [encrypted backups](en/operations/backups.md) ([ru](ru/operations/backups.md)).
 

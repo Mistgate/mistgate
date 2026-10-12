@@ -2,7 +2,7 @@
 
 The thin TypeScript shell that runs the Mistgate panel on Cloudflare Workers: the Go panel compiled to `js/wasm`
 (`cmd/mistgate-edge`) does everything, this Worker only starts it once per isolate and converts `Request` and `Response`
-to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`.
+to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`. To deploy without Wrangler, use `mistgate edge deploy` (`docs/en/getting-started/install-edge.md`); the Wrangler templates below are for development and hand-made deployments.
 
 - `src/index.ts`: every request goes to the panel (`mgPanel.fetch`); the Worker does not know the secret admin path.
   If the panel cannot start, the answer is 503 and the next request tries again.

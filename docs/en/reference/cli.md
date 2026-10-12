@@ -22,6 +22,8 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `release build` | Builds release binaries the one reproducible way (CI and `make build` use it). |
 | `release sign` | Rebuilds the binaries and the edge bundle from the release tag, then signs the node bundle, the panel manifest and the edge manifest. |
 | `release trust-key` | On the panel server, after a key rotation: makes the binary's release key the installation's key. |
+| `edge deploy` | Deploys the Cloudflare edition (the panel on Cloudflare Workers) to your Cloudflare account. A preview. |
+| `edge setup-link` | Prints the one-time setup link from the key file that `edge deploy` wrote. |
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
 `mistgate` exits with 0 on success, 1 on an error (printed as `mistgate: <error>`) and 2 for an unknown command or a missing one.
@@ -219,6 +221,15 @@ mistgate release trust-key [--data-dir DIR] [--dev]
 ```
 
 Run on the panel server, as the panel's service user or root, after you rotated the release key and installed a panel built with the new key. It writes the key compiled into this binary to `<data-dir>/release.pub` and prints the old and new fingerprints. Until then a panel whose compiled-in key differs from `release.pub` logs an error and trusts no bundle. Restart the panel afterwards. `--data-dir` falls back to `MISTGATE_DATA_DIR`, then `/var/lib/mistgate`; `--dev` (or `MISTGATE_DEV`) means `./.data`. A binary built without a release key refuses.
+
+### mistgate edge
+
+```text
+mistgate edge deploy --host HOST [--name NAME] [--d1-location LOC] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
+mistgate edge setup-link --file FILE
+```
+
+`edge deploy` creates the D1 database and the two Worker scripts of the Cloudflare edition, attaches `HOST` as a custom domain and prints the admin address and a one-time setup link. It reads the API token only from `CLOUDFLARE_API_TOKEN`, and writes the keys of the new panel to `mistgate-edge-<name>.json` in the current directory: back that file up. `--dry-run` only reads from Cloudflare and prints the plan; `--resume` continues a run that stopped. Run again without `--resume`, it updates the deployment. `edge setup-link` prints the stored setup link of a key file. Every flag, the token's permissions and the first sign-in are in [Install the Cloudflare edition](../getting-started/install-edge.md).
 
 ### mistgate version
 

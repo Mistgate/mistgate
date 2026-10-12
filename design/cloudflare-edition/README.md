@@ -1,6 +1,6 @@
 # Mistgate edition on Cloudflare: specification
 
-Status: ACCEPTED as the plan (2026-10-06); phase 1 in progress; the phase 3 item "SSH provisioning" is built (2026-10-12, [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)), pending a real Cloudflare deploy. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
+Status: ACCEPTED as the plan (2026-10-06); phase 1 in progress; the phase 3 item "SSH provisioning" is built (2026-10-12, [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)), pending a real Cloudflare deploy; the installer `mistgate edge deploy` and its install page (`docs/en/getting-started/install-edge.md`) are written (2026-10-12), also pending a real account. Measured facts behind it: [`SPIKE.md`](SPIKE.md).
 Decisions with their reasons: [`../adr/`](../adr/). The agent link and session core (step 6b-3), with its status and the
 next steps: [`AGENT-LINK.md`](AGENT-LINK.md). A FULL Cloudflare edition kept in parity with the VPS edition: same
 features, same release, ONE version number. This document says how to get there; it is not an implementation.

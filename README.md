@@ -48,7 +48,7 @@ Two static Go binaries, one for the panel and one for the node agent. SQLite and
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
 
-> **Coming soon, not in a release yet:** VLESS REALITY and XHTTP (the node engine is merged), Xray JSON and sing-box subscriptions, a full Telegram bot for the fleet and for users, and a free edition of the panel that runs on Cloudflare Workers (in development).
+> **Coming soon, not in a release yet:** VLESS REALITY and XHTTP (the node engine is merged), Xray JSON and sing-box subscriptions, a full Telegram bot for the fleet and for users, and a free edition of the panel that runs on Cloudflare Workers (a [preview](docs/en/getting-started/install-edge.md): not run on a real account yet).
 
 ## Screenshots
 
@@ -110,7 +110,7 @@ Others are ahead in protocol breadth, community size, HWID limits and full Teleg
 
 Mistgate is in beta. The current release is [`v0.1.33`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
-Next: VLESS REALITY and XHTTP, Xray JSON and sing-box subscriptions, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
+Next: VLESS REALITY and XHTTP, Xray JSON and sing-box subscriptions, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)). Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 
 ## Documentation
 

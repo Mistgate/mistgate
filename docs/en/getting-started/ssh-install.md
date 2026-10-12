@@ -81,7 +81,7 @@ After a successful installation the panel keeps the SSH login and password, encr
 
 ## On the Cloudflare edition
 
-The edge edition (the panel on Cloudflare Workers) installs nodes over SSH too. The wizard, the steps, the install manager and the saved access are the same; the installs run in a second Worker script, `mistgate-edge-provision`, that is deployed with the panel (see `edge/worker/README.md`). What differs:
+The edge edition (the panel on Cloudflare Workers) installs nodes over SSH too. The wizard, the steps, the install manager and the saved access are the same; the installs run in a second Worker script, `mistgate-edge-provision`, that `mistgate edge deploy` deploys with the panel (see [Install the Cloudflare edition](install-edge.md)). What differs:
 
 - **The panel connects from Cloudflare's network**, not from a server you know and not from your computer. For the time of the install SSH on the new server must accept inbound TCP from the internet on its port, in the provider firewall or security group and in the host firewall. A rule that allows only your own IP, or one fixed panel address, makes the check time out: Cloudflare does not publish the addresses a Worker connects from. You change or reveal the saved password later over SSH too, so open it again for that.
 - **The agent comes from the signed release on GitHub** that matches the panel's version, and the node enrols over the panel's public address. A panel build that is not a release has no trusted agent and the wizard says so.

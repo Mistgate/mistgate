@@ -17,6 +17,8 @@ Mistgate needs one Linux server for the panel, one or more Linux servers for the
 | Storage | The data directory, `/var/lib/mistgate` by default: one SQLite database, the master key, the node bundle and a few small files. |
 | Other software | None. The panel is one static binary. Only its self-update calls systemd (`systemctl`, `systemd-run`). |
 
+> **Note:** the Cloudflare edition (a preview) needs no panel server; its own requirements, Workers Paid and a domain on Cloudflare DNS, are in [Install the Cloudflare edition](install-edge.md).
+
 > **Tip:** keep the panel on a server of its own. A node on the same host would compete with the panel for TCP 443 (Hysteria2 runs an HTTPS site there by default) and TCP 80.
 
 ## Node servers

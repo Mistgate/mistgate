@@ -42,6 +42,10 @@ The decoy site, the admin and the subscriptions can sit behind Cloudflare's prox
 
 Cloudflare then sees the admin's traffic, including its secret address. The Cloudflare Turnstile check at sign-in is separate from this and works either way (see [Security](../operations/security.md)). See [Configuration](configuration.md) for the flags and [Install the panel](../getting-started/install-panel.md) for running the panel behind a reverse proxy.
 
+## Can the panel run on Cloudflare Workers, with no server?
+
+As a preview, yes: `mistgate edge deploy` puts the panel on two Workers and a D1 database in your Cloudflare account. It needs Workers Paid and a domain on Cloudflare DNS, it has not been run on a real account yet, and backups, Telegram alerts, MCP, tunnel checks and updates are not available in it. See [Install the Cloudflare edition](../getting-started/install-edge.md).
+
 ## Can I migrate from another panel?
 
 There is no migration tool. Set up the panel, add the servers as nodes and create the users again. On a server that ran another VPN stack, the doctor's **Leftovers of other VPNs** and **Foreign firewall rules** checks show what is still there (x-ui, Xray, old WireGuard interfaces, foreign nftables rules); removing it is your decision.

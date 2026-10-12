@@ -54,7 +54,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Torrent blocking | yes: in the kernel; an event keeps what matched and the destination port, no addresses | ? | ? | ? | yes: a plugin | ? | ? |
 | Decoy site | yes | ? | ? | ? | ? | ? | ? |
 | Signed releases | yes: offline key, reproducible, nodes install only signed builds | partial: `.sha256` files | ? | ? | ? | ? | ? |
-| Edition on Cloudflare Workers | in development | no | no | no | no | no | no |
+| Edition on Cloudflare Workers | preview: [not yet run on a real Cloudflare account](../getting-started/install-edge.md) | no | no | no | no | no | no |
 | GitHub stars | 1 | about 47.7k | about 7.4k | about 2.7k | about 5.2k | about 9.3k | about 10.0k |
 | Latest release | v0.1.32 | v3.9.0 (2026-10-03) | v0.8.4 (2025-01-09) | v5.4.1 (2026-09-12) | 3.4.5 (2026-10-06) | v13.0.3 (2026-09-26) | v1.6.4 (2026-10-07) |
 

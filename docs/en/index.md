@@ -18,7 +18,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 ## Reading order for a new admin
 
 1. [Overview](getting-started/overview.md) and [Requirements](getting-started/requirements.md): what a panel, a node and a profile are, and what servers you need.
-2. [Install the panel](getting-started/install-panel.md) from the official release, by hand or with the install prompt of the [AI agent guide](getting-started/ai-agents.md).
+2. [Install the panel](getting-started/install-panel.md) from the official release, by hand or with the install prompt of the [AI agent guide](getting-started/ai-agents.md). Or, as a preview, [on Cloudflare Workers](getting-started/install-edge.md) with no server of your own.
 3. [Install a node over SSH](getting-started/ssh-install.md), or [add a node](getting-started/add-node.md) with a command you run yourself.
 4. [First users](getting-started/first-users.md): a profile on the node, a group, a user, a subscription link.
 5. [Health](operations/health.md), [Security](operations/security.md) and [encrypted backups](operations/backups.md) before you give links to other people.
@@ -31,6 +31,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Overview](getting-started/overview.md): what Mistgate is and its concepts: panel, node, profile, server on a node, user, group, device, subscription, user page.
 - [Requirements](getting-started/requirements.md): what the panel and the nodes need, and what you need to build from source.
 - [Install the panel](getting-started/install-panel.md): from a fresh Linux server to the owner account in the admin.
+- [Install the Cloudflare edition](getting-started/install-edge.md): the panel on Cloudflare Workers instead of a server, with `mistgate edge deploy` (a preview).
 - [Add a node](getting-started/add-node.md): the two ways to add a node, the manual install command, and removing a node.
 - [Install a node over SSH](getting-started/ssh-install.md): the panel installs the agent itself; install jobs and the saved SSH access.
 - [AI agent guide](getting-started/ai-agents.md): ready prompts to install the panel, run the fleet through MCP and contribute to the code.
