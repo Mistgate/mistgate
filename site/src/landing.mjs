@@ -19,6 +19,7 @@ export const LANDING = {
     lead: "For family, friends, a community or a small team. Install one panel, add your servers from the browser and send each person one link. Mistgate keeps the servers configured and checks them the way an app does, so you hear about an outage first.",
     install: "Install the panel", how: "How it works",
     facts: ["Hysteria2", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker", "English · Русский"],
+    shotAlt: "The Mistgate admin: nodes with their health and throughput, an open problem and recent events",
     fitH: "How it fits together",
     fitP: "Two programs: the panel and an agent on every server. A person's app talks to the panel only to fetch its link; VPN traffic goes straight to the node.",
     fitAlt: "How Mistgate fits together: you use the admin, a person's app fetches its link from the panel, VPN traffic goes from the app to the node and out to the internet, and the node keeps one connection to the panel",
@@ -69,6 +70,7 @@ export const LANDING = {
     lead: "Для семьи, друзей, сообщества или небольшой команды. Вы ставите одну панель, добавляете серверы из браузера и отправляете каждому человеку одну ссылку. Mistgate держит серверы настроенными и проверяет их так же, как приложение, поэтому о сбое вы узнаёте первыми.",
     install: "Установить панель", how: "Как это устроено",
     facts: ["Hysteria2", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker", "English · Русский"],
+    shotAlt: "Админка Mistgate: ноды с их состоянием и скоростью, открытая проблема и последние события",
     fitH: "Как это устроено",
     fitP: "Две программы: панель и агент на каждом сервере. С панелью приложение человека говорит, только когда забирает ссылку; VPN-трафик идёт прямо на ноду.",
     fitAlt: "Как устроен Mistgate: вы работаете в админке, приложение человека забирает ссылку у панели, VPN-трафик идёт от приложения на ноду и в интернет, а нода держит одно соединение с панелью",
@@ -131,6 +133,7 @@ export function renderLanding({ lang, t, nav, section }) {
 <p class="hero__lead">${esc(L.lead)}</p>
 <div class="hero__cta"><a class="btn btn--primary" href="${url("getting-started/install-panel")}">${esc(L.install)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="${url("getting-started/overview")}">${esc(L.how)}</a><a class="btn btn--secondary" href="${GITHUB}" rel="noopener">GitHub${icon("externalLink", 14)}</a></div>
 <ul class="facts">${L.facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+<figure class="shot"><img class="shot__light" src="/img/overview-light-${lang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"><img class="shot__dark" src="/img/overview-dark-${lang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"></figure>
 </section>`;
 
   const fit = `<section class="home-sec" aria-labelledby="fit"><h2 id="fit">${esc(L.fitH)}</h2><p class="home-p">${esc(L.fitP)}</p>

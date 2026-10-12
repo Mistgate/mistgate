@@ -30,6 +30,9 @@ const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) }
 out(assets.css, css);
 out(assets.js, js);
 for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f)) { mkdirSync(join(DIST, "fonts"), { recursive: true }); copyFileSync(join(BRAND, "fonts", f), join(DIST, "fonts", f)); }
+// the admin screenshot on the home page: the README's own pictures, light and dark, per language
+const SHOTS = join(ROOT, "..", "docs", "images", "readme");
+for (const f of readdirSync(SHOTS)) if (/^overview-(light|dark)-(en|ru)\.webp$/.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));
 out("mistgate-badge.svg", badge);
 out("favicon.svg", badge);
