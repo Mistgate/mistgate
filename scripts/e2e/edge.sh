@@ -12,7 +12,9 @@
 # The Worker is copied into $WORK/worker and installed there: the repo's own edge/worker is never written to.
 #
 # Two scripts run in the one `wrangler dev`: the main Worker and mistgate-edge-provision (the Provisioner Durable Object that
-# installs nodes over SSH). Step 2d drives the SSH wizard through both against a real OpenSSH sshd in this namespace.
+# installs nodes over SSH). The SSH steps (2d, 8b, 10b; scripts/e2e/sshnode.sh) drive the wizard and real installs through
+# both against a real OpenSSH sshd in this namespace. The wasm is built as a release would be: a tag, a release key, and the
+# download base pointed (-X update.releaseDownloadBase) at a fake release served from this namespace and signed with that key.
 
 EDGE_HOST=de1.example.com
 EDGE_NS=""
@@ -23,7 +25,6 @@ edge_note_ns() { EDGE_NS=$(ip netns identify $$); }
 # its workerd behind). Only processes of those two programs, never anything else.
 edge_reap() {
   local p exe
-  [ -z "${EDGE_RUN_SSHD_MADE:-}" ] || rmdir /run/sshd 2>/dev/null || true # the privilege separation directory sshd insists on
   [ -n "$EDGE_NS" ] || return 0
   for p in $(ip netns pids "$EDGE_NS" 2>/dev/null); do
     [ "$p" != $$ ] || continue
@@ -89,7 +90,10 @@ edge_tls() { # a CA and a leaf for de1.example.com, valid two days
 edge_build() {
   local w=$WORK/worker src=$REPO/edge/worker
   mkdir -p "$w/dist"
-  GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o "$w/dist/panel.wasm" ./cmd/mistgate-edge
+  GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
+    -o "$w/dist/panel.wasm" ./cmd/mistgate-edge
+  # a -X on a variable the linker does not see as a constant string is silently ignored: look for the value in the program
+  grep -qa "http://127.0.0.1:$REL_PORT/" "$w/dist/panel.wasm" || die "the wasm does not carry the fake release's address: -X update.releaseDownloadBase did not take"
   cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$w/dist/wasm_exec.js"
   cp -r "$src/src" "$w/src"
   cp "$src/package.json" "$src/pnpm-lock.yaml" "$src/tsconfig.json" "$w/"
@@ -182,49 +186,108 @@ edge_workerd_rss() { vmrss_mb "$(edge_workerd_pid)"; }
 # path holds the secret prefixes. That is wrangler's dev server, not the panel; the rest is what the panel logs.
 edge_worker_log() { grep -vE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" || true; }
 
-# ---------------------------------------------------------------- a real sshd for the SSH wizard
+# ---------------------------------------------------------------- the fake release and the load for the SSH installs
 
-EDGE_SSH_IP=45.67.89.10 # a public-looking address (the panel refuses private ones); it lives on this namespace's lo only
-EDGE_SSH_USER=mgsshtest # a login of this run: private copies of passwd and shadow are mounted over the real ones, in this mount namespace only
+SSHN_BI=github.com/mistgate/mistgate/internal/buildinfo
+SSHN_UPD=github.com/mistgate/mistgate/internal/panel/update
+SSHN_SQL=edge_sql
+SSHN_CLOSED_CODE=ssh_target_refused # the Worker's sockets cannot tell a closed port from a refusal, and say so
 
-# edge_ssh_up: OpenSSH on $EDGE_SSH_IP:22 with password login for one throwaway user. The system sshd stays as it is (masked):
-# this one has a configuration file of its own, runs in this network namespace and dies with it.
-edge_ssh_up() {
-  local d=$WORK/sshd
-  [ -x /usr/sbin/sshd ] || die "step 2d needs openssh-server (/usr/sbin/sshd); apt-get install openssh-server (the system service stays masked)"
-  mkdir -p "$d"
-  ssh-keygen -q -t ed25519 -N '' -f "$d/host_ed25519" || die "ssh-keygen failed"
-  EDGE_SSH_FP=$(ssh-keygen -lf "$d/host_ed25519.pub" | awk '{print $2}')
-  EDGE_SSH_PASS=$(openssl rand -hex 12)
-  SECRETS+=("$EDGE_SSH_PASS")
-  cp /etc/passwd "$d/passwd"
-  cp /etc/shadow "$d/shadow"
-  printf '%s:x:61999:65534::%s:/bin/sh\n' "$EDGE_SSH_USER" "$d" >>"$d/passwd"
-  printf '%s:%s:19000:0:99999:7:::\n' "$EDGE_SSH_USER" "$(printf %s "$EDGE_SSH_PASS" | openssl passwd -6 -stdin)" >>"$d/shadow"
-  mount --bind "$d/passwd" /etc/passwd
-  mount --bind "$d/shadow" /etc/shadow
-  [ -d /run/sshd ] || { mkdir -p /run/sshd && EDGE_RUN_SSHD_MADE=1; }
-  cat >"$d/sshd_config" <<CONF
-Port 22
-ListenAddress $EDGE_SSH_IP
-HostKey $d/host_ed25519
-PidFile $d/sshd.pid
-AuthorizedKeysFile none
-PasswordAuthentication yes
-KbdInteractiveAuthentication no
-PubkeyAuthentication no
-UsePAM no
-PermitRootLogin no
-AllowUsers $EDGE_SSH_USER
-StrictModes no
-LogLevel VERBOSE
-CONF
-  ip addr add "$EDGE_SSH_IP/32" dev lo
-  /usr/sbin/sshd -t -f "$d/sshd_config" || die "the sshd configuration is not valid"
-  spawn /usr/sbin/sshd -D -e -f "$d/sshd_config" -E "$WORK/sshd.log"
-  EDGE_SSHD_PID=$LAST_PID
-  sshd_listens() { ss -ltn "sport = :22" | grep -q "$EDGE_SSH_IP:22"; }
-  wait_for 15 "sshd to listen on $EDGE_SSH_IP:22" sshd_listens || { tail -n 10 "$WORK/sshd.log" 2>/dev/null; die "sshd did not start"; }
+# edge_release_keys: the run's release key pair (never the owner's) and the port of the fake release, before the wasm is built
+edge_release_keys() {
+  go build -trimpath -o "$BIN/mistgate-tool" ./cmd/mistgate # keygen only
+  go build -trimpath -o "$BIN/signbundle" ./scripts/e2e/signbundle
+  REL_PUB=$("$BIN/mistgate-tool" release keygen --out "$WORK/release.key" | sed -n 's/^public key: //p')
+  [ -n "$REL_PUB" ] || die "release keygen printed no public key"
+  SECRETS+=("$(cat "$WORK/release.key")")
+  REL_PORT=$(free_port tcp)
+}
+
+# edge_release_serve: the agent of the fake release (the tag, the key), signed, served over HTTP from this namespace as a
+# GitHub release download would be. The Provisioner streams it into the SSH upload and checks it against the signed manifest.
+edge_release_serve() {
+  local arch d=$WORK/fake-release
+  arch=$(go env GOARCH)
+  mkdir -p "$WORK/rel/ssh"
+  go build -trimpath -ldflags "-X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.Built=$(date +%s) -X $SSHN_BI.ReleaseKey=$REL_PUB" \
+    -o "$WORK/rel/ssh/mistgate-node-linux-$arch" ./cmd/mistgate-node
+  "$BIN/signbundle" --key "$WORK/release.key" --version "$SSHN_TAG" --built "$(date +%s)" --out "$d/$SSHN_TAG" "$WORK/rel/ssh/mistgate-node-linux-$arch" >>"$WORK/signbundle.log" \
+    || die "signing the fake release failed"
+  SSHN_NODE_BIN=$d/$SSHN_TAG/mistgate-node-linux-$arch
+  SSHN_NODE_BIN_SHA=$(sha256sum "$SSHN_NODE_BIN" | cut -d' ' -f1)
+  cat >"$WORK/fake-release.py" <<'PY'
+import http.server, sys, time
+
+root, port, log = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+
+class H(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *a, **k):
+        super().__init__(*a, directory=root, **k)
+
+    def log_message(self, fmt, *args):
+        with open(log, "a") as f:
+            f.write("%d %s\n" % (int(time.time()), fmt % args))
+
+http.server.ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+PY
+  spawn python3 "$WORK/fake-release.py" "$d" "$REL_PORT" "$WORK/fake-release.log"
+  wait_for 10 "the fake release to answer" curl -sf -o /dev/null "http://127.0.0.1:$REL_PORT/$SSHN_TAG/manifest.json" || die "the fake release server did not start"
+  : >"$WORK/fake-release.log"
+}
+
+# touching the Provisioner's script makes wrangler reload: the runtime restarts, every isolate and object is reset
+sshn_reload_provisioner() {
+  # (not "n": wait_for has a local of that name, and a function it runs sees that one)
+  RELOADS_BEFORE=$(grep -c 'Reloading' "$WORK/wrangler.log" || true)
+  echo "// reload $(date +%s)" >>"$WORK/worker/src/provision-index.ts"
+  reloaded() { [ "$(grep -c 'Reloading' "$WORK/wrangler.log" || true)" -gt "$RELOADS_BEFORE" ]; }
+  wait_for 60 "wrangler to reload the Workers" reloaded || die "wrangler did not reload after provision-index.ts changed"
+}
+
+# The load of another Durable Object and of stateless requests while a job runs in the Provisioner (design 2.6a: in one
+# script the SSH goroutine woke inside a foreign event and the platform refused it): decoy page fetches and admin API
+# calls (stateless requests of the main Worker's Go), a cron tick (it kicks the Provisioner too) and an admin fan-out to
+# the connected agent, over and over, with the agent's own stats frames arriving at its NodeLink object meanwhile. Kept
+# under the public listener's 10 a second (and the subscription's 60 an hour per token, which the earlier steps use up).
+# sshn_load_stop fails on any bad answer or a cross-context error in the log.
+edge_hammer() {
+  local i en=false
+  while [ ! -e "$WORK/hammer.stop" ]; do
+    for i in 1 2 3 4; do
+      ( c=$(edge_get -o /dev/null -w '%{http_code}' "$(edge_url /)" 2>&1) || c=curl-failed; echo "decoy $c" >>"$WORK/hammer.res" ) &
+    done
+    ( c=$(edge_cron 2>&1) || c=cron-failed; echo "cron $c" >>"$WORK/hammer.res" ) &
+    ( api AuthService/Me >/dev/null 2>&1 && echo "admin ok" >>"$WORK/hammer.res" || echo "admin failed" >>"$WORK/hammer.res" ) &
+    ( api UserService/SetUsersEnabled "{\"userIds\":[\"$USER_ID\"],\"enabled\":$en}" >/dev/null 2>&1 && echo "fanout ok" >>"$WORK/hammer.res" || echo "fanout failed" >>"$WORK/hammer.res" ) &
+    [ "$en" = false ] && en=true || en=false
+    wait
+    sleep 1
+  done
+}
+sshn_load_start() {
+  rm -f "$WORK/hammer.stop"
+  : >"$WORK/hammer.res"
+  edge_hammer &
+  HAMMER_PID=$!
+  PIDS+=("$HAMMER_PID")
+}
+sshn_load_stop() {
+  local decoys bad
+  : >"$WORK/hammer.stop"
+  wait "$HAMMER_PID" || true
+  api UserService/SetUsersEnabled "{\"userIds\":[\"$USER_ID\"],\"enabled\":true}" >/dev/null || die "re-enabling alice after the load failed"
+  decoys=$(grep -c '^decoy ' "$WORK/hammer.res" || true)
+  [ "$decoys" -ge 20 ] || die "the load made only $decoys decoy fetches"
+  bad=$(grep -E '^(decoy|cron) ' "$WORK/hammer.res" | grep -vcE '^(decoy|cron) 200$' || true)
+  [ "$bad" = 0 ] || die "$bad request(s) of the load failed: $(sort "$WORK/hammer.res" | uniq -c | tr '
+' ' ')"
+  ! grep -qE '^(admin|fanout) failed' "$WORK/hammer.res" || die "an admin call failed during the load: $(sort "$WORK/hammer.res" | uniq -c | tr '
+' ' ')"
+  ! grep -q 'Cannot perform I/O on behalf of a different' "$WORK/wrangler.log" || die "the Worker log has a cross-context I/O error ('Cannot perform I/O on behalf of a different ...') after the load"
+  ! grep -qiE 'never generate a response|Promise will never complete|hung' "$WORK/wrangler.log" || die "the Worker log reports a hung invocation after the load"
+  node_online || die "the primary node went offline during the load"
+  SSHN_LOAD_SUMMARY="$decoys decoy fetches, $(grep -c '^cron ' "$WORK/hammer.res" || true) cron ticks (all 200), $(grep -c '^admin ok' "$WORK/hammer.res" || true) admin calls and $(grep -c '^fanout ok' "$WORK/hammer.res" || true) fan-outs to the connected agent, its stats frames meanwhile: no cross-context I/O error, no hung invocation"
+  note "load during the job: $SSHN_LOAD_SUMMARY"
 }
 
 # ---------------------------------------------------------------- scenario
@@ -241,11 +304,13 @@ edge_run() {
 
   step "0. build: the wasm panel, the Worker copy, wrangler, the node agent, the hysteria client"
   [ -f web/dist/index.html ] || die "web/dist is missing: build the SPA first (cd web && pnpm build)"
+  edge_release_keys
   edge_build
   go build -trimpath -o "$BIN/mistgate-node" ./cmd/mistgate-node
   NODE_BIN=$BIN/mistgate-node
   build_hysteria
-  pass "built the wasm panel ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped), the Worker copy (installed in the work directory, zero D1 id), the node agent and the hysteria client"
+  edge_release_serve
+  pass "built the wasm panel ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped; tag $SSHN_TAG, a release key and the fake release's address built in), the Worker copy (installed in the work directory, zero D1 id), the node agent, the signed fake release of the agent ($(($(stat -c %s "$SSHN_NODE_BIN") / 1048576)) MB) and the hysteria client"
 
   step "1. wrangler dev: the Worker answers on $EDGE_HOST:$PUB, first admin from the setup token given as SETUP_TOKEN_SHA256 (no link in the log)"
   edge_start_worker
@@ -374,33 +439,9 @@ PY
   PANEL_PID=$(edge_workerd_pid)
   pass "Worker source touched: wrangler reloaded, the agent reconnected as generation $((GEN_BEFORE + 1)), still no full DesiredState, inbound ACTIVE"
 
-  step "2d. install over SSH: the wizard reaches a real OpenSSH through the Worker, the Provisioner object and connect()"
-  edge_ssh_up
-  ssh_attempts() { grep -c 'Failed password\|Accepted password' "$WORK/sshd.log" || true; }
-  # marker (main Worker) -> Provisioner object (second script) -> Go -> connect() -> sshd: the host key, with no login sent
-  FP_GOT=$(api ProvisioningService/GetSSHFingerprint "{\"host\":\"$EDGE_SSH_IP\",\"port\":22}" | jq -r .fingerprint) || die "GetSSHFingerprint failed through the Provisioner"
-  [ "$FP_GOT" = "$EDGE_SSH_FP" ] || die "the wizard read host key '$FP_GOT', sshd has '$EDGE_SSH_FP'"
-  [ "$(ssh_attempts)" = 0 ] || die "reading the host key sent a login to sshd"
-  # a closed port: the platform's socket cannot tell it from a refusal, and says so
-  ERR=$(api ProvisioningService/GetSSHFingerprint "{\"host\":\"$EDGE_SSH_IP\",\"port\":2299}" 2>&1 >/dev/null || true)
-  grep -q 'ssh_target_refused' <<<"$ERR" || die "a closed port did not answer ssh_target_refused: $ERR"
-  # the login, with the owner's step-up: a wrong password is refused by sshd, the right one gets in (and stops at the
-  # preflight: the throwaway user is not root and has no sudo), a wrong host key never gets the password
-  stepup || die "step-up failed"
-  check_ssh() { # <fingerprint> <password>
-    jq -nc --arg h "$EDGE_SSH_IP" --arg f "$1" --arg u "$EDGE_SSH_USER" --arg p "$2" '{host:$h, port:22, fingerprint:$f, username:$u, password:$p}'
-  }
-  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "$EDGE_SSH_FP" "wrong-$(openssl rand -hex 6)")" 2>&1 >/dev/null || true)
-  grep -q 'ssh_authentication_failed' <<<"$ERR" || die "a wrong password did not answer ssh_authentication_failed: $ERR"
-  [ "$(ssh_attempts)" = 1 ] || die "sshd saw $(ssh_attempts) login attempts after the wrong password, want 1"
-  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "$EDGE_SSH_FP" "$EDGE_SSH_PASS")" 2>&1 >/dev/null || true)
-  grep -q 'Accepted password for '"$EDGE_SSH_USER" "$WORK/sshd.log" || die "sshd never accepted the password of the right login: $ERR"
-  ! grep -q 'ssh_authentication_failed\|ssh_connection\|ssh_target' <<<"$ERR" || die "the right password did not get through the login: $ERR"
-  ATTEMPTS=$(ssh_attempts)
-  ERR=$(api ProvisioningService/CheckSSH "$(check_ssh "SHA256:$(printf 'A%.0s' $(seq 43))" "$EDGE_SSH_PASS")" 2>&1 >/dev/null || true)
-  grep -q 'ssh_host_key_changed' <<<"$ERR" || die "a wrong host key did not answer ssh_host_key_changed: $ERR"
-  [ "$(ssh_attempts)" = "$ATTEMPTS" ] || die "the password was sent to a host whose key did not match"
-  pass "SSH wizard through the Provisioner Worker: the host key read over a Worker socket matches sshd's, a closed port is ssh_target_refused, a wrong password is refused by sshd, the right one logs in (preflight is the next step), a wrong host key never gets the password"
+  step "2d. SSH wizard: the Worker reaches a real OpenSSH through the Provisioner object and connect()"
+  sshn_up
+  sshn_wizard
 
   step "3. user, subscription"
   GROUP_ID=$(api GroupService/CreateGroup "{\"name\":\"e2e\",\"profileIds\":[\"$PROFILE_ID\"]}" | jq -r .group.id)
@@ -426,6 +467,7 @@ PY
   grep -q 'insecure=1' <<<"$URI" && grep -q 'pinSHA256=' <<<"$URI" && grep -q 'obfs=salamander' <<<"$URI" || die "the self-signed URI must carry insecure=1, pinSHA256 and obfs=salamander"
   pass "subscription: 200, userinfo header, one hysteria2:// line with pin and obfs (credentials created on the first fetch reached the node)"
 
+  if [ -z "${SSH_ONLY:-}" ]; then # ---- the traffic steps 4-8 (--ssh-only skips them)
   step "4. real Hysteria2 client, download through the node; the panel counts it"
   start_client main "$SOCKS" || { tail -n 15 "$WORK/client-main.log" | redact; die "client did not connect"; }
   MAIN_CLIENT=$LAST_PID
@@ -577,6 +619,12 @@ PY
   pass "expiry reached, cron tick (HTTP 200): alice EXPIRED after ${T_EXP} s, her session kicked ${KICK} s after the tick, a new client is refused (status just before the tick: ${STATUS_BEFORE#USER_STATUS_})"
   mutate UserService/UpdateUser "{\"userId\":\"$USER_ID\",\"expiresUnix\":0}" >/dev/null || die "UpdateUser(expiry 0) failed"
 
+  fi # ---- end of steps 4-8
+
+  step "8b. installs under load: cancel in the middle of the upload; retire while the install waits for the agent (the primary node is online and busy)"
+  sshn_scn_cancel sshn-cancel
+  sshn_scn_retire_waiting sshn-wait
+
   step "9. measurements of this run (numbers, not pass/fail)"
   RSS_WORKERD=$(edge_workerd_rss)
   WASM_MB=$(edge_mem)
@@ -605,6 +653,17 @@ PY
   api NodeService/ListNodes '{}' | jq -e --arg n "$NODE_NAME" '[(.nodes // [])[] | select(.name == $n)] | length == 0' >/dev/null || die "a retired node is still in the default list"
   pass "retired: agent notified, exited 0, nft table, sysctl and journald drop-ins removed, node RETIRED and hidden, the object's storage holds no rows (_cf_KV empty), node_live row gone"
 
+  step "10b. installs once the primary node is gone: a truncated upload; a full install; a full install with the Provisioner reloaded in the middle of the upload"
+  sshn_scn_truncated sshn-trunc
+  sshn_scn_full sshn-full
+  sshn_scn_full sshn-reload reload
+  sshn_scan_state "$WORK/wrangler-state"
+  pass "the stored state (D1 and the Durable Object files) holds no plaintext SSH password"
+  FETCHES=$(grep -c "GET /$SSHN_TAG/mistgate-node-linux-" "$WORK/fake-release.log" || true)
+  MANIFESTS=$(grep -c "GET /$SSHN_TAG/manifest.json" "$WORK/fake-release.log" || true)
+  [ "$FETCHES" -ge 6 ] && [ "$MANIFESTS" -ge 6 ] || die "the fake release saw $MANIFESTS manifest and $FETCHES binary requests, want one of each per install attempt (at least 6)"
+  pass "the agent came from the fake release every time ($MANIFESTS manifests, $FETCHES binary downloads): -X update.releaseDownloadBase and the release key built into the wasm are what the Provisioner used"
+
   step "11. secrets never reach the logs (Worker log without wrangler's own request lines; wrangler's file log; node and client logs)"
   LEAKS=0
   edge_worker_log >"$WORK/wrangler-worker-output.txt"
@@ -624,6 +683,6 @@ PY
   ! grep -q 'Cannot perform I/O on behalf of a different request' "$WORK/wrangler.log" "$WORK/wrangler-file-log.txt"     || die "the Worker log has 'Cannot perform I/O on behalf of a different request'"
   # wrangler's dev server prints the path of every request: the secret prefixes are in those lines, by its design
   PATHS=$(grep -cE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" || true)
-  pass "no secret (admin password, TOTP, cookie, master key, enrolment token, subscription token, hysteria credentials) in the Worker's output, wrangler's file log, or the node and client logs; wrangler's own request lines ($PATHS) print URL paths and are excluded"
+  pass "no secret (admin password, TOTP, cookie, master key, enrolment token, subscription token, hysteria credentials, the SSH passwords and the release key of the SSH installs) in the Worker's output, wrangler's file log, or the sshd, installed agent, fake release, node and client logs; wrangler's own request lines ($PATHS) print URL paths and are excluded"
   ! grep -qE 'Error|error' "$WORK/wrangler-worker-output.txt" || note "the Worker log has error lines: $(grep -E 'Error|error' "$WORK/wrangler-worker-output.txt" | sort | uniq -c | sort -rn | head -5 | tr '\n' ';')"
 }

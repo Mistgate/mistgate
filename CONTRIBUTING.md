@@ -46,6 +46,13 @@ End-to-end tests:
   a real Hysteria2 client and self-update, optionally AmneziaWG clients, a fake WARP peer and a real mihomo. Runs as
   root in WSL in its own network namespace (`wsl -d Ubuntu -u root -- bash scripts/e2e-wsl.sh` from the repo root);
   needs go, curl, jq, python3 (with yaml for the tunnel steps), openssl, nft, ip, and internet access. 3 to 10 minutes.
+  The last step before the retire check installs nodes over SSH on a real OpenSSH `sshd` of the run (needs
+  `openssh-server`; its system service stays masked): wizard, cancel, retire while waiting, a truncated upload, a full
+  install (`scripts/e2e/sshnode.sh`).
+- `scripts/e2e-wsl.sh --edge [--ssh-only]`: the same against the Cloudflare edition, the panel being the Go wasm build in
+  a local `wrangler dev` (needs node 22 and pnpm; nothing of a Cloudflare account is touched). It also installs nodes over
+  SSH through the Provisioner Worker, with the agent streamed from a fake signed release and the Provisioner's script
+  reloaded in the middle of an upload; `--ssh-only` skips the traffic steps.
 - `scripts/e2e-mcp.sh [-mode listener|prefix|both] [-keep]`: API tokens and MCP against a real panel on loopback, any
   OS, no internet, about a minute.
 

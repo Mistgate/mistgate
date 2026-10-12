@@ -22,6 +22,13 @@
 # another key: the agent refuses it). With --old-node the node is a build without update/1 and the step checks that
 # it is shown as UNSUPPORTED and never sent an update.
 #
+# SSH install (step 10b, scripts/e2e/sshnode.sh): after the first node is retired, a real OpenSSH sshd in the run's namespace
+# (root and an unprivileged login, a systemd stand-in, private /root, /usr/local and /etc/systemd/system) is the host the
+# panel installs the trusted bundle's agent on: the wizard (host key, wrong password, wrong host key), a cancel in the middle
+# of the upload, a retire while the install waits for the agent, a truncated upload, and the full install (agent online, the
+# subscription lists its inbound, a Hysteria2 client downloads through it). --edge runs the same on the Cloudflare edition.
+# Needs openssh-server installed (its system service stays masked); skipped by --m3-only and --old-node.
+#
 # The tunnel steps (AmneziaWG, WARP, Mihomo, VLESS; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
 # --warp, --mihomo, --vless one by one, run after step 9 and before the retire; --m3-only runs them without the base and
 # self-update steps between. Clients and a fake internet sit in anonymous namespaces inside the run's namespace (`unshare -n`, a veth
@@ -40,7 +47,9 @@
 # `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a
 # link-only agent that enrols and connects over the Worker's public WebSocket link, and the steps are the edge subset of
 # this scenario (no self-update, no tunnel steps, no panel restarts) plus the edge-specific ones: fan-out, the cron
-# path, an object reset. It needs node 22 and pnpm, and builds into the work directory only.
+# path, an object reset (--edge --ssh-only skips the traffic steps 4-8, for work on the SSH steps), and the SSH installs through the Provisioner Worker (the agent streamed from a fake, signed GitHub
+# release; the Provisioner's script reloaded in the middle of an upload). It needs node 22 and pnpm, and builds into the work
+# directory only.
 #
 # ISOLATION. A node agent owns things that exist once per host: TCP 443 (masquerade), the nft table
 # mistgate_node, /etc/sysctl.d/90-mistgate.conf and the journald drop-in. So the whole run happens in a private
@@ -59,7 +68,7 @@ OLD_NODE=""
 # scenario and takes what it always took.
 # --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_ONLY="" EDGE=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_ONLY="" EDGE="" SSH_ONLY=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
@@ -71,6 +80,7 @@ while [ $# -gt 0 ]; do
     --vless) M3_VLESS=1 ;;
     --m3-only) M3_ONLY=1 ;;
     --edge) EDGE=1 ;;
+    --ssh-only) SSH_ONLY=1 ;;
     --old-node) OLD_NODE=${2:?--old-node needs a path}; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -83,6 +93,7 @@ M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
 [ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
+[ -z "$SSH_ONLY" ] || [ -n "$EDGE" ] || { echo "--ssh-only goes with --edge (it skips the traffic steps 4-8 of the edge scenario; the VPS edition's SSH step needs the bundle of the base steps)" >&2; exit 2; }
 [ "$(id -u)" = 0 ] || { echo "run as root (wsl -d Ubuntu -u root)" >&2; exit 2; }
 for tool in go curl jq python3 openssl nft ip mount; do
   command -v "$tool" >/dev/null || { echo "missing tool: $tool" >&2; exit 2; }
@@ -92,6 +103,12 @@ if [ -n "$EDGE" ]; then
     command -v "$tool" >/dev/null || { echo "missing tool for --edge: $tool" >&2; exit 2; }
   done
   [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 22 ] || { echo "--edge needs node 22 or newer" >&2; exit 2; }
+fi
+if [ -n "$EDGE" ] || { [ -z "$M3_ONLY" ] && [ -z "$OLD_NODE" ]; }; then # the SSH install steps (scripts/e2e/sshnode.sh)
+  [ -x /usr/sbin/sshd ] || { echo "the SSH install steps need openssh-server (/usr/sbin/sshd): apt-get install openssh-server (the system service stays masked)" >&2; exit 2; }
+  for tool in nsenter unshare ss ssh-keygen; do
+    command -v "$tool" >/dev/null || { echo "missing tool for the SSH install steps: $tool" >&2; exit 2; }
+  done
 fi
 if [ -n "$M3_LIVE" ]; then
   for tool in nsenter unshare ss ping base64; do
@@ -158,6 +175,8 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto} CGO_ENABLED=0 GOFLAGS=-buildvcs=false
 # shellcheck source=e2e/m3.sh
 . "$REPO/scripts/e2e/m3.sh" # the tunnel steps (functions only; the calls are below)
+# shellcheck source=e2e/sshnode.sh
+. "$REPO/scripts/e2e/sshnode.sh" # the SSH install on a real OpenSSH host (functions only; both editions call it)
 
 WORK=$(mktemp -d /tmp/mg-e2e.XXXXXX)
 BIN=$WORK/bin DATA=$WORK/data NODE_STATE=$WORK/node-state
@@ -237,6 +256,7 @@ cleanup() {
   [ -e "$WORK/sampling" ] && rm -f "$WORK/sampling"
   for ((p = ${#PIDS[@]} - 1; p >= 0; p--)); do stop_pid "${PIDS[$p]}"; done
   ! declare -F edge_reap >/dev/null || edge_reap # workerd and the wrangler processes that outlived their parent
+  sshn_reap # the agent an SSH install started on the test host, and its sshd sessions
   # Nothing to undo on the host: the nft table lives in the namespace and the agent's files on private tmpfs
   # mounts, both gone when the last process here exits.
   if [ -n "${KEEP:-}" ]; then say "work directory kept: $WORK"; else rm -rf "$WORK"; fi
@@ -1196,6 +1216,11 @@ done
 api NodeService/ListNodes '{}' | jq -e --arg n "$NODE_NAME" '[(.nodes // [])[] | select(.name == $n)] | length == 0' >/dev/null || die "a retired node is still in the default list"
 pass "retired: agent notified, exited 0, nft table $NFT_TABLE, sysctl and journald drop-ins removed (and no mgawg*/mgwarp link, mistgate_awg/mistgate_warp table, WARP ip rule or route left), node RETIRED and hidden"
 
+# ================================================================ 10b. SSH install (needs the bundle the base steps leave behind)
+if [ -z "$M3_ONLY" ] && [ -z "$OLD_NODE" ]; then
+  sshn_run_vps
+fi
+
 # ================================================================ 11. hygiene
 step "11. secrets never reach the logs"
 LEAKS=0
@@ -1207,4 +1232,4 @@ for s in "${SECRETS[@]}"; do
   fi
 done
 [ "$LEAKS" = 0 ] || die "$LEAKS secret(s) found in logs"
-pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials, VLESS user ids) in any log"
+pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, the SSH passwords of the test host (in the panel, sshd and installed agent logs too), and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials, VLESS user ids) in any log"
