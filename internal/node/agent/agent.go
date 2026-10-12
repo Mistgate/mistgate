@@ -133,6 +133,7 @@ type Agent struct {
 	udpSends     int
 	udpAfterFunc func(time.Duration, func()) udpCountTimer
 	sendUDP      func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	tcp          tcpProbeState
 
 	doc      *doctor.Doctor
 	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
@@ -907,6 +908,10 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.udpCount(s, m.UdpCount) })
 	case *pb.ConnectResponse_UdpSend:
 		a.goBusy(func() { a.udpSend(s, m.UdpSend) })
+	case *pb.ConnectResponse_HttpMark:
+		a.goBusy(func() { a.httpMark(s, m.HttpMark) })
+	case *pb.ConnectResponse_TcpProbe:
+		a.goBusy(func() { a.tcpProbe(s, m.TcpProbe) })
 	case *pb.ConnectResponse_UpdateAgent:
 		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:

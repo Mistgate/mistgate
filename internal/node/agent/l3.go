@@ -26,6 +26,7 @@ const (
 	capWarp         = "warp/1"
 	capTorrentGuard = "torrentguard/1"
 	capUDPCheck     = "udpcheck/1"
+	capTCPCheck     = "tcpcheck/1"
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
@@ -120,7 +121,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}
