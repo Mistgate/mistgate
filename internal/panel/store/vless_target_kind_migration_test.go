@@ -12,8 +12,8 @@ import (
 func TestVLESSTargetKindMigration(t *testing.T) {
 	ctx := context.Background()
 	s, p := openProvider(t)
-	if _, err := p.UpTo(ctx, 56); err != nil {
-		t.Fatalf("up to 56: %v", err)
+	if _, err := p.UpTo(ctx, 57); err != nil {
+		t.Fatalf("up to 57: %v", err)
 	}
 	profiles := map[string]struct{ protocol, settings string }{
 		"prf_legacy":  {"vless", `{"port":443,"reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}`},
@@ -52,8 +52,8 @@ func TestVLESSTargetKindMigration(t *testing.T) {
 		before[id] = settings(id)
 	}
 
-	if _, err := p.UpTo(ctx, 57); err != nil {
-		t.Fatalf("up to 57: %v", err)
+	if _, err := p.UpTo(ctx, 58); err != nil {
+		t.Fatalf("up to 58: %v", err)
 	}
 	for id, want := range map[string]string{
 		"prf_legacy": "site", "prf_ipv6": "site", "prf_site": "site", "prf_self": "self",
@@ -73,8 +73,8 @@ func TestVLESSTargetKindMigration(t *testing.T) {
 		}
 	}
 
-	if _, err := p.DownTo(ctx, 56); err != nil {
-		t.Fatalf("down to 56: %v", err)
+	if _, err := p.DownTo(ctx, 57); err != nil {
+		t.Fatalf("down to 57: %v", err)
 	}
 	for _, id := range []string{"prf_legacy", "prf_ipv6", "prf_site", "prf_self"} {
 		if got := kind(id); got != "<none>" {
@@ -84,7 +84,7 @@ func TestVLESSTargetKindMigration(t *testing.T) {
 	if got := settings("prf_legacy"); got != `{"port":443,"reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}` {
 		t.Errorf("rolled-back document = %s", got)
 	}
-	if _, err := p.UpTo(ctx, 57); err != nil {
+	if _, err := p.UpTo(ctx, 58); err != nil {
 		t.Fatalf("up again: %v", err)
 	}
 	if kind("prf_legacy") != "site" {
