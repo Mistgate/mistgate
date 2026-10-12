@@ -54,7 +54,7 @@ type Warning = { code: string; params: Record<string, string> };
 export function decoyNote(t: T, p: Record<string, string | undefined>): string {
   const vars = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v ?? ""]));
   const via = p.via === "self" || p.via === "tls" ? p.via : "site";
-  const port80 = p.port80 === "open" || p.port80 === "closed" || p.port80 === "unchecked" ? t(`node.check.decoy.port80.${p.port80}`, vars) : "";
+  const port80 = p.port80 === "open" || p.port80 === "closed" || p.port80 === "busy" || p.port80 === "unchecked" ? t(`node.check.decoy.port80.${p.port80}`, vars) : "";
   return [t(`node.check.decoy.${via}`, vars), port80].filter(Boolean).join(" ");
 }
 

@@ -394,7 +394,7 @@ sender, checked_at, PRIMARY KEY(node_id, port))`; `alpn` = the listener answers 
 node page, not a budgeted D1 path). `admin.v1`: `message TcpCheck { port, role, alpn, profile, verdict, reason, sender, checked_unix }`;
 `CheckPortsResponse.tcp = 4`; `GetNodeResponse.tcp_checks` = next free number; update the CheckPorts comment.
 
-UI: `web/src/screens/node/udp-ports.tsx` becomes "Ports" with TCP rows and one renewal line. `renewalOf(rows)` in
+UI: `web/src/screens/node/ports.tsx` becomes "Ports" with TCP rows and one renewal line. `renewalOf(rows)` in
 `web/src/lib/port-check.ts`: `ok80` if port 80 is `ours`; else `ok443` if any `alpn` row on 443 is `ours`; else `risk` (with the
 VLESS profile if a `site` REALITY holds 443); else none (no ACME). Texts in `web/src/i18n/ports.ts`:
 - `ports.title`: "Ports" / "Порты"

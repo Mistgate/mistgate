@@ -284,7 +284,7 @@ func TestDecoyPausedPort80FromStoredCheck(t *testing.T) {
 		{"only a 443 row", []store.TCPCheck{row(443, "site", "ours")}, "unchecked"},
 		{"ours", []store.TCPCheck{row(80, "acme", "ours")}, "open"},
 		{"another server", []store.TCPCheck{row(80, "acme", "other")}, "closed"},
-		{"busy", []store.TCPCheck{row(80, "acme", "busy")}, "closed"},
+		{"busy", []store.TCPCheck{row(80, "acme", "busy")}, "busy"},
 		{"closed", []store.TCPCheck{row(80, "acme", "refused")}, "closed"},
 		{"filtered", []store.TCPCheck{row(80, "acme", "timeout")}, "closed"},
 		{"not probed", []store.TCPCheck{{Port: 80, Role: "acme", Reason: "agent_too_old", CheckedAt: e.clock}}, "unchecked"},

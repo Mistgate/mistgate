@@ -806,8 +806,8 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 }
 
 // port80State reads the node's stored TCP check of port 80 (design/vless.md §7.4) for the decoy warning: open when a
-// connection reaches Mistgate; closed when another server answers, another program holds the port, or it is closed or
-// filtered; unchecked when there is no row, or the row has no verdict.
+// connection reaches Mistgate; busy when another program on the node holds it; closed when another server answers, or it
+// is closed or filtered; unchecked when there is no row, or the row has no verdict.
 func (s *Service) port80State(ctx context.Context, nodeID string) (string, error) {
 	rows, err := s.st.TCPChecks(ctx, nodeID)
 	if err != nil {
@@ -820,7 +820,9 @@ func (s *Service) port80State(ctx context.Context, nodeID string) (string, error
 		switch r.Verdict {
 		case "ours":
 			return "open", nil
-		case "other", "busy", "refused", "timeout":
+		case "busy":
+			return "busy", nil
+		case "other", "refused", "timeout":
 			return "closed", nil
 		}
 	}

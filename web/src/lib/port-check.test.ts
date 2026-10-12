@@ -97,6 +97,7 @@ describe("a VLESS profile on the Hysteria2 site's TCP port (hy2_decoy_paused)", 
     expect(decoyNote(t, { ...params, via: "tls", port80: undefined })).toBe(fill(en["node.check.decoy.tls"], params));
     expect(decoyNote(t, { ...params, port80: "closed" })).toContain("will stop renewing. Open TCP 80 at the provider, move “vless 443” to 8443");
     expect(decoyNote(t, { ...params, port80: "open" })).toContain("Port 80 reaches Mistgate here");
+    expect(decoyNote(t, { ...params, port80: "busy" })).toContain("Another program on the node holds port 80");
     // a value this page does not know reads as the plain REALITY case
     expect(decoyNote(t, { ...params, via: "later", port80: "maybe" })).toBe(fill(en["node.check.decoy.site"], params));
   });
