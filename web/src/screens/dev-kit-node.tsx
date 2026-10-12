@@ -55,7 +55,7 @@ const baseNode = (over: object) => ({
   ...over,
 });
 
-const metrics = { cpuPct: 23, softirqPct: 4, load1: 0.42, ramUsedBytes: 610e6, ramTotalBytes: 2e9, diskUsedBytes: 7.1e9, diskTotalBytes: 20e9, netRxBps: 38e6, netTxBps: 41e6 };
+const metrics = { cpuPct: 23, softirqPct: 4, load1: 0.42, ramUsedBytes: 610e6, ramTotalBytes: 2e9, diskUsedBytes: 7.1e9, diskTotalBytes: 20e9, netRxBps: 38e6, netTxBps: 41e6, atUnix: now - 5 };
 const facts = { hostname: "de1", os: "Ubuntu 24.04", kernel: "6.8.0-45", arch: "amd64", cpuCount: 2, ramTotalBytes: 2e9, diskTotalBytes: 20e9, virt: "kvm", hasIpv6: true, bootUnix: now - 9 * 86400, engines: ["hysteria2 2.6.1"] };
 
 const alert = (over: object) => ({
@@ -179,7 +179,7 @@ export function NodeDemos() {
           <NodeDetail
             data={
               {
-                node: baseNode({ status: NodeStatus.NO_TRAFFIC, warp: { state: WarpState.DOWN, source: 1, colo: "", accountType: "free" } }),
+                node: baseNode({ status: NodeStatus.NO_TRAFFIC, bandwidthMbps: 50, warp: { state: WarpState.DOWN, source: 1, colo: "", accountType: "free" } }),
                 inbounds: [
                   inbound({
                     id: "inb_3",
@@ -227,6 +227,7 @@ export function NodeDemos() {
             data={
               {
                 node: baseNode({
+                  bandwidthMbps: 75,
                   reason: { code: "inbound_failed", params: { inbound: "inb_2", profile: "hy2 · WARP · 8443", error: "listen udp :8443: bind: address already in use", failed: "1", total: "3" } },
                 }),
                 inbounds: [

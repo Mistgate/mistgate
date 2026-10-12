@@ -11,7 +11,10 @@ import { useToast } from "@/components/ui/toast";
 import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
+import { cx } from "@/lib/cx";
+import { nodeLoad } from "@/lib/node-load";
 import type { Plain } from "@/lib/plain";
+import { useNow } from "@/lib/time";
 import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -71,6 +74,31 @@ function WarpChip({ node }: { node: NonNullable<Plain<GetNodeResponse>["node"]> 
     >
       <StatusPill kind={warpKind[state]} label={label} sm />
     </Link>
+  );
+}
+
+/** The load chip of the header: the three-step meter of the user's page, plus the percentage only the admin sees. */
+function LoadChip({ data }: { data: Plain<GetNodeResponse> }) {
+  const t = useT();
+  const now = useNow(10_000);
+  const load = nodeLoad(data.metrics, data.node!.bandwidthMbps, Math.floor(now / 1000));
+  if (!load || !agentLinked(data.node!.status)) return null; // the page counts connected nodes only
+  const fill = { low: 1, medium: 2, high: 3 }[load.level];
+  const high = load.level === "high";
+  return (
+    <span
+      title={t(data.node!.bandwidthMbps > 0 ? "node.loadHint" : "node.loadHintCpu")}
+      className="inline-flex h-[26px] flex-none items-center gap-2 rounded-xl border border-line bg-surface pr-2.5 pl-2 text-xs leading-none font-bold whitespace-nowrap"
+    >
+      <span className="font-semibold text-muted">{t("node.load")}</span>
+      <span aria-hidden className="flex gap-[3px]">
+        {[1, 2, 3].map((n) => (
+          <i key={n} className={cx("block h-[5px] w-3.5 rounded-[3px]", n > fill ? "bg-surface-2" : high ? "bg-warn" : "bg-accent")} />
+        ))}
+      </span>
+      <span className={high ? "text-warn-text" : undefined}>{t(`node.loadLevel.${load.level}`)}</span>
+      <span className="font-mono text-[11px] text-muted">{load.percent}%</span>
+    </span>
   );
 }
 
@@ -152,6 +180,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
             <h1 className="text-2xl leading-none font-extrabold tracking-[-0.04em] md:text-[28px]">{node.name}</h1>
             <StatusPill kind={kind} label={st.word(node)} />
             <WarpChip node={node} />
+            <LoadChip data={data} />
           </div>
           <p className="text-xs text-pretty text-muted">
             {[node.location || fmt.country(node.countryCode), node.provider].filter(Boolean).join(" · ")}
