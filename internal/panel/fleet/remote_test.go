@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -307,8 +308,8 @@ func TestFleetRemoteRetireLogsAndDrop(t *testing.T) {
 		t.Fatal("RetireNode closed the VPS session while the remote seam was active")
 	}
 	logsErr := (nodeService{e.f}).StreamLogs(e.ctx, connect.NewRequest(&adminv1.StreamLogsRequest{}), nil)
-	if code(logsErr) != connect.CodeUnimplemented {
-		t.Fatalf("remote StreamLogs error = %v, want Unimplemented", logsErr)
+	if code(logsErr) != connect.CodeFailedPrecondition || !strings.HasPrefix(logsErr.(*connect.Error).Message(), "unavailable_in_edition") {
+		t.Fatalf("remote StreamLogs error = %v, want the coded unavailable_in_edition refusal", logsErr)
 	}
 	e.f.drop(e.ctx, a.nodeID, "node re-enrolled")
 	tasks, closes := remote.calls()

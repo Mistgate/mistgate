@@ -233,6 +233,10 @@ message MeResponse {
   // Where the source code of this panel is published (serve --source-url), linked next to the version in the admin
   // (AGPL-3.0 section 13). Empty = no link.
   string source_url = 4;
+  // Edition this panel runs: "vps" or "edge".
+  string edition = 5;
+  // Stable feature IDs that are not available in this edition.
+  repeated string unavailable = 6;
 }
 
 message Admin {

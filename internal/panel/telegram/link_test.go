@@ -553,3 +553,42 @@ func TestAnotherBotStartsThePollFromTheBeginning(t *testing.T) {
 		return false
 	})
 }
+
+// The edge delivers nothing and polls nothing: linking a chat and the test message are refused with the coded reason
+// (no fake-Telegram call, no pending code), and they work on the VPS.
+func TestEdgeRefusesLinkAndTest(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 1)
+	r := rpc{e.svc}
+	ctx := e.ctxAs(owner)
+	begin := func() error {
+		_, err := r.BeginTelegramLink(ctx, connect.NewRequest(&adminv1.BeginTelegramLinkRequest{}))
+		return err
+	}
+	test := func() error {
+		_, err := r.SendTelegramTest(ctx, connect.NewRequest(&adminv1.SendTelegramTestRequest{}))
+		return err
+	}
+
+	e.svc.cfg.Edge = true
+	sent := e.tg.total()
+	for name, call := range map[string]func() error{"BeginTelegramLink": begin, "SendTelegramTest": test} {
+		err := call()
+		if connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "unavailable_in_edition: feature=telegram") {
+			t.Errorf("edge %s = %v, want the coded refusal", name, err)
+		}
+	}
+	if e.tg.total() != sent || len(e.svc.codes) != 0 {
+		t.Errorf("a refused call sent %d messages and left %d link codes", e.tg.total()-sent, len(e.svc.codes))
+	}
+
+	e.svc.cfg.Edge = false
+	if err := begin(); err != nil {
+		t.Errorf("VPS BeginTelegramLink = %v", err)
+	}
+	if err := test(); err != nil {
+		t.Errorf("VPS SendTelegramTest = %v", err)
+	}
+}

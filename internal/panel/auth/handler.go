@@ -18,6 +18,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -614,7 +615,11 @@ func (s *Service) Me(ctx context.Context, _ *connect.Request[adminv1.MeRequest])
 	if !ok {
 		return nil, errUnauthenticated
 	}
-	resp := &adminv1.MeResponse{Admin: toProtoAdmin(admin), Version: buildinfo.Version, SourceUrl: s.sourceURL}
+	edge := s.edge.Load()
+	resp := &adminv1.MeResponse{
+		Admin: toProtoAdmin(admin), Version: buildinfo.Version, SourceUrl: s.sourceURL,
+		Edition: edition.Name(edge), Unavailable: edition.Unavailable(edge),
+	}
 	if sess, ok := sessionFrom(ctx); ok {
 		if until := s.stepUpUntil(sess); !until.IsZero() {
 			resp.StepUpUntilUnix = until.Unix()

@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -160,7 +161,7 @@ func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.Ch
 }
 
 func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
-	if err := edgeFileRPCUnavailable(); err != nil {
+	if err := edition.Check(r.s.cfg.Edge, edition.PanelUpdate); err != nil {
 		return nil, err
 	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
@@ -190,6 +191,9 @@ func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv
 }
 
 func (r rpc) StartRollout(ctx context.Context, req *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {
+	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
+		return nil, err
+	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -250,6 +254,9 @@ func (r rpc) CancelRollout(ctx context.Context, req *connect.Request[adminv1.Can
 }
 
 func (r rpc) RollbackNode(ctx context.Context, req *connect.Request[adminv1.RollbackNodeRequest]) (*connect.Response[adminv1.RollbackNodeResponse], error) {
+	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
+		return nil, err
+	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -261,7 +268,7 @@ func (r rpc) RollbackNode(ctx context.Context, req *connect.Request[adminv1.Roll
 }
 
 func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.RescanBundleRequest]) (*connect.Response[adminv1.RescanBundleResponse], error) {
-	if err := edgeFileRPCUnavailable(); err != nil {
+	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
 		return nil, err
 	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
@@ -273,6 +280,9 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 }
 
 func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {
+	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
+		return nil, err
+	}
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}

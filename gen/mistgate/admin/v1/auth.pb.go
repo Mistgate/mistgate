@@ -1223,7 +1223,11 @@ type MeResponse struct {
 	StepUpUntilUnix int64 `protobuf:"varint,3,opt,name=step_up_until_unix,json=stepUpUntilUnix,proto3" json:"step_up_until_unix,omitempty"`
 	// Where the source code of this panel is published (serve --source-url), linked next to the version in the admin
 	// (AGPL-3.0 section 13). Empty = no link.
-	SourceUrl     string `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	SourceUrl string `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	// Edition this panel runs: "vps" or "edge".
+	Edition string `protobuf:"bytes,5,opt,name=edition,proto3" json:"edition,omitempty"`
+	// Stable feature IDs that are not available in this edition.
+	Unavailable   []string `protobuf:"bytes,6,rep,name=unavailable,proto3" json:"unavailable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1284,6 +1288,20 @@ func (x *MeResponse) GetSourceUrl() string {
 		return x.SourceUrl
 	}
 	return ""
+}
+
+func (x *MeResponse) GetEdition() string {
+	if x != nil {
+		return x.Edition
+	}
+	return ""
+}
+
+func (x *MeResponse) GetUnavailable() []string {
+	if x != nil {
+		return x.Unavailable
+	}
+	return nil
 }
 
 type Admin struct {
@@ -3284,14 +3302,16 @@ const file_mistgate_admin_v1_auth_proto_rawDesc = "" +
 	"\x04totp\x18\x02 \x01(\bR\x04totp\"\x0f\n" +
 	"\rLogoutRequest\"\x10\n" +
 	"\x0eLogoutResponse\"\v\n" +
-	"\tMeRequest\"\xa6\x01\n" +
+	"\tMeRequest\"\xe2\x01\n" +
 	"\n" +
 	"MeResponse\x12.\n" +
 	"\x05admin\x18\x01 \x01(\v2\x18.mistgate.admin.v1.AdminR\x05admin\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12/\n" +
 	"\x12step_up_until_unix\x18\x03 \x01(\x03B\x020\x02R\x0fstepUpUntilUnix\x12\x1d\n" +
 	"\n" +
-	"source_url\x18\x04 \x01(\tR\tsourceUrl\"g\n" +
+	"source_url\x18\x04 \x01(\tR\tsourceUrl\x12\x18\n" +
+	"\aedition\x18\x05 \x01(\tR\aedition\x12 \n" +
+	"\vunavailable\x18\x06 \x03(\tR\vunavailable\"g\n" +
 	"\x05Admin\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12+\n" +

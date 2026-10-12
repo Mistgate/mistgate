@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -115,6 +116,9 @@ func (r *tokenRPC) CreateApiToken(ctx context.Context, req *connect.Request[admi
 	s := r.s
 	admin, err := ownerSession(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := edition.Check(s.edge.Load(), edition.MCP); err != nil { // tokens exist for the MCP endpoint, which the edge does not serve
 		return nil, err
 	}
 	if err := s.RequireStepUp(ctx); err != nil {

@@ -125,8 +125,6 @@ func checkBackupBucket(ctx context.Context, api s3API, bucket string) error {
 	return nil
 }
 
-func edgeRPCUnavailable() error { return nil }
-
 func uploadBackup(ctx context.Context, api s3API, bucket, key, filePath string) (int64, error) {
 	return uploadBackupWithLimits(ctx, api, bucket, key, filePath, r2SingleUploadLimit, r2MultipartPartSize)
 }

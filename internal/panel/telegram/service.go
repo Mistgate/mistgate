@@ -62,6 +62,8 @@ type Config struct {
 	// AdminURL is the public address of the admin ("" = unknown: messages carry no link).
 	AdminURL string
 	Log      *slog.Logger
+	// Edge is the edge edition: nothing polls or delivers there, so linking a chat and the test message refuse.
+	Edge bool
 
 	// Test seams. The zero value is production.
 	APIBase     string       // https://api.telegram.org

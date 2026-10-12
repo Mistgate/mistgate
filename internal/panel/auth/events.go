@@ -29,6 +29,10 @@ type Event struct {
 	Until   time.Time // EventLockout: when the lock ends
 }
 
+// SetEdge tells the service it serves the edge edition: Me reports it with the features the edge lacks, and
+// CreateApiToken refuses (MCP is not served there). The app sets it once while building.
+func (s *Service) SetEdge(edge bool) { s.edge.Store(edge) }
+
 // SetEventHook installs fn, called once per event on its own goroutine, so it may block
 // without slowing a sign-in down (and must be safe for concurrent use). nil removes it.
 // Events are fire-and-forget: the audit log is the record.

@@ -90,6 +90,7 @@ type Service struct {
 	tsURL    string       // Turnstile siteverify endpoint
 	tsClient *http.Client // and the client that calls it
 	hook     atomic.Pointer[func(Event)]
+	edge     atomic.Bool // the Cloudflare edge edition (SetEdge): Me says so, and MCP tokens cannot be made
 
 	// API tokens (bearer.go): the per-token request limiter, and the once-a-minute gates that keep a polling
 	// script from rewriting last_used_* or filling the audit log with reads.

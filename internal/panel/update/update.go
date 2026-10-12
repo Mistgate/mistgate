@@ -97,6 +97,8 @@ type Config struct {
 	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
 	// A trusted newer bundle is installed into dist and made available for owner-triggered node updates.
 	NodeBundleSource NodeBundleSource
+	// Edge is the edge edition: no node bundle, rollout or panel self-update there yet, so the RPCs that start one refuse.
+	Edge bool
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
 	StepUp func(context.Context) error
 	// Actor returns the admin id for audit rows and for the rollout's created_by. Default: the signed-in admin.

@@ -21,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -52,6 +53,8 @@ type Config struct {
 	DataDir   string
 	MasterKey []byte
 	StepUp    func(context.Context) error
+	// Edge is the edge edition: no scheduled or manual backup runs there yet (R2), so those RPCs refuse.
+	Edge bool
 	// OnResult is told how every backup ended: "" when it worked, else the error code (backup_storage_failed, ...). The
 	// Telegram alerts hang on it. It must not block.
 	OnResult func(code string)
@@ -65,6 +68,7 @@ type Service struct {
 	masterKey []byte
 	stepUp    func(context.Context) error
 	onResult  func(code string)
+	edge      bool
 	log       *slog.Logger
 	mu        sync.Mutex  // held while a backup runs
 	running   atomic.Bool // the same, for the settings page to read
@@ -83,7 +87,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, onResult: cfg.OnResult, log: cfg.Log, now: time.Now}
+	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, onResult: cfg.OnResult, edge: cfg.Edge, log: cfg.Log, now: time.Now}
 	s.r2Factory = s.newR2Client
 	return s, nil
 }
@@ -171,6 +175,9 @@ func (r rpc) GetBackupSettings(ctx context.Context, _ *connect.Request[adminv1.G
 }
 
 func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[adminv1.UpdateBackupSettingsRequest]) (*connect.Response[adminv1.UpdateBackupSettingsResponse], error) {
+	if err := edition.Check(r.s.edge, edition.Backups); err != nil { // the schedule would never run there
+		return nil, err
+	}
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -221,7 +228,7 @@ func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.T
 	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
-	if err := edgeRPCUnavailable(); err != nil {
+	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
 		return nil, err
 	}
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
@@ -247,7 +254,7 @@ func (r rpc) CreateBackup(ctx context.Context, _ *connect.Request[adminv1.Create
 	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
-	if err := edgeRPCUnavailable(); err != nil {
+	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
 		return nil, err
 	}
 	if err := r.s.requireOwnerStepUp(ctx); err != nil {
@@ -289,7 +296,7 @@ func (r rpc) ListBackups(ctx context.Context, _ *connect.Request[adminv1.ListBac
 	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
-	if err := edgeRPCUnavailable(); err != nil {
+	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
 		return nil, err
 	}
 	settings, err := r.s.st.PanelBackupSettings(ctx)

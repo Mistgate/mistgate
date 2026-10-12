@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -174,6 +175,9 @@ func respondBot(ctx context.Context, s *Service, a store.Admin) (*connect.Respon
 }
 
 func (r rpc) BeginTelegramLink(ctx context.Context, _ *connect.Request[adminv1.BeginTelegramLinkRequest]) (*connect.Response[adminv1.BeginTelegramLinkResponse], error) {
+	if err := edition.Check(r.s.cfg.Edge, edition.Telegram); err != nil {
+		return nil, err
+	}
 	a, err := self(ctx)
 	if err != nil {
 		return nil, err
@@ -236,6 +240,9 @@ func (r rpc) SetTelegramAlerts(ctx context.Context, req *connect.Request[adminv1
 }
 
 func (r rpc) SendTelegramTest(ctx context.Context, _ *connect.Request[adminv1.SendTelegramTestRequest]) (*connect.Response[adminv1.SendTelegramTestResponse], error) {
+	if err := edition.Check(r.s.cfg.Edge, edition.Telegram); err != nil {
+		return nil, err
+	}
 	a, err := self(ctx)
 	if err != nil {
 		return nil, err

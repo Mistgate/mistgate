@@ -601,11 +601,15 @@ async function run() {
 
     const backup = await connectRPC(secondPanel, "BackupService/CreateBackup", {}, adminCookie);
     assert.equal(backup.message.code, "failed_precondition", "filesystem backup RPC fails cleanly on the edge");
-    assert.ok(backup.message.message.includes("R2 binding"));
+    assert.ok(backup.message.message.includes("unavailable_in_edition: feature=backups"), "the refusal is the coded edition reason");
 
     const rescan = await connectRPC(secondPanel, "UpdateService/RescanBundle", {}, adminCookie);
     assert.equal(rescan.message.code, "failed_precondition", "filesystem update RPC fails cleanly on the edge");
-    assert.ok(rescan.message.message.includes("edge edition"));
+    assert.ok(rescan.message.message.includes("unavailable_in_edition: feature=agent_updates"), "the refusal is the coded edition reason");
+
+    const me = await connectRPC(secondPanel, "AuthService/Me", {}, adminCookie);
+    assert.equal(me.message.edition, "edge", "Me names the edge edition");
+    assert.ok(me.message.unavailable.includes("backups") && me.message.unavailable.includes("mcp"), "Me lists the features the edge lacks");
 
     const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
     assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");

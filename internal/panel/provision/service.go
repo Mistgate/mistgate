@@ -20,6 +20,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -50,6 +51,8 @@ type BinarySource interface {
 
 // Config contains the services needed for durable SSH provisioning.
 type Config struct {
+	// Edge is the edge edition: it cannot reach a server over SSH, so the SSH wizard and the installs refuse.
+	Edge       bool
 	StepUp     func(context.Context) error
 	Nodes      NodeManager
 	Binaries   BinarySource
@@ -123,6 +126,9 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 
 // GetSSHFingerprint reads the remote SSH host key without sending authentication.
 func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[adminv1.GetSSHFingerprintRequest]) (*connect.Response[adminv1.GetSSHFingerprintResponse], error) {
+	if err := edition.Check(s.cfg.Edge, edition.Provision); err != nil {
+		return nil, err
+	}
 	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
 	if err != nil {
 		return nil, invalidArgument("invalid SSH target")
@@ -147,6 +153,9 @@ func (s *Service) GetSSHFingerprint(ctx context.Context, req *connect.Request[ad
 
 // CheckSSH authenticates only after the submitted fingerprint exactly matches the host key.
 func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.CheckSSHRequest]) (*connect.Response[adminv1.CheckSSHResponse], error) {
+	if err := edition.Check(s.cfg.Edge, edition.Provision); err != nil {
+		return nil, err
+	}
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -176,6 +185,9 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 // StartNodeProvision stores the SSH credential sealed to this job and queues installation. The owner's UI sends the
 // password; the MCP apply sends plan_id instead and the password comes from that plan's approval (ownerPassword).
 func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {
+	if err := edition.Check(s.cfg.Edge, edition.Provision); err != nil {
+		return nil, err
+	}
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -266,6 +278,9 @@ func (s *Service) ownerPassword(ctx context.Context, planID, fingerprint string)
 // may have changed the host already; the worker's resume path (preflight identity check, enroll --resume-key) picks
 // up from there. A job whose node was retired cannot come back.
 func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[adminv1.RetryNodeProvisionRequest]) (*connect.Response[adminv1.RetryNodeProvisionResponse], error) {
+	if err := edition.Check(s.cfg.Edge, edition.Provision); err != nil {
+		return nil, err
+	}
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -41,7 +40,3 @@ func recentBackups(context.Context, s3API, string, int) ([]backupObject, error) 
 	return nil, errEdgeBackupUnavailable
 }
 func backupObjectKey(time.Time) (string, error) { return "", errEdgeBackupUnavailable }
-
-func edgeRPCUnavailable() error {
-	return connect.NewError(connect.CodeFailedPrecondition, errEdgeBackupUnavailable)
-}

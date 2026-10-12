@@ -44,6 +44,13 @@ func (r *edgeTickRemote) pokeCount() int {
 
 func buildEdgeTickPanel(t *testing.T, remote fleet.Remote) *Panel {
 	t.Helper()
+	p, _ := buildPanel(t, remote)
+	return p
+}
+
+// buildPanel assembles a panel on a fresh store: the edge edition when remote is set, the VPS one when it is nil.
+func buildPanel(t *testing.T, remote fleet.Remote) (*Panel, *auth.Service) {
+	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
 	if err != nil {
@@ -76,7 +83,7 @@ func buildEdgeTickPanel(t *testing.T, remote fleet.Remote) *Panel {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p
+	return p, authSvc
 }
 
 func addExpiredAlice(t *testing.T, p *Panel, now time.Time) {

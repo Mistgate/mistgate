@@ -20,6 +20,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -852,7 +853,7 @@ func (f *Fleet) notifyRetire(ctx context.Context, nodeID string, live store.Node
 func (s nodeService) StreamLogs(ctx context.Context, req *connect.Request[adminv1.StreamLogsRequest], stream *connect.ServerStream[adminv1.StreamLogsResponse]) error {
 	f := s.f
 	if f.cfg.Remote != nil {
-		return connect.NewError(connect.CodeUnimplemented, errors.New("log streaming is not available in this edition yet"))
+		return edition.Refuse(edition.AgentLogs)
 	}
 	m := req.Msg
 	n, err := f.st.Node(ctx, m.NodeId)

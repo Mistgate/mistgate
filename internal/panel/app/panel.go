@@ -97,7 +97,9 @@ type Config struct {
 	HealthBlipWindow   time.Duration
 	BackgroundStarters []BackgroundJob
 	AfterResponse      access.AfterResponseRunner
-	Remote             fleet.Remote
+	// Remote is the edge edition's node link. Setting it makes this the edge edition (fleet does the same): Me says so,
+	// and the RPCs that start work the edge does not run yet refuse with unavailable_in_edition.
+	Remote fleet.Remote
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.
@@ -130,6 +132,8 @@ func Build(c Config) (*Panel, error) {
 	}
 
 	st, vlt, authSvc, log, in := c.Store, c.Vault, c.Auth, c.Logger, c.Instance
+	edge := c.Remote != nil
+	authSvc.SetEdge(edge)
 	limiter := c.Limiter
 	if limiter == nil {
 		limiter = securitylimit.NewMemory(c.Clock, 0)
@@ -141,7 +145,7 @@ func Build(c Config) (*Panel, error) {
 	if in.AdminListen == "" && len(in.RPOrigins) > 0 {
 		alertsURL = in.AdminURL()
 	}
-	tg, err := telegram.New(telegram.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, AdminURL: alertsURL, Log: log})
+	tg, err := telegram.New(telegram.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, AdminURL: alertsURL, Edge: edge, Log: log})
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +231,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	upd, err := update.New(st, fl, hl, update.Config{
 		DataDir: c.DataDir, Key: relKey, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
-		StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, NodeBundleSource: nodeBundleSource, Log: log,
+		Edge: edge, StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, NodeBundleSource: nodeBundleSource, Log: log,
 	})
 	if err != nil {
 		return nil, err
@@ -242,7 +246,7 @@ func Build(c Config) (*Panel, error) {
 		OutdatedAgents: upd.OutdatedAgents,
 	})
 	prov, err := nodeprovision.NewService(st, vlt, nodeprovision.Config{
-		StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
+		Edge: edge, StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
 		PanelAddr: c.PanelAddr, AgentSNI: in.AgentSNI, Log: log,
 	})
 	if err != nil {
@@ -250,7 +254,7 @@ func Build(c Config) (*Panel, error) {
 	}
 	bkp, err := backup.New(backup.Config{
 		Store: st, Vault: vlt, DataDir: c.DataDir, MasterKey: c.MasterKey,
-		StepUp: authSvc.RequireStepUp, OnResult: backupResult(tg), Log: log,
+		Edge: edge, StepUp: authSvc.RequireStepUp, OnResult: backupResult(tg), Log: log,
 	})
 	if err != nil {
 		return nil, err

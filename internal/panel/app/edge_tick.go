@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/edition"
 )
 
 const edgeTickJobTimeout = 20 * time.Second
@@ -23,6 +25,19 @@ var edgeDeferred = map[string]string{
 	"telegram":       "enqueue remains local and messages are not delivered on edge",
 	"provision":      "phase 3",
 	"mcp-plan-sweep": "MCP is not served on the edge",
+}
+
+// edgeDeferredFeatures maps every deferred job above to the admin features it takes away: the ids Me reports in
+// "unavailable" (internal/panel/edition). A test keeps the two lists in step, so a job cannot be deferred without the
+// admin saying so, nor a feature be listed with nothing behind it.
+var edgeDeferredFeatures = map[string][]string{
+	"fleet":          {edition.AgentLogs},
+	"health":         {edition.HealthChecks},
+	"updates":        {edition.AgentUpdates, edition.PanelUpdate},
+	"backups":        {edition.Backups},
+	"telegram":       {edition.Telegram},
+	"provision":      {edition.Provision},
+	"mcp-plan-sweep": {edition.MCP},
 }
 
 // EdgeTick runs the scheduled work shared by the edge edition. Each pass gets a fresh timeout so one slow job does not
