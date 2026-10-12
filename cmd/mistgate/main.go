@@ -24,6 +24,7 @@ commands:
   mcp       stdio proxy to the panel's MCP endpoint for agent clients: --url <admin url> --token-file <file>
   release   the owner's release key and signed releases: "release keygen", "release build", "release sign";
             on the panel server "release trust-key" after a key rotation
+  edge      deploy the Cloudflare edition or print its one-time setup link
   version   print the version, build time and the release key fingerprint
 `
 
@@ -45,6 +46,8 @@ func main() {
 		err = runAuth(os.Args[2:], os.Stdout)
 	case "release":
 		err = runRelease(os.Args[2:], os.Stdout)
+	case "edge":
+		err = runEdge(os.Args[2:], os.Stdout)
 	case "panel-update-helper":
 		err = panelupdate.RunPanelUpdateHelper(os.Args[2:])
 	case "mcp":
