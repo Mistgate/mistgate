@@ -189,6 +189,8 @@ export const en = {
   "node.ssh.host": "SSH server address",
   "node.ssh.hostHint": "The panel connects from its own server. If the provider firewall blocks this SSH port, allow inbound TCP from the panel's public egress IP in the provider controls before continuing.",
   "node.ssh.port": "SSH port",
+  "node.ssh.hostHintEdge": "The panel connects from Cloudflare's network, not from your computer. While the install runs, this SSH port must accept inbound TCP from the internet: a rule that allows only your own IP will time out.",
+  "node.ssh.providerFirewallHintEdge": "A provider firewall or security group must allow inbound TCP on this SSH port from the internet for the install, because Cloudflare does not publish the addresses the panel connects from. The panel cannot change a rule that blocks SSH.",
   "node.ssh.portHint": "Usually 22",
   "node.ssh.providerFirewallHint": "A provider firewall or security group must allow inbound TCP on this SSH port from the panel server before the panel can connect. The panel cannot change a rule that blocks SSH.",
   "node.ssh.checkServer": "Check server",
@@ -246,6 +248,11 @@ export const en = {
   "node.ssh.phase.waiting_node": "Waiting for the node to connect",
   "node.ssh.phase.cancelling": "Stopping the SSH job",
   "node.ssh.error.timeout": "The panel could not reach this SSH address and port in time. Check that SSH is running and allow inbound TCP from the panel server's public egress IP in the provider firewall/security group. If the host firewall blocks SSH, use provider console or recovery access to open it first. The panel can prepare host rules only after SSH connects; provider rules must be changed in provider controls.",
+  "node.ssh.error.timeoutEdge":
+    "The panel got no answer from this SSH address and port in time. The Cloudflare edition connects from Cloudflare's network, not from your computer, so SSH must accept inbound TCP from the internet (provider firewall and host firewall), not only from your own IP. Open it for the install, or use the manual command.",
+  "node.ssh.error.refused":
+    "The panel's network refused this address, or the server cannot be reached from it. The Cloudflare edition connects from Cloudflare's network: Cloudflare addresses, names behind Cloudflare's proxy (orange cloud) and private or VPN-only networks are refused. Enter the server's own public address, or install the node with the manual command.",
+  "node.ssh.useManual": "Use the manual command",
   "node.ssh.error.unavailable": "The panel could not read an SSH key from this address. Check the host, port, and SSH service.",
   "node.ssh.error.notPublic": "Enter a public server address that can be reached over SSH.",
   "node.ssh.error.authentication": "The server rejected this SSH login or password. Check them and try again.",
@@ -1197,6 +1204,8 @@ export const ru: typeof en = {
   "node.ssh.host": "Адрес SSH-сервера",
   "node.ssh.hostHint": "Панель подключается со своего сервера. Если firewall хостера блокирует этот SSH-порт, заранее разреши входящий TCP с публичного исходящего IP панели в настройках хостера.",
   "node.ssh.port": "Порт SSH",
+  "node.ssh.hostHintEdge": "Панель подключается из сети Cloudflare, а не с твоего компьютера. Пока идёт установка, этот SSH-порт должен принимать входящий TCP из интернета: правило только для твоего IP даст таймаут.",
+  "node.ssh.providerFirewallHintEdge": "Firewall или security group хостера должны на время установки разрешить входящий TCP на этот SSH-порт из интернета: Cloudflare не публикует адреса, с которых подключается панель. Панель не может изменить правило, которое блокирует SSH.",
   "node.ssh.portHint": "Обычно 22",
   "node.ssh.providerFirewallHint": "Firewall или security group хостера должны разрешить входящий TCP на этот SSH-порт с сервера панели. Панель не может изменить правило, которое блокирует SSH.",
   "node.ssh.checkServer": "Проверить сервер",
@@ -1254,6 +1263,11 @@ export const ru: typeof en = {
   "node.ssh.phase.waiting_node": "Ожидание подключения ноды",
   "node.ssh.phase.cancelling": "Остановка SSH-задания",
   "node.ssh.error.timeout": "Панель не получила ответ от SSH-сервера вовремя. Проверь, что SSH запущен, и разреши входящий TCP с публичного исходящего IP панели в firewall/security group хостера. Если SSH блокирует host firewall, сначала открой порт через консоль хостера или режим восстановления. Панель настраивает host firewall только после SSH-подключения; правила хостера нужно менять отдельно.",
+  "node.ssh.error.timeoutEdge":
+    "Панель не получила ответ от этого SSH-адреса и порта вовремя. Cloudflare-версия подключается из сети Cloudflare, а не с твоего компьютера, поэтому SSH должен принимать входящий TCP из интернета (firewall хостера и сервера), а не только с твоего IP. Открой его на время установки или поставь ноду командой вручную.",
+  "node.ssh.error.refused":
+    "Сеть панели отказала в соединении с этим адресом, или сервер из неё недоступен. Cloudflare-версия подключается из сети Cloudflare: адреса Cloudflare, имена за прокси Cloudflare (оранжевое облако) и частные сети или сети только для VPN недоступны. Укажи собственный публичный адрес сервера или поставь ноду командой вручную.",
+  "node.ssh.useManual": "Поставить командой вручную",
   "node.ssh.error.unavailable": "Панель не смогла получить SSH-ключ по этому адресу. Проверь адрес, порт и работу SSH-службы.",
   "node.ssh.error.notPublic": "Укажи публичный адрес сервера, доступный по SSH.",
   "node.ssh.error.authentication": "Сервер отклонил SSH-логин или пароль. Проверь их и попробуй снова.",

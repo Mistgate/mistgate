@@ -322,7 +322,7 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 			s.renderForRequest(w, r, http.StatusInternalServerError, installPageData{Step: "host", Message: "Не удалось загрузить события задания."})
 			return
 		}
-		view := makeJobView(job.Msg.Job)
+		view := s.jobView(job.Msg.Job)
 		page := installPageData{Step: "job", Job: &view, Refresh: view.State == "queued" || view.State == "running" || view.State == "cancel_requested"}
 		if r.URL.Query().Get("cancelled") == "1" {
 			if view.State == "cancelled" && job.Msg.Job.ErrorCode == "cancelled_before_start" {
@@ -347,7 +347,7 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 		page.Message = "Пароль изменён, новый SSH-вход проверен."
 	}
 	for _, job := range jobs.Msg.Jobs {
-		page.Jobs = append(page.Jobs, makeJobView(job))
+		page.Jobs = append(page.Jobs, s.jobView(job))
 	}
 	access, err := s.ListNodeServerAccess(r.Context(), connect.NewRequest(&adminv1.ListNodeServerAccessRequest{}))
 	if err != nil {
@@ -377,7 +377,7 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 		result, err := s.GetSSHFingerprint(r.Context(), connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: host, Port: port}))
 		if err != nil {
 			s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
-				Step: "host", Message: userError(err, "Не удалось получить SSH-отпечаток. Проверьте публичный адрес и доступность порта."), Form: form,
+				Step: "host", Message: s.userMessage(err, "Не удалось получить SSH-отпечаток. Проверьте публичный адрес и доступность порта."), Form: form,
 			})
 			return
 		}
@@ -398,7 +398,7 @@ func (s *Service) postPage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 				Step: "fingerprint", Form: form, Fingerprint: fingerprint,
-				Message: userError(err, "SSH-проверка не прошла. Проверьте логин и пароль, ключ сервера и требования к системе."),
+				Message: s.userMessage(err, "SSH-проверка не прошла. Проверьте логин и пароль, ключ сервера и требования к системе."),
 			})
 			return
 		}
@@ -427,7 +427,7 @@ func (s *Service) cancelPageJob(w http.ResponseWriter, r *http.Request, values u
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			status = http.StatusNotFound
 		}
-		s.renderForRequest(w, r, status, installPageData{Step: "host", Message: userError(err, "Не удалось отменить установку. Обновите страницу и проверьте состояние задания.")})
+		s.renderForRequest(w, r, status, installPageData{Step: "host", Message: s.userMessage(err, "Не удалось отменить установку. Обновите страницу и проверьте состояние задания.")})
 		return
 	}
 	query := url.Values{"job": []string{jobID}, "cancelled": []string{"1"}, "lang": []string{string(pageLanguage(r))}}
@@ -451,7 +451,7 @@ func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values ur
 	if err != nil {
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 			Step: "fingerprint", Form: form, Fingerprint: fingerprint,
-			Message: userError(err, "Повторная SSH-проверка не прошла. Проверьте пароль и попробуйте снова."),
+			Message: s.userMessage(err, "Повторная SSH-проверка не прошла. Проверьте пароль и попробуйте снова."),
 		})
 		return
 	}
@@ -462,7 +462,7 @@ func (s *Service) startPageJob(w http.ResponseWriter, r *http.Request, values ur
 	if err != nil {
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
 			Step: "preflight", Form: form, Fingerprint: fingerprint, Preflight: makePreflightView(facts),
-			Message: userError(err, "Не удалось создать задание. Проверьте имя ноды и повторите действие."),
+			Message: s.userMessage(err, "Не удалось создать задание. Проверьте имя ноды и повторите действие."),
 		})
 		return
 	}
@@ -479,7 +479,7 @@ func (s *Service) retryPageJob(w http.ResponseWriter, r *http.Request, values ur
 		JobId: jobID, ConfirmInstall: true, Password: values.Get("password"), SshUsername: sshUsername(values.Get("username")),
 	}))
 	if err != nil {
-		s.getPageWithMessage(w, r, jobID, userError(err, "Не удалось повторить установку. Проверьте логин, пароль и состояние задания."))
+		s.getPageWithMessage(w, r, jobID, s.userMessage(err, "Не удалось повторить установку. Проверьте логин, пароль и состояние задания."))
 		return
 	}
 	redirectToJob(w, result.Msg.Job.Id, pageLanguage(r))
@@ -498,7 +498,7 @@ func (s *Service) getPageWithMessage(w http.ResponseWriter, r *http.Request, job
 		s.renderForRequest(w, r, http.StatusInternalServerError, installPageData{Step: "host", Message: "Не удалось загрузить события задания."})
 		return
 	}
-	view := makeJobView(job.Msg.Job)
+	view := s.jobView(job.Msg.Job)
 	page := installPageData{Step: "job", Job: &view, Message: message, Refresh: view.State == "queued" || view.State == "running"}
 	for _, event := range events.Msg.Events {
 		page.Events = append(page.Events, makeEventView(event))
@@ -528,7 +528,7 @@ func (s *Service) rotatePagePassword(w http.ResponseWriter, r *http.Request, val
 	}))
 	if err != nil {
 		s.renderForRequest(w, r, http.StatusBadRequest, installPageData{
-			Step: "host", Message: userError(err, "Не удалось подтвердить смену пароля. Доступ сохранён для восстановления."),
+			Step: "host", Message: s.userMessage(err, "Не удалось подтвердить смену пароля. Доступ сохранён для восстановления."),
 		})
 		return
 	}
@@ -706,12 +706,46 @@ func eventLabel(phase, code string) string {
 	}
 }
 
+// refusedTargetMessage is ssh_target_refused: the network the panel dials from refused the address or cannot reach it. Only
+// the Cloudflare edition reports it; the words say "refused or unreachable" because the platform's own refusal looks
+// the same as a closed port.
+const refusedTargetMessage = "Сеть панели отказала в соединении с этим адресом, или сервер из неё недоступен. Панель подключается из сети Cloudflare: адреса Cloudflare, имена за прокси Cloudflare (оранжевое облако) и частные сети недоступны. Укажите собственный публичный адрес сервера или поставьте ноду командой вручную (в панели: добавление ноды, «Получить команду для ручной установки»)."
+
+// edgeTimeoutMessage and edgeTimeoutLabel replace the generic timeout words on the Cloudflare edition, where the panel does
+// not dial from the owner's computer or from a VPS the owner knows, but from Cloudflare's network.
+const (
+	edgeTimeoutMessage = "Панель не получила ответ от SSH-сервера вовремя. Панель подключается из сети Cloudflare, а не с вашего компьютера: SSH должен принимать входящий TCP из интернета (firewall хостера и сервера), а не только с вашего IP. Откройте его на время установки или поставьте ноду командой вручную."
+	edgeTimeoutLabel   = "Сервер не ответил вовремя. Панель подключается из сети Cloudflare, а не с вашего компьютера: SSH должен принимать входящий TCP из интернета, а не только с вашего IP."
+)
+
+// onEdge reports the Cloudflare edition: only it enrols nodes over a link (Config.LinkURL).
+func (s *Service) onEdge() bool { return s.cfg.LinkURL != "" }
+
+// userMessage is userError with the edition's words for a timeout.
+func (s *Service) userMessage(err error, fallback string) string {
+	if s.onEdge() && connect.CodeOf(err) == connect.CodeDeadlineExceeded {
+		return edgeTimeoutMessage
+	}
+	return userError(err, fallback)
+}
+
+// jobView is makeJobView with the edition's words for a timeout.
+func (s *Service) jobView(job *adminv1.NodeProvisionJob) jobView {
+	view := makeJobView(job)
+	if s.onEdge() && job != nil && (job.ErrorCode == "ssh_connection_timeout" || job.ErrorCode == "ssh_preflight_timeout") {
+		view.ErrorLabel = edgeTimeoutLabel
+	}
+	return view
+}
+
 func errorLabel(code string) string {
 	switch code {
 	case "remote_outcome_unknown":
 		return "SSH-задание остановлено. Проверьте сервер: часть команд установки могла уже выполниться."
 	case "ssh_target_invalid", "ssh_target_not_public":
 		return "Укажите публичный адрес сервера, доступный по SSH."
+	case "ssh_target_refused":
+		return refusedTargetMessage
 	case "ssh_host_key_changed":
 		return "Ключ SSH изменился после подтверждения. Установка остановлена."
 	case "ssh_authentication_failed":
@@ -777,6 +811,10 @@ func userError(err error, fallback string) string {
 	case connect.CodeDeadlineExceeded:
 		return "Панель не получила ответ от SSH-сервера вовремя. Проверьте порт и firewall сервера или хостера, разрешив TCP-подключение с сервера панели."
 	case connect.CodeFailedPrecondition:
+		var connectErr *connect.Error
+		if errors.As(err, &connectErr) && connectErr.Message() == "ssh_target_refused" {
+			return refusedTargetMessage
+		}
 		return "Сервер не подходит для установки или настройка панели не завершена. Проверьте требования к системе."
 	case connect.CodeInvalidArgument:
 		return "Проверьте адрес, порт, логин, пароль и данные новой ноды."

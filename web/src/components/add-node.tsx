@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
-import { EditionNotice } from "@/components/edition-notice";
 import { SSHNodeInstall } from "@/components/ssh-node-install";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -18,7 +17,6 @@ import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { cx } from "@/lib/cx";
-import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { nodeKind, useNodeStatus } from "@/lib/node-status";
@@ -67,7 +65,6 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
   const [touched, setTouched] = useState(false);
   const [method, setMethod] = useState<"choose" | "manual" | "ssh">("choose");
   const [issued, setIssued] = useState<Plain<CreateEnrollmentResponse> | null>(null);
-  const sshOff = useEdition().off("provision"); // no install over SSH there: the manual command is the way
 
   // The token is single-use and shown once: once the modal is closed (after its exit animation) drop it from memory.
   useEffect(() => {
@@ -124,30 +121,26 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
       open={open}
       onOpenChange={(o) => !o && close()}
       title={method === "ssh" ? t("node.ssh.title") : issued ? t("node.add.commandTitle", { name: issued.node?.name ?? "" }) : reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("node.add.title")}
-      description={method === "ssh" ? t("node.ssh.body") : issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" || sshOff ? t("node.add.manualBody") : t("node.add.body")}
+      description={method === "ssh" ? t("node.ssh.body") : issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" ? t("node.add.manualBody") : t("node.add.body")}
       closeLabel={t("common.close")}
       className={method === "ssh" ? "md:max-w-[760px] md:max-h-[90vh]" : undefined}
     >
       {issued ? (
         <InstallSteps issued={issued} onClose={onClose} />
       ) : !reenroll && method === "ssh" ? (
-        <SSHNodeInstall onBack={() => setMethod("choose")} onClose={close} />
+        <SSHNodeInstall onBack={() => setMethod("choose")} onClose={close} onManual={() => setMethod("manual")} />
       ) : !reenroll && method === "choose" ? (
         <div className="flex flex-col gap-4">
-          {sshOff ? (
-            <EditionNotice feature="provision">{t("edition.hint.provision")}</EditionNotice>
-          ) : (
-            <section className="rounded-card border border-accent/40 bg-accent/5 p-4">
-              <h3 className="text-base font-bold text-ink">{t("node.add.sshInstallTitle")}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">{t("node.add.sshInstallHint")}</p>
-              <Button type="button" variant="primary" size="lg" full className="mt-4" onClick={() => setMethod("ssh")}>
-                {t("node.add.sshInstall")}
-              </Button>
-            </section>
-          )}
-          <div className={cx("flex flex-col gap-2", !sshOff && "border-t border-line pt-3")}>
-            {!sshOff && <p className="text-center text-xs text-muted">{t("node.add.manualDivider")}</p>}
-            <Button type="button" variant={sshOff ? "primary" : "outline"} size="md" onClick={() => setMethod("manual")}>
+          <section className="rounded-card border border-accent/40 bg-accent/5 p-4">
+            <h3 className="text-base font-bold text-ink">{t("node.add.sshInstallTitle")}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">{t("node.add.sshInstallHint")}</p>
+            <Button type="button" variant="primary" size="lg" full className="mt-4" onClick={() => setMethod("ssh")}>
+              {t("node.add.sshInstall")}
+            </Button>
+          </section>
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-center text-xs text-muted">{t("node.add.manualDivider")}</p>
+            <Button type="button" variant="outline" size="md" onClick={() => setMethod("manual")}>
               {t("node.add.manualOption")}
             </Button>
           </div>

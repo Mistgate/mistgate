@@ -177,19 +177,11 @@ async function openAddNode() {
 }
 
 describe("Add node on the edge", () => {
-  it("offers only the manual command, and says so", async () => {
-    await openAddNode();
-    expect(text()).toContain(notice("provision"));
-    expect(text()).toContain(en["edition.hint.provision"]);
-    expect(buttons()).not.toContain("Install automatically over SSH");
-    expect(buttons()).toContain("Get a manual install command");
-  });
-
-  it("keeps the SSH install on the VPS", async () => {
-    edition = "vps";
+  it("offers the SSH install next to the manual command, with no notice", async () => {
     await openAddNode();
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(buttons()).toContain("Install automatically over SSH");
+    expect(buttons()).toContain("Get a manual install command");
   });
 });
 

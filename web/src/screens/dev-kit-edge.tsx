@@ -65,7 +65,7 @@ export function EdgeKit() {
       <Shot id="edge-updates" title="Edge: Updates (nodes and releases listed, no buttons that start anything)" seed={[[updatesQuery.queryKey, { ...available, panel: panelOffer.panel }]]}>
         <UpdatesScreen />
       </Shot>
-      <Shot id="edge-add-node" title="Edge: Add node (only the manual command)">
+      <Shot id="edge-add-node" title="Edge: Add node (SSH install and the manual command)">
         <AddNodeButton />
       </Shot>
       <Shot id="edge-backups" title="Edge: Settings → Backups">

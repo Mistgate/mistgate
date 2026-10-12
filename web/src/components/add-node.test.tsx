@@ -411,4 +411,41 @@ describe("why an SSH install failed", () => {
       expect(sshError(new ConnectError("panel_address_not_configured", Code.FailedPrecondition), t)).toBe(dict["node.ssh.error.panelAddress"]);
     }
   });
+
+  it("says a refused or unreachable target in the same words from the wizard and from a job, and points to the manual command", () => {
+    for (const dict of [en, ru] as Record<string, string>[]) {
+      const t = tOf(dict);
+      const refused = jobError("ssh_target_refused", t);
+      expect(refused).toBe(dict["node.ssh.error.refused"]);
+      expect(refused).not.toBe(dict["node.ssh.error.install"]);
+      expect(sshError(new ConnectError("ssh_target_refused", Code.FailedPrecondition), t)).toBe(refused);
+      expect(refused).toMatch(/Cloudflare/);
+    }
+  });
+
+  it("explains a timeout by the Cloudflare network on the edge only", () => {
+    for (const dict of [en, ru] as Record<string, string>[]) {
+      const t = tOf(dict);
+      for (const code of ["ssh_fingerprint_timeout", "ssh_connection_timeout", "ssh_preflight_timeout"]) {
+        expect(jobError(code, t), code).toBe(dict["node.ssh.error.timeout"]);
+        expect(jobError(code, t, true), code).toBe(dict["node.ssh.error.timeoutEdge"]);
+        expect(sshError(new ConnectError(code, Code.DeadlineExceeded), t, true), code).toBe(dict["node.ssh.error.timeoutEdge"]);
+      }
+      expect(dict["node.ssh.error.timeoutEdge"]).toMatch(/Cloudflare/);
+      expect(jobError("ssh_authentication_failed", t, true)).toBe(dict["node.ssh.error.authentication"]); // only the timeouts change
+    }
+  });
+
+  it("offers the manual command after a refusal of the target", async () => {
+    getSSHFingerprint.mockRejectedValue(new ConnectError("ssh_target_refused", Code.FailedPrecondition));
+    await open();
+    await click(button("Install automatically over SSH"));
+    await type(input("de1.example.com"), "de1.example.com");
+    await click(button("Check server"));
+    await settle();
+    expect(text()).toContain(en["node.ssh.error.refused"]);
+    await click(button("Use the manual command"));
+    await settle();
+    expect(document.querySelector('input[placeholder="de1"]')).not.toBeNull(); // the manual form
+  });
 });

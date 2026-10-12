@@ -12,10 +12,12 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { provisioning } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
+import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 
-type Props = { onBack: () => void; onClose: () => void };
+type Props = { onBack: () => void; onClose: () => void; onManual?: () => void };
 type Step = 0 | 1 | 2 | 3;
 type Busy = "fingerprint" | "check" | "start" | "retry" | null;
 
@@ -41,6 +43,7 @@ const codeText: Record<string, MessageKey> = {
   ssh_connection_unavailable: "node.ssh.error.unavailable",
   ssh_target_not_public: "node.ssh.error.notPublic",
   ssh_target_invalid: "node.ssh.error.notPublic",
+  ssh_target_refused: "node.ssh.error.refused",
   "invalid ssh target": "node.ssh.error.notPublic",
   ssh_authentication_failed: "node.ssh.error.authentication",
   ssh_password_auth_unavailable: "node.ssh.error.passwordOff",
@@ -67,14 +70,19 @@ const codeText: Record<string, MessageKey> = {
   agent_install_failed: "node.ssh.error.systemd",
 };
 
-export function sshError(error: unknown, t: T): string {
-  const raw = ConnectError.from(error).rawMessage.toLowerCase();
-  const key = Object.hasOwn(codeText, raw) ? codeText[raw] : raw.includes("sudo") ? "node.ssh.error.sudo" : undefined;
-  return key ? t(key) : errorText(error, t);
+// On the Cloudflare edition the panel dials from Cloudflare's network, so a timeout means something else there.
+function codeMessage(key: MessageKey, t: T, edge: boolean): string {
+  return t(edge && key === "node.ssh.error.timeout" ? "node.ssh.error.timeoutEdge" : key);
 }
 
-export function jobError(code: string, t: T): string {
-  return t(Object.hasOwn(codeText, code) ? codeText[code]! : "node.ssh.error.install");
+export function sshError(error: unknown, t: T, edge = false): string {
+  const raw = ConnectError.from(error).rawMessage.toLowerCase();
+  const key = Object.hasOwn(codeText, raw) ? codeText[raw] : raw.includes("sudo") ? "node.ssh.error.sudo" : undefined;
+  return key ? codeMessage(key, t, edge) : errorText(error, t);
+}
+
+export function jobError(code: string, t: T, edge = false): string {
+  return codeMessage(Object.hasOwn(codeText, code) ? codeText[code]! : "node.ssh.error.install", t, edge);
 }
 
 // The worker's phases (provision/worker.go setPhase); an unknown one reads as "Installing", never as a raw code.
@@ -171,8 +179,9 @@ function Fact({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
-export function SSHNodeInstall({ onBack, onClose }: Props) {
+export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   const t = useT();
+  const { edge } = useEdition();
   const fmt = useFmt();
   const guard = useStepUp();
   const qc = useQueryClient();
@@ -260,7 +269,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
       setAddress(host.trim());
       setStep(1);
     } catch (error) {
-      setFailure(sshError(error, t));
+      setFailure(sshError(error, t, edge));
     } finally {
       setBusy(null);
     }
@@ -289,7 +298,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
       setConfirmedInstall(false);
       setStep(2);
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t));
+      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
     } finally {
       setPassword("");
       setBusy(null);
@@ -323,7 +332,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
       qc.setQueryData(["node-provision", response.job.id], response.job);
       setStep(3);
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t));
+      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
     } finally {
       setPassword("");
       setBusy(null);
@@ -347,7 +356,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
       if (response.job) qc.setQueryData(["node-provision", jobId], response.job);
       await qc.invalidateQueries({ queryKey: ["node-provision", jobId] });
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t));
+      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
     } finally {
       setPassword("");
       setBusy(null);
@@ -372,16 +381,23 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
     void navigate({ to: "/nodes/$id", params: { id: nodeId } });
   };
 
+  const hostHint = t(edge ? "node.ssh.hostHintEdge" : "node.ssh.hostHint");
+  // "refused or unreachable" has one way out that needs no SSH from the panel: the one-time command run by hand
+  const manualButton = onManual && (
+    <Button type="button" variant="outline" size="md" className={cx(footBtn, "self-start")} onClick={onManual}>{t("node.ssh.useManual")}</Button>
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <Steps current={step} labels={labels} ariaLabel={t("node.ssh.steps")} />
       {failure && <Notice tone="danger">{failure}</Notice>}
+      {failure === t("node.ssh.error.refused") && manualButton}
 
       {step === 0 && (
         <form onSubmit={(event) => void getFingerprint(event)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <h3 className="text-base font-extrabold tracking-[-0.02em]">{t("node.ssh.step.server")}</h3>
-            <p className="text-sm leading-relaxed text-muted">{t("node.ssh.hostHint")}</p>
+            <p className="text-sm leading-relaxed text-muted">{hostHint}</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_132px]">
             <TextField
@@ -390,7 +406,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
               onChange={(event) => setHost(event.target.value)}
               placeholder="de1.example.com"
               mono
-              hint={t("node.ssh.hostHint")}
+              hint={hostHint}
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
@@ -409,7 +425,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
               hint={t("node.ssh.portHint")}
               required
             />
-            <p className="text-xs leading-relaxed text-muted sm:col-span-2">{t("node.ssh.providerFirewallHint")}</p>
+            <p className="text-xs leading-relaxed text-muted sm:col-span-2">{t(edge ? "node.ssh.providerFirewallHintEdge" : "node.ssh.providerFirewallHint")}</p>
           </div>
           <div className={`${footerCls} sm:justify-between`}>
             <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onBack}>{t("common.cancel")}</Button>
@@ -552,7 +568,7 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
       {step === 3 && (
         <div className="flex flex-col gap-4">
           {job.isPending && <div className="rounded-card border border-line bg-surface-2 p-4 text-sm text-muted">{t("node.ssh.state.queued")}</div>}
-          {job.error && <Notice tone="danger">{sshError(job.error, t)}</Notice>}
+          {job.error && <Notice tone="danger">{sshError(job.error, t, edge)}</Notice>}
           {job.data && (
             <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-2 p-4" aria-live="polite">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -567,9 +583,12 @@ export function SSHNodeInstall({ onBack, onClose }: Props) {
               {jobDone ? (
                 <Banner kind="ok" title={t("node.ssh.done")} />
               ) : jobFailed ? (
-                <Notice tone="danger">{jobError(job.data.errorCode, t)}</Notice>
+                <>
+                  <Notice tone="danger">{jobError(job.data.errorCode, t, edge)}</Notice>
+                  {job.data.errorCode === "ssh_target_refused" && manualButton}
+                </>
               ) : jobCancelled ? (
-                <Notice tone="danger">{jobError(job.data.errorCode, t)}</Notice>
+                <Notice tone="danger">{jobError(job.data.errorCode, t, edge)}</Notice>
               ) : (
                 <>
                   <p className="text-sm text-muted">{phaseLabel(job.data.phase, t)}</p>

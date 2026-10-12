@@ -120,9 +120,10 @@ func TestInstallPageInEnglish(t *testing.T) {
 		"unsupported_os", "unsupported_architecture", "systemd_required", "panel_unreachable", "insufficient_resources", "insufficient_disk_space",
 		"node_not_connected", "ssh_connection_failed", "ssh_connection_refused", "ssh_preflight_failed", "node_identity_mismatch", "node_state_unavailable",
 		"node_retired", "host_firewall_configuration_failed", "agent_bundle_unavailable", "agent_transfer_failed", "node_enrollment_failed", "node_name_taken",
-		"systemd_install_failed", "a_code_from_tomorrow"} {
+		"systemd_install_failed", "ssh_target_refused", "a_code_from_tomorrow"} {
 		errs = append(errs, errorLabel(code))
 	}
+	errs = append(errs, edgeTimeoutMessage, edgeTimeoutLabel, userError(connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_target_refused")), ""))
 	for _, code := range []connect.Code{connect.CodePermissionDenied, connect.CodeUnauthenticated, connect.CodeAlreadyExists, connect.CodeDeadlineExceeded,
 		connect.CodeFailedPrecondition, connect.CodeInvalidArgument} {
 		errs = append(errs, userError(connect.NewError(code, errors.New("x")), ""))
@@ -239,6 +240,51 @@ func TestFingerprintTimeoutExplainsPanelNetworkPath(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("timeout message %q does not contain %q", got, want)
 		}
+	}
+}
+
+// A target the panel's network refuses reads the same from the wizard's first step, from the check and from a job.
+func TestRefusedTargetIsExplainedEverywhere(t *testing.T) {
+	fromStep := userError(connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_target_refused")), "fallback")
+	for _, want := range []string{"отказала", "недоступен", "Cloudflare", "вручную"} {
+		if !strings.Contains(fromStep, want) {
+			t.Errorf("refused message %q does not contain %q", fromStep, want)
+		}
+	}
+	if got := errorLabel("ssh_target_refused"); got != fromStep {
+		t.Fatalf("job label %q differs from the step message %q", got, fromStep)
+	}
+	if got := pageEN.tr(fromStep); got == fromStep || !strings.Contains(got, "manual install command") {
+		t.Fatalf("English refused message = %q", got)
+	}
+	// another precondition keeps the generic words
+	if got := userError(connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_host_key_changed")), ""); strings.Contains(got, "Cloudflare") {
+		t.Fatalf("host-key precondition = %q", got)
+	}
+}
+
+// Only the Cloudflare edition (the one with a link URL) blames the network path for a timeout.
+func TestEdgeTimeoutNamesTheCloudflareNetwork(t *testing.T) {
+	timeout := connect.NewError(connect.CodeDeadlineExceeded, errors.New("ssh_fingerprint_timeout"))
+	vps, edge := &Service{}, &Service{cfg: Config{LinkURL: "wss://panel.example.com/link/"}}
+	if got := vps.userMessage(timeout, "x"); got != userError(timeout, "x") || strings.Contains(got, "Cloudflare") {
+		t.Fatalf("VPS timeout = %q", got)
+	}
+	if got := edge.userMessage(timeout, "x"); got != edgeTimeoutMessage || !strings.Contains(got, "Cloudflare") {
+		t.Fatalf("edge timeout = %q", got)
+	}
+	if got := edge.userMessage(connect.NewError(connect.CodeInvalidArgument, errors.New("x")), "x"); strings.Contains(got, "Cloudflare") {
+		t.Fatalf("only timeouts change, got %q", got)
+	}
+	job := &adminv1.NodeProvisionJob{State: "failed", ErrorCode: "ssh_connection_timeout"}
+	if got := vps.jobView(job).ErrorLabel; got != errorLabel("ssh_connection_timeout") {
+		t.Fatalf("VPS job label = %q", got)
+	}
+	if got := edge.jobView(job).ErrorLabel; got != edgeTimeoutLabel {
+		t.Fatalf("edge job label = %q", got)
+	}
+	if got := edge.jobView(&adminv1.NodeProvisionJob{ErrorCode: "ssh_authentication_failed"}).ErrorLabel; got != errorLabel("ssh_authentication_failed") {
+		t.Fatalf("edge keeps other labels, got %q", got)
 	}
 }
 
