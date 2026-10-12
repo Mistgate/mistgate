@@ -15,6 +15,7 @@ import (
 )
 
 var transactionShape1 = map[string]string{
+	"admin.go:OfferSetupToken":                     "Inserts the supplied token hash only while no admin exists and reads it back, in one fixed batch.",
 	"admin.go:PutSetupToken":                       "Replaces unused setup tokens and inserts the latest in one fixed batch.",
 	"access_user.go:CreateUser":                    "Inserts the user, selected nodes, and optional implicit device credentials in one fixed batch.",
 	"access_user.go:EnsureImplicitDevice":          "Idempotently inserts the implicit device and missing credentials, then reads back its live snapshot.",
@@ -32,6 +33,7 @@ var transactionShape1 = map[string]string{
 	"provision.go:FinishCancelledNodeProvisionJob": "The cancellation event and guarded state transition run in one fixed batch.",
 	"provision.go:RequeueNodeProvisionJobs":        "Set-based event inserts and state updates requeue interrupted jobs in one fixed batch.",
 	"provision.go:createNodeProvisionJob":          "The job insert and optional queued event run in one fixed batch.",
+	"store.go:SetSettingsIfAbsent":                 "Inserts each missing setting and reads the stored values back in one batch.",
 	"store.go:SetSettings":                         "Upserts the supplied settings in one fixed batch.",
 	"telegram.go:ClearTelegramBot":                 "Deletes links and the bot as one fixed batch.",
 	"token.go:RevokeAPIToken":                      "Revokes the token and cancels its open plans in one fixed batch.",

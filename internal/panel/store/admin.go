@@ -75,6 +75,44 @@ func (s *Store) PutSetupToken(ctx context.Context, hash []byte, expires time.Tim
 	return err
 }
 
+// SetupTokenOffer is what OfferSetupToken found after its insert.
+type SetupTokenOffer struct {
+	AdminExists bool      // an admin exists: nothing was offered
+	Found       bool      // the token's row exists
+	Expires     time.Time // when the row (this offer or an earlier one) stops working
+	Used        bool      // the row was consumed
+}
+
+// OfferSetupToken makes hash a setup token for whoever deploys the panel (the hash comes from the deploy tool, the
+// panel never sees the token). One batch inserts the row only while no admin exists and keeps an existing row as it is,
+// so concurrent isolates offer it once and an expired or used token is never revived; a second statement reads back
+// the admin count and the row.
+func (s *Store) OfferSetupToken(ctx context.Context, hash []byte, expires time.Time) (SetupTokenOffer, error) {
+	results, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO setup_token (hash, expires_at) SELECT ?1, ?2 WHERE NOT EXISTS (SELECT 1 FROM admin)
+			ON CONFLICT(hash) DO NOTHING`, Args: []any{hash, unix(expires)}},
+		Stmt{Query: `SELECT (SELECT count(*) FROM admin) AS admins,
+			(SELECT expires_at FROM setup_token WHERE hash = ?1) AS expires_at,
+			(SELECT used_at FROM setup_token WHERE hash = ?1) AS used_at`, Args: []any{hash}, Returning: true},
+	)
+	if err != nil {
+		return SetupTokenOffer{}, err
+	}
+	if len(results[1].Rows) != 1 {
+		return SetupTokenOffer{}, errors.New("store: setup token read-back returned no row")
+	}
+	var admins int64
+	var expiresAt, usedAt sql.NullInt64
+	if err := batchRow(results[1].Rows[0]).Scan(&admins, &expiresAt, &usedAt); err != nil {
+		return SetupTokenOffer{}, err
+	}
+	out := SetupTokenOffer{AdminExists: admins > 0, Found: expiresAt.Valid, Used: usedAt.Valid}
+	if expiresAt.Valid {
+		out.Expires = fromUnix(expiresAt.Int64)
+	}
+	return out, nil
+}
+
 // CheckSetupToken returns ErrSetupClosed unless hash is an unused, unexpired setup
 // token and no admin exists yet. It does not consume the token.
 func (s *Store) CheckSetupToken(ctx context.Context, hash []byte, now time.Time) error {

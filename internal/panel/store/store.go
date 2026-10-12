@@ -9,6 +9,7 @@ import (
 	"embed"
 	"encoding/base32"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -233,4 +234,39 @@ func (s *Store) SetSettings(ctx context.Context, kv map[string]string) error {
 	}
 	_, err := s.batch(ctx, stmts...)
 	return err
+}
+
+// SetSettingsIfAbsent stores each setting of kv that has no value yet and returns the stored value of every key of kv
+// (the supplied one, or the one that was there first). Isolates that generate the same first-run settings at the same
+// time all end up with the stored ones.
+func (s *Store) SetSettingsIfAbsent(ctx context.Context, kv map[string]string) (map[string]string, error) {
+	out := make(map[string]string, len(kv))
+	if len(kv) == 0 {
+		return out, nil
+	}
+	keys := make([]string, 0, len(kv))
+	for k := range kv {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	stmts := make([]Stmt, 0, len(keys)+1)
+	for _, k := range keys {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING`, Args: []any{k, kv[k]}})
+	}
+	stmts = append(stmts, Stmt{Query: `SELECT k, v FROM setting WHERE k IN (SELECT value FROM json_each(?))`, Args: []any{accJSON(keys)}, Returning: true})
+	results, err := s.batch(ctx, stmts...)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range results[len(results)-1].Rows {
+		var k, v string
+		if err := batchRow(row).Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		out[k] = v
+	}
+	if len(out) != len(kv) {
+		return nil, errors.New("store: stored settings read-back is incomplete")
+	}
+	return out, nil
 }
