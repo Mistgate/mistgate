@@ -1,6 +1,6 @@
-// Package vless is the panel half of the VLESS protocol plugin. It offers REALITY with an external target over TCP
-// (RAW + Vision) and XHTTP. TLS, WebSocket and the CDN fields come with the node's TLS front: the schema does not
-// list them and Validate refuses them, so the node never sees a spec it cannot serve.
+// Package vless is the panel half of the VLESS protocol plugin. It offers REALITY over TCP (RAW + Vision) and XHTTP, with
+// the node's own site as the target ("self", the default) or another site. TLS, WebSocket and the CDN fields come with the
+// node's TLS front: the schema does not list them and Validate refuses them, so the node never sees a spec it cannot serve.
 package vless
 
 import (
@@ -34,7 +34,17 @@ type Settings struct {
 	Egress    string          `json:"egress"`
 }
 
+// Target kinds: where REALITY sends everyone who is not a client. self is the node's own site (its name is the profile's
+// server name for the inbound, see BuildInbound), site is another site named by Target.
+const (
+	targetSelf = "self"
+	targetSite = "site"
+)
+
 type RealitySettings struct {
+	// TargetKind is self or site. A document that predates the field (a profile made before the node could serve its own
+	// site) carries a target and no kind: it reads as site, see kind().
+	TargetKind  string   `json:"target_kind"`
 	Target      string   `json:"target"`
 	ServerNames []string `json:"server_names"`
 	ShortIDs    []string `json:"short_ids"`
@@ -46,6 +56,18 @@ type XHTTPSettings struct {
 	Host          string `json:"host"`
 	Mode          string `json:"mode"`
 	XPaddingBytes string `json:"x_padding_bytes"`
+}
+
+// kind is the target kind of a document: the one it names, else site when it has a target (what every profile did before
+// the field existed), else self.
+func (r RealitySettings) kind() string {
+	switch {
+	case r.TargetKind != "":
+		return r.TargetKind
+	case strings.TrimSpace(r.Target) != "":
+		return targetSite
+	}
+	return targetSelf
 }
 
 // NodeSettings is the deterministic settings_json contract consumed by internal/node/vless.parseSpec.
@@ -99,18 +121,33 @@ func (*Protocol) SettingsSchema() []byte { return []byte(settingsSchema) }
 func (*Protocol) DefaultSettings() (json.RawMessage, error) {
 	return json.Marshal(Settings{
 		Port: 443, Transport: "xhttp", Security: "reality",
-		Reality: RealitySettings{ServerNames: []string{}, ShortIDs: []string{}, Fingerprint: "chrome"},
+		Reality: RealitySettings{TargetKind: targetSelf, ServerNames: []string{}, ShortIDs: []string{}, Fingerprint: "chrome"},
 		XHTTP:   XHTTPSettings{Mode: "auto", XPaddingBytes: defaultXPaddingBytes},
 		Egress:  "direct",
 	})
 }
 
 // NormalizeSettings draws the short ids (one of 8 and one of 16 hex characters) and the XHTTP path of a profile that has
-// none. It returns Merged itself when there is nothing to draw.
+// none. A document that gives a target and does not say what kind it is (a script written for the panel before the node
+// could serve its own site) means another site, as it always did: the default "self" would otherwise drop its target in
+// silence. It returns Merged itself when there is nothing to change.
 func (*Protocol) NormalizeSettings(in protocols.NormalizeInput) (json.RawMessage, error) {
 	s, errs := parse(in.Merged)
-	if len(errs) != 0 || (len(s.Reality.ShortIDs) != 0 && s.XHTTP.Path != "") {
+	if len(errs) != 0 {
 		return in.Merged, nil // Validate answers a document it cannot read
+	}
+	changed := false
+	switch {
+	case s.Reality.TargetKind == targetSelf && namesTargetOnly(in.Input) && !hasTargetKind(in.Old):
+		s.Reality.TargetKind, changed = targetSite, true
+	case s.Reality.TargetKind == "": // stored before the field existed: say what it has always meant
+		s.Reality.TargetKind, changed = s.Reality.kind(), true
+	}
+	if len(s.Reality.ShortIDs) != 0 && s.XHTTP.Path != "" {
+		if !changed {
+			return in.Merged, nil
+		}
+		return json.Marshal(s)
 	}
 	if len(s.Reality.ShortIDs) == 0 {
 		ids, err := generatedShortIDs()
@@ -127,6 +164,31 @@ func (*Protocol) NormalizeSettings(in protocols.NormalizeInput) (json.RawMessage
 		s.XHTTP.Path = path
 	}
 	return json.Marshal(s)
+}
+
+// realityKeys is the reality object of a settings document as raw members, so that "said nothing" and "said self" differ.
+func realityKeys(raw json.RawMessage) map[string]json.RawMessage {
+	var doc struct {
+		Reality map[string]json.RawMessage `json:"reality"`
+	}
+	if json.Unmarshal(raw, &doc) != nil {
+		return nil
+	}
+	return doc.Reality
+}
+
+// namesTargetOnly: the client's document gives a target and no target kind.
+func namesTargetOnly(input json.RawMessage) bool {
+	r := realityKeys(input)
+	var target string
+	_ = json.Unmarshal(r["target"], &target)
+	_, hasKind := r["target_kind"]
+	return strings.TrimSpace(target) != "" && !hasKind
+}
+
+func hasTargetKind(stored json.RawMessage) bool {
+	_, ok := realityKeys(stored)["target_kind"]
+	return ok
 }
 
 const defaultXPaddingBytes = "100-1000"
@@ -220,33 +282,14 @@ func validate(s Settings) []protocols.FieldError {
 	default:
 		add("/security", "invalid_enum", "security must be reality")
 	}
-	targetHost, targetErr := targetHostPort(s.Reality.Target)
-	if targetErr != nil {
-		add("/reality/target", "invalid", targetErr.Error())
-	}
-	names := s.Reality.ServerNames
-	switch {
-	case len(names) > 8:
-		add("/reality/server_names", "length", "at most 8 host names")
-	case len(names) == 0:
-		// empty = the target's host; an IP target has no host name to fall back to
-		if targetErr == nil && !isHostname(targetHost) {
-			add("/reality/server_names", "required", "the target is an IP address: list the host names its certificate is valid for")
-		}
+	switch s.Reality.kind() {
+	case targetSelf:
+		// The node's own site: its name comes from the node or the inbound (BuildInbound). A target or names left over from
+		// the other kind are not read.
+	case targetSite:
+		errs = append(errs, validateSiteTarget(s.Reality)...)
 	default:
-		seen := make(map[string]struct{}, len(names))
-		for _, name := range names {
-			if !isHostname(name) {
-				add("/reality/server_names", "invalid", "names must be host names without wildcards")
-				break
-			}
-			key := strings.ToLower(name)
-			if _, ok := seen[key]; ok {
-				add("/reality/server_names", "duplicate", "names must be unique")
-				break
-			}
-			seen[key] = struct{}{}
-		}
+		add("/reality/target_kind", "invalid_enum", "target_kind must be self or site")
 	}
 	if len(s.Reality.ShortIDs) < 1 || len(s.Reality.ShortIDs) > 8 {
 		add("/reality/short_ids", "length", "must contain 1-8 values")
@@ -288,21 +331,65 @@ func validate(s Settings) []protocols.FieldError {
 	return errs
 }
 
-func targetHostPort(target string) (string, error) {
+// validateSiteTarget checks the target of another site and the names REALITY accepts for it.
+func validateSiteTarget(r RealitySettings) []protocols.FieldError {
+	var errs []protocols.FieldError
+	add := func(ptr, code, message string) { errs = append(errs, fe(ptr, code, message)) }
+	targetHost, targetErr := targetHostPort(r.Target)
+	if targetErr != nil {
+		add("/reality/target", targetErr.code, targetErr.message)
+	}
+	names := r.ServerNames
+	switch {
+	case len(names) > 8:
+		add("/reality/server_names", "length", "at most 8 host names")
+	case len(names) == 0:
+		// empty = the target's host; an IP target has no host name to fall back to
+		if targetErr == nil && !isHostname(targetHost) {
+			add("/reality/server_names", "required", "the target is an IP address: list the host names its certificate is valid for")
+		}
+	default:
+		seen := make(map[string]struct{}, len(names))
+		for _, name := range names {
+			if !isHostname(name) {
+				add("/reality/server_names", "invalid", "names must be host names without wildcards")
+				break
+			}
+			key := strings.ToLower(name)
+			if _, ok := seen[key]; ok {
+				add("/reality/server_names", "duplicate", "names must be unique")
+				break
+			}
+			seen[key] = struct{}{}
+		}
+	}
+	return errs
+}
+
+// targetError is a refusal of the target field: a code the admin UI words itself (field.reality.target.<code>) and the
+// English sentence that stands in until it does.
+type targetError struct{ code, message string }
+
+func (e *targetError) Error() string { return e.message }
+
+func targetHostPort(target string) (string, *targetError) {
 	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", &targetError{"required", "enter the site's host:port"}
+	}
 	host, portText, err := net.SplitHostPort(target)
 	if err != nil || strings.TrimSpace(host) == "" {
-		return "", errors.New("must be an external host:port")
+		return "", &targetError{"format", "must be an external host:port"}
 	}
 	if !validHost(host) {
-		return "", errors.New("must use a plain host name or IP address")
+		return "", &targetError{"host", "must use a plain host name or IP address"}
 	}
 	if portText == "" || strings.IndexFunc(portText, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
-		return "", errors.New("port must be 1-65535")
+		return "", &targetError{"port_range", "port must be 1-65535"}
 	}
 	port, err := strconv.ParseUint(portText, 10, 16)
 	if err != nil || port == 0 {
-		return "", errors.New("port must be 1-65535")
+		return "", &targetError{"port_range", "port must be 1-65535"}
 	}
 	return host, nil
 }
@@ -365,8 +452,9 @@ func validateXHTTP(s XHTTPSettings) []protocols.FieldError {
 	return errs
 }
 
-// effectiveServerNames are the TLS names REALITY accepts: the list, or the target's host when the list is empty.
-// Nothing derived is stored, so a changed target keeps the names in step.
+// effectiveServerNames are the TLS names REALITY accepts for another site: the list, or the target's host when the list is
+// empty. Nothing derived is stored, so a changed target keeps the names in step. For the node's own site the one name is
+// the inbound's (siteName), not a setting.
 func effectiveServerNames(s RealitySettings) []string {
 	if len(s.ServerNames) > 0 {
 		return s.ServerNames
@@ -376,6 +464,24 @@ func effectiveServerNames(s RealitySettings) []string {
 		return []string{host}
 	}
 	return nil
+}
+
+// siteName is the name of the node's own site, which is the certificate's name and the only name REALITY accepts: the
+// inbound's own server name, else the node's address when that is a host name. A name needs a dot (a certificate authority
+// does not issue for a bare label), and an IP address has none, so such a node needs an SNI (NeedsDomainError).
+func siteName(in protocols.InboundInput) (string, error) {
+	if o := in.TLSServerNameOverride; o != "" {
+		name := strings.ToLower(strings.TrimSuffix(o, "."))
+		if !isHostname(name) || !strings.Contains(name, ".") {
+			return "", &protocols.ServerNameError{Name: o, DomainOnly: true}
+		}
+		return name, nil
+	}
+	name := strings.ToLower(strings.TrimSuffix(in.Node.Address, "."))
+	if isHostname(name) && strings.Contains(name, ".") {
+		return name, nil
+	}
+	return "", &protocols.NeedsDomainError{Address: in.Node.Address, Reality: true}
 }
 
 func (*Protocol) Summary(raw json.RawMessage) string {
@@ -414,7 +520,8 @@ func (*Protocol) InitInbound(protocols.InboundInitInput) (protocols.InboundInit,
 	return protocols.InboundInit{State: priv.Bytes(), Public: public}, nil
 }
 
-// BuildInbound lifts the TCP listen port and egress out of settings. The rest is the node's vless wireSettings.
+// BuildInbound lifts the TCP listen port and egress out of settings. The rest is the node's vless wireSettings. The node's
+// own site as the target (the default) also asks for a Let's Encrypt certificate for the site's name: TLS acme_domain.
 func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, error) {
 	s, errs := parse(in.Profile.Settings)
 	if len(errs) == 0 {
@@ -434,7 +541,14 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	if err != nil {
 		return plugin.InboundSpec{}, errors.New("the REALITY private key of this inbound is missing or damaged")
 	}
-	names := effectiveServerNames(s.Reality)
+	target, names, tlsSpec := strings.TrimSpace(s.Reality.Target), effectiveServerNames(s.Reality), plugin.TLS{}
+	if s.Reality.kind() == targetSelf {
+		name, err := siteName(in)
+		if err != nil {
+			return plugin.InboundSpec{}, err
+		}
+		target, names, tlsSpec = "self", []string{name}, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: name}
+	}
 	shortIDs := make([]string, len(s.Reality.ShortIDs))
 	for i, id := range s.Reality.ShortIDs {
 		shortIDs[i] = strings.ToLower(id)
@@ -449,7 +563,7 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	settings, err := json.Marshal(NodeSettings{
 		Transport: s.Transport, Security: s.Security, Flow: flow,
 		Reality: NodeReality{
-			Target: strings.TrimSpace(s.Reality.Target), ServerNames: names, ShortIDs: shortIDs,
+			Target: target, ServerNames: names, ShortIDs: shortIDs,
 			PrivateKey: base64.RawURLEncoding.EncodeToString(priv.Bytes()),
 		},
 		XHTTP: NodeXHTTP{Path: xhttp.Path, Host: xhttp.Host, Mode: xhttp.Mode, XPaddingBytes: xhttp.XPaddingBytes},
@@ -460,7 +574,7 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	}
 	return plugin.InboundSpec{
 		Protocol: ID, ProfileID: in.Profile.ID, Version: in.SpecVersion, Enabled: in.Enabled,
-		Listen: plugin.Listen{Network: "tcp", Port: uint16(port)}, Egress: s.Egress, Settings: settings,
+		Listen: plugin.Listen{Network: "tcp", Port: uint16(port)}, TLS: tlsSpec, Egress: s.Egress, Settings: settings,
 	}, nil
 }
 
@@ -533,6 +647,12 @@ func renderView(in protocols.RenderInput) (view, bool) {
 		return view{}, false
 	}
 	names := effectiveServerNames(s.Reality)
+	if s.Reality.kind() == targetSelf {
+		names = nil // the node's own site: the one name the inbound was built with
+		if in.Inbound.TLSServerName != "" {
+			names = []string{in.Inbound.TLSServerName}
+		}
+	}
 	if len(names) == 0 || len(s.Reality.ShortIDs) == 0 {
 		return view{}, false
 	}

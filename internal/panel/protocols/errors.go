@@ -5,8 +5,13 @@ package protocols
 // page shows as last_error when a stored inbound stops building.
 
 // NeedsDomainError: the certificate is Let's Encrypt, which is issued for a DNS name only, and the inbound has none:
-// the node address is an IP and no SNI is set (neither on the inbound nor in the profile).
-type NeedsDomainError struct{ Address string }
+// the node address is an IP and no SNI is set (neither on the inbound nor in the profile). Reality: the certificate is the
+// one of the node's own site behind a REALITY profile (VLESS), whose other choice is another site as the target; the UI
+// words that refusal apart (reality_needs_domain).
+type NeedsDomainError struct {
+	Address string
+	Reality bool
+}
 
 func (*NeedsDomainError) Error() string {
 	return "a host name is required for a Let's Encrypt certificate: the node address is an IP, set an SNI"

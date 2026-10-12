@@ -3,9 +3,10 @@ package vless
 // settingsSchema is the JSON Schema the admin UI renders the profile form from (vocabulary: the comment block of
 // proto/mistgate/admin/v1/profile.proto).
 //
-// What is not here, on purpose: the REALITY target "self" (the node's own site), TLS security, WebSocket and the CDN
-// fields need the node's TLS front. They are not offered, and Validate refuses them, so a profile can never ask a node
-// for something its engine cannot serve. The `security` setting exists (always "reality") but has no field: a control
+// What is not here, on purpose: TLS security, WebSocket and the CDN fields need the node's TLS front. They are not offered,
+// and Validate refuses them, so a profile can never ask a node for something its engine cannot serve. REALITY's target is
+// the node's own site by default (target_kind self); target and server_names belong to the other choice, another site, and
+// the editor hides them for self. The `security` setting exists (always "reality") but has no field: a control
 // with one choice would only confuse; it returns to the schema with the second choice.
 //
 // Groups follow the form's vocabulary: basics (what the node listens on and where REALITY looks), obfuscation (what
@@ -31,15 +32,22 @@ const settingsSchema = `{
     "reality": {
       "type": "object", "title": "REALITY", "x-group": "basics", "x-order": 30,
       "properties": {
+        "target_kind": {
+          "type": "string", "enum": ["self", "site"], "default": "self",
+          "x-enum-labels": {"self": "This node's site", "site": "Another site"},
+          "title": "Site shown to everyone else",
+          "description": "What anyone who is not a client sees on this port. This node's site is the node's own site with its own Let's Encrypt certificate (the node needs a domain). Another site is a real site you name, and the node passes visitors on to it.",
+          "x-widget": "segmented", "x-order": 5, "x-critical": true
+        },
         "target": {
           "type": "string", "minLength": 3, "title": "Target host:port",
-          "description": "A real site the node shows to anyone who is not a client, for example www.example.org:443. It must serve TLS 1.3 with X25519MLKEM768; a site in the same network (ASN) as the node is best.",
+          "description": "Another site's address, for example www.example.org:443. It must serve TLS 1.3 with X25519MLKEM768; a site in the same network (ASN) as the node is best.",
           "x-order": 10, "x-critical": true
         },
         "server_names": {
           "type": "array", "maxItems": 8, "uniqueItems": true,
           "items": {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"},
-          "title": "Server names", "description": "Names the target's certificate is valid for, up to 8. Empty = the host of the target. Needed when the target is an IP address.",
+          "title": "Server names", "description": "Names the other site's certificate is valid for, up to 8. Empty = the host of the target. Needed when the target is an IP address.",
           "x-group": "obfuscation", "x-widget": "string-list", "x-order": 20, "x-critical": true
         },
         "short_ids": {

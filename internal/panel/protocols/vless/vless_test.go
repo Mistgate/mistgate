@@ -24,6 +24,7 @@ func validSettings(t *testing.T, mutate func(*Settings)) json.RawMessage {
 	if err := json.Unmarshal(raw, &s); err != nil {
 		t.Fatal(err)
 	}
+	s.Reality.TargetKind = "site" // the defaults say self; most of these tests are about another site
 	s.Reality.Target = "www.example.org:443"
 	s.Reality.ServerNames = []string{"www.example.org"}
 	s.Reality.ShortIDs = []string{"6ba85179", "0f1e2d3c4b5a6978"}
@@ -63,7 +64,7 @@ func TestSchemaAndDefaults(t *testing.T) {
 	if err := json.Unmarshal(defs, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Port != 443 || got.Transport != "xhttp" || got.Security != "reality" || got.Reality.Target != "" ||
+	if got.Port != 443 || got.Transport != "xhttp" || got.Security != "reality" || got.Reality.Target != "" || got.Reality.TargetKind != "self" ||
 		got.Reality.Fingerprint != "chrome" || got.XHTTP.Mode != "auto" || got.XHTTP.XPaddingBytes != defaultXPaddingBytes || got.Egress != "direct" {
 		t.Errorf("defaults = %+v", got)
 	}
@@ -123,7 +124,7 @@ func TestSchemaAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/transport", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
+	want := []string{"/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/reality/target_kind", "/transport", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
 	if strings.Join(crit, ",") != strings.Join(want, ",") {
 		t.Errorf("x-critical = %v, want %v", crit, want)
 	}

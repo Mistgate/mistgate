@@ -1,0 +1,18 @@
+- name: "de1 · vless · 443"
+  type: vless
+  server: "de1.example.com"
+  port: 443
+  uuid: "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc"
+  udp: true
+  packet-encoding: xudp
+  tls: true
+  servername: "de1.example.com"
+  client-fingerprint: chrome
+  skip-cert-verify: false
+  network: xhttp
+  xhttp-opts:
+    path: "/q8x2kd7w"
+    mode: auto
+  reality-opts:
+    public-key: "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw"
+    short-id: "0f1e2d3c4b5a6978"

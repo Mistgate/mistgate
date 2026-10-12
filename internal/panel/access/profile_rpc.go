@@ -266,7 +266,7 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 		oldSpec, oldErr := s.buildSpec(f, oldMerged)
 		newSpec, newErr := s.buildSpec(f, newMerged)
 		if newErr != nil {
-			return nil, invalid("node %s: %v", f.Node.Name, newErr)
+			return nil, nodeBuildRefusal(newErr, f.Node.Name)
 		}
 		if oldErr != nil || specChanged(oldSpec, newSpec) {
 			impact.InboundsRestarted++
@@ -405,7 +405,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			oldSpec, oldErr := s.buildSpec(f, oldMerged)
 			newSpec, newErr := s.buildSpec(f, newMerged)
 			if newErr != nil {
-				return nil, invalid("node %s: %v", f.Node.Name, newErr)
+				return nil, nodeBuildRefusal(newErr, f.Node.Name)
 			}
 			if oldErr == nil && !specChanged(oldSpec, newSpec) {
 				continue
@@ -737,6 +737,8 @@ func buildRefusal(err error, node string) error {
 	var hop *protocols.PortInHopError
 	var name *protocols.ServerNameError
 	switch {
+	case errors.As(err, &domain) && domain.Reality:
+		return coded(connect.CodeInvalidArgument, "reality_needs_domain", "address", domain.Address, "node", node)
 	case errors.As(err, &domain):
 		return coded(connect.CodeInvalidArgument, "acme_needs_domain", "address", domain.Address, "node", node)
 	case errors.As(err, &hop):
@@ -749,13 +751,30 @@ func buildRefusal(err error, node string) error {
 	return invalid("%v", err)
 }
 
+// nodeBuildRefusal is buildRefusal for a change of a profile that is already on nodes: a refusal the UI words keeps its
+// code (the editor names the node and the address), any other keeps the plugin's sentence with the node in front.
+func nodeBuildRefusal(err error, node string) error {
+	var domain *protocols.NeedsDomainError
+	var name *protocols.ServerNameError
+	if errors.As(err, &domain) || errors.As(err, &name) {
+		return buildRefusal(err, node)
+	}
+	return invalid("node %s: %v", node, err)
+}
+
 // inboundWarnings is what the admin should know before adding or switching on an inbound although it does not stop it:
 // a VLESS listener that pauses a Hysteria2 site, or a WARP exit whose account is missing, paused, or down.
 func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profileName string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
 	var warnings []*adminv1.StatusReason
 	var port80Err error
-	appendDecoyWarning := func(port int, hy2, vless, target string, hy2Spec plugin.InboundSpec) {
-		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": "site", "target": target}
+	appendDecoyWarning := func(port int, hy2, vless string, vlessSpec, hy2Spec plugin.InboundSpec) {
+		// via self: REALITY shows the node's own site, so the Hysteria2 site stays and nothing is borrowed; via site: another
+		// site is shown, which is named by target
+		via := "site"
+		if vlessTargetSelf(vlessSpec) {
+			via = "self"
+		}
+		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": via, "target": vlessTargetHost(vlessSpec)}
 		// only an ACME certificate renews through the site port, so only then does TCP 80 become its sole way (§7.1)
 		if m := hy2Spec.TLS.Mode; m == plugin.TLSAcmeDomain || m == plugin.TLSAcmeIP {
 			params["port80"], port80Err = s.port80State(ctx, nodeID)
@@ -767,7 +786,7 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
 				continue
 			}
-			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, vlessTargetHost(spec), other.spec)
+			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, spec, other.spec)
 			break
 		}
 	} else if spec.Protocol == "hysteria2" {
@@ -777,7 +796,7 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 				if !other.enabled || other.protocol != "vless" || other.l.Network != "tcp" || int(other.l.Port) != port {
 					continue
 				}
-				appendDecoyWarning(port, profileName, other.profile, vlessTargetHost(other.spec), spec)
+				appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
 				break
 			}
 		}
@@ -846,6 +865,19 @@ func hy2TCPPort(spec plugin.InboundSpec) int {
 		return max(*settings.Masquerade.TCPPort, 0)
 	}
 	return 443
+}
+
+// vlessTargetSelf: the VLESS inbound's REALITY target is the node's own site (wire value "self").
+func vlessTargetSelf(spec plugin.InboundSpec) bool {
+	if spec.Protocol != "vless" {
+		return false
+	}
+	var settings struct {
+		Reality struct {
+			Target string `json:"target"`
+		} `json:"reality"`
+	}
+	return json.Unmarshal(spec.Settings, &settings) == nil && strings.TrimSpace(settings.Reality.Target) == "self"
 }
 
 func vlessTargetHost(spec plugin.InboundSpec) string {
