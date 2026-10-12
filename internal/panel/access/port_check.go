@@ -46,14 +46,18 @@ func freePortCandidates(protocol string, n int, listen plugin.Listen, others []n
 	candidates := freePorts(protocol, limit, func(port uint16) bool { return portAllowed(listen, port, others) })
 	var fresh, unchecked []uint16
 	for _, port := range candidates {
+		if listen.Network != "udp" {
+			unchecked = append(unchecked, port)
+			continue
+		}
 		if check, ok := checks[port]; ok && check.Bad(now) {
 			continue
 		}
 		if check, ok := checks[port]; ok && check.Fresh(now) {
 			fresh = append(fresh, port)
-		} else {
-			unchecked = append(unchecked, port)
+			continue
 		}
+		unchecked = append(unchecked, port)
 	}
 	ordered := append(fresh, unchecked...)
 	if len(ordered) > n {
@@ -109,9 +113,16 @@ func cachedPortLossy(checks map[uint16]store.PortCheck, port uint16, now time.Ti
 	return check, ok && check.Bad(now)
 }
 
+func cachedListenPortLossy(listen plugin.Listen, checks map[uint16]store.PortCheck, now time.Time) (store.PortCheck, bool) {
+	if listen.Network != "udp" {
+		return store.PortCheck{}, false
+	}
+	return cachedPortLossy(checks, listen.Port, now)
+}
+
 func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol string, listen plugin.Listen,
 	others []nodeListen, checks map[uint16]store.PortCheck, allowLossy bool) (*adminv1.StatusReason, bool, error) {
-	if s.cfg.CheckPorts == nil {
+	if listen.Network != "udp" || s.cfg.CheckPorts == nil {
 		return nil, false, nil
 	}
 	if cached, ok := checks[listen.Port]; ok && cached.Fresh(s.now()) {

@@ -410,6 +410,9 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			if oldErr == nil && !specChanged(oldSpec, newSpec) {
 				continue
 			}
+			if newSpec.Listen.Network != "udp" {
+				continue
+			}
 			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
 			if err != nil {
 				return nil, err
@@ -436,7 +439,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		for _, changed := range changedPorts {
 			checks := portChecks[changed.node.ID]
 			if m.DryRun {
-				if bad, ok := cachedPortLossy(checks, changed.listen.Port, s.now()); ok {
+				if bad, ok := cachedListenPortLossy(changed.listen, checks, s.now()); ok {
 					if changed.portChanged && !m.AllowLossyPort {
 						free := freePortFor(p.Protocol, changed.listen, changed.others, checks, s.now())
 						return nil, portLossyRefusal(ctx, s, changed.node.Name, bad, free)
@@ -456,7 +459,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 				if override {
 					lossyOverrides = append(lossyOverrides, changed)
 				}
-			} else if bad, ok := cachedPortLossy(checks, changed.listen.Port, s.now()); ok {
+			} else if bad, ok := cachedListenPortLossy(changed.listen, checks, s.now()); ok {
 				portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
 			}
 		}
@@ -695,8 +698,8 @@ func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
 	return nil
 }
 
-// freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and stored bad
-// checks excluded; 0 when none is free.
+// freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and, for UDP,
+// stored bad checks excluded; 0 when none is free.
 func freePortFor(protocol string, l plugin.Listen, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
 	ports := freePortCandidates(protocol, 1, l, others, checks, now)
 	if len(ports) == 0 {
@@ -918,10 +921,6 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if here[f.Profile.ID] {
 		return nil, coded(connect.CodeAlreadyExists, "already_on_node")
 	}
-	portChecks, err := s.readPortChecks(ctx, f.Node.ID)
-	if err != nil {
-		return nil, s.internal("read UDP port checks", err)
-	}
 	if ini, ok := proto.(protocols.InboundInitializer); ok {
 		// Key material of this (profile, node) only (AWG: the server key pair): a hacked node must not give away the
 		// others. A key parked by DeleteInbound is taken back, so that a remove + re-add does not break the configs
@@ -955,6 +954,13 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
 	}
+	var portChecks portCheckCache
+	if spec.Listen.Network == "udp" {
+		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
+		if err != nil {
+			return nil, s.internal("read UDP port checks", err)
+		}
+	}
 	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
@@ -963,7 +969,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, err
 	}
 	if m.ValidateOnly {
-		if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+		if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
 			free := freePortFor(proto.ID(), spec.Listen, others, portChecks[f.Node.ID], s.now())
 			if !m.AllowLossyPort {
 				return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
@@ -1046,7 +1052,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	var portWarning *adminv1.StatusReason
 	var lossyOverride bool
 	var portChecks portCheckCache
-	if m.ValidateOnly || in.Enabled {
+	if spec.Listen.Network == "udp" && (m.ValidateOnly || in.Enabled) {
 		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
 		if err != nil {
 			return nil, s.internal("read UDP port checks", err)
@@ -1062,7 +1068,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		portChanged := oldSpec.Listen.Port != spec.Listen.Port
 		switchedOn := !oldEnabled && in.Enabled
 		if m.ValidateOnly {
-			if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+			if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
 				free := freePortFor(f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], s.now())
 				if (portChanged || switchedOn) && !m.AllowLossyPort {
 					return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
@@ -1077,7 +1083,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 			if portWarning != nil {
 				warnings = append(warnings, portWarning)
 			}
-		} else if bad, ok := cachedPortLossy(portChecks[f.Node.ID], spec.Listen.Port, s.now()); ok {
+		} else if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
 			warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
 		}
 	}

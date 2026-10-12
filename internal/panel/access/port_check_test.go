@@ -14,6 +14,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type accessPortCall struct {
@@ -202,6 +203,143 @@ func TestPortValidationUsesOnlyCachedChecks(t *testing.T) {
 	}
 	if calls, _ := fixtureChecker.snapshot(); len(calls) != 0 {
 		t.Fatalf("UpdateInbound validate_only called CheckPorts: %+v", calls)
+	}
+}
+
+func TestVLESSInboundSkipsUDPLossChecks(t *testing.T) {
+	t.Run("create does not call UDP checker", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		e.inbound(hy2.Id, "nod_de1")
+		checker := usePortChecker(e, func(node string, port uint16) (store.PortCheck, bool) {
+			return portResult(e, node, port, "broken", 300, 100), true
+		}, "")
+		p := e.vlessProfile("vless")
+
+		created, err := e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{ProfileId: p.Id, NodeId: "nod_de1"}))
+		if err != nil {
+			t.Fatalf("CreateInbound returned an error: %v", err)
+		}
+		if warningWithCode(created.Msg.Warnings, "port_lossy") != nil {
+			t.Fatalf("CreateInbound returned a UDP loss warning: %+v", created.Msg.Warnings)
+		}
+		if calls, _ := checker.snapshot(); len(calls) != 0 {
+			t.Fatalf("VLESS CreateInbound called UDP checker: %+v", calls)
+		}
+	})
+
+	t.Run("create ignores cached UDP loss", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		e.inbound(hy2.Id, "nod_de1")
+		checker := usePortChecker(e, nil, "")
+		p := e.vlessProfile("vless")
+		savePortResult(t, e, portResult(e, "nod_de1", 443, "broken", 300, 100))
+
+		checked, err := e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{
+			ProfileId: p.Id, NodeId: "nod_de1", ValidateOnly: true,
+		}))
+		if err != nil {
+			t.Fatalf("CreateInbound validate_only returned an error: %v", err)
+		}
+		if warningWithCode(checked.Msg.Warnings, "port_lossy") != nil {
+			t.Fatalf("CreateInbound validate_only returned a UDP loss warning: %+v", checked.Msg.Warnings)
+		}
+		if calls, _ := checker.snapshot(); len(calls) != 0 {
+			t.Fatalf("VLESS CreateInbound validate_only called UDP checker: %+v", calls)
+		}
+	})
+
+	t.Run("update does not call UDP checker or refuse cached UDP loss", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		e.inbound(hy2.Id, "nod_de1")
+		p := e.vlessProfile("vless")
+		in := e.inbound(p.Id, "nod_de1")
+		checker := usePortChecker(e, func(node string, port uint16) (store.PortCheck, bool) {
+			return portResult(e, node, port, "broken", 300, 100), true
+		}, "")
+		savePortResult(t, e, portResult(e, "nod_de1", 4443, "broken", 300, 100))
+
+		validated, err := e.s.UpdateInbound(e.ctx, req(&adminv1.UpdateInboundRequest{
+			InboundId: in.Id, PortOverride: new(uint32(4443)), ValidateOnly: true,
+		}))
+		if err != nil {
+			t.Fatalf("UpdateInbound validate_only returned an error: %v", err)
+		}
+		if warningWithCode(validated.Msg.Warnings, "port_lossy") != nil {
+			t.Fatalf("UpdateInbound validate_only returned a UDP loss warning: %+v", validated.Msg.Warnings)
+		}
+
+		e.sql(`DELETE FROM node_port_check WHERE node_id = ?`, "nod_de1")
+		updated, err := e.s.UpdateInbound(e.ctx, req(&adminv1.UpdateInboundRequest{
+			InboundId: in.Id, PortOverride: new(uint32(4444)),
+		}))
+		if err != nil {
+			t.Fatalf("UpdateInbound returned an error: %v", err)
+		}
+		if warningWithCode(updated.Msg.Warnings, "port_lossy") != nil {
+			t.Fatalf("UpdateInbound returned a UDP loss warning: %+v", updated.Msg.Warnings)
+		}
+		if calls, _ := checker.snapshot(); len(calls) != 0 {
+			t.Fatalf("VLESS UpdateInbound called UDP checker: %+v", calls)
+		}
+	})
+
+	t.Run("profile update skips UDP loss checks", func(t *testing.T) {
+		e := newEnv(t)
+		e.node("nod_de1", "de1", "de1.example.com", "active")
+		hy2 := e.profile("hy2", "")
+		e.inbound(hy2.Id, "nod_de1")
+		p := e.vlessProfile("vless")
+		e.inbound(p.Id, "nod_de1")
+		checker := usePortChecker(e, func(node string, port uint16) (store.PortCheck, bool) {
+			return portResult(e, node, port, "broken", 300, 100), true
+		}, "")
+		savePortResult(t, e, portResult(e, "nod_de1", 4445, "broken", 300, 100))
+		settings := `{"port":4445}`
+
+		dryRun, err := e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{
+			ProfileId: p.Id, ExpectedVersion: p.Version, SettingsJson: &settings, DryRun: true,
+		}))
+		if err != nil {
+			t.Fatalf("UpdateProfile dry_run returned an error: %v", err)
+		}
+		if warningWithCode(dryRun.Msg.Profile.Warnings, "port_lossy") != nil {
+			t.Fatalf("UpdateProfile dry_run returned a UDP loss warning: %+v", dryRun.Msg.Profile.Warnings)
+		}
+
+		e.sql(`DELETE FROM node_port_check WHERE node_id = ?`, "nod_de1")
+		settings = `{"port":4446}`
+		updated, err := e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{
+			ProfileId: p.Id, ExpectedVersion: p.Version, SettingsJson: &settings,
+		}))
+		if err != nil {
+			t.Fatalf("UpdateProfile returned an error: %v", err)
+		}
+		if warningWithCode(updated.Msg.Profile.Warnings, "port_lossy") != nil {
+			t.Fatalf("UpdateProfile returned a UDP loss warning: %+v", updated.Msg.Profile.Warnings)
+		}
+		if calls, _ := checker.snapshot(); len(calls) != 0 {
+			t.Fatalf("VLESS UpdateProfile called UDP checker: %+v", calls)
+		}
+	})
+}
+
+func TestFreePortForTCPKeepsTCPAndUDPPortsSeparate(t *testing.T) {
+	now := time.Unix(1790779200, 0).UTC()
+	listen := plugin.Listen{Network: "tcp", Port: 443}
+	others := []nodeListen{
+		{profile: "tcp", l: plugin.Listen{Network: "tcp", Port: 8443}},
+		{profile: "hy2", l: plugin.Listen{Network: "udp", Port: 4443}},
+	}
+	checks := map[uint16]store.PortCheck{4443: {Port: 4443, Verdict: "broken", BadAt: now}}
+
+	if got := freePortFor("vless", listen, others, checks, now); got != 4443 {
+		t.Fatalf("free TCP port = %d, want UDP-only port 4443", got)
 	}
 }
 

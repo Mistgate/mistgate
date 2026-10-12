@@ -248,7 +248,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		f.log.Warn("list inbounds for UDP port check", "node", target.ID, "err", err)
 		return portCheckOutcome{errorCode: "failed"}
 	}
-	ports := udpCheckPorts(requested, inbounds)
+	ports := f.udpCheckPorts(target, requested, inbounds)
 	if len(ports) == 0 {
 		return portCheckOutcome{errorCode: "failed"}
 	}
@@ -329,13 +329,29 @@ func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live ma
 	return candidates
 }
 
-func udpCheckPorts(requested []uint16, inbounds []store.FleetInboundRow) []uint16 {
+type udpCheckInbound struct {
+	enabled  bool
+	settings udpPortSettings
+}
+
+func (f *Fleet) udpCheckPorts(node store.NodeRow, requested []uint16, inbounds []store.FleetInboundRow) []uint16 {
+	built := make([]udpCheckInbound, 0, len(inbounds))
+	for _, inbound := range inbounds {
+		spec, err := f.buildSpec(node, inbound)
+		if err != nil || spec.Listen.Network != "udp" {
+			continue
+		}
+		settings := udpPortSettings{Port: spec.Listen.Port}
+		settings.Hop.From, settings.Hop.To = spec.Listen.HopFrom, spec.Listen.HopTo
+		built = append(built, udpCheckInbound{enabled: inbound.Enabled, settings: settings})
+	}
+	return udpCheckPortList(requested, built)
+}
+
+func udpCheckPortList(requested []uint16, inbounds []udpCheckInbound) []uint16 {
 	used := make([]udpPortSettings, 0, len(inbounds))
 	for _, inbound := range inbounds {
-		settings := udpPortSettings{}
-		_ = json.Unmarshal([]byte(inbound.Settings), &settings)
-		settings.Port = udpInboundPort(inbound)
-		used = append(used, settings)
+		used = append(used, inbound.settings)
 	}
 	var out []uint16
 	seen := make(map[uint16]bool, udpcheck.MaxPorts)
@@ -356,8 +372,8 @@ func udpCheckPorts(requested []uint16, inbounds []store.FleetInboundRow) []uint1
 		}
 	} else {
 		for _, inbound := range inbounds {
-			if inbound.Enabled {
-				add(udpInboundPort(inbound))
+			if inbound.enabled {
+				add(inbound.settings.Port)
 			}
 		}
 		for _, port := range udpCheckPreferred {
@@ -637,7 +653,11 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 		if !inbound.Enabled {
 			continue
 		}
-		port := udpInboundPort(inbound)
+		spec, buildErr := f.buildSpec(target, inbound)
+		if buildErr != nil || spec.Listen.Network != "udp" {
+			continue
+		}
+		port := spec.Listen.Port
 		check, ok := checked[port]
 		if !ok || check.Verdict == "ok" || previous[port].Bad(f.now()) {
 			continue
@@ -700,15 +720,6 @@ func (f *Fleet) portCheckMessages(ctx context.Context, checks []store.PortCheck,
 			Sent: check.Sent, Got: check.Got, CheckedUnix: check.CheckedAt.Unix(), BadUnix: badAt, Sender: rowSender, Reason: reason})
 	}
 	return out, senderName, nil
-}
-
-func udpInboundPort(inbound store.FleetInboundRow) uint16 {
-	if inbound.PortOverride != 0 {
-		return inbound.PortOverride
-	}
-	var settings udpPortSettings
-	_ = json.Unmarshal([]byte(inbound.Settings), &settings)
-	return settings.Port
 }
 
 func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow) []store.NodeRow {

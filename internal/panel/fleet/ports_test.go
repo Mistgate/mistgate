@@ -2,7 +2,9 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -12,7 +14,11 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	accesssvc "github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type portCheckRPCResult struct {
@@ -26,9 +32,36 @@ type portCheckFleetResult struct {
 	code   string
 }
 
+// udpCheckPorts adapts the raw row fixtures used by the list-policy test; runtime code builds plugin specs first.
+func udpCheckPorts(requested []uint16, inbounds []store.FleetInboundRow) []uint16 {
+	rows := make([]udpCheckInbound, 0, len(inbounds))
+	for _, inbound := range inbounds {
+		settings := udpPortSettings{}
+		_ = json.Unmarshal([]byte(inbound.Settings), &settings)
+		settings.Port = udpInboundPort(inbound)
+		rows = append(rows, udpCheckInbound{enabled: inbound.Enabled, settings: settings})
+	}
+	return udpCheckPortList(requested, rows)
+}
+
+func udpInboundPort(inbound store.FleetInboundRow) uint16 {
+	if inbound.PortOverride != 0 {
+		return inbound.PortOverride
+	}
+	var settings udpPortSettings
+	_ = json.Unmarshal([]byte(inbound.Settings), &settings)
+	return settings.Port
+}
+
 func portCheckTarget(t *testing.T) (*l3Env, *agent, *conn) {
 	t.Helper()
 	x, target := newL3Env(t)
+	reg, err := protocols.NewRegistry(fakeProto{"fakehy", plugin.ClientHapp}, fakeProto{"fakewg", plugin.ClientAmnezia},
+		fakeProto{"awg", plugin.ClientAmnezia})
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.f.reg = reg
 	x.exec(`UPDATE node SET address = '203.0.113.10', provider = 'provider-a', country_code = 'TR' WHERE id = ?`, target.nodeID)
 	x.f.settleUDP = func(context.Context) error { return nil }
 	targetConn, _, _ := connectCaps(target, "ports-target", capUDPCheck)
@@ -87,6 +120,60 @@ func portCountResult(family string, got map[uint16]uint64, packets map[uint16]ui
 		params["b"+strconv.Itoa(int(port))] = strconv.FormatUint(count*uint64(udpCheckSize)+packets[port]*header, 10)
 	}
 	return &agentv1.CommandResult{Ok: true, Params: params}
+}
+
+func portSpecRows(t *testing.T) (*env, store.NodeRow, []store.FleetInboundRow) {
+	t.Helper()
+	reg := builtin.Registry()
+	x := newEnvWithoutServer(t, reg)
+	access, err := accesssvc.New(x.st, x.v, reg, nil, nil, accesssvc.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.exec(`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_de1', 'de1', 'de1.example.com', 'active', 1)`)
+	hy2, err := access.CreateProfile(x.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "hysteria2", Name: "hy2",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = access.CreateInbound(x.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
+		ProfileId: hy2.Msg.Profile.Id, NodeId: "nod_de1",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	settings := `{"reality":{"target":"www.example.org:443"}}`
+	vless, err := access.CreateProfile(x.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "vless", SettingsJson: settings,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = access.CreateInbound(x.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
+		ProfileId: vless.Msg.Profile.Id, NodeId: "nod_de1", PortOverride: 443,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	otherVLESS, err := access.CreateProfile(x.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "vless-alt", SettingsJson: settings,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = access.CreateInbound(x.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
+		ProfileId: otherVLESS.Msg.Profile.Id, NodeId: "nod_de1", PortOverride: 23456,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	node, err := x.st.Node(x.ctx, "nod_de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbounds, err := x.st.FleetInbounds(x.ctx, node.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return x, node, inbounds
 }
 
 func replyPortStop(c *conn, command *agentv1.UdpCount, family string, got map[uint16]uint64, packets map[uint16]uint64) {
@@ -499,5 +586,41 @@ func TestUDPCheckPortListUsesEnabledPortsPreferredFreePortsAndAnchor(t *testing.
 	}
 	if got := udpCheckPorts([]uint16{8443}, inbounds); !reflect.DeepEqual(got, []uint16{8443, 443}) {
 		t.Fatalf("explicit ports = %v", got)
+	}
+}
+
+func TestUDPPortChecksUseBuiltNetworkAndPort(t *testing.T) {
+	x, node, inbounds := portSpecRows(t)
+	ports := x.f.udpCheckPorts(node, nil, inbounds)
+	if slices.Contains(ports, 23456) {
+		t.Fatalf("UDP check ports include VLESS TCP override 23456: %v", ports)
+	}
+	if got := x.f.udpCheckPorts(node, []uint16{443}, inbounds); !reflect.DeepEqual(got, []uint16{443}) {
+		t.Fatalf("UDP check ports for Hysteria2 UDP 443 and VLESS TCP 443 = %v, want [443] once", got)
+	}
+
+	var hy2ID string
+	var vlessIDs []string
+	for _, inbound := range inbounds {
+		switch inbound.Protocol {
+		case "hysteria2":
+			hy2ID = inbound.ID
+		case "vless":
+			vlessIDs = append(vlessIDs, inbound.ID)
+		}
+	}
+	if hy2ID == "" || len(vlessIDs) != 2 {
+		t.Fatalf("test inbounds do not contain Hysteria2 and both VLESS listeners: %+v", inbounds)
+	}
+	x.f.portLossyEvents(x.ctx, node, inbounds, []store.PortCheck{{
+		NodeID: node.ID, Port: 443, Verdict: "lossy", CheckedAt: time.Now(),
+	}}, map[uint16]store.PortCheck{})
+	if got := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND inbound_id = ? AND code = 'port_lossy'`, node.ID, hy2ID); got != 1 {
+		t.Fatalf("Hysteria2 port_lossy events = %d, want 1", got)
+	}
+	for _, id := range vlessIDs {
+		if got := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND inbound_id = ? AND code = 'port_lossy'`, node.ID, id); got != 0 {
+			t.Fatalf("VLESS inbound %s port_lossy events = %d, want 0", id, got)
+		}
 	}
 }
