@@ -213,12 +213,21 @@ Measured again on the same machine on 10 October with the same scripts. The mach
 | B: 64 streams (Gbit/s) | 3.29 | 2.62 | 2.63 |
 | A: private memory (MiB) | 57 | 57 | 57 |
 
-The uncached path is about twice as fast and its p99 halves, but the tail is not gone (0.92 s, not the hoped-for 0.1 s). The storm in D is served with a 25-30 % lower p95. Everything else (the 429 path, the node, the tunnel, memory, restart) is unchanged within the spread, as expected: the fixes did not touch it.
+The uncached path is about twice as fast and its p99 halves, but the tail is not gone (0.92 s, not the hoped-for 0.1 s; see below). The storm in D is served with a 25-30 % lower p95. Everything else (the 429 path, the node, the tunnel, memory, restart) is unchanged within the spread, as expected: the fixes did not touch it.
+
+The remaining tail had another cause. A `database/sql` transaction starts a goroutine per transaction and per query, and the SQLite driver one per statement, to watch a cancellable context: about 25 per subscription fetch. On one CPU that overflowed the Go scheduler's local run queue into the global one, which a busy processor drains once in 61 rounds, so a connection whose HTTP read goroutine landed there waited up to a second. A fourth change (`perf(store)`, read batches on their own connections without context watchers) removes them. Same machine, same session, uncached variant, 3 repetitions:
+
+| Mistgate, panel only (1 vCPU, 1 GB) | main before the change (control) | with the change |
+|:--|--:|--:|
+| Uncached subscription, requests per second | 4,066 | 4,580 |
+| p50 / p95 / p99 | 1.6 / 3.1 / 682 ms | 11.0 / 20.8 / 23.5 ms |
+| Slowest request | 780 ms | 32 ms |
+
+The machine was faster that day, so compare the columns with each other, not with the tables above. The higher p50 is the fair share of 50 clients that never pause on a saturated server (50 / 4,580 per second = 10.9 ms); before, a few stalled clients left the others an idle server.
 
 Open work:
 
-1. The remaining 0.92 s tail of the uncached subscription path at `GOMAXPROCS=1`.
-2. Investigate the small-request latency inside a loaded tunnel on the node. At 64 parallel streams the p95 of a small request through the tunnel was 29 ms in two of three repetitions (2.3 ms in the third), against about 2 ms for the other three panels; on a 1 vCPU / 1 GB server it was 67 ms against 2.4-3.3 ms (see the tables of phase B and "Cheapest server"). The profiling pass shows a contended mutex in `QStream.Write` (`apernet/quic-go`) and stop-the-world pauses of 46-49 ms when the group is held at its quota; whether either explains the latency is not established.
+1. Investigate the small-request latency inside a loaded tunnel on the node. At 64 parallel streams the p95 of a small request through the tunnel was 29 ms in two of three repetitions (2.3 ms in the third), against about 2 ms for the other three panels; on a 1 vCPU / 1 GB server it was 67 ms against 2.4-3.3 ms (see the tables of phase B and "Cheapest server"). The profiling pass shows a contended mutex in `QStream.Write` (`apernet/quic-go`) and stop-the-world pauses of 46-49 ms when the group is held at its quota; whether either explains the latency is not established.
 
 ## Method
 
