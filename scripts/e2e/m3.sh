@@ -960,10 +960,11 @@ PY
 }
 
 # vless_settings <port> <transport> <server name> [jq filter]: the default settings of a vless profile that uses the local target
+# (another site: the default target kind is the node's own site, which needs a domain and Let's Encrypt, neither of which this node has)
 vless_settings() {
   api ProfileService/ListProtocols '{}' | jq -c --argjson p "$1" --arg t "$2" --arg sn "$3" --arg target "127.0.0.1:$TD_PORT" \
     ".protocols[] | select(.id == \"vless\") | .defaultSettingsJson | fromjson
-     | .port = \$p | .transport = \$t | .reality.target = \$target | .reality.server_names = [\$sn] | ${4:-.}"
+     | .port = \$p | .transport = \$t | .reality.target_kind = \"site\" | .reality.target = \$target | .reality.server_names = [\$sn] | ${4:-.}"
 }
 # vl_get <socks port> <path> [curl args]: prints "<http code> <seconds>" of a GET to the fake internet through a client
 vl_get() {
