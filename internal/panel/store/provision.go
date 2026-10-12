@@ -87,6 +87,23 @@ func (s *Store) NodeProvisionJob(ctx context.Context, id string) (NodeProvisionJ
 		`SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE id = ?`, id))
 }
 
+// NodeProvisionJobsPending reports whether any install job is queued, running or being cancelled: the edge cron wakes the
+// provisioner only then.
+func (s *Store) NodeProvisionJobsPending(ctx context.Context) (bool, error) {
+	return s.provisionJobExists(ctx, `state IN ('queued', 'running', 'cancel_requested')`)
+}
+
+// NodeProvisionJobsQueued reports whether a job waits for a worker.
+func (s *Store) NodeProvisionJobsQueued(ctx context.Context) (bool, error) {
+	return s.provisionJobExists(ctx, `state = 'queued'`)
+}
+
+func (s *Store) provisionJobExists(ctx context.Context, where string) (bool, error) {
+	var exists bool
+	err := s.R.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM node_provision_job WHERE `+where+`)`).Scan(&exists)
+	return exists, err
+}
+
 // NodeProvisionJobState reads only the durable worker state, without loading the encrypted credential blob.
 func (s *Store) NodeProvisionJobState(ctx context.Context, id string) (string, error) {
 	var state string
@@ -119,9 +136,21 @@ func (s *Store) NodeProvisionJobs(ctx context.Context, limit int) ([]NodeProvisi
 	return out, rows.Err()
 }
 
-// RequeueNodeProvisionJobs restores interrupted work after a panel restart.
+// MaxProvisionAttempts is how many times a worker may claim one job. A job still running when the worker restarts for
+// the MaxProvisionAttempts-th time fails with job_interrupted instead of being requeued; a retry starts the count again.
+const MaxProvisionAttempts = 3
+
+// RequeueNodeProvisionJobs restores interrupted work after a panel restart: a running job goes back to the queue, unless
+// it has already been claimed MaxProvisionAttempts times, in which case it fails with job_interrupted and its secret is
+// erased like on any other failure.
 func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time) error {
 	_, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
+			SELECT id, 'failed', 'job_interrupted', ? FROM node_provision_job WHERE state = 'running' AND attempt >= ?`,
+			Args: []any{unix(now), MaxProvisionAttempts}},
+		Stmt{Query: `UPDATE node_provision_job
+			SET state = 'failed', phase = 'failed', error_code = 'job_interrupted', secret = X'', updated_at = ?
+			WHERE state = 'running' AND attempt >= ?`, Args: []any{unix(now), MaxProvisionAttempts}},
 		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
 			SELECT id, 'queued', 'resumed_after_restart', ? FROM node_provision_job WHERE state = 'running'`, Args: []any{unix(now)}},
 		Stmt{Query: `UPDATE node_provision_job SET state = 'queued', phase = 'queued', updated_at = ? WHERE state = 'running'`, Args: []any{unix(now)}},
@@ -189,14 +218,15 @@ func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, 
 	return results[1].RowsAffected == 1, nil
 }
 
-// ClaimNodeProvisionJob atomically claims the oldest queued job for the single panel worker.
+// ClaimNodeProvisionJob atomically claims the oldest queued job for the single panel worker and counts the attempt.
 func (s *Store) ClaimNodeProvisionJob(ctx context.Context, now time.Time) (NodeProvisionJob, bool, error) {
 	queued := `SELECT id FROM node_provision_job WHERE state = 'queued' ORDER BY created_at, id LIMIT 1`
 	results, err := s.batch(ctx,
 		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
 			SELECT id, 'connecting', 'started', ? FROM node_provision_job
 			WHERE id = (` + queued + `) AND state = 'queued'`, Args: []any{unix(now)}},
-		Stmt{Query: `UPDATE node_provision_job SET state = 'running', phase = 'connecting', error_code = '', updated_at = ?
+		Stmt{Query: `UPDATE node_provision_job SET state = 'running', phase = 'connecting', error_code = '',
+			attempt = attempt + 1, updated_at = ?
 			WHERE id = (` + queued + `) AND state = 'queued' RETURNING ` + nodeProvisionJobCols,
 			Args: []any{unix(now)}, Returning: true},
 	)
@@ -240,6 +270,11 @@ func (s *Store) RetryNodeProvisionJob(ctx context.Context, id, from string, secr
 }
 
 func (s *Store) updateNodeProvisionJobFromState(ctx context.Context, id, expected, state, phase, errorCode string, secret []byte, eventCode string, now time.Time) error {
+	// A job leaving failed or cancelled for the queue is an owner's retry: it gets all its attempts again.
+	resetAttempts := ""
+	if state == "queued" && expected != "running" {
+		resetAttempts = ", attempt = 0"
+	}
 	stmts := make([]Stmt, 0, 2)
 	if eventCode != "" {
 		stmts = append(stmts, Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
@@ -247,7 +282,7 @@ func (s *Store) updateNodeProvisionJobFromState(ctx context.Context, id, expecte
 			Args: []any{phase, eventCode, unix(now), id, expected}})
 	}
 	stmts = append(stmts, Stmt{Query: `UPDATE node_provision_job
-		SET state = ?, phase = ?, error_code = ?, secret = ?, updated_at = ? WHERE id = ? AND state = ?`,
+		SET state = ?, phase = ?, error_code = ?, secret = ?, updated_at = ?` + resetAttempts + ` WHERE id = ? AND state = ?`,
 		Args: []any{state, phase, errorCode, secret, unix(now), id, expected}})
 	results, err := s.batch(ctx, stmts...)
 	if err != nil {

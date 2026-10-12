@@ -293,3 +293,15 @@ func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testi
 		t.Fatalf("forgetting twice = %v, want ErrNotFound", err)
 	}
 }
+
+func TestNodeProvisionJobAttemptCapFailsAJobInterruptedThreeTimes(t *testing.T) {
+	checkProvisionAttemptCap(t, openTemp(t))
+}
+
+func TestRequeueNodeProvisionJobsLeavesOtherStatesAlone(t *testing.T) {
+	checkProvisionRequeueLeavesOtherStates(t, openTemp(t))
+}
+
+func TestNodeProvisionJobsPendingAndQueued(t *testing.T) {
+	checkProvisionPending(t, openTemp(t))
+}

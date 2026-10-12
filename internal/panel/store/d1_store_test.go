@@ -1349,6 +1349,9 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 			t.Fatalf("empty claim: ok=%v err=%v", ok, err)
 		}
 	})
+	t.Run("provision attempt cap", func(t *testing.T) { checkProvisionAttemptCap(t, newStore(t)) })
+	t.Run("provision requeue leaves other states", func(t *testing.T) { checkProvisionRequeueLeavesOtherStates(t, newStore(t)) })
+	t.Run("NodeProvisionJobsPending", func(t *testing.T) { checkProvisionPending(t, newStore(t)) })
 	t.Run("updateNodeProvisionJobFromState", func(t *testing.T) {
 		st := newStore(t)
 		seedJob(t, st, "job_update", "node_update", "node-update", "running", now)
