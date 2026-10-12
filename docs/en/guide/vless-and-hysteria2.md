@@ -16,7 +16,7 @@ A node can run Hysteria2 and VLESS side by side. They use different transports (
 
 Two profiles cannot take the same port and network of one node, but UDP 443 and TCP 443 are different ports, and a VLESS profile on another TCP port touches nothing of Hysteria2.
 
-When a VLESS profile on TCP 443 is switched on, the node closes the Hysteria2 HTTPS site on that port and opens it again when the port is free, that is when the VLESS profile is removed, switched off or moved to another port. Hysteria2 itself, on UDP, and its HTTP/3 site keep working. Anyone who opens `https://de1.example.com` on TCP 443 now reaches REALITY, which passes everyone who is not a VLESS client to the REALITY target: they see the target's site, with the target's certificate.
+When a VLESS profile on TCP 443 is switched on, the node closes the Hysteria2 HTTPS site on that port and opens it again when the port is free, that is when the VLESS profile is removed, switched off or moved to another port. Hysteria2 itself, on UDP, and its HTTP/3 site keep working. Anyone who opens `https://de1.example.com` on TCP 443 now reaches REALITY, which passes everyone who is not a VLESS client to the REALITY target. With the node's own site as the target (the default) they see the same site Hysteria2 shows, with the node's own certificate. With another site as the target they see that site, with its certificate.
 
 When you add a VLESS profile on TCP 443 to a node with an enabled Hysteria2 profile, or the other way round, the dialog warns about it (`hy2_decoy_paused`) with the names of both profiles, the port, and the target. The warning does not stop you.
 
@@ -26,19 +26,19 @@ When you add a VLESS profile on TCP 443 to a node with an enabled Hysteria2 prof
 |:--|:--|:--|
 | **VLESS on another TCP port**, for example 8443 | Everything: its site on TCP 443 and the certificate renewal | Open the port at the provider. Some networks filter ports other than 443, and VLESS on such a port does not connect there. |
 | **VLESS on TCP 443, REALITY target another site** | The tunnel. Its HTTPS site is paused | The certificate of a Let's Encrypt Hysteria2 profile now renews only through TCP 80: see below. |
-| **VLESS on TCP 443, the node's own site as the REALITY target** | The tunnel and the same site, shown through REALITY | **Planned.** It needs a domain on the node. |
+| **VLESS on TCP 443, the node's own site as the REALITY target** (the default) | The tunnel, the same site shown through REALITY, and the certificate renewal | It needs a domain on the node and the agent v0.1.35 or newer. See [VLESS REALITY](vless.md#the-nodes-own-site). |
 
-The first way costs nothing and changes nothing for Hysteria2; take it when you can open the port. The second gives VLESS the port every network lets through, at the price of the site and of TCP 80. TLS behind a CDN is **Planned** as well.
+The first way costs nothing and changes nothing for Hysteria2; take it when you can open the port. The third gives VLESS the port every network lets through and keeps the site and the renewal: take it on any node that has a domain. The second does the same for a node without a domain, at the price of the site and of TCP 80. TLS behind a CDN is **Planned**.
 
 ## Certificates
 
-A node gets a Let's Encrypt certificate for its Hysteria2 profile by answering a challenge from Let's Encrypt, in one of two ways: over TCP 80, or over TCP 443 through the Hysteria2 site. While the site is paused, a challenge sent to TCP 443 reaches the REALITY target instead and fails. That leaves TCP 80:
+A node gets a Let's Encrypt certificate for its Hysteria2 profile by answering a challenge from Let's Encrypt, in one of two ways: over TCP 80, or over TCP 443 through the Hysteria2 site. With the node's own site as the REALITY target, REALITY passes the challenge on TCP 443 to that site and the node answers it: renewal keeps working and TCP 80 is not needed. With another site as the target, a challenge sent to TCP 443 reaches that site instead and fails while the Hysteria2 site is paused. That leaves TCP 80:
 
 - **Keep TCP 80 reachable from the internet** on any node that has a Let's Encrypt Hysteria2 profile and a VLESS profile on TCP 443 with another site as the target, and keep other programs off it.
 - A failed try on 443 does no harm: the node switches to the check on 80 with its next order, and Let's Encrypt allows five failed validations per name per hour.
 - A Hysteria2 profile with a self-signed certificate has nothing to renew and is not affected. REALITY itself needs no certificate.
 
-The **Certificate is about to expire** alert (`cert_expiry`, see [Health](../operations/health.md)) warns 14 days ahead. While VLESS holds TCP 443, the doctor cannot read the certificate the Hysteria2 profile serves there, so the alert may stay silent for it. Look at the expiry date of the Hysteria2 certificate yourself now and then, or keep it on a node where the two do not share the port.
+The **Certificate is about to expire** alert (`cert_expiry`, see [Health](../operations/health.md)) warns 14 days ahead. While VLESS holds TCP 443, the doctor cannot read the certificate the Hysteria2 profile serves there; it then uses the expiry the node reports for the certificate it last handed out. After a renewal with no visitor since, that date can lag and the alert can warn too early, and the next visitor clears it.
 
 ## What Mistgate checks of the ports
 
