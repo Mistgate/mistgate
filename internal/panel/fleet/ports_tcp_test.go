@@ -509,3 +509,29 @@ func TestTCPProbeVerdictsOutsideTheKnownSetAreFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestTCPCheckPanelOnTheTargetsHostAnswersButStoresNothing(t *testing.T) {
+	x, target, targetConn := tcpCheckTarget(t)
+	x.exec(`UPDATE node SET address = '127.0.0.1' WHERE id = ?`, target.nodeID)
+	x.f.probeTCP = func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error) {
+		return "4", map[uint16]string{80: "ours", 443: "ours", 8443: "ours"}, nil
+	}
+	node, err := x.st.Node(x.ctx, target.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan []storeTCP, 1)
+	go func() {
+		rows, _ := x.f.runTCPCheck(x.ctx, node, true)
+		done <- rows
+	}()
+	mark := waitHTTPMark(targetConn)
+	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
+	rows := <-done
+	if len(rows) != 3 || rows[1].Verdict != "ours" || rows[1].Sender != "panel" {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if stored, err := x.st.TCPChecks(x.ctx, target.nodeID); err != nil || len(stored) != 0 {
+		t.Fatalf("a hairpin result was stored: %+v, %v", stored, err)
+	}
+}

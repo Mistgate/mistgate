@@ -408,6 +408,24 @@ VLESS profile if a `site` REALITY holds 443); else none (no ACME). Texts in `web
 - `ports.renewal.risk`: "Port 80 is closed and TCP 443 does not answer Let's Encrypt{why}: certificates on this node will stop renewing. Open TCP 80 at the provider, move VLESS to 8443, or make its REALITY target "This node's site"." / "Порт 80 закрыт, а TCP 443 не отвечает Let's Encrypt{why} — сертификаты на этой ноде перестанут обновляться. Открой TCP 80 у провайдера, перенеси VLESS на 8443 или поставь ему цель REALITY «Сайт этой ноды»."
 - `ports.renewal.risk.vless` (fills {why}): " (it goes to "{profile}", REALITY with another site)" / " (его занимает «{profile}» — REALITY с другим сайтом)"
 
+R4.1 as built (2026-10-12), where it adds to the text above:
+- Callers: the admin `CheckPorts` RPC and the scheduled `CheckPortsAsSystem` run the TCP part; the save-time check of the
+  port picker (`Fleet.CheckPorts`) stays UDP only, so saving an inbound does not wait on TCP timeouts.
+- The TCP part runs whenever the target is connected, with its own sender list (nodes listing `tcpcheck/1`, then the VPS
+  panel). Only an offline target stops it. A run with nothing to probe (no ACME name, no hy2 site, no VLESS) does nothing.
+- Rows: verdict `ours | other | refused | timeout`, plus `busy` for port 80 when the agent answers `http01: busy`. A row that
+  could not be probed has verdict "" and a reason: `agent_too_old` (port 80, target without `tcpcheck/1`), `busy`, `no_route`
+  or `failed`. `http01: off` drops the row. A run stores its rows (replacing the node's) only when at least one has a
+  verdict; when every sender failed, the last stored result stays.
+- The VPS panel on the target's own host still answers (as UDP `same_host`), but nothing is stored: a hairpin through the
+  local stack says nothing about the provider's filter.
+- `tcpTargets` already reads the R3 wire settings (`security: "tls"`, `reality.target: "self"`; the node's own name from
+  `Tls.server_name`, ALPN only on 443 with an ACME certificate). Before R3 only REALITY with another site and the hy2 site occur.
+- The pin the node reported for an inbound goes with its target; the verdict is "ours" for a valid chain or that pin.
+- Rows have no address column (the migration is as specified), so after a change of `node.address` the old rows stay until
+  the next run.
+- The scheduled run still keys on the UDP rows (`LastCheckedAt`), so TCP is refreshed every six hours with it.
+
 ### 7.5 REALITY target "self" (R3 node, R4 panel)
 
 Verified in the dependencies:

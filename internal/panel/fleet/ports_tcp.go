@@ -231,14 +231,15 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 	if len(senders) > 2 {
 		senders = senders[:2]
 	}
+	sameHost := false // the VPS panel runs on the target's host: it reaches the node through its own stack, not the network
 	if len(senders) == 0 {
-		// The VPS panel is the sender of last resort, but never against its own host.
-		sameHost := false
+		// The VPS panel is the sender of last resort. Against its own host it still answers (as the UDP part's same_host),
+		// but a hairpin through the local stack says nothing about the provider's filter, so nothing is stored.
+		if !allowPanel {
+			return nil, false
+		}
 		if address, err := udpcheck.Resolve(ctx, target.Address); err == nil {
 			sameHost = panelHasAddress(address)
-		}
-		if !allowPanel || sameHost {
-			return nil, false
 		}
 		senders = []portSender{{panel: true}}
 	}
@@ -293,7 +294,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 	for _, row := range rows {
 		conclusive = conclusive || row.Verdict != ""
 	}
-	if conclusive {
+	if conclusive && !sameHost {
 		if err := f.st.PutTCPChecks(ctx, target.ID, rows); err != nil {
 			f.log.Warn("store TCP port checks", "node", target.ID, "err", err)
 		}
