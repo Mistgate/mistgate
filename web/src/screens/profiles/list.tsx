@@ -74,8 +74,9 @@ function Label({ children }: { children: string }) {
 }
 
 function ProfileCard({ p, t, protocol, inGroup }: { p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; inGroup?: boolean }) {
-  // VLESS in its own tone, so it does not read as Hysteria2; accent for the other protocol Happ consumes; grey for AWG
-  const tone = p.protocol === "vless" ? "sky" : undefined;
+  // each protocol reads apart: VLESS sky, AmneziaWG lavender (the tones of the nodes and integrations sections), accent for
+  // Hysteria2 (the other protocol Happ consumes)
+  const tone = p.protocol === "vless" ? "sky" : p.protocol === "awg" ? "lavender" : undefined;
   const accent = !tone && (protocol?.apps.includes(App.HAPP) ?? false);
   const labels = [p.nodeCount === 0 && t("profiles.label.nowhere"), inGroup === false && t("profiles.label.noGroup")].filter((x): x is string => !!x);
   return (
