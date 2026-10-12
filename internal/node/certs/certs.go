@@ -89,15 +89,36 @@ func (s *Source) log() *slog.Logger {
 // on first use and reused afterwards (same pin). ACME certificates are fetched lazily on the first
 // handshake and in the background right after Acquire; Info is zero until one exists.
 func (s *Source) Acquire(ctx context.Context, inboundID string, t plugin.TLS) (engine.Cert, error) {
+	var c engine.Cert
+	var err error
 	switch t.Mode {
 	case plugin.TLSSelfSigned:
-		return s.selfSigned(t.ServerName)
+		c, err = s.selfSigned(t.ServerName)
 	case plugin.TLSAcmeDomain:
-		return s.acquireACME(inboundID, t.ServerName)
+		c, err = s.acquireACME(inboundID, t.ServerName)
 	case plugin.TLSAcmeIP:
 		return engine.Cert{}, errors.New("certs: tls mode acme_ip is not supported yet")
 	default:
 		return engine.Cert{}, fmt.Errorf("certs: unknown tls mode %d", t.Mode)
+	}
+	if err != nil {
+		return engine.Cert{}, err
+	}
+	c.GetCertificate = s.routeALPN(c.GetCertificate)
+	return c, nil
+}
+
+// routeALPN sends a TLS-ALPN-01 hello (acme-tls/1 as the only protocol) to the ACME entry of its SNI, whatever the
+// inbound that holds the listener is: a node answers the validation of every name it owns on any of its TLS listeners
+// on 443 (design/vless.md section 7.3). Every other hello keeps the inbound's own path.
+func (s *Source) routeALPN(inner func(*tls.ClientHelloInfo) (*tls.Certificate, error)) func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
+			if e := s.entryFor(hello.ServerName); e != nil {
+				return e.getCertificate(hello)
+			}
+		}
+		return inner(hello)
 	}
 }
 

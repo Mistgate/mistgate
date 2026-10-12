@@ -325,3 +325,43 @@ func TestACMEHTTPPortBusyIsNotFatal(t *testing.T) {
 		t.Fatal("expected a usable TLS-ALPN-only source")
 	}
 }
+
+// A TLS-ALPN-01 hello is answered for every ACME name of the node by whichever inbound holds the listener
+// (design/vless.md section 7.3); every other hello keeps the inbound's own certificate.
+func TestALPNChallengeRoutesBySNIWhateverTheInbound(t *testing.T) {
+	s := New(t.TempDir())
+	s.DirectoryURL = "http://127.0.0.1:1/directory"
+	s.HTTPAddr = "127.0.0.1:0"
+	ctx := context.Background()
+	acmeInbound, err := s.Acquire(ctx, "inb-acme", plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "node-a.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Release("inb-acme") })
+	selfInbound, err := s.Acquire(ctx, "inb-self", plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: "site.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alpn := []string{"acme-tls/1"}
+
+	// The self-signed inbound would hand out its own certificate to anything; the challenge for the ACME name must
+	// reach the ACME entry instead (which has no token for it here, so it answers with an error).
+	if _, err := selfInbound.GetCertificate(&tls.ClientHelloInfo{ServerName: "node-a.example.com", SupportedProtos: alpn}); err == nil {
+		t.Fatal("a TLS-ALPN-01 hello for an ACME name was answered by the self-signed inbound")
+	}
+	// A normal hello, and a challenge for a name the node does not hold, keep the inbound's own path.
+	if l := leafOf(t, selfInbound.GetCertificate, "node-a.example.com"); l.Subject.CommonName != "site.example.com" {
+		t.Fatalf("normal hello got %q", l.Subject.CommonName)
+	}
+	if c, err := selfInbound.GetCertificate(&tls.ClientHelloInfo{ServerName: "stranger.example.com", SupportedProtos: alpn}); err != nil || c == nil {
+		t.Fatalf("challenge for an unknown name: %v", err)
+	}
+	// The other way round: the ACME inbound refuses a name it does not hold, as before.
+	if _, err := acmeInbound.GetCertificate(&tls.ClientHelloInfo{ServerName: "stranger.example.com", SupportedProtos: alpn}); err == nil {
+		t.Fatal("the ACME inbound answered a challenge for a name it does not hold")
+	}
+	// Two ALPN protocols is a browser, not a validation.
+	if c, err := selfInbound.GetCertificate(&tls.ClientHelloInfo{ServerName: "node-a.example.com", SupportedProtos: []string{"h2", "acme-tls/1"}}); err != nil || c == nil {
+		t.Fatalf("mixed ALPN: %v", err)
+	}
+}
