@@ -25,7 +25,9 @@ function Start-FakeSshd([string]$RepoRoot, [string]$TempDir) {
         Pop-Location
     }
     $out = Join-Path $TempDir "fakesshd.out"
-    $process = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError (Join-Path $TempDir "fakesshd.err")
+    $start = @{ FilePath = $exe; PassThru = $true; RedirectStandardOutput = $out; RedirectStandardError = (Join-Path $TempDir "fakesshd.err") }
+    if ($IsWindows -or $PSVersionTable.PSEdition -eq "Desktop") { $start.WindowStyle = "Hidden" } # PowerShell on Linux has no -WindowStyle
+    $process = Start-Process @start
     $ready = $null
     for ($i = 0; $i -lt 100 -and -not $ready; $i++) {
         Start-Sleep -Milliseconds 100
