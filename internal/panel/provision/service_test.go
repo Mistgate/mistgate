@@ -6,11 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -333,7 +333,7 @@ func (testNodeManager) ProvisionNodeState(context.Context, string) (string, bool
 
 type testBinarySource struct{}
 
-func (testBinarySource) OpenNodeBinary(string, string) (*os.File, int64, string, error) {
+func (testBinarySource) OpenNodeBinary(context.Context, string, string) (io.ReadCloser, int64, string, error) {
 	return nil, 0, "", errors.New("unused")
 }
 

@@ -50,6 +50,8 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 	passwords := make(chan string, 8)
 	var serverPasswordMu sync.Mutex
 	serverPassword := password
+	var storedMu sync.Mutex
+	var stored []byte // what the fake node's disk holds after the upload
 	signer := testSigner(t)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -95,9 +97,17 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 		case command == "cat > /root/mistgate-node.new":
 			data, err := io.ReadAll(channel)
 			if err == nil {
+				storedMu.Lock()
+				stored = data
+				storedMu.Unlock()
 				uploaded <- data
 			}
 			return nil, err
+		case strings.HasPrefix(command, "sha256sum "):
+			storedMu.Lock()
+			sum := sha256.Sum256(stored)
+			storedMu.Unlock()
+			return []byte(hex.EncodeToString(sum[:]) + "  /root/mistgate-node.new\n"), nil
 		case strings.HasPrefix(command, "/root/mistgate-node enroll "):
 			data, err := io.ReadAll(channel)
 			if err == nil {
@@ -291,14 +301,17 @@ func TestWorkerInstallsNodeOverPinnedSSHAndRedactsSecrets(t *testing.T) {
 			t.Fatalf("credential appeared in SSH command: %q", command)
 		}
 	}
-	if len(remoteCommands) != 8 {
-		t.Fatalf("remote command count = %d, want 8: %q", len(remoteCommands), remoteCommands)
+	if len(remoteCommands) != 9 {
+		t.Fatalf("remote command count = %d, want 9: %q", len(remoteCommands), remoteCommands)
 	}
 	if remoteCommands[1] != "sh -s -- 22" || remoteCommands[2] != "cat > /root/mistgate-node.new" {
 		t.Fatalf("firewall preparation must follow preflight and precede transfer: %q", remoteCommands)
 	}
-	if !strings.HasSuffix(remoteCommands[3], "&& rm -f /root/mistgate-node.new") {
-		t.Fatalf("the uploaded temporary agent is left on the host: %q", remoteCommands[3])
+	if remoteCommands[3] != "sha256sum /root/mistgate-node.new" {
+		t.Fatalf("the uploaded agent is not verified on the node before it is installed: %q", remoteCommands)
+	}
+	if !strings.HasSuffix(remoteCommands[4], "&& rm -f /root/mistgate-node.new") {
+		t.Fatalf("the uploaded temporary agent is left on the host: %q", remoteCommands[4])
 	}
 	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 20)
 	if err != nil {
@@ -405,7 +418,7 @@ type e2eBinarySource struct {
 	path, digest string
 }
 
-func (b e2eBinarySource) OpenNodeBinary(_, _ string) (*os.File, int64, string, error) {
+func (b e2eBinarySource) OpenNodeBinary(context.Context, string, string) (io.ReadCloser, int64, string, error) {
 	file, err := os.Open(b.path)
 	if err != nil {
 		return nil, 0, "", err

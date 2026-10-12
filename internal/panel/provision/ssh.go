@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -24,10 +25,28 @@ var (
 	errHostKeySeen = errors.New("provision: host key captured")
 	// ErrHostKey reports that the server key changed after the owner confirmed it.
 	ErrHostKey = errors.New("provision: SSH host key does not match the confirmed fingerprint")
+	// ErrAuthRejected reports that the server was sent the password (as a password or a keyboard-interactive answer)
+	// and refused it.
+	ErrAuthRejected = errors.New("provision: SSH server rejected the login or password")
+	// ErrNoPasswordAuth reports that the server offers neither password nor keyboard-interactive login (key-only
+	// sshd): the password was never sent, so no password can fix it.
+	ErrNoPasswordAuth = errors.New("provision: SSH server offers no password login")
 )
 
 type contextDialer interface {
 	DialContext(context.Context, string, string) (net.Conn, error)
+}
+
+type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
+func (f dialFunc) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return f(ctx, network, address)
+}
+
+type lookupFunc func(ctx context.Context, host string) ([]netip.Addr, error)
+
+func (f lookupFunc) LookupNetIP(ctx context.Context, _, host string) ([]netip.Addr, error) {
+	return f(ctx, host)
 }
 
 // Client performs password-free host-key discovery and pinned SSH connections.
@@ -41,6 +60,13 @@ type Client struct {
 // NewClient builds a production SSH client with bounded timeouts.
 func NewClient() *Client {
 	return &Client{resolver: net.DefaultResolver, dialer: &net.Dialer{Timeout: sshTimeout}, timeout: sshTimeout}
+}
+
+// NewClientWith builds a client over the caller's connection source and name lookup, for a runtime that has neither a
+// system resolver nor a TCP dialer (the edge edition's sockets and DNS-over-HTTPS). Every address it is asked about
+// still goes through the same public-unicast check as with NewClient.
+func NewClientWith(dial func(ctx context.Context, network, address string) (net.Conn, error), lookup func(ctx context.Context, host string) ([]netip.Addr, error)) *Client {
+	return &Client{resolver: lookupFunc(lookup), dialer: dialFunc(dial), timeout: sshTimeout}
 }
 
 // Fingerprint reads one reachable server key without authenticating and returns its SHA-256 fingerprint and key type.
@@ -232,9 +258,11 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	}
 	defer stopHandshake()
 
+	auth, asked := passwordAuth(password)
 	config := &ssh.ClientConfig{
 		User:              username,
-		Auth:              []ssh.AuthMethod{ssh.Password(password)},
+		Auth:              auth,
+		Config:            ssh.Config{Ciphers: sshCiphers()},
 		HostKeyAlgorithms: preferredHostKeyAlgorithms(),
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			if ssh.FingerprintSHA256(key) != expected {
@@ -246,7 +274,7 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, target.Address(), config)
 	if err != nil {
 		conn.Close()
-		return nil, err
+		return nil, classifyAuthError(err, asked.Load())
 	}
 	stopHandshake()
 	if err := conn.SetDeadline(time.Time{}); err != nil {
@@ -256,6 +284,42 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	client := ssh.NewClient(clientConn, chans, reqs)
 	stop := context.AfterFunc(lifetime, func() { _ = client.Close() })
 	return &Connection{client: client, stop: stop, user: username}, nil
+}
+
+// passwordAuth is the login the owner typed, offered the two ways sshd takes a password: as the password method and, when
+// that is not offered (OpenSSH with PasswordAuthentication no and KbdInteractiveAuthentication yes, PAM-only images), as
+// the answer to every keyboard-interactive prompt. asked turns true once the password has been handed to the server.
+func passwordAuth(password string) (methods []ssh.AuthMethod, asked *atomic.Bool) {
+	asked = new(atomic.Bool)
+	return []ssh.AuthMethod{
+		ssh.PasswordCallback(func() (string, error) {
+			asked.Store(true)
+			return password, nil
+		}),
+		ssh.KeyboardInteractive(func(_, _ string, questions []string, _ []bool) ([]string, error) {
+			answers := make([]string, len(questions))
+			for i := range answers {
+				answers[i] = password
+			}
+			if len(questions) > 0 {
+				asked.Store(true)
+			}
+			return answers, nil
+		}),
+	}, asked
+}
+
+// classifyAuthError tells a refused password from a server that never took one. x/crypto/ssh reports both as the same
+// "unable to authenticate ... no supported methods remain" error; passwordAsked says whether the password left the panel.
+// Any other failure (host key, network, timeout) passes through unchanged.
+func classifyAuthError(err error, passwordAsked bool) error {
+	if err == nil || !strings.Contains(err.Error(), "unable to authenticate") {
+		return err
+	}
+	if passwordAsked {
+		return fmt.Errorf("%w: %w", ErrAuthRejected, err)
+	}
+	return fmt.Errorf("%w: %w", ErrNoPasswordAuth, err)
 }
 
 func validSSHUsername(username string) bool {

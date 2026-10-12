@@ -102,37 +102,14 @@ func (s *Service) Run(ctx context.Context) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		// Keep the claim and active-cancel registration in one critical section.
-		// A cancellation request either wins before the claim or sees the cancel
-		// function after the row becomes running.
-		s.cancelMu.Lock()
-		job, ok, err := s.st.ClaimNodeProvisionJob(ctx, s.cfg.Now())
-		var jobCtx context.Context
-		var cancel context.CancelFunc
-		if ok {
-			jobCtx, cancel = context.WithCancel(ctx)
-			s.active[job.ID] = cancel
-		}
-		s.cancelMu.Unlock()
+		ran, err := s.runNext(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("provision: claim job: %w", err)
+			return err
 		}
-		if ok {
-			stopWatcher, watcherDone := make(chan struct{}), make(chan struct{})
-			go func() {
-				defer close(watcherDone)
-				s.watchWorkerCancellation(jobCtx, job.ID, stopWatcher, cancel)
-			}()
-			s.runJob(jobCtx, job)
-			close(stopWatcher)
-			<-watcherDone
-			cancel()
-			s.cancelMu.Lock()
-			delete(s.active, job.ID)
-			s.cancelMu.Unlock()
+		if ran {
 			continue
 		}
 		select {
@@ -142,6 +119,74 @@ func (s *Service) Run(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+// Drain is the pass of a host that cannot keep a loop running between events (the edge edition's alarm): it claims and
+// runs at most one queued job, then says whether another is waiting. busy: a pass is already running in this process,
+// nothing was done. The first pass of a Service also recovers jobs a dead process left running, as Run does at start.
+func (s *Service) Drain(ctx context.Context) (more, busy bool, err error) {
+	if !s.drainMu.TryLock() {
+		return false, true, nil
+	}
+	defer s.drainMu.Unlock()
+	if !s.recovered {
+		if err := s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now()); err != nil {
+			return false, false, fmt.Errorf("provision: recover jobs: %w", err)
+		}
+		s.recovered = true
+	}
+	if _, err := s.runNext(ctx); err != nil {
+		return false, false, err
+	}
+	if ctx.Err() != nil {
+		// The pass ran out of time with a job still running: queue it for the next pass instead of leaving it running
+		// forever (this process will not recover it again). The attempt counter still bounds how often that can happen.
+		recoverCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := s.st.RequeueNodeProvisionJobs(recoverCtx, s.cfg.Now()); err != nil {
+			return false, false, fmt.Errorf("provision: recover jobs: %w", err)
+		}
+	}
+	more, err = s.st.NodeProvisionJobsQueued(context.WithoutCancel(ctx))
+	if err != nil {
+		return false, false, fmt.Errorf("provision: look for queued jobs: %w", err)
+	}
+	return more, false, nil
+}
+
+// runNext claims the oldest queued job and runs it to its end. ran is false when nothing was queued.
+func (s *Service) runNext(ctx context.Context) (ran bool, err error) {
+	// Keep the claim and active-cancel registration in one critical section.
+	// A cancellation request either wins before the claim or sees the cancel
+	// function after the row becomes running.
+	s.cancelMu.Lock()
+	job, ok, err := s.st.ClaimNodeProvisionJob(ctx, s.cfg.Now())
+	var jobCtx context.Context
+	var cancel context.CancelFunc
+	if ok {
+		jobCtx, cancel = context.WithCancel(ctx)
+		s.active[job.ID] = cancel
+	}
+	s.cancelMu.Unlock()
+	if err != nil {
+		return false, fmt.Errorf("provision: claim job: %w", err)
+	}
+	if !ok {
+		return false, nil
+	}
+	stopWatcher, watcherDone := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		s.watchWorkerCancellation(jobCtx, job.ID, stopWatcher, cancel)
+	}()
+	s.runJob(jobCtx, job)
+	close(stopWatcher)
+	<-watcherDone
+	cancel()
+	s.cancelMu.Lock()
+	delete(s.active, job.ID)
+	s.cancelMu.Unlock()
+	return true, nil
 }
 
 func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
@@ -175,7 +220,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if err := s.setPhase(ctx, &job, "preflight", "checking_host", secret); err != nil {
 		return
 	}
-	remote, err := readPreflight(ctx, conn, s.cfg.PanelAddr)
+	remote, err := readPreflight(ctx, conn, s.cfg.panelAddress())
 	if err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, publicPreflightCode(err))
@@ -196,7 +241,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		return
 	}
 
-	binary, size, digest, err := s.cfg.Binaries.OpenNodeBinary("linux", arch)
+	binary, size, digest, err := s.cfg.Binaries.OpenNodeBinary(ctx, "linux", arch)
 	if err != nil || binary == nil {
 		s.failJob(ctx, job, "agent_bundle_unavailable")
 		return
@@ -288,7 +333,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if !s.mayContinue(ctx, &job) {
 			return
 		}
-		if err := runEnrollment(ctx, conn, s.cfg.PanelAddr, s.cfg.AgentSNI, secret.CAFingerprint, secret.EnrollmentToken); err != nil {
+		if err := runEnrollment(ctx, conn, s.cfg, secret.CAFingerprint, secret.EnrollmentToken); err != nil {
 			if ctx.Err() == nil {
 				s.failJob(ctx, job, "node_enrollment_failed")
 			}
@@ -325,7 +370,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 }
 
 func (s *Service) watchWorkerCancellation(ctx context.Context, jobID string, stop <-chan struct{}, cancel context.CancelFunc) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(cancelPoll)
 	defer ticker.Stop()
 	for {
 		select {
@@ -636,25 +681,52 @@ func supportedArchitecture(raw string) (string, bool) {
 	}
 }
 
+// uploadBinary streams the agent into a temporary file and proves the node holds exactly the signed bytes, twice: the
+// digest of what was read from the source (a corrupted or replaced source), then the digest of the file on the node.
+// The second is not redundant: when the connection drops or the sending process restarts mid-stream, `cat` sees the end
+// of its input and exits 0 on a truncated file, which only a look at the file itself reveals.
 func uploadBinary(ctx context.Context, conn *Connection, binary io.Reader, size int64, expected string) error {
+	const remotePath = "/root/mistgate-node.new"
 	limited := &io.LimitedReader{R: binary, N: size + 1}
 	digest := sha256.New()
 	input := io.TeeReader(limited, digest)
-	if err := runSSH(ctx, conn, "cat > /root/mistgate-node.new", input, 3*time.Minute); err != nil {
+	if err := runSSH(ctx, conn, "cat > "+remotePath, input, 3*time.Minute); err != nil {
 		return err
 	}
 	read := size + 1 - limited.N
 	if read != size || hex.EncodeToString(digest.Sum(nil)) != expected {
-		_ = runSSH(ctx, conn, "rm -f /root/mistgate-node.new", nil, 10*time.Second)
+		_ = runSSH(ctx, conn, "rm -f "+remotePath, nil, 10*time.Second)
 		return errors.New("provision: agent digest mismatch")
+	}
+	output, err := runSSHCapture(ctx, conn, "sha256sum "+remotePath, nil, time.Minute, 4<<10)
+	if err == nil {
+		if fields := strings.Fields(string(output)); len(fields) == 0 || fields[0] != expected {
+			err = errors.New("provision: agent digest mismatch on the node")
+		}
+	}
+	if err != nil {
+		if ctx.Err() == nil {
+			_ = runSSH(ctx, conn, "rm -f "+remotePath, nil, 10*time.Second)
+		}
+		return err
 	}
 	return nil
 }
 
-func runEnrollment(ctx context.Context, conn *Connection, panelAddr, sni, caFingerprint, token string) error {
-	command := "/root/mistgate-node enroll --panel " + shellQuote(panelAddr) +
-		" --sni " + shellQuote(sni) + " --ca-sha256 " + shellQuote(caFingerprint) + " --token-stdin --resume-key"
-	return runSSH(ctx, conn, command, strings.NewReader(token+"\n"), 45*time.Second)
+// enrollCommand registers the node with the one-time token (sent on stdin, never in the command line): over the panel's
+// public link when the panel has one (the edge edition, whose agents have no mTLS endpoint to dial), else over mTLS.
+func enrollCommand(cfg Config, caFingerprint string) string {
+	command := "/root/mistgate-node enroll "
+	if cfg.LinkURL != "" {
+		command += "--link-url " + shellQuote(cfg.LinkURL)
+	} else {
+		command += "--panel " + shellQuote(cfg.PanelAddr) + " --sni " + shellQuote(cfg.AgentSNI)
+	}
+	return command + " --ca-sha256 " + shellQuote(caFingerprint) + " --token-stdin --resume-key"
+}
+
+func runEnrollment(ctx context.Context, conn *Connection, cfg Config, caFingerprint, token string) error {
+	return runSSH(ctx, conn, enrollCommand(cfg, caFingerprint), strings.NewReader(token+"\n"), 45*time.Second)
 }
 
 func runSSH(ctx context.Context, conn *Connection, command string, input io.Reader, timeout time.Duration) error {
@@ -732,6 +804,10 @@ func publicSSHCode(err error) string {
 		return "ssh_target_not_public"
 	case errors.Is(err, ErrHostKey):
 		return "ssh_host_key_changed"
+	case errors.Is(err, ErrAuthRejected):
+		return "ssh_authentication_failed"
+	case errors.Is(err, ErrNoPasswordAuth):
+		return "ssh_password_auth_unavailable"
 	case errors.Is(err, context.Canceled):
 		return "ssh_connection_canceled"
 	case isTimeoutError(err):

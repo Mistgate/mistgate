@@ -5,10 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -44,20 +45,29 @@ type NodeManager interface {
 	ProvisionNodeState(context.Context, string) (state string, connected bool, err error)
 }
 
-// BinarySource returns a file from the currently trusted release bundle and the digest in its signed manifest.
+// BinarySource returns a node binary from the currently trusted release, its size and the sha256 (hex) in the signed
+// manifest. The reader is a local file on the VPS edition and a network stream on the edge, hence the context. The
+// caller verifies the bytes it transfers against the digest.
 type BinarySource interface {
-	OpenNodeBinary(goos, goarch string) (*os.File, int64, string, error)
+	OpenNodeBinary(ctx context.Context, goos, goarch string) (io.ReadCloser, int64, string, error)
 }
 
 // Config contains the services needed for durable SSH provisioning.
 type Config struct {
 	// Edge is the edge edition: it cannot reach a server over SSH, so the SSH wizard and the installs refuse.
-	Edge       bool
-	StepUp     func(context.Context) error
-	Nodes      NodeManager
-	Binaries   BinarySource
-	PanelAddr  string
-	AgentSNI   string
+	Edge      bool
+	StepUp    func(context.Context) error
+	Nodes     NodeManager
+	Binaries  BinarySource
+	PanelAddr string
+	AgentSNI  string
+	// LinkURL (wss://host/<secret-prefix>/) makes the node enrol over the panel's public link instead of the mTLS
+	// endpoint (--link-url, no --panel or --sni), and its host:port is what the node's reachability probe dials. Set by
+	// the edge edition only; PanelAddr is then unused. With neither, installs say panel_address_not_configured.
+	LinkURL string
+	// Kick, when set, is called instead of waking the in-process worker loop whenever a job is queued: a host without
+	// a loop (the edge alarm) wakes its own runner. It runs inside the request that queued the job, so it must not block.
+	Kick       func()
 	Log        *slog.Logger
 	Now        func() time.Time
 	SSH        *Client
@@ -67,14 +77,16 @@ type Config struct {
 
 // Service exposes the owner-only provisioning API and runs durable jobs.
 type Service struct {
-	st       *store.Store
-	vault    *vault.Vault
-	cfg      Config
-	ssh      *Client
-	work     chan struct{}
-	accessMu sync.Mutex
-	cancelMu sync.Mutex
-	active   map[string]context.CancelFunc
+	st        *store.Store
+	vault     *vault.Vault
+	cfg       Config
+	ssh       *Client
+	work      chan struct{}
+	accessMu  sync.Mutex
+	cancelMu  sync.Mutex
+	active    map[string]context.CancelFunc
+	drainMu   sync.Mutex // one Drain pass at a time; held for a whole job
+	recovered bool       // Drain has requeued the jobs a dead process left running (guarded by drainMu)
 }
 
 type credentials struct {
@@ -100,6 +112,12 @@ func NewService(st *store.Store, vlt *vault.Vault, cfg Config) (*Service, error)
 			return nil, errors.New("provision: agent panel address must be host:port")
 		}
 	}
+	if cfg.LinkURL != "" {
+		u, err := url.Parse(cfg.LinkURL)
+		if err != nil || u.Scheme != "wss" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return nil, errors.New("provision: agent link address must be wss://host/<prefix>")
+		}
+	}
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
@@ -116,6 +134,23 @@ func NewService(st *store.Store, vlt *vault.Vault, cfg Config) (*Service, error)
 		cfg.RetryDelay = 2 * time.Second
 	}
 	return &Service{st: st, vault: vlt, cfg: cfg, ssh: cfg.SSH, work: make(chan struct{}, 1), active: make(map[string]context.CancelFunc)}, nil
+}
+
+// panelAddress is the host:port a node must be able to reach: the link's when it enrols over the link, else the panel
+// address of the mTLS endpoint. Empty: neither is configured.
+func (c Config) panelAddress() string {
+	if c.LinkURL == "" {
+		return c.PanelAddr
+	}
+	u, err := url.Parse(c.LinkURL)
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+	return net.JoinHostPort(u.Hostname(), port)
 }
 
 // Handler mounts the owner-only ProvisioningService Connect handler.
@@ -159,7 +194,7 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	if s.cfg.PanelAddr == "" {
+	if s.cfg.panelAddress() == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
 	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
@@ -172,7 +207,7 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 		return nil, sshConnectError(err)
 	}
 	defer conn.Close()
-	remote, err := readPreflight(ctx, conn, s.cfg.PanelAddr)
+	remote, err := readPreflight(ctx, conn, s.cfg.panelAddress())
 	if err != nil {
 		return nil, preflightConnectError(err)
 	}
@@ -194,7 +229,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if !req.Msg.ConfirmInstall {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("confirm_install_required"))
 	}
-	if s.cfg.PanelAddr == "" {
+	if s.cfg.panelAddress() == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
 	fromPlan := req.Msg.PlanId != ""
@@ -639,6 +674,10 @@ func (s *Service) auditAs(ctx context.Context, actor, action string, params map[
 }
 
 func (s *Service) signalWorker() {
+	if s.cfg.Kick != nil {
+		s.cfg.Kick()
+		return
+	}
 	select {
 	case s.work <- struct{}{}:
 	default:
@@ -704,7 +743,7 @@ func sshConnectError(err error) error {
 	switch code {
 	case "ssh_target_not_public":
 		status = connect.CodeInvalidArgument
-	case "ssh_host_key_changed":
+	case "ssh_host_key_changed", "ssh_password_auth_unavailable":
 		status = connect.CodeFailedPrecondition
 	case "ssh_connection_canceled":
 		status = connect.CodeCanceled

@@ -245,10 +245,11 @@ func (s *Service) NodeBinary(goos, goarch string) string {
 	return filepath.ToSlash(p)
 }
 
-// OpenNodeBinary opens a verified node binary from the current trusted bundle. The caller receives the signed
-// manifest's digest as well and must verify the bytes it transfers: the descriptor is stable across path replacement,
-// while an in-place write can still change bytes after this method returns.
-func (s *Service) OpenNodeBinary(goos, goarch string) (*os.File, int64, string, error) {
+// OpenNodeBinary opens a verified node binary from the current trusted bundle (provision.BinarySource; the file is local,
+// so the context is unused). The caller receives the signed manifest's digest as well and must verify the bytes it
+// transfers: the descriptor is stable across path replacement, while an in-place write can still change bytes after this
+// method returns.
+func (s *Service) OpenNodeBinary(_ context.Context, goos, goarch string) (io.ReadCloser, int64, string, error) {
 	b := s.current()
 	if b == nil || !b.trusted || b.manifest == nil || s.now().Unix() > b.manifest.Expires {
 		return nil, 0, "", errors.New("update: no current trusted bundle")

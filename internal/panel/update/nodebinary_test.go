@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
@@ -48,7 +49,7 @@ func TestOpenNodeBinaryRechecksTheBytesItWillTransfer(t *testing.T) {
 	e := newEnv(t)
 	want := []byte("trusted node binary")
 	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": want})
-	f, size, digest, err := e.s.OpenNodeBinary("linux", "amd64")
+	f, size, digest, err := e.s.OpenNodeBinary(context.Background(), "linux", "amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestOpenNodeBinaryRechecksTheBytesItWillTransfer(t *testing.T) {
 	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
 		t.Fatal(err)
 	}
-	if f, _, _, err := e.s.OpenNodeBinary("linux", "amd64"); err == nil {
+	if f, _, _, err := e.s.OpenNodeBinary(context.Background(), "linux", "amd64"); err == nil {
 		f.Close()
 		t.Fatal("tampered binary passed the signed digest check")
 	}

@@ -57,6 +57,15 @@ func linkURL(in InstanceConfig) string {
 	return "wss://" + u.Host + in.LinkPrefix
 }
 
+// provisionLinkURL is the link an SSH install enrols the node over. Edge agents are link-only (no mTLS endpoint to dial),
+// so an edge install uses the link, like fleet's own install command; the VPS edition keeps the mTLS enrolment.
+func provisionLinkURL(edge bool, in InstanceConfig) string {
+	if !edge {
+		return ""
+	}
+	return linkURL(in)
+}
+
 // AdminURL is the address the owner opens in a browser.
 func (in InstanceConfig) AdminURL() string {
 	if len(in.RPOrigins) == 0 {
@@ -247,7 +256,7 @@ func Build(c Config) (*Panel, error) {
 	})
 	prov, err := nodeprovision.NewService(st, vlt, nodeprovision.Config{
 		Edge: edge, StepUp: authSvc.RequireStepUp, Nodes: fl, Binaries: upd,
-		PanelAddr: c.PanelAddr, AgentSNI: in.AgentSNI, Log: log,
+		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(edge, in), AgentSNI: in.AgentSNI, Log: log,
 	})
 	if err != nil {
 		return nil, err
