@@ -380,6 +380,40 @@ func TestD1PortChecksUseOneStatement(t *testing.T) {
 	}
 }
 
+func TestD1TCPChecksStorage(t *testing.T) {
+	tcpCheckStoreProof(t, openD1Store(t))
+}
+
+func TestD1PutTCPChecksUsesOneBatch(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, created_at)
+		VALUES ('nod_tcp_count', 'node-tcp-count', '203.0.113.13', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	checks := []TCPCheck{
+		{Port: 80, Role: "acme", Verdict: "ours", Sender: "panel", CheckedAt: time.Unix(100, 0)},
+		{Port: 443, Role: "site", ALPN: true, Profile: "alice-hy2", Verdict: "ours", Sender: "panel", CheckedAt: time.Unix(100, 0)},
+	}
+	binding := js.Global().Get("__d1")
+	var err error
+	calls := countD1Queries(t, binding, "PutTCPChecks", func() { err = st.PutTCPChecks(ctx, "nod_tcp_count", checks) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("PutTCPChecks used %d sequential queries and %d batches, want one batch", calls.queries, calls.batches)
+	}
+	var rows []TCPCheck
+	calls = countD1Queries(t, binding, "TCPChecks", func() { rows, err = st.TCPChecks(ctx, "nod_tcp_count") })
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("TCPChecks() = %+v, %v", rows, err)
+	}
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("TCPChecks used %d sequential queries and %d batches, want one read", calls.queries, calls.batches)
+	}
+}
+
 func TestD1ResetUserPeriodDoesNotOverwriteANewerPeriod(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

@@ -493,6 +493,12 @@
   },
   {
     "type": "table",
+    "name": "node_tcp_check",
+    "tbl_name": "node_tcp_check",
+    "sql": "CREATE TABLE node_tcp_check ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, port INTEGER NOT NULL, role TEXT NOT NULL, alpn INTEGER NOT NULL DEFAULT 0, profile TEXT NOT NULL DEFAULT '', verdict TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', sender TEXT NOT NULL, checked_at INTEGER NOT NULL, PRIMARY KEY (node_id, port) )"
+  },
+  {
+    "type": "table",
     "name": "node_traffic_hour",
     "tbl_name": "node_traffic_hour",
     "sql": "CREATE TABLE node_traffic_hour ( node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, protocol TEXT NOT NULL, hour_start INTEGER NOT NULL CHECK (hour_start % 3600 = 0), bytes_up INTEGER NOT NULL DEFAULT 0, bytes_down INTEGER NOT NULL DEFAULT 0, peak_users INTEGER NOT NULL DEFAULT 0, -- max distinct users online in any snapshot of the hour peak_devices INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, protocol, hour_start) ) STRICT, WITHOUT ROWID"

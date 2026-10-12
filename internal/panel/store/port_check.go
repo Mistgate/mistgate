@@ -104,3 +104,66 @@ func (s *Store) PortChecks(ctx context.Context, nodeIDs ...string) ([]PortCheck,
 	}
 	return out, rows.Err()
 }
+
+// TCPCheck is one row of the latest TCP port check of a node: whether a connection to Port reaches Mistgate.
+// Verdict is ours | other | busy | refused | timeout, or "" with a Reason when the port could not be probed.
+type TCPCheck struct {
+	NodeID, Role, Profile string
+	Port                  uint16
+	ALPN                  bool // the listener answers TLS-ALPN-01 (a Hysteria2 site, a VLESS TLS front or "self" on 443)
+	Verdict, Reason       string
+	Sender                string
+	CheckedAt             time.Time
+}
+
+// PutTCPChecks replaces a node's TCP check rows with checks (all of one node) in one batch. An empty list clears them.
+func (s *Store) PutTCPChecks(ctx context.Context, nodeID string, checks []TCPCheck) error {
+	stmts := make([]Stmt, 0, 2)
+	stmts = append(stmts, Stmt{Query: `DELETE FROM node_tcp_check WHERE node_id = ?`, Args: []any{nodeID}})
+	if len(checks) > 0 {
+		values := make([]string, 0, len(checks))
+		args := make([]any, 0, len(checks)*9)
+		for _, check := range checks {
+			values = append(values, "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			alpn := 0
+			if check.ALPN {
+				alpn = 1
+			}
+			args = append(args, nodeID, int64(check.Port), check.Role, alpn, check.Profile, check.Verdict, check.Reason,
+				check.Sender, unix(check.CheckedAt))
+		}
+		stmts = append(stmts, Stmt{Query: `INSERT INTO node_tcp_check
+			(node_id, port, role, alpn, profile, verdict, reason, sender, checked_at)
+			VALUES ` + strings.Join(values, ", "), Args: args})
+	}
+	_, err := s.batch(ctx, stmts...)
+	return err
+}
+
+// TCPChecks reads the stored TCP check rows. With no nodeIDs it returns every node's rows.
+func (s *Store) TCPChecks(ctx context.Context, nodeIDs ...string) ([]TCPCheck, error) {
+	q := `SELECT node_id, port, role, alpn, profile, verdict, reason, sender, checked_at FROM node_tcp_check`
+	var args []any
+	if len(nodeIDs) > 0 {
+		q += ` WHERE node_id IN (SELECT value FROM json_each(?))`
+		args = append(args, jsonStrings(nodeIDs))
+	}
+	q += ` ORDER BY node_id, port`
+	rows, err := s.R.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TCPCheck
+	for rows.Next() {
+		var check TCPCheck
+		var port, alpn, checkedAt int64
+		if err := rows.Scan(&check.NodeID, &port, &check.Role, &alpn, &check.Profile, &check.Verdict, &check.Reason,
+			&check.Sender, &checkedAt); err != nil {
+			return nil, err
+		}
+		check.Port, check.ALPN, check.CheckedAt = uint16(port), alpn != 0, fromUnix(checkedAt)
+		out = append(out, check)
+	}
+	return out, rows.Err()
+}
