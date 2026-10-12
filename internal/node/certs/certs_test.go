@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,6 +19,100 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
+
+func TestHTTP01MarkIsOneShotAndBypassesHostRouting(t *testing.T) {
+	s, url := markTestSource(t)
+	token, answer := []byte("0123456789abcdef"), []byte("fedcba9876543210")
+	if !s.Mark(token, answer, time.Now().Add(time.Minute)) {
+		t.Fatal("Mark rejected a fresh mark")
+	}
+	path := "/.well-known/acme-challenge/" + hex.EncodeToString(token)
+	for i, wantStatus := range []int{http.StatusOK, http.StatusNotFound} {
+		req, err := http.NewRequest(http.MethodGet, url+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Host = "unmatched.example"
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, readErr := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if readErr != nil || resp.StatusCode != wantStatus {
+			t.Fatalf("request %d: status %d, body %q, err %v", i, resp.StatusCode, body, readErr)
+		}
+		if i == 0 && string(body) != string(answer) {
+			t.Fatalf("mark body = %q, want exact answer", body)
+		}
+	}
+}
+
+func TestHTTP01MarkExpiresAndHTTP01State(t *testing.T) {
+	s := New(t.TempDir())
+	if got := s.HTTP01State(); got != "off" {
+		t.Fatalf("without ACME inbounds HTTP01State() = %q", got)
+	}
+	s.acme["example.com"] = &acmeEntry{name: "example.com"}
+	if got := s.HTTP01State(); got != "busy" {
+		t.Fatalf("ACME with an unavailable :80 listener HTTP01State() = %q", got)
+	}
+	s, url := markTestSource(t)
+	if got := s.HTTP01State(); got != "serving" {
+		t.Fatalf("bound HTTP-01 listener HTTP01State() = %q", got)
+	}
+	token, answer := []byte("0123456789abcdef"), []byte("fedcba9876543210")
+	if !s.Mark(token, answer, time.Now().Add(time.Minute)) {
+		t.Fatal("Mark rejected a fresh mark")
+	}
+	s.mu.Lock()
+	s.httpMark.until = time.Now().Add(-time.Second)
+	s.mu.Unlock()
+	req, err := http.NewRequest(http.MethodGet, url+"/.well-known/acme-challenge/"+hex.EncodeToString(token), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "unmatched.example"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expired mark status = %d, want 404", resp.StatusCode)
+	}
+	if !s.Mark([]byte("abcdef0123456789"), answer, time.Now().Add(time.Minute)) {
+		t.Fatal("expired mark kept the one-mark slot busy")
+	}
+}
+
+func TestHTTP01MarkBusyWhileAnotherMarkIsActive(t *testing.T) {
+	s, _ := markTestSource(t)
+	if !s.Mark([]byte("0123456789abcdef"), []byte("fedcba9876543210"), time.Now().Add(time.Minute)) {
+		t.Fatal("first mark was rejected")
+	}
+	if s.Mark([]byte("abcdef0123456789"), []byte("0123456789abcdef"), time.Now().Add(time.Minute)) {
+		t.Fatal("second concurrent mark replaced the first")
+	}
+}
+
+func markTestSource(t *testing.T) (*Source, string) {
+	t.Helper()
+	s := New(t.TempDir())
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	s.acme["example.com"] = &acmeEntry{name: "example.com", httpH: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})}
+	s.http = serveHTTP(ln, s)
+	addr := s.http.addr.String()
+	s.mu.Unlock()
+	t.Cleanup(func() { s.http.close() })
+	return s, "http://" + addr
+}
 
 func leafOf(t *testing.T, gc func(*tls.ClientHelloInfo) (*tls.Certificate, error), sni string) *x509.Certificate {
 	t.Helper()

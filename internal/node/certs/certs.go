@@ -56,10 +56,17 @@ type Source struct {
 
 	dir string
 
-	mu   sync.Mutex
-	acme map[string]*acmeEntry // by server name
-	byID map[string]string     // inbound id -> acme server name
-	http *httpServer
+	mu       sync.Mutex
+	acme     map[string]*acmeEntry // by server name
+	byID     map[string]string     // inbound id -> acme server name
+	http     *httpServer
+	httpMark *http01Mark
+}
+
+type http01Mark struct {
+	token  []byte
+	answer []byte
+	until  time.Time
 }
 
 var _ engine.CertSource = (*Source)(nil)
@@ -100,6 +107,54 @@ func (s *Source) Release(inboundID string) {
 	s.releaseLocked(inboundID)
 }
 
+// Mark arms one one-shot HTTP-01 delivery mark. The token and answer are held only in memory and the mark expires at until.
+func (s *Source) Mark(token, answer []byte, until time.Time) bool {
+	if len(token) != 16 || len(answer) != 16 {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.httpMark != nil && !time.Now().Before(s.httpMark.until) {
+		s.httpMark = nil
+	}
+	if s.httpMark != nil {
+		return false
+	}
+	s.httpMark = &http01Mark{token: append([]byte(nil), token...), answer: append([]byte(nil), answer...), until: until}
+	return true
+}
+
+// HTTP01State reports whether an ACME inbound can answer the HTTP-01 probe on this node.
+func (s *Source) HTTP01State() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.acme) == 0 {
+		return "off"
+	}
+	if s.http == nil {
+		return "busy"
+	}
+	return "serving"
+}
+
+func (s *Source) takeHTTPMark(path string) ([]byte, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mark := s.httpMark
+	if mark == nil {
+		return nil, false
+	}
+	if !time.Now().Before(mark.until) {
+		s.httpMark = nil
+		return nil, false
+	}
+	if path != "/.well-known/acme-challenge/"+hex.EncodeToString(mark.token) {
+		return nil, false
+	}
+	s.httpMark = nil
+	return append([]byte(nil), mark.answer...), true
+}
+
 func (s *Source) releaseLocked(inboundID string) {
 	name, ok := s.byID[inboundID]
 	if !ok {
@@ -118,6 +173,7 @@ func (s *Source) releaseLocked(inboundID string) {
 	if len(s.acme) == 0 && s.http != nil {
 		s.http.close()
 		s.http = nil
+		s.httpMark = nil
 	}
 }
 
@@ -382,6 +438,11 @@ func serveHTTP(ln net.Listener, s *Source) *httpServer {
 	notFound := decoy.NotFound()
 	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if answer, ok := s.takeHTTPMark(r.URL.Path); ok {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(answer)
+				return
+			}
 			if e := s.entryFor(r.Host); e != nil && e.httpH != nil {
 				e.httpH.ServeHTTP(w, r)
 				return
