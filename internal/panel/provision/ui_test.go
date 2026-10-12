@@ -116,7 +116,7 @@ func TestInstallPageInEnglish(t *testing.T) {
 		events = append(events, eventView{Label: eventLabel("install", code)})
 	}
 	var errs []string
-	for _, code := range []string{"remote_outcome_unknown", "ssh_target_invalid", "ssh_host_key_changed", "ssh_authentication_failed", "ssh_connection_timeout",
+	for _, code := range []string{"remote_outcome_unknown", "ssh_target_invalid", "ssh_host_key_changed", "ssh_authentication_failed", "ssh_password_auth_unavailable", "ssh_connection_timeout",
 		"unsupported_os", "unsupported_architecture", "systemd_required", "panel_unreachable", "insufficient_resources", "insufficient_disk_space",
 		"node_not_connected", "ssh_connection_failed", "ssh_connection_refused", "ssh_preflight_failed", "node_identity_mismatch", "node_state_unavailable",
 		"node_retired", "host_firewall_configuration_failed", "agent_bundle_unavailable", "agent_transfer_failed", "node_enrollment_failed", "node_name_taken",

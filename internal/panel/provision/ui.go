@@ -717,6 +717,8 @@ func errorLabel(code string) string {
 	case "ssh_authentication_failed":
 		// root or a sudo user: the login is the owner's, so is the refusal
 		return "Сервер отклонил SSH-логин или пароль. Проверьте их и повторите установку."
+	case "ssh_password_auth_unavailable":
+		return "Сервер не принимает вход по паролю, только по ключу. Поставьте ноду командой вручную или временно разрешите вход по паролю в sshd."
 	case "ssh_connection_timeout", "ssh_preflight_timeout":
 		return "Сервер не ответил вовремя. Проверьте сеть и порт SSH."
 	case "unsupported_os", "unsupported_os_version":

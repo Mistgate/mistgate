@@ -43,6 +43,7 @@ const codeText: Record<string, MessageKey> = {
   ssh_target_invalid: "node.ssh.error.notPublic",
   "invalid ssh target": "node.ssh.error.notPublic",
   ssh_authentication_failed: "node.ssh.error.authentication",
+  ssh_password_auth_unavailable: "node.ssh.error.passwordOff",
   ssh_host_key_changed: "node.ssh.error.hostKey",
   unsupported_os: "node.ssh.error.unsupportedOS",
   unsupported_os_version: "node.ssh.error.unsupportedOS",
