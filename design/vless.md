@@ -355,7 +355,7 @@ How it proves that our process answered (the nftables counter used for UDP would
 
 | Port and role | Probe | "ours" when |
 |---|---|---|
-| 80, `acme` (only if the node has an ACME inbound) | The target agent arms a one-time mark; the sender sends `GET /.well-known/acme-challenge/<hex token>` (Host = node address). This is Let's Encrypt's own path, so a provider filter on it shows up too. | Status 200 and body = `<hex answer>` |
+| 80, `acme` (only if the node has an ACME inbound) | The target agent arms a one-time mark; the sender sends `GET /.well-known/acme-challenge/<token>` (Host = node address). The token is 32 random bytes in unpadded base64url, as Let's Encrypt issues it, so a provider filter on that path shows up too. | Status 200 and body = `<token>.<base64url of 32 answer bytes>`, the shape of an ACME key authorization |
 | hy2 site port (when not claimed), `site` | TLS handshake, SNI = spec server name | Chain valid for the SNI (system roots), or leaf sha256 = the reported pin (self-signed) |
 | VLESS port, `vless` (tls/self) | Same | Same |
 | VLESS port, `vless` (REALITY with another site) | TLS handshake, SNI = `server_names[0]` | Chain valid for the target name, so our REALITY forwarded it. A full REALITY-authenticated probe stays "later". |
@@ -367,7 +367,7 @@ Proto `agent.v1` (additive; `api_version` stays 1; section "TCP DELIVERY CHECK";
 
 ```proto
 HttpMark http_mark = 28;  TcpProbe tcp_probe = 29;
-message HttpMark { string request_id = 1; bytes token = 2; /*16*/ bytes answer = 3; /*16*/ uint32 hold_s = 4; /*1-60*/ }
+message HttpMark { string request_id = 1; bytes token = 2; /*32*/ bytes answer = 3; /*32*/ uint32 hold_s = 4; /*1-60*/ }
 // -> CommandResult{ok, params{"http01": "serving"|"busy"|"off"}}  busy = another program holds :80; off = no ACME name, :80 unused
 message TcpProbe { string request_id = 1; string host = 2; repeated TcpTarget targets = 3; /*1-8*/ }
 message TcpTarget { uint32 port = 1; string kind = 2; /*"http_mark"|"tls"*/ string sni = 3; string pin_sha256 = 4; bytes token = 5; bytes answer = 6; }
@@ -410,13 +410,30 @@ VLESS profile if a `site` REALITY holds 443); else none (no ACME). Texts in `web
 
 R4.1 as built (2026-10-12), where it adds to the text above:
 - Callers: the admin `CheckPorts` RPC and the scheduled `CheckPortsAsSystem` run the TCP part; the save-time check of the
-  port picker (`Fleet.CheckPorts`) stays UDP only, so saving an inbound does not wait on TCP timeouts.
+  port picker (`Fleet.CheckPorts`) stays UDP only and starts no TCP work of its own. It still queues behind a run that is
+  already in flight on the node (the per-node gate): behind a full run it waits for the TCP half too and takes that run's
+  result, bounded by the picker's `portCheckTimeout` of 8 s (then the port is `unchecked`). The confirming second sample of
+  the scheduler after UDP loss is UDP only (`CheckPortsAsSystemUDP`). A caller that wants the TCP half does not take the
+  result of a UDP-only run it waited behind; it runs its own.
+- Mark: the path and the body are `tcpcheck.MarkPath` / `tcpcheck.MarkBody`, shared by the node and the prober. The proto is
+  unreleased, so the sizes moved from 16 to 32 bytes without a new capability.
 - The TCP part runs whenever the target is connected, with its own sender list (nodes listing `tcpcheck/1`, then the VPS
   panel). Only an offline target stops it. A run with nothing to probe (no ACME name, no hy2 site, no VLESS) does nothing.
 - Rows: verdict `ours | other | refused | timeout`, plus `busy` for port 80 when the agent answers `http01: busy`. A row that
   could not be probed has verdict "" and a reason: `agent_too_old` (port 80, target without `tcpcheck/1`), `busy`, `no_route`
-  or `failed`. `http01: off` drops the row. A run stores its rows (replacing the node's) only when at least one has a
-  verdict; when every sender failed, the last stored result stays.
+  or `failed`. `http01: off` drops the row. A run stores its rows (replacing the node's) only when a probe gave at least one
+  verdict; when every sender failed, the last stored result stays. The target's own `busy` for port 80 is no probe verdict:
+  with TLS rows to probe it does not replace good stored rows, and it is the whole result only when port 80 is the only
+  target. Rows are removed when nothing is left to say: no TCP target any more (the last inbound with a TCP port is gone or
+  disabled) or `http01: off` removed the only target.
+- A second sender takes over after `busy` or `no_route` of the first (both answer before any request leaves the sender, so
+  the mark is still good). After any other failure (a timeout of the command, a lost link) the first sender may have made its GET and
+  used the mark up: the second probes the TLS ports only and port 80 reads verdict "" with reason `failed`, never a false
+  `other`. The mark does not replace an older one; a second arm while one is held is `busy`, the only guard against two runs
+  from different isolates on the edge.
+- Safety: the prober refuses unspecified, multicast, broadcast and link-local unicast addresses (loopback stays, the panel may
+  run on the node's own host), bounds the name lookup by the connect timeout, and reports a cancelled run as an error rather
+  than as `timeout` verdicts.
 - The VPS panel on the target's own host still answers (as UDP `same_host`), but nothing is stored: a hairpin through the
   local stack says nothing about the provider's filter.
 - `tcpTargets` already reads the R3 wire settings (`security: "tls"`, `reality.target: "self"`; the node's own name from
@@ -425,6 +442,16 @@ R4.1 as built (2026-10-12), where it adds to the text above:
 - Rows have no address column (the migration is as specified), so after a change of `node.address` the old rows stay until
   the next run.
 - The scheduled run still keys on the UDP rows (`LastCheckedAt`), so TCP is refreshed every six hours with it.
+
+R4.1 not built yet (TODO), so the web and the other readers are still behind the data:
+- The `Ports` block and `renewalOf` in `web/src/lib/port-check.ts` (the renewal line of this section) are not built; the rows
+  are stored and sent (`GetNodeResponse.tcp_checks`, `CheckPortsResponse.tcp`) but nothing in the UI reads them.
+- `port80` of the access warnings is not read from the stored port-80 row: `access` still sends `unchecked`.
+- The MCP `node_ports` tool (`internal/panel/mcp/tools_read.go`, `nodePorts`) reads only the UDP rows and drops the TCP ones.
+- The docs section for the TCP check is not written.
+- Small: `hy2SitePort` duplicates the node's rule in `internal/node/hysteria2/settings.go`; after an agent restart the `Live`
+  row is read again for the sender; `runTCPCheck` still returns a `ran` flag that no caller uses; a few reads (inbounds,
+  nodes, live) repeat between the UDP and the TCP half.
 
 ### 7.5 REALITY target "self" (R3 node, R4 panel)
 
