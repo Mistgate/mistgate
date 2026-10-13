@@ -33,6 +33,16 @@ export const ru: typeof en = {
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };
 
-// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
 // Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
-export const zh: typeof en = { ...en };
+export const zh: typeof en = {
+  "err.unavailable_in_edition": "Cloudflare 版暂不支持：{feature}。",
+  "edition.feature.backups": "备份",
+  "edition.feature.telegram": "Telegram 告警",
+  "edition.feature.mcp": "MCP 和 API 令牌",
+  "edition.feature.health_checks": "隧道检测",
+  "edition.feature.agent_updates": "更新节点",
+  "edition.feature.agent_logs": "节点日志",
+  "edition.feature.panel_update": "更新面板",
+  "edition.feature.decoy_own": "自有伪装站点",
+  "edition.hint.mcp": "已有的令牌可以查看和吊销，暂时无法创建新令牌。",
+};

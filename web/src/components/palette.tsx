@@ -40,43 +40,43 @@ const tab = (section: "subscriptions" | "health", id: string, label: MessageKey,
 
 // Every menu section, the Settings pages and the parts of Integrations, Subscriptions and Health.
 export const places: readonly Place[] = [
-  { id: "overview", label: "nav.overview", words: "главная home dashboard", go: { to: "/" } },
-  { id: "nodes", label: "nav.nodes", words: "серверы флот servers fleet", go: { to: "/nodes" } },
-  { id: "users", label: "nav.users", words: "люди друзья группы people friends groups", go: { to: "/users" } },
-  { id: "profiles", label: "nav.profiles", words: "протоколы protocols", go: { to: "/profiles" } },
-  { id: "subscriptions", label: "nav.subscriptions", words: "ссылки links", go: { to: "/subscriptions" } },
-  { id: "health", label: "nav.health", words: "", go: { to: "/health" } },
-  { id: "updates", label: "nav.updates", words: "раскатка версии rollout versions", go: { to: "/updates" } },
-  { id: "integrations", label: "nav.integrations", words: "", go: { to: "/integrations" } },
-  { id: "settings", label: "nav.settings", words: "", go: { to: "/settings" } },
-  page("interface", "тема язык акцент цвет бренд логотип название theme language accent colour color brand logo"),
-  page("security", "passkey пароль код вход cloudflare turnstile капча 2fa totp password code sign-in captcha"),
-  page("sessions", "устройства входы devices"),
-  page("audit", "журнал история log history"),
-  page("admins", "помощник роли helper roles"),
-  page("domains", "адрес ссылки address url links"),
-  page("backups", "бэкап бэкапы копия backup copy"),
-  { id: "tokens", label: "int.tok.title", crumb: "nav.integrations", words: "токен токены ключ скрипт token tokens key script api", go: { to: "/integrations" } },
-  { id: "mcp", label: "int.mcp.title", crumb: "nav.integrations", words: "агент ии claude agent ai", go: { to: "/integrations" } },
-  { id: "approvals", label: "palette.approvals", crumb: "nav.integrations", words: "одобрить решения approve decisions", go: { to: "/integrations" } },
-  tab("subscriptions", "formats", "subs.tab.formats", "приложения форматы mihomo happ apps formats clients", true),
-  tab("subscriptions", "rules", "subs.tab.rules", "правила user-agent rules", false),
-  tab("subscriptions", "texts", "subs.tab.texts", "тексты названия texts names", false),
-  tab("subscriptions", "page", "subs.tab.page", "страница друга page", false),
-  tab("subscriptions", "dns", "subs.tab.dns", "днс пресеты presets", false),
-  tab("health", "alerts", "hl.tab.alerts", "алерты проблемы alerts problems", true),
-  tab("health", "checks", "hl.tab.checks", "проверки checks", false),
-  tab("health", "doctor", "hl.tab.doctor", "доктор doctor", false),
+  { id: "overview", label: "nav.overview", words: "главная home dashboard 首页 总览 仪表盘", go: { to: "/" } },
+  { id: "nodes", label: "nav.nodes", words: "серверы флот servers fleet 节点 服务器 集群 主机", go: { to: "/nodes" } },
+  { id: "users", label: "nav.users", words: "люди друзья группы people friends groups 用户 人员 朋友 分组 群组", go: { to: "/users" } },
+  { id: "profiles", label: "nav.profiles", words: "протоколы protocols 协议 协议配置 配置 入站", go: { to: "/profiles" } },
+  { id: "subscriptions", label: "nav.subscriptions", words: "ссылки links 订阅 链接 订阅链接", go: { to: "/subscriptions" } },
+  { id: "health", label: "nav.health", words: "健康 状态 监控 告警 检测", go: { to: "/health" } },
+  { id: "updates", label: "nav.updates", words: "раскатка версии rollout versions 更新 升级 版本 滚动更新 发布", go: { to: "/updates" } },
+  { id: "integrations", label: "nav.integrations", words: "集成 接口 令牌 智能体 审批", go: { to: "/integrations" } },
+  { id: "settings", label: "nav.settings", words: "设置 配置 选项", go: { to: "/settings" } },
+  page("interface", "тема язык акцент цвет бренд логотип название theme language accent colour color brand logo 界面 主题 语言 强调色 颜色 品牌 标志 名称"),
+  page("security", "passkey пароль код вход cloudflare turnstile капча 2fa totp password code sign-in captcha 安全 通行密钥 密码 验证码 登录 人机验证 两步验证"),
+  page("sessions", "устройства входы devices 会话 登录 设备 活动会话"),
+  page("audit", "журнал история log history 审计 日志 记录 历史"),
+  page("admins", "помощник роли helper roles 管理员 协作者 角色 权限"),
+  page("domains", "адрес ссылки address url links 域名 地址 链接 网址"),
+  page("backups", "бэкап бэкапы копия backup copy 备份 恢复 快照"),
+  { id: "tokens", label: "int.tok.title", crumb: "nav.integrations", words: "токен токены ключ скрипт token tokens key script api 令牌 密钥 脚本 接口", go: { to: "/integrations" } },
+  { id: "mcp", label: "int.mcp.title", crumb: "nav.integrations", words: "агент ии claude agent ai 智能体 人工智能 MCP", go: { to: "/integrations" } },
+  { id: "approvals", label: "palette.approvals", crumb: "nav.integrations", words: "одобрить решения approve decisions 审批 批准 拒绝 决定", go: { to: "/integrations" } },
+  tab("subscriptions", "formats", "subs.tab.formats", "приложения форматы mihomo happ apps formats clients 应用 格式 客户端", true),
+  tab("subscriptions", "rules", "subs.tab.rules", "правила user-agent rules 规则 下发规则", false),
+  tab("subscriptions", "texts", "subs.tab.texts", "тексты названия texts names 文本 名称 显示名称", false),
+  tab("subscriptions", "page", "subs.tab.page", "страница друга page 页面 用户页面 订阅页面", false),
+  tab("subscriptions", "dns", "subs.tab.dns", "днс пресеты presets 预设 解析 分流", false),
+  tab("health", "alerts", "hl.tab.alerts", "алерты проблемы alerts problems 告警 警报 问题", true),
+  tab("health", "checks", "hl.tab.checks", "проверки checks 检测 检查 探测", false),
+  tab("health", "doctor", "hl.tab.doctor", "доктор doctor 诊断 医生", false),
 ];
 
 /** The node page's tabs, each with the words that find it next to a node's name ("de1 логи"). */
 const nodeTabs = [
-  { id: "profiles", label: "node.tab.profiles", words: "профили profiles" },
-  { id: "users", label: "node.tab.users", words: "пользователи users" },
-  { id: "logs", label: "node.tab.logs", words: "логи журнал logs log" },
-  { id: "events", label: "node.tab.events", words: "события events" },
-  { id: "doctor", label: "node.tab.doctor", words: "доктор doctor" },
-  { id: "settings", label: "node.tab.settings", words: "настройки settings warp" },
+  { id: "profiles", label: "node.tab.profiles", words: "профили profiles 协议配置 协议" },
+  { id: "users", label: "node.tab.users", words: "пользователи users 用户" },
+  { id: "logs", label: "node.tab.logs", words: "логи журнал logs log 日志" },
+  { id: "events", label: "node.tab.events", words: "события events 事件" },
+  { id: "doctor", label: "node.tab.doctor", words: "доктор doctor 诊断" },
+  { id: "settings", label: "node.tab.settings", words: "настройки settings warp 设置" },
 ] as const satisfies readonly { id: string; label: MessageKey; words: string }[];
 
 /** Every word of the query is found in the place's names (every language) or its extra words. */
@@ -168,14 +168,14 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
           .map((p) => ({ id: `place-${p.id}`, tag: "→", label: t(p.label), meta: p.crumb ? t(p.crumb) : undefined, run: go(p.go) }))
       : [];
     const actions: (Item & { words: string })[] = [
-      { id: "new-token", tag: "+", label: t("palette.newToken"), words: "новый токен создать ключ api new token create key", run: go({ to: "/integrations", search: { new: "token" } }) },
-      { id: "new-profile", tag: "+", label: t("palette.newProfile"), words: "новый профиль создать new profile create", run: go({ to: "/profiles/new" }) },
-      { id: "create-user", tag: "+", label: t("palette.createUser"), words: "новый пользователь создать добавить друга new user create add friend", run: go({ to: "/users", search: { create: "true" } }) },
+      { id: "new-token", tag: "+", label: t("palette.newToken"), words: "новый токен создать ключ api new token create key 新建 令牌 创建 密钥", run: go({ to: "/integrations", search: { new: "token" } }) },
+      { id: "new-profile", tag: "+", label: t("palette.newProfile"), words: "новый профиль создать new profile create 新建 协议配置 创建", run: go({ to: "/profiles/new" }) },
+      { id: "create-user", tag: "+", label: t("palette.createUser"), words: "новый пользователь создать добавить друга new user create add friend 新建 用户 创建 添加 朋友", run: go({ to: "/users", search: { create: "true" } }) },
       {
         id: "add-node",
         tag: "+",
         label: t("palette.addNode"),
-        words: "добавить ноду новая сервер add node new server",
+        words: "добавить ноду новая сервер add node new server 添加 节点 服务器 新增",
         run: () => {
           done();
           addNode();
@@ -185,7 +185,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
         id: "sign-out",
         tag: "←",
         label: t("header.signOut"),
-        words: "выйти выход logout sign out exit",
+        words: "выйти выход logout sign out exit 退出 登出 退出登录",
         run: () => {
           done();
           void signOut();
