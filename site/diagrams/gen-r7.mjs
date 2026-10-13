@@ -1,9 +1,9 @@
 // D3 one node with Hysteria2, AmneziaWG and WARP; D4 a node's ports; D7 who gets what -> docs/<lang>/diagrams/*.svg
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const docs = fileURLToPath(new URL("../../docs", import.meta.url)); // the repository's docs/ next to site/
 import { svg, rect, text, chip, item, flow, lines, yn } from "./svgkit.mjs";
-const out = (lang, name, w, h, title, desc, body) => writeFileSync(`${docs}/${lang}/diagrams/${name}.svg`, svg({ w, h, title, desc, body }));
+const out = (lang, name, w, h, title, desc, body) => (mkdirSync(`${docs}/${lang}/diagrams`, { recursive: true }), writeFileSync(`${docs}/${lang}/diagrams/${name}.svg`, svg({ w, h, title, desc, body })));
 const nodeHead = (x, y, w, title, sub) => [chip("sky", "nav-nodes", x + 16, y + 16, 26), text("h", x + 52, y + 34, title), sub ? text("m", x + w - 16, y + 33, sub, "end") : ""];
 
 // ---- D3: profiles, exits, fail-closed ----
@@ -25,6 +25,15 @@ const D3 = {
     direct: "Напрямую", directSub: "адрес ноды", warp: "WARP", warpSub: "один аккаунт",
     seesDirect: ["сайты видят", "IP ноды"], seesWarp: ["сайты видят", "IP Cloudflare"],
     failT: "Закрыто при сбое", fail: ["Без рабочего WARP профили с выходом WARP не пропускают трафик:", "через собственный адрес ноды они не выходят никогда."],
+  },
+  zh: {
+    title: "同时运行 Hysteria2、AmneziaWG 和 WARP 的一个节点",
+    desc: "节点上的每个协议配置都有自己的出口。出口为「直连」的协议配置从节点自己的地址出去；出口为 WARP 的协议配置经过节点唯一的 WARP 账户，网站看到的是 Cloudflare 的地址。WARP 不可用时，经 WARP 出口的协议配置不转发任何流量，也绝不会回退到节点自己的地址。",
+    apps: "应用", appsSub: ["Happ, kl!ck,", "AmneziaVPN"], node: "节点",
+    profiles: [["Hysteria2", "出口：直连"], ["Hysteria2，WARP 副本", "出口：WARP"], ["AmneziaWG", "出口：WARP"]],
+    direct: "直连", directSub: "节点的 IP", warp: "WARP", warpSub: "一个账户",
+    seesDirect: ["网站看到的", "是节点 IP"], seesWarp: ["网站看到的", "是 Cloudflare IP"],
+    failT: "故障时停止转发", fail: ["WARP 不可用时，经 WARP 出口的协议配置不转发任何流量：", "它们绝不会回退到节点自己的地址。"],
   },
 };
 for (const [lang, s] of Object.entries(D3)) {
@@ -66,6 +75,14 @@ const D4 = {
     outs: [["lav", "nav-overview", "Панель", "TCP 443"], ["grey", "globe", "Let's Encrypt, DNS", ""], ["sky", "globe", "Cloudflare WARP", "если включён"], ["grey", "gauge", "Тест скорости", "по запросу"]],
     noPortT: "Порта управления нет", noPort: ["Агент сам подключается к панели, панель к ноде не подключается никогда.", "Во включённый UFW агент ставит свои правила для UDP-портов, firewalld только проверяет."],
   },
+  zh: {
+    title: "节点的端口",
+    desc: "节点为自己的服务器监听 UDP 端口：Hysteria2 使用 443，可选的 Hysteria2 端口跳跃范围从 1024 起，AmneziaWG 使用 10000 到 60000 之间的一个端口。TCP 443 提供 Hysteria2 向所有非客户端访问者展示的 HTTPS 站点，TCP 80 用于 Let's Encrypt，新的 SSH 连接有速率限制。从节点向外发出的有 Agent 到面板的连接、Let's Encrypt 和 DNS、协议配置用到时的 Cloudflare WARP，以及仅在你测速时才有的测速流量。面板不需要节点上的任何端口。",
+    inbound: "入站", outbound: "出站", node: "节点",
+    rows: [["sky", "bolt", "Hysteria2", "UDP 443", "应用"], ["sky", "bolt", "跳跃范围", "UDP，1024 起，可选", "应用"], ["sky", "key", "AmneziaWG", "UDP 10000–60000", "应用"], ["sage", "mask", "HTTPS 站点", "TCP 443，面向非客户端", "浏览器"], ["sand", "lock", "Let's Encrypt", "TCP 80，空闲时", "Let's Encrypt"], ["grey", "terminal", "SSH", "新连接有速率限制", "你"]],
+    outs: [["lav", "nav-overview", "面板", "TCP 443"], ["grey", "globe", "Let's Encrypt, DNS", ""], ["sky", "globe", "Cloudflare WARP", "如已启用"], ["grey", "gauge", "测速", "按需"]],
+    noPortT: "没有管理端口", noPort: ["Agent 主动连接面板，面板从不连接节点。", "UFW 启用时，Agent 会为 UDP 端口添加带标记的规则；firewalld 只做检查。"],
+  },
 };
 for (const [lang, s] of Object.entries(D4)) {
   const ry = (i) => 92 + i * 50, oy = (i) => 96 + i * 72;
@@ -96,6 +113,14 @@ const D7 = {
     groupSub: "группа", profilesNote: "профили группы", nodesT: "Серверы на нодах",
     gets: "Что получает Алиса", yes: "да", no: "нет",
     result: [[true, "Hysteria2 на de1"], [false, "Hysteria2 на nl1: выключен на ноде"], [false, "AmneziaWG на de1: его не читает ни одно её приложение, AmneziaVPN выключен"]],
+  },
+  zh: {
+    title: "谁得到哪个服务器",
+    desc: "Alice 的状态为有效，属于分组 Family，可以使用所有节点，Happ 开关已开启，AmneziaVPN 已关闭。Family 包含协议配置 Hysteria2 和 AmneziaWG。在 de1 上两个协议配置都已开启，在 nl1 上 Hysteria2 已关闭。Alice 得到 de1 上的 Hysteria2；得不到 nl1 上的 Hysteria2，因为它已关闭；也得不到 AmneziaWG，因为她已开启的应用都不读取它。",
+    alice: "Alice", user: "用户", status: "状态", active: "有效", group: "分组", family: "Family", nodes: "节点", all: "全部", on: "开", off: "关",
+    groupSub: "分组", profilesNote: "该分组的协议配置", nodesT: "节点上的服务器",
+    gets: "Alice 得到什么", yes: "是", no: "否",
+    result: [[true, "de1 上的 Hysteria2"], [false, "nl1 上的 Hysteria2：在节点上已关闭"], [false, "de1 上的 AmneziaWG：她的应用都不读取它，AmneziaVPN 已关闭"]],
   },
 };
 for (const [lang, s] of Object.entries(D7)) {

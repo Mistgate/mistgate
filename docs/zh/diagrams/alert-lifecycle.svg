@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 300" width="720" height="300" role="img" aria-labelledby="title desc">
+<title id="title">告警的生命周期</title>
+<desc id="desc">条件成立期间，告警保持打开，并计入角标。静默会让它在最长 7 天内不计入角标，静默结束后再次计入。条件消失后告警关闭，无论是否静默；条件在一小时内再次出现则重新打开；告警在历史记录中保留 90 天。</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="299" rx="16"/>
+<rect class="card" x="190" y="80" width="170" height="60" rx="14"/>
+<g class="rose"><rect class="chip" x="204" y="98" width="24" height="24" rx="7"/><svg x="209" y="103" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16zM10 21h4"/></svg></g>
+<text class="t" x="238" y="107">活动</text>
+<text class="m" x="238" y="123">计入角标</text>
+<rect class="card" x="190" y="210" width="170" height="60" rx="14"/>
+<g class="sand"><rect class="chip" x="204" y="228" width="24" height="24" rx="7"/><svg x="209" y="233" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg></g>
+<text class="t" x="238" y="237">已静默</text>
+<text class="m" x="238" y="253">最多 7 天</text>
+<rect class="card" x="530" y="80" width="170" height="60" rx="14"/>
+<g class="grey"><rect class="chip" x="544" y="98" width="24" height="24" rx="7"/><svg x="549" y="103" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M5 12.5l4.5 4.5L19 7.5"/></svg></g>
+<text class="t" x="578" y="107">已关闭</text>
+<text class="m" x="578" y="123">保留 90 天</text>
+<circle cx="44" cy="110" r="8" fill="var(--d-muted)"/>
+<g class="grey"><path class="flow " d="M52 110L183 110"/><path class="head" d="M190 110l-8 -4.5v9z"/></g>
+<text class="s" x="121" y="101" text-anchor="middle">条件成立</text>
+<g class="grey"><path class="flow " d="M360 100L523 100"/><path class="head" d="M530 100l-8 -4.5v9z"/></g>
+<text class="s" x="445" y="91" text-anchor="middle">条件消失</text>
+<g class="grey"><path class="flow " d="M530 122L367 122"/><path class="head" d="M360 122l8 -4.5v9z"/></g>
+<text class="s" x="445" y="139" text-anchor="middle">一小时内再次出现</text>
+<g class="grey"><path class="flow " d="M240 140L240 203"/><path class="head" d="M240 210l-4.5 -8h9z"/></g>
+<text class="s" x="232" y="179" text-anchor="end">静默</text>
+<g class="grey"><path class="flow " d="M310 210L310 147"/><path class="head" d="M310 140l-4.5 8h9z"/></g>
+<text class="s" x="318" y="179">静默结束</text>
+<g class="grey"><path class="flow " d="M360 240L615 240L615 147"/><path class="head" d="M615 140l-4.5 8h9z"/></g>
+<text class="s" x="487" y="231" text-anchor="middle">条件消失</text>
+</svg>

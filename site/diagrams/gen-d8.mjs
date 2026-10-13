@@ -1,5 +1,5 @@
 // D8 "The life of an alert": docs/<lang>/diagrams/alert-lifecycle.svg
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const docs = fileURLToPath(new URL("../../docs", import.meta.url)); // the repository's docs/ next to site/
 import { svg, rect, text, chip, flow } from "./svgkit.mjs";
@@ -16,6 +16,12 @@ const S = {
     desc: "Алерт открывается, пока выполняется его условие, и считается в значке. Заглушка убирает его из значка до 7 дней, после неё он возвращается. Алерт закрывается, когда условия больше нет, заглушён он или нет, открывается снова, если условие вернулось в течение часа, и хранится в истории 90 дней.",
     active: ["Активен", "в значке"], muted: ["Заглушён", "до 7 дней"], closed: ["Закрыт", "хранится 90 дней"],
     holds: "условие выполняется", gone: "условия больше нет", back: "вернулся в течение часа", mute: "Заглушить", ends: "заглушка кончилась",
+  },
+  zh: {
+    title: "告警的生命周期",
+    desc: "条件成立期间，告警保持打开，并计入角标。静默会让它在最长 7 天内不计入角标，静默结束后再次计入。条件消失后告警关闭，无论是否静默；条件在一小时内再次出现则重新打开；告警在历史记录中保留 90 天。",
+    active: ["活动", "计入角标"], muted: ["已静默", "最多 7 天"], closed: ["已关闭", "保留 90 天"],
+    holds: "条件成立", gone: "条件消失", back: "一小时内再次出现", mute: "静默", ends: "静默结束",
   },
 };
 
@@ -34,6 +40,7 @@ for (const [lang, s] of Object.entries(S)) {
     flow("grey", [[310, 210], [310, 140]]), text("s", 318, 179, s.ends),
     flow("grey", [[360, 240], [615, 240], [615, 140]]), text("s", 487, 231, s.gone, "middle"),
   ];
+  mkdirSync(`${docs}/${lang}/diagrams`, { recursive: true });
   writeFileSync(`${docs}/${lang}/diagrams/alert-lifecycle.svg`, svg({ w: W, h: H, title: s.title, desc: s.desc, body }));
 }
 console.log("D8 written");

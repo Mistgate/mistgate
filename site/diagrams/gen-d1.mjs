@@ -33,6 +33,20 @@ const S = {
       ["Нода сама подключается к панели:", "получает настройки и отчитывается."],
     ],
   },
+  zh: {
+    title: "Mistgate 各部分如何配合",
+    you: "你", owner: "所有者", app: "用户的应用", apps: "Happ, kl!ck, …",
+    panel: "面板", admin: "管理后台", adminSub: "私密地址", decoy: "伪装站点", decoySub: "面向其他访问者",
+    subs: "订阅", subsSub: "每人一个链接", agents: "Agent 接入端点", agentsSub: "双向 TLS",
+    node: "节点", hy: "Hysteria2", hySub: "UDP 443", awg: "AmneziaWG", awgSub: "UDP 端口",
+    net: "互联网", netSub: ["直连", "或 WARP"],
+    legend: [
+      ["你在管理后台里完成所有操作，", "后台位于私密地址。"],
+      ["用户的应用通过一个链接，", "获取自己的服务器列表。"],
+      ["VPN 流量直接发往节点，再转到", "互联网，不经过面板。"],
+      ["节点主动连接面板：获取", "期望状态并回报情况。"],
+    ],
+  },
 };
 
 const W = 720, H = 524;
@@ -79,7 +93,7 @@ for (const [lang, s] of Object.entries(S)) {
       return [badge(tones[i], x + 10, y - 4, i + 1), lines("s", x + 30, y, l, 18)];
     }),
   ];
-  const desc = s.legend.map((l, i) => `${i + 1}. ${l.join(" ")}`).join(" ");
+  const desc = s.legend.map((l, i) => `${i + 1}. ${l.join(lang === "zh" ? "" : " ")}`).join(" ");
   mkdirSync(`${docs}/${lang}/diagrams`, { recursive: true });
   writeFileSync(`${docs}/${lang}/diagrams/how-it-fits.svg`, svg({ w: W, h: H, title: s.title, desc, body }));
 }
