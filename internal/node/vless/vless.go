@@ -73,9 +73,13 @@ type inbound struct {
 	connTracker *tcpConnTracker
 
 	// target "self": the node's own site behind REALITY, and the ACME certificate claim it holds (front.go).
-	site     *site
-	cert     engine.Cert
-	certHeld bool
+	site             *site
+	front            *tlsFront
+	tlsSocketNetwork string
+	tlsSocketAddr    string
+	tlsSocketCleanup func()
+	cert             engine.Cert
+	certHeld         bool
 
 	mu        sync.Mutex
 	state     plugin.RunState
@@ -198,8 +202,8 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 		if restarted {
 			in.restarts++
 		}
-		// The certificate claim of a site that stays a site is kept across the restart: its entry holds the issued leaf.
-		keepCert := spec.Enabled && cfg.reality.self && old.cfg.reality.self
+		// Keep the same certificate claim across restarts when both specs still need that certificate.
+		keepCert := spec.Enabled && old.certHeld && spec.TLS == old.spec.TLS && needsCertificate(cfg) && needsCertificate(old.cfg)
 		old.stop(!keepCert)
 		in.certHeld = keepCert && old.certHeld
 		e.retireMissing(oldIdx, ix)
@@ -228,6 +232,12 @@ func (in *inbound) start(ctx context.Context) error {
 	started := false
 	defer func() {
 		if !started {
+			in.closeTLSFront()
+			if in.instance != nil {
+				_ = in.instance.Close()
+				in.instance = nil
+				in.userManager = nil
+			}
 			tracker.stop()
 			if in.connTracker == tracker {
 				in.connTracker = nil
@@ -246,7 +256,25 @@ func (in *inbound) start(ctx context.Context) error {
 		in.site, in.cert = s, cert
 		in.cfg.reality.dialNet, in.cfg.reality.dialAddr = s.network, s.addr
 	}
-	inst, err := core.New(buildCoreConfig(in.spec, in.cfg, in.idx.Load(), tracker))
+	if in.cfg.security == "tls" {
+		if in.e.env.Certs == nil {
+			return errors.New("TLS VLESS inbound needs a certificate source")
+		}
+		cert, err := in.e.env.Certs.Acquire(ctx, in.spec.ID, in.spec.TLS)
+		if err != nil {
+			return fmt.Errorf("TLS certificate: %w", err)
+		}
+		in.cert, in.certHeld = cert, true
+		if cert.GetCertificate == nil {
+			return errors.New("TLS certificate source has no certificate callback")
+		}
+		network, addr, cleanup, err := tlsSocketFn(in.spec.ID)
+		if err != nil {
+			return fmt.Errorf("TLS socket: %w", err)
+		}
+		in.tlsSocketNetwork, in.tlsSocketAddr, in.tlsSocketCleanup = network, addr, cleanup
+	}
+	inst, err := core.New(buildCoreConfig(in.spec, in.cfg, in.idx.Load(), tracker, in.tlsSocketAddr))
 	if err != nil {
 		return err
 	}
@@ -285,6 +313,13 @@ func (in *inbound) start(ctx context.Context) error {
 		_ = inst.Close()
 		return err
 	}
+	if in.cfg.security == "tls" {
+		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, in.tlsSocketNetwork, in.tlsSocketAddr)
+		if err != nil {
+			return err
+		}
+		in.front = front
+	}
 	started = true
 	in.mu.Lock()
 	in.state, in.detail, in.since, in.everServe = plugin.RunRunning, "", in.e.now(), true
@@ -293,10 +328,29 @@ func (in *inbound) start(ctx context.Context) error {
 		// The node's own site is local and always up: there is nothing to probe, but REALITY cannot measure it (see
 		// measureSiteRecords).
 		go measureSiteRecords(in.ctx, in.site, in.cfg.reality.serverNames[0])
-	} else {
+	} else if in.cfg.security == "reality" {
 		go in.probeTarget()
 	}
 	return nil
+}
+
+func needsCertificate(cfg settings) bool {
+	return cfg.security == "tls" || cfg.reality.self
+}
+
+// tlsSocketFn is a seam for tests. Production uses an abstract Unix socket on Linux and a private temp socket elsewhere.
+var tlsSocketFn = tlsSocket
+
+func (in *inbound) closeTLSFront() {
+	if in.front != nil {
+		in.front.Close()
+		in.front = nil
+	}
+	if in.tlsSocketCleanup != nil {
+		in.tlsSocketCleanup()
+		in.tlsSocketCleanup = nil
+	}
+	in.tlsSocketNetwork, in.tlsSocketAddr = "", ""
 }
 
 // closeSite closes the node's own site, if the inbound has one. It runs after the Xray instance is closed: until then
@@ -381,6 +435,7 @@ func (in *inbound) stop(releaseCert bool) {
 			cs.cancelLinks()
 		}
 	}
+	in.closeTLSFront()
 	if in.instance != nil {
 		_ = in.instance.Close()
 		in.instance = nil
@@ -527,7 +582,7 @@ func (e *eng) Health() []plugin.EngineHealth {
 		in.mu.Lock()
 		h := plugin.EngineHealth{InboundID: in.spec.ID, State: in.state, Detail: in.detail, Restarts: in.restarts, Since: in.since}
 		in.mu.Unlock()
-		if in.cert.Info != nil { // a self site: known once Let's Encrypt has issued the certificate, so Apply could not report it
+		if in.cert.Info != nil { // known once ACME has issued the certificate, or immediately for self-signed mode
 			ci := in.cert.Info()
 			h.CertPinSHA256, h.CertNotAfter = ci.PinSHA256, ci.NotAfter
 		}

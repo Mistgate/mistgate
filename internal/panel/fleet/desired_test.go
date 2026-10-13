@@ -29,6 +29,7 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: capVLESS},
 		{name: "VLESS, another site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}, want: capVLESS},
 		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: capVLESSSelf},
+		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: capVLESSTLS},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
 		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
 	}
@@ -491,9 +492,10 @@ func legacySameCred(a, b plugin.UserCred) bool {
 func TestVLESSSelfInboundIsWithheldFromAnAgentWithoutTheCapability(t *testing.T) {
 	site := plugin.InboundSpec{ID: "inb_site", Protocol: "vless", Enabled: true, Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}
 	self := plugin.InboundSpec{ID: "inb_self", Protocol: "vless", Enabled: true, Settings: []byte(`{"reality":{"target":"self"}}`)}
+	tls := plugin.InboundSpec{ID: "inb_tls", Protocol: "vless", Enabled: true, Settings: []byte(`{"security":"tls"}`)}
 	e := newEnv(t)
 	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
-		return []statehash.Inbound{{Spec: site}, {Spec: self}}, nil
+		return []statehash.Inbound{{Spec: site}, {Spec: self}, {Spec: tls}}, nil
 	}
 	node := store.NodeRow{ID: "nod_1", State: "active"}
 	for _, tc := range []struct {
@@ -502,9 +504,10 @@ func TestVLESSSelfInboundIsWithheldFromAnAgentWithoutTheCapability(t *testing.T)
 		held     []string
 		withheld []string
 	}{
-		{"agent v0.1.34: vless/1 only", []string{"vless/1"}, []string{"inb_site"}, []string{"inb_self"}},
-		{"agent with the capability", []string{"vless/1", "vless-self/1"}, []string{"inb_self", "inb_site"}, nil},
-		{"no VLESS at all", nil, nil, []string{"inb_self", "inb_site"}},
+		{"agent v0.1.34: vless/1 only", []string{"vless/1"}, []string{"inb_site"}, []string{"inb_self", "inb_tls"}},
+		{"agent with VLESS self only", []string{"vless/1", "vless-self/1"}, []string{"inb_self", "inb_site"}, []string{"inb_tls"}},
+		{"agent with the TLS capability", []string{"vless/1", "vless-self/1", "vless-tls/1"}, []string{"inb_self", "inb_site", "inb_tls"}, nil},
+		{"no VLESS at all", nil, nil, []string{"inb_self", "inb_site", "inb_tls"}},
 	} {
 		st, err := e.f.buildState(context.Background(), node, tc.caps)
 		if err != nil {

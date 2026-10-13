@@ -87,6 +87,19 @@ func TestTCPTargets(t *testing.T) {
 				{Port: 8443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "node-a.example.com"},
 			},
 		},
+		"TLS fronts use their server name and only ACME on 443 gets ALPN": {
+			specs: []tcpSpec{
+				vlessSpec("a", 443, `{"security":"tls"}`, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "origin.example.com"}),
+				vlessSpec("b", 8443, `{"security":"tls"}`, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "origin.example.com"}),
+				vlessSpec("c", 9443, `{"security":"tls"}`, plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: "origin.example.com"}),
+			},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "origin.example.com"},
+				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "origin.example.com"},
+				{Port: 9443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "origin.example.com"},
+			},
+		},
 		"the reported pin goes with its inbound": {
 			specs: []tcpSpec{hy2Spec("a", plugin.TLSSelfSigned, "203.0.113.10", "")},
 			pins:  map[string]string{"a": pin, "other": pin},

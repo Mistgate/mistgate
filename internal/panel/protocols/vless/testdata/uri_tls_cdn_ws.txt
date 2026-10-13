@@ -1,0 +1,1 @@
+vless://8a3b5c2d-1e4f-4a6b-8c0d-123456789abc@cdn.example.org:443?encryption=none&fp=chrome&host=cdn.example.org&path=%2Fws&security=tls&sni=cdn.example.org&type=ws#de1%20%C2%B7%20vless%20%C2%B7%20443

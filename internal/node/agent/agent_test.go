@@ -50,6 +50,20 @@ func TestCapabilitiesAdvertiseVLESSSelfWithACertificateSource(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesAdvertiseVLESSTLSWithACertificateSource(t *testing.T) {
+	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
+	if slices.Contains(a.capabilities(), "vless-tls/1") {
+		t.Fatal("vless-tls/1 is advertised without a certificate source")
+	}
+	a.cfg.Certs = &markCerts{}
+	if caps := a.capabilities(); !slices.Contains(caps, "vless-tls/1") || !slices.Contains(caps, "vless/1") {
+		t.Fatalf("capabilities %v lack vless/1 or vless-tls/1", caps)
+	}
+	if slices.Contains((&Agent{cfg: Config{Certs: &markCerts{}}, engines: map[string]engine.Engine{}}).capabilities(), "vless-tls/1") {
+		t.Fatal("vless-tls/1 is advertised without a VLESS engine")
+	}
+}
+
 func TestConfiguredLinkUsesMTLSWhenPanelDoesNotAdvertiseSupport(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.LinkURL = "wss://example.com/abcdefghijklmnop" }})
 	h.waitConnected()

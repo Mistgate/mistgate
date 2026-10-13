@@ -170,6 +170,43 @@ func TestRenderMihomoGolden(t *testing.T) {
 	}
 }
 
+func TestRenderTLSGolden(t *testing.T) {
+	cases := []struct {
+		name, transport, cdnHost string
+	}{
+		{name: "direct_xhttp", transport: "xhttp"},
+		{name: "cdn_xhttp", transport: "xhttp", cdnHost: "cdn.example.org"},
+		{name: "direct_ws", transport: "ws"},
+		{name: "cdn_ws", transport: "ws", cdnHost: "cdn.example.org"},
+	}
+	for _, tc := range cases {
+		for _, format := range []plugin.ClientFormat{plugin.FormatURIList, plugin.FormatMihomo} {
+			format := format
+			t.Run(tc.name+"/"+string(format), func(t *testing.T) {
+				in := tlsRenderInput(t, format, tc.transport, tc.cdnHost)
+				in.InboundPublic = testPublicKey(t) // TLS output must not depend on REALITY's public key.
+				frag, ok := New().Render(in)
+				if !ok {
+					t.Fatal("TLS rendering refused")
+				}
+				prefix := "uri_"
+				if format == plugin.FormatMihomo {
+					prefix = "mihomo_"
+				}
+				suffix := ".txt"
+				if format == plugin.FormatMihomo {
+					suffix = ".yaml"
+				}
+				got := string(frag.Data)
+				if format == plugin.FormatURIList {
+					got += "\n"
+				}
+				renderGolden(t, prefix+"tls_"+tc.name+suffix, got)
+			})
+		}
+	}
+}
+
 func TestRenderSelectionAndNonDefaults(t *testing.T) {
 	in := renderInput(t, plugin.FormatURIList, "xhttp", func(s *Settings) {
 		s.Reality.ServerNames = []string{"first.example.org", "second.example.org"}

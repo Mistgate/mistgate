@@ -3,14 +3,12 @@ package vless
 // settingsSchema is the JSON Schema the admin UI renders the profile form from (vocabulary: the comment block of
 // proto/mistgate/admin/v1/profile.proto).
 //
-// What is not here, on purpose: TLS security, WebSocket and the CDN fields need the node's TLS front. They are not offered,
-// and Validate refuses them, so a profile can never ask a node for something its engine cannot serve. REALITY's target is
-// the node's own site by default (target_kind self); target and server_names belong to the other choice, another site, and
-// the editor hides them for self. The `security` setting exists (always "reality") but has no field: a control
-// with one choice would only confuse; it returns to the schema with the second choice.
+// TLS and WebSocket settings are offered by agents with the VLESS TLS front. REALITY's target is the node's own site by
+// default (target_kind self); target and server_names belong to the other choice, another site, and the editor hides them
+// for self.
 //
-// Groups follow the form's vocabulary: basics (what the node listens on and where REALITY looks), obfuscation (what
-// the handshake shows: names, short ids, fingerprint), advanced (XHTTP details, the exit). server_names and short_ids
+// Groups follow the form's vocabulary: basics (what the node listens on), TLS (certificate and CDN), obfuscation (what
+// the handshake shows: names, short ids, fingerprint), advanced (transport details and the exit). server_names and short_ids
 // are lists of strings, which the generic form needs a "string-list" widget for. They and the XHTTP path have no default
 // here: NormalizeSettings draws them per profile (the SPA keeps the defaults for a whole session).
 const settingsSchema = `{
@@ -24,10 +22,33 @@ const settingsSchema = `{
       "x-group": "basics", "x-order": 10, "x-critical": true
     },
     "transport": {
-      "type": "string", "enum": ["xhttp", "tcp"], "default": "xhttp",
-      "x-enum-labels": {"xhttp": "XHTTP", "tcp": "TCP (RAW + Vision)"},
+      "type": "string", "enum": ["xhttp", "tcp", "ws"], "default": "xhttp",
+      "x-enum-labels": {"xhttp": "XHTTP", "tcp": "TCP (RAW + Vision)", "ws": "WebSocket"},
       "title": "Transport", "description": "XHTTP is the default. TCP with Vision is the fastest and has the least overhead.",
       "x-group": "basics", "x-widget": "segmented", "x-order": 20, "x-critical": true
+    },
+    "security": {
+      "type": "string", "enum": ["reality", "tls"], "default": "reality",
+      "x-enum-labels": {"reality": "REALITY", "tls": "TLS"},
+      "title": "Security", "description": "REALITY is direct. TLS works directly with a domain certificate or through a CDN.",
+      "x-group": "basics", "x-widget": "segmented", "x-order": 25, "x-critical": true
+    },
+    "tls_mode": {
+      "type": "string", "enum": ["acme_domain", "self_signed"],
+      "x-enum-labels": {"acme_domain": "Let's Encrypt", "self_signed": "Self-signed origin"},
+      "title": "Origin certificate", "description": "A direct TLS connection needs a domain certificate. A self-signed certificate is allowed only when a CDN connects to the origin.",
+      "x-group": "tls", "x-order": 10, "x-critical": true
+    },
+    "sni": {
+      "type": "string", "default": "", "title": "Origin server name", "description": "Empty uses the node's domain or the inbound override.",
+      "x-group": "tls", "x-order": 20, "x-critical": true
+    },
+    "cdn": {
+      "type": "object", "title": "CDN", "x-group": "tls", "x-order": 30,
+      "properties": {
+        "host": {"type": "string", "default": "", "title": "CDN host", "description": "The host clients connect to. The client Host and SNI use this value.", "x-order": 10, "x-critical": true},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 443, "title": "CDN port", "x-order": 20}
+      }
     },
     "reality": {
       "type": "object", "title": "REALITY", "x-group": "basics", "x-order": 30,
@@ -73,7 +94,7 @@ const settingsSchema = `{
           "x-order": 10, "x-critical": true
         },
         "host": {
-          "type": "string", "default": "", "title": "Host header", "description": "Empty = none.",
+          "type": "string", "default": "", "title": "Host header", "description": "REALITY only. TLS derives the client Host from the origin SNI or CDN host.",
           "x-order": 20, "x-critical": true
         },
         "mode": {
@@ -87,6 +108,13 @@ const settingsSchema = `{
           "title": "Padding bytes", "description": "Random padding per request, min-max, 1 to 4096.",
           "x-order": 40, "x-critical": true
         }
+      }
+    },
+    "ws": {
+      "type": "object", "title": "WebSocket", "x-group": "advanced", "x-order": 55,
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^/[A-Za-z0-9/_-]*$", "title": "Path", "description": "Empty: a random one is made when the profile is saved.", "x-order": 10, "x-critical": true},
+        "host": {"type": "string", "default": "", "title": "Client Host header", "description": "The node's WebSocket origin always leaves Host empty. Empty = no client Host override.", "x-order": 20, "x-critical": true}
       }
     },
     "egress": {

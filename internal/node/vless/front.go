@@ -87,15 +87,155 @@ func (s *site) Close() {
 // clean up, not reachable from another network namespace), a socket file in a temp directory elsewhere (the tests of
 // non-Linux developers).
 func siteSocket(id string) (network, addr string, cleanup func(), err error) {
+	return internalSocket(id, "site")
+}
+
+func tlsSocket(id string) (network, addr string, cleanup func(), err error) {
+	return internalSocket(id, "tls")
+}
+
+func internalSocket(id, purpose string) (network, addr string, cleanup func(), err error) {
 	name := socketName(id)
 	if runtime.GOOS == "linux" {
-		return "unix", "@mistgate-vless-site-" + name, func() {}, nil
+		return "unix", "@mistgate-vless-" + purpose + "-" + name, func() {}, nil
 	}
-	dir, err := os.MkdirTemp("", "mgvs")
+	dir, err := os.MkdirTemp("", "mgv"+purpose[:1])
 	if err != nil {
 		return "", "", nil, err
 	}
 	return "unix", filepath.Join(dir, name+".sock"), func() { _ = os.RemoveAll(dir) }, nil
+}
+
+// tlsFront terminates the public TLS connection and relays its decrypted bytes to Xray on a private Unix socket.
+type tlsFront struct {
+	ln          net.Listener
+	unixNetwork string
+	unixAddr    string
+	cert        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+
+	mu     sync.Mutex
+	conns  map[*tlsFrontConn]struct{}
+	closed bool
+	wg     sync.WaitGroup
+}
+
+type tlsFrontConn struct {
+	client   net.Conn
+	upstream net.Conn
+}
+
+func startTLSFront(id string, port uint16, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), unixNetwork, unixAddr string) (*tlsFront, error) {
+	host := ""
+	if BindIP != nil {
+		host = BindIP.String()
+	}
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(int(port))))
+	if err != nil {
+		return nil, fmt.Errorf("TLS front for %q: %w", id, err)
+	}
+	front := &tlsFront{
+		ln: ln, unixNetwork: unixNetwork, unixAddr: unixAddr, cert: cert,
+		conns: make(map[*tlsFrontConn]struct{}),
+	}
+	front.wg.Add(1)
+	go front.accept()
+	return front, nil
+}
+
+func (f *tlsFront) accept() {
+	defer f.wg.Done()
+	for {
+		conn, err := f.ln.Accept()
+		if err != nil {
+			return
+		}
+		state := &tlsFrontConn{client: conn}
+		f.mu.Lock()
+		if f.closed {
+			f.mu.Unlock()
+			_ = conn.Close()
+			continue
+		}
+		f.conns[state] = struct{}{}
+		f.wg.Add(1)
+		f.mu.Unlock()
+		go f.serve(state)
+	}
+}
+
+func (f *tlsFront) serve(state *tlsFrontConn) {
+	defer f.wg.Done()
+	defer func() {
+		f.mu.Lock()
+		delete(f.conns, state)
+		f.mu.Unlock()
+		_ = state.client.Close()
+		if state.upstream != nil {
+			_ = state.upstream.Close()
+		}
+	}()
+
+	client := tls.Server(state.client, &tls.Config{
+		MinVersion:     tls.VersionTLS12,
+		GetCertificate: f.cert,
+		NextProtos:     []string{"h2", "http/1.1", acme.ALPNProto},
+	})
+	_ = state.client.SetDeadline(time.Now().Add(10 * time.Second))
+	if err := client.Handshake(); err != nil {
+		return
+	}
+	_ = state.client.SetDeadline(time.Time{})
+	if client.ConnectionState().NegotiatedProtocol == acme.ALPNProto {
+		return
+	}
+	upstream, err := (&net.Dialer{Timeout: 5 * time.Second}).Dial(f.unixNetwork, f.unixAddr)
+	if err != nil {
+		return
+	}
+	f.mu.Lock()
+	if f.closed {
+		f.mu.Unlock()
+		_ = upstream.Close()
+		return
+	}
+	state.upstream = upstream
+	f.mu.Unlock()
+
+	finished := make(chan struct{}, 2)
+	go func() {
+		_, _ = io.Copy(upstream, client)
+		finished <- struct{}{}
+	}()
+	go func() {
+		_, _ = io.Copy(client, upstream)
+		finished <- struct{}{}
+	}()
+	<-finished
+	_ = state.client.Close()
+	_ = upstream.Close()
+	<-finished
+}
+
+func (f *tlsFront) Close() {
+	f.mu.Lock()
+	if f.closed {
+		f.mu.Unlock()
+		return
+	}
+	f.closed = true
+	conns := make([]*tlsFrontConn, 0, len(f.conns))
+	for conn := range f.conns {
+		conns = append(conns, conn)
+	}
+	f.mu.Unlock()
+	_ = f.ln.Close()
+	for _, conn := range conns {
+		_ = conn.client.Close()
+		if conn.upstream != nil {
+			_ = conn.upstream.Close()
+		}
+	}
+	f.wg.Wait()
 }
 
 // socketName is the inbound id when it is short and plain, else a hash of it: an abstract name has 107 bytes at most.

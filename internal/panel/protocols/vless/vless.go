@@ -1,6 +1,5 @@
-// Package vless is the panel half of the VLESS protocol plugin. It offers REALITY over TCP (RAW + Vision) and XHTTP, with
-// the node's own site as the target ("self", the default) or another site. TLS, WebSocket and the CDN fields come with the
-// node's TLS front: the schema does not list them and Validate refuses them, so the node never sees a spec it cannot serve.
+// Package vless is the panel half of the VLESS protocol plugin. It offers REALITY over TCP (RAW + Vision) and XHTTP, plus
+// XHTTP+TLS and WebSocket+TLS through the node's TLS front.
 package vless
 
 import (
@@ -29,8 +28,12 @@ type Settings struct {
 	Port      int             `json:"port"`
 	Transport string          `json:"transport"`
 	Security  string          `json:"security"`
+	TLSMode   string          `json:"tls_mode,omitempty"`
+	SNI       string          `json:"sni,omitempty"`
+	CDN       *CDNSettings    `json:"cdn,omitempty"`
 	Reality   RealitySettings `json:"reality"`
 	XHTTP     XHTTPSettings   `json:"xhttp"`
+	WS        *WSSettings     `json:"ws,omitempty"`
 	Egress    string          `json:"egress"`
 }
 
@@ -58,6 +61,16 @@ type XHTTPSettings struct {
 	XPaddingBytes string `json:"x_padding_bytes"`
 }
 
+type CDNSettings struct {
+	Host string `json:"host"`
+	Port int    `json:"port,omitempty"`
+}
+
+type WSSettings struct {
+	Path string `json:"path"`
+	Host string `json:"host"`
+}
+
 // kind is the target kind of a document: the one it names, else site when it has a target (what every profile did before
 // the field existed), else self.
 func (r RealitySettings) kind() string {
@@ -76,9 +89,14 @@ type NodeSettings struct {
 	Transport string        `json:"transport"`
 	Security  string        `json:"security"`
 	Flow      string        `json:"flow"`
+	CDN       *NodeCDN      `json:"cdn,omitempty"`
 	Reality   NodeReality   `json:"reality"`
 	XHTTP     NodeXHTTP     `json:"xhttp"`
 	WS        NodeWebSocket `json:"ws"`
+}
+
+type NodeCDN struct {
+	Host string `json:"host"`
 }
 
 type NodeReality struct {
@@ -142,6 +160,19 @@ func (*Protocol) NormalizeSettings(in protocols.NormalizeInput) (json.RawMessage
 		s.Reality.TargetKind, changed = targetSite, true
 	case s.Reality.TargetKind == "": // stored before the field existed: say what it has always meant
 		s.Reality.TargetKind, changed = s.Reality.kind(), true
+	}
+	if s.Security == "tls" && s.Transport == "xhttp" && s.CDN != nil && s.CDN.Host != "" && (s.XHTTP.Mode == "" || s.XHTTP.Mode == "auto") {
+		s.XHTTP.Mode, changed = "packet-up", true
+	}
+	if s.Transport == "ws" && (s.WS == nil || s.WS.Path == "") {
+		if s.WS == nil {
+			s.WS = &WSSettings{}
+		}
+		path, err := randomPath(10)
+		if err != nil {
+			return nil, err
+		}
+		s.WS.Path, changed = path, true
 	}
 	if len(s.Reality.ShortIDs) != 0 && s.XHTTP.Path != "" {
 		if !changed {
@@ -269,59 +300,112 @@ func validate(s Settings) []protocols.FieldError {
 		add("/port", "reserved", "port 80 is reserved for the Let's Encrypt HTTP check")
 	}
 	switch s.Transport {
-	case "tcp", "xhttp":
-	case "ws":
-		add("/transport", "unsupported", "WebSocket is not available yet; use xhttp or tcp")
+	case "tcp", "xhttp", "ws":
 	default:
-		add("/transport", "invalid_enum", "transport must be xhttp or tcp")
+		add("/transport", "invalid_enum", "transport must be xhttp, tcp or ws")
 	}
 	switch s.Security {
-	case "reality":
-	case "tls":
-		add("/security", "unsupported", "TLS is not available yet; use reality")
+	case "reality", "tls":
 	default:
-		add("/security", "invalid_enum", "security must be reality")
+		add("/security", "invalid_enum", "security must be reality or tls")
 	}
-	switch s.Reality.kind() {
-	case targetSelf:
-		// The node's own site: its name comes from the node or the inbound (BuildInbound). A target or names left over from
-		// the other kind are not read.
-	case targetSite:
-		errs = append(errs, validateSiteTarget(s.Reality)...)
-	default:
-		add("/reality/target_kind", "invalid_enum", "target_kind must be self or site")
-	}
-	if len(s.Reality.ShortIDs) < 1 || len(s.Reality.ShortIDs) > 8 {
-		add("/reality/short_ids", "length", "must contain 1-8 values")
-	} else {
-		seen := make(map[string]struct{}, len(s.Reality.ShortIDs))
-		for _, value := range s.Reality.ShortIDs {
-			if len(value) > 16 || len(value)%2 != 0 {
-				add("/reality/short_ids", "invalid", "values must be even-length hex of at most 16 characters")
-				break
+	if s.Security == "reality" {
+		if s.Transport == "ws" {
+			add("/transport", "requires_tls", "WebSocket requires TLS security")
+		}
+		if s.TLSMode != "" {
+			add("/tls_mode", "unsupported", "certificate mode is only available with TLS security")
+		}
+		if s.SNI != "" {
+			add("/sni", "unsupported", "server name is only available with TLS security")
+		}
+		if s.CDN != nil {
+			add("/cdn", "unsupported", "CDN settings are only available with TLS security")
+		}
+		switch s.Reality.kind() {
+		case targetSelf:
+			// The node's own site: its name comes from the node or the inbound (BuildInbound).
+		case targetSite:
+			errs = append(errs, validateSiteTarget(s.Reality)...)
+		default:
+			add("/reality/target_kind", "invalid_enum", "target_kind must be self or site")
+		}
+		if len(s.Reality.ShortIDs) < 1 || len(s.Reality.ShortIDs) > 8 {
+			add("/reality/short_ids", "length", "must contain 1-8 values")
+		} else {
+			seen := make(map[string]struct{}, len(s.Reality.ShortIDs))
+			for _, value := range s.Reality.ShortIDs {
+				if len(value) > 16 || len(value)%2 != 0 {
+					add("/reality/short_ids", "invalid", "values must be even-length hex of at most 16 characters")
+					break
+				}
+				decoded, err := hex.DecodeString(value)
+				if err != nil {
+					add("/reality/short_ids", "invalid", "values must contain hexadecimal characters only")
+					break
+				}
+				padded := make([]byte, 8) // the node compares the zero-padded 8 bytes: "01" and "0100" are one id
+				copy(padded, decoded)
+				key := string(padded)
+				if _, ok := seen[key]; ok {
+					add("/reality/short_ids", "duplicate", "values must be unique")
+					break
+				}
+				seen[key] = struct{}{}
 			}
-			decoded, err := hex.DecodeString(value)
-			if err != nil {
-				add("/reality/short_ids", "invalid", "values must contain hexadecimal characters only")
-				break
+		}
+	} else if s.Security == "tls" {
+		if s.Transport == "tcp" {
+			add("/transport", "unsupported", "TCP with Vision requires REALITY security")
+		}
+		switch s.TLSMode {
+		case "acme_domain", "self_signed":
+		case "":
+			add("/tls_mode", "required", "choose an origin certificate mode")
+		default:
+			add("/tls_mode", "invalid_enum", "must be acme_domain or self_signed")
+		}
+		if s.SNI != "" {
+			if s.TLSMode == "acme_domain" && (!isHostname(s.SNI) || !strings.Contains(s.SNI, ".")) || s.TLSMode != "acme_domain" && !validHost(s.SNI) {
+				add("/sni", "format", "must be a domain for ACME or a host name for a self-signed certificate")
 			}
-			padded := make([]byte, 8) // the node compares the zero-padded 8 bytes: "01" and "0100" are one id
-			copy(padded, decoded)
-			key := string(padded)
-			if _, ok := seen[key]; ok {
-				add("/reality/short_ids", "duplicate", "values must be unique")
-				break
+		}
+		cdnHost := ""
+		if s.CDN != nil {
+			cdnHost = strings.TrimSpace(s.CDN.Host)
+			if cdnHost != "" && (!isHostname(cdnHost) || !strings.Contains(cdnHost, ".")) {
+				add("/cdn/host", "format", "must be a plain domain name")
 			}
-			seen[key] = struct{}{}
+			if s.CDN.Port < 0 || s.CDN.Port > 65535 {
+				add("/cdn/port", "out_of_range", "must be 1-65535")
+			}
+		}
+		if s.TLSMode == "self_signed" && cdnHost == "" {
+			add("/cdn/host", "required", "a self-signed origin needs a CDN host")
+		}
+		if s.Transport == "ws" {
+			if s.WS == nil || s.WS.Path == "" || len(s.WS.Path) > 64 || s.WS.Path[0] != '/' || strings.IndexFunc(s.WS.Path, func(r rune) bool {
+				return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '/' || r == '_' || r == '-')
+			}) >= 0 {
+				add("/ws/path", "format", "must start with / and contain only letters, digits, / _ -")
+			}
+			if s.WS != nil && s.WS.Host != "" && !validHost(s.WS.Host) {
+				add("/ws/host", "format", "must be empty or a host name")
+			}
 		}
 	}
-	switch s.Reality.Fingerprint {
-	case "chrome", "firefox", "safari", "ios", "edge", "random":
-	default:
-		add("/reality/fingerprint", "invalid_enum", "must be chrome, firefox, safari, ios, edge or random")
+	if s.Security == "reality" {
+		switch s.Reality.Fingerprint {
+		case "chrome", "firefox", "safari", "ios", "edge", "random":
+		default:
+			add("/reality/fingerprint", "invalid_enum", "must be chrome, firefox, safari, ios, edge or random")
+		}
 	}
 	if s.Transport == "xhttp" {
 		errs = append(errs, validateXHTTP(s.XHTTP)...)
+		if s.Security == "tls" && s.XHTTP.Host != "" {
+			add("/xhttp/host", "unsupported", "TLS clients use the origin or CDN host")
+		}
 	}
 	switch s.Egress {
 	case "direct", "warp":
@@ -492,8 +576,11 @@ func (*Protocol) Summary(raw json.RawMessage) string {
 	label := "XHTTP"
 	if s.Transport == "tcp" {
 		label = "TCP"
+	} else if s.Transport == "ws" {
+		label = "WebSocket"
 	}
-	parts := []string{label + " " + strconv.Itoa(s.Port), "REALITY"}
+	security := strings.ToUpper(s.Security)
+	parts := []string{label + " " + strconv.Itoa(s.Port), security}
 	if s.Transport == "tcp" {
 		parts = append(parts, "Vision")
 	}
@@ -520,8 +607,8 @@ func (*Protocol) InitInbound(protocols.InboundInitInput) (protocols.InboundInit,
 	return protocols.InboundInit{State: priv.Bytes(), Public: public}, nil
 }
 
-// BuildInbound lifts the TCP listen port and egress out of settings. The rest is the node's vless wireSettings. The node's
-// own site as the target (the default) also asks for a Let's Encrypt certificate for the site's name: TLS acme_domain.
+// BuildInbound lifts the TCP listen port, TLS certificate and egress out of settings. The node receives only the origin
+// fields needed to build the TLS front; the CDN endpoint stays in the panel profile for client rendering.
 func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, error) {
 	s, errs := parse(in.Profile.Settings)
 	if len(errs) == 0 {
@@ -537,37 +624,87 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	if port < 1 || port > 65535 || port == 80 {
 		return plugin.InboundSpec{}, errors.New("VLESS TCP port must be 1-65535 and not 80")
 	}
-	priv, err := ecdh.X25519().NewPrivateKey(in.PluginState)
-	if err != nil {
-		return plugin.InboundSpec{}, errors.New("the REALITY private key of this inbound is missing or damaged")
-	}
-	target, names, tlsSpec := strings.TrimSpace(s.Reality.Target), effectiveServerNames(s.Reality), plugin.TLS{}
-	if s.Reality.kind() == targetSelf {
-		name, err := siteName(in)
+	var privateKey []byte
+	target, names, tlsSpec := "", []string(nil), plugin.TLS{}
+	if s.Security == "reality" {
+		priv, err := ecdh.X25519().NewPrivateKey(in.PluginState)
 		if err != nil {
-			return plugin.InboundSpec{}, err
+			return plugin.InboundSpec{}, errors.New("the REALITY private key of this inbound is missing or damaged")
 		}
-		target, names, tlsSpec = "self", []string{name}, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: name}
+		privateKey = priv.Bytes()
+		target, names = strings.TrimSpace(s.Reality.Target), effectiveServerNames(s.Reality)
+		if s.Reality.kind() == targetSelf {
+			name, err := siteName(in)
+			if err != nil {
+				return plugin.InboundSpec{}, err
+			}
+			target, names, tlsSpec = "self", []string{name}, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: name}
+		}
+	} else {
+		name := strings.TrimSpace(in.TLSServerNameOverride)
+		if name == "" {
+			name = strings.TrimSpace(s.SNI)
+		}
+		if name == "" && (isHostname(in.Node.Address) || net.ParseIP(strings.Trim(in.Node.Address, "[]")) != nil) {
+			name = strings.Trim(in.Node.Address, "[]")
+		}
+		name = strings.ToLower(strings.TrimSuffix(name, "."))
+		mode := plugin.TLSAcmeDomain
+		if s.TLSMode == "self_signed" {
+			mode = plugin.TLSSelfSigned
+		}
+		if mode == plugin.TLSAcmeDomain {
+			if name == "" || !isHostname(name) || !strings.Contains(name, ".") {
+				if in.TLSServerNameOverride != "" {
+					return plugin.InboundSpec{}, &protocols.ServerNameError{Name: in.TLSServerNameOverride, DomainOnly: true}
+				}
+				return plugin.InboundSpec{}, &protocols.NeedsDomainError{Address: in.Node.Address}
+			}
+		} else if name == "" || !validHost(name) {
+			if in.TLSServerNameOverride != "" {
+				return plugin.InboundSpec{}, &protocols.ServerNameError{Name: in.TLSServerNameOverride}
+			}
+			return plugin.InboundSpec{}, &protocols.NeedsDomainError{Address: in.Node.Address}
+		}
+		tlsSpec = plugin.TLS{Mode: mode, ServerName: name}
 	}
-	shortIDs := make([]string, len(s.Reality.ShortIDs))
-	for i, id := range s.Reality.ShortIDs {
-		shortIDs[i] = strings.ToLower(id)
+	var shortIDs []string
+	if s.Security == "reality" {
+		shortIDs = make([]string, len(s.Reality.ShortIDs))
+		for i, id := range s.Reality.ShortIDs {
+			shortIDs[i] = strings.ToLower(id)
+		}
 	}
 	xhttp := s.XHTTP
 	xhttp.Mode = defaultString(xhttp.Mode, "auto")
+	if s.Security == "tls" && s.CDN != nil && s.CDN.Host != "" && xhttp.Mode == "auto" {
+		xhttp.Mode = "packet-up"
+	}
 	xhttp.XPaddingBytes = defaultString(xhttp.XPaddingBytes, defaultXPaddingBytes)
+	if s.Security == "tls" {
+		xhttp.Host = ""
+	}
 	flow := ""
 	if s.Transport == "tcp" {
 		flow = "xtls-rprx-vision"
 	}
+	var cdn *NodeCDN
+	if s.Security == "tls" && s.CDN != nil && s.CDN.Host != "" {
+		cdn = &NodeCDN{Host: strings.ToLower(strings.TrimSpace(s.CDN.Host))}
+	}
+	var ws NodeWebSocket
+	if s.Security == "tls" && s.Transport == "ws" && s.WS != nil {
+		ws.Path = s.WS.Path
+	}
 	settings, err := json.Marshal(NodeSettings{
 		Transport: s.Transport, Security: s.Security, Flow: flow,
+		CDN: cdn,
 		Reality: NodeReality{
 			Target: target, ServerNames: names, ShortIDs: shortIDs,
-			PrivateKey: base64.RawURLEncoding.EncodeToString(priv.Bytes()),
+			PrivateKey: base64.RawURLEncoding.EncodeToString(privateKey),
 		},
 		XHTTP: NodeXHTTP{Path: xhttp.Path, Host: xhttp.Host, Mode: xhttp.Mode, XPaddingBytes: xhttp.XPaddingBytes},
-		WS:    NodeWebSocket{},
+		WS:    ws,
 	})
 	if err != nil {
 		return plugin.InboundSpec{}, err
@@ -620,7 +757,8 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 // view is what both renderers need of one inbound: the settings, the address, and the per-device picks.
 type view struct {
 	Settings
-	host, publicKey, serverName, shortID string
+	host, publicKey, serverName, shortID, clientHost string
+	port                                             uint16
 }
 
 // renderView checks the inputs a client link depends on and makes the device's picks: the server name and the short
@@ -636,6 +774,39 @@ func renderView(in protocols.RenderInput) (view, bool) {
 	host, ok := plainHost(in.Inbound.Node.Address)
 	if !ok || in.Inbound.Port == 0 || in.Inbound.Port == 80 {
 		return view{}, false
+	}
+	v := view{Settings: s, host: host, port: in.Inbound.Port}
+	if s.Security == "tls" {
+		name := in.Inbound.TLSServerName
+		if name == "" {
+			name = s.SNI
+		}
+		if name == "" && isHostname(in.Inbound.Node.Address) {
+			name = in.Inbound.Node.Address
+		}
+		if !validHost(name) {
+			return view{}, false
+		}
+		name = strings.ToLower(strings.TrimSuffix(name, "."))
+		v.serverName = name
+		if s.CDN != nil && s.CDN.Host != "" {
+			cdnHost := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(s.CDN.Host), "."))
+			if !isHostname(cdnHost) || !strings.Contains(cdnHost, ".") {
+				return view{}, false
+			}
+			v.host = cdnHost
+			v.port = uint16(s.CDN.Port)
+			if v.port == 0 {
+				v.port = 443
+			}
+			v.serverName = cdnHost
+			v.clientHost = cdnHost
+		} else if s.Transport == "xhttp" {
+			v.clientHost = name
+		} else if s.WS != nil {
+			v.clientHost = s.WS.Host
+		}
+		return v, true
 	}
 	var public struct {
 		PublicKey string `json:"public_key"`
@@ -657,11 +828,13 @@ func renderView(in protocols.RenderInput) (view, bool) {
 		return view{}, false
 	}
 	hash := fnv32(in.DeviceID)
-	return view{
-		Settings: s, host: host, publicKey: public.PublicKey,
-		serverName: names[hash%uint32(len(names))],
-		shortID:    strings.ToLower(s.Reality.ShortIDs[hash%uint32(len(s.Reality.ShortIDs))]),
-	}, true
+	v.publicKey = public.PublicKey
+	v.serverName = names[hash%uint32(len(names))]
+	v.shortID = strings.ToLower(s.Reality.ShortIDs[hash%uint32(len(s.Reality.ShortIDs))])
+	if s.Transport == "xhttp" {
+		v.clientHost = s.XHTTP.Host
+	}
+	return v, true
 }
 
 func plainHost(address string) (string, bool) {

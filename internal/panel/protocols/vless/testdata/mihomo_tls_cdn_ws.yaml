@@ -1,0 +1,16 @@
+- name: "de1 · vless · 443"
+  type: vless
+  server: "cdn.example.org"
+  port: 443
+  uuid: "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc"
+  udp: true
+  packet-encoding: xudp
+  tls: true
+  servername: "cdn.example.org"
+  client-fingerprint: chrome
+  skip-cert-verify: false
+  network: ws
+  ws-opts:
+    path: "/ws"
+    headers:
+      Host: "cdn.example.org"

@@ -5,7 +5,7 @@ description: "The VLESS profile with REALITY on TCP: when to choose it over Hyst
 
 VLESS is a TCP protocol. With REALITY the node answers anyone who is not a client with a real web site, the **target**: by default the node's own site, or another site you name, so a probe sees a genuine TLS handshake of a site that exists. A person with the right keys is recognised inside the same handshake and gets the tunnel. This page lists the settings of a VLESS profile and what they do; how a profile is made and put on nodes is on [Profiles](profiles.md), and how it shares a node with Hysteria2 is on [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
 
-> **Note:** this release offers REALITY over TCP and over XHTTP, with the node's own site (the default) or another site as the target. TLS behind a CDN and WebSocket are **Planned**; the editor does not show them yet.
+> **Note:** VLESS supports REALITY over TCP and XHTTP, plus XHTTP+TLS and WebSocket+TLS. TLS can connect directly with an ACME domain certificate or through a CDN.
 
 ## When to pick it
 
@@ -28,7 +28,11 @@ The editor groups the settings into **Basics**, **Obfuscation** and **Advanced**
 | Setting | Default | Critical | What it does |
 |:--|:--|:--|:--|
 | **TCP port** | 443 | yes | The TCP port the node listens on. 1 to 65535, not 80. |
-| **Transport** | XHTTP | yes | **XHTTP**, or **TCP (RAW + Vision)**: the fastest, with the least overhead. Vision is always on for TCP. |
+| **Transport** | XHTTP | yes | **XHTTP**, **TCP (RAW + Vision)**, or **WebSocket** with TLS. Vision is always on for TCP. |
+| **Security** | REALITY | yes | **REALITY** or **TLS**. TCP with Vision is REALITY-only; WebSocket is TLS-only. |
+| **Origin certificate** | Let's Encrypt domain | yes | TLS only: ACME domain certificate for a direct connection. A self-signed certificate is allowed only behind a CDN that accepts it. |
+| **Origin server name** | node domain | yes | TLS only: the certificate name on the node. An inbound's Domain (SNI) override takes precedence. |
+| **CDN host and port** | empty, 443 | yes | TLS only: clients connect to this endpoint and use the CDN host for both Host and SNI. The origin connection remains TLS. |
 | **Site shown to everyone else** | This node's site | yes | **This node's site**: the node's own site with its own Let's Encrypt certificate. **Another site**: a real site you name. See below. |
 | **Target host:port** | none | yes | Another site only: the site REALITY shows to everyone else, for example `www.example.org:443`. Required for another site, not shown for the node's own. |
 | **Server names** | empty | yes | Another site only: up to 8 host names the target's certificate is valid for. Empty means the host of the target. Needed when the target is an IP address. No wildcards. |
@@ -38,9 +42,18 @@ The editor groups the settings into **Basics**, **Obfuscation** and **Advanced**
 | **XHTTP host header** | empty | yes | Empty: none. |
 | **XHTTP mode** | Auto | no | **Auto**, **Packet up**, **Stream up** or **Stream one**. The client picks; the node accepts all of them. |
 | **XHTTP padding** | 100-1000 | yes | The random padding added to each request, written `min-max`, from 1 to 4096 bytes. |
+| **WebSocket path and host** | generated, empty | yes | TLS only. The server host is empty; the client uses the CDN host when configured, otherwise the optional WebSocket Host value. |
 | **Exit** | Direct | no | **Direct** or **WARP**. See [WARP](warp.md). |
 
 The XHTTP settings apply to the XHTTP transport only. Which server name and which short ID a device gets is fixed by the device, so its link does not change from one update of the subscription to the next.
+
+## TLS and a CDN
+
+Choose TLS with XHTTP or WebSocket for a direct connection or a CDN. A direct connection needs an ACME domain certificate. The node can answer ACME TLS-ALPN-01 on TCP 443 and HTTP-01 on TCP 80 when that port is available. The certificate is issued on demand and renews without restarting the inbound.
+
+For a CDN, set its host and port. The client connects to that endpoint and sends the CDN host as both Host and SNI. The CDN connects to the node over TLS; Mistgate never configures a plain-HTTP origin. XHTTP defaults to **Packet up** with a CDN because some CDNs buffer complete request bodies. Use **Stream up** only when the CDN streams request bodies. WebSocket+TLS is the fallback transport when XHTTP does not work with the CDN.
+
+A self-signed origin certificate is only for a CDN configured to accept an unverified origin certificate. It is not suitable for clients connecting directly to the node.
 
 Each device has one VLESS identity, a UUID, used for every VLESS server of that device. It is made at the device's next update of the subscription. The node keeps the UUIDs as they are, because VLESS compares them itself; Hysteria2 is different, its node holds only a hash.
 

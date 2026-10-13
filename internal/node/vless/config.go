@@ -16,33 +16,38 @@ import (
 	"github.com/xtls/xray-core/transport/internet/reality"
 	"github.com/xtls/xray-core/transport/internet/splithttp"
 	_ "github.com/xtls/xray-core/transport/internet/tcp"
+	websocketcfg "github.com/xtls/xray-core/transport/internet/websocket"
 
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialIndex, tracker *tcpConnTracker) *core.Config {
-	dest, network := cfg.reality.target, "tcp"
-	if cfg.reality.dialAddr != "" {
-		dest, network = cfg.reality.dialAddr, cfg.reality.dialNet
-	}
-	clients := make([]*protocol.User, 0, len(creds.byID))
-	for _, id := range sortedCredentialIDs(creds) {
-		cs := creds.byID[id]
-		clients = append(clients, userConfig(cs, cfg.flow))
+func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialIndex, tracker *tcpConnTracker, unixAddr string) *core.Config {
+	var clients []*protocol.User
+	if creds != nil {
+		clients = make([]*protocol.User, 0, len(creds.byID))
+		for _, id := range sortedCredentialIDs(creds) {
+			cs := creds.byID[id]
+			clients = append(clients, userConfig(cs, cfg.flow))
+		}
 	}
 
-	stream := &internet.StreamConfig{
-		ProtocolName: "tcp",
-		SecurityType: serial.GetMessageType(&reality.Config{}),
-		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
+	stream := &internet.StreamConfig{ProtocolName: "tcp"}
+	if cfg.security == "reality" {
+		dest, network := cfg.reality.target, "tcp"
+		if cfg.reality.dialAddr != "" {
+			dest, network = cfg.reality.dialAddr, cfg.reality.dialNet
+		}
+		stream.SecurityType = serial.GetMessageType(&reality.Config{})
+		stream.SecuritySettings = []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
 			Dest: dest, Type: network, ServerNames: append([]string(nil), cfg.reality.serverNames...),
 			PrivateKey: append([]byte(nil), cfg.reality.privateKey...), ShortIds: cloneByteSlices(cfg.reality.shortIDs),
-		})},
+		})}
 	}
 	if tracker != nil {
 		stream.Tcpmasks = []*serial.TypedMessage{serial.ToTypedMessage(newTCPConnMaskConfig(tracker.key.inboundID, tracker.key.generation))}
 	}
-	if cfg.transport == "xhttp" {
+	switch cfg.transport {
+	case "xhttp":
 		stream.ProtocolName = "splithttp"
 		stream.TransportSettings = []*internet.TransportConfig{{
 			ProtocolName: "splithttp",
@@ -51,17 +56,27 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 				XPaddingBytes: &splithttp.RangeConfig{From: int32(cfg.xhttp.xPaddingFrom), To: int32(cfg.xhttp.xPaddingTo)},
 			}),
 		}}
+	case "ws":
+		stream.ProtocolName = "websocket"
+		stream.TransportSettings = []*internet.TransportConfig{{
+			ProtocolName: "websocket",
+			Settings:     serial.ToTypedMessage(&websocketcfg.Config{Path: cfg.wsPath, Host: cfg.wsHost}),
+		}}
 	}
 
 	receiver := &proxyman.ReceiverConfig{
-		PortList:       &net.PortList{Range: []*net.PortRange{net.SinglePortRange(net.Port(spec.Listen.Port))}},
 		StreamSettings: stream,
 		SniffingSettings: &proxyman.SniffingConfig{
 			Enabled: true, DestinationOverride: []string{"http", "tls", "quic"},
 		},
 	}
-	if BindIP != nil {
-		receiver.Listen = net.NewIPOrDomain(net.IPAddress(BindIP))
+	if cfg.security == "tls" {
+		receiver.Listen = net.NewIPOrDomain(net.DomainAddress(unixAddr))
+	} else {
+		receiver.PortList = &net.PortList{Range: []*net.PortRange{net.SinglePortRange(net.Port(spec.Listen.Port))}}
+		if BindIP != nil {
+			receiver.Listen = net.NewIPOrDomain(net.IPAddress(BindIP))
+		}
 	}
 
 	return &core.Config{

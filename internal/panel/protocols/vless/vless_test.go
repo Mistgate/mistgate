@@ -39,6 +39,22 @@ func validSettings(t *testing.T, mutate func(*Settings)) json.RawMessage {
 	return out
 }
 
+func editSettingsJSON(t *testing.T, raw json.RawMessage, fields map[string]any) json.RawMessage {
+	t.Helper()
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for key, value := range fields {
+		doc[key] = value
+	}
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
 func TestSchemaAndDefaults(t *testing.T) {
 	p := New()
 	var schema map[string]any
@@ -52,8 +68,8 @@ func TestSchemaAndDefaults(t *testing.T) {
 		}
 	}
 	for _, id := range []string{"security", "tls_mode", "cdn", "ws", "sni"} {
-		if _, ok := props[id]; ok {
-			t.Errorf("R3 field %q was exposed in R4", id)
+		if _, ok := props[id]; !ok {
+			t.Errorf("R3 field %q is missing", id)
 		}
 	}
 	defs, err := p.DefaultSettings()
@@ -124,7 +140,7 @@ func TestSchemaAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/reality/target_kind", "/transport", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
+	want := []string{"/cdn/host", "/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/reality/target_kind", "/security", "/sni", "/tls_mode", "/transport", "/ws/host", "/ws/path", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
 	if strings.Join(crit, ",") != strings.Join(want, ",") {
 		t.Errorf("x-critical = %v, want %v", crit, want)
 	}
@@ -179,11 +195,51 @@ func TestValidate(t *testing.T) {
 		{name: "ip target needs names", mutate: func(s *Settings) { s.Reality.Target = "203.0.113.10:443"; s.Reality.ServerNames = nil }, want: "/reality/server_names"},
 		{name: "ip target with names", mutate: func(s *Settings) { s.Reality.Target = "203.0.113.10:443" }},
 		{name: "bad target reports once", mutate: func(s *Settings) { s.Reality.Target = ""; s.Reality.ServerNames = nil }, want: "/reality/target"},
-		{name: "transport ws", mutate: func(s *Settings) { s.Transport = "ws" }, want: "/transport", message: "unsupported"},
+		{name: "transport ws", mutate: func(s *Settings) { s.Transport = "ws" }, want: "/transport", message: "requires_tls"},
 		{name: "transport unknown", mutate: func(s *Settings) { s.Transport = "grpc" }, want: "/transport", message: "invalid_enum"},
-		{name: "security tls", mutate: func(s *Settings) { s.Security = "tls" }, want: "/security", message: "unsupported"},
 		{name: "security empty", mutate: func(s *Settings) { s.Security = "" }, want: "/security", message: "invalid_enum"},
 		{name: "egress invalid", mutate: func(s *Settings) { s.Egress = "exit" }, want: "/egress"},
+	}
+
+	tlsSettings := func(fields map[string]any) json.RawMessage {
+		base := validSettings(t, nil)
+		fields["security"] = "tls"
+		return editSettingsJSON(t, base, fields)
+	}
+	for _, tc := range []struct {
+		name, pointer, code string
+		fields              map[string]any
+	}{
+		{name: "direct XHTTP TLS", fields: map[string]any{"tls_mode": "acme_domain", "sni": "de1.example.com"}},
+		{name: "CDN XHTTP TLS", fields: map[string]any{"tls_mode": "acme_domain", "sni": "origin.example.com", "cdn": map[string]any{"host": "cdn.example.org", "port": 443}}},
+		{name: "CDN self-signed WebSocket TLS", fields: map[string]any{"transport": "ws", "tls_mode": "self_signed", "sni": "origin.example.com", "cdn": map[string]any{"host": "cdn.example.org", "port": 443}, "ws": map[string]any{"path": "/ws", "host": ""}}},
+		{name: "TLS mode required", pointer: "/tls_mode", code: "required"},
+		{name: "TLS TCP unsupported", pointer: "/transport", code: "unsupported", fields: map[string]any{"transport": "tcp", "tls_mode": "acme_domain", "sni": "de1.example.com"}},
+		{name: "self-signed needs CDN", pointer: "/cdn/host", code: "required", fields: map[string]any{"tls_mode": "self_signed", "sni": "origin.example.com"}},
+		{name: "CDN host format", pointer: "/cdn/host", code: "format", fields: map[string]any{"tls_mode": "acme_domain", "sni": "origin.example.com", "cdn": map[string]any{"host": "https://cdn.example.org", "port": 443}}},
+		{name: "ACME name must be a domain", pointer: "/sni", code: "format", fields: map[string]any{"tls_mode": "acme_domain", "sni": "203.0.113.10"}},
+		{name: "TLS XHTTP host is derived", pointer: "/xhttp/host", code: "unsupported", fields: map[string]any{"tls_mode": "acme_domain", "sni": "origin.example.com", "xhttp": map[string]any{"path": "/q8x2kd7w", "host": "cover.example.org", "mode": "auto", "x_padding_bytes": "100-1000"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fields := map[string]any{}
+			for k, v := range tc.fields {
+				fields[k] = v
+			}
+			errs := New().Validate(tlsSettings(fields))
+			if tc.pointer == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %+v", errs)
+				}
+				return
+			}
+			if len(errs) == 0 || errs[0].Pointer != tc.pointer || errs[0].Code != tc.code {
+				t.Fatalf("errors = %+v, want %s (%s)", errs, tc.pointer, tc.code)
+			}
+		})
+	}
+	minimalTLS := json.RawMessage(`{"port":443,"transport":"xhttp","security":"tls","tls_mode":"acme_domain","sni":"origin.example.com","xhttp":{"path":"/x","mode":"auto","x_padding_bytes":"100-1000"},"egress":"direct"}`)
+	if errs := New().Validate(minimalTLS); len(errs) != 0 {
+		t.Fatalf("TLS validation depended on REALITY settings: %+v", errs)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -327,6 +383,44 @@ func TestInitBuildAndCredential(t *testing.T) {
 	wantData := fmt.Sprintf(`{"id":%q}`, a.Secret)
 	if string(a.NodeData) != wantData || strings.Contains(string(a.NodeData), "private") {
 		t.Errorf("node data = %s", a.NodeData)
+	}
+}
+
+func TestBuildTLSInboundUsesOriginCertificateAndCDNClientSettings(t *testing.T) {
+	raw := editSettingsJSON(t, validSettings(t, nil), map[string]any{
+		"security": "tls", "tls_mode": "acme_domain", "sni": "origin.example.com",
+		"cdn": map[string]any{"host": "cdn.example.org", "port": 443},
+	})
+	spec, err := New().BuildInbound(protocols.InboundInput{
+		Profile:     protocols.ProfileView{ID: "prf_1", Settings: raw},
+		Node:        protocols.NodeView{ID: "nod_1", Name: "de1", Address: "de1.example.com"},
+		PluginState: bytes32(), Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.TLS != (plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "origin.example.com"}) || spec.Listen.Port != 443 {
+		t.Fatalf("TLS inbound = %+v", spec)
+	}
+	var node struct {
+		Security string `json:"security"`
+		CDN      struct {
+			Host string `json:"host"`
+		} `json:"cdn"`
+		XHTTP struct {
+			Host string `json:"host"`
+			Mode string `json:"mode"`
+		} `json:"xhttp"`
+		Reality struct {
+			PrivateKey string   `json:"private_key"`
+			ShortIDs   []string `json:"short_ids"`
+		} `json:"reality"`
+	}
+	if err := json.Unmarshal(spec.Settings, &node); err != nil {
+		t.Fatal(err)
+	}
+	if node.Security != "tls" || node.CDN.Host != "cdn.example.org" || node.XHTTP.Host != "" || node.XHTTP.Mode != "packet-up" || node.Reality.PrivateKey != "" || len(node.Reality.ShortIDs) != 0 {
+		t.Fatalf("node origin settings = %+v", node)
 	}
 }
 

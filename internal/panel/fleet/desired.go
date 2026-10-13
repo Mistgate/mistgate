@@ -27,6 +27,7 @@ const (
 	// capVLESSSelf: an agent that can serve the node's own site behind REALITY (target "self"). An older vless/1 agent
 	// rejects that target, and self is the default of a new VLESS profile.
 	capVLESSSelf = "vless-self/1"
+	capVLESSTLS  = "vless-tls/1"
 	capWarp      = "warp/1"
 )
 
@@ -39,12 +40,22 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capAWG
 	}
 	if s.Protocol == "vless" {
+		if vlessTLS(s) {
+			return capVLESSTLS
+		}
 		if vlessTargetSelf(s) {
 			return capVLESSSelf
 		}
 		return capVLESS
 	}
 	return ""
+}
+
+func vlessTLS(s plugin.InboundSpec) bool {
+	var settings struct {
+		Security string `json:"security"`
+	}
+	return json.Unmarshal(s.Settings, &settings) == nil && settings.Security == "tls"
 }
 
 // vlessTargetSelf: the REALITY target of a VLESS inbound is the node's own site (wire value "self").

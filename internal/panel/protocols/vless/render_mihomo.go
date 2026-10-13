@@ -28,7 +28,7 @@ func renderURI(in protocols.RenderInput) (plugin.Fragment, bool) {
 	}
 	q := make(url.Values)
 	q.Set("encryption", "none")
-	if s.Transport == "tcp" {
+	if s.Security == "reality" && s.Transport == "tcp" {
 		q.Set("flow", "xtls-rprx-vision")
 	}
 	q.Set("fp", s.Reality.Fingerprint)
@@ -36,19 +36,26 @@ func renderURI(in protocols.RenderInput) (plugin.Fragment, bool) {
 		if extra := xhttpExtra(s.XHTTP); extra != "" {
 			q.Set("extra", extra)
 		}
-		if s.XHTTP.Host != "" {
-			q.Set("host", s.XHTTP.Host)
+		if v.clientHost != "" {
+			q.Set("host", v.clientHost)
 		}
-		q.Set("mode", defaultString(s.XHTTP.Mode, "auto"))
+		q.Set("mode", clientXHTTPMode(s))
 		q.Set("path", s.XHTTP.Path)
+	} else if s.Transport == "ws" {
+		if v.clientHost != "" {
+			q.Set("host", v.clientHost)
+		}
+		q.Set("path", s.WS.Path)
 	}
-	q.Set("pbk", v.publicKey)
-	q.Set("security", "reality")
-	q.Set("sid", v.shortID)
+	q.Set("security", s.Security)
+	if s.Security == "reality" {
+		q.Set("pbk", v.publicKey)
+		q.Set("sid", v.shortID)
+		q.Set("spx", spx(in.DeviceID))
+	}
 	q.Set("sni", v.serverName)
-	q.Set("spx", spx(in.DeviceID))
 	q.Set("type", s.Transport)
-	uri := "vless://" + user + "@" + address(host, in.Inbound.Port) + "?" + q.Encode() + "#" + (&url.URL{Fragment: name}).EscapedFragment()
+	uri := "vless://" + user + "@" + address(host, v.port) + "?" + q.Encode() + "#" + (&url.URL{Fragment: name}).EscapedFragment()
 	return plugin.Fragment{Format: plugin.FormatURIList, Name: name, Data: []byte(uri)}, true
 }
 
@@ -61,6 +68,14 @@ func xhttpExtra(s XHTTPSettings) string {
 		XPaddingBytes string `json:"xPaddingBytes"`
 	}{XPaddingBytes: padding})
 	return string(b)
+}
+
+func clientXHTTPMode(s Settings) string {
+	mode := defaultString(s.XHTTP.Mode, "auto")
+	if s.Security == "tls" && s.CDN != nil && s.CDN.Host != "" && mode == "auto" {
+		return "packet-up"
+	}
+	return mode
 }
 
 func spx(deviceID string) string {
@@ -89,7 +104,7 @@ func renderMihomo(in protocols.RenderInput) (plugin.Fragment, bool) {
 	add("name", quoted(name))
 	add("type", strNode("vless"))
 	add("server", quoted(host))
-	add("port", intNode(int(in.Inbound.Port)))
+	add("port", intNode(int(v.port)))
 	add("uuid", quoted(uuid))
 	add("udp", boolNode(true))
 	add("packet-encoding", strNode("xudp"))
@@ -97,24 +112,33 @@ func renderMihomo(in protocols.RenderInput) (plugin.Fragment, bool) {
 	add("servername", quoted(v.serverName))
 	add("client-fingerprint", strNode(s.Reality.Fingerprint))
 	add("skip-cert-verify", boolNode(false))
-	if s.Transport == "tcp" {
+	if s.Security == "reality" && s.Transport == "tcp" {
 		add("network", strNode("tcp"))
 		add("flow", strNode("xtls-rprx-vision"))
-	} else {
+	} else if s.Transport == "xhttp" {
 		add("network", strNode("xhttp"))
-		xopts := []*yaml.Node{strNode("path"), quoted(s.XHTTP.Path), strNode("mode"), strNode(defaultString(s.XHTTP.Mode, "auto"))}
-		if s.XHTTP.Host != "" {
-			xopts = append(xopts, strNode("host"), quoted(s.XHTTP.Host))
+		xopts := []*yaml.Node{strNode("path"), quoted(s.XHTTP.Path), strNode("mode"), strNode(clientXHTTPMode(s))}
+		if v.clientHost != "" {
+			xopts = append(xopts, strNode("host"), quoted(v.clientHost))
 		}
 		padding := defaultString(s.XHTTP.XPaddingBytes, defaultXPaddingBytes)
 		if padding != defaultXPaddingBytes {
 			xopts = append(xopts, strNode("x-padding-bytes"), quoted(padding))
 		}
 		add("xhttp-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: xopts})
+	} else if s.Transport == "ws" {
+		add("network", strNode("ws"))
+		wsOpts := []*yaml.Node{strNode("path"), quoted(s.WS.Path)}
+		if v.clientHost != "" {
+			wsOpts = append(wsOpts, strNode("headers"), &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{strNode("Host"), quoted(v.clientHost)}})
+		}
+		add("ws-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: wsOpts})
 	}
-	add("reality-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
-		strNode("public-key"), quoted(v.publicKey), strNode("short-id"), quoted(v.shortID),
-	}})
+	if s.Security == "reality" {
+		add("reality-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
+			strNode("public-key"), quoted(v.publicKey), strNode("short-id"), quoted(v.shortID),
+		}})
+	}
 
 	proxy := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: kv}
 	var buf bytes.Buffer
