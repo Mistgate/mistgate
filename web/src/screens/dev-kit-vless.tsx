@@ -15,7 +15,7 @@ import { hy2, vless } from "@/screens/profiles/schema.fixtures";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 
 // Development only, part of /dev-kit: VLESS REALITY (design/vless.md §3, §7.2, §7.5) on made-up data — the new-profile form
-// with the site segment (this node's site by default), its string lists and the TCP 443 hint, the add dialog's
+// with the site segment (this node's site by default), its string lists, the TLS and CDN fields and the TCP 443 hint, the add dialog's
 // hy2_decoy_paused notice and the same sentence in "Put on nodes", and the node's own site on a node with only an IP.
 // The calls are answered here and armed on a click or a mount, like the other kits.
 
@@ -72,13 +72,44 @@ function Demo({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-type VlessSettings = { port?: number; transport?: string; reality?: { target_kind?: string; target?: string; server_names?: string[]; short_ids?: string[]; fingerprint?: string }; xhttp?: { path?: string; mode?: string } };
+type VlessSettings = {
+  port?: number;
+  transport?: string;
+  security?: string;
+  tls_mode?: string;
+  sni?: string;
+  cdn?: { host?: string; port?: number };
+  ws?: { path?: string };
+  reality?: { target_kind?: string; target?: string; server_names?: string[]; short_ids?: string[]; fingerprint?: string };
+  xhttp?: { path?: string; mode?: string };
+};
 
 /** Dev only: the preview a panel would draw for these settings (the link of design/vless.md §3, shortened). */
 function fakeCalls() {
   const p = profilesApi as unknown as Record<string, unknown>;
   p.previewProfile = async (r: { settingsJson: string }) => {
     const s = JSON.parse(r.settingsJson) as VlessSettings;
+    if (s.security === "tls") {
+      const cdn = (s.cdn?.host ?? "").trim();
+      if (s.tls_mode === "self_signed" && !cdn) {
+        return { errors: [{ pointer: "/cdn/host", code: "required", message: "a self-signed origin needs a CDN host" }], warnings: [], clientPreview: "", clientLabel: "Subscription link · URI list" };
+      }
+      const host = cdn || "de1.example.com";
+      const ws = s.transport === "ws";
+      const mode = cdn && (s.xhttp?.mode ?? "auto") === "auto" ? "packet-up" : (s.xhttp?.mode ?? "auto");
+      const q = [
+        "encryption=none",
+        "fp=chrome",
+        `host=${host}`,
+        !ws && `mode=${mode}`,
+        `path=${encodeURIComponent((ws ? s.ws?.path : s.xhttp?.path) || "/…")}`,
+        "security=tls",
+        `sni=${host}`,
+        `type=${ws ? "ws" : "xhttp"}`,
+      ].filter(Boolean);
+      const port = cdn ? (s.cdn?.port ?? 443) : (s.port ?? 443);
+      return { errors: [], warnings: [], clientPreview: `vless://••••@${host}:${port}?${q.join("&")}#de1 · vless · ${port}`, clientLabel: "Subscription link · URI list" };
+    }
     const own = s.reality?.target_kind !== "site"; // the node's own site: its name is the node's domain
     const target = s.reality?.target ?? "";
     if (!own && !target.includes(":")) {
@@ -170,7 +201,7 @@ function DeployDemo() {
 export function VlessKit() {
   return (
     <div className="relative left-1/2 flex w-[min(64rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-6">
-      <Demo title="VLESS: a new profile (the site segment, string lists, XHTTP hidden for TCP, the TCP 443 hint)">
+      <Demo title="VLESS: a new profile (the site segment, string lists, TLS and CDN fields, XHTTP hidden for TCP, the TCP 443 hint)">
         <EditorDemo />
       </Demo>
       <Demo title="VLESS: the add dialog on a node with Hysteria2 (hy2_decoy_paused)">

@@ -66,8 +66,8 @@ export const other = JSON.stringify({
   },
 });
 
-// The schema the VLESS plugin publishes (internal/panel/protocols/vless/schema.go), whole: two string lists and the XHTTP
-// block that only the xhttp transport uses.
+// The schema the VLESS plugin publishes (internal/panel/protocols/vless/schema.go), whole: the REALITY block with two string
+// lists, the TLS and CDN fields, the XHTTP and WebSocket blocks that only their transports use.
 export const vless = String.raw`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "VLESS",
@@ -79,10 +79,33 @@ export const vless = String.raw`{
       "x-group": "basics", "x-order": 10, "x-critical": true
     },
     "transport": {
-      "type": "string", "enum": ["xhttp", "tcp"], "default": "xhttp",
-      "x-enum-labels": {"xhttp": "XHTTP", "tcp": "TCP (RAW + Vision)"},
+      "type": "string", "enum": ["xhttp", "tcp", "ws"], "default": "xhttp",
+      "x-enum-labels": {"xhttp": "XHTTP", "tcp": "TCP (RAW + Vision)", "ws": "WebSocket"},
       "title": "Transport", "description": "XHTTP is the default. TCP with Vision is the fastest and has the least overhead.",
       "x-group": "basics", "x-widget": "segmented", "x-order": 20, "x-critical": true
+    },
+    "security": {
+      "type": "string", "enum": ["reality", "tls"], "default": "reality",
+      "x-enum-labels": {"reality": "REALITY", "tls": "TLS"},
+      "title": "Security", "description": "REALITY is direct. TLS works directly with a domain certificate or through a CDN.",
+      "x-group": "basics", "x-widget": "segmented", "x-order": 25, "x-critical": true
+    },
+    "tls_mode": {
+      "type": "string", "enum": ["acme_domain", "self_signed"],
+      "x-enum-labels": {"acme_domain": "Let's Encrypt", "self_signed": "Self-signed origin"},
+      "title": "Origin certificate", "description": "A direct TLS connection needs a domain certificate. A self-signed certificate is allowed only when a CDN connects to the origin.",
+      "x-group": "tls", "x-order": 10, "x-critical": true
+    },
+    "sni": {
+      "type": "string", "default": "", "title": "Origin server name", "description": "Empty uses the node's domain or the inbound override.",
+      "x-group": "tls", "x-order": 20, "x-critical": true
+    },
+    "cdn": {
+      "type": "object", "title": "CDN", "x-group": "tls", "x-order": 30,
+      "properties": {
+        "host": {"type": "string", "default": "", "title": "CDN host", "description": "The host clients connect to. The client Host and SNI use this value.", "x-order": 10, "x-critical": true},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 443, "title": "CDN port", "x-order": 20}
+      }
     },
     "reality": {
       "type": "object", "title": "REALITY", "x-group": "basics", "x-order": 30,
@@ -128,7 +151,7 @@ export const vless = String.raw`{
           "x-order": 10, "x-critical": true
         },
         "host": {
-          "type": "string", "default": "", "title": "Host header", "description": "Empty = none.",
+          "type": "string", "default": "", "title": "Host header", "description": "REALITY only. TLS derives the client Host from the origin SNI or CDN host.",
           "x-order": 20, "x-critical": true
         },
         "mode": {
@@ -142,6 +165,13 @@ export const vless = String.raw`{
           "title": "Padding bytes", "description": "Random padding per request, min-max, 1 to 4096.",
           "x-order": 40, "x-critical": true
         }
+      }
+    },
+    "ws": {
+      "type": "object", "title": "WebSocket", "x-group": "advanced", "x-order": 55,
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^/[A-Za-z0-9/_-]*$", "title": "Path", "description": "Empty: a random one is made when the profile is saved.", "x-order": 10, "x-critical": true},
+        "host": {"type": "string", "default": "", "title": "Client Host header", "description": "The node's WebSocket origin always leaves Host empty. Empty = no client Host override.", "x-order": 20, "x-critical": true}
       }
     },
     "egress": {

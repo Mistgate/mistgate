@@ -124,7 +124,7 @@ function leaf(node: Node, path: string[], ctx: Ctx, kind: FieldKind): Field {
   };
 }
 
-const groupOrder = ["basics", "obfuscation", "advanced"];
+const groupOrder = ["basics", "tls", "obfuscation", "advanced"];
 
 /** The form: fields in schema order, gathered into groups (basics, obfuscation, advanced, then any other). */
 export function parseSchema(schemaJson: string): Group[] {

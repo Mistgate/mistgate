@@ -33,17 +33,18 @@ import { ConfLine } from "./conf-preview";
 import { DeployDialog, type DeployProfile } from "./deploy";
 import { EgressNote } from "./egress-note";
 import { SchemaForm, type Problem } from "./schema-form";
+import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
 import { WherePanel } from "./where";
-
-/** VLESS: the fields that belong to "another site" as the REALITY target; the node's own site (the default) has no use for them. */
-const vlessSiteFields = ["reality.target", "reality.server_names"];
 
 /**
  * What "Put on nodes" must know to ask for a domain before the click, where Let's Encrypt cannot work on an IP: Hysteria2's
  * certificate mode and domain, or the node's own site behind VLESS REALITY, which always has a Let's Encrypt certificate.
  */
 function certOfSettings(protocol: string, settings: Settings): Pick<DeployProfile, "tlsMode" | "sni"> {
-  if (protocol === "vless") return { tlsMode: getAt(settings, ["reality", "target_kind"]) === "self" ? "acme_domain" : "", sni: "" };
+  if (protocol === "vless") {
+    if (getAt(settings, ["security"]) === "tls") return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
+    return { tlsMode: getAt(settings, ["reality", "target_kind"]) === "self" ? "acme_domain" : "", sni: "" };
+  }
   return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
 }
 
@@ -279,17 +280,11 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const isAwg = info.id === "awg";
   const locked = isAwg && inbounds.length > 0;
   const readOnly = useMemo<ReadonlySet<string>>(() => (locked ? new Set(["subnet4", "subnet6"]) : new Set()), [locked]);
-  // VLESS: the XHTTP block means nothing to the tcp transport, and the target and its names belong to "another site"
+  // VLESS: REALITY and TLS have fields of their own, the transports belong to one of them, and the target and its names belong
+  // to "another site" (vless-form.ts)
   const isVless = info.id === "vless";
-  const tcp = isVless && getAt(settings, ["transport"]) === "tcp";
-  const ownSite = isVless && getAt(settings, ["reality", "target_kind"]) === "self";
-  const vlessHidden = useMemo<ReadonlySet<string>>(() => {
-    const ids = new Set<string>();
-    if (tcp) for (const f of fields) if (f.path[0] === "xhttp") ids.add(f.id);
-    if (ownSite) for (const id of vlessSiteFields) ids.add(id);
-    return ids;
-  }, [fields, tcp, ownSite]);
-  const hidden = isAwg ? awgHidden : isVless && vlessHidden.size > 0 ? vlessHidden : undefined;
+  const vlessHiddenIds = useMemo<ReadonlySet<string>>(() => (isVless ? vlessHidden(fields, settings) : new Set()), [isVless, fields, settings]);
+  const hidden = isAwg ? awgHidden : isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : undefined;
   const extra = (f: Field): ReactNode => {
     if (isNew && isAwg && (f.id === "subnet4" || f.id === "subnet6") && !getAt(settings, f.path)) {
       return <span className="text-[11px] leading-snug text-muted">{t("awg.subnet.auto")}</span>;
@@ -303,12 +298,17 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
     }
     if (locked && (f.id === "subnet4" || f.id === "subnet6")) return <span className="text-[11px] leading-snug text-warn-text">{t("awg.subnet.locked")}</span>;
     if (f.id === "egress" && getAt(settings, f.path) === "warp") return <EgressNote nodeIds={[...new Set(inbounds.map((i) => i.nodeId))]} />;
+    // behind a CDN the mode "auto" is sent to clients as packet-up (the panel does it too)
+    if (isVless && f.id === "xhttp.mode" && getAt(settings, ["security"]) === "tls" && String(getAt(settings, ["cdn", "host"]) ?? "").trim() !== "" && getAt(settings, f.path) === "auto") {
+      return <span className="text-[11px] leading-snug text-muted">{t("profiles.vless.mode.cdn")}</span>;
+    }
     // TCP 443 is also where a Hysteria2 profile on the same node keeps its site (design/vless.md §7.2)
     if (isVless && f.id === "port" && Number(getAt(settings, f.path)) === 443) {
-      const self = getAt(settings, ["reality", "target_kind"]) === "self";
+      const tls = getAt(settings, ["security"]) === "tls";
+      const self = !tls && getAt(settings, ["reality", "target_kind"]) === "self";
       return (
         <span className={cx("flex flex-col items-start gap-0.5 text-[11px] leading-snug", self ? "text-muted" : "text-warn-text")}>
-          {t(self ? "profiles.vless.port443.self" : "profiles.vless.port443.site")}
+          {t(tls ? "profiles.vless.port443.tls" : self ? "profiles.vless.port443.self" : "profiles.vless.port443.site")}
           <VlessHy2Docs />
         </span>
       );
@@ -400,7 +400,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
           </Card>
           {isNew && <AfterCreate a={after} info={info} settings={settings} />}
           {isAwg && <AwgPanel settings={settings} onChange={edit} advice={preview.data && preview.data.errors.length === 0 ? { warnings: preview.data.warnings, score: preview.data.obfuscationScore } : undefined} />}
-          <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : edit} hidden={hidden} readOnly={readOnly} extra={extra} />
+          <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : isVless ? (n) => edit(vlessEdited(settings, n)) : edit} hidden={hidden} offers={isVless ? vlessOffers : undefined} readOnly={readOnly} extra={extra} />
           {profile && <DeleteSection profile={profile} inbounds={inbounds} />}
         </div>
 

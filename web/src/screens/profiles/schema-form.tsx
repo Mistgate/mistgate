@@ -16,6 +16,7 @@ const groupMarks: Record<string, { icon: IconName; tone: Tone }> = {
   basics: { icon: "sliders", tone: "sand" },
   obfuscation: { icon: "mask", tone: "sage" },
   advanced: { icon: "gear", tone: "sky" },
+  tls: { icon: "lock", tone: "sand" },
 };
 const groupMark = (id: string) => groupMarks[id] ?? groupMarks.basics!;
 
@@ -28,6 +29,8 @@ type Props = {
   hidden?: ReadonlySet<string>;
   /** Fields (dotted ids) that show their value but cannot be edited. */
   readOnly?: ReadonlySet<string>;
+  /** Whether a choice of a field is offered (the other choices of the schema stay out of the control). */
+  offers?: (f: Field, value: string, settings: Settings) => boolean;
   /** Something a protocol adds under a field's hint ("random" next to a port, a note under the exit). */
   extra?: (f: Field) => ReactNode;
   groups: Group[];
@@ -43,7 +46,7 @@ type Props = {
  * Text that the dictionary has for a field (profiles.f.<protocol>.<field>.title|hint|enum.<value>) replaces
  * the schema's own English; a field without an entry shows the schema text, so a new protocol needs no UI work.
  */
-export function SchemaForm({ protocol, groups, settings, base, problems, onChange, hidden, readOnly, extra }: Props) {
+export function SchemaForm({ protocol, groups, settings, base, problems, onChange, hidden, readOnly, extra, offers }: Props) {
   const t = useTx();
   // advanced starts folded; a group with a problem is always open
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -82,6 +85,7 @@ export function SchemaForm({ protocol, groups, settings, base, problems, onChang
                     t={t}
                     settings={settings}
                     locked={readOnly?.has(f.id) ?? false}
+                    offers={offers}
                     extra={extra?.(f)}
                     dirty={isChanged(f, settings, base)}
                     problems={errorsOf(f, problems)}
@@ -100,13 +104,13 @@ export function SchemaForm({ protocol, groups, settings, base, problems, onChang
 const inputCls =
   "h-[38px] rounded-xl border border-line bg-canvas font-mono text-[13px] text-fg outline-none transition-colors duration-200 focus:border-accent aria-invalid:border-danger";
 
-function FieldRow({ protocol, f, t, settings, locked, extra, dirty, problems, onChange }: { protocol: string; f: Field; t: Tx; settings: Settings; locked: boolean; extra?: ReactNode; dirty: boolean; problems: Problem[]; onChange: (path: string[], value: unknown) => void }) {
+function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, problems, onChange }: { protocol: string; f: Field; t: Tx; settings: Settings; locked: boolean; offers?: Props["offers"]; extra?: ReactNode; dirty: boolean; problems: Problem[]; onChange: (path: string[], value: unknown) => void }) {
   const copy = (part: string) => t.opt(`profiles.f.${protocol}.${f.id}.${part}`);
   const label = copy("title") ?? f.title;
   const hint = copy("hint") ?? f.hint;
   const unit = f.unit ? (t.opt(`profiles.unit.${f.unit}`) ?? f.unit) : "";
   const invalid = problems.length > 0;
-  const choices = f.choices.map((c) => ({ ...c, label: copy(`enum.${c.value}`) ?? c.label }));
+  const choices = f.choices.filter((c) => offers?.(f, c.value, settings) ?? true).map((c) => ({ ...c, label: copy(`enum.${c.value}`) ?? c.label }));
   const errId = useId();
   const describedBy = invalid ? errId : undefined;
   // a list shows a bad item's problem under that item; the server's sentence about the whole list would repeat it
