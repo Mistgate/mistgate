@@ -479,7 +479,7 @@ func (s *Server) AdminListener() http.Handler {
 // prefix already stripped. Routing is by explicit path tests, never a ServeMux, so the
 // admin never answers with a redirect (which would lose the secret prefix).
 func (s *Server) newAdmin(base string) http.Handler {
-	api := http.StripPrefix("/api", s.auth.RequireSession(s.api))
+	api := http.StripPrefix("/api", s.auth.RequireSession(withVersion(s.api)))
 	spa := s.spa(base)
 	return s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch p := r.URL.Path; {

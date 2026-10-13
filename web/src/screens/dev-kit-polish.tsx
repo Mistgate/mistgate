@@ -19,6 +19,7 @@ import { NodesScreen } from "@/screens/nodes";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
 import { SessionsPage } from "@/screens/settings-pages/sessions";
+import { StaleBannerView } from "@/components/stale-banner";
 import { UpdateToast } from "@/components/update-toast";
 import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
@@ -233,6 +234,9 @@ export function PolishKit() {
           {createPortal(<UpdateToast />, document.body)}
         </Shot>
       )}
+      <Shot id="polish-stale-banner" title="Stale tab: the panel was updated under an open admin (sticky under the header; the profile form swaps Save for Reload)">
+        <StaleBannerView version="0.1.36" />
+      </Shot>
       <Shot id="polish-errors" title="QueryError and Pending: full and compact">
         <QueryError error={new Error("x")} onRetry={() => {}} />
         <div className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">

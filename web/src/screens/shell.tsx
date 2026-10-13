@@ -7,6 +7,7 @@ import { StepUpProvider } from "@/components/step-up";
 import { Brand, Logo, Wordmark } from "@/components/brand";
 import { navKey, sections, type SectionId } from "@/components/nav";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
+import { StaleBanner } from "@/components/stale-banner";
 import { UpdateToast } from "@/components/update-toast";
 import { Avatar, Kbd } from "@/components/ui/bits";
 import { Icon, NavIcon } from "@/components/ui/icons";
@@ -84,6 +85,7 @@ function ShellFrame() {
       {/* one width rule for every screen: a centred column of at most 1360px, side padding that grows with the window.
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
       <main id="main" tabIndex={-1} className="outline-none px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
+        <StaleBanner />
         <div key={section} className="screen-enter mx-auto max-w-[1360px] has-[.app-wide]:max-w-none">
           <Outlet />
         </div>

@@ -77,6 +77,8 @@ const core = {
   "header.theme.toDark": "Switch to dark theme",
   "header.signOut": "Sign out",
   "header.version": "Panel version {version}",
+  "stale.msg": "The panel was updated to {version}. Reload the page so the admin matches it.",
+  "stale.reload": "Reload",
   "header.source": "Source code",
   "more.theme": "Dark theme",
   "more.language": "Language",

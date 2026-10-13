@@ -19,6 +19,7 @@ import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
 import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
 import type { MessageKey } from "@/i18n/en";
+import { versionInterceptor } from "./stale";
 
 // The panel rewrites <base href> to the admin prefix (e.g. "/4hbx.../");
 // everything below derives from document.baseURI, nothing is hard-coded.
@@ -27,6 +28,7 @@ export const basepath = new URL(document.baseURI).pathname;
 const transport = createConnectTransport({
   baseUrl: new URL("api", document.baseURI).href,
   useBinaryFormat: false,
+  interceptors: [versionInterceptor],
 });
 
 export const auth = createClient(AuthService, transport);

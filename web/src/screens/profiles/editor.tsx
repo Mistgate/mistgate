@@ -26,6 +26,7 @@ import { randomPort } from "@/lib/awg";
 import { avatarIndex } from "@/screens/users/format";
 import { ConfirmModal, Panel, useDebounced } from "@/screens/users/ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import { reloadPage, useStaleVersion } from "@/lib/stale";
 import { allFields, changedFields, getAt, makeSecret, parseSchema, parseSettings, setAt, withGeneratedSecrets, type Field, type Settings } from "./schema";
 import { AfterCreate, autoName, useAfterCreate } from "./after-create";
 import { AwgPanel, awgHidden, handTyped } from "./awg-panel";
@@ -324,7 +325,8 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   };
 
   // an empty name does not grey the button out: the click says what is missing, at the field
-  const canSave = !busy && problems.length === 0 && (isNew || count > 0);
+  const stale = useStaleVersion() !== ""; // the schema this form was drawn from is the old panel's: saving it could be refused or wrong
+  const canSave = !busy && !stale && problems.length === 0 && (isNew || count > 0);
   const nodes = profile ? `${profile.nodeCount} ${t.n("profiles.nodes", profile.nodeCount)} · ${profile.userCount} ${t.n("profiles.users", profile.userCount)}` : info.displayName;
   const certOf = fields.some((f) => f.id === "tls_mode" || f.id === "reality.target_kind") ? certOfSettings(info.id, base) : undefined;
 
@@ -432,8 +434,8 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
               {t("profiles.reset")}
             </Button>
           )}
-          <Button variant="primary" disabled={!canSave} onClick={() => void save()}>
-            {busy && !isNew && profile.nodeCount > 0 && changed.some((f) => f.id === "port") ? t("ports.saving", { port: String(getAt(settings, ["port"]) ?? "") }) : isNew ? t("profiles.createBtn") : t("profiles.save")}
+          <Button variant="primary" disabled={!stale && !canSave} onClick={stale ? reloadPage : () => void save()}>
+            {stale ? t("stale.reload") : busy && !isNew && profile.nodeCount > 0 && changed.some((f) => f.id === "port") ? t("ports.saving", { port: String(getAt(settings, ["port"]) ?? "") }) : isNew ? t("profiles.createBtn") : t("profiles.save")}
           </Button>
         </div>
       )}

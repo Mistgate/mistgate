@@ -73,6 +73,8 @@ const core: CoreMessages = {
   "header.theme.toDark": "Включить тёмную тему",
   "header.signOut": "Выйти",
   "header.version": "Версия панели {version}",
+  "stale.msg": "Панель обновлена до {version}. Перезагрузи страницу, чтобы админка работала с новой версией.",
+  "stale.reload": "Перезагрузить",
   "header.source": "Исходный код",
   "more.theme": "Тёмная тема",
   "more.language": "Язык",

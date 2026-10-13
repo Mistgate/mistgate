@@ -2,10 +2,21 @@ package httpserver
 
 import (
 	"bytes"
+	"html"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/panel/auth"
+)
+
+// versionMeta names the <meta> that tells a tab which panel version served its index.html. The admin compares it with the
+// versionHeader of its API answers (web/src/lib/stale.ts): a tab that outlives a panel update says so.
+const (
+	versionMeta   = "mistgate-version"
+	versionHeader = "X-Mistgate-Version"
 )
 
 const uiNotBuiltHTML = `<!doctype html><html><head><meta charset="utf-8"><title>Mistgate</title></head>
@@ -52,11 +63,28 @@ func (s *Server) spa(base string) http.Handler {
 		if base != "/" {
 			index = bytes.Replace(index, []byte(`<base href="/">`), []byte(`<base href="`+base+`">`), 1)
 		}
+		if v := buildinfo.Version; v != "" {
+			index = bytes.Replace(index, []byte("<head>"), []byte(`<head><meta name="`+versionMeta+`" content="`+html.EscapeString(v)+`">`), 1)
+		}
 		h := w.Header()
 		h["Content-Type"] = headerContentTypeHTML[:1:1]
+		if _, ok := h["Cache-Control"]; !ok { // the admin stack already says no-store; this keeps the shell fresh on its own
+			h["Cache-Control"] = headerCacheNoCache[:1:1]
+		}
 		w.WriteHeader(http.StatusOK)
 		if r.Method != http.MethodHead {
 			w.Write(index)
 		}
+	})
+}
+
+// withVersion stamps the panel version on the API answers of a signed-in admin (the sign-in procedures stay silent: the
+// version is not public). A tab compares it with the version of its own index.html.
+func withVersion(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := auth.AdminFrom(r.Context()); ok && buildinfo.Version != "" {
+			w.Header()[versionHeader] = []string{buildinfo.Version}
+		}
+		next.ServeHTTP(w, r)
 	})
 }
