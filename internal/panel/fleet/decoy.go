@@ -15,11 +15,46 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+// panelDecoyTTL is how long a snapshot of the panel's --decoy-dir is reused: every ListNodes would otherwise read and
+// hash the directory again.
+const panelDecoyTTL = 5 * time.Second
+
+// panelDecoyBundle is the snapshot of the panel's --decoy-dir (at most 2 MiB, like an own bundle), or why there is none.
 func (f *Fleet) panelDecoyBundle() (*decoy.Bundle, error) {
 	if f.cfg.DecoyDir == "" {
-		return nil, decoy.ErrInvalidBundle
+		return nil, errNoPanelDecoy
 	}
-	return decoy.FromDir(f.cfg.DecoyDir)
+	f.panelDecoyMu.Lock()
+	defer f.panelDecoyMu.Unlock()
+	if f.panelDecoyDir == f.cfg.DecoyDir && time.Since(f.panelDecoyAt) < panelDecoyTTL {
+		return f.panelDecoyB, f.panelDecoyErr
+	}
+	b, err := decoy.FromDir(f.cfg.DecoyDir)
+	f.panelDecoyDir, f.panelDecoyAt, f.panelDecoyB, f.panelDecoyErr = f.cfg.DecoyDir, time.Now(), b, err
+	return b, err
+}
+
+var errNoPanelDecoy = errors.New("the panel has no --decoy-dir")
+
+// panelReason is the decoy_reason_code of a panel site that cannot be used.
+func panelReason(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, errNoPanelDecoy):
+		return "panel_unavailable"
+	case decoy.ReasonOf(err) == decoy.ReasonTooLarge:
+		return "panel_too_large"
+	case decoy.ReasonOf(err) == decoy.ReasonNoIndex:
+		return "panel_no_index"
+	default:
+		return "panel_invalid"
+	}
+}
+
+// panelUnavailable is the refusal when the owner picks the panel's site and there is none.
+func panelUnavailable(err error) error {
+	return connect.NewError(connect.CodeFailedPrecondition, errors.New(panelReason(err)))
 }
 
 func (f *Fleet) nodeMessages(ctx context.Context, nodes []store.NodeRow) ([]*adminv1.Node, error) {
@@ -70,10 +105,12 @@ func (f *Fleet) scheduleDecoySync(nodeID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		for {
-			if err := f.syncNodeDecoy(ctx, nodeID); err != nil && !errors.Is(err, errNodeOffline) {
+			err := f.syncNodeDecoy(ctx, nodeID)
+			if err != nil && !errors.Is(err, errNodeOffline) {
 				f.log.Warn("sync node decoy site", "node", nodeID, "err", err)
 			}
 			f.decoySyncMu.Lock()
+			f.decoyAttempts[nodeID] = decoyAttempt{at: time.Now(), failed: err != nil && !errors.Is(err, errNodeOffline)}
 			if f.decoySyncDirty[nodeID] && ctx.Err() == nil {
 				delete(f.decoySyncDirty, nodeID)
 				f.decoySyncMu.Unlock()
@@ -85,6 +122,49 @@ func (f *Fleet) scheduleDecoySync(nodeID string) {
 			return
 		}
 	})
+}
+
+// decoyAttempt is the last try to give a node its site: when, and whether it failed.
+type decoyAttempt struct {
+	at     time.Time
+	failed bool
+}
+
+// decoyRetryAfter is how long the sweeper waits before it tries a node whose site failed to apply again.
+const decoyRetryAfter = 5 * time.Minute
+
+// decoySyncFailed says whether the last attempt to give this node its site ended in an error.
+func (f *Fleet) decoySyncFailed(nodeID string) bool {
+	f.decoySyncMu.Lock()
+	defer f.decoySyncMu.Unlock()
+	return f.decoyAttempts[nodeID].failed
+}
+
+// decoySweep runs with the 30 s sweep: a connected node whose reported site is not the configured one gets it again
+// (the panel's --decoy-dir changed, or an earlier push failed; a failed push waits decoyRetryAfter).
+func (f *Fleet) decoySweep(n store.NodeRow, live store.NodeLiveRow) {
+	if n.State != "active" || !live.Connected || n.DecoyMode == decoy.ModeBuiltin || !slices.Contains(live.AgentCaps, capDecoy) {
+		return
+	}
+	want := n.DecoyBundleHash
+	if n.DecoyMode == decoy.ModePanel {
+		b, err := f.panelDecoyBundle()
+		if err != nil {
+			return
+		}
+		want = b.Hash()
+	}
+	if n.DecoyAgentMode == n.DecoyMode && n.DecoyAgentHash == want {
+		return
+	}
+	f.decoySyncMu.Lock()
+	last := f.decoyAttempts[n.ID]
+	busy := f.decoySyncing[n.ID]
+	f.decoySyncMu.Unlock()
+	if busy || (last.failed && time.Since(last.at) < decoyRetryAfter) {
+		return
+	}
+	f.scheduleDecoySync(n.ID)
 }
 
 func decoyFilesFor(bundle *decoy.Bundle, reportedHash string) []*agentv1.DecoyFile {
@@ -142,11 +222,18 @@ func (f *Fleet) syncNodeDecoy(ctx context.Context, nodeID string) error {
 		return nil
 	}
 	files := decoyFilesFor(bundle, n.DecoyAgentHash)
-	result, err := f.command(ctx, nodeID, 90*time.Second, func(requestID string) *agentv1.ConnectResponse {
-		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SetDecoy{SetDecoy: &agentv1.SetDecoy{
-			RequestId: requestID, Mode: mode, BundleSha256: hash, Files: files,
-		}}}
-	})
+	send := func(files []*agentv1.DecoyFile) (*agentv1.CommandResult, error) {
+		return f.command(ctx, nodeID, 90*time.Second, func(requestID string) *agentv1.ConnectResponse {
+			return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SetDecoy{SetDecoy: &agentv1.SetDecoy{
+				RequestId: requestID, Mode: mode, BundleSha256: hash, Files: files,
+			}}}
+		})
+	}
+	result, err := send(files)
+	if err == nil && !result.Ok && result.Error == "bad_params" && files == nil && bundle != nil {
+		// The node reported a hash it no longer has (a state file lost): send the whole tree once.
+		result, err = send(decoyFilesFor(bundle, ""))
+	}
 	if err != nil {
 		return err
 	}
@@ -162,7 +249,7 @@ func (f *Fleet) syncNodeDecoy(ctx context.Context, nodeID string) error {
 func (f *Fleet) applyDecoyMode(ctx context.Context, nodeID, mode string, bundle []byte) (store.NodeRow, error) {
 	if mode == decoy.ModePanel {
 		if _, err := f.panelDecoyBundle(); err != nil {
-			return store.NodeRow{}, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel decoy site is unavailable"))
+			return store.NodeRow{}, panelUnavailable(err)
 		}
 	}
 	if mode == decoy.ModeOwn {
@@ -172,7 +259,7 @@ func (f *Fleet) applyDecoyMode(ctx context.Context, nodeID, mode string, bundle 
 		if len(bundle) > 0 {
 			parsed, err := decoy.ParseArchive(bundle)
 			if err != nil {
-				return store.NodeRow{}, invalid("invalid decoy bundle")
+				return store.NodeRow{}, invalid(decoy.ClientMessage(err))
 			}
 			return f.st.SetNodeDecoyBundle(ctx, nodeID, parsed.Hash(), parsed.Archive())
 		}

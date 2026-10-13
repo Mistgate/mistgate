@@ -72,7 +72,7 @@ func TestBundleValidationTable(t *testing.T) {
 		{name: "NUL path", data: zipArchive(t, []File{{Path: "index\x00.html", Content: []byte("x")}}, 0o644)},
 		{name: "backslash path", data: zipArchive(t, []File{{Path: `dir\\index.html`, Content: []byte("x")}}, 0o644)},
 		{name: "symlink", data: symlink},
-		{name: "executable file", data: executable},
+		{name: "executable bit is not a refusal", data: executable, want: true},
 		{name: "non-static tar entry", data: tarArchive(t, "pipe", tar.TypeFifo, 0, nil)},
 		{name: "tar symlink", data: tarArchive(t, "link", tar.TypeSymlink, 0, nil)},
 	}

@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/base64"
 	"strings"
 	"testing"
@@ -70,4 +72,48 @@ func TestNodeDecoyToolDescriptionAvoidsRepeatingOtherSites(t *testing.T) {
 	if !found {
 		t.Fatal("node_decoy_plan is missing")
 	}
+}
+
+// A refused bundle comes back as a coded reason an agent can act on, and nothing is planned or sent.
+func TestNodeDecoyPlanRefusesBadBundlesWithAReason(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	noIndex := zipOf(t, map[string]string{"about.html": "x"})
+	for name, tc := range map[string]struct {
+		args map[string]any
+		want string
+	}{
+		"not base64":         {map[string]any{"node": nodeA, "mode": "own", "bundle_base64": "!!!"}, "bundle_base64"},
+		"missing bundle":     {map[string]any{"node": nodeA, "mode": "own"}, "required"},
+		"no index.html":      {map[string]any{"node": nodeA, "mode": "own", "bundle_base64": base64.StdEncoding.EncodeToString(noIndex)}, "decoy_bundle_no_index"},
+		"bundle with panel":  {map[string]any{"node": nodeA, "mode": "panel", "bundle_base64": base64.StdEncoding.EncodeToString(noIndex)}, "only allowed with own"},
+		"unknown mode":       {map[string]any{"node": nodeA, "mode": "proxy"}, "mode must be"},
+		"archive over 2 MiB": {map[string]any{"node": nodeA, "mode": "own", "bundle_base64": base64.StdEncoding.EncodeToString(make([]byte, decoy.MaxBundleBytes+1))}, "decoy_bundle_too_large"},
+	} {
+		out, isErr := callTool(t, s, "node_decoy_plan", tc.args)
+		if !isErr || !strings.Contains(out, tc.want) {
+			t.Errorf("%s: isError=%v out=%q, want it to contain %q", name, isErr, out, tc.want)
+		}
+	}
+	if len(e.w.nodeDecoyReqs) != 0 {
+		t.Fatal("a refused plan reached the admin API")
+	}
+}
+
+func zipOf(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	w := zip.NewWriter(&b)
+	for name, body := range files {
+		f, err := w.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = f.Write([]byte(body))
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
 }

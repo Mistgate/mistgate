@@ -271,7 +271,8 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	case decoy.ModePanel:
 		switch {
 		case panelBundle == nil:
-			reasonCode = "panel_unavailable"
+			_, perr := f.panelDecoyBundle()
+			reasonCode = panelReason(perr)
 		case !decoySupported:
 			reasonCode = "agent_too_old"
 		case !live.Connected:
@@ -292,6 +293,9 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		case agentMode != decoy.ModeOwn || n.DecoyAgentHash != n.DecoyBundleHash:
 			reasonCode = "pending"
 		}
+	}
+	if reasonCode == "pending" && f.decoySyncFailed(n.ID) {
+		reasonCode = "apply_failed"
 	}
 	out.DecoyMode = n.DecoyMode
 	out.DecoySupported = decoySupported
@@ -633,7 +637,7 @@ func (s nodeService) SetNodeDecoyMode(ctx context.Context, req *connect.Request[
 	}
 	if m.Mode == decoy.ModePanel {
 		if _, err := f.panelDecoyBundle(); err != nil {
-			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel decoy site is unavailable"))
+			return nil, panelUnavailable(err)
 		}
 	}
 	old, err := f.st.Node(ctx, m.NodeId)
@@ -671,7 +675,7 @@ func (s nodeService) UploadNodeDecoy(ctx context.Context, req *connect.Request[a
 	}
 	bundle, err := decoy.ParseArchive(m.BundleArchive)
 	if err != nil {
-		return nil, invalid("invalid decoy bundle")
+		return nil, invalid(decoy.ClientMessage(err))
 	}
 	old, err := f.st.Node(ctx, m.NodeId)
 	if errors.Is(err, store.ErrNotFound) {
@@ -702,7 +706,7 @@ func (s nodeService) SetNodesDecoyMode(ctx context.Context, req *connect.Request
 	}
 	if m.Mode == decoy.ModePanel {
 		if _, err := f.panelDecoyBundle(); err != nil {
-			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel decoy site is unavailable"))
+			return nil, panelUnavailable(err)
 		}
 	}
 	if m.Mode == decoy.ModeOwn {

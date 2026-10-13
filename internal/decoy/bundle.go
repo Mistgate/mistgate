@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,13 +23,80 @@ import (
 )
 
 const (
-	// MaxBundleBytes limits the sum of file contents and the uploaded archive.
+	// MaxBundleBytes caps the sum of the file contents and, separately, an uploaded archive. The same cap applies to a
+	// bundle an owner uploads for one node and to the snapshot of the panel's own --decoy-dir.
 	MaxBundleBytes        = 2 << 20
 	maxBundleFiles        = 4096
+	maxArchiveEntries     = 2 * maxBundleFiles // files, directories and skipped hidden entries together
 	maxStoredArchiveBytes = MaxBundleBytes + 512<<10
+	// maxTarStream bounds what a gzip stream may expand to: every entry at 1 KiB of tar framing plus the contents.
+	maxTarStream = MaxBundleBytes + 2*maxArchiveEntries*512
 )
 
+// ErrInvalidBundle is the base of every bundle refusal; the concrete error is a *BundleError.
 var ErrInvalidBundle = errors.New("invalid decoy bundle")
+
+// Reasons a bundle is refused. They are stable: the admin shows a sentence for each.
+const (
+	ReasonEmpty        = "empty"          // nothing to serve
+	ReasonBadArchive   = "bad_archive"    // not a readable ZIP, TAR or TAR.GZ
+	ReasonTooLarge     = "too_large"      // the archive or its files are over MaxBundleBytes
+	ReasonTooManyFiles = "too_many_files" // more than 4096 entries
+	ReasonBadPath      = "bad_path"       // "..", an absolute path, a backslash, a colon or a NUL byte in a name
+	ReasonNotStatic    = "not_static"     // a symlink, device, FIFO or other entry that is not a plain file
+	ReasonNoIndex      = "no_index"       // no index.html at the top level
+	ReasonDuplicate    = "duplicate"      // one path twice, or a file where a directory is needed
+)
+
+// BundleError says why a bundle was refused; Path names the offending entry when there is one.
+type BundleError struct {
+	Reason string
+	Path   string
+}
+
+func (e *BundleError) Error() string {
+	if e.Path == "" {
+		return "invalid decoy bundle: " + e.Reason
+	}
+	return "invalid decoy bundle: " + e.Reason + " (" + e.Path + ")"
+}
+
+func (e *BundleError) Is(target error) bool { return target == ErrInvalidBundle }
+
+// ClientMessage is the coded message the admin and the MCP tools show: "decoy_bundle_<reason>" or
+// "decoy_bundle_<reason>: path=<entry>" (the convention of the panel's refusal codes, web/src/lib/errors.ts).
+func (e *BundleError) ClientMessage() string {
+	m := "decoy_bundle_" + e.Reason
+	if e.Path != "" {
+		m += ": path=" + url.QueryEscape(e.Path)
+	}
+	return m
+}
+
+// ReasonOf returns the reason of a refusal, ReasonBadArchive for an error that is not a *BundleError.
+func ReasonOf(err error) string {
+	var be *BundleError
+	if errors.As(err, &be) {
+		return be.Reason
+	}
+	return ReasonBadArchive
+}
+
+// ClientMessage is the coded message for any bundle error.
+func ClientMessage(err error) string {
+	var be *BundleError
+	if errors.As(err, &be) {
+		return be.ClientMessage()
+	}
+	return "decoy_bundle_" + ReasonBadArchive
+}
+
+func refuse(reason, entry string) error {
+	if len(entry) > 80 {
+		entry = entry[:80]
+	}
+	return &BundleError{Reason: reason, Path: strings.ToValidUTF8(entry, "?")}
+}
 
 // File is one regular file in a decoy bundle. Paths are slash-separated and relative to the site root.
 type File struct {
@@ -43,94 +111,108 @@ type Bundle struct {
 	archive []byte
 }
 
-// ParseArchive accepts a ZIP, TAR or gzip-compressed TAR upload. The upload and expanded contents are each capped at 2 MB.
+// ParseArchive accepts a ZIP, TAR or gzip-compressed TAR upload. The upload and the expanded contents are each capped at
+// 2 MiB. Dot-files and macOS "__MACOSX" entries are dropped (the site never serves them), a single wrapping folder is
+// removed when index.html is inside it, and symlinks, devices, ".." and absolute paths are refused.
 func ParseArchive(data []byte) (*Bundle, error) {
-	if len(data) == 0 || len(data) > MaxBundleBytes {
-		return nil, ErrInvalidBundle
+	if len(data) == 0 {
+		return nil, refuse(ReasonEmpty, "")
+	}
+	if len(data) > MaxBundleBytes {
+		return nil, refuse(ReasonTooLarge, "")
 	}
 	if len(data) >= 4 && bytes.Equal(data[:4], []byte{'P', 'K', 3, 4}) {
-		return parseZip(data, MaxBundleBytes)
+		return parseZip(data, MaxBundleBytes, true)
 	}
 	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
 		gz, err := gzip.NewReader(bytes.NewReader(data))
 		if err != nil {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonBadArchive, "")
 		}
 		defer gz.Close()
-		return parseTar(gz, MaxBundleBytes)
+		return parseTar(io.LimitReader(gz, maxTarStream+1), MaxBundleBytes)
 	}
 	return parseTar(bytes.NewReader(data), MaxBundleBytes)
 }
 
 // ParseStoredArchive reads the canonical ZIP kept by the panel and node. Its ZIP metadata may exceed the file-content cap.
 func ParseStoredArchive(data []byte) (*Bundle, error) {
-	if len(data) == 0 || len(data) > maxStoredArchiveBytes {
-		return nil, ErrInvalidBundle
+	if len(data) == 0 {
+		return nil, refuse(ReasonEmpty, "")
 	}
-	return parseZip(data, MaxBundleBytes)
+	if len(data) > maxStoredArchiveBytes {
+		return nil, refuse(ReasonTooLarge, "")
+	}
+	return parseZip(data, MaxBundleBytes, false)
 }
 
 // FromFiles validates files received over the agent protocol and makes a canonical bundle.
 func FromFiles(files []File) (*Bundle, error) {
-	if len(files) == 0 || len(files) > maxBundleFiles {
-		return nil, ErrInvalidBundle
+	if len(files) == 0 {
+		return nil, refuse(ReasonEmpty, "")
+	}
+	if len(files) > maxBundleFiles {
+		return nil, refuse(ReasonTooManyFiles, "")
 	}
 	out := make([]File, 0, len(files))
 	seen := make(map[string]struct{}, len(files))
 	var total int64
 	for _, f := range files {
 		if !validFilePath(f.Path) {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonBadPath, f.Path)
 		}
 		if _, ok := seen[f.Path]; ok {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonDuplicate, f.Path)
 		}
 		seen[f.Path] = struct{}{}
 		total += int64(len(f.Content))
 		if total > MaxBundleBytes {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonTooLarge, "")
 		}
 		out = append(out, File{Path: f.Path, Content: bytes.Clone(f.Content)})
 	}
-	if hasFileDirectoryConflict(seen) {
-		return nil, ErrInvalidBundle
+	if name := fileDirectoryConflict(seen); name != "" {
+		return nil, refuse(ReasonDuplicate, name)
+	}
+	if _, ok := seen["index.html"]; !ok {
+		return nil, refuse(ReasonNoIndex, "")
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	b := &Bundle{files: out, hash: hashFiles(out)}
 	archive, err := zipFiles(out)
 	if err != nil || len(archive) > maxStoredArchiveBytes {
-		return nil, ErrInvalidBundle
+		return nil, refuse(ReasonTooLarge, "")
 	}
 	b.archive = archive
 	return b, nil
 }
 
 // FromDir snapshots a local --decoy-dir bundle. Paths the panel hides by its dot-path rule are omitted; symlinks and
-// non-regular files are refused.
+// non-regular files are refused. The directory is held to the same 2 MiB cap as an uploaded bundle.
 func FromDir(dir string) (*Bundle, error) {
 	if dir == "" {
-		return nil, ErrInvalidBundle
+		return nil, refuse(ReasonEmpty, "")
 	}
 	root, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, ErrInvalidBundle
+		return nil, refuse(ReasonBadPath, "")
 	}
 	st, err := os.Lstat(root)
 	if err != nil || st.Mode()&os.ModeSymlink != 0 || !st.IsDir() {
-		return nil, ErrInvalidBundle
+		return nil, refuse(ReasonBadArchive, "")
 	}
 	files := make([]File, 0)
 	var total int64
 	err = filepath.WalkDir(root, func(name string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return ErrInvalidBundle
+			return refuse(ReasonBadArchive, "")
 		}
 		if name == root {
 			return nil
 		}
 		rel, err := filepath.Rel(root, name)
 		if err != nil {
-			return ErrInvalidBundle
+			return refuse(ReasonBadPath, "")
 		}
 		rel = filepath.ToSlash(rel)
 		if hasHiddenPathSegment(rel) {
@@ -141,46 +223,56 @@ func FromDir(dir string) (*Bundle, error) {
 		}
 		info, err := os.Lstat(name)
 		if err != nil {
-			return ErrInvalidBundle
+			return refuse(ReasonBadArchive, "")
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			return ErrInvalidBundle
+			return refuse(ReasonNotStatic, rel)
 		}
 		if info.IsDir() {
 			if !validDirPath(rel) {
-				return ErrInvalidBundle
+				return refuse(ReasonBadPath, rel)
 			}
 			return nil
 		}
-		if !info.Mode().IsRegular() || !validFilePath(rel) || info.Mode().Perm()&0o111 != 0 {
-			return ErrInvalidBundle
+		if !info.Mode().IsRegular() {
+			return refuse(ReasonNotStatic, rel)
 		}
-		if len(files) == maxBundleFiles || info.Size() < 0 || info.Size() > MaxBundleBytes-total {
-			return ErrInvalidBundle
+		if !validFilePath(rel) {
+			return refuse(ReasonBadPath, rel)
+		}
+		if len(files) == maxBundleFiles {
+			return refuse(ReasonTooManyFiles, "")
+		}
+		if info.Size() < 0 || info.Size() > MaxBundleBytes-total {
+			return refuse(ReasonTooLarge, "")
 		}
 		f, err := os.Open(name)
 		if err != nil {
-			return ErrInvalidBundle
+			return refuse(ReasonBadArchive, rel)
 		}
 		openedInfo, statErr := f.Stat()
 		if statErr != nil || !os.SameFile(info, openedInfo) || !openedInfo.Mode().IsRegular() {
 			_ = f.Close()
-			return ErrInvalidBundle
+			return refuse(ReasonNotStatic, rel)
 		}
 		content, readErr := io.ReadAll(io.LimitReader(f, MaxBundleBytes+1))
 		closeErr := f.Close()
 		if readErr != nil || closeErr != nil {
-			return ErrInvalidBundle
+			return refuse(ReasonBadArchive, rel)
 		}
 		total += int64(len(content))
 		if total > MaxBundleBytes {
-			return ErrInvalidBundle
+			return refuse(ReasonTooLarge, "")
 		}
 		files = append(files, File{Path: rel, Content: content})
 		return nil
 	})
 	if err != nil {
-		return nil, ErrInvalidBundle
+		var be *BundleError
+		if errors.As(err, &be) {
+			return nil, be
+		}
+		return nil, refuse(ReasonBadArchive, "")
 	}
 	return FromFiles(files)
 }
@@ -211,46 +303,106 @@ func (b *Bundle) Archive() []byte {
 	return bytes.Clone(b.archive)
 }
 
-func parseZip(data []byte, maxTotal int64) (*Bundle, error) {
+// archiveEntry cleans an archive entry name. skip is true for what the site never serves (dot-files, "__MACOSX", the
+// archive root); a name that could escape the site root is an error, never skipped.
+func archiveEntry(raw string) (name string, skip bool, err error) {
+	name = archivePath(raw)
+	if name == "" || name == "." {
+		return "", true, nil
+	}
+	if strings.ContainsAny(name, "\\:") || strings.ContainsRune(name, 0) || strings.HasPrefix(name, "/") || len(name) > 1024 {
+		return "", false, refuse(ReasonBadPath, raw)
+	}
+	segments := strings.Split(name, "/")
+	for _, s := range segments {
+		if s == "" || s == ".." || s == "." {
+			return "", false, refuse(ReasonBadPath, raw)
+		}
+	}
+	if segments[0] == "__MACOSX" || hasHiddenPathSegment(name) {
+		return name, true, nil
+	}
+	return name, false, nil
+}
+
+// finishArchive turns the collected files into a bundle: a single wrapping folder is removed when the site's index.html
+// is inside it, which is what zipping a folder produces.
+func finishArchive(files []File, seen map[string]struct{}) (*Bundle, error) {
+	if len(files) == 0 {
+		return nil, refuse(ReasonEmpty, "")
+	}
+	if name := fileDirectoryConflict(seen); name != "" {
+		return nil, refuse(ReasonDuplicate, name)
+	}
+	if _, ok := seen["index.html"]; !ok {
+		prefix := files[0].Path[:max(strings.IndexByte(files[0].Path, '/')+1, 0)]
+		wrapped := prefix != ""
+		for _, f := range files {
+			wrapped = wrapped && strings.HasPrefix(f.Path, prefix)
+		}
+		if _, ok := seen[prefix+"index.html"]; wrapped && ok {
+			for i := range files {
+				files[i].Path = strings.TrimPrefix(files[i].Path, prefix)
+			}
+		}
+	}
+	return FromFiles(files)
+}
+
+// parseZip reads an archive. lenient is true for an upload (hidden entries are dropped and a wrapping folder removed);
+// the stored canonical ZIP holds neither and is read strictly.
+func parseZip(data []byte, maxTotal int64, lenient bool) (*Bundle, error) {
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil || len(r.File) == 0 || len(r.File) > maxBundleFiles {
-		return nil, ErrInvalidBundle
+	if err != nil {
+		return nil, refuse(ReasonBadArchive, "")
+	}
+	if len(r.File) == 0 {
+		return nil, refuse(ReasonEmpty, "")
+	}
+	if len(r.File) > maxArchiveEntries {
+		return nil, refuse(ReasonTooManyFiles, "")
 	}
 	files := make([]File, 0, len(r.File))
 	seen := make(map[string]struct{}, len(r.File))
 	var total int64
 	for _, zf := range r.File {
-		name := archivePath(zf.Name)
+		name, skip, err := archiveEntry(zf.Name)
+		if err != nil {
+			return nil, err
+		}
+		if !lenient && skip {
+			return nil, refuse(ReasonBadPath, zf.Name)
+		}
 		if zf.FileInfo().IsDir() {
-			if !validDirPath(name) {
-				return nil, ErrInvalidBundle
-			}
 			continue
 		}
-		if !zf.Mode().IsRegular() || zf.Mode().Perm()&0o111 != 0 || !validFilePath(name) {
-			return nil, ErrInvalidBundle
+		if !zf.Mode().IsRegular() {
+			return nil, refuse(ReasonNotStatic, zf.Name)
+		}
+		if skip {
+			continue
 		}
 		if _, ok := seen[name]; ok {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonDuplicate, name)
 		}
 		seen[name] = struct{}{}
 		if zf.UncompressedSize64 > uint64(maxTotal-total) {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonTooLarge, "")
 		}
 		f, err := zf.Open()
 		if err != nil {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonBadArchive, name)
 		}
 		content, readErr := io.ReadAll(io.LimitReader(f, maxTotal-total+1))
 		closeErr := f.Close()
 		if readErr != nil || closeErr != nil || uint64(len(content)) != zf.UncompressedSize64 {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonBadArchive, name)
 		}
 		total += int64(len(content))
 		files = append(files, File{Path: name, Content: content})
 	}
-	if len(files) == 0 || hasFileDirectoryConflict(seen) {
-		return nil, ErrInvalidBundle
+	if lenient {
+		return finishArchive(files, seen)
 	}
 	return FromFiles(files)
 }
@@ -260,45 +412,48 @@ func parseTar(r io.Reader, maxTotal int64) (*Bundle, error) {
 	files := make([]File, 0)
 	seen := make(map[string]struct{})
 	var total int64
-	for {
+	for entries := 0; ; entries++ {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonBadArchive, "")
 		}
-		name := archivePath(h.Name)
+		if entries >= maxArchiveEntries {
+			return nil, refuse(ReasonTooManyFiles, "")
+		}
+		if h.Typeflag == tar.TypeXGlobalHeader { // `git archive` writes one; it holds no file
+			continue
+		}
+		name, skip, err := archiveEntry(h.Name)
+		if err != nil {
+			return nil, err
+		}
 		switch h.Typeflag {
 		case tar.TypeDir:
-			if !validDirPath(name) {
-				return nil, ErrInvalidBundle
-			}
 		case tar.TypeReg, tar.TypeRegA:
-			if !validFilePath(name) || h.Mode&0o111 != 0 || h.Size < 0 || h.Size > maxTotal-total {
-				return nil, ErrInvalidBundle
+			if skip {
+				continue
+			}
+			if h.Size < 0 || h.Size > maxTotal-total {
+				return nil, refuse(ReasonTooLarge, "")
 			}
 			if _, ok := seen[name]; ok {
-				return nil, ErrInvalidBundle
+				return nil, refuse(ReasonDuplicate, name)
 			}
 			seen[name] = struct{}{}
 			content, err := io.ReadAll(io.LimitReader(tr, h.Size+1))
 			if err != nil || int64(len(content)) != h.Size {
-				return nil, ErrInvalidBundle
+				return nil, refuse(ReasonBadArchive, name)
 			}
 			total += int64(len(content))
 			files = append(files, File{Path: name, Content: content})
 		default:
-			return nil, ErrInvalidBundle
-		}
-		if len(files) > maxBundleFiles {
-			return nil, ErrInvalidBundle
+			return nil, refuse(ReasonNotStatic, h.Name)
 		}
 	}
-	if len(files) == 0 || hasFileDirectoryConflict(seen) {
-		return nil, ErrInvalidBundle
-	}
-	return FromFiles(files)
+	return finishArchive(files, seen)
 }
 
 func validDirPath(name string) bool {
@@ -339,15 +494,16 @@ func validSitePath(name string) bool {
 	return true
 }
 
-func hasFileDirectoryConflict(files map[string]struct{}) bool {
+// fileDirectoryConflict returns a path that is a file and also the parent of another file, or "".
+func fileDirectoryConflict(files map[string]struct{}) string {
 	for name := range files {
 		for parent := path.Dir(name); parent != "."; parent = path.Dir(parent) {
 			if _, ok := files[parent]; ok {
-				return true
+				return parent
 			}
 		}
 	}
-	return false
+	return ""
 }
 
 func hashFiles(files []File) string {

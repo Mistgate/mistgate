@@ -94,14 +94,20 @@ var nodeDecoy = changeSpec[nodeDecoyArgs]{
 			}
 			bundle, err = decoy.ParseArchive(archive)
 			if err != nil {
-				return nil, errors.New("invalid decoy bundle")
+				return nil, errors.New(decoy.ClientMessage(err))
 			}
 		default:
 			return nil, errors.New("mode must be builtin, panel or own")
 		}
 		facts := []Fact{{Key: "node", Value: nm(name), Untrusted: true}, {Key: "mode", Value: a.Mode}}
 		if bundle != nil {
-			facts = append(facts, Fact{Key: "bundle", Value: bundle.Hash()})
+			var size int
+			files := bundle.Files()
+			for _, f := range files {
+				size += len(f.Content)
+			}
+			facts = append(facts, Fact{Key: "bundle", Value: bundle.Hash()},
+				Fact{Key: "files", Value: fmt.Sprint(len(files))}, Fact{Key: "bytes", Value: fmt.Sprint(size)})
 		}
 		a.Node = id
 		return &planned{Summary: "Change the decoy site for one node. The owner must approve this change before it is applied.",

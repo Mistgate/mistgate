@@ -20,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
@@ -137,9 +138,16 @@ type Fleet struct {
 	decoySyncMu    sync.Mutex
 	decoySyncing   map[string]bool
 	decoySyncDirty map[string]bool
-	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
-	probeTCP       func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
-	settleUDP      func(context.Context) error
+	decoyAttempts  map[string]decoyAttempt
+
+	panelDecoyMu  sync.Mutex
+	panelDecoyDir string
+	panelDecoyAt  time.Time
+	panelDecoyB   *decoy.Bundle
+	panelDecoyErr error
+	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
+	settleUDP     func(context.Context) error
 }
 
 // New builds the module: it loads (or creates) the panel CA. Call Run to start the background work.
@@ -179,6 +187,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		portCheckLocks:       map[string]*portCheckLock{},
 		decoySyncing:         map[string]bool{},
 		decoySyncDirty:       map[string]bool{},
+		decoyAttempts:        map[string]decoyAttempt{},
 		kick:                 make(chan struct{}, 1),
 		enrollLim:            cfg.Limiter,
 		unit:                 time.Second,
@@ -445,6 +454,7 @@ func (f *Fleet) sweep(ctx context.Context) {
 	now := f.now().UTC()
 	for _, n := range nodes {
 		live := liveByID[n.ID]
+		f.decoySweep(n, live)
 		if n.State != "active" || live.Connected {
 			continue
 		}
