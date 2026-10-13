@@ -43,7 +43,7 @@ VLESS 可以通过 TCP 运行（搭配 XHTTP，或搭配 RAW 和 Vision），也
 输入它的 IP 和 root 密码。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口、安装已签名的 Agent，并等待它连接。节点会自行获取 Let’s Encrypt 证书，**启用 WARP** 则让它获得一个 Cloudflare 出口。[通过 SSH 安装节点](https://mistgate.app/zh/getting-started/ssh-install/)
 
 **你最先知道。**
-面板每 5 分钟像应用那样连接一次每台服务器，并通过隧道加载一个测试页面。每个节点上的诊断会运行 16 项主机检查（磁盘、日志、DNS 解析、时钟、端口、BBR），并提供五种修复，只有你确认后才会执行。告警发送到 Telegram。[运行状况](https://mistgate.app/zh/operations/health/)
+面板每 5 分钟像应用那样连接一次每台服务器，并通过隧道加载一个测试页面。每个节点上的诊断会运行 17 项主机检查（磁盘、日志、DNS 解析、时钟、端口、BBR），并提供六种修复，只有你确认后才会执行。告警发送到 Telegram。[运行状况](https://mistgate.app/zh/operations/health/)
 
 **轻量且隐蔽。**
 两个静态 Go 二进制文件，一个是面板，一个是节点 Agent。使用 SQLite 和 systemd：无需 Docker，也无需数据库服务器。在一台小型测试服务器（1 vCPU / 1 GB）上，面板单独空闲时占用 16–20 MiB 私有内存（3x-ui 为 68–74，PasarGuard 为 262–265，Remnawave 为 426–454）；面板、节点和数据库一起运行在一台 2 vCPU / 2 GB 的服务器上，共占用 57 MiB（同样三者为 74、297 和 761）。在这项测试中，添加和删除用户、重启面板都没有断开任何连接，而 3x-ui 在用户变化时会重启其内核。陌生人打开面板地址只会看到一个伪装站点；管理后台位于私密路径或私密主机名之后。发布版本可复现构建，并在离线环境中签名，节点只安装已签名的构建。BT 下载拦截会在节点上拦截明文 BitTorrent；相关事件只记录匹配到的内容和目标端口，不会有任何地址离开节点。[安全](https://mistgate.app/zh/operations/security/) · [发布版本和签名](https://mistgate.app/zh/operations/releases/) · [基准测试，包括 Mistgate 较慢的地方](https://mistgate.app/zh/reference/benchmarks/)
