@@ -402,3 +402,21 @@ func mustNode(e *env, id string) store.NodeRow {
 	}
 	return n
 }
+
+// TestCapabilitiesKeepTheWholeAgentList: an agent of v0.1.36 lists 17 capabilities with update-guard/1 last; the
+// bound must not cut it (the updates page then warned of a missing crash-loop guard that the node had).
+func TestCapabilitiesKeepTheWholeAgentList(t *testing.T) {
+	caps := strings.Fields("doctor/1 bandwidth/1 client-ipv6/1 ws-link/1 tcpcheck/1 decoy/1 awg/1 vless/1 vless-self/1 " +
+		"vless-tls/1 warp/1 torrentguard/1 udpcheck/1 unit/3 awg-prepare/1 update/1 update-guard/1")
+	got := capabilities(&agentv1.Hello{Capabilities: caps})
+	if len(got) != len(caps) || got[len(got)-1] != "update-guard/1" {
+		t.Fatalf("capabilities kept %d of %d: %v", len(got), len(caps), got)
+	}
+	many := make([]string, maxCapabilities+5)
+	for i := range many {
+		many[i] = "x/1"
+	}
+	if got := capabilities(&agentv1.Hello{Capabilities: many}); len(got) != maxCapabilities {
+		t.Fatalf("an oversized list keeps %d, want the bound %d", len(got), maxCapabilities)
+	}
+}

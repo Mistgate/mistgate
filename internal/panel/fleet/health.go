@@ -17,7 +17,9 @@ import (
 // capDoctor is the Hello.capabilities entry of an agent that implements the doctor (agent.proto "DOCTOR").
 const capDoctor = "doctor/1"
 
-const maxCapabilities = 16
+// maxCapabilities bounds the Hello list a node can make the panel store. It must stay well above what an agent
+// lists: v0.1.36 lists 17, and the 16 of an earlier bound cut off the last one (update-guard/1).
+const maxCapabilities = 64
 
 // Health is implemented by the health module. All methods must be cheap and must not call back into the
 // stream they run on.
