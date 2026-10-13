@@ -9,7 +9,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { langs, setLang, useLang, useT } from "@/i18n";
+import { isLang, langNames, langs, setLang, useLang, useT } from "@/i18n";
 import { instance as instanceApi } from "@/lib/api";
 import type { Instance } from "@/gen/mistgate/admin/v1/instance_pb";
 import { plain, type Plain } from "@/lib/plain";
@@ -49,7 +49,7 @@ export function InterfacePage() {
             aria-label={t("settings.language")}
             value={lang}
             onValueChange={setLang}
-            options={langs.map((l) => ({ value: l, label: l === "ru" ? "Русский" : "English" }))}
+            options={langs.map((l) => ({ value: l, label: langNames[l] }))}
           />
         </div>
         <div className={row}>
@@ -100,7 +100,7 @@ function BrandForm({ stored }: { stored: Plain<Instance> }) {
   const [head, setHead] = useState(stored.brandHead);
   const [tail, setTail] = useState(stored.brandTail);
   const [accent, setAccent] = useState(stored.accent);
-  const [language, setLanguage] = useState(stored.language === "ru" ? "ru" : "en");
+  const [language, setLanguage] = useState(isLang(stored.language) ? stored.language : "en");
   const [logo, setLogo] = useState<Logo>({ kind: "keep" });
   const [logoError, setLogoError] = useState<string | null>(null);
 
@@ -212,7 +212,7 @@ function BrandForm({ stored }: { stored: Plain<Instance> }) {
             aria-label={t("brand.language")}
             value={language}
             onValueChange={setLanguage}
-            options={langs.map((l) => ({ value: l, label: l === "ru" ? "Русский" : "English" }))}
+            options={langs.map((l) => ({ value: l, label: langNames[l] }))}
           />
         </div>
 

@@ -102,7 +102,7 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
     return [
       { value: none, label: t("node.add.countryNone") },
       ...[...codes]
-        .sort((a, b) => fmt.country(a).localeCompare(fmt.country(b), fmt.lang))
+        .sort((a, b) => fmt.country(a).localeCompare(fmt.country(b), fmt.locale))
         .map((c) => ({ value: c, label: `${c} · ${fmt.country(c)}` })),
     ];
   }, [fmt, t, start.country]);

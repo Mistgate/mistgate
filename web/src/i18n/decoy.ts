@@ -130,3 +130,7 @@ export const ru: typeof en = {
   "decoy.bulk.ownBlocked": "«Свой сайт» выключен: для {names} ничего не загружено. Сначала загрузи сайт в настройках каждой ноды.",
   "decoy.bulk.done": "Сайт-ширма сменён на {n} ноде|Сайт-ширма сменён на {n} нодах|Сайт-ширма сменён на {n} нодах",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

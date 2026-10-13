@@ -149,7 +149,7 @@ function TextsForm({ data }: { data: Data }) {
           template={f.template}
           samples={data.samples?.length ? data.samples : madeUp}
           group={data.samples?.length ? (data.sampleGroup ?? "") : ""}
-          lang={data.namesLanguage || t.lang}
+          lang={data.namesLanguage || t.locale}
         />
       </div>
 
@@ -181,7 +181,7 @@ function SubscriptionPreview({ t, title, announcement, hours, support, template,
   const regions = new Intl.DisplayNames([lang], { type: "region" });
   const names = serverNames(template, samples, (code) => (/^[A-Z]{2}$/i.test(code) ? code.toUpperCase() : regions.of(code) ?? code));
   const [now] = useState(() => Date.now());
-  const until = new Intl.DateTimeFormat(t.lang, { day: "numeric", month: "long" }).format(new Date(now + 76 * 86_400_000));
+  const until = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long" }).format(new Date(now + 76 * 86_400_000));
   return (
     <Card lg className="flex min-w-0 flex-col gap-3 p-4 lg:sticky lg:top-[72px]">
       <SectionLabel icon="phone" tone="mint">

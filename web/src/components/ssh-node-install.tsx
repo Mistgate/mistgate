@@ -212,7 +212,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       { value: noCountry, label: t("node.add.countryNone") },
       ...countryCodes
         .map((code) => ({ value: code, label: code + " · " + fmt.country(code) }))
-        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.lang)),
+        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.locale)),
     ],
     [fmt, t],
   );

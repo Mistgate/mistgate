@@ -53,10 +53,10 @@ function dayLabel(t: ReturnType<typeof useT>, fmt: Fmt, unix: number, now = new 
   const same = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   if (same(d, now)) return t("node.ev.today");
   if (same(d, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return t("node.ev.yesterday");
-  return d.toLocaleDateString(fmt.lang, { day: "numeric", month: "long", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  return d.toLocaleDateString(fmt.locale, { day: "numeric", month: "long", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
-const exact = (fmt: Fmt, unix: number) => new Date(unix * 1000).toLocaleString(fmt.lang, { dateStyle: "short", timeStyle: "medium" });
+const exact = (fmt: Fmt, unix: number) => new Date(unix * 1000).toLocaleString(fmt.locale, { dateStyle: "short", timeStyle: "medium" });
 
 const pageSizes = [25, 50, 100] as const;
 

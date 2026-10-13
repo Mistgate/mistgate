@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cases } from "./dev-data";
-import { dict } from "./i18n";
-import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, detectPlatform, fmtAgo, hero, isReturning, kinds, normalize, pickPlatform, safeAddUrl, safeUrl, stateText } from "./logic";
+import { dict, isLang, langs } from "./i18n";
+import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, describePreset, detectPlatform, fmtAgo, hero, isReturning, kinds, normalize, pickPlatform, safeAddUrl, safeUrl, stateText } from "./logic";
 import { actions, data, plain, state, text } from "./test-kit";
 import { annKey, view } from "./view";
 
@@ -187,10 +187,24 @@ describe("visits", () => {
   });
 });
 
+describe("languages", () => {
+  it("every language has the page's whole dictionary, and the server's language is read through isLang", () => {
+    const keys = (o: object) => Object.keys(o).sort();
+    for (const lang of langs) {
+      expect(keys(dict[lang]), lang).toEqual(keys(dict.ru));
+      expect(isLang(lang)).toBe(true);
+    }
+    expect(normalize({ lang: "zh" }).lang).toBe("zh");
+    expect(normalize({ lang: "fr" }).lang).toBe("ru");
+    expect(describePreset("Русский\nEnglish", "zh")).toBe("English");
+    expect(describePreset("Русский\nEnglish", "ru")).toBe("Русский");
+  });
+});
+
 describe("view", () => {
   for (const [name, raw] of Object.entries(cases)) {
-    it(`renders ${name} in both languages, with nothing the page must never show`, () => {
-      for (const lang of ["ru", "en"] as const) {
+    it(`renders ${name} in every language, with nothing the page must never show`, () => {
+      for (const lang of langs) {
         const d = normalize(raw);
         const el = view(d, state("ios", { returning: isReturning(d, false) }, lang), actions());
         expect(el.querySelector(".hero")).not.toBeNull();
@@ -306,10 +320,11 @@ describe("view", () => {
     expect(annKey(d.announcement)).toBe(annKey(d.announcement));
   });
 
-  it("the language switch: two buttons, the current one pressed", () => {
+  it("the language switch: a button per language, the current one pressed", () => {
     const a = actions();
     const el = view(data("first"), state("ios"), a);
-    expect([...el.querySelectorAll(".lang button")].map((b) => [text(b), b.getAttribute("aria-pressed")])).toEqual([["RU", "true"], ["EN", "false"]]);
+    expect([...el.querySelectorAll(".lang button")].map((b) => [text(b), b.getAttribute("aria-pressed")])).toEqual([["RU", "true"], ["EN", "false"], ["中文", "false"]]);
+    expect([...el.querySelectorAll(".lang button")].map((b) => b.getAttribute("lang"))).toEqual(["ru", "en", "zh-CN"]);
     el.querySelector<HTMLButtonElement>("[data-k=lang-en]")!.click();
     el.querySelector<HTMLButtonElement>("[data-k=lang-ru]")!.click(); // already this one: nothing
     expect(a.log).toEqual(["lang en"]);
@@ -334,7 +349,7 @@ describe("view", () => {
   });
 
   it("no dash starts a line: the space before it does not break", () => {
-    for (const lang of ["ru", "en"] as const) {
+    for (const lang of langs) {
       const t = dict[lang];
       for (const s of [t.linkD, t.privacy, t.limit(3, 3, true), t.txt.expired("X").call, t.staleSteps("A").join(" "), t.dnsLinkNote("A", "B"), t.dnsDoneLink(12).join(" "), t.soon(3).join(" ")]) expect(s).not.toMatch(/ —/);
     }

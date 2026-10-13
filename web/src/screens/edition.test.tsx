@@ -11,6 +11,7 @@ import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb
 import { editionFeatures } from "@/i18n/edition";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
+import { zh } from "@/i18n/zh";
 import { setLang } from "@/i18n";
 import { meQuery } from "@/lib/session";
 import { ChecksTab } from "@/screens/health/checks";
@@ -116,7 +117,8 @@ describe("EditionNotice", () => {
   it("names every feature the server can list", () => {
     for (const f of editionFeatures) {
       expect(en[`edition.feature.${f}`], f).toBeTruthy();
-      expect(ru[`edition.feature.${f}`], f).not.toBe(en[`edition.feature.${f}`]);
+      expect(ru[`edition.feature.${f}`], f).not.toBe(en[`edition.feature.${f}`]); // zh joins this once the translation pass has run
+      expect(zh[`edition.feature.${f}`], f).toBeTruthy();
     }
   });
 });

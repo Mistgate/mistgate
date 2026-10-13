@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { fill, type Lang, type T } from "@/i18n";
+import { dictionaries as dict, fill, langs, type Lang, type T } from "@/i18n";
 import { en } from "@/i18n/en";
-import { ru } from "@/i18n/ru";
 import { itemDetail, itemParams } from "./doctor-detail";
 import { makeFmt } from "./format";
 
-const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 
 /** The text the SPA writes for a code with these params, in a language. */
@@ -100,8 +98,8 @@ const samples: Record<string, Record<string, string>> = {
 };
 
 describe("the node's fact lines", () => {
-  it("has wording in both languages for every code, with every placeholder filled", () => {
-    for (const lang of ["en", "ru"] as const) {
+  it("has wording in every language for every code, with every placeholder filled", () => {
+    for (const lang of langs) {
       for (const [code, params] of Object.entries(samples)) {
         const text = render(lang, code, params);
         expect(text, `${lang} ${code}`).toBeTruthy();

@@ -17,12 +17,14 @@
   var accent = pref("accent") || pref("instance-accent"); // the device's own pick wins over the instance default
   if (accent && /^#[0-9a-f]{6}$/i.test(accent)) root.style.setProperty("--accent", accent);
   var saved = pref("lang");
-  var lang = saved === "ru" || saved === "en" ? saved : /^ru/i.test(navigator.language || "") ? "ru" : "en";
-  root.lang = lang;
+  var lang = saved === "ru" || saved === "en" || saved === "zh" ? saved : /^ru/i.test(navigator.language || "") ? "ru" : /^zh/i.test(navigator.language || "") ? "zh" : "en";
+  root.lang = lang === "zh" ? "zh-CN" : lang;
 
   var text = {
     ru: { load: "Загрузка…", fail: "Не удалось загрузить панель. Обновите страницу.", reload: "Обновить" },
     en: { load: "Loading…", fail: "Cannot load the panel. Reload the page.", reload: "Reload" },
+    // zh: filled by the translation pass (English until then)
+    zh: { load: "Loading…", fail: "Cannot load the panel. Reload the page.", reload: "Reload" },
   }[lang];
 
   function fill() {

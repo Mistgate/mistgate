@@ -135,8 +135,9 @@
   --radius-dock: 20px;
   --radius-sheet: 22px;
 
-  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* The ideographs are in no web font: after the Latin faces come the system CJK ones (nothing is downloaded). */
+  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", monospace;
 
 }
 
@@ -317,4 +318,21 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * Simplified Chinese (<html lang="zh-CN">). Unlayered on purpose: it beats the utilities. Ideographs are set solid, so the
+ * tight tracking meant for Latin headings is dropped and the lines get a little more air; nothing else changes.
+ */
+:lang(zh) body {
+  line-height: 1.6;
+}
+:lang(zh) .leading-snug {
+  line-height: 1.55;
+}
+:lang(zh) .leading-tight {
+  line-height: 1.4;
+}
+:lang(zh) [class*="tracking-[-"] {
+  letter-spacing: 0;
 }

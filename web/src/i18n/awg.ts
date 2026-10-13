@@ -580,3 +580,7 @@ export const ru: typeof en = {
   "health.doctor.awg_backend.why.docker_forward_drop":
     "AmneziaWG работает ({backend}), но фаервол хоста (чаще всего политика FORWARD у Docker) отбрасывает то, что клиенты пересылают в интернет: они подключаются и ничего не получают. Разреши пересылку с интерфейсов mgawg или не давай Docker ставить политику DROP.",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

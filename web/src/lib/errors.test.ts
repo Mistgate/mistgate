@@ -1,21 +1,19 @@
 import { existsSync, readFileSync } from "node:fs";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import { fill, type Lang, type T } from "@/i18n";
+import { dictionaries as dict, fill, langs, type Lang, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { errorCodes, errorText, errorVars } from "./errors";
 
-const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 const say = (msg: string, code: Code, lang: Lang = "en") => errorText(new ConnectError(msg, code), tOf(lang));
 
 describe("the panel's refusal codes", () => {
-  it("have a sentence in both languages", () => {
+  it("have a sentence in every language", () => {
     for (const c of errorCodes) {
-      expect(en[`err.${c}`], `en ${c}`).toBeTruthy();
-      expect(ru[`err.${c}`], `ru ${c}`).toBeTruthy();
-      expect(ru[`err.${c}`], `ru ${c}`).not.toBe(en[`err.${c}`]);
+      for (const lang of langs) expect(dict[lang][`err.${c}`], `${lang} ${c}`).toBeTruthy();
+      expect(ru[`err.${c}`], `ru ${c}`).not.toBe(en[`err.${c}`]); // zh joins this once the translation pass has run
     }
   });
 

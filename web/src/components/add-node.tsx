@@ -87,7 +87,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
       { value: none, label: t("node.add.countryNone") },
       ...countryCodes
         .map((c) => ({ value: c, label: `${c} · ${fmt.country(c)}` }))
-        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.lang)),
+        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.locale)),
     ],
     [fmt, t],
   );

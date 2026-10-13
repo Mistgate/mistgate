@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity, CheckStatus, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
-import { fill, pickForm, type T } from "@/i18n";
+import { dictionaries, fill, langs, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { healthKind } from "./fleet";
@@ -395,10 +395,10 @@ describe("the server's vocabulary is covered", () => {
     "node.reason.no_traffic",
     "node.reason.doctor_fail",
   ];
-  it("has an English and a Russian sentence for each", () => {
+  it("has a sentence in every language for each", () => {
     for (const k of expected) {
       expect(hasKey(k), k).toBe(true);
-      expect(ru[k as keyof typeof ru], k).toBeTruthy();
+      for (const lang of langs) expect(dictionaries[lang][k as keyof typeof ru], `${lang} ${k}`).toBeTruthy();
     }
   });
   it("has every placeholder of the why texts among the params the node or the panel sends", () => {

@@ -1,7 +1,7 @@
 import { cases } from "./dev-data";
 import { normalize } from "./logic";
 import { newAmzState, newDnsState, type Actions, type State } from "./state";
-import type { MgData } from "./types";
+import type { Lang, MgData } from "./types";
 
 // Shared by the tests of the page: sample data, a state, and actions that only note what was asked.
 
@@ -52,7 +52,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
 }
 
 /** The state of a page opened on `platform` (the platform is also what the browser says it is). */
-export function state(platform: State["platform"] = "ios", over: Partial<State> = {}, lang: "ru" | "en" = "ru"): State {
+export function state(platform: State["platform"] = "ios", over: Partial<State> = {}, lang: Lang = "ru"): State {
   return {
     lang,
     platform,

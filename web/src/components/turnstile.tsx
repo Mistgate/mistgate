@@ -136,7 +136,7 @@ function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRe
         const id = api.render(box.current, {
           sitekey: siteKey,
           theme,
-          language: lang,
+          language: lang === "zh" ? "zh-cn" : lang, // Turnstile spells the Chinese widget "zh-cn"
           size: "flexible",
           callback: (token: string) => {
             errors = 0;

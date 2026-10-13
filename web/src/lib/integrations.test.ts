@@ -1,7 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
 import { ApprovalState, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
-import { fill, pickForm, type T } from "@/i18n";
+import { dictionaries, fill, langs, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { makeFmt } from "./format";
@@ -78,7 +78,7 @@ describe("the create form's rules", () => {
     for (const p of [TokenProfile.READONLY, TokenProfile.OPERATOR, TokenProfile.ADMIN]) {
       const info = profileInfo(p);
       expect(en[info.key]).toBeTruthy();
-      expect(ru[info.desc]).toBeTruthy();
+      for (const lang of langs) expect(dictionaries[lang][info.desc], lang).toBeTruthy();
     }
   });
 });
@@ -126,7 +126,7 @@ describe("words of an approval", () => {
     ];
     for (const tool of tools) {
       expect(toolTitle(t, tool), tool).not.toBe(tool);
-      expect(ru[`approval.tool.${tool}` as keyof typeof ru], tool).toBeTruthy();
+      for (const lang of langs) expect(dictionaries[lang][`approval.tool.${tool}` as keyof typeof ru], `${lang} ${tool}`).toBeTruthy();
     }
     expect(toolTitle(t, "something_new")).toBe("something_new");
   });
@@ -139,7 +139,7 @@ describe("words of an approval", () => {
     ];
     for (const k of keys) {
       expect(factLabel(t, k), k).not.toBe(k);
-      expect(ru[`approval.fact.${k}` as keyof typeof ru], k).toBeTruthy();
+      for (const lang of langs) expect(dictionaries[lang][`approval.fact.${k}` as keyof typeof ru], `${lang} ${k}`).toBeTruthy();
     }
     expect(factLabel(t, "brand_new")).toBe("brand_new");
     // rollout_start updates one node now: no batches, no canary, so no words for them

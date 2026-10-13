@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useLang, useT, type Lang, type T } from "@/i18n";
+import { localeOf, useLang, useT, type Lang, type T } from "@/i18n";
 
 /** Scales a byte count to the largest unit that keeps the number below `base` (1000 for traffic, 1024 for RAM and disk). */
 export function scaleBytes(n: number, base: 1000 | 1024 = 1000): { value: number; unit: 0 | 1 | 2 | 3 | 4 } {
@@ -19,7 +19,7 @@ function numberFormat(lang: Lang, digits: number, fixed: boolean) {
   const key = `${lang}/${digits}/${fixed}`;
   let f = numberFormats.get(key);
   if (!f) {
-    f = new Intl.NumberFormat(lang, { maximumFractionDigits: digits, minimumFractionDigits: fixed ? digits : 0 });
+    f = new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: digits, minimumFractionDigits: fixed ? digits : 0 });
     numberFormats.set(key, f);
   }
   return f;
@@ -27,7 +27,7 @@ function numberFormat(lang: Lang, digits: number, fixed: boolean) {
 
 /** Local time of day, 24 hours: "14:06". */
 function clockOf(unix: number, lang: Lang) {
-  return new Date(unix * 1000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(unix * 1000).toLocaleTimeString(localeOf(lang), { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 const sameDay = (a: Date, b: Date) =>
@@ -36,7 +36,7 @@ const sameDay = (a: Date, b: Date) =>
 /** "28 сент.": the year only when it is not this one ("28 сент. 2025 г."). */
 export function dayOf(unix: number, lang: Lang, now = new Date()) {
   const d = new Date(unix * 1000);
-  return d.toLocaleDateString(lang, { day: "numeric", month: "short", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  return d.toLocaleDateString(localeOf(lang), { day: "numeric", month: "short", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
 /** "28 сент., 18:15", the year as in dayOf. */
@@ -96,6 +96,8 @@ export function makeFmt(lang: Lang, t: T) {
   };
   return {
     lang,
+    /** The Intl locale of the UI language ("zh" is "zh-CN"): what toLocale*, Intl.* and localeCompare take. */
+    locale: localeOf(lang),
     num,
     bytes,
     mbit,
@@ -110,7 +112,7 @@ export function makeFmt(lang: Lang, t: T) {
     country: (code: string) => {
       if (!code) return "";
       try {
-        return new Intl.DisplayNames(lang, { type: "region" }).of(code.toUpperCase()) ?? code;
+        return new Intl.DisplayNames(localeOf(lang), { type: "region" }).of(code.toUpperCase()) ?? code;
       } catch {
         return code;
       }

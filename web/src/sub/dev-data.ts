@@ -1,7 +1,7 @@
 import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, DnsPreset, MgData, Platform, ServerEntry } from "./types";
 
 // Sample mg-data for working on the page, one per state. Used ONLY by the dev server (vite.sub.config.ts injects it
-// in place of the <!--MG_DATA--> marker for `?case=<name>&lang=ru|en`); it is not imported by the page and never
+// in place of the <!--MG_DATA--> marker for `?case=<name>&lang=ru|en|zh`); it is not imported by the page and never
 // ships in web/dist/sub.html. The shapes are what the server sends (subs/page.go, subs/devices.go): the link apps share
 // one device without platform or model, a device added without a name comes back as the page named it.
 //
@@ -294,5 +294,6 @@ export const cases: Record<string, MgData> = {
 export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);
   const c = cases[p.get("case") ?? ""] ?? base;
-  return p.get("lang") === "en" ? { ...c, lang: "en" } : c;
+  const lang = p.get("lang");
+  return lang === "en" || lang === "zh" ? { ...c, lang } : c;
 }

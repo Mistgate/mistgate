@@ -2,7 +2,7 @@ import badge from "../assets/mistgate-badge.svg?raw";
 import { connectCard, qrSide } from "./connect";
 import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
-import { dict, type Dict } from "./i18n";
+import { dict, htmlLang, langs, langShort, type Dict } from "./i18n";
 import { staleCard } from "./amnezia";
 import { icon } from "./icons";
 import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
@@ -44,7 +44,7 @@ export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): H
   const t = dict[lang];
   const wordmark = d.title.trim().toLowerCase() === d.brand.parts.join("").toLowerCase() || !d.title.trim();
   const btn = (l: Lang) =>
-    h("button", { class: lang === l ? "on" : "", type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: l, on: { click: () => lang !== l && setLang(l) } }, l.toUpperCase());
+    h("button", { class: lang === l ? "on" : "", type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: htmlLang(l), on: { click: () => lang !== l && setLang(l) } }, langShort[l]);
   return h(
     "header",
     { class: "hd" },
@@ -52,7 +52,7 @@ export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): H
     wordmark && d.brand.parts[0]
       ? h("div", { class: "wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1]))
       : h("div", { class: "wm plain" }, brandName(d)),
-    h("div", { class: "lang", role: "group", "aria-label": t.langGroup }, btn("ru"), btn("en")),
+    h("div", { class: "lang", role: "group", "aria-label": t.langGroup }, ...langs.map(btn)),
   );
 }
 

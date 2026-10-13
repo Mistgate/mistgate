@@ -180,7 +180,7 @@ function UserDetail({ data }: { data: DetailN }) {
   const shown = shownStatus(user);
   const disabled = user.status === UserStatus.DISABLED;
   const d = daysLeft(user.expiresUnix, now);
-  const dateText = new Intl.DateTimeFormat(t.lang, { day: "numeric", month: "long", ...(new Date(user.expiresUnix * 1000).getFullYear() !== new Date(now * 1000).getFullYear() && { year: "numeric" }) }).format(new Date(user.expiresUnix * 1000));
+  const dateText = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long", ...(new Date(user.expiresUnix * 1000).getFullYear() !== new Date(now * 1000).getFullYear() && { year: "numeric" }) }).format(new Date(user.expiresUnix * 1000));
   const term = d === null ? t("users.never") : user.expiresUnix <= now ? t("users.status.expired") : `${t("users.until")} ${dateText} · ${t("users.days", { n: d })}`;
 
   return (

@@ -15,7 +15,7 @@ import { Lead } from "./ui";
 export function whoByRules(t: Tx, f: SubFormat, rules: readonly Rule[]) {
   const texts = rules.filter((r) => r.format === f).map((r) => (t.lang === "ru" ? `«${r.uaContains}»` : `“${r.uaContains}”`));
   if (texts.length === 0) return t("subs.fmt.who.decoy");
-  const list = new Intl.ListFormat(t.lang, { type: "conjunction" }).format(texts);
+  const list = new Intl.ListFormat(t.locale, { type: "conjunction" }).format(texts);
   return t.n(f === SubFormat.MIHOMO_YAML ? "subs.fmt.who.mihomo" : "subs.fmt.who.rules", texts.length, { rules: list });
 }
 

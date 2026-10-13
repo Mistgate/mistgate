@@ -702,3 +702,7 @@ export const ru: Record<keyof typeof en, string> = {
   "health.alert.update_failed.why.unknown": "Раскатка на паузе. Открой страницу «Обновления».",
   "up.alert.open": "Открыть «Обновления»",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };
