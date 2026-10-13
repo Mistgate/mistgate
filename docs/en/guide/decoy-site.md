@@ -11,13 +11,30 @@ Without `--decoy-dir` the panel shows a built-in "Coming soon" page. Every insta
 
 ## Nodes: three options
 
-Choose a decoy site for each node in the panel:
+Every node serves a decoy site to anyone who is not a client: the Hysteria2 masquerade (HTTP/3 and the TCP site) and the VLESS REALITY site in `self` mode. Choose which site each node shows, in the node's settings or for several nodes at once on the Nodes page (select the nodes, then set the decoy site):
 
-- **Built-in** keeps the fixed Mistgate page. Existing nodes stay on this option after an upgrade until you change them.
-- **Panel** copies the panel's `--decoy-dir` bundle to the node. Use it when you want the panel and several nodes to show the same small site. New nodes default to this option when the panel has a valid decoy directory.
-- **Own** uploads a ZIP or TAR bundle for one node only. Use a different subject and visual style for every node: never repeat the subject or look already used on another node. The archive and the total files are each limited to 2 MB. The edge edition does not offer own bundles.
+- **Built-in** keeps the fixed Mistgate page. Every installation ships the same page, so it is recognisable. Nodes that existed before the upgrade stay on it until you change them.
+- **Panel's site** copies the panel's `--decoy-dir` bundle to the node. Use it for one domain with subdomains: the subdomains are linked anyway (Certificate Transparency logs list them), and one company's site on its regional hosts looks natural. New nodes default to this option when the panel has a usable decoy directory.
+- **Own site** is a bundle you upload for that one node. Use it for nodes on separate domains or on bare IPs that must not be linkable to each other. Give every node its own subject and look, and never repeat those of a site already made for another node.
 
-The chosen site is served by the node's Hysteria2 masquerade over HTTP/3 and TCP, and by VLESS REALITY in `self` mode. The site contains static files only. See [Masquerade](hysteria2.md#masquerade) for how the node serves it.
+### What a bundle may contain
+
+The same rules apply to an uploaded Own bundle and to the panel's `--decoy-dir` when it is copied to nodes:
+
+- **Size:** at most **2 MiB** of files in total. The limit applies to **both** Own bundles and the panel's `--decoy-dir`. An Own upload is also limited to 2 MiB as an archive. A decoy directory over 2 MiB still works for the panel itself, but it is not offered to nodes: the node settings say the panel's site is too large, and the node keeps serving what it had. At most 4096 files.
+- **Format of an upload:** ZIP, TAR or TAR.GZ. Zip a folder as you normally would: a single wrapping folder is removed when it holds `index.html`.
+- **`index.html`** must be at the top of the site. `404.html` is used for every unknown address; without a `robots.txt` the built-in one is served.
+- **Static files only.** Symbolic links, devices and other non-files are refused, as are paths with `..`, absolute paths and names with a backslash or a colon. Dot-files and macOS `__MACOSX` entries are left out, as the panel hides them too. The executable bit is ignored: files are only ever served as data.
+
+If a bundle is refused, the panel says why (no `index.html`, too large, an unsafe path, a link in the archive).
+
+### How a node gets its site
+
+The panel stores each bundle by its SHA-256 and sends a node only its own bundle, and only when the node does not already have it: an unchanged bundle is not sent again. The node checks the bundle again, saves it on disk and switches without restarting its listeners, so open connections and the Hysteria2 and VLESS ports are not interrupted. After a restart the node serves the saved site at once, before it reconnects to the panel. The node settings show the configured mode next to the mode and hash the node reports, and say why they differ: the node is offline, the change is on its way, an earlier push failed (the panel tries again every few minutes), or the panel's site is unavailable. A changed `--decoy-dir` reaches the connected nodes within about a minute.
+
+A node whose agent is too old (it predates this feature) keeps the built-in page, and the panel shows "agent too old": update the node, then choose its site. The edge edition does not store Own bundles, so Own is unavailable there. Every change is recorded in the audit log.
+
+An AI agent connected over [MCP](../reference/mcp.md) can set a node's site with `node_decoy_plan` and `node_decoy_apply`; the owner approves each change. The agent prompt in [AI agents](../getting-started/ai-agents.md) tells it never to repeat the subject or look of the sites made for other nodes.
 
 ## What a good decoy looks like
 
