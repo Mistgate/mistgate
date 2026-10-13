@@ -5,20 +5,78 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-func TestChineseTelegramMessagesUseEnglishPlaceholders(t *testing.T) {
-	if got := L("zh").pick("Node is unreachable", "Нода недоступна", ""); got != "Node is unreachable" {
-		t.Errorf("Chinese fallback = %q, want English placeholder", got)
+func hasHan(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
 	}
-	if got := L("zh").pick("English", "Russian", "Chinese placeholder"); got != "Chinese placeholder" {
+	return false
+}
+
+// The Chinese text must be a real translation: it exists, is not the English one, and carries Chinese characters.
+func TestChineseTelegramMessagesAreTranslated(t *testing.T) {
+	if got := L("zh").pick("Node is unreachable", "Нода недоступна", ""); got != "Node is unreachable" {
+		t.Errorf("Chinese fallback = %q, want the English text when the Chinese one is empty", got)
+	}
+	if got := L("zh").pick("English", "Russian", "中文"); got != "中文" {
 		t.Errorf("Chinese text = %q, want the Chinese variant", got)
 	}
-	a := store.HealthAlert{Kind: "node_down"}
-	if got := alertTitle("zh", a); got != "Node is unreachable" {
-		t.Errorf("Chinese alert title = %q, want English placeholder", got)
+	for _, kind := range []string{"node_down", "no_traffic", "check_failed", "state_drift", "cert_expiry", "update_failed", "quota",
+		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy"} {
+		a := store.HealthAlert{Kind: kind, Params: map[string]string{"profile": "HY2"}}
+		zh, en := alertTitle("zh", a), alertTitle("en", a)
+		if zh == en || !hasHan(zh) {
+			t.Errorf("alertTitle(%s): zh %q is not a translation of %q", kind, zh, en)
+		}
+	}
+	if got := alertTitle("zh", store.HealthAlert{Kind: "node_down"}); got != "节点无法连接" {
+		t.Errorf("Chinese node_down title = %q, want the admin wording", got)
+	}
+	if got := alertTitle("zh", store.HealthAlert{Kind: "check_failed", Params: map[string]string{"profile": "HY2"}}); got != "「HY2」未通过客户端视角检测" {
+		t.Errorf("Chinese check_failed title = %q", got)
+	}
+}
+
+// The Chinese sentences join with their own stop, separators and no space after the stop; the values stay in place.
+func TestChineseTorrentAndDurationText(t *testing.T) {
+	p := map[string]string{"user_name": "Alice", "nodes": "nl", "count": "3", "evidence": "dht_query", "ports": "443"}
+	want := "Alice 正在 nl 上尝试使用 BT 下载：一天内 3 次尝试，均已被拦截。判定依据：DHT 查询，端口 443。"
+	if got := torrentReason("zh", p); got != want {
+		t.Errorf("torrentReason(zh) = %q, want %q", got, want)
+	}
+	for d, want := range map[time.Duration]string{
+		30 * time.Second:  "不到 1 分钟",
+		14 * time.Minute:  "14 分钟",
+		125 * time.Minute: "2 小时 5 分钟",
+		27 * time.Hour:    "1 天 3 小时",
+		48 * time.Hour:    "2 天",
+	} {
+		if got := L("zh").duration(d); got != want {
+			t.Errorf("duration(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+func TestChineseSecurityMessages(t *testing.T) {
+	until := time.Date(2026, 10, 7, 18, 21, 0, 0, time.UTC)
+	got := lockoutText("zh", "root", "203.0.113.5", until)
+	for _, want := range []string{"<b>多次登录失败，登录已锁定</b>", "用户名：<b>root</b>", "来源地址：203.0.113.5", "锁定至 18:21 UTC。"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("lockoutText(zh) = %q, lacks %q", got, want)
+		}
+	}
+	if got := signInText("zh", "Alice", "passkey", ""); !strings.Contains(got, "<b>Alice</b> 已登录（通行密钥）。") {
+		t.Errorf("signInText(zh) = %q", got)
+	}
+	if got := methodChangedText("zh", "Alice", auth.EventPasskeyAdded, ""); !strings.Contains(got, "<b>Alice</b>：已添加通行密钥。") {
+		t.Errorf("methodChangedText(zh) = %q", got)
 	}
 }
 
@@ -37,6 +95,13 @@ func TestTelegramMessageTablesHaveAllLanguageTexts(t *testing.T) {
 		for key, text := range table.values {
 			if text.en == "" || text.ru == "" || text.zh == "" {
 				t.Errorf("%s[%q] is missing a language text: %+v", table.name, key, text)
+			}
+			// Names that are the same in every language (IPv6, CPU softirq) are the only ones allowed to equal the English text.
+			if text.zh == text.en && hasHan(text.zh) || text.zh != text.en && !hasHan(text.zh) {
+				t.Errorf("%s[%q] zh text %q is not a translation of %q", table.name, key, text.zh, text.en)
+			}
+			if text.zh == text.en && text.en != "IPv6" && text.en != "CPU softirq" {
+				t.Errorf("%s[%q] zh text is still the English placeholder %q", table.name, key, text.en)
 			}
 		}
 	}
@@ -63,6 +128,7 @@ func TestReopenedAlertCountsFromItsEpisodeAndSaysAgain(t *testing.T) {
 	}{
 		{"en", "Again", "lasted 2 min", "Again, first at 18:21 UTC", "Again, first at 07.10 18:21 UTC"},
 		{"ru", "Снова", "длилось 2 мин", "Снова, впервые в 18:21 UTC", "Снова, впервые в 07.10 18:21 UTC"},
+		{"zh", "再次出现", "已持续 2 分钟", "再次出现，首次于 18:21 UTC", "再次出现，首次于 07.10 18:21 UTC"},
 	} {
 		got := alertResolved(tc.lang, reopened, "nl")
 		if !strings.Contains(got, tc.duration) || strings.Contains(got, "1 h") || strings.Contains(got, "1 ч") || !strings.Contains(got, tc.again) {
@@ -105,6 +171,7 @@ func TestDoctorAlertLocalizesWARPWithoutInboundIDs(t *testing.T) {
 	}{
 		{lang: "en", want: "Profiles with WARP egress (“HY2 · WARP”) cannot start: the node has no WARP account"},
 		{lang: "ru", want: "Профили с выходом через WARP («HY2 · WARP») не стартуют: у ноды нет аккаунта WARP"},
+		{lang: "zh", want: "使用 WARP 出口的协议配置（「HY2 · WARP」）无法启动：节点没有 WARP 账户"},
 	} {
 		got := alertOpened(tc.lang, a, "nl", "")
 		if !strings.Contains(got, tc.want) {

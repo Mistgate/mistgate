@@ -209,9 +209,16 @@ const (
 
 var ruMonths = [...]string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
 
-// dayText is a date the way the user page writes it: "29 сентября", "29 September"; the year only when it is not this one.
+// dayText is a date the way the user page writes it: "29 сентября", "29 September", "9月29日"; the year only when it is not
+// this one.
 func dayText(t, now time.Time, lang string) string {
-	// zh: translation pass — English month names are placeholders for now.
+	if lang == "zh" {
+		s := strconv.Itoa(int(t.Month())) + "月" + strconv.Itoa(t.Day()) + "日"
+		if t.Year() != now.Year() {
+			s = strconv.Itoa(t.Year()) + "年" + s
+		}
+		return s
+	}
 	m := t.Month().String()
 	if lang == "ru" {
 		m = ruMonths[t.Month()-1]
@@ -226,26 +233,28 @@ func dayText(t, now time.Time, lang string) string {
 // stateNote is what the subscription apps show a person whose subscription does not work, in the words of the user page and
 // the instance language; "" while it works.
 func stateNote(v access.SubView, lang string, now time.Time) string {
-	pick := func(ru, en string) string {
-		if lang == "ru" {
+	pick := func(ru, en, zh string) string {
+		switch lang {
+		case "ru":
 			return ru
+		case "zh":
+			return zh
 		}
-		// zh: translation pass — English is the placeholder for these subscription notices.
 		return en
 	}
 	switch v.Status {
 	case access.StatusExpired:
 		if v.Expires.IsZero() {
-			return pick("Подписка закончилась. Напишите — продлим", "Subscription ended. Message us to renew")
+			return pick("Подписка закончилась. Напишите — продлим", "Subscription ended. Message us to renew", "订阅已到期。联系我们即可续期")
 		}
-		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew"), dayText(v.Expires, now, lang))
+		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew", "订阅已于 %s 到期。联系我们即可续期"), dayText(v.Expires, now, lang))
 	case access.StatusLimited:
 		if v.NextReset.IsZero() || v.QuotaReset == "" || v.QuotaReset == access.ResetNone {
-			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit")
+			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit", "流量已用完。联系我们，可以为你增加")
 		}
-		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s"), dayText(v.NextReset, now, lang))
+		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s 重置"), dayText(v.NextReset, now, lang))
 	case access.StatusDisabled:
-		return pick("Доступ приостановлен", "Access paused")
+		return pick("Доступ приостановлен", "Access paused", "访问已暂停")
 	}
 	return ""
 }
@@ -259,10 +268,12 @@ func mihomoOnlyNote(v access.SubView, lang string) string {
 	}) {
 		return ""
 	}
-	if lang == "ru" {
+	switch lang {
+	case "ru":
 		return "Эти серверы работают только в kl!ck и других Mihomo-приложениях"
+	case "zh":
+		return "这些服务器仅限 kl!ck 和其他 Mihomo 应用"
 	}
-	// zh: translation pass — use the English placeholder until this notice is translated.
 	return "These servers work only in kl!ck and other Mihomo apps"
 }
 

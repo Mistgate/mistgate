@@ -1,9 +1,11 @@
 package dns
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"connectrpc.com/connect"
 
@@ -228,7 +230,9 @@ func TestPresetWordsForThePage(t *testing.T) {
 	}{
 		{stock, "ru", "AdGuard: без рекламы", "AdGuard DNS: без рекламы и трекеров"},
 		{stock, "en", "AdGuard: no ads", "AdGuard DNS: no ads, no trackers"},
-		{stock, "zh", "AdGuard: no ads", "AdGuard DNS: no ads, no trackers"},
+		{stock, "zh", "AdGuard：无广告", "AdGuard DNS：无广告，无跟踪器"},
+		{Preset{ID: "dns_builtin_adblock", Name: "AdGuard: без рекламы", Description: "Моё\nMine", Builtin: true}, "zh", "AdGuard：无广告", "Mine"},
+		{Preset{ID: "dns_builtin_adblock", Name: "Мой блок", Description: "AdGuard DNS: без рекламы и трекеров\nAdGuard DNS: no ads, no trackers", Builtin: true}, "zh", "Мой блок", "AdGuard DNS：无广告，无跟踪器"},
 		{Preset{ID: "dns_builtin_adblock", Name: "Мой блок", Description: "Моё\nMine", Builtin: true}, "en", "Мой блок", "Mine"},
 		{Preset{ID: "dns_abc", Name: "Домашний", Description: "Только у меня"}, "en", "Домашний", "Только у меня"},
 		{Preset{ID: "dns_abc", Name: "Home", Description: "line one\nline two"}, "ru", "Home", "line one\nline two"},
@@ -243,11 +247,36 @@ func TestPresetWordsForThePage(t *testing.T) {
 	}
 }
 
-func TestChineseBuiltInNamesHavePlaceholders(t *testing.T) {
+// The Chinese names are real: each differs from the English one (except the brand-only names), has Chinese characters
+// where the English one has words, and the stock descriptions are translated too.
+func TestChineseBuiltInNamesAreTranslated(t *testing.T) {
+	hasHan := func(s string) bool {
+		return strings.ContainsFunc(s, func(r rune) bool { return unicode.Is(unicode.Han, r) })
+	}
+	migration, err := os.ReadFile("../store/migrations/00009_dns_order.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for id, names := range builtinNames {
 		p := Preset{ID: id, Name: names.ru, Builtin: true}
-		if got := p.NameIn("zh"); got == "" {
-			t.Errorf("%s has no Chinese name placeholder", id)
+		got := p.NameIn("zh")
+		brandOnly := names.zh == names.en // "Cloudflare + Google", "Yandex DNS"
+		if got != names.zh || brandOnly == hasHan(got) {
+			t.Errorf("%s: Chinese name %q is not a translation of %q", id, got, names.en)
+		}
+		if strings.Contains(got, ": ") || strings.Contains(got, "“") {
+			t.Errorf("%s: Chinese name %q uses an English colon or quotes", id, got)
+		}
+		d, ok := builtinDescriptions[id]
+		if !ok || d.zh == "" || d.zh == d.en || !hasHan(d.zh) {
+			t.Errorf("%s: no Chinese description (%+v)", id, d)
+		}
+		if !strings.Contains(string(migration), "'"+d.en+"'") {
+			t.Errorf("%s: the stock English description %q is not in the migration", id, d.en)
+		}
+		p.Description = names.ru + "\n" + d.en
+		if got := p.DescriptionIn("zh"); got != d.zh {
+			t.Errorf("%s: DescriptionIn(zh) = %q, want %q", id, got, d.zh)
 		}
 	}
 }

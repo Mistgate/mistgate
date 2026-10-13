@@ -97,8 +97,28 @@ export const catalogOf = (providers: readonly Provider[]): Catalog => new Map(pr
 
 /** "Cloudflare · Family": the provider and the variant in the UI language. */
 export function variantLabel(e: { provider: Provider; variant: Variant }, lang: string): string {
-  return `${e.provider.name} · ${lang === "ru" ? e.variant.nameRu : e.variant.nameEn}`;
+  const name = lang === "ru" ? e.variant.nameRu : lang === "zh" ? (variantNamesZh[e.variant.id] ?? e.variant.nameEn) : e.variant.nameEn;
+  return `${e.provider.name} · ${name}`;
 }
+// The catalog (internal/panel/dns/providers.go) names its variants in Russian and English only; this is the Chinese for each.
+const variantNamesZh: Record<string, string> = {
+  "cloudflare/standard": "标准",
+  "cloudflare/security": "安全",
+  "cloudflare/family": "儿童",
+  "google/standard": "标准",
+  "quad9/standard": "安全",
+  "adguard/default": "默认",
+  "adguard/family": "儿童",
+  "adguard/unfiltered": "不过滤",
+  "yandex/basic": "基础",
+  "yandex/safe": "安全",
+  "yandex/family": "儿童",
+  "mullvad/standard": "标准",
+  "mullvad/adblock": "无广告",
+  "mullvad/base": "广告与恶意网站",
+  "opendns/familyshield": "FamilyShield",
+  "dnssb/standard": "标准",
+};
 export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : v.noteEn);
 
 type ServerLike = { address: string; kind?: DnsServerKind; providerVariant?: string };
@@ -374,30 +394,31 @@ const categoryLooks: Partial<Record<DnsCategory, PresetLook>> = {
 /** The glyph of a preset: the first built-ins keep their own, the rest take the look of their category. */
 export const presetLook = (p: { id: string; category?: DnsCategory }): PresetLook => looks[p.id] ?? categoryLooks[p.category ?? DnsCategory.UNSPECIFIED] ?? { glyph: "server", tone: "muted" };
 
-// The built-in presets have one stored name (Russian). An English UI shows these while the stored name is still the
-// stock one; a name an admin edited is shown as stored.
-const builtinNames: Record<string, { ru: string; en: string }> = {
-  dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct" },
-  dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN" },
-  dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google" },
-  dns_builtin_adblock: { ru: "AdGuard: без рекламы", en: "AdGuard: no ads" },
-  dns_builtin_family: { ru: "AdGuard Family: без рекламы и 18+", en: "AdGuard Family: no ads, no 18+" },
-  dns_builtin_quad9: { ru: "Quad9: защита от вредоносных", en: "Quad9: malware blocking" },
-  dns_builtin_yandex: { ru: "Яндекс DNS", en: "Yandex DNS" },
-  dns_builtin_cloudflare: { ru: "Cloudflare: без фильтров", en: "Cloudflare: no filtering" },
-  dns_builtin_google: { ru: "Google: без фильтров", en: "Google: no filtering" },
-  dns_builtin_dnssb: { ru: "DNS.SB: без фильтров", en: "DNS.SB: no filtering" },
-  dns_builtin_cloudflare_family: { ru: "Cloudflare Family: без вредоносных и 18+", en: "Cloudflare Family: no malware, no 18+" },
-  dns_builtin_yandex_family: { ru: "Яндекс семейный: без 18+", en: "Yandex Family: no 18+" },
-  dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+" },
-  dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking" },
-  dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking" },
+// The built-in presets have one stored name (Russian). An English or Chinese UI shows these while the stored name is still
+// the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
+// (internal/panel/dns/node.go builtinNames).
+const builtinNames: Record<string, { ru: string; en: string; zh: string }> = {
+  dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连" },
+  dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN" },
+  dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google" },
+  dns_builtin_adblock: { ru: "AdGuard: без рекламы", en: "AdGuard: no ads", zh: "AdGuard：无广告" },
+  dns_builtin_family: { ru: "AdGuard Family: без рекламы и 18+", en: "AdGuard Family: no ads, no 18+", zh: "AdGuard Family：无广告和成人内容" },
+  dns_builtin_quad9: { ru: "Quad9: защита от вредоносных", en: "Quad9: malware blocking", zh: "Quad9：拦截恶意网站" },
+  dns_builtin_yandex: { ru: "Яндекс DNS", en: "Yandex DNS", zh: "Yandex DNS" },
+  dns_builtin_cloudflare: { ru: "Cloudflare: без фильтров", en: "Cloudflare: no filtering", zh: "Cloudflare：无过滤" },
+  dns_builtin_google: { ru: "Google: без фильтров", en: "Google: no filtering", zh: "Google：无过滤" },
+  dns_builtin_dnssb: { ru: "DNS.SB: без фильтров", en: "DNS.SB: no filtering", zh: "DNS.SB：无过滤" },
+  dns_builtin_cloudflare_family: { ru: "Cloudflare Family: без вредоносных и 18+", en: "Cloudflare Family: no malware, no 18+", zh: "Cloudflare Family：无恶意网站和成人内容" },
+  dns_builtin_yandex_family: { ru: "Яндекс семейный: без 18+", en: "Yandex Family: no 18+", zh: "Yandex Family：无成人内容" },
+  dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+", zh: "OpenDNS FamilyShield：无成人内容" },
+  dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking", zh: "Cloudflare Security：拦截恶意网站" },
+  dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking", zh: "Yandex Safe：拦截恶意网站" },
 };
 
 /** The name of a preset in the UI language (see builtinNames). */
 export function presetName(p: { id: string; name: string }, lang: string): string {
   const b = builtinNames[p.id];
-  return b && lang !== "ru" && p.name === b.ru ? b.en : p.name;
+  return b && lang !== "ru" && p.name === b.ru ? (lang === "zh" ? b.zh : b.en) : p.name;
 }
 
 // Who runs a resolver, by address: what a person knows it by ("Cloudflare · Google"), not the IPs.

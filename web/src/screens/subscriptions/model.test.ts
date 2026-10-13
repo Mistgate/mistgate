@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -183,6 +183,25 @@ describe("presetName", () => {
     expect(presetName({ id: "dns_builtin_adblock", name: "AdGuard: без рекламы" }, "ru")).toBe("AdGuard: без рекламы");
     expect(presetName({ id: "dns_builtin_adblock", name: "Мой блок" }, "en")).toBe("Мой блок");
     expect(presetName({ id: "dns_custom", name: "Офис" }, "en")).toBe("Офис");
+  });
+  it("shows the Chinese name of a stock built-in in the Chinese UI only", () => {
+    expect(presetName({ id: "dns_builtin_adblock", name: "AdGuard: без рекламы" }, "zh")).toBe("AdGuard：无广告");
+    expect(presetName({ id: "dns_builtin_ru_split", name: "Россия: .ru напрямую" }, "zh")).toBe("俄罗斯：.ru 直连");
+    expect(presetName({ id: "dns_builtin_adblock", name: "Мой блок" }, "zh")).toBe("Мой блок");
+    expect(presetName({ id: "dns_custom", name: "Офис" }, "zh")).toBe("Офис");
+  });
+});
+
+describe("variantLabel", () => {
+  const entry = (id: string, nameRu: string, nameEn: string) => ({ provider: { name: "Cloudflare" } as Provider, variant: { id, nameRu, nameEn } as Provider["variants"][number] });
+  it("names the variant in the UI language", () => {
+    const family = entry("cloudflare/family", "Семейный", "Family");
+    expect(variantLabel(family, "ru")).toBe("Cloudflare · Семейный");
+    expect(variantLabel(family, "en")).toBe("Cloudflare · Family");
+    expect(variantLabel(family, "zh")).toBe("Cloudflare · 儿童");
+  });
+  it("falls back to English for a catalog variant it has no Chinese name for", () => {
+    expect(variantLabel(entry("cloudflare/new", "Новый", "Fresh"), "zh")).toBe("Cloudflare · Fresh");
   });
 });
 
