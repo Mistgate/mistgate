@@ -15,6 +15,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -108,7 +109,10 @@ type pageData struct {
 	// DevicesEndpoint is where the page removes and renames the devices of its person: POST <it>/<device id>/revoke and
 	// /rename {"label"} (the calls the Amnezia section makes, now for every device the person may change; see pageDevice.CanRemove).
 	// "" in the admin's preview, which cannot write, and when the owner switched self-service off.
-	DevicesEndpoint string       `json:"devices_endpoint"`
+	DevicesEndpoint string `json:"devices_endpoint"`
+	// LinkDeviceLimit is the mode of the device limit for the apps on the link: "track" (counted, nobody refused), "enforce" or
+	// "strict" (the apps that report no device ID are refused). The page words the shared place and the full limit by it.
+	LinkDeviceLimit string       `json:"link_device_limit"`
 	Amnezia         *pageAmnezia `json:"amnezia"` // null unless the user has the Amnezia app and a usable AWG profile (or keys to remove)
 	// Servers are the person's servers, one per node; DNS and DNSPresets are the choice of DNS for each of them.
 	Servers    []pageNode      `json:"servers"`
@@ -179,6 +183,9 @@ type pageDevice struct {
 	Kind      string `json:"kind"`
 	CanRemove bool   `json:"can_remove"`
 	CanRename bool   `json:"can_rename"`
+	// OSVersion and Client are what the app last said about itself ("18.1", "Happ/3.4.2"); "" when it said nothing.
+	OSVersion string `json:"os_version"`
+	Client    string `json:"client"`
 }
 
 var platformName = map[adminv1.Platform]string{
@@ -209,7 +216,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		Announcement: set.GetAnnouncement(), SupportURL: set.GetSupportUrl(),
 		Options: pageOptions{ShowAnnouncement: opt.GetShowAnnouncement(), ShowSupport: opt.GetShowSupport(), ShowQR: opt.GetShowQr()},
 		Apps:    []pageApp{}, Devices: []pageDevice{},
-		Access: pageAccess{Happ: v.AccessHapp, Amnezia: v.AccessAmnezia},
+		Access: pageAccess{Happ: v.AccessHapp, Amnezia: v.AccessAmnezia}, LinkDeviceLimit: store.LinkModeOf(v.LinkMode),
 	}
 	if d.User.QuotaReset == "" {
 		d.User.QuotaReset = access.ResetNone
@@ -230,7 +237,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	for _, dv := range v.Devices {
 		own := d.DevicesEndpoint != "" && dv.Kind != "shared"
 		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online,
-			Kind: dv.Kind, CanRemove: own, CanRename: own})
+			Kind: dv.Kind, CanRemove: own, CanRename: own, OSVersion: dv.OSVersion, Client: dv.Client})
 	}
 	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
 	d.Servers = pageServers(v, set, lang)

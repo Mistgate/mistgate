@@ -144,6 +144,7 @@ if (data.locked) {
     theme: startTheme,
     qrOpen: false,
     stepsAgain: false,
+    devicesOpen: false,
     annClosed: stored(ann) === "1",
     returning: isReturning(data, stored("setup") === "1"),
     marked: stored("setup") === "1",
@@ -194,6 +195,10 @@ if (data.locked) {
       st.stepsAgain = true;
       render();
     },
+    devicesOpen(open) {
+      st.devicesOpen = open;
+      render();
+    },
     closeAnn() {
       st.annClosed = true;
       store(ann, "1");
@@ -209,7 +214,7 @@ if (data.locked) {
       data,
       st,
       render: () => render(),
-      api: import.meta.env.DEV && data.amnezia?.endpoints === "dev:" ? devApi : api,
+      api: import.meta.env.DEV && (data.amnezia?.endpoints === "dev:" || data.devices_endpoint === "dev:") ? devApi : api,
       reveal(id) {
         requestAnimationFrame(() => {
           const el = document.getElementById(id);

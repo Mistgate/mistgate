@@ -4,8 +4,9 @@ import { defaultLabel, defaultPane, mainProfile } from "./logic";
 import type { AmzActions, AmzState } from "./state";
 import type { AwgDevice, Lang, MgData } from "./types";
 
-// What the buttons of the key devices do: call the panel, then change the page's own copy of the data (the device
-// list, the count) and the section's state, and draw again. The calls are injected so a test can use a fake.
+// What the buttons of the devices do (the keys, and the remove and rename of a link app's device): call the panel, then change
+// the page's own copy of the data (the device list, the count) and the section's state, and draw again. The calls are injected
+// so a test can use a fake.
 
 export type Api = {
   addDevice(endpoints: string, body: { profile_id: string; platform: string; label: string }): Promise<Answer>;
@@ -34,6 +35,10 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
   const am = () => st.amz;
   const endpoints = () => data.amnezia?.endpoints ?? "";
   const find = (id: string) => data.amnezia?.devices.find((x) => x.id === id);
+  /** A device of a link app (not a key): removed and renamed at the page's devices address. */
+  const linkDevice = (id: string) => (find(id) ? undefined : data.devices.find((x) => x.id === id && x.kind !== "shared"));
+  /** Where the calls for a device go: a key's at the Amnezia address, a link app's device at the page's own. */
+  const urlFor = (id: string) => (find(id) ? endpoints() : data.devices_endpoint);
   /** The control that opened a row's question or editor: its "more" button. */
   const back = (id: string) => `amz-more-${id}`;
 
@@ -46,17 +51,17 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     render();
   };
   /**
-   * Runs one call for a device; one at a time (a second click while it is in flight does nothing). Without an address
+   * Runs one call for a device at `url`; one at a time (a second click while it is in flight does nothing). Without an address
    * (self-service off, the admin's preview) nothing is sent at all: a call to "" would hit the decoy and count as a guess.
    */
-  async function run<T>(busy: string, call: () => Promise<T>, done: (r: T) => void): Promise<boolean> {
-    if (am().busy || !endpoints()) return false;
+  async function run<T>(busy: string, url: string, call: (url: string) => Promise<T>, done: (r: T) => void): Promise<boolean> {
+    if (am().busy || !url) return false;
     am().busy = busy;
     am().error = "";
     am().errorAt = "";
     render();
     try {
-      done(await call());
+      done(await call(url));
       am().busy = "";
       render();
       return true;
@@ -123,7 +128,8 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       const name = f.label.trim() || defaultLabel(f.platform, data.amnezia?.devices.map((x) => x.label) ?? [], dict[st.lang]);
       void run(
         "add",
-        () => api.addDevice(endpoints(), { profile_id: f.profile, platform: f.platform, label: name }),
+        endpoints(),
+        (url) => api.addDevice(url, { profile_id: f.profile, platform: f.platform, label: name }),
         (r) => {
           if (!r.device || !data.amnezia) throw new ApiError(0, "failed");
           data.amnezia.devices.push(r.device);
@@ -144,7 +150,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
         am().open = id;
         return render();
       }
-      void run(id, () => api.getConfigs(endpoints(), id), (r) => received(id, r)).then((ok) => {
+      void run(id, endpoints(), (url) => api.getConfigs(url, id), (r) => received(id, r)).then((ok) => {
         if (ok) am().open = id; // the call failed: nothing to show
         render();
       });
@@ -156,7 +162,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
         render();
       };
       if (am().configs[id] && !find(id)?.stale) return open();
-      void run(`renew:${id}`, () => api.getConfigs(endpoints(), id), (r) => received(id, r)).then((ok) => ok && open());
+      void run(`renew:${id}`, endpoints(), (url) => api.getConfigs(url, id), (r) => received(id, r)).then((ok) => ok && open());
     },
     node(id, i) {
       am().node[id] = i;
@@ -179,7 +185,8 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     rotate(id) {
       void run(
         id,
-        () => api.rotateKey(endpoints(), id),
+        endpoints(),
+        (url) => api.rotateKey(url, id),
         (r) => {
           am().configs[id] = r.configs;
           am().node[id] = 0;
@@ -192,7 +199,8 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     remove(id) {
       void run(
         id,
-        () => api.revokeDevice(endpoints(), id),
+        urlFor(id),
+        (url) => api.revokeDevice(url, id),
         () => {
           if (data.amnezia) data.amnezia.devices = data.amnezia.devices.filter((x) => x.id !== id);
           data.devices = data.devices.filter((x) => x.id !== id);
@@ -209,13 +217,13 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       if (id) focus?.(`amz-m-ren-${id}`);
     },
     renameStart(id) {
-      const x = find(id);
-      if (!x) return;
+      const value = find(id)?.label ?? linkDevice(id)?.model;
+      if (value === undefined) return;
       am().menu = null;
       am().confirm = null;
       am().error = "";
       am().errorAt = "";
-      am().rename = { id, value: x.label };
+      am().rename = { id, value };
       render();
       focus?.(`amz-ren-${id}`);
     },
@@ -229,13 +237,16 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       if (!r) return;
       const value = r.value.trim();
       const x = find(r.id);
-      if (!value || !x || value === x.label) return cancelRename();
+      const ld = linkDevice(r.id);
+      if (!value || (!x && !ld) || value === (x ? x.label : ld!.model)) return cancelRename();
       void run(
         `rename:${r.id}`,
-        () => api.renameDevice(endpoints(), r.id, value),
+        urlFor(r.id),
+        (url) => api.renameDevice(url, r.id, value),
         (ans) => {
-          if (ans.device) merge(r.id, { ...ans.device, stale: x.stale, stale_reason: x.stale_reason, min_clients: x.min_clients.length ? x.min_clients : ans.device.min_clients });
-          else x.label = value;
+          if (ld) ld.model = ans.device?.label || value; // the name as the server cleaned it
+          else if (ans.device) merge(r.id, { ...ans.device, stale: x!.stale, stale_reason: x!.stale_reason, min_clients: x!.min_clients.length ? x!.min_clients : ans.device.min_clients });
+          else x!.label = value;
           am().rename = null;
         },
       ).then((ok) => ok && focus?.(back(r.id)));

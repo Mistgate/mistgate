@@ -18,7 +18,7 @@ import {
 } from "./logic";
 import { qrSvg } from "./qr";
 import type { AmzActions, AmzState, Tools } from "./state";
-import { dot, note, rich, tile } from "./ui";
+import { dot, gap, note, rich, tile } from "./ui";
 import type { AwgDevice, Lang, MgData, Platform } from "./types";
 
 export { newAmzState } from "./state";
@@ -179,7 +179,7 @@ function addForm(c: AmzCtx): Kid[] {
           "div",
           { class: "note bad sm", role: "alert" },
           icon("warn", 16),
-          h("div", { class: "stack g8" }, h("p", null, h("b", null, t.fullT), " ", t.fullD), support && h("a", { class: "tlink", href: support, target: "_blank", rel: "noopener noreferrer", style: { "min-height": "28px" } }, t.writeInTg)),
+          h("div", { class: "stack g8" }, h("p", null, h("b", null, t.fullT), gap(t.fullT), t.fullD), support && h("a", { class: "tlink", href: support, target: "_blank", rel: "noopener noreferrer", style: { "min-height": "28px" } }, t.writeInTg)),
         ),
       h("button", { class: "btn pri", type: "submit", "data-k": "modal-create", disabled: busy }, busy ? t.awgBusy : t.awgCreate),
     ),

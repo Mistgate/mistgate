@@ -11,6 +11,7 @@ import type {
   DnsPreset,
   Kind,
   Lang,
+  LinkMode,
   LoadLevel,
   MgData,
   MinClient,
@@ -30,6 +31,8 @@ export const platformOrder: Platform[] = ["ios", "android", "windows", "macos", 
 const kindOrder: Kind[] = ["happ", "amnezia"];
 const statuses: Status[] = ["active", "expired", "limited", "disabled"];
 const levels: LoadLevel[] = ["low", "medium", "high"];
+const deviceKinds: Device["kind"][] = ["link", "shared", "key"];
+const linkModes: LinkMode[] = ["track", "enforce", "strict"];
 const resets = ["none", "day", "week", "month", "rolling_month"] as const;
 const day = 86400;
 
@@ -201,8 +204,16 @@ export function normalize(raw: unknown): MgData {
         app: str(d.app),
         last_seen_unix: num(d.last_seen_unix),
         online: d.online === true,
+        // without a kind (an older panel), the shared place is the device with neither platform nor model
+        kind: deviceKinds.find((k) => k === d.kind) ?? (d.app === "amnezia" ? "key" : !d.platform && !d.model ? "shared" : "link"),
+        can_remove: d.can_remove === true,
+        can_rename: d.can_rename === true,
+        os_version: str(d.os_version).trim(),
+        client: str(d.client).trim(),
       }),
     ),
+    devices_endpoint: str(r.devices_endpoint),
+    link_device_limit: linkModes.find((m) => m === r.link_device_limit) ?? "track",
     amnezia,
     locked: r.locked === true,
     unlock_url: str(r.unlock_url),
@@ -493,8 +504,8 @@ export function describePreset(text: string, lang: Lang): string {
 
 // --- setup and visits --------------------------------------------------------------------------------------
 
-/** When an app last fetched the subscription (the one shared device of the link); 0 = never. */
-export const fetchedUnix = (d: MgData): number => Math.max(0, ...d.devices.filter(isShared).map((x) => x.last_seen_unix));
+/** When an app on the link last fetched the subscription (its own device or the shared place); 0 = never. */
+export const fetchedUnix = (d: MgData): number => Math.max(0, ...d.devices.filter((x) => x.kind !== "key").map((x) => x.last_seen_unix));
 
 /** A returning visitor: an app fetched the subscription, there are keys, or this device pressed "add" before (`marked`). */
 export const isReturning = (d: MgData, marked: boolean): boolean => fetchedUnix(d) > 0 || (d.amnezia?.devices.length ?? 0) > 0 || marked;
@@ -644,11 +655,20 @@ export const otherDevices = (d: MgData): Device[] => {
   return d.devices.filter((x) => !awg.has(x.id));
 };
 
-/** The one device every link app shares (no platform, no model: the server cannot tell the apps apart). */
-export const isShared = (x: Device) => !x.platform && !x.model;
+/** The one place the link apps that report no device ID share (the server cannot tell them apart). */
+export const isShared = (x: Device) => x.kind === "shared";
 
-/** Some app has already taken the subscription: the link's one slot is in the list (and in the count). */
-export const linkInUse = (d: MgData) => otherDevices(d).some(isShared);
+const osNames: Record<string, string> = { ios: "iOS", android: "Android", windows: "Windows", macos: "macOS", linux: "Linux" };
+
+/** What a link app said about its device, to tell two phones apart: "iOS 18.1 · Happ 3.4.2"; either part may be missing. */
+export function deviceAbout(x: Device): string {
+  const os = osNames[x.platform] ?? "";
+  const sys = x.os_version && os && !x.os_version.toLowerCase().startsWith(os.toLowerCase()) ? `${os} ${x.os_version}` : x.os_version || os;
+  return [sys, x.client.replace("/", " ")].filter(Boolean).join(" · ");
+}
+
+/** Every place is taken and a new app on the link is refused (ENFORCE, STRICT): the list says how to free one. TRACK refuses nobody. */
+export const linkFull = (d: MgData) => d.access.happ && d.link_device_limit !== "track" && d.user.device_limit > 0 && d.user.devices_used >= d.user.device_limit;
 
 export const isDesktop = (platform: string) => platform === "windows" || platform === "macos" || platform === "linux";
 export const isPhone = (platform: string) => platform === "ios" || platform === "android";

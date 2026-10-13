@@ -262,9 +262,13 @@ func TestPageSaysWhatThePersonMayDoWithTheirDevices(t *testing.T) {
 	r := newRig(t, "/k3xq8")
 	h, _ := r.handler(func(c *subs.Config) { c.MinInterval = -1; c.MaxPerHour = -1 })
 	_, tok := r.user("alice", nil)
-	fetch(h, "/"+tok, happUA, "X-HWID", hwidA, "X-Device-OS", "iOS")
+	fetch(h, "/"+tok, happUA, "X-HWID", hwidA, "X-Device-OS", "iOS", "X-Ver-OS", "18.1")
 	fetch(h, "/"+tok, happUA) // the shared device
 	data, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+	// the mode words the shared place and the full limit (users made after the cache: an empty install, ENFORCE)
+	if data["link_device_limit"] != "enforce" {
+		t.Errorf("link_device_limit = %v, want enforce", data["link_device_limit"])
+	}
 	if !strings.HasSuffix(data["devices_endpoint"].(string), "/"+tok+"/devices") {
 		t.Errorf("devices_endpoint = %v", data["devices_endpoint"])
 	}
@@ -275,5 +279,9 @@ func TestPageSaysWhatThePersonMayDoWithTheirDevices(t *testing.T) {
 	}
 	if len(kinds) != 2 || kinds["link"]["can_remove"] != true || kinds["link"]["can_rename"] != true || kinds["shared"]["can_remove"] != false || kinds["shared"]["can_rename"] != false {
 		t.Fatalf("devices = %v", data["devices"])
+	}
+	// what tells two phones apart: the OS version and the app, as the app said them; the shared place has no OS of its own
+	if l := kinds["link"]; l["os_version"] != "18.1" || !strings.HasPrefix(l["client"].(string), "Happ/") || kinds["shared"]["os_version"] != "" {
+		t.Fatalf("os_version and client: link %v, shared %v", l, kinds["shared"])
 	}
 }

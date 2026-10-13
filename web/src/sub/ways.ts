@@ -1,16 +1,16 @@
 import { h, type Kid } from "./dom";
 import { icon } from "./icons";
-import { appNames, appsFor, keyAppName, keyAvailability, linkInUse, type Way, type KeyAvailability } from "./logic";
+import { appNames, appsFor, keyAppName, keyAvailability, type Way, type KeyAvailability } from "./logic";
 import type { Ctx } from "./state";
 import { tile } from "./ui";
 
 // The two ways to connect a device as cards: with an app and the subscription link (recommended), or with an AmneziaVPN key.
 // The same cards stand in the "add a device" sheet (a card is a button that goes on) and in the first-visit steps (the cards
 // are a radio group, one is chosen), so the page reads as one design. A way the person cannot use is a quiet card that says
-// why. The words under a way say what it takes: a square for a slot, hollow when the way takes none.
+// why. The words under a way say what it takes: a square for a slot.
 
-/** The words under a way: a square for a slot, hollow when the way takes none. */
-const slotLine = (tone: "sky" | "mint", free: boolean, text: string) => h("span", { class: `wayslot ${tone}` }, h("i", { class: `sq${free ? " o" : ""}`, "aria-hidden": "true" }), h("span", null, text));
+/** The words under a way: a square for a slot. */
+const slotLine = (tone: "sky" | "mint", text: string) => h("span", { class: `wayslot ${tone}` }, h("i", { class: "sq", "aria-hidden": "true" }), h("span", null, text));
 
 /** A way that cannot be used right now: why, and the way to write where writing helps. */
 function offCard(c: Ctx, why: Exclude<KeyAvailability, "ok" | "none">): HTMLElement {
@@ -43,7 +43,9 @@ export function wayCards(c: Ctx, o: { k: string; pick: (w: Way) => void; selecte
   const attrs = (w: Way) => ({ class: `opt go${o.selected === w ? " on" : ""}`, type: "button", role: radio ? "radio" : false, "aria-checked": radio ? o.selected === w : false, "data-k": `${o.k}way-${w}`, on: { click: () => o.selected !== w && o.pick(w) } });
 
   const names = appNames(appsFor(d, s.platform, "happ")).slice(0, 3);
-  const used = linkInUse(d);
+  const limit = d.user.device_limit;
+  // an app that reports its device ID takes a place of its own, as a key does (the ones that report none share one)
+  const slot = t.waySlot(limit > 0 ? limit - d.user.devices_used : -1);
   const link = h(
     "button",
     attrs("link"),
@@ -54,20 +56,19 @@ export function wayCards(c: Ctx, o: { k: string; pick: (w: Way) => void; selecte
       h("span", { class: "opt-t" }, t.wayAppT, h("span", { class: "badge" }, t.recommended)),
       h("span", { class: "opt-d" }, t.wayAppD),
       names.length > 0 && h("span", { class: "chips" }, ...names.map((n) => h("span", { class: "chip sm" }, n))),
-      slotLine("sky", used, used ? t.wayAppSlotShared : t.wayAppSlotFirst),
+      slotLine("sky", slot),
     ),
     end(o.selected === "link"),
   );
 
   const avail = keyAvailability(d);
-  const limit = d.user.device_limit;
   const key =
     avail === "ok"
       ? h(
           "button",
           attrs("key"),
           tile("mint", "key"),
-          h("span", { class: "opt-b" }, h("span", { class: "opt-t" }, t.wayKeyT(app)), h("span", { class: "opt-d" }, t.wayKeyD(app)), slotLine("mint", false, t.wayKeySlot(limit > 0 ? limit - d.user.devices_used : -1))),
+          h("span", { class: "opt-b" }, h("span", { class: "opt-t" }, t.wayKeyT(app)), h("span", { class: "opt-d" }, t.wayKeyD(app)), slotLine("mint", slot)),
           end(o.selected === "key"),
         )
       : avail === "none"

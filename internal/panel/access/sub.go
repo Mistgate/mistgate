@@ -63,6 +63,9 @@ type SubView struct {
 	EffectiveDNS *dns.Preset // the Mihomo link resolver, already read with the node choices
 	// Format is what Lines hold (FormatURIList unless the view was asked for another).
 	Format plugin.ClientFormat
+	// LinkMode is the mode of the device limit for the apps on the link (store.LinkModeTrack, LinkModeEnforce or LinkModeStrict):
+	// the page words the shared place and the full limit by it.
+	LinkMode string
 	// Refusal says why an app that is entitled to servers gets none: RefusalDeviceLimit, RefusalDeviceBlocked or
 	// RefusalNoDeviceID. "" for everyone served, for a person without access (Status says why) and for the page, which never
 	// registers a device. Lines and Servers are empty with it; the subscription handler answers with one entry that says why.
@@ -130,11 +133,13 @@ type SubDevice struct {
 	ID, Platform, Model string
 	// Kind is "link" (an app that reports a device ID), "shared" (the common place of the apps that report none) or "key" (an
 	// AmneziaVPN key). The person can remove and rename the first and the last.
-	Kind     string
-	App      string // "happ" | "amnezia" | ""
-	LastSeen time.Time
-	Online   bool
-	AWG      *SubAWG // set for an AmneziaWG device
+	Kind string
+	// OSVersion and Client are what the app last said about itself (X-Ver-OS, the first token of its User-Agent); "" if nothing.
+	OSVersion, Client string
+	App               string // "happ" | "amnezia" | ""
+	LastSeen          time.Time
+	Online            bool
+	AWG               *SubAWG // set for an AmneziaWG device
 }
 
 // SubAWG is what the public page shows about an AmneziaWG device. The keys are not part of it: the page fetches
@@ -329,7 +334,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		awgByID[d.ID] = d
 	}
 	for _, d := range devs {
-		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && len(data.OnlineDevices[d.ID]) > 0}
+		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), OSVersion: d.OSVersion, Client: d.Client,
+			LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && len(data.OnlineDevices[d.ID]) > 0}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
 				if happ, amnezia, _ := clientApps(p); happ {
@@ -350,7 +356,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		v.Devices = append(v.Devices, sd)
 	}
-	v.DevicesUsed = len(devs)
+	v.DevicesUsed, v.LinkMode = len(devs), data.LinkMode
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
 		if touch {

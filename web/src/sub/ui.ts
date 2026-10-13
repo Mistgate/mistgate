@@ -5,6 +5,9 @@ import { icon, type IconName } from "./icons";
 
 export const dot = (cls = "") => h("i", { class: `dot${cls ? ` ${cls}` : ""}` });
 
+/** The space after a sentence before the next one: none after a full-width stop (Chinese sets "。" solid). */
+export const gap = (sentence: string) => (/[\u3000-\u303f\uff00-\uffef]$/.test(sentence) ? "" : " ");
+
 /** Text with every «quoted» piece kept on one line (the buttons and menu names the person must find). */
 export function rich(text: string): Kid[] {
   return text.split(/(«[^»]*»)/).filter(Boolean).map((p) => (p.startsWith("«") ? h("span", { class: "q" }, p) : p));

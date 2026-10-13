@@ -50,9 +50,17 @@ const noLinux = apps.filter((a) => a.platform !== "linux");
 // Several apps on one platform without an add scheme: copy the link, then paste it in the app. The name is made up.
 const exampleApp: AppEntry = { platform: "windows", kind: "happ", name: "Example Client", download_url: "https://example.com/client/releases/latest", add_url: "", description: "Несколько протоколов в одном приложении", recommended: false };
 
-const dev = (id: string, platform: string, model: string, app: string, ago: number, online = false): Device => ({ id, platform, model, app, last_seen_unix: now - ago, online });
-// what the server lists for the link apps: one shared device, whichever apps and however many phones use the link
-const shared = (ago: number, online = false) => [dev("d1", "", "", "happ", ago, online)];
+const dev = (id: string, platform: string, model: string, app: string, ago: number, online = false, kind: Device["kind"] = "link", os_version = "", client = ""): Device => {
+  const own = kind !== "shared";
+  return { id, platform, model, app, last_seen_unix: now - ago, online, kind, can_remove: own, can_rename: own, os_version, client };
+};
+// the place the link apps without a device ID share (Hiddify, v2rayNG; Happ with its device ID turned off)
+const shared = (ago: number, online = false) => [dev("d1", "", "", "happ", ago, online, "shared")];
+// the devices of the apps that report a device ID: each one is a device of its own (made-up models)
+const iphone = dev("l1", "ios", "iPhone 15", "happ", 40, true, "link", "18.1", "Happ/3.4.2");
+const galaxy = dev("l2", "android", "Pixel 8", "happ", 2 * day, false, "link", "15", "Happ/3.4.1");
+const desktop = dev("l3", "windows", "DESKTOP-4F7K2LM", "happ", 5 * day, false, "link", "10.0.26100", "mihomo/1.19.31");
+const tablet = dev("l4", "ios", "iPad", "happ", 20 * day, false, "link", "17.6", "Happ/3.3.0");
 const awg = (id: string, platform: string, label: string, ago: number, extra: Partial<AwgDevice> = {}): AwgDevice => ({
   id,
   platform,
@@ -76,7 +84,7 @@ const pixel = awg("d3", "android", "Pixel 7", 40);
 const macbook = awg("d4", "macos", "MacBook", 12 * day);
 const winbox = awg("d5", "windows", "Windows", -1);
 // the page lists them among the devices too (app "amnezia"): the page shows them once, in their own rows
-const asDevice = (x: AwgDevice): Device => ({ id: x.id, platform: x.platform, model: x.label, app: "amnezia", last_seen_unix: x.last_handshake_unix, online: x.online });
+const asDevice = (x: AwgDevice): Device => ({ ...dev(x.id, x.platform, x.label, "amnezia", 0, x.online, "key"), last_seen_unix: x.last_handshake_unix });
 
 // generic names for the screenshots: an iPhone, a router (platform "other"), an Android phone and a PC
 const richKeys = [awg("d3", "ios", "iPhone", 40), awg("d6", "other", "Router", 3 * hour), awg("d7", "android", "Pixel 7", 2 * day), awg("d8", "windows", "Work PC", 9 * day)];
@@ -159,6 +167,9 @@ const base: MgData = {
   apps,
   access: { happ: true, amnezia: true },
   devices: [],
+  devices_endpoint: "dev:",
+  // an install that was upgraded counts the devices only; the hwid-* cases show the other modes
+  link_device_limit: "track",
   amnezia: amz([]),
   locked: false,
   unlock_url: "",
@@ -190,7 +201,31 @@ const off = (user: Partial<MgData["user"]>): MgData => ({
   dns: { ...dnsOn, endpoint: "" },
 });
 
+// a key that is not online, for the lists that must have one device online
+const router = awg("d6", "other", "Router", 6 * hour);
+// the apps on the link alone, each with its own device (the page of step 6 of the device limit)
+const linkOnly = (devices: Device[], user: Partial<MgData["user"]>, mode: MgData["link_device_limit"], extra: Partial<MgData> = {}): MgData => ({
+  ...base,
+  announcement: "",
+  access: { happ: true, amnezia: false },
+  amnezia: null,
+  devices,
+  user: withUser({ devices_used: devices.length, ...user }),
+  link_device_limit: mode,
+  ...extra,
+});
+
 export const cases: Record<string, MgData> = {
+  // three devices of their own (one online) and the shared place; every place taken and a new app refused (ENFORCE)
+  "hwid-full": linkOnly([iphone, galaxy, desktop, ...shared(9 * day)], { device_limit: 4 }, "enforce"),
+  // the same, counted only (TRACK): no hint, nobody is refused
+  "hwid-track": linkOnly([iphone, galaxy, desktop, ...shared(9 * day)], { device_limit: 5 }, "track"),
+  // STRICT: no shared place; the row says the apps without a device ID do not connect
+  "hwid-strict": linkOnly([iphone, galaxy, desktop], { device_limit: 5 }, "strict"),
+  // the dense list: 5 of 5, one online, with a key (every place taken, so nothing folds)
+  "hwid-dense": { ...linkOnly([iphone, galaxy, desktop, ...shared(9 * day), asDevice(router)], { device_limit: 5 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
+  // a long list with room left: it folds to three rows
+  "hwid-long": { ...linkOnly([iphone, galaxy, desktop, tablet, ...shared(9 * day), asDevice(router)], { device_limit: 10 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
   // a first visit: nothing set up yet
   first: base,
   // a returning visit

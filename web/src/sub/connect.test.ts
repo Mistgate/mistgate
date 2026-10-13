@@ -94,7 +94,7 @@ describe("step 1: how to connect (two ways: the same cards as the sheet)", () =>
 
   it("the keys of the wizard and the cards are one design: the same words as the sheet", () => {
     const el = view(data("first"), state("ios"), actions());
-    expect(text(el.querySelector("[data-k=way-link] .wayslot"))).toBe("Одно место на все приложения");
+    expect(text(el.querySelector("[data-k=way-link] .wayslot"))).toBe("Занимает 1 место · свободно 3");
     expect(text(el.querySelector("[data-k=way-key] .wayslot"))).toBe("Занимает 1 место · свободно 3");
   });
 });

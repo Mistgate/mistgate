@@ -340,7 +340,7 @@ describe("the list of devices", () => {
   it("each key with what a friend needs: name, platform, when; no AWG, profile or address", () => {
     const el = rows("many");
     const names = [...el.querySelectorAll(".dev .dev-n")].map(text);
-    expect(names).toEqual(["Приложения по ссылке", "Pixel 7", "MacBook", "Windows"]);
+    expect(names).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
     expect(meta(row(el, "d3"))).toBe("Android · в сети");
     expect(meta(row(el, "d4"))).toBe("Mac · подключалось 12 дней назад");
     expect(meta(row(el, "d5"))).toBe("ещё не подключалось");
@@ -496,20 +496,19 @@ describe("the list of devices", () => {
     expect(keys.querySelector("[data-k=dev-add]")).toBeNull();
   });
 
-  it("only the link: one row, and 'Add a device' is there for the next app", () => {
+  it("only the shared place: one row of one line, and 'Add a device' is there for the next app", () => {
     const a = actions();
     const el = rows("happ", {}, a);
-    expect([...el.querySelectorAll(".dev-n")].map(text)).toEqual(["Приложения по ссылке"]);
-    expect(text(el.querySelector(".dev .hint"))).toBe("Все приложения по ссылке — одно место");
+    expect([...el.querySelectorAll(".dev-n")].map(text)).toEqual(["Приложения без ID устройства"]);
+    expect(text(el.querySelector(".dev .dev-m"))).toBe("одно место на всех·в сети"); // online: the state, else the time alone
+    expect(el.querySelector(".dev .hint")).toBeNull();
     el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!.click();
     expect(a.log).toEqual(["add true"]);
   });
 
-  it("the hint says what takes a slot, when there is a limit and both ways", () => {
-    const hint = (el: HTMLElement) => text([...el.querySelectorAll(".shead")].find((x) => text(x.querySelector(".h2")) === "Мои устройства")?.querySelector(".sec-sub"));
-    expect(hint(rows("many"))).toBe("Ключ — одно место на устройство, приложения по ссылке — одно на всех");
-    expect(hint(rows("happ"))).toBe("");
-    expect(hint(rows("plain"))).toBe("");
+  it("no hint under the title: a device is a place, whatever the way (the shared place says its own exception)", () => {
+    const hint = (el: HTMLElement) => [...el.querySelectorAll(".shead")].find((x) => text(x.querySelector(".h2")) === "Мои устройства")?.querySelector(".sec-sub");
+    expect(hint(rows("many"))).toBeNull();
   });
   it("when the subscription is not active the devices stay: rename and remove, but no key is shown or issued", () => {
     for (const name of ["expired", "quota", "disabled"]) {

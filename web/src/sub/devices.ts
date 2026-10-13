@@ -1,14 +1,16 @@
 import { copyButton, label } from "./amnezia";
 import { h, type Kid } from "./dom";
 import { icon, type IconName } from "./icons";
-import { atDeviceLimit, deviceIcon, fmtAgo, isShared, keyAppName, keyAvailability, otherDevices, platformWord, selfServe, ways } from "./logic";
+import { atDeviceLimit, deviceAbout, deviceIcon, fmtAgo, isShared, keyAppName, keyAvailability, linkFull, otherDevices, platformWord, selfServe } from "./logic";
 import type { Ctx } from "./state";
-import { dot, note, tile } from "./ui";
+import { dot, gap, note, tile } from "./ui";
 import type { AwgDevice, Device } from "./types";
 
-// "My devices": one card. The shared row of the link apps (they take one slot together), then the key devices (one key each,
-// one main action and a "more" menu), then "add a device": one button for both ways (add.ts asks which). A subscription that is
-// not active still lists the devices: they can be renamed and removed, no key is shown or issued.
+// "My devices": one card. The devices of the link apps (each app that reports a device ID is a device of its own, with a "more"
+// menu to rename or remove it), the shared place of the apps that report none, then the key devices (one key each, one main
+// action and a "more" menu), then "add a device": one button for both ways (add.ts asks which). When a new app would be refused
+// (ENFORCE, STRICT, every place taken) a hint above the list says how to free a place. A subscription that is not active still
+// lists the devices: they can be renamed and removed, no key is shown or issued. Blocked devices are not listed at all.
 
 const sendBtn = (c: Ctx, cls = "sec") => c.support && h("a", { class: `btn ${cls}`, href: c.support, target: "_blank", rel: "noopener noreferrer" }, icon("send"), c.t.write);
 
@@ -34,30 +36,135 @@ function when(c: Ctx, last: number, online: boolean, never: string, text: (w: st
   return last ? [h("span", null, text(fmtAgo(last, s.lang)))] : [h("span", { class: "state" }, dot("off"), never)];
 }
 
-// ---- rows of the link apps ----
+// ---- what a row asks: remove it (or replace its key), rename it ----
 
-function linkRow(c: Ctx, x: Device | null, app: string): HTMLElement {
-  const { d, a, t } = c;
-  const shared = x === null || isShared(x);
-  const word = x ? platformWord(x.platform, t) : "";
-  const name = shared ? t.linkApps : x!.model || word || (app ? t.devApp(app) : t.devGeneric);
+/** The question of a row, in its place: the safe answer first (the keyboard goes there), the red one second. */
+function askRow(c: Ctx, id: string, title: string, desc: Kid[], removing: boolean, busy: boolean, err: Kid): HTMLElement {
+  const { a, t } = c;
   return h(
     "div",
-    { class: "dev" },
+    { class: `dev${removing ? " danger" : ""}`, id: `amz-row-${id}`, role: "alertdialog", "aria-labelledby": `ask-t-${id}`, "aria-describedby": `ask-d-${id}` },
+    h("div", { class: "dev-top" }, tile(removing ? "rose" : "sand", removing ? "trash" : "refresh", { size: 36 }), h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `ask-t-${id}` }, title), h("p", { class: "sm mut", id: `ask-d-${id}` }, ...desc))),
+    h(
+      "div",
+      { class: "dev-acts" },
+      h("button", { class: "btn sec grow", type: "button", "data-k": `amz-no-${id}`, disabled: busy, on: { click: () => a.amz.ask(null) } }, t.awgCancel),
+      h("button", { class: `btn ${removing ? "bad" : "pri"} grow`, type: "button", "data-k": `amz-yes-${id}`, disabled: busy, on: { click: () => (removing ? a.amz.remove(id) : a.amz.rotate(id)) } }, busy ? t.awgBusy : removing ? t.removeYes : t.rotateYes),
+    ),
+    err,
+  );
+}
+
+/** The name of a device, edited in its row. */
+function renameRow(c: Ctx, id: string, tone: string, ico: IconName, word: string, value: string, busy: boolean, err: Kid): HTMLElement {
+  const { a, t } = c;
+  return h(
+    "form",
+    {
+      class: "dev",
+      id: `amz-row-${id}`,
+      on: {
+        submit: (e) => {
+          e.preventDefault();
+          a.amz.renameSave();
+        },
+      },
+    },
     h(
       "div",
       { class: "dev-top" },
-      tile("sky", shared ? "link" : deviceIcon(x!.platform), { size: 36 }),
+      tile(tone, ico, { size: 36 }),
       h(
         "div",
-        { class: "dev-b" },
-        h("p", { class: "dev-n" }, name),
-        h("p", { class: "dev-m" }, ...(!shared && x!.model && word ? [h("span", null, word), h("span", null, "·")] : []), ...when(c, x?.last_seen_unix ?? 0, x?.online ?? false, t.linkNever, t.fetched, true)),
-        shared && h("p", { class: "hint" }, t.linkAppsNote),
+        { class: "fld grow" },
+        h("label", { for: `ren-${id}` }, t.renameT),
+        h("input", { class: "inp", id: `ren-${id}`, "data-k": `amz-ren-${id}`, "data-autofocus": "", type: "text", maxlength: 40, autocomplete: "off", value, on: { input: (e) => a.amz.renameInput((e.target as HTMLInputElement).value) } }),
+        h("p", { class: "hint", style: { "margin-top": "-2px" } }, t.renameH(word)),
       ),
     ),
-    // the one action of the row: the link itself, for an app that does not take "add with one tap" (announced: "Скопировано")
-    shared && d.user.status === "active" && d.access.happ && d.subscription_url !== "" && h("div", { class: "dev-acts" }, copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "sec grow", key: "dev-link-copy", after: a.mark, live: true })),
+    h(
+      "div",
+      { class: "dev-acts" },
+      h("button", { class: "btn sec grow", type: "button", "data-k": `amz-ren-no-${id}`, disabled: busy, on: { click: () => a.amz.renameCancel() } }, t.awgCancel),
+      h("button", { class: "btn pri grow", type: "submit", "data-k": `amz-ren-yes-${id}`, disabled: busy }, busy ? t.awgBusy : t.save),
+    ),
+    err,
+  );
+}
+
+/** The error of the last call made for a device, under its row. */
+function rowError(c: Ctx, id: string): HTMLElement | null {
+  const am = c.s.amz;
+  return am.error && (am.errorAt === id || am.errorAt === `rename:${id}`) ? note("bad", "warn", c.t.err(am.error, am.retryMin), { cls: "dev-x" }) : null;
+}
+
+const menuItem = (key: string, ic: IconName, text: string, on: () => void, bad = false) => h("button", { class: bad ? "bad" : "", type: "button", role: "menuitem", "data-k": key, on: { click: on } }, icon(ic), text);
+
+// ---- rows of the link apps ----
+
+/**
+ * A device of an app that reports its ID: the name and one quiet line (online, or when it last updated); rename and remove in
+ * "more". What the app said about itself ("iOS 18.1 · Happ 3.4.2") stands in the question, where two phones must be told apart.
+ */
+function linkRow(c: Ctx, x: Device): HTMLElement {
+  const { s, a, t } = c;
+  const am = s.amz;
+  const word = platformWord(x.platform, t);
+  const name = x.model || word || t.devGeneric;
+  const ico = deviceIcon(x.platform);
+  const busy = am.busy === x.id || am.busy === `rename:${x.id}`;
+  const err = rowError(c, x.id);
+  if (am.confirm?.id === x.id) {
+    const about = deviceAbout(x);
+    return askRow(c, x.id, t.removeT(name), about ? [h("span", { class: "dev-about" }, about), h("br", null), t.removeLinkD] : [t.removeLinkD], true, busy, err);
+  }
+  if (am.rename?.id === x.id) return renameRow(c, x.id, "sky", ico, word, am.rename.value, busy, err);
+
+  const menuOpen = am.menu === x.id;
+  const moreAria = t.moreAria(false);
+  return h(
+    "div",
+    { class: "dev", id: `amz-row-${x.id}` },
+    h(
+      "div",
+      { class: "dev-top" },
+      tile("sky", ico, { size: 36 }),
+      h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `dev-n-${x.id}` }, name), h("p", { class: "dev-m" }, ...when(c, x.last_seen_unix, x.online, t.linkNever, t.fetchedOne))),
+      (x.can_remove || x.can_rename) &&
+        h(
+          "div",
+          { class: "dev-more" },
+          h("button", { class: "ibtn", type: "button", "data-k": `amz-more-${x.id}`, disabled: busy, "aria-haspopup": "menu", "aria-expanded": menuOpen, "aria-label": moreAria, "aria-describedby": `dev-n-${x.id}`, on: { click: () => a.amz.menu(menuOpen ? null : x.id) } }, busy ? h("span", { class: "spin" }) : icon("dots")),
+          menuOpen &&
+            h(
+              "div",
+              { class: "pop menu", role: "menu", "aria-label": moreAria },
+              x.can_rename && menuItem(`amz-m-ren-${x.id}`, "pencil", t.rename, () => a.amz.renameStart(x.id)),
+              x.can_rename && x.can_remove && h("div", { class: "sep", role: "separator" }),
+              x.can_remove && menuItem(`amz-m-del-${x.id}`, "trash", t.removeKey, () => a.amz.ask({ id: x.id, kind: "remove" }), true),
+            ),
+        ),
+    ),
+    err,
+  );
+}
+
+/**
+ * The place the apps without a device ID share (Hiddify, v2rayNG: the server cannot tell them apart), in one short line: they
+ * share one place, or (STRICT, a quiet row that is no device) they do not connect. Before any app took the link it is the link's
+ * own row, whose one action is the link itself, for an app that does not take "add with one tap".
+ */
+function sharedRow(c: Ctx, x: Device | null, strict: boolean): HTMLElement {
+  const { d, a, t } = c;
+  const first = !x && !strict;
+  // one short line: the time alone, the place's words say what it is
+  const line = strict ? [h("span", null, t.strictNote)] : x ? [h("span", null, t.sharedNote), h("span", { "aria-hidden": "true" }, "·"), ...when(c, x.last_seen_unix, x.online, t.linkNever, (w) => w)] : when(c, 0, false, t.linkNever, t.fetched);
+  return h(
+    "div",
+    { class: "dev" },
+    h("div", { class: "dev-top" }, tile(strict && !x ? "dash" : "sky", "link", { size: 36 }), h("div", { class: "dev-b" }, h("p", { class: "dev-n" }, first ? t.linkApps : t.sharedT), h("p", { class: "dev-m" }, ...line))),
+    // announced: "Скопировано"
+    first && d.user.status === "active" && d.access.happ && d.subscription_url !== "" && h("div", { class: "dev-acts" }, copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "sec grow", key: "dev-link-copy", after: a.mark, live: true })),
   );
 }
 
@@ -76,58 +183,13 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
   const renaming = am.rename?.id === x.id ? am.rename : null;
   const app = keyAppName(d, x.platform as never);
   const ico: IconName = deviceIcon(x.platform);
-  const err = am.error && (am.errorAt === x.id || am.errorAt === `rename:${x.id}`) ? note("bad", "warn", t.err(am.error, am.retryMin), { cls: "dev-x" }) : null;
+  const err = rowError(c, x.id);
 
   if (ask) {
     const removing = ask.kind === "remove";
-    return h(
-      "div",
-      { class: `dev${removing ? " danger" : ""}`, id: `amz-row-${x.id}`, role: "alertdialog", "aria-labelledby": `ask-t-${x.id}`, "aria-describedby": `ask-d-${x.id}` },
-      h("div", { class: "dev-top" }, tile(removing ? "rose" : "sand", removing ? "trash" : "refresh", { size: 36 }), h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `ask-t-${x.id}` }, removing ? t.removeT(name) : t.rotateT(name)), h("p", { class: "sm mut", id: `ask-d-${x.id}` }, removing ? t.removeD : t.rotateD(app)))),
-      h(
-        "div",
-        { class: "dev-acts" },
-        h("button", { class: "btn sec grow", type: "button", "data-k": `amz-no-${x.id}`, disabled: busy, on: { click: () => a.amz.ask(null) } }, t.awgCancel),
-        h("button", { class: `btn ${removing ? "bad" : "pri"} grow`, type: "button", "data-k": `amz-yes-${x.id}`, disabled: busy, on: { click: () => (removing ? a.amz.remove(x.id) : a.amz.rotate(x.id)) } }, busy ? t.awgBusy : removing ? t.removeYes : t.rotateYes),
-      ),
-      err,
-    );
+    return askRow(c, x.id, removing ? t.removeT(name) : t.rotateT(name), [removing ? t.removeD : t.rotateD(app)], removing, busy, err);
   }
-
-  if (renaming) {
-    return h(
-      "form",
-      {
-        class: "dev",
-        id: `amz-row-${x.id}`,
-        on: {
-          submit: (e) => {
-            e.preventDefault();
-            a.amz.renameSave();
-          },
-        },
-      },
-      h(
-        "div",
-        { class: "dev-top" },
-        tile("mint", ico, { size: 36 }),
-        h(
-          "div",
-          { class: "fld grow" },
-          h("label", { for: `ren-${x.id}` }, t.renameT),
-          h("input", { class: "inp", id: `ren-${x.id}`, "data-k": `amz-ren-${x.id}`, "data-autofocus": "", type: "text", maxlength: 40, autocomplete: "off", value: renaming.value, on: { input: (e) => a.amz.renameInput((e.target as HTMLInputElement).value) } }),
-          h("p", { class: "hint", style: { "margin-top": "-2px" } }, t.renameH(word)),
-        ),
-      ),
-      h(
-        "div",
-        { class: "dev-acts" },
-        h("button", { class: "btn sec grow", type: "button", "data-k": `amz-ren-no-${x.id}`, disabled: busy, on: { click: () => a.amz.renameCancel() } }, t.awgCancel),
-        h("button", { class: "btn pri grow", type: "submit", "data-k": `amz-ren-yes-${x.id}`, disabled: busy }, busy ? t.awgBusy : t.save),
-      ),
-      err,
-    );
-  }
+  if (renaming) return renameRow(c, x.id, "mint", ico, word, renaming.value, busy, err);
 
   const stale = x.stale && !inactive;
   const primary = stale ? "renew" : "show";
@@ -136,8 +198,6 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
   const menuOpen = am.menu === x.id;
   const busyPrimary = busy && !am.rename;
   const moreAria = t.moreAria(!inactive);
-  const menuItem = (key: string, ic: IconName, text: string, on: () => void, bad = false) =>
-    h("button", { class: bad ? "bad" : "", type: "button", role: "menuitem", "data-k": key, on: { click: on } }, icon(ic), text);
 
   // one block for a phone and a computer: the main action, and "more" with the rest
   const acts = serve
@@ -207,7 +267,7 @@ function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
   // an app with the link: always possible (the limit counts keys; the link's one slot is shared), so the button stays
   if (d.access.happ) {
     const key = keyAvailability(d);
-    const hint = key === "limit" ? [t.slotsFull, true] : key === "ok" && free > 0 ? [t.freeSlots(free), false] : null;
+    const hint = key === "limit" && !linkFull(d) ? [t.slotsFull, true] : key === "ok" && free > 0 ? [t.freeSlots(free), false] : null;
     return h("div", { class: "dev" }, add(false, true), hint && h("p", { class: `hint dev-hint${hint[1] ? " warn-t b" : ""}` }, hint[0] as string));
   }
   // keys alone
@@ -223,25 +283,41 @@ function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
 
 /** The "My devices" section. */
 export function devicesSection(c: Ctx): Kid[] {
-  const { d, t } = c;
+  const { d, s, a, t } = c;
   const am = d.amnezia;
   const inactive = d.user.status !== "active";
   const keys = am && (d.access.amnezia || inactive) ? am : null;
   const serve = selfServe(d);
-  const app = keyAppName(d, null);
   const others = otherDevices(d);
+  const shared = others.find(isShared) ?? null;
+  const strict = d.link_device_limit === "strict";
   const rows: Kid[] = [];
 
   if (inactive) rows.push(h("div", { class: "dev" }, note("", "shield", d.user.status === "disabled" ? t.devOffDisabled : t.devOff, { cls: "grow" })));
-  if (others.length > 0) rows.push(...others.map((x) => linkRow(c, x, app)));
-  else if (d.access.happ) rows.push(linkRow(c, null, app));
-  if (keys) rows.push(...keys.devices.map((x) => keyRow(c, x, serve)));
+  // the devices: the one in use first, so a short list never hides it; the shared place, or STRICT's row; the keys
+  const own = others.filter((x) => !isShared(x)).sort((x, y) => Number(y.online) - Number(x.online) || y.last_seen_unix - x.last_seen_unix);
+  const list: HTMLElement[] = own.map((x) => linkRow(c, x));
+  if (shared || (d.access.happ && (strict || own.length === 0))) list.push(sharedRow(c, shared, strict));
+  if (keys) list.push(...keys.devices.map((x) => keyRow(c, x, serve)));
+  // a long list folds to three rows, so the page stays short; never when every place is taken (that is when an old one is looked for)
+  const fold = list.length > 4 && !(d.user.device_limit > 0 && d.user.devices_used >= d.user.device_limit);
+  rows.push(...(fold && !s.devicesOpen ? list.slice(0, 3) : list));
+  if (fold) {
+    rows.push(
+      h(
+        "div",
+        { class: "dev dev-fold" },
+        h("button", { class: "tlink", type: "button", "data-k": "dev-fold", "aria-expanded": s.devicesOpen, on: { click: () => a.devicesOpen(!s.devicesOpen) } }, s.devicesOpen ? t.lessDevices : t.moreDevices(list.length - 3), icon("chev", 16)),
+      ),
+    );
+  }
   const add = keys || d.access.happ ? addRow(c, (keys?.devices.length ?? 0) > 0) : null;
   if (add) rows.push(add);
   if (rows.length === 0 || (inactive && rows.length === 1)) return [];
-  const both = ways(d).length > 1;
+  // every place taken and a new app would be refused: how to free one, calmly, under the title (TRACK refuses nobody: nothing)
+  const full = linkFull(d);
   return [
-    h("div", { class: "shead" }, h("h2", { class: "h2" }, t.devicesT), slots(c), both && d.user.device_limit > 0 && h("p", { class: "hint sec-sub" }, t.slotsHint)),
-    h("section", { class: "card", "aria-label": t.devicesAria }, ...rows),
+    h("div", { class: "shead" }, h("h2", { class: "h2" }, t.devicesT), slots(c), full && h("p", { class: "hint sec-sub", id: "dev-full" }, h("b", null, t.fullT), gap(t.fullT), t.linkFullD)),
+    h("section", { class: "card", "aria-label": t.devicesAria, "aria-describedby": full ? "dev-full" : false }, ...rows),
   ];
 }

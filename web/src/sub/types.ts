@@ -10,13 +10,25 @@ export type Theme = "auto" | "light" | "dark";
 /** One app of the settings. Several may share a platform and a kind; the page lists them in the settings' order. */
 export type AppEntry = { platform: Platform; kind: Kind; name: string; download_url: string; add_url: string; description: string; recommended: boolean };
 
+/** The mode of the device limit for the apps on the link: counted only, refused over the limit, or also refused without a device ID. */
+export type LinkMode = "track" | "enforce" | "strict";
+
 export type Device = {
   id: string;
   platform: string;
+  /** The model the app reported, or the name the person gave the device. */
   model: string;
   app: string;
   last_seen_unix: number;
   online: boolean;
+  /** "link": an app that reports a device ID; "shared": the one place of the apps that report none; "key": an AmneziaVPN key. */
+  kind: "link" | "shared" | "key";
+  /** The person may remove or rename it on this page (never the shared place, never in the admin's preview). */
+  can_remove: boolean;
+  can_rename: boolean;
+  /** What the app said about itself: the OS version ("18.1") and the app ("Happ/3.4.2"); "" when it said nothing. */
+  os_version: string;
+  client: string;
 };
 
 /** How busy a node's channel is, coarsely (subs/page.go loadLevel); the page never gets the rates. */
@@ -141,6 +153,9 @@ export type MgData = {
   apps: AppEntry[];
   access: { happ: boolean; amnezia: boolean };
   devices: Device[];
+  /** Where a device of the link is removed and renamed (POST <it>/<id>/revoke, /rename); "" in the admin's preview and with self-service off. */
+  devices_endpoint: string;
+  link_device_limit: LinkMode;
   amnezia: AmneziaData | null;
   /** The page asks for its password: only `brand`, `title`, `lang` and `unlock_url` are real (subs/unlock.go). */
   locked: boolean;
