@@ -630,7 +630,7 @@ describe("NodeLink ask guards", () => {
     echo();
     const id = newNode();
     const c = await login(id);
-    const first = stubFor(id).ask("r-dup", text("one"), Date.now() + 300);
+    const first = stubFor(id).ask("r-dup", text("one"), Date.now() + 1500); // room for a slow runner: it must still be pending below
     await c.until(() => c.inbox.includes("one"), "the first request frame");
     await expect(stubFor(id).ask("r-dup", text("two"), Date.now() + 300)).rejects.toThrow("duplicate request id");
     await expect(first).rejects.toThrow("timeout"); // its own timer, not overwritten or cancelled by the second
