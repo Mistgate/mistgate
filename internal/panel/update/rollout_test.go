@@ -1172,13 +1172,17 @@ func TestRolloutSurvivesAPanelRestart(t *testing.T) {
 		e := newEnv(t)
 		e.defaultBundle()
 		a := e.addNode("a", nodeOpts{})
-		hold := make(chan struct{})
+		hold, started := make(chan struct{}), make(chan struct{}, 1)
 		e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+			started <- struct{}{}
 			<-hold
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("the node link dropped"))
 		}
 		e.startRollout()
 		e.s.tick(e.ctx)
+		// The command reaches the node before the panel dies. Otherwise the dead panel's goroutine meets the node after
+		// drop, is told it is offline (nothing was sent) and rightly skips the step under the new panel.
+		<-started
 		old := e.s
 		e.restart()
 		e.drop(a)
