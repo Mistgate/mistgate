@@ -11,7 +11,7 @@ permissions: {}
 jobs:
   # The node agents: Go only, no Node.js and no npm packages in this job.
   node:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -61,7 +61,7 @@ jobs:
 
   # The panel embeds the admin SPA, so this job runs pnpm (third-party code) — with read-only permissions.
   panel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -100,7 +100,7 @@ jobs:
   # admin SPA in one deterministic tarball, mistgate-edge.tar.gz. It runs pnpm (third-party code), so read-only too; the
   # bundle is loaded in workerd before it is uploaded. The owner signs it later (edge-manifest.json, edge-manifest.sig).
   edge:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -146,7 +146,7 @@ jobs:
 
   publish:
     needs: [node, panel, edge]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
