@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -253,10 +252,6 @@ func TestChineseBuiltInNamesAreTranslated(t *testing.T) {
 	hasHan := func(s string) bool {
 		return strings.ContainsFunc(s, func(r rune) bool { return unicode.Is(unicode.Han, r) })
 	}
-	migration, err := os.ReadFile("../store/migrations/00009_dns_order.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for id, names := range builtinNames {
 		p := Preset{ID: id, Name: names.ru, Builtin: true}
 		got := p.NameIn("zh")
@@ -271,13 +266,37 @@ func TestChineseBuiltInNamesAreTranslated(t *testing.T) {
 		if !ok || d.zh == "" || d.zh == d.en || !hasHan(d.zh) {
 			t.Errorf("%s: no Chinese description (%+v)", id, d)
 		}
-		if !strings.Contains(string(migration), "'"+d.en+"'") {
-			t.Errorf("%s: the stock English description %q is not in the migration", id, d.en)
-		}
 		p.Description = names.ru + "\n" + d.en
 		if got := p.DescriptionIn("zh"); got != d.zh {
 			t.Errorf("%s: DescriptionIn(zh) = %q, want %q", id, got, d.zh)
 		}
+	}
+}
+
+// Every built-in preset the migrations create has its words for the page: a stock name and description that the tables
+// recognise, so a visitor never sees the stored Russian name in another language.
+func TestEveryBuiltInPresetHasItsWords(t *testing.T) {
+	e := newEnv(t)
+	all, err := e.s.Presets(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for id, p := range all {
+		if !p.Builtin {
+			continue
+		}
+		n++
+		if b, ok := builtinNames[id]; !ok || b.ru != p.Name {
+			t.Errorf("%s: stored name %q has no entry in builtinNames (%+v)", id, p.Name, b)
+		}
+		_, en, _ := strings.Cut(p.Description, "\n")
+		if d, ok := builtinDescriptions[id]; !ok || d.en != strings.TrimSpace(en) {
+			t.Errorf("%s: stored English description %q has no entry in builtinDescriptions (%+v)", id, en, d)
+		}
+	}
+	if n != len(builtinNames) || n != len(builtinDescriptions) {
+		t.Errorf("%d built-in presets, %d names, %d descriptions", n, len(builtinNames), len(builtinDescriptions))
 	}
 }
 

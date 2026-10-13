@@ -149,6 +149,15 @@ var builtinNames = map[string]struct{ ru, en, zh string }{
 	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"},
 	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9：拦截恶意网站"},
 	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS", "Yandex DNS"},
+	// 00011_dns_v2.sql
+	"dns_builtin_cloudflare":          {"Cloudflare: без фильтров", "Cloudflare: no filtering", "Cloudflare：无过滤"},
+	"dns_builtin_google":              {"Google: без фильтров", "Google: no filtering", "Google：无过滤"},
+	"dns_builtin_dnssb":               {"DNS.SB: без фильтров", "DNS.SB: no filtering", "DNS.SB：无过滤"},
+	"dns_builtin_cloudflare_family":   {"Cloudflare Family: без вредоносных и 18+", "Cloudflare Family: no malware, no 18+", "Cloudflare Family：无恶意网站和成人内容"},
+	"dns_builtin_yandex_family":       {"Яндекс семейный: без 18+", "Yandex Family: no 18+", "Yandex Family：无成人内容"},
+	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: без 18+", "OpenDNS FamilyShield: no 18+", "OpenDNS FamilyShield：无成人内容"},
+	"dns_builtin_cloudflare_security": {"Cloudflare Security: защита от вредоносных", "Cloudflare Security: malware blocking", "Cloudflare Security：拦截恶意网站"},
+	"dns_builtin_yandex_safe":         {"Яндекс безопасный: защита от вредоносных", "Yandex Safe: malware blocking", "Yandex Safe：拦截恶意网站"},
 }
 
 // NameIn is the name of the preset in the language of the page.
@@ -177,6 +186,15 @@ var builtinDescriptions = map[string]struct{ en, zh string }{
 	"dns_builtin_family":     {"AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"},
 	"dns_builtin_quad9":      {"Quad9: blocks malware and phishing domains", "Quad9：拦截恶意软件和钓鱼域名"},
 	"dns_builtin_yandex":     {"Yandex DNS for everything: Russian sites are more reliable", "全部使用 Yandex DNS：俄罗斯网站更稳定"},
+	// 00011_dns_v2.sql
+	"dns_builtin_cloudflare":          {"Cloudflare 1.1.1.1: fast DNS, no filtering", "Cloudflare 1.1.1.1：快速 DNS，不过滤"},
+	"dns_builtin_google":              {"Google Public DNS: no filtering", "Google Public DNS：不过滤"},
+	"dns_builtin_dnssb":               {"DNS.SB: no logs, no filtering", "DNS.SB：不记录日志，不过滤"},
+	"dns_builtin_cloudflare_family":   {"Cloudflare Family: no malware, no 18+", "Cloudflare Family：拦截恶意网站和成人内容"},
+	"dns_builtin_yandex_family":       {"Yandex DNS, family mode: no 18+ content", "Yandex DNS 家庭模式：拦截成人内容"},
+	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: no 18+ content", "OpenDNS FamilyShield：拦截成人内容"},
+	"dns_builtin_cloudflare_security": {"Cloudflare Security: blocks malware domains", "Cloudflare Security：拦截恶意域名"},
+	"dns_builtin_yandex_safe":         {"Yandex DNS, safe mode: no malware, no fraud sites", "Yandex DNS 安全模式：拦截恶意和诈骗网站"},
 }
 
 // DescriptionIn is the description in the language of the page. A built-in one is stored as "Russian\nEnglish" and is
