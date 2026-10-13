@@ -126,7 +126,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_upsert` | Оператор | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) и `name` указывают приложение; для изменения — только меняемые поля, для нового приложения — как минимум `kind`: `kind` (`happ` принимает ссылку подписки, `amnezia` — ключ AmneziaWG), `download_url`, `add_link_template` (подстановки `{url}`, `{url_enc}`, `{name_enc}`), `description` (не длиннее 80 символов), `recommended` | всегда |
 | `subscription_app_remove` | Оператор | `platform`, `name` | всегда |
 | `node_fix` | Админ | `node`, `fix_id` из отчёта доктора, `params`, если пункт их перечисляет | всегда |
-| `node_decoy` | Админ | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (ZIP- или TAR-архив в base64 до 2 МБ, обязателен для `own`) | всегда |
+| `node_decoy` | Админ | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (ZIP- или TAR-архив в base64 до 2 МиБ, обязателен для `own`) | всегда |
 | `warp_restart` | Админ | `node` — идентификатор или точное имя; план перечислит профили с выходом через WARP, которые могут прерваться на несколько секунд; для применения нужен только `confirm_token` | нет |
 | `warp_reregister` | Админ | `node` — идентификатор или точное имя, необязательный `reason` (не длиннее 300 символов); для применения нужен только `confirm_token`. В плане есть ссылка на условия Cloudflare; одобрение владельца принимает их для этого аккаунта и заменяет его новым анонимным устройством, меняя IP-адрес выхода через WARP | всегда |
 | `rollout_start` | Админ | ровно одна запись `node_ids` из `updates_status` (обновит эту ноду сейчас); доверенная версия закрепляется в плане | всегда |

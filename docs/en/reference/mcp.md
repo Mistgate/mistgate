@@ -126,7 +126,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
-| `node_decoy` | Admin | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (base64 ZIP or TAR up to 2 MB, required for `own`) | always |
+| `node_decoy` | Admin | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (base64 ZIP or TAR up to 2 MiB, required for `own`) | always |
 | `warp_restart` | Admin | `node` id or exact name; the plan lists profiles using WARP egress that may blink for a few seconds; apply takes only `confirm_token` | no |
 | `warp_reregister` | Admin | `node` id or exact name and optional `reason` (at most 300 characters); apply takes only `confirm_token`. The plan shows the Cloudflare terms link; owner approval accepts them for this account and replaces it with a new anonymous device, changing the WARP exit IP | always |
 | `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |

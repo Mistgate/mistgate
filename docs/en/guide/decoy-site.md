@@ -40,7 +40,7 @@ An AI agent connected over [MCP](../reference/mcp.md) can set a node's site with
 
 - **A few static pages**, three to five, on a plausible and boring topic that fits the domain name: a small local business or a hobby project. A home page, an "about" page, a page with services or prices, a contact page with an address and opening hours.
 - **Text written for this site.** Do not copy a template or text found elsewhere: a search engine can find copied text, and then the site stands out. No "lorem ipsum", no "under construction".
-- **Everything local and small.** No external scripts, fonts, CDNs, analytics, maps, embeds or social buttons. The whole site is well under 2 MB; a handful of pages with one style sheet is a few tens of kilobytes.
+- **Everything local and small.** No external scripts, fonts, CDNs, analytics, maps, embeds or social buttons. The whole site is well under 2 MiB; a handful of pages with one style sheet is a few tens of kilobytes.
 - **Nothing that needs a backend.** No forms, no logins, no contact form, no shop. Give an email address instead.
 - **Light images.** Small local SVG drawings or optimised files, each a few tens of kilobytes at most.
 - **A realistic `404.html`** in the same style as the site. The panel answers every unknown path with it, so a visitor who guesses a wrong address sees what a small site would show. Add a `429.html` the same way if you like.
