@@ -42,7 +42,8 @@ func TestHashingReturnsItsMemoryToTheOS(t *testing.T) {
 	}
 	_ = hash
 	peak := retained()
-	if peak < base+argonMemory*3/4 {
+	// Half is enough to prove the hash was measured: part of the argon2 buffer can land in free pages the heap already held.
+	if peak < base+argonMemory/2 {
 		t.Fatalf("the heap grew by only %d MiB during the hash: this test does not measure what it should", (peak-base)>>20)
 	}
 
