@@ -42,9 +42,9 @@ type Options = { sizes: readonly number[]; defaultSize: number };
 const sizeOf = (o: Options, s: PagingSearch) => (s.size !== undefined && o.sizes.includes(s.size) ? s.size : o.defaultSize);
 
 /** Moves the paging params of the current route, keeping everything else in the query. `undefined` removes a param. */
-function useMove() {
+export function useMove() {
   const navigate = useNavigate();
-  return (patch: PagingSearch, opts: { replace?: boolean; state?: (prev: Record<string, unknown>) => Record<string, unknown> } = {}) =>
+  return (patch: Record<string, unknown>, opts: { replace?: boolean; state?: (prev: Record<string, unknown>) => Record<string, unknown> } = {}) =>
     void navigate({
       search: (prev: Record<string, unknown>) => {
         const next: Record<string, unknown> = { ...prev, ...patch };

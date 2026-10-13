@@ -15,6 +15,7 @@ import { useT } from "@/i18n";
 import { basepath, isUnauthenticated } from "@/lib/api";
 import { bootBrand, loginInfoQuery } from "@/lib/instance";
 import { validatePaging, type PagingSearch } from "@/lib/paging";
+import { validateSort, type SortSearch } from "@/screens/users/sort";
 import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/session";
 import { validateHealthSearch } from "@/screens/health/tabs";
 import { validateNodeSearch } from "@/screens/node/tabs";
@@ -119,13 +120,14 @@ const node = createRoute({
 
 // "?create" opens the create-user dialog (the palette's "Create user" action uses it); "?group=<id>" lists one group's users
 // (the profile page links to it). "?tab=groups" is the Groups tab, where "?group=<id>" opens that group.
+// "?sort=traffic&desc=1" is the order of the people list.
 const users = createRoute({
   getParentRoute: () => app,
   path: "/users",
-  validateSearch: (s: Record<string, unknown>): { create?: true; group?: string; tab?: "groups" } & PagingSearch => ({
+  validateSearch: (s: Record<string, unknown>): { create?: true; group?: string; tab?: "groups" } & PagingSearch & SortSearch => ({
     ...(s.create === true || s.create === "true" || s.create === "1" ? { create: true as const } : {}),
     ...(typeof s.group === "string" && s.group !== "" ? { group: s.group } : {}),
-    ...(s.tab === "groups" ? { tab: "groups" as const } : validatePaging(s)),
+    ...(s.tab === "groups" ? { tab: "groups" as const } : { ...validatePaging(s), ...validateSort(s) }),
   }),
   component: lazyRouteComponent(() => import("@/screens/users"), "UsersScreen"),
 });

@@ -1,14 +1,16 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { UserFilter, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, Card, PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
+import { IconButton } from "@/components/ui/icon-button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { StatusDot } from "@/components/ui/status";
 import { Tabs } from "@/components/ui/tabs";
 import { TextField } from "@/components/ui/text-field";
@@ -17,7 +19,7 @@ import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
-import { clampPage, usePaging } from "@/lib/paging";
+import { clampPage, useMove, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
 import { CreateUserModal } from "./create-user";
 import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, shownText, termText, usage, viaOf } from "./format";
@@ -25,6 +27,7 @@ import { GroupChip, GroupsTab } from "./groups";
 import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
 import { AppLink, useGo } from "./nav";
+import { clickSort, firstDesc, sortIds, sortLabel, sortOf, type SortId, type SortSearch, type SortState } from "./sort";
 import { useTx, type Tx } from "./t";
 import { groupsQuery } from "./rpc";
 import { Check, useDebounced } from "./ui";
@@ -40,9 +43,32 @@ const filterValue: Record<FilterId, UserFilter> = {
   over: UserFilter.OVER_QUOTA,
 };
 
+const sortValue: Record<SortId, UserSort> = {
+  name: UserSort.NAME,
+  status: UserSort.STATUS,
+  group: UserSort.GROUP,
+  devices: UserSort.DEVICES,
+  traffic: UserSort.TRAFFIC,
+  expiry: UserSort.EXPIRY,
+  seen: UserSort.LAST_SEEN,
+};
+
 // One grid for the header and every row keeps the columns aligned: check, name, status, app, group, devices,
 // traffic, term, last seen, node.
-const cols = "grid-cols-[18px_minmax(120px,1.3fr)_132px_136px_minmax(70px,0.7fr)_40px_minmax(120px,1.2fr)_52px_86px_minmax(40px,0.5fr)]";
+const cols = "grid-cols-[18px_minmax(96px,1.3fr)_124px_128px_minmax(64px,0.7fr)_58px_minmax(104px,1.2fr)_56px_106px_minmax(40px,0.5fr)]";
+
+// the header's cells: the sortable ones name the order they set (the term column sorts by the expiry time)
+const columns: readonly { id: "name" | "status" | "via" | "group" | "devices" | "traffic" | "term" | "seen" | "node"; sort?: SortId }[] = [
+  { id: "name", sort: "name" },
+  { id: "status", sort: "status" },
+  { id: "via" },
+  { id: "group", sort: "group" },
+  { id: "devices", sort: "devices" },
+  { id: "traffic", sort: "traffic" },
+  { id: "term", sort: "expiry" },
+  { id: "seen", sort: "seen" },
+  { id: "node" },
+];
 
 type Search = { create?: boolean; group?: string; tab?: "groups" };
 
@@ -71,7 +97,7 @@ export function UsersScreen() {
           <PageTitle>{t("users.title")}</PageTitle>
           {onGroups
             ? groups.data && <span className="text-xs text-muted">{t.n("users.groupsCount", groups.data.length)}</span>
-            : counts && <span className="text-xs text-muted">{t.n("users.summary", counts.all, { o: counts.online })}</span>}
+            : counts && <Summary counts={counts} t={t} />}
         </div>
         {onGroups ? (
           <Button variant="primary" onClick={() => setNewGroup(true)}>
@@ -123,10 +149,17 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
 
   // numbered pages: the server skips `offset` rows; the size of the filter in use is among the counts of the answer
   const paging = usePaging({ sizes: pageSizes, defaultSize: PAGE });
+  // the order is in the URL too (?sort=traffic&desc=1); another order starts from page 1, the filter, search and group stay
+  const order = sortOf(useSearch({ strict: false }) as Record<string, unknown>);
+  const move = useMove();
+  const setSort = (next: SortSearch) => move({ sort: undefined, desc: undefined, ...next, page: undefined, before: undefined });
   const list = useQuery<ReturnType<typeof usersPageN>>({
-    queryKey: ["users", "list", filter, query, groupId, paging.page, paging.size],
+    queryKey: ["users", "list", filter, query, groupId, paging.page, paging.size, order.sort, order.desc],
+    // every order pages by offset (never a page_token: the server takes it for name order only, and the numbered pager does not need it)
     queryFn: ({ signal }) =>
-      users.listUsers({ filter: filterValue[filter], query, groupId, pageSize: paging.size, offset: (paging.page - 1) * paging.size }, { signal }).then(usersPageN),
+      users
+        .listUsers({ filter: filterValue[filter], query, groupId, pageSize: paging.size, offset: (paging.page - 1) * paging.size, sort: sortValue[order.sort], descending: order.desc }, { signal })
+        .then(usersPageN),
     refetchInterval: 10_000,
     // the old rows stay while the next page loads: the card keeps its height, nothing jumps
     placeholderData: keepPreviousData,
@@ -261,6 +294,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                 ),
               }))}
             />
+            <SortPick order={order} onSort={setSort} t={t} />
           </div>
 
           {pickedList.length > 0 && (
@@ -290,19 +324,29 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
               ) : (
                 <>
                   <Card lg className="hidden overflow-hidden md:block">
-                    <div className={cx("grid h-[38px] items-center gap-2.5 border-b border-line px-4 text-[11px] font-bold tracking-[0.06em] text-muted uppercase", cols)}>
-                      <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
-                      {(["name", "status", "via", "group", "devices", "traffic", "term", "seen", "node"] as const).map((c) => (
-                        <span key={c} className="truncate">
-                          {t(`users.col.${c}`)}
-                        </span>
-                      ))}
-                    </div>
-                    <div className={cx("transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
-                      {rows.map((u) => (
-                        <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
-                      ))}
-                    </div>
+                    <table className="block w-full text-left">
+                      <thead className="block">
+                        <tr className={cx("grid h-[38px] items-center gap-2.5 border-b border-line px-4 text-[11px] font-bold tracking-[0.06em] text-muted uppercase", cols)}>
+                          <th scope="col" className="p-0">
+                            <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
+                          </th>
+                          {columns.map((c) =>
+                            c.sort ? (
+                              <SortTh key={c.id} id={c.sort} order={order} onSort={(id) => setSort(clickSort(order, id))} label={t(`users.col.${c.id}`)} />
+                            ) : (
+                              <th key={c.id} scope="col" className="min-w-0 truncate p-0">
+                                {t(`users.col.${c.id}`)}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className={cx("block transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
+                        {rows.map((u) => (
+                          <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                        ))}
+                      </tbody>
+                    </table>
                     <Pagination className="px-4" {...pager} />
                   </Card>
                   <div className="flex flex-col gap-2 md:hidden">
@@ -341,6 +385,97 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
         }}
       />
       <LinkModal target={link?.target ?? null} initialUrl={link?.url} initialPassword={link?.password} onClose={() => setLink(null)} />
+    </div>
+  );
+}
+
+/** The digits of a counted message in the text colour, the words around them muted (the parent sets `b`). */
+function Num({ text }: { text: string }) {
+  return text.split(/(\d+)/).map((part, i) => (i % 2 ? <b key={i}>{part}</b> : part));
+}
+
+/**
+ * Under the title: "17 people · 31 devices · 6 online now (8 devices)". Numbers carry the weight, the online part is
+ * green (like every online state), and each part stays whole when the line wraps on a phone.
+ */
+function Summary({ counts, t }: { counts: { all: number; online: number; devicesUsed: number; devicesOnline: number }; t: Tx }) {
+  const live = counts.online > 0;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted max-sm:gap-x-3 [&_b]:font-bold [&_b]:text-fg">
+      <span className="whitespace-nowrap">
+        <Num text={t.n("users.sum.people", counts.all)} />
+      </span>
+      <span aria-hidden className="text-faint max-sm:hidden">
+        ·
+      </span>
+      <span className="whitespace-nowrap">
+        <Num text={t.n("users.sum.devices", counts.devicesUsed)} />
+      </span>
+      <span aria-hidden className="text-faint max-sm:hidden">
+        ·
+      </span>
+      <span className={cx("flex items-center gap-1.5 whitespace-nowrap", live && "tone-ok")}>
+        {live && <StatusDot kind="ok" />}
+        <span className={cx(live && "tone-text font-semibold [&_b]:text-[inherit]")}>
+          <Num text={t.n("users.sum.online", counts.online)} />
+        </span>
+        {live && counts.devicesOnline > 0 && (
+          <span>
+            <Num text={t.n("users.sum.onDevices", counts.devicesOnline)} />
+          </span>
+        )}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * A column header that sorts: a real button in the <th>, the order on the <th> for a screen reader. The arrow is the
+ * current direction; on the others it is a faint hint of the first one, shown on hover and focus only (its room stays).
+ */
+function SortTh({ id, order, onSort, label }: { id: SortId; order: SortState; onSort: (id: SortId) => void; label: string }) {
+  const active = order.sort === id;
+  const desc = active ? order.desc : firstDesc[id];
+  return (
+    <th scope="col" aria-sort={active ? (order.desc ? "descending" : "ascending") : undefined} className="min-w-0 p-0">
+      <button
+        type="button"
+        onClick={() => onSort(id)}
+        className={cx(
+          "group/sort flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-[length:inherit] font-[inherit] tracking-[inherit] uppercase transition-colors duration-200 hover:text-fg",
+          active && "text-fg",
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <Icon
+          name={desc ? "arrowDown" : "arrowUp"}
+          size={11}
+          className={cx("transition-opacity duration-200", active ? "opacity-100" : "opacity-0 group-hover/sort:opacity-40 group-focus-visible/sort:opacity-40")}
+        />
+      </button>
+    </th>
+  );
+}
+
+/** On the phone the list is cards without headers: the same choice as a small select and a direction button. */
+function SortPick({ order, onSort, t }: { order: SortState; onSort: (next: SortSearch) => void; t: Tx }) {
+  return (
+    <div className="flex items-center gap-1.5 md:hidden">
+      <span aria-hidden className="text-xs font-semibold text-muted">
+        {t("users.sort")}
+      </span>
+      <div className="w-[132px]">
+        <Select
+          compact
+          aria-label={t("users.sort")}
+          value={order.sort}
+          onValueChange={(id) => onSort(clickSort(order, id as SortId))}
+          options={sortIds.map((id) => ({ value: id, label: id === "devices" ? t("users.sortBy.devices") : t(sortLabel[id]) }))}
+        />
+      </div>
+      <IconButton variant="field" aria-label={t(order.desc ? "users.sort.toAsc" : "users.sort.toDesc")} onClick={() => onSort({ ...(order.sort !== "name" ? { sort: order.sort } : {}), ...(order.desc ? {} : { desc: 1 as const }) })}>
+        <Icon name={order.desc ? "arrowDown" : "arrowUp"} size={14} />
+      </IconButton>
     </div>
   );
 }
@@ -420,7 +555,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const term = termText(u, t, now);
   const full = shownStatus(u) === "devices";
   return (
-    <div
+    <tr
       onClick={onOpen}
       className={cx(
         "grid min-h-[52px] cursor-pointer items-center gap-2.5 border-b border-line px-4 py-1.5 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2",
@@ -429,28 +564,36 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         u.status === UserStatus.DISABLED && "opacity-60",
       )}
     >
-      <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
-      <div className="flex min-w-0 items-center gap-2.5">
+      <td>
+        <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
+      </td>
+      <td className="flex min-w-0 items-center gap-2.5">
         <Avatar name={u.name} index={avatarIndex(u.id)} />
         <AppLink to="/users/$id" params={{ id: u.id }} className="truncate font-bold" onClick={stop}>
           {u.name}
         </AppLink>
-      </div>
-      <StatusCell u={u} t={t} />
-      <AppCell u={u} group={group} t={t} />
-      <span className="flex min-w-0" onClick={stop}>
+      </td>
+      <td className="flex min-w-0">
+        <StatusCell u={u} t={t} />
+      </td>
+      <td className="flex min-w-0">
+        <AppCell u={u} group={group} t={t} />
+      </td>
+      <td className="flex min-w-0" onClick={stop}>
         <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
-      </span>
-      <span className={cx("font-mono text-xs", full ? "text-warn" : "text-muted")}>
+      </td>
+      <td className={cx("font-mono text-xs", full ? "text-warn" : "text-muted")}>
         {u.devicesUsed}/{u.deviceLimit}
-      </span>
-      <div className="flex min-w-0 flex-col gap-1">
+      </td>
+      <td className="flex min-w-0 flex-col gap-1">
         <span className="font-mono text-[11px] whitespace-nowrap text-muted">{use.text}</span>
         <UsageBar pct={use.pct} tone={use.tone} />
-      </div>
-      <span className={cx("font-mono text-xs", toneClass[term.tone])}>{term.text}</span>
-      <SeenCell u={u} t={t} now={now} />
-      <span className="truncate font-mono text-xs text-muted">
+      </td>
+      <td className={cx("font-mono text-xs", toneClass[term.tone])}>{term.text}</td>
+      <td className="flex min-w-0">
+        <SeenCell u={u} t={t} now={now} />
+      </td>
+      <td className="truncate font-mono text-xs text-muted">
         {u.currentNodeId ? (
           <Link to="/nodes/$id" params={{ id: u.currentNodeId }} onClick={stop} className="hover:text-fg hover:underline">
             {u.currentNodeName}
@@ -458,8 +601,8 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         ) : (
           "—"
         )}
-      </span>
-    </div>
+      </td>
+    </tr>
   );
 }
 

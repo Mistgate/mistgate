@@ -2,7 +2,14 @@
 // against it. A message with forms separated by "|" is a plural (one|other in English, one|few|many in Russian).
 export const en = {
   "users.title": "Users",
-  "users.summary": "{n} person · {o} online|{n} people · {o} online",
+  "users.sum.people": "{n} person|{n} people",
+  "users.sum.devices": "{n} device|{n} devices",
+  "users.sum.online": "{n} online now",
+  "users.sum.onDevices": "({n} device)|({n} devices)",
+  "users.sort": "Sort by",
+  "users.sort.toAsc": "Sort ascending",
+  "users.sort.toDesc": "Sort descending",
+  "users.sortBy.devices": "Devices",
   "users.tabs": "People and groups",
   "users.tab.people": "People",
   "users.tab.groups": "Groups",
@@ -256,7 +263,14 @@ export const en = {
 
 export const ru: typeof en = {
   "users.title": "Пользователи",
-  "users.summary": "{n} человек · {o} онлайн|{n} человека · {o} онлайн|{n} человек · {o} онлайн",
+  "users.sum.people": "{n} человек|{n} человека|{n} человек",
+  "users.sum.devices": "{n} устройство|{n} устройства|{n} устройств",
+  "users.sum.online": "{n} онлайн сейчас",
+  "users.sum.onDevices": "({n} устройство)|({n} устройства)|({n} устройств)",
+  "users.sort": "Сортировка",
+  "users.sort.toAsc": "Сортировать по возрастанию",
+  "users.sort.toDesc": "Сортировать по убыванию",
+  "users.sortBy.devices": "Устройства",
   "users.tabs": "Люди и группы",
   "users.tab.people": "Люди",
   "users.tab.groups": "Группы",
@@ -512,7 +526,14 @@ export const ru: typeof en = {
 
 export const zh: typeof en = {
   "users.title": "用户",
-  "users.summary": "{n} 个用户 · {o} 人在线",
+  "users.sum.people": "{n} 人",
+  "users.sum.devices": "{n} 台设备",
+  "users.sum.online": "{n} 人在线",
+  "users.sum.onDevices": "（{n} 台设备）",
+  "users.sort": "排序",
+  "users.sort.toAsc": "按升序排序",
+  "users.sort.toDesc": "按降序排序",
+  "users.sortBy.devices": "设备",
   "users.tabs": "用户与分组",
   "users.tab.people": "用户",
   "users.tab.groups": "分组",

@@ -5,7 +5,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
-import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { setLang } from "@/i18n";
 import { groupTone } from "./format";
 import { UsersScreen } from "./list";
 
@@ -83,6 +84,7 @@ beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: (s: string) => (written.push(s), Promise.resolve()) } });
 });
 afterEach(() => {
+  setLang("en");
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
@@ -181,7 +183,7 @@ describe("the people list", () => {
     });
     await mount();
     const table = document.querySelector<HTMLElement>(".md\\:block")!;
-    const rows = [...table.querySelectorAll<HTMLElement>("div.cursor-pointer")];
+    const rows = [...table.querySelectorAll<HTMLElement>("tr.cursor-pointer")];
     const via = (row: HTMLElement) => row.querySelector<HTMLElement>('[role="img"]');
     const chips = (row: HTMLElement) => [...via(row)!.querySelectorAll<HTMLElement>(".tone-chip")].map((c) => `${c.dataset.tone}:${c.textContent}`);
     expect(chips(rows[0]!)).toEqual(["sky:Link"]);
@@ -274,5 +276,157 @@ describe("the people list, in pages", () => {
     const move = navigate.mock.calls.at(-1)![0] as { search: (prev: Record<string, unknown>) => Record<string, unknown>; replace?: boolean };
     expect(move.search({ page: 9 })).toEqual({ page: 3 });
     expect(move.replace).toBe(true);
+  });
+});
+
+describe("the people list, sorted", () => {
+  const moved = () => {
+    const move = navigate.mock.calls.at(-1)![0] as { search: (prev: Record<string, unknown>) => Record<string, unknown> };
+    return (prev: Record<string, unknown> = {}) => move.search(prev);
+  };
+  const th = (label: string) => [...document.querySelectorAll<HTMLElement>("th")].find((h) => h.textContent === label)!;
+  const sortBtn = (label: string) => th(label).querySelector("button")!;
+  // the shell's own count query asks for one row; the list is the other
+  const lastCall = () => listUsers.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((r) => r.pageSize !== 1).at(-1)!;
+
+  it("makes the seven sortable headers real buttons, and leaves App and Node plain", async () => {
+    await mount();
+    for (const label of ["Name", "Status", "Group", "Dev.", "Traffic", "Term", "Last seen"]) expect(sortBtn(label), label).toBeInstanceOf(HTMLButtonElement);
+    expect(th("App").querySelector("button")).toBeNull();
+    expect(th("Node").querySelector("button")).toBeNull();
+  });
+
+  it("sorts by name, ascending, until the URL says otherwise; only that header has aria-sort", async () => {
+    await mount();
+    expect(lastCall()).toMatchObject({ sort: UserSort.NAME, descending: false, offset: 0 });
+    expect(th("Name").getAttribute("aria-sort")).toBe("ascending");
+    expect(document.querySelectorAll("th[aria-sort]").length).toBe(1);
+  });
+
+  it("asks for the order of the URL, by offset and never with a page token", async () => {
+    search = { sort: "traffic", desc: 1, page: 2 };
+    await mount();
+    expect(lastCall()).toMatchObject({ sort: UserSort.TRAFFIC, descending: true, offset: 50, pageSize: 50 });
+    for (const [req] of listUsers.mock.calls) expect(req).not.toHaveProperty("pageToken");
+    expect(th("Traffic").getAttribute("aria-sort")).toBe("descending");
+    expect(document.querySelectorAll("th[aria-sort]").length).toBe(1);
+  });
+
+  it("falls back to name order for a sort the server does not know", async () => {
+    search = { sort: "colour", desc: "maybe" };
+    await mount();
+    expect(lastCall()).toMatchObject({ sort: UserSort.NAME, descending: false });
+  });
+
+  it("sorts a column in its natural first direction: most first for traffic, devices and last seen, soonest first for the term", async () => {
+    await mount();
+    const first = async (label: string) => {
+      await click(sortBtn(label));
+      return moved()({ page: 3, size: 25 });
+    };
+    expect(await first("Traffic")).toEqual({ size: 25, sort: "traffic", desc: 1 });
+    expect(await first("Dev.")).toEqual({ size: 25, sort: "devices", desc: 1 });
+    expect(await first("Last seen")).toEqual({ size: 25, sort: "seen", desc: 1 });
+    expect(await first("Term")).toEqual({ size: 25, sort: "expiry" });
+    expect(await first("Group")).toEqual({ size: 25, sort: "group" });
+    expect(await first("Status")).toEqual({ size: 25, sort: "status" });
+    // name is the bare URL
+    act(() => root?.unmount());
+    search = { sort: "traffic", desc: 1 };
+    await mount();
+    await click(sortBtn("Name"));
+    expect(moved()({ sort: "traffic", desc: 1 })).toEqual({});
+  });
+
+  it("reverses the active column on the second click, and goes back to the first page", async () => {
+    search = { sort: "traffic", desc: 1, page: 3 };
+    await mount();
+    await click(sortBtn("Traffic"));
+    expect(moved()({ sort: "traffic", desc: 1, page: 3 })).toEqual({ sort: "traffic" });
+    act(() => root?.unmount());
+    search = { sort: "expiry" };
+    await mount();
+    await click(sortBtn("Term"));
+    expect(moved()({ sort: "expiry" })).toEqual({ sort: "expiry", desc: 1 });
+    act(() => root?.unmount());
+    search = {};
+    await mount();
+    await click(sortBtn("Name"));
+    expect(moved()({})).toEqual({ desc: 1 });
+  });
+
+  it("keeps the order when the filter or the search changes, and the filter and the search when the order changes", async () => {
+    search = { sort: "traffic", desc: 1 };
+    await mount();
+    await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.startsWith("Online")));
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='Name or group']")!, "an");
+    await act(async () => void (await new Promise((r) => setTimeout(r, 300))));
+    await settle();
+    expect(lastCall()).toMatchObject({ filter: 1, query: "an", sort: UserSort.TRAFFIC, descending: true, offset: 0 });
+    // the order changes by the URL only; the filter and the search are the screen's own state and stay
+    await click(sortBtn("Term"));
+    expect(lastCall()).toMatchObject({ filter: 1, query: "an" });
+    expect(moved()({ sort: "traffic", desc: 1 })).toEqual({ sort: "expiry" });
+  });
+
+  it("offers the same choice on the phone: a select and a direction button", async () => {
+    search = { sort: "traffic", desc: 1 };
+    await mount();
+    expect(document.querySelector("[aria-label='Sort by']")?.textContent).toBe("Traffic");
+    await click(document.querySelector("button[aria-label='Sort ascending']"));
+    expect(moved()({ sort: "traffic", desc: 1, page: 2 })).toEqual({ sort: "traffic" });
+    act(() => root?.unmount());
+    search = {};
+    await mount();
+    await click(document.querySelector("button[aria-label='Sort descending']"));
+    expect(moved()({})).toEqual({ desc: 1 });
+  });
+});
+
+describe("the count line under the title", () => {
+  const countLine = () => [...document.querySelectorAll("p")].find((p) => p.textContent?.includes("·"));
+  const line = () => countLine()?.textContent;
+  const withCounts = (counts: Record<string, number>) =>
+    listUsers.mockResolvedValue({ users: [person({ id: "usr_a", name: "Anna" })], nextPageToken: "", counts: { expiring: 0, overQuota: 0, ...counts } });
+
+  it("says people, devices and who is online with how many devices, in English", async () => {
+    withCounts({ all: 17, online: 6, devicesUsed: 31, devicesOnline: 8 });
+    await mount();
+    expect(line()).toBe("17 people·31 devices·6 online now(8 devices)");
+  });
+
+  it("uses the singular, and drops the online devices when nobody is online", async () => {
+    withCounts({ all: 1, online: 1, devicesUsed: 1, devicesOnline: 1 });
+    await mount();
+    expect(line()).toBe("1 person·1 device·1 online now(1 device)");
+    act(() => root?.unmount());
+    withCounts({ all: 4, online: 0, devicesUsed: 9, devicesOnline: 0 });
+    await mount();
+    expect(line()).toBe("4 people·9 devices·0 online now");
+  });
+
+  it("gives the numbers their weight and the online part its colour", async () => {
+    withCounts({ all: 17, online: 6, devicesUsed: 31, devicesOnline: 8 });
+    await mount();
+    expect([...countLine()!.querySelectorAll("b")].map((b) => b.textContent)).toEqual(["17", "31", "6", "8"]);
+    expect(countLine()!.querySelector(".tone-ok .tone-text")?.textContent).toBe("6 online now");
+  });
+
+  it("speaks Russian with its three forms", async () => {
+    setLang("ru");
+    withCounts({ all: 21, online: 3, devicesUsed: 32, devicesOnline: 5 });
+    await mount();
+    expect(line()).toBe("21 человек·32 устройства·3 онлайн сейчас(5 устройств)");
+    act(() => root?.unmount());
+    withCounts({ all: 2, online: 1, devicesUsed: 1, devicesOnline: 1 });
+    await mount();
+    expect(line()).toBe("2 человека·1 устройство·1 онлайн сейчас(1 устройство)");
+  });
+
+  it("speaks Chinese with the measure words", async () => {
+    setLang("zh");
+    withCounts({ all: 17, online: 6, devicesUsed: 31, devicesOnline: 8 });
+    await mount();
+    expect(line()).toBe("17 人·31 台设备·6 人在线（8 台设备）");
   });
 });
