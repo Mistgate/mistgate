@@ -28,7 +28,7 @@ When you add a VLESS profile on TCP 443 to a node with an enabled Hysteria2 prof
 | **VLESS on TCP 443, REALITY target another site** | The tunnel. Its HTTPS site is paused | The certificate of a Let's Encrypt Hysteria2 profile now renews only through TCP 80: see below. |
 | **VLESS on TCP 443, the node's own site as the REALITY target** (the default) | The tunnel, the same site shown through REALITY, and the certificate renewal | It needs a domain on the node and the agent v0.1.35 or newer. See [VLESS REALITY](vless.md#the-nodes-own-site). |
 
-The first way costs nothing and changes nothing for Hysteria2; take it when you can open the port. The third gives VLESS the port every network lets through and keeps the site and the renewal: take it on any node that has a domain. The second does the same for a node without a domain, at the price of the site and of TCP 80. TLS behind a CDN is **Planned**.
+The first way costs nothing and changes nothing for Hysteria2; take it when you can open the port. The third gives VLESS the port every network lets through and keeps the site and the renewal: take it on any node that has a domain. The second does the same for a node without a domain, at the price of the site and of TCP 80. For VLESS over TLS, direct or behind a CDN, see [TLS and a CDN](vless.md#tls-and-a-cdn).
 
 ## Certificates
 

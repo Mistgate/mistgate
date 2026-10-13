@@ -5,7 +5,7 @@ description: "Run the panel on Cloudflare Workers instead of a server with mistg
 
 The Cloudflare edition is the same panel, built for WebAssembly and run by two Cloudflare Workers with a D1 database, instead of a binary on your own Linux server. One command, `mistgate edge deploy`, creates everything on your Cloudflare account. The nodes are still your servers, added from the admin as usual. This page takes you from a Cloudflare account to the owner account in the admin. The examples use `panel.example.com`.
 
-> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare, not yet on a real account (that is the next round of work), and no published release carries the edge bundle yet. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
+> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare, not yet on a real account (that is the next round of work). The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
 
 ## Requirements
 
@@ -130,6 +130,7 @@ The admin shows "Not available in the Cloudflare edition yet" in the places belo
 | Updating nodes | The panel does not update node agents: no rollouts, no scheduled updates. |
 | Node logs | The live log of a node's agent is not shown. |
 | Updating the panel | There is no self-update: update by running the command again (below). |
+| Own decoy site | A node cannot get the **Own site** decoy: this edition does not store uploaded bundles. |
 
 Registering a WARP account from the panel is not available either and fails with "WARP registration is unavailable in this edition"; the admin does not mark it yet.
 

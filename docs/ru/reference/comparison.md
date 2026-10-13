@@ -17,12 +17,12 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 
 ## В чём другие впереди
 
-- **Протоколы.** VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard есть в большинстве других панелей. В Mistgate есть Hysteria2, VLESS REALITY (XHTTP и TCP с Vision) и AmneziaWG. **Планируется**: VLESS за CDN (XHTTP или WebSocket поверх TLS).
+- **Протоколы.** VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard есть в большинстве других панелей. В Mistgate есть Hysteria2, VLESS (REALITY по XHTTP или TCP с Vision; TLS по XHTTP или WebSocket, напрямую или за CDN) и AmneziaWG.
 - **Форматы подписок.** Другие отдают Xray JSON, sing-box, Clash, Stash или Outline. Mistgate отдаёт список URI, Mihomo YAML и ключи AmneziaVPN. **Планируется**: Xray JSON и sing-box.
 - **Сообщество и зрелость.** У 3x-ui около 47,7 тыс. звёзд на GitHub, у s-ui около 10,0 тыс., у Hiddify Manager около 9,3 тыс. Mistgate новый проект в ранних версиях.
 - **Лимит устройств.** 3x-ui, PasarGuard и Remnawave ограничивают устройства по HWID. Mistgate считает устройства.
 - **Telegram.** У 3x-ui, Marzban, PasarGuard и Hiddify Manager полноценные Telegram-боты. Mistgate отправляет алерты. **Планируется**: полноценный бот.
-- **Установка.** Большинство других ставятся одной командой. **Планируется**: установка Mistgate одной командой.
+- **Установка.** Установщик Mistgate одной командой проверяет подписанный манифест панели, прежде чем её ставить.
 
 ## Полная таблица
 

@@ -37,7 +37,7 @@ Mistgate для тех, кто держит VPN для других людей: 
 Приложения на ядре Clash/Mihomo (kl!ck, FlClash, Clash Verge Rev) получают по одной ссылке серверы Hysteria2, VLESS и AmneziaWG. Если в сети у человека заблокируют один протокол, второй уже есть в приложении. Happ получает серверы Hysteria2 и VLESS, а AmneziaVPN берёт ключ для каждого устройства со страницы человека. [Приложения-клиенты](docs/ru/guide/client-apps.md)
 
 **VLESS REALITY за настоящим сайтом.**
-VLESS идёт по TCP, через XHTTP или RAW с Vision, и работает в сетях, где режут UDP. Всякий, кто не клиент, видит настоящий сайт: по умолчанию собственный сайт ноды с её сертификатом Let's Encrypt или другой сайт, который вы укажете. Hysteria2 и VLESS могут жить на одной ноде, в том числе на общем TCP 443. **Проверить порты** на странице ноды с другой ноды проверяет, доходит ли TCP-порт именно до Mistgate. [VLESS REALITY](docs/ru/guide/vless.md) · [VLESS и Hysteria2 на одной ноде](docs/ru/guide/vless-and-hysteria2.md)
+VLESS идёт по TCP, через XHTTP или RAW с Vision, или через TLS по XHTTP или WebSocket, напрямую или за CDN, и работает в сетях, где режут UDP. Всякий, кто не клиент, видит настоящий сайт: по умолчанию собственный сайт ноды с её сертификатом Let's Encrypt или другой сайт, который вы укажете. Hysteria2 и VLESS могут жить на одной ноде, в том числе на общем TCP 443. **Проверить порты** на странице ноды с другой ноды проверяет, доходит ли TCP-порт именно до Mistgate. [VLESS REALITY](docs/ru/guide/vless.md) · [VLESS и Hysteria2 на одной ноде](docs/ru/guide/vless-and-hysteria2.md)
 
 **Сервер добавляется из браузера.**
 Введите IP и пароль root. Панель запомнит SSH-ключ сервера, проверит его, откроет порты во включённом UFW или firewalld, поставит подписанный агент и дождётся, пока он подключится. Сертификат Let's Encrypt нода получает сама, а кнопка **Включить WARP** даёт ей выход через Cloudflare. [Установка ноды по SSH](docs/ru/getting-started/ssh-install.md)
@@ -51,7 +51,7 @@ VLESS идёт по TCP, через XHTTP или RAW с Vision, и работа�
 **ИИ-агент в помощь.**
 В панель встроен MCP-сервер. Claude Code, Codex или другой агент видит флот и меняет его по схеме «план → применить». Установка ноды, исправление доктора и смена пароля сервера ждут, пока вы одобрите их в админке. Ссылки подписок, ключи устройств и пароли агент не получает. [Инструкция для AI-агента](docs/ru/getting-started/ai-agents.md) · [MCP-сервер](docs/ru/reference/mcp.md)
 
-> **Скоро, в релизах этого пока нет:** VLESS за CDN (XHTTP и WebSocket поверх TLS; в работе), подписки в форматах Xray JSON и sing-box, полноценный Telegram-бот для флота и пользователей и бесплатная версия панели на Cloudflare Workers ([предварительная](docs/ru/getting-started/install-edge.md): на настоящем аккаунте ещё не запускалась).
+> **Скоро, в релизах этого пока нет:** подписки в форматах Xray JSON и sing-box и полноценный Telegram-бот для флота и пользователей. Версия панели на Cloudflare Workers входит в релизы с v0.1.36 как [предварительная](docs/ru/getting-started/install-edge.md) и на настоящем аккаунте Cloudflare ещё не запускалась.
 
 ## Скриншоты
 
@@ -111,9 +111,9 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 
 ## Статус и планы
 
-Проект в бете. Текущий релиз [`v0.1.35`](https://github.com/Mistgate/mistgate/releases/latest), он уже работает в продакшене. До версии 1.0 ещё могут меняться API, хранимые настройки и протокол ноды. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+Проект в бете. Текущий релиз [`v0.1.36`](https://github.com/Mistgate/mistgate/releases/latest), он уже работает в продакшене. До версии 1.0 ещё могут меняться API, хранимые настройки и протокол ноды. Бинарники для Linux amd64 и arm64 лежат в [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
-Дальше: VLESS за CDN (XHTTP и WebSocket поверх TLS), подписки Xray JSON и sing-box, Telegram-бот для флота и пользователей и версия для Cloudflare Workers ([предварительная](docs/ru/getting-started/install-edge.md)). Часть настроек по умолчанию рассчитана на пользователей в России (Яндекс DNS для нод в России, контрольные домены доктора, пресеты split-DNS); всё это меняется в настройках. Подробности и известные ограничения: [Статус и план развития](docs/ru/roadmap/status.md).
+Дальше: первый запуск версии для Cloudflare Workers ([предварительная](docs/ru/getting-started/install-edge.md)) на настоящем аккаунте и перенос в неё того, что есть на VPS, затем подписки Xray JSON и sing-box; позже — Telegram-бот для флота и пользователей. Часть настроек по умолчанию рассчитана на пользователей в России (Яндекс DNS для нод в России, контрольные домены доктора, пресеты split-DNS); всё это меняется в настройках. Подробности и известные ограничения: [Статус и план развития](docs/ru/roadmap/status.md).
 
 ## Документация
 

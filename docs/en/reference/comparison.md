@@ -17,7 +17,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 
 ## Where the others are ahead
 
-- **Protocols.** VMess, Trojan, Shadowsocks, TUIC and plain WireGuard are in most other panels. Mistgate has Hysteria2, VLESS REALITY (XHTTP and TCP with Vision) and AmneziaWG; VLESS behind a CDN (XHTTP or WebSocket over TLS) is **Planned**.
+- **Protocols.** VMess, Trojan, Shadowsocks, TUIC and plain WireGuard are in most other panels. Mistgate has Hysteria2, VLESS (REALITY over XHTTP or TCP with Vision; TLS over XHTTP or WebSocket, direct or behind a CDN) and AmneziaWG.
 - **Subscription formats.** Others serve Xray JSON, sing-box, Clash, Stash or Outline. Mistgate serves a URI list, Mihomo YAML and AmneziaVPN keys; Xray JSON and sing-box are **Planned**.
 - **Community and maturity.** 3x-ui has about 47.7k GitHub stars, s-ui about 10.0k, Hiddify Manager about 9.3k. Mistgate is a new project in early releases.
 - **Device limits.** 3x-ui, PasarGuard and Remnawave limit devices by HWID. Mistgate counts devices.

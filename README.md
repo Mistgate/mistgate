@@ -37,7 +37,7 @@ Mistgate is for people who run a VPN for others: family, friends, a community or
 Apps on the Clash/Mihomo core (kl!ck, FlClash, Clash Verge Rev) get the Hysteria2, VLESS and AmneziaWG servers from the same link, so when one protocol is blocked on someone's network, the other is already in their app. Happ gets the Hysteria2 and VLESS servers; AmneziaVPN gets a key per device from the person's page. [Client apps](docs/en/guide/client-apps.md)
 
 **VLESS REALITY, hidden behind a real site.**
-VLESS runs over TCP, with XHTTP or with RAW and Vision, and works on networks that throttle UDP. Anyone who is not a client sees a real site: by default the node's own, with its own Let's Encrypt certificate, or another site you name. Hysteria2 and VLESS can share a node, TCP 443 included. **Check ports** on the node page tests from another node whether a TCP port reaches Mistgate itself. [VLESS REALITY](docs/en/guide/vless.md) · [VLESS and Hysteria2 on one node](docs/en/guide/vless-and-hysteria2.md)
+VLESS runs over TCP, with XHTTP or with RAW and Vision, or over TLS with XHTTP or WebSocket, direct or behind a CDN, and works on networks that throttle UDP. Anyone who is not a client sees a real site: by default the node's own, with its own Let's Encrypt certificate, or another site you name. Hysteria2 and VLESS can share a node, TCP 443 included. **Check ports** on the node page tests from another node whether a TCP port reaches Mistgate itself. [VLESS REALITY](docs/en/guide/vless.md) · [VLESS and Hysteria2 on one node](docs/en/guide/vless-and-hysteria2.md)
 
 **Add a server from the browser.**
 Type its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld, installs the signed agent and waits for it to connect. The node gets its Let's Encrypt certificate itself, and **Enable WARP** gives it a Cloudflare exit. [Install a node over SSH](docs/en/getting-started/ssh-install.md)
@@ -51,7 +51,7 @@ Two static Go binaries, one for the panel and one for the node agent. SQLite and
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
 
-> **Coming soon, not in a release yet:** VLESS behind a CDN (XHTTP and WebSocket over TLS; in progress), Xray JSON and sing-box subscriptions, a full Telegram bot for the fleet and for users, and a free edition of the panel that runs on Cloudflare Workers (a [preview](docs/en/getting-started/install-edge.md): not run on a real account yet).
+> **Coming soon, not in a release yet:** Xray JSON and sing-box subscriptions, and a full Telegram bot for the fleet and for users. The edition of the panel that runs on Cloudflare Workers is in the releases since v0.1.36 as a [preview](docs/en/getting-started/install-edge.md) and has not run on a real Cloudflare account yet.
 
 ## Screenshots
 
@@ -111,9 +111,9 @@ Others are ahead in protocol breadth, community size, HWID limits and full Teleg
 
 ## Status and roadmap
 
-Mistgate is in beta. The current release is [`v0.1.35`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+Mistgate is in beta. The current release is [`v0.1.36`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
-Next: VLESS behind a CDN (XHTTP and WebSocket over TLS), Xray JSON and sing-box subscriptions, a Telegram bot for the fleet and for users, and the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)). Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
+Next: the first run of the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)) on a real account and bringing it on par with the VPS panel, then Xray JSON and sing-box subscriptions; later a Telegram bot for the fleet and for users. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 
 ## Documentation
 
