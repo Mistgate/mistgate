@@ -400,6 +400,8 @@ const updatesPage = (over: object) => ({
   panel: { version: "0.3.0-9dd4c", built: CUR, hasReleaseKey: true, releaseKeyFingerprint: "abcd1234abcd1234" },
   bundle,
   distDir: "/var/lib/mistgate/dist",
+  agentNotes: [],
+  panelNotes: [],
   ...over,
 });
 const manualUpdates = updatesPage({

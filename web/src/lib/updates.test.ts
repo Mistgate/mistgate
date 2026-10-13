@@ -100,6 +100,8 @@ const updates = (over: Partial<Updates> = {}): Updates => ({
   bundle: bundle(BundleStatus.TRUSTED),
   nodes: [node({ state: NodeUpdateState.OUTDATED })],
   distDir: "/var/lib/mistgate/dist",
+  agentNotes: [],
+  panelNotes: [],
   ...over,
 });
 

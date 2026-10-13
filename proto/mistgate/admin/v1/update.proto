@@ -291,6 +291,35 @@ message GetUpdatesResponse {
   string dist_dir = 6;
   // Fixed UTC offset used to enter new scheduled updates (minutes east of UTC).
   int32 schedule_timezone_offset_minutes = 7;
+  // "What's new", newest first: the notes of the GitHub releases a node update would bring, i.e. every stable release
+  // newer than the OLDEST agent version among the nodes, up to the trusted bundle's version. Empty without a trusted
+  // bundle, when no node is behind it, or when the panel has not read the release notes (the Cloudflare edition never
+  // does: it has no bundle).
+  repeated ReleaseNote agent_notes = 8;
+  // The same for this panel: every stable release newer than PanelBuild.version, up to PanelUpdate.version. Only while
+  // PanelUpdate.available (a release whose signed panel manifest verified), else empty.
+  repeated ReleaseNote panel_notes = 9;
+}
+
+// The notes of one GitHub release, as the maintainers wrote them in the release description. They are INFORMATIONAL and
+// NOT signed (the signed things are the manifests): the panel reads them over HTTPS from the official repository, like
+// the release check, and the SPA renders them with its own tiny markdown renderer, never as HTML. A description is
+// an English part, a line "---", a Russian part and, from the releases that follow, another "---" and a Simplified
+// Chinese part; the panel splits it on lines that are exactly "---" and gives
+// each part the language of its script, not of its position. The "Full Changelog" line is dropped.
+message ReleaseNote {
+  // The release tag, "v0.1.38".
+  string version = 1;
+  // The release page on GitHub (https://github.com/Mistgate/mistgate/releases/tag/<version>).
+  string url = 2;
+  int64 published_unix = 3 [jstype = JS_NUMBER];
+  // The notes in markdown per language; an empty one means the release has none in it and the SPA falls back to English.
+  string en = 4;
+  string ru = 5;
+  string zh = 6;
+  // A heading "Security", "Безопасность" or "安全" (any level) is in the notes: the SPA badges the release and tells the
+  // owner it is worth updating soon.
+  bool security = 7;
 }
 
 message CheckPanelUpdateRequest {}

@@ -100,7 +100,10 @@ type PanelUpdateConfig struct {
 	UseRootHelperService bool
 	// APIURL, HTTPClient, Runner, OS, Arch and Now are injectable test seams. Production uses the fixed Mistgate
 	// endpoint, the default GitHub client and the host values. Runner returns the command's standard output.
-	APIURL     string
+	APIURL string
+	// NotesURL is the release list that feeds "What's new" (GitHubReleaseNotesURL in production). Empty = the panel
+	// reads no release notes; tests that inject APIURL leave it empty so they make no second request.
+	NotesURL   string
 	HTTPClient *http.Client
 	Runner     func(context.Context, string, ...string) ([]byte, error)
 	OS         string
@@ -149,6 +152,10 @@ type GitHubPanelUpdater struct {
 	status     PanelUpdateStatus
 	seq        uint64 // accepted installs, so a stale watcher cannot end a newer one
 	install    sync.Mutex
+
+	notesMu   sync.Mutex
+	notes     []ReleaseNote // the last good list, newest first (changelog.go)
+	notesETag string
 }
 
 // PanelUpdateHostSupported reports whether this installation has the required systemd update path.
@@ -240,6 +247,7 @@ func (u *GitHubPanelUpdater) Check(ctx context.Context) PanelUpdateStatus {
 	if s := u.Status(); s.CheckedUnix > 0 && u.now().Sub(time.Unix(s.CheckedUnix, 0)) < panelUpdateCheckCache {
 		return s
 	}
+	defer u.refreshNotes(ctx) // after the verdict is stored; it never changes it
 	checkCtx, cancel := context.WithTimeout(ctx, panelUpdateCheckTimeout)
 	defer cancel()
 
@@ -276,10 +284,15 @@ func (u *GitHubPanelUpdater) keepKnownRelease(errorKey string) bool {
 	return true
 }
 func (u *GitHubPanelUpdater) Run(ctx context.Context) {
+	check := func() { _ = u.Check(ctx) }
 	if !u.supported {
-		return
+		if u.cfg.NotesURL == "" {
+			return
+		}
+		// no self-update here, but the node card still shows "What's new" for the bundle
+		check = func() { u.refreshNotes(ctx) }
 	}
-	_ = u.Check(ctx)
+	check()
 	tick := time.NewTicker(panelUpdateInterval)
 	defer tick.Stop()
 	for {
@@ -287,7 +300,7 @@ func (u *GitHubPanelUpdater) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			_ = u.Check(ctx)
+			check()
 		}
 	}
 }

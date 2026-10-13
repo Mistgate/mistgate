@@ -267,7 +267,7 @@ func Build(c Config) (*Panel, error) {
 	// the panel's service user. Without one the Updates page says the panel cannot verify releases.
 	compiledKey, _ := buildinfo.ReleasePublicKey()
 	panelUpdater := update.NewGitHubPanelUpdater(update.PanelUpdateConfig{
-		CurrentBuilt: buildinfo.BuiltUnix(), Key: compiledKey, DataDir: c.DataDir,
+		CurrentBuilt: buildinfo.BuiltUnix(), Key: compiledKey, DataDir: c.DataDir, NotesURL: update.GitHubReleaseNotesURL,
 		ServiceUnit: c.UpdateService, Enabled: update.PanelUpdateHostSupported(),
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})

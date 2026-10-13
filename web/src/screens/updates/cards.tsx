@@ -12,6 +12,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
+import { WhatsNew } from "./notes";
 
 const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
   [BundleStatus.UNSPECIFIED]: { kind: "off", key: "up.bundle.status.missing" },
@@ -328,6 +329,7 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
         <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.panel.details")} controls="up-panel-details" />
       </div>
       <EditionNotice feature="panel_update" />
+      <WhatsNew notes={data.panelNotes} />
       {open && (
         <div id="up-panel-details" className="flex flex-col gap-3 border-t border-line pt-3">
           <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">

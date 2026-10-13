@@ -141,7 +141,41 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 			resp.DistDir = abs
 		}
 	}
+	resp.AgentNotes, resp.PanelNotes = s.releaseNotes(b, views, resp.Panel.Update)
 	return connect.NewResponse(resp), nil
+}
+
+// releaseNotes picks "What's new" for the two cards: the releases a node update would bring (newer than the oldest agent
+// among the nodes, up to the trusted bundle) and the ones a panel update would bring (newer than this panel, up to the
+// release it can install). The notes are informational and unsigned; without a verified release to go to, nothing is shown.
+func (s *Service) releaseNotes(b *bundleState, views []nodeView, panel *adminv1.PanelUpdate) (agent, pnl []*adminv1.ReleaseNote) {
+	src, ok := s.cfg.PanelUpdater.(interface{ ReleaseNotes() []ReleaseNote })
+	if !ok {
+		return nil, nil
+	}
+	all := src.ReleaseNotes()
+	if len(all) == 0 {
+		return nil, nil
+	}
+	if b != nil && b.trusted && b.manifest != nil {
+		versions := make([]string, 0, len(views))
+		for _, v := range views {
+			versions = append(versions, v.row.AgentVersion)
+		}
+		agent = releaseNoteMsgs(notesBetween(all, oldestVersion(versions), b.manifest.Version))
+	}
+	if panel != nil && panel.Available {
+		pnl = releaseNoteMsgs(notesBetween(all, s.cfg.PanelVersion, panel.Version))
+	}
+	return agent, pnl
+}
+
+func releaseNoteMsgs(notes []ReleaseNote) []*adminv1.ReleaseNote {
+	out := make([]*adminv1.ReleaseNote, 0, len(notes))
+	for _, n := range notes {
+		out = append(out, &adminv1.ReleaseNote{Version: n.Version, Url: n.URL, PublishedUnix: n.PublishedUnix, En: n.En, Ru: n.Ru, Zh: n.Zh, Security: n.Security})
+	}
+	return out
 }
 
 func panelUpdateProto(s PanelUpdateStatus) *adminv1.PanelUpdate {

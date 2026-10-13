@@ -353,6 +353,18 @@ export const en = {
   "health.alert.update_failed.why.panel_restart_ambiguous": "The panel restarted while {node} was being updated and lost track of the step. Check the node, then resume or cancel the rollout on the Updates page.",
   "health.alert.update_failed.why.unknown": "The rollout is paused. Open the Updates page.",
   "up.alert.open": "Open updates",
+
+  // ---- What's new (release notes from the GitHub releases; unsigned)
+  "up.notes.title": "What’s new",
+  "up.notes.security": "Security fixes",
+  "up.notes.securityHint": "Includes security fixes — update soon.",
+  "up.notes.showAll": "Show all",
+  "up.notes.showLess": "Show less",
+  "up.notes.earlier": "and {n} earlier version|and {n} earlier versions",
+  "up.notes.hideEarlier": "Hide earlier versions",
+  "up.notes.noText": "No notes for this release.",
+  "up.notes.source": "From the GitHub releases. The text is not signed.",
+  "up.notes.open": "Open {version} on GitHub",
 };
 
 export const ru: Record<keyof typeof en, string> = {
@@ -701,6 +713,18 @@ export const ru: Record<keyof typeof en, string> = {
   "health.alert.update_failed.why.panel_restart_ambiguous": "Панель перезапустилась, пока обновлялась {node}, и потеряла нить шага. Проверь ноду, потом продолжи или отмени раскатку на странице «Обновления».",
   "health.alert.update_failed.why.unknown": "Раскатка на паузе. Открой страницу «Обновления».",
   "up.alert.open": "Открыть «Обновления»",
+
+  // ---- Что нового (описания релизов с GitHub; не подписаны)
+  "up.notes.title": "Что нового",
+  "up.notes.security": "Исправления безопасности",
+  "up.notes.securityHint": "Есть исправления безопасности — лучше обновиться скорее.",
+  "up.notes.showAll": "Показать всё",
+  "up.notes.showLess": "Свернуть",
+  "up.notes.earlier": "и ещё {n} более ранняя версия|и ещё {n} более ранние версии|и ещё {n} более ранних версий",
+  "up.notes.hideEarlier": "Скрыть прежние версии",
+  "up.notes.noText": "У этого релиза нет описания.",
+  "up.notes.source": "Из релизов GitHub. Текст не подписан.",
+  "up.notes.open": "Открыть {version} на GitHub",
 };
 
 export const zh: typeof en = {
@@ -1031,4 +1055,16 @@ export const zh: typeof en = {
   "health.alert.update_failed.why.panel_restart_ambiguous": "更新 {node} 期间面板重启，丢失了该步骤的进展。请检查该节点，再到「更新」页面继续或取消滚动更新。",
   "health.alert.update_failed.why.unknown": "滚动更新已暂停。请打开「更新」页面。",
   "up.alert.open": "打开更新",
+
+  // ---- 更新内容（来自 GitHub Releases 的发布说明，未签名）
+  "up.notes.title": "更新内容",
+  "up.notes.security": "安全修复",
+  "up.notes.securityHint": "包含安全修复，建议尽快更新。",
+  "up.notes.showAll": "显示全部",
+  "up.notes.showLess": "收起",
+  "up.notes.earlier": "以及另外 {n} 个更早的版本",
+  "up.notes.hideEarlier": "隐藏更早的版本",
+  "up.notes.noText": "此版本没有更新说明。",
+  "up.notes.source": "来自 GitHub Releases，文本未签名。",
+  "up.notes.open": "在 GitHub 上打开 {version}",
 };

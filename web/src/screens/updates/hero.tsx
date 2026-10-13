@@ -24,6 +24,7 @@ import {
   type UpdateActions,
 } from "@/lib/updates";
 import { BundleStrip } from "./cards";
+import { WhatsNew } from "./notes";
 
 type Look = { kind: StatusKind; accent?: boolean; tint?: boolean; eyebrow: string; title: string; text: string };
 
@@ -210,6 +211,8 @@ export function HeroCard({
           )}
         </div>
         {active ? <RolloutBar rollout={active} /> : data.nodes.length > 0 && <FleetBar nodes={data.nodes} />}
+        {/* what the update brings, so the owner can tell whether to do it now or later; not while a rollout runs */}
+        {!active && <WhatsNew notes={data.agentNotes} />}
         {!owner && !noUpdates && (hero.id === "available" || active) && <p className="text-xs text-muted">{t("up.ownerOnly")}</p>}
       </div>
       <BundleStrip data={data} owner={owner} actions={actions} />

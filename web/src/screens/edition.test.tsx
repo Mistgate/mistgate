@@ -199,6 +199,8 @@ const updatesPage = {
     { nodeId: "nod_1", name: "de1", version: "0.1.0-aaa", built: 100, supportsUpdate: true, crashGuard: true, state: NodeUpdateState.OUTDATED, scheduledUnix: 0, scheduledVersion: "", scheduledBuilt: 0, scheduledTimezoneOffsetMinutes: 0, scheduledMissed: false, inbounds: 1, onlineUsers: 0, address: "de1.example.com", arch: "amd64" },
   ],
   distDir: "/data/dist",
+  agentNotes: [],
+  panelNotes: [],
 };
 
 describe("Updates on the edge", () => {

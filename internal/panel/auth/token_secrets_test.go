@@ -25,6 +25,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.PanelBuild.has_release_key":          "a bool",
 		"mistgate.admin.v1.PanelBuild.release_key_fingerprint":  "the fingerprint of the public release key",
 		"mistgate.admin.v1.PanelUpdate.url":                     "a public link to the official GitHub release",
+		"mistgate.admin.v1.ReleaseNote.url":                     "a public link to the official GitHub release",
 		"mistgate.admin.v1.NodeServerAccess.password_generated": "a bool: whether the panel generated the saved password",
 		// The subscription page every user sees (SubscriptionService.Get/UpdateSubscriptionSettings): names, texts and public
 		// app links, no user's link or password.

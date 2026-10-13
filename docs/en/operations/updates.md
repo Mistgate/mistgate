@@ -68,6 +68,12 @@ From top to bottom, by what needs you:
 
 "No guard against repeated crashes" under a node means its service file has no crash-loop guard: only the agent's own 5-minute self-rollback protects an update there. If Health → Doctor offers **Refresh the service**, apply it there; the agent restarts and connections can drop for a few seconds. For an agent too old to offer the fix, run `mistgate-node install` with a current binary once.
 
+### What's new
+
+Under the top card and in the panel's line the page lists what the update brings, so you can tell whether to do it now or later: the notes of every stable release newer than your oldest node agent, up to the bundle on the panel (and, for the panel, every release between this one and the one it can install). The newest version is shown in full, with **Show all** when it is long; the earlier ones are folded behind "and N earlier versions". The notes appear in the language of the interface (English when the release has none in it).
+
+The text is the description of the release on GitHub, read by the panel over HTTPS from the official repository on the same schedule as the release check. It is informational and **not signed**: only the manifests are. Nothing is decided from it except one badge. A release whose notes have a **Security** section (a heading "Security", "Безопасность" or "安全") is marked **Security fixes**, and the card then says that the update includes security fixes and is worth doing soon. Without such a section the page says nothing about urgency. Without a trusted bundle, or when the panel could not read the notes (for example on the [Cloudflare edition](../getting-started/install-edge.md), which has no node bundle), the block is simply absent.
+
 ## Update a node
 
 ### Everything that can be updated, in one rollout

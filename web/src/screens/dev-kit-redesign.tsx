@@ -259,6 +259,8 @@ const page = (over: object) => ({
   },
   bundle,
   distDir: "/var/lib/mistgate/dist",
+  agentNotes: [],
+  panelNotes: [],
   ...over,
 });
 const doneStep = (nodeId: string, nodeName: string, stage: number, from: number) => ({ nodeId, nodeName, stage, state: StepState.PASSED, fromVersion: V_OLD, fromBuilt: B_OLD, startedUnix: NOW - from, finishedUnix: NOW - from + 420, errorKey: "", params: {} });
@@ -328,6 +330,95 @@ const untrusted = page({
   nodes: [upNode({ state: NodeUpdateState.OUTDATED, version: V_OLD, built: B_OLD }), upNode({ nodeId: "nod_fi1", name: "fi1", state: NodeUpdateState.OFFLINE, version: V_OLD, built: B_OLD, address: "fi1.example.com" })],
 });
 
+const NL = String.fromCharCode(10);
+// "What's new": release notes shaped like the real GitHub releases (English, Russian and, from the next releases, Chinese).
+const relNote = (version: string, ago: number, over: object) => ({
+  version,
+  url: `https://github.com/Mistgate/mistgate/releases/tag/${version}`,
+  publishedUnix: NOW - ago,
+  en: "",
+  ru: "",
+  zh: "",
+  security: false,
+  ...over,
+});
+const notes24 = relNote("v0.1.24", 6 * H, {
+  en: [
+    "## Features",
+    "",
+    "- **Node page:** the events tab keeps its filters when you switch between nodes.",
+    "- The Users list sorts by any column and counts a user's devices in its header.",
+    "  - the sort happens on the server, so it stays right on the second page",
+    "  - the choice is kept per device",
+    "- `mistgate-node version` prints the key fingerprint the agent carries.",
+    "",
+    "## Fixes",
+    "",
+    "- A doctor fix that the node answers with \"nothing to do\" now re-runs the node's checks.",
+    "- The user page named eight built-in DNS presets in Russian whatever the visitor's language, see [the docs](https://mistgate.app/en/).",
+    "- In English the admin quotes names with “ ” instead of « ».",
+  ].join(NL),
+  ru: [
+    "## Возможности",
+    "",
+    "- **Страница ноды:** вкладка событий помнит фильтры при переходе между нодами.",
+    "- Список пользователей сортируется по любому столбцу и считает устройства в заголовке.",
+    "  - сортировка идёт на сервере, поэтому верна и на второй странице",
+    "  - выбор запоминается на устройстве",
+    "- `mistgate-node version` печатает отпечаток ключа, который несёт агент.",
+    "",
+    "## Исправления",
+    "",
+    "- Исправление доктора, на которое нода ответила «нечего делать», теперь перезапускает проверки ноды.",
+    "- Страница пользователя называла восемь встроенных DNS-пресетов по-русски на любом языке посетителя, см. [документацию](https://mistgate.app/ru/).",
+    "- В английском интерфейсе имена в кавычках теперь “ ”, а не « ».",
+  ].join(NL),
+  zh: [
+    "## 新功能",
+    "",
+    "- **节点页面：** 在节点之间切换时，事件标签页会保留筛选条件。",
+    "- 用户列表可按任意列排序，并在表头显示设备数量。",
+    "- `mistgate-node version` 会显示 Agent 内置密钥的指纹。",
+    "",
+    "## 修复",
+    "",
+    "- 节点回答「无需处理」的医生修复，现在会重新运行该节点的检查。",
+    "- 无论访客使用什么语言，用户页面都曾用俄语显示八个内置 DNS 预设。",
+  ].join(NL),
+});
+const notes23 = relNote("v0.1.23", 4 * D, {
+  en: ["## Security", "", "- A node enrolment link can no longer be reused after the node has joined.", "- The admin session cookie is now `SameSite=Strict`.", "", "## Fixes", "", "- Backups list the newest archive first."].join(NL),
+  ru: ["## Безопасность", "", "- Ссылку для подключения ноды нельзя использовать повторно после входа ноды.", "- Cookie сессии админки теперь `SameSite=Strict`.", "", "## Исправления", "", "- Резервные копии показываются от новых к старым."].join(NL),
+  security: true,
+});
+const notes22 = relNote("v0.1.22", 9 * D, {
+  en: ["## Fixes", "", "- The Updates page no longer shows a finished rollout as running after a panel restart."].join(NL),
+  ru: ["## Исправления", "", "- Страница «Обновления» больше не показывает завершённую раскатку как идущую после перезапуска панели."].join(NL),
+});
+export const availableNotes = page({
+  nodes: [
+    upNode({ nodeId: "nod_de1", name: "de1", version: "v0.1.21", built: B_OLD, state: NodeUpdateState.OUTDATED, onlineUsers: 5 }),
+    upNode({ nodeId: "nod_fi1", name: "fi1", version: "v0.1.22", built: B_OLD, state: NodeUpdateState.OUTDATED, onlineUsers: 1, address: "fi1.example.com" }),
+    upNode({ nodeId: "nod_nl1", name: "nl1", onlineUsers: 2, address: "nl1.example.com" }),
+    upNode({ nodeId: "nod_se1", name: "se1", onlineUsers: 3, address: "se1.example.com" }),
+  ],
+  agentNotes: [notes24, notes23, notes22],
+});
+export const panelOfferNotes = page({
+  panel: {
+    version: "v0.1.23",
+    built: B_NEW,
+    hasReleaseKey: true,
+    releaseKeyFingerprint: "abcd1234abcd1234",
+    update: { version: "v0.1.24", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.24", publishedUnix: NOW - H, checkedUnix: NOW - 300, available: true, supported: true, installable: true, installing: false, errorKey: "", built: NOW - H, sha256: "77ab10123456789abcdef0123456789abcdef0123456789abcdef0123456789a" },
+  },
+  nodes: [
+    upNode({ nodeId: "nod_de1", name: "de1" }),
+    upNode({ nodeId: "nod_fi1", name: "fi1", address: "fi1.example.com" }),
+  ],
+  panelNotes: [notes24],
+});
+
 export function UpdatesKit() {
   return (
     <div className="relative left-1/2 flex w-[min(calc(100vw-2rem),1100px)] -translate-x-1/2 flex-col gap-10">
@@ -338,6 +429,12 @@ export function UpdatesKit() {
         <UpdatesScreen />
       </Shot>
       <Shot id="updates-panel" title="Updates: every node current, a signed panel release is out" seed={[[updatesQuery.queryKey, panelOffer]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-notes" title="Updates: what's new in the node card (a security fix among the versions) and in the panel card" seed={[[updatesQuery.queryKey, availableNotes]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-notes-panel" title="Updates: what's new in the panel card, a signed release is out" seed={[[updatesQuery.queryKey, panelOfferNotes]]}>
         <UpdatesScreen />
       </Shot>
       <Shot id="updates-untrusted" title="Updates: the bundle failed the check (its details open by themselves)" seed={[[updatesQuery.queryKey, untrusted]]}>

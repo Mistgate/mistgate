@@ -760,3 +760,104 @@ describe("the rollout window follows the server's batch plan", () => {
     expect(dialog()!.textContent).not.toContain("at a time");
   });
 });
+describe("What's new", () => {
+  const note = (version: string, over: Record<string, unknown> = {}) => ({
+    version,
+    url: `https://github.com/Mistgate/mistgate/releases/tag/${version}`,
+    publishedUnix: 1_790_000_000,
+    en: `## Fixes\n\n- Fix in ${version}.`,
+    ru: `## Исправления\n\n- Исправление в ${version}.`,
+    zh: "",
+    security: false,
+    ...over,
+  });
+  const behind = (over: Record<string, unknown> = {}) =>
+    page({
+      bundle: bundle({ version: "v0.1.40" }),
+      nodes: [node({ nodeId: "nod_1", name: "de1", version: "v0.1.37", state: NodeUpdateState.OUTDATED })],
+      agentNotes: [note("v0.1.40"), note("v0.1.39"), note("v0.1.38")],
+      ...over,
+    });
+  const remount = async (data: unknown) => {
+    await act(async () => root!.unmount());
+    host!.remove();
+    await mount(data);
+  };
+  const article = (version: string) => [...document.querySelectorAll("article")].find((x) => x.getAttribute("aria-label") === version);
+
+  it("shows the newest release in the node card and folds the earlier ones", async () => {
+    await mount(behind());
+    expect(text()).toContain("What’s new");
+    expect(text()).toContain("Fix in v0.1.40.");
+    expect(text()).not.toContain("Fix in v0.1.39.");
+    expect(text()).toContain("The text is not signed");
+    // no pressure without a security section
+    expect(text()).not.toContain("Security fixes");
+    expect(text()).not.toContain("update soon");
+    await click(button("and 2 earlier versions"));
+    expect(text()).toContain("Fix in v0.1.39.");
+    expect(text()).toContain("Fix in v0.1.38.");
+    expect(button("Hide earlier versions")).toBeTruthy();
+    await click(button("Hide earlier versions"));
+    expect(text()).not.toContain("Fix in v0.1.38.");
+    // the version links to its GitHub page, safely
+    const a = document.querySelector('a[href="https://github.com/Mistgate/mistgate/releases/tag/v0.1.40"]')!;
+    expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("badges a release with security fixes and says so plainly", async () => {
+    await mount(behind({ agentNotes: [note("v0.1.40"), note("v0.1.39", { security: true, en: "## Security\n\n- Fixed a hole." })] }));
+    expect(text()).toContain("Includes security fixes — update soon.");
+    // the badge is on the release that has the fixes, which is folded here
+    expect(text()).not.toContain("Fixed a hole.");
+    await click(button("and 1 earlier version"));
+    expect(text()).toContain("Fixed a hole.");
+    expect(article("v0.1.39")?.textContent).toContain("Security fixes");
+    expect(article("v0.1.40")?.textContent).not.toContain("Security fixes");
+  });
+
+  it("clamps a long release and offers Show all", async () => {
+    const long = Array.from({ length: 14 }, (_, i) => `- line ${i}`).join("\n");
+    await mount(behind({ agentNotes: [note("v0.1.40", { en: long })] }));
+    expect(document.querySelector("article div.max-h-56")).toBeTruthy();
+    await click(button("Show all"));
+    expect(document.querySelector("article div.max-h-56")).toBeNull();
+    expect(button("Show less")).toBeTruthy();
+    // a short one has no button
+    await remount(behind({ agentNotes: [note("v0.1.40")] }));
+    expect(button("Show all")).toBeUndefined();
+    expect(text()).not.toContain("earlier version");
+  });
+
+  it("shows the panel's notes in the panel card, only for a verified release", async () => {
+    const update = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+    await mount(page({ panel: { ...page().panel, update }, panelNotes: [note("v0.3.0", { en: "- Panel thing." }), note("v0.2.5")] }));
+    expect(text()).toContain("Panel thing.");
+    expect(text()).toContain("and 1 earlier version");
+    await remount(page({ panel: { ...page().panel, update }, panelNotes: [] }));
+    expect(text()).not.toContain("What’s new");
+  });
+
+  it("is absent without notes (the edition, nothing behind) and while a rollout runs", async () => {
+    await mount(behind({ agentNotes: [] }));
+    expect(text()).not.toContain("What’s new");
+    await remount(behind({ rollout: rollout({ steps: [step()] }) }));
+    expect(text()).not.toContain("What’s new");
+  });
+
+  it("reads the notes in the interface language, with English as the fallback", async () => {
+    const { setLang } = await import("@/i18n");
+    try {
+      act(() => setLang("ru"));
+      await mount(behind({ agentNotes: [note("v0.1.40")] }));
+      expect(text()).toContain("Что нового");
+      expect(text()).toContain("Исправление в v0.1.40.");
+      act(() => setLang("zh"));
+      await remount(behind({ agentNotes: [note("v0.1.40")] }));
+      expect(text()).toContain("更新内容");
+      expect(text()).toContain("Fix in v0.1.40."); // the release has no Chinese text: English
+    } finally {
+      act(() => setLang("en"));
+    }
+  });
+});
