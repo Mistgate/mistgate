@@ -124,9 +124,15 @@ describe("the people list", () => {
   it("marks an active person who would get nothing, with the reason on hover", async () => {
     await mount();
     expect(text()).toContain("App"); // the column
+    // the table: a mark without words, named (with the reason) for a screen reader and in its tooltip
+    expect([...document.querySelectorAll("table [role=img][tabindex='0']")].map((d) => d.getAttribute("aria-label"))).toEqual([
+      "No access. Gets nothing yet: no profile of the group runs on a node", // Anna
+      "Active", // Boris gets something
+      "Disabled", // Clara
+    ]);
+    // the phone card says it in words, the reason on hover
     const marks = [...document.querySelectorAll<HTMLElement>("[title]")].filter((e) => e.textContent?.includes("No access"));
-    // Anna (twice: the table and the phone card); Boris gets something, Clara is disabled
-    expect(marks.length).toBe(2);
+    expect(marks.length).toBe(1);
     expect(marks[0]!.title).toBe("Gets nothing yet: no profile of the group runs on a node");
   });
 
@@ -140,8 +146,8 @@ describe("the people list", () => {
       counts: { all: 2, online: 1, expiring: 0, overQuota: 0 },
     });
     await mount();
-    const table = document.querySelector<HTMLElement>(".md\\:block")!;
-    const now = [...table.querySelectorAll<HTMLElement>("span")].find((s) => s.textContent === "now")!;
+    const table = document.querySelector<HTMLElement>("table")!;
+    const now = [...table.querySelectorAll<HTMLElement>("span")].filter((s) => s.textContent === "now").at(-1)!; // the innermost
     const cell = now.closest<HTMLElement>(".tone-ok")!;
     expect(cell.className).toContain("tone-text");
     expect(cell.querySelector(".tone-ok.rounded-full")).not.toBeNull(); // the dot
@@ -170,7 +176,7 @@ describe("the people list", () => {
     expect(chip("grp_empty")[0]!.dataset.tone).toBe("mint");
     expect(chip("grp_old")[0]!.dataset.tone).toBe(groupTone("grp_old")); // none stored: the id's tone
   });
-  it("shows the apps as a Link chip, a Keys chip, both or a dash, with the whole wording for a screen reader", async () => {
+  it("shows the apps as a link icon chip, a keys icon chip, both or nothing, with the whole wording for a screen reader", async () => {
     listUsers.mockResolvedValue({
       users: [
         person({ id: "usr_l", name: "L", accessHapp: true, via: [App.HAPP] }),
@@ -182,19 +188,76 @@ describe("the people list", () => {
       counts: { all: 4, online: 0, expiring: 0, overQuota: 0 },
     });
     await mount();
-    const table = document.querySelector<HTMLElement>(".md\\:block")!;
+    const table = document.querySelector<HTMLElement>("table")!;
     const rows = [...table.querySelectorAll<HTMLElement>("tr.cursor-pointer")];
-    const via = (row: HTMLElement) => row.querySelector<HTMLElement>('[role="img"]');
-    const chips = (row: HTMLElement) => [...via(row)!.querySelectorAll<HTMLElement>(".tone-chip")].map((c) => `${c.dataset.tone}:${c.textContent}`);
-    expect(chips(rows[0]!)).toEqual(["sky:Link"]);
+    const via = (row: HTMLElement) => [...row.querySelectorAll<HTMLElement>('[role="img"]')].find((e) => e.querySelector(".tone-chip"));
+    // icon only: each chip names itself on hover and holds no text
+    const chips = (row: HTMLElement) => [...via(row)!.querySelectorAll<HTMLElement>(".tone-chip")].map((c) => `${c.dataset.tone}:${c.title}:${c.textContent}`);
+    expect(chips(rows[0]!)).toEqual(["sky:Subscription link:"]);
     expect(via(rows[0]!)!.getAttribute("aria-label")).toBe("Subscription link");
-    expect(chips(rows[1]!)).toEqual(["mint:Keys"]);
+    expect(chips(rows[1]!)).toEqual(["mint:AmneziaVPN keys:"]);
     expect(via(rows[1]!)!.getAttribute("aria-label")).toBe("AmneziaVPN keys");
-    expect(chips(rows[2]!)).toEqual(["sky:Link", "mint:Keys"]);
-    expect(via(rows[2]!)!.title).toBe("Link + AmneziaVPN keys");
-    expect(via(rows[3]!)).toBeNull();
-    expect(rows[3]!.textContent).toContain("—");
+    expect(chips(rows[2]!)).toEqual(["sky:Subscription link:", "mint:AmneziaVPN keys:"]);
+    expect(via(rows[2]!)!.getAttribute("aria-label")).toBe("Link + AmneziaVPN keys");
+    expect(via(rows[3]!)).toBeUndefined();
     expect(text()).not.toContain("Both");
+  });
+
+  it("shows the status as a mark without words: a quiet dot when healthy, a glyph on its colour for a problem", async () => {
+    listUsers.mockResolvedValue({
+      users: [
+        person({ id: "usr_ok", name: "Fine", accessHapp: true }),
+        person({ id: "usr_full", name: "Full", accessHapp: true, devicesUsed: 5, deviceLimit: 5 }),
+        person({ id: "usr_exp", name: "Gone", accessHapp: true, status: UserStatus.EXPIRED }),
+        person({ id: "usr_off", name: "Paused", accessHapp: true, status: UserStatus.DISABLED }),
+      ],
+      nextPageToken: "",
+      counts: { all: 4, online: 0, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    const table = document.querySelector("table")!;
+    const dot = (name: string) => [...table.querySelectorAll("tr")].find((r) => r.textContent?.includes(name))!.querySelector<HTMLElement>("[role=img][tabindex='0']")!;
+    expect(dot("Fine").getAttribute("aria-label")).toBe("Active");
+    expect(dot("Fine").textContent).toBe(""); // a plain dot
+    expect(dot("Fine").querySelector(".tone-ok.rounded-full")).not.toBeNull();
+    // a problem reads by its shape as well as its hue
+    expect([dot("Full"), dot("Gone"), dot("Paused")].map((d) => `${d.getAttribute("aria-label")}:${d.textContent}`)).toEqual(["Device limit:!", "Expired:×", "Disabled:–"]);
+    expect(dot("Full").querySelector(".tone-warn")).not.toBeNull();
+    expect(dot("Gone").querySelector(".tone-bad")).not.toBeNull();
+    expect(dot("Paused").querySelector(".tone-off")).not.toBeNull();
+    // no status word in the table; the phone card says a problem in words and nothing about a healthy person
+    expect(table.querySelector("tbody")!.textContent).not.toMatch(/Active|Device limit|Expired|Disabled/);
+    const cards = [...document.querySelectorAll<HTMLElement>("div.cursor-pointer")];
+    expect(cards[0]!.textContent).not.toContain("Active");
+    expect(cards[1]!.textContent).toContain("Device limit");
+  });
+
+  it("names the status in a tooltip when the mark gets the keyboard focus", async () => {
+    listUsers.mockResolvedValue({
+      users: [person({ id: "usr_ok", name: "Fine", accessHapp: true })],
+      nextPageToken: "",
+      counts: { all: 1, online: 0, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    expect(text()).not.toContain("Active");
+    const dot = document.querySelector<HTMLElement>("table [role=img][tabindex='0']")!;
+    await act(async () => dot.focus());
+    await settle();
+    expect(text()).toContain("Active");
+  });
+
+  it("puts the node of an online person next to the word now, as a link to the node", async () => {
+    listUsers.mockResolvedValue({
+      users: [person({ id: "usr_on", name: "Online", online: true, accessHapp: true, currentNodeId: "nod_1", currentNodeName: "de1" })],
+      nextPageToken: "",
+      counts: { all: 1, online: 1, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    const seen = [...document.querySelector("table")!.querySelectorAll("td")].at(-1)!;
+    expect(seen.textContent).toBe("now·de1");
+    const node = seen.querySelector<HTMLAnchorElement>("a")!;
+    expect(node.getAttribute("href")).toBe("/nodes/$id");
+    expect(JSON.parse(node.dataset.params!)).toEqual({ id: "nod_1" });
   });
 
   it("names the group as a link to it", async () => {
@@ -289,11 +352,11 @@ describe("the people list, sorted", () => {
   // the shell's own count query asks for one row; the list is the other
   const lastCall = () => listUsers.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((r) => r.pageSize !== 1).at(-1)!;
 
-  it("makes the seven sortable headers real buttons, and leaves App and Node plain", async () => {
+  it("makes the seven sortable headers real buttons, and leaves App plain", async () => {
     await mount();
     for (const label of ["Name", "Status", "Group", "Dev.", "Traffic", "Term", "Last seen"]) expect(sortBtn(label), label).toBeInstanceOf(HTMLButtonElement);
     expect(th("App").querySelector("button")).toBeNull();
-    expect(th("Node").querySelector("button")).toBeNull();
+    expect(th("Node")).toBeUndefined(); // the node is in "Last seen" now
   });
 
   it("sorts by name, ascending, until the URL says otherwise; only that header has aria-sort", async () => {

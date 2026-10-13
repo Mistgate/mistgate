@@ -78,17 +78,23 @@ export const shownText: Record<Shown, string> = {
   disabled: "text-faint",
 };
 
-/** "12.3 / 100 GB" (the number shares the quota's unit) and the bar fill; unlimited quota has no bar. */
+/**
+ * Traffic against the quota: `used` in the quota's unit ("182", "3.4") and `of` the quota ("500 GB"), or `used` with its
+ * own unit and `of` "" when there is no quota. One decimal under 10 only: a list reads "405 / 500 GB", not "405.0".
+ * The bar is quiet while there is room, amber from 80%, red once the quota is used up.
+ */
 export function usage(used: number, quota: number, fmt: Fmt) {
-  if (quota <= 0) return { text: fmt.bytes(used), pct: 0, tone: "ok" as const };
+  if (quota <= 0) return { used: fmt.bytes(used), of: "", text: fmt.bytes(used), pct: 0, tone: "ok" as const };
   const { unit } = scaleBytes(quota);
-  const n = fmt.num(used / 1000 ** unit, 1, true);
+  const v = used / 1000 ** unit;
+  const n = fmt.num(v, v > 0 && v < 10 ? 1 : 0);
+  const of = fmt.bytes(quota);
   const pct = used / quota;
-  return { text: `${n} / ${fmt.bytes(quota)}`, pct, tone: pct > 1 ? ("over" as const) : pct >= 0.8 ? ("high" as const) : ("ok" as const) };
+  return { used: n, of, text: `${n} / ${of}`, pct, tone: pct >= 1 ? ("over" as const) : pct >= 0.8 ? ("high" as const) : ("ok" as const) };
 }
 
 export const barTone = {
-  ok: "bg-[color-mix(in_oklch,var(--accent)_70%,var(--surface))]",
+  ok: "bg-[color-mix(in_oklch,var(--muted)_70%,var(--surface))]",
   high: "bg-warn",
   over: "bg-danger",
 } as const;
@@ -103,11 +109,11 @@ export function seenText(u: User, t: Tx, now = nowSec()): string {
   return u.online ? t("users.now") : agoText(u.lastSeenUnix, t, now);
 }
 
-/** Term column: days left ("0" once expired: the status pill already says so), or "∞" for no expiry. */
+/** Term column: days left ("0 d", red, once expired), or "∞" for no expiry; a week or less is in the text colour. */
 export function termText(u: User, t: Tx, now = nowSec()): { text: string; tone: "muted" | "fg" | "bad" } {
   const d = daysLeft(u.expiresUnix, now);
   if (d === null) return { text: "∞", tone: "muted" };
-  if (u.expiresUnix <= now) return { text: "0", tone: "bad" };
+  if (u.expiresUnix <= now) return { text: t("users.days", { n: 0 }), tone: "bad" };
   return { text: t("users.days", { n: d }), tone: d <= 7 ? "fg" : "muted" };
 }
 

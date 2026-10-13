@@ -52,7 +52,7 @@ export function StatusPill({
   glyphOnly?: boolean;
 }) {
   const t = useT();
-  const { glyph, word } = kinds[kind];
+  const { word } = kinds[kind];
   const text = glyphOnly ? "" : (label ?? t(word));
   return (
     <span
@@ -63,20 +63,26 @@ export function StatusPill({
         glyphOnly ? "h-5 px-0.5" : sm ? "h-[22px] pr-2 pl-1 text-[11px]" : "h-[26px] pr-2.5 pl-1.5 text-xs",
       )}
     >
-      <span
-        aria-hidden
-        className={cx(
-          "box-border grid size-3.5 flex-none place-items-center rounded-full text-[10px] font-extrabold text-on-accent",
-          kind === "busy" ? "animate-[mg-ui-spin_1s_linear_infinite] border-2 border-(color:--c) border-t-transparent" : "bg-(--c)",
-        )}
-      >
-        {kind === "ok" ? (
-          <span className="-mt-0.5 h-1.5 w-[3px] rotate-45 border-r-2 border-b-2 border-on-accent" />
-        ) : (
-          glyph
-        )}
-      </span>
+      <StatusGlyph kind={kind} />
       {text}
+    </span>
+  );
+}
+
+/**
+ * The pill's round 14px glyph on its own: a tick, "!", "×" or "–" on the status colour, so a state reads by its shape as
+ * well as its hue. Decorative: whoever shows it names the state (aria-label, a word beside it).
+ */
+export function StatusGlyph({ kind }: { kind: StatusKind }) {
+  return (
+    <span
+      aria-hidden
+      className={cx(
+        `tone-${kind} box-border grid size-3.5 flex-none place-items-center rounded-full text-[10px] leading-none font-extrabold text-on-accent`,
+        kind === "busy" ? "animate-[mg-ui-spin_1s_linear_infinite] border-2 border-(color:--c) border-t-transparent" : "bg-(--c)",
+      )}
+    >
+      {kind === "ok" ? <span className="-mt-0.5 h-1.5 w-[3px] rotate-45 border-r-2 border-b-2 border-on-accent" /> : kinds[kind].glyph}
     </span>
   );
 }

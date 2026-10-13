@@ -284,7 +284,7 @@ export const ru: typeof en = {
   "users.filter.over": "Превысил квоту",
   "users.col.name": "Имя",
   "users.col.status": "Статус",
-  "users.col.via": "Приложение",
+  "users.col.via": "Прил.",
   "users.col.group": "Группа",
   "users.col.devices": "Устр.",
   "users.col.traffic": "Трафик",

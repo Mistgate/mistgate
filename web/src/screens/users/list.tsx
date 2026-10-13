@@ -11,7 +11,8 @@ import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
-import { StatusDot } from "@/components/ui/status";
+import { kindTextClass, StatusDot, StatusGlyph, type StatusKind } from "@/components/ui/status";
+import { Tip } from "@/components/ui/tooltip";
 import { Tabs } from "@/components/ui/tabs";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -22,7 +23,7 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { clampPage, useMove, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
 import { CreateUserModal } from "./create-user";
-import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, shownText, termText, usage, viaOf } from "./format";
+import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, termText, usage, viaOf } from "./format";
 import { GroupChip, GroupsTab } from "./groups";
 import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
@@ -53,22 +54,23 @@ const sortValue: Record<SortId, UserSort> = {
   seen: UserSort.LAST_SEEN,
 };
 
-// One grid for the header and every row keeps the columns aligned: check, name, status, app, group, devices,
-// traffic, term, last seen, node.
-const cols = "grid-cols-[18px_minmax(96px,1.3fr)_124px_128px_minmax(64px,0.7fr)_58px_minmax(104px,1.2fr)_56px_106px_minmax(40px,0.5fr)]";
-
-// the header's cells: the sortable ones name the order they set (the term column sorts by the expiry time)
-const columns: readonly { id: "name" | "status" | "via" | "group" | "devices" | "traffic" | "term" | "seen" | "node"; sort?: SortId }[] = [
+// The table's columns. A real table with fixed layout: each header cell sets its width (padding included), the name
+// takes the rest, so nothing overlaps. The status is a mark before the name (its header an icon), like the nodes list's
+// dot. As the list narrows the traffic column slims down and the columns go in this order: App (under 900px), Devices
+// (under 840), Group (under 700), Term (under 640); under 600 the list is cards. The sortable ones name the order they
+// set (the term column sorts by the expiry time). The classes are whole strings, for Tailwind to find.
+type ColId = "name" | "status" | "via" | "group" | "devices" | "traffic" | "term" | "seen";
+const columns: readonly { id: ColId; sort?: SortId; cls?: string; end?: boolean; icon?: IconName }[] = [
+  { id: "status", sort: "status", cls: "w-11 text-center", icon: "pulse" },
   { id: "name", sort: "name" },
-  { id: "status", sort: "status" },
-  { id: "via" },
-  { id: "group", sort: "group" },
-  { id: "devices", sort: "devices" },
-  { id: "traffic", sort: "traffic" },
-  { id: "term", sort: "expiry" },
-  { id: "seen", sort: "seen" },
-  { id: "node" },
+  { id: "via", cls: "hidden w-16 @min-[900px]:table-cell" },
+  { id: "group", sort: "group", cls: "hidden w-28 @min-[700px]:table-cell" },
+  { id: "devices", sort: "devices", cls: "hidden w-[72px] @min-[840px]:table-cell", end: true },
+  { id: "traffic", sort: "traffic", cls: "w-[172px] pl-6 @min-[900px]:w-[196px]", end: true },
+  { id: "term", sort: "expiry", cls: "hidden w-[68px] @min-[640px]:table-cell", end: true },
+  { id: "seen", sort: "seen", cls: "w-32 pr-4", end: true },
 ];
+const col = Object.fromEntries(columns.map((c) => [c.id, cx("px-2", c.cls, c.end && "text-right")])) as Record<ColId, string>;
 
 type Search = { create?: boolean; group?: string; tab?: "groups" };
 
@@ -240,8 +242,9 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
   };
   const hasNone = !list.isPending && counts?.all === 0 && filter === "all" && query === "" && groupId === "";
 
+  // a container: the table's columns, and the switch to cards, follow the width the list really has (not the window's)
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="@container flex flex-col gap-3.5">
       {hasNone ? (
         <Card lg className="border-dashed">
           <EmptyState
@@ -323,25 +326,25 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                 <p className="p-8 text-center text-[13px] text-muted">{t("users.empty")}</p>
               ) : (
                 <>
-                  <Card lg className="hidden overflow-hidden md:block">
-                    <table className="block w-full text-left">
-                      <thead className="block">
-                        <tr className={cx("grid h-[38px] items-center gap-2.5 border-b border-line px-4 text-[11px] font-bold tracking-[0.06em] text-muted uppercase", cols)}>
-                          <th scope="col" className="p-0">
+                  <Card lg className="hidden overflow-hidden @min-[600px]:block">
+                    <table className="w-full table-fixed text-left">
+                      <thead>
+                        <tr className="h-10 border-b border-line text-[11px] font-bold tracking-[0.06em] text-muted uppercase">
+                          <th scope="col" className="w-[42px] pr-2 pl-4">
                             <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
                           </th>
                           {columns.map((c) =>
                             c.sort ? (
-                              <SortTh key={c.id} id={c.sort} order={order} onSort={(id) => setSort(clickSort(order, id))} label={t(`users.col.${c.id}`)} />
+                              <SortTh key={c.id} id={c.sort} order={order} onSort={(id) => setSort(clickSort(order, id))} label={t(`users.col.${c.id}`)} end={c.end} icon={c.icon} className={col[c.id]} />
                             ) : (
-                              <th key={c.id} scope="col" className="min-w-0 truncate p-0">
+                              <th key={c.id} scope="col" className={cx("truncate font-bold", col[c.id])}>
                                 {t(`users.col.${c.id}`)}
                               </th>
                             ),
                           )}
                         </tr>
                       </thead>
-                      <tbody className={cx("block transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
+                      <tbody className={cx("transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
                         {rows.map((u) => (
                           <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
                         ))}
@@ -349,7 +352,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                     </table>
                     <Pagination className="px-4" {...pager} />
                   </Card>
-                  <div className="flex flex-col gap-2 md:hidden">
+                  <div className="flex flex-col gap-2 @min-[600px]:hidden">
                     <div className={cx("flex flex-col gap-2 transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
                       {rows.map((u) => (
                         <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
@@ -432,35 +435,54 @@ function Summary({ counts, t }: { counts: { all: number; online: number; devices
 /**
  * A column header that sorts: a real button in the <th>, the order on the <th> for a screen reader. The arrow is the
  * current direction; on the others it is a faint hint of the first one, shown on hover and focus only (its room stays).
+ * A right-aligned column (`end`) keeps its label flush right and puts the arrow before it. A narrow one shows an `icon`
+ * instead of its label: the label is then its accessible name and its tooltip.
  */
-function SortTh({ id, order, onSort, label }: { id: SortId; order: SortState; onSort: (id: SortId) => void; label: string }) {
+function SortTh({ id, order, onSort, label, end, icon, className }: { id: SortId; order: SortState; onSort: (id: SortId) => void; label: string; end?: boolean; icon?: IconName; className?: string }) {
   const active = order.sort === id;
   const desc = active ? order.desc : firstDesc[id];
-  return (
-    <th scope="col" aria-sort={active ? (order.desc ? "descending" : "ascending") : undefined} className="min-w-0 p-0">
-      <button
-        type="button"
-        onClick={() => onSort(id)}
-        className={cx(
-          "group/sort flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-[length:inherit] font-[inherit] tracking-[inherit] uppercase transition-colors duration-200 hover:text-fg",
-          active && "text-fg",
-        )}
-      >
+  const button = (
+    <button
+      type="button"
+      onClick={() => onSort(id)}
+      className={cx(
+        "group/sort inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm align-middle text-[length:inherit] font-[inherit] tracking-[inherit] uppercase transition-colors duration-200 hover:text-fg",
+        end && "flex-row-reverse",
+        icon && "relative",
+        active && "text-fg",
+      )}
+    >
+      {icon ? (
+        <>
+          <Icon name={icon} size={13} />
+          <span className="sr-only">{label}</span>
+        </>
+      ) : (
         <span className="truncate">{label}</span>
-        <Icon
-          name={desc ? "arrowDown" : "arrowUp"}
-          size={11}
-          className={cx("transition-opacity duration-200", active ? "opacity-100" : "opacity-0 group-hover/sort:opacity-40 group-focus-visible/sort:opacity-40")}
-        />
-      </button>
+      )}
+      <Icon
+        name={desc ? "arrowDown" : "arrowUp"}
+        size={11}
+        className={cx(
+          "transition-opacity duration-200",
+          // beside an icon the arrow hangs off to the right, so the icon stays on the axis of the marks under it
+          icon && "absolute top-1/2 left-full ml-0.5 -translate-y-1/2",
+          active ? "opacity-100" : "opacity-0 group-hover/sort:opacity-40 group-focus-visible/sort:opacity-40",
+        )}
+      />
+    </button>
+  );
+  return (
+    <th scope="col" aria-sort={active ? (order.desc ? "descending" : "ascending") : undefined} className={cx("font-bold", className)}>
+      {icon ? <Tip label={label}>{button}</Tip> : button}
     </th>
   );
 }
 
-/** On the phone the list is cards without headers: the same choice as a small select and a direction button. */
+/** Where the list is cards (a phone, a narrow window) there are no headers: the same choice as a small select and a direction button. */
 function SortPick({ order, onSort, t }: { order: SortState; onSort: (next: SortSearch) => void; t: Tx }) {
   return (
-    <div className="flex items-center gap-1.5 md:hidden">
+    <div className="flex items-center gap-1.5 @min-[600px]:hidden">
       <span aria-hidden className="text-xs font-semibold text-muted">
         {t("users.sort")}
       </span>
@@ -482,73 +504,131 @@ function SortPick({ order, onSort, t }: { order: SortState; onSort: (next: SortS
 
 type RowProps = { u: User; group?: Group; t: Tx; fmt: Fmt; now: number; on: boolean; onToggle: () => void; onOpen: () => void };
 
-function UsageBar({ pct, tone }: { pct: number; tone: keyof typeof barTone }) {
+/** A slim usage bar: quiet while there is room, amber near the quota, red once it is used up. */
+function UsageBar({ pct, tone, className }: { pct: number; tone: keyof typeof barTone; className?: string }) {
   return (
-    <div className="h-[3px] rounded-sm bg-surface-2">
-      <div className={cx("h-full rounded-sm", barTone[tone])} style={{ width: `${Math.min(100, pct * 100).toFixed(1)}%` }} />
-    </div>
+    <span aria-hidden className={cx("block h-1 overflow-hidden rounded-full bg-surface-2", className)}>
+      <span className={cx("block h-full rounded-full", barTone[tone])} style={{ width: `${Math.min(100, pct * 100).toFixed(1)}%` }} />
+    </span>
   );
 }
 
-function StatusCell({ u, t }: { u: User; t: Tx }) {
-  const s = shownStatus(u);
+/** "182 / 500 GB": what was used in the text colour (red once the quota is used up), the quota muted; "330 GB / ∞" without one. */
+function UsageText({ use, t }: { use: ReturnType<typeof usage>; t: Tx }) {
   return (
-    <span className={cx("flex min-w-0 items-center gap-[7px] text-xs font-semibold", shownText[s])}>
-      <StatusDot kind={shownKind[s]} />
-      <span className="truncate">{t(shownKey[s])}</span>
+    <span className="font-mono text-xs whitespace-nowrap">
+      <span className={use.tone === "over" ? "text-danger-text" : "text-fg"}>{use.used}</span>
+      <span className="text-muted">
+        {" / "}
+        {use.of || <Inf title={t("users.unlimited")} />}
+      </span>
     </span>
   );
 }
 
 /**
- * The app column: what the person really used lately, as a "Link" chip, a "Keys" chip, both, or "—". An active person whose page would give
- * nothing gets a yellow "No access" instead, with the reason on hover (the group gives nothing, or not for their apps).
+ * The person's state in the list: a status of the API, "devices full", or "no access" (active, but their page would give
+ * nothing; `why` says why: the group gives nothing, or nothing to the person's apps). `word` is the state's name.
  */
-function AppCell({ u, group, t }: { u: User; group?: Group; t: Tx }) {
-  if (u.status === UserStatus.ACTIVE && !u.accessHapp && !u.accessAmnezia) {
+function stateOf(u: User, group: Group | undefined, t: Tx): { active: boolean; kind: StatusKind; word: string; why?: string } {
+  const s = shownStatus(u);
+  if (s === "active" && !u.accessHapp && !u.accessAmnezia) {
     const groupGivesNothing = !group || (group.happNodes === 0 && group.amneziaNodes === 0);
-    return (
-      <span title={t(groupGivesNothing ? "users.noAccessGroup" : "users.noAccessApps")} className="inline-flex h-[22px] max-w-full items-center gap-1 rounded-[7px] border border-warn-line bg-warn-soft px-1.5 text-[11px] font-bold whitespace-nowrap text-warn-text">
-        <span aria-hidden>!</span>
-        {t("users.noAccess")}
-      </span>
-    );
+    return { active: false, kind: "warn", word: t("users.noAccess"), why: t(groupGivesNothing ? "users.noAccessGroup" : "users.noAccessApps") };
   }
+  return { active: s === "active", kind: shownKind[s], word: t(shownKey[s]) };
+}
+
+/**
+ * The table's status: a mark without words, its name in a tooltip (hover and keyboard focus) and in its aria-label. A
+ * healthy person is a small quiet dot; a problem is the round glyph on its colour, "!" amber, "×" red, "–" grey, so a
+ * state reads by its shape too, not by the hue alone.
+ */
+function StatusCell({ u, group, t }: { u: User; group?: Group; t: Tx }) {
+  const s = stateOf(u, group, t);
+  return (
+    <Tip label={s.why ? <><b className={kindTextClass[s.kind]}>{s.word}</b>{` · ${s.why}`}</> : s.word}>
+      <span role="img" tabIndex={0} aria-label={s.why ? `${s.word}. ${s.why}` : s.word} onClick={stop} className="inline-grid size-3.5 cursor-default place-items-center rounded-full align-middle">
+        {s.active ? <StatusDot kind="ok" /> : <StatusGlyph kind={s.kind} />}
+      </span>
+    </Tip>
+  );
+}
+
+/**
+ * The card's status, in words: nothing for a healthy person, a problem as the dot and its word in its colour. "No
+ * access" says why on hover.
+ */
+function StatusMark({ u, group, t }: { u: User; group?: Group; t: Tx }) {
+  const s = stateOf(u, group, t);
+  if (s.active) return null;
+  return (
+    <span title={s.why ?? s.word} className={cx("flex min-w-0 items-center gap-1.5 text-xs font-semibold", kindTextClass[s.kind])}>
+      <StatusDot kind={s.kind} />
+      <span className="truncate">{s.word}</span>
+    </span>
+  );
+}
+
+/**
+ * The app column: what the person really used lately, as small icon chips, the link (sky) and the keys (mint), tinted
+ * like the subscription page's. Each chip names itself on hover; a screen reader gets the whole wording once.
+ */
+function AppIcons({ u, t }: { u: User; t: Tx }) {
   const { link, keys } = viaOf(u);
-  if (!link && !keys) return <span className="text-xs text-muted">—</span>;
-  // the chips say it short; the whole wording is what a screen reader and the hover get
+  if (!link && !keys) return null;
   const full = t(link && keys ? "users.appsBoth" : link ? "users.appsHapp" : "users.appsAwg");
   return (
-    <span role="img" aria-label={full} title={full} className="flex flex-none items-center gap-1">
-      {link && <ViaChip tone="sky" icon="link" label={t("users.via.link")} />}
-      {keys && <ViaChip tone="mint" icon="key" label={t("users.via.keys")} />}
+    <span role="img" aria-label={full} className="flex flex-none items-center gap-1">
+      {link && <ViaChip tone="sky" icon="link" label={t("users.appsHapp")} />}
+      {keys && <ViaChip tone="mint" icon="key" label={t("users.appsAwg")} />}
     </span>
   );
 }
 
-/** "Link" (sky) and "Keys" (mint): the two ways, tinted like the subscription page's chips. */
 function ViaChip({ tone, icon, label }: { tone: Tone; icon: IconName; label: string }) {
   return (
-    <span data-tone={tone} className="tone-chip inline-flex h-[22px] items-center gap-1 px-1.5 text-[11px] font-bold whitespace-nowrap">
-      <Icon name={icon} size={12} />
-      {label}
+    <span data-tone={tone} title={label} className="tone-chip grid size-[22px] place-items-center">
+      <Icon name={icon} size={13} />
     </span>
   );
 }
 
-/** Last seen: "now" is green (the dot and the word, like every online state); anything else is how long ago, quiet grey. */
-function SeenCell({ u, t, now }: { u: User; t: Tx; now: number }) {
-  if (!u.online) return <span className="truncate text-xs text-muted">{seenText(u, t, now)}</span>;
+/** Last seen: "now" in green with a dot, and the node they are on (not on the narrow cards); anything else is how long ago, quiet grey. */
+function SeenCell({ u, t, now, node = true }: { u: User; t: Tx; now: number; node?: boolean }) {
+  if (!u.online) return <span className={cx("block truncate text-xs", u.lastSeenUnix ? "text-muted" : "text-faint")}>{seenText(u, t, now)}</span>;
   return (
-    <span className="tone-ok tone-text flex min-w-0 items-center gap-1.5 text-xs font-semibold">
-      <StatusDot kind="ok" />
-      <span className="truncate">{t("users.now")}</span>
+    <span className="flex min-w-0 items-center justify-end gap-1.5 text-xs">
+      <span className="tone-ok tone-text flex flex-none items-center gap-1.5 font-semibold">
+        <StatusDot kind="ok" />
+        <span>{t("users.now")}</span>
+      </span>
+      {node && u.currentNodeId && (
+        <>
+          <span aria-hidden className="text-faint">
+            ·
+          </span>
+          <Link to="/nodes/$id" params={{ id: u.currentNodeId }} title={t("users.col.node")} onClick={stop} className="truncate font-mono text-muted hover:text-fg hover:underline">
+            {u.currentNodeName}
+          </Link>
+        </>
+      )}
     </span>
   );
 }
 
-const toneClass = { muted: "text-muted", fg: "text-fg", bad: "text-danger-text" } as const;
+const toneClass = { muted: "text-muted", fg: "font-semibold text-fg", bad: "font-semibold text-danger-text" } as const;
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+/** "2/5"; no limit is "2/∞". */
+const devicesOf = (u: User) => `${u.devicesUsed}/${u.deviceLimit > 0 ? u.deviceLimit : "∞"}`;
+/** ∞ a size up: at 12px the glyph is a speck next to the digits. */
+const Inf = ({ title }: { title: string }) => (
+  <span title={title} className="text-[15px] leading-none">
+    ∞
+  </span>
+);
+/** The term: days left, or ∞ for no expiry. */
+const TermText = ({ u, text, t }: { u: User; text: string; t: Tx }) => (u.expiresUnix === 0 ? <Inf title={t("users.never")} /> : text);
 
 function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
@@ -558,54 +638,56 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
     <tr
       onClick={onOpen}
       className={cx(
-        "grid min-h-[52px] cursor-pointer items-center gap-2.5 border-b border-line px-4 py-1.5 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2",
-        cols,
+        "h-14 cursor-pointer border-b border-line text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2",
         on && "bg-accent-soft hover:bg-accent-soft",
         u.status === UserStatus.DISABLED && "opacity-60",
       )}
     >
-      <td>
+      <td className="pr-2 pl-4">
         <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
       </td>
-      <td className="flex min-w-0 items-center gap-2.5">
-        <Avatar name={u.name} index={avatarIndex(u.id)} />
-        <AppLink to="/users/$id" params={{ id: u.id }} className="truncate font-bold" onClick={stop}>
-          {u.name}
-        </AppLink>
+      <td className={col.status}>
+        <StatusCell u={u} group={group} t={t} />
       </td>
-      <td className="flex min-w-0">
-        <StatusCell u={u} t={t} />
+      <td className={col.name}>
+        <span className="flex min-w-0 items-center gap-2.5">
+          <Avatar name={u.name} index={avatarIndex(u.id)} />
+          <AppLink to="/users/$id" params={{ id: u.id }} title={u.name} className="truncate font-bold" onClick={stop}>
+            {u.name}
+          </AppLink>
+        </span>
       </td>
-      <td className="flex min-w-0">
-        <AppCell u={u} group={group} t={t} />
+      <td className={col.via}>
+        <AppIcons u={u} t={t} />
       </td>
-      <td className="flex min-w-0" onClick={stop}>
-        <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
+      <td className={col.group} onClick={stop}>
+        <span className="flex min-w-0">
+          <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
+        </span>
       </td>
-      <td className={cx("font-mono text-xs", full ? "text-warn" : "text-muted")}>
-        {u.devicesUsed}/{u.deviceLimit}
+      <td className={cx(col.devices, "font-mono text-xs", full ? "font-semibold text-warn-text" : "text-muted")}>{devicesOf(u)}</td>
+      <td className={col.traffic}>
+        <span className="flex items-center gap-3">
+          <UsageBar pct={use.pct} tone={use.tone} className={cx("w-10 min-w-4 @min-[900px]:w-16", u.quotaBytes <= 0 && "invisible")} />
+          <span className="ml-auto flex-none">
+            <UsageText use={use} t={t} />
+          </span>
+        </span>
       </td>
-      <td className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[11px] whitespace-nowrap text-muted">{use.text}</span>
-        <UsageBar pct={use.pct} tone={use.tone} />
+      <td className={cx(col.term, "text-xs whitespace-nowrap", toneClass[term.tone])}>
+        <TermText u={u} text={term.text} t={t} />
       </td>
-      <td className={cx("font-mono text-xs", toneClass[term.tone])}>{term.text}</td>
-      <td className="flex min-w-0">
+      <td className={col.seen}>
         <SeenCell u={u} t={t} now={now} />
-      </td>
-      <td className="truncate font-mono text-xs text-muted">
-        {u.currentNodeId ? (
-          <Link to="/nodes/$id" params={{ id: u.currentNodeId }} onClick={stop} className="hover:text-fg hover:underline">
-            {u.currentNodeName}
-          </Link>
-        ) : (
-          "—"
-        )}
       </td>
     </tr>
   );
 }
 
+/**
+ * The card of the narrow list: the person on the first line (a problem right after the name, when they were last seen on
+ * the right), the group, the apps, the devices and the term under it, the traffic and its bar at the bottom.
+ */
 function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
@@ -622,29 +704,38 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <div className="flex items-center gap-2.5">
         <Check large checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
         <Avatar name={u.name} index={avatarIndex(u.id)} />
-        <AppLink to="/users/$id" params={{ id: u.id }} className="min-w-0 flex-1 truncate text-[15px] font-bold" onClick={stop}>
-          {u.name}
-        </AppLink>
-        <StatusCell u={u} t={t} />
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <AppLink to="/users/$id" params={{ id: u.id }} className="min-w-0 truncate text-[15px] font-bold" onClick={stop}>
+            {u.name}
+          </AppLink>
+          <span className="flex flex-none">
+            <StatusMark u={u} group={group} t={t} />
+          </span>
+        </span>
+        <span className="flex flex-none justify-end">
+          <SeenCell u={u} t={t} now={now} node={false} />
+        </span>
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-        <AppCell u={u} group={group} t={t} />·
-        <span onClick={stop}>
+      <div className="flex items-center gap-2 text-xs text-muted">
+        <span onClick={stop} className="flex min-w-0">
           <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
         </span>
-        ·
-        <span className={cx("font-mono", full && "text-warn")}>
-          {u.devicesUsed}/{u.deviceLimit}
-        </span>
-        ·<span className={cx("font-mono", toneClass[term.tone])}>{term.text}</span>
+        <AppIcons u={u} t={t} />
         <span className="flex-1" />
-        <SeenCell u={u} t={t} now={now} />
+        <span title={t("users.sortBy.devices")} className={cx("flex items-center gap-1 font-mono whitespace-nowrap", full && "font-semibold text-warn-text")}>
+          <Icon name="phone" size={12} />
+          <span className="sr-only">{t("users.sortBy.devices")}</span>
+          {devicesOf(u)}
+        </span>
+        <span title={t("users.col.term")} className={cx("flex items-center gap-1 whitespace-nowrap", toneClass[term.tone])}>
+          <Icon name="calendar" size={12} className="text-muted" />
+          <span className="sr-only">{t("users.col.term")}</span>
+          <TermText u={u} text={term.text} t={t} />
+        </span>
       </div>
-      <div className="flex items-center gap-2.5">
-        <div className="flex-1">
-          <UsageBar pct={use.pct} tone={use.tone} />
-        </div>
-        <span className="font-mono text-[11px] text-muted">{use.text}</span>
+      <div className="flex items-center gap-3">
+        <UsageBar pct={use.pct} tone={use.tone} className={cx("flex-1", u.quotaBytes <= 0 && "invisible")} />
+        <UsageText use={use} t={t} />
       </div>
     </div>
   );

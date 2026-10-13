@@ -55,18 +55,22 @@ describe("user display helpers", () => {
     expect(avatarIndex("usr_a")).toBeLessThan(9);
   });
 
-  it("formats usage against a quota", () => {
-    const fmt = { num: (v: number, d = 1, fixed = false) => (fixed ? v.toFixed(d) : String(Math.round(v * 10) / 10)), bytes: (n: number) => `${n / 1e9} GB` } as never;
-    expect(usage(12.3e9, 100e9, fmt)).toMatchObject({ text: "12.3 / 100 GB", tone: "ok" });
+  it("formats usage against a quota: whole numbers from 10 up, the quota apart, red once it is used up", () => {
+    const fmt = { num: (v: number, d = 1) => String(Number(v.toFixed(d))), bytes: (n: number) => `${n / 1e9} GB` } as never;
+    expect(usage(12.3e9, 100e9, fmt)).toMatchObject({ used: "12", of: "100 GB", text: "12 / 100 GB", tone: "ok" });
+    expect(usage(405e9, 500e9, fmt)).toMatchObject({ used: "405", tone: "high" });
+    expect(usage(3.44e9, 100e9, fmt).used).toBe("3.4");
+    expect(usage(0, 100e9, fmt).used).toBe("0");
     expect(usage(85e9, 100e9, fmt).tone).toBe("high");
+    expect(usage(100e9, 100e9, fmt).tone).toBe("over"); // the quota is used up: the server limits the person
     expect(usage(101e9, 100e9, fmt).tone).toBe("over");
-    expect(usage(5e9, 0, fmt)).toMatchObject({ text: "5 GB", pct: 0 });
+    expect(usage(5e9, 0, fmt)).toMatchObject({ used: "5 GB", of: "", text: "5 GB", pct: 0 });
   });
 
   it("shows the term as days, expired or unlimited", () => {
     const t = ((k: string, v?: Record<string, number>) => (k === "users.days" ? `${v!.n} d` : k)) as never;
     expect(termText(user({ expiresUnix: 0 }), t, 100).text).toBe("∞");
-    expect(termText(user({ expiresUnix: 50 }), t, 100)).toMatchObject({ text: "0", tone: "bad" });
+    expect(termText(user({ expiresUnix: 50 }), t, 100)).toMatchObject({ text: "0 d", tone: "bad" });
     expect(termText(user({ expiresUnix: 100 + 86400 * 3 }), t, 100)).toMatchObject({ text: "3 d", tone: "fg" });
   });
 });

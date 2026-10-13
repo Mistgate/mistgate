@@ -10,5 +10,5 @@ export function useGo() {
   return (to: string, opts?: { params?: Params; replace?: boolean }) => navigate({ to, ...opts } as never);
 }
 
-type LinkProps = { to: string; params?: Params; className?: string; children: ReactNode; "aria-label"?: string; onClick?: (e: MouseEvent) => void };
+type LinkProps = { to: string; params?: Params; className?: string; children: ReactNode; "aria-label"?: string; title?: string; onClick?: (e: MouseEvent) => void };
 export const AppLink = Link as unknown as (props: LinkProps) => ReactNode;
