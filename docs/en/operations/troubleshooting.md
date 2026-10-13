@@ -78,7 +78,7 @@ Every message and what to do about it: "When it fails" in [Install a node over S
 | Could not get the certificate: it needs a domain whose A record points to the node's IP, and ports 80 and 443 open | Set a **Domain (SNI)** whose A record points at the node, open TCP 80 and 443 on the node, or switch the profile to a self-signed certificate. Let's Encrypt does not issue certificates for an IP address. |
 | There is no working WARP on the node | See "WARP does not work" below. |
 | AmneziaWG did not start on the node | See "The AmneziaWG kernel module is missing" below. |
-| The agent lacks permissions on the server | Read the original error under it and the node's log. The agent runs in a hardened service with a small set of permissions; if the node was installed long ago, `mistgate-node install` writes the current service file. |
+| The agent lacks permissions on the server | Read the original error under it and the node's log. The agent runs in a hardened service with a small set of permissions; if Health → Doctor reports an old unit, apply **Refresh the service** there, or run `mistgate-node install` once with the current binary when the agent is too old to offer it. |
 
 When the port is free again, **Restart** the profile (or apply the doctor's **Restart profile** fix).
 
@@ -159,7 +159,7 @@ If authenticator codes for the admin keep failing, check the clock of the panel 
   ```
 
   It supports Debian and Ubuntu (apt), not in a container, without Secure Boot, with systemd. A run started by the panel logs to the journal unit `mistgate-awg-prepare`.
-- If the doctor says the service file hides `/dev/net/tun` (an outdated unit), run `mistgate-node install` once.
+- If the doctor says the service file hides `/dev/net/tun` (an outdated unit), apply **Refresh the service** from Health → Doctor. For an agent too old to offer the fix, run `mistgate-node install` once with the current binary.
 
 See [AmneziaWG](../guide/amneziawg.md).
 
@@ -178,7 +178,7 @@ Profiles with WARP egress fail closed: they never send traffic out directly inst
 1. On the WARP card: **Restart WARP**, and look at the handshake, the probes and the last error. **Read from Cloudflare again** refreshes the account.
 2. **Paused**: **Resume** it.
 3. "WARP cannot use this host": another tool uses WARP's routing table, rule priority or interface name (for example an old `wg-quick` setup). Remove that tool's configuration.
-4. **No backend**: the node has neither a WireGuard kernel module nor `/dev/net/tun`; run `mistgate-node install` once to get the current service file.
+4. **No backend**: the node has neither a WireGuard kernel module nor `/dev/net/tun`; if the doctor's unit check is old, apply **Refresh the service** in Health → Doctor. For an agent too old to offer it, run `mistgate-node install` once with a current binary.
 5. "Profiles with WARP egress cannot start: the node has no WARP account": register or import an account on the node, or switch those profiles to direct.
 
 A node without IPv6 is fine for WARP. See [WARP](../guide/warp.md).

@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -590,7 +591,7 @@ func latest(ts ...time.Time) time.Time {
 
 // checkOrder is the fixed order of agent.proto "CHECK IDS"; unknown ids go after these, by name.
 var checkOrder = []string{"disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft",
-	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path"}
+	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation"}
 
 func checkRank(id string) int {
 	for i, c := range checkOrder {
@@ -677,6 +678,31 @@ func withNames(checkID string, params map[string]string, ts []*target) map[strin
 	return out
 }
 
+func unitGenerationNeedsWarning(rows []store.DoctorRow, unitRow store.DoctorRow) bool {
+	gen, err := strconv.Atoi(unitRow.Params["unit_gen"])
+	if err != nil || gen < 2 {
+		return true
+	}
+	if gen >= unit.Generation {
+		return false
+	}
+	for _, r := range rows {
+		switch r.CheckID {
+		case "awg_backend":
+			if r.Params["backend"] == "userspace" || r.Params["mode"] == "userspace" ||
+				r.Params["hint"] == "unit_outdated" || r.Params["hint"] == "no_tun" ||
+				strings.Contains(strings.ToLower(r.Detail+" "+r.Params["reason"]), "/dev/net/tun") {
+				return true
+			}
+		case "warp_path":
+			if r.Params["backend"] == "userspace" || strings.Contains(strings.ToLower(r.Detail+" "+r.Params["reason"]), "/dev/net/tun") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // certWhy is the reason of a certificate alert about one profile: it names the profile and its domain (the agent's
 // own certificate keeps the doctor's general text).
 func certWhy(reason string) string {
@@ -748,6 +774,9 @@ func (s *Service) doctorConds(now time.Time, n store.NodeRow, rows []store.Docto
 			c.key, c.severity = key{kDoctorWarn, n.ID, r.CheckID}, sevWarning
 			if r.CheckID == "kernel_headers" && !hasAWG {
 				c.severity = sevInfo // nothing on this node needs the AmneziaWG module
+			}
+			if r.CheckID == "unit_generation" && !unitGenerationNeedsWarning(rows, r) {
+				c.severity = sevInfo // gen 2 remains safe without userspace tunnels or a /dev/net/tun failure
 			}
 		}
 		out = append(out, c)

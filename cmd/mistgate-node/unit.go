@@ -7,23 +7,20 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/node/update"
 )
 
 const (
-	unitName    = "mistgate-node.service"
+	unitName    = unit.ServiceName
 	defaultBin  = "/usr/local/bin/mistgate-node"
 	minGoMemMiB = 64
-	// unitGeneration is written into the unit as MISTGATE_UNIT_GEN. Generation 2 adds the
-	// crash-loop guard and makes the binary's directory writable so the agent can update itself; generation 1 units
+	// Generation 2 adds the crash-loop guard and makes the binary's directory writable so the agent can update itself; generation 1 units
 	// (nodes installed before self-update) cannot, and show up in the panel as "update by hand once".
 	// Generation 3 is the L3 protocols: /dev/net/tun is reachable (PrivateDevices=no with exactly that
 	// device allowed), which the userspace AmneziaWG and WARP backends need, and ExecStopPost removes what a crashed
 	// agent leaves behind (the mgawg* and mgwarp interfaces, the tunnel and WARP nft tables, the WARP routes and rules).
-	// The agent never rewrites its own unit: a node on generation 2 keeps working (the kernel backends need nothing new),
-	// lists "unit/3" only from generation 3, and its awg_backend doctor check says "unit_outdated" when the userspace
-	// backend has no /dev/net/tun; the owner runs `mistgate-node install` once.
-	unitGeneration = 3
+	// The unit refresh runs the installed binary from a transient systemd unit; the agent never writes through its sandbox.
 )
 
 // safePath keeps anything that could break out of a unit-file line (spaces, quotes, newlines, %, $) out
@@ -118,5 +115,5 @@ UMask=0077
 
 [Install]
 WantedBy=multi-user.target
-`, bin, stateDir, goMem, high, maxMem, update.UnitGuardLine(bin, stateDir), unitGeneration, binDir), nil
+`, bin, stateDir, goMem, high, maxMem, update.UnitGuardLine(bin, stateDir), unit.Generation, binDir), nil
 }

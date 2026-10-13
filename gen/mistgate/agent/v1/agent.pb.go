@@ -897,6 +897,7 @@ type Hello struct {
 	Facts            *HostFacts    `protobuf:"bytes,10,opt,name=facts,proto3" json:"facts,omitempty"`
 	// Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
 	// feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
+	// "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
 	// "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
 	// crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
 	// InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
@@ -2992,7 +2993,7 @@ type ConnectResponse_Ping struct {
 }
 
 type ConnectResponse_RunDoctor struct {
-	// Only sent to agents with "doctor/1" in Hello.capabilities.
+	// Only sent to agents with "doctor/1" in Hello.capabilities; refresh_unit also requires "unit-refresh/1".
 	RunDoctor *RunDoctor `protobuf:"bytes,19,opt,name=run_doctor,json=runDoctor,proto3,oneof"`
 }
 

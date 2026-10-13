@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,18 +31,19 @@ import (
 // Files in the state dir (mode 0600). update.starts and the guard's update.rolledback[.reason] are written by the unit's
 // ExecStartPre script (GuardScript), everything else by this package.
 const (
-	FilePending        = "update.pending"
-	FileStarts         = "update.starts"
-	FileRolledBack     = "update.rolledback"
-	FileRolledBackWhy  = "update.rolledback.reason"
-	FileOutcome        = "update.outcome"
-	CapUpdate          = "update/1"
-	CapGuard           = "update-guard/1"
-	CommitWindow       = 5 * time.Minute
-	probeName          = ".mistgate-write-probe"
-	defaultTimeout     = 10 * time.Minute
-	defaultRetryWait   = 5 * time.Second
-	defaultMaxReasonSz = 64
+	FilePending            = "update.pending"
+	FileStarts             = "update.starts"
+	FileRolledBack         = "update.rolledback"
+	FileRolledBackWhy      = "update.rolledback.reason"
+	FileOutcome            = "update.outcome"
+	FileUnitRefreshPending = "unit-refresh.pending"
+	CapUpdate              = "update/1"
+	CapGuard               = "update-guard/1"
+	CommitWindow           = 5 * time.Minute
+	probeName              = ".mistgate-write-probe"
+	defaultTimeout         = 10 * time.Minute
+	defaultRetryWait       = 5 * time.Second
+	defaultMaxReasonSz     = 64
 )
 
 // Reasons of a rollback (LastUpdate.reason vocabulary of agent.proto).
@@ -62,7 +64,8 @@ var (
 	// ErrPermanent wraps a download error that retrying cannot fix (name not in the manifest, no bundle).
 	ErrPermanent = errors.New("update: permanent download error")
 	// ErrNoPrevious means there is no <exe>.prev to go back to.
-	ErrNoPrevious = errors.New("no_previous")
+	ErrNoPrevious  = errors.New("no_previous")
+	ErrRefreshBusy = errors.New("unit refresh busy")
 
 	reasonRe = regexp.MustCompile(`^[a-z_]{1,32}$`)
 )
@@ -217,6 +220,101 @@ func (u *Updater) AckOutcome(o *pb.LastUpdate) {
 
 // Pending reports whether this process is a new build inside its commit window.
 func (u *Updater) Pending() bool { return u.pend.Load() != nil }
+
+// RefreshBusy reports an update download, commit window, or a refresh reservation that makes a service restart unsafe.
+func (u *Updater) RefreshBusy() bool {
+	if u == nil {
+		return false
+	}
+	return u.busy.Load() || u.updateBlocked()
+}
+
+// ReserveUnitRefresh excludes update and rollback work, then leaves a state-dir marker for the transient refresh helper
+// and the process that systemd starts after the restart. release(true) drops this process's memory lock but leaves the
+// marker for the helper to clear when its active-state check finishes; release(false) cancels a launch that did not start.
+func (u *Updater) ReserveUnitRefresh() (release func(started bool), err error) {
+	if u == nil {
+		return func(bool) {}, nil
+	}
+	if u.RefreshBusy() || !u.busy.CompareAndSwap(false, true) {
+		return nil, ErrRefreshBusy
+	}
+	if u.updateBlocked() {
+		u.busy.Store(false)
+		return nil, ErrRefreshBusy
+	}
+	marker := u.path(FileUnitRefreshPending)
+	f, err := os.OpenFile(marker, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		u.busy.Store(false)
+		if errors.Is(err, os.ErrExist) {
+			return nil, ErrRefreshBusy
+		}
+		return nil, err
+	}
+	if _, err := fmt.Fprint(f, u.cfg.Now().UTC().Format(time.RFC3339Nano)); err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		syncDir(u.cfg.StateDir)
+	}
+	if err != nil {
+		_ = os.Remove(marker)
+		u.busy.Store(false)
+		return nil, err
+	}
+	var once sync.Once
+	return func(started bool) {
+		once.Do(func() {
+			if !started {
+				_ = ClearUnitRefreshPending(u.cfg.StateDir)
+			}
+			u.busy.Store(false)
+		})
+	}, nil
+}
+
+// ClearUnitRefreshPending is called by the transient helper after it writes the final unit-refresh outcome.
+func ClearUnitRefreshPending(stateDir string) error {
+	path := filepath.Join(stateDir, FileUnitRefreshPending)
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	syncDir(stateDir)
+	return nil
+}
+
+func (u *Updater) updateBlocked() bool {
+	if u.Pending() || u.fileExists(FilePending) {
+		return true
+	}
+	return u.refreshReserved()
+}
+
+func (u *Updater) refreshReserved() bool {
+	marker := u.path(FileUnitRefreshPending)
+	info, err := os.Stat(marker)
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if err != nil {
+		return true
+	}
+	if age := u.cfg.Now().Sub(info.ModTime()); age > 10*time.Minute {
+		_ = os.Remove(marker)
+		return false
+	}
+	return true
+}
+
+func (u *Updater) fileExists(name string) bool {
+	_, err := os.Stat(u.path(name))
+	return err == nil || !errors.Is(err, os.ErrNotExist)
+}
 
 // Startup reads the marker files before the agent connects. It may decide to roll back at once, in
 // which case Finish is set and the caller must drain and run it before doing anything else.
@@ -446,8 +544,12 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 	if err != nil {
 		return fail(err)
 	}
-	if u.pend.Load() != nil || !u.busy.CompareAndSwap(false, true) { // also busy while a new build is uncommitted
+	if u.updateBlocked() || !u.busy.CompareAndSwap(false, true) {
 		return fail(step("busy", errors.New("another update or rollback is in progress")))
+	}
+	if u.updateBlocked() { // close the race with a unit-refresh reservation made after the first check
+		u.busy.Store(false)
+		return fail(step("busy", errors.New("a unit refresh or update commit is in progress")))
 	}
 	swapped := false
 	defer func() {
@@ -514,8 +616,12 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 	if u.cfg.Key == nil {
 		return fail(step("unsigned_build", errors.New("unsigned build: update by hand")))
 	}
-	if !u.busy.CompareAndSwap(false, true) {
+	if u.refreshReserved() || !u.busy.CompareAndSwap(false, true) {
 		return fail(step("busy", errors.New("another update or rollback is in progress")))
+	}
+	if u.refreshReserved() {
+		u.busy.Store(false)
+		return fail(step("busy", errors.New("a unit refresh or update commit is in progress")))
 	}
 	done := false
 	defer func() {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/node/agent"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/unit"
 )
 
 const unitDir = "/etc/systemd/system"
@@ -23,14 +24,43 @@ func cmdInstall(args []string) int {
 	stateDir := fs.String("state-dir", envOr("MISTGATE_NODE_STATE_DIR", defaultStateDir), "state directory (must be the one used by enroll)")
 	bin := fs.String("bin", defaultBin, "where the binary lives; this executable is copied there if it is elsewhere")
 	noStart := fs.Bool("no-start", false, "write and enable the unit but do not start it")
+	refreshUnit := fs.Bool("refresh-unit", false, "refresh the running unit without copying the binary")
+	fromGen := fs.Int("from-generation", -1, "current unit generation (refresh helper only)")
+	ackToken := fs.String("ack-token", "", "refresh ack token (refresh helper only)")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *refreshUnit {
+		if *noStart || fs.NArg() != 0 || *fromGen < 0 || *fromGen >= unit.Generation || *ackToken == "" {
+			fmt.Fprintln(os.Stderr, "install: invalid --refresh-unit arguments")
+			return 2
+		}
+		if err := installUnitRefresh(*stateDir, *bin, *fromGen, *ackToken); err != nil {
+			fmt.Fprintln(os.Stderr, "install --refresh-unit:", err)
+			return 1
+		}
+		return 0
 	}
 	if err := install(*stateDir, *bin, !*noStart); err != nil {
 		fmt.Fprintln(os.Stderr, "install:", err)
 		return 1
 	}
 	return 0
+}
+
+func validateRefreshInstall(stateDir, bin string) error {
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("must run as root")
+	}
+	stateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		return err
+	}
+	if !agent.IsEnrolled(stateDir) {
+		return fmt.Errorf("%s holds no identity: run `mistgate-node enroll` first", stateDir)
+	}
+	_, err = renderUnit(bin, stateDir, 0)
+	return err
 }
 
 func install(stateDir, bin string, start bool) error {

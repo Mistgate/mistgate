@@ -77,6 +77,14 @@ type Config struct {
 	Warp WarpManager
 	// UnitGen is the generation of the systemd unit the agent runs from (MISTGATE_UNIT_GEN); 3 is listed as "unit/3".
 	UnitGen int
+	// UnitUnderSystemd detects the service manager environment even if this build cannot launch unit refresh.
+	UnitUnderSystemd bool
+	// UnitSkipReason is "other_unit" when the process belongs to systemd but not mistgate-node.service.
+	UnitSkipReason string
+	// UnitRefreshLauncher is available only in Linux systemd services; nil disables refresh_unit and its capability.
+	UnitRefreshBusy     func(context.Context) error
+	UnitRefreshReserve  func(context.Context) (release func(started bool), err error)
+	UnitRefreshLauncher func(context.Context, func()) error
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller
@@ -93,6 +101,7 @@ type Config struct {
 // Agent is the node agent. Build it with New and run it with Run.
 type Agent struct {
 	cfg       Config
+	startedAt time.Time
 	log       *slog.Logger
 	ring      *logRing
 	host      hostctl.Host
@@ -302,7 +311,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	}
 	ring := newLogRing()
 	a := &Agent{
-		cfg: cfg, ring: ring, host: host, meta: id.meta,
+		cfg: cfg, startedAt: time.Now(), ring: ring, host: host, meta: id.meta,
 		decoySite:     site,
 		log:           slog.New(&ringHandler{ring: ring, inner: inner}),
 		engines:       map[string]engine.Engine{},

@@ -40,7 +40,7 @@ The panel is one process. `cmd/mistgate` wires the modules together; they know e
 | `torrentguard` | Torrent protection: recognises plaintext BitTorrent that a client starts by its protocol signature, never by port. Hysteria2 checks the flows it proxies; for AmneziaWG the host hands tunnel flows to the agent and a match is blocked in the kernel. See [Torrent protection](../guide/torrent-protection.md). |
 | `warp`, `egress` | The node's WARP tunnel and the exits (direct or WARP) the engines use. |
 | `certs` | Let's Encrypt and self-signed certificates for the servers on the node. |
-| `doctor` | Host checks and the four safe fixes. |
+| `doctor` | Host checks and the six safe fixes. |
 | `update`, `awgprep` | Self-update from signed bundles; building the AmneziaWG kernel module on request. |
 | `speedtest` | The bandwidth test: parallel downloads and uploads against the nearest Ookla server (Cloudflare and others as fallbacks), with byte and time limits. |
 
@@ -167,4 +167,4 @@ The longer version, with sign-in, roles, step-up, sessions and the audit log, is
 
 - Is the keys to everything: the master key decrypts every stored secret, and the panel decides what every node runs.
 - Holds the saved SSH access of the nodes installed over SSH, sealed with the master key: whoever has both can log in to those servers with their passwords, signature or not. Nodes installed with the install command have no saved access.
-- Still cannot make a node agent run code you did not sign: agents accept updates only with a signature that verifies under the release public key compiled into them, and the private release key lives offline, never on the panel. Nor can a changed data directory make the root update helper install a panel you did not sign: it verifies with the key compiled into the binary, never with `release.pub`. Commands to nodes are a fixed list; doctor fixes are four safe operations; nodes refuse port-hopping ranges below port 1024 or over their sshd port.
+- Still cannot make a node agent run code you did not sign: agents accept updates only with a signature that verifies under the release public key compiled into them, and the private release key lives offline, never on the panel. Nor can a changed data directory make the root update helper install a panel you did not sign: it verifies with the key compiled into the binary, never with `release.pub`. Commands to nodes are a fixed list; doctor fixes are six safe operations, including a unit refresh that runs only the installed binary and its compiled template; nodes refuse port-hopping ranges below port 1024 or over their sshd port.

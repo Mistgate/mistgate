@@ -216,7 +216,7 @@ func TestNodeFixNeedsTheOwner(t *testing.T) {
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
 
-	p := planOf(t, s, "node_fix", map[string]any{"node": "de1", "fix_id": "fix_ntp", "reason": "clock drift"})
+	p := planOf(t, s, "node_fix", map[string]any{"node": "de1", "fix_id": "refresh_unit"})
 	if !p.NeedsApproval || len(p.Danger) != 1 || p.Danger[0] != "fleet" || !strings.Contains(p.Next, p.PlanID) {
 		t.Errorf("plan: %+v", p)
 	}

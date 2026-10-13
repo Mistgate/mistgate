@@ -90,6 +90,13 @@ const (
 	CodeWarpPaused      = "warp_path.paused"
 	CodeWarpDown        = "warp_path.down"
 	CodeWarpUnknown     = "warp_path.unknown_state"
+	// unit_generation: unit_gen, current, reason, from_gen, to_gen
+	CodeUnitCurrent       = "unit_generation.current"
+	CodeUnitOutdated      = "unit_generation.outdated"
+	CodeUnitManual        = "unit_generation.not_systemd"
+	CodeUnitOtherUnit     = "unit_generation.other_unit"
+	CodeUnitUnknown       = "unit_generation.unknown"
+	CodeUnitRefreshFailed = "unit_generation.refresh_failed"
 	// Any check: why it did not run. skip.unsupported has reason (English, from the host probe).
 	CodeSkipUnsupported = "skip.unsupported"
 	CodeSkipTimeout     = "skip.timeout"
@@ -113,5 +120,6 @@ var Codes = []string{
 	CodeAwgNone, CodeAwgNoEngine, CodeAwgRunning, CodeAwgForwardDrop, CodeAwgUnavailable,
 	CodeWarpNoManager, CodeWarpUnused, CodeWarpNoAccount, CodeWarpHostClash, CodeWarpUp, CodeWarpCheckFailed, CodeWarpStarting,
 	CodeWarpNoBackend, CodeWarpPausedUsed, CodeWarpPaused, CodeWarpDown, CodeWarpUnknown,
+	CodeUnitCurrent, CodeUnitOutdated, CodeUnitManual, CodeUnitOtherUnit, CodeUnitUnknown, CodeUnitRefreshFailed,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

@@ -825,6 +825,9 @@ func (f *Fleet) readyForRequest(ctx context.Context, nodeID string, frame *agent
 	if capability, message := requestCapability(frame); capability != "" && !slices.Contains(live.AgentCaps, capability) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
 	}
+	if fix := frame.GetApplyFix(); fix != nil && fix.GetFixId() == "refresh_unit" && !slices.Contains(live.AgentCaps, capUnitRefresh) {
+		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
+	}
 	return live, nil
 }
 

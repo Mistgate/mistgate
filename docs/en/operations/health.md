@@ -86,7 +86,7 @@ A green cell means that, within the last few minutes, a client from the panel's 
 
 ## Node doctor
 
-Every node agent runs 16 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
+Every node agent runs 17 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
 
 ### When it runs
 
@@ -116,8 +116,9 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | Memory (`memory_pressure`) | Available memory, swap, memory pressure (PSI) and OOM kills in the kernel log of the last 24 hours. | Less than 12% available, swap over 50% under pressure, or an OOM kill | Less than 5% available, heavy pressure, or the OOM killer hit the agent or a VPN engine | None |
 | CPU softirq (`cpu_softirq`) | Mean softirq share and total CPU over 10 minutes. Skipped until 30 samples are collected. | Softirq 50% or more | Softirq 90% or more, or CPU 97% or more | None |
 | Kernel headers (`kernel_headers`) | Headers, `dkms`, `make` and `gcc` for the AmneziaWG kernel module. Skipped without an AmneziaWG profile; only a fact while AmneziaWG runs in userspace. | Kernel mode is requested and the module does not run while tools are missing | None | None: see [AmneziaWG](../guide/amneziawg.md) |
-| AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | None |
+| AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | Refresh the service when `unit_outdated` is reported and the agent offers the fix |
 | WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it, or the tunnel is up but its latest check failed | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Check WARP / reconnect if down, when the tunnel is down or its latest check failed |
+| Unit generation (`unit_generation`) | Whether the systemd unit running the agent matches this build. Skipped when the agent was started by hand. | The unit is older than this build | None | Refresh the service; the agent restarts and connections can drop for a few seconds |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 
@@ -125,7 +126,7 @@ A warning or problem opens an alert (see "Kinds of alerts" below). The certifica
 
 ### Fixes
 
-There are exactly five fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
+There are exactly six fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
 
 | Button | What it does | Offered by |
 |---|---|---|
@@ -134,13 +135,14 @@ There are exactly five fixes. They are compiled into the agent: the panel sends 
 | Restart profile | Restarts one profile on the node, or every profile that failed to start. Connections through it drop for a couple of seconds and come back by themselves. | Ports in use, Certificates (self-signed) |
 | Fix the resolver | Points the host resolver at the node's **DNS resolvers for this node** (node settings) or, when that is the server's own resolver, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
 | Check WARP / reconnect if down | Runs the WARP checks again at once. Only when the tunnel is down, or this check takes it to its failure threshold, it rebuilds the configured tunnel and its routes with the same account; otherwise nothing changes. During a reconnect, profiles using WARP may briefly lose traffic. If the tunnel recovered before Apply, nothing is changed. | WARP exit |
+| Refresh the service | Runs the installed binary from a fixed transient systemd unit to write its compiled unit template, reload systemd and restart the agent. The node identity and state stay in place; connections can drop for a few seconds. | Unit generation; AmneziaWG backend when it reports `unit_outdated` |
 
 A fix always takes two steps:
 
 1. Click the fix button on the doctor item or on its alert. The panel asks the node what it would do ("Asking the node what it would do…"); the node answers with a dry run that changes nothing.
 2. The dialog shows the plan: for example, the journal size before and after, or the profiles to restart and how many connections drop. **Apply** performs exactly that plan.
 
-The plan is valid for 10 minutes, works once and is bound to the node, the fix and its parameters. One fix runs at a time on a node. Both steps go to the audit log. After a successful fix the node runs the affected checks again, and alerts that the fix cleared close as "fixed". Applying a fix needs the owner.
+The plan is valid for 10 minutes, works once and is bound to the node, the fix and its parameters. One fix runs at a time on a node. Both steps go to the audit log. After a successful fix the node runs the affected checks again, and alerts that the fix cleared close as "fixed". For a unit refresh, the apply result reaches the panel before the restart; the agent reports again after it reconnects. Applying a fix needs the owner.
 
 When a fix fails, the dialog says why:
 

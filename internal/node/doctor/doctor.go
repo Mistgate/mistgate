@@ -1,5 +1,4 @@
-// Package doctor is the node's self-diagnosis: sixteen host
-// checks that each come from a real incident, and five safe fixes the panel may ask for.
+// Package doctor is the node's self-diagnosis: host checks that each come from a real incident, and safe fixes the panel may ask for.
 //
 // Rules the package keeps:
 //
@@ -72,15 +71,17 @@ const (
 	CheckKernelHeaders  = "kernel_headers"
 	CheckAwgBackend     = "awg_backend"
 	CheckWarpPath       = "warp_path"
+	CheckUnitGeneration = "unit_generation"
 )
 
-// Fix ids (agent.proto "FIX IDS"). Only these five exist.
+// Fix ids (agent.proto "FIX IDS").
 const (
 	FixJournaldVacuum = "journald_vacuum"
 	FixApplyBaseline  = "apply_baseline"
 	FixRestartInbound = "restart_inbound"
 	FixSetResolver    = "set_resolver"
 	FixReconnectWarp  = "reconnect_warp"
+	FixRefreshUnit    = "refresh_unit"
 )
 
 // Result is one check's outcome; it becomes one DoctorResult.
@@ -134,6 +135,7 @@ var checks = []check{
 	{CheckKernelHeaders, checkKernelHeaders},
 	{CheckAwgBackend, checkAwgBackend},
 	{CheckWarpPath, checkWarpPath},
+	{CheckUnitGeneration, checkUnitGeneration},
 }
 
 // CheckIDs returns every check id in report order.
@@ -145,12 +147,13 @@ func CheckIDs() []string {
 	return ids
 }
 
-// FixIDs returns the five fix ids.
+// FixIDs returns the fix ids.
 func FixIDs() []string {
-	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp}
+	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit}
 }
 
-// fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix").
+// fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix"). A unit
+// refresh restarts the agent, so its next periodic report is the re-check; an immediate report would be stale.
 var fixChecks = map[string][]string{
 	FixJournaldVacuum: {CheckJournaldSize, CheckDiskSpace},
 	FixApplyBaseline:  {CheckNetBaseline},

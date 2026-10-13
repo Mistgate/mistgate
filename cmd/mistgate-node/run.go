@@ -29,6 +29,12 @@ func cmdRun(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	absStateDir, err := filepath.Abs(*stateDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "run: state directory:", err)
+		return 2
+	}
+	*stateDir = absStateDir
 	var lv slog.Level
 	if err := lv.UnmarshalText([]byte(*level)); err != nil {
 		fmt.Fprintln(os.Stderr, "run: bad --log-level:", err)
@@ -115,6 +121,9 @@ func newAgent(stateDir, linkURL string, log *slog.Logger) (*agent.Agent, error) 
 	cfg.Built = buildinfo.BuiltUnix()
 	cfg.Updater = newUpdater(stateDir, log)
 	cfg.UnitGen = unitGen()
+	refresh := newUnitRefresh(stateDir, cfg.Updater)
+	cfg.UnitUnderSystemd, cfg.UnitSkipReason = refresh.underSystemd, refresh.reason
+	cfg.UnitRefreshBusy, cfg.UnitRefreshReserve, cfg.UnitRefreshLauncher = refresh.busy, refresh.reserve, refresh.launch
 	cfg.AwgPrepare = newAwgPrepare(stateDir)
 	a, err := agent.New(cfg, engines, hostctl.New(log))
 	if err != nil {

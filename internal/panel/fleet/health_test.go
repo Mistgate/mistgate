@@ -134,6 +134,27 @@ func TestOldAgentIsNeverSentDoctorCommands(t *testing.T) {
 	}
 }
 
+func TestRefreshUnitCommandRequiresBothCapabilities(t *testing.T) {
+	e := newEnv(t)
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_ApplyFix{ApplyFix: &agentv1.ApplyFix{FixId: "refresh_unit"}}}
+	for _, tc := range []struct {
+		name string
+		caps []string
+		want bool
+	}{
+		{"doctor only", []string{capDoctor}, false},
+		{"refresh only", []string{capUnitRefresh}, false},
+		{"doctor and refresh", []string{capDoctor, capUnitRefresh}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := e.f.readyForRequest(e.ctx, "nodea", frame, &store.NodeLiveRow{Connected: true, AgentCaps: tc.caps})
+			if (err == nil) != tc.want {
+				t.Fatalf("readyForRequest caps=%v error=%v; want ready=%v", tc.caps, err, tc.want)
+			}
+		})
+	}
+}
+
 // A new agent: RunDoctor and ApplyFix are relayed, the report reaches Health (periodic ones too), and the
 // answer to a request is the report that echoes its id.
 func TestDoctorRelay(t *testing.T) {

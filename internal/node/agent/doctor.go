@@ -47,6 +47,13 @@ func (a *Agent) doctorEnv() doctor.Env {
 	e.Samples = func(w time.Duration) []doctor.Sample { return a.hostRing.Since(a.now(), w) }
 	e.Offset = a.offset.Load
 	e.AgentCertNotAfter = func() time.Time { return a.id.Load().notAfter() }
+	e.UnitGen = a.cfg.UnitGen
+	e.UnderSystemd = a.cfg.UnitUnderSystemd
+	e.UnitSkipReason = a.cfg.UnitSkipReason
+	e.UnitRefreshBusy = a.cfg.UnitRefreshBusy
+	e.UnitRefreshReserve = a.cfg.UnitRefreshReserve
+	e.LaunchUnitRefresh = a.cfg.UnitRefreshLauncher
+	e.AgentStartedAt = a.startedAt
 	e.ApplyBaseline = a.host.ApplyBaseline
 	e.RestartInbound = a.doctorRestart
 	e.ReconnectWarp = a.doctorReconnectWarp
@@ -324,11 +331,26 @@ func (a *Agent) runDoctor(s *session, r *pb.RunDoctor) {
 func (a *Agent) applyFix(s *session, r *pb.ApplyFix) {
 	ctx, cancel := context.WithTimeout(s.ctx, fixTimeout)
 	defer cancel()
-	out := a.doc.Apply(ctx, r.FixId, r.DryRun, r.Params)
+	replied := false
+	var beforeRefresh func(doctor.FixOutcome)
+	if r.FixId == doctor.FixRefreshUnit && !r.DryRun {
+		beforeRefresh = func(out doctor.FixOutcome) {
+			replied = true
+			s.sendSync(cmdResult(&pb.CommandResult{
+				RequestId: r.RequestId, Ok: out.OK, Error: out.Err, Affected: out.Affected, Detail: out.Detail, Params: out.Params,
+			}), 3*time.Second)
+		}
+	}
+	out := a.doc.ApplyWithRefreshAck(ctx, r.FixId, r.DryRun, r.Params, beforeRefresh)
+	if !replied {
+		s.send(cmdResult(&pb.CommandResult{
+			RequestId: r.RequestId, Ok: out.OK, Error: out.Err, Affected: out.Affected, Detail: out.Detail, Params: out.Params,
+		}))
+	}
 	a.log.Info("doctor fix", "fix", r.FixId, "dry_run", r.DryRun, "ok", out.OK, "affected", out.Affected, "error", out.Err)
-	s.send(cmdResult(&pb.CommandResult{
-		RequestId: r.RequestId, Ok: out.OK, Error: out.Err, Affected: out.Affected, Detail: out.Detail, Params: out.Params,
-	}))
+	if r.FixId == doctor.FixRefreshUnit {
+		return // the helper writes the outcome after restart; the new process reports it on its next doctor run
+	}
 	if !out.OK || r.DryRun {
 		return
 	}

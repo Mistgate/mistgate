@@ -145,6 +145,64 @@ func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer)
 
 func (e *env) src(content []byte) *fakeSrc { return &fakeSrc{now: e.now, content: content} }
 
+func TestUnitRefreshReservationBlocksUpdatesUntilOutcome(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	release, err := u.ReserveUnitRefresh()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !u.RefreshBusy() {
+		t.Fatal("refresh reservation was not busy")
+	}
+	release(true)
+	if !u.RefreshBusy() {
+		t.Fatal("started refresh lost its persistent busy marker")
+	}
+	manifest, sig := e.manifest(newBin, newBuilt, nil)
+	src := e.src(newBin)
+	res, fin := u.Apply(context.Background(), e.req(manifest, sig), src)
+	if res.Error != "busy" || fin != nil || src.calls != 0 {
+		t.Fatalf("update during refresh = %+v finish=%v fetches=%d", res, fin, src.calls)
+	}
+	if err := ClearUnitRefreshPending(e.state); err != nil {
+		t.Fatal(err)
+	}
+	if u.RefreshBusy() {
+		t.Fatal("refresh busy marker remained after helper completion")
+	}
+
+	u.busy.Store(true) // the update's download/commit critical section
+	if _, err := u.ReserveUnitRefresh(); !errors.Is(err, ErrRefreshBusy) {
+		t.Fatalf("refresh during update = %v", err)
+	}
+	u.busy.Store(false)
+	u.pend.Store(&Marker{}) // new build inside its commit window
+	if _, err := u.ReserveUnitRefresh(); !errors.Is(err, ErrRefreshBusy) {
+		t.Fatalf("refresh during commit window = %v", err)
+	}
+	u.pend.Store(nil)
+	if err := os.WriteFile(filepath.Join(e.state, FilePending), []byte("pending"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.ReserveUnitRefresh(); !errors.Is(err, ErrRefreshBusy) {
+		t.Fatalf("refresh with update.pending = %v", err)
+	}
+}
+
+func TestUnitRefreshReservationCanCancelBeforeLaunch(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	release, err := u.ReserveUnitRefresh()
+	if err != nil {
+		t.Fatal(err)
+	}
+	release(false)
+	if u.RefreshBusy() {
+		t.Fatal("cancelled refresh left its busy marker")
+	}
+}
+
 func readFile(t *testing.T, p string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(p)

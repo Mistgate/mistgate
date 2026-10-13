@@ -120,10 +120,10 @@ package mistgate.agent.v1;
 //   the api_version: a peer that does not know these messages simply never sends them and ignores them
 //   (an unknown oneof member is dropped by both ends, which log "unknown ... message ignored").
 //   - CAPABILITY GATE. An agent that implements the doctor lists "doctor/1" in Hello.capabilities. The panel
-//     sends RunDoctor / ApplyFix ONLY to a stream whose Hello carried that string; for any other agent it
-//     answers the admin call with FAILED_PRECONDITION ("agent too old") and sends nothing. So a new panel
-//     with an old agent never waits for a CommandResult that cannot come, and a new agent with an old
-//     panel just has its DoctorReport dropped.
+//     sends RunDoctor / ApplyFix ONLY to a stream whose Hello carried that string; refresh_unit additionally
+//     requires "unit-refresh/1". For an unsupported command it answers the admin call with FAILED_PRECONDITION
+//     ("agent too old") and sends nothing. So a new panel with an old agent never waits for a CommandResult that
+//     cannot come, and a new agent with an old panel just has its DoctorReport dropped.
 //   - SCHEDULE. The agent sends an unsolicited DoctorReport (request_id = "") about 30 s after every
 //     connect (engines need a moment to settle) and then every 10 min +-60 s jitter. A RunDoctor is
 //     answered with a DoctorReport that echoes request_id. One run at a time: a RunDoctor that arrives
@@ -146,7 +146,9 @@ package mistgate.agent.v1;
 //     detail, params} describing what would happen (the admin API turns it into the "plan" step). dry_run =
 //     false performs the fix and answers CommandResult{ok, affected, detail, params}; on ok the agent then
 //     re-runs the checks that offer that fix and sends a partial DoctorReport (request_id = "") so the
-//     panel and the UI see the result without waiting 10 min. A fix that has nothing to do is ok = true,
+//     panel and the UI see the result without waiting 10 min. refresh_unit sends its CommandResult before it
+//     starts the transient systemd job; that job rewrites the unit and restarts the agent, whose new process
+//     reconnects with its refreshed generation and capabilities. A fix that has nothing to do is ok = true,
 //     affected = 0, params{noop:"1"}. The agent owns a compiled allow-list of fix ids; an id is never a
 //     shell string, params are validated (an inbound_id must be one the agent runs), and only one fix runs at a
 //     time ("busy").
@@ -177,7 +179,8 @@ package mistgate.agent.v1;
 //     warp_path         the node's WARP tunnel and its routes; SKIP while the node has no WARP account and no inbound with
 //                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
 //                       table_in_use | rule_pref_in_use | interface_in_use
-//   FIX IDS (stable; only these five exist; all are safe: no data loss, no package install, no change to sshd or
+//     unit_generation   the generation of the hardened systemd unit running this agent; manual runs SKIP. Params: unit_gen, current
+//   FIX IDS (stable; all are safe: no data loss, no package install, no change to sshd or
 //   to firewall rules outside the agent's own nftables table, where apply_baseline puts the SSH guard back). The
 //   check that offers a fix puts its id into DoctorResult.fix_id.
 //     journald_vacuum   journalctl --vacuum-size=200M (+ --vacuum-time=7d)           offered by journald_size, disk_space
@@ -187,6 +190,9 @@ package mistgate.agent.v1;
 //                       agent's default for NodeSettings.country_code); the previous config is backed up and
 //                       removed again by Cleanup                                      offered by resolver
 //     reconnect_warp    rebuild the current WARP tunnel and reapply its routes (no account changes) offered by warp_path while down
+//     refresh_unit      run the installed signed binary from a fixed transient systemd unit to rewrite the unit from its compiled
+//                       template and restart the agent; the fix takes no params and is offered only with "unit-refresh/1"
+//                       from a systemd service. The CommandResult reaches the panel before that agent restart.
 //
 // UPDATE (agent self-update; additive, protocol api_version stays 1)
 //   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it
@@ -484,6 +490,7 @@ message Hello {
   HostFacts facts = 10;
   // Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
   // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
+  // "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
   // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
@@ -805,7 +812,7 @@ message ConnectResponse {
     LogRequest log_request = 16;
     LogCancel log_cancel = 17;
     Ping ping = 18;
-    // Only sent to agents with "doctor/1" in Hello.capabilities.
+    // Only sent to agents with "doctor/1" in Hello.capabilities; refresh_unit also requires "unit-refresh/1".
     RunDoctor run_doctor = 19;
     ApplyFix apply_fix = 20;
     // Only sent to agents with "update/1" in Hello.capabilities (see "UPDATE").

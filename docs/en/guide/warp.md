@@ -117,7 +117,7 @@ Some problems need you, not a button. The card names them:
 
 ## What the host needs
 
-A WireGuard kernel module, or `/dev/net/tun` for the userspace one. A node installed with an old service unit may hide `/dev/net/tun` from the agent; run `mistgate-node install` once with the current binary to rewrite the unit.
+A WireGuard kernel module, or `/dev/net/tun` for the userspace one. If Health → Doctor reports an outdated unit, apply **Refresh the service** there; the agent restarts and connections can drop for a few seconds. For an agent too old to offer that fix, run `mistgate-node install` once with the current binary.
 
 ## Registration settings
 

@@ -287,9 +287,9 @@ export const en = {
   "health.doctor.awg_backend.why":
     "The AmneziaWG engine on this node has no working backend ({mode}): {reason}. Its profiles are not started until it has one.",
   "health.doctor.awg_backend.why.no_tun":
-    "The AmneziaWG engine needs /dev/net/tun and the agent cannot see it. Run mistgate-node install on the node with the current binary; on a container or a VPS check that the TUN device is enabled.",
+    "The AmneziaWG engine needs /dev/net/tun and the agent cannot see it. If the node’s service unit is old, press “Refresh the service” in the node’s doctor; on a container or a VPS check that the TUN device is enabled.",
   "health.doctor.awg_backend.why.unit_outdated":
-    "The node’s service unit is old (generation {unit_gen}) and hides /dev/net/tun from the agent. Run mistgate-node install on the node once with the current binary: it rewrites the unit.",
+    "The node’s service unit is old (generation {unit_gen}) and hides /dev/net/tun from the agent. Press Refresh the service in the node’s doctor: it rewrites the unit (a current agent offers it).",
   "health.doctor.awg_backend.why.no_module":
     "The backend is set to the kernel module, but it is not loaded. An up-to-date agent builds it itself from the node’s settings (“AmneziaWG backend”); otherwise run mistgate-node awg prepare-kernel --yes on the node (it installs packages). Or switch the backend to userspace in the node’s settings.",
   "health.doctor.awg_backend.why.docker_forward_drop":
@@ -572,9 +572,9 @@ export const ru: typeof en = {
   "health.doctor.awg_backend.why":
     "У движка AmneziaWG на этой ноде нет рабочего бэкенда ({mode}): {reason}. Пока его нет, профили AmneziaWG не запускаются.",
   "health.doctor.awg_backend.why.no_tun":
-    "Движку AmneziaWG нужен /dev/net/tun, а агент его не видит. Выполни на ноде mistgate-node install текущим бинарником; в контейнере или на VPS проверь, что включено устройство TUN.",
+    "Движку AmneziaWG нужен /dev/net/tun, а агент его не видит. Если служба ноды старая, нажми «Обновить службу» в докторе ноды; в контейнере или на VPS проверь, что включено устройство TUN.",
   "health.doctor.awg_backend.why.unit_outdated":
-    "Юнит службы на ноде старый (поколение {unit_gen}) и прячет /dev/net/tun от агента. Один раз выполни на ноде mistgate-node install текущим бинарником: он перепишет юнит.",
+    "Юнит службы на ноде старый (поколение {unit_gen}) и прячет /dev/net/tun от агента. Нажми «Обновить службу» в докторе ноды: она перепишет юнит (её предлагает текущая версия агента).",
   "health.doctor.awg_backend.why.no_module":
     "Бэкенд задан как модуль ядра, но он не загружен. Свежий агент соберёт его сам из настроек ноды («Бэкенд AmneziaWG»); иначе выполни на ноде mistgate-node awg prepare-kernel --yes (команда ставит пакеты). Или переключи бэкенд на userspace в настройках ноды.",
   "health.doctor.awg_backend.why.docker_forward_drop":

@@ -151,7 +151,7 @@ In the node's **Profiles** tab, each AmneziaWG profile shows what the node last 
 - "Not one packet reached the port": the hoster or a firewall blocks this UDP port. Try another port.
 - "Packets arrive but no handshake completes": the obfuscation parameters on the node and in the config differ, usually an outdated config.
 
-The doctor's **AmneziaWG backend** check covers the rest: no working backend, `/dev/net/tun` hidden by an old service unit (run `mistgate-node install` once with the current binary), the kernel module missing, or a host firewall (often Docker's FORWARD policy) that drops what clients send to the internet. See [Health](../operations/health.md).
+The doctor's **AmneziaWG backend** check covers the rest: no working backend, `/dev/net/tun` hidden by an old service unit, the kernel module missing, or a host firewall (often Docker's FORWARD policy) that drops what clients send to the internet. When it reports `unit_outdated`, apply **Refresh the service** from Health → Doctor; for an agent too old to offer that fix, run `mistgate-node install` once with the current binary. See [Health](../operations/health.md).
 
 ## Devices and keys
 

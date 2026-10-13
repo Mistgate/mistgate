@@ -926,16 +926,42 @@ func TestKernelHeadersIsInfoWithoutAmneziaWG(t *testing.T) {
 	}
 }
 
-func TestDoctorFixIdsAreTheFiveKnownOnes(t *testing.T) {
+func TestUnitGenerationSeverityTracksGuardAndTunUse(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		gen  string
+		more []*agentv1.DoctorResult
+		want int
+	}{
+		{name: "generation one misses crash guard", gen: "1", want: sevWarning},
+		{name: "generation two without userspace tunnels", gen: "2", want: sevInfo},
+		{name: "generation two with userspace awg", gen: "2", more: []*agentv1.DoctorResult{res("awg_backend", dOK, "", "backend", "userspace")}, want: sevWarning},
+		{name: "generation two with userspace warp", gen: "2", more: []*agentv1.DoctorResult{res("warp_path", dOK, "", "backend", "userspace")}, want: sevWarning},
+		{name: "generation two with a tun failure", gen: "2", more: []*agentv1.DoctorResult{res("awg_backend", dFail, "", "hint", "unit_outdated")}, want: sevWarning},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "hetzner", true)
+			rows := append([]*agentv1.DoctorResult{res("unit_generation", dWarn, "refresh_unit", "unit_gen", tc.gen)}, tc.more...)
+			e.report("de1", false, rows...)
+			al := e.active()["doctor_warn/de1/unit_generation"]
+			if al.Severity != tc.want {
+				t.Fatalf("severity = %d, want %d (alert %+v)", al.Severity, tc.want, al)
+			}
+		})
+	}
+}
+
+func TestDoctorFixIdsAreTheKnownOnes(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
-	e.report("de1", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"), res("warp_path", dFail, "reconnect_warp"))
+	e.report("de1", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"), res("warp_path", dFail, "reconnect_warp"), res("unit_generation", dWarn, "refresh_unit"))
 	rows, _ := e.st.DoctorResults(e.ctx, "de1")
 	fixes := map[string]string{}
 	for _, r := range rows {
 		fixes[r.CheckID] = r.FixID
 	}
-	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" || fixes["warp_path"] != "reconnect_warp" {
+	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" || fixes["warp_path"] != "reconnect_warp" || fixes["unit_generation"] != "refresh_unit" {
 		t.Fatalf("fix ids: %v", fixes)
 	}
 }

@@ -399,6 +399,63 @@ func TestGetDoctorViews(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound, "node")
 }
 
+func TestRefreshUnitFixOfferRequiresCapability(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.report("de1", false, res("unit_generation", dWarn, "refresh_unit", "unit_gen", "2", "current", "3"))
+	getDoctor := func() *adminv1.NodeDoctor {
+		t.Helper()
+		resp, err := rpc{e.s}.GetDoctor(e.ctx, req(&adminv1.GetDoctorRequest{NodeId: "de1"}))
+		if err != nil || len(resp.Msg.Nodes) != 1 {
+			t.Fatalf("GetDoctor: %+v, %v", resp, err)
+		}
+		return resp.Msg.Nodes[0]
+	}
+	if item := getDoctor().Items[0]; item.FixId != "" {
+		t.Fatalf("old agent was offered %q", item.FixId)
+	}
+	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, capUnitRefresh}})
+	if item := getDoctor().Items[0]; item.FixId != "refresh_unit" {
+		t.Fatalf("capable agent fix = %q", item.FixId)
+	}
+}
+
+func TestRefreshUnitPlanIsDisruptive(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	resp, err := rpc{e.s}.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "refresh_unit", DryRun: true}))
+	if err != nil || resp.Msg.Plan == nil || !resp.Msg.Plan.Disruptive || resp.Msg.Plan.TitleKey != "health.fix.refresh_unit.plan" {
+		t.Fatalf("refresh plan = %+v, %v", resp, err)
+	}
+}
+
+func TestRefreshUnitAlertActionRequiresCapability(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.report("de1", false, res("unit_generation", dWarn, "refresh_unit"))
+	list := func() *adminv1.Alert {
+		t.Helper()
+		resp, err := rpc{e.s}.ListAlerts(e.ctx, req(&adminv1.ListAlertsRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, a := range resp.Msg.Active {
+			if a.Subject == "unit_generation" {
+				return a
+			}
+		}
+		t.Fatal("unit generation alert missing")
+		return nil
+	}
+	if got := strings.Join(list().Actions, ","); strings.Contains(got, "apply_fix:") {
+		t.Fatalf("old agent alert action = %s", got)
+	}
+	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, capUnitRefresh}})
+	if got := strings.Join(list().Actions, ","); !strings.Contains(got, "apply_fix:refresh_unit") {
+		t.Fatalf("capable agent alert actions = %s", got)
+	}
+}
+
 func TestIPv6SuggestionFlowsToDoctorAPIAndAlert(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

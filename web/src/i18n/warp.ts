@@ -88,7 +88,7 @@ export const en = {
   "warp.e.stat_failed": "The node could not read the state of the WARP tunnel.",
   "warp.e.stat_failed.more": "That is a kernel or WireGuard error on the host; look at the agent’s log.",
   "warp.e.backend_unavailable": "This host has no WireGuard.",
-  "warp.e.backend_unavailable.more": "Neither the kernel module nor /dev/net/tun is there. Run mistgate-node install with the current binary, or use a host with WireGuard.",
+  "warp.e.backend_unavailable.more": "Neither the kernel module nor /dev/net/tun is there. If the node’s service unit is old, press “Refresh the service” in the node’s doctor, or use a host with WireGuard.",
   "warp.e.up_failed": "The node could not create the WARP tunnel: {detail}",
   "warp.ladder.reassert": "Trying to recover: restoring routes and rules.",
   "warp.ladder.reassert_failed": "Trying to recover, but the routes and rules could not be set again.",
@@ -170,7 +170,7 @@ export const en = {
   "health.doctor.warp_path.why.not_configured":
     "Profiles with the WARP exit are on this node ({profiles}), but it has no WARP account, so they do not start. Enable WARP in the node’s settings or move those profiles to the direct exit.",
   "health.doctor.warp_path.why.no_backend":
-    "WARP cannot run on this host: neither a WireGuard kernel module nor /dev/net/tun is available. Run mistgate-node install with the current binary (an old unit hides /dev/net/tun) or use a host with WireGuard.",
+    "WARP cannot run on this host: neither a WireGuard kernel module nor /dev/net/tun is available. If the node’s service unit is old (it hides /dev/net/tun), press “Refresh the service” in the node’s doctor, or use a host with WireGuard.",
   "health.doctor.warp_path.why.paused":
     "WARP is paused while profiles depend on it, so they fail closed. Resume it in the node’s settings or move the profiles to the direct exit.",
   "health.doctor.warp_path.why.table_in_use":
@@ -266,7 +266,7 @@ export const ru: typeof en = {
   "warp.e.stat_failed": "Нода не смогла прочитать состояние туннеля WARP.",
   "warp.e.stat_failed.more": "Это ошибка ядра или WireGuard на хосте; загляни в журнал агента.",
   "warp.e.backend_unavailable": "На этом хосте нет WireGuard.",
-  "warp.e.backend_unavailable.more": "Нет ни модуля ядра, ни /dev/net/tun. Выполни mistgate-node install текущим бинарником или возьми хост с WireGuard.",
+  "warp.e.backend_unavailable.more": "Нет ни модуля ядра, ни /dev/net/tun. Если служба ноды старая, нажми «Обновить службу» в докторе ноды или возьми хост с WireGuard.",
   "warp.e.up_failed": "Нода не смогла создать туннель WARP: {detail}",
   "warp.ladder.reassert": "Пробую восстановить: возвращаю маршруты и правила.",
   "warp.ladder.reassert_failed": "Пробую восстановить, но маршруты и правила не удалось настроить заново.",
@@ -347,7 +347,7 @@ export const ru: typeof en = {
   "health.doctor.warp_path.why.not_configured":
     "На этой ноде есть профили с выходом через WARP ({profiles}), но аккаунта WARP нет, поэтому они не запускаются. Включи WARP в настройках ноды или переведи эти профили на прямой выход.",
   "health.doctor.warp_path.why.no_backend":
-    "WARP не может работать на этом хосте: нет ни модуля ядра WireGuard, ни /dev/net/tun. Выполни mistgate-node install текущим бинарником (старый юнит прячет /dev/net/tun) или возьми хост с WireGuard.",
+    "WARP не может работать на этом хосте: нет ни модуля ядра WireGuard, ни /dev/net/tun. Если служба ноды старая (она прячет /dev/net/tun), нажми «Обновить службу» в докторе ноды или возьми хост с WireGuard.",
   "health.doctor.warp_path.why.paused":
     "WARP на паузе, а от него зависят профили, поэтому они закрыты. Возобнови его в настройках ноды или переведи профили на прямой выход.",
   "health.doctor.warp_path.why.table_in_use":

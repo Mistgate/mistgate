@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -67,6 +69,95 @@ func TestHelloAdvertisesTheDoctor(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("Hello.capabilities = %v", hello.Capabilities)
+	}
+}
+
+func TestHelloAdvertisesUnitRefreshOnlyWithLauncher(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		launcher bool
+	}{
+		{"without launcher", false},
+		{"with launcher", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, harnessOpts{cfg: func(c *Config) {
+				if tc.launcher {
+					c.UnitRefreshLauncher = func(context.Context, func()) error { return nil }
+				}
+			}})
+			hello := <-h.panel.hellos
+			found := false
+			for _, c := range hello.Capabilities {
+				found = found || c == unit.CapabilityRefresh
+			}
+			if found != tc.launcher {
+				t.Fatalf("unit-refresh capability present=%v, want %v; capabilities=%v", found, tc.launcher, hello.Capabilities)
+			}
+		})
+	}
+}
+
+func TestRefreshUnitCommandResultFollowsQueueAndPrecedesRestart(t *testing.T) {
+	var h *harness
+	queued := make(chan struct{})
+	restarted := make(chan struct{})
+	release := make(chan struct{})
+	h = newHarness(t, harnessOpts{cfg: func(c *Config) {
+		c.UnitGen = 2
+		c.UnitUnderSystemd = true
+		c.UnitRefreshLauncher = func(ctx context.Context, afterQueue func()) error {
+			close(queued)
+			afterQueue()
+			select {
+			case <-release:
+				close(restarted)
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}})
+	h.waitConnected()
+	h.panel.send(&pb.ConnectResponse{Message: &pb.ConnectResponse_ApplyFix{ApplyFix: &pb.ApplyFix{
+		RequestId: "req_refresh", FixId: doctor.FixRefreshUnit,
+	}}})
+	result := h.panel.nextCmd()
+	if result.RequestId != "req_refresh" || !result.Ok || result.Params["unit_gen"] != "2" || result.Params["target"] != strconv.Itoa(unit.Generation) ||
+		!strings.Contains(result.Detail, "started") || strings.Contains(result.Detail, "would start") {
+		t.Fatalf("refresh result after queue: %+v", result)
+	}
+	select {
+	case <-queued:
+	default:
+		t.Fatal("systemd-run had not queued the helper before the CommandResult")
+	}
+	select {
+	case <-restarted:
+		t.Fatal("the helper restarted the service before the CommandResult was released")
+	default:
+	}
+	close(release)
+	select {
+	case <-restarted:
+	case <-time.After(time.Second):
+		t.Fatal("the queued helper did not restart after the ack gate opened")
+	}
+}
+
+func TestRefreshUnitPreflightErrorIsCodedBeforeAck(t *testing.T) {
+	h := newHarness(t, harnessOpts{cfg: func(c *Config) {
+		c.UnitGen = 2
+		c.UnitUnderSystemd = true
+		c.UnitRefreshLauncher = func(context.Context, func()) error { return unit.ErrPreflight }
+	}})
+	h.waitConnected()
+	h.panel.send(&pb.ConnectResponse{Message: &pb.ConnectResponse_ApplyFix{ApplyFix: &pb.ApplyFix{
+		RequestId: "req_refresh_preflight", FixId: doctor.FixRefreshUnit,
+	}}})
+	result := h.panel.nextCmd()
+	if result.RequestId != "req_refresh_preflight" || result.Ok || result.Error != doctor.ErrUnitRefreshInvalid {
+		t.Fatalf("preflight result = %+v", result)
 	}
 }
 

@@ -141,7 +141,7 @@ function FixDialog({ dlg, onClose, onConfirm }: { dlg: Dialog | null; onClose: (
     ? restart
       ? (restartConsequence(t, many ? "many" : "one", plan.params.online) ?? t("hl.fix.disruptive"))
       : plan.disruptive
-        ? t(d.target.fixId === "reconnect_warp" ? "hl.fix.disruptiveWarp" : "hl.fix.disruptive")
+        ? t(d.target.fixId === "reconnect_warp" ? "hl.fix.disruptiveWarp" : d.target.fixId === "refresh_unit" ? "hl.fix.disruptiveUnit" : "hl.fix.disruptive")
         : ""
     : "";
 

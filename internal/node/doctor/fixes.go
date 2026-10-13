@@ -9,15 +9,17 @@ import (
 	"strings"
 
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/unit"
 )
 
 // The fix vocabulary of CommandResult.error for ApplyFix (agent.proto "DOCTOR").
 const (
-	ErrUnknownFix      = "unknown_fix"
-	ErrBadParams       = "bad_params"
-	ErrNotApplicable   = "not_applicable"
-	ErrUnsupportedHost = "unsupported_host"
-	ErrFixBusy         = "busy"
+	ErrUnknownFix         = "unknown_fix"
+	ErrBadParams          = "bad_params"
+	ErrNotApplicable      = "not_applicable"
+	ErrUnsupportedHost    = "unsupported_host"
+	ErrFixBusy            = "busy"
+	ErrUnitRefreshInvalid = "unit_refresh_invalid"
 )
 
 // FixOutcome is the answer to Apply; the agent turns it into a CommandResult.
@@ -39,10 +41,15 @@ func noop(detail string) FixOutcome {
 	return FixOutcome{OK: true, Detail: detail, Params: p("noop", "1")}
 }
 
-// Apply runs one of the five fixes. The id is compared against a compiled list and never reaches a shell;
-// params are validated (an inbound id must be one this agent runs). dryRun changes nothing: it only reads
-// and describes. One fix at a time.
+// Apply runs one of the compiled fixes. The id never reaches a shell; params are validated before use. dryRun changes
+// nothing. One fix at a time.
 func (d *Doctor) Apply(ctx context.Context, fixID string, dryRun bool, params map[string]string) FixOutcome {
+	return d.ApplyWithRefreshAck(ctx, fixID, dryRun, params, nil)
+}
+
+// ApplyWithRefreshAck lets the agent send refresh_unit's CommandResult after systemd-run accepts the gated helper and
+// before the helper is released to restart this service. Other fixes do not call beforeRefresh.
+func (d *Doctor) ApplyWithRefreshAck(ctx context.Context, fixID string, dryRun bool, params map[string]string, beforeRefresh func(FixOutcome)) FixOutcome {
 	known := false
 	for _, id := range FixIDs() {
 		known = known || id == fixID
@@ -70,9 +77,78 @@ func (d *Doctor) Apply(ctx context.Context, fixID string, dryRun bool, params ma
 		return fixRestart(ctx, e, dryRun, params)
 	case FixReconnectWarp:
 		return fixReconnectWarp(ctx, e, dryRun, params)
-	default:
+	case FixRefreshUnit:
+		return fixRefreshUnit(ctx, e, dryRun, params, beforeRefresh)
+	case FixSetResolver:
 		return fixResolver(ctx, e, dryRun, params)
+	default:
+		return FixOutcome{Err: ErrUnknownFix}
 	}
+}
+
+func fixRefreshUnit(ctx context.Context, e *Env, dry bool, params map[string]string, beforeRefresh func(FixOutcome)) FixOutcome {
+	if !noParams(params) {
+		return FixOutcome{Err: ErrBadParams}
+	}
+	if !e.UnderSystemd || e.LaunchUnitRefresh == nil {
+		return FixOutcome{Err: ErrNotApplicable}
+	}
+	if e.UnitGen < 0 {
+		return FixOutcome{Err: ErrNotApplicable}
+	}
+	if e.UnitGen >= unit.Generation {
+		if e.UnitRefreshBusy != nil {
+			if err := e.UnitRefreshBusy(ctx); errors.Is(err, unit.ErrBusy) {
+				return FixOutcome{Err: ErrFixBusy}
+			} else if err != nil {
+				return failed(err)
+			}
+		}
+		return noop("systemd unit is already current")
+	}
+	paramsOut := p("unit_gen", strconv.Itoa(e.UnitGen), "target", strconv.Itoa(unit.Generation), "disruptive", "1")
+	detail := fmt.Sprintf("would start a systemd unit refresh from generation %d to %d; the agent restarts and connections drop for a few seconds", e.UnitGen, unit.Generation)
+	out := FixOutcome{OK: true, Affected: 1, Detail: detail, Params: paramsOut}
+	if dry {
+		return out
+	}
+	release := func(bool) {}
+	if e.UnitRefreshReserve != nil {
+		reserved, err := e.UnitRefreshReserve(ctx)
+		if errors.Is(err, unit.ErrBusy) {
+			return FixOutcome{Err: ErrFixBusy}
+		}
+		if err != nil {
+			return failed(err)
+		}
+		if reserved != nil {
+			release = reserved
+		}
+	}
+	keepReservation := false
+	defer func() {
+		if !keepReservation {
+			release(false)
+		}
+	}()
+	out.Detail = "systemd unit refresh started; the agent restarts and connections drop for a few seconds"
+	err := e.LaunchUnitRefresh(ctx, func() {
+		if beforeRefresh != nil {
+			beforeRefresh(out)
+		}
+	})
+	if errors.Is(err, unit.ErrBusy) {
+		return FixOutcome{Err: ErrFixBusy}
+	}
+	if errors.Is(err, unit.ErrPreflight) {
+		return FixOutcome{Err: ErrUnitRefreshInvalid, Detail: clip(firstLine(err.Error()), 180)}
+	}
+	if err != nil {
+		return failed(err)
+	}
+	release(true)
+	keepReservation = true
+	return out
 }
 
 // reconnect_warp retries the current health check when a configured tunnel is up/starting but its latest check failed.

@@ -53,6 +53,18 @@ func TestAwgBackendCheck(t *testing.T) {
 		want(t, r, Fail, "")
 		param(t, r, "hint", "no_tun")
 	})
+	t.Run("outdated systemd unit offers the shared refresh fix", func(t *testing.T) {
+		f := newFake(t)
+		b := AwgBackend{Mode: "auto", Reason: "open /dev/net/tun: no such file or directory"}
+		r := run(t, f.doctor(withInbounds(awgIn("failed")), func(e *Env) {
+			e.AwgBackend = func() AwgBackend { return b }
+			e.UnitGen = 2
+			e.UnderSystemd = true
+			e.LaunchUnitRefresh = func(context.Context, func()) error { return nil }
+		}), CheckAwgBackend)
+		want(t, r, Fail, FixRefreshUnit)
+		param(t, r, "hint", "unit_outdated")
+	})
 	t.Run("kernel mode without the module", func(t *testing.T) {
 		f := newFake(t)
 		b := AwgBackend{Mode: "kernel", Reason: "the amneziawg kernel module is not loaded"}

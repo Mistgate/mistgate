@@ -11,6 +11,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/node/warp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -148,6 +149,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if a.cfg.UnitGen >= 3 {
 		caps = append(caps, capUnit3)
+	}
+	if a.cfg.UnitRefreshLauncher != nil {
+		caps = append(caps, unit.CapabilityRefresh)
 	}
 	if a.cfg.AwgPrepare != nil && a.engines[awg.Protocol] != nil {
 		caps = append(caps, capAwgPrepare)

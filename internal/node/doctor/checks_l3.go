@@ -5,12 +5,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/node/unit"
 )
 
 // The two checks of the L3 protocols: awg_backend and warp_path. A down WARP tunnel can be reconnected with its
 // current account; host collisions, missing configuration, and unavailable WireGuard backends still need owner action.
-// Missing /dev/net/tun is the unit's (run `mistgate-node install`), and a missing kernel module is an explicit owner
-// action (`mistgate-node awg prepare-kernel`). Installing packages or rewriting the firewall is not in the safe set.
+// When an old systemd unit hides /dev/net/tun the doctor can offer its unit refresh; a missing kernel module is an
+// explicit owner action (`mistgate-node awg prepare-kernel`). Installing packages or rewriting the firewall is not in
+// the safe set.
 
 // AwgBackend is the choice of the AmneziaWG backend as the engine made it (awg.BackendStatus).
 type AwgBackend struct {
@@ -64,9 +67,12 @@ func checkAwgBackend(ctx context.Context, e *Env) Result {
 			Detail: clip("no AmneziaWG backend: "+b.Reason, 200)}
 		if strings.Contains(b.Reason, "/dev/net/tun") || strings.Contains(b.Reason, "tun") {
 			r.Params["hint"] = "no_tun"
-			if e.UnitGen > 0 && e.UnitGen < 3 {
+			if e.UnitGen > 0 && e.UnitGen < unit.Generation {
 				r.Params["hint"] = "unit_outdated" // the unit of generation 2 hides /dev/net/tun (PrivateDevices=yes)
 				r.Params["unit_gen"] = strconv.Itoa(e.UnitGen)
+				if e.UnderSystemd && e.LaunchUnitRefresh != nil {
+					r.FixID = FixRefreshUnit
+				}
 			}
 		} else if b.Mode == "kernel" {
 			r.Params["hint"] = "no_module"

@@ -68,13 +68,27 @@ type Env struct {
 	OwnIface func(name string) bool
 	// AwgBackend is the choice of the AmneziaWG backend (awg_backend check); nil = this build has no awg engine.
 	AwgBackend func() AwgBackend
+	// UnderSystemd says the agent was started by systemd, including an older unit without UnitGen.
+	UnderSystemd bool
+	// UnitSkipReason is "other_unit" when systemd owns the process but it is not mistgate-node.service.
+	UnitSkipReason string
+	// UnitRefreshBusy checks for an existing refresh job or an update before a no-op or refresh.
+	UnitRefreshBusy func(context.Context) error
+	// UnitRefreshReserve excludes update/rollback while the refresh job is started. release(true) leaves the persistent
+	// marker for the transient helper to clear after the service is healthy; release(false) cancels a failed launch.
+	UnitRefreshReserve func(context.Context) (release func(started bool), err error)
+	// LaunchUnitRefresh queues the fixed transient refresh job. beforeLaunch sends the started result after systemd-run
+	// accepts the job and before the helper's ack file lets it restart this service.
+	LaunchUnitRefresh func(context.Context, func()) error
 	// Warp is the WARP manager's view (warp_path check); nil = this build has no WARP manager.
 	Warp func(ctx context.Context) WarpInfo
 	// HostPath lists clashes of the host with the tunnel path (a routing table or rule preference another tool uses, a
 	// FORWARD drop policy); nil = not checked.
 	HostPath func(ctx context.Context) []PathFinding
-	// UnitGen is the generation of the systemd unit the agent runs from (MISTGATE_UNIT_GEN), 0 = unknown.
+	// UnitGen is the generation of the systemd unit the agent runs from (MISTGATE_UNIT_GEN), 0 = unknown or predates the variable.
 	UnitGen int
+	// AgentStartedAt lets unit_generation ignore outcomes left by earlier agent processes.
+	AgentStartedAt time.Time
 
 	// Fix actions.
 	ApplyBaseline  func(ctx context.Context) error

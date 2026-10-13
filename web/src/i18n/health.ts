@@ -177,6 +177,7 @@ export const en = {
   "hl.fix.nothing": "Nothing to do: the node is already in the wanted state.",
   "hl.fix.disruptive": "Client connections through this profile drop for a moment and reconnect by themselves.",
   "hl.fix.disruptiveWarp": "If WARP is still down when applied, traffic from profiles using it may pause briefly while the tunnel reconnects.",
+  "hl.fix.disruptiveUnit": "The agent restarts: every client connection on this node drops for a few seconds and reconnects by itself.",
   "hl.fix.restartNamed": "Restart “{profile}”",
   "hl.fix.details": "Details",
   "hl.fix.safe": "This changes nothing you would have to undo: only Mistgate’s own files and services are touched.",
@@ -188,6 +189,7 @@ export const en = {
   "hl.fix.err.bad_params": "the node refused the parameters",
   "hl.fix.err.not_applicable": "the problem is already gone or the host cannot do it",
   "hl.fix.err.unsupported_host": "this kind of host does not support it",
+  "hl.fix.err.unit_refresh_invalid": "the node checked the refresh first and found it cannot run it; nothing was started",
   "hl.fix.err.busy": "the node is busy with another fix",
   "hl.fix.err.generic": "the node reported an error",
   "hl.fix.tooOld": "This node’s agent is too old to apply fixes.",
@@ -289,6 +291,7 @@ export const en = {
   // ---- doctor titles (doctor.<check>.title), neutral: the facts come as a caption
   "doctor.disk_space.title": "Disk space",
   "doctor.journald_size.title": "System journal size",
+  "doctor.unit_generation.title": "Agent service unit",
   "doctor.dstate_tasks.title": "Hung processes",
   "doctor.time_sync.title": "Clock",
   "doctor.resolver.title": "Server resolver",
@@ -307,6 +310,8 @@ export const en = {
     "{mount} is {used_pct}% full, {free_mb} MB free. A full disk stops logs, certificate renewal and the agent itself. If the journal is the big part, the fix trims it; otherwise free the space by hand.",
   "health.doctor.journald_size.why":
     "The system journal takes {journal_mb} MB while the cap is {cap_mb} MB, so the cap is not working. Trimming it is safe and loses only old log lines.",
+  "health.doctor.unit_generation.why":
+    "The agent runs from a systemd unit that sets its sandbox, its memory limits and the guard that rolls back a self-update that keeps crashing. A unit of generation {unit_gen} lacks parts of it; refreshing writes generation {current} from the template built into the agent’s own binary.",
   "health.doctor.dstate_tasks.why":
     "Stuck processes: {stuck} ({tasks}), waiting for the hardware. Such a host soon stops answering SSH and apt. Nothing on the node fixes it: reboot it from the hoster’s panel.",
   "health.doctor.dstate_tasks.why.qxl_ttm":
@@ -394,6 +399,12 @@ export const en = {
   "doctor.detail.awg_backend.running": "{backend}: {version} (mode: {mode})",
   "doctor.detail.awg_backend.forward_drop": "Running ({backend}), but the host firewall drops forwarded traffic",
   "doctor.detail.awg_backend.unavailable": "No working AmneziaWG backend (mode: {mode}): {reason}",
+  "doctor.detail.unit_generation.current": "The unit is current (generation {current})",
+  "doctor.detail.unit_generation.outdated": "The unit is generation {unit_gen}; this agent writes generation {current}",
+  "doctor.detail.unit_generation.not_systemd": "The agent was not started by systemd: there is no unit to refresh",
+  "doctor.detail.unit_generation.unknown": "Unit generation {unit_gen} is unknown to this agent",
+  "doctor.detail.unit_generation.other_unit": "The agent runs from another systemd unit, not mistgate-node.service: the panel does not refresh it",
+  "doctor.detail.unit_generation.refresh_failed": "Refreshing the unit from generation {from_gen} to {to_gen} failed: {reason}. The node runs on its previous unit",
   "doctor.detail.warp_path.no_manager": "This build has no WARP manager",
   "doctor.detail.warp_path.unused": "WARP is not used on this node",
   "doctor.detail.warp_path.not_configured": "Profiles with WARP egress ({profiles}) cannot start: the node has no WARP account",
@@ -464,6 +475,8 @@ export const en = {
   "health.fix.set_resolver.plan": "Point the host resolver ({mode}) from {before} to {after}. The previous setting is backed up.",
   "health.fix.reconnect_warp.label": "Check WARP / reconnect if down",
   "health.fix.reconnect_warp.plan": "Rerun the WARP checks now; reconnect the configured tunnel and reapply its routes only if it is down.",
+  "health.fix.refresh_unit.label": "Refresh the service",
+  "health.fix.refresh_unit.plan": "Rewrite the agent’s systemd unit from generation {unit_gen} to {target} using the template built into its own binary, then restart the agent. Connections on this node drop for a few seconds.",
 
   // ---- check errors (health.check.err.<code>)
   "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
@@ -646,6 +659,7 @@ export const ru: typeof en = {
   "hl.fix.nothing": "Делать нечего: нода уже в нужном состоянии.",
   "hl.fix.disruptive": "Подключения клиентов через этот профиль на миг оборвутся и восстановятся сами.",
   "hl.fix.disruptiveWarp": "Если WARP всё ещё отключён при применении, трафик профилей через него может ненадолго прерваться при переподключении туннеля.",
+  "hl.fix.disruptiveUnit": "Агент перезапустится: все подключения клиентов на этой ноде оборвутся на несколько секунд и восстановятся сами.",
   "hl.fix.restartNamed": "Перезапустить «{profile}»",
   "hl.fix.details": "Подробности",
   "hl.fix.safe": "Ничего такого, что пришлось бы откатывать: затрагиваются только файлы и службы самого Mistgate.",
@@ -657,6 +671,7 @@ export const ru: typeof en = {
   "hl.fix.err.bad_params": "нода отклонила параметры",
   "hl.fix.err.not_applicable": "проблема уже ушла или хост этого не умеет",
   "hl.fix.err.unsupported_host": "такой хост этого не поддерживает",
+  "hl.fix.err.unit_refresh_invalid": "нода заранее проверила обновление службы и не может его выполнить; ничего не запускалось",
   "hl.fix.err.busy": "нода занята другим исправлением",
   "hl.fix.err.generic": "нода сообщила об ошибке",
   "hl.fix.tooOld": "Агент этой ноды слишком старый, чтобы применять исправления.",
@@ -758,6 +773,7 @@ export const ru: typeof en = {
   // ---- doctor titles
   "doctor.disk_space.title": "Место на диске",
   "doctor.journald_size.title": "Размер журнала systemd",
+  "doctor.unit_generation.title": "Служба агента",
   "doctor.dstate_tasks.title": "Зависшие процессы",
   "doctor.time_sync.title": "Часы",
   "doctor.resolver.title": "Резолвер сервера",
@@ -776,6 +792,8 @@ export const ru: typeof en = {
     "{mount} заполнен на {used_pct}%, свободно {free_mb} МБ. Полный диск останавливает журналы, продление сертификатов и самого агента. Если большая часть занята журналом, исправление его сожмёт; иначе освободи место вручную.",
   "health.doctor.journald_size.why":
     "Журнал systemd занимает {journal_mb} МБ при лимите {cap_mb} МБ, то есть лимит не работает. Сжатие безопасно: теряются только старые строки логов.",
+  "health.doctor.unit_generation.why":
+    "Агент работает из службы systemd: она задаёт его песочницу, лимиты памяти и защиту, которая откатывает самообновление, если новая версия раз за разом падает. В службе поколения {unit_gen} части этого нет; обновление пишет поколение {current} по шаблону, встроенному в бинарник самого агента.",
   "health.doctor.dstate_tasks.why":
     "Застрявших процессов: {stuck} ({tasks}), они ждут железо. Такой хост скоро перестаёт отвечать на SSH и apt. На самой ноде это не лечится: перезагрузи её из панели хостера.",
   "health.doctor.dstate_tasks.why.qxl_ttm":
@@ -863,6 +881,12 @@ export const ru: typeof en = {
   "doctor.detail.awg_backend.running": "{backend}: {version} (режим: {mode})",
   "doctor.detail.awg_backend.forward_drop": "Работает ({backend}), но файрвол хоста отбрасывает пересылаемый трафик",
   "doctor.detail.awg_backend.unavailable": "Нет рабочего бэкенда AmneziaWG (режим: {mode}): {reason}",
+  "doctor.detail.unit_generation.current": "Служба актуальна (поколение {current})",
+  "doctor.detail.unit_generation.outdated": "Служба поколения {unit_gen}, этот агент пишет поколение {current}",
+  "doctor.detail.unit_generation.not_systemd": "Агент запущен не через systemd: обновлять нечего",
+  "doctor.detail.unit_generation.unknown": "Поколение службы {unit_gen} этому агенту неизвестно",
+  "doctor.detail.unit_generation.other_unit": "Агент запущен из другой службы systemd, не mistgate-node.service: обновлять её панель не будет",
+  "doctor.detail.unit_generation.refresh_failed": "Не удалось обновить службу с поколения {from_gen} до {to_gen}: {reason}. Нода работает на прежней службе",
   "doctor.detail.warp_path.no_manager": "В этой сборке нет менеджера WARP",
   "doctor.detail.warp_path.unused": "WARP на этой ноде не используется",
   "doctor.detail.warp_path.not_configured": "Профили с выходом через WARP ({profiles}) не стартуют: у ноды нет аккаунта WARP",
@@ -933,6 +957,8 @@ export const ru: typeof en = {
   "health.fix.set_resolver.plan": "Направить резолвер хоста ({mode}) с {before} на {after}. Прежняя настройка сохраняется.",
   "health.fix.reconnect_warp.label": "Проверить WARP / переподключить при сбое",
   "health.fix.reconnect_warp.plan": "Запустить проверку WARP сейчас; если туннель отключён, переподключить его и восстановить маршруты.",
+  "health.fix.refresh_unit.label": "Обновить службу",
+  "health.fix.refresh_unit.plan": "Переписать службу systemd агента с поколения {unit_gen} на {target} по шаблону, встроенному в его бинарник и перезапустить агента. Подключения на этой ноде прервутся на несколько секунд.",
 
   // ---- check errors
   "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",

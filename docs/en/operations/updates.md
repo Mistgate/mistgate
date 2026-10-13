@@ -66,7 +66,7 @@ From top to bottom, by what needs you:
 | Update by hand | Its agent cannot update itself (see "Old agents" below). |
 | Offline | The node is not connected; the last known build is shown. |
 
-"No guard against repeated crashes" under a node means its service file has no crash-loop guard: only the agent's own 5-minute self-rollback protects an update there. Run `mistgate-node install` with a new binary on it once to add the guard.
+"No guard against repeated crashes" under a node means its service file has no crash-loop guard: only the agent's own 5-minute self-rollback protects an update there. If Health → Doctor offers **Refresh the service**, apply it there; the agent restarts and connections can drop for a few seconds. For an agent too old to offer the fix, run `mistgate-node install` with a current binary once.
 
 ## Update a node
 
@@ -158,7 +158,7 @@ Common step errors:
 | The release is older than what the node already runs | A newer signed build is needed. |
 | The bundle has no file for this node's system and architecture | The bundle lacks the binary for its architecture (for example `arm64`). |
 | The node could not download the file from the panel | Look at the node's link to the panel. |
-| The node cannot write next to its program file | Check the disk of the node; running `mistgate-node install` once writes a current service file. |
+| The node cannot write next to its program file | Check the disk of the node; apply **Refresh the service** in Health → Doctor when offered, or run `mistgate-node install` once with a current binary. |
 | The node did not answer the update command in 10 minutes | Look at the node. |
 | The node did not come back within 3 minutes | Look at the node and its logs. |
 | The client-eye check failed after the update | See [Health](health.md); the node is back on the previous version. |

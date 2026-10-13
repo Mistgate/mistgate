@@ -84,7 +84,14 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 
 func TestDryRunChangesNothing(t *testing.T) {
 	r, mk := newFixRig(t)
-	d := mk()
+	d := mk(func(e *Env) {
+		e.UnitGen = 2
+		e.UnderSystemd = true
+		e.LaunchUnitRefresh = func(context.Context, func()) error {
+			t.Fatal("dry run launched a unit refresh")
+			return nil
+		}
+	})
 	before := snapshot(t, r.f.root)
 	for _, fix := range FixIDs() {
 		params := map[string]string(nil)
@@ -408,7 +415,11 @@ func TestApplyGuards(t *testing.T) {
 	// Capabilities the host does not offer.
 	bare := r.f.doctor()
 	for _, fix := range FixIDs() {
-		if out := bare.Apply(context.Background(), fix, false, nil); out.Err != ErrUnsupportedHost {
+		want := ErrUnsupportedHost
+		if fix == FixRefreshUnit {
+			want = ErrNotApplicable // this process has no systemd refresh launcher
+		}
+		if out := bare.Apply(context.Background(), fix, false, nil); out.Err != want {
 			t.Errorf("%s without actions: %+v", fix, out)
 		}
 	}
@@ -442,7 +453,7 @@ func TestOneFixAtATime(t *testing.T) {
 }
 
 func TestRecheckIDsMatchTheChecksOfferingTheFix(t *testing.T) {
-	// Every fix a check can offer is re-checked by exactly the checks listed for it.
+	// Every synchronous fix a check can offer is re-checked by exactly the checks listed for it.
 	for fix, ids := range fixChecks {
 		if len(ids) == 0 {
 			t.Errorf("%s has no re-check", fix)
@@ -455,5 +466,8 @@ func TestRecheckIDsMatchTheChecksOfferingTheFix(t *testing.T) {
 	}
 	if RecheckIDs("nope") != nil {
 		t.Error("unknown fix has re-checks")
+	}
+	if RecheckIDs(FixRefreshUnit) != nil {
+		t.Error("refresh_unit has an immediate re-check; the restarted process reports it after reconnect")
 	}
 }
