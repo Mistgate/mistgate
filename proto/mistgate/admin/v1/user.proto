@@ -133,7 +133,8 @@ message User {
   // Node of the newest open session; empty when offline.
   string current_node_id = 17;
   string current_node_name = 18;
-  // 0 = no limit. Experimental: token bucket in the Hysteria traffic callback.
+  // The PERSON limit: 0 = no limit. Experimental: one token bucket per person on each node, shared by all the
+  // person's devices there. A person on two nodes at once can reach twice the limit.
   uint64 speed_limit_bps = 19 [jstype = JS_NUMBER];
   NodeSelection nodes = 20;
   int64 created_unix = 21 [jstype = JS_NUMBER];
@@ -152,6 +153,8 @@ message User {
   string subscription_name = 28;
   // The colour of the user's group (Group.color), so a list of people paints the group's chip without a second request.
   string group_color = 29;
+  // The DEVICE limit: no single device of the person goes faster than this. 0 = no separate device limit.
+  uint64 device_speed_limit_bps = 30 [jstype = JS_NUMBER];
 }
 
 enum DnsSource {
@@ -310,9 +313,12 @@ message CreateUserRequest {
   AppToggles apps = 7;
   // Absent = all nodes.
   NodeSelection nodes = 8;
+  // The person limit (User.speed_limit_bps).
   uint64 speed_limit_bps = 9 [jstype = JS_NUMBER];
   // Empty = inherit (group, then the instance default).
   string dns_preset_id = 10;
+  // The device limit (User.device_speed_limit_bps).
+  uint64 device_speed_limit_bps = 11 [jstype = JS_NUMBER];
 }
 
 message CreateUserResponse {
@@ -333,7 +339,7 @@ message UpdateUserRequest {
   optional uint32 device_limit = 7;
   optional AppToggles apps = 8;
   optional NodeSelection nodes = 9;
-  // 0 = remove the limit.
+  // The person limit. 0 = remove the limit.
   optional uint64 speed_limit_bps = 10 [jstype = JS_NUMBER];
   // "" = inherit.
   optional string dns_preset_id = 11;
@@ -341,6 +347,8 @@ message UpdateUserRequest {
   bool dry_run = 12;
   // Empty clears the public name and falls back to the account name.
   optional string subscription_name = 13;
+  // The device limit (User.device_speed_limit_bps). 0 = remove the limit.
+  optional uint64 device_speed_limit_bps = 14 [jstype = JS_NUMBER];
 }
 
 message UpdateUserResponse {

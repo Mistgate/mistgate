@@ -76,8 +76,11 @@ type UserCred struct {
 	UserID       string
 	DeviceID     string
 	Data         json.RawMessage // verifier, never the raw end-user secret
-	RateLimitBps uint64          // 0 = unlimited
-	ValidUntil   time.Time       // zero = no expiry; the agent drops the credential itself at this time
+	RateLimitBps uint64          // the device limit: this credential never goes faster; 0 = unlimited
+	// UserRateLimitBps is the person limit: one bucket shared by every credential of UserID on the node; 0 = none. An
+	// agent that does not list "user-rate-limit/1" never gets it (the panel folds it into RateLimitBps).
+	UserRateLimitBps uint64
+	ValidUntil       time.Time // zero = no expiry; the agent drops the credential itself at this time
 }
 
 // UserTraffic is a counter delta. Up = client -> internet, Down = internet -> client (the END USER's

@@ -256,8 +256,11 @@ type Node struct {
 	// Mode and SHA-256 last reported by the node agent.
 	DecoyAgentMode   string `protobuf:"bytes,32,opt,name=decoy_agent_mode,json=decoyAgentMode,proto3" json:"decoy_agent_mode,omitempty"`
 	DecoyAgentSha256 string `protobuf:"bytes,33,opt,name=decoy_agent_sha256,json=decoyAgentSha256,proto3" json:"decoy_agent_sha256,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The connected or last-seen agent lists "user-rate-limit/1", so it applies the per-person speed limit
+	// (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
+	UserRateLimitSupported bool `protobuf:"varint,34,opt,name=user_rate_limit_supported,json=userRateLimitSupported,proto3" json:"user_rate_limit_supported,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Node) Reset() {
@@ -519,6 +522,13 @@ func (x *Node) GetDecoyAgentSha256() string {
 		return x.DecoyAgentSha256
 	}
 	return ""
+}
+
+func (x *Node) GetUserRateLimitSupported() bool {
+	if x != nil {
+		return x.UserRateLimitSupported
+	}
+	return false
 }
 
 // The automatic preparation of the kernel module, as the panel last learned it from the node.
@@ -2900,7 +2910,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xc1\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xfc\n" +
 	"\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -2941,7 +2951,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x15decoy_panel_available\x18\x1e \x01(\bR\x13decoyPanelAvailable\x12.\n" +
 	"\x13decoy_own_available\x18\x1f \x01(\bR\x11decoyOwnAvailable\x12(\n" +
 	"\x10decoy_agent_mode\x18  \x01(\tR\x0edecoyAgentMode\x12,\n" +
-	"\x12decoy_agent_sha256\x18! \x01(\tR\x10decoyAgentSha256\"\xc0\x01\n" +
+	"\x12decoy_agent_sha256\x18! \x01(\tR\x10decoyAgentSha256\x129\n" +
+	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\"\xc0\x01\n" +
 	"\n" +
 	"AwgPrepare\x12\x1c\n" +
 	"\tsupported\x18\x01 \x01(\bR\tsupported\x128\n" +

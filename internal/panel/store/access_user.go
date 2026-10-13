@@ -23,7 +23,8 @@ type AccessUser struct {
 	UsedBytes                                      uint64
 	ExpiresAt                                      time.Time // zero = never
 	DeviceLimit                                    int
-	SpeedLimitBps                                  uint64
+	SpeedLimitBps                                  uint64 // the person's limit: all their devices on one node together (0 = none)
+	DeviceSpeedLimitBps                            uint64 // one device's limit (0 = none)
 	SubTokenHash, SubTokenEnc                      []byte
 	LastSeenAt                                     time.Time
 	LastNodeID                                     string
@@ -34,7 +35,7 @@ type AccessUser struct {
 }
 
 const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.all_nodes,
-	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps,
+	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps, u.device_speed_limit_bps,
 	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id AS group_dns_preset_id`
 
 const accUserFrom = ` FROM user u JOIN user_group g ON g.id = u.group_id `
@@ -42,15 +43,15 @@ const accUserFrom = ` FROM user u JOIN user_group g ON g.id = u.group_id `
 func scanAccessUser(r rowScanner) (AccessUser, error) {
 	var u AccessUser
 	var dis, happ, amn, all int
-	var quota, used, speed, period, seen, created int64
+	var quota, used, speed, deviceSpeed, period, seen, created int64
 	var expires sql.NullInt64
 	var lastNode, dns, gdns sql.NullString
 	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &all,
-		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed,
+		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed, &deviceSpeed,
 		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns)
 	u.DNSPresetID, u.GroupDNSPresetID = dns.String, gdns.String
 	u.Disabled, u.AppHapp, u.AppAmnezia, u.AllNodes = dis == 1, happ == 1, amn == 1, all == 1
-	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps = uint64(quota), uint64(used), uint64(speed)
+	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps, u.DeviceSpeedLimitBps = uint64(quota), uint64(used), uint64(speed), uint64(deviceSpeed)
 	u.PeriodStart = fromUnix(period)
 	u.ExpiresAt = accTimeIfNonzero(expires)
 	u.LastSeenAt = accTimeIfNonzero(sql.NullInt64{Int64: seen, Valid: true})
@@ -96,10 +97,10 @@ type AccessCred struct {
 
 func accInsertUserStmt(u AccessUser) Stmt {
 	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
-		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, device_speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
-			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps),
+			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps),
 			u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID)}}
 }
 
@@ -481,11 +482,11 @@ func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) err
 	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
 		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
-			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?,
+			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?, device_speed_limit_bps = ?,
 			   dns_preset_id = ?
 			 WHERE id = ?`,
 			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
-				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
+				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
 	}
 	if setNodes {
 		stmts = append(stmts, accSetUserNodeStmts(u.ID, u.NodeIDs)...)
@@ -980,7 +981,8 @@ func (a Access) revokeDevice(ctx context.Context, id string, now time.Time, cond
 // the protocol's Clients().
 type AccessDesiredCred struct {
 	InboundID, CredID, UserID, DeviceID, Protocol, DataJSON string
-	SpeedLimitBps                                           uint64
+	SpeedLimitBps                                           uint64 // the person's limit (user.speed_limit_bps)
+	DeviceSpeedLimitBps                                     uint64 // one device's limit (user.device_speed_limit_bps)
 	ExpiresAt                                               time.Time
 	AppHapp, AppAmnezia                                     bool
 }
@@ -988,7 +990,7 @@ type AccessDesiredCred struct {
 // DesiredCreds returns the candidate credentials of every enabled inbound of a node.
 func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia
+		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia
 		 FROM inbound i
 		 JOIN profile p ON p.id = i.profile_id
 		 JOIN user_group_profile gp ON gp.profile_id = p.id
@@ -1006,13 +1008,14 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 	var out []AccessDesiredCred
 	for rows.Next() {
 		var c AccessDesiredCred
-		var speed int64
+		var speed, deviceSpeed int64
 		var exp sql.NullInt64
 		var happ, amn int
-		if err := rows.Scan(&c.InboundID, &c.CredID, &c.UserID, &c.DeviceID, &c.Protocol, &c.DataJSON, &speed, &exp, &happ, &amn); err != nil {
+		if err := rows.Scan(&c.InboundID, &c.CredID, &c.UserID, &c.DeviceID, &c.Protocol, &c.DataJSON, &speed, &deviceSpeed, &exp, &happ, &amn); err != nil {
 			return nil, err
 		}
-		c.SpeedLimitBps, c.ExpiresAt, c.AppHapp, c.AppAmnezia = uint64(speed), accTimeIfNonzero(exp), happ == 1, amn == 1
+		c.SpeedLimitBps, c.DeviceSpeedLimitBps = uint64(speed), uint64(deviceSpeed)
+		c.ExpiresAt, c.AppHapp, c.AppAmnezia = accTimeIfNonzero(exp), happ == 1, amn == 1
 		out = append(out, c)
 	}
 	return out, rows.Err()

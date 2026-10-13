@@ -29,6 +29,8 @@ const (
 	capVLESSSelf = "vless-self/1"
 	capVLESSTLS  = "vless-tls/1"
 	capWarp      = "warp/1"
+	// capUserRateLimit: the agent shares one bucket per person (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
+	capUserRateLimit = "user-rate-limit/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
@@ -125,6 +127,11 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 				continue
 			}
 			creds := append([]plugin.UserCred(nil), x.Creds...)
+			if !slices.Contains(caps, capUserRateLimit) {
+				for i := range creds {
+					creds[i].RateLimitBps, creds[i].UserRateLimitBps = foldRateLimits(creds[i].RateLimitBps, creds[i].UserRateLimitBps), 0
+				}
+			}
 			sort.Slice(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 			st.in[x.Spec.ID] = &inboundState{spec: x.Spec, specHash: statehash.Spec(x.Spec), creds: creds}
 		}
@@ -137,6 +144,16 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 	}
 	st.hash = statehash.StateWarp(st.list(), st.warp)
 	return st, nil
+}
+
+// foldRateLimits is the limit an agent without "user-rate-limit/1" gets: it cannot share a bucket between devices, so it
+// holds every device to the smaller of the two non-zero limits (per device, as before the person limit existed, and never
+// faster than the device limit). 0 = unlimited.
+func foldRateLimits(device, person uint64) uint64 {
+	if device == 0 || (person != 0 && person < device) {
+		return person
+	}
+	return device
 }
 
 // prepareDesiredState reads the node and builds its desired state without touching session state.
@@ -209,6 +226,10 @@ func credentialHashWithBuffer(c plugin.UserCred, data []byte) (string, []byte) {
 	// existing digest layout so old hashes remain stable for second-aligned expiries.
 	clear(value[:])
 	data = append(data, value[:]...)
+	if c.UserRateLimitBps != 0 { // appended only when set: the digest of a credential without a person limit stays as it was
+		binary.BigEndian.PutUint64(value[:], c.UserRateLimitBps)
+		data = append(data, value[:]...)
+	}
 	return shortHash(data), data
 }
 
@@ -373,7 +394,7 @@ func warpProto(w *plugin.WarpSpec) *agentv1.WarpSpec {
 
 func credProto(c plugin.UserCred) *agentv1.Credential {
 	return &agentv1.Credential{CredId: c.CredID, UserId: c.UserID, DeviceId: c.DeviceID, DataJson: string(c.Data),
-		RateLimitBps: c.RateLimitBps, ValidUntilUnix: credentialValidUntilUnix(c)}
+		RateLimitBps: c.RateLimitBps, UserRateLimitBps: c.UserRateLimitBps, ValidUntilUnix: credentialValidUntilUnix(c)}
 }
 
 func credsProto(cs []plugin.UserCred) []*agentv1.Credential {

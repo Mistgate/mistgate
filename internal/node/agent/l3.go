@@ -37,6 +37,9 @@ const (
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
+	// capUserRateLimit: the engines that shape traffic per credential also share a bucket per person
+	// (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
+	capUserRateLimit = "user-rate-limit/1"
 	// capUnit3 says the node runs from a systemd unit of generation 3: /dev/net/tun is reachable (the userspace AWG
 	// and WARP backends need it) and ExecStopPost cleans the tunnel interfaces. A node without it keeps working with
 	// the kernel backends and shows the hint "unit_outdated" on the awg_backend doctor check.
@@ -138,6 +141,9 @@ func (a *Agent) capabilities() []string {
 			caps = append(caps, capVLESSSelf, capVLESSTLS)
 		}
 	}
+	if a.appliesUserRateLimit() {
+		caps = append(caps, capUserRateLimit)
+	}
 	if a.cfg.Warp != nil {
 		caps = append(caps, capWarp)
 	}
@@ -160,6 +166,22 @@ func (a *Agent) capabilities() []string {
 		return caps
 	}
 	return append(caps, a.upd.Capabilities()...)
+}
+
+// appliesUserRateLimit: some engine shares a bucket per person and none that shapes per credential cannot (an engine that
+// shapes nothing, like awg, does not count: it ignores the device limit too). Otherwise the panel folds the person limit
+// into the device limit for this agent.
+func (a *Agent) appliesUserRateLimit() bool {
+	found := false
+	for _, e := range a.engines {
+		c := e.Capabilities()
+		if c.RateLimitPerUser {
+			found = true
+		} else if c.RateLimitPerCred {
+			return false
+		}
+	}
+	return found
 }
 
 // engineSettings hands NodeSettings to the engines that follow it.

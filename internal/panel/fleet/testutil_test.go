@@ -378,7 +378,7 @@ func warpFromProto(w *agentv1.WarpSpec) *plugin.WarpSpec {
 }
 
 func credFromProto(c *agentv1.Credential) plugin.UserCred {
-	uc := plugin.UserCred{CredID: c.CredId, UserID: c.UserId, DeviceID: c.DeviceId, Data: json.RawMessage(c.DataJson), RateLimitBps: c.RateLimitBps}
+	uc := plugin.UserCred{CredID: c.CredId, UserID: c.UserId, DeviceID: c.DeviceId, Data: json.RawMessage(c.DataJson), RateLimitBps: c.RateLimitBps, UserRateLimitBps: c.UserRateLimitBps}
 	if c.ValidUntilUnix != 0 {
 		uc.ValidUntil = time.Unix(c.ValidUntilUnix, 0)
 	}

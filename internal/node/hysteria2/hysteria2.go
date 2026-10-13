@@ -36,6 +36,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/node/torrentguard"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -65,6 +66,7 @@ type eng struct {
 	log            *slog.Logger
 	now            func() time.Time
 	out            func(name string) (engine.Egress, error)
+	users          *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
 	torrentEnabled atomic.Bool
 	torrentVersion uint64 // guards inbound generations under mu so toggles replace existing outbound flows
 
@@ -83,7 +85,10 @@ func New(env engine.Env) (engine.Engine, error) {
 	if env.Certs == nil {
 		return nil, errors.New("hysteria2: Env.Certs is required")
 	}
-	e := &eng{env: env, log: env.Log, now: env.Now, out: env.Egress, inbounds: map[string]*inbound{}, tcpClaims: map[uint16]string{}}
+	e := &eng{env: env, log: env.Log, now: env.Now, out: env.Egress, users: env.UserLimits, inbounds: map[string]*inbound{}, tcpClaims: map[uint16]string{}}
+	if e.users == nil {
+		e.users = ratelimit.NewRegistry()
+	}
 	if e.log == nil {
 		e.log = slog.Default()
 	}
@@ -117,7 +122,7 @@ func (e *eng) Version() string {
 }
 
 func (e *eng) Capabilities() engine.Capabilities {
-	return engine.Capabilities{RateLimitPerCred: true, HardExpiry: true}
+	return engine.Capabilities{RateLimitPerCred: true, RateLimitPerUser: true, HardExpiry: true}
 }
 
 // NodeSettings changes the protocol-level torrent detector. Reapplying inbounds closes outbound flows that
@@ -182,7 +187,7 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	if old != nil {
 		oldIdx = old.idx.Load()
 	}
-	ix, err := buildIndex(spec.ID, oldIdx, creds)
+	ix, err := buildIndex(spec.ID, oldIdx, creds, e.users)
 	if err != nil {
 		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("hysteria2 inbound %q: %w", spec.ID, err)
 	}
@@ -487,6 +492,7 @@ func (e *eng) Remove(ctx context.Context, inboundID string) error {
 // drop stops an inbound for good and queues its counters. Caller holds e.mu.
 func (e *eng) drop(in *inbound) {
 	in.stop(true)
+	e.users.Sync(in.spec.ID, nil)
 	for _, cs := range in.idx.Load().byID {
 		cs.removed.Store(true)
 		e.retired = append(e.retired, cs)

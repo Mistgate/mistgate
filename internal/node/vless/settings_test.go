@@ -110,7 +110,7 @@ func TestSettingsSchemaToEngineAndOrder(t *testing.T) {
 		t.Fatalf("parsed derived/legacy fields: flow=%q ws=%q %q", got.flow, got.wsPath, got.wsHost)
 	}
 
-	creds, err := buildIndex(first.ID, nil, []plugin.UserCred{{CredID: "alice", Data: json.RawMessage(`{"id":"66ad4540-b58c-4ad2-9926-ea63445a9b57"}`)}}, time.Now, func(d time.Duration, f func()) stoppable { return time.AfterFunc(d, f) })
+	creds, err := buildIndex(first.ID, nil, []plugin.UserCred{{CredID: "alice", Data: json.RawMessage(`{"id":"66ad4540-b58c-4ad2-9926-ea63445a9b57"}`)}}, time.Now, func(d time.Duration, f func()) stoppable { return time.AfterFunc(d, f) }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

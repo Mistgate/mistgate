@@ -24,14 +24,15 @@ type credState struct {
 	hash      [32]byte // sha256(auth token); immutable (a changed token makes a new credState)
 	owner     atomic.Pointer[credIdentity]
 
-	validUntil atomic.Int64 // unix seconds, 0 = never
-	limit      atomic.Pointer[ratelimit.Limiter]
-	up, down   atomic.Uint64 // user's view: core tx = up, core rx = down
-	conns      atomic.Int32  // open QUIC connections
-	kicks      atomic.Int32  // connections still to be closed at their next packet (see takeKick)
-	kickUntil  atomic.Int64  // unix nano; unused kick tokens expire
-	lastKill   atomic.Int64  // unix nano of the last token taken
-	removed    atomic.Bool   // dropped from the index; its sessions are dying
+	validUntil atomic.Int64                      // unix seconds, 0 = never
+	limit      atomic.Pointer[ratelimit.Limiter] // the device limit: this credential's own bucket
+	person     atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
+	up, down   atomic.Uint64                     // user's view: core tx = up, core rx = down
+	conns      atomic.Int32                      // open QUIC connections
+	kicks      atomic.Int32                      // connections still to be closed at their next packet (see takeKick)
+	kickUntil  atomic.Int64                      // unix nano; unused kick tokens expire
+	lastKill   atomic.Int64                      // unix nano of the last token taken
+	removed    atomic.Bool                       // dropped from the index; its sessions are dying
 }
 
 type credIdentity struct{ userID string }
@@ -48,8 +49,9 @@ type parsedCred struct {
 }
 
 // buildIndex validates creds (nothing is touched on error), then reuses the states of credentials that
-// already exist in old and updates their mutable fields.
-func buildIndex(inboundID string, old *index, creds []plugin.UserCred) (*index, error) {
+// already exist in old and updates their mutable fields. users hands out the person buckets of the inbound's
+// credentials (nil: no person limits).
+func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ratelimit.Registry) (*index, error) {
 	parsed := make([]parsedCred, 0, len(creds))
 	seenID := make(map[string]struct{}, len(creds))
 	seenHash := make(map[[32]byte]string, len(creds))
@@ -84,6 +86,11 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred) (*index, 
 		byHash: make(map[[32]byte]*credState, len(parsed)),
 		byID:   make(map[string]*credState, len(parsed)),
 	}
+	holders := make([]ratelimit.Holder, len(parsed))
+	for i, p := range parsed {
+		holders[i] = ratelimit.Holder{CredID: p.c.CredID, UserID: p.c.UserID, BPS: p.c.UserRateLimitBps}
+	}
+	shared := users.Sync(inboundID, holders)
 	for _, p := range parsed {
 		var cs *credState
 		if old != nil {
@@ -108,6 +115,7 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred) (*index, 
 		case cur == nil || cur.BPS() != p.c.RateLimitBps:
 			cs.limit.Store(ratelimit.New(p.c.RateLimitBps))
 		}
+		cs.person.Store(shared[p.c.CredID])
 		ix.byHash[p.hash] = cs
 		ix.byID[p.c.CredID] = cs
 	}
@@ -145,10 +153,10 @@ func (in *inbound) LogTraffic(id string, tx, rx uint64) bool {
 	if cs.takeKick(time.Now()) {
 		return false
 	}
-	if l := cs.limit.Load(); l != nil {
-		// One bucket per direction; for UDP this stalls the connection's single receive loop,
-		// which is acceptable for an experimental limit. Waits end when the inbound stops.
-		if !l.WaitUp(in.ctx, tx) || !l.WaitDown(in.ctx, rx) {
+	if device, person := cs.limit.Load(), cs.person.Load(); device != nil || person != nil {
+		// One bucket per direction, the device's then the person's; for UDP this stalls the connection's single
+		// receive loop, which is acceptable for an experimental limit. Waits end when the inbound stops.
+		if !ratelimit.WaitUp(in.ctx, device, person, tx) || !ratelimit.WaitDown(in.ctx, device, person, rx) {
 			return false
 		}
 	}

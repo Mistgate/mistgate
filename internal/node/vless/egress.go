@@ -50,7 +50,8 @@ type credState struct {
 	owner     atomic.Pointer[credIdentity]
 
 	validUntil atomic.Int64
-	limit      atomic.Pointer[ratelimit.Limiter]
+	limit      atomic.Pointer[ratelimit.Limiter] // the device limit: this credential's own bucket
+	person     atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
 	up, down   atomic.Uint64
 	removed    atomic.Bool
 
@@ -63,7 +64,8 @@ type credState struct {
 	expiryTimer stoppable
 }
 
-func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred, now func() time.Time, after afterFunc) (*credentialIndex, error) {
+// users hands out the person buckets of the inbound's credentials (nil: no person limits).
+func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred, now func() time.Time, after afterFunc, users *ratelimit.Registry) (*credentialIndex, error) {
 	parsed := make([]parsedCredential, 0, len(creds))
 	seenID := make(map[string]struct{}, len(creds))
 	seenUUID := make(map[xuuid.UUID]string, len(creds))
@@ -94,6 +96,11 @@ func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred,
 	}
 
 	ix := &credentialIndex{byID: make(map[string]*credState, len(parsed))}
+	holders := make([]ratelimit.Holder, len(parsed))
+	for i, p := range parsed {
+		holders[i] = ratelimit.Holder{CredID: p.cred.CredID, UserID: p.cred.UserID, BPS: p.cred.UserRateLimitBps}
+	}
+	shared := users.Sync(inboundID, holders)
 	for _, p := range parsed {
 		var cs *credState
 		if old != nil {
@@ -105,6 +112,7 @@ func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred,
 			cs = &credState{id: p.cred.CredID, inboundID: inboundID, uuid: p.uuid, links: make(map[*transport.Link]*linkHandle), now: now, after: after}
 		}
 		cs.configure(p.cred)
+		cs.person.Store(shared[cs.id])
 		ix.byID[cs.id] = cs
 	}
 	return ix, nil
@@ -349,12 +357,13 @@ type countWriter struct {
 
 func (w countWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	n := uint64(mb.Len())
-	if limit := w.cred.limit.Load(); limit != nil {
+	device, person := w.cred.limit.Load(), w.cred.person.Load()
+	if device != nil || person != nil {
 		ok := false
 		if w.up {
-			ok = limit.WaitUp(w.ctx, n)
+			ok = ratelimit.WaitUp(w.ctx, device, person, n)
 		} else {
-			ok = limit.WaitDown(w.ctx, n)
+			ok = ratelimit.WaitDown(w.ctx, device, person, n)
 		}
 		if !ok {
 			return w.ctx.Err()
@@ -565,7 +574,7 @@ func (in *inbound) udpUpload(ctx context.Context, link *transport.Link, cs *cred
 			if packet.UDP != nil {
 				target = *packet.UDP
 			}
-			if limit := cs.limit.Load(); limit != nil && !limit.WaitUp(ctx, uint64(packet.Len())) {
+			if !ratelimit.WaitUp(ctx, cs.limit.Load(), cs.person.Load(), uint64(packet.Len())) {
 				buf.ReleaseMulti(mb)
 				return ctx.Err()
 			}
@@ -591,7 +600,7 @@ func (in *inbound) udpDownload(ctx context.Context, link *transport.Link, cs *cr
 		if err != nil {
 			return err
 		}
-		if limit := cs.limit.Load(); limit != nil && !limit.WaitDown(ctx, uint64(n)) {
+		if !ratelimit.WaitDown(ctx, cs.limit.Load(), cs.person.Load(), uint64(n)) {
 			return ctx.Err()
 		}
 		response := buf.FromBytes(append([]byte(nil), packet[:n]...))

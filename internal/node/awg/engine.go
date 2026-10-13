@@ -155,7 +155,8 @@ func (e *Engine) Version() string {
 // Capabilities: the interface is shared by all users of a profile, so no per-credential rate limit; a credential
 // cannot expire by itself on the device (the agent withdraws it).
 func (e *Engine) Capabilities() engine.Capabilities {
-	return engine.Capabilities{RateLimitPerCred: false, HardExpiry: false}
+	// A tunnel interface is not shaped per credential or per person: both speed limits are ignored on awg inbounds.
+	return engine.Capabilities{RateLimitPerCred: false, RateLimitPerUser: false, HardExpiry: false}
 }
 
 // BackendStatus says which backend was chosen, or why there is none (for the doctor and the node page).

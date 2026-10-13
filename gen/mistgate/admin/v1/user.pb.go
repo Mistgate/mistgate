@@ -452,7 +452,8 @@ type User struct {
 	// Node of the newest open session; empty when offline.
 	CurrentNodeId   string `protobuf:"bytes,17,opt,name=current_node_id,json=currentNodeId,proto3" json:"current_node_id,omitempty"`
 	CurrentNodeName string `protobuf:"bytes,18,opt,name=current_node_name,json=currentNodeName,proto3" json:"current_node_name,omitempty"`
-	// 0 = no limit. Experimental: token bucket in the Hysteria traffic callback.
+	// The PERSON limit: 0 = no limit. Experimental: one token bucket per person on each node, shared by all the
+	// person's devices there. A person on two nodes at once can reach twice the limit.
 	SpeedLimitBps uint64         `protobuf:"varint,19,opt,name=speed_limit_bps,json=speedLimitBps,proto3" json:"speed_limit_bps,omitempty"`
 	Nodes         *NodeSelection `protobuf:"bytes,20,opt,name=nodes,proto3" json:"nodes,omitempty"`
 	CreatedUnix   int64          `protobuf:"varint,21,opt,name=created_unix,json=createdUnix,proto3" json:"created_unix,omitempty"`
@@ -470,9 +471,11 @@ type User struct {
 	// Optional name shown on the public subscription page; empty falls back to name.
 	SubscriptionName string `protobuf:"bytes,28,opt,name=subscription_name,json=subscriptionName,proto3" json:"subscription_name,omitempty"`
 	// The colour of the user's group (Group.color), so a list of people paints the group's chip without a second request.
-	GroupColor    string `protobuf:"bytes,29,opt,name=group_color,json=groupColor,proto3" json:"group_color,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	GroupColor string `protobuf:"bytes,29,opt,name=group_color,json=groupColor,proto3" json:"group_color,omitempty"`
+	// The DEVICE limit: no single device of the person goes faster than this. 0 = no separate device limit.
+	DeviceSpeedLimitBps uint64 `protobuf:"varint,30,opt,name=device_speed_limit_bps,json=deviceSpeedLimitBps,proto3" json:"device_speed_limit_bps,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -706,6 +709,13 @@ func (x *User) GetGroupColor() string {
 		return x.GroupColor
 	}
 	return ""
+}
+
+func (x *User) GetDeviceSpeedLimitBps() uint64 {
+	if x != nil {
+		return x.DeviceSpeedLimitBps
+	}
+	return 0
 }
 
 type ListUsersRequest struct {
@@ -1653,12 +1663,15 @@ type CreateUserRequest struct {
 	// Absent = both on. At least one must be on.
 	Apps *AppToggles `protobuf:"bytes,7,opt,name=apps,proto3" json:"apps,omitempty"`
 	// Absent = all nodes.
-	Nodes         *NodeSelection `protobuf:"bytes,8,opt,name=nodes,proto3" json:"nodes,omitempty"`
-	SpeedLimitBps uint64         `protobuf:"varint,9,opt,name=speed_limit_bps,json=speedLimitBps,proto3" json:"speed_limit_bps,omitempty"`
+	Nodes *NodeSelection `protobuf:"bytes,8,opt,name=nodes,proto3" json:"nodes,omitempty"`
+	// The person limit (User.speed_limit_bps).
+	SpeedLimitBps uint64 `protobuf:"varint,9,opt,name=speed_limit_bps,json=speedLimitBps,proto3" json:"speed_limit_bps,omitempty"`
 	// Empty = inherit (group, then the instance default).
-	DnsPresetId   string `protobuf:"bytes,10,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DnsPresetId string `protobuf:"bytes,10,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
+	// The device limit (User.device_speed_limit_bps).
+	DeviceSpeedLimitBps uint64 `protobuf:"varint,11,opt,name=device_speed_limit_bps,json=deviceSpeedLimitBps,proto3" json:"device_speed_limit_bps,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateUserRequest) Reset() {
@@ -1761,6 +1774,13 @@ func (x *CreateUserRequest) GetDnsPresetId() string {
 	return ""
 }
 
+func (x *CreateUserRequest) GetDeviceSpeedLimitBps() uint64 {
+	if x != nil {
+		return x.DeviceSpeedLimitBps
+	}
+	return 0
+}
+
 type CreateUserResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	User            *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
@@ -1834,7 +1854,7 @@ type UpdateUserRequest struct {
 	DeviceLimit *uint32        `protobuf:"varint,7,opt,name=device_limit,json=deviceLimit,proto3,oneof" json:"device_limit,omitempty"`
 	Apps        *AppToggles    `protobuf:"bytes,8,opt,name=apps,proto3,oneof" json:"apps,omitempty"`
 	Nodes       *NodeSelection `protobuf:"bytes,9,opt,name=nodes,proto3,oneof" json:"nodes,omitempty"`
-	// 0 = remove the limit.
+	// The person limit. 0 = remove the limit.
 	SpeedLimitBps *uint64 `protobuf:"varint,10,opt,name=speed_limit_bps,json=speedLimitBps,proto3,oneof" json:"speed_limit_bps,omitempty"`
 	// "" = inherit.
 	DnsPresetId *string `protobuf:"bytes,11,opt,name=dns_preset_id,json=dnsPresetId,proto3,oneof" json:"dns_preset_id,omitempty"`
@@ -1842,8 +1862,10 @@ type UpdateUserRequest struct {
 	DryRun bool `protobuf:"varint,12,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
 	// Empty clears the public name and falls back to the account name.
 	SubscriptionName *string `protobuf:"bytes,13,opt,name=subscription_name,json=subscriptionName,proto3,oneof" json:"subscription_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The device limit (User.device_speed_limit_bps). 0 = remove the limit.
+	DeviceSpeedLimitBps *uint64 `protobuf:"varint,14,opt,name=device_speed_limit_bps,json=deviceSpeedLimitBps,proto3,oneof" json:"device_speed_limit_bps,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -1965,6 +1987,13 @@ func (x *UpdateUserRequest) GetSubscriptionName() string {
 		return *x.SubscriptionName
 	}
 	return ""
+}
+
+func (x *UpdateUserRequest) GetDeviceSpeedLimitBps() uint64 {
+	if x != nil && x.DeviceSpeedLimitBps != nil {
+		return *x.DeviceSpeedLimitBps
+	}
+	return 0
 }
 
 type UpdateUserResponse struct {
@@ -2818,7 +2847,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\aamnezia\x18\x02 \x01(\bR\aamnezia\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xa3\t\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xdc\t\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -2856,7 +2885,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\x12+\n" +
 	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\x12\x1f\n" +
 	"\vgroup_color\x18\x1d \x01(\tR\n" +
-	"groupColor\"\x9f\x02\n" +
+	"groupColor\x127\n" +
+	"\x16device_speed_limit_bps\x18\x1e \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -2940,7 +2970,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x16\n" +
 	"\x06client\x18\x04 \x01(\tR\x06client\x12%\n" +
 	"\fblocked_unix\x18\x05 \x01(\x03B\x020\x02R\vblockedUnix\x12 \n" +
-	"\vfingerprint\x18\x06 \x01(\tR\vfingerprint\"\xa2\x03\n" +
+	"\vfingerprint\x18\x06 \x01(\tR\vfingerprint\"\xdb\x03\n" +
 	"\x11CreateUserRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x19\n" +
 	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12#\n" +
@@ -2954,11 +2984,12 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x05nodes\x18\b \x01(\v2 .mistgate.admin.v1.NodeSelectionR\x05nodes\x12*\n" +
 	"\x0fspeed_limit_bps\x18\t \x01(\x04B\x020\x02R\rspeedLimitBps\x12\"\n" +
 	"\rdns_preset_id\x18\n" +
-	" \x01(\tR\vdnsPresetId\"\x91\x01\n" +
+	" \x01(\tR\vdnsPresetId\x127\n" +
+	"\x16device_speed_limit_bps\x18\v \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\"\x91\x01\n" +
 	"\x12CreateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x12)\n" +
 	"\x10subscription_url\x18\x02 \x01(\tR\x0fsubscriptionUrl\x12#\n" +
-	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xe9\x05\n" +
+	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xc2\x06\n" +
 	"\x11UpdateUserRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1e\n" +
@@ -2976,7 +3007,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\rdns_preset_id\x18\v \x01(\tH\tR\vdnsPresetId\x88\x01\x01\x12\x17\n" +
 	"\adry_run\x18\f \x01(\bR\x06dryRun\x120\n" +
 	"\x11subscription_name\x18\r \x01(\tH\n" +
-	"R\x10subscriptionName\x88\x01\x01B\a\n" +
+	"R\x10subscriptionName\x88\x01\x01\x12<\n" +
+	"\x16device_speed_limit_bps\x18\x0e \x01(\x04B\x020\x02H\vR\x13deviceSpeedLimitBps\x88\x01\x01B\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_group_idB\x0e\n" +
 	"\f_quota_bytesB\x0e\n" +
@@ -2987,7 +3019,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x06_nodesB\x12\n" +
 	"\x10_speed_limit_bpsB\x10\n" +
 	"\x0e_dns_preset_idB\x14\n" +
-	"\x12_subscription_name\"z\n" +
+	"\x12_subscription_nameB\x19\n" +
+	"\x17_device_speed_limit_bps\"z\n" +
 	"\x12UpdateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x127\n" +
 	"\x06impact\x18\x02 \x01(\v2\x1f.mistgate.admin.v1.AccessImpactR\x06impact\"\x94\x01\n" +

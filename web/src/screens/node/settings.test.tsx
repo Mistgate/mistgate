@@ -301,6 +301,22 @@ describe("IPv6 for clients", () => {
   });
 });
 
+describe("per-person speed limit", () => {
+  it("says an agent that cannot share a bucket holds each device to the smaller limit", async () => {
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: false });
+    expect(text()).toContain(en["node.settings.userRateLimitUnsupported"]);
+  });
+
+  it("is quiet for an agent that applies it, and for a node that never connected", async () => {
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: true });
+    expect(text()).not.toContain(en["node.settings.userRateLimitUnsupported"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 0, userRateLimitSupported: false });
+    expect(text()).not.toContain(en["node.settings.userRateLimitUnsupported"]);
+  });
+});
+
 describe("retiring a node", () => {
   it("goes back to the list when the agent got the order", async () => {
     retireNode.mockResolvedValue({ agentNotified: true });

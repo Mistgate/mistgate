@@ -93,9 +93,12 @@ package mistgate.agent.v1;
 //                   listen.network, listen.port, listen.hop_from, listen.hop_to, tls.mode,
 //                   tls.server_name, egress, settings_json)))                 // decimal integers, "1"/"0" bools
 //   creds_hash(i) = hex(sha256(join("\n", sorted(cred_id + "\x1f" + hex(sha256(data_json)) + "\x1f" +
-//                   rate_limit_bps + "\x1f" + valid_until_unix for every credential))))
+//                   rate_limit_bps + "\x1f" + valid_until_unix [+ "\x1f" + user_rate_limit_bps, only when it is not 0]
+//                   for every credential))))
 //   state_hash    = hex(sha256(join("\n", sorted(inbound_id + "\x1f" + spec_hash + "\x1f" + creds_hash
 //                   for every inbound))))
+//   user_rate_limit_bps is appended to a credential's line ONLY when it is not 0, so the hash of a state without
+//   person limits is byte for byte what it was before the field existed.
 //   spec_version is deliberately part of the hash: it is bumped by the panel when profile settings
 //   or inbound overrides change, so a missed update shows up as a mismatch.
 //   L3 additions ("AWG AND WARP" below). Both are appended ONLY when present, so every hash of a node
@@ -382,6 +385,21 @@ package mistgate.agent.v1;
 //   already has bundle_sha256; otherwise it contains the complete static file tree. The agent validates and persists
 //   the files before switching. One CommandResult answers the command with params{"mode", "sha256"}.
 //
+// SPEED LIMITS (additive, protocol api_version stays 1)
+//   A user has two limits, both optional. The DEVICE limit is Credential.rate_limit_bps: that credential never goes
+//   faster. The PERSON limit is Credential.user_rate_limit_bps: one token bucket per user_id on THIS node, shared by all
+//   the person's credentials (every inbound, every engine), so their devices together never go faster. A byte waits
+//   for the device bucket first and then for the person bucket. The person limit is per node: a person on two nodes at
+//   once can reach twice the limit; there is no coordination between nodes.
+//   - CAPABILITY GATE. An agent lists "user-rate-limit/1" when its engines apply the person limit (Hysteria2 and VLESS;
+//     AmneziaWG shapes neither limit). To any other agent the panel sends rate_limit_bps = the smaller of the two
+//     non-zero limits and user_rate_limit_bps = 0 (per device, as before the person limit existed), and the node page
+//     says the node does not apply the person limit.
+//   - The credentials of one user on a node carry the same value. If they ever disagree (a delta applied in
+//     parts) the bucket takes the smallest non-zero one, so the result does not depend on the order of arrival.
+//   - The bucket is created with the first credential that carries a limit, changes its rate in place when the value
+//     changes, and goes away with the user's last such credential (or when its inbound is removed).
+//
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
@@ -497,7 +515,8 @@ message Hello {
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
   // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
-  // "decoy/1" (SetDecoy; see "NODE DECOY SITE").
+  // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
+  // "SPEED LIMITS").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -1105,11 +1124,16 @@ message Credential {
   // AmneziaWG: {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],"psk":"<base64>"}
   // (see "AWG AND WARP"; the PSK is a per-peer secret, like any WireGuard server holds).
   string data_json = 4;
-  // 0 = unlimited. Engines that cannot shape traffic ignore it and say so in Engine.Capabilities.
+  // The DEVICE limit: this credential never goes faster than this. 0 = unlimited. Engines that cannot shape traffic
+  // ignore it and say so in Engine.Capabilities (RateLimitPerCred).
   uint64 rate_limit_bps = 5;
   // 0 = no expiry. The agent drops the credential (and closes its sessions) at this time by itself, so a
   // term ends on time even while the panel link is down. Quotas cannot be enforced offline.
   int64 valid_until_unix = 6;
+  // The PERSON limit (see "SPEED LIMITS"): one bucket shared by every credential of Credential.user_id on THIS
+  // node, so the person's devices together never go faster than this. 0 = none. Sent only to agents that list
+  // "user-rate-limit/1"; for any other the panel folds both limits into rate_limit_bps and leaves this 0.
+  uint64 user_rate_limit_bps = 7;
 }
 
 message Kick {

@@ -22,6 +22,7 @@ import (
 	agentpb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -39,6 +40,7 @@ type eng struct {
 	now   func() time.Time
 	after afterFunc
 	out   func(string) (engine.Egress, error)
+	users *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
 
 	torrentEnabled atomic.Bool
 	idleTimeout    time.Duration
@@ -105,6 +107,9 @@ func New(env engine.Env) (engine.Engine, error) {
 	after := afterFunc(func(d time.Duration, f func()) stoppable { return time.AfterFunc(d, f) })
 	e := &eng{env: env, log: logger, now: now, after: after, idleTimeout: 300 * time.Second, inbounds: make(map[string]*inbound)}
 	e.out = env.Egress
+	if e.users = env.UserLimits; e.users == nil {
+		e.users = ratelimit.NewRegistry()
+	}
 	if e.out == nil {
 		direct := egress.New(env.DNS)
 		e.out = func(name string) (engine.Egress, error) {
@@ -140,7 +145,7 @@ func displayVersion(v string) string {
 }
 
 func (e *eng) Capabilities() engine.Capabilities {
-	return engine.Capabilities{RateLimitPerCred: true, HardExpiry: true}
+	return engine.Capabilities{RateLimitPerCred: true, RateLimitPerUser: true, HardExpiry: true}
 }
 
 func (e *eng) NodeSettings(_ context.Context, st *agentpb.NodeSettings) bool {
@@ -172,7 +177,7 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	if old != nil {
 		oldIdx = old.idx.Load()
 	}
-	ix, err := buildIndex(spec.ID, oldIdx, creds, e.now, e.after)
+	ix, err := buildIndex(spec.ID, oldIdx, creds, e.now, e.after, e.users)
 	if err != nil {
 		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("vless inbound %q: %w", spec.ID, err)
 	}
@@ -492,6 +497,7 @@ func (e *eng) Remove(_ context.Context, inboundID string) error {
 	defer e.mu.Unlock()
 	if in := e.inbounds[inboundID]; in != nil {
 		in.stop(true)
+		e.users.Sync(inboundID, nil)
 		if ix := in.idx.Load(); ix != nil {
 			for _, cs := range ix.byID {
 				if cs.retire() {
@@ -597,6 +603,7 @@ func (e *eng) Close(context.Context) error {
 	e.closed = true
 	for _, in := range e.sortedInbounds() {
 		in.stop(true)
+		e.users.Sync(in.spec.ID, nil)
 		if ix := in.idx.Load(); ix != nil {
 			for _, cs := range ix.byID {
 				if cs.retire() {

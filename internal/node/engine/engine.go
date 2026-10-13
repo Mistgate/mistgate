@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -66,7 +67,10 @@ type TCPPortUser interface {
 }
 
 type Capabilities struct {
-	RateLimitPerCred bool // honours UserCred.RateLimitBps
+	RateLimitPerCred bool // honours UserCred.RateLimitBps (the device limit)
+	// RateLimitPerUser: honours UserCred.UserRateLimitBps, one bucket per user shared by all the user's credentials on the
+	// node (Env.UserLimits). An engine with RateLimitPerCred but not this one makes the agent withhold "user-rate-limit/1".
+	RateLimitPerUser bool
 	HardExpiry       bool // honours UserCred.ValidUntil itself (the agent also enforces it, this is an optimisation)
 }
 
@@ -106,6 +110,9 @@ type Env struct {
 	// for HTTP/3 (the core's MasqHandler) and for TCP 443 (hysteria extras/masq.MasqTCPServer).
 	Masquerade func(inboundID string) http.Handler
 	Now        func() time.Time
+	// UserLimits holds the person limit buckets, shared by every engine of the agent so that a person's hysteria2 and vless
+	// credentials draw on one bucket. Nil: the engine keeps a registry of its own.
+	UserLimits *ratelimit.Registry
 }
 
 // Event is a small, protocol-neutral signal from an engine to the node agent.

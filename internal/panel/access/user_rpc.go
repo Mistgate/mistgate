@@ -134,7 +134,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
-			SpeedLimitBps: u.SpeedLimitBps, Nodes: &adminv1.NodeSelection{All: u.AllNodes, NodeIds: u.NodeIDs},
+			SpeedLimitBps: u.SpeedLimitBps, DeviceSpeedLimitBps: u.DeviceSpeedLimitBps, Nodes: &adminv1.NodeSelection{All: u.AllNodes, NodeIds: u.NodeIDs},
 			CreatedUnix: u.CreatedAt.Unix(), DnsPresetId: u.DNSPresetID,
 		}
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
@@ -260,7 +260,7 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 		ID: id, Name: name, GroupID: m.GroupId, Status: ComputeStatus(false, expires, m.QuotaBytes, 0, now),
 		AppHapp: happ, AppAmnezia: amnezia, AllNodes: all, NodeIDs: nodeIDs,
 		QuotaBytes: m.QuotaBytes, QuotaReset: reset, PeriodStart: PeriodStart(reset, now), ExpiresAt: expires,
-		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DNSPresetID: m.DnsPresetId,
+		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DeviceSpeedLimitBps: m.DeviceSpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
 	}
 	// No device yet: the first app that fetches the subscription makes its own, with its own credentials.
@@ -556,6 +556,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	if m.SpeedLimitBps != nil {
 		u.SpeedLimitBps = *m.SpeedLimitBps
 	}
+	if m.DeviceSpeedLimitBps != nil {
+		u.DeviceSpeedLimitBps = *m.DeviceSpeedLimitBps
+	}
 	if m.DnsPresetId != nil {
 		if err := s.checkDNSPreset(ctx, *m.DnsPresetId); err != nil {
 			return nil, err
@@ -587,7 +590,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	// No credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
 	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
-		!u.ExpiresAt.Equal(old.ExpiresAt) {
+		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()
 	}
 	s.audit(ctx, actor(ctx), "user_update", map[string]any{"user": u.ID, "name": u.Name, "fields": changedUserFields(m)})
@@ -748,7 +751,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 	}{
 		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
 		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Nodes != nil, "nodes"},
-		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
+		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DeviceSpeedLimitBps != nil, "device_speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
 	} {
 		if x.set {
 			f = append(f, x.name)

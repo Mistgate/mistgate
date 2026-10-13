@@ -66,6 +66,9 @@ func Creds(cs []plugin.UserCred) string {
 			vu = c.ValidUntil.Unix()
 		}
 		lines[i] = c.CredID + us + hexSum(string(c.Data)) + us + u(c.RateLimitBps) + us + strconv.FormatInt(vu, 10)
+		if c.UserRateLimitBps != 0 { // appended only when set: every hash without a person limit is what it was before
+			lines[i] += us + u(c.UserRateLimitBps)
+		}
 	}
 	sort.Strings(lines)
 	return hexSum(strings.Join(lines, "\n"))

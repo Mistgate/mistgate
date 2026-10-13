@@ -252,6 +252,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	caps := live.AgentCaps
 	out.TorrentBlockerSupported = capabilityPresent(caps, capTorrentGuard)
 	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
+	out.UserRateLimitSupported = capabilityPresent(caps, capUserRateLimit)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	if live.Connected {
 		out.Online = protocolCounts(onlineByProtocolView(view))

@@ -41,6 +41,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/node/speedtest"
 	"github.com/mistgate/mistgate/internal/node/update"
 )
@@ -332,8 +333,10 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	a.id.Store(id)
 	a.settings.Store(&pb.NodeSettings{})
 
+	userLimits := ratelimit.NewRegistry() // one per agent: a person's hysteria2 and vless credentials share their bucket
 	for proto, f := range engines {
 		e, err := f(engine.Env{
+			UserLimits: userLimits,
 			Log:        a.log.With("source", proto),
 			Event:      a.engineEvent,
 			Certs:      cfg.Certs,

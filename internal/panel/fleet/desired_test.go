@@ -92,12 +92,13 @@ func TestCredentialHashMatchesWireFields(t *testing.T) {
 	}
 	baseHash := credentialHash(base)
 	for name, mutate := range map[string]func(*plugin.UserCred){
-		"credential id": func(c *plugin.UserCred) { c.CredID += "_changed" },
-		"user id":       func(c *plugin.UserCred) { c.UserID += "_changed" },
-		"device id":     func(c *plugin.UserCred) { c.DeviceID += "_changed" },
-		"data":          func(c *plugin.UserCred) { c.Data = json.RawMessage(`{"auth":"changed"}`) },
-		"rate limit":    func(c *plugin.UserCred) { c.RateLimitBps++ },
-		"expiry second": func(c *plugin.UserCred) { c.ValidUntil = c.ValidUntil.Add(time.Second) },
+		"credential id":     func(c *plugin.UserCred) { c.CredID += "_changed" },
+		"user id":           func(c *plugin.UserCred) { c.UserID += "_changed" },
+		"device id":         func(c *plugin.UserCred) { c.DeviceID += "_changed" },
+		"data":              func(c *plugin.UserCred) { c.Data = json.RawMessage(`{"auth":"changed"}`) },
+		"rate limit":        func(c *plugin.UserCred) { c.RateLimitBps++ },
+		"person rate limit": func(c *plugin.UserCred) { c.UserRateLimitBps++ },
+		"expiry second":     func(c *plugin.UserCred) { c.ValidUntil = c.ValidUntil.Add(time.Second) },
 	} {
 		changed := base
 		mutate(&changed)

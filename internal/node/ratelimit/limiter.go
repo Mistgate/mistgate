@@ -1,22 +1,47 @@
-// Package ratelimit provides the per-credential byte token bucket shared by node engines.
+// Package ratelimit provides the byte token buckets shared by node engines: one per credential (the device limit) and
+// one per user on the node (the person limit, see Registry).
 package ratelimit
 
 import (
 	"context"
+	"sync/atomic"
+	"time"
 
 	"golang.org/x/time/rate"
 )
 
 const minBurst = 64 * 1024
 
-// Limiter keeps independent upload and download buckets. BPS is the configured limit in bits per second.
+// Limiter keeps independent upload and download buckets. BPS is the configured limit in bits per second; SetBPS
+// changes it in place, so everything holding the limiter follows.
 type Limiter struct {
-	bps  uint64
+	bps  atomic.Uint64
 	up   *rate.Limiter
 	down *rate.Limiter
+	clk  clock
 }
 
-func New(bps uint64) *Limiter {
+// clock is the time source of the waits; tests replace it so that a wait advances a fake time instead of sleeping.
+type clock struct {
+	now   func() time.Time
+	sleep func(ctx context.Context, d time.Duration) bool
+}
+
+var realClock = clock{now: time.Now, sleep: sleepCtx}
+
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// bucket returns the refill rate (bytes/s) and the burst of a limit in bits per second.
+func bucket(bps uint64) (rate.Limit, int) {
 	bytes := bps / 8
 	if bytes == 0 {
 		bytes = 1
@@ -25,21 +50,69 @@ func New(bps uint64) *Limiter {
 	if burst < minBurst {
 		burst = minBurst
 	}
-	return &Limiter{bps: bps, up: rate.NewLimiter(rate.Limit(bytes), burst), down: rate.NewLimiter(rate.Limit(bytes), burst)}
+	return rate.Limit(bytes), burst
 }
 
-func (l *Limiter) BPS() uint64 { return l.bps }
+func New(bps uint64) *Limiter { return newWithClock(bps, realClock) }
 
-func (l *Limiter) WaitUp(ctx context.Context, n uint64) bool { return wait(ctx, l.up, n) }
+func newWithClock(bps uint64, clk clock) *Limiter {
+	r, burst := bucket(bps)
+	l := &Limiter{up: rate.NewLimiter(r, burst), down: rate.NewLimiter(r, burst), clk: clk}
+	l.bps.Store(bps)
+	return l
+}
 
-func (l *Limiter) WaitDown(ctx context.Context, n uint64) bool { return wait(ctx, l.down, n) }
+func (l *Limiter) BPS() uint64 { return l.bps.Load() }
 
-func wait(ctx context.Context, l *rate.Limiter, n uint64) bool {
+// SetBPS changes the limit of both buckets in place. Tokens already in a bucket stay (capped by the new burst).
+func (l *Limiter) SetBPS(bps uint64) {
+	if l.bps.Swap(bps) == bps {
+		return
+	}
+	r, burst := bucket(bps)
+	for _, b := range []*rate.Limiter{l.up, l.down} {
+		b.SetLimit(r)
+		b.SetBurst(burst)
+	}
+}
+
+func (l *Limiter) WaitUp(ctx context.Context, n uint64) bool { return l.wait(ctx, l.up, n) }
+
+func (l *Limiter) WaitDown(ctx context.Context, n uint64) bool { return l.wait(ctx, l.down, n) }
+
+// WaitUp waits until n upload bytes may pass both the device limiter and the person limiter; either may be nil
+// (no such limit). The device bucket goes first: a device held back by its own limit must not sit on tokens of the
+// person bucket that the person's other devices could use. No lock is held while waiting. False: ctx ended.
+func WaitUp(ctx context.Context, device, person *Limiter, n uint64) bool {
+	return (device == nil || device.WaitUp(ctx, n)) && (person == nil || person.WaitUp(ctx, n))
+}
+
+// WaitDown is WaitUp for the download direction.
+func WaitDown(ctx context.Context, device, person *Limiter, n uint64) bool {
+	return (device == nil || device.WaitDown(ctx, n)) && (person == nil || person.WaitDown(ctx, n))
+}
+
+// wait reserves n bytes (clamped to the burst, so a chunk bigger than the bucket cannot wait forever) and sleeps
+// until they are due; it is rate.Limiter.WaitN with the clock made injectable.
+func (l *Limiter) wait(ctx context.Context, b *rate.Limiter, n uint64) bool {
 	if n == 0 {
 		return true
 	}
-	if n > uint64(l.Burst()) {
-		n = uint64(l.Burst())
+	if burst := uint64(b.Burst()); n > burst {
+		n = burst
 	}
-	return l.WaitN(ctx, int(n)) == nil
+	now := l.clk.now()
+	r := b.ReserveN(now, int(n))
+	if !r.OK() { // cannot happen after the clamp; fail closed rather than pass unshaped
+		return false
+	}
+	d := r.DelayFrom(now)
+	if d <= 0 {
+		return true
+	}
+	if !l.clk.sleep(ctx, d) {
+		r.CancelAt(l.clk.now())
+		return false
+	}
+	return true
 }

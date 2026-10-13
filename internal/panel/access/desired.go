@@ -64,7 +64,8 @@ func (s *Service) Desired(ctx context.Context, nodeID string) ([]NodeInbound, er
 		}
 		out[i].Creds = append(out[i].Creds, plugin.UserCred{
 			CredID: r.CredID, UserID: r.UserID, DeviceID: r.DeviceID, Data: json.RawMessage(r.DataJSON),
-			RateLimitBps: r.SpeedLimitBps, ValidUntil: r.ExpiresAt,
+			// The device limit is the credential's own; the person limit is shared by the person's credentials on the node.
+			RateLimitBps: r.DeviceSpeedLimitBps, UserRateLimitBps: r.SpeedLimitBps, ValidUntil: r.ExpiresAt,
 		})
 	}
 	return out, nil

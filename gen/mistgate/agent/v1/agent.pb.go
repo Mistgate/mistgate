@@ -904,7 +904,8 @@ type Hello struct {
 	// "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
 	// (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
 	// UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
-	// "decoy/1" (SetDecoy; see "NODE DECOY SITE").
+	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
+	// "SPEED LIMITS").
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -4749,13 +4750,18 @@ type Credential struct {
 	// AmneziaWG: {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],"psk":"<base64>"}
 	// (see "AWG AND WARP"; the PSK is a per-peer secret, like any WireGuard server holds).
 	DataJson string `protobuf:"bytes,4,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
-	// 0 = unlimited. Engines that cannot shape traffic ignore it and say so in Engine.Capabilities.
+	// The DEVICE limit: this credential never goes faster than this. 0 = unlimited. Engines that cannot shape traffic
+	// ignore it and say so in Engine.Capabilities (RateLimitPerCred).
 	RateLimitBps uint64 `protobuf:"varint,5,opt,name=rate_limit_bps,json=rateLimitBps,proto3" json:"rate_limit_bps,omitempty"`
 	// 0 = no expiry. The agent drops the credential (and closes its sessions) at this time by itself, so a
 	// term ends on time even while the panel link is down. Quotas cannot be enforced offline.
 	ValidUntilUnix int64 `protobuf:"varint,6,opt,name=valid_until_unix,json=validUntilUnix,proto3" json:"valid_until_unix,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The PERSON limit (see "SPEED LIMITS"): one bucket shared by every credential of Credential.user_id on THIS
+	// node, so the person's devices together never go faster than this. 0 = none. Sent only to agents that list
+	// "user-rate-limit/1"; for any other the panel folds both limits into rate_limit_bps and leaves this 0.
+	UserRateLimitBps uint64 `protobuf:"varint,7,opt,name=user_rate_limit_bps,json=userRateLimitBps,proto3" json:"user_rate_limit_bps,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Credential) Reset() {
@@ -4826,6 +4832,13 @@ func (x *Credential) GetRateLimitBps() uint64 {
 func (x *Credential) GetValidUntilUnix() int64 {
 	if x != nil {
 		return x.ValidUntilUnix
+	}
+	return 0
+}
+
+func (x *Credential) GetUserRateLimitBps() uint64 {
+	if x != nil {
+		return x.UserRateLimitBps
 	}
 	return 0
 }
@@ -6094,7 +6107,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x03Tls\x12.\n" +
 	"\x04mode\x18\x01 \x01(\x0e2\x1a.mistgate.agent.v1.TlsModeR\x04mode\x12\x1f\n" +
 	"\vserver_name\x18\x02 \x01(\tR\n" +
-	"serverName\"\xc8\x01\n" +
+	"serverName\"\xf7\x01\n" +
 	"\n" +
 	"Credential\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x17\n" +
@@ -6102,7 +6115,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\x12\x1b\n" +
 	"\tdata_json\x18\x04 \x01(\tR\bdataJson\x12$\n" +
 	"\x0erate_limit_bps\x18\x05 \x01(\x04R\frateLimitBps\x12(\n" +
-	"\x10valid_until_unix\x18\x06 \x01(\x03R\x0evalidUntilUnix\"X\n" +
+	"\x10valid_until_unix\x18\x06 \x01(\x03R\x0evalidUntilUnix\x12-\n" +
+	"\x13user_rate_limit_bps\x18\a \x01(\x04R\x10userRateLimitBps\"X\n" +
 	"\x04Kick\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x19\n" +

@@ -177,7 +177,7 @@ func credFromPB(c *pb.Credential) (plugin.UserCred, error) {
 	}
 	uc := plugin.UserCred{
 		CredID: c.CredId, UserID: c.UserId, DeviceID: c.DeviceId,
-		Data: json.RawMessage(c.DataJson), RateLimitBps: c.RateLimitBps,
+		Data: json.RawMessage(c.DataJson), RateLimitBps: c.RateLimitBps, UserRateLimitBps: c.UserRateLimitBps,
 	}
 	if c.ValidUntilUnix > 0 {
 		uc.ValidUntil = time.Unix(c.ValidUntilUnix, 0)
@@ -200,7 +200,7 @@ func specToPB(s plugin.InboundSpec) *pb.InboundSpec {
 }
 
 func credToPB(c plugin.UserCred) *pb.Credential {
-	pc := &pb.Credential{CredId: c.CredID, UserId: c.UserID, DeviceId: c.DeviceID, DataJson: string(c.Data), RateLimitBps: c.RateLimitBps}
+	pc := &pb.Credential{CredId: c.CredID, UserId: c.UserID, DeviceId: c.DeviceID, DataJson: string(c.Data), RateLimitBps: c.RateLimitBps, UserRateLimitBps: c.UserRateLimitBps}
 	if !c.ValidUntil.IsZero() {
 		pc.ValidUntilUnix = c.ValidUntil.Unix()
 	}

@@ -182,7 +182,12 @@ func TestEffectiveAccess(t *testing.T) {
 		m.Nodes = &adminv1.NodeSelection{NodeIds: []string{"nod_nl1"}}
 	}).User
 	frank := e.user("frank", g2, nil).User
-	gina := e.user("gina", f.group, func(m *adminv1.CreateUserRequest) { m.QuotaBytes = 100; m.SpeedLimitBps = 5000; m.TermDays = 30 }).User
+	gina := e.user("gina", f.group, func(m *adminv1.CreateUserRequest) {
+		m.QuotaBytes = 100
+		m.SpeedLimitBps = 5000
+		m.DeviceSpeedLimitBps = 2000
+		m.TermDays = 30
+	}).User
 
 	must(e.s.SetUsersEnabled(e.ctx, req(&adminv1.SetUsersEnabledRequest{UserIds: []string{b.Id}, Enabled: false})))
 	e.sql(`UPDATE user SET expires_at = ? WHERE id = ?`, e.clock.Add(-time.Hour).Unix(), c.Id)
@@ -214,8 +219,11 @@ func TestEffectiveAccess(t *testing.T) {
 		if !strings.HasPrefix(cr.CredID, "crd_") || cr.DeviceID == "" {
 			t.Errorf("cred = %+v", cr)
 		}
-		if cr.UserID == gina.Id && (cr.RateLimitBps != 5000 || cr.ValidUntil.IsZero()) {
-			t.Errorf("gina's limits were not carried: %+v", cr)
+		if cr.UserID != gina.Id && (cr.RateLimitBps != 0 || cr.UserRateLimitBps != 0) {
+			t.Errorf("a user without limits got one: %+v", cr)
+		}
+		if cr.UserID == gina.Id && (cr.UserRateLimitBps != 5000 || cr.RateLimitBps != 2000 || cr.ValidUntil.IsZero()) {
+			t.Errorf("gina's limits were not carried (person 5000 -> UserRateLimitBps, device 2000 -> RateLimitBps): %+v", cr)
 		}
 		var data map[string]string
 		if json.Unmarshal(cr.Data, &data) != nil || len(data["auth_sha256"]) != 64 {

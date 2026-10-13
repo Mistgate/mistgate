@@ -113,6 +113,9 @@ message Node {
   // Mode and SHA-256 last reported by the node agent.
   string decoy_agent_mode = 32;
   string decoy_agent_sha256 = 33;
+  // The connected or last-seen agent lists "user-rate-limit/1", so it applies the per-person speed limit
+  // (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
+  bool user_rate_limit_supported = 34;
 }
 
 enum AwgPrepareState {

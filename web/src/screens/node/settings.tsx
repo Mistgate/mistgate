@@ -306,6 +306,13 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
           </label>
         </div>
 
+        {/* an agent without "user-rate-limit/1" holds every device to the smaller of the person and device limits */}
+        {!retired && node.lastSeenUnix > 0 && !node.userRateLimitSupported && (
+          <div className="rounded-card border border-line bg-surface px-3.5 py-3">
+            <span className="text-xs leading-snug text-muted">{t("node.settings.userRateLimitUnsupported")}</span>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <Button type="submit" variant="primary" size="md" disabled={!dirty || !!errors.name || !!errors.address || !!errors.dns || !!errors.bandwidth || save.isPending}>
             {t("common.save")}
