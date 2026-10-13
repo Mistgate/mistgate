@@ -17,7 +17,7 @@ Hysteria2, AmneziaWG and VLESS REALITY on your own servers: add a server from th
 <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/"><b>Docs</b></a> · <a href="#quick-start"><b>Install</b></a> · <a href="#screenshots"><b>Screenshots</b></a> · <a href="#compared-with-other-panels"><b>Compare</b></a> · <a href="README.ru.md">Русский</a></p>
+<p><a href="https://mistgate.app/"><b>Docs</b></a> · <a href="#quick-start"><b>Install</b></a> · <a href="#screenshots"><b>Screenshots</b></a> · <a href="#compared-with-other-panels"><b>Compare</b></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a></p>
 
 <p><sub><b>Beta.</b> Mistgate runs in production, but until 1.0 expect rough edges, and the API, the stored settings and the node protocol may still change. <a href="https://mistgate.app/roadmap/status/">Status and roadmap</a></sub></p>
 

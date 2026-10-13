@@ -17,7 +17,7 @@ Hysteria2, AmneziaWG и VLESS REALITY на ваших серверах: серв
 <a href="go.mod"><img alt="Версия Go" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#скриншоты"><b>Скриншоты</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a></p>
+<p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#скриншоты"><b>Скриншоты</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a> · <a href="README.zh.md">简体中文</a></p>
 
 <p><sub><b>Бета.</b> Mistgate уже работает в продакшене, но до 1.0 возможны шероховатости, а API, хранимые настройки и протокол ноды ещё могут меняться. <a href="https://mistgate.app/ru/roadmap/status/">Статус и план</a></sub></p>
 
