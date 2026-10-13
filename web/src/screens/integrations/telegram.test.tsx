@@ -108,7 +108,7 @@ describe("the Telegram card: the bot (owner)", () => {
     expect(text()).toContain("Token is set");
     expect(document.querySelector("input[type=password]")).toBeNull();
     expect(document.body.innerHTML).not.toContain("AAFake");
-    expect(text()).toContain("Cloudflare mirror Worker"); // the Worker may use the same bot
+    expect(text()).toContain("panel watcher (a Cloudflare Worker)"); // the Worker may use the same bot
   });
 
   it("replaces the token on request, and cancel puts the row back", async () => {

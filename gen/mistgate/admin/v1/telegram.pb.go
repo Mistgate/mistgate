@@ -95,7 +95,7 @@ type TelegramLink struct {
 	Enabled    bool  `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	LinkedUnix int64 `protobuf:"varint,5,opt,name=linked_unix,json=linkedUnix,proto3" json:"linked_unix,omitempty"`
 	// The Telegram chat id, only on the caller's own link (0 on the others): the id of a private chat is the person's own
-	// Telegram id, and it is what another sender of the same bot (the mirror Worker) needs to write to this chat.
+	// Telegram id, and it is what another sender of the same bot (the panel watcher Worker) needs to write to this chat.
 	ChatId        int64 `protobuf:"varint,6,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

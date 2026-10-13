@@ -52,7 +52,7 @@ message TelegramLink {
   bool enabled = 4;
   int64 linked_unix = 5 [jstype = JS_NUMBER];
   // The Telegram chat id, only on the caller's own link (0 on the others): the id of a private chat is the person's own
-  // Telegram id, and it is what another sender of the same bot (the mirror Worker) needs to write to this chat.
+  // Telegram id, and it is what another sender of the same bot (the panel watcher Worker) needs to write to this chat.
   int64 chat_id = 6 [jstype = JS_NUMBER];
 }
 

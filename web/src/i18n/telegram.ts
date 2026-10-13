@@ -31,7 +31,7 @@ export const en = {
   "tg.bot.error.unauthorized": "Telegram refused the token: it was revoked or is wrong. Paste a new one.",
   "tg.bot.error.unreachable": "The panel cannot reach Telegram right now. It keeps trying.",
   "tg.bot.error.conflict": "Another program reads this bot's messages, or a webhook is set on it. Give the panel a bot of its own.",
-  "tg.worker": "The Cloudflare mirror Worker can use the same bot token and chat id for its own “panel is down” message.",
+  "tg.worker": "The panel watcher (a Cloudflare Worker) can use the same bot token and chat id for its own “panel is down” message.",
 
   // ---- your chat (every admin)
   "tg.link.title": "Your Telegram",
@@ -50,7 +50,7 @@ export const en = {
   "tg.link.since": "since {date}",
   "tg.link.done": "Telegram is linked",
   "tg.link.chatId": "Chat ID",
-  "tg.link.chatId.hint": "The mirror Worker needs it, with the bot token, to write to this chat.",
+  "tg.link.chatId.hint": "The panel watcher needs it, with the bot token, to write to this chat.",
   "tg.link.alerts": "Send me alerts",
   "tg.link.test": "Send test",
   "tg.link.test.sent": "Test message sent",
@@ -104,7 +104,7 @@ export const ru: Record<keyof typeof en, string> = {
   "tg.bot.error.unauthorized": "Telegram отклонил токен: его отозвали или он неверный. Вставь новый.",
   "tg.bot.error.unreachable": "Панель сейчас не достаёт до Telegram. Она продолжает пробовать.",
   "tg.bot.error.conflict": "Сообщения этого бота читает другая программа, либо у него задан webhook. Заведи панели отдельного бота.",
-  "tg.worker": "Воркер зеркала на Cloudflare может использовать тот же токен бота и тот же чат для своего сообщения «панель недоступна».",
+  "tg.worker": "Наблюдатель панели (Worker на Cloudflare) может использовать тот же токен бота и тот же чат для своего сообщения «панель недоступна».",
 
   "tg.link.title": "Твой Telegram",
   "tg.link.none": "Чат ещё не привязан. Привяжи его, и алерты будут приходить тебе.",
@@ -122,7 +122,7 @@ export const ru: Record<keyof typeof en, string> = {
   "tg.link.since": "с {date}",
   "tg.link.done": "Telegram привязан",
   "tg.link.chatId": "ID чата",
-  "tg.link.chatId.hint": "Он нужен воркеру зеркала вместе с токеном бота, чтобы писать в этот чат.",
+  "tg.link.chatId.hint": "Он нужен наблюдателю панели вместе с токеном бота, чтобы писать в этот чат.",
   "tg.link.alerts": "Присылать мне алерты",
   "tg.link.test": "Отправить проверку",
   "tg.link.test.sent": "Проверочное сообщение отправлено",

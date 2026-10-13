@@ -81,7 +81,7 @@ export type TelegramLink = Message<"mistgate.admin.v1.TelegramLink"> & {
 
   /**
    * The Telegram chat id, only on the caller's own link (0 on the others): the id of a private chat is the person's own
-   * Telegram id, and it is what another sender of the same bot (the mirror Worker) needs to write to this chat.
+   * Telegram id, and it is what another sender of the same bot (the panel watcher Worker) needs to write to this chat.
    *
    * @generated from field: int64 chat_id = 6 [jstype = JS_NUMBER];
    */

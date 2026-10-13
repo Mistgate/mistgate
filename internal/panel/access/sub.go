@@ -28,7 +28,7 @@ type SubView struct {
 	Up, Down, Total uint64
 	Expires         time.Time
 	// Lines are the client fragments, one per usable inbound; empty unless Status is active. In the default
-	// format they are hysteria2:// URIs; for SubOptions.Format = FormatMihomo each is one proxy as an element of a
+	// format they are hysteria2:// and vless:// URIs; for SubOptions.Format = FormatMihomo each is one proxy as an element of a
 	// YAML list, rendered by its plugin (the assembler adds groups, dns and rules).
 	Lines []string
 

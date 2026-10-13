@@ -1,5 +1,5 @@
 // Package subs serves the public subscription endpoint: GET <prefix>/<token> returns base64 of the user's
-// client lines (hysteria2:// URIs) with the headers Happ and other Xray/sing-box apps read, or, for a client the
+// client lines (hysteria2:// and vless:// URIs) with the headers Happ and other Xray/sing-box apps read, or, for a client the
 // settings send to the Mihomo format, a Mihomo YAML profile (mihomo.go); a browser gets the user page. Under the same
 // prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go). Unknown tokens get the
 // decoy, so the endpoint cannot be told from any other path of the site.
