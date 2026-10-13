@@ -117,7 +117,7 @@ export function NodeTraffic({ nodeId }: { nodeId: string }) {
       idle={{ when: t("ov.last24"), main: fmt.bytes(total) }}
       at={(i) => ({ when: `${hourLabel(s.times[i]!)}–${hourLabel(s.times[i]! + 3600)}`, main: fmt.bytes(s.values[i] ?? 0) })}
       legend={() => []}
-      label={`${t("node.traffic")}: ${fmt.bytes(total)}`}
+      label={t("common.labeled", { label: t("node.traffic"), value: fmt.bytes(total) })}
     />
   );
 }

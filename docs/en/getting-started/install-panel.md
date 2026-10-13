@@ -216,7 +216,7 @@ The agent port is then a port of its own that answers only the secret TLS name; 
 
 Open the setup link from step 3 in a browser, the whole link including the part after `#`.
 
-1. **Language.** Pick English or Russian. You can change it later.
+1. **Language.** Pick English, Russian or Simplified Chinese. You can change it later.
 2. **Create the admin.** The LOGIN field (it starts as `admin`) is your login and the name the panel shows. Then:
    - **Create passkey**: the browser asks for a fingerprint, a face, a PIN or a security key. The key stays on your device. This is the recommended way.
    - **password + authenticator code**: a password of at least 12 characters, then scan the QR code with an authenticator app (Google Authenticator, 1Password, Aegis and the like), type the 6-digit code and press **Create admin**.

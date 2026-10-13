@@ -19,7 +19,7 @@ mistgate release keygen --out ~/mistgate-release.key
 
 命令会将私钥写入文件（权限模式 0600；不会覆盖现有文件），并输出公钥及其指纹（SHA-256 的前 16 个十六进制字符）。
 
-> **警告：**将密钥文件离线保存并做好备份。没有它就无法从面板更新节点；你需要创建新密钥、使用它构建新二进制，然后手动更新每个节点和面板一次。
+> **警告：** 将密钥文件离线保存并做好备份。没有它就无法从面板更新节点；你需要创建新密钥、使用它构建新二进制，然后手动更新每个节点和面板一次。
 
 ### 使用公钥构建
 
@@ -74,7 +74,7 @@ gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 
 `mistgate-edge.tar.gz` 是 Cloudflare 版：为 `js/wasm` 编译的面板（`panel.wasm`，和其他二进制一样写入版本、构建时间和发布公钥）、两个 Worker 脚本（`worker.js` 和 `provision.js`，由 `edge/worker/package.json` 锁定的 esbuild 打包）、管理后台 SPA（`assets/`）以及 `edge.json`。该文件列出脚本、绑定、Durable Object 迁移和 `mistgate edge deploy` 使用的密钥名称。SPA 构建完成并在 `edge/worker` 中运行 `pnpm install --frozen-lockfile` 后，`mistgate release build --version V --key PUBLIC mistgate-edge.tar.gz --out DIR` 会构建发布包；`release sign` 会用相同方式重新构建，如果 tar 包不一致就拒绝签名，并写入 `edge-manifest.json`（含版本、构建时间、有效期、tar 包大小和 SHA-256）与 `edge-manifest.sig`。Edge 清单使用同一个发布密钥在独立的 Ed25519 上下文中签名，因此它不能通过面板或节点签名校验，反之亦然。`panel-manifest.json` 不会更改。
 
-tar 包具有确定性（条目排序、权限模式固定、所有者和时间固定，gzip 标头不含文件名或时间）。要保持一致，Go 工具链必须与 `go.mod` 中的版本相同；`web/dist` 和 `edge/worker/node_modules` 必须来自锁定的 lockfile；签名程序使用的 Go 版本必须与构建 tar 包的版本相同（gzip 层的压缩取决于签名程序使用的 Go 版本；如果压缩结果不同，`release sign` 会拒绝签名，不会转而签署其他内容）。
+tar 包具有确定性（条目排序、权限模式固定、所有者和时间固定，gzip 头部不含文件名或时间）。要保持一致，Go 工具链必须与 `go.mod` 中的版本相同；`web/dist` 和 `edge/worker/node_modules` 必须来自锁定的 lockfile；签名程序使用的 Go 版本必须与构建 tar 包的版本相同（gzip 层的压缩取决于签名程序使用的 Go 版本；如果压缩结果不同，`release sign` 会拒绝签名，不会转而签署其他内容）。
 
 ### 保持签名有效期较短
 
@@ -103,7 +103,7 @@ mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --expires 90
 scp dist/* panel.example.com:/var/lib/mistgate/dist/
 ```
 
-面板会读取 `<data-dir>/dist`，并在一分钟内发现更改；在更新页面中选择**再次读取目录**可立即重新读取。只有常规文件才会计入（不会跟随符号链接）。请一次性替换整个发布包；更新过程中更改发布包会暂停滚动更新。更新页面的**发布包**一行会显示签名是否通过校验：参见[更新](updates.md)。
+面板会读取 `<data-dir>/dist`，并在一分钟内发现更改；在更新页面中选择**重新读取文件夹**可立即重新读取。只有常规文件才会计入（不会跟随符号链接）。请一次性替换整个发布包；更新过程中更改发布包会暂停滚动更新。更新页面的**发布包**一行会显示签名是否通过校验：参见[更新](updates.md)。
 
 ## 轮换发布密钥
 

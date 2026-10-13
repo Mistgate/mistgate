@@ -58,7 +58,7 @@ export function useAfterCreate(info: ProtocolInfo, fromNode: string, enabled = t
 
 export type AfterState = ReturnType<typeof useAfterCreate>;
 
-const quoted = (gs: Group[]) => gs.map((g) => `«${g.name}»`).join(", ");
+const quoted = (t: Tx, gs: Group[]) => gs.map((g) => t("common.quoted", { name: g.name })).join(", ");
 
 /** The app a protocol reaches, in words for the hint: the subscription apps by name, or AmneziaVPN. */
 const appWords = (t: Tx, info: ProtocolInfo, linkApps: string) =>
@@ -137,8 +137,8 @@ export function AfterCreate({ a, info, settings }: { a: AfterState; info: Protoc
             </div>
             {!a.groupsTouched && (
               <div className="flex flex-col gap-1 text-xs leading-snug text-muted">
-                {a.lacking.length > 0 && <p>{t.n("profiles.afterFirst", a.lacking.length, { groups: quoted(a.lacking), proto, app })}</p>}
-                {a.having.length > 0 && <p>{t.n("profiles.afterSecond", a.having.length, { groups: quoted(a.having), proto })}</p>}
+                {a.lacking.length > 0 && <p>{t.n("profiles.afterFirst", a.lacking.length, { groups: quoted(t, a.lacking), proto, app })}</p>}
+                {a.having.length > 0 && <p>{t.n("profiles.afterSecond", a.having.length, { groups: quoted(t, a.having), proto })}</p>}
               </div>
             )}
           </div>

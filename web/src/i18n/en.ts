@@ -23,6 +23,10 @@ const core = {
   "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.undo": "Undo",
+  // a name from data inside a sentence, in the language's quotes
+  "common.quoted": "“{name}”",
+  // "label: value" where the label and the value are separate texts; the colon belongs to the language (full-width in Chinese)
+  "common.labeled": "{label}: {value}",
 
   // the pager at the bottom of a long list (components/ui/pagination.tsx)
   "pager.nav": "Pages",

@@ -31,18 +31,18 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
       points:
         - "[通过 SSH 安装节点](../getting-started/ssh-install.md)，也可以通过 MCP 在所有者审批后安装：固定主机密钥，在更改前检查，安装任务可取消、重试，并能在中断后继续。"
         - "加密保存 SSH 凭据，并验证密码更改。"
-        - "[WARP 出口](../guide/warp.md)在 WARP 连接中断时会停止转发；所有节点都支持[种子下载防护](../guide/torrent-protection.md)。"
+        - "[WARP 出口](../guide/warp.md)在 WARP 连接中断时会停止转发；所有节点都支持[BT 下载拦截](../guide/torrent-protection.md)。"
         - "[检测端口](../guide/nodes.md#端口)：从集群中的另一节点检测节点每个端口的 UDP 可达性和 TCP 连接。"
         - "[测量节点网络带宽](../guide/nodes.md#测量网络带宽)。"
     - title: 用户
       section: users
       points:
         - "[用户和分组](../guide/users-and-groups.md)：支持按周期统计流量配额、有效期和设备上限。"
-        - "支持用户页签和一次对多个用户执行批量操作。"
+        - "支持用户标签页和一次对多个用户执行批量操作。"
     - title: 订阅
       section: subscriptions
       points:
-        - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 核心的应用提供 Mihomo YAML。"
+        - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、用户自己的设备，以及供 AmneziaVPN 使用的 `vpn://` 密钥。"
         - "提供 [DNS 预设](../guide/dns.md)，并可让用户在用户页面中为每台服务器选择 DNS。"
     - title: 运行状况
@@ -68,7 +68,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
     - title: 设置
       section: settings
       points:
-        - "管理后台提供英语和俄语；支持使用通行密钥或密码加身份验证器验证码登录，可选 Cloudflare Turnstile，并提供审计日志。参见[安全](../operations/security.md)。"
+        - "管理后台提供英语、俄语和简体中文；支持使用通行密钥或密码加身份验证器验证码登录，可选 Cloudflare Turnstile，并提供审计日志。参见[安全](../operations/security.md)。"
         - "[伪装站点](../guide/decoy-site.md)会显示在面板地址上，向陌生人隐藏管理后台。"
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now

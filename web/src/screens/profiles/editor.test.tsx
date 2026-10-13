@@ -158,8 +158,8 @@ describe("a new profile", () => {
     expect(text()).toContain("fi1: the address is an IP, Let's Encrypt does not work there.");
     expect(pressed("test")).toBe("true");
     expect(pressed("Все")).toBe("false");
-    expect(text()).toContain("«test»: no Hysteria2 profile yet. Without one its people get nothing in the subscription apps (Happ), so it is ticked.");
-    expect(text()).toContain("«Все» already gets Hysteria2: a second profile is usually a test or a variant, so it is not ticked.");
+    expect(text()).toContain("“test”: no Hysteria2 profile yet. Without one its people get nothing in the subscription apps (Happ), so it is ticked.");
+    expect(text()).toContain("“Все” already gets Hysteria2: a second profile is usually a test or a variant, so it is not ticked.");
   });
 
   it("is created, joins the groups, goes on the nodes in the same window, and opens its page when all went well", async () => {

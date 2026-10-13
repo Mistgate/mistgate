@@ -1,4 +1,4 @@
-﻿---
+---
 title: 命令行
 description: mistgate 和 mistgate-node 的所有命令及其标志、环境变量、默认值和示例。
 ---
@@ -52,10 +52,10 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | 放置自有伪装站点的目录。其中的 `404.html` 和 `429.html` 会替换内置错误页面。 |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 和 `Forwarded` 请求头会被采信。可重复指定。未设置时，TCP 对端就是客户端。 |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | 面板自身的 systemd 单元；面板更新程序在替换二进制文件前后会停止并重新启动它。面板以 root 运行时使用此值；面板以其他用户身份运行时，会启动固定的 root 辅助单元，命令行中会指定该单元本身。 |
-| `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | 此构建源代码的发布地址，会显示在管理后台版本旁（AGPL-3.0 第 13 节）。分支版本应指向自己的仓库；设为空可隐藏链接。 |
+| `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | 此构建源代码的发布地址，会显示在管理后台版本旁（AGPL-3.0 第 13 节）。派生版本（fork）应指向自己的仓库；设为空可隐藏链接。 |
 | `--dev` | `MISTGATE_DEV` (`1`, `true`, `yes`, `on`) | off | 开发模式，见下文。 |
 
-**开发模式。** `--dev` 使用 `./.data`，通过普通 HTTP 提供服务：伪装站点位于 `127.0.0.1:8080`，管理后台位于 `127.0.0.1:8081`，Agent 接入端点位于 `127.0.0.1:8082`；WebAuthn 信赖方使用 `localhost`；无需运行 `setup`。尚未创建管理员时，会显示一个一次性设置链接（`http://localhost:8081/setup#…`，有效期为 30 分钟）。切勿在服务器上使用此模式。
+**开发模式。** `--dev` 使用 `./.data`，通过普通 HTTP 提供服务：伪装站点位于 `127.0.0.1:8080`，管理后台位于 `127.0.0.1:8081`，Agent 接入端点位于 `127.0.0.1:8082`；WebAuthn 依赖方使用 `localhost`；无需运行 `setup`。尚未创建管理员时，会显示一个一次性设置链接（`http://localhost:8081/setup#…`，有效期为 30 分钟）。切勿在服务器上使用此模式。
 
 ### mistgate setup
 
@@ -78,12 +78,12 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，例如 `https://panel.example.com`。此 URL 也是订阅链接的基础地址。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
 | `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
-| `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 信赖方 ID。 |
+| `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | 允许的 WebAuthn 来源，使用逗号分隔。 |
 
 必须指定 `--public-url`、`--admin-host` 或 `--admin-listen` 之一。管理后台的访问地址如下：
 
-| 指定参数 | 管理后台 URL | WebAuthn 信赖方 |
+| 指定参数 | 管理后台 URL | WebAuthn 依赖方 |
 |---|---|---|
 | `--public-url` only | `<public url>/<24 random characters>/` | the public host |
 | `--admin-host admin-k7q2.example.com` | `https://admin-k7q2.example.com/` (scheme and port of `--public-url` when given) | the admin host |
@@ -136,7 +136,7 @@ mistgate auth reset-login [<login>] [--admin ID] [--qr-invert] [--data-dir DIR]
 
 手机丢失后，可通过 **`auth reset-login`** 恢复登录：
 
-- `mistgate auth reset-login` 会列出面板管理员的 ID、姓名、角色、登录名和通行密钥数量。
+- `mistgate auth reset-login` 会列出面板管理员的 ID、名称、角色、登录名和通行密钥数量。
 - `mistgate auth reset-login <login>` 会为该登录名设置新密码和新的身份验证器应用、解除锁定，并结束该管理员的所有会话。通行密钥会保留。
 - `mistgate auth reset-login <new login> --admin <id>` 会为仅使用通行密钥的管理员添加密码登录方式（有多个管理员时用 `--admin` 选择）。
 
@@ -156,7 +156,7 @@ mistgate mcp --url https://panel.example.com/<prefix>/ --token-file ~/.config/mi
 
 | 标志 | 环境变量 | 含义 |
 |---|---|---|
-| `--url` | `MISTGATE_URL` | `mistgate setup` 显示的管理后台 URL。除非主机是 `localhost` 或环回地址，否则会拒绝普通 `http`。URL 不能包含凭据、查询字符串或片段。 |
+| `--url` | `MISTGATE_URL` | `mistgate setup` 显示的管理后台 URL。除非主机是 `localhost` 或回环地址，否则会拒绝普通 `http`。URL 不能包含凭据、查询字符串或片段。 |
 | `--token-file` | `MISTGATE_TOKEN_FILE` | API 令牌（`tk1_…`）所在文件的路径，令牌必须位于第一行。令牌只会从文件读取，不会从命令行或环境变量读取，也绝不显示。其他人可读取此文件时会显示警告。 |
 
 面板拒绝令牌（令牌已过期、已吊销或权限级别不正确）时，代理会停止。stdout 仅包含协议消息；其他所有内容都写入 stderr。参见 [MCP](mcp.md)。
@@ -171,7 +171,7 @@ mistgate release keygen --out ~/mistgate-release.key
 |---|---|
 | `--out` | 私钥文件的写入位置。文件必须不存在，不会覆盖已有密钥。文件权限为 0600。 |
 
-显示公钥及其指纹。将公钥写入构建命令：`RELEASE_KEY=<public key> make build`。请离线保存并备份密钥文件。参见[发布与签名](../operations/releases.md)。
+显示公钥及其指纹。将公钥写入构建命令：`RELEASE_KEY=<public key> make build`。请离线保存并备份密钥文件。参见[发布版本和签名](../operations/releases.md)。
 
 ### mistgate release build
 
@@ -212,7 +212,7 @@ mistgate release sign --key ~/mistgate-release.key --version v0.1.4 --source ~/s
   downloaded/mistgate-linux-amd64 downloaded/mistgate-linux-arm64 --out signed
 ```
 
-完整发布流程参见[发布与签名](../operations/releases.md)。
+完整发布流程参见[发布版本和签名](../operations/releases.md)。
 
 ### mistgate release trust-key
 
@@ -240,7 +240,7 @@ mistgate edge setup-link --file FILE
 | 命令 | 功能 |
 |---|---|
 | `enroll` | 使用一次性令牌换取节点证书。 |
-| `install` | 写入强化配置的 systemd 单元，并启用和启动它。 |
+| `install` | 写入加固配置的 systemd 单元，并启用和启动它。 |
 | `run` | 在前台运行 Agent。 |
 | `cleanup-net` | 移除 Agent 的隧道接口、WARP 路由和 nftables 表。 |
 | `awg prepare-kernel` | 安装 AmneziaWG 内核模块。 |
@@ -331,6 +331,3 @@ mistgate-node awg prepare-kernel --yes    # 执行命令
 ### mistgate-node version
 
 显示 `mistgate-node <version>`、`built <unix time>`，以及 `release key <fingerprint>` 或 `release key none (unsigned build: update by hand)`。
-
-
-

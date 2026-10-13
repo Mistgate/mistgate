@@ -45,7 +45,7 @@ How the messages behave:
 - **Bursts become one message.** Events that arrive within about 30 seconds of each other are sent together, one message per chat; an identical line is not repeated.
 - **The same open alert is never sent twice.** When it resolves you get one message that says how long it lasted. An alert that a worse one replaced, one you accepted as normal and one you muted end without a message.
 - **Info-level alerts are not sent.** Only warnings and critical ones are (a fixed floor in this version; there are no quiet hours or filters yet).
-- **Short, in the panel language.** Messages are in Russian or English, whichever the panel's default language is (**Settings → Interface → Default language**). Names that come from data, such as a node, a profile or a token, are escaped and cut to one line.
+- **Short, in the panel language.** Messages are in English, Russian or Simplified Chinese, whichever the panel's default language is (**Settings → Interface → Default language**). Names that come from data, such as a node, a profile or a token, are escaped and cut to one line.
 - **Never a secret.** A message holds no token, no subscription link and no password.
 - **Links only when the panel knows its public address.** With one, a message ends with a link to the right admin page (Health, Updates, Integrations, the backup settings). Without it (the admin is on a separate local listener), the card says so and messages carry no links. Mind that the link holds the address of your hidden admin: it is in the chat history on Telegram's servers, so link only a private chat on an account you trust.
 

@@ -2205,7 +2205,7 @@ export const zh: typeof en = {
   "node.add.title": "添加节点",
   "node.add.body": "选择通过 SSH 自动安装，或生成命令后自己在服务器上运行。",
   "node.add.sshInstallTitle": "通过 SSH 自动安装",
-  "node.add.sshInstallHint": "确认服务器的 SSH 密钥，然后由面板安装 Agent 并准备已启用的主机防火墙。服务商防火墙规则必须已放行 SSH。",
+  "node.add.sshInstallHint": "确认服务器的 SSH 密钥，然后由面板安装 Agent 并配置已启用的主机防火墙。服务商防火墙规则必须已放行 SSH。",
   "node.add.sshInstall": "通过 SSH 自动安装",
   "node.ssh.title": "通过 SSH 安装节点",
   "node.ssh.body": "面板会检查服务器、确认其 SSH 密钥，然后安装 Mistgate Agent。",

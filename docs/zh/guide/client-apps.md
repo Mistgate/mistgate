@@ -23,7 +23,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 |:--|:--|:--|
 | kl!ck | Mihomo YAML（kl!ck 发送 `User-Agent: mihomo/…`，会匹配默认规则 `mihomo`） | Hysteria2、VLESS 和 AmneziaWG 服务器、一个服务器组，以及根据用户 DNS 预设生成的 `dns:` 部分。 |
 | Clash Verge Rev、FlClash、Clash Meta for Android | Mihomo YAML，应用的 User-Agent 包含 `clash` 或 `mihomo` 时（匹配两条默认规则之一） | 与 kl!ck 相同。没有匹配任何规则的应用会获取链接列表：添加包含其部分 User-Agent 的规则。 |
-| Happ | 链接列表（base64） | Hysteria2 和 VLESS 服务器；Happ 不支持 AmneziaWG。Happ 还会收到包含 DNS 预设的 `Routing` 标头，以及服务器名称中的负载信息。 |
+| Happ | 链接列表（base64） | Hysteria2 和 VLESS 服务器；Happ 不支持 AmneziaWG。Happ 还会收到包含 DNS 预设的 `Routing` 响应头，以及服务器名称中的负载信息。 |
 | Hiddify、v2rayNG 和同类应用 | 链接列表（base64），除非匹配你设置的规则 | Hysteria2 和 VLESS 服务器。应用能否读取 `hysteria2://` 和 `vless://`（REALITY、XHTTP）链接取决于其版本。 |
 | AmneziaVPN、AmneziaWG 应用 | 不使用订阅：每台设备从用户页面获取一个密钥（`vpn://`、`.conf` 文件或二维码） | 仅 AmneziaWG。 |
 
@@ -31,7 +31,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 ## 一键添加链接
 
-用户页面上的**添加**按钮会打开应用，并自动填入订阅链接。此按钮使用应用自己的链接方案，并将订阅链接填入应用的**「添加」链接模板**（占位符 `{url}`、`{url_enc}`、`{name_enc}`；参见[订阅](subscriptions.md)）。模板为空或应用无法识别链接时，页面会提供**复制链接**：在应用的添加订阅页面中粘贴链接。
+用户页面上的**添加**按钮会打开应用，并自动填入订阅链接。此按钮使用应用自己的链接方案，并将订阅链接填入应用的 **「添加」链接模板**（占位符 `{url}`、`{url_enc}`、`{name_enc}`；参见[订阅](subscriptions.md)）。模板为空或应用无法识别链接时，页面会提供**复制链接**：在应用的添加订阅页面中粘贴链接。
 
 以下是已知应用的模板。除 Happ 外，每种方案都能从应用自己的文档或源代码中确认（见下方说明）。
 
@@ -54,24 +54,24 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 [kl!ck](https://github.com/vbu00/klick) 是由 vbu00 开发的 Windows 和 macOS 开源桌面客户端，使用 Rust 编写，以 Tauri 调用未修改的 Mihomo 内核。Mistgate 推荐在桌面端使用此应用，并注明其作者；此应用不属于 Mistgate。
 
-**为什么推荐桌面用户使用此应用。**它能读取 Mihomo YAML，这是唯一包含全部三种协议的格式：同时使用 Hysteria2、VLESS 和 AmneziaWG 的用户，可以在同一个应用中通过同一订阅链接获取所有服务器，并使用其 DNS 预设。在 Windows 和 macOS 上，另一种选择是用 Happ 连接 Hysteria2 和 VLESS，再用 AmneziaVPN 管理密钥，需要两个应用和两种添加方式。
+**为什么推荐桌面用户使用此应用**。它能读取 Mihomo YAML，这是唯一包含全部三种协议的格式：同时使用 Hysteria2、VLESS 和 AmneziaWG 的用户，可以在同一个应用中通过同一订阅链接获取所有服务器，并使用其 DNS 预设。在 Windows 和 macOS 上，另一种选择是用 Happ 连接 Hysteria2 和 VLESS，再用 AmneziaVPN 管理密钥，需要两个应用和两种添加方式。
 
-**面板需要进行哪些设置。**无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**通过订阅链接**类型。AmneziaWG 服务器的设置见上文。
+**面板需要做哪些设置**。无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**订阅链接**类型。AmneziaWG 服务器的设置见上文。
 
-**下载。**访问发布页面：<https://github.com/vbu00/klick/releases/latest>。Windows 和 macOS 版本分开发布，文件名中包含版本号，因此面板链接到发布页面，而不是具体文件。截至撰写本文时（2026 年 10 月），最新版本是 0.4.0，提供 Windows 安装程序；macOS 端口已合并到源代码，发布后 macOS 安装包会出现在同一页面。
+**下载**。访问发布页面：<https://github.com/vbu00/klick/releases/latest>。Windows 和 macOS 版本分开发布，文件名中包含版本号，因此面板链接到发布页面，而不是具体文件。截至撰写本文时（2026 年 10 月），最新版本是 0.4.0，提供 Windows 安装程序；macOS 端口已合并到源代码，发布后 macOS 安装包会出现在同一页面。
 
-**一键添加及其限制。**kl!ck 支持 `klick://add?url=<percent-encoded https link>&name=<optional name>`（也支持 `klick://add/<link>`）。它不会自动添加订阅：它会打开**添加**页面并填入订阅链接，只显示链接的域名，需要用户确认。链接必须使用 `https://`。kl!ck 在 0.4.0 之后才加入此处理方式，因此**一键添加需要使用比 0.4.0 更新的 kl!ck 版本**。旧版无法识别此方案：用户需要从页面复制链接，然后在 kl!ck 中手动添加。
+**一键添加及其限制**。kl!ck 支持 `klick://add?url=<percent-encoded https link>&name=<optional name>`（也支持 `klick://add/<link>`）。它不会自动添加订阅：它会打开**添加**页面并填入订阅链接，只显示链接的域名，需要用户确认。链接必须使用 `https://`。kl!ck 在 0.4.0 之后才加入此处理方式，因此**一键添加需要使用比 0.4.0 更新的 kl!ck 版本**。旧版无法识别此方案：用户需要从页面复制链接，然后在 kl!ck 中手动添加。
 
 ## 在管理后台配置应用
 
-**订阅 → 用户页面 → 用户页面中的应用**是页面显示的应用卡片列表（参见[订阅](subscriptions.md#用户页面中的应用)）。添加应用的步骤如下：
+**订阅 → 用户页面 → 页面上的应用**是页面显示的应用卡片列表（参见[订阅](subscriptions.md#用户页面中的应用)）。添加应用的步骤如下：
 
 1. 在列表下方选择一个**平台**。
 2. 选择一个**已知应用**：kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify 或 v2rayNG。列表只显示该平台上可用的应用。**自定义应用，手动填写**可保留原有方式：选择**接入方式**并自行填写字段。
 3. 点击**添加应用**。卡片会自动填入应用名称、类型、该平台的下载链接和「添加」链接模板。你可以编辑任一字段，添加最多 80 个字符的说明，并开启**推荐**。
 4. 使用箭头移动卡片：推荐应用会排在该平台的最前面；推荐状态相同时，列表中位置靠前的应用排在前面。点击**保存**。
 
-要在现有面板中将 kl!ck 设为桌面推荐应用：为 Windows 和 macOS 添加 kl!ck，开启它的**推荐**，并在这两个平台上关闭 Happ 的该选项。在同一选项卡的预览中检查结果。
+要在现有面板中将 kl!ck 设为桌面推荐应用：为 Windows 和 macOS 添加 kl!ck，开启它的**推荐**，并在这两个平台上关闭 Happ 的该选项。在同一标签页的预览中检查结果。
 
 ## 全新面板
 

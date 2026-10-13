@@ -197,6 +197,8 @@ export const en = {
   // ---- Overview strip and the header
   "hl.strip.open": "Health",
   "hl.strip.more": "and {n} more",
+  // the strip's headline: the problem count, then the nodes it is about ({more} is "and N more" with its space, or empty)
+  "hl.strip.headline": "{count}: {names}{more}",
 
   // ---- node status reasons that the health module adds
   "node.reason.no_traffic": "no client gets through: {failed} of {total} profiles fail the check",
@@ -679,6 +681,7 @@ export const ru: typeof en = {
   // ---- Overview strip and the header
   "hl.strip.open": "Здоровье",
   "hl.strip.more": "и ещё {n}",
+  "hl.strip.headline": "{count}: {names}{more}",
 
   // ---- node status reasons that the health module adds
   "node.reason.no_traffic": "клиенты не проходят: {failed} из {total} профилей не проходят проверку",
@@ -1155,6 +1158,7 @@ export const zh: typeof en = {
 
   "hl.strip.open": "运行状况",
   "hl.strip.more": "另有 {n} 个",
+  "hl.strip.headline": "{count}：{names}{more}",
 
   "node.reason.no_traffic": "没有客户端能连通：{total} 个协议配置中有 {failed} 个未通过检测",
   "node.reason.doctor_fail": "主机检查失败：{check}",
@@ -1207,9 +1211,9 @@ export const zh: typeof en = {
   "health.alert.user_connection.why.never_connected": "{user_name} 的 AmneziaWG 密钥从未连接过。配置可能还没有导入，或其网络封锁了它。",
   "health.alert.user_connection.why.stale_key": "{user_name} 的 AmneziaWG 密钥早于最近一次协议配置变更，且超过一小时没有连接。需要给他新的配置。",
   "health.alert.user_connection.why.silent": "{user_name} 的应用一直在刷新订阅，但已超过一天没有流量。VPN 可能无法为其连接。",
-  "health.alert.users_impacted.title": "节点上的连接掉线了",
+  "health.alert.users_impacted.title": "节点上的连接已中断",
   "health.alert.users_impacted.why.gone": "{protocol} 的在线用户：现在 {now} 人，此时段通常约 {usual} 人，而节点在线。这看起来是用户侧网络封锁。",
-  "health.alert.port_lossy.title": "到端口 {port} 的 UDP 在丢包",
+  "health.alert.port_lossy.title": "端口 {port} 的 UDP 丢包",
   "health.alert.port_lossy.why": "发往「{profile}」端口 {port} 的测试包丢失了 {lost}%（由 {sender} 检测）。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
   "health.alert.torrent.title": "BT 下载尝试",
   "health.alert.torrent.why": "{user_name} 正在 {nodes} 上尝试使用 BT 下载：一天内 {attempts}，均已被拦截。{proof}满一天没有新的尝试后，告警会关闭。",

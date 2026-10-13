@@ -29,7 +29,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | 自有静态伪装站点的目录（`index.html`，可选的 `404.html`、`429.html`、`robots.txt`）。 |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。目录必须已存在（先运行 `mistgate setup`）；每次启动 `serve` 时都会将其权限模式设为 0700。 |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | 面板自身的 systemd 单元；替换二进制文件前后，面板更新程序会停止并重新启动它。面板以 root 运行时，此值会决定更新程序以哪个名称启动临时辅助单元。面板以其他用户身份运行时，则会启动固定的 root 辅助单元 `mistgate-panel-update.service`，其命令行会指定单元和数据目录本身（若与你的配置不同，请编辑该单元）；参见[更新](../operations/updates.md)。使用 `--dev` 时，面板不会自更新。 |
-| `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | 此构建源代码的发布地址，会以「源代码」链接显示在管理后台的版本旁（AGPL-3.0 第 13 节）。分支版本应指向自己的仓库；设为空可隐藏链接。 |
+| `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | 此构建源代码的发布地址，会以「源代码」链接显示在管理后台的版本旁（AGPL-3.0 第 13 节）。派生版本（fork）应指向自己的仓库；设为空可隐藏链接。 |
 | `--dev` | `MISTGATE_DEV` | off | 开发模式：数据位于 `./.data`（会同时创建主密钥）；使用普通 HTTP，伪装站点位于 `--listen`（`127.0.0.1:8080`），管理后台位于 `127.0.0.1:8081`，Agent 接入端点位于 `127.0.0.1:8082`；WebAuthn 使用 `localhost`；尚未创建管理员时，启动时会显示设置链接。地址信息不会保存。切勿在公共服务器上使用。 |
 
 未指定 `--tls-cert` 和 `--acme-domain` 时，公共监听器使用普通 HTTP。只有在 TLS 由反向代理终止，并同时配置 `--trusted-proxy` 和 `--agent-listen` 时，这样做才有意义；参见[安装面板](../getting-started/install-panel.md)中的「位于反向代理之后」。
@@ -46,7 +46,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，格式为 `http(s)://host[:port]`，例如 `https://panel.example.com`。这是订阅链接和 Agent 地址的基础地址。除非指定 `--admin-host` 或 `--admin-listen`，否则必须设置；始终建议设置。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
 | `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
-| `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 信赖方 ID。 |
+| `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | WebAuthn 和管理后台状态变更请求允许使用的浏览器来源，使用逗号分隔。 |
 
 setup 在各种模式下生成的值：
@@ -57,7 +57,7 @@ setup 在各种模式下生成的值：
 | `--admin-host` | `https://<admin host>/`（若提供公共 URL，则使用其中的协议和端口） | 管理后台主机名 | 管理后台 URL 的来源 |
 | `--admin-listen` | `http://localhost:<port>/` | `localhost` | `http://localhost:<port>` |
 
-所有模式下，setup 还会生成两个密钥：Agent 接入端点的私密 TLS 名称（16 个随机字符，作为公共 URL 主机名下的标签；若没有公共 URL，则位于管理后台主机名下；如果面板没有域名，则位于 `com` 下；它不需要 DNS 记录），以及订阅链接的私密路径前缀（24 个随机字符）。这些值都会存储在数据库中。之后没有命令可以更改这些值。
+所有模式下，setup 还会生成两个随机私密值：Agent 接入端点的私密 TLS 名称（16 个随机字符，作为公共 URL 主机名下的标签；若没有公共 URL，则位于管理后台主机名下；如果面板没有域名，则位于 `com` 下；它不需要 DNS 记录），以及订阅链接的私密路径前缀（24 个随机字符）。这些值都会存储在数据库中。之后没有命令可以更改这些值。
 
 > **警告：** `setup` 和 `serve` 都会读取 `MISTGATE_ADMIN_LISTEN`。仅当安装使用单独的管理后台监听器时才设置此项。
 
@@ -88,7 +88,7 @@ setup 在各种模式下生成的值：
 | `restore --file` | 下载的加密备份（`.tar.gz.age`）。 |
 | `restore --data-dir` | 尚不存在的新目录。不会读取 `MISTGATE_DATA_DIR`。 |
 
-**`mistgate release keygen`**、**`mistgate release build`** 和 **`mistgate release sign`** 只接收标志，不使用环境变量（`release trust-key` 还会读取 `MISTGATE_DATA_DIR` 和 `MISTGATE_DEV`，并接收 `--data-dir` 和 `--dev`）：参见 [CLI](cli.md) 和[发布与签名](../operations/releases.md)。
+**`mistgate release keygen`**、**`mistgate release build`** 和 **`mistgate release sign`** 只接收标志，不使用环境变量（`release trust-key` 还会读取 `MISTGATE_DATA_DIR` 和 `MISTGATE_DEV`，并接收 `--data-dir` 和 `--dev`）：参见 [CLI](cli.md) 和[发布版本和签名](../operations/releases.md)。
 
 隐藏命令 **`mistgate panel-update-helper`** 接收 `--fetch-latest`（必需）、`--data-dir` 和 `--service`。只有面板更新程序会以 root 身份启动它；固定单元 `mistgate-panel-update.service` 使用 `--data-dir /var/lib/mistgate --service mistgate.service` 运行。
 
@@ -138,7 +138,7 @@ setup 在各种模式下生成的值：
 | `release.pub` | 此安装的发布公钥（ed25519）；用于验证 `dist/` 中的节点发布包。首次使用密钥构建面板时会写入此文件；后续使用同一密钥的构建会继续使用它；不带密钥的构建也会继续使用它；若构建中内置了其他密钥，则在 `mistgate release trust-key` 替换此文件前不会信任任何发布包。面板发布版本只使用编译在二进制文件中的密钥验证，绝不使用此文件。 | 否 |
 | `dist/` | 节点更新用的签名发布包：`manifest.json`、`manifest.sig` 和 `mistgate-node-linux-amd64` / `-arm64`。你可以将其复制到此处，面板也会自动放入：每 10 分钟检查最新的稳定版 GitHub Release，并安装通过 `release.pub` 验证的较新发布包（滚动更新期间除外）。面板每分钟重新扫描此目录。 | 否 |
 | `panel-update.request` | 所有者确认的面板发布版本（版本号和 SHA-256），留给更新辅助程序处理，之后由辅助程序删除。 | 否 |
-| `panel-update.new` | 更新辅助程序下载的新面板二进制文件，并根据已签名的面板清单进行验证；更新成功后会删除。 | 否 |
+| `panel-update.new` | 更新辅助程序下载的新面板二进制文件，并根据已签名的面板清单验证；更新成功后会删除。 | 否 |
 | `.mistgate-backup-*/` | 正在运行的备份的工作目录：包含数据库快照和加密归档。备份结束时会删除（若崩溃后残留，则在下次备份时删除），绝不会纳入备份。 | 是 |
 | `acme/` | 仅在使用 `--acme-domain` 时存储 Let’s Encrypt 账户密钥和证书。丢失后会自动重新生成。 | 是 |
 
@@ -146,7 +146,7 @@ setup 在各种模式下生成的值：
 
 每当 `serve`、`setup`、`auth` 命令或 `backup restore` 打开数据库时，都会自动向前应用数据库迁移。
 
-> **危险：** 丢失 `master.key` 后，所有加密密钥都会无法读取，包括面板 CA 密钥和节点已保存的 SSH 密码；丢失整个目录则意味着必须重新注册所有节点。请按[安装面板](../getting-started/install-panel.md)第 9 步所述进行备份，并设置[加密备份](../operations/backups.md)。
+> **危险：** 丢失 `master.key` 后，所有加密密钥都会无法读取，包括面板 CA 密钥和节点已保存的 SSH 密码；丢失整个目录则意味着必须重新注册所有节点。请按[安装面板](../getting-started/install-panel.md)第 9 步所述做好备份，并设置[加密备份](../operations/backups.md)。
 
 ## 节点的状态目录
 

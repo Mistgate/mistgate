@@ -68,7 +68,7 @@ Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production
     - title: Settings
       section: settings
       points:
-        - "The admin in English and Russian; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
+        - "The admin in English, Russian and Simplified Chinese; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now

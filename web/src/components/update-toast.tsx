@@ -67,7 +67,7 @@ export function UpdateToast() {
             ref={pill}
             type="button"
             onClick={() => collapse(false)}
-            aria-label={`${t("up.toast.expand")}: ${vee(notice.version)}`}
+            aria-label={t("common.labeled", { label: t("up.toast.expand"), value: vee(notice.version) })}
             title={t("up.toast.expand")}
             className="pop-in pointer-events-auto flex h-11 max-w-full items-center gap-2.5 rounded-full border border-accent-line bg-surface pr-4 pl-3.5 font-mono text-xs font-bold shadow-(--shadow-toast) transition-transform duration-200 ease-spring active:scale-[0.97]"
           >

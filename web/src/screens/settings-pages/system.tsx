@@ -69,7 +69,7 @@ function AboutCard({ panel }: { panel: Updates["panel"] }) {
   const t = useT();
   const lang = useLang();
   const fmt = useFmt();
-  const docs = lang === "ru" ? "https://mistgate.app/ru/" : "https://mistgate.app/";
+  const docs = lang === "ru" || lang === "zh" ? `https://mistgate.app/${lang}/` : "https://mistgate.app/";
 
   return (
     <section className={card}>

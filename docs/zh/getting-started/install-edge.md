@@ -13,25 +13,25 @@ Cloudflare 版是为 WebAssembly 构建的同一面板，由两个 Cloudflare Wo
 |:--|:--|
 | Cloudflare 计划 | **Workers Paid。** Workers Free 的每个请求最多只能使用 10 ms CPU 并发送 50 个子请求，而仅加载 WebAssembly 面板的冷启动就需要约 125 到 254 ms，因此无法满足要求。D1 和 Durable Objects 按 Cloudflare 的用量计费；尚未测量真实账户上面板的费用。 |
 | 域名 | 一个主机名，例如 `panel.example.com`，位于已启用且**使用 Cloudflare DNS** 的区域中。命令会在令牌可访问的账户中查找该主机所属区域；如果不存在对应区域，或区域尚未启用（名称服务器必须已经指向 Cloudflare），命令会在创建任何内容前停止。使用尚无 DNS 记录的名称：Cloudflare 会为 Worker 自定义域名自行添加记录；已有记录时的处理方式尚未测试。 |
-| 命令 | `mistgate`，即面板所用的同一个二进制文件。在任何可通过互联网访问 `api.cloudflare.com` 和 `github.com` 的计算机上运行。官方发布二进制文件适用于 Linux（amd64 和 arm64）；在 macOS 或 Windows 上，从源代码构建（见[要求](requirements.md)）。 |
-| 带有 Cloudflare 版发布包的发布版本 | 命令会下载该二进制文件自身版本对应的 GitHub 发布包 `mistgate-edge.tar.gz` 及其已签名清单；上传前会使用二进制文件内置的发布密钥验证它们。目前尚无发布版本包含此包。开发构建必须通过 `--version` 或 `--bundle` 指定要使用的包。见[发布与签名](../operations/releases.md)。 |
-| 节点 | 与其他面板相同：见[要求](requirements.md)。Agent 通过 HTTPS（WebSocket）连接到 `panel.example.com`，因此节点只需允许到该地址的出站 TCP 443。 |
+| 命令 | `mistgate`，即面板所用的同一个二进制文件。在任何可通过互联网访问 `api.cloudflare.com` 和 `github.com` 的计算机上运行。官方发布二进制文件适用于 Linux（amd64 和 arm64）；在 macOS 或 Windows 上，从源代码构建（见[系统要求](requirements.md)）。 |
+| 带有 Cloudflare 版发布包的发布版本 | 命令会下载该二进制文件自身版本对应的 GitHub 发布包 `mistgate-edge.tar.gz` 及其已签名清单；上传前会使用二进制文件内置的发布密钥验证它们。目前尚无发布版本包含此包。开发构建必须通过 `--version` 或 `--bundle` 指定要使用的包。见[发布版本和签名](../operations/releases.md)。 |
+| 节点 | 与其他面板相同：见[系统要求](requirements.md)。Agent 通过 HTTPS（WebSocket）连接到 `panel.example.com`，因此节点只需允许到该地址的出站 TCP 443。 |
 
 ## 创建 API 令牌
 
-命令会使用你创建的令牌访问 Cloudflare API。在 Cloudflare 控制面板中打开**「我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌」**，并授予以下权限：
+命令会使用你创建的令牌访问 Cloudflare API。在 Cloudflare 控制面板中打开「**我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌**」（My Profile → API Tokens → Create Token → Create Custom Token），并授予以下权限：
 
 | 范围 | 权限 | 命令的用途 |
 |:--|:--|:--|
-| 账户 | 账户设置：读取 | 第一个请求 `GET /accounts`：列出令牌可访问的账户，同时检查令牌。 |
-| 区域 | 区域：读取 | `GET /zones`：查找主机所属的区域。 |
-| 账户 | Workers 脚本：编辑 | 列出脚本，上传两个脚本及其静态文件，设置 cron 计划并关闭 `workers.dev` 名称（`/workers/scripts/...`）。 |
-| 账户 | D1：编辑 | 查找或创建数据库（`/d1/database`）。 |
-| 区域 | Workers 路由：编辑 | 将主机绑定到 Worker 作为自定义域名（`PUT /workers/domains`）。 |
+| 账户 | 「账户设置：读取」（Account Settings: Read） | 第一个请求 `GET /accounts`：列出令牌可访问的账户，同时检查令牌。 |
+| 区域 | 「区域：读取」（Zone: Read） | `GET /zones`：查找主机所属的区域。 |
+| 账户 | 「Workers 脚本：编辑」（Workers Scripts: Edit） | 列出脚本，上传两个脚本及其静态文件，设置 cron 计划并关闭 `workers.dev` 名称（`/workers/scripts/...`）。 |
+| 账户 | 「D1：编辑」（D1: Edit） | 查找或创建数据库（`/d1/database`）。 |
+| 区域 | 「Workers 路由：编辑」（Workers Routes: Edit） | 将主机绑定到 Worker 作为自定义域名（`PUT /workers/domains`）。 |
 
-在**账户资源**中选择你的账户，在**区域资源**中选择该主机所属的单个区域。
+在**账户资源**（Account Resources）中选择你的账户，在**区域资源**（Zone Resources）中选择该主机所属的单个区域。
 
-> **注意：** 此权限清单是根据命令发出的 API 请求整理的，尚未在真实账户上确认；只有首次真实部署后才能确定最小权限。如果命令因权限错误停止，错误信息会指出失败的请求。最可能缺少的是自定义域名权限，它可能还需要**「区域：DNS：编辑」**；添加该权限，然后使用 `--resume` 重新运行命令。
+> **注意：** 此权限清单是根据命令发出的 API 请求整理的，尚未在真实账户上确认；只有首次真实部署后才能确定最小权限。如果命令因权限错误停止，错误信息会指出失败的请求。最可能缺少的是自定义域名权限，它可能还需要「**区域：DNS：编辑**」（Zone: DNS: Edit）；添加该权限，然后使用 `--resume` 重新运行命令。
 
 只能通过环境变量 `CLOUDFLARE_API_TOKEN` 向命令提供令牌。没有对应标志，因此令牌不会出现在进程列表中；命令也不会将它写入密钥文件或 Cloudflare。在错误信息中，令牌会替换为 `[REDACTED]`。在 bash 中，下面的命令也不会将它写入历史记录；在 PowerShell 中使用 `$env:CLOUDFLARE_API_TOKEN = "..."`：
 
@@ -129,7 +129,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 | 隧道检测 | 面板不会检测服务器的隧道，也不会触发依赖这些检测结果的告警。 |
 | 更新节点 | 面板不会更新节点 Agent：不支持滚动更新和定时更新。 |
 | 节点日志 | 不显示节点 Agent 的实时日志。 |
-| 更新面板 | 不支持自更新：需再次运行命令进行更新（见下文）。 |
+| 更新面板 | 不支持自更新：需再次运行命令更新（见下文）。 |
 | 自有伪装站点 | 节点无法使用**自有站点**伪装内容：此版本不保存上传的站点包。 |
 
 此版本也不支持从面板注册 WARP 账户；操作会失败并显示「此版本无法注册 WARP」，但管理后台暂时不会标明这一点。
@@ -153,7 +153,7 @@ mistgate edge deploy --host panel.example.com
 | 命令显示 | 处理方法 |
 |:--|:--|
 | CLOUDFLARE_API_TOKEN is required | 在同一个 shell 中导出环境变量。 |
-| list Cloudflare accounts: ... | 令牌错误、已过期或缺少 **账户设置：读取** 权限。按上文所述重新创建令牌。 |
+| list Cloudflare accounts: ... | 令牌错误、已过期或缺少「**账户设置：读取**」（Account Settings: Read）权限。按上文所述重新创建令牌。 |
 | no Cloudflare DNS zone matches host panel.example.com; the host's zone must be on Cloudflare DNS | 将域名添加到 Cloudflare，将其名称服务器指向 Cloudflare，并使用该区域中的主机名。 |
 | the Cloudflare zone example.com has status "pending", not "active" | 完成域名名称服务器的 Cloudflare 指向，然后重新运行命令。 |
 | a Worker script with this name already exists but its local key file is missing; refusing to replace its secrets | 当前目录中没有密钥文件。找到该文件，或使用其他 `--name`（旧脚本和数据库仍保留在账户中；若不需要，可在控制面板中删除）。D1 数据库名称重复时也会出现相同拒绝。 |

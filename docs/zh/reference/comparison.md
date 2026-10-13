@@ -1,16 +1,16 @@
-﻿---
+---
 title: 与其他面板对比
 description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Manager 和 s-ui 的对比、其他项目领先之处，以及截至 2026-10-09 核对过的来源。
 ---
 
-本页将 Mistgate 与人们最常用来执行相同任务的自托管面板进行比较。每个单元格都在 2026-10-09 对照项目自己的 README、文档和发布说明核实；「?」表示项目未说明。项目变化很快，作出决定前请先查看来源；发现单元格内容过时时，请提交 issue。
+本页将 Mistgate 与同类用途中最常用的几款自托管面板做对比。每个单元格都在 2026-10-09 对照项目自己的 README、文档和发布说明核实；「?」表示项目未说明。项目变化很快，作出决定前请先查看来源；发现单元格内容过时时，请提交 issue。
 
 ## Mistgate 的不同之处
 
 - **从面板添加节点。** 使用密码通过 SSH 连接：面板固定主机密钥、检查服务器、配置已启用的主机防火墙，并安装签名 Agent。其他面板需要手动添加节点：为每个节点运行完整面板、安装节点软件包或使用生成的 compose 文件。
 - **无需 Docker 或数据库服务器。** 只需两个静态 Go 二进制文件、SQLite 和 systemd。
 - **原生支持 AmneziaWG 协议。** 支持 2.0 和 3.1 版，每台设备使用独立密钥（手机丢失时只吊销对应密钥，不影响其他设备），并为 AmneziaVPN 提供 `vpn://` 密钥。3x-ui 也提供用户态的 AmneziaWG 3.1。
-- **从客户端侧进行检测。** 面板像应用一样连接每个节点上的每项协议配置；每个节点运行诊断程序，修复操作由你确认；告警会开启、关闭并发送到 Telegram。
+- **客户端视角检测。** 面板像应用一样连接每个节点上的每项协议配置；每个节点运行诊断程序，修复操作由你确认；告警会自动打开和关闭，并发送到 Telegram。
 - **签名发布版本。** 使用离线密钥为可复现构建签名；面板和节点只安装签名构建。
 - **默认隐藏。** 公共地址提供伪装站点；管理后台位于私密路径、主机名或监听器之后。
 - **内置 MCP 服务器**供 AI 智能体使用，支持计划 / 执行和所有者审批。
@@ -62,7 +62,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 
 在运行 VPN 核心、数据库并承载 Hysteria2 流量的 2 vCPU / 2 GB 服务器上，Mistgate（面板和节点）空闲时占用 57 MiB，在「高负载日」占用 80 MiB（64 条隧道流、每秒 300 个订阅请求、每秒添加一个用户并移除一个用户）；3x-ui 的对应数据为 74 和 129 MiB，PasarGuard 为 297 和 347 MiB，Remnawave 为 761 和 1,114 MiB。测量方法、版本以及 Mistgate 较慢的部分见[基准测试](benchmarks.md)。端到端测试会检查面板空闲内存是否低于 80 MB，以及节点 Agent 是否低于 100 MB。
 
-Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正在转向 PasarGuard。PasarGuard 是在独立仓库中开发的后继项目，并非 GitHub 分支。Marzneshin 已停止活跃开发。
+Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正在转向 PasarGuard。PasarGuard 是在独立仓库中开发的后继项目，并非 GitHub fork（派生版本）。Marzneshin 已停止活跃开发。
 
 ## 来源
 
@@ -76,8 +76,4 @@ Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正
 | PasarGuard | [PasarGuard/panel](https://github.com/PasarGuard/panel) | [docs.pasarguard.org](https://docs.pasarguard.org) |
 | Remnawave | [remnawave/panel](https://github.com/remnawave/panel) | [docs.rw](https://docs.rw) |
 | Hiddify Manager | [hiddify/Hiddify-Manager](https://github.com/hiddify/Hiddify-Manager) | [hiddify.com](https://hiddify.com) |
-| s-ui | [alireza0/s-ui](https://github.com/alireza0/s-ui) | [the wiki](https://github.com/alireza0/s-ui/wiki) |
-
-
-
-
+| s-ui | [alireza0/s-ui](https://github.com/alireza0/s-ui) | [Wiki](https://github.com/alireza0/s-ui/wiki) |

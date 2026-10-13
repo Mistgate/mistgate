@@ -267,7 +267,7 @@ function GroupPicker({ open, onOpenChange, profile, groups }: { open: boolean; o
               <li key={g.id} className="flex min-h-11 items-center gap-2.5 rounded-field border border-line py-1.5 pr-1.5 pl-3">
                 <b className="min-w-0 flex-1 truncate text-[13px]">{g.name}</b>
                 <span className="font-mono text-[11px] text-muted">{t.n("where.usersN", g.userCount)}</span>
-                <Button variant="primary" size="sm" disabled={add.isPending} aria-label={`${t("where.add")}: ${g.name}`} onClick={() => add.mutate(g)}>
+                <Button variant="primary" size="sm" disabled={add.isPending} aria-label={t("common.labeled", { label: t("where.add"), value: g.name })} onClick={() => add.mutate(g)}>
                   {t("where.add")}
                 </Button>
               </li>

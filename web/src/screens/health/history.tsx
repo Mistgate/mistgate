@@ -29,7 +29,7 @@ export function Bars({ cell }: { cell: CheckCell }) {
   const failed = bars.reduce((n, b) => n + b.bucket.failed, 0);
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex h-10 items-end gap-0.5" role="img" aria-label={`${t("hl.hist.h24")} → ${t("hl.hist.now")}: ${failed} ✕`}>
+      <div className="flex h-10 items-end gap-0.5" role="img" aria-label={t("common.labeled", { label: `${t("hl.hist.h24")} → ${t("hl.hist.now")}`, value: `${failed} ✕` })}>
         {bars.map((b, i) => (
           <span
             key={b.bucket.startUnix || i}

@@ -248,7 +248,7 @@ function RestartDialog({ open, onOpenChange, alert: a, scope }: { open: boolean;
     mutationFn: () => nodesApi.restartInbounds({ nodeId: a.nodeId, inboundId: scope === "one" ? (a.params.inbound ?? "") : "" }),
     onSuccess: (r) => {
       onOpenChange(false);
-      toast(`${a.nodeName}: ${t.n("node.restarted", r.restarted)}`);
+      toast(t("common.labeled", { label: a.nodeName, value: t.n("node.restarted", r.restarted) }));
       for (const k of ["health", "node", "nodes"]) void qc.invalidateQueries({ queryKey: [k] });
     },
     onError: (e) => setError(errorText(e, t)),

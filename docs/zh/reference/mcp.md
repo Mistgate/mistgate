@@ -65,7 +65,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 `mistgate mcp --url <admin URL> --token-file <file>` 会通过 stdin 和 stdout 运行本地 MCP 服务器，并将每条消息转发到面板端点。它不作任何判断、不缓存内容，也不识别工具：由面板负责响应。
 
 - 令牌只从文件第一行读取，不会从命令行或环境变量读取，也绝不显示。其他人可以读取该文件时会显示警告（Windows 上不检查）。
-- `--url` 必须使用 `https`，`localhost` 或环回地址除外。不会跟随重定向，因此令牌不会发送到其他地址。
+- `--url` 必须使用 `https`，`localhost` 或回环地址除外。不会跟随重定向，因此令牌不会发送到其他地址。
 - 面板拒绝令牌（令牌已过期、已吊销或权限级别不正确）时，代理会显示相应消息并停止。
 - `--url` 和 `--token-file` 未指定时，会分别回退到 `MISTGATE_URL` 和 `MISTGATE_TOKEN_FILE`。
 
@@ -75,7 +75,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 | 限制 | 数值 |
 |---|---|
-| 每个令牌同时进行的工具调用数 | 4（超过限制时返回 429 和 `at most 4 tool calls at a time per token`） |
+| 每个令牌同时运行的工具调用数 | 4（超过限制时返回 429 和 `at most 4 tool calls at a time per token`） |
 | 每分钟请求数 | 该令牌自身的限制 |
 | 请求正文大小 | 3 MiB |
 | 单个工具结果 | 32 KiB；长列表会逐步减半，直到符合限制，并标记为已截断 |
@@ -96,7 +96,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `warp_status` | 只读 | 单个节点是否有 WARP 账户，以及账户是否已启用或暂停；Agent 状态、colo、距上次握手的时间、Cloudflare 和其他站点的探测状态与延迟、注册时间、是否有刷新令牌，以及经 WARP 出口的协议配置。不含地址、密钥、账户 ID、许可证或令牌。 |
 | `node_metrics` | 只读 | 节点当前的 CPU、RAM、磁盘和网络数据、今日流量、各协议的在线用户，以及今日流量最高的用户。 |
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 |
-| `users_search` | 只读 | 按姓名片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
+| `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
 | `user_get` | 只读 | 单个用户：限制、状态、设备、协议配置和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
@@ -185,12 +185,12 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 ### 所有者在哪里审批
 
-此类计划会显示在管理后台的 **集成 → 待你审批** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由 Agent 撰写。面板未检查此内容。」）和剩余时间，然后选择：
+此类计划会显示在管理后台的 **集成 → 待你审批** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
 
 - **批准**：要求所有者再次使用通行密钥或身份验证器验证码。之后智能体只能执行此计划。
 - **拒绝**：智能体执行计划时会失败，并返回「rejected by the owner」。
 
-对于 `node_install`，审批卡片会显示面板读取到的 SHA-256 主机密钥指纹和密钥类型（智能体收到的计划副本会遮蔽指纹，与其他密钥类值相同）。所有者需要将它与可信副本进行比较、勾选确认并在此处输入服务器的 SSH 密码；两项操作都完成前，**批准**按钮会保持禁用。面板会将密码密封到该计划中；智能体执行时只携带确认令牌，并且只会使用所有者确认过的主机密钥和该密码安装一次。密码绝不会经过智能体、其对话记录或模型提供商。密码轮换也有相同的所有者审批边界：面板生成新密码并且绝不返回。
+对于 `node_install`，审批卡片会显示面板读取到的 SHA-256 主机密钥指纹和密钥类型（智能体收到的计划副本会遮蔽指纹，与其他密钥类值相同）。所有者需要将它与可信副本比较、勾选确认并在此处输入服务器的 SSH 密码；两项操作都完成前，**批准**按钮会保持禁用。面板会将密码密封到该计划中；智能体执行时只携带确认令牌，并且只会使用所有者确认过的主机密钥和该密码安装一次。密码绝不会经过智能体、其对话记录或模型服务商。密码轮换也有相同的所有者审批边界：面板生成新密码并且绝不返回。
 
 令牌永远不能批准自己制定的计划。未作决定的计划会在创建 10 分钟后过期。**最近的决定**会保留审批记录和结果：已完成、出错、已过期、已取消（令牌已吊销）等。智能体轮询间隔不应短于 30 秒。
 
@@ -240,7 +240,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 ## 审计
 
-工具调用的每个方法都会以「MCP 令牌 <name>」作为操作者写入审计日志，来源为 MCP。计划和执行过程也会各自增加日志项：「planned a change: <tool>」和「ran the planned change: <tool>」；所有者的决定则记录为「approved the change」或「rejected the change」。可在**设置 → 审计**中按 MCP 来源筛选。
+工具调用的每个方法都会以「MCP 令牌 <name>」作为操作者写入审计日志，来源为 MCP。计划和执行过程也会各自增加日志项：「制定了变更计划：<tool>」和「执行了已制定的变更计划：<tool>」；所有者的决定则记录为「批准了变更：<tool>」或「拒绝了变更：<tool>」。可在**设置 → 审计**中按 MCP 来源筛选。
 
 
 

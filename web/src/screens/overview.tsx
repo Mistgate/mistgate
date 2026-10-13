@@ -247,7 +247,7 @@ function TrafficChart({ data, range, onRange }: { data: OverviewResponse; range:
           tone: k === 0 ? "accent" : "them",
         }))
       }
-      label={`${t("ov.traffic")}, ${t(daily ? "ov.last7" : "ov.last24")}: ${fmt.bytes(sum(s.total))}`}
+      label={t("common.labeled", { label: `${t("ov.traffic")}, ${t(daily ? "ov.last7" : "ov.last24")}`, value: fmt.bytes(sum(s.total)) })}
     />
   );
 }
@@ -290,7 +290,7 @@ function OnlineChart({ data }: { data: OverviewResponse }) {
           tone: k === 0 ? "accent" : "them",
         }))
       }
-      label={`${t("ov.onlineTitle")}: ${t.n("ov.onlineCount", data.usersOnline)}`}
+      label={t("common.labeled", { label: t("ov.onlineTitle"), value: t.n("ov.onlineCount", data.usersOnline) })}
     />
   );
 }

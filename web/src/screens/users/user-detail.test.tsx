@@ -241,7 +241,7 @@ describe("the user card", () => {
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_f", dryRun: true });
     const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
     expect(dialog.textContent).toContain("Marina: move to “friends”?");
-    expect(dialog.textContent).toContain("Marina loses: «AWG 3.1» (1 AmneziaVPN key stops working)");
+    expect(dialog.textContent).toContain("Marina loses: “AWG 3.1” (1 AmneziaVPN key stops working)");
     expect(updateUser).toHaveBeenCalledTimes(1);
     await click(button("Change group"));
     await settle();

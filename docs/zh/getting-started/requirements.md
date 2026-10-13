@@ -1,6 +1,6 @@
 ---
-title: 要求
-description: 面板服务器、节点服务器和构建机器的要求，以及 Agent 会对节点进行的更改。
+title: 系统要求
+description: 面板服务器、节点服务器和构建机器的要求，以及 Agent 对节点所做的更改。
 ---
 
 Mistgate 需要一台 Linux 面板服务器、一台或多台 Linux 节点服务器和一个域名。二进制文件可以从 GitHub 发布版本获取，也可以在自己的机器上从源代码构建。
@@ -67,7 +67,7 @@ make build
 # bin/mistgate-linux-arm64       bin/mistgate-node-linux-arm64
 ```
 
-> **警告：** 只有使用你自己的发布密钥构建的二进制文件才会自行更新（`RELEASE_KEY=<public key> make build`），并且只会从你签名的发布包更新。没有密钥的构建安装的节点必须手动更新。若要使用签名更新，在首次构建前创建密钥：见[发布与签名](../operations/releases.md)。
+> **警告：** 只有使用你自己的发布密钥构建的二进制文件才会自行更新（`RELEASE_KEY=<public key> make build`），并且只会从你签名的发布包更新。没有密钥的构建安装的节点必须手动更新。若要使用签名更新，在首次构建前创建密钥：见[发布版本和签名](../operations/releases.md)。
 
 ## DNS 和证书
 
@@ -77,7 +77,7 @@ make build
 - **Agent 端点。** 无需 DNS 记录或公网证书。Agent 使用私密 TLS 名称（面板域名下的随机标签）连接到面板地址，面板使用自己的 CA 为该名称提供证书。
 - **节点。** 使用 Let’s Encrypt 证书的 Hysteria2 服务器需要一个 A 记录指向节点的域名：可以是节点地址，也可以是协议配置的域名（SNI）。如果节点只能通过 IP 访问，则使用自签名（固定指纹）证书。AmneziaWG 不需要证书。
 
-## Agent 会对节点进行的更改
+## Agent 对节点所做的更改
 
 Agent 仅会更改下表列出的内容和自身创建的对象：它不会编辑其他程序的 nftables 表，不会重定向 1024 以下的端口，也不会让端口跳跃范围覆盖 sshd 端口。
 
@@ -98,7 +98,7 @@ Agent 仅会更改下表列出的内容和自身创建的对象：它不会编�
 | 日志大小 | `journalctl --vacuum-size=200M --vacuum-time=7d`。 | 仅在应用诊断修复时 |
 | AmneziaWG 内核模块 | apt 软件包、Ubuntu 上的 Amnezia PPA 或 Debian 上的源代码构建、`/etc/modules-load.d/amneziawg.conf`。通过临时单元 `mistgate-awg-prepare` 运行。 | 仅在你要求时 |
 
-> **注意：** SSH 防护会按源地址（IPv6 按每个 /64）限制发往 sshd 端口的**新建**连接速率：初始突发 10 次，之后每分钟 6 次。不会影响已建立的会话，不会封禁地址，豁免 loopback；表已满时，防护会停止匹配，以免将你锁在服务器外。若工具从同一地址同时打开大量 SSH 连接，可能会受到影响。Agent 会通过 `sshd -T`、sshd 配置文件和 `ssh.socket` 查找 sshd 端口；如果都没有找到，则使用 22。
+> **注意：** SSH 防护会按源地址（IPv6 按每个 /64）限制发往 sshd 端口的**新建**连接速率：初始突发 10 次，之后每分钟 6 次。不会影响已建立的会话，不会封禁地址，豁免 回环地址；表已满时，防护会停止匹配，以免将你锁在服务器外。若工具从同一地址同时打开大量 SSH 连接，可能会受到影响。Agent 会通过 `sshd -T`、sshd 配置文件和 `ssh.socket` 查找 sshd 端口；如果都没有找到，则使用 22。
 
 ### 服务单元
 

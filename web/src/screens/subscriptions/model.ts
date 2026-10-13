@@ -119,7 +119,26 @@ const variantNamesZh: Record<string, string> = {
   "opendns/familyshield": "FamilyShield",
   "dnssb/standard": "标准",
 };
-export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : v.noteEn);
+// The catalog's notes are Russian and English only; this is the Chinese for each variant.
+const variantNotesZh: Record<string, string> = {
+  "cloudflare/standard": "速度快，不过滤。2026 年 8 月起，俄罗斯封锁了到 Cloudflare 的 DoH，在隧道内不受影响。",
+  "cloudflare/security": "拦截恶意和钓鱼网站。2026 年 8 月起，俄罗斯封锁了 DoH。",
+  "cloudflare/family": "拦截恶意网站和成人内容。2026 年 8 月起，俄罗斯封锁了 DoH。",
+  "google/standard": "不过滤。",
+  "quad9/standard": "拦截已知的恶意和钓鱼域名。",
+  "adguard/default": "拦截广告和跟踪器。",
+  "adguard/family": "拦截广告、跟踪器和成人内容。",
+  "adguard/unfiltered": "不拦截任何内容。",
+  "yandex/basic": "俄罗斯网站解析更稳定。在俄罗斯可使用 DoH 和 DoT。",
+  "yandex/safe": "拦截恶意和诈骗网站。在俄罗斯可使用 DoH 和 DoT。",
+  "yandex/family": "拦截成人内容和恶意网站。在俄罗斯可使用 DoH 和 DoT。",
+  "mullvad/standard": "仅支持 DoH/DoT，没有普通 DNS。该服务将于 2026-11-02 停止运营。",
+  "mullvad/adblock": "拦截广告和跟踪器。仅支持 DoH/DoT。该服务将于 2026-11-02 停止运营。",
+  "mullvad/base": "拦截广告、跟踪器和恶意网站。仅支持 DoH/DoT。该服务将于 2026-11-02 停止运营。",
+  "opendns/familyshield": "拦截成人内容。没有 DoT：主机名尚未确认。",
+  "dnssb/standard": "不记录日志，支持 DNSSEC，不过滤。",
+};
+export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : lang === "zh" ? (variantNotesZh[v.id] ?? v.noteEn) : v.noteEn);
 
 type ServerLike = { address: string; kind?: DnsServerKind; providerVariant?: string };
 

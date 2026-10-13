@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createHl, createRenderer } from "../src/markdown.mjs";
+import { T } from "../src/layout.mjs";
+import { LANGS } from "../src/urls.mjs";
 
 const siteRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = dirname(siteRoot);
@@ -120,4 +123,36 @@ test("node guides show the SSH install choice, and updates show the published pa
   assert.ok(updatesRu.includes("текущего стабильного релиза"));
   assert.ok(updatesRu.includes("появились до самообновления панели"));
   assert.ok(updatesRu.includes("Проверить GitHub"));
+});
+
+// Emphasis that CommonMark does not close (a ** next to full-width punctuation and a letter) shows up as literal asterisks:
+// render every page of every language with the site's own pipeline and look for them in the text, outside code.
+test("no page shows a literal ** or a stray __ after rendering", async () => {
+  const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".md") ? [p] : []; });
+  const highlight = await createHl();
+  const entities = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" };
+  const bad = [];
+  for (const lang of LANGS) {
+    const dir = join(repositoryRoot, "docs", lang);
+    const render = createRenderer(lang, T[lang], highlight);
+    for (const file of walk(dir)) {
+      const raw = readFileSync(file, "utf8").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+      const body = raw.replace(/^---\n[\s\S]*?\n---\n?/, "");
+      const key = file.slice(dir.length + 1).replace(/\\/g, "/").replace(/\.md$/, "");
+      const env = { lang, key, dir: dirname(file), dirEn: dirname(file), pages: new Map(), warn: () => {}, headings: [], codes: new Map() };
+      const text = render(body, env)
+        .replace(/<pre[\s\S]*?<\/pre>/g, " ")
+        .replace(/<code[\s\S]*?<\/code>/g, " ")
+        .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ")
+        .replace(/<[^>]+>/g, "\u0001")
+        .replace(/&(amp|lt|gt|quot|#39);/g, (m) => entities[m]);
+      const lines = raw.split("\n");
+      for (const m of text.matchAll(/\*\*|(?<![\p{L}\p{N}])__(?=\p{L})/gu)) {
+        const before = text.slice(Math.max(0, m.index - 16), m.index).split("\u0001").pop();
+        const at = before ? lines.findIndex((l) => l.includes(before + m[0]) || l.includes(before)) : -1;
+        bad.push(`${lang}/${key}.md:${at < 0 ? "?" : at + 1}: ${(before + text.slice(m.index, m.index + 24)).replace(/\u0001/g, "")}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], `literal emphasis marks in rendered text:\n${bad.join("\n")}`);
 });

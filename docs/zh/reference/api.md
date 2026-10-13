@@ -74,7 +74,7 @@ proto 文件中的注释是各字段的参考说明。约定（`common.proto`）
 Authorization: Bearer tk1_...
 ```
 
-带有 Bearer 请求头的请求只根据令牌进行验证；不会检查 Cookie。拒绝响应：
+带有 Bearer 请求头的请求只根据令牌验证；不会检查 Cookie。拒绝响应：
 
 | 状态码 | 正文中的 `code` | 消息 |
 |---|---|---|
