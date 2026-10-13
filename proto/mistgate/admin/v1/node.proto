@@ -17,7 +17,7 @@ service NodeService {
   rpc UpdateNode(UpdateNodeRequest) returns (UpdateNodeResponse);
   // Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
   rpc SetNodeDecoyMode(SetNodeDecoyModeRequest) returns (SetNodeDecoyModeResponse);
-  // Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+  // Upload one ZIP or TAR static site for this node (2 MiB maximum); this also selects "own".
   rpc UploadNodeDecoy(UploadNodeDecoyRequest) returns (UploadNodeDecoyResponse);
   // Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
   rpc SetNodesDecoyMode(SetNodesDecoyModeRequest) returns (SetNodesDecoyModeResponse);
@@ -306,7 +306,7 @@ message SetNodeDecoyModeResponse {
 
 message UploadNodeDecoyRequest {
   string node_id = 1;
-  // ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MB.
+  // ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MiB.
   bytes bundle_archive = 2;
 }
 

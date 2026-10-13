@@ -1865,7 +1865,7 @@ func (x *SetNodeDecoyModeResponse) GetNode() *Node {
 type UploadNodeDecoyRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	// ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MB.
+	// ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MiB.
 	BundleArchive []byte `protobuf:"bytes,2,opt,name=bundle_archive,json=bundleArchive,proto3" json:"bundle_archive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

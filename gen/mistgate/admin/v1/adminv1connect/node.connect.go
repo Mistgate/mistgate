@@ -80,7 +80,7 @@ type NodeServiceClient interface {
 	UpdateNode(context.Context, *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error)
 	// Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
 	SetNodeDecoyMode(context.Context, *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error)
-	// Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+	// Upload one ZIP or TAR static site for this node (2 MiB maximum); this also selects "own".
 	UploadNodeDecoy(context.Context, *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error)
 	// Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
 	SetNodesDecoyMode(context.Context, *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error)
@@ -300,7 +300,7 @@ type NodeServiceHandler interface {
 	UpdateNode(context.Context, *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error)
 	// Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
 	SetNodeDecoyMode(context.Context, *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error)
-	// Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+	// Upload one ZIP or TAR static site for this node (2 MiB maximum); this also selects "own".
 	UploadNodeDecoy(context.Context, *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error)
 	// Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
 	SetNodesDecoyMode(context.Context, *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error)

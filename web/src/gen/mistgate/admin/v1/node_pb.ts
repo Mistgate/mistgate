@@ -963,7 +963,7 @@ export type UploadNodeDecoyRequest = Message<"mistgate.admin.v1.UploadNodeDecoyR
   nodeId: string;
 
   /**
-   * ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MB.
+   * ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MiB.
    *
    * @generated from field: bytes bundle_archive = 2;
    */
@@ -1633,7 +1633,7 @@ export const NodeService: GenService<{
     output: typeof SetNodeDecoyModeResponseSchema;
   },
   /**
-   * Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+   * Upload one ZIP or TAR static site for this node (2 MiB maximum); this also selects "own".
    *
    * @generated from rpc mistgate.admin.v1.NodeService.UploadNodeDecoy
    */
