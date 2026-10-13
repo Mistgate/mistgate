@@ -17,7 +17,7 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 
 ## В чём другие впереди
 
-- **Протоколы.** VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard есть в большинстве других панелей. В Mistgate есть Hysteria2 и AmneziaWG, а VLESS REALITY в релизы пока не вошёл.
+- **Протоколы.** VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard есть в большинстве других панелей. В Mistgate есть Hysteria2, VLESS REALITY (XHTTP и TCP с Vision) и AmneziaWG. **Планируется**: VLESS за CDN (XHTTP или WebSocket поверх TLS).
 - **Форматы подписок.** Другие отдают Xray JSON, sing-box, Clash, Stash или Outline. Mistgate отдаёт список URI, Mihomo YAML и ключи AmneziaVPN. **Планируется**: Xray JSON и sing-box.
 - **Сообщество и зрелость.** У 3x-ui около 47,7 тыс. звёзд на GitHub, у s-ui около 10,0 тыс., у Hiddify Manager около 9,3 тыс. Mistgate новый проект в ранних версиях.
 - **Лимит устройств.** 3x-ui, PasarGuard и Remnawave ограничивают устройства по HWID. Mistgate считает устройства.
@@ -34,8 +34,8 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 | Docker | не нужен: systemd, статические бинарники | по желанию | частично: установщик использует Compose, ручная установка описана | частично: Compose | нужен и панели, и ноде | по желанию | по желанию |
 | Установка одной командой | да | да | да | да | нет: Compose, скрипты сообщества | да | да |
 | Память | панель: 16-20 МиБ в простое, замер¹; нода: установщику по SSH нужно 256 МБ | 68-74 МиБ в простое, замер¹ | ? | 262-265 МиБ в простое, замер¹; по документации: минимум 1 ГБ, рекомендуется 2 ГБ | 426-454 МиБ в простое, замер¹; по документации: панель минимум 2 ГБ, рекомендуется 4 ГБ; нода минимум 1 ГБ | ? | ? |
-| Ядро | Hysteria2; AmneziaWG в userspace или в ядре; xray-core для VLESS (**Планируется**) | Xray, TUIC внутри процесса, AmneziaWG | Xray | Xray, ядро WireGuard; нода на sing-box анонсирована | Xray | Xray и sing-box | sing-box |
-| VLESS REALITY / XHTTP | **Планируется** (движок на ноде уже в основной ветке) | да / да | да / ? | да / ? | да / да | да / да | ? (VLESS есть в исходниках) |
+| Ядро | Hysteria2; xray-core для VLESS; AmneziaWG в userspace или в ядре | Xray, TUIC внутри процесса, AmneziaWG | Xray | Xray, ядро WireGuard; нода на sing-box анонсирована | Xray | Xray и sing-box | sing-box |
+| VLESS REALITY / XHTTP | да / да | да / да | да / ? | да / ? | да / да | да / да | ? (VLESS есть в исходниках) |
 | VMess, Trojan, Shadowsocks | нет | да | да | да | частично: Trojan и Shadowsocks, VMess не указан | да | да (в исходниках) |
 | Hysteria2 | да | да | ? | да | частично: только в клиентских конфигах Xray JSON | да | да (в исходниках) |
 | TUIC | нет | да (v5) | ? | ? | ? | да | да (в исходниках) |

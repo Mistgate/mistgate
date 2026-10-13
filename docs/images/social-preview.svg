@@ -24,7 +24,7 @@ text{font-family:"Onest","Segoe UI",Arial,sans-serif}
 <text class="h" x="72" y="236">Your own VPN</text>
 <text class="h" x="72" y="302">for your people,</text>
 <text class="h" x="72" y="368">without babysitting servers.</text>
-<rect x="72" y="452" width="452" height="48" rx="24" class="chip"/><text x="298.0" y="484" text-anchor="middle" class="chipt"><tspan>Hysteria2 · AmneziaWG · </tspan><tspan class="soon">VLESS soon</tspan></text>
+<rect x="72" y="452" width="452" height="48" rx="24" class="chip"/><text x="298.0" y="484" text-anchor="middle" class="chipt"><tspan>Hysteria2 · VLESS · AmneziaWG</tspan></text>
 <rect x="72" y="516" width="168" height="48" rx="24" class="chip"/><text x="156.0" y="548" text-anchor="middle" class="chipt">No Docker</text>
 <rect x="256" y="516" width="268" height="48" rx="24" class="chip"/><text x="390.0" y="548" text-anchor="middle" class="chipt">One link per person</text>
 </svg>

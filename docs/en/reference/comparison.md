@@ -17,7 +17,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 
 ## Where the others are ahead
 
-- **Protocols.** VMess, Trojan, Shadowsocks, TUIC and plain WireGuard are in most other panels. Mistgate has Hysteria2 and AmneziaWG; VLESS REALITY is not in a release yet.
+- **Protocols.** VMess, Trojan, Shadowsocks, TUIC and plain WireGuard are in most other panels. Mistgate has Hysteria2, VLESS REALITY (XHTTP and TCP with Vision) and AmneziaWG; VLESS behind a CDN (XHTTP or WebSocket over TLS) is **Planned**.
 - **Subscription formats.** Others serve Xray JSON, sing-box, Clash, Stash or Outline. Mistgate serves a URI list, Mihomo YAML and AmneziaVPN keys; Xray JSON and sing-box are **Planned**.
 - **Community and maturity.** 3x-ui has about 47.7k GitHub stars, s-ui about 10.0k, Hiddify Manager about 9.3k. Mistgate is a new project in early releases.
 - **Device limits.** 3x-ui, PasarGuard and Remnawave limit devices by HWID. Mistgate counts devices.
@@ -34,8 +34,8 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Docker | not used: systemd, static binaries | optional | partial: the installer uses Compose; a manual install is documented | partial: Compose | required for the panel and the node | optional | optional |
 | One-line installer | yes | yes | yes | yes | no: Compose, community scripts | yes | yes |
 | Memory | panel: 16-20 MiB idle, measured¹; node: the SSH installer needs 256 MB | 68-74 MiB idle, measured¹ | ? | 262-265 MiB idle, measured¹; documented: 1 GB minimum, 2 GB recommended | 426-454 MiB idle, measured¹; documented: panel 2 GB minimum, 4 GB recommended; node 1 GB minimum | ? | ? |
-| Core | Hysteria2; AmneziaWG in userspace or the kernel; xray-core for VLESS (**Planned**) | Xray, TUIC in process, AmneziaWG | Xray | Xray, a WireGuard core; a sing-box node announced | Xray | Xray and sing-box | sing-box |
-| VLESS REALITY / XHTTP | **Planned** (the node engine is merged) | yes / yes | yes / ? | yes / ? | yes / yes | yes / yes | ? (VLESS is in the source) |
+| Core | Hysteria2; xray-core for VLESS; AmneziaWG in userspace or the kernel | Xray, TUIC in process, AmneziaWG | Xray | Xray, a WireGuard core; a sing-box node announced | Xray | Xray and sing-box | sing-box |
+| VLESS REALITY / XHTTP | yes / yes | yes / yes | yes / ? | yes / ? | yes / yes | yes / yes | ? (VLESS is in the source) |
 | VMess, Trojan, Shadowsocks | no | yes | yes | yes | partial: Trojan and Shadowsocks; VMess not listed | yes | yes (in the source) |
 | Hysteria2 | yes | yes | ? | yes | partial: in Xray JSON client configs only | yes | yes (in the source) |
 | TUIC | no | yes (v5) | ? | ? | ? | yes | yes (in the source) |

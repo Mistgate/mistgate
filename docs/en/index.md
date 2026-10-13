@@ -3,7 +3,7 @@ title: Mistgate documentation
 description: What is in the documentation, where to find it, and the order to read it in.
 ---
 
-Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel, one for the node agent, Hysteria2 and AmneziaWG in one subscription. This documentation describes what the code does today; features that are still being built are marked **Planned**.
+Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel, one for the node agent, Hysteria2, VLESS REALITY and AmneziaWG in one subscription. This documentation describes what the code does today; features that are still being built are marked **Planned**.
 
 ## What is where
 

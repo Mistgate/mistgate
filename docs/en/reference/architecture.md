@@ -20,7 +20,7 @@ The panel is one process. `cmd/mistgate` wires the modules together; they know e
 | `instance` | The brand (name, logo, accent, language) and the read-only addresses shown in **Settings → Domains**. |
 | `fleet` | The panel CA, node enrollment, the agent stream, liveness, ingestion of stats and events, desired-state revisions and deltas, commands to nodes, the admin's node and overview APIs. |
 | `access` | Profiles, servers on nodes, groups, users, devices and credentials; the rule of who gets what; subscription views. |
-| `protocols` | The registry of protocol plugins (Hysteria2, AmneziaWG) and their schema-driven settings. |
+| `protocols` | The registry of protocol plugins (Hysteria2, VLESS, AmneziaWG) and their schema-driven settings. |
 | `subs`, `subsettings`, `dns` | The public subscription endpoint and the user page, the subscription settings and User-Agent rules, DNS presets. |
 | `health` | Client-eye checks, alerts, the node doctor's reports and fixes, data retention. |
 | `update` | The signed release bundle in `<data-dir>/dist` and its download from GitHub, staged rollouts and scheduled updates of node agents, the panel's own update. |
@@ -35,7 +35,7 @@ The panel is one process. `cmd/mistgate` wires the modules together; they know e
 | Part (`internal/node/...`) | Responsibility |
 |:--|:--|
 | `agent` | Enrollment, the one stream to the panel with reconnects, a single worker that applies every change to engines and host, the reliable outbox, commands, the in-memory log of the last 5000 records. |
-| `engine`, `hysteria2`, `awg` | One engine per protocol. Hysteria2 runs the official core in-process; AmneziaWG runs in userspace (amneziawg-go) or on the kernel module. |
+| `engine`, `hysteria2`, `vless`, `awg` | One engine per protocol. Hysteria2 runs the official core in-process; VLESS runs xray-core in-process; AmneziaWG runs in userspace (amneziawg-go) or on the kernel module. |
 | `hostctl` | The only host state the agent owns: its nftables tables, the sysctl and journald baseline, the tunnel firewall, the UDP ports of its servers in an active UFW (only rules it tagged itself, never one of yours; `ufw` runs outside the agent's sandbox), host facts and metrics. |
 | `torrentguard` | Torrent protection: recognises plaintext BitTorrent that a client starts by its protocol signature, never by port. Hysteria2 checks the flows it proxies; for AmneziaWG the host hands tunnel flows to the agent and a match is blocked in the kernel. See [Torrent protection](../guide/torrent-protection.md). |
 | `warp`, `egress` | The node's WARP tunnel and the exits (direct or WARP) the engines use. |
@@ -127,7 +127,7 @@ The **panel half** (`internal/panel/protocols`) describes and renders the protoc
 
 | Method | Purpose |
 |:--|:--|
-| `ID`, `DisplayName` | `hysteria2` / "Hysteria2", `awg` / "AmneziaWG". |
+| `ID`, `DisplayName` | `hysteria2` / "Hysteria2", `vless` / "VLESS", `awg` / "AmneziaWG". |
 | `SettingsSchema`, `DefaultSettings`, `Validate`, `Summary` | The JSON Schema the admin renders the profile form from, defaults with generated secrets, per-field validation, the one-line summary on a profile card. |
 | `BuildInbound` | Turns profile settings, node and per-node overrides into the spec the node runs. |
 | `IssueCredential` | Makes a device's credential: the secret the client presents, and the verifier sent to nodes. |
@@ -138,7 +138,7 @@ Optional interfaces cover what only some protocols need: per-server key material
 
 The **node half** (`internal/node/engine`) runs it. An engine applies a spec with its credentials (idempotent; credentials swap without a restart), removes a server, collects traffic deltas and sessions, kicks sessions, reports what it holds (for the state hash) and its health. From the agent it gets certificates, the exits (direct or WARP), the node's DNS and the decoy handler for unauthenticated requests.
 
-Both registries are built into the binaries (`internal/panel/protocols/builtin` and `cmd/mistgate-node/wire.go`); there is no loading of plugins at run time. External protocol plugins, with VLESS REALITY as the first, are **Planned**.
+Both registries are built into the binaries (`internal/panel/protocols/builtin` and `cmd/mistgate-node/wire.go`); there is no loading of plugins at run time. External protocol plugins are **Planned**.
 
 ## Security model in brief
 

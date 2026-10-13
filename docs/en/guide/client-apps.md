@@ -9,7 +9,7 @@ Mistgate has no client of its own. People connect with existing apps, and the pa
 
 | Platform | Recommended | Also offered |
 |:--|:--|:--|
-| Windows, macOS | [kl!ck](#klck): Hysteria2 and AmneziaWG in one app | Happ; AmneziaVPN for keys |
+| Windows, macOS | [kl!ck](#klck): Hysteria2, VLESS and AmneziaWG in one app | Happ; AmneziaVPN for keys |
 | iOS, Android | Happ: Hysteria2 | AmneziaVPN for keys |
 | Linux | none by default | AmneziaVPN for keys; any app on the mihomo core you add |
 
@@ -54,7 +54,7 @@ These are the templates of the known apps. Each scheme is confirmed by the app's
 
 [kl!ck](https://github.com/vbu00/klick) is an open-source desktop client for Windows and macOS by vbu00, written in Rust with Tauri around an unmodified Mihomo core. Mistgate recommends it on the desktop and credits its author: the app is not part of Mistgate.
 
-**Why it is the desktop recommendation.** It reads the Mihomo YAML, the one format that carries both protocols: a person with Hysteria2 and AmneziaWG gets all their servers from the one subscription in the one app, with the DNS section of their preset. On Windows and macOS the alternative is Happ for Hysteria2 plus AmneziaVPN for keys, two apps and two ways to add.
+**Why it is the desktop recommendation.** It reads the Mihomo YAML, the one format that carries all three protocols: a person with Hysteria2, VLESS and AmneziaWG gets all their servers from the one subscription in the one app, with the DNS section of their preset. On Windows and macOS the alternative is Happ for Hysteria2 and VLESS plus AmneziaVPN for keys, two apps and two ways to add.
 
 **What the panel needs.** Nothing special: kl!ck fetches the subscription as `mihomo/1.19.31`, so the default rule `mihomo` serves it the Mihomo YAML. The app entry is of the kind **By subscription link**. For the AmneziaWG servers, see the switch above.
 
