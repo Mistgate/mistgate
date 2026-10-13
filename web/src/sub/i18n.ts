@@ -634,8 +634,10 @@ const zh: Dict = { ...en };
 
 export const dict: Record<Lang, Dict> = { ru: typeset(ru), en: typeset(en), zh: typeset(zh) };
 
-/** The languages of the switch in the top bar, in order; the labels are the buttons' text. */
-export const langs: readonly Lang[] = ["ru", "en", "zh"];
+/** The languages of the menu in the top bar, in order. */
+export const langs: readonly Lang[] = ["en", "ru", "zh"];
+/** Each language in its own words: the rows of the menu. */
+export const langNames: Record<Lang, string> = { ru: "Русский", en: "English", zh: "简体中文" };
 export const langShort: Record<Lang, string> = { ru: "RU", en: "EN", zh: "中文" };
 export const isLang = (v: unknown): v is Lang => langs.includes(v as Lang);
 /** The value of the `lang` attribute (<html>, the language buttons). */

@@ -118,13 +118,19 @@ a { color: inherit; }
 .wm { flex: 1; min-width: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wm b { font-weight: 800; color: var(--accent-text); }
 .wm.plain { font-size: 15px; letter-spacing: -0.02em; }
-.lang { display: flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--surface-2); }
-.lang button { position: relative; min-width: 38px; height: 30px; padding: 0 8px; border: 0; border-radius: 9px; background: none; font: 700 12px/1 var(--mono); color: var(--muted); }
-/* 30 px to see, 44 px to hit */
-.lang button::after { content: ""; position: absolute; inset: -7px -3px; }
-.lang .on { background: var(--raise); color: var(--text); }
-:root[data-theme="light"] .lang .on, :root[data-theme="light"] .seg .on { box-shadow: 0 0 0 1px var(--border); }
-@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .lang .on, :root:not([data-theme="dark"]) .seg .on { box-shadow: 0 0 0 1px var(--border); } }
+/* the language menu: a native <details>; the card is the .pop of the row menus */
+.lang-menu { position: relative; flex: none; }
+.lang-menu summary { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px 0 11px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--muted); font: 700 12px/1 var(--mono); cursor: pointer; list-style: none; user-select: none; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+.lang-menu summary::-webkit-details-marker { display: none; }
+.lang-menu summary:hover { background: var(--surface-2); color: var(--text); }
+.lang-menu[open] summary { border-color: var(--accent-line); color: var(--text); }
+.lang-menu .lang-card { top: calc(100% + 6px); width: 208px; }
+.lang-menu .lang-card button { height: 44px; }
+.lang-menu .lang-card .ln { flex: 1; min-width: 0; }
+.lang-menu .lang-card .lc { font: 700 12px/1 var(--mono); color: var(--muted); }
+.lang-menu .lang-card .lk { display: grid; place-items: center; width: 16px; flex: none; color: var(--accent-text); }
+:root[data-theme="light"] .seg .on { box-shadow: 0 0 0 1px var(--border); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .seg .on { box-shadow: 0 0 0 1px var(--border); } }
 
 /* the owner's announcement */
 .ann { display: flex; align-items: flex-start; gap: 10px; padding: 12px 2px 12px 14px; border-radius: 16px; background: var(--warning-soft); border: 1px solid var(--warning-line); }

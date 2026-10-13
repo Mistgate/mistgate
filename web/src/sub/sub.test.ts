@@ -320,14 +320,40 @@ describe("view", () => {
     expect(annKey(d.announcement)).toBe(annKey(d.announcement));
   });
 
-  it("the language switch: a button per language, the current one pressed", () => {
+  it("the language menu: the summary names the current language, a row per language (English, Русский, 简体中文), the current one checked", () => {
     const a = actions();
     const el = view(data("first"), state("ios"), a);
-    expect([...el.querySelectorAll(".lang button")].map((b) => [text(b), b.getAttribute("aria-pressed")])).toEqual([["RU", "true"], ["EN", "false"], ["中文", "false"]]);
-    expect([...el.querySelectorAll(".lang button")].map((b) => b.getAttribute("lang"))).toEqual(["ru", "en", "zh-CN"]);
-    el.querySelector<HTMLButtonElement>("[data-k=lang-en]")!.click();
-    el.querySelector<HTMLButtonElement>("[data-k=lang-ru]")!.click(); // already this one: nothing
+    const menu = el.querySelector<HTMLDetailsElement>("details.lang-menu")!;
+    expect(menu.open).toBe(false);
+    const summary = menu.querySelector("summary")!;
+    expect(text(summary)).toBe("RU");
+    expect(summary.getAttribute("aria-label")).toBe("Язык: Русский");
+    const rows = [...menu.querySelectorAll("button")];
+    expect(rows.map((b) => [text(b), b.getAttribute("aria-pressed"), b.getAttribute("lang")])).toEqual([
+      ["EnglishEN", "false", "en"],
+      ["РусскийRU", "true", "ru"],
+      ["简体中文中文", "false", "zh-CN"],
+    ]);
+    expect(rows.map((b) => b.querySelectorAll("svg").length)).toEqual([0, 1, 0]);
+    rows[0]!.click();
+    rows[1]!.click(); // already this one: nothing but closing
     expect(a.log).toEqual(["lang en"]);
+  });
+
+  it("the language menu closes on a click outside and on Esc, which gives the focus back to the summary", () => {
+    const el = view(data("first"), state("ios"), actions());
+    document.body.append(el);
+    const menu = el.querySelector<HTMLDetailsElement>("details.lang-menu")!;
+    menu.open = true;
+    el.querySelector<HTMLElement>(".hero")!.click();
+    expect(menu.open).toBe(false);
+    menu.open = true;
+    menu.querySelector("summary")!.click(); // inside: the browser's own toggle, the page stays out of it
+    menu.open = true;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(menu.querySelector("summary"));
+    el.remove();
   });
 
   it("the theme switch in the footer: Auto, Light, Dark", () => {
