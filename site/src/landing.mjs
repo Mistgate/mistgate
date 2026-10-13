@@ -118,7 +118,7 @@ export const LANDING = {
   zh: {
     meta: "Mistgate 是面向家人、朋友、社群或小团队的自托管 VPN 面板：在你自己的服务器上运行 Hysteria2、VLESS REALITY 和 AmneziaWG，每人一个链接，并像应用那样检测每台服务器。",
     eyebrow: "测试版 · 自托管 · 开源 · AGPL-3.0",
-    h1: "为身边的人搭一个自己的 VPN，不必时时盯着服务器。",
+    h1: "为身边的人​搭一个自己的 VPN，​不必时时盯着服务器。", // ​: the only places the headline may wrap
     lead: "适合家人、朋友、社群或小团队。安装一个面板，在浏览器里添加你的服务器，再给每个人发一个链接。Mistgate 负责保持服务器配置正确，并像应用那样检测它们，所以出了故障你会最先知道。",
     install: "安装面板", how: "工作原理",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite，无需 Docker"],
