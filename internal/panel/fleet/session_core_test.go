@@ -2202,8 +2202,14 @@ func TestRunSessionStepsDisconnectBeforeClosingDone(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("session did not stop after cancellation")
 	}
-	if !s.coreState.Disconnected || nextSessionAlarm(s.coreState, e.f.now()) != nil {
-		t.Fatalf("runSession ended without clearing core alarms: state=%+v", s.coreState)
+	now := e.f.now()
+	s.coreMu.Lock()
+	disconnected := s.coreState.Disconnected
+	nextAlarm := nextSessionAlarm(s.coreState, now)
+	state := fmt.Sprintf("%+v", s.coreState)
+	s.coreMu.Unlock()
+	if !disconnected || nextAlarm != nil {
+		t.Fatalf("runSession ended without clearing core alarms: state=%s", state)
 	}
 	e.f.mu.Lock()
 	poison := e.f.stuck[a.nodeID]

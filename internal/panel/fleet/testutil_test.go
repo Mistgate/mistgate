@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,12 +130,17 @@ func newEnvWithoutServer(t *testing.T, reg *protocols.Registry) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	acc, err := access.New(st, v, reg, nil, nil, access.Config{})
+	// AfterResponse work (decoy sync, WARP attention…) outlives the request that started it; in a test it must not outlive
+	// the store. This cleanup is registered after st.Close, so it runs first and waits for that work.
+	var after sync.WaitGroup
+	t.Cleanup(after.Wait)
+	afterResponse := func(work func()) { after.Go(work) }
+	acc, err := access.New(st, v, reg, nil, nil, access.Config{AfterResponse: afterResponse})
 	if err != nil {
 		t.Fatal(err)
 	}
 	f, err := New(st, v, reg, Config{AgentSNI: testSNI, PanelAddr: "panel.example.com:443", Debounce: 20 * time.Millisecond,
-		Desired: desiredFrom(acc), Actor: func(context.Context) string { return "adm_test" }})
+		Desired: desiredFrom(acc), Actor: func(context.Context) string { return "adm_test" }, AfterResponse: afterResponse})
 	if err != nil {
 		t.Fatal(err)
 	}
