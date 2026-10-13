@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/buildinfo"
-	"github.com/mistgate/mistgate/internal/panel/health/vlesshelper"
 	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
 
@@ -52,7 +51,7 @@ func main() {
 	case "panel-update-helper":
 		err = panelupdate.RunPanelUpdateHelper(os.Args[2:])
 	case "health-vless-helper":
-		err = vlesshelper.Run(os.Stdin, os.Stdout, os.Stderr)
+		err = runVLESSHelper()
 	case "mcp":
 		// stdout is the protocol channel: nothing else may be written to it
 		err = runMCP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)

@@ -297,10 +297,10 @@ func (c *vlessProbeConn) Write(p []byte) (int, error) {
 func (t *vlessTunnel) probeError(err error, ctx context.Context) *ProbeError {
 	for i := 0; ; i++ {
 		pe, known := classifyVLESSFailure(err, ctx, t.stderr.String())
-		if known || i >= 5 {
+		if known || i >= 10 {
 			return pe
 		}
-		time.Sleep(40 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -312,7 +312,9 @@ func classifyVLESSFailure(err error, ctx context.Context, stderr string) (pe *Pr
 	if (ctx != nil && ctx.Err() != nil) || errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
 		return &ProbeError{Code: "timeout", Detail: "VLESS tunnel handshake timed out"}, true
 	}
-	low := strings.ToLower(stderr + " " + errorText(err))
+	// The reason comes from the helper only: err is the loopback SOCKS stream, whose "connection reset" or EOF just says
+	// that the helper gave up, not why.
+	low := strings.ToLower(stderr)
 	switch {
 	case strings.Contains(low, "certificate"), strings.Contains(low, "x509"), strings.Contains(low, "tls alert"),
 		strings.Contains(low, "tls:"), strings.Contains(low, "handshake failure"):
@@ -331,6 +333,8 @@ func classifyVLESSFailure(err error, ctx context.Context, stderr string) (pe *Pr
 		return &ProbeError{Code: "auth", Detail: "the VLESS server dropped the tunnel after the handshake (credential rejected)"}, true
 	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
 		return &ProbeError{Code: "refused", Detail: "the VLESS tunnel ended before the probe completed"}, false
+	case strings.Contains(strings.ToLower(errorText(err)), "timeout"):
+		return &ProbeError{Code: "timeout", Detail: "VLESS tunnel handshake timed out"}, false
 	default:
 		return &ProbeError{Code: "refused", Detail: "VLESS tunnel connection failed"}, false
 	}
