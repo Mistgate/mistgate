@@ -13,7 +13,7 @@ describe("the panel's refusal codes", () => {
   it("have a sentence in every language", () => {
     for (const c of errorCodes) {
       for (const lang of langs) expect(dict[lang][`err.${c}`], `${lang} ${c}`).toBeTruthy();
-      expect(ru[`err.${c}`], `ru ${c}`).not.toBe(en[`err.${c}`]); // zh joins this once the translation pass has run
+      for (const lang of langs.filter((l) => l !== "en")) expect(dict[lang][`err.${c}`], `${lang} ${c}`).not.toBe(en[`err.${c}`]);
     }
   });
 

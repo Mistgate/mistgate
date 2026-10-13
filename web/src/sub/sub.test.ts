@@ -208,7 +208,7 @@ describe("view", () => {
         const d = normalize(raw);
         const el = view(d, state("ios", { returning: isReturning(d, false) }, lang), actions());
         expect(el.querySelector(".hero")).not.toBeNull();
-        expect(el.querySelector(".priv")?.textContent).toContain("—");
+        if (lang !== "zh") expect(el.querySelector(".priv")?.textContent).toContain("—"); // Chinese has no spaced dash
         const all = el.textContent ?? "";
         // nothing the page shows is the panel's jargon, a tunnel address, a node name, a profile name, or the secret link
         expect(all).not.toMatch(/AWG|10\.66\.|fd66:|Old apps|Main ·|nod_|vpn:\/\/|3f9k2v8q/); // the link and the key are copied or scanned, never written out

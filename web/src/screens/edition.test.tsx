@@ -117,8 +117,8 @@ describe("EditionNotice", () => {
   it("names every feature the server can list", () => {
     for (const f of editionFeatures) {
       expect(en[`edition.feature.${f}`], f).toBeTruthy();
-      expect(ru[`edition.feature.${f}`], f).not.toBe(en[`edition.feature.${f}`]); // zh joins this once the translation pass has run
-      expect(zh[`edition.feature.${f}`], f).toBeTruthy();
+      expect(ru[`edition.feature.${f}`], f).not.toBe(en[`edition.feature.${f}`]);
+      expect(zh[`edition.feature.${f}`], f).not.toBe(en[`edition.feature.${f}`]);
     }
   });
 });
