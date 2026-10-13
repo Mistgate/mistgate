@@ -42,8 +42,8 @@
   --tone-sage: light-dark(#3b511d, #b0cc90);     --tone-sage-bg: light-dark(#e8f1e0, #2c3126);
   --tone-mint: light-dark(#00582f, #7dd3a0);     --tone-mint-bg: light-dark(#dcf3e4, #243229);
   --tone-rose: light-dark(#67343e, #e6a6b0);     --tone-rose-bg: light-dark(#f9e6e8, #362a2c);
-  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif; /* the CJK names are only fallbacks for Chinese text: no web font is loaded */
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC", monospace;
   --r-chip: 7px; --r-ctl: 11px; --r-field: 14px; --r-card: 16px; --r-card-lg: 18px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --hh: 68px;
@@ -114,10 +114,20 @@ main:focus { outline: none; }
 .search-btn__t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kbds { display: flex; gap: 4px; }
 kbd { display: inline-flex; align-items: center; justify-content: center; height: 24px; min-width: 24px; padding: 0 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--r-chip); background: var(--surface-2); color: var(--text); font: 700 12px var(--font-mono); }
-.lang { display: flex; gap: 2px; padding: 2px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
-.lang a { display: inline-flex; align-items: center; justify-content: center; height: 28px; min-width: 36px; padding: 0 8px; border-radius: var(--r-ctl); font: 700 11px var(--font-mono); color: var(--muted); }
-.lang a:hover { color: var(--text); }
-.lang a[aria-current] { background: var(--accent); color: var(--ink-on-accent); }
+/* language menu: <details> with a card of links; the accent marks only the current language */
+.lang { position: relative; flex: none; }
+.lang__btn { width: auto; gap: 6px; padding: 0 10px; list-style: none; cursor: pointer; font: 700 13px var(--font-sans); user-select: none; -webkit-tap-highlight-color: transparent; }
+.lang__btn::-webkit-details-marker { display: none; }
+.lang[open] > .lang__btn { border-color: var(--accent-line); background: var(--surface-2); }
+.lang__chev { color: var(--muted); transition: transform 0.18s var(--ease); }
+.lang[open] .lang__chev { transform: rotate(180deg); }
+.lang__panel { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: 220px; max-width: calc(100vw - 2 * var(--pad)); margin: 0; padding: 6px; list-style: none; border: 1px solid var(--border); border-radius: var(--r-field); background: var(--surface); box-shadow: var(--shadow-pop); }
+.lang__item { display: grid; grid-template-columns: minmax(0, 1fr) auto 16px; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: var(--r-ctl); font-size: 14px; font-weight: 600; line-height: 1.2; color: var(--text); }
+a.lang__item:hover { background: var(--surface-2); }
+.lang__code { font: 600 11px var(--font-mono); letter-spacing: 0.04em; color: var(--muted); }
+.lang__tick { display: grid; place-items: center; }
+.lang__item[aria-current] { background: var(--accent-soft); color: var(--accent-text); cursor: default; }
+.lang__item[aria-current] .lang__code { color: inherit; opacity: 0.75; }
 
 /* ---------- shell ---------- */
 .shell { max-width: 1360px; margin: 0 auto; padding: 0 var(--pad); display: flex; gap: 40px; align-items: flex-start; }
@@ -183,7 +193,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; height
 @media (max-width: 479px) { .brand { font-size: 16px; } }
 @media (max-width: 419px) { .js .hide-xs { display: none !important; } }
 @media (max-width: 1100px), (pointer: coarse) {
-  .lang a { height: 40px; min-width: 40px; }
+  .lang__item { min-height: 40px; }
   .nav-link { min-height: 40px; }
 }
 
@@ -542,4 +552,12 @@ dialog.search::backdrop { background: var(--backdrop); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+/* ---------- Chinese (html lang="zh-CN"): wider leading, no negative tracking (it crowds the glyphs), labels not shrunk to 11 px ---------- */
+body.mg:lang(zh) { line-height: 1.75; }
+:lang(zh) .doc-h1, :lang(zh) .hero__h1, :lang(zh) .prose h2, :lang(zh) .prose h3, :lang(zh) .prose h4, :lang(zh) .home-sec h2, :lang(zh) .home-sec h3,
+:lang(zh) .pn__t, :lang(zh) .proof__t, :lang(zh) .rm-nav__t, :lang(zh) .rm-card h3 { letter-spacing: 0; line-height: 1.35; }
+:lang(zh) .label, :lang(zh) .eyebrow, :lang(zh) .code__lang, :lang(zh) .grp__label { letter-spacing: 0.04em; font-size: 12px; }
+:lang(zh) .prose p, :lang(zh) .prose li, :lang(zh) .doc-lead, :lang(zh) .hero__lead, :lang(zh) .why p, :lang(zh) .steps p, :lang(zh) .sec-card p, :lang(zh) .callout__body, :lang(zh) .rm-card p, :lang(zh) .rm-points { line-height: 1.8; }
+:lang(zh) .prose p, :lang(zh) .prose li { text-align: left; overflow-wrap: break-word; }
+
 @media print { .top, .side, .toc, .toc-inline, .foot, .pns, .edit, .backdrop { display: none !important; } .shell { display: block; } }

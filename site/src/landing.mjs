@@ -1,6 +1,7 @@
 // The home page: who Mistgate is for and what it does, how it fits together (D1), why it is worth a look, how to
 // start, and the docs by admin section. The copy follows README.md / README.ru.md; facts and numbers come from the
 // docs (benchmarks, comparison). docs/<lang>/index.md stays the sidebar's source and the docs' start page on GitHub.
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { GITHUB, pageUrl } from "./urls.mjs";
 import { icon, NAV } from "./icons.mjs";
@@ -18,7 +19,7 @@ export const LANDING = {
     h1: "Your own VPN for your people, without babysitting servers.",
     lead: "For family, friends, a community or a small team. Install one panel, add your servers from the browser and send each person one link. Mistgate keeps the servers configured and checks them the way an app does, so you hear about an outage first.",
     install: "Install the panel", how: "How it works",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker", "English · Русский"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker"],
     shotAlt: "The Mistgate admin: nodes with their health and throughput, an open problem and recent events",
     fitH: "How it fits together",
     fitP: "Two programs: the panel and an agent on every server. A person's app talks to the panel only to fetch its link; VPN traffic goes straight to the node.",
@@ -69,7 +70,7 @@ export const LANDING = {
     h1: "Свой VPN для своих людей — без возни с серверами.",
     lead: "Для семьи, друзей, сообщества или небольшой команды. Вы ставите одну панель, добавляете серверы из браузера и отправляете каждому человеку одну ссылку. Mistgate держит серверы настроенными и проверяет их так же, как приложение, поэтому о сбое вы узнаёте первыми.",
     install: "Установить панель", how: "Как это устроено",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker", "English · Русский"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker"],
     shotAlt: "Админка Mistgate: ноды с их состоянием и скоростью, открытая проблема и последние события",
     fitH: "Как это устроено",
     fitP: "Две программы: панель и агент на каждом сервере. С панелью приложение человека говорит, только когда забирает ссылку; VPN-трафик идёт прямо на ноду.",
@@ -114,14 +115,70 @@ export const LANDING = {
     status: "Mistgate в бете: сейчас выходят релизы 0.1.x, и до 1.0 API, хранимые настройки и протокол нод ещё могут меняться.",
     statusLink: "Статус и план развития",
   },
+  zh: {
+    // zh: translation pass: every string below is temporary English
+    meta: "Mistgate is a self-hosted VPN panel for family, friends, a community or a small team: Hysteria2, VLESS REALITY and AmneziaWG on your own servers, one link per person, every server checked the way an app sees it.",
+    eyebrow: "Beta · self-hosted · open source · AGPL-3.0",
+    h1: "Your own VPN for your people, without babysitting servers.",
+    lead: "For family, friends, a community or a small team. Install one panel, add your servers from the browser and send each person one link. Mistgate keeps the servers configured and checks them the way an app does, so you hear about an outage first.",
+    install: "Install the panel", how: "How it works",
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker"],
+    shotAlt: "The Mistgate admin: nodes with their health and throughput, an open problem and recent events",
+    fitH: "How it fits together",
+    fitP: "Two programs: the panel and an agent on every server. A person's app talks to the panel only to fetch its link; VPN traffic goes straight to the node.",
+    fitAlt: "How Mistgate fits together: you use the admin, a person's app fetches its link from the panel, VPN traffic goes from the app to the node and out to the internet, and the node keeps one connection to the panel",
+    whyH: "Why Mistgate",
+    why: [
+      ["subscriptions", "One link, several protocols", "Apps on the Mihomo core get Hysteria2, VLESS and AmneziaWG from the same link: when one protocol is blocked on someone's network, the other is already in their app.", "guide/client-apps"],
+      ["nodes", "Servers added from the browser", "Type the IP and the root password. The panel pins the host key, checks the server, opens the ports, installs the signed agent and waits for it to connect.", "getting-started/ssh-install"],
+      ["health", "You find out first", "Every 5 minutes the panel connects to each server the way an app does. A doctor on every node runs 16 host checks, and alerts go to Telegram.", "operations/health"],
+      ["settings", "Light and hidden", "Two static Go binaries and SQLite, no Docker. The panel idles at 16–20 MiB, and a stranger who opens its address sees a decoy site.", "operations/security"],
+    ],
+    more: "More",
+    proof: [
+      ["gauge", "Benchmarks", "On a 1 vCPU / 1 GB server the panel idles at 16–20 MiB; 3x-ui at 68–74, PasarGuard at 262–265, Remnawave at 426–454. The method, the versions, and where Mistgate is slower.", "reference/benchmarks"],
+      ["layers", "Comparison with other panels", "Mistgate next to 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager and s-ui, with sources, including where the others are ahead.", "reference/comparison"],
+    ],
+    startH: "Quick start",
+    startP: "From an empty Linux server to the first person with a working link.",
+    steps: [
+      ["Install the panel", "The signed binary from the latest release, `mistgate setup` and a systemd unit. Or give the install prompt to an AI agent.", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["Add a node", "**Nodes → Add node** installs the agent over SSH, or gives you a one-time command to run on the server yourself.", ["getting-started/ssh-install", "getting-started/add-node"]],
+      ["Give people their links", "Put a profile on the node, create a user and send them the link.", ["getting-started/first-users"]],
+      ["Make it safe to rely on", "Link Telegram for alerts, check the security settings and set up encrypted backups before others depend on it.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+    ],
+    secH: "The docs by admin section",
+    secP: "Each section of the admin and the pages about it.",
+    reference: "Reference",
+    first: "Start here",
+    firstDesc: "What Mistgate is, what servers you need, and how to install the panel.",
+    desc: {
+      overview: "Fleet health at a glance, node cards, traffic and the latest events.",
+      nodes: "Servers in your fleet, their protocols, load and the wizard to add a new one.",
+      users: "People with access: apps, devices, traffic quotas and expiry dates.",
+      profiles: "Ready-made protocol setups that you roll out to nodes and users.",
+      subscriptions: "Subscription formats, delivery rules and the page users see.",
+      health: "Alerts, client-eye checks and the fleet doctor.",
+      updates: "Panel and node agent versions, staged rollouts and rollback.",
+      integrations: "API tokens for scripts, MCP for AI agents and the changes they ask you to approve.",
+      settings: "Admins, security, backups and domains.",
+    },
+    refDesc: "Commands, flags, variables, the architecture and answers to common questions.",
+    status: "Mistgate is in beta: releases are 0.1.x, and until 1.0 the API, the stored settings and the node protocol may still change.",
+    statusLink: "Status and roadmap",
+  },
 };
 
 /** Hero and body of the home page. `nav` gives the order and titles of the pages; `section(key)` names the admin section a page
  *  describes, "start" for the pages before the admin, null for the reference. */
-export function renderLanding({ lang, t, nav, section }) {
+export function renderLanding({ lang, t, nav, section, langNames = [] }) {
   const L = LANDING[lang];
   const pages = new Map(nav.flatMap((g) => g.items).map((i) => [i.key, i]));
-  const url = (key) => pageUrl(lang, key);
+  // a page not translated yet (zh while it is being written) sends the reader to the English one instead of nowhere
+  const url = (key) => pageUrl(pages.has(key) ? lang : "en", key);
+  // the screenshot and the diagram of a language that has none yet are the English ones
+  const shotLang = existsSync(`${DOCS}images/readme/overview-light-${lang}.webp`) && existsSync(`${DOCS}images/readme/overview-dark-${lang}.webp`) ? lang : "en";
+  const fitLang = existsSync(`${DOCS}${lang}/diagrams/how-it-fits.svg`) ? lang : "en";
   const title = (key) => pages.get(key)?.title ?? key;
   const chip = (id, size = 26) => `<span class="id-chip" data-tone="${NAV[id].tone}" style="width:${size}px;height:${size}px">${icon(`nav-${id}`, Math.round(size * 0.6))}</span>`;
   const bold = (s) => rich(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -132,12 +189,12 @@ export function renderLanding({ lang, t, nav, section }) {
 <h1 class="hero__h1">${esc(L.h1)}</h1>
 <p class="hero__lead">${esc(L.lead)}</p>
 <div class="hero__cta"><a class="btn btn--primary" href="${url("getting-started/install-panel")}">${esc(L.install)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="${url("getting-started/overview")}">${esc(L.how)}</a><a class="btn btn--secondary" href="${GITHUB}" rel="noopener">GitHub${icon("externalLink", 14)}</a></div>
-<ul class="facts">${L.facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
-<figure class="shot"><img class="shot__light" src="/img/overview-light-${lang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"><img class="shot__dark" src="/img/overview-dark-${lang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"></figure>
+<ul class="facts">${[...L.facts, langNames.join(" · ")].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+<figure class="shot"><img class="shot__light" src="/img/overview-light-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"><img class="shot__dark" src="/img/overview-dark-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"></figure>
 </section>`;
 
   const fit = `<section class="home-sec" aria-labelledby="fit"><h2 id="fit">${esc(L.fitH)}</h2><p class="home-p">${esc(L.fitP)}</p>
-<figure class="diagram diagram--svg" tabindex="0">${inlineSvg(`${DOCS}${lang}/diagrams/how-it-fits.svg`, L.fitAlt)}</figure></section>`;
+<figure class="diagram diagram--svg" tabindex="0">${inlineSvg(`${DOCS}${fitLang}/diagrams/how-it-fits.svg`, L.fitAlt)}</figure></section>`;
 
   const why = `<section class="home-sec" aria-labelledby="why"><h2 id="why">${esc(L.whyH)}</h2>
 <ul class="why">${L.why.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${esc(p)} <a href="${url(key)}">${esc(L.more)}<span class="sr">: ${esc(title(key))}</span></a></p></div></li>`).join("")}</ul>

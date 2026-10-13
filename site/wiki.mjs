@@ -9,7 +9,7 @@ import { parseArgs } from "node:util";
 import YAML from "yaml";
 import { parseNav } from "./src/markdown.mjs";
 import { expandRoadmap } from "./src/roadmap.mjs";
-import { SITE, GITHUB, LANGS, pageUrl, editUrl } from "./src/urls.mjs";
+import { SITE, GITHUB, LANGS, COMPLETE, pageUrl, editUrl } from "./src/urls.mjs";
 
 const RAW = GITHUB.replace("github.com", "raw.githubusercontent.com");
 const RESERVED = new Set(["home", "_sidebar", "_footer"]);
@@ -19,15 +19,24 @@ const T = {
     name: "English", other: "Other pages", edit: "Edit this page", site: "View on mistgate.app", start: "Start page",
     intro: "**Mistgate** is a self-hosted panel for your own VPN fleet: one binary for the panel, one for the node agent, Hysteria2 and AmneziaWG in one subscription.",
     footer: `Generated from [docs/](${GITHUB}/tree/main/docs) in [Mistgate/mistgate](${GITHUB}) — edit the docs, not the wiki.`,
+    heading: "Mistgate documentation",
   },
   ru: {
     name: "Русский", other: "Другие страницы", edit: "Редактировать страницу", site: "Страница на mistgate.app", start: "Начальная страница",
     intro: "**Mistgate** — панель для собственного VPN-флота: один бинарь для панели, один для агента ноды, Hysteria2 и AmneziaWG в одной подписке.",
     footer: `Сгенерировано из [docs/](${GITHUB}/tree/main/docs) в [Mistgate/mistgate](${GITHUB}) — правьте документацию, а не вики.`,
+    heading: "Документация Mistgate",
+  },
+  // zh: translation pass: name is final, the rest is temporary English
+  zh: {
+    name: "简体中文", other: "Other pages", edit: "Edit this page", site: "View on mistgate.app", start: "Start page",
+    intro: "**Mistgate** is a self-hosted panel for your own VPN fleet: one binary for the panel, one for the node agent, Hysteria2 and AmneziaWG in one subscription.",
+    footer: `Generated from [docs/](${GITHUB}/tree/main/docs) in [Mistgate/mistgate](${GITHUB}) — edit the docs, not the wiki.`,
+    heading: "Mistgate documentation",
   },
 };
 
-const ALERTS = { note: "NOTE", tip: "TIP", warning: "WARNING", danger: "CAUTION", "важно": "NOTE", "совет": "TIP", "внимание": "WARNING", "опасно": "CAUTION" };
+const ALERTS = { note: "NOTE", tip: "TIP", warning: "WARNING", danger: "CAUTION", "важно": "NOTE", "совет": "TIP", "внимание": "WARNING", "опасно": "CAUTION", "注意": "NOTE", "提示": "TIP", "警告": "WARNING", "危险": "CAUTION" };
 
 // ---- naming ----------------------------------------------------------------------------------
 
@@ -149,7 +158,7 @@ export function rewriteBody(body, ctx) {
     if (repoPath.startsWith("..")) { ctx.problems.push(`${here()}: ${href} points outside the repository`); return href; }
     const page = ctx.byPath.get(repoPath);
     if (page) { ctx.links.push({ from: here(), page, anchor: frag }); return wikiHref(page.name) + (frag ? `#${frag}` : ""); }
-    if (/^docs\/(en|ru)\/.*\.md$/.test(repoPath)) { ctx.problems.push(`${here()}: link to ${href} -> ${repoPath}, no such documentation page`); return href; }
+    if (new RegExp(`^docs/(${LANGS.join("|")})/.*\\.md$`).test(repoPath)) { ctx.problems.push(`${here()}: link to ${href} -> ${repoPath}, no such documentation page`); return href; }
     const kind = path.endsWith("/") ? "tree" : "blob";
     return `${GITHUB}/${kind}/main/${repoPath.replace(/\/$/, "")}${frag ? `#${frag}` : ""}`;
   }
@@ -166,7 +175,7 @@ export function rewriteBody(body, ctx) {
   const lines = mapLines(body, (line) => {
     const quote = /^\s*>/.test(line);
     let out = line;
-    const alert = !prevQuote && /^(\s*)>\s?\*\*([^*:]+):\*\*\s*(.*)$/.exec(line);
+    const alert = !prevQuote && /^(\s*)>\s?\*\*([^*:：]+)[:：]\*\*\s*(.*)$/.exec(line);
     const kind = alert && ALERTS[alert[2].trim().toLowerCase()];
     if (kind) out = `${alert[1]}> [!${kind}]` + (alert[3] ? `\n${alert[1]}> ${alert[3]}` : "");
     prevQuote = quote;
@@ -218,7 +227,7 @@ export function buildWiki(sources) {
   const byLang = {};
   for (const lang of LANGS) {
     byLang[lang] = new Map(Object.keys(sources[lang] ?? {}).sort().map((k) => [k, parsePage(lang, k, sources[lang][k], warn)]));
-    if (!byLang[lang].size) warn(`no documentation pages for "${lang}"`);
+    if (!byLang[lang].size && COMPLETE[lang]) warn(`no documentation pages for "${lang}"`);
   }
   const all = LANGS.flatMap((l) => [...byLang[l].values()]);
   assignNames(all);
@@ -244,11 +253,12 @@ export function buildWiki(sources) {
     return out;
   };
   const startLinks = LANGS.filter((l) => start[l]).map((l) => `**${T[l].name}:** [${T[l].start}](${wikiHref(start[l].name)})`).join(" · ");
+  const shown = LANGS.filter((l) => byLang[l].size); // en and ru always; zh once it has pages
   files.set("Home.md", [
-    "# Mistgate documentation · Документация Mistgate", "",
-    T.en.intro, "", T.ru.intro, "",
+    `# ${[...new Set(shown.map((l) => T[l].heading))].join(" · ")}`, "",
+    ...shown.flatMap((l) => [T[l].intro, ""]),
     startLinks, "",
-    `Website: [mistgate.app](${SITE}) · Repository: [Mistgate/mistgate](${GITHUB}) · Сайт: [mistgate.app/ru/](${SITE}/ru/)`, "",
+    `Website: [mistgate.app](${SITE}) · Repository: [Mistgate/mistgate](${GITHUB})${shown.slice(1).map((l) => ` · ${T[l].name}: [mistgate.app/${l}/](${SITE}/${l}/)`).join("")}`, "",
     ...LANGS.filter((l) => byLang[l].size).flatMap((l) => [`## ${T[l].name}`, "", ...section(l, 3)]),
   ].join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n");
 

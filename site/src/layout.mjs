@@ -5,7 +5,7 @@ import { renderLanding } from "./landing.mjs";
 
 export const T = {
   en: {
-    hreflang: "en", name: "English", short: "EN", docs: "Docs", home: "Home", siteTitle: "Mistgate docs",
+    hreflang: "en", htmlLang: "en", ogLocale: "en_US", name: "English", short: "EN", docs: "Docs", home: "Home", siteTitle: "Mistgate docs",
     skip: "Skip to content", menu: "Menu", closeMenu: "Close menu", navLabel: "Documentation", crumbs: "Breadcrumb",
     search: "Search docs", searchLabel: "Search the documentation", searchEmpty: "Nothing found. Try another word.", searchClose: "Close search", searchIn: "in",
     onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
@@ -15,7 +15,7 @@ export const T = {
     notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
   },
   ru: {
-    hreflang: "ru", name: "Русский", short: "RU", docs: "Документация", home: "Главная", siteTitle: "Документация Mistgate",
+    hreflang: "ru", htmlLang: "ru", ogLocale: "ru_RU", name: "Русский", short: "RU", docs: "Документация", home: "Главная", siteTitle: "Документация Mistgate",
     skip: "К содержимому", menu: "Меню", closeMenu: "Закрыть меню", navLabel: "Документация", crumbs: "Навигация по разделам",
     search: "Поиск по документации", searchLabel: "Поиск по документации", searchEmpty: "Ничего не нашлось. Попробуйте другое слово.", searchClose: "Закрыть поиск", searchIn: "в",
     onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub",
@@ -23,6 +23,17 @@ export const T = {
     license: "Лицензия AGPL-3.0", other: "Прочее",
     inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
+  },
+  zh: {
+    // zh: translation pass: everything below the language fields (hreflang ... short) is temporary English
+    hreflang: "zh-Hans", htmlLang: "zh-CN", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "Docs", home: "Home", siteTitle: "Mistgate docs",
+    skip: "Skip to content", menu: "Menu", closeMenu: "Close menu", navLabel: "Documentation", crumbs: "Breadcrumb",
+    search: "Search docs", searchLabel: "Search the documentation", searchEmpty: "Nothing found. Try another word.", searchClose: "Close search", searchIn: "in",
+    onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
+    language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
+    license: "Released under AGPL-3.0", other: "Other",
+    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", updates: "Updates", integrations: "Integrations", settings: "Settings" },
+    notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
   },
 };
 
@@ -74,7 +85,7 @@ ${alts}
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${SITE}${canonical}">
-<meta property="og:locale" content="${lang === "ru" ? "ru_RU" : "en_US"}">
+<meta property="og:locale" content="${t.ogLocale}">
 ${assets.og ? `<meta property="og:image" content="${SITE}${assets.og}">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0c0e">
@@ -87,16 +98,27 @@ ${fonts}
 <script src="${assets.js}" defer></script>`;
 }
 
-function header({ lang, t, switchUrl }) {
-  const other = lang === "en" ? "ru" : "en";
-  const lg = (l) => `<a href="${l === lang ? "#" : switchUrl}" lang="${l}" hreflang="${l}" ${l === lang ? 'aria-current="true"' : `title="${esc(T[l].name)}"`}>${T[l].short}</a>`;
+/** The language menu: a native <details> (works without JS; app.js closes it on outside click and Esc). One entry per language
+ *  that has docs: the same page when it exists there, else that language's home (build.mjs decides the url). */
+export function langMenu({ lang, t, langLinks }) {
+  if (!langLinks || langLinks.length < 2) return "";
+  const item = (l) => {
+    const n = T[l.lang], cur = l.lang === lang;
+    const inner = `<span class="lang__name">${esc(n.name)}</span><span class="lang__code">${esc(n.short)}</span><span class="lang__tick">${cur ? icon("check", 14) : ""}</span>`;
+    return `<li>${cur ? `<span class="lang__item" lang="${n.htmlLang}" aria-current="true">${inner}</span>` : `<a class="lang__item" href="${l.url}" lang="${n.htmlLang}" hreflang="${n.hreflang}">${inner}</a>`}</li>`;
+  };
+  return `<details class="lang"><summary class="ib lang__btn" aria-label="${esc(t.language)}">${icon("globe", 18)}<span class="lang__cur" lang="${t.htmlLang}">${esc(t.short)}</span>${icon("chevronDown", 14, "lang__chev")}</summary>
+<ul class="lang__panel">${langLinks.map(item).join("")}</ul></details>`;
+}
+
+function header({ lang, t, langLinks }) {
   return `<header class="top"><div class="top__in">
 <a class="ib menu-btn" href="#nav" data-menu aria-controls="nav" aria-label="${esc(t.menu)}">${icon("menu", 20)}</a>
 <a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="32" height="32" alt="">${wordmark}</a>
 <span class="chip tag">${esc(t.docs)}</span>
 <span class="grow"></span>
 <button class="search-btn js-only" type="button" data-search-open aria-label="${esc(t.search)}" aria-keyshortcuts="Control+K Meta+K /">${icon("search", 16)}<span class="search-btn__t">${esc(t.search)}</span><span class="kbds"><kbd data-mod>Ctrl</kbd><kbd>K</kbd></span></button>
-<div class="lang" role="group" aria-label="${esc(t.language)}">${lg(lang)}${lg(other)}</div>
+${langMenu({ lang, t, langLinks })}
 <button class="ib js-only hide-xs" type="button" data-theme-toggle aria-label="${esc(t.theme)}"><span class="theme-ico theme-ico--sun">${icon("sun", 18)}</span><span class="theme-ico theme-ico--moon">${icon("moon", 18)}</span></button>
 <a class="ib hide-s" href="${GITHUB}" aria-label="${esc(t.github)}" rel="noopener">${GH}</a>
 </div></header>`;
@@ -135,12 +157,12 @@ function searchDialog(t, lang) {
 const bodyData = (t) => esc(JSON.stringify({ copy: t.copy, copied: t.copied, inn: t.searchIn }));
 
 export function renderDoc(ctx) {
-  const { lang, t, page, nav, assets, switchUrl, alternates, prev, next, crumbGroup } = ctx;
+  const { lang, t, page, nav, assets, langLinks, alternates, prev, next, crumbGroup } = ctx;
   const isHome = page.key === "index";
   const st = pageStyle(page.key);
   const toc = page.headings.filter((h) => h.level <= 3 && h.toc !== false);
   const showToc = !isHome && toc.length >= 2;
-  const home = isHome ? renderLanding({ lang, t, nav, section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
+  const home = isHome ? renderLanding({ lang, t, nav, langNames: (langLinks ?? []).map((l) => T[l.lang].name), section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
   const hero = isHome
     ? home.hero
@@ -149,13 +171,13 @@ export function renderDoc(ctx) {
   const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${esc(x.title)}</span></a>` : "<span></span>";
   const edit = `<p class="edit"><a href="${editUrl(lang, page.key)}" rel="noopener">${icon("externalLink", 14)}${esc(t.edit)}</a></p>`;
   return `<!doctype html>
-<html lang="${lang}">
+<html lang="${t.htmlLang}">
 <head>
 ${head({ lang, t, title: page.title, description: isHome ? home.description : page.description, canonical: page.url, alternates, assets, home: isHome })}
 </head>
 <body class="mg" data-t="${bodyData(t)}"${st.tone ? ` data-tone="${st.tone}"` : ""}>
 <a class="skip" href="#content">${esc(t.skip)}</a>
-${header({ lang, t, switchUrl })}
+${header({ lang, t, langLinks })}
 <div class="shell">
 ${sidebar({ lang, t, nav, current: page.key })}
 <main class="main" id="content" tabindex="-1">
@@ -176,8 +198,9 @@ ${searchDialog(t, lang)}
 `;
 }
 
-export function render404({ assets }) {
-  const t = T.en, r = T.ru;
+/** `others`: the languages besides English that have a home page, each gets its line and button. */
+export function render404({ assets, others = [] }) {
+  const t = T.en;
   const alternates = [];
   return `<!doctype html>
 <html lang="en">
@@ -191,8 +214,8 @@ ${head({ lang: "en", t, title: t.notFound, description: t.notFoundText, canonica
 <p class="nf__code">404</p>
 <h1 class="doc-h1">${esc(t.notFound)}</h1>
 <p class="doc-lead">${esc(t.notFoundText)}</p>
-<p class="doc-lead" lang="ru">${esc(r.notFoundText)}</p>
-<div class="hero__cta"><a class="btn btn--primary" href="/">${esc(t.toHome)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="/ru/" lang="ru">${esc(r.toHome)}</a></div>
+${others.map((l) => `<p class="doc-lead" lang="${T[l].htmlLang}">${esc(T[l].notFoundText)}</p>`).join("")}
+<div class="hero__cta"><a class="btn btn--primary" href="/">${esc(t.toHome)}${icon("chevronRight", 14)}</a>${others.map((l) => `<a class="btn btn--secondary" href="${pageUrl(l, "index")}" lang="${T[l].htmlLang}">${esc(T[l].toHome)}</a>`).join("")}</div>
 </main>
 ${footer({ lang: "en", t })}
 </body>

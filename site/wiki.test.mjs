@@ -152,3 +152,23 @@ test("a roadmap block reaches the wiki as headings and lists, its links rewritte
   assert.doesNotMatch(t, /```roadmap|status: next/);
   assert.deepEqual(r.errors, []);
 });
+
+test("zh joins the wiki when it has pages: its own section, (ZH) on a name clash, full-width callouts; without pages the wiki is as before", () => {
+  const zh = {
+    index: idx({ "入门": ["start/one"], "指南": ["guide/nodes"] }),
+    "start/one": page("安装面板", "见[节点](../guide/nodes.md)。"),
+    "guide/nodes": page("Nodes", "> **注意：** 一。\n\n> **警告：** 二。\n"),
+  };
+  const r = buildWiki({ en, ru, zh });
+  assert.deepEqual(r.errors, []);
+  assert.match(get(r, "Nodes-(ZH).md"), /> \[!NOTE\]\n> 一。/);
+  assert.match(get(r, "Nodes-(ZH).md"), /> \[!WARNING\]\n> 二。/);
+  assert.ok(get(r, "安装面板.md").includes("[节点](Nodes-%28ZH%29)"));
+  assert.match(get(r, "安装面板.md"), /mistgate\.app\/zh\/start\/one\/\)<\/sub>/);
+  assert.match(get(r, "Home.md"), /## 简体中文/);
+  assert.match(get(r, "Home.md"), /简体中文: \[mistgate\.app\/zh\/\]/);
+  assert.match(get(r, "_Sidebar.md"), /<b>简体中文<\/b>/);
+  const without = build();
+  assert.doesNotMatch(get(without, "Home.md"), /简体中文|\/zh\//);
+  assert.deepEqual(without.warnings.filter((w) => /"zh"/.test(w)), [], "a language still being translated is not a warning when it has no pages");
+});

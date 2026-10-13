@@ -7,11 +7,12 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { createHl, createRenderer, parseNav } from "./src/markdown.mjs";
 import { T, renderDoc, render404, THEME_INIT } from "./src/layout.mjs";
-import { SITE, LANGS, pageUrl } from "./src/urls.mjs";
+import { SITE, LANGS, COMPLETE, pageUrl } from "./src/urls.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const DOCS = join(ROOT, "..", "docs");
-const DIST = join(ROOT, "dist");
+// MG_DOCS / MG_DIST point the build at another docs tree / output (the test builds a fixture that way)
+const DOCS = process.env.MG_DOCS ?? join(ROOT, "..", "docs");
+const DIST = process.env.MG_DIST ?? join(ROOT, "dist");
 const INSTALLER = join(ROOT, "..", "scripts", "install.sh");
 const SRC = join(ROOT, "src");
 const BRAND = join(ROOT, "..", "web", "src");
@@ -26,14 +27,16 @@ mkdirSync(DIST, { recursive: true });
 
 // ---- static assets ----
 const css = readFileSync(join(SRC, "assets", "style.css"), "utf8");
-const js = readFileSync(join(SRC, "assets", "app.js"), "utf8");
+const find = readFileSync(join(SRC, "assets", "find.js"), "utf8").replace(/^\/\/.*\n/gm, "").trimEnd(); // the matcher, without its comments
+const js = readFileSync(join(SRC, "assets", "app.js"), "utf8").replace("/*@find*/", () => find);
 const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) };
 out(assets.css, css);
 out(assets.js, js);
 for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f)) { mkdirSync(join(DIST, "fonts"), { recursive: true }); copyFileSync(join(BRAND, "fonts", f), join(DIST, "fonts", f)); }
 // the admin screenshot on the home page: the README's own pictures, light and dark, per language
 const SHOTS = join(ROOT, "..", "docs", "images", "readme");
-for (const f of readdirSync(SHOTS)) if (/^overview-(light|dark)-(en|ru)\.webp$/.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
+const SHOT = new RegExp(`^overview-(light|dark)-(${LANGS.join("|")})\\.webp$`);
+for (const f of readdirSync(SHOTS)) if (SHOT.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
 out("install.sh", readFileSync(INSTALLER));
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));
 out("mistgate-badge.svg", badge);
@@ -65,7 +68,7 @@ const site = {}; // lang -> {pages: Map, nav: [...], seq: [...]}
 
 for (const lang of LANGS) {
   const dir = join(DOCS, lang);
-  if (!existsSync(dir)) { warn(`docs/${lang} does not exist`); continue; }
+  if (!existsSync(dir)) { if (COMPLETE[lang]) warn(`docs/${lang} does not exist`); continue; } // a language still being translated may not have started
   const pages = new Map(walk(dir).map((f) => readPage(lang, f)).map((p) => [p.key, p]));
   if (!pages.has("index")) { warn(`docs/${lang}/index.md is missing: no home page, no sidebar order`); continue; }
 
@@ -106,18 +109,18 @@ for (const lang of Object.keys(site)) {
     page.headings = [];
     page.codes = new Map();
     const w = (m) => warn(`${lang}/${page.key}.md: ${m}`);
-    const env = { lang, key: page.key, dir: dirname(join(DOCS, lang, page.key)), pages, warn: w, headings: page.headings, codes: page.codes, answersFrom: lang === "en" ? null : site.en?.pages.get(page.key)?.answers };
+    const env = { lang, key: page.key, dir: dirname(join(DOCS, lang, page.key)), dirEn: dirname(join(DOCS, "en", page.key)), pages, warn: w, headings: page.headings, codes: page.codes, answersFrom: lang === "en" ? null : site.en?.pages.get(page.key)?.answers };
     page.html = render(page.body, env);
     page.answers = env.answers;
     const i = seq.findIndex((s) => s.key === page.key);
     const others = LANGS.filter((l) => l !== lang && site[l]?.pages.has(page.key));
-    const switchLang = LANGS.find((l) => l !== lang);
-    const alternates = [lang, ...others].map((l) => ({ lang: l, url: pageUrl(l, page.key) }));
+    // the language menu: every language that has docs; the same page where it exists there, else that language's home
+    const langLinks = LANGS.filter((l) => site[l]).map((l) => ({ lang: l, url: pageUrl(l, site[l].pages.has(page.key) ? page.key : "index") }));
+    const alternates = [lang, ...others].map((l) => ({ lang: T[l].hreflang, url: pageUrl(l, page.key) }));
     if (site.en?.pages.has(page.key)) alternates.push({ lang: "x-default", url: pageUrl("en", page.key) });
     const crumbGroup = nav.find((g) => g.items.some((x) => x.key === page.key))?.title;
     const html = renderDoc({
-      lang, t, page, nav, assets, prev: seq[i - 1], next: seq[i + 1], crumbGroup, alternates,
-      switchUrl: others.length ? pageUrl(switchLang, page.key) : pageUrl(switchLang, "index"),
+      lang, t, page, nav, assets, prev: seq[i - 1], next: seq[i + 1], crumbGroup, alternates, langLinks,
     });
     out(page.url.slice(1) + "index.html", html);
     written.set(page.url, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])));
@@ -126,7 +129,7 @@ for (const lang of Object.keys(site)) {
   }
   out(pageUrl(lang, "search-index.json").slice(1).replace(/\/$/, ""), JSON.stringify(searchIdx[lang]));
 }
-out("404.html", render404({ assets }));
+out("404.html", render404({ assets, others: LANGS.filter((l) => l !== "en" && site[l]) }));
 
 // ---- sitemap, robots, headers ----
 const urls = Object.values(site).flatMap((s) => [...s.pages.values()]);
@@ -140,7 +143,8 @@ ${urls.map((p) => `<url><loc>${SITE}${p.url}</loc>${p.alternates.length > 1 ? "\
 out("robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
 // pages that moved: old address -> new page key (Cloudflare Pages reads _redirects)
 const MOVED = { "roadmap/m2-ssh-provisioning": "roadmap/status" };
-out("_redirects", Object.entries(MOVED).flatMap(([from, to]) => LANGS.flatMap((l) => {
+// only in the languages that have the new page (a language added later has no old addresses, and a redirect must not lead nowhere)
+out("_redirects", Object.entries(MOVED).flatMap(([from, to]) => LANGS.filter((l) => site[l]?.pages.has(to)).flatMap((l) => {
   const src = pageUrl(l, from), dst = pageUrl(l, to);
   return [`${src} ${dst} 301`, `${src.slice(0, -1)} ${dst} 301`];
 })).join("\n") + "\n");

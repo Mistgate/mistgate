@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { T, PAGE_SECTION } from "../src/layout.mjs";
 import { NAV } from "../src/icons.mjs";
 import { LANDING } from "../src/landing.mjs";
+import { LANGS, COMPLETE } from "../src/urls.mjs";
 
 const root = join(dirname(dirname(fileURLToPath(import.meta.url))), "..");
 const panelCss = readFileSync(join(root, "web/src/index.css"), "utf8");
@@ -28,14 +29,14 @@ test("the accent is the panel's lavender", () => {
 });
 
 test("section names match the panel's sidebar in both languages", () => {
-  for (const lang of ["en", "ru"]) {
+  for (const lang of LANGS.filter((l) => COMPLETE[l])) { // zh joins when COMPLETE.zh is true: until then its wording is a placeholder
     const i18n = readFileSync(join(root, `web/src/i18n/${lang}.ts`), "utf8");
     for (const [id, label] of Object.entries(T[lang].sections)) assert.match(i18n, new RegExp(`"nav\\.${id}": "${label}"`), `${lang} nav.${id}`);
   }
 });
 
 test("the home page describes each admin section in the panel's own words", () => {
-  for (const lang of ["en", "ru"]) {
+  for (const lang of LANGS.filter((l) => COMPLETE[l])) { // zh joins when COMPLETE.zh is true: until then its wording is a placeholder
     const i18n = readFileSync(join(root, `web/src/i18n/${lang}.ts`), "utf8");
     for (const [id, desc] of Object.entries(LANDING[lang].desc)) {
       assert.equal(new RegExp(`"section\\.${id}\\.desc": "([^"]+)"`).exec(i18n)?.[1], desc, `${lang} section.${id}.desc`);

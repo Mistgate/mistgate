@@ -2,6 +2,7 @@
 import MarkdownIt from "markdown-it";
 import anchor from "markdown-it-anchor";
 import { createHighlighter } from "shiki";
+import { existsSync } from "node:fs";
 import { posix, join } from "node:path";
 import { pageUrl } from "./urls.mjs";
 import { icon } from "./icons.mjs";
@@ -27,19 +28,20 @@ export async function createHl() {
 const slugify = (s) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, "-") || "section";
 
 // "> **Note:** ..." and friends; GitHub shows the same blockquote, the wiki turns it into an alert (wiki.mjs ALERTS)
-const CALLOUTS = { note: "note", "важно": "note", tip: "tip", "совет": "tip", warning: "warning", "внимание": "warning", danger: "danger", "опасно": "danger" };
+// zh: "注意：" with the full-width colon inside the bold text is read like "Note:" (translation pass: confirm the words)
+const CALLOUTS = { note: "note", "важно": "note", "注意": "note", tip: "tip", "совет": "tip", "提示": "tip", warning: "warning", "внимание": "warning", "警告": "warning", danger: "danger", "опасно": "danger", "危险": "danger" };
 const CALLOUT_CHIP = { note: ["info", "lavender"], tip: ["sparkle", "mint"], warning: ["warn", "sand"], danger: ["warn", "rose"] };
 // code block bar: language name and icon; a word after the language (```ini /etc/x.service) names the file instead
 const CODE_NAME = { sh: "Shell", yaml: "YAML", json: "JSON", ini: "INI", toml: "TOML", javascript: "JavaScript", typescript: "TypeScript", go: "Go", sql: "SQL", diff: "Diff" };
 // a table cell that is a yes / no / partial answer becomes a pill (colour + glyph + word, like the panel's status)
-const ANSWER = /^(yes|no|partial|да|нет|частично)(?=$|:|\s\()/iu;
-const ANSWER_KIND = { yes: "yes", "да": "yes", no: "no", "нет": "no", partial: "part", "частично": "part" };
+const ANSWER = /^(yes|no|partial|да|нет|частично|是|否|部分)(?=$|[:：]|\s\(|（)/iu;
+const ANSWER_KIND = { yes: "yes", "да": "yes", no: "no", "нет": "no", partial: "part", "частично": "part", "是": "yes", "否": "no", "部分": "part" };
 // a name worth finding: starts with a letter, a dash or an underscore, no placeholders or prose
 const SEARCHABLE = /^(?=.{3,60}$)(?=.*[A-Za-z])[A-Za-z_-][\w.:=/@-]*(?: [\w.:=/@-]+){0,3}$/;
 const NOISE = new Set(["true", "false", "yes", "no", "on", "off", "http", "https", "localhost"]);
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** @returns {(src: string, env: {lang: string, key: string, pages: Map<string, object>, warn: Function, headings: object[]}) => string} */
+/** @returns {(src: string, env: {lang: string, key: string, dirEn: string, pages: Map<string, object>, warn: Function, headings: object[]}) => string} */
 export function createRenderer(lang, t, highlight) {
   const md = new MarkdownIt({ html: false, linkify: false, typographer: false });
 
@@ -78,7 +80,12 @@ export function createRenderer(lang, t, highlight) {
     if (!src.endsWith(".svg") || /^([a-z][a-z0-9+.-]*:|\/)/i.test(src)) return image(tokens, idx, o, env, self);
     const alt = self.renderInlineAsText(tok.children, o, env);
     if (!alt) env.warn(`diagram ${src} has no alt text`);
-    return `<figure class="diagram diagram--svg" tabindex="0">${inlineSvg(join(env.dir, src), alt || t.diagram)}</figure>`;
+    let file = join(env.dir, src);
+    if (!existsSync(file) && env.lang !== "en") { // a translation without its own drawing yet shows the English one
+      const en = join(env.dirEn, src);
+      if (existsSync(en)) { env.warn(`diagram ${src} is not translated yet, showing the English one`); file = en; }
+    }
+    return `<figure class="diagram diagram--svg" tabindex="0">${inlineSvg(file, alt || t.diagram)}</figure>`;
   };
   md.core.ruler.push("mg_figures", (state) => {
     state.tokens.forEach((tok, i) => {
@@ -97,9 +104,9 @@ export function createRenderer(lang, t, highlight) {
       const ch = tk[i + 2].children;
       while (ch?.[0]?.type === "text" && ch[0].content === "") ch.shift();
       if (ch?.[0]?.type !== "strong_open" || ch[1]?.type !== "text" || ch[2]?.type !== "strong_close") continue;
-      const kind = CALLOUTS[ch[1].content.replace(/:$/, "").trim().toLowerCase()];
-      if (!kind || !/:$/.test(ch[1].content.trim())) continue;
-      const label = ch[1].content.replace(/:$/, "").trim();
+      const kind = CALLOUTS[ch[1].content.replace(/[:：]$/, "").trim().toLowerCase()];
+      if (!kind || !/[:：]$/.test(ch[1].content.trim())) continue;
+      const label = ch[1].content.replace(/[:：]$/, "").trim();
       ch.splice(0, 3);
       if (ch[0]?.type === "text") ch[0].content = ch[0].content.replace(/^\s+/, "");
       let depth = 0, close = -1;
@@ -147,7 +154,7 @@ export function createRenderer(lang, t, highlight) {
             if (!m) return;
             const pill = new state.Token("html_inline", "", 0);
             pill.content = `<span class="yn yn--${ANSWER_KIND[m[1].toLowerCase()]}"><span class="yn__g" aria-hidden="true"></span>${esc(m[1])}</span>`;
-            c.children[0].content = c.children[0].content.slice(m[1].length).replace(/^:\s*/, " ");
+            c.children[0].content = c.children[0].content.slice(m[1].length).replace(/^[:：]\s*/, " ");
             c.children.unshift(pill);
           });
         });
@@ -200,7 +207,7 @@ export function createRenderer(lang, t, highlight) {
           stack.push(true);
         } else if (tok.type === "link_close") {
           if (stack.pop()) tok.tag = "span";
-        } else if (tok.type === "strong_open" && blk.children[n + 1]?.type === "text" && /^(Planned|Планируется)$/.test(blk.children[n + 1].content)) {
+        } else if (tok.type === "strong_open" && blk.children[n + 1]?.type === "text" && /^(Planned|Планируется|计划中)$/.test(blk.children[n + 1].content)) {
           tok.attrJoin("class", "planned");
         }
       });
