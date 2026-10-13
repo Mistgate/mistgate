@@ -30,7 +30,7 @@ AI 智能体也可以通过 MCP 发起 SSH 安装；你需要在审批页面上�
 
 如果地址是 IP，窗口会在继续前提示：该节点上的 Hysteria2 需要有 A 记录的域名，或在添加协议配置时选择自签名（固定指纹）证书。AmneziaWG 可以直接使用 IP。
 
-按**创建安装命令**。节点会以「等待安装」状态显示在列表中，窗口会显示三个步骤。
+按**生成安装命令**。节点会以「等待安装」状态显示在列表中，窗口会显示三个步骤。
 
 ## 2. 将 Agent 放到服务器上
 
@@ -172,6 +172,6 @@ systemctl restart systemd-journald
 | `already enrolled; use --force to replace the identity` | 状态目录中已有身份信息。 | 在 `enroll` 后添加 `--force`，或者先移除 `/var/lib/mistgate-node`。 |
 | `install: must run as root` | 当前用户不是 root。 | 以 root 身份运行命令。 |
 | `holds no identity: run mistgate-node enroll first` | `enroll` 失败，或 `install` 使用了另一个 `--state-dir`。 | 在相同状态目录中重新运行 `enroll`。 |
-| 管理后台在**创建安装命令**后显示「未配置面板地址」 | 面板没有 Agent 地址：setup 未使用 `--public-url`，且 `serve` 没有 `--agent-addr`。 | 重启面板并传入 `--agent-addr panel.example.com:443`。 |
+| 管理后台在**生成安装命令**后显示「未配置面板地址」 | 面板没有 Agent 地址：setup 未使用 `--public-url`，且 `serve` 没有 `--agent-addr`。 | 重启面板并传入 `--agent-addr panel.example.com:443`。 |
 
 更多现象和处理方法见[故障排查](../operations/troubleshooting.md)。日常节点设置见[节点](../guide/nodes.md)。

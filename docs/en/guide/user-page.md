@@ -9,7 +9,7 @@ The user page is what a browser gets at a person's subscription link: a page mad
 
 The greeting uses the optional **Name shown on the subscription page** from the user's settings. Leave it blank to use the account name shown in **Users**. This public name is separate from the account name and does not change the user's access or connection details.
 
-The page speaks Russian or English: the browser's language when it is one of the two, else the panel's default language. A switch in the top bar changes it. The top bar carries the panel's name and logo, and the accent colour of the brand (set in **Settings** → **Interface**).
+The page speaks English, Russian or Simplified Chinese: the first of them in the browser's language list (any Chinese counts), else the panel's default language. A switch in the top bar changes it, and the choice is remembered on that device. The top bar carries the panel's name and logo, and the accent colour of the brand (set in **Settings** → **Interface**).
 
 From top to bottom:
 

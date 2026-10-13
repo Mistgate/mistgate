@@ -277,7 +277,7 @@ and CONTRIBUTING.md and follow them.
 - Work on a new branch. Keep the change small and focused; no unrelated refactoring.
 - proto/ is the source of the APIs: after editing it run "make gen"; never edit gen/ or
   web/src/gen/ by hand. Never edit a migration that has shipped; add a new one.
-- UI strings live only in web/src/i18n, in English and Russian, with the same placeholders.
+- UI strings live only in web/src/i18n, in English, Russian and Simplified Chinese, with the same placeholders.
 - No real host names, addresses, tokens or passwords in code, tests or docs: use
   example.com, de1, 203.0.113.0/24 and 2001:db8::/32.
 - Do not run tests that need root (MG_ROOT_TESTS=1) or the scripts in scripts/ unless this

@@ -56,7 +56,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 **为什么推荐桌面用户使用此应用。**它能读取 Mihomo YAML，这是唯一包含全部三种协议的格式：同时使用 Hysteria2、VLESS 和 AmneziaWG 的用户，可以在同一个应用中通过同一订阅链接获取所有服务器，并使用其 DNS 预设。在 Windows 和 macOS 上，另一种选择是用 Happ 连接 Hysteria2 和 VLESS，再用 AmneziaVPN 管理密钥，需要两个应用和两种添加方式。
 
-**面板需要进行哪些设置。**无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**通过订阅链接**类型。AmneziaWG 服务器的设置见上文。
+**面板需要进行哪些设置。**无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**订阅链接**类型。AmneziaWG 服务器的设置见上文。
 
 **下载。**访问发布页面：<https://github.com/vbu00/klick/releases/latest>。Windows 和 macOS 版本分开发布，文件名中包含版本号，因此面板链接到发布页面，而不是具体文件。截至撰写本文时（2026 年 10 月），最新版本是 0.4.0，提供 Windows 安装程序；macOS 端口已合并到源代码，发布后 macOS 安装包会出现在同一页面。
 
@@ -64,7 +64,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 ## 在管理后台配置应用
 
-**订阅 → 用户页面 → 用户页面中的应用**是页面显示的应用卡片列表（参见[订阅](subscriptions.md#用户页面中的应用)）。添加应用的步骤如下：
+**订阅 → 用户页面 → 页面上的应用**是页面显示的应用卡片列表（参见[订阅](subscriptions.md#用户页面中的应用)）。添加应用的步骤如下：
 
 1. 在列表下方选择一个**平台**。
 2. 选择一个**已知应用**：kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify 或 v2rayNG。列表只显示该平台上可用的应用。**自定义应用，手动填写**可保留原有方式：选择**接入方式**并自行填写字段。

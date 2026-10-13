@@ -19,19 +19,19 @@ Cloudflare 版是为 WebAssembly 构建的同一面板，由两个 Cloudflare Wo
 
 ## 创建 API 令牌
 
-命令会使用你创建的令牌访问 Cloudflare API。在 Cloudflare 控制面板中打开**「我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌」**，并授予以下权限：
+命令会使用你创建的令牌访问 Cloudflare API。在 Cloudflare 控制面板中打开**「我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌」**（My Profile → API Tokens → Create Token → Create Custom Token），并授予以下权限：
 
 | 范围 | 权限 | 命令的用途 |
 |:--|:--|:--|
-| 账户 | 账户设置：读取 | 第一个请求 `GET /accounts`：列出令牌可访问的账户，同时检查令牌。 |
-| 区域 | 区域：读取 | `GET /zones`：查找主机所属的区域。 |
-| 账户 | Workers 脚本：编辑 | 列出脚本，上传两个脚本及其静态文件，设置 cron 计划并关闭 `workers.dev` 名称（`/workers/scripts/...`）。 |
-| 账户 | D1：编辑 | 查找或创建数据库（`/d1/database`）。 |
-| 区域 | Workers 路由：编辑 | 将主机绑定到 Worker 作为自定义域名（`PUT /workers/domains`）。 |
+| 账户 | 「账户设置：读取」（Account Settings: Read） | 第一个请求 `GET /accounts`：列出令牌可访问的账户，同时检查令牌。 |
+| 区域 | 「区域：读取」（Zone: Read） | `GET /zones`：查找主机所属的区域。 |
+| 账户 | 「Workers 脚本：编辑」（Workers Scripts: Edit） | 列出脚本，上传两个脚本及其静态文件，设置 cron 计划并关闭 `workers.dev` 名称（`/workers/scripts/...`）。 |
+| 账户 | 「D1：编辑」（D1: Edit） | 查找或创建数据库（`/d1/database`）。 |
+| 区域 | 「Workers 路由：编辑」（Workers Routes: Edit） | 将主机绑定到 Worker 作为自定义域名（`PUT /workers/domains`）。 |
 
-在**账户资源**中选择你的账户，在**区域资源**中选择该主机所属的单个区域。
+在**账户资源**（Account Resources）中选择你的账户，在**区域资源**（Zone Resources）中选择该主机所属的单个区域。
 
-> **注意：** 此权限清单是根据命令发出的 API 请求整理的，尚未在真实账户上确认；只有首次真实部署后才能确定最小权限。如果命令因权限错误停止，错误信息会指出失败的请求。最可能缺少的是自定义域名权限，它可能还需要**「区域：DNS：编辑」**；添加该权限，然后使用 `--resume` 重新运行命令。
+> **注意：** 此权限清单是根据命令发出的 API 请求整理的，尚未在真实账户上确认；只有首次真实部署后才能确定最小权限。如果命令因权限错误停止，错误信息会指出失败的请求。最可能缺少的是自定义域名权限，它可能还需要**「区域：DNS：编辑」**（Zone: DNS: Edit）；添加该权限，然后使用 `--resume` 重新运行命令。
 
 只能通过环境变量 `CLOUDFLARE_API_TOKEN` 向命令提供令牌。没有对应标志，因此令牌不会出现在进程列表中；命令也不会将它写入密钥文件或 Cloudflare。在错误信息中，令牌会替换为 `[REDACTED]`。在 bash 中，下面的命令也不会将它写入历史记录；在 PowerShell 中使用 `$env:CLOUDFLARE_API_TOKEN = "..."`：
 
@@ -153,7 +153,7 @@ mistgate edge deploy --host panel.example.com
 | 命令显示 | 处理方法 |
 |:--|:--|
 | CLOUDFLARE_API_TOKEN is required | 在同一个 shell 中导出环境变量。 |
-| list Cloudflare accounts: ... | 令牌错误、已过期或缺少 **账户设置：读取** 权限。按上文所述重新创建令牌。 |
+| list Cloudflare accounts: ... | 令牌错误、已过期或缺少**「账户设置：读取」**（Account Settings: Read）权限。按上文所述重新创建令牌。 |
 | no Cloudflare DNS zone matches host panel.example.com; the host's zone must be on Cloudflare DNS | 将域名添加到 Cloudflare，将其名称服务器指向 Cloudflare，并使用该区域中的主机名。 |
 | the Cloudflare zone example.com has status "pending", not "active" | 完成域名名称服务器的 Cloudflare 指向，然后重新运行命令。 |
 | a Worker script with this name already exists but its local key file is missing; refusing to replace its secrets | 当前目录中没有密钥文件。找到该文件，或使用其他 `--name`（旧脚本和数据库仍保留在账户中；若不需要，可在控制面板中删除）。D1 数据库名称重复时也会出现相同拒绝。 |

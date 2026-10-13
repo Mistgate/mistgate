@@ -3,7 +3,7 @@ title: AI 智能体指南
 description: 三段现成提示词：使用可运行 shell 命令的智能体安装面板，通过 MCP 添加节点并管理集群，以及使用编码智能体参与代码开发。
 ---
 
-Mistgate 支持手动操作，也支持使用 AI 智能体。本页提供三段可复制到智能体中的提示词；网站和 GitHub 上的每个代码块都有复制按钮。发送前填写下方提示词中的「Fill in」部分。智能体同样能理解英文和俄文；俄文页面提供了相同的俄语提示词。
+Mistgate 支持手动操作，也支持使用 AI 智能体。本页提供三段可复制到智能体中的提示词；网站和 GitHub 上的每个代码块都有复制按钮。发送前填写下方提示词中的「Fill in」部分。智能体同样能理解英语和俄语；俄语页面提供了相同的俄语提示词。
 
 | 提示词 | 智能体 | 所需条件 | 用途 |
 |:--|:--|:--|:--|
@@ -277,7 +277,7 @@ and CONTRIBUTING.md and follow them.
 - Work on a new branch. Keep the change small and focused; no unrelated refactoring.
 - proto/ is the source of the APIs: after editing it run "make gen"; never edit gen/ or
   web/src/gen/ by hand. Never edit a migration that has shipped; add a new one.
-- UI strings live only in web/src/i18n, in English and Russian, with the same placeholders.
+- UI strings live only in web/src/i18n, in English, Russian and Simplified Chinese, with the same placeholders.
 - No real host names, addresses, tokens or passwords in code, tests or docs: use
   example.com, de1, 203.0.113.0/24 and 2001:db8::/32.
 - Do not run tests that need root (MG_ROOT_TESTS=1) or the scripts in scripts/ unless this

@@ -5,7 +5,7 @@ description: 关于 Mistgate 常见问题的简短回答：Docker、内存、应
 
 ## 为什么没有 Docker 镜像？
 
-Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和管理界面的面板，以及节点 Agent。面板运行不需要其他组件。Agent 会直接管理主机：nftables 表、sysctl 设置、隧道接口、journald 容量上限、自己的强化 systemd 单元和自更新。在容器中运行仍然需要主机网络和广泛权限，因此 Agent 直接由 systemd 启动，并只获得少量能力。参见[系统要求](../getting-started/requirements.md)。
+Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和管理后台的面板，以及节点 Agent。面板运行不需要其他组件。Agent 会直接管理主机：nftables 表、sysctl 设置、隧道接口、journald 容量上限、自己的强化 systemd 单元和自更新。在容器中运行仍然需要主机网络和广泛权限，因此 Agent 直接由 systemd 启动，并只获得少量能力。参见[系统要求](../getting-started/requirements.md)。
 
 ## 它会占用多少内存？
 

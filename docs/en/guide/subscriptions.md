@@ -116,6 +116,8 @@ When a person is disabled, past their term or over their quota, the apps do not 
 
 In Russian: «Подписка закончилась 29 сентября. Напишите — продлим», «Трафик закончился, обнулится 1 октября», «Трафик закончился. Напишите — увеличим», «Доступ приостановлен».
 
+In Chinese: 「订阅已于 9月29日 到期。联系我们即可续期」、「流量已用完，10月1日 重置」、「流量已用完。联系我们，可以为你增加」、「访问已暂停」.
+
 For such a person the refresh interval drops to 1 hour, so a fix (term extended, quota raised) reaches the app soon. The person's page explains the same in their language.
 
 ## The user page

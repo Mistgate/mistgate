@@ -8,7 +8,7 @@ Mistgate is a self-hosted panel for a small VPN fleet that you run on your own s
 ## What Mistgate is
 
 - **Two programs, no Docker.** `mistgate` is the panel. `mistgate-node` is the agent that runs on every VPN server. Both are single Go binaries for Linux (amd64 and arm64).
-- **One admin for the whole fleet.** The panel keeps people, protocol setups and servers in one SQLite database and shows them in a web admin in English and Russian.
+- **One admin for the whole fleet.** The panel keeps people, protocol setups and servers in one SQLite database and shows them in a web admin in English, Russian and Simplified Chinese.
 - **Agents do the work on the servers.** The agent runs the protocols and keeps the host in the state the panel asks for. It dials the panel, so the panel needs no management port on your servers. The panel logs in to a server over SSH only to install a node (from the admin, or for an AI agent with your approval) and, while that SSH access stays saved, to change or check the server's password at your request.
 - **Protocols.** Hysteria2 (the official core, built into the agent), VLESS REALITY over XHTTP or TCP (xray-core, built into the agent) and AmneziaWG 2.0 and 3.1 (userspace by default, the kernel module per node on request). Cloudflare WARP can be the exit for all three.
 - **One link per person.** A subscription app that opens the link gets the server list in a format it reads (a list of `hysteria2://` and `vless://` links or a Mihomo YAML profile, chosen by User-Agent rules). A browser gets the person's own page with instructions. AmneziaVPN users get a key per device.

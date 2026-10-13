@@ -5,7 +5,7 @@
 ## Start here
 
 - [AI agent guide](https://mistgate.app/getting-started/ai-agents/): ready prompts to install the panel over SSH, run the fleet through owner-approved MCP tools, and contribute.
-- [Documentation map](https://mistgate.app/): English docs; `/ru/` is Russian.
+- [Documentation map](https://mistgate.app/): English docs; `/ru/` is Russian, `/zh/` is Simplified Chinese.
 - [Install the panel](https://mistgate.app/getting-started/install-panel/)
 - [Install a node over SSH](https://mistgate.app/getting-started/ssh-install/)
 - [Add a node manually](https://mistgate.app/getting-started/add-node/)
@@ -20,3 +20,4 @@
 
 - English: https://mistgate.app/
 - Russian: https://mistgate.app/ru/
+- Simplified Chinese: https://mistgate.app/zh/
