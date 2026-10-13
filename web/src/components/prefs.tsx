@@ -1,19 +1,56 @@
-import { langs, setLang, useLang, useT } from "@/i18n";
-import { Segmented } from "@/components/ui/segmented";
+import { Select as BaseSelect } from "@base-ui/react/select";
+import { isLang, langNames, langShort, langs, localeOf, setLang, useLang, useT } from "@/i18n";
+import { Icon } from "@/components/ui/icons";
+import { SelectCheck, selectItemClass, selectPopupClass } from "@/components/ui/select";
+import { cx } from "@/lib/cx";
 import { toggleTheme, useTheme } from "@/lib/theme";
 
-/** RU/EN pill of the top bar, the More sheet and the auth screens. */
-export function LangToggle() {
+/**
+ * The language menu of the top bar, the More sheet and the auth screens: a globe, the short code of the current language and
+ * a chevron; the list under it names every language in its own script (and sets `lang` on the row so the right font draws it).
+ * One row per entry of `langs`, so a new language adds a row and nothing else.
+ */
+export function LangToggle({ className }: { className?: string }) {
   const t = useT();
   const lang = useLang();
   return (
-    <Segmented
-      variant="lang"
-      aria-label={t("header.language")}
-      value={lang}
-      onValueChange={setLang}
-      options={langs.map((l) => ({ value: l, label: l.toUpperCase() }))}
-    />
+    <BaseSelect.Root value={lang} onValueChange={(v) => isLang(v) && setLang(v)}>
+      <BaseSelect.Trigger
+        aria-label={`${t("header.language")}: ${langNames[lang]}`}
+        className={cx(
+          // 40px where a finger taps, 36px (as the other top-bar buttons) from md up
+          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pr-2 pl-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-9",
+          className,
+        )}
+      >
+        <Icon name="globe" size={16} />
+        <span lang={localeOf(lang)}>{langShort[lang]}</span>
+        <svg aria-hidden width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 4.5l3 3 3-3" />
+        </svg>
+      </BaseSelect.Trigger>
+      <BaseSelect.Portal>
+        <BaseSelect.Positioner side="bottom" align="end" sideOffset={6} alignItemWithTrigger={false} className="z-50 outline-none">
+          <BaseSelect.Popup className={cx(selectPopupClass, "min-w-44")}>
+            <BaseSelect.List>
+              {langs.map((l) => (
+                <BaseSelect.Item key={l} value={l} lang={localeOf(l)} className={selectItemClass}>
+                  <BaseSelect.ItemText className="flex-1">{langNames[l]}</BaseSelect.ItemText>
+                  <span aria-hidden className="font-mono text-[11px] font-bold text-muted">
+                    {langShort[l]}
+                  </span>
+                  <span aria-hidden className="grid w-3 place-items-center text-accent-text">
+                    <BaseSelect.ItemIndicator>
+                      <SelectCheck />
+                    </BaseSelect.ItemIndicator>
+                  </span>
+                </BaseSelect.Item>
+              ))}
+            </BaseSelect.List>
+          </BaseSelect.Popup>
+        </BaseSelect.Positioner>
+      </BaseSelect.Portal>
+    </BaseSelect.Root>
   );
 }
 

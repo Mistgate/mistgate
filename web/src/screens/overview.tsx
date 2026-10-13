@@ -236,9 +236,9 @@ function TrafficChart({ data, range, onRange }: { data: OverviewResponse; range:
       max={max}
       height={150}
       yLabels={[fmt.num(max, digits), fmt.num(step, digits), "0"]}
-      xLabels={xLabels(s, daily, t, fmt.lang)}
+      xLabels={xLabels(s, daily, t, fmt.locale)}
       idle={{ when: t(daily ? "ov.last7" : "ov.last24"), main: fmt.bytes(sum(s.total)) }}
-      at={(i) => ({ when: whenLabel(s, i, daily, fmt.lang), main: fmt.bytes(s.total[i] ?? 0) })}
+      at={(i) => ({ when: whenLabel(s, i, daily, fmt.locale), main: fmt.bytes(s.total[i] ?? 0) })}
       legend={(i) =>
         s.protocols.map((p, k) => ({
           key: p,
@@ -279,7 +279,7 @@ function OnlineChart({ data }: { data: OverviewResponse }) {
       max={max}
       height={72}
       yLabels={[String(max), String(step), "0"]}
-      xLabels={xLabels(s, false, t, fmt.lang)}
+      xLabels={xLabels(s, false, t, fmt.locale)}
       idle={{ when: t("ov.now"), main: t.n("ov.onlineCount", data.usersOnline) }}
       at={(i) => ({ when: hourLabel(s.times[i]!), main: t.n("ov.onlineCount", s.total[i] ?? 0) })}
       legend={(i) =>

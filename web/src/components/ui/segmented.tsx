@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 export type SegmentedOption<V extends string> = { value: V; label: ReactNode; title?: string };
 
 // thumb: 36px with a sliding selection. inset / flat: the 28px-item groups of Settings and
-// of the list filters. lang: the RU/EN pill of the top bar, the selected item filled with the accent.
+// of the list filters.
 const looks = {
   thumb: {
     track: "relative grid h-9 auto-cols-fr grid-flow-col rounded-xl border border-line bg-surface p-[3px]",
@@ -19,10 +19,6 @@ const looks = {
   flat: {
     track: "flex gap-0.5 rounded-xl border border-line bg-surface p-[3px]",
     item: "h-7 rounded-[9px] px-3 text-xs font-bold text-muted transition-colors duration-200 data-checked:bg-surface-2 data-checked:text-fg",
-  },
-  lang: {
-    track: "flex h-7 gap-0.5 rounded-[14px] border border-line bg-surface p-0.5",
-    item: "h-[22px] rounded-ctl px-2 font-mono text-[11px] font-bold text-muted data-checked:bg-accent data-checked:text-on-accent",
   },
 } as const;
 

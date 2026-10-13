@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "./en";
 import { ru } from "./ru";
-import { pickForm } from "./index";
+import { dictionaries, isLang, langs, localeOf, pickForm } from "./index";
 
 describe("pickForm", () => {
   const ruForms = ru["auth.attemptsLeft"];
@@ -30,13 +30,40 @@ describe("pickForm", () => {
   it("returns a single form as it is", () => {
     expect(pickForm("Hello", 3, "en")).toBe("Hello");
   });
+  it("Chinese has one form: a message without \"|\" as it is, a leftover \"a|b\" gives the last form for every count", () => {
+    for (const lang of ["zh", "zh-CN"]) {
+      for (const n of [0, 1, 2, 5, 11, 21]) {
+        expect(pickForm("{n} 条记录", n, lang)).toBe("{n} 条记录");
+        expect(pickForm("{n} entry|{n} entries", n, lang)).toBe("{n} entries");
+        expect(pickForm("{n} one|{n} few|{n} many", n, lang)).toBe("{n} many");
+      }
+    }
+  });
+});
+
+describe("languages", () => {
+  it("are the three of the panel, each with its dictionary and an Intl locale", () => {
+    expect([...langs].sort()).toEqual(["en", "ru", "zh"]);
+    for (const lang of langs) {
+      expect(isLang(lang)).toBe(true);
+      expect(Object.keys(dictionaries[lang]).sort(), lang).toEqual(Object.keys(en).sort());
+      expect(Intl.DateTimeFormat.supportedLocalesOf(localeOf(lang))).toHaveLength(1);
+    }
+    expect(localeOf("zh")).toBe("zh-CN");
+    expect(isLang("fr")).toBe(false);
+  });
 });
 
 describe("dictionaries", () => {
-  it("keep the same {placeholders} in both languages", () => {
+  it("have a text for every key and keep the same {placeholders} in every language", () => {
     const ph = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
     const set = (s: string) => [...new Set(ph(s))].sort().join();
-    for (const key of Object.keys(en) as (keyof typeof en)[]) expect(set(ru[key]), key).toBe(set(en[key]));
+    for (const lang of langs) {
+      for (const key of Object.keys(en) as (keyof typeof en)[]) {
+        expect(dictionaries[lang][key], `${lang} ${key}`).toBeTruthy();
+        expect(set(dictionaries[lang][key]), `${lang} ${key}`).toBe(set(en[key]));
+      }
+    }
   });
 
   // the glossary (one word per idea): words the owner reads as jargon or a calque never come back into the Russian copy

@@ -163,3 +163,7 @@ export const ru: typeof en = {
   "audit.node.ports_check": "проверил(а) доставку UDP на {node}: порты {ports}",
   "audit.port_lossy_override": "сохранил(а) порт {port} на {node}, хотя он теряет UDP-пакеты",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

@@ -1,15 +1,13 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
-import { fill, type Lang, type T } from "@/i18n";
+import { dictionaries as dict, fill, type Lang, type T } from "@/i18n";
 import { en } from "@/i18n/en";
-import { ru } from "@/i18n/ru";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
 import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, reasons, reasonText, renewalOf, renewalText } from "./port-check";
 
-const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 const t = tOf("en");
 const at = Math.floor(Date.now() / 1000) - 5 * 60;

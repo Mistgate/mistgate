@@ -145,3 +145,7 @@ export const ru: Record<keyof typeof en, string> = {
   "tg.err.notLinked": "К твоему аккаунту не привязан чат.",
   "tg.err.tooSoon": "Одной проверки раз в несколько секунд достаточно. Подожди немного.",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

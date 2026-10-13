@@ -253,6 +253,7 @@ const core = {
 };
 
 export type CoreMessages = typeof core;
+export { core as coreEn };
 export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn };
 
 export type Messages = typeof en;

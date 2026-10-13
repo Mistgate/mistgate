@@ -509,3 +509,7 @@ export const ru: typeof en = {
   "users.notFound": "Такого пользователя нет",
   "users.notFoundBody": "Возможно, его удалили. Вернись к списку.",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

@@ -16,7 +16,7 @@ import { useCaptcha } from "@/components/captcha";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { langs, setLang, useLang, useT } from "@/i18n";
+import { langNames, langShort, langs, setLang, useLang, useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { auth, errorKey, groups, webauthnSupported } from "@/lib/api";
@@ -34,7 +34,6 @@ import { cx } from "@/lib/cx";
 import { createPasskey } from "@/lib/passkey";
 import { forgetSession } from "@/lib/session";
 
-const langNames = { ru: "Русский", en: "English" } as const;
 const steps = 3;
 
 /** A fresh panel starts with an empty "Everyone" group (named in the setup language): profiles have a place to go, users a group to land in. */
@@ -99,7 +98,7 @@ function LanguageStep({ onNext }: { onNext: () => void }) {
             value={l}
             className="flex h-14 cursor-pointer items-center gap-3 rounded-card border border-line bg-surface px-4 text-left transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft"
           >
-            <span className="w-6 font-mono text-xs font-bold text-muted">{l.toUpperCase()}</span>
+            <span className="w-6 font-mono text-xs font-bold text-muted">{langShort[l]}</span>
             <b className="flex-1 text-[15px]">{langNames[l]}</b>
             <span
               aria-hidden

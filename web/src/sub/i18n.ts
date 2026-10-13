@@ -35,6 +35,8 @@ const ru = {
   leftUntil: (rest: string, date: string) => `Осталось ${rest} до ${date}`,
   leftOnly: (rest: string) => `Осталось ${rest}`,
   /** [what is left, what to do]: the second part is dropped when there is no support link. */
+  /** the unit under the big number of days left */
+  dayWord: (n: number) => pluralRu(n, ["день", "дня", "дней"]),
   soon: (days: number): [string, string] => [`Осталось ${days} ${pluralRu(days, ["день", "дня", "дней"])}`, "напишите, чтобы продлить"],
   txt: {
     expiredOn: (d: string) => `Подписка закончилась ${d}.`,
@@ -324,6 +326,7 @@ const ru = {
 export type Dict = typeof ru;
 
 const en: Dict = {
+  dayWord: (n) => (n === 1 ? "day" : "days"),
   hi: (n) => `Hi, ${n}`,
   hiAnon: "Hi",
   statusAria: "Subscription",
@@ -625,4 +628,19 @@ function typeset<T>(v: T): T {
   return v;
 }
 
-export const dict: Record<Lang, Dict> = { ru: typeset(ru), en: typeset(en) };
+// zh: filled by the translation pass. Until then the page shows the English copy; replace the spread with real strings
+// (Simplified Chinese: no plural forms, the user is addressed as 您).
+const zh: Dict = { ...en };
+
+export const dict: Record<Lang, Dict> = { ru: typeset(ru), en: typeset(en), zh: typeset(zh) };
+
+/** The languages of the menu in the top bar, in order. */
+export const langs: readonly Lang[] = ["en", "ru", "zh"];
+/** Each language in its own words: the rows of the menu. */
+export const langNames: Record<Lang, string> = { ru: "Русский", en: "English", zh: "简体中文" };
+export const langShort: Record<Lang, string> = { ru: "RU", en: "EN", zh: "中文" };
+export const isLang = (v: unknown): v is Lang => langs.includes(v as Lang);
+/** The value of the `lang` attribute (<html>, the language buttons). */
+export const htmlLang = (lang: Lang): string => (lang === "zh" ? "zh-CN" : lang);
+/** The Intl locale of a language. */
+export const localeOf = (lang: Lang): string => (lang === "ru" ? "ru" : lang === "zh" ? "zh-CN" : "en-GB");

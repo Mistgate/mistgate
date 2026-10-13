@@ -172,7 +172,7 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
               key={`${l.timeUnixMs}/${i}`}
               className={cx("flex gap-2.5 px-3.5 whitespace-nowrap", w === "ERROR" ? "bg-danger-soft" : w === "WARN" ? "bg-warn-soft" : "")}
             >
-              <span className="text-faint">{new Date(l.timeUnixMs).toLocaleTimeString(fmt.lang, { hour12: false })}</span>
+              <span className="text-faint">{new Date(l.timeUnixMs).toLocaleTimeString(fmt.locale, { hour12: false })}</span>
               <span className={cx("w-10 flex-none font-bold", levelTone[w])}>{w}</span>
               <span className="w-[72px] flex-none truncate text-muted">{l.source}</span>
               <span>{l.message}</span>

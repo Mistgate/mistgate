@@ -1,4 +1,4 @@
-import { dict, type Dict } from "./i18n";
+import { dict, isLang, localeOf, type Dict } from "./i18n";
 import type { AddPane } from "./state";
 import type {
   AmneziaData,
@@ -158,7 +158,7 @@ export function normalize(raw: unknown): MgData {
     : null;
   return {
     v: num(r.v) || 1,
-    lang: r.lang === "en" ? "en" : "ru",
+    lang: isLang(r.lang) ? r.lang : "ru",
     brand: {
       parts: [parts[0] ?? "", parts[1] ?? ""],
       logo_svg: str(brand.logo_svg),
@@ -487,7 +487,8 @@ export function dnsChoices(d: MgData, s: ServerEntry, lang: Lang): { id: string;
 export function describePreset(text: string, lang: Lang): string {
   const at = text.indexOf("\n");
   if (at < 0) return text.trim();
-  return lang === "en" ? text.slice(at + 1).trim() : text.slice(0, at).trim();
+  // the built-ins carry two texts, ru and en; any other language reads the English one
+  return lang === "ru" ? text.slice(0, at).trim() : text.slice(at + 1).trim();
 }
 
 // --- setup and visits --------------------------------------------------------------------------------------
@@ -500,18 +501,13 @@ export const isReturning = (d: MgData, marked: boolean): boolean => fetchedUnix(
 
 // --- numbers and dates -------------------------------------------------------------------------------------
 
-const locale = (lang: Lang) => (lang === "ru" ? "ru" : "en-GB");
-const units: Record<Lang, string[]> = { ru: ["Б", "КБ", "МБ", "ГБ", "ТБ"], en: ["B", "KB", "MB", "GB", "TB"] };
+const locale = localeOf;
+const units: Record<Lang, string[]> = { ru: ["Б", "КБ", "МБ", "ГБ", "ТБ"], en: ["B", "KB", "MB", "GB", "TB"], zh: ["B", "KB", "MB", "GB", "TB"] };
 
 export function fmtNum(n: number, lang: Lang): string {
   return new Intl.NumberFormat(locale(lang), { maximumFractionDigits: n < 1 ? 2 : n < 10 ? 1 : 0 }).format(n);
 }
 
-export function plural(n: number, lang: Lang, forms: Record<string, string>): string {
-  return forms[new Intl.PluralRules(locale(lang)).select(n)] ?? forms.other ?? "";
-}
-export const daysWord = (n: number, lang: Lang) =>
-  lang === "ru" ? plural(n, lang, { one: "день", few: "дня", many: "дней", other: "дня" }) : n === 1 ? "day" : "days";
 
 export function fmtDate(unix: number, lang: Lang, now = Date.now() / 1000): string {
   const d = new Date(unix * 1000);
@@ -585,7 +581,7 @@ export function hero(d: MgData, lang: Lang, now = Date.now() / 1000): Hero {
     showTerm: active,
     termL: noExpiry ? t.termL : t.leftL,
     big: noExpiry ? "∞" : String(shown),
-    unit: noExpiry ? t.noExpiry : daysWord(shown, lang),
+    unit: noExpiry ? t.noExpiry : t.dayWord(shown),
     sub: noExpiry ? "" : t.until(fmtDate(u.expires_unix, lang, now)),
     showTraffic: active || u.status === "limited",
     usedN: fmtNum(u.used_bytes / 1024 ** i, lang),

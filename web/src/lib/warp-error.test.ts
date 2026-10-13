@@ -1,11 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { fill, type Lang, type T } from "@/i18n";
+import { dictionaries as dict, fill, langs, type Lang, type T } from "@/i18n";
 import { en } from "@/i18n/en";
-import { ru } from "@/i18n/ru";
 import { attentionWords, describeWarpError, splitWarpError, warpCheckFailed, warpErrorLine } from "./warp-error";
 
-const dict = { en, ru };
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 
 // Every last_error the agent can produce (internal/node/warp/manager.go): reasons, then the recovery notes it appends.
@@ -41,8 +39,8 @@ describe("WARP's last_error in words", () => {
     expect(warpCheckFailed("")).toBe(false);
   });
 
-  it("gives every reason and every note of the agent a sentence in both languages, with nothing raw left over", () => {
-    for (const lang of ["en", "ru"] as const) {
+  it("gives every reason and every note of the agent a sentence in every language, with nothing raw left over", () => {
+    for (const lang of langs) {
       const t = tOf(lang);
       for (const reason of reasons) {
         const w = describeWarpError(t, reason)!;

@@ -1,7 +1,7 @@
 // The page data the server embeds as <script type="application/json" id="mg-data">.
 // logic.ts reads it defensively: a field the server forgot must not blank the page.
 
-export type Lang = "ru" | "en";
+export type Lang = "ru" | "en" | "zh";
 export type Platform = "ios" | "android" | "windows" | "macos" | "linux";
 export type Kind = "happ" | "amnezia";
 export type Status = "active" | "expired" | "limited" | "disabled";

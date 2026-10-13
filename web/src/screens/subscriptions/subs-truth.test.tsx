@@ -81,6 +81,7 @@ const tx = (lang: "en" | "ru") =>
     n: (key: keyof typeof en, n: number, vars?: Record<string, string | number>) => fill(pickForm((lang === "ru" ? ru : en)[key], n, lang), { n, ...vars }),
     opt: () => undefined,
     lang,
+    locale: lang,
   }) as unknown as Tx;
 
 describe("who gets a format", () => {

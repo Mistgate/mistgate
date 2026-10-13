@@ -2,7 +2,7 @@ import badge from "../assets/mistgate-badge.svg?raw";
 import { connectCard, qrSide } from "./connect";
 import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
-import { dict, type Dict } from "./i18n";
+import { dict, htmlLang, langNames, langs, langShort, type Dict } from "./i18n";
 import { staleCard } from "./amnezia";
 import { icon } from "./icons";
 import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
@@ -39,12 +39,47 @@ export function logoSrc(d: MgData): string {
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
 
-/** The top bar: logo, name and the language switch. Shared by the page and the password form. */
+// The language menu is a native <details>: it opens without script. The page closes it on a click outside and on Esc
+// (the focus goes back to its summary); one pair of listeners for the whole page, however often the tree is rebuilt.
+let watching = false;
+function watchLangMenu() {
+  if (watching) return;
+  watching = true;
+  document.addEventListener("click", (e) => {
+    for (const m of document.querySelectorAll<HTMLDetailsElement>("details.lang-menu[open]")) if (!m.contains(e.target as Node)) m.open = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const m = document.querySelector<HTMLDetailsElement>("details.lang-menu[open]");
+    if (!m) return;
+    m.open = false;
+    m.querySelector("summary")?.focus();
+  });
+}
+
+/** The language menu: a globe, the short code of the current language and a chevron; the card lists every language by its own name. */
+function langMenu(t: Dict, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
+  watchLangMenu();
+  const menu = h("details", { class: "lang-menu" });
+  const row = (l: Lang) =>
+    h(
+      "button",
+      { type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: htmlLang(l), on: { click: () => (lang !== l ? setLang(l) : (menu.open = false)) } },
+      h("span", { class: "ln" }, langNames[l]),
+      h("span", { class: "lc", "aria-hidden": "true" }, langShort[l]),
+      h("span", { class: "lk", "aria-hidden": "true" }, lang === l && icon("check", 16)),
+    );
+  menu.append(
+    h("summary", { "aria-label": `${t.langGroup}: ${langNames[lang]}`, "data-k": "lang-menu" }, icon("globe", 18), h("span", { lang: htmlLang(lang) }, langShort[lang]), icon("chev", 14)),
+    h("div", { class: "pop menu lang-card", role: "group", "aria-label": t.langGroup }, ...langs.map(row)),
+  );
+  return menu;
+}
+
+/** The top bar: logo, name and the language menu. Shared by the page and the password form. */
 export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
   const t = dict[lang];
   const wordmark = d.title.trim().toLowerCase() === d.brand.parts.join("").toLowerCase() || !d.title.trim();
-  const btn = (l: Lang) =>
-    h("button", { class: lang === l ? "on" : "", type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: l, on: { click: () => lang !== l && setLang(l) } }, l.toUpperCase());
   return h(
     "header",
     { class: "hd" },
@@ -52,7 +87,7 @@ export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): H
     wordmark && d.brand.parts[0]
       ? h("div", { class: "wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1]))
       : h("div", { class: "wm plain" }, brandName(d)),
-    h("div", { class: "lang", role: "group", "aria-label": t.langGroup }, btn("ru"), btn("en")),
+    langMenu(t, lang, setLang),
   );
 }
 

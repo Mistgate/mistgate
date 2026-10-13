@@ -2031,3 +2031,7 @@ export const ru: typeof en = {
   "brand.language": "Язык по умолчанию",
   "brand.languageHint": "Для браузеров, где язык не выбран.",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

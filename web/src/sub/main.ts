@@ -4,7 +4,7 @@ import { amzActions } from "./amz-actions";
 import * as api from "./api";
 import { dnsActions } from "./dns-actions";
 import { h } from "./dom";
-import { dict } from "./i18n";
+import { dict, htmlLang, isLang } from "./i18n";
 import { icon } from "./icons";
 import { lockActions, lockView, type LockState } from "./lock";
 import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
@@ -45,7 +45,7 @@ function store(key: string, value: string) {
 const langKey = "lang";
 function savedLang(): Lang | null {
   const v = stored(langKey);
-  return v === "ru" || v === "en" ? v : null;
+  return isLang(v) ? v : null;
 }
 const saveLang = (l: Lang) => store(langKey, l);
 
@@ -107,7 +107,7 @@ function download(filename: string, text: string) {
 }
 
 function setDocument(lang: Lang) {
-  document.documentElement.lang = lang;
+  document.documentElement.lang = htmlLang(lang);
   document.title = data.title.trim() || brandName(data);
 }
 

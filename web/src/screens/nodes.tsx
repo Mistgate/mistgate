@@ -51,7 +51,7 @@ export function NodesScreen() {
 
   const protocols = useMemo(() => sortProtocols(nodes.flatMap((n) => n.protocols)), [nodes]);
   const countries = useMemo(
-    () => [...new Set(nodes.map((n) => n.countryCode).filter(Boolean))].sort((a, b) => fmt.country(a).localeCompare(fmt.country(b), fmt.lang)),
+    () => [...new Set(nodes.map((n) => n.countryCode).filter(Boolean))].sort((a, b) => fmt.country(a).localeCompare(fmt.country(b), fmt.locale)),
     [nodes, fmt],
   );
 

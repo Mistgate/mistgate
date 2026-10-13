@@ -617,3 +617,7 @@ export const ru: Record<keyof typeof en, string> = {
   "subs.dnsChoice.resetBody": "Выборы {name} по всем серверам будут удалены. Каждый сервер вернётся к DNS по умолчанию на ноде или к пресету его пользователя, группы или экземпляра. Человек сможет выбрать снова на своей странице.",
   "subs.dnsChoice.resetDone": "Выбор DNS у {name} сброшен",
 };
+
+// zh: filled by the translation pass. Until then it shows the English copy; replace the spread with real strings.
+// Simplified Chinese has one plural form: write a message without "|" (a leftover "a|b" shows the last form).
+export const zh: typeof en = { ...en };

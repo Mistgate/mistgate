@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icons";
 import { useT } from "@/i18n";
 import { en, type MessageKey } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
+import { zh } from "@/i18n/zh";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
@@ -78,9 +79,9 @@ const nodeTabs = [
   { id: "settings", label: "node.tab.settings", words: "настройки settings warp" },
 ] as const satisfies readonly { id: string; label: MessageKey; words: string }[];
 
-/** Every word of the query is found in the place's names (both languages) or its extra words. */
+/** Every word of the query is found in the place's names (every language) or its extra words. */
 export function placeMatches(p: Pick<Place, "label" | "crumb" | "words">, q: string): boolean {
-  const hay = [en[p.label], ru[p.label], p.crumb ? en[p.crumb] : "", p.crumb ? ru[p.crumb] : "", p.words].join(" ").toLowerCase();
+  const hay = [en[p.label], ru[p.label], zh[p.label], p.crumb ? en[p.crumb] : "", p.crumb ? ru[p.crumb] : "", p.crumb ? zh[p.crumb] : "", p.words].join(" ").toLowerCase();
   return q.split(/\s+/).every((w) => hay.includes(w));
 }
 
