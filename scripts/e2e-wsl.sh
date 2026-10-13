@@ -38,10 +38,12 @@
 # AWG/WARP link, table, rule or route is left.
 #
 # --vless: three VLESS REALITY inbounds (XHTTP, RAW + Vision, XHTTP packet-up) behind a local TLS 1.3 target
-# (scripts/e2e/tlsdest), real xray-core and mihomo clients, traffic accounting, disable/enable, node RSS, and the delay of
+# (scripts/e2e/tlsdest) and three VLESS TLS inbounds with a self-signed origin behind a CDN that is the node itself
+# (XHTTP with the default mode, XHTTP stream-up, WebSocket; the clients dial the node and pin its certificate),
+# real xray-core and mihomo clients, traffic accounting, disable/enable, node RSS, and the delay of
 # the first REALITY handshake after an agent start, and Check ports (TCP): the Hysteria2 site and the REALITY ports are
 # "ours", then a VLESS inbound on 443 claims the site port. The panel sends that check itself (one node, same host), so
-# the step restarts it with the trust file of the REALITY target. xhttp+tls is not in the product yet (design/vless.md R3).
+# the step restarts it with the trust file of the REALITY target.
 #
 # --edge runs the Cloudflare edition instead (scripts/e2e/edge.sh): the panel is the Go js/wasm build inside a local
 # `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a

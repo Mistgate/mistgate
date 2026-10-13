@@ -929,17 +929,30 @@ xray_bin() {
 # one VLESS outbound) from a subscription line and prints "<label> <uuid>" (label: tcp, xhttp-<mode>)
 write_vless2xray() {
   cat >"$WORK/vless2xray.py" <<'PY'
-import json, sys
+import hashlib, json, socket, ssl, sys
 from urllib.parse import urlsplit, parse_qs, unquote
 u = urlsplit(sys.argv[1])
 q = {k: v[0] for k, v in parse_qs(u.query).items()}
-assert u.scheme == "vless" and q["encryption"] == "none" and q["security"] == "reality", q
+assert u.scheme == "vless" and q["encryption"] == "none" and q["security"] in ("reality", "tls"), q
 uuid = unquote(u.username)
 user = {"id": uuid, "encryption": "none"}
 if q.get("flow"):
     user["flow"] = q["flow"]
-stream = {"network": q["type"], "security": "reality", "realitySettings": {
-    "serverName": q["sni"], "fingerprint": q["fp"], "publicKey": q["pbk"], "shortId": q["sid"], "spiderX": q.get("spx", "")}}
+address, port, prefix = u.hostname, u.port, ""
+if q["security"] == "reality":
+    stream = {"network": q["type"], "security": "reality", "realitySettings": {
+        "serverName": q["sni"], "fingerprint": q["fp"], "publicKey": q["pbk"], "shortId": q["sid"], "spiderX": q.get("spx", "")}}
+else:
+    # The TLS profiles of this run sit behind a "CDN" that is the node itself: the line names the CDN (host = sni = cdn.edge.test,
+    # the CDN port), the client dials the node instead and trusts the node's self-signed certificate by its pin.
+    assert q["sni"] == q["host"] == u.hostname == "cdn.edge.test", (q["sni"], q.get("host"), u.hostname)
+    address, prefix = "127.0.0.1", "tls-"
+    ctx = ssl.create_default_context()
+    ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+    with socket.create_connection((address, port), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=q["sni"]) as tls:
+        pin = hashlib.sha256(tls.getpeercert(binary_form=True)).hexdigest()
+    stream = {"network": q["type"], "security": "tls", "tlsSettings": {
+        "serverName": q["sni"], "fingerprint": q["fp"], "pinnedPeerCertSha256": pin}}
 label = "tcp"
 if q["type"] == "xhttp":
     x = {"path": q["path"], "mode": q.get("mode", "auto")}
@@ -948,12 +961,16 @@ if q["type"] == "xhttp":
     if q.get("extra"):
         x["extra"] = json.loads(q["extra"])
     stream["xhttpSettings"] = x
-    label = "xhttp-" + x["mode"]
+    label = prefix + "xhttp-" + x["mode"]
+elif q["type"] == "ws":
+    assert q["security"] == "tls", q
+    stream["wsSettings"] = {"path": q["path"], "host": q["host"]}
+    label = "tls-ws"
 else:
     assert q["type"] == "tcp", q["type"]
 conf = {"log": {"loglevel": "warning"},
         "inbounds": [{"listen": "127.0.0.1", "port": int(sys.argv[2]), "protocol": "socks", "settings": {"auth": "noauth", "udp": False}}],
-        "outbounds": [{"protocol": "vless", "settings": {"vnext": [{"address": u.hostname, "port": u.port, "users": [user]}]}, "streamSettings": stream}]}
+        "outbounds": [{"protocol": "vless", "settings": {"vnext": [{"address": address, "port": port, "users": [user]}]}, "streamSettings": stream}]}
 json.dump(conf, open(sys.argv[3], "w"))
 print(label, uuid)
 PY
@@ -965,6 +982,14 @@ vless_settings() {
   api ProfileService/ListProtocols '{}' | jq -c --argjson p "$1" --arg t "$2" --arg sn "$3" --arg target "127.0.0.1:$TD_PORT" \
     ".protocols[] | select(.id == \"vless\") | .defaultSettingsJson | fromjson
      | .port = \$p | .transport = \$t | .reality.target_kind = \"site\" | .reality.target = \$target | .reality.server_names = [\$sn] | ${4:-.}"
+}
+# vless_tls_settings <port> <transport> [jq filter]: a TLS profile behind a CDN. The origin certificate is self-signed (allowed only
+# with a CDN host); the CDN host names the "CDN" that the clients dial, and its port is the inbound port because the "CDN" is the node
+vless_tls_settings() {
+  api ProfileService/ListProtocols '{}' | jq -c --argjson p "$1" --arg t "$2" \
+    ".protocols[] | select(.id == \"vless\") | .defaultSettingsJson | fromjson
+     | .port = \$p | .transport = \$t | .security = \"tls\" | .tls_mode = \"self_signed\" | .sni = \"origin.edge.test\"
+     | .cdn = {host: \"cdn.edge.test\", port: \$p} | ${3:-.}"
 }
 # vl_get <socks port> <path> [curl args]: prints "<http code> <seconds>" of a GET to the fake internet through a client
 vl_get() {
@@ -993,7 +1018,7 @@ restart_node() {
 }
 
 m3_vless() {
-  step "tunnels.6 VLESS: REALITY over XHTTP and RAW+Vision behind a local TLS 1.3 target, real xray and mihomo clients"
+  step "tunnels.6 VLESS: REALITY over XHTTP and RAW+Vision behind a local TLS 1.3 target, XHTTP and WebSocket over TLS behind a CDN that is the node itself, real xray and mihomo clients"
   local td_pid i l
   XRAY=$(xray_bin)
 
@@ -1017,25 +1042,27 @@ m3_vless() {
   sleep 3
   wait_for 90 "every inbound ACTIVE again" inbounds_active_all || die "inbounds after the panel restart: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | select(.state != "INBOUND_STATE_ACTIVE") | {protocol, state, lastError}')"
 
-  # ---- three inbounds: XHTTP, RAW + Vision, XHTTP packet-up with another padding and fingerprint (xhttp+tls is not in the
-  # product yet: design/vless.md R3 has the TLS front, the panel plugin refuses security tls)
-  local px pt pp want vports
+  # ---- six inbounds. REALITY: XHTTP, RAW + Vision, XHTTP packet-up with another padding and fingerprint. TLS, each with a CDN
+  # host and a self-signed origin (the e2e node has no ACME name and no public name; the "CDN" is the node itself, the client
+  # dials the node and pins its certificate): XHTTP with the default mode (packet-up behind a CDN), XHTTP stream-up, WebSocket
+  local px pt pp tp ts tw want vports
   px=$(make_profile vless e2e-vless-xhttp "$(vless_settings "$(free_port tcp)" xhttp www.example.com)")
   pt=$(make_profile vless e2e-vless-tcp "$(vless_settings "$(free_port tcp)" tcp www.example.net)")
   pp=$(make_profile vless e2e-vless-packetup "$(vless_settings "$(free_port tcp)" xhttp www.example.org \
     '.xhttp.mode = "packet-up" | .xhttp.x_padding_bytes = "200-400" | .reality.fingerprint = "firefox"')")
-  [ -n "$px" ] && [ "$px" != null ] && [ -n "$pt" ] && [ "$pt" != null ] && [ -n "$pp" ] && [ "$pp" != null ] || die "CreateProfile(vless) returned no id"
-  want=$(($(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq '.inbounds | length') + 3))
-  make_inbound "$px"
-  make_inbound "$pt"
-  make_inbound "$pp"
-  wait_for 90 "the three vless inbounds ACTIVE" inbounds_active "$want" \
+  tp=$(make_profile vless e2e-vless-tls-cdn "$(vless_tls_settings "$(free_port tcp)" xhttp)")
+  ts=$(make_profile vless e2e-vless-tls-streamup "$(vless_tls_settings "$(free_port tcp)" xhttp '.xhttp.mode = "stream-up"')")
+  tw=$(make_profile vless e2e-vless-tls-ws "$(vless_tls_settings "$(free_port tcp)" ws)")
+  for i in "$px" "$pt" "$pp" "$tp" "$ts" "$tw"; do [ -n "$i" ] && [ "$i" != null ] || die "CreateProfile(vless) returned no id"; done
+  want=$(($(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq '.inbounds | length') + 6))
+  for i in "$px" "$pt" "$pp" "$tp" "$ts" "$tw"; do make_inbound "$i"; done
+  wait_for 90 "the six vless inbounds ACTIVE" inbounds_active "$want" \
     || die "vless inbounds did not become ACTIVE: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | select(.protocol == "vless") | {port, state, lastError}')"
   T_ACTIVE=$(date +%s.%N)
   vports=$(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -r '[.inbounds[] | select(.protocol == "vless") | .port] | sort | map(tostring) | join(" ")')
   for i in $vports; do listening "$i" || die "nothing listens on TCP $i"; done
   ! grep -q 'REALITY target probe warning' "$WORK/node.log" || die "the node's probe of the REALITY target warns: $(grep 'REALITY target probe warning' "$WORK/node.log" | head -1)"
-  pass "three vless inbounds ACTIVE on TCP $vports; the node's probe of the target found TLS 1.3 with X25519MLKEM768 (no warning)"
+  pass "six vless inbounds ACTIVE on TCP $vports; the node's probe of the target found TLS 1.3 with X25519MLKEM768 (no warning)"
 
   # ---- Check ports, the TCP half (design/vless.md §7.4, R4.1). The panel sits on the node's host, so it answers (error_code
   # same_host, as for UDP) and stores nothing. The e2e node has no ACME name, so there is no port 80 row; a REALITY port that
@@ -1065,19 +1092,19 @@ m3_vless() {
     || die "with VLESS on 443 the row is not a vless row that is ours: $(jq -c .tcp <<<"$pc")"
   pass "Check ports (TCP): VLESS on 443 claims the site port and answers (443 vless ours, no site row)"
   api ProfileService/DeleteInbound "{\"inboundId\":\"$(inbound_of "$pv" | jq -r .id)\"}" >/dev/null || die "DeleteInbound of the 443 inbound failed"
-  wait_for 60 "the three vless inbounds ACTIVE after the 443 inbound is gone" inbounds_active "$want" || die "inbounds after deleting the 443 inbound: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | {protocol, port, state}')"
+  wait_for 60 "the six vless inbounds ACTIVE after the 443 inbound is gone" inbounds_active "$want" || die "inbounds after deleting the 443 inbound: $(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -c '.inbounds[] | {protocol, port, state}')"
 
-  # ---- a user and the Happ subscription: three vless:// lines
+  # ---- a user and the Happ subscription: six vless:// lines
   local vera vera_url lines
-  new_user vera "$(make_group e2e-vless "[\"$px\",\"$pt\",\"$pp\"]")"
+  new_user vera "$(make_group e2e-vless "[\"$px\",\"$pt\",\"$pp\",\"$tp\",\"$ts\",\"$tw\"]")"
   vera=$U_ID vera_url=$U_URL
   vless_lines() { curl -sk -m 15 -A 'Happ/3.0' -D "$WORK/vless-sub.hdr" "$vera_url" | base64 -d 2>/dev/null | grep '^vless://' || true; }
-  three_lines() { [ "$(vless_lines | wc -l)" = 3 ]; }
-  wait_for 40 "three vless:// lines in the Happ subscription" three_lines || die "the Happ subscription has $(vless_lines | wc -l) vless:// lines, want 3"
+  six_lines() { [ "$(vless_lines | wc -l)" = 6 ]; }
+  wait_for 40 "six vless:// lines in the Happ subscription" six_lines || die "the Happ subscription has $(vless_lines | wc -l) vless:// lines, want 6"
   grep -q '^HTTP/[0-9.]* 200' "$WORK/vless-sub.hdr" || die "the Happ fetch is not 200"
   lines=$(vless_lines)
   [ "$(curl -sk -m 15 -A 'Happ/3.0' "$vera_url" | base64 -d 2>/dev/null | grep -c '^hysteria2://' || true)" = 0 ] || die "the VLESS-only user has a hysteria2 line"
-  [ "$(grep -o '^vless://[^@]*' <<<"$lines" | sort -u | wc -l)" = 1 ] || die "the three lines do not carry one user id (one credential per device)"
+  [ "$(grep -o '^vless://[^@]*' <<<"$lines" | sort -u | wc -l)" = 1 ] || die "the six lines do not carry one user id (one credential per device)"
   write_vless2xray
   local -A port conf pid
   local label uuid sp
@@ -1087,13 +1114,17 @@ m3_vless() {
     SECRETS+=("$uuid")
     port[$label]=$sp conf[$label]=$WORK/xray-c$sp.json
   done <<<"$lines"
-  [ "${#port[@]}" = 3 ] && [ -n "${port[tcp]:-}" ] && [ -n "${port[xhttp-auto]:-}" ] && [ -n "${port[xhttp-packet-up]:-}" ] \
-    || die "the lines are not xhttp (auto), tcp and xhttp (packet-up): ${!port[*]}"
+  [ "${#port[@]}" = 6 ] && [ -n "${port[tcp]:-}" ] && [ -n "${port[xhttp-auto]:-}" ] && [ -n "${port[xhttp-packet-up]:-}" ] \
+    && [ -n "${port[tls-xhttp-packet-up]:-}" ] && [ -n "${port[tls-xhttp-stream-up]:-}" ] && [ -n "${port[tls-ws]:-}" ] \
+    || die "the lines are not xhttp (auto), tcp, xhttp (packet-up) and the three TLS ones (xhttp default = packet-up, stream-up, ws): ${!port[*]}"
   grep 'type=tcp' <<<"$lines" | grep -q 'flow=xtls-rprx-vision' || die "the tcp line carries no Vision flow"
-  pass "Happ subscription: 200, three vless:// lines (${!port[*]}), one user id, no other protocol; converted to xray client configs"
+  [ "$(grep -c 'security=tls' <<<"$lines")" = 3 ] || die "want three TLS lines"
+  ! grep 'security=tls' <<<"$lines" | grep -q 'flow=\|pbk=\|sid=' || die "a TLS line carries REALITY or flow parameters"
+  pass "Happ subscription: 200, six vless:// lines (${!port[*]}), one user id, no other protocol; the TLS lines name the CDN (host = sni = cdn.edge.test) and the XHTTP one defaults to packet-up; converted to xray client configs"
 
   # ---- real xray clients; the first request of each (REALITY measures its target once per inbound), then 20 MB each
-  local labels=(xhttp-auto tcp xhttp-packet-up)
+  local rlabels=(xhttp-auto tcp xhttp-packet-up) tlabels=(tls-xhttp-packet-up tls-xhttp-stream-up tls-ws)
+  local labels=("${rlabels[@]}" "${tlabels[@]}")
   for l in "${labels[@]}"; do
     start_xray "$l" "${conf[$l]}" "${port[$l]}" || { tail -n 8 "$WORK/client-xray-$l.log" | redact; die "the xray client ($l) did not start"; }
     pid[$l]=$LAST_PID
@@ -1107,8 +1138,8 @@ m3_vless() {
     src=$(curl -s -m 15 --socks5-hostname "127.0.0.1:${port[$l]}" "http://$WHOAMI/vless-who-$l" | tr -d '\n')
     [ "$src" = "$DIRECT_SRC" ] || die "vless $l: the fake internet saw '$src', expected the node $DIRECT_SRC"
   done
-  say "first request through each client: xhttp ${first[xhttp-auto]} s, tcp ${first[tcp]} s, packet-up ${first[xhttp-packet-up]} s (the first began $(python3 -c "print(round($(date +%s.%N) - $T_ACTIVE, 1))") s after the panel showed the inbounds ACTIVE)"
-  pass "three xray clients connect through the node, and the fake internet sees the node ($DIRECT_SRC) from each"
+  say "first request through each client: xhttp ${first[xhttp-auto]} s, tcp ${first[tcp]} s, packet-up ${first[xhttp-packet-up]} s, tls packet-up ${first[tls-xhttp-packet-up]} s, tls stream-up ${first[tls-xhttp-stream-up]} s, tls ws ${first[tls-ws]} s (the first began $(python3 -c "print(round($(date +%s.%N) - $T_ACTIVE, 1))") s after the panel showed the inbounds ACTIVE)"
+  pass "six xray clients connect through the node, and the fake internet sees the node ($DIRECT_SRC) from each"
 
   local before got delta ratio peak rss
   peak=$(vmrss_mb "$NODE_PID")
@@ -1142,7 +1173,7 @@ m3_vless() {
   done
   vl_started() { [ "$(stat -c %s "$WORK/vless-long-$1.bin" 2>/dev/null || echo 0)" -gt 200000 ]; }
   for l in "${labels[@]}"; do wait_for 20 "the long download through $l to start" vl_started "$l" || die "the long download through $l did not start"; done
-  [ "$(egress_open)" -ge 3 ] || die "the node has $(egress_open) connection(s) to the fake internet during three long downloads, want 3"
+  [ "$(egress_open)" -ge "${#labels[@]}" ] || die "the node has $(egress_open) connection(s) to the fake internet during ${#labels[@]} long downloads, want ${#labels[@]}"
   t_off=$(date +%s.%N)
   api UserService/SetUsersEnabled "{\"userIds\":[\"$vera\"],\"enabled\":false}" | jq -e '.users[0].status == "USER_STATUS_DISABLED"' >/dev/null || die "SetUsersEnabled(false) did not disable"
   for ((i = 0; i < 150; i++)); do [ "$(egress_open)" = 0 ] && break; sleep 0.1; done
@@ -1150,7 +1181,7 @@ m3_vless() {
   [ "$(egress_open)" = 0 ] || die "the node still holds $(egress_open) connection(s) to the fake internet 15 s after the user was disabled"
   t_gone=$(python3 -c "print(round($t_gone - $t_off, 1))")
   python3 -c "import sys; sys.exit(0 if $t_gone <= 5 else 1)" || die "the node closed the sessions of the disabled user only after $t_gone s (want <= 5)"
-  for ((i = 0; i < 600 && ndead < 3; i++)); do
+  for ((i = 0; i < 600 && ndead < ${#labels[@]}; i++)); do
     for l in "${labels[@]}"; do
       if [ -z "${dead[$l]:-}" ] && ! alive "${dl[$l]}"; then dead[$l]=$(date +%s.%N) ndead=$((ndead + 1)); fi
     done
@@ -1171,7 +1202,7 @@ m3_vless() {
     out=$(VL_T=20 vl_get "${port[$l]}" vless-refused)
     [ "${out%% *}" != 200 ] || die "a fresh $l client connected although the user is disabled"
   done
-  pass "disabled user: the node closed all its sessions to the fake internet ${t_gone} s after SetUsersEnabled(false); the curl downloads (at 1 MB/s, draining client-side buffers) ended after$kicks new requests are refused (old client and a fresh client process, all three)"
+  pass "disabled user: the node closed all its sessions to the fake internet ${t_gone} s after SetUsersEnabled(false); the curl downloads (at 1 MB/s, draining client-side buffers) ended after$kicks new requests are refused (old client and a fresh client process, all six)"
   local t_on back=""
   api UserService/SetUsersEnabled "{\"userIds\":[\"$vera\"],\"enabled\":true}" | jq -e '.users[0].status == "USER_STATUS_ACTIVE"' >/dev/null || die "SetUsersEnabled(true) did not enable"
   t_on=$(date +%s.%N)
@@ -1180,7 +1211,7 @@ m3_vless() {
     wait_for 40 "$l to work after enabling" vl_again || die "after re-enabling the user no request gets through $l"
     back="$back $l $(python3 -c "print(round($(date +%s.%N) - $t_on, 1))") s;"
   done
-  pass "re-enabled user: requests work again through all three clients after$back"
+  pass "re-enabled user: requests work again through all six clients after$back"
 
   # ---- the Mihomo profile of the same user: mihomo -t, then traffic through each proxy
   m3_vless_mihomo "$vera_url"
@@ -1195,8 +1226,8 @@ m3_vless() {
   pass "node RSS with the inbounds [$protos]: $idle MB idle after the traffic (peak sampled during the 20 MB transfers: $peak MB), budget <= 100 MB"
 
   # ---- the first handshake after an agent start (design/vless.md, REALITY first connections): restart the agent, send the
-  # first request through each of the three inbounds the moment their listeners exist, then a second one
-  for l in "${labels[@]}"; do
+  # first request through each of the three REALITY inbounds the moment their listeners exist, then a second one
+  for l in "${rlabels[@]}"; do
     start_xray "$l" "${conf[$l]}" "${port[$l]}" || die "the xray client ($l) did not start"
     pid[$l]=$LAST_PID
   done
@@ -1209,13 +1240,13 @@ m3_vless() {
   for ((i = 0; i < 600; i++)); do all_listen && break; sleep 0.05; done
   all_listen || die "the vless listeners did not come back after the agent restart"
   t_listen=$(date +%s.%N)
-  for l in "${labels[@]}"; do
+  for l in "${rlabels[@]}"; do
     (VL_T=60 vl_get "${port[$l]}" "vless-hs1-$l" >"$WORK/hs1-$l.out") &
     hs+=("$!")
     PIDS+=("$!")
   done
   wait "${hs[@]}" || true
-  for l in "${labels[@]}"; do
+  for l in "${rlabels[@]}"; do
     out=$(<"$WORK/hs1-$l.out")
     [ "${out%% *}" = 200 ] || die "the first request through $l after the agent restart failed: '$out'"
     first_s="$first_s $l ${out#* } s;"
@@ -1225,7 +1256,7 @@ m3_vless() {
   done
   say "agent restart: the three listeners were up $(python3 -c "print(round($t_listen - $t_start, 1))") s after the start; the first requests began at once"
   pass "first REALITY handshake after an agent start (client-visible, requests sent when the listeners came up):$first_s the second request:$second_s"
-  for l in "${labels[@]}"; do stop_pid "${pid[$l]}"; done
+  for l in "${rlabels[@]}"; do stop_pid "${pid[$l]}"; done
   wait_for 90 "the node ONLINE and its inbounds ACTIVE again" inbounds_active "$want" || die "the inbounds are not ACTIVE after the agent restart"
 }
 
@@ -1244,27 +1275,42 @@ m3_vless_mihomo() {
 import sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))
 p = d["proxies"]
-assert len(p) == 3 and all(x["type"] == "vless" for x in p), [x["type"] for x in p]
-assert sorted(x["network"] for x in p) == ["tcp", "xhttp", "xhttp"], [x["network"] for x in p]
-assert all(x.get("reality-opts", {}).get("public-key") for x in p), "no REALITY key"
+assert len(p) == 6 and all(x["type"] == "vless" for x in p), [x["type"] for x in p]
+assert sorted(x["network"] for x in p) == ["tcp", "ws", "xhttp", "xhttp", "xhttp", "xhttp"], [x["network"] for x in p]
+reality = [x for x in p if "reality-opts" in x]
+tls = [x for x in p if "reality-opts" not in x]
+assert len(reality) == 3 and all(x["reality-opts"].get("public-key") for x in reality), "no REALITY key"
 assert [x for x in p if x["network"] == "tcp"][0]["flow"] == "xtls-rprx-vision"
+# the CDN rendering: server = servername = Host = the CDN name, certificate verified (no skip), packet-up by default
+assert len(tls) == 3 and all(x["tls"] and x["server"] == x["servername"] == "cdn.edge.test" and not x["skip-cert-verify"] and "flow" not in x for x in tls), tls
+ws = [x for x in tls if x["network"] == "ws"][0]
+assert ws["ws-opts"]["headers"]["Host"] == "cdn.edge.test" and ws["ws-opts"]["path"].startswith("/"), ws
+xt = {x["xhttp-opts"]["mode"]: x for x in tls if x["network"] == "xhttp"}
+assert sorted(xt) == ["packet-up", "stream-up"] and all(x["xhttp-opts"]["host"] == "cdn.edge.test" for x in xt.values()), xt
 names = [x["name"] for x in p]
-assert len(set(names)) == 3 and set(names) <= set(d["proxy-groups"][0]["proxies"]), names
+assert len(set(names)) == 6 and set(names) <= set(d["proxy-groups"][0]["proxies"]), names
 PY
   mkdir -p "$WORK/mhv-test"
   "$mh" -t -d "$WORK/mhv-test" -f "$WORK/mihomo-vless.yaml" >"$WORK/mihomo-vless-t.log" 2>&1 || { redact <"$WORK/mihomo-vless-t.log" | tail -n 5; die "mihomo -t rejects the VLESS profile the panel served"; }
-  pass "the VLESS Mihomo profile: text/yaml, three vless proxies (tcp+Vision, xhttp, xhttp), REALITY keys, and \`mihomo -t\` accepts it as served"
+  pass "the VLESS Mihomo profile: text/yaml, six vless proxies (REALITY tcp+Vision, xhttp, xhttp; TLS xhttp packet-up, xhttp stream-up, ws, each server = servername = Host = the CDN name), and \`mihomo -t\` accepts it as served"
 
   # one proxy at a time through a real mihomo in a namespace of its own; the node's address in the profile is replaced by
   # the veth gateway, as in the other Mihomo step
   mk_ns cli6 198.18.56
-  for ((i = 0; i < 3; i++)); do
+  for ((i = 0; i < 6; i++)); do
     port=$((21000 + i))
     name=$(python3 - "$WORK/mihomo-vless.yaml" "$i" "$WORK/mhv-$i.yaml" "$cli6_GW" "$port" <<'PY'
-import sys, yaml
+import hashlib, socket, ssl, sys, yaml
 src, i, out, gw, port = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], int(sys.argv[5])
 d = yaml.safe_load(open(src))
 for p in d["proxies"]:
+    if "reality-opts" not in p:
+        # a TLS proxy names the "CDN"; the node is the CDN here, so the client dials the node's address (the veth gateway) and
+        # trusts the self-signed origin certificate by its pin
+        ctx = ssl.create_default_context()
+        ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+        with socket.create_connection(("127.0.0.1", p["port"]), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=p["servername"]) as t:
+            p["fingerprint"] = hashlib.sha256(t.getpeercert(binary_form=True)).hexdigest()
     p["server"] = gw
 d.update({"mixed-port": port, "allow-lan": False, "mode": "rule", "log-level": "info"})
 d["rules"] = ["MATCH," + d["proxies"][i]["name"]]
@@ -1291,5 +1337,5 @@ PY
     say "mihomo vless proxy $i ($name): the fake internet sees the node"
     stop_pid "$MHV"
   done
-  pass "real mihomo ($(basename "$mh")): all three VLESS proxies of the served profile (tcp+Vision, xhttp, xhttp packet-up) pass traffic to the fake internet via the node"
+  pass "real mihomo ($(basename "$mh")): all six VLESS proxies of the served profile (REALITY tcp+Vision, xhttp, xhttp packet-up; TLS xhttp packet-up, xhttp stream-up, ws) pass traffic to the fake internet via the node"
 }
