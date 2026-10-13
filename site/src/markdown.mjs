@@ -6,6 +6,7 @@ import { posix, join } from "node:path";
 import { pageUrl } from "./urls.mjs";
 import { icon } from "./icons.mjs";
 import { inlineSvg, mermaidSvg } from "./diagrams.mjs";
+import { parseRoadmap, roadmapTokens } from "./roadmap.mjs";
 
 const LANGS = ["sh", "yaml", "json", "ini", "toml", "javascript", "typescript", "go", "sql", "diff"];
 const ALIAS = { bash: "sh", shell: "sh", shellscript: "sh", zsh: "sh", console: "sh", yml: "yaml", js: "javascript", ts: "typescript", conf: "ini", text: "text", txt: "text", plain: "text", plaintext: "text", "": "text" };
@@ -46,7 +47,15 @@ export function createRenderer(lang, t, highlight) {
     level: 2,
     slugify,
     permalink: anchor.permalink.linkInsideHeader({ placement: "after", symbol: "#", class: "anchor", ariaHidden: false, assistiveText: (title) => `${t.permalink}: ${title}`, visuallyHiddenClass: "sr", space: false }),
-    callback: (token, info) => { (md.__env ?? { headings: [] }).headings.push({ level: Number(token.tag.slice(1)), title: info.title, id: info.slug }); },
+    callback: (token, info) => { (md.__env ?? { headings: [] }).headings.push({ level: Number(token.tag.slice(1)), title: info.title, id: info.slug, toc: token.meta?.toc !== false }); },
+  });
+
+  // ```roadmap blocks become the timeline (roadmap.mjs) before inline parsing, so their text is ordinary Markdown
+  md.core.ruler.after("block", "mg_roadmap", (state) => {
+    const tk = state.tokens;
+    for (let i = tk.length - 1; i >= 0; i--) {
+      if (tk[i].type === "fence" && tk[i].info.trim() === "roadmap") tk.splice(i, 1, ...roadmapTokens(parseRoadmap(tk[i].content), { Token: state.Token, slugify, label: t.roadmap }));
+    }
   });
 
   md.renderer.rules.fence = (tokens, idx, _o, env) => {

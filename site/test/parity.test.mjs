@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import MarkdownIt from "markdown-it";
 import { loadDocs } from "../wiki.mjs";
+import { roadmapBlocks, roadmapShape } from "../src/roadmap.mjs";
 
 const docs = loadDocs(join(dirname(dirname(fileURLToPath(import.meta.url))), "..", "docs"));
 const md = new MarkdownIt();
@@ -46,6 +47,21 @@ test("each page has the same structure in English and Russian", () => {
     if (onlyEn.length || onlyRu.length) bad.push(`${key}: table rows only in en ${JSON.stringify(onlyEn)}, only in ru ${JSON.stringify(onlyRu)}`);
   }
   assert.deepEqual(bad, []);
+});
+
+test("each roadmap has the same phases, cards, chips and links in English and Russian", () => {
+  for (const key of Object.keys(docs.en)) {
+    if (!docs.ru[key]) continue;
+    assert.deepEqual(roadmapBlocks(docs.ru[key]).map(roadmapShape), roadmapBlocks(docs.en[key]).map(roadmapShape), key);
+  }
+});
+
+test("the roadmap check catches a dropped card and a different link", () => {
+  const en = "```roadmap\n- status: next\n  title: Next\n  cards:\n    - title: A\n      text: See [x](../a.md#one).\n    - title: B\n```\n";
+  const ru = "```roadmap\n- status: next\n  title: Дальше\n  cards:\n    - title: А\n      text: См. [x](../a.md#раз).\n```\n";
+  assert.notDeepEqual(roadmapBlocks(ru).map(roadmapShape), roadmapBlocks(en).map(roadmapShape));
+  assert.deepEqual(roadmapShape(roadmapBlocks(ru)[0])[0].cards[0].links, ["../a.md"]); // anchors are translated, pages are not
+  assert.throws(() => roadmapBlocks(en.replace("next", "soon")), /status must be one of/);
 });
 
 test("the shape check catches a dropped table row", () => {

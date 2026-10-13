@@ -143,3 +143,12 @@ test("the real docs/ tree generates cleanly: every link resolves, every page end
     }
   }
 });
+
+test("a roadmap block reaches the wiki as headings and lists, its links rewritten", () => {
+  const block = "Intro.\n\n```roadmap\n- status: next\n  title: Next\n  meta: soon-ish\n  cards:\n    - title: Faster nodes\n      release: v9.9.9\n      tag: Preview\n      text: See [nodes](../guide/nodes.md).\n      points:\n        - \"`mistgate edge deploy` first\"\n```\n\n## After\n";
+  const r = build({ ...en, "start/two": page("Add: a node?", block) });
+  const t = get(r, "Add-a-node.md");
+  assert.match(t, /## Next\n\n\*soon-ish\*\n\n### Faster nodes\n\n`v9\.9\.9` · \*Preview\*\n\nSee \[nodes\]\(Nodes\)\.\n\n- `mistgate edge deploy` first\n\n## After/);
+  assert.doesNotMatch(t, /```roadmap|status: next/);
+  assert.deepEqual(r.errors, []);
+});

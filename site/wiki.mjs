@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import YAML from "yaml";
 import { parseNav } from "./src/markdown.mjs";
+import { expandRoadmap } from "./src/roadmap.mjs";
 import { SITE, GITHUB, LANGS, pageUrl, editUrl } from "./src/urls.mjs";
 
 const RAW = GITHUB.replace("github.com", "raw.githubusercontent.com");
@@ -78,7 +79,7 @@ export function parsePage(lang, key, rawText, warn = () => {}) {
     lang, key,
     title: String(fm.title ?? key.split("/").pop()).replace(/\s+/g, " ").trim(),
     description: String(fm.description ?? "").replace(/\s+/g, " ").trim(),
-    body: (m ? raw.slice(m[0].length) : raw).replace(/^\n+/, ""),
+    body: expandRoadmap(m ? raw.slice(m[0].length) : raw).replace(/^\n+/, ""), // the wiki shows a ```roadmap block as Markdown
   };
 }
 

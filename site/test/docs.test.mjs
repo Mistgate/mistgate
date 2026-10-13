@@ -35,6 +35,26 @@ test("the status page replaces the M2 roadmap page in both languages", () => {
   assert.ok(ru.includes("github.com/Mistgate/mistgate/edit/main/docs/ru/roadmap/status.md"));
 });
 
+test("the status page draws its roadmap block as phases with cards, listed and searchable", () => {
+  for (const [lang, base, phases, card] of [["en", "", ["Released", "Now", "Next", "Later", "Road to 1.0"], "Subscription mirrors"], ["ru", "/ru", ["Выпущено", "Сейчас", "Дальше", "Позже", "Путь к 1.0"], "Зеркала подписки"]]) {
+    const html = page(lang, "roadmap/status");
+    assert.ok(!html.includes("language-roadmap") && !html.includes("status: released"), `${lang}: the block is drawn, not shown as code`);
+    assert.deepEqual([...html.matchAll(/<li class="rm-phase" data-status="(\w+)">/g)].map((m) => m[1]), ["released", "now", "next", "later", "goal"]);
+    const h2 = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([^<]+)/g)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(h2.slice(0, 5).map((x) => x[1]), phases);
+    for (const [id] of h2.slice(0, 5)) assert.ok(html.includes(`<a href="#${id}">`), `${lang}: the phase strip links to #${id}`);
+    const toc = /<aside class="toc"[\s\S]*?<\/aside>/.exec(html)[0];
+    assert.ok(toc.includes(phases[2]) && !toc.includes(card), `${lang}: the table of contents lists phases, not cards`);
+    assert.ok(html.includes(`<h3 id=`) && html.includes(card));
+    assert.ok(html.includes(`href="${base}/getting-started/install-edge/"`), `${lang}: card links point to site pages`);
+    assert.ok(html.includes('<span class="rm-ver">v0.1.36</span>'));
+    const index = JSON.parse(readFileSync(join(dist, lang === "en" ? "search-index.json" : "ru/search-index.json"), "utf8")).find((p) => p.u === `${base}/roadmap/status/`);
+    assert.ok(index.h.some(([t]) => t === card), `${lang}: cards are in the search index`);
+    assert.ok(index.k.some(([c]) => c === "mistgate edge deploy"), `${lang}: names in cards are searchable`);
+    assert.ok(page(lang, "index").includes(`href="${base}/roadmap/status/"`), `${lang}: the home page links to the status page`);
+  }
+});
+
 test("the old M2 address redirects to the status page", () => {
   const redirects = readFileSync(join(dist, "_redirects"), "utf8");
   assert.ok(redirects.includes("/roadmap/m2-ssh-provisioning/ /roadmap/status/ 301"));

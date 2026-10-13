@@ -9,7 +9,7 @@ export const T = {
     skip: "Skip to content", menu: "Menu", closeMenu: "Close menu", navLabel: "Documentation", crumbs: "Breadcrumb",
     search: "Search docs", searchLabel: "Search the documentation", searchEmpty: "Nothing found. Try another word.", searchClose: "Close search", searchIn: "in",
     onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
-    language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet",
+    language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
     license: "Released under AGPL-3.0", other: "Other",
     inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", updates: "Updates", integrations: "Integrations", settings: "Settings" },
     notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
@@ -19,7 +19,7 @@ export const T = {
     skip: "К содержимому", menu: "Меню", closeMenu: "Закрыть меню", navLabel: "Документация", crumbs: "Навигация по разделам",
     search: "Поиск по документации", searchLabel: "Поиск по документации", searchEmpty: "Ничего не нашлось. Попробуйте другое слово.", searchClose: "Закрыть поиск", searchIn: "в",
     onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub",
-    language: "Язык", copy: "Копировать", copied: "Скопировано", table: "Таблица", plain: "Текст", diagram: "Схема", permalink: "Ссылка на раздел", pending: "Эта страница ещё не написана",
+    language: "Язык", copy: "Копировать", copied: "Скопировано", table: "Таблица", plain: "Текст", diagram: "Схема", permalink: "Ссылка на раздел", pending: "Эта страница ещё не написана", roadmap: "Этапы плана",
     license: "Лицензия AGPL-3.0", other: "Прочее",
     inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
@@ -138,7 +138,7 @@ export function renderDoc(ctx) {
   const { lang, t, page, nav, assets, switchUrl, alternates, prev, next, crumbGroup } = ctx;
   const isHome = page.key === "index";
   const st = pageStyle(page.key);
-  const toc = page.headings.filter((h) => h.level <= 3);
+  const toc = page.headings.filter((h) => h.level <= 3 && h.toc !== false);
   const showToc = !isHome && toc.length >= 2;
   const home = isHome ? renderLanding({ lang, t, nav, section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
