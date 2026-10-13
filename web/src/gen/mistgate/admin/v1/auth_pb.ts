@@ -49,7 +49,7 @@ export type GetLoginInfoResponse = Message<"mistgate.admin.v1.GetLoginInfoRespon
   accent: string;
 
   /**
-   * Default UI language, "en" or "ru".
+   * Default UI language, "en", "ru", or "zh".
    *
    * @generated from field: string language = 4;
    */

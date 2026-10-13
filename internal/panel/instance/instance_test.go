@@ -158,6 +158,10 @@ func TestDefaultsAndUpdate(t *testing.T) {
 	if err != nil || s.Language != "ru" || strings.Contains(s.LogoSVG, "script") || strings.Contains(s.LogoSVG, "onclick") || !strings.Contains(s.LogoSVG, "<path") {
 		t.Fatalf("logo update: %+v %v", s, err)
 	}
+	s, err = Update(ctx, st, Patch{Language: sp("zh")})
+	if err != nil || s.Language != "zh" {
+		t.Fatalf("Chinese language update: %+v %v", s, err)
+	}
 	got, _ := Load(ctx, st)
 	if got != s {
 		t.Fatalf("not persisted: %+v vs %+v", got, s)

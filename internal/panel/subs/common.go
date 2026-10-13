@@ -101,11 +101,13 @@ func (c *common) link(r *http.Request, token string) string {
 	return scheme + "://" + r.Host + c.prefix + "/" + token
 }
 
-// pageLang is the language of the page: the first of ru/en in Accept-Language, else the instance language.
+// pageLang is the first supported language in Accept-Language, else the instance language.
 func pageLang(r *http.Request, def string) string {
 	for _, part := range strings.Split(r.Header.Get("Accept-Language"), ",") {
 		tag, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(part)), ";")
 		switch {
+		case strings.HasPrefix(tag, "zh"):
+			return "zh"
 		case strings.HasPrefix(tag, "ru"):
 			return "ru"
 		case strings.HasPrefix(tag, "en"):

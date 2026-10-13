@@ -262,7 +262,11 @@ func newInstallTemplate(l pageLang) *template.Template {
 }
 
 // installPageTemplates holds the page once per language: the words differ, the markup does not.
-var installPageTemplates = map[pageLang]*template.Template{pageRU: newInstallTemplate(pageRU), pageEN: newInstallTemplate(pageEN)}
+var installPageTemplates = map[pageLang]*template.Template{
+	pageRU: newInstallTemplate(pageRU),
+	pageEN: newInstallTemplate(pageEN),
+	pageZH: newInstallTemplate(pageZH),
+}
 
 // PageHandler serves the Go-rendered SSH installation wizard. The HTTP server wraps it
 // in the same owner-only session and cross-origin protections as the admin API.
@@ -825,7 +829,7 @@ func userError(err error, fallback string) string {
 
 func (l pageLang) bytes(value uint64) string {
 	units := [...]string{"Б", "КБ", "МБ", "ГБ", "ТБ", "ПБ"}
-	if l == pageEN {
+	if l != pageRU {
 		units = [...]string{"B", "KB", "MB", "GB", "TB", "PB"}
 	}
 	const unit = uint64(1024)

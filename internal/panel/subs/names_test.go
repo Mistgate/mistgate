@@ -19,6 +19,36 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
+func TestChineseStateNotesUseEnglishPlaceholders(t *testing.T) {
+	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	sep29, oct10, jan5 := time.Date(2026, 9, 29, 9, 0, 0, 0, time.UTC), time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC), time.Date(2027, 1, 5, 0, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		view access.SubView
+		want string
+	}{
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "Subscription ended on 29 September. Message us to renew"},
+		{access.SubView{Status: access.StatusExpired}, "Subscription ended. Message us to renew"},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "Traffic used up, resets on 10 October"},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "Traffic used up, resets on 5 January 2027"},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetNone}, "Traffic used up. Message us to raise the limit"},
+		{access.SubView{Status: access.StatusDisabled}, "Access paused"},
+	} {
+		if got := stateNote(c.view, "zh", now); got != c.want {
+			t.Errorf("Chinese state note = %q, want English placeholder %q", got, c.want)
+		}
+	}
+}
+
+func TestMihomoOnlyNoteUsesEnglishPlaceholderForChinese(t *testing.T) {
+	v := access.SubView{
+		Status: access.StatusActive,
+		Nodes:  []access.SubNode{{Conns: []access.SubConn{{MihomoOnly: true}}}},
+	}
+	if got := mihomoOnlyNote(v, "zh"); got != "These servers work only in kl!ck and other Mihomo apps" {
+		t.Errorf("Chinese notice = %q, want English placeholder", got)
+	}
+}
+
 func TestFlagEmoji(t *testing.T) {
 	for cc, want := range map[string]string{"DE": "\U0001F1E9\U0001F1EA", "de": "\U0001F1E9\U0001F1EA", " nl ": "\U0001F1F3\U0001F1F1", "": "", "D": "", "DEU": "", "1A": "", "д": ""} {
 		if got := flagEmoji(cc); got != want {
@@ -40,6 +70,27 @@ func TestCountryName(t *testing.T) {
 	} {
 		if got := access.CountryName(c.cc, c.lang); got != c.want {
 			t.Errorf("CountryName(%q, %q) = %q, want %q", c.cc, c.lang, got, c.want)
+		}
+	}
+	if got := access.CountryName("DE", "zh"); got == "DE" || got == "Germany" {
+		t.Errorf("CountryName(%q, %q) = %q, want a localized country name", "DE", "zh", got)
+	}
+}
+
+func TestSubscriptionPageLanguage(t *testing.T) {
+	for _, c := range []struct {
+		accept, def, want string
+	}{
+		{"zh-CN,zh;q=0.9,en;q=0.8", "ru", "zh"},
+		{"de-DE,zh-Hant;q=0.8", "en", "zh"},
+		{"ru-RU,zh-CN;q=0.8", "en", "ru"},
+		{"fr-FR", "zh", "zh"},
+		{"", "", "en"},
+	} {
+		r := httptest.NewRequest("GET", "https://example.com/", nil)
+		r.Header.Set("Accept-Language", c.accept)
+		if got := pageLang(r, c.def); got != c.want {
+			t.Errorf("pageLang(%q, %q) = %q, want %q", c.accept, c.def, got, c.want)
 		}
 	}
 }
@@ -255,6 +306,7 @@ func TestStateNote(t *testing.T) {
 	}{
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "ru", "Подписка закончилась 29 сентября. Напишите — продлим"},
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "en", "Subscription ended on 29 September. Message us to renew"},
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "zh", "Subscription ended on 29 September. Message us to renew"},
 		{access.SubView{Status: access.StatusExpired}, "ru", "Подписка закончилась. Напишите — продлим"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "ru", "Трафик закончился, обнулится 10 октября"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "ru", "Трафик закончился, обнулится 5 января 2027"},

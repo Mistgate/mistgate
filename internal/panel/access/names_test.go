@@ -14,6 +14,12 @@ import (
 
 // Keys are named like the page's server list: the country and the location, "Server", a number on a repeat. The panel's
 // node name (de1, "ノード") never shows: the user page and the user's apps get these names.
+func TestServerLabelerUsesEnglishPlaceholderForChinese(t *testing.T) {
+	if got := ServerLabeler("zh")("", ""); got != "Server" {
+		t.Errorf("Chinese generic server name = %q, want English placeholder", got)
+	}
+}
+
 func TestKeyNames(t *testing.T) {
 	n := func(name, cc, location string) store.AccessNode {
 		return store.AccessNode{Name: name, CountryCode: cc, Location: location}

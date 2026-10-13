@@ -9,6 +9,42 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+func TestChineseTelegramMessagesUseEnglishPlaceholders(t *testing.T) {
+	if got := L("zh").pick("Node is unreachable", "Нода недоступна", ""); got != "Node is unreachable" {
+		t.Errorf("Chinese fallback = %q, want English placeholder", got)
+	}
+	if got := L("zh").pick("English", "Russian", "Chinese placeholder"); got != "Chinese placeholder" {
+		t.Errorf("Chinese text = %q, want the Chinese variant", got)
+	}
+	a := store.HealthAlert{Kind: "node_down"}
+	if got := alertTitle("zh", a); got != "Node is unreachable" {
+		t.Errorf("Chinese alert title = %q, want English placeholder", got)
+	}
+}
+
+func TestTelegramMessageTablesHaveAllLanguageTexts(t *testing.T) {
+	tables := []struct {
+		name   string
+		values map[string]localizedText
+	}{
+		{"checkTitles", checkTitles},
+		{"whyVariants", whyVariants},
+		{"torrentEvidence", torrentEvidence},
+		{"backupReasons", backupReasons},
+		{"toolTitles", toolTitles},
+	}
+	for _, table := range tables {
+		for key, text := range table.values {
+			if text.en == "" || text.ru == "" || text.zh == "" {
+				t.Errorf("%s[%q] is missing a language text: %+v", table.name, key, text)
+			}
+		}
+	}
+	if got := (localizedText{en: "English", ru: "Russian"}).forLanguage("zh"); got != "English" {
+		t.Errorf("missing Chinese text fallback = %q, want English", got)
+	}
+}
+
 // A re-opened alert keeps its row: first_seen is the first episode, opened_at the current one. The resolve message counts
 // its duration from opened_at, and both messages say "again" with the time of the first episode; a plain alert says neither.
 func TestReopenedAlertCountsFromItsEpisodeAndSaysAgain(t *testing.T) {

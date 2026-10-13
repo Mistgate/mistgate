@@ -228,6 +228,7 @@ func TestPresetWordsForThePage(t *testing.T) {
 	}{
 		{stock, "ru", "AdGuard: без рекламы", "AdGuard DNS: без рекламы и трекеров"},
 		{stock, "en", "AdGuard: no ads", "AdGuard DNS: no ads, no trackers"},
+		{stock, "zh", "AdGuard: no ads", "AdGuard DNS: no ads, no trackers"},
 		{Preset{ID: "dns_builtin_adblock", Name: "Мой блок", Description: "Моё\nMine", Builtin: true}, "en", "Мой блок", "Mine"},
 		{Preset{ID: "dns_abc", Name: "Домашний", Description: "Только у меня"}, "en", "Домашний", "Только у меня"},
 		{Preset{ID: "dns_abc", Name: "Home", Description: "line one\nline two"}, "ru", "Home", "line one\nline two"},
@@ -238,6 +239,15 @@ func TestPresetWordsForThePage(t *testing.T) {
 		}
 		if got := c.p.DescriptionIn(c.lang); got != c.descr {
 			t.Errorf("%s/%s description %q, want %q", c.p.ID, c.lang, got, c.descr)
+		}
+	}
+}
+
+func TestChineseBuiltInNamesHavePlaceholders(t *testing.T) {
+	for id, names := range builtinNames {
+		p := Preset{ID: id, Name: names.ru, Builtin: true}
+		if got := p.NameIn("zh"); got == "" {
+			t.Errorf("%s has no Chinese name placeholder", id)
 		}
 	}
 }

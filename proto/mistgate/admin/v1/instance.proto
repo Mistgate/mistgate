@@ -21,7 +21,7 @@ message Instance {
   string brand_tail = 2;
   // "#rrggbb", lower case.
   string accent = 3;
-  // Default UI language for new browsers, "en" or "ru".
+  // Default UI language for new browsers: "en", "ru", or "zh".
   string language = 4;
   // A custom logo is set (GET brand/logo.svg).
   bool has_logo = 5;
@@ -46,7 +46,7 @@ message UpdateInstanceRequest {
   optional string brand_tail = 2;
   // "#rrggbb".
   optional string accent = 3;
-  // "en" or "ru".
+  // "en", "ru", or "zh".
   optional string language = 4;
   // SVG source, at most 64 KB. It is sanitised on the way in: scripts, foreign objects,
   // event handlers, links, animation and external references are removed. "" removes the logo.

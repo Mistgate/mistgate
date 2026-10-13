@@ -29,7 +29,7 @@ type Instance struct {
 	BrandTail string `protobuf:"bytes,2,opt,name=brand_tail,json=brandTail,proto3" json:"brand_tail,omitempty"`
 	// "#rrggbb", lower case.
 	Accent string `protobuf:"bytes,3,opt,name=accent,proto3" json:"accent,omitempty"`
-	// Default UI language for new browsers, "en" or "ru".
+	// Default UI language for new browsers: "en", "ru", or "zh".
 	Language string `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
 	// A custom logo is set (GET brand/logo.svg).
 	HasLogo bool `protobuf:"varint,5,opt,name=has_logo,json=hasLogo,proto3" json:"has_logo,omitempty"`
@@ -217,7 +217,7 @@ type UpdateInstanceRequest struct {
 	BrandTail *string `protobuf:"bytes,2,opt,name=brand_tail,json=brandTail,proto3,oneof" json:"brand_tail,omitempty"`
 	// "#rrggbb".
 	Accent *string `protobuf:"bytes,3,opt,name=accent,proto3,oneof" json:"accent,omitempty"`
-	// "en" or "ru".
+	// "en", "ru", or "zh".
 	Language *string `protobuf:"bytes,4,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	// SVG source, at most 64 KB. It is sanitised on the way in: scripts, foreign objects,
 	// event handlers, links, animation and external references are removed. "" removes the logo.
