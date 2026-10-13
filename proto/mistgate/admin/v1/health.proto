@@ -121,6 +121,11 @@ enum AlertKind {
   // from the latest verdict of that port, not the sticky one: it resolves when a re-check is clean or the inbound moves
   // to another port.
   ALERT_KIND_PORT_LOSSY = 16;
+  // A person was refused because they are at their device limit (an app asked for a new device and got the "limit
+  // reached" entry instead of servers), in the last 24 hours. WARNING. node_id = "", subject = user id, params{user_id,
+  // user_name, used, limit, count, last_unix}. Open while a refusal is under 24 hours old; in TRACK mode nobody is refused,
+  // so the events it writes stay history and raise nothing.
+  ALERT_KIND_DEVICE_LIMIT = 17;
 }
 
 message Alert {

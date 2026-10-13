@@ -180,6 +180,7 @@ const knownValues: Record<string, MessageKey> = {
   "they can connect again": "approval.value.enable",
   "the node restarts its agent": "approval.value.restart",
   "the device is disconnected and must be set up again": "approval.value.device",
+  "the device is disconnected and cannot come back until it is unblocked in the admin panel": "approval.value.device_blocked",
   pause: "approval.value.pause",
   resume: "approval.value.resume",
   cancel: "approval.value.cancel",

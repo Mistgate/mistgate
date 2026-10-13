@@ -269,7 +269,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	var limit *store.AccessLimitError
 	switch {
 	case errors.As(err, &limit):
-		if eventErr := s.st.RecordDeviceLimitReached(ctx, u.ID, limit.Used, limit.Limit, now); eventErr != nil {
+		if eventErr := s.st.RecordDeviceLimitReached(ctx, u.ID, limit.Used, limit.Limit, limit.Mode, true, now); eventErr != nil {
 			s.log.Warn("access: device limit event", "user", u.ID, "err", eventErr)
 		}
 		return store.AccessAWGDevice{}, nil, failed("device_limit: %d/%d%s", limit.Used, limit.Limit, s.limitDevices(ctx, u.ID))

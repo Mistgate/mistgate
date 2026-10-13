@@ -266,7 +266,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("user_devices", ProfileReadonly, procs(adminv1connect.UserServiceGetUserProcedure),
-			"A user's devices: platform, model, last seen, online, and the AWG profile, version and tunnel address. Never a key or a config.",
+			"A user's devices: kind, platform, model, OS version, app, traffic, last seen, online and on which nodes (two: one device on two servers), the fingerprint of its ID, the AWG profile, version and tunnel address, and the blocked devices. Never a key or a config.",
 			func(c *call, in userArg) (any, error) {
 				r, err := c.getUser(in.UserID)
 				if err != nil {

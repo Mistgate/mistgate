@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -73,7 +72,11 @@ type AccessDevice struct {
 	ID, UserID, Platform, Model, OSVersion string
 	Client                                 string // the app: first token of its User-Agent
 	Kind                                   string // DeviceKindLink or DeviceKindKey; read back by scanAccessDevice, set on insert by AWG
-	Implicit                               bool   // hwid_hash IS NULL
+	UsedBytes                              uint64 // all-time traffic of the device (device.used_bytes)
+	// Fingerprint is the first 6 hex characters of a link device's hash, to tell two phones of one model apart; empty for the
+	// shared device and for keys.
+	Fingerprint string
+	Implicit    bool // hwid_hash IS NULL
 	// HWIDHash is the hash of the device's HWID (HWIDHash): set for a link device that reported one, nil for the shared
 	// device. A request's device is looked up by it (EnsureLinkDevice, SubscriptionData).
 	HWIDHash []byte
@@ -277,6 +280,7 @@ type AccessUserQuery struct {
 	Offset            int    // rows skipped after After, for numbered pages
 	Limit             int
 	OnlineIDs         []string // users currently online (fleet), for the "online" filter and its count
+	OnlineDeviceIDs   []string // devices with a session now (fleet), for the devices_online count of subscription devices
 	Now               time.Time
 	DeviceOnlineAfter time.Time // AWG devices with a newer handshake count as online
 }
@@ -310,9 +314,9 @@ func accLike(s string) string {
 }
 
 // The grouped CTE counts each live device once: the join with the credentials is grouped by device. Online, AmneziaWG
-// devices follow their latest handshake; subscription devices count at most one per person who is online, because the
-// nodes report who is online, not which device yet, and a person with four HWID apps and one in use is not four online.
-// The user scope keeps the aggregate bounded by the same query and group_id as the people counts.
+// key devices follow their latest handshake; subscription devices follow their sessions (the nodes say which credential a
+// session uses, so a person with four HWID apps and one in use has one device online). The user scope keeps the aggregate
+// bounded by the same query and group_id as the people counts.
 func accUserDeviceCountsCTE(base string) string {
 	return `live_devices AS (
 		SELECT d.id, d.user_id, d.last_seen_at,
@@ -326,8 +330,8 @@ func accUserDeviceCountsCTE(base string) string {
 		 GROUP BY d.id
 	), device_counts AS (
 		SELECT user_id, count(*) AS devices_used,
-		   sum(CASE WHEN is_awg = 1 AND last_seen_at > ? THEN 1 ELSE 0 END) +
-		   max(CASE WHEN is_awg = 0 AND user_id IN (SELECT value FROM json_each(?)) THEN 1 ELSE 0 END) AS devices_online
+		   sum(CASE WHEN is_awg = 1 AND last_seen_at > ? THEN 1
+		            WHEN is_awg = 0 AND id IN (SELECT value FROM json_each(?)) THEN 1 ELSE 0 END) AS devices_online
 		 FROM live_devices GROUP BY user_id
 	)`
 }
@@ -381,7 +385,7 @@ func accUserListQuery(q AccessUserQuery, base string, baseArgs []any, lconds str
 	if needsDeviceCounts {
 		query = `WITH ` + accUserDeviceCountsCTE(base) + ` ` + query
 		cteArgs := append([]any{}, baseArgs...)
-		cteArgs = append(cteArgs, unix(q.DeviceOnlineAfter), online)
+		cteArgs = append(cteArgs, unix(q.DeviceOnlineAfter), accJSON(q.OnlineDeviceIDs))
 		queryArgs = append(cteArgs, queryArgs...)
 	}
 	limit := q.Limit
@@ -412,7 +416,7 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	deviceCTE := accUserDeviceCountsCTE(base)
 	var counts AccessUserCounts
 	countArgs := append([]any{}, args...)
-	countArgs = append(countArgs, unix(q.DeviceOnlineAfter), online, online, now, soon)
+	countArgs = append(countArgs, unix(q.DeviceOnlineAfter), accJSON(q.OnlineDeviceIDs), online, now, soon)
 	countArgs = append(countArgs, args...)
 	err := a.s.R.QueryRowContext(ctx,
 		`WITH `+deviceCTE+`
@@ -616,6 +620,8 @@ type SubscriptionData struct {
 	Group     AccessGroup
 	Inbounds  []AccessInboundFull
 	LiveNodes []NodeLiveRow
+	// OnlineDevices maps each device of the user that has a session on a connected node to those nodes (node order).
+	OnlineDevices map[string][]string
 }
 
 type subscriptionTraffic struct{ Up, Down uint64 }
@@ -623,14 +629,21 @@ type subscriptionTraffic struct{ Up, Down uint64 }
 func scanSubscriptionNodeLive(r rowScanner) (NodeLiveRow, error) {
 	var row NodeLiveRow
 	var liveNodeID sql.NullString
-	var connected, userOnline int64
-	if err := r.Scan(&row.NodeID, &liveNodeID, &row.SampleAt, &row.RxBps, &row.TxBps, &row.CPUPct, &connected, &userOnline); err != nil {
+	var connected int64
+	if err := r.Scan(&row.NodeID, &liveNodeID, &row.SampleAt, &row.RxBps, &row.TxBps, &row.CPUPct, &connected); err != nil {
 		return NodeLiveRow{}, err
 	}
 	row.Exists = liveNodeID.Valid
 	row.Connected = connected != 0
-	row.UserOnline = userOnline != 0
 	return row, nil
+}
+
+type onlineDevice struct{ device, node string }
+
+func scanOnlineDevice(r rowScanner) (onlineDevice, error) {
+	var o onlineDevice
+	err := r.Scan(&o.device, &o.node)
+	return o, err
 }
 
 func scanSubscriptionTraffic(r rowScanner) (subscriptionTraffic, error) {
@@ -643,13 +656,14 @@ func scanSubscriptionTraffic(r rowScanner) (subscriptionTraffic, error) {
 
 func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	var d AccessDevice
-	var id, userID, kind, platform, model, osVersion, client, protocols sql.NullString
-	var implicit, first, last, created sql.NullInt64
-	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols); err != nil {
+	var id, userID, kind, platform, model, osVersion, client, protocols, fingerprint sql.NullString
+	var implicit, first, last, created, used sql.NullInt64
+	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols, &used, &fingerprint); err != nil {
 		return AccessDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
 	d.Kind, d.Client = kind.String, client.String
+	d.UsedBytes, d.Fingerprint = uint64(max(used.Int64, 0)), fingerprint.String
 	d.Implicit = implicit.Int64 == 1
 	if first.Valid && first.Int64 != 0 {
 		d.FirstSeenAt = fromUnix(first.Int64)
@@ -764,11 +778,12 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var groupProfileIDs []string
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
+	var online []onlineDevice
 	r := reads{}
 	r.add(oneRow(&traffic, scanSubscriptionTraffic), `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
 	r.add(appendRows(&devices, scanAccessDevice), `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
-			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols
+			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols`+accDeviceTail+`
 			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive+` ORDER BY d.created_at, d.id`, userID)
 	r.add(appendRows(&awgDevices, scanAWGDevice), `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig
@@ -791,14 +806,17 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
 	}
-	path, _ := json.Marshal(userID)
 	r.add(appendRows(&liveNodes, scanSubscriptionNodeLive), `SELECT n.id AS node_id,
 		l.node_id AS live_node_id, coalesce(l.sample_at, 0) AS sample_at, coalesce(l.rx_bps, 0) AS rx_bps,
 		coalesce(l.tx_bps, 0) AS tx_bps, coalesce(l.cpu_pct, 0) AS cpu_pct,
-		(l.node_id IS NOT NULL AND n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s) AS connected,
-		(l.node_id IS NOT NULL AND n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s AND json_extract(l.users, ?) IS NOT NULL) AS user_online
-		FROM node AS n LEFT JOIN node_live AS l ON l.node_id = n.id WHERE n.state <> 'retired' ORDER BY n.id`,
-		unix(now), unix(now), "$."+string(path))
+		(l.node_id IS NOT NULL AND n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s) AS connected
+		FROM node AS n LEFT JOIN node_live AS l ON l.node_id = n.id WHERE n.state <> 'retired' ORDER BY n.id`, unix(now))
+	// Which of the person's devices have a session: the devices of a node are only the ones online, so the scan is as long as
+	// the people online, and the join with the person's devices keeps the rows to theirs.
+	r.add(appendRows(&online, scanOnlineDevice), `SELECT j.key AS device_id, l.node_id AS node_id
+		FROM node AS n JOIN node_live AS l ON l.node_id = n.id, json_each(l.devices) AS j
+		WHERE n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s
+		  AND j.key IN (SELECT id FROM device WHERE user_id = ? AND revoked_at IS NULL) ORDER BY n.id, j.key`, unix(now), userID)
 	if err := r.run(ctx, a.s); err != nil {
 		return SubscriptionData{}, err
 	}
@@ -806,6 +824,12 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
 		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
 		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
+	if len(online) > 0 {
+		out.OnlineDevices = make(map[string][]string, len(online))
+		for _, o := range online {
+			out.OnlineDevices[o.device] = append(out.OnlineDevices[o.device], o.node)
+		}
+	}
 	if active {
 		out.Group.ProfileIDs = groupProfileIDs
 	}
@@ -906,6 +930,9 @@ func (a Access) NodeTraffic(ctx context.Context, userID string, since time.Time)
 
 // ---- devices and credentials ----
 
+// accDeviceTail is what scanAccessDevice reads after the protocols: the device's traffic and its fingerprint.
+const accDeviceTail = `, d.used_bytes, CASE WHEN d.kind = 'link' THEN lower(hex(substr(d.hwid_hash, 1, 3))) ELSE '' END`
+
 // accDeviceLive is the SQL condition "device d holds a live credential".
 const accDeviceLive = `EXISTS (SELECT 1 FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL)`
 
@@ -918,7 +945,7 @@ func (a Access) Devices(ctx context.Context, userID string) ([]AccessDevice, err
 func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool) ([]AccessDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client, d.first_seen_at, d.last_seen_at, d.created_at,
-		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')
+		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail+`
 		 FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND (? = 0 OR `+accDeviceLive+`) ORDER BY d.created_at, d.id`,
 		userID, accBool(withCredsOnly))
 	if err != nil {

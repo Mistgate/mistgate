@@ -334,6 +334,9 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 	for id := range s.online.OnlineUsers() {
 		q.OnlineIDs = append(q.OnlineIDs, id)
 	}
+	for id := range s.online.OnlineDevices() {
+		q.OnlineDeviceIDs = append(q.OnlineDeviceIDs, id)
+	}
 	if m.PageToken != "" {
 		if q.Sort != store.AccessUserSortUnspecified && q.Sort != store.AccessUserSortName {
 			return nil, invalid("page token requires name sort")
@@ -392,14 +395,23 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 	for _, d := range awgDevs {
 		awgByID[d.ID] = d
 	}
+	onlineDevices := s.online.OnlineDevices()
 	for _, d := range devs {
 		if ad, ok := awgByID[d.ID]; ok {
-			resp.Devices = append(resp.Devices, s.deviceProto(ad))
+			dev := s.deviceProto(ad)
+			dev.UsedBytes = d.UsedBytes
+			resp.Devices = append(resp.Devices, dev)
 			continue
 		}
+		kind := adminv1.DeviceKind_DEVICE_KIND_LINK
+		if d.Implicit {
+			kind = adminv1.DeviceKind_DEVICE_KIND_LINK_SHARED
+		}
+		nodes := onlineDevices[d.ID]
 		resp.Devices = append(resp.Devices, &adminv1.Device{
 			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
-			Online: protos[0].Online, Protocols: d.Protocols,
+			Online: len(nodes) > 0, Protocols: d.Protocols, Kind: kind, OsVersion: d.OSVersion, Client: d.Client, UsedBytes: d.UsedBytes,
+			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint,
 		})
 	}
 

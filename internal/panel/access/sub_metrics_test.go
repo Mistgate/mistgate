@@ -10,6 +10,8 @@ type subscriptionOnline struct{ users map[string]string }
 
 func (s subscriptionOnline) OnlineUsers() map[string]string { return s.users }
 
+func (s subscriptionOnline) OnlineDevices() map[string][]string { return nil }
+
 func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
@@ -34,24 +36,27 @@ func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	}
 	e.s.online = subscriptionOnline{users: map[string]string{}}
 	created := e.user("alice", f.group, nil).User
-	users, err := json.Marshal(map[string]int64{created.Id: e.clock.Unix()})
+	// the person's device has a session on the first node; the second node has one of somebody else's
+	other := e.user("bob", f.group, nil).User
+	var own, foreign string
+	for id, dest := range map[string]*string{created.Id: &own, other.Id: &foreign} {
+		if err := e.st.R.QueryRowContext(e.ctx, `SELECT id FROM device WHERE user_id = ?`, id).Scan(dest); err != nil {
+			t.Fatal(err)
+		}
+	}
+	devices, err := json.Marshal(map[string]int64{own: e.clock.Unix(), "dev_gone": 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.sql(`UPDATE node_live SET users = ? WHERE node_id = ?`, string(users), f.nodeID)
+	e.sql(`UPDATE node_live SET devices = ? WHERE node_id = ?`, string(devices), f.nodeID)
+	e.sql(`UPDATE node_live SET devices = ? WHERE node_id = 'nod_nl1'`, `{"`+foreign+`":1}`)
 	user := must(e.st.Access().User(e.ctx, created.Id))
 	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.GroupID, user.PeriodStart, true, e.clock, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	foundOnline := false
-	for _, live := range data.LiveNodes {
-		if live.NodeID == f.nodeID {
-			foundOnline = live.UserOnline
-		}
-	}
-	if !foundOnline {
-		t.Fatalf("subscription live rows did not find the user key: %+v", data.LiveNodes)
+	if got := data.OnlineDevices; len(got) != 1 || len(got[own]) != 1 || got[own][0] != f.nodeID {
+		t.Fatalf("online devices = %v, want only the person's own device on %s", got, f.nodeID)
 	}
 
 	view, err := e.s.subView(e.ctx, user, false, SubOptions{})

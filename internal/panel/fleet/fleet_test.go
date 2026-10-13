@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -425,6 +426,31 @@ func TestStatsSequenceDedup(t *testing.T) {
 	if ou := e.f.OnlineUsers(); len(ou) != 2 || ou["usr_alice"] != a.nodeID || ou["usr_erin"] != a.nodeID {
 		t.Errorf("OnlineUsers %v", ou)
 	}
+	// Per device: the sessions name the devices of the credentials (alice's hysteria2 one and erin's), and the traffic of each
+	// credential is added to its own device, the foreign data skipped as for the person.
+	var aliceDev, aliceWgDev, erinDev string
+	for cred, dest := range map[string]*string{"crd_alice_hy": &aliceDev, "crd_alice_wg": &aliceWgDev, "crd_erin_hy": &erinDev} {
+		if err := e.st.R.QueryRow(`SELECT device_id FROM device_credential WHERE id = ?`, cred).Scan(dest); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if od := e.f.OnlineDevices(); len(od) != 2 || !slices.Equal(od[aliceDev], []string{a.nodeID}) || !slices.Equal(od[erinDev], []string{a.nodeID}) {
+		t.Errorf("OnlineDevices %v, want %s and %s on %s", od, aliceDev, erinDev, a.nodeID)
+	}
+	deviceBytes := func(id string) (n int64) {
+		e.st.R.QueryRow(`SELECT used_bytes FROM device WHERE id = ?`, id).Scan(&n)
+		return
+	}
+	wantAlice := int64(6000)
+	if aliceWgDev == aliceDev {
+		wantAlice = 6003
+	}
+	if got := deviceBytes(aliceDev); got != wantAlice {
+		t.Errorf("alice's device used_bytes %d, want %d", got, wantAlice)
+	}
+	if got := deviceBytes(erinDev); got != 0 {
+		t.Errorf("erin's device used_bytes %d, want 0 (sessions, no traffic)", got)
+	}
 
 	// The same batch resent after a reconnect of the same instance: counted once, acked again.
 	c.st.CloseRequest()
@@ -441,6 +467,9 @@ func TestStatsSequenceDedup(t *testing.T) {
 	}
 	if up, down := bytes(); up != 1001 || down != 5002 {
 		t.Errorf("duplicate was counted: up %d down %d", up, down)
+	}
+	if got := deviceBytes(aliceDev); got != wantAlice {
+		t.Errorf("duplicate was counted on the device: %d, want %d", got, wantAlice)
 	}
 	// A new message continues the count.
 	c2.send(2, batch(10, 20))

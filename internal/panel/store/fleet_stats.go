@@ -83,6 +83,11 @@ type fleetStatsUserWrite struct {
 	Bytes  int64  `json:"bytes"`
 }
 
+type fleetStatsDeviceWrite struct {
+	DeviceID string `json:"device_id"`
+	Bytes    int64  `json:"bytes"`
+}
+
 type fleetInboundCertWrite struct {
 	InboundID string `json:"inbound_id"`
 	Pin       string `json:"pin"`
@@ -185,6 +190,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		perBucket := map[bucketKey]*fleetStatsSums{}
 		perProto := map[string]*fleetStatsSums{}
 		perUser := map[string]uint64{}
+		perDevice := map[string]uint64{}
 		for _, d := range in.Traffic {
 			ref, ok := creds[d.CredID]
 			if !ok && probes[d.CredID] {
@@ -208,6 +214,9 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			perProto[ref.Protocol].up = satAdd(perProto[ref.Protocol].up, up)
 			perProto[ref.Protocol].down = satAdd(perProto[ref.Protocol].down, down)
 			perUser[ref.UserID] = satAdd(perUser[ref.UserID], satAdd(up, down))
+			if ref.DeviceID != "" {
+				perDevice[ref.DeviceID] = satAdd(perDevice[ref.DeviceID], satAdd(up, down))
+			}
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.
@@ -267,6 +276,15 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			userWrites = append(userWrites, fleetStatsUserWrite{UserID: uid, Bytes: i64(perUser[uid])})
 			out.Users = append(out.Users, uid)
 		}
+		deviceIDs := make([]string, 0, len(perDevice))
+		for id := range perDevice {
+			deviceIDs = append(deviceIDs, id)
+		}
+		sort.Strings(deviceIDs)
+		deviceWrites := make([]fleetStatsDeviceWrite, 0, len(deviceIDs))
+		for _, id := range deviceIDs {
+			deviceWrites = append(deviceWrites, fleetStatsDeviceWrite{DeviceID: id, Bytes: i64(perDevice[id])})
+		}
 		certByInbound := make(map[string]FleetInboundCert, len(in.Certs))
 		for _, cert := range in.Certs {
 			certByInbound[cert.InboundID] = cert
@@ -306,7 +324,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			seenAt := touchAtByDevice[id]
 			touchWrites = append(touchWrites, fleetDeviceTouchWrite{DeviceID: id, LastSeenAt: seenAt, NotAfter: seenAt})
 		}
-		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, certWrites, touchWrites, live)
+		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites, touchWrites, live)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +337,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 }
 
 func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets []fleetStatsBucketWrite,
-	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, certs []fleetInboundCertWrite,
+	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, devices []fleetStatsDeviceWrite, certs []fleetInboundCertWrite,
 	touches []fleetDeviceTouchWrite, live FleetLive) ([]Stmt, error) {
 	bucketJSON, err := json.Marshal(buckets)
 	if err != nil {
@@ -330,6 +348,10 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		return nil, err
 	}
 	userJSON, err := json.Marshal(users)
+	if err != nil {
+		return nil, err
+	}
+	deviceJSON, err := json.Marshal(devices)
 	if err != nil {
 		return nil, err
 	}
@@ -372,6 +394,10 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 				last_seen_at = ?2, last_node_id = ?3
 			FROM json_each(?1) AS change
 			WHERE user.id = json_extract(change.value, '$.user_id')`, Args: []any{string(userJSON), unix(in.Now), in.NodeID}},
+		{Query: `
+			UPDATE device SET used_bytes = used_bytes + CAST(json_extract(change.value, '$.bytes') AS INTEGER)
+			FROM json_each(?1) AS change
+			WHERE device.id = json_extract(change.value, '$.device_id')`, Args: []any{string(deviceJSON)}},
 		certStmt,
 		touchStmt,
 		liveStmt,
@@ -387,14 +413,17 @@ func nodeLiveStatsStmt(nodeID string, session uint64, live FleetLive) (Stmt, err
 	if live.UsersJSON == "" {
 		live.UsersJSON = "{}"
 	}
+	if live.DevicesJSON == "" {
+		live.DevicesJSON = "{}"
+	}
 	if live.LiveJSON == "" {
 		live.LiveJSON = "{}"
 	}
 	return Stmt{Query: `
-		UPDATE node_live SET drift = ?, sample_at = ?, rx_bps = ?, tx_bps = ?, cpu_pct = ?, users = ?, live_json = ?
+		UPDATE node_live SET drift = ?, sample_at = ?, rx_bps = ?, tx_bps = ?, cpu_pct = ?, users = ?, devices = ?, live_json = ?
 		WHERE node_id = ? AND session = ? AND ? = 1`,
 		Args: []any{boolInt(live.Drift), live.SampleAt, int64(live.RxBps), int64(live.TxBps),
-			live.CPUPct, live.UsersJSON, live.LiveJSON, nodeID, sessionID, boolInt(live.Apply)}}, nil
+			live.CPUPct, live.UsersJSON, live.DevicesJSON, live.LiveJSON, nodeID, sessionID, boolInt(live.Apply)}}, nil
 }
 
 func inboundCertsStmt(nodeID string, now time.Time, certs []fleetInboundCertWrite) (Stmt, error) {

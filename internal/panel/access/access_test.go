@@ -27,9 +27,29 @@ type fakeNotify struct{ n atomic.Int32 }
 
 func (f *fakeNotify) StateChanged() { f.n.Add(1) }
 
+// fakeOnline maps a user id to the node of their session, and a device id ("dev_...") to the nodes, comma separated, that
+// have a session of it.
 type fakeOnline map[string]string
 
-func (f fakeOnline) OnlineUsers() map[string]string { return f }
+func (f fakeOnline) OnlineUsers() map[string]string {
+	out := map[string]string{}
+	for id, node := range f {
+		if !strings.HasPrefix(id, "dev_") {
+			out[id] = node
+		}
+	}
+	return out
+}
+
+func (f fakeOnline) OnlineDevices() map[string][]string {
+	out := map[string][]string{}
+	for id, nodes := range f {
+		if strings.HasPrefix(id, "dev_") {
+			out[id] = strings.Split(nodes, ",")
+		}
+	}
+	return out
+}
 
 type env struct {
 	t      *testing.T

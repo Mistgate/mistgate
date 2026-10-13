@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -317,10 +318,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	slices.SortStableFunc(data.Inbounds, compareSubscriptionInbounds)
 	liveByNode := make(map[string]store.NodeLiveRow, len(data.LiveNodes))
-	userOnline := false
 	for _, live := range data.LiveNodes {
 		liveByNode[live.NodeID] = live
-		userOnline = userOnline || live.UserOnline
 	}
 	v.Up = min(data.Up, u.UsedBytes) // used_bytes is authoritative; the buckets only give the split
 	v.Down = u.UsedBytes - v.Up
@@ -330,7 +329,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		awgByID[d.ID] = d
 	}
 	for _, d := range devs {
-		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && userOnline}
+		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && len(data.OnlineDevices[d.ID]) > 0}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
 				if happ, amnezia, _ := clientApps(p); happ {
@@ -642,8 +641,10 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 	case errors.Is(err, store.ErrNoSharedDevice):
 		return RefusalNoDeviceID, false
 	case errors.As(err, &limit):
-		s.limitReached(u.ID, limit.Used, u.DeviceLimit)
-		if limit.Mode == store.LinkModeTrack {
+		// TRACK refuses nobody: the app takes the shared place, and the event is a sighting. ENFORCE and STRICT turn it away.
+		refused := limit.Mode != store.LinkModeTrack
+		s.limitReached(u.ID, limit.Used, u.DeviceLimit, limit.Mode, refused)
+		if !refused {
 			return "", true
 		}
 		return RefusalDeviceLimit, false
@@ -655,16 +656,16 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 // devices than the limit is an event for the owner to see. A place that a silent device gave away is no such case.
 func (s *Service) placed(u store.AccessUser, data store.SubscriptionData, res store.LinkDeviceResult) {
 	if res.Born && u.DeviceLimit > 0 && res.Replaced == "" && len(data.Devices) >= u.DeviceLimit {
-		s.limitReached(u.ID, len(data.Devices)+1, u.DeviceLimit)
+		s.limitReached(u.ID, len(data.Devices)+1, u.DeviceLimit, data.LinkMode, false)
 	}
 }
 
 // limitReached writes the device_limit_reached event off the request (the store keeps one an hour per user; the same hour is
 // remembered here too, so that a refused app that keeps asking does not even queue the read). On Cloudflare the work runs
 // after the response (AfterResponse).
-func (s *Service) limitReached(userID string, used, limit int) {
+func (s *Service) limitReached(userID string, used, limit int, mode string, refused bool) {
 	now := s.now()
-	key := "lim:" + userID
+	key := "lim:" + userID + ":" + strconv.FormatBool(refused)
 	if at, seen := s.limited.LoadOrStore(key, now); seen {
 		if now.Sub(at.(time.Time)) < time.Hour {
 			return
@@ -674,7 +675,7 @@ func (s *Service) limitReached(userID string, used, limit int) {
 	s.afterResponse(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := s.st.RecordDeviceLimitReached(ctx, userID, used, limit, now); err != nil {
+		if err := s.st.RecordDeviceLimitReached(ctx, userID, used, limit, mode, refused, now); err != nil {
 			s.log.Warn("access: device limit event", "user", userID, "err", err)
 		}
 	})

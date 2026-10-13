@@ -38,12 +38,23 @@ type HealthTorrentSignal struct {
 	DstPorts       []string
 }
 
+// HealthDeviceLimitSignal is the device_limit_reached events of one user in the last 24 hours that turned an app away
+// (params refused = 1): how many, when the last was, and the count and limit it saw.
+type HealthDeviceLimitSignal struct {
+	UserID      string
+	Count       int
+	LastAt      time.Time
+	Used, Limit int
+}
+
 // HealthSignalBatch contains the stored inputs for user and fleet impact alerts.
 type HealthSignalBatch struct {
 	Users      []HealthUserSignal
 	AWGDevices []HealthAWGSignal
 	NodeHours  []HealthNodeHourSignal
 	Torrents   []HealthTorrentSignal
+	// DeviceLimits are the people refused at their device limit; the sightings TRACK writes are history only and are not here.
+	DeviceLimits []HealthDeviceLimitSignal
 }
 
 func scanHealthUserSignal(r rowScanner) (HealthUserSignal, error) {
@@ -117,7 +128,30 @@ const healthTorrentSQL = `
 	  AND coalesce(json_extract(params_json, '$.evidence'), '') <> ''
 	GROUP BY 1, 2`
 
-// HealthSignals reads the user, AWG, hourly fleet and torrent inputs in one read batch.
+func scanHealthDeviceLimit(r rowScanner) (HealthDeviceLimitSignal, error) {
+	var signal HealthDeviceLimitSignal
+	var lastAt int64
+	if err := r.Scan(&signal.UserID, &signal.Count, &lastAt, &signal.Used, &signal.Limit); err != nil {
+		return HealthDeviceLimitSignal{}, err
+	}
+	signal.LastAt = fleetTime(lastAt)
+	return signal, nil
+}
+
+// healthDeviceLimitSQL reads the last day of device_limit_reached events that refused an app, one row per user. It is served by
+// the partial index event_device_limit (ts) (TestHealthSignalsDeviceLimitQueryUsesItsIndex holds the plan). The events of TRACK
+// (refused = 0) and the ones an older version wrote without the param are left out; an event without a user groups under "", which
+// the alert ignores. With a single max(), SQLite takes the bare
+// columns from the row that holds the maximum: the last refusal.
+const healthDeviceLimitSQL = `
+	SELECT coalesce(user_id, '') AS user_id, count(*) AS refusals, max(ts) AS last_at,
+	       coalesce(CAST(json_extract(params_json, '$.used') AS INTEGER), 0) AS used,
+	       coalesce(CAST(json_extract(params_json, '$.limit') AS INTEGER), 0) AS device_limit
+	FROM event
+	WHERE code = 'device_limit_reached' AND ts >= ? AND json_extract(params_json, '$.refused') = '1'
+	GROUP BY 1`
+
+// HealthSignals reads the user, AWG, hourly fleet, torrent and device-limit inputs in one read batch.
 func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalBatch, error) {
 	var out HealthSignalBatch
 	currentHour := now.UTC().Truncate(time.Hour).Unix()
@@ -149,6 +183,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		FROM node_traffic_hour
 		WHERE hour_start IN (?, ?, ?, ?, ?, ?, ?, ?)`, hourStarts...)
 	reads.add(appendRows(&out.Torrents, scanHealthTorrent), healthTorrentSQL, now.Add(-24*time.Hour).Unix())
+	reads.add(appendRows(&out.DeviceLimits, scanHealthDeviceLimit), healthDeviceLimitSQL, now.Add(-24*time.Hour).Unix())
 	if err := reads.run(ctx, s); err != nil {
 		return HealthSignalBatch{}, err
 	}

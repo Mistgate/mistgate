@@ -392,6 +392,21 @@ func (f *Fleet) OnlineUsers() map[string]string {
 	return out
 }
 
+// OnlineDevices maps each device with an open session to the connected nodes it has one on, in node order
+// (access.OnlineSource). Two nodes: the same keys are in use on two servers at once.
+func (f *Fleet) OnlineDevices() map[string][]string {
+	out := map[string][]string{}
+	pairs, err := f.st.OnlineDevices(context.Background(), f.now().UTC())
+	if err != nil {
+		f.log.Warn("read online devices", "err", err)
+		return out
+	}
+	for _, p := range pairs {
+		out[p[0]] = append(out[p[0]], p[1])
+	}
+	return out
+}
+
 func (f *Fleet) snapshotSessions() []*session {
 	f.mu.Lock()
 	defer f.mu.Unlock()

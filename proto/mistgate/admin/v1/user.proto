@@ -231,6 +231,32 @@ message Device {
   string address = 12;
   // Last handshake of the peer on any node; 0 = never connected.
   int64 last_handshake_unix = 13 [jstype = JS_NUMBER];
+  // What the device is: an app on the subscription link (its own HWID), the one place the apps without a HWID share, or an
+  // AmneziaVPN key.
+  DeviceKind kind = 14;
+  // The OS version and the app ("Happ/3.4.2") the device last fetched with; empty when it never said.
+  string os_version = 15;
+  string client = 16;
+  // Everything the device carried, all time, both directions.
+  uint64 used_bytes = 17 [jstype = JS_NUMBER];
+  // The connected nodes that have a session of this device right now (empty = offline). Two or more: the same keys are
+  // in use on two servers at once, which is the sign of a copied config. A key (AmneziaVPN) device goes by its
+  // handshake, so this is empty for it.
+  repeated string online_node_ids = 18;
+  // 19 is not used: a blocked device is listed in GetUserResponse.blocked_devices, not here.
+  // The first 6 hex characters of the device's hash, to tell two phones of one model apart. Empty for the shared device
+  // and for keys.
+  string fingerprint = 20;
+}
+
+enum DeviceKind {
+  DEVICE_KIND_UNSPECIFIED = 0;
+  // An app that fetches the subscription link and reports a HWID.
+  DEVICE_KIND_LINK = 1;
+  // The place shared by every app that sends no HWID.
+  DEVICE_KIND_LINK_SHARED = 2;
+  // An AmneziaVPN key (DeviceService.CreateAwgDevice).
+  DEVICE_KIND_KEY = 3;
 }
 
 message DayTraffic {

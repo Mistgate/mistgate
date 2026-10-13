@@ -591,31 +591,69 @@ func groupsView(r *adminv1.ListGroupsResponse) *GroupsV {
 }
 
 type deviceV struct {
-	ID         string   `json:"id"`
-	Platform   string   `json:"platform,omitempty"`
-	Model      string   `json:"model,omitempty"`
-	FirstSeen  int64    `json:"first_seen_unix"`
-	LastSeen   int64    `json:"last_seen_unix"`
-	Online     bool     `json:"online"`
-	Protocols  []string `json:"protocols,omitempty"`
-	AwgProfile string   `json:"awg_profile,omitempty"`
-	AwgVersion string   `json:"awg_version,omitempty"`
-	Stale      bool     `json:"stale,omitempty"`
-	Address    string   `json:"address,omitempty"`
-	LastHandsh int64    `json:"last_handshake_unix,omitempty"`
+	ID string `json:"id"`
+	// Kind: link (an app with an ID of its own), link_shared (the place of every app that sends none) or key (AmneziaVPN).
+	Kind      string `json:"kind,omitempty"`
+	Platform  string `json:"platform,omitempty"`
+	Model     string `json:"model,omitempty"`
+	OSVersion string `json:"os_version,omitempty"`
+	Client    string `json:"client,omitempty"`
+	UsedBytes uint64 `json:"used_bytes"`
+	// Fingerprint: the first 6 hex characters of the hash of the device's ID, to tell two phones of one model apart.
+	Fingerprint string `json:"fingerprint,omitempty"`
+	// OnlineNodes: the nodes that have a session of this device now. Two or more: the same keys are in use on two servers.
+	OnlineNodes []nodeRefV `json:"online_nodes,omitempty"`
+	FirstSeen   int64      `json:"first_seen_unix"`
+	LastSeen    int64      `json:"last_seen_unix"`
+	Online      bool       `json:"online"`
+	Protocols   []string   `json:"protocols,omitempty"`
+	AwgProfile  string     `json:"awg_profile,omitempty"`
+	AwgVersion  string     `json:"awg_version,omitempty"`
+	Stale       bool       `json:"stale,omitempty"`
+	Address     string     `json:"address,omitempty"`
+	LastHandsh  int64      `json:"last_handshake_unix,omitempty"`
 }
 
-func deviceViews(ds []*adminv1.Device) []deviceV {
+type nodeRefV struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+type blockedDeviceV struct {
+	ID          string `json:"id"`
+	Platform    string `json:"platform,omitempty"`
+	Model       string `json:"model,omitempty"`
+	Client      string `json:"client,omitempty"`
+	BlockedUnix int64  `json:"blocked_unix"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+func blockedDeviceViews(bs []*adminv1.BlockedDevice) []blockedDeviceV {
+	var out []blockedDeviceV
+	for _, b := range bs {
+		out = append(out, blockedDeviceV{ID: b.GetId(), Platform: clean(b.GetPlatform(), 40), Model: nm(b.GetModel()), Client: clean(b.GetClient(), 40),
+			BlockedUnix: b.GetBlockedUnix(), Fingerprint: clean(b.GetFingerprint(), 12)})
+	}
+	return out
+}
+
+// deviceViews describes devices; nodes names the nodes an online device is on (node id -> name, from the user's node access).
+func deviceViews(ds []*adminv1.Device, nodes map[string]string) []deviceV {
 	out := make([]deviceV, 0, len(ds))
 	for _, d := range ds {
 		dv := deviceV{
-			ID: d.GetId(), Platform: clean(d.GetPlatform(), 40), Model: nm(d.GetModel()), FirstSeen: d.GetFirstSeenUnix(),
-			LastSeen: d.GetLastSeenUnix(), Online: d.GetOnline(), AwgProfile: nm(d.GetAwgProfileName()),
+			ID: d.GetId(), Kind: enumName("DEVICE_KIND_", d.GetKind().String()), Platform: clean(d.GetPlatform(), 40), Model: nm(d.GetModel()),
+			OSVersion: clean(d.GetOsVersion(), 40), Client: clean(d.GetClient(), 40), UsedBytes: d.GetUsedBytes(), Fingerprint: clean(d.GetFingerprint(), 12),
+			FirstSeen: d.GetFirstSeenUnix(),
+			LastSeen:  d.GetLastSeenUnix(), Online: d.GetOnline(), AwgProfile: nm(d.GetAwgProfileName()),
 			AwgVersion: clean(d.GetAwgVersion(), 20), Stale: d.GetStale(), Address: clean(d.GetAddress(), 64),
 			LastHandsh: d.GetLastHandshakeUnix(),
 		}
 		for _, p := range d.GetProtocols() {
 			dv.Protocols = append(dv.Protocols, clean(p, 40))
+		}
+		for _, id := range d.GetOnlineNodeIds() {
+			dv.OnlineNodes = append(dv.OnlineNodes, nodeRefV{ID: id, Name: nm(nodes[id])})
 		}
 		out = append(out, dv)
 	}
@@ -657,6 +695,15 @@ func profileRefs(ps []*adminv1.ProfileRef) []profileRefV {
 	return out
 }
 
+// nodeNames maps node ids to names from the user's node access (the nodes an online device can be on).
+func nodeNames(r *adminv1.GetUserResponse) map[string]string {
+	out := make(map[string]string, len(r.GetNodeAccess()))
+	for _, n := range r.GetNodeAccess() {
+		out[n.GetNodeId()] = n.GetNodeName()
+	}
+	return out
+}
+
 func nodeAccessViews(ns []*adminv1.NodeAccess) []nodeAccessV {
 	var out []nodeAccessV
 	for _, n := range ns {
@@ -671,7 +718,7 @@ func nodeAccessViews(ns []*adminv1.NodeAccess) []nodeAccessV {
 
 func userGetView(r *adminv1.GetUserResponse) *UserGetV {
 	return &UserGetV{
-		User: userView(r.GetUser()), Devices: deviceViews(r.GetDevices()), Profiles: profileRefs(r.GetProfiles()),
+		User: userView(r.GetUser()), Devices: deviceViews(r.GetDevices(), nodeNames(r)), Profiles: profileRefs(r.GetProfiles()),
 		NodeAccess: nodeAccessViews(r.GetNodeAccess()),
 	}
 }
@@ -727,21 +774,24 @@ func userTrafficView(r *adminv1.GetUserResponse) *UserTrafficV {
 
 // UserDevicesV is the user_devices result.
 type UserDevicesV struct {
-	UserID    string    `json:"user_id"`
-	Name      string    `json:"name"`
-	Limit     uint32    `json:"device_limit"`
-	Devices   []deviceV `json:"devices"`
-	Truncated bool      `json:"truncated,omitempty"`
+	UserID  string    `json:"user_id"`
+	Name    string    `json:"name"`
+	Limit   uint32    `json:"device_limit"`
+	Devices []deviceV `json:"devices"`
+	// Blocked: devices the owner revoked and refused; they are not in devices and take no place. Unblocking is in the admin panel.
+	Blocked   []blockedDeviceV `json:"blocked,omitempty"`
+	Truncated bool             `json:"truncated,omitempty"`
 }
 
 func (v *UserDevicesV) shrink() bool {
 	v.Truncated = true
-	return cut(&v.Devices)
+	return cut(&v.Devices) || cut(&v.Blocked)
 }
 
 func userDevicesView(r *adminv1.GetUserResponse) *UserDevicesV {
 	u := r.GetUser()
-	return &UserDevicesV{UserID: u.GetId(), Name: nm(u.GetName()), Limit: u.GetDeviceLimit(), Devices: deviceViews(r.GetDevices())}
+	return &UserDevicesV{UserID: u.GetId(), Name: nm(u.GetName()), Limit: u.GetDeviceLimit(), Devices: deviceViews(r.GetDevices(), nodeNames(r)),
+		Blocked: blockedDeviceViews(r.GetBlockedDevices())}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

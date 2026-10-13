@@ -475,7 +475,7 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 		case "superseded", "accepted", "node_retired":
 			return
 		}
-		if a.Kind == "torrent" {
+		if a.Kind == "torrent" || a.Kind == "device_limit" {
 			return // a person is told once a day: the end of a quiet day is not a second message
 		}
 		if a.MutedUntil.After(s.now()) {

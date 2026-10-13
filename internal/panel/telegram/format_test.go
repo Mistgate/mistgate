@@ -29,7 +29,7 @@ func TestChineseTelegramMessagesAreTranslated(t *testing.T) {
 		t.Errorf("Chinese text = %q, want the Chinese variant", got)
 	}
 	for _, kind := range []string{"node_down", "no_traffic", "check_failed", "state_drift", "cert_expiry", "update_failed", "quota",
-		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy"} {
+		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy", "device_limit"} {
 		a := store.HealthAlert{Kind: kind, Params: map[string]string{"profile": "HY2"}}
 		zh, en := alertTitle("zh", a), alertTitle("en", a)
 		if zh == en || !hasHan(zh) {
@@ -359,5 +359,24 @@ func TestTorrentAlertIsLocalizedWithEvidenceAndPorts(t *testing.T) {
 	}
 	if got := alertTitle("en", alert); got != "Torrent attempts" {
 		t.Errorf("en title = %q", got)
+	}
+}
+
+func TestDeviceLimitAlertIsLocalized(t *testing.T) {
+	alert := store.HealthAlert{
+		Kind: "device_limit", Severity: 2, Subject: "usr_a", WhyKey: "health.alert.device_limit.why", FirstSeen: time.Now(), OpenedAt: time.Now(),
+		Params: map[string]string{"user_id": "usr_a", "user_name": "alice <x>", "used": "5", "limit": "5", "count": "3"},
+	}
+	for lang, want := range map[L][]string{
+		"en": {"An app was turned away at the device limit", "alice &lt;x&gt; is at the device limit (5 of 5): an app asking for a new place was turned away."},
+		"ru": {"Приложению отказали: лимит устройств", "У alice &lt;x&gt; заняты все места для устройств (5 из 5)"},
+		"zh": {"有应用因设备数上限被拒绝", "alice &lt;x&gt; 的设备数已达上限（5 / 5）：有应用申请新名额，被拒绝了。"},
+	} {
+		got := alertOpened(lang, alert, "", "")
+		for _, w := range want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s message %q lacks %q", lang, got, w)
+			}
+		}
 	}
 }

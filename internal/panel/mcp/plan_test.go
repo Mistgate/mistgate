@@ -589,6 +589,67 @@ func TestNodeRollbackAndOtherChanges(t *testing.T) {
 	mustFail(t, s, "device_revoke_plan", map[string]any{"user_id": "usr_alice", "device_id": "dev_9"})
 }
 
+// With block the device does not come back: the plan says so, only an app with a device ID can be blocked, and the request
+// carries the flag. A plain revoke does not.
+func TestDeviceRevokeCanBlock(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+
+	mustFail(t, s, "device_revoke_plan", map[string]any{"user_id": "usr_alice", "device_id": "dev_1", "block": true})      // a key or an unknown kind
+	mustFail(t, s, "device_revoke_plan", map[string]any{"user_id": "usr_alice", "device_id": "dev_shared", "block": true}) // the shared place
+	p := planOf(t, s, "device_revoke", map[string]any{"user_id": "usr_alice", "device_id": "dev_link", "block": true})
+	var effect, fingerprint string
+	for _, f := range p.Facts {
+		switch f.Key {
+		case "effect":
+			effect = f.Value
+		case "fingerprint":
+			fingerprint = f.Value
+		}
+	}
+	if !strings.Contains(effect, "cannot come back until it is unblocked") || fingerprint != "a1b2c3" {
+		t.Errorf("plan facts = %+v", p.Facts)
+	}
+	applyOf(t, s, "device_revoke", p.ConfirmToken)
+	plain := planOf(t, s, "device_revoke", map[string]any{"user_id": "usr_alice", "device_id": "dev_link"})
+	for _, f := range plain.Facts {
+		if strings.Contains(f.Value, "unblocked") {
+			t.Errorf("a plain revoke promises a block: %+v", f)
+		}
+	}
+	applyOf(t, s, "device_revoke", plain.ConfirmToken)
+	if len(e.w.revokeReq) != 2 || !e.w.revokeReq[0].GetBlock() || e.w.revokeReq[1].GetBlock() || e.w.revokeReq[0].GetDeviceId() != "dev_link" {
+		t.Errorf("revoke requests: %+v", e.w.revokeReq)
+	}
+}
+
+// user_devices says what each device is and where it is online, with the nodes by name, and lists the blocked ones apart.
+func TestUserDevicesShowsKindTrafficOnlineNodesAndBlocked(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	var got UserDevicesV
+	if err := json.Unmarshal([]byte(mustOK(t, s, "user_devices", map[string]any{"user_id": "usr_alice"})), &got); err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]deviceV{}
+	for _, d := range got.Devices {
+		byID[d.ID] = d
+	}
+	link := byID["dev_link"]
+	if link.Kind != "link" || link.OSVersion != "15" || link.Client != "Happ/3.4.2" || link.UsedBytes != 5<<20 || link.Fingerprint != "a1b2c3" ||
+		len(link.OnlineNodes) != 2 || link.OnlineNodes[0].Name != "de1" || link.OnlineNodes[1].ID != "nod_gone" || link.OnlineNodes[1].Name != "" {
+		t.Errorf("link device = %+v", link)
+	}
+	if byID["dev_shared"].Kind != "link_shared" {
+		t.Errorf("shared device = %+v", byID["dev_shared"])
+	}
+	if len(got.Blocked) != 1 || got.Blocked[0].ID != "dev_blocked" || got.Blocked[0].Fingerprint != "d4e5f6" || got.Blocked[0].BlockedUnix != 1700000000 || got.Blocked[0].Client != "mihomo/1.19.31" {
+		t.Errorf("blocked = %+v", got.Blocked)
+	}
+}
+
 func TestUserCreateMasksTheLink(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileOperator)

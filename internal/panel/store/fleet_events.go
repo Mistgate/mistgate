@@ -25,26 +25,37 @@ type EventRow struct {
 
 const deviceLimitEventWindow = time.Hour
 
-// RecordDeviceLimitReached adds one user-history event per user per hour. The read skips repeated writes; the
-// conditional insert protects concurrent refusals from adding duplicate rows.
-func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, used, limit int, now time.Time) error {
+// RecordDeviceLimitReached adds one user-history event per user per hour, per kind: a refusal (refused: an app was turned away at
+// the limit) and a sighting (TRACK let the device in past the limit) are counted apart, so a sighting does not hide the refusal
+// that follows it in the same hour. Only the refusals open the device-limit alert (HealthSignals). mode is the link-device mode
+// the decision was made in ("" for an AmneziaVPN key, which has no mode). The read skips repeated writes; the conditional insert
+// protects concurrent refusals from adding duplicate rows.
+func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, used, limit int, mode string, refused bool, now time.Time) error {
 	cutoff := unix(now.Add(-deviceLimitEventWindow))
+	flag := "0"
+	if refused {
+		flag = "1"
+	}
 	var recorded bool
 	if err := s.R.QueryRowContext(ctx, `SELECT EXISTS (
-		SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ?
-	)`, userID, cutoff).Scan(&recorded); err != nil {
+		SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ? AND json_extract(params_json, '$.refused') = ?
+	)`, userID, cutoff, flag).Scan(&recorded); err != nil {
 		return err
 	}
 	if recorded {
 		return nil
 	}
-	params, _ := json.Marshal(map[string]string{"used": strconv.Itoa(used), "limit": strconv.Itoa(limit)})
+	fields := map[string]string{"used": strconv.Itoa(used), "limit": strconv.Itoa(limit), "refused": flag}
+	if mode != "" {
+		fields["mode"] = mode
+	}
+	params, _ := json.Marshal(fields)
 	_, err := s.batch(ctx, Stmt{Query: `
 		INSERT INTO event (ts, severity, code, source, user_id, params_json)
 		SELECT ?, 1, 'device_limit_reached', 'panel', ?, ?
 		WHERE NOT EXISTS (
-			SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ?
-		)`, Args: []any{unix(now), userID, string(params), userID, cutoff}})
+			SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ? AND json_extract(params_json, '$.refused') = ?
+		)`, Args: []any{unix(now), userID, string(params), userID, cutoff, flag}})
 	return err
 }
 

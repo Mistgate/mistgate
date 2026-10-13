@@ -90,6 +90,27 @@ func userConds(now time.Time, sn *snapshot, signals store.HealthSignalBatch, act
 
 	addUsersImpacted(now, sn, signals.NodeHours, activeKeys, d, add)
 	addTorrents(sn, signals, add)
+	addDeviceLimits(signals, add)
+}
+
+// addDeviceLimits raises one DEVICE_LIMIT alert per person an app was turned away for in the last 24 hours (the store window:
+// only the refusals of ENFORCE and STRICT, never the sightings TRACK writes, so an upgrade does not alert everyone who is
+// already over). It closes after a quiet day, and a person who is back after one is a new episode. A user who is not active,
+// expired or limited (disabled, deleted) is left out.
+func addDeviceLimits(signals store.HealthSignalBatch, add func(cond)) {
+	userNames := make(map[string]string, len(signals.Users))
+	for _, user := range signals.Users {
+		userNames[user.ID] = user.Name
+	}
+	for _, signal := range signals.DeviceLimits {
+		name, known := userNames[signal.UserID]
+		if !known || signal.Count <= 0 {
+			continue
+		}
+		add(cond{key: key{kDeviceLimit, "", signal.UserID}, severity: sevWarning, why: "health.alert.device_limit.why",
+			params: map[string]string{"user_id": signal.UserID, "user_name": name, "used": strconv.Itoa(signal.Used), "limit": strconv.Itoa(signal.Limit),
+				"count": strconv.Itoa(signal.Count), "last_unix": strconv.FormatInt(signal.LastAt.Unix(), 10)}})
+	}
 }
 
 // addTorrents raises one TORRENT alert per person who has a torrent_attempt in the last 24 hours (the store window).

@@ -117,6 +117,10 @@ func TestTrackLetsTheDeviceThroughAndSaysSo(t *testing.T) {
 	if !strings.Contains(params, `"limit":"2"`) || !strings.Contains(params, `"used":"3"`) {
 		t.Errorf("event params %s, want used 3 of limit 2", params)
 	}
+	// nobody was turned away: a sighting for the history, which opens no alert
+	if !strings.Contains(params, `"refused":"0"`) || !strings.Contains(params, `"mode":"track"`) {
+		t.Errorf("event params %s, want refused 0 in track", params)
+	}
 }
 
 // One event an hour per person, however often the refused app asks.
@@ -140,10 +144,47 @@ func TestLimitEventIsWrittenOncePerHourPerUser(t *testing.T) {
 	if n := e.events("device_limit_reached"); n != 2 {
 		t.Fatalf("events = %d, want one per person", n)
 	}
+	var params string
+	e.st.R.QueryRow(`SELECT params_json FROM event WHERE code = 'device_limit_reached' AND user_id = ?`, r.User.Id).Scan(&params)
+	if !strings.Contains(params, `"refused":"1"`) || !strings.Contains(params, `"mode":"enforce"`) {
+		t.Errorf("event params %s, want a refusal in enforce", params)
+	}
 	e.clock = e.clock.Add(61 * time.Minute)
 	fetchAs(e, token, hintN(1), "")
 	if n := e.count(`SELECT count(*) FROM event WHERE code = 'device_limit_reached' AND user_id = ?`, r.User.Id); n != 2 {
 		t.Fatalf("events of alice an hour later = %d, want 2", n)
+	}
+}
+
+// A sighting that TRACK wrote does not hide the refusal that follows it in the same hour: the owner moved to ENFORCE, and the
+// refusals are what the alert is made of.
+func TestARefusalIsNotHiddenByASightingOfTheSameHour(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	e.syncAfterResponse()
+	r := e.userBare("alice", f.group, func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 1 })
+	token := e.tokenOf(r.User.Id)
+	fetchAs(e, token, hintN(0), "")
+	fetchAs(e, token, hintN(1), "") // TRACK: made past the limit, a sighting
+	e.setLinkMode(store.LinkModeEnforce)
+	if v := fetchAs(e, token, hintN(2), ""); v.Refusal != RefusalDeviceLimit {
+		t.Fatalf("refusal = %q, want the device limit", v.Refusal)
+	}
+	var refused []string
+	rows, err := e.st.R.Query(`SELECT json_extract(params_json, '$.refused') FROM event WHERE code = 'device_limit_reached' AND user_id = ? ORDER BY id`, r.User.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var flag string
+		if err := rows.Scan(&flag); err != nil {
+			t.Fatal(err)
+		}
+		refused = append(refused, flag)
+	}
+	if strings.Join(refused, ",") != "0,1" {
+		t.Fatalf("events (refused flags) = %v, want the sighting and then the refusal", refused)
 	}
 }
 

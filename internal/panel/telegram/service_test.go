@@ -642,3 +642,32 @@ func TestTorrentAlertIsOneMessagePerEpisodeAndResolvesSilently(t *testing.T) {
 	e.svc.AlertTransition(a, false)
 	waitFor(t, "the next episode's message", func() bool { return len(e.tg.sentTo(777)) == 2 })
 }
+
+// A person refused at the limit is told once per episode, and the end of the quiet day says nothing.
+func TestDeviceLimitAlertIsOneMessagePerEpisodeAndResolvesSilently(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 777)
+	e.run()
+
+	a := alert("device_limit", "", 2)
+	a.Subject = "usr_a"
+	a.Params = map[string]string{"user_id": "usr_a", "user_name": "alice", "used": "5", "limit": "5", "count": "2"}
+	e.svc.AlertTransition(a, false)
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "the device limit message", func() bool { return len(e.tg.sentTo(777)) == 1 })
+	e.quiet(1, 150*time.Millisecond)
+	if got := e.tg.sentTo(777)[0]; !strings.Contains(got, "alice is at the device limit (5 of 5)") {
+		t.Errorf("device limit message = %q", got)
+	}
+
+	before := e.tg.total()
+	a.Resolution, a.ResolvedAt = "cleared", e.clk.now()
+	e.svc.AlertTransition(a, true)
+	e.quiet(before, 150*time.Millisecond)
+
+	a.Resolution, a.ResolvedAt = "", time.Time{}
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "the next episode's message", func() bool { return len(e.tg.sentTo(777)) == 2 })
+}

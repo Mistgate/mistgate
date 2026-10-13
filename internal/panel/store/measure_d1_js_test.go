@@ -186,7 +186,7 @@ func TestD1BatchShapes(t *testing.T) {
 		got  d1Shape
 		want []int
 	}{
-		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 8}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
+		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 9}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
 	} {
 		if fmt.Sprint(c.got.BatchSizes) != fmt.Sprint(c.want) {
 			t.Errorf("%s batches = %v, want %v", name, c.got.BatchSizes, c.want)

@@ -140,7 +140,7 @@ func (a Access) BlockedDevices(ctx context.Context, userID string) ([]AccessBloc
 func (a Access) Device(ctx context.Context, id string) (AccessDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client, d.first_seen_at, d.last_seen_at, d.created_at,
-		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')
+		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail+`
 		 FROM device d WHERE d.id = ? AND d.revoked_at IS NULL`, id)
 	if err != nil {
 		return AccessDevice{}, err

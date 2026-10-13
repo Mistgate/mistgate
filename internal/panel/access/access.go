@@ -39,10 +39,12 @@ import (
 // pushed. It must be cheap and non-blocking (the fleet debounces).
 type StateNotifier interface{ StateChanged() }
 
-// OnlineSource tells which users have an open session right now. The fleet module implements it.
+// OnlineSource tells which users and devices have an open session right now. The fleet module implements it.
 type OnlineSource interface {
 	// OnlineUsers maps user id to the id of the node of the user's newest open session.
 	OnlineUsers() map[string]string
+	// OnlineDevices maps device id to the ids of the connected nodes that have a session of it, in node order.
+	OnlineDevices() map[string][]string
 }
 
 // AfterResponseRunner starts work that must not delay a request response. A nil runner uses a goroutine.
@@ -95,6 +97,8 @@ func (noNotify) StateChanged() {}
 type noOnline struct{}
 
 func (noOnline) OnlineUsers() map[string]string { return nil }
+
+func (noOnline) OnlineDevices() map[string][]string { return nil }
 
 // New builds the service. notify and online may be nil (nothing to notify, nobody online).
 func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateNotifier, online OnlineSource, cfg Config) (*Service, error) {

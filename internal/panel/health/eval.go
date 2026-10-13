@@ -38,6 +38,7 @@ const (
 	kUsersImpacted  = "users_impacted"
 	kTorrent        = "torrent"
 	kPortLossy      = "port_lossy"
+	kDeviceLimit    = "device_limit"
 )
 
 var kindProto = map[string]adminv1.AlertKind{
@@ -52,6 +53,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kUsersImpacted:  adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED,
 	kTorrent:        adminv1.AlertKind_ALERT_KIND_TORRENT,
 	kPortLossy:      adminv1.AlertKind_ALERT_KIND_PORT_LOSSY,
+	kDeviceLimit:    adminv1.AlertKind_ALERT_KIND_DEVICE_LIMIT,
 }
 
 const (
@@ -821,12 +823,12 @@ func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, acti
 		have[k] = true
 		if c, ok := d.conds[k]; ok {
 			refreshAfter := time.Second
-			if a.Kind == kAccessEnded || a.Kind == kUserConnection || a.Kind == kUsersImpacted || a.Kind == kTorrent {
+			if a.Kind == kAccessEnded || a.Kind == kUserConnection || a.Kind == kUsersImpacted || a.Kind == kTorrent || a.Kind == kDeviceLimit {
 				refreshAfter = userAlertRefreshInterval
 			}
-			// A torrent alert's params (count, last attempt) move with every attempt: they are written with the 5-minute
-			// refresh, not on every evaluation. Its severity and text never change.
-			if (changed(a, c) && a.Kind != kTorrent) || now.Sub(a.LastSeen) >= refreshAfter {
+			// A torrent or device-limit alert's params (count, last attempt) move with every attempt: they are written with
+			// the 5-minute refresh, not on every evaluation. Its severity and text never change.
+			if (changed(a, c) && a.Kind != kTorrent && a.Kind != kDeviceLimit) || now.Sub(a.LastSeen) >= refreshAfter {
 				na := c.alert()
 				na.ID = a.ID
 				if err := s.st.TouchAlert(ctx, na, now); err != nil {

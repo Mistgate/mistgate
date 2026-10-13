@@ -24,7 +24,6 @@ type NodeLiveRow struct {
 	UsersJSON  string
 	LiveJSON   string
 	Connected  bool
-	UserOnline bool
 }
 
 // FleetLive is one sanitized projection built from a StatsBatch and its resolved credentials.
@@ -36,7 +35,9 @@ type FleetLive struct {
 	TxBps     uint64
 	CPUPct    int64
 	UsersJSON string
-	LiveJSON  string
+	// DevicesJSON is UsersJSON per device: device id -> the start of its newest session.
+	DevicesJSON string
+	LiveJSON    string
 }
 
 // NodeLive lists node live projections. An empty nodeID lists every node; view includes live_json.
@@ -92,6 +93,30 @@ func (s *Store) NodeLive(ctx context.Context, now time.Time, nodeID string, view
 		rows = append(rows, row)
 	}
 	return rows, nil
+}
+
+// OnlineDevices lists the devices that have a session on a connected node as (device id, node id) pairs, in node order. It
+// reads node_live.devices only, not the live_json of the view.
+func (s *Store) OnlineDevices(ctx context.Context, now time.Time) ([][2]string, error) {
+	results, err := s.read(ctx, Stmt{Query: `SELECT j.key AS device_id, l.node_id AS node_id
+		FROM node AS n JOIN node_live AS l ON l.node_id = n.id, json_each(l.devices) AS j
+		WHERE n.state = 'active' AND n.last_seen_at >= ? - n.liveness_timeout_s ORDER BY n.id, j.key`,
+		Args: []any{unix(now)}, Returning: true})
+	if err != nil {
+		return nil, err
+	}
+	if len(results) != 1 {
+		return nil, errors.New("store: unexpected OnlineDevices read result count")
+	}
+	out := make([][2]string, 0, len(results[0].Rows))
+	for _, values := range results[0].Rows {
+		var device, node string
+		if err := batchRow(values).Scan(&device, &node); err != nil {
+			return nil, err
+		}
+		out = append(out, [2]string{device, node})
+	}
+	return out, nil
 }
 
 func nodeSessionValue(session uint64) (int64, error) {

@@ -100,7 +100,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
 | `user_get` | Read only | One user: limits, status, devices, profiles, node access. No subscription link, no keys. |
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
-| `user_devices` | Read only | Devices with platform, model, last seen, online, and for AmneziaWG the profile and tunnel address. Never a key or a config. |
+| `user_devices` | Read only | Devices with kind, platform, model, OS version, app, traffic, last seen, online and on which nodes, a short fingerprint of the device ID, and for AmneziaWG the profile and tunnel address; the blocked devices apart. Never a key or a config. |
 | `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
 | `subscription_settings_get` | Read only | The subscription page every user sees: the apps per platform in display order (name, kind, download link, add-link template, description, recommended), the page options (including `dns_choice`, the switch for DNS choice on the page), the server-name template, and the subscription title, announcement, support link and refresh interval. No user's link. |
 | `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
@@ -121,7 +121,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
-| `device_revoke` | Operator | `user_id`, `device_id` | no |
+| `device_revoke` | Operator | `user_id`, `device_id`, and optionally `block` (the device does not come back until the owner unblocks it in the admin panel; only an app that sends a device ID can be blocked) | no |
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |

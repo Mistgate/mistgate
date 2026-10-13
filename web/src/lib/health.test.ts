@@ -184,6 +184,13 @@ describe("alerts", () => {
     expect(alertWhy(tPlural, fmt, torrent({ evidence: "new_code" }))).toContain("Evidence: new_code.");
     expect(alertTitle(tRu, alert({ kind: AlertKind.TORRENT, titleKey: "health.alert.torrent.title" }))).toBe("Попытки качать торренты");
   });
+  it("words a device_limit alert with who is at the limit and what to do", () => {
+    const limited = alert({ kind: AlertKind.DEVICE_LIMIT, nodeId: "", subject: "usr_1", titleKey: "health.alert.device_limit.title", whyKey: "health.alert.device_limit.why",
+      params: { user_id: "usr_1", user_name: "alice", used: "5", limit: "5", count: "2", last_unix: "1790000000" } });
+    expect(alertTitle(t, limited)).toBe("An app was turned away at the device limit");
+    expect(alertWhy(t, fmt, limited)).toMatch(/^alice is at the device limit \(5 of 5\) and an app asking for a new place was turned away\./);
+    expect(alertWhy(tRu, fmtRu, limited)).toMatch(/^У alice заняты все места для устройств \(5 из 5\)/);
+  });
   it("words a port_lossy alert with the loss in percent and who sent the test packets", () => {
     const lossy = (sender: string) =>
       alert({ kind: AlertKind.PORT_LOSSY, subject: "inb_1", titleKey: "health.alert.port_lossy.title", whyKey: "health.alert.port_lossy.why",
@@ -436,6 +443,7 @@ describe("the server's vocabulary is covered", () => {
       check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers", "nodes", "cdn_host"],
       cert_expiry: ["inbound", "inbound_id", "profile", "server_name", "days_left", "reason", "server_part"],
       node_down: ["duration"],
+      device_limit: ["user_name", "used", "limit"],
     };
     for (const [kind, params] of Object.entries(sent)) {
       for (const key of Object.keys(en).filter((k) => k.startsWith(`health.alert.${kind}.why`))) {
@@ -451,9 +459,11 @@ describe("alerts about people", () => {
   const silent = alert({ kind: AlertKind.USER_CONNECTION, nodeId: "", severity: AlertSeverity.INFO, subject: "usr_3", params: { user_id: "usr_3" } });
   const impacted = alert({ kind: AlertKind.USERS_IMPACTED, subject: "hysteria2" });
   const torrent = alert({ kind: AlertKind.TORRENT, nodeId: "", subject: "usr_4", params: { user_id: "usr_4", user_name: "alice" } });
+  const limit = alert({ kind: AlertKind.DEVICE_LIMIT, nodeId: "", subject: "usr_5", params: { user_id: "usr_5", user_name: "bob" } });
 
   it("tells them from the alerts about nodes: the dropped connections of a node are a node alert", () => {
-    expect([ended, device, silent, impacted, alert(), torrent].map(isPeopleAlert)).toEqual([true, true, true, false, false, true]);
+    expect([ended, device, silent, impacted, alert(), torrent, limit].map(isPeopleAlert)).toEqual([true, true, true, false, false, true, true]);
+    expect(alertIsAbout(limit, "usr_5")).toBe(true);
     expect(alertIsAbout(torrent, "usr_4")).toBe(true);
     expect(alertIsAbout(torrent, "usr_1")).toBe(false);
   });

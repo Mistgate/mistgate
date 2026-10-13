@@ -134,6 +134,11 @@ const (
 	// from the latest verdict of that port, not the sticky one: it resolves when a re-check is clean or the inbound moves
 	// to another port.
 	AlertKind_ALERT_KIND_PORT_LOSSY AlertKind = 16
+	// A person was refused because they are at their device limit (an app asked for a new device and got the "limit
+	// reached" entry instead of servers), in the last 24 hours. WARNING. node_id = "", subject = user id, params{user_id,
+	// user_name, used, limit, count, last_unix}. Open while a refusal is under 24 hours old; in TRACK mode nobody is refused,
+	// so the events it writes stay history and raise nothing.
+	AlertKind_ALERT_KIND_DEVICE_LIMIT AlertKind = 17
 )
 
 // Enum value maps for AlertKind.
@@ -156,6 +161,7 @@ var (
 		14: "ALERT_KIND_USERS_IMPACTED",
 		15: "ALERT_KIND_TORRENT",
 		16: "ALERT_KIND_PORT_LOSSY",
+		17: "ALERT_KIND_DEVICE_LIMIT",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -175,6 +181,7 @@ var (
 		"ALERT_KIND_USERS_IMPACTED":              14,
 		"ALERT_KIND_TORRENT":                     15,
 		"ALERT_KIND_PORT_LOSSY":                  16,
+		"ALERT_KIND_DEVICE_LIMIT":                17,
 	}
 )
 
@@ -2451,7 +2458,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xf2\x03\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\x8f\x04\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -2470,7 +2477,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_KIND_USER_CONNECTION\x10\r\x12\x1d\n" +
 	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e\x12\x16\n" +
 	"\x12ALERT_KIND_TORRENT\x10\x0f\x12\x19\n" +
-	"\x15ALERT_KIND_PORT_LOSSY\x10\x10*\x8e\x01\n" +
+	"\x15ALERT_KIND_PORT_LOSSY\x10\x10\x12\x1b\n" +
+	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

@@ -168,7 +168,7 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 			Certs:    []FleetInboundCert{{InboundID: "inb_d1_stats", Pin: "d1-stats-pin", NotAfter: now.Add(24 * time.Hour)}},
 			Live: func(map[string]FleetCredRef) FleetLive {
 				return FleetLive{Apply: true, SampleAt: now.Unix(), RxBps: 7, TxBps: 8, CPUPct: 9,
-					UsersJSON: `{"usr_d1_stats":1699999940}`, LiveJSON: `{"interval_end_unix":1700000000,"marker":"d1"}`}
+					UsersJSON: `{"usr_d1_stats":1699999940}`, DevicesJSON: `{"dev_d1_stats":1699999940}`, LiveJSON: `{"interval_end_unix":1700000000,"marker":"d1"}`}
 			},
 		})
 	})
@@ -193,6 +193,28 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if deviceSeen != now.Add(-time.Minute).Unix() || certPin != "d1-stats-pin" || certNotAfter != now.Add(24*time.Hour).Unix() {
 		t.Fatalf("D1 stats touch/certificate = %d / %q / %d", deviceSeen, certPin, certNotAfter)
 	}
+	t.Run("DeviceTrafficAndOnlineDevices", func(t *testing.T) {
+		// the same batch added the traffic to the device and named it in node_live.devices, in the two round trips counted above
+		var used int64
+		var devices string
+		if err := st.R.QueryRowContext(ctx, `SELECT used_bytes FROM device WHERE id = 'dev_d1_stats'`).Scan(&used); err != nil || used != 100 {
+			t.Fatalf("D1 device used_bytes = %d, %v; want 100", used, err)
+		}
+		if err := st.R.QueryRowContext(ctx, `SELECT devices FROM node_live WHERE node_id = ?`, node.ID).Scan(&devices); err != nil || devices != `{"dev_d1_stats":1699999940}` {
+			t.Fatalf("D1 node_live.devices = %q, %v", devices, err)
+		}
+		if _, err := st.W.ExecContext(ctx, `UPDATE node SET state = 'active', last_seen_at = ?, liveness_timeout_s = 90 WHERE id = ?`, now.Unix(), node.ID); err != nil {
+			t.Fatal(err)
+		}
+		pairs, err := st.OnlineDevices(ctx, now)
+		if err != nil || len(pairs) != 1 || pairs[0] != [2]string{"dev_d1_stats", node.ID} {
+			t.Fatalf("D1 OnlineDevices = %v, %v", pairs, err)
+		}
+		data, err := st.Access().SubscriptionData(ctx, "usr_d1_stats", "grp_d1_stats", now, false, now, nil)
+		if err != nil || len(data.OnlineDevices["dev_d1_stats"]) != 1 || data.OnlineDevices["dev_d1_stats"][0] != node.ID {
+			t.Fatalf("D1 SubscriptionData.OnlineDevices = %v, %v", data.OnlineDevices, err)
+		}
+	})
 	var duplicate bool
 	calls = countD1Queries(t, binding, "IngestEvent", func() {
 		duplicate, err = st.IngestEvent(ctx, node.ID, "d1-instance", 2, now, EventRow{Time: now, Severity: 1, Code: "edge.smoke.event"})

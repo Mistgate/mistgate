@@ -271,7 +271,7 @@ func TestAWGDeviceLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(events) != 1 || events[0].Severity != 1 ||
-		events[0].Params["used"] != "2" || events[0].Params["limit"] != "2" {
+		events[0].Params["used"] != "2" || events[0].Params["limit"] != "2" || events[0].Params["refused"] != "1" {
 		t.Fatalf("device-limit event = %+v, want one severity-1 event with used=2 and limit=2", events)
 	}
 	e.clock = e.clock.Add(time.Hour)

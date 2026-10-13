@@ -208,6 +208,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("Torrent attempts", "Попытки качать торренты", "BT 下载尝试")
 	case "port_lossy":
 		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты", "UDP 正在丢包")
+	case "device_limit":
+		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -285,6 +287,8 @@ func alertReason(l L, a store.HealthAlert) string {
 			name+" 仍在尝试连接，但订阅已在 "+ago+"前到期。")
 	case "torrent":
 		return torrentReason(l, p)
+	case "device_limit":
+		return deviceLimitReason(l, p)
 	case "port_lossy":
 		return portLossReason(l, p)
 	case "users_impacted":
@@ -320,6 +324,18 @@ func portLossReason(l L, p map[string]string) string {
 	return l.pick("Profile “"+profile+"” on port "+port+" lost "+percent+"% of UDP packets in the latest check.",
 		"Профиль «"+profile+"» на порту "+port+" потерял "+percent+"% UDP-пакетов при последней проверке.",
 		"发往「"+profile+"」端口 "+port+" 的 UDP 测试包在最近一次检测中丢失了 "+percent+"%。")
+}
+
+// deviceLimitReason is the sentence of a DEVICE_LIMIT alert: who is at the limit and what they can do about it. The owner is
+// the reader, so it says what the person can do too. Values from data go through data().
+func deviceLimitReason(l L, p map[string]string) string {
+	name, used, limit := data(p["user_name"], 60), data(p["used"], 6), data(p["limit"], 6)
+	return l.pick(name+" is at the device limit ("+used+" of "+limit+"): an app asking for a new place was turned away. "+
+		"They can remove an old device on their subscription page, or you can raise the limit.",
+		"У "+name+" заняты все места для устройств ("+used+" из "+limit+"): приложению, которое просило новое место, отказали. "+
+			"Можно удалить старое устройство на странице подписки или поднять лимит.",
+		name+" 的设备数已达上限（"+used+" / "+limit+"）：有应用申请新名额，被拒绝了。"+
+			"可以在订阅页面删除旧设备，或提高上限。")
 }
 
 // torrentEvidence say in a few words what the node's torrent guard matched (the "evidence" of a torrent_attempt event).

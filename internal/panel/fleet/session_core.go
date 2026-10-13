@@ -622,6 +622,7 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 		view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
 	}
 	users := make(map[string]int64)
+	devices := make(map[string]int64) // device id -> its newest session: the same as users, one level down
 	for i, se := range st.Sessions {
 		if i == maxStatsDeltas {
 			break
@@ -637,6 +638,9 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 		sinceUnix := since.Unix()
 		if previous, ok := users[ref.UserID]; !ok || sinceUnix > previous {
 			users[ref.UserID] = sinceUnix
+		}
+		if previous, ok := devices[ref.DeviceID]; ref.DeviceID != "" && (!ok || sinceUnix > previous) {
+			devices[ref.DeviceID] = sinceUnix
 		}
 		if len(view.Online) < 2000 {
 			view.Online = append(view.Online, liveJSONOnline{UserID: ref.UserID, DeviceID: ref.DeviceID,
@@ -656,11 +660,12 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 	view.UserDownBPS = topRates(view.UserDownBPS, 2000)
 	view.UploadBPS = min(view.UploadBPS, maxRate)
 	usersJSON, _ := json.Marshal(users)
+	devicesJSON, _ := json.Marshal(devices)
 	encoded, _ := json.Marshal(view)
-	if len(usersJSON)+len(encoded) > maxFleetLiveJSONBytes {
+	if len(usersJSON)+len(devicesJSON)+len(encoded) > maxFleetLiveJSONBytes {
 		return store.FleetLive{}, end, true
 	}
-	projection.UsersJSON, projection.LiveJSON = string(usersJSON), string(encoded)
+	projection.UsersJSON, projection.DevicesJSON, projection.LiveJSON = string(usersJSON), string(devicesJSON), string(encoded)
 	return projection, end, false
 }
 

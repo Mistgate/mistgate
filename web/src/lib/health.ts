@@ -210,7 +210,7 @@ export const resolutionWord = (r: string): MessageKey => {
  * node and is not one of these.
  */
 export const isPeopleAlert = (a: Pick<Alert, "kind">) =>
-  a.kind === AlertKind.ACCESS_ENDED || a.kind === AlertKind.USER_CONNECTION || a.kind === AlertKind.TORRENT;
+  a.kind === AlertKind.ACCESS_ENDED || a.kind === AlertKind.USER_CONNECTION || a.kind === AlertKind.TORRENT || a.kind === AlertKind.DEVICE_LIMIT;
 
 /** Whether an alert about a person is about this user: params.user_id, or the subject for the alerts keyed by user (a device alert's subject is the device). */
 export const alertIsAbout = (a: Alert, userId: string) => isPeopleAlert(a) && (a.params.user_id === userId || a.subject === userId);

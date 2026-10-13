@@ -351,7 +351,7 @@
     "type": "table",
     "name": "device",
     "tbl_name": "device",
-    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER) STRICT"
+    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER, used_bytes INTEGER NOT NULL DEFAULT 0) STRICT"
   },
   {
     "type": "table",
@@ -471,7 +471,7 @@
     "type": "table",
     "name": "node_live",
     "tbl_name": "node_live",
-    "sql": "CREATE TABLE node_live ( node_id TEXT PRIMARY KEY REFERENCES node(id) ON DELETE CASCADE, session INTEGER NOT NULL, drift INTEGER NOT NULL DEFAULT 0, sample_at INTEGER NOT NULL DEFAULT 0, rx_bps INTEGER NOT NULL DEFAULT 0, tx_bps INTEGER NOT NULL DEFAULT 0, cpu_pct INTEGER NOT NULL DEFAULT 0, users TEXT NOT NULL DEFAULT '{}', live_json TEXT NOT NULL DEFAULT '{}' )"
+    "sql": "CREATE TABLE node_live ( node_id TEXT PRIMARY KEY REFERENCES node(id) ON DELETE CASCADE, session INTEGER NOT NULL, drift INTEGER NOT NULL DEFAULT 0, sample_at INTEGER NOT NULL DEFAULT 0, rx_bps INTEGER NOT NULL DEFAULT 0, tx_bps INTEGER NOT NULL DEFAULT 0, cpu_pct INTEGER NOT NULL DEFAULT 0, users TEXT NOT NULL DEFAULT '{}', live_json TEXT NOT NULL DEFAULT '{}' , devices TEXT NOT NULL DEFAULT '{}')"
   },
   {
     "type": "table",

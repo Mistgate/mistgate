@@ -292,6 +292,64 @@ func TestIngestStatsKeepsTrafficWhenLiveProjectionIsSkipped(t *testing.T) {
 	}
 }
 
+// A batch adds its traffic to the device the credential belongs to, next to the person's total and not twice when it is resent; the live projection names the devices with a session, and OnlineDevices finds them on a connected node only.
+func TestIngestStatsAddsDeviceTrafficAndOnlineDevices(t *testing.T) {
+	s := openTemp(t)
+	f := newFleetBatchFixture(t, s, "stats_device")
+	ctx := context.Background()
+	if _, _, err := s.NodeHello(ctx, f.nodeID, 1, HelloInfo{Instance: "instance-device"}, f.now); err != nil {
+		t.Fatal(err)
+	}
+	devices := `{"` + f.deviceID + `":1699999940}`
+	batch := func(seq uint64, up, down uint64) FleetStatsIn {
+		return FleetStatsIn{NodeID: f.nodeID, Instance: "instance-device", Session: 1, Seq: seq, Now: f.now,
+			HourStart: f.now.Unix() / 3600 * 3600,
+			Traffic: []FleetTraffic{{CredID: f.credID, InboundID: f.inboundID, Up: up, Down: down},
+				{CredID: "crd_unknown", InboundID: f.inboundID, Up: 1000, Down: 1000}},
+			Live: func(map[string]FleetCredRef) FleetLive {
+				return FleetLive{Apply: true, UsersJSON: `{}`, DevicesJSON: devices, LiveJSON: `{}`}
+			}}
+	}
+	for seq, sizes := range [][2]uint64{{4, 5}, {1, 1}} {
+		if out, err := s.IngestStats(ctx, batch(uint64(seq+1), sizes[0], sizes[1])); err != nil || out.Duplicate || out.Skipped != 1 {
+			t.Fatalf("batch %d = %+v, %v", seq+1, out, err)
+		}
+	}
+	if out, err := s.IngestStats(ctx, batch(2, 1, 1)); err != nil || !out.Duplicate {
+		t.Fatalf("resent batch = %+v, %v; want Duplicate", out, err)
+	}
+	if got := queryInt(t, s, `SELECT used_bytes FROM device WHERE id = ?`, f.deviceID); got != 11 {
+		t.Fatalf("device used_bytes = %d, want 11 (9 + 2, the resent batch not counted)", got)
+	}
+	if got := queryInt(t, s, `SELECT used_bytes FROM user WHERE id = ?`, f.userID); got != 11 {
+		t.Fatalf("user used_bytes = %d, want the same 11", got)
+	}
+	var stored string
+	if err := s.R.QueryRowContext(ctx, `SELECT devices FROM node_live WHERE node_id = ?`, f.nodeID).Scan(&stored); err != nil || stored != devices {
+		t.Fatalf("node_live.devices = %q, %v; want %q", stored, err, devices)
+	}
+
+	if _, err := s.W.ExecContext(ctx, `UPDATE node SET state = 'active', last_seen_at = ?, liveness_timeout_s = 90 WHERE id = ?`, f.now.Unix(), f.nodeID); err != nil {
+		t.Fatal(err)
+	}
+	pairs, err := s.OnlineDevices(ctx, f.now)
+	if err != nil || len(pairs) != 1 || pairs[0] != [2]string{f.deviceID, f.nodeID} {
+		t.Fatalf("OnlineDevices = %v, %v; want the device on its node", pairs, err)
+	}
+	if pairs, err = s.OnlineDevices(ctx, f.now.Add(time.Hour)); err != nil || len(pairs) != 0 {
+		t.Fatalf("OnlineDevices of a node that went silent = %v, %v; want none", pairs, err)
+	}
+	// a batch whose projection is skipped leaves the devices where they were
+	skipped := batch(3, 1, 1)
+	skipped.Live = func(map[string]FleetCredRef) FleetLive { return FleetLive{DevicesJSON: `{}`} }
+	if _, err := s.IngestStats(ctx, skipped); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.R.QueryRowContext(ctx, `SELECT devices FROM node_live WHERE node_id = ?`, f.nodeID).Scan(&stored); err != nil || stored != devices {
+		t.Fatalf("a skipped projection changed node_live.devices to %q, %v", stored, err)
+	}
+}
+
 func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	const users = 300
 	const sessions = 600
@@ -301,12 +359,14 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	buckets := make([]fleetStatsBucketWrite, 0, users)
 	userWrites := make([]fleetStatsUserWrite, 0, users)
 	touches := make([]fleetDeviceTouchWrite, 0, users)
+	deviceWrites := make([]fleetStatsDeviceWrite, 0, users)
 	for i := 0; i < users; i++ {
 		id := fmt.Sprintf("%03d", i)
 		buckets = append(buckets, fleetStatsBucketWrite{UserID: "usr_" + id, NodeID: in.NodeID, Protocol: "awg",
 			HourStart: in.HourStart, BytesUp: 1, BytesDown: 2})
 		userWrites = append(userWrites, fleetStatsUserWrite{UserID: "usr_" + id, Bytes: 3})
 		touches = append(touches, fleetDeviceTouchWrite{DeviceID: "dev_" + id, LastSeenAt: now.Unix() - 1, NotAfter: now.Unix() - 1})
+		deviceWrites = append(deviceWrites, fleetStatsDeviceWrite{DeviceID: "dev_" + id, Bytes: 3})
 	}
 	hours := []fleetStatsHourWrite{{NodeID: in.NodeID, Protocol: "awg", HourStart: in.HourStart, BytesUp: users, BytesDown: users * 2,
 		PeakUsers: users, PeakDevices: users}}
@@ -314,7 +374,7 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	for i := 0; i < certificates; i++ {
 		certs = append(certs, fleetInboundCertWrite{InboundID: fmt.Sprintf("inb_%03d", i), Pin: "pin", NotAfter: now.Add(time.Hour).Unix()})
 	}
-	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, certs, touches, FleetLive{})
+	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, deviceWrites, certs, touches, FleetLive{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,8 +382,8 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	if before != 1211 {
 		t.Fatalf("legacy batch statement count = %d, want 1211", before)
 	}
-	if len(stmts) != 8 {
-		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 8 after",
+	if len(stmts) != 9 {
+		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 9 after",
 			users, sessions, certificates, before, len(stmts))
 	}
 	t.Logf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d",

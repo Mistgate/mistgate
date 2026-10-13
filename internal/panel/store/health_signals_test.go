@@ -4,6 +4,7 @@ package store
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -100,5 +101,54 @@ func TestHealthSignalsTorrentQueryUsesTheSeverityTimeIndex(t *testing.T) {
 	t.Log(plan)
 	if !strings.Contains(plan, "USING INDEX event_retention") && !strings.Contains(plan, "USING COVERING INDEX event_retention") {
 		t.Fatalf("torrent signal scans the whole event table: %s", plan)
+	}
+}
+
+func TestHealthSignalsDeviceLimitQueryUsesItsIndex(t *testing.T) {
+	s := openTemp(t)
+	rows, err := s.R.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+healthDeviceLimitSQL, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var plan string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan += detail + "; "
+	}
+	if !strings.Contains(plan, "event_device_limit") {
+		t.Fatalf("device-limit signal does not use event_device_limit: %s", plan)
+	}
+}
+
+// Only the events that turned an app away are signals; the day is a window, and the last refusal tells used and limit.
+func TestHealthSignalsDeviceLimitCountsRefusalsOnly(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	add := func(user string, age time.Duration, params string) {
+		t.Helper()
+		if _, err := s.W.ExecContext(ctx, `INSERT INTO event (ts, severity, code, source, user_id, params_json) VALUES (?, 1, 'device_limit_reached', 'panel', ?, ?)`,
+			now.Add(-age).Unix(), user, params); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("usr_alice", 5*time.Hour, `{"used":"5","limit":"5","refused":"1","mode":"enforce"}`)
+	add("usr_alice", time.Hour, `{"used":"6","limit":"5","refused":"1","mode":"strict"}`)
+	add("usr_alice", 30*time.Minute, `{"used":"7","limit":"5","refused":"0","mode":"track"}`)
+	add("usr_bob", time.Hour, `{"used":"7","limit":"5","refused":"0","mode":"track"}`)
+	add("usr_carol", time.Hour, `{"used":"3","limit":"3"}`)
+	add("usr_erin", 25*time.Hour, `{"used":"3","limit":"3","refused":"1"}`)
+	batch, err := s.HealthSignals(ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []HealthDeviceLimitSignal{{UserID: "usr_alice", Count: 2, LastAt: now.Add(-time.Hour), Used: 6, Limit: 5}}
+	if !reflect.DeepEqual(batch.DeviceLimits, want) {
+		t.Fatalf("device limit signals = %+v, want %+v", batch.DeviceLimits, want)
 	}
 }

@@ -100,7 +100,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
 | `user_get` | 只读 | 单个用户：限制、状态、设备、协议配置和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
-| `user_devices` | 只读 | 设备的平台、型号、最后在线时间和在线状态；AmneziaWG 还会返回协议配置和隧道地址。绝不返回密钥或配置文件。 |
+| `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置和节点。不返回订阅内容或链接。 |
 | `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：各平台上的应用及其显示顺序（名称、类型、下载链接、添加链接模板、说明、是否推荐）、页面选项（包括 `dns_choice`，即页面上的 DNS 选择开关）、服务器名称模板，以及订阅标题、公告、联系链接和更新间隔。不含任何用户的链接。 |
 | `alerts_list` | 只读 | 活跃告警；设置 `include_history` 后也会返回已关闭的告警（`window_s` 最长为 30 天）。 |
@@ -121,7 +121,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
-| `device_revoke` | 操作员 | `user_id`、`device_id` | 否 |
+| `device_revoke` | 操作员 | `user_id`、`device_id`，可选 `block`（设备在所有者于管理后台解除拉黑前不会再回来；只有会发送设备 ID 的应用才能被拉黑） | 否 |
 | `alert_mute` | 操作员 | `alert_id`、`duration_s`（最多 604800；0 表示取消静默） | 否 |
 | `subscription_app_upsert` | 操作员 | `platform`（`ios`、`android`、`windows`、`macos`、`linux`）和 `name` 用于指定应用；更改现有应用时只传入变更字段；新应用至少要传入 `kind`：`kind`（`happ` 接收订阅链接，`amnezia` 接收 AmneziaWG 密钥）、`download_url`、`add_link_template`（占位符 `{url}`、`{url_enc}`、`{name_enc}`）、`description`（最多 80 个字符）、`recommended` | 始终 |
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |

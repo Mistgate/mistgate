@@ -21,8 +21,9 @@ func (s *Service) deviceProto(d store.AccessAWGDevice) *adminv1.Device {
 	return &adminv1.Device{
 		Id: d.ID, Platform: d.Platform, Model: d.Model,
 		FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
-		Online:       !d.LastSeenAt.IsZero() && s.now().Sub(d.LastSeenAt) < awgOnlineWindow,
-		Protocols:    []string{"awg"},
+		Online:    !d.LastSeenAt.IsZero() && s.now().Sub(d.LastSeenAt) < awgOnlineWindow,
+		Protocols: []string{"awg"},
+		Kind:      adminv1.DeviceKind_DEVICE_KIND_KEY, OsVersion: d.OSVersion, Client: d.Client,
 		AwgProfileId: d.ProfileID, AwgProfileName: d.ProfileName, AwgVersion: awgVersion([]byte(d.ProfileSettingsJSON)),
 		Stale: d.Stale(), Address: deviceAddress(d.DataJSON), LastHandshakeUnix: unixOrZero(d.LastSeenAt),
 	}

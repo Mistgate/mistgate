@@ -51,6 +51,16 @@ func addListTestDevice(e *env, userID, deviceID string) {
 		VALUES (?, ?, ?, 'hysteria2', ?, '{}', ?)`, "crd_"+deviceID, deviceID, userID, []byte("sealed"), e.clock.Unix())
 }
 
+// sharedDeviceID is the id of the shared device (no HWID) the person's subscription fetch made.
+func sharedDeviceID(e *env, userID string) string {
+	e.t.Helper()
+	var id string
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT id FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID).Scan(&id); err != nil {
+		e.t.Fatal(err)
+	}
+	return id
+}
+
 func addListTestAWGDevice(e *env, userID, profileID, deviceID string, lastSeen int64, idx int) {
 	e.sql(`INSERT INTO device (id, user_id, hwid_hash, kind, first_seen_at, last_seen_at, created_at)
 		VALUES (?, ?, ?, 'key', ?, ?, ?)`, deviceID, userID, []byte("awg-"+deviceID), lastSeen, lastSeen, e.clock.Unix())
@@ -103,6 +113,11 @@ func TestListUsersSortsBothDirections(t *testing.T) {
 	e.online[ids["bob"]] = "nod_de1"
 	e.online[ids["cy"]] = "nod_de1"
 	e.online[ids["fox"]] = "nod_de1"
+	// each device is online by its own sessions: bob has two in use, cy none (online, but on a device the list does not
+	// know), fox the shared one
+	e.online[sharedDeviceID(e, ids["bob"])] = "nod_de1"
+	e.online["dev_bob_0"] = "nod_de1"
+	e.online[sharedDeviceID(e, ids["fox"])] = "nod_de1"
 
 	checks := []struct {
 		name       string
@@ -173,7 +188,7 @@ func TestListUsersSortsBothDirections(t *testing.T) {
 		t.Fatalf("filtered traffic order = %s, want fox,bob", got)
 	}
 	if filtered.Counts.All != 3 || listUserCountValue(filtered.Counts, "devices_used", 5) != 4 ||
-		listUserCountValue(filtered.Counts, "devices_online", 6) != 2 { // bob's two link devices count once
+		listUserCountValue(filtered.Counts, "devices_online", 6) != 3 { // bob's two link devices and fox's one
 		t.Fatalf("query/group counts = %+v, devices=(%d,%d)", filtered.Counts,
 			listUserCountValue(filtered.Counts, "devices_used", 5), listUserCountValue(filtered.Counts, "devices_online", 6))
 	}
@@ -256,7 +271,9 @@ func TestListUsersDeviceCounts(t *testing.T) {
 	addListTestAWGDevice(e, awgFresh.Id, awgProfile.Id, "dev_awg_fresh", e.clock.Add(-60_000_000_000).Unix(), 2)
 	addListTestAWGDevice(e, awgStale.Id, awgProfile.Id, "dev_awg_stale", e.clock.Add(-4*60_000_000_000).Unix(), 3)
 	e.online[online.Id] = "nod_de1"
+	e.online["dev_online"] = "nod_de1"
 	e.online[awgStale.Id] = "nod_de1" // an AWG handshake, not the user's session, controls this device's online flag
+	e.online["dev_awg_stale"] = "nod_de1"
 
 	filtered := &adminv1.ListUsersRequest{Filter: adminv1.UserFilter_USER_FILTER_ONLINE}
 	response := must(e.s.ListUsers(e.ctx, req(filtered))).Msg
@@ -266,11 +283,19 @@ func TestListUsersDeviceCounts(t *testing.T) {
 	if got := listUserCountValue(response.Counts, "devices_used", 5); got != 6 {
 		t.Fatalf("devices used = %d, want 6", got)
 	}
-	// "online" has two link devices (the shared one and a HWID one): the nodes say the person is online, not which
-	// device, so they count once. awg-fresh's handshake is the other one.
+	// "online" has two link devices (the shared one and a HWID one) and only the HWID one has a session; awg-fresh's
+	// handshake is the other one. A session on a key device does not make it online: the handshake does.
 	if got := listUserCountValue(response.Counts, "devices_online", 6); got != 2 {
 		t.Fatalf("devices online = %d, want 2", got)
 	}
+	// the shared device gets a session too: both of the person's link devices are online now
+	e.online[sharedDeviceID(e, online.Id)] = "nod_de1"
+	response = must(e.s.ListUsers(e.ctx, req(filtered))).Msg
+	if got := listUserCountValue(response.Counts, "devices_online", 6); got != 3 {
+		t.Fatalf("devices online with both link devices in use = %d, want 3", got)
+	}
+	delete(e.online, sharedDeviceID(e, online.Id))
+	response = must(e.s.ListUsers(e.ctx, req(filtered))).Msg
 	wire := must(proto.Marshal(response))
 	var roundTrip adminv1.ListUsersResponse
 	if err := proto.Unmarshal(wire, &roundTrip); err != nil {

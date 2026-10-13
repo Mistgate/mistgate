@@ -822,12 +822,14 @@ type deviceRevokeArgs struct {
 	ReasonField
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id" jsonschema:"a device id from user_devices"`
+	Block    bool   `json:"block,omitempty" jsonschema:"also refuse the device's ID from now on: its app cannot register again until the owner unblocks it in the admin panel (not possible through this server). Only a device of kind link can be blocked, not the shared place and not an AmneziaVPN key"`
 }
 
 var deviceRevoke = changeSpec[deviceRevokeArgs]{
 	name: "device_revoke", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceRevokeDeviceProcedure),
-	desc:  "Revoke one device of a user: its credentials are dropped from every node and the device must be set up again.",
+	desc: "Revoke one device of a user: its credentials are dropped from every node and the device must be set up again. With block, the device does not come back: " +
+		"its app is refused until the owner unblocks it in the admin panel; unblocking is not offered here.",
 	plan: func(c *call, a deviceRevokeArgs) (*planned, error) {
 		if err := validID("device_id", a.DeviceID); err != nil {
 			return nil, err
@@ -840,21 +842,33 @@ var deviceRevoke = changeSpec[deviceRevokeArgs]{
 			if d.GetId() != a.DeviceID {
 				continue
 			}
-			return &planned{
-				Summary: "Revoke one device of a user: its credentials leave every node.",
-				Facts: []Fact{
-					{Key: "user", Value: nm(r.GetUser().GetName()), Untrusted: true},
-					{Key: "device", Value: nm(d.GetPlatform() + " " + d.GetModel()), Untrusted: true},
-					timeFact("last_seen", d.GetLastSeenUnix()),
-					codedFact("effect", "the device is disconnected and must be set up again", "device"),
-				},
-			}, nil
+			facts := []Fact{
+				{Key: "user", Value: nm(r.GetUser().GetName()), Untrusted: true},
+				{Key: "device", Value: nm(d.GetPlatform() + " " + d.GetModel()), Untrusted: true},
+				timeFact("last_seen", d.GetLastSeenUnix()),
+				codedFact("effect", "the device is disconnected and must be set up again", "device"),
+			}
+			summary := "Revoke one device of a user: its credentials leave every node."
+			if a.Block {
+				if d.GetKind() != adminv1.DeviceKind_DEVICE_KIND_LINK {
+					return nil, errors.New("only an app that reported a device ID can be blocked: the shared place and AmneziaVPN keys cannot")
+				}
+				summary = "Revoke and block one device of a user: its credentials leave every node and its app is refused until the owner unblocks it."
+				facts = append(facts[:3], codedFact("effect", "the device is disconnected and cannot come back until it is unblocked in the admin panel", "device_blocked"))
+				if d.GetFingerprint() != "" {
+					facts = append(facts, Fact{Key: "fingerprint", Value: d.GetFingerprint()})
+				}
+			}
+			return &planned{Summary: summary, Facts: facts}, nil
 		}
 		return nil, errors.New("this user has no such device")
 	},
 	apply: func(c *call, a deviceRevokeArgs, _ Plan) (done, error) {
-		if _, err := c.cl.User.RevokeDevice(c.ctx, connect.NewRequest(&adminv1.RevokeDeviceRequest{DeviceId: a.DeviceID})); err != nil {
+		if _, err := c.cl.User.RevokeDevice(c.ctx, connect.NewRequest(&adminv1.RevokeDeviceRequest{DeviceId: a.DeviceID, Block: a.Block})); err != nil {
 			return done{}, apiError(err)
+		}
+		if a.Block {
+			return doneWith("device_blocked", "Device revoked and blocked: its app is refused until the owner unblocks it in the admin panel."), nil
 		}
 		return doneWith("device_revoked", "Device revoked."), nil
 	},
