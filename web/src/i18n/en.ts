@@ -63,7 +63,7 @@ const core = {
   "section.nodes.desc": "Servers in your fleet, their protocols, load and the wizard to add a new one.",
   "section.users.desc": "People with access: apps, devices, traffic quotas and expiry dates.",
   "section.profiles.desc": "Ready-made protocol setups that you roll out to nodes and users.",
-  "section.subscriptions.desc": "Subscription formats, delivery rules, mirrors and the page users see.",
+  "section.subscriptions.desc": "Subscription formats, delivery rules and the page users see.",
   "section.health.desc": "Alerts, client-eye checks and the fleet doctor.",
   "section.updates.desc": "Panel and node agent versions, staged rollouts and rollback.",
   "section.integrations.desc": "API tokens for scripts, MCP for AI agents and the changes they ask you to approve.",
