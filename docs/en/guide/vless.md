@@ -1,6 +1,6 @@
 ---
 title: VLESS REALITY
-description: "The VLESS profile with REALITY on TCP: when to choose it over Hysteria2, every setting, the node's own site or another site as the REALITY target, ports, and what the apps receive and need."
+description: "The VLESS profile: REALITY on TCP and XHTTP, or TLS with XHTTP and WebSocket, direct or behind a CDN. When to choose it over Hysteria2, every setting, the REALITY target, ports, and what the apps receive and need."
 ---
 
 VLESS is a TCP protocol. With REALITY the node answers anyone who is not a client with a real web site, the **target**: by default the node's own site, or another site you name, so a probe sees a genuine TLS handshake of a site that exists. A person with the right keys is recognised inside the same handshake and gets the tunnel. This page lists the settings of a VLESS profile and what they do; how a profile is made and put on nodes is on [Profiles](profiles.md), and how it shares a node with Hysteria2 is on [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
@@ -56,6 +56,25 @@ For a CDN, set its host and port. The client connects to that endpoint and sends
 A self-signed origin certificate is only for a CDN configured to accept an unverified origin certificate. It is not suitable for clients connecting directly to the node.
 
 Each device has one VLESS identity, a UUID, used for every VLESS server of that device. It is made at the device's next update of the subscription. The node keeps the UUIDs as they are, because VLESS compares them itself; Hysteria2 is different, its node holds only a hash.
+
+## VLESS behind a CDN
+
+A CDN puts its own address between the client and the node: the client connects to the CDN, the CDN connects to the node. It helps where the node's address is blocked but the CDN's is not.
+
+In the profile choose **Security: TLS**, a transport (XHTTP, or WebSocket), and fill in **CDN host**, the name clients connect to, for example `cdn.example.org`. Every link then carries that name as the address, the server name (SNI) and the Host header, and XHTTP starts as **Packet up**. The node keeps its own name for the certificate; clients never use it.
+
+What to set on the CDN:
+
+1. **Origin**: the node's own name (the profile's **Server name**, or the node's domain) and the profile's TCP port. Keep the DNS record of that name **DNS-only**, not proxied through the CDN: the CDN has to reach the node, and Let's Encrypt has to as well.
+2. **Allowed requests**: GET and POST on the profile's path. XHTTP sends its upload as POST requests and receives the download as one long GET. A CDN that only passes GET breaks it.
+3. **Caching**: off for that path. The CDN must not store or reshape the responses.
+4. **WebSocket**: turn it on at the CDN when the profile's transport is WebSocket.
+5. **Origin certificate**: the origin is always TLS, never plain HTTP, because the VLESS header would cross the network in the clear. Let's Encrypt works when the CDN checks the origin's certificate. A self-signed certificate works only if the CDN is set not to verify it, and Mistgate allows it only for a profile that has a CDN host.
+6. **Origin port**: some CDNs forward only to a fixed list of ports. Use one the CDN supports (443 is the safe choice).
+
+If XHTTP stalls, the CDN may be holding whole request bodies: keep **Packet up**. If it still does not work, make a second profile with WebSocket; people then see both. Against a CDN that cuts idle connections after 60 to 100 seconds, the node sends keep-alive padding on a quiet download; that has not been checked against a real CDN either.
+
+> **Note:** real CDNs are not tested yet. The whole path, from a client through the node's TLS front to the internet, is tested in the project's end-to-end run, with the node itself standing in for the CDN. How a particular CDN treats long downloads, request sizes and idle connections is not known until someone tries it.
 
 ## The node's own site
 
@@ -143,3 +162,4 @@ A server whose node address is not a plain host name or IP address gets no link 
 - The panel's own client-eye check does not test VLESS servers yet, so a VLESS server is not marked **No traffic** by it. See [Health](../operations/health.md).
 - **Check ports** on the node page shows whether a TCP connection reaches Mistgate from one other node, see [Nodes](nodes.md). It is one vantage point and does not run a full REALITY handshake. To see what a client sees, test from another network (`nc -vz de1.example.com 8443`), or by connecting from a phone.
 - The subscription carries no Xray JSON or sing-box format yet.
+- VLESS behind a CDN is not tested against a real CDN yet, see [VLESS behind a CDN](#vless-behind-a-cdn).
