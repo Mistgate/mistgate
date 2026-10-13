@@ -154,7 +154,8 @@ func TestBlockedDeviceAnswer(t *testing.T) {
 	must(r.svc.RevokeDevice(r.ctx, connect.NewRequest(&adminv1.RevokeDeviceRequest{DeviceId: id, Block: true})))
 	rec := fetch(h, "/"+tok, happUA, "X-HWID", hwidA)
 	if rec.Code != 200 || !strings.Contains(decode(t, rec.Body.String()), "0.0.0.0") || unb64(t, rec.Header().Get("Announce")) != "This device was turned off by the owner" ||
-		rec.Header().Get("X-Hwid-Active") != "true" || rec.Header().Get("Profile-Update-Interval") != "1" {
+		rec.Header().Get("X-Hwid-Active") != "true" || rec.Header().Get("Profile-Update-Interval") != "1" ||
+		rec.Header().Get("X-Hwid-Max-Devices-Reached") != "" { // not the limit: no "free a place"
 		t.Fatalf("blocked device: %d %q %v", rec.Code, decode(t, rec.Body.String()), rec.Header())
 	}
 	must(r.svc.UnblockDevice(r.ctx, connect.NewRequest(&adminv1.UnblockDeviceRequest{DeviceId: id})))

@@ -478,11 +478,13 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	}
 	if v.Refusal != "" {
 		// The headers of Remnawave, 3x-ui and v2RayTun, so the apps that read them say the same: the HWID check is on, and
-		// either the limit is reached (a blocked device is turned away the same way) or the app has no device ID to give.
+		// the limit is reached or the app has no device ID to give. A blocked device gets neither: the limit is not why,
+		// and an app that reads the flag would tell the person to free a place; the announcement says what happened.
 		hd.Set("X-Hwid-Active", "true")
-		if v.Refusal == access.RefusalNoDeviceID {
+		switch v.Refusal {
+		case access.RefusalNoDeviceID:
 			hd.Set("X-Hwid-Not-Supported", "true")
-		} else {
+		case access.RefusalDeviceLimit:
 			hd.Set("X-Hwid-Max-Devices-Reached", "true")
 		}
 		hd.Set("X-Hwid-Limit", strconv.Itoa(v.DeviceLimit))
