@@ -210,6 +210,18 @@ func TestDecoySyncPushesOnlyWhatTheNodeLacks(t *testing.T) {
 	if set.Mode != decoy.ModeBuiltin || set.BundleSha256 != "" || len(set.Files) != 0 {
 		t.Fatalf("builtin push = %+v", set)
 	}
+	reason := func() string {
+		got, err := nodeService{e.f}.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.Msg.Node.DecoyReasonCode
+	}
+	if r := reason(); r != "pending" {
+		t.Fatalf("reason while the node still shows the own site = %q, want pending", r)
+	}
+	replyPortCommand(c2, set.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"mode": set.Mode, "sha256": ""}})
+	waitFor(t, func() bool { return reason() == "" })
 }
 
 func noSetDecoy(t *testing.T, c *conn) {
@@ -280,5 +292,22 @@ func TestUploadNodeDecoyRefusalIsCoded(t *testing.T) {
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeInvalidArgument || !strings.HasPrefix(ce.Message(), "decoy_bundle_bad_path: path=") {
 		t.Fatalf("UploadNodeDecoy(../x.html) = %v", err)
+	}
+}
+
+// Only the two calls that carry a decoy bundle accept a large request; the rest of the node API keeps its small cap.
+func TestOnlyDecoyCallsAcceptLargeBodies(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	nodes, _ := e.adminClients()
+	bundle := make([]byte, 200<<10) // not an archive, but past 64 KiB
+	notes := strings.Repeat("x", 200<<10)
+	_, err := nodes.UpdateNode(e.ctx, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: a.nodeID, Notes: &notes}))
+	if connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("a 200 KiB UpdateNode = %v, want resource_exhausted", err)
+	}
+	_, err = nodes.UploadNodeDecoy(e.ctx, connect.NewRequest(&adminv1.UploadNodeDecoyRequest{NodeId: a.nodeID, BundleArchive: bundle}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.HasPrefix(err.Error(), "invalid_argument: decoy_bundle_") {
+		t.Fatalf("a 200 KiB upload = %v, want the bundle refusal (decoy_bundle_...)", err)
 	}
 }

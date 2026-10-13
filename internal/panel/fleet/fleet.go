@@ -220,7 +220,15 @@ func (f *Fleet) AgentHandler() http.Handler {
 // NodeHandler is the admin NodeService. Pass connect.WithInterceptors(auth.Interceptor()) so that it is
 // behind the admin session; the path is the Connect prefix to mount it on.
 func (f *Fleet) NodeHandler(opts ...connect.HandlerOption) (string, http.Handler) {
-	return adminv1connect.NewNodeServiceHandler(nodeService{f}, append([]connect.HandlerOption{connect.WithReadMaxBytes(3 << 20)}, opts...)...)
+	path, h := adminv1connect.NewNodeServiceHandler(nodeService{f}, append([]connect.HandlerOption{connect.WithReadMaxBytes(3 << 20)}, opts...)...)
+	// Only the two calls that carry a decoy bundle (2 MiB, 2.7 MiB as base64 JSON) may be large: every other node call
+	// keeps the small request cap of the rest of the admin API.
+	return path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/SetNodeDecoyMode") && !strings.HasSuffix(r.URL.Path, "/UploadNodeDecoy") {
+			r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // FleetHandler is the admin FleetService (Overview, ListEvents); see NodeHandler for opts.

@@ -47,7 +47,7 @@ type nodeDecoyArgs struct {
 	ReasonField
 	Node         string `json:"node" jsonschema:"node id or exact name"`
 	Mode         string `json:"mode" jsonschema:"builtin, panel or own"`
-	BundleBase64 string `json:"bundle_base64,omitempty" jsonschema:"base64 ZIP or TAR static site up to 2 MB; required for own, omitted otherwise"`
+	BundleBase64 string `json:"bundle_base64,omitempty" jsonschema:"base64 ZIP or TAR static site up to 2 MiB; required for own, omitted otherwise"`
 }
 
 var nodeDecoy = changeSpec[nodeDecoyArgs]{

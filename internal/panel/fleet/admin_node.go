@@ -268,6 +268,14 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	reasonCode := ""
 	switch n.DecoyMode {
 	case decoy.ModeBuiltin:
+		// An old agent serves the built-in page anyway; a newer one may still be showing the site it had before.
+		switch {
+		case !decoySupported || agentMode == decoy.ModeBuiltin:
+		case !live.Connected:
+			reasonCode = "node_offline"
+		default:
+			reasonCode = "pending"
+		}
 	case decoy.ModePanel:
 		switch {
 		case panelBundle == nil:
