@@ -98,7 +98,7 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
 | `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
 | `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
-| `user_get` | Read only | One user: limits, status, devices, profiles, node access. No subscription link, no keys. |
+| `user_get` | Read only | One user: limits (including both speed limits), status, devices, profiles, node access. No subscription link, no keys. |
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with kind, platform, model, OS version, app, traffic, last seen, online and on which nodes, a short fingerprint of the device ID, and for AmneziaWG the profile and tunnel address; the blocked devices apart. Never a key or a config. |
 | `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
@@ -116,8 +116,8 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 
 | Tool | Profile | Arguments | Needs the owner |
 |---|---|---|---|
-| `user_create` | Operator | `name` (1 to 64 characters, unique ignoring case), `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month` (default), `rolling_month`), `term_days` (at most 3650), `device_limit` (at most 100), `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps`, `dns_preset_id` | no |
-| `user_update` | Operator | `user_id`, optionally `subscription_name` (at most 64 characters; empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`) | no |
+| `user_create` | Operator | `name` (1 to 64 characters, unique ignoring case), `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month` (default), `rolling_month`), `term_days` (at most 3650), `device_limit` (at most 100), `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps` (per person: all their devices together on one node), `device_speed_limit_bps` (per device), `dns_preset_id` | no |
+| `user_update` | Operator | `user_id`, optionally `subscription_name` (at most 64 characters; empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`; the plan names both speed limits, per person on one node and per device) | no |
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |

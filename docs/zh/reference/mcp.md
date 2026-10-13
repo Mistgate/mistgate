@@ -98,7 +98,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
-| `user_get` | 只读 | 单个用户：限制、状态、设备、协议配置和节点访问权限。不含订阅链接或密钥。 |
+| `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、设备、协议配置和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置和节点。不返回订阅内容或链接。 |
@@ -116,8 +116,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 | 工具 | 权限级别 | 参数 | 需要所有者审批 |
 |---|---|---|---|
-| `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`、`dns_preset_id` | 否 |
-| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`） | 否 |
+| `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`（每人：其所有设备在同一节点上合计）、`device_speed_limit_bps`（每台设备）、`dns_preset_id` | 否 |
+| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速） | 否 |
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |

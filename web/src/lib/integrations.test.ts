@@ -133,7 +133,7 @@ describe("words of an approval", () => {
   it("labels every fact key the panel writes, and shows an unknown key as it came", () => {
     const keys = [
       "name", "subscription_name", "quota", "term", "apps", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
-      "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit",
+      "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit", "device_speed_limit",
       "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
       "ssh", "username", "host_key", "host_key_algorithm", "address", "installation", "recovery",
     ];

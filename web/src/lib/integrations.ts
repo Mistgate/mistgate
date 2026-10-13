@@ -228,6 +228,7 @@ function changeSide(t: T, fmt: Fmt, key: string, v: string): string {
     case "expires":
       return n === 0 ? t("approval.value.noTerm") : fmt.date(n);
     case "speed_limit":
+    case "device_speed_limit":
       return n === 0 ? t("approval.value.noLimit") : fmt.mbit(n);
     case "apps":
       return appsKey[v] ? t(appsKey[v]) : v;

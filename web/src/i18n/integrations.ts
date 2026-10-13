@@ -186,7 +186,8 @@ export const en = {
   "approval.fact.quota_reset": "Quota reset",
   "approval.fact.expires": "Valid until",
   "approval.fact.device_limit": "Device limit",
-  "approval.fact.speed_limit": "Speed",
+  "approval.fact.speed_limit": "Speed per person",
+  "approval.fact.device_speed_limit": "Speed per device",
   "approval.fact.dns_preset": "DNS preset",
   "approval.fact.used": "Used",
 
@@ -467,7 +468,8 @@ export const ru: Record<keyof typeof en, string> = {
   "approval.fact.quota_reset": "Сброс квоты",
   "approval.fact.expires": "Действует до",
   "approval.fact.device_limit": "Лимит устройств",
-  "approval.fact.speed_limit": "Скорость",
+  "approval.fact.speed_limit": "Скорость на человека",
+  "approval.fact.device_speed_limit": "Скорость на устройство",
   "approval.fact.dns_preset": "DNS-пресет",
   "approval.fact.used": "Израсходовано",
 
@@ -744,7 +746,8 @@ export const zh: typeof en = {
   "approval.fact.quota_reset": "配额重置",
   "approval.fact.expires": "有效期至",
   "approval.fact.device_limit": "设备上限",
-  "approval.fact.speed_limit": "限速",
+  "approval.fact.speed_limit": "每人限速",
+  "approval.fact.device_speed_limit": "每台设备限速",
   "approval.fact.dns_preset": "DNS 预设",
   "approval.fact.used": "已用",
 

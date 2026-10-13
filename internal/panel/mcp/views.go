@@ -482,26 +482,28 @@ func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*
 // users
 
 type userV struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	GroupID     string   `json:"group_id,omitempty"`
-	Group       string   `json:"group,omitempty"`
-	Status      string   `json:"status"`
-	Online      bool     `json:"online"`
-	DevicesUsed uint32   `json:"devices_used"`
-	DeviceLimit uint32   `json:"device_limit"`
-	UsedBytes   uint64   `json:"used_bytes"`
-	QuotaBytes  uint64   `json:"quota_bytes"`
-	QuotaReset  string   `json:"quota_reset,omitempty"`
-	ExpiresUnix int64    `json:"expires_unix"`
-	LastSeen    int64    `json:"last_seen_unix"`
-	Node        string   `json:"current_node,omitempty"`
-	SpeedLimit  uint64   `json:"speed_limit_bps,omitempty"`
-	Happ        bool     `json:"app_happ"`
-	Amnezia     bool     `json:"app_amnezia"`
-	AllNodes    bool     `json:"all_nodes"`
-	NodeIDs     []string `json:"node_ids,omitempty"`
-	CreatedUnix int64    `json:"created_unix"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	GroupID     string `json:"group_id,omitempty"`
+	Group       string `json:"group,omitempty"`
+	Status      string `json:"status"`
+	Online      bool   `json:"online"`
+	DevicesUsed uint32 `json:"devices_used"`
+	DeviceLimit uint32 `json:"device_limit"`
+	UsedBytes   uint64 `json:"used_bytes"`
+	QuotaBytes  uint64 `json:"quota_bytes"`
+	QuotaReset  string `json:"quota_reset,omitempty"`
+	ExpiresUnix int64  `json:"expires_unix"`
+	LastSeen    int64  `json:"last_seen_unix"`
+	Node        string `json:"current_node,omitempty"`
+	SpeedLimit  uint64 `json:"speed_limit_bps,omitempty"` // per person: all devices together, on one node
+	// DeviceSpeedLimit: each device alone.
+	DeviceSpeedLimit uint64   `json:"device_speed_limit_bps,omitempty"`
+	Happ             bool     `json:"app_happ"`
+	Amnezia          bool     `json:"app_amnezia"`
+	AllNodes         bool     `json:"all_nodes"`
+	NodeIDs          []string `json:"node_ids,omitempty"`
+	CreatedUnix      int64    `json:"created_unix"`
 }
 
 func userView(u *adminv1.User) userV {
@@ -510,7 +512,7 @@ func userView(u *adminv1.User) userV {
 		Status: enumName("USER_STATUS_", u.GetStatus().String()), Online: u.GetOnline(),
 		DevicesUsed: u.GetDevicesUsed(), DeviceLimit: u.GetDeviceLimit(), UsedBytes: u.GetUsedBytes(), QuotaBytes: u.GetQuotaBytes(),
 		QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()), ExpiresUnix: u.GetExpiresUnix(), LastSeen: u.GetLastSeenUnix(),
-		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
+		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), DeviceSpeedLimit: u.GetDeviceSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
 		AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
 	}
 	if !v.AllNodes {

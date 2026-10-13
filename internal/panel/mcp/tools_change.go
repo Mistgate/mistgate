@@ -469,8 +469,10 @@ type userCreateArgs struct {
 	DeviceLimit   uint32    `json:"device_limit,omitempty" jsonschema:"0 = the panel's default"`
 	Apps          *appsArg  `json:"apps,omitempty" jsonschema:"absent = both apps on"`
 	Nodes         *nodesArg `json:"nodes,omitempty" jsonschema:"absent = all nodes"`
-	SpeedLimitBps uint64    `json:"speed_limit_bps,omitempty" jsonschema:"0 = no limit"`
-	DNSPresetID   string    `json:"dns_preset_id,omitempty"`
+	SpeedLimitBps uint64    `json:"speed_limit_bps,omitempty" jsonschema:"per person: all the devices of the user together on one node (so two nodes at once can reach twice this); 0 = no limit"`
+	// DeviceSpeedLimitBps is the other limit: each device of the user alone. Both can be set; a device is held to the lower.
+	DeviceSpeedLimitBps uint64 `json:"device_speed_limit_bps,omitempty" jsonschema:"per device: no single device of the user goes faster than this; 0 = no separate device limit"`
+	DNSPresetID         string `json:"dns_preset_id,omitempty"`
 }
 
 var userCreate = changeSpec[userCreateArgs]{
@@ -518,22 +520,27 @@ var userCreate = changeSpec[userCreateArgs]{
 		if a.TermDays > 0 {
 			term = plural(int(a.TermDays), "day", "days")
 		}
-		return &planned{
-			Summary: fmt.Sprintf("Create one user with a %s quota (reset: %s), term: %s, on %s.", fmtBytes(a.QuotaBytes), reset, term, a.Nodes.text()),
-			Facts: []Fact{
-				{Key: "name", Value: nm(a.Name), Untrusted: true},
-				quotaFact(a.QuotaBytes, reset),
-				termFact(a.TermDays),
-				codedFact("apps", a.Apps.text(), a.Apps.code()),
-				nodesFact("nodes", a.Nodes),
-			},
-		}, nil
+		summary := fmt.Sprintf("Create one user with a %s quota (reset: %s), term: %s, on %s.", fmtBytes(a.QuotaBytes), reset, term, a.Nodes.text())
+		facts := []Fact{
+			{Key: "name", Value: nm(a.Name), Untrusted: true},
+			quotaFact(a.QuotaBytes, reset),
+			termFact(a.TermDays),
+			codedFact("apps", a.Apps.text(), a.Apps.code()),
+			nodesFact("nodes", a.Nodes),
+		}
+		if a.SpeedLimitBps > 0 || a.DeviceSpeedLimitBps > 0 {
+			summary += " Speed limits: " + speedLimitsText(a.SpeedLimitBps, a.DeviceSpeedLimitBps) + "."
+			facts = append(facts,
+				Fact{Key: "speed_limit", Value: fmt.Sprintf("%d bit/s per person on one node (0 = none)", a.SpeedLimitBps)},
+				Fact{Key: "device_speed_limit", Value: fmt.Sprintf("%d bit/s per device (0 = none)", a.DeviceSpeedLimitBps)})
+		}
+		return &planned{Summary: summary, Facts: facts}, nil
 	},
 	apply: func(c *call, a userCreateArgs, _ Plan) (done, error) {
 		reset, _ := quotaReset(a.QuotaReset)
 		r, err := c.cl.User.CreateUser(c.ctx, connect.NewRequest(&adminv1.CreateUserRequest{
 			Name: a.Name, GroupId: a.GroupID, QuotaBytes: a.QuotaBytes, QuotaReset: reset, TermDays: a.TermDays,
-			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DnsPresetId: a.DNSPresetID,
+			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DeviceSpeedLimitBps: a.DeviceSpeedLimitBps, DnsPresetId: a.DNSPresetID,
 		}))
 		if err != nil {
 			return done{}, apiError(err)
@@ -542,6 +549,17 @@ var userCreate = changeSpec[userCreateArgs]{
 		return doneWith("user_created", fmt.Sprintf("User created (id %s). The subscription link is not shown to agents; the owner copies it in the admin panel.",
 			r.Msg.GetUser().GetId())), nil
 	},
+}
+
+// speedLimitsText names the two speed limits of a user: per person on one node, per device.
+func speedLimitsText(person, device uint64) string {
+	word := func(bps uint64) string {
+		if bps == 0 {
+			return "none"
+		}
+		return fmt.Sprintf("%d bit/s", bps)
+	}
+	return word(person) + " per person on one node, " + word(device) + " per device"
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -559,8 +577,10 @@ type userUpdateArgs struct {
 	DeviceLimit      *uint32   `json:"device_limit,omitempty"`
 	Apps             *appsArg  `json:"apps,omitempty"`
 	Nodes            *nodesArg `json:"nodes,omitempty"`
-	SpeedLimitBps    *uint64   `json:"speed_limit_bps,omitempty" jsonschema:"0 = remove the limit"`
-	DNSPresetID      *string   `json:"dns_preset_id,omitempty" jsonschema:"empty string = inherit"`
+	SpeedLimitBps    *uint64   `json:"speed_limit_bps,omitempty" jsonschema:"per person: all the devices of the user together on one node; 0 = remove the limit"`
+	// DeviceSpeedLimitBps is the per-device limit: each device of the user alone.
+	DeviceSpeedLimitBps *uint64 `json:"device_speed_limit_bps,omitempty" jsonschema:"per device: no single device goes faster than this; 0 = remove the limit"`
+	DNSPresetID         *string `json:"dns_preset_id,omitempty" jsonschema:"empty string = inherit"`
 }
 
 func checkSubscriptionName(name string) error {
@@ -652,8 +672,13 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			n++
 		}
 		if a.SpeedLimitBps != nil {
-			change("speed_limit", fmt.Sprintf("%d -> %d bit/s (0 = none)", u.GetSpeedLimitBps(), *a.SpeedLimitBps),
+			change("speed_limit", fmt.Sprintf("per person on one node: %d -> %d bit/s (0 = none)", u.GetSpeedLimitBps(), *a.SpeedLimitBps),
 				strconv.FormatUint(u.GetSpeedLimitBps(), 10), strconv.FormatUint(*a.SpeedLimitBps, 10))
+			n++
+		}
+		if a.DeviceSpeedLimitBps != nil {
+			change("device_speed_limit", fmt.Sprintf("per device: %d -> %d bit/s (0 = none)", u.GetDeviceSpeedLimitBps(), *a.DeviceSpeedLimitBps),
+				strconv.FormatUint(u.GetDeviceSpeedLimitBps(), 10), strconv.FormatUint(*a.DeviceSpeedLimitBps, 10))
 			n++
 		}
 		if a.DNSPresetID != nil {
@@ -673,7 +698,7 @@ var userUpdate = changeSpec[userUpdateArgs]{
 	apply: func(c *call, a userUpdateArgs, _ Plan) (done, error) {
 		req := &adminv1.UpdateUserRequest{
 			UserId: a.UserID, Name: a.Name, SubscriptionName: a.SubscriptionName, GroupId: a.GroupID, QuotaBytes: a.QuotaBytes, ExpiresUnix: a.ExpiresUnix,
-			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DnsPresetId: a.DNSPresetID,
+			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DeviceSpeedLimitBps: a.DeviceSpeedLimitBps, DnsPresetId: a.DNSPresetID,
 		}
 		if a.QuotaReset != nil {
 			q, _ := quotaReset(*a.QuotaReset)

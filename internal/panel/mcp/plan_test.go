@@ -589,6 +589,62 @@ func TestNodeRollbackAndOtherChanges(t *testing.T) {
 	mustFail(t, s, "device_revoke_plan", map[string]any{"user_id": "usr_alice", "device_id": "dev_9"})
 }
 
+// Both speed limits are set, shown and changed on their own: per person on one node, and per device.
+func TestUserSpeedLimitsPerPersonAndPerDevice(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+
+	var got UserGetV
+	if err := json.Unmarshal([]byte(mustOK(t, s, "user_get", map[string]any{"user_id": "usr_alice"})), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.User.SpeedLimit != 20_000_000 || got.User.DeviceSpeedLimit != 5_000_000 {
+		t.Errorf("user_get limits = %d / %d, want 20000000 per person and 5000000 per device", got.User.SpeedLimit, got.User.DeviceSpeedLimit)
+	}
+
+	// an update of the device limit alone names it, as a change from the stored value, and leaves the person's limit alone
+	p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "device_speed_limit_bps": 8_000_000})
+	var device *Fact
+	for i := range p.Facts {
+		switch p.Facts[i].Key {
+		case "device_speed_limit":
+			device = &p.Facts[i]
+		case "speed_limit":
+			t.Errorf("an update of the device limit also plans the person's limit: %+v", p.Facts[i])
+		}
+	}
+	if device == nil || !strings.Contains(device.Value, "per device: 5000000 -> 8000000") {
+		t.Fatalf("plan facts = %+v", p.Facts)
+	}
+	both := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "speed_limit_bps": 0, "device_speed_limit_bps": 0})
+	if !strings.Contains(factsText(both), "per person on one node: 20000000 -> 0") || !strings.Contains(factsText(both), "per device: 5000000 -> 0") {
+		t.Errorf("clearing both: %+v", both.Facts)
+	}
+	applyOf(t, s, "user_update", p.ConfirmToken)
+	if len(e.w.updateReq) != 1 || e.w.updateReq[0].DeviceSpeedLimitBps == nil || *e.w.updateReq[0].DeviceSpeedLimitBps != 8_000_000 || e.w.updateReq[0].SpeedLimitBps != nil {
+		t.Errorf("update request: %+v", e.w.updateReq)
+	}
+
+	// a new user: the plan names both limits and the request carries both
+	c := planOf(t, s, "user_create", map[string]any{"group_id": "grp_1", "name": "dina", "speed_limit_bps": 30_000_000, "device_speed_limit_bps": 10_000_000})
+	if !strings.Contains(c.Summary, "30000000 bit/s per person on one node, 10000000 bit/s per device") {
+		t.Errorf("create summary = %q", c.Summary)
+	}
+	applyOf(t, s, "user_create", c.ConfirmToken)
+	if len(e.w.createReq) != 1 || e.w.createReq[0].GetSpeedLimitBps() != 30_000_000 || e.w.createReq[0].GetDeviceSpeedLimitBps() != 10_000_000 {
+		t.Errorf("create request: %+v", e.w.createReq)
+	}
+}
+
+func factsText(p PlanOut) string {
+	var b strings.Builder
+	for _, f := range p.Facts {
+		b.WriteString(f.Key + "=" + f.Value + "\n")
+	}
+	return b.String()
+}
+
 // With block the device does not come back: the plan says so, only an app with a device ID can be blocked, and the request
 // carries the flag. A plain revoke does not.
 func TestDeviceRevokeCanBlock(t *testing.T) {
