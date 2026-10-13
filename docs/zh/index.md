@@ -17,8 +17,8 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 
 ## 新管理员的阅读顺序
 
-1. [概览](getting-started/overview.md)和[要求](getting-started/requirements.md)：了解面板、节点和协议配置是什么，以及需要哪些服务器。
-2. 从官方发布版本[安装面板](getting-started/install-panel.md)，手动安装，或使用 [AI 智能体指南](getting-started/ai-agents.md)中的安装提示词。也可以先在[Cloudflare Workers](getting-started/install-edge.md) 上试用，无需自备服务器。
+1. [概览](getting-started/overview.md)和[系统要求](getting-started/requirements.md)：了解面板、节点和协议配置是什么，以及需要哪些服务器。
+2. 从官方发布版本[安装面板](getting-started/install-panel.md)，手动安装，或使用 [AI 智能体指南](getting-started/ai-agents.md)中的安装提示词。也可以部署到 [Cloudflare Workers](getting-started/install-edge.md)（预览版），无需自备服务器。
 3. [通过 SSH 安装节点](getting-started/ssh-install.md)，或使用自行运行的命令[添加节点](getting-started/add-node.md)。
 4. [首批用户](getting-started/first-users.md)：在节点上部署协议配置、创建分组和用户，并发送订阅链接。
 5. 向其他人提供链接前，先了解[运行状况](operations/health.md)、[安全](operations/security.md)和[加密备份](operations/backups.md)。
@@ -29,7 +29,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 ### 入门
 
 - [概览](getting-started/overview.md)：Mistgate 是什么，以及其基本概念：面板、节点、协议配置、节点上的服务器、用户、分组、设备、订阅和用户页面。
-- [要求](getting-started/requirements.md)：面板和节点的要求，以及从源代码构建所需的条件。
+- [系统要求](getting-started/requirements.md)：面板和节点的要求，以及从源代码构建所需的条件。
 - [安装面板](getting-started/install-panel.md)：从一台全新的 Linux 服务器到在管理后台创建所有者账户。
 - [安装 Cloudflare 版](getting-started/install-edge.md)：使用 `mistgate edge deploy` 在 Cloudflare Workers 上运行面板，而非使用服务器（预览版）。
 - [添加节点](getting-started/add-node.md)：添加节点的两种方式、手动安装命令以及移除节点。
@@ -57,11 +57,11 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 ### 运维
 
 - [运行状况](operations/health.md)：客户端视角检测、节点诊断和告警。
-- [Telegram 告警](operations/telegram-alerts.md)：机器人、关联聊天、发送内容和对象，以及面板监视器。
+- [Telegram 告警](operations/telegram-alerts.md)：机器人、绑定聊天、发送内容和对象，以及面板监视器。
 - [面板监视器](operations/panel-watcher.md)：Cloudflare 每分钟检查一次面板，并通过 Telegram 报告服务中断。
 - [更新](operations/updates.md)：节点自更新、立即或定时更新节点、回滚以及更新面板。
-- [发布与签名](operations/releases.md)：发布密钥、可重现构建、签名和发布，以及自建发布包。
-- [加密备份](operations/backups.md)：配置 R2、保护离线恢复身份并恢复面板。
+- [发布版本和签名](operations/releases.md)：发布密钥、可重现构建、签名和发布，以及自建发布包。
+- [加密备份](operations/backups.md)：配置 R2、妥善保管离线恢复私钥并恢复面板。
 - [安全](operations/security.md)：管理后台登录、角色、再次验证、会话、审计、伪装站点和隐藏的管理后台、数据目录和备份，以及恢复访问权限。
 - [故障排查](operations/troubleshooting.md)：常见问题及其原因查找方法。
 

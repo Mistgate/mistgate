@@ -203,7 +203,7 @@ func alertTitle(l L, a store.HealthAlert) string {
 	case "user_connection":
 		return l.pick("A user may have a connection problem", "У пользователя может быть проблема с подключением", "可能有人无法连接")
 	case "users_impacted":
-		return l.pick("Connections dropped for some users", "У части пользователей пропало подключение", "节点上的连接掉线了")
+		return l.pick("Connections dropped for some users", "У части пользователей пропало подключение", "部分用户的连接已中断")
 	case "torrent":
 		return l.pick("Torrent attempts", "Попытки качать торренты", "BT 下载尝试")
 	case "port_lossy":
@@ -412,7 +412,7 @@ func doctorDetail(l L, p map[string]string) (string, bool) {
 			"Профили с выходом через WARP ("+profiles+") не стартуют: у ноды нет аккаунта WARP",
 			"使用 WARP 出口的协议配置（"+profiles+"）无法启动：节点没有 WARP 账户"), true
 	case "warp_path.host_clash":
-		return l.pick("WARP cannot use this host", "WARP не может работать на этом хосте", "WARP 无法使用此主机"), true
+		return l.pick("WARP cannot use this host", "WARP не может работать на этом хосте", "WARP 无法在此主机上运行"), true
 	case "warp_path.check_failed":
 		state := warpStateWord(l, p["state"])
 		if state == "" {
@@ -515,7 +515,7 @@ func againLine(l L, a store.HealthAlert) string {
 func alertResolved(l L, a store.HealthAlert, node string) string {
 	tail := ""
 	if !a.OpenedAt.IsZero() && a.ResolvedAt.After(a.OpenedAt) {
-		tail = l.pick("lasted ", "длилось ", "已持续 ") + l.duration(a.ResolvedAt.Sub(a.OpenedAt))
+		tail = l.pick("lasted ", "длилось ", "持续了 ") + l.duration(a.ResolvedAt.Sub(a.OpenedAt))
 	}
 	line := nodeLine(l, node)
 	switch {

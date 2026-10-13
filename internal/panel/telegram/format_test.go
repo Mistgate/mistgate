@@ -128,7 +128,7 @@ func TestReopenedAlertCountsFromItsEpisodeAndSaysAgain(t *testing.T) {
 	}{
 		{"en", "Again", "lasted 2 min", "Again, first at 18:21 UTC", "Again, first at 07.10 18:21 UTC"},
 		{"ru", "Снова", "длилось 2 мин", "Снова, впервые в 18:21 UTC", "Снова, впервые в 07.10 18:21 UTC"},
-		{"zh", "再次出现", "已持续 2 分钟", "再次出现，首次于 18:21 UTC", "再次出现，首次于 07.10 18:21 UTC"},
+		{"zh", "再次出现", "持续了 2 分钟", "再次出现，首次于 18:21 UTC", "再次出现，首次于 07.10 18:21 UTC"},
 	} {
 		got := alertResolved(tc.lang, reopened, "nl")
 		if !strings.Contains(got, tc.duration) || strings.Contains(got, "1 h") || strings.Contains(got, "1 ч") || !strings.Contains(got, tc.again) {

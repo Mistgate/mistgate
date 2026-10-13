@@ -29,11 +29,11 @@ func TestChineseStateNotesAreTranslated(t *testing.T) {
 		want string
 		date time.Time
 	}{
-		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "订阅已于 9月29日 到期。联系我们即可续期", sep29},
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "订阅已于9月29日到期。联系我们即可续期", sep29},
 		{access.SubView{Status: access.StatusExpired}, "订阅已到期。联系我们即可续期", time.Time{}},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "流量已用完，10月10日 重置", oct10},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "流量已用完，2027年1月5日 重置", jan5},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetNone}, "流量已用完。联系我们，可以为你增加", time.Time{}},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "流量已用完，10月10日重置", oct10},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "流量已用完，2027年1月5日重置", jan5},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetNone}, "流量已用完。联系我们提高额度", time.Time{}},
 		{access.SubView{Status: access.StatusDisabled}, "访问已暂停", time.Time{}},
 	} {
 		got := stateNote(c.view, "zh", now)
@@ -317,7 +317,7 @@ func TestStateNote(t *testing.T) {
 	}{
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "ru", "Подписка закончилась 29 сентября. Напишите — продлим"},
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "en", "Subscription ended on 29 September. Message us to renew"},
-		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "zh", "订阅已于 9月29日 到期。联系我们即可续期"},
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "zh", "订阅已于9月29日到期。联系我们即可续期"},
 		{access.SubView{Status: access.StatusExpired}, "ru", "Подписка закончилась. Напишите — продлим"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "ru", "Трафик закончился, обнулится 10 октября"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "ru", "Трафик закончился, обнулится 5 января 2027"},

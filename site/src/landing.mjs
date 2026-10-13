@@ -28,7 +28,7 @@ export const LANDING = {
     why: [
       ["subscriptions", "One link, several protocols", "Apps on the Mihomo core get Hysteria2, VLESS and AmneziaWG from the same link: when one protocol is blocked on someone's network, the other is already in their app.", "guide/client-apps"],
       ["nodes", "Servers added from the browser", "Type the IP and the root password. The panel pins the host key, checks the server, opens the ports, installs the signed agent and waits for it to connect.", "getting-started/ssh-install"],
-      ["health", "You find out first", "Every 5 minutes the panel connects to each server the way an app does. A doctor on every node runs 16 host checks, and alerts go to Telegram.", "operations/health"],
+      ["health", "You find out first", "Every 5 minutes the panel connects to each server the way an app does. A doctor on every node runs 17 host checks, and alerts go to Telegram.", "operations/health"],
       ["settings", "Light and hidden", "Two static Go binaries and SQLite, no Docker. The panel idles at 16–20 MiB, and a stranger who opens its address sees a decoy site.", "operations/security"],
     ],
     more: "More",
@@ -79,7 +79,7 @@ export const LANDING = {
     why: [
       ["subscriptions", "Одна ссылка, несколько протоколов", "Приложения на ядре Mihomo получают по одной ссылке Hysteria2, VLESS и AmneziaWG: если в сети у человека заблокируют один протокол, второй уже есть в приложении.", "guide/client-apps"],
       ["nodes", "Серверы добавляются из браузера", "Введите IP и пароль root. Панель запомнит SSH-ключ сервера, проверит его, откроет порты, поставит подписанный агент и дождётся, пока он подключится.", "getting-started/ssh-install"],
-      ["health", "Вы узнаёте первым", "Каждые 5 минут панель подключается к каждому серверу так же, как приложение. Доктор на каждой ноде делает 16 проверок хоста, предупреждения приходят в Telegram.", "operations/health"],
+      ["health", "Вы узнаёте первым", "Каждые 5 минут панель подключается к каждому серверу так же, как приложение. Доктор на каждой ноде делает 17 проверок хоста, предупреждения приходят в Telegram.", "operations/health"],
       ["settings", "Лёгкая и незаметная", "Два статических бинарника на Go и SQLite, без Docker. Панель в простое занимает 16–20 МиБ, а посторонний по её адресу видит сайт-ширму.", "operations/security"],
     ],
     more: "Подробнее",
@@ -130,7 +130,7 @@ export const LANDING = {
     why: [
       ["subscriptions", "一个链接，多种协议", "基于 Mihomo 内核的应用可以从同一个链接获取 Hysteria2、VLESS 和 AmneziaWG：用户的网络封锁了其中一种协议时，另一种已经在应用里了。", "guide/client-apps"],
       ["nodes", "在浏览器里添加服务器", "输入 IP 和 root 密码。面板会固定主机密钥、检查服务器、开放端口、安装已签名的 Agent，并等待它连接。", "getting-started/ssh-install"],
-      ["health", "你最先知道", "面板每 5 分钟像应用那样连接一次每台服务器。每个节点上的诊断会运行 16 项主机检查，告警发送到 Telegram。", "operations/health"],
+      ["health", "你最先知道", "面板每 5 分钟像应用那样连接一次每台服务器。每个节点上的诊断会运行 17 项主机检查，告警发送到 Telegram。", "operations/health"],
       ["settings", "轻量且隐蔽", "两个静态 Go 二进制文件加 SQLite，无需 Docker。面板空闲时占用 16–20 MiB，陌生人打开它的地址只会看到一个伪装站点。", "operations/security"],
     ],
     more: "更多",

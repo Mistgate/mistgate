@@ -3,13 +3,13 @@ title: 安装面板
 description: 下载或构建 Mistgate，使用 mistgate setup 准备面板，通过 systemd 运行，并首次登录。
 ---
 
-本页介绍如何从一台全新的 Linux 服务器开始，运行面板并创建所有者账户。示例使用 `panel.example.com`；先阅读[要求](requirements.md)。面板服务器上的命令以 root 身份运行。能够通过 SSH 访问服务器的 AI 智能体也可以替你完成这些步骤：见 [AI 智能体指南](ai-agents.md)中的安装提示词。
+本页介绍如何从一台全新的 Linux 服务器开始，运行面板并创建所有者账户。示例使用 `panel.example.com`；先阅读[系统要求](requirements.md)。面板服务器上的命令以 root 身份运行。能够通过 SSH 访问服务器的 AI 智能体也可以替你完成这些步骤：见 [AI 智能体指南](ai-agents.md)中的安装提示词。
 
 > **注意：** 本页介绍在自有服务器上运行面板。若要改为在 Cloudflare Workers 上运行（预览版），无需服务器，参见[安装 Cloudflare 版](install-edge.md)。
 
 ## 一行安装
 
-对于一台全新的 amd64 或 arm64 Linux 服务器（使用 systemd），以 root 身份运行以下命令。域名必须直接指向服务器，TCP 80 和 443 端口必须空闲。验证签名需要支持 `ssh-keygen -Y verify` 的 `openssh-client`，或 OpenSSL 3.2 及更高版本。安装器会下载最新发布版本，根据 `SHA256SUMS` 和已签名的面板清单检查二进制文件，然后运行 setup 并安装 systemd 服务。它不会更改防火墙规则；如果 UFW 或 firewalld 已启用，安装器会显示需要添加的规则。
+在一台使用 systemd 的全新 amd64 或 arm64 Linux 服务器上，以 root 身份运行以下命令。域名必须直接指向服务器，TCP 80 和 443 端口必须空闲。验证签名需要支持 `ssh-keygen -Y verify` 的 `openssh-client`，或 OpenSSL 3.2 及更高版本。安装器会下载最新发布版本，根据 `SHA256SUMS` 和已签名的面板清单检查二进制文件，然后运行 setup 并安装 systemd 服务。它不会更改防火墙规则；如果 UFW 或 firewalld 已启用，安装器会显示需要添加的规则。
 
 ```sh
 curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
@@ -51,7 +51,7 @@ mistgate version
 
 #### 从源代码构建
 
-在装有[要求](requirements.md)中列出的工具的构建机器上运行：
+在装有[系统要求](requirements.md)中列出的工具的构建机器上运行：
 
 ```sh
 git clone https://github.com/Mistgate/mistgate.git
@@ -63,7 +63,7 @@ ssh root@panel.example.com 'install -m 0755 /root/mistgate-linux-amd64 /usr/loca
 
 `bin/` 目录也包含节点 Agent（`mistgate-node-linux-amd64`、`mistgate-node-linux-arm64`）；保留这些文件，以供[手动安装节点](add-node.md)时使用。
 
-> **警告：** 不带 `RELEASE_KEY` 的构建没有发布密钥：节点 Agent 不会自行更新，面板无法安装面板发布版本，SSH 安装也没有可信的 Agent 包可安装。使用自己的密钥构建时，只信任你签名的发布版本。首次构建前创建密钥：见[发布与签名](../operations/releases.md)。
+> **警告：** 不带 `RELEASE_KEY` 的构建没有发布密钥：节点 Agent 不会自行更新，面板无法安装面板发布版本，SSH 安装也没有可信的 Agent 包可安装。使用自己的密钥构建时，只信任你签名的发布版本。首次构建前创建密钥：见[发布版本和签名](../operations/releases.md)。
 
 ### 2. 选择访问管理后台的方式
 
@@ -78,7 +78,7 @@ ssh root@panel.example.com 'install -m 0755 /root/mistgate-linux-amd64 /usr/loca
 - 不符合管理后台地址的请求（前缀错误、未知主机名或未知路径）都会显示伪装站点，因此探测者无法区分接近正确的尝试和随机猜测。
 - 始终传入 `--public-url`。它是所有订阅链接的基础地址，也是节点安装命令中使用的地址。不传入时，面板不会提供订阅链接；除非 `serve` 获得 `--agent-addr`，否则添加节点也会失败。
 - `--admin-host` 和 `--admin-listen` 不能同时使用。
-- 单独的管理后台监听器使用普通 HTTP。将它绑定到 loopback，并通过 SSH 访问：
+- 单独的管理后台监听器使用普通 HTTP。将它绑定到 回环地址，并通过 SSH 访问：
 
   ```sh
   ssh -N -L 8081:127.0.0.1:8081 root@panel.example.com
@@ -109,7 +109,7 @@ setup 会执行以下操作：
 1. 创建权限为 0700 的数据目录 `/var/lib/mistgate`（可使用 `--data-dir` 更改路径）。
 2. 创建包含 32 个随机字节且权限为 0600 的 `master.key`。面板保存的所有密钥都由它加密。
 3. 创建数据库 `mistgate.db` 并应用数据库结构。
-4. 保存所选模式的地址，并生成另外两个密钥：节点 Agent 用于连接面板的 TLS 名称，以及订阅链接的私密路径前缀。
+4. 保存所选模式的地址，并另外生成两个随机私密值：节点 Agent 用于连接面板的 TLS 名称，以及订阅链接的私密路径前缀。
 5. 输出有效期为 30 分钟的一次性设置链接。
 
 妥善保管管理后台 URL。再次运行 setup 是安全的：它会保留现有配置；只要尚未创建管理员，就会输出新的设置链接。
@@ -133,7 +133,7 @@ setup 会执行以下操作：
 - `/` 和所有目录都会提供各自的 `index.html`。
 - 如果存在 `404.html` 和 `429.html`，则会分别替换内置的「未找到」和「请求过多」页面。所有未知路径、错误的管理后台前缀和未知订阅链接都会显示相同的 404 页面。
 - 如果没有 `robots.txt`，则使用内置文件拒绝已知的 AI 爬虫。
-- 只响应 GET 和 HEAD 请求。名称以点开头的文件和目录不会提供服务；响应不包含 Last-Modified 或 ETag 标头。
+- 只响应 GET 和 HEAD 请求。名称以点开头的文件和目录不会提供服务；响应不包含 Last-Modified 或 ETag 响应头。
 
 面板只会读取此目录。使用下方的 systemd 服务单元时，将该目录放在 `/home` 和 `/root` 之外（例如 `/srv/mistgate-decoy`）。[自有伪装站点](../guide/decoy-site.md)说明了合适站点的特点，并提供让 AI 智能体生成独特站点的提示词。
 
@@ -206,7 +206,7 @@ journalctl -u mistgate -f
 
 如果同一主机上的其他 Web 服务器必须占用端口 443，Mistgate 可以在它后面运行：
 
-- 在 loopback 上运行无 TLS 的公网监听器（`--listen 127.0.0.1:8080`，不传入 `--acme-domain`、`--tls-cert`），让代理为 `panel.example.com` 终止 TLS，并原样传递 Host 标头和路径。
+- 在 回环地址 上运行无 TLS 的公网监听器（`--listen 127.0.0.1:8080`，不传入 `--acme-domain`、`--tls-cert`），让代理为 `panel.example.com` 终止 TLS，并原样传递 Host 请求头和路径。
 - 添加 `--trusted-proxy 127.0.0.1`，这样速率限制、会话和审计日志可以从 `X-Forwarded-For` 或 `Forwarded` 获取真实客户端地址。
 - 节点 Agent 必须从面板本身获取 TLS。为它们单独配置一个监听器，并将其地址放入安装命令：`--agent-listen :8443 --agent-addr panel.example.com:8443`。代理不能处理该端口。
 
@@ -218,8 +218,8 @@ journalctl -u mistgate -f
 
 1. **语言。** 选择英语、俄语或简体中文。之后可以更改。
 2. **创建管理员。** LOGIN 字段（默认为 `admin`）是你的用户名，也是面板中显示的名称。然后：
-   - **创建通行密钥**：浏览器会要求使用指纹、人脸、PIN 或安全密钥进行验证。密钥保留在你的设备上。推荐使用此方式。
-   - **改用密码 + 身份验证器验证码**：设置至少 12 个字符的密码，然后使用身份验证器应用（Google Authenticator、1Password、Aegis 等）扫描二维码，输入 6 位验证码，并按**创建管理员**。
+   - **创建通行密钥**：浏览器会要求使用指纹、人脸、PIN 或安全密钥验证。密钥保留在你的设备上。推荐使用此方式。
+   - **改用密码 + 身份验证器验证码**：设置至少 12 个字符的密码，然后使用身份验证器应用（Google Authenticator、1Password、Aegis 等）扫描二维码，输入 6 位验证码，并点击**创建管理员**。
 3. **完成。** 选择**添加第一个节点**或**先随便看看，以后再说**。
 
 第一个管理员是所有者。设置向导还会为首批用户创建一个名为「所有人」的空分组。

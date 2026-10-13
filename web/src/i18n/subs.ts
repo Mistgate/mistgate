@@ -653,7 +653,7 @@ export const zh: typeof en = {
   "subs.fmt.who.base64": "{names} 以及所有没有对应规则的其他应用",
   "subs.fmt.who.base64.any": "所有没有对应规则的应用",
   "subs.fmt.who.page": "在浏览器中打开链接的任何人",
-  "subs.fmt.who.decoy": "没有人，直到你为它添加规则",
+  "subs.fmt.who.decoy": "无，需先为它添加规则",
   "subs.fmt.who.mihomo": "使用 mihomo 内核的应用（Clash Meta、FlClash、Clash Verge），按规则 {rules}",
   "subs.fmt.who.rules": "被规则 {rules} 匹配的应用",
   "subs.fmt.rulesLink": "打开「下发规则」",
@@ -893,7 +893,7 @@ export const zh: typeof en = {
   "subs.dns.src.user": "在用户上设置",
   "subs.dns.src.group": "来自分组",
   "subs.dns.src.default": "默认预设",
-  "subs.dns.delivery": "生效时间：链接对应的应用（{apps}）在下次更新订阅时生效；AmneziaVPN 仅对新密钥生效。",
+  "subs.dns.delivery": "生效时间：订阅类应用（{apps}）在下次更新订阅时生效；AmneziaVPN 仅对新密钥生效。",
   "subs.dns.scopeUser": "对此用户订阅中的所有节点生效。切换服务器时不会改变。",
   "subs.dns.scopeGroup": "分组成员在其可用节点上的默认值。用户自己的 DNS 选择优先。",
 

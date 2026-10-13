@@ -247,12 +247,12 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 		if v.Expires.IsZero() {
 			return pick("Подписка закончилась. Напишите — продлим", "Subscription ended. Message us to renew", "订阅已到期。联系我们即可续期")
 		}
-		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew", "订阅已于 %s 到期。联系我们即可续期"), dayText(v.Expires, now, lang))
+		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew", "订阅已于%s到期。联系我们即可续期"), dayText(v.Expires, now, lang))
 	case access.StatusLimited:
 		if v.NextReset.IsZero() || v.QuotaReset == "" || v.QuotaReset == access.ResetNone {
-			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit", "流量已用完。联系我们，可以为你增加")
+			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit", "流量已用完。联系我们提高额度")
 		}
-		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s 重置"), dayText(v.NextReset, now, lang))
+		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s重置"), dayText(v.NextReset, now, lang))
 	case access.StatusDisabled:
 		return pick("Доступ приостановлен", "Access paused", "访问已暂停")
 	}

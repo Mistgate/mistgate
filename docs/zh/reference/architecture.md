@@ -28,7 +28,7 @@ Mistgate 由两个 Go 程序组成：面板（`mistgate`）和节点 Agent（`mi
 | `backup` | 将面板加密备份到 Cloudflare R2，以及 `mistgate backup` 使用的离线部分。 |
 | `warp` | 节点的 Cloudflare WARP 账户。 |
 | `mcp` | 基于同一管理 API 提供的 MCP 服务器。 |
-| `store`, `vault`, `pagepass` | 数据库、使用主密钥进行加密封存、由主密钥派生的用户页面密码。 |
+| `store`, `vault`, `pagepass` | 数据库、使用主密钥加密封存、由主密钥派生的用户页面密码。 |
 
 ### 节点 Agent
 

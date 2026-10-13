@@ -28,7 +28,7 @@ const core: CoreMessages = {
   "pager.range": "显示第 {from}–{to} 条，共 {total} 条",
   "pager.rangeFrom": "第 {from}–{to} 条",
   "pager.count": "{n} 条记录",
-  "pager.prev": "返回",
+  "pager.prev": "上一页",
   "pager.next": "下一页",
   "pager.prevAria": "上一页",
   "pager.nextAria": "下一页",

@@ -1,6 +1,6 @@
 ---
 title: 添加节点
-description: 在 SSH 安装和手动安装之间进行选择，使用一次性命令注册服务器，查看节点上线情况，并在之后彻底移除节点。
+description: 选择 SSH 安装或手动安装，使用一次性命令注册服务器，查看节点上线情况，并在之后彻底移除节点。
 ---
 
 节点 Agent 从面板获取证书、将自己安装为 systemd 服务并连接后，节点就会加入集群。**节点 → 添加节点**提供两种方式：
@@ -14,13 +14,13 @@ AI 智能体也可以通过 MCP 发起 SSH 安装；你需要在审批页面上�
 
 ## 手动安装前
 
-- 一台符合[要求](requirements.md)的服务器，并且可以通过 SSH 使用 root 登录。
+- 一台符合[系统要求](requirements.md)的服务器，并且可以通过 SSH 使用 root 登录。
 - 与面板版本相同的 Agent 二进制文件：`mistgate-node-linux-amd64` 或 `mistgate-node-linux-arm64`。如果面板数据目录中有可信的发布包，会显示可直接运行的 `scp` 命令；否则，从与面板相同的 [GitHub 发布版本](https://github.com/Mistgate/mistgate/releases/latest)或自行构建的 `bin/` 目录中获取。
 - 服务器必须能通过 TCP 443 访问面板的公网地址（或传给 `serve --agent-addr` 的地址）。面板不会连接节点。
 
 ## 1. 选择手动安装
 
-在**节点 → 添加节点**中选择**获取手动安装命令**。从概览页的**添加节点**卡片、命令面板和设置向导末尾，也可以打开同一个窗口。如果已创建待手动安装的节点，要在 SSH 向导中使用相同名称前，先将其退役，或选择其他未使用的名称。
+在**节点 → 添加节点**中选择**获取手动安装命令**。从概览页的**添加节点**卡片、命令面板和设置向导末尾，也可以打开同一个窗口。如果已经创建了等待手动安装的节点，又想在 SSH 向导中使用同一名称，请先将它退役，或换一个未使用的名称。
 
 | 字段 | 输入内容 |
 |:--|:--|
@@ -30,7 +30,7 @@ AI 智能体也可以通过 MCP 发起 SSH 安装；你需要在审批页面上�
 
 如果地址是 IP，窗口会在继续前提示：该节点上的 Hysteria2 需要有 A 记录的域名，或在添加协议配置时选择自签名（固定指纹）证书。AmneziaWG 可以直接使用 IP。
 
-按**生成安装命令**。节点会以「等待安装」状态显示在列表中，窗口会显示三个步骤。
+点击**生成安装命令**。节点会以「等待安装」状态显示在列表中，窗口会显示三个步骤。
 
 ## 2. 将 Agent 放到服务器上
 
@@ -82,7 +82,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 1. 检查是否以 root 身份运行，以及状态目录中是否有身份信息。
 2. 将自身复制到 `/usr/local/bin/mistgate-node`。之后不再需要 `/root` 中的文件。
-3. 根据服务器内存写入强化过的服务单元 `/etc/systemd/system/mistgate-node.service`，然后运行 `systemctl daemon-reload`、`enable` 和 `restart`。
+3. 根据服务器内存写入加固过的服务单元 `/etc/systemd/system/mistgate-node.service`，然后运行 `systemctl daemon-reload`、`enable` 和 `restart`。
 
 Agent 启动后：
 
@@ -91,17 +91,17 @@ Agent 启动后：
 3. 通过双向 TLS 与面板建立一个长期连接，报告主机信息，并接收设置和期望状态：要运行哪些服务器，以及使用哪些用户凭据。
 4. 每 10 秒发送流量、会话和主机指标；连接 30 秒后运行一次诊断，此后每 10 分钟运行一次；证书剩余有效期不足 10 天时，使用新密钥续期。
 
-Agent 会对主机进行的完整更改列表见[要求](requirements.md)中的「Agent 会对节点进行的更改」。
+Agent 对主机所做的完整更改列表见[系统要求](requirements.md)中的「Agent 对节点所做的更改」。
 
 ## 4. 节点上线
 
-窗口会自动刷新。第 3 步安装完成后，通常几秒内状态就会变为**已连接**，节点事件中会显示「首次连接」和 Agent 版本。按**向 de1 添加协议配置**继续阅读[首批用户](first-users.md)：在节点上运行协议配置前，状态会显示「没有协议配置：用户无法使用此节点」。
+窗口会自动刷新。第 3 步安装完成后，通常几秒内状态就会变为**已连接**，节点事件中会显示「首次连接」和 Agent 版本。点击**向 de1 添加协议配置**，然后按[首批用户](first-users.md)继续操作：在节点上运行协议配置前，状态会显示「没有协议配置：用户无法使用此节点」。
 
 | 状态 | 含义 |
 |:--|:--|
 | 等待安装 | 节点已创建，但 Agent 尚未注册。节点页面会显示命令的有效期。 |
 | 正常 | Agent 已连接，节点上的服务器正在运行。 |
-| 主机闪断 | 连接在 10 分钟内中断过，通常是服务商网络问题。 |
+| 主机闪断 | 连接中断不到 10 分钟，通常是服务商网络问题。 |
 | 无法连接 | 已有 10 分钟没有联系。节点页面会显示重启 Agent 和查看日志的命令。 |
 | 已退役 | 已从集群中移除。 |
 
@@ -117,11 +117,11 @@ systemctl restart mistgate-node && journalctl -u mistgate-node -n 50 --no-pager
 
 等待安装的节点可在节点页面、概览页和快速开始清单中使用**新安装命令**按钮。命令过期或丢失时使用此按钮。生成新命令后，旧的未使用命令会失效。
 
-之前注册过的节点（证书丢失、服务器重装或状态目录丢失）也可在其**设置**页签中使用相同按钮，已退役节点除外。只有所有者能看到该按钮。节点会保留名称、协议配置和用户；新 Agent 连接后，旧证书就会失效。如果服务器上仍有旧状态目录，`enroll` 会拒绝并显示 `already enrolled; use --force to replace the identity`：在 `enroll` 后添加 `--force`。
+之前注册过的节点（证书丢失、服务器重装或状态目录丢失）也可在其**设置**标签页中使用相同按钮，已退役节点除外。只有所有者能看到该按钮。节点会保留名称、协议配置和用户；新 Agent 连接后，旧证书就会失效。如果服务器上仍有旧状态目录，`enroll` 会拒绝并显示 `already enrolled; use --force to replace the identity`：在 `enroll` 后添加 `--force`。
 
 ## 移除节点
 
-打开节点，选择**设置 → 危险区域 → 从集群退役**，然后输入节点名称进行确认。面板随后会：
+打开节点，选择**设置 → 危险区域 → 从集群退役**，然后输入节点名称确认。面板随后会：
 
 - 从所有用户的访问权限中移除此节点：用户的订阅中不再包含该节点，但链接保持不变；
 - 吊销节点证书，并取消其尚未使用的安装命令；
@@ -145,7 +145,7 @@ rm -f /usr/local/bin/mistgate-node /usr/local/bin/mistgate-node.prev /usr/local/
 rm -rf /var/lib/mistgate-node
 ```
 
-> **警告：** 节点离线时退役，它不会收到指令。面板会拒绝其证书，但 Agent 会继续运行上次应用的状态（其服务器会继续为原用户提供服务），并不断尝试连接。面板会立即提示这一情况（「{name} 未收到指令」），并显示需要复制的所有命令。先按下方步骤手动清理此类服务器，再运行上面的命令。
+> **警告：** 如果退役时节点处于离线状态，它就收不到退役指令。面板会拒绝其证书，但 Agent 会继续运行上次应用的状态（其服务器会继续为原用户提供服务），并不断尝试连接。面板会立即提示这一情况（「{name} 未收到指令」），并显示需要复制的所有命令。先按下方步骤手动清理此类服务器，再运行上面的命令。
 
 ```sh
 systemctl disable --now mistgate-node      # stop 时运行 cleanup-net：隧道接口、WARP 路由及其表
@@ -168,7 +168,7 @@ systemctl restart systemd-journald
 | `too many failed attempts, try later` | 此地址在一分钟内有十次失败尝试。 | 等待一分钟，并使用新命令。 |
 | `node retired` | 节点已退役。 | 添加新节点。 |
 | `no certificate in the chain matches the pinned CA fingerprint`、`panel did not present its CA certificate` 或 `the CA returned by the panel does not match --ca-sha256` | `--panel` 地址的 TLS 响应来自面板以外的位置：面板前方有 CDN 或反向代理、地址错误，或生成命令后重建了面板数据目录。 | 将面板 DNS 直接指向面板服务器，检查 `--public-url` 和 `--agent-addr`，然后生成新命令。 |
-| 超时或 `connection refused` | 面板已停止、防火墙阻止到面板 TCP 443 的连接，或命令中的地址错误。 | 检查面板和防火墙；从节点运行 `curl -I https://panel.example.com/` 进行测试。 |
+| 超时或 `connection refused` | 面板已停止、防火墙阻止到面板 TCP 443 的连接，或命令中的地址错误。 | 检查面板和防火墙；从节点运行 `curl -I https://panel.example.com/` 测试。 |
 | `already enrolled; use --force to replace the identity` | 状态目录中已有身份信息。 | 在 `enroll` 后添加 `--force`，或者先移除 `/var/lib/mistgate-node`。 |
 | `install: must run as root` | 当前用户不是 root。 | 以 root 身份运行命令。 |
 | `holds no identity: run mistgate-node enroll first` | `enroll` 失败，或 `install` 使用了另一个 `--state-dir`。 | 在相同状态目录中重新运行 `enroll`。 |
