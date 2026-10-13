@@ -211,7 +211,7 @@ export function pauseConsequence(t: ReturnType<typeof useTx>, nodeName: string, 
   const online = inbounds.reduce((n, i) => n + i.online, 0);
   const idle = online === 0;
   if (inbounds.length === 1) return t(idle ? "warp.pause.oneIdle" : "warp.pause.one", { profile: inbounds[0]!.profileName, online: t.n("warp.pause.online", online) });
-  const profiles = inbounds.map((i) => `«${i.profileName}»`).join(", ");
+  const profiles = inbounds.map((i) => t("common.quoted", { name: i.profileName })).join(", ");
   return t(idle ? "warp.pause.manyIdle" : "warp.pause.many", { profiles, online: t.n("warp.pause.online", online) });
 }
 

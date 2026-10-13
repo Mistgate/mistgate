@@ -9,6 +9,7 @@ import { DnsPresetSchema } from "@/gen/mistgate/admin/v1/dns_pb";
 import { Platform, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
+import { zh } from "@/i18n/zh";
 import { fill, pickForm } from "@/i18n";
 import { DnsSelect } from "@/screens/users/dns-select";
 import type { Tx } from "@/screens/users/t";
@@ -76,9 +77,9 @@ async function mount(ui: ReactElement) {
   for (let i = 0; i < 4; i++) await settle();
 }
 
-const tx = (lang: "en" | "ru") =>
-  Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill((lang === "ru" ? ru : en)[key], vars), {
-    n: (key: keyof typeof en, n: number, vars?: Record<string, string | number>) => fill(pickForm((lang === "ru" ? ru : en)[key], n, lang), { n, ...vars }),
+const tx = (lang: "en" | "ru" | "zh") =>
+  Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill({ en, ru, zh }[lang][key], vars), {
+    n: (key: keyof typeof en, n: number, vars?: Record<string, string | number>) => fill(pickForm({ en, ru, zh }[lang][key], n, lang), { n, ...vars }),
     opt: () => undefined,
     lang,
     locale: lang,
@@ -90,6 +91,7 @@ describe("who gets a format", () => {
     expect(whoByRules(tx("ru"), SubFormat.MIHOMO_YAML, rules)).toBe("Приложениям на ядре mihomo (Clash Meta, FlClash, Clash Verge) — по правилам «mihomo» и «clash»");
     expect(whoByRules(tx("ru"), SubFormat.MIHOMO_YAML, rules.slice(0, 1))).toBe("Приложениям на ядре mihomo (Clash Meta, FlClash, Clash Verge) — по правилу «mihomo»");
     expect(whoByRules(tx("en"), SubFormat.DECOY, rules)).toBe("Apps that the rule “curl” catches");
+    expect(whoByRules(tx("zh"), SubFormat.DECOY, rules)).toBe("被规则 「curl」 匹配的应用");
     expect(whoByRules(tx("ru"), SubFormat.MIHOMO_YAML, [])).toBe(ru["subs.fmt.who.decoy"]);
   });
 

@@ -508,7 +508,7 @@ function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
         {days.map((x, i) => (
           <span
             key={x.dayUnix}
-            title={`${fmt.date(x.dayUnix)}: ${fmt.bytes(x.bytes)}`}
+            title={t("common.labeled", { label: fmt.date(x.dayUnix), value: fmt.bytes(x.bytes) })}
             className={cx("flex-1 rounded-t-sm", i === days.length - 1 ? "bg-accent" : "bg-[color-mix(in_oklch,var(--accent)_45%,var(--surface-2))]", x.bytes === 0 && "opacity-40")}
             style={{ height: `${max > 0 ? Math.max(4, Math.round((x.bytes / max) * 100)) : 4}%` }}
           />
@@ -902,7 +902,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
           </SettingRow>
           {data.profiles.length === 0 ? <span className="text-xs text-muted">{t("users.noProfiles")}</span> : <WaysOfGroup profiles={data.profiles} compact />}
           <p className="text-xs leading-normal text-pretty text-muted">
-            {withNode(t("users.accessHint"), "group", <GroupLink id={user.groupId} name={user.groupName}>«{user.groupName}»</GroupLink>)}
+            {withNode(t("users.accessHint"), "group", <GroupLink id={user.groupId} name={user.groupName}>{t("common.quoted", { name: user.groupName })}</GroupLink>)}
           </p>
 
           <div className="flex flex-col gap-2 border-t border-line pt-3">

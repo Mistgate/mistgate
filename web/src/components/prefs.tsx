@@ -16,7 +16,7 @@ export function LangToggle({ className }: { className?: string }) {
   return (
     <BaseSelect.Root value={lang} onValueChange={(v) => isLang(v) && setLang(v)}>
       <BaseSelect.Trigger
-        aria-label={`${t("header.language")}: ${langNames[lang]}`}
+        aria-label={t("common.labeled", { label: t("header.language"), value: langNames[lang] })}
         className={cx(
           // 40px where a finger taps, 36px (as the other top-bar buttons) from md up
           "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pr-2 pl-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-9",

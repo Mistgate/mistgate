@@ -84,7 +84,7 @@ export function useRunDoctor(nodeId = "") {
       for (const k of ["alerts", "doctor"]) void qc.invalidateQueries({ queryKey: ["health", k] });
       void qc.invalidateQueries({ queryKey: ["overview"] });
     },
-    onError: (e) => toast.error(`${t("hl.doctor.rerunFailed")}: ${errorText(e, t)}`),
+    onError: (e) => toast.error(t("common.labeled", { label: t("hl.doctor.rerunFailed"), value: errorText(e, t) })),
   });
 }
 

@@ -160,7 +160,7 @@ export function ReachLine({ group, action }: { group: Group; action?: ReactNode 
         {n > 0 ? "✓" : "–"}
       </span>
       <span className={n > 0 ? "text-fg" : "text-muted"}>
-        <b>{w === "sub" ? t("users.reachSub", { apps }) : t("users.reachAwg")}</b> — {n > 0 ? t.n("users.reachNodes", n) : `${t("users.reachNo")}: ${t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg")}`}
+        <b>{w === "sub" ? t("users.reachSub", { apps }) : t("users.reachAwg")}</b> — {n > 0 ? t.n("users.reachNodes", n) : t("common.labeled", { label: t("users.reachNo"), value: t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg") })}
       </span>
     </li>
   );
@@ -178,10 +178,10 @@ export function ReachLine({ group, action }: { group: Group; action?: ReactNode 
   );
 }
 
-/** Lost and gained profiles of a group change, in words: "Marina loses: «AWG 3.1» (2 AmneziaVPN keys stop working)". */
+/** Lost and gained profiles of a group change, in words: "Marina loses: “AWG 3.1” (2 AmneziaVPN keys stop working)". */
 export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string }) {
   const t = useTx();
-  const name = (p: AccessImpact["lost"][number]) => `«${p.name}»${p.awgDevices > 0 ? ` (${t.n("users.impactKeys", p.awgDevices)})` : ""}`;
+  const name = (p: AccessImpact["lost"][number]) => `${t("common.quoted", { name: p.name })}${p.awgDevices > 0 ? ` (${t.n("users.impactKeys", p.awgDevices)})` : ""}`;
   return (
     <span className="flex flex-col gap-1">
       {impact.lost.length > 0 && (
@@ -191,7 +191,7 @@ export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string
       )}
       {impact.gained.length > 0 && (
         <span>
-          <b>{who ? t("users.impactGains") : t("users.impactGainsGroup")}</b> {impact.gained.map((p) => `«${p.name}»`).join(", ")}
+          <b>{who ? t("users.impactGains") : t("users.impactGainsGroup")}</b> {impact.gained.map((p) => t("common.quoted", { name: p.name })).join(", ")}
         </span>
       )}
     </span>

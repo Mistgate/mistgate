@@ -197,6 +197,8 @@ export const en = {
   // ---- Overview strip and the header
   "hl.strip.open": "Health",
   "hl.strip.more": "and {n} more",
+  // the strip's headline: the problem count, then the nodes it is about ({more} is "and N more" with its space, or empty)
+  "hl.strip.headline": "{count}: {names}{more}",
 
   // ---- node status reasons that the health module adds
   "node.reason.no_traffic": "no client gets through: {failed} of {total} profiles fail the check",
@@ -679,6 +681,7 @@ export const ru: typeof en = {
   // ---- Overview strip and the header
   "hl.strip.open": "Здоровье",
   "hl.strip.more": "и ещё {n}",
+  "hl.strip.headline": "{count}: {names}{more}",
 
   // ---- node status reasons that the health module adds
   "node.reason.no_traffic": "клиенты не проходят: {failed} из {total} профилей не проходят проверку",
@@ -1155,6 +1158,7 @@ export const zh: typeof en = {
 
   "hl.strip.open": "运行状况",
   "hl.strip.more": "另有 {n} 个",
+  "hl.strip.headline": "{count}：{names}{more}",
 
   "node.reason.no_traffic": "没有客户端能连通：{total} 个协议配置中有 {failed} 个未通过检测",
   "node.reason.doctor_fail": "主机检查失败：{check}",

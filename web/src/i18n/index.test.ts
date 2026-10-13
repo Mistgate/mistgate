@@ -71,4 +71,14 @@ describe("dictionaries", () => {
     const banned = [/инбаунд/i, /inbound/i, /парк/i, /руками/i, /путь warp/i, /вернуть звук/i, /синтетическ/i, /клиентск\S* проверк/i, /нода × профиль/i, /сетевая база/i, /применить базу/i, /tls-имя/i, /ждёт агента/i, /токен api/i];
     for (const [key, text] of Object.entries(ru)) for (const re of banned) expect(text, key).not.toMatch(re);
   });
+
+  // the quotes and the colon belong to the language: the code joins a name or a label through these, never by hand
+  it("quotes names and joins a label with the language's own marks", () => {
+    expect(en["common.quoted"]).toBe("“{name}”");
+    expect(ru["common.quoted"]).toBe("«{name}»");
+    expect(dictionaries.zh["common.quoted"]).toBe("「{name}」");
+    expect(en["common.labeled"]).toBe("{label}: {value}");
+    expect(dictionaries.zh["common.labeled"]).toBe("{label}：{value}");
+    expect(dictionaries.zh["hl.strip.headline"]).toBe("{count}：{names}{more}");
+  });
 });

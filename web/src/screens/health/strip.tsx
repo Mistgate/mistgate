@@ -56,11 +56,12 @@ export function stripView(
     const alertNodes = [...new Set(alerts.map((a) => a.nodeName).filter(Boolean))];
     const named = [...alertNodes, ...bad.map((n) => n.name).filter((n) => !alertNodes.includes(n))];
     const more = named.length > 3 ? ` ${t("hl.strip.more", { n: named.length - 3 })}` : "";
-    const headline = `${t.n("ov.problems", problems)}${named.length ? `: ${named.slice(0, 3).join(", ")}${more}` : ""}`;
+    const count = t.n("ov.problems", problems);
+    const headline = named.length ? t("hl.strip.headline", { count, names: named.slice(0, 3).join(", "), more }) : count;
     const covered = new Set(alerts.map((a) => a.nodeId));
     const detail = [
-      ...alerts.slice(0, 2).map((a) => `${a.nodeName ? `${a.nodeName}: ` : ""}${alertTitle(t, a)}`),
-      ...bad.filter((n) => !covered.has(n.id)).map((n) => `${n.name}: ${statusLine(t, n)}`),
+      ...alerts.slice(0, 2).map((a) => (a.nodeName ? t("common.labeled", { label: a.nodeName, value: alertTitle(t, a) }) : alertTitle(t, a))),
+      ...bad.filter((n) => !covered.has(n.id)).map((n) => t("common.labeled", { label: n.name, value: statusLine(t, n) })),
     ]
       .slice(0, 3)
       .join(" · ");

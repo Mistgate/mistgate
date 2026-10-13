@@ -21,6 +21,8 @@ const core: CoreMessages = {
   "common.loading": "正在加载…",
   "common.retry": "重试",
   "common.undo": "撤销",
+  "common.quoted": "「{name}」",
+  "common.labeled": "{label}：{value}",
 
   "pager.nav": "分页",
   "pager.range": "显示第 {from}–{to} 条，共 {total} 条",

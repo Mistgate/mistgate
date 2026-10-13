@@ -42,7 +42,7 @@ describe("LangToggle", () => {
     await act(async () => rows[2]!.click());
     await settle();
     expect(document.documentElement.lang).toBe("zh-CN");
-    expect(trigger.getAttribute("aria-label")).toBe("语言: 简体中文");
+    expect(trigger.getAttribute("aria-label")).toBe("语言：简体中文");
     expect(trigger.textContent).toBe("中文");
   });
 });

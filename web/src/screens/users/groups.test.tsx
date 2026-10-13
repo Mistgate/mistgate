@@ -167,7 +167,7 @@ describe("editing a group", () => {
     await settle();
     expect(updateGroup).toHaveBeenCalledTimes(1);
     expect(updateGroup).toHaveBeenLastCalledWith(expect.objectContaining({ dryRun: true, profileIds: { values: ["p_hy"] } }));
-    expect(dialog().textContent).toContain("5 people lose: «AWG 3.1» (2 AmneziaVPN keys stop working)");
+    expect(dialog().textContent).toContain("5 people lose: “AWG 3.1” (2 AmneziaVPN keys stop working)");
     await click(button("Take it away from 5 people"));
     await settle();
     expect(updateGroup).toHaveBeenCalledTimes(2);

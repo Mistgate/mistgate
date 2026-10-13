@@ -35,7 +35,7 @@ export function runsLine(t: T, r: RunInfo): string {
   if (failed === 0) return `${via}, ${t.n("node.settings.bandwidthRunsAll", ok)}`;
   const reasons = [...new Set(r.runFailures.map((c) => reasonText(t, c)))].join(", ");
   const some = t.n("node.settings.bandwidthRunsSome", ok, { total: r.runsTotal });
-  return reasons ? `${via}, ${some}: ${t.n("node.settings.bandwidthRunsFailed", failed, { reasons })}` : `${via}, ${some}`;
+  return reasons ? t("common.labeled", { label: `${via}, ${some}`, value: t.n("node.settings.bandwidthRunsFailed", failed, { reasons }) }) : `${via}, ${some}`;
 }
 
 /**

@@ -96,7 +96,7 @@ function FleetBar({ nodes }: { nodes: readonly NodeUpdate[] }) {
   const legend = all.filter((l) => l.n > 0);
   return (
     <div className="flex flex-col gap-2">
-      <div role="img" aria-label={`${t("up.fleet.aria")}: ${legend.map((l) => l.text).join(", ")}`} className="flex h-2 gap-[3px]">
+      <div role="img" aria-label={t("common.labeled", { label: t("up.fleet.aria"), value: legend.map((l) => l.text).join(", ") })} className="flex h-2 gap-[3px]">
         {nodes.map((n) => (
           <span key={n.nodeId} title={n.name} className={cx("h-full min-w-1.5 flex-1 rounded-full", segment[nodeStateKind(n.state)])} />
         ))}

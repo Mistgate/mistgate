@@ -20,6 +20,8 @@ const core: CoreMessages = {
   "common.loading": "Загрузка…",
   "common.retry": "Повторить",
   "common.undo": "Откатить",
+  "common.quoted": "«{name}»",
+  "common.labeled": "{label}: {value}",
 
   "pager.nav": "Страницы",
   "pager.range": "Показано {from}–{to} из {total}",
