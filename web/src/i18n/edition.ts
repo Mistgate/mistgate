@@ -29,6 +29,6 @@ export const ru: typeof en = {
   "edition.feature.agent_updates": "Обновление нод",
   "edition.feature.agent_logs": "Логи ноды",
   "edition.feature.panel_update": "Обновление панели",
-  "edition.feature.decoy_own": "Свой сайт-обманка",
+  "edition.feature.decoy_own": "Свой сайт-ширма",
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };

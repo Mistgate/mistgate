@@ -52,7 +52,7 @@ describe("the panel's refusal codes", () => {
       expect(say(c, Code.FailedPrecondition, "ru")).toBe(ru[`err.${c}`]);
     }
     expect(say("own decoy bundle is not uploaded", Code.FailedPrecondition)).toBe("own decoy bundle is not uploaded"); // the server's own words stay
-    expect(say("unavailable_in_edition: feature=decoy_own", Code.FailedPrecondition, "ru")).toBe("Пока недоступно в Cloudflare-версии: Свой сайт-обманка.");
+    expect(say("unavailable_in_edition: feature=decoy_own", Code.FailedPrecondition, "ru")).toBe("Пока недоступно в Cloudflare-версии: Свой сайт-ширма.");
   });
 
   it("localizes known API-token denial reasons and keeps role denial separate", () => {
