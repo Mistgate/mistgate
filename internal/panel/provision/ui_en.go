@@ -5,26 +5,32 @@ import (
 	"strings"
 )
 
-// pageLang is the language of the install page: its words are written in Russian in ui.go, and pageEnglish gives the
-// English ones. A string missing here stays Russian on an English page (the test renders every step and catches it).
+// pageLang is the language of the install page: its words are written in Russian in ui.go, and the language maps give
+// the other languages. Chinese uses English placeholders until it is translated.
 type pageLang string
 
 const (
 	pageRU pageLang = "ru"
 	pageEN pageLang = "en"
+	pageZH pageLang = "zh"
 )
 
-// pageLanguage is the page's language: the admin's own, which the SPA passes as ?lang= (and every link of the page
-// keeps), else the browser's first choice, Russian only when that is Russian (as the SPA decides).
+// pageLanguage is the language the SPA passes as ?lang=, else the browser's first zh/ru choice, with English as fallback.
 func pageLanguage(r *http.Request) pageLang {
 	switch r.URL.Query().Get("lang") {
 	case "ru":
 		return pageRU
 	case "en":
 		return pageEN
+	case "zh":
+		return pageZH
 	}
 	first, _, _ := strings.Cut(r.Header.Get("Accept-Language"), ",")
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(first)), "ru") {
+	first = strings.ToLower(strings.TrimSpace(first))
+	if strings.HasPrefix(first, "zh") {
+		return pageZH
+	}
+	if strings.HasPrefix(first, "ru") {
 		return pageRU
 	}
 	return pageEN
@@ -32,15 +38,34 @@ func pageLanguage(r *http.Request) pageLang {
 
 // tr gives a page string in l. A label followed by a code ("Установка остановлена: x", "Подготовка · y") keeps the code.
 func (l pageLang) tr(s string) string {
-	if l != pageEN || s == "" {
+	if s == "" {
 		return s
 	}
-	if e, ok := pageEnglish[s]; ok {
+	translations := map[string]string(nil)
+	switch l {
+	case pageEN:
+		translations = pageEnglish
+	case pageZH:
+		translations = pageChinese
+	default:
+		return s
+	}
+	lookup := func(key string) (string, bool) {
+		if e, ok := translations[key]; ok {
+			return e, true
+		}
+		if l == pageZH {
+			e, ok := pageEnglish[key]
+			return e, ok
+		}
+		return "", false
+	}
+	if e, ok := lookup(s); ok {
 		return e
 	}
 	for _, sep := range []string{": ", " · "} {
 		if head, tail, ok := strings.Cut(s, sep); ok {
-			if e, ok := pageEnglish[head]; ok {
+			if e, ok := lookup(head); ok {
 				return e + sep + tail
 			}
 		}

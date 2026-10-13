@@ -113,7 +113,7 @@ message GetSubscriptionSettingsResponse {
   repeated ServerSample server_samples = 3;
   // That group's name ("" with no samples).
   string sample_group = 4;
-  // The instance language. {country} itself is the two-letter code whatever the language.
+  // The instance language ("en", "ru", or "zh"). {country} itself is the two-letter code whatever the language.
   string names_language = 5;
 }
 

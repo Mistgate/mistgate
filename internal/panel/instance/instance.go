@@ -42,8 +42,8 @@ const (
 	maxBrandPart = 24 // runes per wordmark part
 )
 
-// Languages are the UI languages the SPA ships.
-var Languages = []string{"en", "ru"}
+// Languages are the supported UI languages.
+var Languages = []string{"en", "ru", "zh"}
 
 // ErrInvalid wraps every validation failure, so callers can map it to INVALID_ARGUMENT.
 var ErrInvalid = errors.New("invalid instance setting")

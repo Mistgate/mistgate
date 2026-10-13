@@ -37,7 +37,7 @@ export type Instance = Message<"mistgate.admin.v1.Instance"> & {
   accent: string;
 
   /**
-   * Default UI language for new browsers, "en" or "ru".
+   * Default UI language for new browsers: "en", "ru", or "zh".
    *
    * @generated from field: string language = 4;
    */
@@ -133,7 +133,7 @@ export type UpdateInstanceRequest = Message<"mistgate.admin.v1.UpdateInstanceReq
   accent?: string | undefined;
 
   /**
-   * "en" or "ru".
+   * "en", "ru", or "zh".
    *
    * @generated from field: optional string language = 4;
    */

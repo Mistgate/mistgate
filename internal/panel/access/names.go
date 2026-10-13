@@ -16,7 +16,7 @@ import (
 
 // What a friend's apps and page call the things they get: a country, never the panel's node names (de1, nl1) or profile names.
 
-// CountryName is the localised name of a country code in lang ("ru", "en"); the code itself when unknown.
+// CountryName is the localised name of a country code in lang ("ru", "en", "zh"); the code itself when unknown.
 func CountryName(cc, lang string) string {
 	cc = strings.ToUpper(strings.TrimSpace(cc))
 	if cc == "" {
@@ -69,6 +69,7 @@ func ServerLabeler(lang string) func(cc, location string) string {
 			name = strings.TrimPrefix(name+" · "+place, " · ")
 		}
 		if name == "" {
+			// zh: translation pass — "Server" is the English placeholder for the generic server name.
 			name = "Server"
 			if lang == "ru" {
 				name = "Сервер"

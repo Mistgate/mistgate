@@ -272,7 +272,7 @@ export type GetSubscriptionSettingsResponse = Message<"mistgate.admin.v1.GetSubs
   sampleGroup: string;
 
   /**
-   * The instance language. {country} itself is the two-letter code whatever the language.
+   * The instance language ("en", "ru", or "zh"). {country} itself is the two-letter code whatever the language.
    *
    * @generated from field: string names_language = 5;
    */

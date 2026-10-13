@@ -101,7 +101,7 @@ message GetLoginInfoResponse {
   string brand_tail = 2;
   // "#rrggbb".
   string accent = 3;
-  // Default UI language, "en" or "ru".
+  // Default UI language, "en", "ru", or "zh".
   string language = 4;
   // A custom logo exists; it is served at GET brand/logo.svg next to the admin UI.
   bool has_logo = 5;

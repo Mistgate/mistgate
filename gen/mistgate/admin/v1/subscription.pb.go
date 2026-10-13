@@ -548,7 +548,7 @@ type GetSubscriptionSettingsResponse struct {
 	ServerSamples []*ServerSample `protobuf:"bytes,3,rep,name=server_samples,json=serverSamples,proto3" json:"server_samples,omitempty"`
 	// That group's name ("" with no samples).
 	SampleGroup string `protobuf:"bytes,4,opt,name=sample_group,json=sampleGroup,proto3" json:"sample_group,omitempty"`
-	// The instance language. {country} itself is the two-letter code whatever the language.
+	// The instance language ("en", "ru", or "zh"). {country} itself is the two-letter code whatever the language.
 	NamesLanguage string `protobuf:"bytes,5,opt,name=names_language,json=namesLanguage,proto3" json:"names_language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

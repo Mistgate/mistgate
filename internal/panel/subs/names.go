@@ -211,6 +211,7 @@ var ruMonths = [...]string{"января", "февраля", "марта", "ап
 
 // dayText is a date the way the user page writes it: "29 сентября", "29 September"; the year only when it is not this one.
 func dayText(t, now time.Time, lang string) string {
+	// zh: translation pass — English month names are placeholders for now.
 	m := t.Month().String()
 	if lang == "ru" {
 		m = ruMonths[t.Month()-1]
@@ -229,6 +230,7 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 		if lang == "ru" {
 			return ru
 		}
+		// zh: translation pass — English is the placeholder for these subscription notices.
 		return en
 	}
 	switch v.Status {
@@ -260,6 +262,7 @@ func mihomoOnlyNote(v access.SubView, lang string) string {
 	if lang == "ru" {
 		return "Эти серверы работают только в kl!ck и других Mihomo-приложениях"
 	}
+	// zh: translation pass — use the English placeholder until this notice is translated.
 	return "These servers work only in kl!ck and other Mihomo apps"
 }
 

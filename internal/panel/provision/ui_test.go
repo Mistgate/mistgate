@@ -85,9 +85,11 @@ func TestInstallPageLanguage(t *testing.T) {
 	}{
 		{"", "ru-RU,ru;q=0.9,en;q=0.8", pageRU},
 		{"", "en-US,en;q=0.9,ru;q=0.5", pageEN},
+		{"", "zh-Hans-CN,zh;q=0.9,en;q=0.8", pageZH},
 		{"", "de-DE", pageEN},
 		{"?lang=en", "ru-RU", pageEN},
 		{"?lang=ru", "en-US", pageRU},
+		{"?lang=zh", "en-US", pageZH},
 		{"?lang=xx", "ru", pageRU},
 	} {
 		r := httptest.NewRequest(http.MethodGet, AdminPagePath+tc.query, nil)
@@ -98,8 +100,31 @@ func TestInstallPageLanguage(t *testing.T) {
 	}
 }
 
-// An English page has no Russian word left: every step, every state, phase, event and error, and the links keep the language.
-func TestInstallPageInEnglish(t *testing.T) {
+func TestChinesePageTranslationsHaveEveryEnglishKey(t *testing.T) {
+	for key := range pageEnglish {
+		if value, ok := pageChinese[key]; !ok || value == "" {
+			t.Errorf("Chinese placeholder missing for %q", key)
+		}
+	}
+	for key := range pageChinese {
+		if _, ok := pageEnglish[key]; !ok {
+			t.Errorf("Chinese placeholder has no English source for %q", key)
+		}
+	}
+}
+
+func TestInstallPageInChineseUsesItsLanguageTag(t *testing.T) {
+	var out strings.Builder
+	if err := installPageTemplates[pageZH].Execute(&out, installPageData{Lang: pageZH, Step: "host"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `lang="zh"`) {
+		t.Errorf("page is not marked Chinese: %s", out.String())
+	}
+}
+
+// English and Chinese-placeholder pages have no Russian words left in each step, state, phase, event and error.
+func TestInstallPageInEnglishAndChinesePlaceholders(t *testing.T) {
 	cyrillic := func(s string) bool {
 		return strings.ContainsFunc(s, func(r rune) bool { return r >= 0x400 && r <= 0x4ff })
 	}
@@ -142,22 +167,24 @@ func TestInstallPageInEnglish(t *testing.T) {
 	for _, e := range errs {
 		pages = append(pages, installPageData{Step: "host", Message: e})
 	}
-	for i, page := range pages {
-		page.Lang = pageEN
-		var out strings.Builder
-		if err := installPageTemplates[pageEN].Execute(&out, page); err != nil {
-			t.Fatal(err)
-		}
-		html := out.String()
-		if cyrillic(html) {
-			for _, line := range strings.Split(html, "\n") {
-				if cyrillic(line) {
-					t.Errorf("page %d (%s) keeps Russian: %s", i, page.Step, strings.TrimSpace(line))
+	for _, lang := range []pageLang{pageEN, pageZH} {
+		for i, page := range pages {
+			page.Lang = lang
+			var out strings.Builder
+			if err := installPageTemplates[lang].Execute(&out, page); err != nil {
+				t.Fatal(err)
+			}
+			html := out.String()
+			if cyrillic(html) {
+				for _, line := range strings.Split(html, "\n") {
+					if cyrillic(line) {
+						t.Errorf("%s page %d (%s) keeps Russian: %s", lang, i, page.Step, strings.TrimSpace(line))
+					}
 				}
 			}
-		}
-		if !strings.Contains(html, `lang="en"`) {
-			t.Errorf("page %d is not marked English", i)
+			if !strings.Contains(html, `lang="`+string(lang)+`"`) {
+				t.Errorf("%s page %d has the wrong language tag", lang, i)
+			}
 		}
 	}
 	var out strings.Builder
@@ -171,7 +198,7 @@ func TestInstallPageInEnglish(t *testing.T) {
 
 // root or a sudo user: the page never says "root password" where the login is someone else's.
 func TestInstallPageWordsFitSudoLogins(t *testing.T) {
-	for _, l := range []pageLang{pageRU, pageEN} {
+	for _, l := range []pageLang{pageRU, pageEN, pageZH} {
 		failed := makeJobView(&adminv1.NodeProvisionJob{Id: "prv_1", State: "failed", ErrorCode: "ssh_authentication_failed"})
 		var out strings.Builder
 		if err := installPageTemplates[l].Execute(&out, installPageData{Lang: l, Step: "job", Job: &failed}); err != nil {

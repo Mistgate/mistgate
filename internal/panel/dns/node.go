@@ -138,24 +138,31 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 // ---- words for the page ----
 
 // The built-in presets have one stored name, Russian, and a description of the form "Russian\nEnglish". The page speaks
-// the language of the visitor: English names are these while the stored name is still the stock one (an owner may have
-// renamed it; that name is shown as it is). They are the names the admin shows an English owner
-// (web/src/screens/subscriptions/model.ts builtinNames); the provider catalog's own English names ("Default", "Basic")
+// the language of the visitor: English names serve English pages and are the zh placeholders while the stored name is
+// still the stock one (an owner may have renamed it; that name is shown as it is). They are the names the admin shows an
+// English owner (web/src/screens/subscriptions/model.ts builtinNames); the provider catalog's own English names ("Default", "Basic")
 // do not say what a preset is for.
-var builtinNames = map[string]struct{ ru, en string }{
-	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct"},
-	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN"},
-	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google"},
-	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads"},
-	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+"},
-	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking"},
-	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS"},
+var builtinNames = map[string]struct{ ru, en, zh string }{
+	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "Russia: .ru direct"},                                      // zh: translation pass
+	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "Russia: all through VPN"},                           // zh: translation pass
+	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},                                     // zh: translation pass
+	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard: no ads"},                                            // zh: translation pass
+	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family: no ads, no 18+"}, // zh: translation pass
+	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9: malware blocking"},                    // zh: translation pass
+	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS", "Yandex DNS"},                                                                // zh: translation pass
 }
 
-// NameIn is the name of the preset in the language of the page ("ru" or anything else = English).
+// NameIn is the name of the preset in the language of the page.
 func (p Preset) NameIn(lang string) string {
-	if b, ok := builtinNames[p.ID]; ok && p.Builtin && lang != "ru" && p.Name == b.ru {
-		return b.en
+	if b, ok := builtinNames[p.ID]; ok && p.Builtin && p.Name == b.ru {
+		switch lang {
+		case "ru":
+			return b.ru
+		case "zh":
+			return b.zh
+		default:
+			return b.en
+		}
 	}
 	return p.Name
 }
@@ -170,6 +177,7 @@ func (p Preset) DescriptionIn(lang string) string {
 	if lang == "ru" {
 		return strings.TrimSpace(ru)
 	}
+	// zh: translation pass — built-in descriptions use their English text as the placeholder.
 	return strings.TrimSpace(en)
 }
 

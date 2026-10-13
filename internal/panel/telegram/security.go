@@ -58,47 +58,75 @@ func ipLine(l L, ip string) string {
 	if ip == "" {
 		return ""
 	}
-	return l.pick("From address ", "С адреса ") + data(ip, 45)
+	return l.pick("From address ", "С адреса ", // zh: translation pass
+		"From address ",
+	) + data(ip, 45)
 }
 
 func lockoutText(l L, login, ip string, until time.Time) string {
 	who := ""
 	if login != "" {
-		who = l.pick("Login: ", "Логин: ") + "<b>" + data(login, 60) + "</b>"
+		who = l.pick("Login: ", "Логин: ", // zh: translation pass
+			"Login: ",
+		) + "<b>" + data(login, 60) + "</b>"
 	}
 	end := ""
 	if !until.IsZero() {
-		end = l.pick("Locked until ", "Заблокирован до ") + until.UTC().Format("15:04") + " UTC."
+		end = l.pick("Locked until ", "Заблокирован до ", // zh: translation pass
+			"Locked until ",
+		) + until.UTC().Format("15:04") + " UTC."
 	}
-	return join("<b>"+l.pick("Sign-in locked after too many failed attempts", "Вход заблокирован после череды неудачных попыток")+"</b>", who, ipLine(l, ip), end)
+	return join("<b>"+l.pick("Sign-in locked after too many failed attempts", "Вход заблокирован после череды неудачных попыток", // zh: translation pass
+		"Sign-in locked after too many failed attempts",
+	)+"</b>", who, ipLine(l, ip), end)
 }
 
 func signInText(l L, name, method, ip string) string {
 	how := ""
 	switch method {
 	case "passkey":
-		how = l.pick(" with a passkey", " по passkey")
+		how = l.pick(" with a passkey", " по passkey", // zh: translation pass
+			" with a passkey",
+		)
 	case "password":
-		how = l.pick(" with a password", " по паролю")
+		how = l.pick(" with a password", " по паролю", // zh: translation pass
+			" with a password",
+		)
 	}
-	return join("<b>"+l.pick("New sign-in to the panel", "Новый вход в панель")+"</b>",
-		"<b>"+data(name, 60)+"</b>"+l.pick(" signed in", " вошёл(а)")+how+".", ipLine(l, ip))
+	return join("<b>"+l.pick("New sign-in to the panel", "Новый вход в панель", // zh: translation pass
+		"New sign-in to the panel",
+	)+"</b>",
+		"<b>"+data(name, 60)+"</b>"+l.pick(" signed in", " вошёл(а)", // zh: translation pass
+			" signed in",
+		)+how+".", ipLine(l, ip))
 }
 
 func methodChangedText(l L, name, kind, ip string) string {
 	what := ""
 	switch kind {
 	case auth.EventPasskeyAdded:
-		what = l.pick("a passkey was added", "добавлен passkey")
+		what = l.pick("a passkey was added", "добавлен passkey", // zh: translation pass
+			"a passkey was added",
+		)
 	case auth.EventPasskeyRemoved:
-		what = l.pick("a passkey was removed", "удалён passkey")
+		what = l.pick("a passkey was removed", "удалён passkey", // zh: translation pass
+			"a passkey was removed",
+		)
 	case auth.EventPasswordChanged:
-		what = l.pick("the password was changed", "пароль изменён")
+		what = l.pick("the password was changed", "пароль изменён", // zh: translation pass
+			"the password was changed",
+		)
 	case auth.EventTOTPRebound:
-		what = l.pick("the authenticator app was re-bound", "приложение-аутентификатор привязано заново")
+		what = l.pick("the authenticator app was re-bound", "приложение-аутентификатор привязано заново", // zh: translation pass
+			"the authenticator app was re-bound",
+		)
 	case auth.EventPasswordAdded:
-		what = l.pick("a password login was added", "добавлен вход по паролю")
+		what = l.pick("a password login was added", "добавлен вход по паролю", // zh: translation pass
+			"a password login was added",
+		)
 	}
-	return join("<b>"+l.pick("A sign-in method changed", "Изменился способ входа")+"</b>",
+	return join("<b>"+l.pick("A sign-in method changed", "Изменился способ входа", // zh: translation pass
+		"A sign-in method changed",
+	)+"</b>",
 		"<b>"+data(name, 60)+"</b>: "+what+".", ipLine(l, ip))
 }

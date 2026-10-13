@@ -281,7 +281,7 @@ type GetLoginInfoResponse struct {
 	BrandTail string `protobuf:"bytes,2,opt,name=brand_tail,json=brandTail,proto3" json:"brand_tail,omitempty"`
 	// "#rrggbb".
 	Accent string `protobuf:"bytes,3,opt,name=accent,proto3" json:"accent,omitempty"`
-	// Default UI language, "en" or "ru".
+	// Default UI language, "en", "ru", or "zh".
 	Language string `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
 	// A custom logo exists; it is served at GET brand/logo.svg next to the admin UI.
 	HasLogo bool `protobuf:"varint,5,opt,name=has_logo,json=hasLogo,proto3" json:"has_logo,omitempty"`
