@@ -171,7 +171,8 @@ test("zh joins the wiki when it has pages: its own section, (ZH) on a name clash
   assert.match(get(r, "_Sidebar.md"), /<b>简体中文<\/b>/);
   const without = build();
   assert.doesNotMatch(get(without, "Home.md"), /简体中文|\/zh\//);
-  assert.deepEqual(without.warnings.filter((w) => /"zh"/.test(w)), [], "a language still being translated is not a warning when it has no pages");
+  // a language still being translated may have no pages; a complete one without pages is a warning, as ru would be
+  assert.deepEqual(without.warnings.filter((w) => /"zh"/.test(w)), COMPLETE.zh ? ['no documentation pages for "zh"'] : []);
 });
 
 test("a zh page linking to a zh page that is not translated yet links the English wiki page (no anchor); a missing en page still fails (until COMPLETE.zh)", { skip: COMPLETE.zh && "zh is complete: a missing page fails as in ru" }, () => {
