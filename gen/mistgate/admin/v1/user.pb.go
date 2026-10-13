@@ -192,6 +192,77 @@ func (UserFilter) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{2}
 }
 
+type UserSort int32
+
+const (
+	// Default: name order; direction follows descending.
+	UserSort_USER_SORT_UNSPECIFIED UserSort = 0
+	UserSort_USER_SORT_NAME        UserSort = 1
+	// Current quota period's used_bytes (upload + download).
+	UserSort_USER_SORT_TRAFFIC UserSort = 2
+	// Expiry time. Users without an expiry sort after dated users ascending and before them descending.
+	UserSort_USER_SORT_EXPIRY UserSort = 3
+	// Last session time. Online users count as most recent; never-seen users sort last descending.
+	UserSort_USER_SORT_LAST_SEEN UserSort = 4
+	// Number of devices used, then device_limit.
+	UserSort_USER_SORT_DEVICES UserSort = 5
+	// The displayed group name.
+	UserSort_USER_SORT_GROUP UserSort = 6
+	// Displayed status ascending: active, devices full, quota, expired, disabled.
+	UserSort_USER_SORT_STATUS UserSort = 7
+)
+
+// Enum value maps for UserSort.
+var (
+	UserSort_name = map[int32]string{
+		0: "USER_SORT_UNSPECIFIED",
+		1: "USER_SORT_NAME",
+		2: "USER_SORT_TRAFFIC",
+		3: "USER_SORT_EXPIRY",
+		4: "USER_SORT_LAST_SEEN",
+		5: "USER_SORT_DEVICES",
+		6: "USER_SORT_GROUP",
+		7: "USER_SORT_STATUS",
+	}
+	UserSort_value = map[string]int32{
+		"USER_SORT_UNSPECIFIED": 0,
+		"USER_SORT_NAME":        1,
+		"USER_SORT_TRAFFIC":     2,
+		"USER_SORT_EXPIRY":      3,
+		"USER_SORT_LAST_SEEN":   4,
+		"USER_SORT_DEVICES":     5,
+		"USER_SORT_GROUP":       6,
+		"USER_SORT_STATUS":      7,
+	}
+)
+
+func (x UserSort) Enum() *UserSort {
+	p := new(UserSort)
+	*p = x
+	return p
+}
+
+func (x UserSort) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UserSort) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_user_proto_enumTypes[3].Descriptor()
+}
+
+func (UserSort) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_user_proto_enumTypes[3]
+}
+
+func (x UserSort) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UserSort.Descriptor instead.
+func (UserSort) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{3}
+}
+
 type DnsSource int32
 
 const (
@@ -228,11 +299,11 @@ func (x DnsSource) String() string {
 }
 
 func (DnsSource) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_user_proto_enumTypes[3].Descriptor()
+	return file_mistgate_admin_v1_user_proto_enumTypes[4].Descriptor()
 }
 
 func (DnsSource) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_user_proto_enumTypes[3]
+	return &file_mistgate_admin_v1_user_proto_enumTypes[4]
 }
 
 func (x DnsSource) Number() protoreflect.EnumNumber {
@@ -241,7 +312,7 @@ func (x DnsSource) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DnsSource.Descriptor instead.
 func (DnsSource) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{4}
 }
 
 type AppToggles struct {
@@ -639,12 +710,17 @@ type ListUsersRequest struct {
 	// Case-insensitive substring of name or group name.
 	Query   string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	GroupId string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	// Default 50, max 200. Order: name, then id (keyset pagination, stable under inserts).
+	// Default 50, max 200. The selected sort value uses `descending`; ties use name ascending, then id ascending.
+	// Name order supports keyset paging with page_token. Other orders use offset paging; page_token with any other
+	// sort or with the opposite name direction is invalid. Earlier unversioned name tokens remain valid ascending.
+	// Name is unique case-insensitively, so the name token is a stable key.
 	PageSize  uint32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken string `protobuf:"bytes,5,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Rows to skip before the page (after page_token when both are given): numbered pages. 0 = none, at most 100000.
 	// The size of what is being paged is in the response counts (the chip of the filter in use).
-	Offset        uint32 `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	Offset        uint32   `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	Sort          UserSort `protobuf:"varint,7,opt,name=sort,proto3,enum=mistgate.admin.v1.UserSort" json:"sort,omitempty"`
+	Descending    bool     `protobuf:"varint,8,opt,name=descending,proto3" json:"descending,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -721,13 +797,33 @@ func (x *ListUsersRequest) GetOffset() uint32 {
 	return 0
 }
 
+func (x *ListUsersRequest) GetSort() UserSort {
+	if x != nil {
+		return x.Sort
+	}
+	return UserSort_USER_SORT_UNSPECIFIED
+}
+
+func (x *ListUsersRequest) GetDescending() bool {
+	if x != nil {
+		return x.Descending
+	}
+	return false
+}
+
 // Badge numbers on the filter chips; computed for the same query and group_id, ignoring `filter`.
 type UserCounts struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	All           uint32                 `protobuf:"varint,1,opt,name=all,proto3" json:"all,omitempty"`
-	Online        uint32                 `protobuf:"varint,2,opt,name=online,proto3" json:"online,omitempty"`
-	Expiring      uint32                 `protobuf:"varint,3,opt,name=expiring,proto3" json:"expiring,omitempty"`
-	OverQuota     uint32                 `protobuf:"varint,4,opt,name=over_quota,json=overQuota,proto3" json:"over_quota,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	All       uint32                 `protobuf:"varint,1,opt,name=all,proto3" json:"all,omitempty"`
+	Online    uint32                 `protobuf:"varint,2,opt,name=online,proto3" json:"online,omitempty"`
+	Expiring  uint32                 `protobuf:"varint,3,opt,name=expiring,proto3" json:"expiring,omitempty"`
+	OverQuota uint32                 `protobuf:"varint,4,opt,name=over_quota,json=overQuota,proto3" json:"over_quota,omitempty"`
+	// Live, non-revoked devices in use for users matching query/group_id, regardless of filter or page. All apps on
+	// one implicit subscription-fetch device count once; each AmneziaWG key counts as one device.
+	DevicesUsed uint32 `protobuf:"varint,5,opt,name=devices_used,json=devicesUsed,proto3" json:"devices_used,omitempty"`
+	// Matching devices whose Device.online value is true, regardless of filter or page. Subscription devices are
+	// online while their user is online; AmneziaWG devices are online after a handshake within the 3-minute window.
+	DevicesOnline uint32 `protobuf:"varint,6,opt,name=devices_online,json=devicesOnline,proto3" json:"devices_online,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -786,6 +882,20 @@ func (x *UserCounts) GetExpiring() uint32 {
 func (x *UserCounts) GetOverQuota() uint32 {
 	if x != nil {
 		return x.OverQuota
+	}
+	return 0
+}
+
+func (x *UserCounts) GetDevicesUsed() uint32 {
+	if x != nil {
+		return x.DevicesUsed
+	}
+	return 0
+}
+
+func (x *UserCounts) GetDevicesOnline() uint32 {
+	if x != nil {
+		return x.DevicesOnline
 	}
 	return 0
 }
@@ -2537,7 +2647,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0eaccess_amnezia\x18\x1b \x01(\bR\raccessAmnezia\x12+\n" +
 	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\x12\x1f\n" +
 	"\vgroup_color\x18\x1d \x01(\tR\n" +
-	"groupColor\"\xce\x01\n" +
+	"groupColor\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -2545,14 +2655,20 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\tpage_size\x18\x04 \x01(\rR\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x05 \x01(\tR\tpageToken\x12\x16\n" +
-	"\x06offset\x18\x06 \x01(\rR\x06offset\"q\n" +
+	"\x06offset\x18\x06 \x01(\rR\x06offset\x12/\n" +
+	"\x04sort\x18\a \x01(\x0e2\x1b.mistgate.admin.v1.UserSortR\x04sort\x12\x1e\n" +
+	"\n" +
+	"descending\x18\b \x01(\bR\n" +
+	"descending\"\xbb\x01\n" +
 	"\n" +
 	"UserCounts\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\rR\x03all\x12\x16\n" +
 	"\x06online\x18\x02 \x01(\rR\x06online\x12\x1a\n" +
 	"\bexpiring\x18\x03 \x01(\rR\bexpiring\x12\x1d\n" +
 	"\n" +
-	"over_quota\x18\x04 \x01(\rR\toverQuota\"\xa1\x01\n" +
+	"over_quota\x18\x04 \x01(\rR\toverQuota\x12!\n" +
+	"\fdevices_used\x18\x05 \x01(\rR\vdevicesUsed\x12%\n" +
+	"\x0edevices_online\x18\x06 \x01(\rR\rdevicesOnline\"\xa1\x01\n" +
 	"\x11ListUsersResponse\x12-\n" +
 	"\x05users\x18\x01 \x03(\v2\x17.mistgate.admin.v1.UserR\x05users\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x125\n" +
@@ -2714,7 +2830,16 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x17USER_FILTER_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12USER_FILTER_ONLINE\x10\x01\x12\x18\n" +
 	"\x14USER_FILTER_EXPIRING\x10\x02\x12\x1a\n" +
-	"\x16USER_FILTER_OVER_QUOTA\x10\x03*j\n" +
+	"\x16USER_FILTER_OVER_QUOTA\x10\x03*\xc1\x01\n" +
+	"\bUserSort\x12\x19\n" +
+	"\x15USER_SORT_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eUSER_SORT_NAME\x10\x01\x12\x15\n" +
+	"\x11USER_SORT_TRAFFIC\x10\x02\x12\x14\n" +
+	"\x10USER_SORT_EXPIRY\x10\x03\x12\x17\n" +
+	"\x13USER_SORT_LAST_SEEN\x10\x04\x12\x15\n" +
+	"\x11USER_SORT_DEVICES\x10\x05\x12\x13\n" +
+	"\x0fUSER_SORT_GROUP\x10\x06\x12\x14\n" +
+	"\x10USER_SORT_STATUS\x10\a*j\n" +
 	"\tDnsSource\x12\x1a\n" +
 	"\x16DNS_SOURCE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDNS_SOURCE_USER\x10\x01\x12\x14\n" +
@@ -2747,102 +2872,104 @@ func file_mistgate_admin_v1_user_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_user_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserStatus)(0),                     // 0: mistgate.admin.v1.UserStatus
 	(QuotaReset)(0),                     // 1: mistgate.admin.v1.QuotaReset
 	(UserFilter)(0),                     // 2: mistgate.admin.v1.UserFilter
-	(DnsSource)(0),                      // 3: mistgate.admin.v1.DnsSource
-	(*AppToggles)(nil),                  // 4: mistgate.admin.v1.AppToggles
-	(*NodeSelection)(nil),               // 5: mistgate.admin.v1.NodeSelection
-	(*User)(nil),                        // 6: mistgate.admin.v1.User
-	(*ListUsersRequest)(nil),            // 7: mistgate.admin.v1.ListUsersRequest
-	(*UserCounts)(nil),                  // 8: mistgate.admin.v1.UserCounts
-	(*ListUsersResponse)(nil),           // 9: mistgate.admin.v1.ListUsersResponse
-	(*GetUserRequest)(nil),              // 10: mistgate.admin.v1.GetUserRequest
-	(*Device)(nil),                      // 11: mistgate.admin.v1.Device
-	(*DayTraffic)(nil),                  // 12: mistgate.admin.v1.DayTraffic
-	(*NodeTraffic)(nil),                 // 13: mistgate.admin.v1.NodeTraffic
-	(*NodeAccess)(nil),                  // 14: mistgate.admin.v1.NodeAccess
-	(*ProfileRef)(nil),                  // 15: mistgate.admin.v1.ProfileRef
-	(*GetUserResponse)(nil),             // 16: mistgate.admin.v1.GetUserResponse
-	(*CreateUserRequest)(nil),           // 17: mistgate.admin.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),          // 18: mistgate.admin.v1.CreateUserResponse
-	(*UpdateUserRequest)(nil),           // 19: mistgate.admin.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),          // 20: mistgate.admin.v1.UpdateUserResponse
-	(*AccessImpact)(nil),                // 21: mistgate.admin.v1.AccessImpact
-	(*ImpactProfile)(nil),               // 22: mistgate.admin.v1.ImpactProfile
-	(*SetUsersEnabledRequest)(nil),      // 23: mistgate.admin.v1.SetUsersEnabledRequest
-	(*SetUsersEnabledResponse)(nil),     // 24: mistgate.admin.v1.SetUsersEnabledResponse
-	(*ExtendUsersRequest)(nil),          // 25: mistgate.admin.v1.ExtendUsersRequest
-	(*ExtendUsersResponse)(nil),         // 26: mistgate.admin.v1.ExtendUsersResponse
-	(*ResetUserTrafficRequest)(nil),     // 27: mistgate.admin.v1.ResetUserTrafficRequest
-	(*ResetUserTrafficResponse)(nil),    // 28: mistgate.admin.v1.ResetUserTrafficResponse
-	(*RevokeDeviceRequest)(nil),         // 29: mistgate.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),        // 30: mistgate.admin.v1.RevokeDeviceResponse
-	(*DeleteUsersRequest)(nil),          // 31: mistgate.admin.v1.DeleteUsersRequest
-	(*DeleteUsersResponse)(nil),         // 32: mistgate.admin.v1.DeleteUsersResponse
-	(*GetSubscriptionLinkRequest)(nil),  // 33: mistgate.admin.v1.GetSubscriptionLinkRequest
-	(*GetSubscriptionLinkResponse)(nil), // 34: mistgate.admin.v1.GetSubscriptionLinkResponse
-	(App)(0),                            // 35: mistgate.admin.v1.App
+	(UserSort)(0),                       // 3: mistgate.admin.v1.UserSort
+	(DnsSource)(0),                      // 4: mistgate.admin.v1.DnsSource
+	(*AppToggles)(nil),                  // 5: mistgate.admin.v1.AppToggles
+	(*NodeSelection)(nil),               // 6: mistgate.admin.v1.NodeSelection
+	(*User)(nil),                        // 7: mistgate.admin.v1.User
+	(*ListUsersRequest)(nil),            // 8: mistgate.admin.v1.ListUsersRequest
+	(*UserCounts)(nil),                  // 9: mistgate.admin.v1.UserCounts
+	(*ListUsersResponse)(nil),           // 10: mistgate.admin.v1.ListUsersResponse
+	(*GetUserRequest)(nil),              // 11: mistgate.admin.v1.GetUserRequest
+	(*Device)(nil),                      // 12: mistgate.admin.v1.Device
+	(*DayTraffic)(nil),                  // 13: mistgate.admin.v1.DayTraffic
+	(*NodeTraffic)(nil),                 // 14: mistgate.admin.v1.NodeTraffic
+	(*NodeAccess)(nil),                  // 15: mistgate.admin.v1.NodeAccess
+	(*ProfileRef)(nil),                  // 16: mistgate.admin.v1.ProfileRef
+	(*GetUserResponse)(nil),             // 17: mistgate.admin.v1.GetUserResponse
+	(*CreateUserRequest)(nil),           // 18: mistgate.admin.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),          // 19: mistgate.admin.v1.CreateUserResponse
+	(*UpdateUserRequest)(nil),           // 20: mistgate.admin.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),          // 21: mistgate.admin.v1.UpdateUserResponse
+	(*AccessImpact)(nil),                // 22: mistgate.admin.v1.AccessImpact
+	(*ImpactProfile)(nil),               // 23: mistgate.admin.v1.ImpactProfile
+	(*SetUsersEnabledRequest)(nil),      // 24: mistgate.admin.v1.SetUsersEnabledRequest
+	(*SetUsersEnabledResponse)(nil),     // 25: mistgate.admin.v1.SetUsersEnabledResponse
+	(*ExtendUsersRequest)(nil),          // 26: mistgate.admin.v1.ExtendUsersRequest
+	(*ExtendUsersResponse)(nil),         // 27: mistgate.admin.v1.ExtendUsersResponse
+	(*ResetUserTrafficRequest)(nil),     // 28: mistgate.admin.v1.ResetUserTrafficRequest
+	(*ResetUserTrafficResponse)(nil),    // 29: mistgate.admin.v1.ResetUserTrafficResponse
+	(*RevokeDeviceRequest)(nil),         // 30: mistgate.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),        // 31: mistgate.admin.v1.RevokeDeviceResponse
+	(*DeleteUsersRequest)(nil),          // 32: mistgate.admin.v1.DeleteUsersRequest
+	(*DeleteUsersResponse)(nil),         // 33: mistgate.admin.v1.DeleteUsersResponse
+	(*GetSubscriptionLinkRequest)(nil),  // 34: mistgate.admin.v1.GetSubscriptionLinkRequest
+	(*GetSubscriptionLinkResponse)(nil), // 35: mistgate.admin.v1.GetSubscriptionLinkResponse
+	(App)(0),                            // 36: mistgate.admin.v1.App
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
-	4,  // 1: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
-	35, // 2: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
+	5,  // 1: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
+	36, // 2: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
 	1,  // 3: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	5,  // 4: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	3,  // 5: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
+	6,  // 4: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	4,  // 5: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
 	2,  // 6: mistgate.admin.v1.ListUsersRequest.filter:type_name -> mistgate.admin.v1.UserFilter
-	6,  // 7: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 8: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
-	6,  // 9: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
-	11, // 10: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
-	12, // 11: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
-	13, // 12: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
-	15, // 13: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
-	14, // 14: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
-	1,  // 15: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	4,  // 16: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	5,  // 17: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	6,  // 18: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
-	1,  // 19: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	4,  // 20: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	5,  // 21: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	6,  // 22: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
-	21, // 23: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	22, // 24: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
-	22, // 25: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
-	6,  // 26: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
-	6,  // 27: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
-	6,  // 28: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
-	6,  // 29: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	7,  // 30: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	10, // 31: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	17, // 32: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	19, // 33: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	23, // 34: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	25, // 35: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	27, // 36: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	29, // 37: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	31, // 38: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	33, // 39: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	9,  // 40: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	16, // 41: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	18, // 42: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	20, // 43: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	24, // 44: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	26, // 45: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	28, // 46: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	30, // 47: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	32, // 48: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	34, // 49: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	40, // [40:50] is the sub-list for method output_type
-	30, // [30:40] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	3,  // 7: mistgate.admin.v1.ListUsersRequest.sort:type_name -> mistgate.admin.v1.UserSort
+	7,  // 8: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
+	9,  // 9: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
+	7,  // 10: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
+	12, // 11: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
+	13, // 12: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
+	14, // 13: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
+	16, // 14: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
+	15, // 15: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
+	1,  // 16: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	5,  // 17: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	6,  // 18: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	7,  // 19: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
+	1,  // 20: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	5,  // 21: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	6,  // 22: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	7,  // 23: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
+	22, // 24: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	23, // 25: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
+	23, // 26: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
+	7,  // 27: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
+	7,  // 28: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
+	7,  // 29: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
+	7,  // 30: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	8,  // 31: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	11, // 32: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	18, // 33: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	20, // 34: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	24, // 35: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	26, // 36: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	28, // 37: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	30, // 38: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	32, // 39: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	34, // 40: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	10, // 41: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	17, // 42: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	19, // 43: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	21, // 44: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	25, // 45: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	27, // 46: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	29, // 47: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	31, // 48: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	33, // 49: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	35, // 50: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	41, // [41:51] is the sub-list for method output_type
+	31, // [31:41] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -2857,7 +2984,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_user_proto_rawDesc), len(file_mistgate_admin_v1_user_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      5,
 			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,

@@ -72,6 +72,24 @@ enum UserFilter {
   USER_FILTER_OVER_QUOTA = 3;
 }
 
+enum UserSort {
+  // Default: name order; direction follows descending.
+  USER_SORT_UNSPECIFIED = 0;
+  USER_SORT_NAME = 1;
+  // Current quota period's used_bytes (upload + download).
+  USER_SORT_TRAFFIC = 2;
+  // Expiry time. Users without an expiry sort after dated users ascending and before them descending.
+  USER_SORT_EXPIRY = 3;
+  // Last session time. Online users count as most recent; never-seen users sort last descending.
+  USER_SORT_LAST_SEEN = 4;
+  // Number of devices used, then device_limit.
+  USER_SORT_DEVICES = 5;
+  // The displayed group name.
+  USER_SORT_GROUP = 6;
+  // Displayed status ascending: active, devices full, quota, expired, disabled.
+  USER_SORT_STATUS = 7;
+}
+
 message AppToggles {
   bool happ = 1;
   bool amnezia = 2;
@@ -143,12 +161,17 @@ message ListUsersRequest {
   // Case-insensitive substring of name or group name.
   string query = 2;
   string group_id = 3;
-  // Default 50, max 200. Order: name, then id (keyset pagination, stable under inserts).
+  // Default 50, max 200. The selected sort value uses `descending`; ties use name ascending, then id ascending.
+  // Name order supports keyset paging with page_token. Other orders use offset paging; page_token with any other
+  // sort or with the opposite name direction is invalid. Earlier unversioned name tokens remain valid ascending.
+  // Name is unique case-insensitively, so the name token is a stable key.
   uint32 page_size = 4;
   string page_token = 5;
   // Rows to skip before the page (after page_token when both are given): numbered pages. 0 = none, at most 100000.
   // The size of what is being paged is in the response counts (the chip of the filter in use).
   uint32 offset = 6;
+  UserSort sort = 7;
+  bool descending = 8;
 }
 
 // Badge numbers on the filter chips; computed for the same query and group_id, ignoring `filter`.
@@ -157,6 +180,12 @@ message UserCounts {
   uint32 online = 2;
   uint32 expiring = 3;
   uint32 over_quota = 4;
+  // Live, non-revoked devices in use for users matching query/group_id, regardless of filter or page. All apps on
+  // one implicit subscription-fetch device count once; each AmneziaWG key counts as one device.
+  uint32 devices_used = 5;
+  // Matching devices whose Device.online value is true, regardless of filter or page. Subscription devices are
+  // online while their user is online; AmneziaWG devices are online after a handshake within the 3-minute window.
+  uint32 devices_online = 6;
 }
 
 message ListUsersResponse {

@@ -4,10 +4,59 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAccessUserSortQueryPlans(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(ctx, filepath.Join(t.TempDir(), "store.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	q := AccessUserQuery{Limit: 50,
+		Now:               time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC),
+		DeviceOnlineAfter: time.Date(2026, 10, 1, 11, 57, 0, 0, time.UTC)}
+	for _, sort := range []AccessUserSort{
+		AccessUserSortName, AccessUserSortTraffic, AccessUserSortExpiry, AccessUserSortLastSeen,
+		AccessUserSortDevices, AccessUserSortGroup, AccessUserSortStatus,
+	} {
+		t.Run(fmt.Sprintf("sort_%d", sort), func(t *testing.T) {
+			q.Sort = sort
+			query, args := accUserListQuery(q, "1 = 1", nil, "1 = 1", nil, accJSON(nil))
+			rows, err := st.R.QueryContext(ctx, `EXPLAIN QUERY PLAN `+query, args...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rows.Close()
+			var details []string
+			for rows.Next() {
+				var id, parent, unused int
+				var detail string
+				if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+					t.Fatal(err)
+				}
+				details = append(details, detail)
+			}
+			if err := rows.Err(); err != nil {
+				t.Fatal(err)
+			}
+			plan := strings.Join(details, "\n")
+			t.Log(plan)
+			if sort == AccessUserSortDevices || sort == AccessUserSortStatus {
+				if !strings.Contains(plan, "SCAN c USING INDEX device_credential_live") || !strings.Contains(plan, "SEARCH d USING INDEX") ||
+					!strings.Contains(plan, "USE TEMP B-TREE FOR ORDER BY") {
+					t.Fatalf("device-derived sort plan changed unexpectedly:\n%s", plan)
+				}
+			}
+		})
+	}
+}
 
 func TestResetUserPeriodDoesNotOverwriteANewerPeriod(t *testing.T) {
 	ctx := context.Background()

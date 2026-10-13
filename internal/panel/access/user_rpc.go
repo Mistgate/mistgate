@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"slices"
 	"strings"
@@ -330,7 +329,19 @@ func (s *Service) loadUsers(ctx context.Context, ids ...string) ([]*adminv1.User
 
 func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.ListUsersRequest]) (*connect.Response[adminv1.ListUsersResponse], error) {
 	m := req.Msg
-	q := store.AccessUserQuery{Query: strings.TrimSpace(m.Query), GroupID: m.GroupId, Limit: int(m.PageSize), Offset: int(min(m.Offset, 100000)), Now: s.now()}
+	now := s.now()
+	sortValue, _, err := listUsersInteger(m, "sort", 7)
+	if err != nil || sortValue > uint64(store.AccessUserSortStatus) {
+		return nil, invalid("unknown sort")
+	}
+	descending, _, err := listUsersInteger(m, "descending", 8)
+	if err != nil {
+		return nil, invalid("unknown sort")
+	}
+	q := store.AccessUserQuery{
+		Query: strings.TrimSpace(m.Query), GroupID: m.GroupId, Sort: store.AccessUserSort(sortValue), Descending: descending != 0,
+		Limit: int(m.PageSize), Offset: int(min(m.Offset, 100000)), Now: now, DeviceOnlineAfter: now.Add(-awgOnlineWindow),
+	}
 	if q.Limit == 0 {
 		q.Limit = 50
 	}
@@ -350,11 +361,16 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 		q.OnlineIDs = append(q.OnlineIDs, id)
 	}
 	if m.PageToken != "" {
-		b, err := base64.RawURLEncoding.DecodeString(m.PageToken)
-		if err != nil {
+		if q.Sort != store.AccessUserSortUnspecified && q.Sort != store.AccessUserSortName {
+			return nil, invalid("page token requires name sort")
+		}
+		q.After, err = decodeUserListPageToken(m.PageToken, q.Descending)
+		if errors.Is(err, errUserListPageTokenFormat) {
 			return nil, invalid("bad page token")
 		}
-		q.After = string(b)
+		if errors.Is(err, errUserListPageTokenDirection) {
+			return nil, invalid("page token does not match name direction")
+		}
 	}
 	users, more, counts, err := s.st.Access().ListUsers(ctx, q)
 	if err != nil {
@@ -363,11 +379,13 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 	resp := &adminv1.ListUsersResponse{Counts: &adminv1.UserCounts{
 		All: uint32(counts.All), Online: uint32(counts.Online), Expiring: uint32(counts.Expiring), OverQuota: uint32(counts.OverQuota),
 	}}
+	setListUserCountField(resp.Counts, "devices_used", 5, uint32(counts.DevicesUsed))
+	setListUserCountField(resp.Counts, "devices_online", 6, uint32(counts.DevicesOnline))
 	if resp.Users, err = s.userProtos(ctx, users); err != nil {
 		return nil, err
 	}
-	if more {
-		resp.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte(users[len(users)-1].Name))
+	if more && (q.Sort == store.AccessUserSortUnspecified || q.Sort == store.AccessUserSortName) {
+		resp.NextPageToken = encodeUserListPageToken(users[len(users)-1].Name, q.Descending)
 	}
 	return connect.NewResponse(resp), nil
 }

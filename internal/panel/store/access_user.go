@@ -255,18 +255,35 @@ func (a Access) collectUsers(ctx context.Context, rows *sql.Rows) ([]AccessUser,
 
 // AccessUserQuery is a list request. Filter is "", "online", "expiring" or "over_quota".
 type AccessUserQuery struct {
-	Filter    string
-	Query     string
-	GroupID   string
-	After     string // name after which the page starts ("" = first page)
-	Offset    int    // rows skipped after After, for numbered pages
-	Limit     int
-	OnlineIDs []string // users currently online (fleet), for the "online" filter and its count
-	Now       time.Time
+	Filter            string
+	Query             string
+	GroupID           string
+	Sort              AccessUserSort
+	Descending        bool
+	After             string // name after which the page starts ("" = first page)
+	Offset            int    // rows skipped after After, for numbered pages
+	Limit             int
+	OnlineIDs         []string // users currently online (fleet), for the "online" filter and its count
+	Now               time.Time
+	DeviceOnlineAfter time.Time // AWG devices with a newer handshake count as online
 }
 
+// AccessUserSort follows the UserSort wire values. Zero means the default name order.
+type AccessUserSort int
+
+const (
+	AccessUserSortUnspecified AccessUserSort = iota
+	AccessUserSortName
+	AccessUserSortTraffic
+	AccessUserSortExpiry
+	AccessUserSortLastSeen
+	AccessUserSortDevices
+	AccessUserSortGroup
+	AccessUserSortStatus
+)
+
 // AccessUserCounts are the filter chip badges for one query, ignoring the filter itself.
-type AccessUserCounts struct{ All, Online, Expiring, OverQuota int }
+type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline int }
 
 const accExpiringWindow = 7 * 24 * time.Hour
 
@@ -275,8 +292,89 @@ func accLike(s string) string {
 	return "%" + r.Replace(s) + "%"
 }
 
-// ListUsers returns one page ordered by name (up to Limit users plus a flag telling whether more follow)
-// and the chip counts. LIKE is case-insensitive for ASCII only.
+// The grouped CTE counts each live device once and follows the Device.online rule: subscription devices follow the
+// user's online state; AmneziaWG devices follow their latest handshake. The user scope keeps the aggregate bounded
+// by the same query and group_id as the people counts.
+func accUserDeviceCountsCTE(base string) string {
+	return `live_devices AS (
+		SELECT d.id, d.user_id, d.last_seen_at,
+		   max(CASE WHEN d.hwid_hash IS NOT NULL AND c.profile_id IS NOT NULL AND ap.credential_id IS NOT NULL THEN 1 ELSE 0 END) AS is_awg
+		 FROM device d
+		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
+		 LEFT JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
+		 JOIN user u ON u.id = d.user_id
+		 JOIN user_group g ON g.id = u.group_id
+		 WHERE ` + base + ` AND d.revoked_at IS NULL
+		 GROUP BY d.id
+	), device_counts AS (
+		SELECT user_id, count(*) AS devices_used,
+		   sum(CASE WHEN (is_awg = 1 AND last_seen_at > ?) OR
+		       (is_awg = 0 AND user_id IN (SELECT value FROM json_each(?))) THEN 1 ELSE 0 END) AS devices_online
+		 FROM live_devices GROUP BY user_id
+	)`
+}
+
+func accUserSortOrder(sort AccessUserSort, descending bool) (string, bool) {
+	dir := "ASC"
+	if descending {
+		dir = "DESC"
+	}
+	tie := `, u.name COLLATE NOCASE ASC, u.id ASC`
+	switch sort {
+	case AccessUserSortTraffic:
+		return `u.used_bytes ` + dir + tie, false
+	case AccessUserSortExpiry:
+		return `u.expires_at IS NULL ` + dir + `, u.expires_at ` + dir + tie, false
+	case AccessUserSortLastSeen:
+		return `CASE WHEN u.id IN (SELECT value FROM json_each(?)) THEN 9223372036854775807 ELSE u.last_seen_at END ` + dir + tie, false
+	case AccessUserSortDevices:
+		return `coalesce(dc.devices_used, 0) ` + dir + `, u.device_limit ` + dir + tie, true
+	case AccessUserSortGroup:
+		return `g.name COLLATE NOCASE ` + dir + tie, false
+	case AccessUserSortStatus:
+		return `CASE
+			WHEN u.status = 'active' AND coalesce(dc.devices_used, 0) >= u.device_limit THEN 1
+			WHEN u.status = 'active' THEN 0
+			WHEN u.status = 'limited' THEN 2
+			WHEN u.status = 'expired' THEN 3
+			ELSE 4
+		END ` + dir + tie, true
+	default:
+		return `u.name COLLATE NOCASE ` + dir + `, u.id ASC`, false
+	}
+}
+
+func accUserListQuery(q AccessUserQuery, base string, baseArgs []any, lconds string, largs []any, online string) (string, []any) {
+	sort := q.Sort
+	if sort == AccessUserSortUnspecified {
+		sort = AccessUserSortName
+	}
+	orderBy, needsDeviceCounts := accUserSortOrder(sort, q.Descending)
+	from := accUserFrom
+	if needsDeviceCounts {
+		from += `LEFT JOIN device_counts dc ON dc.user_id = u.id `
+	}
+	query := `SELECT ` + accUserCols + from + `WHERE ` + lconds + ` ORDER BY ` + orderBy + ` LIMIT ? OFFSET ?`
+	queryArgs := append([]any{}, largs...)
+	if sort == AccessUserSortLastSeen {
+		queryArgs = append(queryArgs, online)
+	}
+	if needsDeviceCounts {
+		query = `WITH ` + accUserDeviceCountsCTE(base) + ` ` + query
+		cteArgs := append([]any{}, baseArgs...)
+		cteArgs = append(cteArgs, unix(q.DeviceOnlineAfter), online)
+		queryArgs = append(cteArgs, queryArgs...)
+	}
+	limit := q.Limit
+	if limit < 1 {
+		limit = 50
+	}
+	queryArgs = append(queryArgs, limit+1, max(q.Offset, 0))
+	return query, queryArgs
+}
+
+// ListUsers returns one page in the requested total order (up to Limit users plus a flag telling whether more
+// follow) and the chip counts. LIKE is case-insensitive for ASCII only.
 func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser, bool, AccessUserCounts, error) {
 	conds, args := []string{"1 = 1"}, []any{}
 	if q.GroupID != "" {
@@ -292,14 +390,22 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	now, soon := unix(q.Now), unix(q.Now.Add(accExpiringWindow))
 	online := accJSON(q.OnlineIDs)
 
+	deviceCTE := accUserDeviceCountsCTE(base)
 	var counts AccessUserCounts
+	countArgs := append([]any{}, args...)
+	countArgs = append(countArgs, unix(q.DeviceOnlineAfter), online, online, now, soon)
+	countArgs = append(countArgs, args...)
 	err := a.s.R.QueryRowContext(ctx,
-		`SELECT count(*),
+		`WITH `+deviceCTE+`
+		 SELECT count(*),
 		   coalesce(sum(u.id IN (SELECT value FROM json_each(?))), 0),
 		   coalesce(sum(u.disabled = 0 AND u.expires_at IS NOT NULL AND u.expires_at > ? AND u.expires_at <= ?), 0),
-		   coalesce(sum(u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes), 0)`+accUserFrom+`WHERE `+base,
-		append([]any{online, now, soon}, args...)...).
-		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota)
+		   coalesce(sum(u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes), 0),
+		   coalesce(sum(coalesce(dc.devices_used, 0)), 0),
+		   coalesce(sum(coalesce(dc.devices_online, 0)), 0)`+accUserFrom+
+			`LEFT JOIN device_counts dc ON dc.user_id = u.id WHERE `+base,
+		countArgs...).
+		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota, &counts.DevicesUsed, &counts.DevicesOnline)
 	if err != nil {
 		return nil, false, counts, err
 	}
@@ -315,16 +421,24 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	case "over_quota":
 		lconds += ` AND u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes`
 	}
-	if q.After != "" {
-		lconds += ` AND u.name > ?`
+	sort := q.Sort
+	if sort == AccessUserSortUnspecified {
+		sort = AccessUserSortName
+	}
+	if q.After != "" && sort == AccessUserSortName {
+		cmp := ">"
+		if q.Descending {
+			cmp = "<"
+		}
+		lconds += ` AND u.name ` + cmp + ` ?`
 		largs = append(largs, q.After)
 	}
 	limit := q.Limit
 	if limit < 1 {
 		limit = 50
 	}
-	largs = append(largs, limit+1, max(q.Offset, 0))
-	rows, err := a.s.R.QueryContext(ctx, `SELECT `+accUserCols+accUserFrom+`WHERE `+lconds+` ORDER BY u.name LIMIT ? OFFSET ?`, largs...)
+	query, queryArgs := accUserListQuery(q, base, args, lconds, largs, online)
+	rows, err := a.s.R.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, false, counts, err
 	}
