@@ -53,7 +53,7 @@ Agent 版本过旧（此功能推出之前的版本）的节点会继续使用�
 
 ## 安装站点
 
-面板只读取目录。将站点放在 `/home` 和 `/root` 之外的目录中（[安装面板](../getting-started/install-panel.md#7-在-systemd-下运行)中的 systemd 单元会对服务隐藏这些目录），例如 `/srv/mistgate-decoy`：
+面板只读取目录。将站点放在 `/home` 和 `/root` 之外的目录中（[安装面板](../getting-started/install-panel.md#7-使用-systemd-运行)中的 systemd 单元会对服务隐藏这些目录），例如 `/srv/mistgate-decoy`：
 
 ```sh
 mkdir -p /srv/mistgate-decoy
