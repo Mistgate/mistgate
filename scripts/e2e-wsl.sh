@@ -68,18 +68,19 @@ set -Eeuo pipefail
 OLD_NODE=""
 # The tunnel steps (AmneziaWG, WARP, Mihomo) are opt-in: without these flags the run is the base and self-update
 # scenario and takes what it always took.
-# --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
+# --decoy runs the decoy-site step alone (scripts/e2e/decoy.sh; --m3 includes it). --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_ONLY="" EDGE="" SSH_ONLY=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
     --keep) KEEP=1 ;;
-    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 ;;
+    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_DECOY=1 ;;
     --awg) M3_AWG=1 ;;
     --warp) M3_WARP=1 ;;
     --mihomo) M3_MIHOMO=1 M3_AWG=1 ;;
     --vless) M3_VLESS=1 ;;
+    --decoy) M3_DECOY=1 ;;
     --m3-only) M3_ONLY=1 ;;
     --edge) EDGE=1 ;;
     --ssh-only) SSH_ONLY=1 ;;
@@ -90,11 +91,12 @@ while [ $# -gt 0 ]; do
 done
 set -- "${ARGS[@]}"
 [ -z "$OLD_NODE" ] || [ -x "$OLD_NODE" ] || [ -f "$OLD_NODE" ] || { echo "--old-node: no such file: $OLD_NODE" >&2; exit 2; }
-[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1; }
+[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_DECOY$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_DECOY=1; }
 M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
-[ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
+[ -z "$OLD_NODE" ] || M3_DECOY=""
+[ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_DECOY$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
 [ -z "$SSH_ONLY" ] || [ -n "$EDGE" ] || { echo "--ssh-only goes with --edge (it skips the traffic steps 4-8 of the edge scenario; the VPS edition's SSH step needs the bundle of the base steps)" >&2; exit 2; }
 [ "$(id -u)" = 0 ] || { echo "run as root (wsl -d Ubuntu -u root)" >&2; exit 2; }
 for tool in go curl jq python3 openssl nft ip mount; do
@@ -177,6 +179,8 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto} CGO_ENABLED=0 GOFLAGS=-buildvcs=false
 # shellcheck source=e2e/m3.sh
 . "$REPO/scripts/e2e/m3.sh" # the tunnel steps (functions only; the calls are below)
+# shellcheck source=e2e/decoy.sh
+. "$REPO/scripts/e2e/decoy.sh" # the decoy site per node (functions only; the call is below)
 # shellcheck source=e2e/sshnode.sh
 . "$REPO/scripts/e2e/sshnode.sh" # the SSH install on a real OpenSSH host (functions only; both editions call it)
 
@@ -336,7 +340,7 @@ start_panel() {
   # The health test hook: a silence of 3 s already counts as an outage (production: 10 min), so the stopped
   # agent of step 2c opens NODE_DOWN within a couple of evaluations.
   MISTGATE_HEALTH_BLIP_WINDOW=3s spawn ${PANEL_SSL_CERT_FILE:+env SSL_CERT_FILE=$PANEL_SSL_CERT_FILE} "${PANEL_BIN:-$BIN/mistgate}" serve --data-dir "$DATA" --listen "127.0.0.1:$PUB" \
-    --tls-cert "$WORK/pub.crt" --tls-key "$WORK/pub.key" --agent-addr "127.0.0.1:$PUB" >>"$WORK/panel.log" 2>&1
+    --tls-cert "$WORK/pub.crt" --tls-key "$WORK/pub.key" --agent-addr "127.0.0.1:$PUB" ${PANEL_DECOY_DIR:+--decoy-dir "$PANEL_DECOY_DIR"} >>"$WORK/panel.log" 2>&1
   PANEL_PID=$LAST_PID
   wait_for 30 "the panel to answer" panel_up || die "panel did not start"
 }
@@ -1180,6 +1184,7 @@ fi # ---- end of steps 2b..9
 
 # ================================================================ tunnel steps (AmneziaWG, WARP, Mihomo), sources in scripts/e2e/m3.sh
 [ -z "$OLD_NODE" ] || m3_compat
+[ -z "$M3_DECOY" ] || decoy_site
 if [ -n "$M3_LIVE" ]; then
   m3_lab
   if [ -n "$M3_AWG" ]; then
