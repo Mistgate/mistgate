@@ -35,9 +35,9 @@ const read = (p) => readFileSync(join(out, p), "utf8");
 const menu = (html) => /<details class="lang">[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
 
 before(() => {
-  // the fixture owns docs/zh: whatever real zh pages exist are left out (their diagrams may stay)
+  // the fixture owns docs/zh: whatever real zh pages and screenshots exist are left out (the diagrams may stay)
   const realZh = join(site, "..", "docs", "zh");
-  cpSync(join(site, "..", "docs"), join(root, "docs"), { recursive: true, filter: (src) => !(src.startsWith(realZh) && src.endsWith(".md")) });
+  cpSync(join(site, "..", "docs"), join(root, "docs"), { recursive: true, filter: (src) => !(src.startsWith(realZh) && src.endsWith(".md")) && !src.endsWith("-zh.webp") });
   const zh = (p, text) => { const f = join(root, "docs/zh", p); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, text); };
   zh("index.md", "---\ntitle: Mistgate 文档\ndescription: 自托管 VPN 面板的文档。\n---\n\n欢迎。\n\n## 所有页面\n\n### 入门\n\n- [概览](getting-started/overview.md): 简介\n- [添加节点](getting-started/add-node.md): 尚未翻译\n");
   zh("getting-started/overview.md", "---\ntitle: 概览\ndescription: Mistgate 是什么，适合谁用，各部分如何配合。\n---\n\n## 两个程序\n\n节点是运行在每台 VPN 服务器上的代理。详见[添加节点](add-node.md)。\n\n> **注意：** 这是占位文字。\n");

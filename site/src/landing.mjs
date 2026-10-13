@@ -2,12 +2,13 @@
 // start, and the docs by admin section. The copy follows README.md / README.ru.md; facts and numbers come from the
 // docs (benchmarks, comparison). docs/<lang>/index.md stays the sidebar's source and the docs' start page on GitHub.
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GITHUB, pageUrl } from "./urls.mjs";
 import { icon, NAV } from "./icons.mjs";
 import { inlineSvg } from "./diagrams.mjs";
 
-const DOCS = fileURLToPath(new URL("../../docs/", import.meta.url));
+const DOCS = process.env.MG_DOCS ? join(process.env.MG_DOCS, "/") : fileURLToPath(new URL("../../docs/", import.meta.url)); // as build.mjs
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // `code` in copy -> <code>
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");

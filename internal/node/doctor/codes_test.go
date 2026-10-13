@@ -37,7 +37,7 @@ func TestCodeRegistry(t *testing.T) {
 	}
 }
 
-// Every code has wording in the admin UI (web/src/i18n/health.ts, both languages), so a new code cannot ship as
+// Every code has wording in the admin UI (web/src/i18n/health.ts, every language: en, ru, zh), so a new code cannot ship as
 // raw English by accident. The test is skipped outside a full checkout.
 func TestEveryCodeHasUIWording(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "..", "..", "web", "src", "i18n", "health.ts"))
@@ -47,8 +47,8 @@ func TestEveryCodeHasUIWording(t *testing.T) {
 	src := string(b)
 	for _, c := range Codes {
 		key := `"doctor.detail.` + c + `"`
-		if n := strings.Count(src, key); n != 2 {
-			t.Errorf("%s is in health.ts %d time(s), want 2 (en and ru)", key, n)
+		if n := strings.Count(src, key); n != 3 {
+			t.Errorf("%s is in health.ts %d time(s), want 3 (en, ru and zh)", key, n)
 		}
 	}
 	// ... and the other way round: no wording for a code the agent never sends. The panel writes a few codes of its own
