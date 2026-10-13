@@ -304,11 +304,10 @@ func accLike(s string) string {
 	return "%" + r.Replace(s) + "%"
 }
 
-// The grouped CTE counts each live device once and follows the Device.online rule: subscription devices follow the
-// user's online state (every link device of a person who is online, as GetUser lists them: the nodes report who is online,
-// not which device yet); AmneziaWG devices follow their latest handshake. A person with several link devices counts each
-// once: the join with the credentials is grouped by device. The user scope keeps the aggregate bounded by the same query
-// and group_id as the people counts.
+// The grouped CTE counts each live device once: the join with the credentials is grouped by device. Online, AmneziaWG
+// devices follow their latest handshake; subscription devices count at most one per person who is online, because the
+// nodes report who is online, not which device yet, and a person with four HWID apps and one in use is not four online.
+// The user scope keeps the aggregate bounded by the same query and group_id as the people counts.
 func accUserDeviceCountsCTE(base string) string {
 	return `live_devices AS (
 		SELECT d.id, d.user_id, d.last_seen_at,
@@ -322,8 +321,8 @@ func accUserDeviceCountsCTE(base string) string {
 		 GROUP BY d.id
 	), device_counts AS (
 		SELECT user_id, count(*) AS devices_used,
-		   sum(CASE WHEN (is_awg = 1 AND last_seen_at > ?) OR
-		       (is_awg = 0 AND user_id IN (SELECT value FROM json_each(?))) THEN 1 ELSE 0 END) AS devices_online
+		   sum(CASE WHEN is_awg = 1 AND last_seen_at > ? THEN 1 ELSE 0 END) +
+		   max(CASE WHEN is_awg = 0 AND user_id IN (SELECT value FROM json_each(?)) THEN 1 ELSE 0 END) AS devices_online
 		 FROM live_devices GROUP BY user_id
 	)`
 }

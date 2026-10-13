@@ -173,7 +173,7 @@ func TestListUsersSortsBothDirections(t *testing.T) {
 		t.Fatalf("filtered traffic order = %s, want fox,bob", got)
 	}
 	if filtered.Counts.All != 3 || listUserCountValue(filtered.Counts, "devices_used", 5) != 4 ||
-		listUserCountValue(filtered.Counts, "devices_online", 6) != 3 {
+		listUserCountValue(filtered.Counts, "devices_online", 6) != 2 { // bob's two link devices count once
 		t.Fatalf("query/group counts = %+v, devices=(%d,%d)", filtered.Counts,
 			listUserCountValue(filtered.Counts, "devices_used", 5), listUserCountValue(filtered.Counts, "devices_online", 6))
 	}
@@ -266,8 +266,10 @@ func TestListUsersDeviceCounts(t *testing.T) {
 	if got := listUserCountValue(response.Counts, "devices_used", 5); got != 6 {
 		t.Fatalf("devices used = %d, want 6", got)
 	}
-	if got := listUserCountValue(response.Counts, "devices_online", 6); got != 3 {
-		t.Fatalf("devices online = %d, want 3", got)
+	// "online" has two link devices (the shared one and a HWID one): the nodes say the person is online, not which
+	// device, so they count once. awg-fresh's handshake is the other one.
+	if got := listUserCountValue(response.Counts, "devices_online", 6); got != 2 {
+		t.Fatalf("devices online = %d, want 2", got)
 	}
 	wire := must(proto.Marshal(response))
 	var roundTrip adminv1.ListUsersResponse
@@ -277,8 +279,8 @@ func TestListUsersDeviceCounts(t *testing.T) {
 	if got := listUserCountValue(roundTrip.Counts, "devices_used", 5); got != 6 {
 		t.Fatalf("wire devices used = %d, want 6", got)
 	}
-	if got := listUserCountValue(roundTrip.Counts, "devices_online", 6); got != 3 {
-		t.Fatalf("wire devices online = %d, want 3", got)
+	if got := listUserCountValue(roundTrip.Counts, "devices_online", 6); got != 2 {
+		t.Fatalf("wire devices online = %d, want 2", got)
 	}
 }
 
