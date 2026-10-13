@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 688" width="720" height="688" role="img" aria-labelledby="title desc">
+<title id="title">Mistgate 的组成</title>
+<desc id="desc">浏览器、订阅类应用、脚本和 AI 智能体通过 TCP 443 访问面板。面板的公开监听端口把请求分发给伪装站点、订阅和用户页面、带 API 与 MCP 服务器的管理后台，或 Agent 接入端点。面板各模块把数据保存在 SQLite 中，机密用主密钥加密封存。每个节点保持一条到 Agent 接入端点的连接，由节点发起。在节点上，Agent 核心把变更应用到引擎（Hysteria2、AmneziaWG）和主机；VPN 流量从应用经引擎送往互联网。</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="687" rx="16"/>
+<rect class="card" x="24" y="24" width="672" height="48" rx="14"/>
+<g class="grey"><rect class="chip" x="40" y="37" width="22" height="22" rx="7"/><svg x="44.5" y="41.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="70" y="52.5">浏览器</text>
+<g class="grey"><rect class="chip" x="206" y="37" width="22" height="22" rx="7"/><svg x="210.5" y="41.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M7 3h10v18H7zM11 18h2"/></svg></g>
+<text class="t" x="236" y="52.5">订阅类应用</text>
+<g class="grey"><rect class="chip" x="372" y="37" width="22" height="22" rx="7"/><svg x="376.5" y="41.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v14H4zM8 10l3 2-3 2M13 14h3"/></svg></g>
+<text class="t" x="402" y="52.5">脚本</text>
+<g class="grey"><rect class="chip" x="538" y="37" width="22" height="22" rx="7"/><svg x="542.5" y="41.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/></svg></g>
+<text class="t" x="568" y="52.5">AI 智能体</text>
+<rect class="card" x="24" y="104" width="672" height="270" rx="16"/>
+<g class="lav"><rect class="chip" x="40" y="120" width="26" height="26" rx="7"/><svg x="45" y="125" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M3 3h8v10H3zM13 3h8v6h-8zM13 13h8v8h-8zM3 17h8v4H3z"/></svg></g>
+<text class="h" x="76" y="138">面板</text>
+<text class="m" x="680" y="137" text-anchor="end">mistgate serve</text>
+<g class="grey"><path class="flow " d="M180 72L180 159"/><path class="head" d="M180 166l-4.5 -8h9z"/></g>
+<text class="m" x="190" y="93">TCP 443</text>
+<rect class="pill" x="40" y="166" width="180" height="48" rx="11"/>
+<g class="grey"><rect class="chip" x="52" y="179" width="22" height="22" rx="7"/><svg x="56.5" y="183.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 7v5M12 12l-7 5M12 12l7 5"/></svg></g>
+<text class="t" x="84" y="188">公开监听端口</text>
+<text class="m" x="84" y="203">TCP 443</text>
+<g class="grey"><path class="flow" d="M220 190H240M240 187V337M240 187H253M240 237H253M240 287H253M240 337H253"/></g>
+<rect class="pill" x="260" y="166" width="220" height="42" rx="11"/>
+<g class="sage"><rect class="chip" x="272" y="176" width="22" height="22" rx="7"/><svg x="276.5" y="180.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 6c3 1 5 1 8 0 3 1 5 1 8 0v6c0 4-3.5 7-8 8-4.5-1-8-4-8-8V6zM8.5 11h.01M15.5 11h.01M9 15c1.5 1 4.5 1 6 0"/></svg></g>
+<text class="t" x="304" y="185">伪装站点</text>
+<text class="m" x="304" y="200">其余所有请求</text>
+<rect class="pill" x="260" y="216" width="220" height="42" rx="11"/>
+<g class="mint"><rect class="chip" x="272" y="226" width="22" height="22" rx="7"/><svg x="276.5" y="230.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></g>
+<text class="t" x="304" y="235">订阅</text>
+<text class="m" x="304" y="250">用户页面、自助</text>
+<rect class="pill" x="260" y="266" width="220" height="42" rx="11"/>
+<g class="lav"><rect class="chip" x="272" y="276" width="22" height="22" rx="7"/><svg x="276.5" y="280.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></g>
+<text class="t" x="304" y="285">管理后台</text>
+<text class="m" x="304" y="300">/api · /mcp</text>
+<rect class="pill" x="260" y="316" width="220" height="42" rx="11"/>
+<g class="sky"><rect class="chip" x="272" y="326" width="22" height="22" rx="7"/><svg x="276.5" y="330.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM9 12l2.2 2.2L15.5 10"/></svg></g>
+<text class="t" x="304" y="335">Agent 接入端点</text>
+<text class="m" x="304" y="350">双向 TLS</text>
+<rect class="pill" x="500" y="166" width="180" height="48" rx="11"/>
+<g class="sand"><rect class="chip" x="512" y="179" width="22" height="22" rx="7"/><svg x="516.5" y="183.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/></svg></g>
+<text class="t" x="544" y="188">模块</text>
+<text class="m" x="544" y="203">auth, fleet, …</text>
+<rect class="pill" x="500" y="222" width="180" height="48" rx="11"/>
+<g class="sand"><rect class="chip" x="512" y="235" width="22" height="22" rx="7"/><svg x="516.5" y="239.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></g>
+<text class="t" x="544" y="244">存储</text>
+<text class="m" x="544" y="259">SQLite 与迁移</text>
+<rect class="pill" x="500" y="278" width="180" height="48" rx="11"/>
+<g class="sand"><rect class="chip" x="512" y="291" width="22" height="22" rx="7"/><svg x="516.5" y="295.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2"/></svg></g>
+<text class="t" x="544" y="300">Vault</text>
+<text class="m" x="544" y="315">主密钥与机密</text>
+<g class="lav"><path class="flow dash" d="M370 405L370 365"/><path class="head" d="M370 358l-4.5 8h9z"/><path class="head" d="M370 412l-4.5 -8h9z"/></g>
+<text class="s" x="386" y="397">每个节点一条连接，由节点发起</text>
+<rect class="card" x="24" y="412" width="672" height="176" rx="16"/>
+<g class="sky"><rect class="chip" x="40" y="428" width="26" height="26" rx="7"/><svg x="45" y="433" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></g>
+<text class="h" x="76" y="446">节点</text>
+<text class="m" x="680" y="445" text-anchor="end">mistgate-node run</text>
+<rect class="pill" x="40" y="468" width="200" height="104" rx="11"/>
+<g class="lav"><rect class="chip" x="52" y="480" width="22" height="22" rx="7"/><svg x="56.5" y="484.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M3 12h4l3-7 4 14 3-7h4"/></svg></g>
+<text class="t" x="84" y="495.5">Agent 核心</text>
+<text class="m" x="54" y="526">与面板保持一条连接</text>
+<text class="m" x="54" y="542">单一工作线程</text>
+<text class="m" x="54" y="558">可靠发件队列</text>
+<rect class="pill" x="260" y="468" width="200" height="104" rx="11"/>
+<g class="sky"><rect class="chip" x="272" y="480" width="22" height="22" rx="7"/><svg x="276.5" y="484.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></g>
+<text class="t" x="304" y="495.5">引擎</text>
+<text class="m" x="274" y="526">Hysteria2，进程内运行</text>
+<text class="m" x="274" y="542">AmneziaWG：用户态</text>
+<text class="m" x="274" y="558">或内核模块</text>
+<rect class="pill" x="480" y="468" width="200" height="104" rx="11"/>
+<g class="sand"><rect class="chip" x="492" y="480" width="22" height="22" rx="7"/><svg x="496.5" y="484.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v14H4zM8 10l3 2-3 2M13 14h3"/></svg></g>
+<text class="t" x="524" y="495.5">主机</text>
+<text class="m" x="494" y="526">nftables, sysctl</text>
+<text class="m" x="494" y="542">WARP、证书</text>
+<text class="m" x="494" y="558">诊断、自更新</text>
+<g class="sky"><path class="flow wide" d="M370 579L370 613"/><path class="head" d="M370 620l-4.5 -8h9z"/><path class="head" d="M370 572l-4.5 8h9z"/></g>
+<rect class="card" x="24" y="620" width="672" height="44" rx="14"/>
+<g class="grey"><rect class="chip" x="40" y="631" width="22" height="22" rx="7"/><svg x="44.5" y="635.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></g>
+<text class="t" x="70" y="646.5">来自应用的 VPN 流量，经引擎送往互联网</text>
+</svg>

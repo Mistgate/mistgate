@@ -80,9 +80,12 @@ export function flow(tone, pts, { both = false, cls = "" } = {}) {
   return `<g class="${tone}"><path class="flow ${cls}" d="${d}"/><path class="head" d="${HEAD[endDir](...end)}"/>${both ? `<path class="head" d="${HEAD[startDir](...start)}"/>` : ""}</g>`;
 }
 export const badge = (tone, x, y, num) => `<g class="${tone}"><circle class="badge" cx="${n(x)}" cy="${n(y)}" r="10"/><text class="bn" x="${n(x)}" y="${n(y + 4)}">${num}</text></g>`;
+/** Estimated width of a short label: `latin` px per character, `cjk` px per Han or full-width character (about 1 em). */
+const CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+export const textWidth = (s, latin, cjk) => [...s].reduce((a, c) => a + (CJK.test(c) ? cjk : latin), 0);
 /** The panel's status pill: a tinted capsule, a filled dot with a check or a dash, the word. `right` anchors it at its right edge. */
 export function yn(yes, x, y, word, right = false) {
-  const w = Math.round(30 + word.length * 6.4), x0 = right ? x - w : x;
+  const w = Math.round(30 + textWidth(word, 6.4, 11.2)), x0 = right ? x - w : x;
   const g = yes ? `<path d="M${n(x0 + 9.5)} ${n(y + 11)}l2 2 3.5 -4" fill="none" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` : `<path d="M${n(x0 + 9.5)} ${n(y + 11)}h5" stroke="var(--d-bg)" stroke-width="1.8" stroke-linecap="round"/>`;
   return `<g class="${yes ? "mint" : "grey"}"><rect class="chip" x="${n(x0)}" y="${n(y)}" width="${w}" height="22" rx="11"/><circle class="badge" cx="${n(x0 + 12)}" cy="${n(y + 11)}" r="7"/>${g}<text class="tt" x="${n(x0 + 24)}" y="${n(y + 15)}" font-size="11" font-weight="700">${esc(word)}</text></g>`;
 }

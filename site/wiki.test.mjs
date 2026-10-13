@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { COMPLETE } from "./src/urls.mjs";
 import { buildWiki, loadDocs, sanitize, ghSlug, wikiHref } from "./wiki.mjs";
 
 const page = (title, body, description = "A page.") => `---\ntitle: ${title}\ndescription: ${description}\n---\n\n${body}\n`;
@@ -135,7 +136,7 @@ test("the real docs/ tree generates cleanly: every link resolves, every page end
   assert.equal(r.files.size, r.pages.length + 3);
   for (const [name, text] of r.files) {
     if (name.startsWith("_")) continue;
-    if (name !== "Home.md") assert.match(text, /\[(Edit this page|Редактировать страницу)\]\(https:\/\/github\.com\/Mistgate\/mistgate\/edit\/main\/docs\/(en|ru)\/.+\.md\)/, name);
+    if (name !== "Home.md") assert.match(text, /\[(Edit this page|Редактировать страницу|编辑此页)\]\(https:\/\/github\.com\/Mistgate\/mistgate\/edit\/main\/docs\/(en|ru|zh)\/.+\.md\)/, name);
     // a page-local link must name a generated file
     for (const m of text.replace(/```[\s\S]*?```/g, "").matchAll(/\]\(([^)\s:]+?)(?:#[^)]*)?\)/g)) {
       const target = decodeURIComponent(m[1]);
@@ -171,4 +172,12 @@ test("zh joins the wiki when it has pages: its own section, (ZH) on a name clash
   const without = build();
   assert.doesNotMatch(get(without, "Home.md"), /简体中文|\/zh\//);
   assert.deepEqual(without.warnings.filter((w) => /"zh"/.test(w)), [], "a language still being translated is not a warning when it has no pages");
+});
+
+test("a zh page linking to a zh page that is not translated yet links the English wiki page (no anchor); a missing en page still fails (until COMPLETE.zh)", { skip: COMPLETE.zh && "zh is complete: a missing page fails as in ru" }, () => {
+  const zh = { index: idx({ "入门": ["start/one"] }), "start/one": page("安装面板", "见[添加节点](two.md#第二部分)，[缺页](../nowhere.md)。") };
+  const r = buildWiki({ en, ru, zh });
+  assert.deepEqual(r.errors, ["zh/start/one.md: link to ../nowhere.md -> docs/zh/nowhere.md, no such documentation page"]);
+  assert.match(get(r, "安装面板.md"), /\[添加节点\]\(Add-a-node\)/);
+  assert.deepEqual(r.warnings.filter((w) => /第二部分/.test(w)), []);
 });

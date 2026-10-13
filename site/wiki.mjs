@@ -27,12 +27,11 @@ const T = {
     footer: `Сгенерировано из [docs/](${GITHUB}/tree/main/docs) в [Mistgate/mistgate](${GITHUB}) — правьте документацию, а не вики.`,
     heading: "Документация Mistgate",
   },
-  // zh: translation pass: name is final, the rest is temporary English
   zh: {
-    name: "简体中文", other: "Other pages", edit: "Edit this page", site: "View on mistgate.app", start: "Start page",
-    intro: "**Mistgate** is a self-hosted panel for your own VPN fleet: one binary for the panel, one for the node agent, Hysteria2 and AmneziaWG in one subscription.",
-    footer: `Generated from [docs/](${GITHUB}/tree/main/docs) in [Mistgate/mistgate](${GITHUB}) — edit the docs, not the wiki.`,
-    heading: "Mistgate documentation",
+    name: "简体中文", other: "其他页面", edit: "编辑此页", site: "在 mistgate.app 上查看", start: "起始页",
+    intro: "**Mistgate** 是用于自建 VPN 集群的自托管面板：面板和节点 Agent 各一个二进制文件，一份订阅同时提供 Hysteria2 和 AmneziaWG。",
+    footer: `由 [Mistgate/mistgate](${GITHUB}) 中的 [docs/](${GITHUB}/tree/main/docs) 生成，请编辑文档，不要直接编辑 wiki。`,
+    heading: "Mistgate 文档",
   },
 };
 
@@ -158,6 +157,9 @@ export function rewriteBody(body, ctx) {
     if (repoPath.startsWith("..")) { ctx.problems.push(`${here()}: ${href} points outside the repository`); return href; }
     const page = ctx.byPath.get(repoPath);
     if (page) { ctx.links.push({ from: here(), page, anchor: frag }); return wikiHref(page.name) + (frag ? `#${frag}` : ""); }
+    // a language still being translated: a page it does not have yet is the English page (no anchor: its headings are other text)
+    const english = !COMPLETE[ctx.lang] && ctx.lang !== LANGS[0] ? ctx.byPath.get(repoPath.replace(`docs/${ctx.lang}/`, `docs/${LANGS[0]}/`)) : null;
+    if (english) { ctx.links.push({ from: here(), page: english, anchor: null }); return wikiHref(english.name); }
     if (new RegExp(`^docs/(${LANGS.join("|")})/.*\\.md$`).test(repoPath)) { ctx.problems.push(`${here()}: link to ${href} -> ${repoPath}, no such documentation page`); return href; }
     const kind = path.endsWith("/") ? "tree" : "blob";
     return `${GITHUB}/${kind}/main/${repoPath.replace(/\/$/, "")}${frag ? `#${frag}` : ""}`;

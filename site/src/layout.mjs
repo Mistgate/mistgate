@@ -25,15 +25,14 @@ export const T = {
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
   },
   zh: {
-    // zh: translation pass: everything below the language fields (hreflang ... short) is temporary English
-    hreflang: "zh-Hans", htmlLang: "zh-CN", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "Docs", home: "Home", siteTitle: "Mistgate docs",
-    skip: "Skip to content", menu: "Menu", closeMenu: "Close menu", navLabel: "Documentation", crumbs: "Breadcrumb",
-    search: "Search docs", searchLabel: "Search the documentation", searchEmpty: "Nothing found. Try another word.", searchClose: "Close search", searchIn: "in",
-    onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
-    language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
-    license: "Released under AGPL-3.0", other: "Other",
-    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", updates: "Updates", integrations: "Integrations", settings: "Settings" },
-    notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
+    hreflang: "zh-Hans", htmlLang: "zh-CN", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "文档", home: "首页", siteTitle: "Mistgate 文档",
+    skip: "跳到正文", menu: "菜单", closeMenu: "关闭菜单", navLabel: "文档", crumbs: "面包屑导航",
+    search: "搜索文档", searchLabel: "搜索文档", searchEmpty: "没有找到结果。换个词试试。", searchClose: "关闭搜索", searchIn: "位于",
+    onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate",
+    language: "语言", copy: "复制", copied: "已复制", table: "表格", plain: "文本", diagram: "示意图", permalink: "链接到此小节", pending: "此页尚未撰写", roadmap: "路线图阶段",
+    license: "基于 AGPL-3.0 发布", other: "其他",
+    inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", updates: "更新", integrations: "集成", settings: "设置" },
+    notFound: "页面不存在", notFoundText: "没有这个页面。它可能已移动，或尚未撰写。", toHome: "前往文档",
   },
 };
 
@@ -166,7 +165,7 @@ export function renderDoc(ctx) {
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
   const hero = isHome
     ? home.hero
-    : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 13)}</span><span>${esc(t.inAdmin)}: ${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
+    : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 13)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
   const inlineToc = showToc ? `<details class="toc-inline"><summary>${esc(t.onPage)}</summary>${tocHtml(toc)}</details>` : "";
   const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${esc(x.title)}</span></a>` : "<span></span>";
   const edit = `<p class="edit"><a href="${editUrl(lang, page.key)}" rel="noopener">${icon("externalLink", 14)}${esc(t.edit)}</a></p>`;

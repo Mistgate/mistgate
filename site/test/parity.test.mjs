@@ -22,7 +22,7 @@ export function shape(src) {
     else if (t.type === "table_open") s.tables.push(0);
     else if (t.type === "tr_open") s.tables[s.tables.length - 1]++;
     else if (t.type === "inline" && tk[i - 1].type === "td_open" && tk[i - 2].type === "tr_open") {
-      const parts = t.children.filter((c) => !(c.type === "text" && /^[\s,/]*$/.test(c.content)));
+      const parts = t.children.filter((c) => !(c.type === "text" && /^[\s,/、，]*$/.test(c.content)));
       const key = parts.map((c) => c.content).join(" ");
       // names only (flags, variables, procedures, commands): a shown value such as `123 ms` is translated
       if (parts.length && parts.every((c) => c.type === "code_inline") && /^[A-Za-z_.-][\w.:=/ -]*$/.test(key)) s.keys.push(key);

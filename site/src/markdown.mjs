@@ -28,7 +28,7 @@ export async function createHl() {
 const slugify = (s) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, "-") || "section";
 
 // "> **Note:** ..." and friends; GitHub shows the same blockquote, the wiki turns it into an alert (wiki.mjs ALERTS)
-// zh: "注意：" with the full-width colon inside the bold text is read like "Note:" (translation pass: confirm the words)
+// zh: "注意：" with the full-width colon inside the bold text is read like "Note:" (confirmed by the zh glossary)
 const CALLOUTS = { note: "note", "важно": "note", "注意": "note", tip: "tip", "совет": "tip", "提示": "tip", warning: "warning", "внимание": "warning", "警告": "warning", danger: "danger", "опасно": "danger", "危险": "danger" };
 const CALLOUT_CHIP = { note: ["info", "lavender"], tip: ["sparkle", "mint"], warning: ["warn", "sand"], danger: ["warn", "rose"] };
 // code block bar: language name and icon; a word after the language (```ini /etc/x.service) names the file instead
