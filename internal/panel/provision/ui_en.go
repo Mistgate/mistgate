@@ -66,6 +66,9 @@ func (l pageLang) tr(s string) string {
 	for _, sep := range []string{": ", " · "} {
 		if head, tail, ok := strings.Cut(s, sep); ok {
 			if e, ok := lookup(head); ok {
+				if l == pageZH && sep == ": " {
+					sep = "：" // the Chinese label takes a full-width colon
+				}
 				return e + sep + tail
 			}
 		}

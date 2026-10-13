@@ -19,33 +19,44 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-func TestChineseStateNotesUseEnglishPlaceholders(t *testing.T) {
+// The Chinese notices are translations: they differ from the English ones, speak Chinese, and carry the date of the
+// English one (the %s of the format) in the way a Chinese page writes it.
+func TestChineseStateNotesAreTranslated(t *testing.T) {
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	sep29, oct10, jan5 := time.Date(2026, 9, 29, 9, 0, 0, 0, time.UTC), time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC), time.Date(2027, 1, 5, 0, 0, 0, 0, time.UTC)
 	for _, c := range []struct {
 		view access.SubView
 		want string
+		date time.Time
 	}{
-		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "Subscription ended on 29 September. Message us to renew"},
-		{access.SubView{Status: access.StatusExpired}, "Subscription ended. Message us to renew"},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "Traffic used up, resets on 10 October"},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "Traffic used up, resets on 5 January 2027"},
-		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetNone}, "Traffic used up. Message us to raise the limit"},
-		{access.SubView{Status: access.StatusDisabled}, "Access paused"},
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "订阅已于 9月29日 到期。联系我们即可续期", sep29},
+		{access.SubView{Status: access.StatusExpired}, "订阅已到期。联系我们即可续期", time.Time{}},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "流量已用完，10月10日 重置", oct10},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "流量已用完，2027年1月5日 重置", jan5},
+		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetNone}, "流量已用完。联系我们，可以为你增加", time.Time{}},
+		{access.SubView{Status: access.StatusDisabled}, "访问已暂停", time.Time{}},
 	} {
-		if got := stateNote(c.view, "zh", now); got != c.want {
-			t.Errorf("Chinese state note = %q, want English placeholder %q", got, c.want)
+		got := stateNote(c.view, "zh", now)
+		if got != c.want {
+			t.Errorf("Chinese state note = %q, want %q", got, c.want)
+		}
+		if en := stateNote(c.view, "en", now); got == en || strings.Contains(got, "%") {
+			t.Errorf("Chinese state note %q is not a translation of %q", got, en)
+		}
+		if !c.date.IsZero() && !strings.Contains(got, dayText(c.date, now, "zh")) {
+			t.Errorf("Chinese state note %q lacks its date", got)
 		}
 	}
 }
 
-func TestMihomoOnlyNoteUsesEnglishPlaceholderForChinese(t *testing.T) {
+func TestMihomoOnlyNoteIsTranslatedForChinese(t *testing.T) {
 	v := access.SubView{
 		Status: access.StatusActive,
 		Nodes:  []access.SubNode{{Conns: []access.SubConn{{MihomoOnly: true}}}},
 	}
-	if got := mihomoOnlyNote(v, "zh"); got != "These servers work only in kl!ck and other Mihomo apps" {
-		t.Errorf("Chinese notice = %q, want English placeholder", got)
+	got := mihomoOnlyNote(v, "zh")
+	if got != "这些服务器仅限 kl!ck 和其他 Mihomo 应用" || got == mihomoOnlyNote(v, "en") || !strings.Contains(got, "kl!ck") || !strings.Contains(got, "Mihomo") {
+		t.Errorf("Chinese notice = %q", got)
 	}
 }
 
@@ -306,7 +317,7 @@ func TestStateNote(t *testing.T) {
 	}{
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "ru", "Подписка закончилась 29 сентября. Напишите — продлим"},
 		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "en", "Subscription ended on 29 September. Message us to renew"},
-		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "zh", "Subscription ended on 29 September. Message us to renew"},
+		{access.SubView{Status: access.StatusExpired, Expires: sep29}, "zh", "订阅已于 9月29日 到期。联系我们即可续期"},
 		{access.SubView{Status: access.StatusExpired}, "ru", "Подписка закончилась. Напишите — продлим"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: oct10}, "ru", "Трафик закончился, обнулится 10 октября"},
 		{access.SubView{Status: access.StatusLimited, QuotaReset: access.ResetMonth, NextReset: jan5}, "ru", "Трафик закончился, обнулится 5 января 2027"},

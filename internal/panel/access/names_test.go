@@ -14,9 +14,19 @@ import (
 
 // Keys are named like the page's server list: the country and the location, "Server", a number on a repeat. The panel's
 // node name (de1, "ノード") never shows: the user page and the user's apps get these names.
-func TestServerLabelerUsesEnglishPlaceholderForChinese(t *testing.T) {
-	if got := ServerLabeler("zh")("", ""); got != "Server" {
-		t.Errorf("Chinese generic server name = %q, want English placeholder", got)
+func TestServerLabelerIsTranslatedForChinese(t *testing.T) {
+	label := ServerLabeler("zh")
+	if got := label("", ""); got != "服务器" {
+		t.Errorf("Chinese generic server name = %q, want 服务器", got)
+	}
+	if got := label("", ""); got != "服务器 2" {
+		t.Errorf("Chinese generic server name, second = %q, want 服务器 2", got)
+	}
+	if got, en := ServerLabeler("zh")("", ""), ServerLabeler("en")("", ""); got == en {
+		t.Errorf("Chinese generic server name %q is the English %q", got, en)
+	}
+	if got := ServerLabeler("zh")("DE", "Frankfurt"); !strings.Contains(got, " · Frankfurt") || strings.HasPrefix(got, "Germany") {
+		t.Errorf("Chinese country server name = %q, want a Chinese country and the location", got)
 	}
 }
 

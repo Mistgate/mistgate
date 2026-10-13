@@ -138,18 +138,17 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 // ---- words for the page ----
 
 // The built-in presets have one stored name, Russian, and a description of the form "Russian\nEnglish". The page speaks
-// the language of the visitor: English names serve English pages and are the zh placeholders while the stored name is
-// still the stock one (an owner may have renamed it; that name is shown as it is). They are the names the admin shows an
-// English owner (web/src/screens/subscriptions/model.ts builtinNames); the provider catalog's own English names ("Default", "Basic")
-// do not say what a preset is for.
+// the language of the visitor while the stored name is still the stock one (an owner may have renamed it; that name is
+// shown as it is). They are the names the admin shows an owner in that language (web/src/screens/subscriptions/model.ts
+// builtinNames); the provider catalog's own English names ("Default", "Basic") do not say what a preset is for.
 var builtinNames = map[string]struct{ ru, en, zh string }{
-	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "Russia: .ru direct"},                                      // zh: translation pass
-	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "Russia: all through VPN"},                           // zh: translation pass
-	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},                                     // zh: translation pass
-	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard: no ads"},                                            // zh: translation pass
-	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family: no ads, no 18+"}, // zh: translation pass
-	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9: malware blocking"},                    // zh: translation pass
-	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS", "Yandex DNS"},                                                                // zh: translation pass
+	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"},
+	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN"},
+	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},
+	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告"},
+	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"},
+	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9：拦截恶意网站"},
+	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS", "Yandex DNS"},
 }
 
 // NameIn is the name of the preset in the language of the page.
@@ -167,6 +166,19 @@ func (p Preset) NameIn(lang string) string {
 	return p.Name
 }
 
+// builtinDescriptions are the stock descriptions of the built-in presets: the English text they are stored with
+// (00009_dns_order.sql) and the same in Chinese. The Chinese one is shown only while the stored English half is still the
+// stock one.
+var builtinDescriptions = map[string]struct{ en, zh string }{
+	"dns_builtin_ru_split":   {"Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"},
+	"dns_builtin_ru_proxied": {"Everything through the VPN, Russian sites via a Russian node", "全部走 VPN，俄罗斯网站经由俄罗斯节点"},
+	"dns_builtin_standard":   {"Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google"},
+	"dns_builtin_adblock":    {"AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器"},
+	"dns_builtin_family":     {"AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"},
+	"dns_builtin_quad9":      {"Quad9: blocks malware and phishing domains", "Quad9：拦截恶意软件和钓鱼域名"},
+	"dns_builtin_yandex":     {"Yandex DNS for everything: Russian sites are more reliable", "全部使用 Yandex DNS：俄罗斯网站更稳定"},
+}
+
 // DescriptionIn is the description in the language of the page. A built-in one is stored as "Russian\nEnglish" and is
 // split; a description of an owner's own preset is one text, shown in any language.
 func (p Preset) DescriptionIn(lang string) string {
@@ -177,8 +189,11 @@ func (p Preset) DescriptionIn(lang string) string {
 	if lang == "ru" {
 		return strings.TrimSpace(ru)
 	}
-	// zh: translation pass — built-in descriptions use their English text as the placeholder.
-	return strings.TrimSpace(en)
+	en = strings.TrimSpace(en)
+	if d, ok := builtinDescriptions[p.ID]; ok && lang == "zh" && en == d.en {
+		return d.zh
+	}
+	return en
 }
 
 // ---- DnsService: what the owner offers per node, and what people picked ----

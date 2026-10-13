@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
 	"connectrpc.com/connect"
 
@@ -100,15 +102,41 @@ func TestInstallPageLanguage(t *testing.T) {
 	}
 }
 
+// Every Chinese text is a translation: it is not empty, not the English text, has Chinese characters and keeps the
+// format verbs and {placeholders} of the English one.
 func TestChinesePageTranslationsHaveEveryEnglishKey(t *testing.T) {
-	for key := range pageEnglish {
-		if value, ok := pageChinese[key]; !ok || value == "" {
-			t.Errorf("Chinese placeholder missing for %q", key)
+	verbs := regexp.MustCompile(`%[a-z]|\{[^}]*\}`)
+	hasHan := func(s string) bool {
+		return strings.ContainsFunc(s, func(r rune) bool { return unicode.Is(unicode.Han, r) })
+	}
+	for key, en := range pageEnglish {
+		zh, ok := pageChinese[key]
+		if !ok || zh == "" {
+			t.Errorf("Chinese text missing for %q", key)
+			continue
+		}
+		if zh == en || !hasHan(zh) {
+			t.Errorf("Chinese text %q is not a translation of %q", zh, en)
+		}
+		if got, want := strings.Join(verbs.FindAllString(zh, -1), " "), strings.Join(verbs.FindAllString(en, -1), " "); got != want {
+			t.Errorf("Chinese text %q has placeholders %q, English has %q", zh, got, want)
+		}
+		if strings.Contains(zh, " — ") || strings.ContainsAny(zh, "“”«»") || strings.Contains(zh, "您") {
+			t.Errorf("Chinese text %q breaks the style guide (spaced dash, wrong quotes or 您)", zh)
+		}
+	}
+	for _, c := range []struct{ name, zh, en string }{
+		{"refusedTargetMessage", pageChinese[refusedTargetMessage], pageEnglish[refusedTargetMessage]},
+		{"edgeTimeoutMessage", pageChinese[edgeTimeoutMessage], pageEnglish[edgeTimeoutMessage]},
+		{"edgeTimeoutLabel", pageChinese[edgeTimeoutLabel], pageEnglish[edgeTimeoutLabel]},
+	} {
+		if c.zh == "" || c.zh == c.en || !hasHan(c.zh) {
+			t.Errorf("%s has no Chinese translation: %q", c.name, c.zh)
 		}
 	}
 	for key := range pageChinese {
 		if _, ok := pageEnglish[key]; !ok {
-			t.Errorf("Chinese placeholder has no English source for %q", key)
+			t.Errorf("Chinese text has no English source for %q", key)
 		}
 	}
 }
@@ -123,8 +151,8 @@ func TestInstallPageInChineseUsesItsLanguageTag(t *testing.T) {
 	}
 }
 
-// English and Chinese-placeholder pages have no Russian words left in each step, state, phase, event and error.
-func TestInstallPageInEnglishAndChinesePlaceholders(t *testing.T) {
+// English and Chinese pages have no Russian words left in each step, state, phase, event and error.
+func TestInstallPageInEnglishAndChinese(t *testing.T) {
 	cyrillic := func(s string) bool {
 		return strings.ContainsFunc(s, func(r rune) bool { return r >= 0x400 && r <= 0x4ff })
 	}
@@ -184,6 +212,17 @@ func TestInstallPageInEnglishAndChinesePlaceholders(t *testing.T) {
 			}
 			if !strings.Contains(html, `lang="`+string(lang)+`"`) {
 				t.Errorf("%s page %d has the wrong language tag", lang, i)
+			}
+			// The Chinese page really is Chinese: its step names are the admin's, the English ones are gone.
+			if lang == pageZH && i == 0 {
+				for _, want := range []string{"1 · 服务器", "2 · SSH 密钥", "3 · 检查", "4 · 安装"} {
+					if !strings.Contains(html, want) {
+						t.Errorf("zh page lacks the step %q", want)
+					}
+				}
+				if strings.Contains(html, "Check the server") || strings.Contains(html, "Start over") {
+					t.Errorf("zh page keeps English text: %s", html)
+				}
 			}
 		}
 	}

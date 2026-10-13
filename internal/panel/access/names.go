@@ -69,10 +69,13 @@ func ServerLabeler(lang string) func(cc, location string) string {
 			name = strings.TrimPrefix(name+" · "+place, " · ")
 		}
 		if name == "" {
-			// zh: translation pass — "Server" is the English placeholder for the generic server name.
-			name = "Server"
-			if lang == "ru" {
+			switch lang {
+			case "ru":
 				name = "Сервер"
+			case "zh":
+				name = "服务器"
+			default:
+				name = "Server"
 			}
 		}
 		unique := name
