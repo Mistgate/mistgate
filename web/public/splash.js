@@ -23,8 +23,7 @@
   var text = {
     ru: { load: "Загрузка…", fail: "Не удалось загрузить панель. Обновите страницу.", reload: "Обновить" },
     en: { load: "Loading…", fail: "Cannot load the panel. Reload the page.", reload: "Reload" },
-    // zh: filled by the translation pass (English until then)
-    zh: { load: "Loading…", fail: "Cannot load the panel. Reload the page.", reload: "Reload" },
+    zh: { load: "正在加载…", fail: "无法加载面板。请刷新页面。", reload: "刷新" },
   }[lang];
 
   function fill() {
