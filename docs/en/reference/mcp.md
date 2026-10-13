@@ -77,11 +77,11 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 |---|---|
 | Tool calls at a time, per token | 4 (more: 429 "at most 4 tool calls at a time per token") |
 | Requests per minute | the token's own limit |
-| Request body | 256 KiB |
+| Request body | 3 MiB |
 | A tool result | 32 KiB; long lists are halved until they fit and marked as truncated |
 | Time per call | 30 s for reads and plans, 90 s for an apply |
 | Open plans | 20 per token; 50 waiting for the owner across the panel |
-| Stored arguments of a plan | 8 KiB |
+| Stored arguments of a plan | 8 KiB (3 MiB for a decoy bundle upload) |
 
 ## Tools
 
@@ -126,6 +126,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
+| `node_decoy` | Admin | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (base64 ZIP or TAR up to 2 MB, required for `own`) | always |
 | `warp_restart` | Admin | `node` id or exact name; the plan lists profiles using WARP egress that may blink for a few seconds; apply takes only `confirm_token` | no |
 | `warp_reregister` | Admin | `node` id or exact name and optional `reason` (at most 300 characters); apply takes only `confirm_token`. The plan shows the Cloudflare terms link; owner approval accepts them for this account and replaces it with a new anonymous device, changing the WARP exit IP | always |
 | `rollout_start` | Admin | exactly one `node_ids` entry from `updates_status` (updates that node now); the trusted version is pinned in the plan | always |
@@ -178,7 +179,7 @@ A plan needs the owner when one of these applies (the `danger` list):
 | Code | Meaning | Tools |
 |---|---|---|
 | `step_up` | The operation itself asks for a fresh confirmation in the admin. | the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `update_timezone`, `node_install`, `node_server_password_rotate` |
-| `fleet` | It changes what runs on the nodes. | `node_fix`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate` |
+| `fleet` | It changes what runs on the nodes. | `node_fix`, `node_decoy`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate` |
 | `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
 | `user_page` | Every user sees it on their subscription page. | `subscription_app_upsert`, `subscription_app_remove` |
 

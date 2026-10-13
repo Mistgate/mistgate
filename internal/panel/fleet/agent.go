@@ -2,10 +2,12 @@ package fleet
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +29,7 @@ const (
 	capTorrentGuard = "torrentguard/1"
 	capClientIPv6   = "client-ipv6/1" // NodeSettings.client_ipv6_disabled
 	capWSLink       = "ws-link/1"
+	capDecoy        = "decoy/1"
 )
 
 type agentService struct{ f *Fleet }
@@ -473,6 +476,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	if tr.Close != nil {
 		return sessionCloseError(tr.Close)
 	}
+	f.scheduleDecoySync(id)
 
 	for {
 		select {
@@ -544,6 +548,20 @@ func sessionCloseError(close *SessionClose) error {
 func helloInfo(h *agentv1.Hello) store.HelloInfo {
 	info := store.HelloInfo{AgentVersion: clip(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
 		Built: h.Built, Caps: capabilities(h), LastUpdateJSON: lastUpdateJSON(h.LastUpdate)}
+	if slices.Contains(info.Caps, capDecoy) {
+		switch h.DecoyMode {
+		case "builtin":
+			if h.DecoySha256 == "" {
+				info.DecoyMode = "builtin"
+			}
+		case "panel", "own":
+			if len(h.DecoySha256) == 64 && strings.ToLower(h.DecoySha256) == h.DecoySha256 {
+				if _, err := hex.DecodeString(h.DecoySha256); err == nil {
+					info.DecoyMode, info.DecoyHash = h.DecoyMode, h.DecoySha256
+				}
+			}
+		}
+	}
 	if ft := h.Facts; ft != nil {
 		if ft.BootUnix > 0 {
 			info.BootAt = time.Unix(ft.BootUnix, 0).UTC()
@@ -783,6 +801,8 @@ func requestCapability(frame *agentv1.ConnectResponse) (capability, message stri
 		return capUDPCheck, "agent too old"
 	case frame.GetHttpMark() != nil, frame.GetTcpProbe() != nil:
 		return capTCPCheck, "agent too old"
+	case frame.GetSetDecoy() != nil:
+		return capDecoy, "agent too old"
 	default:
 		return "", ""
 	}

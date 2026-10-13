@@ -85,6 +85,7 @@ var tokenApproved = map[string]bool{
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure:   true,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:          true, // planning only, in the real policy
 	adminv1connect.WarpServiceRegisterWarpProcedure:                       true,
+	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:                   true,
 	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: true,
 }
 
@@ -318,6 +319,7 @@ type world struct {
 	subsReq           []*adminv1.UpdateSubscriptionSettingsRequest
 	warpRestarts      []*adminv1.RestartWarpRequest
 	warpRegistrations []*adminv1.RegisterWarpRequest
+	nodeDecoyReqs     []*adminv1.SetNodeDecoyModeRequest
 
 	subs                   *adminv1.SubscriptionSettings // the stored subscription settings
 	users                  map[string]*adminv1.GetUserResponse
@@ -427,8 +429,17 @@ func (w *world) ListEvents(_ context.Context, r *connect.Request[adminv1.ListEve
 
 func (w *world) ListNodes(context.Context, *connect.Request[adminv1.ListNodesRequest]) (*connect.Response[adminv1.ListNodesResponse], error) {
 	return connect.NewResponse(&adminv1.ListNodesResponse{Nodes: []*adminv1.Node{
-		{Id: nodeA, Name: "de1", Address: canaryAddr},
-		{Id: nodeB, Name: "nl1", Address: canaryAddr},
+		{Id: nodeA, Name: "de1", Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
+		{Id: nodeB, Name: "nl1", Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
+	}}), nil
+}
+
+func (w *world) SetNodeDecoyMode(_ context.Context, r *connect.Request[adminv1.SetNodeDecoyModeRequest]) (*connect.Response[adminv1.SetNodeDecoyModeResponse], error) {
+	w.mu.Lock()
+	w.nodeDecoyReqs = append(w.nodeDecoyReqs, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.SetNodeDecoyModeResponse{Node: &adminv1.Node{
+		Id: r.Msg.GetNodeId(), Name: "de1", DecoyMode: r.Msg.GetMode(), DecoyOwnAvailable: true,
 	}}), nil
 }
 
@@ -444,7 +455,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 	return connect.NewResponse(&adminv1.GetNodeResponse{
 		Node: &adminv1.Node{
 			Id: r.Msg.GetNodeId(), Name: name, Address: canaryAddr, CountryCode: "DE", Status: w.nodeStatuses[r.Msg.GetNodeId()],
-			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}},
+			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: true,
 		},
 		Metrics: &adminv1.NodeMetrics{CpuPct: 12, Load1: 0.5, RamUsedBytes: 1 << 30, RamTotalBytes: 2 << 30},
 		Facts:   &adminv1.NodeFacts{Hostname: "de1.example.com", Os: "linux"},

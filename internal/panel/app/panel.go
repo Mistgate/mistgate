@@ -218,6 +218,7 @@ func Build(c Config) (*Panel, error) {
 		Limiter:              limiter,
 		PanelAddr:            c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,
+		DecoyDir:             c.DecoyDir,
 		Desired:              desired,
 		// A quota overrun takes effect right after the stats batch that crossed it.
 		OnUsage: func(ctx context.Context, userIDs []string) {

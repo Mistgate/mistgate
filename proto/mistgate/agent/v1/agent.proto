@@ -369,6 +369,12 @@ package mistgate.agent.v1;
 //     8 s per port, 4 concurrent probes. Answer: CommandResult{ok, params{"family": "4" | "6", "t<port>": verdict}}.
 //   - ERRORS (CommandResult.error): busy (a mark already armed, 4 probes running, or a bandwidth test running),
 //     bad_params, unsupported_host, no_route (resolve failed), "failed: <short message>".
+
+// NODE DECOY SITE (additive, protocol api_version stays 1)
+//   A node reports the active mode and bundle SHA-256 in Hello. Agents that implement this command list "decoy/1".
+//   SetDecoy changes the site used by Hysteria2 masquerade and VLESS REALITY self. files is omitted when the agent
+//   already has bundle_sha256; otherwise it contains the complete static file tree. The agent validates and persists
+//   the files before switching. One CommandResult answers the command with params{"mode", "sha256"}.
 //
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
@@ -483,7 +489,8 @@ message Hello {
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
   // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
-  // UdpSend; see "UDP DELIVERY CHECK") and "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK").
+  // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
+  // "decoy/1" (SetDecoy; see "NODE DECOY SITE").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -492,6 +499,10 @@ message Hello {
   // Outcome of the last self-update that this node has not reported yet; unset when there is none
   // (see "UPDATE", LAST_UPDATE).
   LastUpdate last_update = 13;
+  // The active node decoy mode: "builtin", "panel" or "own". Empty means this agent predates decoy/1.
+  string decoy_mode = 14;
+  // SHA-256 of the active panel or own bundle, lowercase hex; empty for builtin.
+  string decoy_sha256 = 15;
 }
 
 enum UpdateOutcome {
@@ -813,7 +824,22 @@ message ConnectResponse {
     // Only sent to agents with "tcpcheck/1" in Hello.capabilities (see "TCP DELIVERY CHECK").
     HttpMark http_mark = 28;
     TcpProbe tcp_probe = 29;
+    // Only sent to agents with "decoy/1" in Hello.capabilities (see "NODE DECOY SITE").
+    SetDecoy set_decoy = 30;
   }
+}
+
+// Select a node's decoy site. A missing file list is valid only when the node already has the named hash.
+message SetDecoy {
+  string request_id = 1;
+  string mode = 2; // "builtin" | "panel" | "own"
+  string bundle_sha256 = 3; // empty for builtin
+  repeated DecoyFile files = 4; // complete tree only when the node's active hash differs
+}
+
+message DecoyFile {
+  string path = 1; // relative slash-separated path
+  bytes contents = 2;
 }
 
 // Ask the node to measure its download and upload speed to a public test server. Answered with one CommandResult; see

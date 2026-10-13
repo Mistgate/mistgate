@@ -348,7 +348,8 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetUdpCount() != nil,
 		frame.GetUdpSend() != nil,
 		frame.GetHttpMark() != nil,
-		frame.GetTcpProbe() != nil:
+		frame.GetTcpProbe() != nil,
+		frame.GetSetDecoy() != nil:
 		return PendingCommand
 	case frame.GetRetire() != nil:
 		return PendingRetire

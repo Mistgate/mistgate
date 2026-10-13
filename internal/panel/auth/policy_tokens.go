@@ -31,6 +31,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.FleetServiceListEventsProcedure:                     TokenAccessDirect,
 	adminv1connect.NodeServiceListNodesProcedure:                       TokenAccessDirect,
 	adminv1connect.NodeServiceGetNodeProcedure:                         TokenAccessDirect,
+	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:                TokenAccessApproved,
 	adminv1connect.HealthServiceListAlertsProcedure:                    TokenAccessDirect,
 	adminv1connect.HealthServiceGetChecksProcedure:                     TokenAccessDirect,
 	adminv1connect.HealthServiceGetDoctorProcedure:                     TokenAccessDirect,
@@ -123,6 +124,7 @@ var stepUpProcedures = map[string]bool{
 // names without the _plan / _apply suffix, as stored in mcp_plan.tool.
 var grantProcedures = map[string]string{
 	"warp_reregister":             adminv1connect.WarpServiceRegisterWarpProcedure,
+	"node_decoy":                  adminv1connect.NodeServiceSetNodeDecoyModeProcedure,
 	"node_fix":                    adminv1connect.HealthServiceApplyFixProcedure,
 	"rollout_start":               adminv1connect.UpdateServiceStartRolloutProcedure,
 	"rollout_pause":               adminv1connect.UpdateServicePauseRolloutProcedure,

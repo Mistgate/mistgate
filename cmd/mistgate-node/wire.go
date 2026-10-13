@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"path/filepath"
 
-	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/agent"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/certs"
@@ -73,7 +71,6 @@ func wire(stateDir string, log *slog.Logger, hooks *agentHooks) (agent.Config, m
 				}
 				return nil, fmt.Errorf("egress %q is not available on this node", name)
 			},
-			Masquerade: func(string) http.Handler { return decoy.Handler() },
 		}, map[string]engine.Factory{
 			"hysteria2": hysteria2.Factory,
 			"vless":     vless.Factory,

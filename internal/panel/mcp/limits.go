@@ -9,23 +9,24 @@ import (
 // The limits of the MCP server. Strings that came from data (names, notes, log lines) are untrusted and
 // cut short; whole results are capped; lists are paged.
 const (
-	maxResultBytes   = 32 << 10 // a tool result, serialised
-	maxBodyBytes     = 256 << 10
-	maxConcurrent    = 4 // tool calls at once per token
-	maxName          = 200
-	maxNote          = 400
-	maxParamValue    = 120
-	maxParams        = 12
-	maxAuditParams   = 500
-	maxError         = 300
-	maxReason        = 300
-	maxArgsJSON      = 8 << 10
-	maxIDs           = 50
-	maxOnlineUsers   = 10
-	defaultUsersPage = 25
-	maxUsersPage     = 50
-	defaultListLimit = 50
-	maxListLimit     = 100
+	maxResultBytes    = 32 << 10 // a tool result, serialised
+	maxBodyBytes      = 3 << 20
+	maxConcurrent     = 4 // tool calls at once per token
+	maxName           = 200
+	maxNote           = 400
+	maxParamValue     = 120
+	maxParams         = 12
+	maxAuditParams    = 500
+	maxError          = 300
+	maxReason         = 300
+	maxArgsJSON       = 8 << 10
+	maxUploadArgsJSON = 3 << 20
+	maxIDs            = 50
+	maxOnlineUsers    = 10
+	defaultUsersPage  = 25
+	maxUsersPage      = 50
+	defaultListLimit  = 50
+	maxListLimit      = 100
 
 	// MaxUnattendedBulk is how many users one user_disable may name before it needs the owner.
 	MaxUnattendedBulk = 3

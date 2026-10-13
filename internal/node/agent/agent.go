@@ -36,6 +36,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/awgprep"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
@@ -62,7 +63,7 @@ type Config struct {
 	Log *slog.Logger
 
 	// Host-side services handed to the engines (engine.Env). Nil Certs means engines get no certificates,
-	// nil Egress means only a "no egress configured" error, nil Masquerade serves a plain 404.
+	// nil Egress means only a "no egress configured" error. Nil Masquerade uses the persisted node decoy site.
 	Certs      engine.CertSource
 	Egress     func(name string) (engine.Egress, error)
 	Masquerade func(inboundID string) http.Handler
@@ -91,12 +92,13 @@ type Config struct {
 
 // Agent is the node agent. Build it with New and run it with Run.
 type Agent struct {
-	cfg  Config
-	log  *slog.Logger
-	ring *logRing
-	host hostctl.Host
-	meta Meta
-	id   atomic.Pointer[identity]
+	cfg       Config
+	log       *slog.Logger
+	ring      *logRing
+	host      hostctl.Host
+	meta      Meta
+	id        atomic.Pointer[identity]
+	decoySite *decoy.Site
 
 	engines   map[string]engine.Engine
 	protocols []string // sorted keys of engines
@@ -281,6 +283,10 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if err != nil {
 		return nil, err
 	}
+	site, siteErr := decoy.OpenSite(cfg.StateDir)
+	if siteErr != nil {
+		site = decoy.BuiltinSite(cfg.StateDir)
+	}
 	if id.meta.Link != "" { // enrolled over the link: that address is the only way to the panel
 		if _, err := parseLinkBase(id.meta.Link); err != nil {
 			return nil, fmt.Errorf("%s link: %w", fileMeta, err)
@@ -297,6 +303,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	ring := newLogRing()
 	a := &Agent{
 		cfg: cfg, ring: ring, host: host, meta: id.meta,
+		decoySite:     site,
 		log:           slog.New(&ringHandler{ring: ring, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
@@ -309,6 +316,9 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		backoffMin:    time.Second, backoffMax: time.Minute,
 		renewEvery: time.Hour, sweepEvery: 30 * time.Second,
 		commitTick: commitTick, commitSettle: commitSettle, upd: cfg.Updater,
+	}
+	if siteErr != nil {
+		a.log.Warn("persisted decoy site ignored", "err", siteErr)
 	}
 	a.id.Store(id)
 	a.settings.Store(&pb.NodeSettings{})
@@ -352,10 +362,10 @@ func (a *Agent) egress(name string) (engine.Egress, error) {
 }
 
 func (a *Agent) masquerade(inboundID string) http.Handler {
-	if a.cfg.Masquerade == nil {
-		return http.NotFoundHandler()
+	if a.cfg.Masquerade != nil {
+		return a.cfg.Masquerade(inboundID)
 	}
-	return a.cfg.Masquerade(inboundID)
+	return a.decoySite.Handler()
 }
 
 // now is the agent clock corrected by the offset measured at Hello.
@@ -836,6 +846,7 @@ func (a *Agent) hello(ctx context.Context) *pb.ConnectRequest {
 		NextSeq: next, FirstUnackedSeq: first, AppliedRevision: rev, AppliedStateHash: hash,
 		Capabilities: a.capabilities(), Built: a.cfg.Built,
 	}
+	h.DecoyMode, h.DecoySha256 = a.decoySite.State()
 	if o := a.upd.Outcome(); o != nil {
 		h.LastUpdate = o
 	}
@@ -912,6 +923,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.httpMark(s, m.HttpMark) })
 	case *pb.ConnectResponse_TcpProbe:
 		a.goBusy(func() { a.tcpProbe(s, m.TcpProbe) })
+	case *pb.ConnectResponse_SetDecoy:
+		a.goBusy(func() { a.setDecoy(s, m.SetDecoy) })
 	case *pb.ConnectResponse_UpdateAgent:
 		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:

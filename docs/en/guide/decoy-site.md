@@ -9,7 +9,15 @@ The public address of the panel shows a decoy site to everyone who is not the ad
 
 Without `--decoy-dir` the panel shows a built-in "Coming soon" page. Every installation ships the same page, so anyone who has seen it once can recognise it, and a prober can tell that the address belongs to a Mistgate panel. A site of your own, with its own text and look, makes the address look like an ordinary small site that nobody has a reason to look at twice.
 
-Nodes are a separate matter. Today a node serves one fixed built-in site (see [Masquerade](hysteria2.md#masquerade) in the Hysteria2 page), the same on every installation. A custom node site is **Planned**: the panel will push the same bundle of files to the nodes. It is not available yet, and `--decoy-dir` only changes what the panel serves.
+## Nodes: three options
+
+Choose a decoy site for each node in the panel:
+
+- **Built-in** keeps the fixed Mistgate page. Existing nodes stay on this option after an upgrade until you change them.
+- **Panel** copies the panel's `--decoy-dir` bundle to the node. Use it when you want the panel and several nodes to show the same small site. New nodes default to this option when the panel has a valid decoy directory.
+- **Own** uploads a ZIP or TAR bundle for one node only. Use a different subject and visual style for every node: never repeat the subject or look already used on another node. The archive and the total files are each limited to 2 MB. The edge edition does not offer own bundles.
+
+The chosen site is served by the node's Hysteria2 masquerade over HTTP/3 and TCP, and by VLESS REALITY in `self` mode. The site contains static files only. See [Masquerade](hysteria2.md#masquerade) for how the node serves it.
 
 ## What a good decoy looks like
 

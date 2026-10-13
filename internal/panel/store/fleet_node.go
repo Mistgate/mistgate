@@ -55,13 +55,16 @@ type NodeRow struct {
 	ClientIPv6 bool
 	// BandwidthMbps is the optional symmetric network capacity used to report node utilization (migration 00039).
 	BandwidthMbps int
+	// DecoyMode is the configured per-node site. DecoyBundleHash names the uploaded own bundle; agent fields come from Hello.
+	DecoyMode, DecoyBundleHash, DecoyAgentMode, DecoyAgentHash string
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,
 	liveness_timeout_s, apply_timeout_s, dial_timeout_s, state, cert_serial, agent_version, api_version,
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
-	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6`
+	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6,
+	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -77,7 +80,8 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&n.LivenessTimeoutS, &n.ApplyTimeoutS, &n.DialTimeoutS, &n.State, &serial, &n.AgentVersion, &n.APIVersion,
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
-		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6)
+		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6,
+		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -235,6 +239,8 @@ type HelloInfo struct {
 	Built          int64
 	Caps           []string
 	LastUpdateJSON string
+	DecoyMode      string
+	DecoyHash      string
 }
 
 // NodeHello records a (re)connect: the node becomes active, facts are stored, and the reliable-message
@@ -258,10 +264,11 @@ func (s *Store) NodeHello(ctx context.Context, id string, session uint64, h Hell
 		UPDATE node SET state = 'active', agent_version = ?, api_version = ?, boot_at = CASE WHEN ? > 0 THEN ? ELSE boot_at END,
 			last_seen_at = ?, last_connected_at = ?, agent_instance_id = ?,
 			last_seq = CASE WHEN agent_instance_id = ? THEN last_seq ELSE 0 END,
-			agent_built = ?, agent_caps = ?, last_update_json = CASE WHEN ? <> '' THEN ? ELSE last_update_json END
+			agent_built = ?, agent_caps = ?, last_update_json = CASE WHEN ? <> '' THEN ? ELSE last_update_json END,
+			decoy_agent_mode = ?, decoy_agent_hash = ?
 		WHERE id = ?`,
 			Args: []any{h.AgentVersion, h.APIVersion, fleetUnix(h.BootAt), fleetUnix(h.BootAt), unix(now), unix(now), h.Instance, h.Instance,
-				max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, id}},
+				max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, h.DecoyMode, h.DecoyHash, id}},
 		Stmt{Query: `
 		INSERT INTO node_facts (node_id, hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

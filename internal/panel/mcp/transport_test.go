@@ -55,7 +55,7 @@ func TestEndpointRefusals(t *testing.T) {
 			t.Errorf("%s: %d", m, resp.StatusCode)
 		}
 	}
-	// a body over 256 KiB
+	// a body over the configured request limit
 	resp, _ := rawPost(t, e.url, secret, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"fleet_status","arguments":{"x":"`+strings.Repeat("a", maxBodyBytes)+`"}}}`, nil)
 	if resp.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Errorf("big body: %d", resp.StatusCode)

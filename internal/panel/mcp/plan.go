@@ -162,13 +162,14 @@ type applyIn struct {
 // changeSpec describes one change: its plan step, which reads and validates, and its apply step, which makes exactly one
 // call that changes something.
 type changeSpec[P any] struct {
-	name   string
-	min    Profile
-	procs  []string
-	desc   string
-	danger bool // may need the owner (a danger rule can fire)
-	plan   func(c *call, p P) (*planned, error)
-	apply  func(c *call, p P, pl Plan) (done, error)
+	name    string
+	min     Profile
+	procs   []string
+	desc    string
+	danger  bool // may need the owner (a danger rule can fire)
+	maxArgs int  // optional larger validated payload for a bounded upload
+	plan    func(c *call, p P) (*planned, error)
+	apply   func(c *call, p P, pl Plan) (done, error)
 }
 
 // change builds the two tools of a change.
@@ -194,7 +195,11 @@ func change[P any, PP reasoned[P]](s changeSpec[P]) []toolDef {
 						stored = pl.Params
 					}
 					params, err := json.Marshal(stored)
-					if err != nil || len(params) > maxArgsJSON {
+					limit := s.maxArgs
+					if limit == 0 {
+						limit = maxArgsJSON
+					}
+					if err != nil || len(params) > limit {
 						return nil, nil, errors.New("the arguments are too large")
 					}
 					out, err := e.createPlan(c, s.name, params, reason, pl)

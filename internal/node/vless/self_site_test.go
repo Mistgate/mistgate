@@ -21,6 +21,7 @@ import (
 
 	xtlsreality "github.com/xtls/reality"
 
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -173,6 +174,40 @@ func TestSelfSiteServesBehindREALITY(t *testing.T) {
 	}
 	if strings.Contains(f.logs.String(), "probe") {
 		t.Fatalf("a self inbound probed a target:\n%s", f.logs.String())
+	}
+}
+
+func TestSelfSiteServesEachDecoyMode(t *testing.T) {
+	f := newSelfFixture(t)
+	site := decoy.BuiltinSite(t.TempDir())
+	f.e.env.Masquerade = func(string) http.Handler { return site.Handler() }
+	spec := f.spec("node-a-decoy")
+	f.apply(t, spec, testCredential("c1", "66ad4540-b58c-4ad2-9926-ea63445a9b57"))
+	panel, err := decoy.FromFiles([]decoy.File{{Path: "index.html", Content: []byte("panel site")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := decoy.FromFiles([]decoy.File{{Path: "index.html", Content: []byte("node site")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		mode, hash, want string
+		files            []decoy.File
+	}{
+		{mode: decoy.ModeBuiltin, want: "Coming soon"},
+		{mode: decoy.ModePanel, hash: panel.Hash(), want: "panel site", files: panel.Files()},
+		{mode: decoy.ModeOwn, hash: own.Hash(), want: "node site", files: own.Files()},
+	}
+	wantCert := infoOfCert(f.certs.fallback).PinSHA256
+	for _, tc := range cases {
+		if _, err := site.Apply(tc.mode, tc.hash, tc.files); err != nil {
+			t.Fatalf("set %s mode: %v", tc.mode, err)
+		}
+		body, leaf := visit(t, spec.Listen.Port, "http/1.1")
+		if !strings.Contains(body, tc.want) || pinOf(leaf) != wantCert {
+			t.Errorf("%s site = %q with certificate %s; want %q and %s", tc.mode, body, pinOf(leaf), tc.want, wantCert)
+		}
 	}
 }
 

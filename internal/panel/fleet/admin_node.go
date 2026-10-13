@@ -19,6 +19,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
@@ -239,7 +240,7 @@ func capabilityPresent(caps []string, want string) bool {
 	return false
 }
 
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow) *adminv1.Node {
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle) *adminv1.Node {
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now)
 	out := &adminv1.Node{
@@ -259,6 +260,47 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, live.Connected, now)
+	decoySupported := capabilityPresent(caps, capDecoy)
+	agentMode := n.DecoyAgentMode
+	if agentMode == "" && !decoySupported {
+		agentMode = decoy.ModeBuiltin
+	}
+	reasonCode := ""
+	switch n.DecoyMode {
+	case decoy.ModeBuiltin:
+	case decoy.ModePanel:
+		switch {
+		case panelBundle == nil:
+			reasonCode = "panel_unavailable"
+		case !decoySupported:
+			reasonCode = "agent_too_old"
+		case !live.Connected:
+			reasonCode = "node_offline"
+		case agentMode != decoy.ModePanel || n.DecoyAgentHash != panelBundle.Hash():
+			reasonCode = "pending"
+		}
+	case decoy.ModeOwn:
+		switch {
+		case f.cfg.Remote != nil:
+			reasonCode = "unavailable_in_edition"
+		case n.DecoyBundleHash == "":
+			reasonCode = "own_bundle_missing"
+		case !decoySupported:
+			reasonCode = "agent_too_old"
+		case !live.Connected:
+			reasonCode = "node_offline"
+		case agentMode != decoy.ModeOwn || n.DecoyAgentHash != n.DecoyBundleHash:
+			reasonCode = "pending"
+		}
+	}
+	out.DecoyMode = n.DecoyMode
+	out.DecoySupported = decoySupported
+	out.DecoyReasonCode = reasonCode
+	out.DecoyBundleSha256 = n.DecoyBundleHash
+	out.DecoyPanelAvailable = panelBundle != nil
+	out.DecoyOwnAvailable = f.cfg.Remote == nil
+	out.DecoyAgentMode = agentMode
+	out.DecoyAgentSha256 = n.DecoyAgentHash
 	return out
 }
 
@@ -308,9 +350,10 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 		return nil, internalErr(f.log.Error, "node live", err)
 	}
 	live := liveRowsByID(liveRows)
+	panelBundle, _ := f.panelDecoyBundle()
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID]))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -376,7 +419,8 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 		return nil, internalErr(f.log.Error, "node live", err)
 	}
 	view := decodeLiveView(live)
-	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live)
+	panelBundle, _ := f.panelDecoyBundle()
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle)
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -521,6 +565,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		return nil, invalid("ttl_seconds must be at most 86400")
 	}
 	now := f.now().UTC()
+	panelBundle, _ := f.panelDecoyBundle()
 	var newNode *store.NodeRow
 	if m.NodeId == "" {
 		name := strings.ToLower(m.Name)
@@ -536,6 +581,9 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 			return nil, invalid("location and provider must be plain text up to 100 characters")
 		}
 		newNode = &store.NodeRow{ID: store.NewID("nod_"), Name: name, Address: m.Address, CountryCode: cc, Location: m.Location, Provider: m.Provider}
+		if panelBundle != nil {
+			newNode.DecoyMode = decoy.ModePanel
+		}
 	}
 	token := randomToken()
 	n, err := f.st.CreateEnrollment(ctx, newNode, m.NodeId, hashToken(token), f.cfg.Actor(ctx), now, now.Add(ttl))
@@ -555,12 +603,136 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}),
+		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle),
 		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
 		CopyCommand:    f.copyCommand(n.Address),
 	}), nil
+}
+
+func nodeDecoyError(f *Fleet, action string, err error) error {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+	case errors.Is(err, store.ErrNodeRetired):
+		return errNodeRetired
+	case errors.Is(err, store.ErrNodeDecoyBundleMissing):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("own decoy bundle is not uploaded"))
+	case errors.Is(err, store.ErrConflict):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node changed; retry the request"))
+	default:
+		return internalErr(f.log.Error, action, err)
+	}
+}
+
+func (s nodeService) SetNodeDecoyMode(ctx context.Context, req *connect.Request[adminv1.SetNodeDecoyModeRequest]) (*connect.Response[adminv1.SetNodeDecoyModeResponse], error) {
+	f, m := s.f, req.Msg
+	if m.Mode != decoy.ModeBuiltin && m.Mode != decoy.ModePanel && m.Mode != decoy.ModeOwn {
+		return nil, invalid("mode must be builtin, panel or own")
+	}
+	if m.Mode == decoy.ModePanel {
+		if _, err := f.panelDecoyBundle(); err != nil {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel decoy site is unavailable"))
+		}
+	}
+	old, err := f.st.Node(ctx, m.NodeId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+	}
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node decoy mode", err)
+	}
+	n, err := f.applyDecoyMode(ctx, m.NodeId, m.Mode, m.BundleArchive)
+	if err != nil {
+		return nil, nodeDecoyError(f, "set node decoy mode", err)
+	}
+	if n.DecoyMode != old.DecoyMode || n.DecoyBundleHash != old.DecoyBundleHash {
+		action := "node.decoy_mode"
+		params := map[string]string{"node_id": n.ID, "mode": n.DecoyMode}
+		if len(m.BundleArchive) > 0 {
+			action = "node.decoy_upload"
+			params["bundle_sha256"] = n.DecoyBundleHash
+		}
+		f.audit(ctx, action, params)
+		f.scheduleDecoySync(n.ID)
+	}
+	out, err := f.nodeMessage(ctx, n)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node decoy state", err)
+	}
+	return connect.NewResponse(&adminv1.SetNodeDecoyModeResponse{Node: out}), nil
+}
+
+func (s nodeService) UploadNodeDecoy(ctx context.Context, req *connect.Request[adminv1.UploadNodeDecoyRequest]) (*connect.Response[adminv1.UploadNodeDecoyResponse], error) {
+	f, m := s.f, req.Msg
+	if err := edition.Check(f.cfg.Remote != nil, edition.DecoyOwn); err != nil {
+		return nil, err
+	}
+	bundle, err := decoy.ParseArchive(m.BundleArchive)
+	if err != nil {
+		return nil, invalid("invalid decoy bundle")
+	}
+	old, err := f.st.Node(ctx, m.NodeId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+	}
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node decoy bundle", err)
+	}
+	n, err := f.st.SetNodeDecoyBundle(ctx, m.NodeId, bundle.Hash(), bundle.Archive())
+	if err != nil {
+		return nil, nodeDecoyError(f, "upload node decoy bundle", err)
+	}
+	if n.DecoyMode != old.DecoyMode || n.DecoyBundleHash != old.DecoyBundleHash {
+		f.audit(ctx, "node.decoy_upload", map[string]string{"node_id": n.ID, "mode": n.DecoyMode, "bundle_sha256": n.DecoyBundleHash})
+		f.scheduleDecoySync(n.ID)
+	}
+	out, err := f.nodeMessage(ctx, n)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read node decoy state", err)
+	}
+	return connect.NewResponse(&adminv1.UploadNodeDecoyResponse{Node: out}), nil
+}
+
+func (s nodeService) SetNodesDecoyMode(ctx context.Context, req *connect.Request[adminv1.SetNodesDecoyModeRequest]) (*connect.Response[adminv1.SetNodesDecoyModeResponse], error) {
+	f, m := s.f, req.Msg
+	if m.Mode != decoy.ModeBuiltin && m.Mode != decoy.ModePanel && m.Mode != decoy.ModeOwn {
+		return nil, invalid("mode must be builtin, panel or own")
+	}
+	if m.Mode == decoy.ModePanel {
+		if _, err := f.panelDecoyBundle(); err != nil {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel decoy site is unavailable"))
+		}
+	}
+	if m.Mode == decoy.ModeOwn {
+		if err := edition.Check(f.cfg.Remote != nil, edition.DecoyOwn); err != nil {
+			return nil, err
+		}
+	}
+	old := make(map[string]store.NodeRow, len(m.NodeIds))
+	for _, id := range m.NodeIds {
+		n, err := f.st.Node(ctx, id)
+		if err != nil {
+			return nil, nodeDecoyError(f, "read node decoy mode", err)
+		}
+		old[id] = n
+	}
+	nodes, err := f.st.SetNodesDecoyMode(ctx, m.NodeIds, m.Mode)
+	if err != nil {
+		return nil, nodeDecoyError(f, "set nodes decoy mode", err)
+	}
+	for _, n := range nodes {
+		if n.DecoyMode != old[n.ID].DecoyMode {
+			f.audit(ctx, "node.decoy_mode", map[string]string{"node_id": n.ID, "mode": n.DecoyMode})
+			f.scheduleDecoySync(n.ID)
+		}
+	}
+	out, err := f.nodeMessages(ctx, nodes)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read nodes decoy state", err)
+	}
+	return connect.NewResponse(&adminv1.SetNodesDecoyModeResponse{Nodes: out}), nil
 }
 
 // nodeBinaryPath is where the admin puts the agent binary on the server: the install command runs it from there, and
@@ -742,7 +914,8 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, now)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live)}), nil
+	panelBundle, _ := f.panelDecoyBundle()
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle)}), nil
 }
 
 // staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the

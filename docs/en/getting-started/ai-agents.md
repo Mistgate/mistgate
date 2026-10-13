@@ -220,6 +220,7 @@ LANGUAGE:      English            # the language you talk to me in
 5. If a tool fails or something looks wrong, stop and tell me. "timeout, outcome unknown"
    means: check the state before you retry.
 6. Do not apply doctor fixes, updates or rollbacks unless I ask; propose them.
+7. When generating an own decoy site for a node, never repeat the subject or visual look of a site already made for another node.
 
 == Steps ==
 1. fleet_status and updates_status. Tell me how many nodes there are and whether the panel

@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/node.proto.
  */
 export const file_mistgate_admin_v1_node: GenFile = /*@__PURE__*/
-  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS9ub2RlLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSK4BQoETm9kZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhQKDGNvdW50cnlfY29kZRgDIAEoCRIQCghsb2NhdGlvbhgEIAEoCRIQCghwcm92aWRlchgFIAEoCRIPCgdhZGRyZXNzGAYgASgJEi0KBnN0YXR1cxgHIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTdGF0dXMSLwoGcmVhc29uGAggASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuU3RhdHVzUmVhc29uEhEKCXByb3RvY29scxgJIAMoCRIwCgZvbmxpbmUYCiADKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Qcm90b2NvbENvdW50Eh8KE3RyYWZmaWNfdG9kYXlfYnl0ZXMYCyABKARCAjACEhMKC2hhc19tZXRyaWNzGAwgASgIEg8KB2NwdV9wY3QYDSABKAISDwoHcmFtX3BjdBgOIAEoAhIVCg1hZ2VudF92ZXJzaW9uGA8gASgJEhQKCHVwdGltZV9zGBAgASgEQgIwAhIaCg5sYXN0X3NlZW5fdW5peBgRIAEoA0ICMAISEwoLYXdnX2JhY2tlbmQYEiABKAkSLAoEd2FycBgTIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBTdW1tYXJ5EjIKC2F3Z19wcmVwYXJlGBQgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuQXdnUHJlcGFyZRIfChd0b3JyZW50X2Jsb2NrZXJfZW5hYmxlZBgVIAEoCBIhChl0b3JyZW50X2Jsb2NrZXJfc3VwcG9ydGVkGBYgASgIEhYKDmJhbmR3aWR0aF9tYnBzGBcgASgNEhMKC2NsaWVudF9pcHY2GBggASgIEh0KFWNsaWVudF9pcHY2X3N1cHBvcnRlZBgZIAEoCCKPAQoKQXdnUHJlcGFyZRIRCglzdXBwb3J0ZWQYASABKAgSMQoFc3RhdGUYAiABKA4yIi5taXN0Z2F0ZS5hZG1pbi52MS5Bd2dQcmVwYXJlU3RhdGUSFgoKc2luY2VfdW5peBgDIAEoA0ICMAISEwoLcmVhc29uX2NvZGUYBCABKAkSDgoGcmVhc29uGAUgASgJIisKEExpc3ROb2Rlc1JlcXVlc3QSFwoPaW5jbHVkZV9yZXRpcmVkGAEgASgIIlsKEUxpc3ROb2Rlc1Jlc3BvbnNlEiYKBW5vZGVzGAEgAygLMhcubWlzdGdhdGUuYWRtaW4udjEuTm9kZRIeChZleHBlY3RlZF9hZ2VudF92ZXJzaW9uGAIgASgJIiEKDkdldE5vZGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAki+wEKC05vZGVNZXRyaWNzEg8KB2NwdV9wY3QYASABKAISEwoLc29mdGlycV9wY3QYAiABKAISDQoFbG9hZDEYAyABKAISGgoOcmFtX3VzZWRfYnl0ZXMYBCABKARCAjACEhsKD3JhbV90b3RhbF9ieXRlcxgFIAEoBEICMAISGwoPZGlza191c2VkX2J5dGVzGAYgASgEQgIwAhIcChBkaXNrX3RvdGFsX2J5dGVzGAcgASgEQgIwAhIWCgpuZXRfcnhfYnBzGAggASgEQgIwAhIWCgpuZXRfdHhfYnBzGAkgASgEQgIwAhITCgdhdF91bml4GAogASgDQgIwAiLdAQoJTm9kZUZhY3RzEhAKCGhvc3RuYW1lGAEgASgJEgoKAm9zGAIgASgJEg4KBmtlcm5lbBgDIAEoCRIMCgRhcmNoGAQgASgJEhEKCWNwdV9jb3VudBgFIAEoDRIbCg9yYW1fdG90YWxfYnl0ZXMYBiABKARCAjACEhwKEGRpc2tfdG90YWxfYnl0ZXMYByABKARCAjACEgwKBHZpcnQYCCABKAkSEAoIaGFzX2lwdjYYCSABKAgSFQoJYm9vdF91bml4GAogASgDQgIwAhIPCgdlbmdpbmVzGAsgAygJIlsKDE5vZGVUaW1lb3V0cxIaChJsaXZlbmVzc190aW1lb3V0X3MYASABKA0SFwoPYXBwbHlfdGltZW91dF9zGAIgASgNEhYKDmRpYWxfdGltZW91dF9zGAMgASgNIo0BCgpPbmxpbmVVc2VyEg8KB3VzZXJfaWQYASABKAkSEQoJdXNlcl9uYW1lGAIgASgJEhAKCHByb3RvY29sGAMgASgJEhQKDGRldmljZV9tb2RlbBgEIAEoCRIdChFjb25uZWN0ZWRfYXRfdW5peBgFIAEoA0ICMAISFAoIZG93bl9icHMYBiABKARCAjACIkAKB1RvcFVzZXISDwoHdXNlcl9pZBgBIAEoCRIRCgl1c2VyX25hbWUYAiABKAkSEQoFYnl0ZXMYAyABKARCAjACIqQECg9HZXROb2RlUmVzcG9uc2USJQoEbm9kZRgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSLwoHbWV0cmljcxgCIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVNZXRyaWNzEisKBWZhY3RzGAMgASgLMhwubWlzdGdhdGUuYWRtaW4udjEuTm9kZUZhY3RzEiwKCGluYm91bmRzGAQgAygLMhoubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZBIzCgxvbmxpbmVfdXNlcnMYBSADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5PbmxpbmVVc2VyEi0KCXRvcF90b2RheRgGIAMoCzIaLm1pc3RnYXRlLmFkbWluLnYxLlRvcFVzZXISDQoFbm90ZXMYByABKAkSFQoNZG5zX3Jlc29sdmVycxgIIAMoCRIxCgh0aW1lb3V0cxgJIAEoCzIfLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVUaW1lb3V0cxIjChdlbnJvbGxtZW50X2V4cGlyZXNfdW5peBgKIAEoA0ICMAISGAoMY3JlYXRlZF91bml4GAsgASgDQgIwAhIxCgtwb3J0X2NoZWNrcxgMIAMoCzIcLm1pc3RnYXRlLmFkbWluLnYxLlBvcnRDaGVjaxIvCgp0Y3BfY2hlY2tzGA0gAygLMhsubWlzdGdhdGUuYWRtaW4udjEuVGNwQ2hlY2simAEKF0NyZWF0ZUVucm9sbG1lbnRSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgdhZGRyZXNzGAMgASgJEhQKDGNvdW50cnlfY29kZRgEIAEoCRIQCghsb2NhdGlvbhgFIAEoCRIQCghwcm92aWRlchgGIAEoCRITCgt0dGxfc2Vjb25kcxgHIAEoDSKiAQoYQ3JlYXRlRW5yb2xsbWVudFJlc3BvbnNlEiUKBG5vZGUYASABKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEhcKD2luc3RhbGxfY29tbWFuZBgCIAEoCRIWCg5jYV9maW5nZXJwcmludBgDIAEoCRIYCgxleHBpcmVzX3VuaXgYBCABKANCAjACEhQKDGNvcHlfY29tbWFuZBgFIAEoCSLOBAoRVXBkYXRlTm9kZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESFAoHYWRkcmVzcxgDIAEoCUgBiAEBEhkKDGNvdW50cnlfY29kZRgEIAEoCUgCiAEBEhUKCGxvY2F0aW9uGAUgASgJSAOIAQESFQoIcHJvdmlkZXIYBiABKAlIBIgBARISCgVub3RlcxgHIAEoCUgFiAEBEjsKDWRuc19yZXNvbHZlcnMYCCABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5EbnNSZXNvbHZlcnNIBogBARI2Cgh0aW1lb3V0cxgJIAEoCzIfLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVUaW1lb3V0c0gHiAEBEhgKC2F3Z19iYWNrZW5kGAogASgJSAiIAQESJAoXdG9ycmVudF9ibG9ja2VyX2VuYWJsZWQYCyABKAhICYgBARIbCg5iYW5kd2lkdGhfbWJwcxgMIAEoDUgKiAEBEhgKC2NsaWVudF9pcHY2GA0gASgISAuIAQFCBwoFX25hbWVCCgoIX2FkZHJlc3NCDwoNX2NvdW50cnlfY29kZUILCglfbG9jYXRpb25CCwoJX3Byb3ZpZGVyQggKBl9ub3Rlc0IQCg5fZG5zX3Jlc29sdmVyc0ILCglfdGltZW91dHNCDgoMX2F3Z19iYWNrZW5kQhoKGF90b3JyZW50X2Jsb2NrZXJfZW5hYmxlZEIRCg9fYmFuZHdpZHRoX21icHNCDgoMX2NsaWVudF9pcHY2Ih4KDERuc1Jlc29sdmVycxIOCgZ2YWx1ZXMYASADKAkiOwoSVXBkYXRlTm9kZVJlc3BvbnNlEiUKBG5vZGUYASABKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlIj0KFlJlc3RhcnRJbmJvdW5kc1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRISCgppbmJvdW5kX2lkGAIgASgJIiwKF1Jlc3RhcnRJbmJvdW5kc1Jlc3BvbnNlEhEKCXJlc3RhcnRlZBgBIAEoDSI7ChdQcmVwYXJlQXdnS2VybmVsUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEg8KB2NvbmZpcm0YAiABKAginQEKGFByZXBhcmVBd2dLZXJuZWxSZXNwb25zZRI1CgdvdXRjb21lGAEgASgOMiQubWlzdGdhdGUuYWRtaW4udjEuUHJlcGFyZUF3Z091dGNvbWUSEwoLcmVhc29uX2NvZGUYAiABKAkSDgoGcmVhc29uGAMgASgJEiUKBG5vZGUYBCABKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlIioKF01lYXN1cmVCYW5kd2lkdGhSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAki9AEKGE1lYXN1cmVCYW5kd2lkdGhSZXNwb25zZRIRCglkb3duX21icHMYASABKA0SDwoHdXBfbWJwcxgCIAEoDRIOCgZzZXJ2ZXIYAyABKAkSEgoKZXJyb3JfY29kZRgEIAEoCRIPCgdzZWNvbmRzGAUgASgNEhgKEHBlb3BsZV9kb3duX21icHMYBiABKA0SFgoOcGVvcGxlX3VwX21icHMYByABKA0SDAoEcnVucxgIIAEoDRISCgpydW5zX3RvdGFsGAkgASgNEhQKDHJ1bl9mYWlsdXJlcxgKIAMoCRIVCg1zZXJ2ZXJfZGV0YWlsGAsgASgJIjMKEUNoZWNrUG9ydHNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFcG9ydHMYAiADKA0ijwEKEkNoZWNrUG9ydHNSZXNwb25zZRIrCgVwb3J0cxgBIAMoCzIcLm1pc3RnYXRlLmFkbWluLnYxLlBvcnRDaGVjaxISCgplcnJvcl9jb2RlGAIgASgJEg4KBnNlbmRlchgDIAEoCRIoCgN0Y3AYBCADKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5UY3BDaGVjayI6ChFSZXRpcmVOb2RlUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhQKDGNvbmZpcm1fbmFtZRgCIAEoCSIsChJSZXRpcmVOb2RlUmVzcG9uc2USFgoOYWdlbnRfbm90aWZpZWQYASABKAgiiQEKEVN0cmVhbUxvZ3NSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDwoHc291cmNlcxgCIAMoCRISCgp0YWlsX2xpbmVzGAMgASgNEg4KBmZvbGxvdxgEIAEoCBIuCgltaW5fbGV2ZWwYBSABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5Mb2dMZXZlbCJwCgdMb2dMaW5lEhgKDHRpbWVfdW5peF9tcxgBIAEoA0ICMAISKgoFbGV2ZWwYAiABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5Mb2dMZXZlbBIOCgZzb3VyY2UYAyABKAkSDwoHbWVzc2FnZRgEIAEoCSJsChJTdHJlYW1Mb2dzUmVzcG9uc2USKQoFbGluZXMYASADKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Mb2dMaW5lEgsKA2VvZhgCIAEoCBIPCgdkcm9wcGVkGAMgASgNEg0KBWVycm9yGAQgASgJKoYBCg9Bd2dQcmVwYXJlU3RhdGUSGgoWQVdHX1BSRVBBUkVfU1RBVEVfTk9ORRAAEh0KGUFXR19QUkVQQVJFX1NUQVRFX1JVTk5JTkcQARIaChZBV0dfUFJFUEFSRV9TVEFURV9ET05FEAISHAoYQVdHX1BSRVBBUkVfU1RBVEVfRkFJTEVEEAMq5QEKEVByZXBhcmVBd2dPdXRjb21lEiMKH1BSRVBBUkVfQVdHX09VVENPTUVfVU5TUEVDSUZJRUQQABIdChlQUkVQQVJFX0FXR19PVVRDT01FX1JFQURZEAESJQohUFJFUEFSRV9BV0dfT1VUQ09NRV9ORUVEU19QUkVQQVJFEAISHwobUFJFUEFSRV9BV0dfT1VUQ09NRV9TVEFSVEVEEAMSHwobUFJFUEFSRV9BV0dfT1VUQ09NRV9SVU5OSU5HEAQSIwofUFJFUEFSRV9BV0dfT1VUQ09NRV9VTlNVUFBPUlRFRBAFKmUKCExvZ0xldmVsEhkKFUxPR19MRVZFTF9VTlNQRUNJRklFRBAAEhIKDkxPR19MRVZFTF9JTkZPEAESFQoRTE9HX0xFVkVMX1dBUk5JTkcQAhITCg9MT0dfTEVWRUxfRVJST1IQAzLWBwoLTm9kZVNlcnZpY2USVgoJTGlzdE5vZGVzEiMubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVzUmVxdWVzdBokLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2Rlc1Jlc3BvbnNlElAKB0dldE5vZGUSIS5taXN0Z2F0ZS5hZG1pbi52MS5HZXROb2RlUmVxdWVzdBoiLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVSZXNwb25zZRJrChBDcmVhdGVFbnJvbGxtZW50EioubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlRW5yb2xsbWVudFJlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVFbnJvbGxtZW50UmVzcG9uc2USWQoKVXBkYXRlTm9kZRIkLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZU5vZGVSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlTm9kZVJlc3BvbnNlEmgKD1Jlc3RhcnRJbmJvdW5kcxIpLm1pc3RnYXRlLmFkbWluLnYxLlJlc3RhcnRJbmJvdW5kc1JlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5SZXN0YXJ0SW5ib3VuZHNSZXNwb25zZRJrChBQcmVwYXJlQXdnS2VybmVsEioubWlzdGdhdGUuYWRtaW4udjEuUHJlcGFyZUF3Z0tlcm5lbFJlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5QcmVwYXJlQXdnS2VybmVsUmVzcG9uc2USawoQTWVhc3VyZUJhbmR3aWR0aBIqLm1pc3RnYXRlLmFkbWluLnYxLk1lYXN1cmVCYW5kd2lkdGhSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuTWVhc3VyZUJhbmR3aWR0aFJlc3BvbnNlElkKCkNoZWNrUG9ydHMSJC5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1BvcnRzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUG9ydHNSZXNwb25zZRJZCgpSZXRpcmVOb2RlEiQubWlzdGdhdGUuYWRtaW4udjEuUmV0aXJlTm9kZVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5SZXRpcmVOb2RlUmVzcG9uc2USWwoKU3RyZWFtTG9ncxIkLm1pc3RnYXRlLmFkbWluLnYxLlN0cmVhbUxvZ3NSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuU3RyZWFtTG9nc1Jlc3BvbnNlMAFCxAEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIJTm9kZVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_common]);
+  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS9ub2RlLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSKPBwoETm9kZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhQKDGNvdW50cnlfY29kZRgDIAEoCRIQCghsb2NhdGlvbhgEIAEoCRIQCghwcm92aWRlchgFIAEoCRIPCgdhZGRyZXNzGAYgASgJEi0KBnN0YXR1cxgHIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTdGF0dXMSLwoGcmVhc29uGAggASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuU3RhdHVzUmVhc29uEhEKCXByb3RvY29scxgJIAMoCRIwCgZvbmxpbmUYCiADKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Qcm90b2NvbENvdW50Eh8KE3RyYWZmaWNfdG9kYXlfYnl0ZXMYCyABKARCAjACEhMKC2hhc19tZXRyaWNzGAwgASgIEg8KB2NwdV9wY3QYDSABKAISDwoHcmFtX3BjdBgOIAEoAhIVCg1hZ2VudF92ZXJzaW9uGA8gASgJEhQKCHVwdGltZV9zGBAgASgEQgIwAhIaCg5sYXN0X3NlZW5fdW5peBgRIAEoA0ICMAISEwoLYXdnX2JhY2tlbmQYEiABKAkSLAoEd2FycBgTIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBTdW1tYXJ5EjIKC2F3Z19wcmVwYXJlGBQgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuQXdnUHJlcGFyZRIfChd0b3JyZW50X2Jsb2NrZXJfZW5hYmxlZBgVIAEoCBIhChl0b3JyZW50X2Jsb2NrZXJfc3VwcG9ydGVkGBYgASgIEhYKDmJhbmR3aWR0aF9tYnBzGBcgASgNEhMKC2NsaWVudF9pcHY2GBggASgIEh0KFWNsaWVudF9pcHY2X3N1cHBvcnRlZBgZIAEoCBISCgpkZWNveV9tb2RlGBogASgJEhcKD2RlY295X3N1cHBvcnRlZBgbIAEoCBIZChFkZWNveV9yZWFzb25fY29kZRgcIAEoCRIbChNkZWNveV9idW5kbGVfc2hhMjU2GB0gASgJEh0KFWRlY295X3BhbmVsX2F2YWlsYWJsZRgeIAEoCBIbChNkZWNveV9vd25fYXZhaWxhYmxlGB8gASgIEhgKEGRlY295X2FnZW50X21vZGUYICABKAkSGgoSZGVjb3lfYWdlbnRfc2hhMjU2GCEgASgJIo8BCgpBd2dQcmVwYXJlEhEKCXN1cHBvcnRlZBgBIAEoCBIxCgVzdGF0ZRgCIAEoDjIiLm1pc3RnYXRlLmFkbWluLnYxLkF3Z1ByZXBhcmVTdGF0ZRIWCgpzaW5jZV91bml4GAMgASgDQgIwAhITCgtyZWFzb25fY29kZRgEIAEoCRIOCgZyZWFzb24YBSABKAkiKwoQTGlzdE5vZGVzUmVxdWVzdBIXCg9pbmNsdWRlX3JldGlyZWQYASABKAgiWwoRTGlzdE5vZGVzUmVzcG9uc2USJgoFbm9kZXMYASADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEh4KFmV4cGVjdGVkX2FnZW50X3ZlcnNpb24YAiABKAkiIQoOR2V0Tm9kZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSL7AQoLTm9kZU1ldHJpY3MSDwoHY3B1X3BjdBgBIAEoAhITCgtzb2Z0aXJxX3BjdBgCIAEoAhINCgVsb2FkMRgDIAEoAhIaCg5yYW1fdXNlZF9ieXRlcxgEIAEoBEICMAISGwoPcmFtX3RvdGFsX2J5dGVzGAUgASgEQgIwAhIbCg9kaXNrX3VzZWRfYnl0ZXMYBiABKARCAjACEhwKEGRpc2tfdG90YWxfYnl0ZXMYByABKARCAjACEhYKCm5ldF9yeF9icHMYCCABKARCAjACEhYKCm5ldF90eF9icHMYCSABKARCAjACEhMKB2F0X3VuaXgYCiABKANCAjACIt0BCglOb2RlRmFjdHMSEAoIaG9zdG5hbWUYASABKAkSCgoCb3MYAiABKAkSDgoGa2VybmVsGAMgASgJEgwKBGFyY2gYBCABKAkSEQoJY3B1X2NvdW50GAUgASgNEhsKD3JhbV90b3RhbF9ieXRlcxgGIAEoBEICMAISHAoQZGlza190b3RhbF9ieXRlcxgHIAEoBEICMAISDAoEdmlydBgIIAEoCRIQCghoYXNfaXB2NhgJIAEoCBIVCglib290X3VuaXgYCiABKANCAjACEg8KB2VuZ2luZXMYCyADKAkiWwoMTm9kZVRpbWVvdXRzEhoKEmxpdmVuZXNzX3RpbWVvdXRfcxgBIAEoDRIXCg9hcHBseV90aW1lb3V0X3MYAiABKA0SFgoOZGlhbF90aW1lb3V0X3MYAyABKA0ijQEKCk9ubGluZVVzZXISDwoHdXNlcl9pZBgBIAEoCRIRCgl1c2VyX25hbWUYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSFAoMZGV2aWNlX21vZGVsGAQgASgJEh0KEWNvbm5lY3RlZF9hdF91bml4GAUgASgDQgIwAhIUCghkb3duX2JwcxgGIAEoBEICMAIiQAoHVG9wVXNlchIPCgd1c2VyX2lkGAEgASgJEhEKCXVzZXJfbmFtZRgCIAEoCRIRCgVieXRlcxgDIAEoBEICMAIipAQKD0dldE5vZGVSZXNwb25zZRIlCgRub2RlGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuTm9kZRIvCgdtZXRyaWNzGAIgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuTm9kZU1ldHJpY3MSKwoFZmFjdHMYAyABKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlRmFjdHMSLAoIaW5ib3VuZHMYBCADKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5JbmJvdW5kEjMKDG9ubGluZV91c2VycxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk9ubGluZVVzZXISLQoJdG9wX3RvZGF5GAYgAygLMhoubWlzdGdhdGUuYWRtaW4udjEuVG9wVXNlchINCgVub3RlcxgHIAEoCRIVCg1kbnNfcmVzb2x2ZXJzGAggAygJEjEKCHRpbWVvdXRzGAkgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuTm9kZVRpbWVvdXRzEiMKF2Vucm9sbG1lbnRfZXhwaXJlc191bml4GAogASgDQgIwAhIYCgxjcmVhdGVkX3VuaXgYCyABKANCAjACEjEKC3BvcnRfY2hlY2tzGAwgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuUG9ydENoZWNrEi8KCnRjcF9jaGVja3MYDSADKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5UY3BDaGVjayKYAQoXQ3JlYXRlRW5yb2xsbWVudFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2FkZHJlc3MYAyABKAkSFAoMY291bnRyeV9jb2RlGAQgASgJEhAKCGxvY2F0aW9uGAUgASgJEhAKCHByb3ZpZGVyGAYgASgJEhMKC3R0bF9zZWNvbmRzGAcgASgNIqIBChhDcmVhdGVFbnJvbGxtZW50UmVzcG9uc2USJQoEbm9kZRgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSFwoPaW5zdGFsbF9jb21tYW5kGAIgASgJEhYKDmNhX2ZpbmdlcnByaW50GAMgASgJEhgKDGV4cGlyZXNfdW5peBgEIAEoA0ICMAISFAoMY29weV9jb21tYW5kGAUgASgJIs4EChFVcGRhdGVOb2RlUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhEKBG5hbWUYAiABKAlIAIgBARIUCgdhZGRyZXNzGAMgASgJSAGIAQESGQoMY291bnRyeV9jb2RlGAQgASgJSAKIAQESFQoIbG9jYXRpb24YBSABKAlIA4gBARIVCghwcm92aWRlchgGIAEoCUgEiAEBEhIKBW5vdGVzGAcgASgJSAWIAQESOwoNZG5zX3Jlc29sdmVycxgIIAEoCzIfLm1pc3RnYXRlLmFkbWluLnYxLkRuc1Jlc29sdmVyc0gGiAEBEjYKCHRpbWVvdXRzGAkgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuTm9kZVRpbWVvdXRzSAeIAQESGAoLYXdnX2JhY2tlbmQYCiABKAlICIgBARIkChd0b3JyZW50X2Jsb2NrZXJfZW5hYmxlZBgLIAEoCEgJiAEBEhsKDmJhbmR3aWR0aF9tYnBzGAwgASgNSAqIAQESGAoLY2xpZW50X2lwdjYYDSABKAhIC4gBAUIHCgVfbmFtZUIKCghfYWRkcmVzc0IPCg1fY291bnRyeV9jb2RlQgsKCV9sb2NhdGlvbkILCglfcHJvdmlkZXJCCAoGX25vdGVzQhAKDl9kbnNfcmVzb2x2ZXJzQgsKCV90aW1lb3V0c0IOCgxfYXdnX2JhY2tlbmRCGgoYX3RvcnJlbnRfYmxvY2tlcl9lbmFibGVkQhEKD19iYW5kd2lkdGhfbWJwc0IOCgxfY2xpZW50X2lwdjYiHgoMRG5zUmVzb2x2ZXJzEg4KBnZhbHVlcxgBIAMoCSI7ChJVcGRhdGVOb2RlUmVzcG9uc2USJQoEbm9kZRgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUiUAoXU2V0Tm9kZURlY295TW9kZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIMCgRtb2RlGAIgASgJEhYKDmJ1bmRsZV9hcmNoaXZlGAMgASgMIkEKGFNldE5vZGVEZWNveU1vZGVSZXNwb25zZRIlCgRub2RlGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuTm9kZSJBChZVcGxvYWROb2RlRGVjb3lSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAiABKAwiQAoXVXBsb2FkTm9kZURlY295UmVzcG9uc2USJQoEbm9kZRgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUiOgoYU2V0Tm9kZXNEZWNveU1vZGVSZXF1ZXN0EhAKCG5vZGVfaWRzGAEgAygJEgwKBG1vZGUYAiABKAkiQwoZU2V0Tm9kZXNEZWNveU1vZGVSZXNwb25zZRImCgVub2RlcxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUiPQoWUmVzdGFydEluYm91bmRzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkiLAoXUmVzdGFydEluYm91bmRzUmVzcG9uc2USEQoJcmVzdGFydGVkGAEgASgNIjsKF1ByZXBhcmVBd2dLZXJuZWxSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDwoHY29uZmlybRgCIAEoCCKdAQoYUHJlcGFyZUF3Z0tlcm5lbFJlc3BvbnNlEjUKB291dGNvbWUYASABKA4yJC5taXN0Z2F0ZS5hZG1pbi52MS5QcmVwYXJlQXdnT3V0Y29tZRITCgtyZWFzb25fY29kZRgCIAEoCRIOCgZyZWFzb24YAyABKAkSJQoEbm9kZRgEIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUiKgoXTWVhc3VyZUJhbmR3aWR0aFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSL0AQoYTWVhc3VyZUJhbmR3aWR0aFJlc3BvbnNlEhEKCWRvd25fbWJwcxgBIAEoDRIPCgd1cF9tYnBzGAIgASgNEg4KBnNlcnZlchgDIAEoCRISCgplcnJvcl9jb2RlGAQgASgJEg8KB3NlY29uZHMYBSABKA0SGAoQcGVvcGxlX2Rvd25fbWJwcxgGIAEoDRIWCg5wZW9wbGVfdXBfbWJwcxgHIAEoDRIMCgRydW5zGAggASgNEhIKCnJ1bnNfdG90YWwYCSABKA0SFAoMcnVuX2ZhaWx1cmVzGAogAygJEhUKDXNlcnZlcl9kZXRhaWwYCyABKAkiMwoRQ2hlY2tQb3J0c1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRINCgVwb3J0cxgCIAMoDSKPAQoSQ2hlY2tQb3J0c1Jlc3BvbnNlEisKBXBvcnRzGAEgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuUG9ydENoZWNrEhIKCmVycm9yX2NvZGUYAiABKAkSDgoGc2VuZGVyGAMgASgJEigKA3RjcBgEIAMoCzIbLm1pc3RnYXRlLmFkbWluLnYxLlRjcENoZWNrIjoKEVJldGlyZU5vZGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFAoMY29uZmlybV9uYW1lGAIgASgJIiwKElJldGlyZU5vZGVSZXNwb25zZRIWCg5hZ2VudF9ub3RpZmllZBgBIAEoCCKJAQoRU3RyZWFtTG9nc1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIPCgdzb3VyY2VzGAIgAygJEhIKCnRhaWxfbGluZXMYAyABKA0SDgoGZm9sbG93GAQgASgIEi4KCW1pbl9sZXZlbBgFIAEoDjIbLm1pc3RnYXRlLmFkbWluLnYxLkxvZ0xldmVsInAKB0xvZ0xpbmUSGAoMdGltZV91bml4X21zGAEgASgDQgIwAhIqCgVsZXZlbBgCIAEoDjIbLm1pc3RnYXRlLmFkbWluLnYxLkxvZ0xldmVsEg4KBnNvdXJjZRgDIAEoCRIPCgdtZXNzYWdlGAQgASgJImwKElN0cmVhbUxvZ3NSZXNwb25zZRIpCgVsaW5lcxgBIAMoCzIaLm1pc3RnYXRlLmFkbWluLnYxLkxvZ0xpbmUSCwoDZW9mGAIgASgIEg8KB2Ryb3BwZWQYAyABKA0SDQoFZXJyb3IYBCABKAkqhgEKD0F3Z1ByZXBhcmVTdGF0ZRIaChZBV0dfUFJFUEFSRV9TVEFURV9OT05FEAASHQoZQVdHX1BSRVBBUkVfU1RBVEVfUlVOTklORxABEhoKFkFXR19QUkVQQVJFX1NUQVRFX0RPTkUQAhIcChhBV0dfUFJFUEFSRV9TVEFURV9GQUlMRUQQAyrlAQoRUHJlcGFyZUF3Z091dGNvbWUSIwofUFJFUEFSRV9BV0dfT1VUQ09NRV9VTlNQRUNJRklFRBAAEh0KGVBSRVBBUkVfQVdHX09VVENPTUVfUkVBRFkQARIlCiFQUkVQQVJFX0FXR19PVVRDT01FX05FRURTX1BSRVBBUkUQAhIfChtQUkVQQVJFX0FXR19PVVRDT01FX1NUQVJURUQQAxIfChtQUkVQQVJFX0FXR19PVVRDT01FX1JVTk5JTkcQBBIjCh9QUkVQQVJFX0FXR19PVVRDT01FX1VOU1VQUE9SVEVEEAUqZQoITG9nTGV2ZWwSGQoVTE9HX0xFVkVMX1VOU1BFQ0lGSUVEEAASEgoOTE9HX0xFVkVMX0lORk8QARIVChFMT0dfTEVWRUxfV0FSTklORxACEhMKD0xPR19MRVZFTF9FUlJPUhADMp0KCgtOb2RlU2VydmljZRJWCglMaXN0Tm9kZXMSIy5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZXNSZXF1ZXN0GiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVzUmVzcG9uc2USUAoHR2V0Tm9kZRIhLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVSZXF1ZXN0GiIubWlzdGdhdGUuYWRtaW4udjEuR2V0Tm9kZVJlc3BvbnNlEmsKEENyZWF0ZUVucm9sbG1lbnQSKi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVFbnJvbGxtZW50UmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUVucm9sbG1lbnRSZXNwb25zZRJZCgpVcGRhdGVOb2RlEiQubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlTm9kZVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVOb2RlUmVzcG9uc2USawoQU2V0Tm9kZURlY295TW9kZRIqLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVEZWNveU1vZGVSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuU2V0Tm9kZURlY295TW9kZVJlc3BvbnNlEmgKD1VwbG9hZE5vZGVEZWNveRIpLm1pc3RnYXRlLmFkbWluLnYxLlVwbG9hZE5vZGVEZWNveVJlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5VcGxvYWROb2RlRGVjb3lSZXNwb25zZRJuChFTZXROb2Rlc0RlY295TW9kZRIrLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVzRGVjb3lNb2RlUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVzRGVjb3lNb2RlUmVzcG9uc2USaAoPUmVzdGFydEluYm91bmRzEikubWlzdGdhdGUuYWRtaW4udjEuUmVzdGFydEluYm91bmRzUmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLlJlc3RhcnRJbmJvdW5kc1Jlc3BvbnNlEmsKEFByZXBhcmVBd2dLZXJuZWwSKi5taXN0Z2F0ZS5hZG1pbi52MS5QcmVwYXJlQXdnS2VybmVsUmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLlByZXBhcmVBd2dLZXJuZWxSZXNwb25zZRJrChBNZWFzdXJlQmFuZHdpZHRoEioubWlzdGdhdGUuYWRtaW4udjEuTWVhc3VyZUJhbmR3aWR0aFJlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5NZWFzdXJlQmFuZHdpZHRoUmVzcG9uc2USWQoKQ2hlY2tQb3J0cxIkLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUG9ydHNSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tQb3J0c1Jlc3BvbnNlElkKClJldGlyZU5vZGUSJC5taXN0Z2F0ZS5hZG1pbi52MS5SZXRpcmVOb2RlUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLlJldGlyZU5vZGVSZXNwb25zZRJbCgpTdHJlYW1Mb2dzEiQubWlzdGdhdGUuYWRtaW4udjEuU3RyZWFtTG9nc1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5TdHJlYW1Mb2dzUmVzcG9uc2UwAULEAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQglOb2RlUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
 
 /**
  * One row of the nodes table / one card.
@@ -182,6 +182,60 @@ export type Node = Message<"mistgate.admin.v1.Node"> & {
    * @generated from field: bool client_ipv6_supported = 25;
    */
   clientIpv6Supported: boolean;
+
+  /**
+   * Configured mode, "builtin" | "panel" | "own". Existing nodes retain builtin unless changed by the owner.
+   *
+   * @generated from field: string decoy_mode = 26;
+   */
+  decoyMode: string;
+
+  /**
+   * Whether the connected or last-seen agent lists "decoy/1".
+   *
+   * @generated from field: bool decoy_supported = 27;
+   */
+  decoySupported: boolean;
+
+  /**
+   * Why the node is still serving builtin or has not applied its configured mode: empty when current.
+   *
+   * @generated from field: string decoy_reason_code = 28;
+   */
+  decoyReasonCode: string;
+
+  /**
+   * SHA-256 of the saved own bundle for this node; empty when none is uploaded.
+   *
+   * @generated from field: string decoy_bundle_sha256 = 29;
+   */
+  decoyBundleSha256: string;
+
+  /**
+   * Whether this panel has a valid --decoy-dir bundle.
+   *
+   * @generated from field: bool decoy_panel_available = 30;
+   */
+  decoyPanelAvailable: boolean;
+
+  /**
+   * False in editions that do not store own bundles.
+   *
+   * @generated from field: bool decoy_own_available = 31;
+   */
+  decoyOwnAvailable: boolean;
+
+  /**
+   * Mode and SHA-256 last reported by the node agent.
+   *
+   * @generated from field: string decoy_agent_mode = 32;
+   */
+  decoyAgentMode: string;
+
+  /**
+   * @generated from field: string decoy_agent_sha256 = 33;
+   */
+  decoyAgentSha256: string;
 };
 
 /**
@@ -854,6 +908,132 @@ export const UpdateNodeResponseSchema: GenMessage<UpdateNodeResponse> = /*@__PUR
   messageDesc(file_mistgate_admin_v1_node, 15);
 
 /**
+ * @generated from message mistgate.admin.v1.SetNodeDecoyModeRequest
+ */
+export type SetNodeDecoyModeRequest = Message<"mistgate.admin.v1.SetNodeDecoyModeRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string mode = 2;
+   */
+  mode: string;
+
+  /**
+   * Optional bundle when selecting "own"; empty reuses the saved bundle.
+   *
+   * @generated from field: bytes bundle_archive = 3;
+   */
+  bundleArchive: Uint8Array;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodeDecoyModeRequest.
+ * Use `create(SetNodeDecoyModeRequestSchema)` to create a new message.
+ */
+export const SetNodeDecoyModeRequestSchema: GenMessage<SetNodeDecoyModeRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 16);
+
+/**
+ * @generated from message mistgate.admin.v1.SetNodeDecoyModeResponse
+ */
+export type SetNodeDecoyModeResponse = Message<"mistgate.admin.v1.SetNodeDecoyModeResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.Node node = 1;
+   */
+  node?: Node | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodeDecoyModeResponse.
+ * Use `create(SetNodeDecoyModeResponseSchema)` to create a new message.
+ */
+export const SetNodeDecoyModeResponseSchema: GenMessage<SetNodeDecoyModeResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 17);
+
+/**
+ * @generated from message mistgate.admin.v1.UploadNodeDecoyRequest
+ */
+export type UploadNodeDecoyRequest = Message<"mistgate.admin.v1.UploadNodeDecoyRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * ZIP or TAR archive containing only regular static files. Archive and total expanded files are each <= 2 MB.
+   *
+   * @generated from field: bytes bundle_archive = 2;
+   */
+  bundleArchive: Uint8Array;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UploadNodeDecoyRequest.
+ * Use `create(UploadNodeDecoyRequestSchema)` to create a new message.
+ */
+export const UploadNodeDecoyRequestSchema: GenMessage<UploadNodeDecoyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 18);
+
+/**
+ * @generated from message mistgate.admin.v1.UploadNodeDecoyResponse
+ */
+export type UploadNodeDecoyResponse = Message<"mistgate.admin.v1.UploadNodeDecoyResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.Node node = 1;
+   */
+  node?: Node | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UploadNodeDecoyResponse.
+ * Use `create(UploadNodeDecoyResponseSchema)` to create a new message.
+ */
+export const UploadNodeDecoyResponseSchema: GenMessage<UploadNodeDecoyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 19);
+
+/**
+ * @generated from message mistgate.admin.v1.SetNodesDecoyModeRequest
+ */
+export type SetNodesDecoyModeRequest = Message<"mistgate.admin.v1.SetNodesDecoyModeRequest"> & {
+  /**
+   * @generated from field: repeated string node_ids = 1;
+   */
+  nodeIds: string[];
+
+  /**
+   * @generated from field: string mode = 2;
+   */
+  mode: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodesDecoyModeRequest.
+ * Use `create(SetNodesDecoyModeRequestSchema)` to create a new message.
+ */
+export const SetNodesDecoyModeRequestSchema: GenMessage<SetNodesDecoyModeRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 20);
+
+/**
+ * @generated from message mistgate.admin.v1.SetNodesDecoyModeResponse
+ */
+export type SetNodesDecoyModeResponse = Message<"mistgate.admin.v1.SetNodesDecoyModeResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.Node nodes = 1;
+   */
+  nodes: Node[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetNodesDecoyModeResponse.
+ * Use `create(SetNodesDecoyModeResponseSchema)` to create a new message.
+ */
+export const SetNodesDecoyModeResponseSchema: GenMessage<SetNodesDecoyModeResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_node, 21);
+
+/**
  * @generated from message mistgate.admin.v1.RestartInboundsRequest
  */
 export type RestartInboundsRequest = Message<"mistgate.admin.v1.RestartInboundsRequest"> & {
@@ -875,7 +1055,7 @@ export type RestartInboundsRequest = Message<"mistgate.admin.v1.RestartInboundsR
  * Use `create(RestartInboundsRequestSchema)` to create a new message.
  */
 export const RestartInboundsRequestSchema: GenMessage<RestartInboundsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 16);
+  messageDesc(file_mistgate_admin_v1_node, 22);
 
 /**
  * @generated from message mistgate.admin.v1.RestartInboundsResponse
@@ -894,7 +1074,7 @@ export type RestartInboundsResponse = Message<"mistgate.admin.v1.RestartInbounds
  * Use `create(RestartInboundsResponseSchema)` to create a new message.
  */
 export const RestartInboundsResponseSchema: GenMessage<RestartInboundsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 17);
+  messageDesc(file_mistgate_admin_v1_node, 23);
 
 /**
  * @generated from message mistgate.admin.v1.PrepareAwgKernelRequest
@@ -919,7 +1099,7 @@ export type PrepareAwgKernelRequest = Message<"mistgate.admin.v1.PrepareAwgKerne
  * Use `create(PrepareAwgKernelRequestSchema)` to create a new message.
  */
 export const PrepareAwgKernelRequestSchema: GenMessage<PrepareAwgKernelRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 18);
+  messageDesc(file_mistgate_admin_v1_node, 24);
 
 /**
  * @generated from message mistgate.admin.v1.PrepareAwgKernelResponse
@@ -953,7 +1133,7 @@ export type PrepareAwgKernelResponse = Message<"mistgate.admin.v1.PrepareAwgKern
  * Use `create(PrepareAwgKernelResponseSchema)` to create a new message.
  */
 export const PrepareAwgKernelResponseSchema: GenMessage<PrepareAwgKernelResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 19);
+  messageDesc(file_mistgate_admin_v1_node, 25);
 
 /**
  * @generated from message mistgate.admin.v1.MeasureBandwidthRequest
@@ -970,7 +1150,7 @@ export type MeasureBandwidthRequest = Message<"mistgate.admin.v1.MeasureBandwidt
  * Use `create(MeasureBandwidthRequestSchema)` to create a new message.
  */
 export const MeasureBandwidthRequestSchema: GenMessage<MeasureBandwidthRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 20);
+  messageDesc(file_mistgate_admin_v1_node, 26);
 
 /**
  * @generated from message mistgate.admin.v1.MeasureBandwidthResponse
@@ -1059,7 +1239,7 @@ export type MeasureBandwidthResponse = Message<"mistgate.admin.v1.MeasureBandwid
  * Use `create(MeasureBandwidthResponseSchema)` to create a new message.
  */
 export const MeasureBandwidthResponseSchema: GenMessage<MeasureBandwidthResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 21);
+  messageDesc(file_mistgate_admin_v1_node, 27);
 
 /**
  * @generated from message mistgate.admin.v1.CheckPortsRequest
@@ -1083,7 +1263,7 @@ export type CheckPortsRequest = Message<"mistgate.admin.v1.CheckPortsRequest"> &
  * Use `create(CheckPortsRequestSchema)` to create a new message.
  */
 export const CheckPortsRequestSchema: GenMessage<CheckPortsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 22);
+  messageDesc(file_mistgate_admin_v1_node, 28);
 
 /**
  * @generated from message mistgate.admin.v1.CheckPortsResponse
@@ -1124,7 +1304,7 @@ export type CheckPortsResponse = Message<"mistgate.admin.v1.CheckPortsResponse">
  * Use `create(CheckPortsResponseSchema)` to create a new message.
  */
 export const CheckPortsResponseSchema: GenMessage<CheckPortsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 23);
+  messageDesc(file_mistgate_admin_v1_node, 29);
 
 /**
  * @generated from message mistgate.admin.v1.RetireNodeRequest
@@ -1148,7 +1328,7 @@ export type RetireNodeRequest = Message<"mistgate.admin.v1.RetireNodeRequest"> &
  * Use `create(RetireNodeRequestSchema)` to create a new message.
  */
 export const RetireNodeRequestSchema: GenMessage<RetireNodeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 24);
+  messageDesc(file_mistgate_admin_v1_node, 30);
 
 /**
  * @generated from message mistgate.admin.v1.RetireNodeResponse
@@ -1167,7 +1347,7 @@ export type RetireNodeResponse = Message<"mistgate.admin.v1.RetireNodeResponse">
  * Use `create(RetireNodeResponseSchema)` to create a new message.
  */
 export const RetireNodeResponseSchema: GenMessage<RetireNodeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 25);
+  messageDesc(file_mistgate_admin_v1_node, 31);
 
 /**
  * @generated from message mistgate.admin.v1.StreamLogsRequest
@@ -1208,7 +1388,7 @@ export type StreamLogsRequest = Message<"mistgate.admin.v1.StreamLogsRequest"> &
  * Use `create(StreamLogsRequestSchema)` to create a new message.
  */
 export const StreamLogsRequestSchema: GenMessage<StreamLogsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 26);
+  messageDesc(file_mistgate_admin_v1_node, 32);
 
 /**
  * @generated from message mistgate.admin.v1.LogLine
@@ -1240,7 +1420,7 @@ export type LogLine = Message<"mistgate.admin.v1.LogLine"> & {
  * Use `create(LogLineSchema)` to create a new message.
  */
 export const LogLineSchema: GenMessage<LogLine> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 27);
+  messageDesc(file_mistgate_admin_v1_node, 33);
 
 /**
  * @generated from message mistgate.admin.v1.StreamLogsResponse
@@ -1272,7 +1452,7 @@ export type StreamLogsResponse = Message<"mistgate.admin.v1.StreamLogsResponse">
  * Use `create(StreamLogsResponseSchema)` to create a new message.
  */
 export const StreamLogsResponseSchema: GenMessage<StreamLogsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_node, 28);
+  messageDesc(file_mistgate_admin_v1_node, 34);
 
 /**
  * @generated from enum mistgate.admin.v1.AwgPrepareState
@@ -1441,6 +1621,36 @@ export const NodeService: GenService<{
     methodKind: "unary";
     input: typeof UpdateNodeRequestSchema;
     output: typeof UpdateNodeResponseSchema;
+  },
+  /**
+   * Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
+   *
+   * @generated from rpc mistgate.admin.v1.NodeService.SetNodeDecoyMode
+   */
+  setNodeDecoyMode: {
+    methodKind: "unary";
+    input: typeof SetNodeDecoyModeRequestSchema;
+    output: typeof SetNodeDecoyModeResponseSchema;
+  },
+  /**
+   * Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+   *
+   * @generated from rpc mistgate.admin.v1.NodeService.UploadNodeDecoy
+   */
+  uploadNodeDecoy: {
+    methodKind: "unary";
+    input: typeof UploadNodeDecoyRequestSchema;
+    output: typeof UploadNodeDecoyResponseSchema;
+  },
+  /**
+   * Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
+   *
+   * @generated from rpc mistgate.admin.v1.NodeService.SetNodesDecoyMode
+   */
+  setNodesDecoyMode: {
+    methodKind: "unary";
+    input: typeof SetNodesDecoyModeRequestSchema;
+    output: typeof SetNodesDecoyModeResponseSchema;
   },
   /**
    * Restart one inbound or all inbounds of a node ("Restart profiles" button). Drops its sessions.

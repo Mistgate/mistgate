@@ -42,6 +42,15 @@ const (
 	NodeServiceCreateEnrollmentProcedure = "/mistgate.admin.v1.NodeService/CreateEnrollment"
 	// NodeServiceUpdateNodeProcedure is the fully-qualified name of the NodeService's UpdateNode RPC.
 	NodeServiceUpdateNodeProcedure = "/mistgate.admin.v1.NodeService/UpdateNode"
+	// NodeServiceSetNodeDecoyModeProcedure is the fully-qualified name of the NodeService's
+	// SetNodeDecoyMode RPC.
+	NodeServiceSetNodeDecoyModeProcedure = "/mistgate.admin.v1.NodeService/SetNodeDecoyMode"
+	// NodeServiceUploadNodeDecoyProcedure is the fully-qualified name of the NodeService's
+	// UploadNodeDecoy RPC.
+	NodeServiceUploadNodeDecoyProcedure = "/mistgate.admin.v1.NodeService/UploadNodeDecoy"
+	// NodeServiceSetNodesDecoyModeProcedure is the fully-qualified name of the NodeService's
+	// SetNodesDecoyMode RPC.
+	NodeServiceSetNodesDecoyModeProcedure = "/mistgate.admin.v1.NodeService/SetNodesDecoyMode"
 	// NodeServiceRestartInboundsProcedure is the fully-qualified name of the NodeService's
 	// RestartInbounds RPC.
 	NodeServiceRestartInboundsProcedure = "/mistgate.admin.v1.NodeService/RestartInbounds"
@@ -69,6 +78,12 @@ type NodeServiceClient interface {
 	// server. Passing node_id re-enrolls an existing node (lost certificate, reinstall).
 	CreateEnrollment(context.Context, *connect.Request[v1.CreateEnrollmentRequest]) (*connect.Response[v1.CreateEnrollmentResponse], error)
 	UpdateNode(context.Context, *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error)
+	// Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
+	SetNodeDecoyMode(context.Context, *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error)
+	// Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+	UploadNodeDecoy(context.Context, *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error)
+	// Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
+	SetNodesDecoyMode(context.Context, *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error)
 	// Restart one inbound or all inbounds of a node ("Restart profiles" button). Drops its sessions.
 	RestartInbounds(context.Context, *connect.Request[v1.RestartInboundsRequest]) (*connect.Response[v1.RestartInboundsResponse], error)
 	// The node's AmneziaWG kernel module (agents with "awg-prepare/1"). confirm = false only asks the node whether the
@@ -134,6 +149,24 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("UpdateNode")),
 			connect.WithClientOptions(opts...),
 		),
+		setNodeDecoyMode: connect.NewClient[v1.SetNodeDecoyModeRequest, v1.SetNodeDecoyModeResponse](
+			httpClient,
+			baseURL+NodeServiceSetNodeDecoyModeProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("SetNodeDecoyMode")),
+			connect.WithClientOptions(opts...),
+		),
+		uploadNodeDecoy: connect.NewClient[v1.UploadNodeDecoyRequest, v1.UploadNodeDecoyResponse](
+			httpClient,
+			baseURL+NodeServiceUploadNodeDecoyProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("UploadNodeDecoy")),
+			connect.WithClientOptions(opts...),
+		),
+		setNodesDecoyMode: connect.NewClient[v1.SetNodesDecoyModeRequest, v1.SetNodesDecoyModeResponse](
+			httpClient,
+			baseURL+NodeServiceSetNodesDecoyModeProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("SetNodesDecoyMode")),
+			connect.WithClientOptions(opts...),
+		),
 		restartInbounds: connect.NewClient[v1.RestartInboundsRequest, v1.RestartInboundsResponse](
 			httpClient,
 			baseURL+NodeServiceRestartInboundsProcedure,
@@ -175,16 +208,19 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // nodeServiceClient implements NodeServiceClient.
 type nodeServiceClient struct {
-	listNodes        *connect.Client[v1.ListNodesRequest, v1.ListNodesResponse]
-	getNode          *connect.Client[v1.GetNodeRequest, v1.GetNodeResponse]
-	createEnrollment *connect.Client[v1.CreateEnrollmentRequest, v1.CreateEnrollmentResponse]
-	updateNode       *connect.Client[v1.UpdateNodeRequest, v1.UpdateNodeResponse]
-	restartInbounds  *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
-	prepareAwgKernel *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
-	measureBandwidth *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
-	checkPorts       *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
-	retireNode       *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
-	streamLogs       *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
+	listNodes         *connect.Client[v1.ListNodesRequest, v1.ListNodesResponse]
+	getNode           *connect.Client[v1.GetNodeRequest, v1.GetNodeResponse]
+	createEnrollment  *connect.Client[v1.CreateEnrollmentRequest, v1.CreateEnrollmentResponse]
+	updateNode        *connect.Client[v1.UpdateNodeRequest, v1.UpdateNodeResponse]
+	setNodeDecoyMode  *connect.Client[v1.SetNodeDecoyModeRequest, v1.SetNodeDecoyModeResponse]
+	uploadNodeDecoy   *connect.Client[v1.UploadNodeDecoyRequest, v1.UploadNodeDecoyResponse]
+	setNodesDecoyMode *connect.Client[v1.SetNodesDecoyModeRequest, v1.SetNodesDecoyModeResponse]
+	restartInbounds   *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
+	prepareAwgKernel  *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
+	measureBandwidth  *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
+	checkPorts        *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
+	retireNode        *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
+	streamLogs        *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
 }
 
 // ListNodes calls mistgate.admin.v1.NodeService.ListNodes.
@@ -205,6 +241,21 @@ func (c *nodeServiceClient) CreateEnrollment(ctx context.Context, req *connect.R
 // UpdateNode calls mistgate.admin.v1.NodeService.UpdateNode.
 func (c *nodeServiceClient) UpdateNode(ctx context.Context, req *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error) {
 	return c.updateNode.CallUnary(ctx, req)
+}
+
+// SetNodeDecoyMode calls mistgate.admin.v1.NodeService.SetNodeDecoyMode.
+func (c *nodeServiceClient) SetNodeDecoyMode(ctx context.Context, req *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error) {
+	return c.setNodeDecoyMode.CallUnary(ctx, req)
+}
+
+// UploadNodeDecoy calls mistgate.admin.v1.NodeService.UploadNodeDecoy.
+func (c *nodeServiceClient) UploadNodeDecoy(ctx context.Context, req *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error) {
+	return c.uploadNodeDecoy.CallUnary(ctx, req)
+}
+
+// SetNodesDecoyMode calls mistgate.admin.v1.NodeService.SetNodesDecoyMode.
+func (c *nodeServiceClient) SetNodesDecoyMode(ctx context.Context, req *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error) {
+	return c.setNodesDecoyMode.CallUnary(ctx, req)
 }
 
 // RestartInbounds calls mistgate.admin.v1.NodeService.RestartInbounds.
@@ -247,6 +298,12 @@ type NodeServiceHandler interface {
 	// server. Passing node_id re-enrolls an existing node (lost certificate, reinstall).
 	CreateEnrollment(context.Context, *connect.Request[v1.CreateEnrollmentRequest]) (*connect.Response[v1.CreateEnrollmentResponse], error)
 	UpdateNode(context.Context, *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error)
+	// Select the node's decoy site: "builtin", "panel" or "own" (an own bundle must already be uploaded).
+	SetNodeDecoyMode(context.Context, *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error)
+	// Upload one ZIP or TAR static site for this node (2 MB maximum); this also selects "own".
+	UploadNodeDecoy(context.Context, *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error)
+	// Select one mode for up to 50 nodes. "own" requires each node to have its own uploaded bundle.
+	SetNodesDecoyMode(context.Context, *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error)
 	// Restart one inbound or all inbounds of a node ("Restart profiles" button). Drops its sessions.
 	RestartInbounds(context.Context, *connect.Request[v1.RestartInboundsRequest]) (*connect.Response[v1.RestartInboundsResponse], error)
 	// The node's AmneziaWG kernel module (agents with "awg-prepare/1"). confirm = false only asks the node whether the
@@ -308,6 +365,24 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("UpdateNode")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceSetNodeDecoyModeHandler := connect.NewUnaryHandler(
+		NodeServiceSetNodeDecoyModeProcedure,
+		svc.SetNodeDecoyMode,
+		connect.WithSchema(nodeServiceMethods.ByName("SetNodeDecoyMode")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nodeServiceUploadNodeDecoyHandler := connect.NewUnaryHandler(
+		NodeServiceUploadNodeDecoyProcedure,
+		svc.UploadNodeDecoy,
+		connect.WithSchema(nodeServiceMethods.ByName("UploadNodeDecoy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nodeServiceSetNodesDecoyModeHandler := connect.NewUnaryHandler(
+		NodeServiceSetNodesDecoyModeProcedure,
+		svc.SetNodesDecoyMode,
+		connect.WithSchema(nodeServiceMethods.ByName("SetNodesDecoyMode")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceRestartInboundsHandler := connect.NewUnaryHandler(
 		NodeServiceRestartInboundsProcedure,
 		svc.RestartInbounds,
@@ -354,6 +429,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceCreateEnrollmentHandler.ServeHTTP(w, r)
 		case NodeServiceUpdateNodeProcedure:
 			nodeServiceUpdateNodeHandler.ServeHTTP(w, r)
+		case NodeServiceSetNodeDecoyModeProcedure:
+			nodeServiceSetNodeDecoyModeHandler.ServeHTTP(w, r)
+		case NodeServiceUploadNodeDecoyProcedure:
+			nodeServiceUploadNodeDecoyHandler.ServeHTTP(w, r)
+		case NodeServiceSetNodesDecoyModeProcedure:
+			nodeServiceSetNodesDecoyModeHandler.ServeHTTP(w, r)
 		case NodeServiceRestartInboundsProcedure:
 			nodeServiceRestartInboundsHandler.ServeHTTP(w, r)
 		case NodeServicePrepareAwgKernelProcedure:
@@ -389,6 +470,18 @@ func (UnimplementedNodeServiceHandler) CreateEnrollment(context.Context, *connec
 
 func (UnimplementedNodeServiceHandler) UpdateNode(context.Context, *connect.Request[v1.UpdateNodeRequest]) (*connect.Response[v1.UpdateNodeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.UpdateNode is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) SetNodeDecoyMode(context.Context, *connect.Request[v1.SetNodeDecoyModeRequest]) (*connect.Response[v1.SetNodeDecoyModeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.SetNodeDecoyMode is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) UploadNodeDecoy(context.Context, *connect.Request[v1.UploadNodeDecoyRequest]) (*connect.Response[v1.UploadNodeDecoyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.UploadNodeDecoy is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) SetNodesDecoyMode(context.Context, *connect.Request[v1.SetNodesDecoyModeRequest]) (*connect.Response[v1.SetNodesDecoyModeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.SetNodesDecoyMode is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) RestartInbounds(context.Context, *connect.Request[v1.RestartInboundsRequest]) (*connect.Response[v1.RestartInboundsResponse], error) {

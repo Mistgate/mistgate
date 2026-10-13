@@ -194,10 +194,13 @@ func (s *Store) CreateEnrollment(ctx context.Context, n *NodeRow, nodeID string,
 	stmts := make([]Stmt, 0, 5)
 	if n != nil {
 		nodeID = n.ID
+		if n.DecoyMode == "" {
+			n.DecoyMode = "builtin"
+		}
 		stmts = append(stmts, Stmt{Query: `
-			INSERT INTO node (id, name, address, country_code, location, provider, state, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-			Args: []any{n.ID, n.Name, n.Address, n.CountryCode, n.Location, n.Provider, unix(now)}})
+			INSERT INTO node (id, name, address, country_code, location, provider, state, created_at, decoy_mode)
+			VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+			Args: []any{n.ID, n.Name, n.Address, n.CountryCode, n.Location, n.Provider, unix(now), n.DecoyMode}})
 	}
 	stmts = append(stmts,
 		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, nodeID),

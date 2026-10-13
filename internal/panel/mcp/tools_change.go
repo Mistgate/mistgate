@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/warp"
 )
 
@@ -34,10 +36,94 @@ func changeTools() []toolDef {
 		change(warpRestart), change(warpReregister),
 		change(nodeFix), change(rolloutStart), change(nodeUpdateSchedule), change(nodeUpdateScheduleCancel), change(updateTimezone),
 		change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
+		change(nodeDecoy),
 	} {
 		out = append(out, g...)
 	}
 	return out
+}
+
+type nodeDecoyArgs struct {
+	ReasonField
+	Node         string `json:"node" jsonschema:"node id or exact name"`
+	Mode         string `json:"mode" jsonschema:"builtin, panel or own"`
+	BundleBase64 string `json:"bundle_base64,omitempty" jsonschema:"base64 ZIP or TAR static site up to 2 MB; required for own, omitted otherwise"`
+}
+
+var nodeDecoy = changeSpec[nodeDecoyArgs]{
+	name: "node_decoy", min: ProfileAdmin, danger: true, maxArgs: maxUploadArgsJSON,
+	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure,
+		adminv1connect.NodeServiceSetNodeDecoyModeProcedure),
+	desc: "Choose builtin, the panel's decoy site, or upload an own static site for one node. When generating an own site, never repeat the subject or look of sites already made for other nodes.",
+	plan: func(c *call, a nodeDecoyArgs) (*planned, error) {
+		id, name, err := c.nodeRef(a.Node)
+		if err != nil {
+			return nil, err
+		}
+		r, err := c.cl.Node.GetNode(c.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: id}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		node := r.Msg.GetNode()
+		if node == nil {
+			return nil, errors.New("node state is unavailable")
+		}
+		var bundle *decoy.Bundle
+		switch a.Mode {
+		case decoy.ModeBuiltin:
+			if a.BundleBase64 != "" {
+				return nil, errors.New("bundle_base64 is only allowed with own mode")
+			}
+		case decoy.ModePanel:
+			if a.BundleBase64 != "" {
+				return nil, errors.New("bundle_base64 is only allowed with own mode")
+			}
+			if !node.GetDecoyPanelAvailable() {
+				return nil, errors.New("panel decoy site is unavailable")
+			}
+		case decoy.ModeOwn:
+			if !node.GetDecoyOwnAvailable() {
+				return nil, errors.New("own decoy sites are unavailable in this edition")
+			}
+			if a.BundleBase64 == "" {
+				return nil, errors.New("bundle_base64 is required for own mode")
+			}
+			archive, err := base64.StdEncoding.Strict().DecodeString(a.BundleBase64)
+			if err != nil {
+				return nil, errors.New("bundle_base64 must encode a ZIP or TAR archive")
+			}
+			bundle, err = decoy.ParseArchive(archive)
+			if err != nil {
+				return nil, errors.New("invalid decoy bundle")
+			}
+		default:
+			return nil, errors.New("mode must be builtin, panel or own")
+		}
+		facts := []Fact{{Key: "node", Value: nm(name), Untrusted: true}, {Key: "mode", Value: a.Mode}}
+		if bundle != nil {
+			facts = append(facts, Fact{Key: "bundle", Value: bundle.Hash()})
+		}
+		a.Node = id
+		return &planned{Summary: "Change the decoy site for one node. The owner must approve this change before it is applied.",
+			Facts: facts, Danger: []string{dangerFleet}, Params: a}, nil
+	},
+	apply: func(c *call, a nodeDecoyArgs, _ Plan) (done, error) {
+		var archive []byte
+		if a.Mode == decoy.ModeOwn {
+			var err error
+			archive, err = base64.StdEncoding.Strict().DecodeString(a.BundleBase64)
+			if err != nil {
+				return done{}, failure("plan_unreadable", "the stored site archive is unreadable: make a new plan")
+			}
+		}
+		_, err := c.cl.Node.SetNodeDecoyMode(c.ctx, connect.NewRequest(&adminv1.SetNodeDecoyModeRequest{
+			NodeId: a.Node, Mode: a.Mode, BundleArchive: archive,
+		}))
+		if err != nil {
+			return done{}, apiError(err)
+		}
+		return done{text: "Node decoy site change applied."}, nil
+	},
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

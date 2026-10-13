@@ -149,9 +149,10 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, t)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
+	panelBundle, _ := f.panelDecoyBundle()
 	return connect.NewResponse(&adminv1.PrepareAwgKernelResponse{
 		Outcome: outcome, ReasonCode: clip(res.Params["code"], 32), Reason: clip(res.Params["reason"], 200),
-		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), t, live),
+		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), t, live, panelBundle),
 	}), nil
 }
 

@@ -66,6 +66,8 @@ type Config struct {
 	AfterResponse func(func())
 	// ExpectedAgentVersion is the newest agent version this panel ships (ListNodes marks older agents).
 	ExpectedAgentVersion string
+	// DecoyDir is the panel's own --decoy-dir bundle. Empty means new nodes default to builtin.
+	DecoyDir string
 	// Debounce is the StateChanged coalescing window. Default 200 ms.
 	Debounce time.Duration
 	// Desired is the desired-state source, required: it returns the enabled inbounds of a node with their
@@ -132,6 +134,9 @@ type Fleet struct {
 
 	portCheckMu    sync.Mutex
 	portCheckLocks map[string]*portCheckLock
+	decoySyncMu    sync.Mutex
+	decoySyncing   map[string]bool
+	decoySyncDirty map[string]bool
 	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
 	probeTCP       func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
 	settleUDP      func(context.Context) error
@@ -172,6 +177,8 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		owners:               map[string]sessionOwner{},
 		stuck:                map[string]stuckSeq{},
 		portCheckLocks:       map[string]*portCheckLock{},
+		decoySyncing:         map[string]bool{},
+		decoySyncDirty:       map[string]bool{},
 		kick:                 make(chan struct{}, 1),
 		enrollLim:            cfg.Limiter,
 		unit:                 time.Second,
@@ -204,7 +211,7 @@ func (f *Fleet) AgentHandler() http.Handler {
 // NodeHandler is the admin NodeService. Pass connect.WithInterceptors(auth.Interceptor()) so that it is
 // behind the admin session; the path is the Connect prefix to mount it on.
 func (f *Fleet) NodeHandler(opts ...connect.HandlerOption) (string, http.Handler) {
-	return adminv1connect.NewNodeServiceHandler(nodeService{f}, adminOpts(opts)...)
+	return adminv1connect.NewNodeServiceHandler(nodeService{f}, append([]connect.HandlerOption{connect.WithReadMaxBytes(3 << 20)}, opts...)...)
 }
 
 // FleetHandler is the admin FleetService (Overview, ListEvents); see NodeHandler for opts.

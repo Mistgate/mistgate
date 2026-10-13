@@ -77,11 +77,11 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 |---|---|
 | Одновременных вызовов инструментов на токен | 4 (больше — 429 «at most 4 tool calls at a time per token») |
 | Запросов в минуту | собственный лимит токена |
-| Тело запроса | 256 КиБ |
+| Тело запроса | 3 МиБ |
 | Результат инструмента | 32 КиБ; длинные списки уменьшаются вдвое, пока не поместятся, и помечаются как урезанные |
 | Время на вызов | 30 секунд на чтение и план, 90 секунд на применение |
 | Открытых планов | 20 на токен; 50 ожидающих владельца на всю панель |
-| Сохранённые аргументы плана | 8 КиБ |
+| Сохранённые аргументы плана | 8 КиБ (3 МиБ для загрузки сайта-ширмы) |
 
 ## Инструменты
 
@@ -126,6 +126,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_upsert` | Оператор | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) и `name` указывают приложение; для изменения — только меняемые поля, для нового приложения — как минимум `kind`: `kind` (`happ` принимает ссылку подписки, `amnezia` — ключ AmneziaWG), `download_url`, `add_link_template` (подстановки `{url}`, `{url_enc}`, `{name_enc}`), `description` (не длиннее 80 символов), `recommended` | всегда |
 | `subscription_app_remove` | Оператор | `platform`, `name` | всегда |
 | `node_fix` | Админ | `node`, `fix_id` из отчёта доктора, `params`, если пункт их перечисляет | всегда |
+| `node_decoy` | Админ | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (ZIP- или TAR-архив в base64 до 2 МБ, обязателен для `own`) | всегда |
 | `warp_restart` | Админ | `node` — идентификатор или точное имя; план перечислит профили с выходом через WARP, которые могут прерваться на несколько секунд; для применения нужен только `confirm_token` | нет |
 | `warp_reregister` | Админ | `node` — идентификатор или точное имя, необязательный `reason` (не длиннее 300 символов); для применения нужен только `confirm_token`. В плане есть ссылка на условия Cloudflare; одобрение владельца принимает их для этого аккаунта и заменяет его новым анонимным устройством, меняя IP-адрес выхода через WARP | всегда |
 | `rollout_start` | Админ | ровно одна запись `node_ids` из `updates_status` (обновит эту ноду сейчас); доверенная версия закрепляется в плане | всегда |
@@ -178,7 +179,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | Код | Значение | Инструменты |
 |---|---|---|
 | `step_up` | Сама операция в админке просит свежего подтверждения. | инструменты раскатки, `node_rollback`, `node_update_schedule` и его отмена, `update_timezone`, `node_install`, `node_server_password_rotate` |
-| `fleet` | Меняет то, что работает на нодах. | `node_fix`, инструменты раскатки, `node_rollback`, `node_update_schedule` и его отмена, `node_install`, `node_server_password_rotate` |
+| `fleet` | Меняет то, что работает на нодах. | `node_fix`, `node_decoy`, инструменты раскатки, `node_rollback`, `node_update_schedule` и его отмена, `node_install`, `node_server_password_rotate` |
 | `bulk` | Затрагивает больше 3 пользователей сразу. | `user_disable`, `user_reset_traffic` |
 | `user_page` | Это увидит каждый пользователь на своей странице подписки. | `subscription_app_upsert`, `subscription_app_remove` |
 

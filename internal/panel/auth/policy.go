@@ -52,16 +52,19 @@ var procedureLevels = map[string]level{
 	adminv1connect.FleetServiceOverviewProcedure:   levelRead,
 	adminv1connect.FleetServiceListEventsProcedure: levelRead,
 
-	adminv1connect.NodeServiceListNodesProcedure:        levelRead,
-	adminv1connect.NodeServiceGetNodeProcedure:          levelRead,
-	adminv1connect.NodeServiceUpdateNodeProcedure:       levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from): owner only
-	adminv1connect.NodeServiceRestartInboundsProcedure:  levelWrite,
-	adminv1connect.NodeServiceCheckPortsProcedure:       levelWrite,
-	adminv1connect.NodeServicePrepareAwgKernelProcedure: levelOwner, // installs packages on the node as root, like ApplyFix; closed to tokens (policy_tokens.go)
-	adminv1connect.NodeServiceMeasureBandwidthProcedure: levelOwner, // makes the node push up to 1 GB through a public server; closed to tokens (policy_tokens.go)
-	adminv1connect.NodeServiceCreateEnrollmentProcedure: levelOwner, // hands out the means to run an agent as a node
-	adminv1connect.NodeServiceRetireNodeProcedure:       levelOwner,
-	adminv1connect.NodeServiceStreamLogsProcedure:       levelOwner, // node logs carry client addresses
+	adminv1connect.NodeServiceListNodesProcedure:         levelRead,
+	adminv1connect.NodeServiceGetNodeProcedure:           levelRead,
+	adminv1connect.NodeServiceUpdateNodeProcedure:        levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from): owner only
+	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:  levelOwner,
+	adminv1connect.NodeServiceUploadNodeDecoyProcedure:   levelOwner,
+	adminv1connect.NodeServiceSetNodesDecoyModeProcedure: levelOwner,
+	adminv1connect.NodeServiceRestartInboundsProcedure:   levelWrite,
+	adminv1connect.NodeServiceCheckPortsProcedure:        levelWrite,
+	adminv1connect.NodeServicePrepareAwgKernelProcedure:  levelOwner, // installs packages on the node as root, like ApplyFix; closed to tokens (policy_tokens.go)
+	adminv1connect.NodeServiceMeasureBandwidthProcedure:  levelOwner, // makes the node push up to 1 GB through a public server; closed to tokens (policy_tokens.go)
+	adminv1connect.NodeServiceCreateEnrollmentProcedure:  levelOwner, // hands out the means to run an agent as a node
+	adminv1connect.NodeServiceRetireNodeProcedure:        levelOwner,
+	adminv1connect.NodeServiceStreamLogsProcedure:        levelOwner, // node logs carry client addresses
 
 	// ProvisioningService can install a root agent over SSH; every operation is owner-only.
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        levelOwner,

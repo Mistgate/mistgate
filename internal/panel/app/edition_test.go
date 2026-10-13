@@ -39,7 +39,7 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 	}
 	listed := edition.Unavailable(true)
 	for _, id := range listed {
-		if !covered[id] {
+		if !covered[id] && id != edition.DecoyOwn {
 			t.Errorf("unavailable id %q has no deferred job behind it", id)
 		}
 	}
@@ -48,8 +48,8 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 			t.Errorf("deferred job maps to %q, which Me does not list as unavailable", id)
 		}
 	}
-	if len(listed) != len(covered) {
-		t.Errorf("unavailable ids %v, ids behind jobs %v", listed, slices.Sorted(maps.Keys(covered)))
+	if len(listed) != len(covered)+1 || !slices.Contains(listed, edition.DecoyOwn) {
+		t.Errorf("unavailable ids %v, ids behind jobs %v plus %q", listed, slices.Sorted(maps.Keys(covered)), edition.DecoyOwn)
 	}
 }
 
@@ -119,6 +119,11 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 		"CreateApiToken": {edition.MCP, func(_ *Panel, a *auth.Service) error {
 			base, hc := serve(a.TokenHandler())
 			_, err := adminv1connect.NewApiTokenServiceClient(hc, base).CreateApiToken(ctx, connect.NewRequest(&adminv1.CreateApiTokenRequest{Name: "ops"}))
+			return err
+		}},
+		"UploadNodeDecoy": {edition.DecoyOwn, func(p *Panel, _ *auth.Service) error {
+			base, hc := serve(p.Fleet.NodeHandler())
+			_, err := adminv1connect.NewNodeServiceClient(hc, base).UploadNodeDecoy(ctx, connect.NewRequest(&adminv1.UploadNodeDecoyRequest{}))
 			return err
 		}},
 	}
