@@ -16,7 +16,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
       release: v0.1.36
       current: true
       points:
-        - "**VLESS over TLS**，支持直连或通过 CDN：除了 REALITY，还支持通过 TLS 建立 XHTTP 和 WebSocket 连接。参见 [VLESS 通过 CDN 接入](../guide/vless.md#vless-通过-cdn-接入)。"
+        - "**VLESS over TLS**，支持直连或通过 CDN：除了 REALITY，还支持通过 TLS 建立 XHTTP 和 WebSocket 连接。参见 [VLESS 通过 CDN 接入](../guide/vless.md#vless-经-cdn-连接)。"
         - "**每个节点都可以设置伪装站点**：使用内置站点、面板站点或自己的站点压缩包，可应用于一个或多个节点。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
         - "**Cloudflare 版首次随发布版本提供**，目前为预览版：已签名的 `mistgate-edge.tar.gz` 发布包使用 `mistgate edge deploy` 安装，也可以直接从该版本安装节点。它尚未在真实的 Cloudflare 账户上运行。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
     - title: 协议配置
@@ -57,7 +57,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
       points:
         - "[签名的节点 Agent 更新](../operations/updates.md)：一次更新一个节点，可立即更新或定时更新；更新后检查失败时会自动回滚。"
         - "面板可从已签名的 GitHub 发布版本自我更新；新面板无法持续运行时会自动回滚。"
-        - "[单行命令安装面板](../getting-started/install-panel.md#单行安装)，并验证发布签名。"
+        - "[单行命令安装面板](../getting-started/install-panel.md#一行安装)，并验证发布签名。"
         - "[可复现发布版本](../operations/releases.md)，使用标签离线签名。"
     - title: 集成
       section: integrations
@@ -78,7 +78,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
   cards:
     - title: 在生产环境中测试 VLESS
       section: profiles
-      text: "v0.1.34 起支持 REALITY，v0.1.35 起支持以节点自己的站点为目标，v0.1.36 起支持 TLS 和 CDN。尚未通过真实 CDN 测试 VLESS：端到端测试中由节点自身模拟 CDN。参见 [VLESS 通过 CDN 接入](../guide/vless.md#vless-通过-cdn-接入)。"
+      text: "v0.1.34 起支持 REALITY，v0.1.35 起支持以节点自己的站点为目标，v0.1.36 起支持 TLS 和 CDN。尚未通过真实 CDN 测试 VLESS：端到端测试中由节点自身模拟 CDN。参见 [VLESS 通过 CDN 接入](../guide/vless.md#vless-经-cdn-连接)。"
     - title: 在每个节点上使用伪装站点
       section: nodes
       text: "每个节点都可以使用内置站点、面板站点或自己的站点压缩包。v0.1.36 之前创建的节点会继续使用内置页面，直到你选择其他选项。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
@@ -115,7 +115,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
       text: "在其他地址保存订阅副本，以便面板地址无法连接时，应用仍能获取订阅。"
     - title: 在 VPS 版和 Cloudflare 版之间迁移
       icon: refresh
-      text: "在两个版本之间迁移用户、节点和订阅链接，同时保持链接可用。目前要使用另一个版本，需要重新配置集群。参见[迁移](../getting-started/install-edge.md#在-vps-面板与-cloudflare-版之间迁移)。"
+      text: "在两个版本之间迁移用户、节点和订阅链接，同时保持链接可用。目前要使用另一个版本，需要重新配置集群。参见[迁移](../getting-started/install-edge.md#在-vps-面板和-cloudflare-版之间迁移)。"
 - status: goal
   title: 迈向 1.0
   lead: 1.0 的发布条件。达到这些条件前仍可能有不兼容变更。
@@ -136,5 +136,5 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.36`�
 - API 令牌和 MCP 无法创建协议配置或分组，也无法将协议配置部署到节点；这些操作由所有者在管理后台执行。
 - 备份只能保存到 Cloudflare R2；恢复时必须离线运行 `mistgate backup restore` 命令，并指定新的数据目录。
 - 面板不会创建 Cloudflare 账户、存储桶或令牌；你需要提供一个仅限存储桶且具有读取、写入和删除权限的令牌。
-- Cloudflare 版仍处于预览阶段，尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本尚不支持)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。
+- Cloudflare 版仍处于预览阶段，尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本中尚不可用的功能)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。
 - 部分默认值偏向俄罗斯用户（俄罗斯节点使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设）；这些都可以在设置中修改。
