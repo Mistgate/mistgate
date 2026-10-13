@@ -8,6 +8,25 @@ import { protocolName, protocolShort } from "@/lib/series";
 
 const cardCls = "flex flex-col gap-2.5 rounded-card-lg border border-line bg-surface p-4";
 
+type Online = Plain<GetNodeResponse>["onlineUsers"][number];
+
+/**
+ * One row per person: the node reports one entry per connection (a Hysteria2 app can hold several), each with the
+ * person's whole rate, so listing them as they come repeats the same name and speed. Protocols and device models are
+ * merged, the earliest connection keeps the order.
+ */
+export function onlinePeople(online: readonly Online[]) {
+  const people = new Map<string, { userId: string; userName: string; protocols: string[]; models: string[]; connections: number; downBps: number }>();
+  for (const o of online) {
+    const p = people.get(o.userId) ?? { userId: o.userId, userName: o.userName, protocols: [], models: [], connections: 0, downBps: o.downBps };
+    if (!p.protocols.includes(o.protocol)) p.protocols.push(o.protocol);
+    if (o.deviceModel && !p.models.includes(o.deviceModel)) p.models.push(o.deviceModel);
+    p.connections++;
+    people.set(o.userId, p);
+  }
+  return [...people.values()];
+}
+
 /** "On this node now" and "Top today". */
 export function UsersTab({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
@@ -19,19 +38,26 @@ export function UsersTab({ data }: { data: Plain<GetNodeResponse> }) {
         <SectionLabel as="h2" icon="people" tone="mint">
           {t("node.onlineHere")}
         </SectionLabel>
-        {data.onlineUsers.map((u, i) => (
-          <Link key={`${u.userId}/${u.protocol}/${u.connectedAtUnix}`} to="/users/$id" params={{ id: u.userId }} className="flex min-h-9 items-center gap-2.5">
-            <Avatar name={u.userName} index={i} />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <b className="truncate text-[13px]">{u.userName}</b>
-              {u.deviceModel && <span className="truncate text-[11px] text-muted">{u.deviceModel}</span>}
-            </span>
-            <span title={protocolName(u.protocol)}>
-              <Chip mono>{protocolShort(u.protocol)}</Chip>
-            </span>
-            <span className="w-[90px] text-right font-mono text-xs">{fmt.mbit(u.downBps)}</span>
-          </Link>
-        ))}
+        {onlinePeople(data.onlineUsers).map((u, i) => {
+          const detail = [...u.models, u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" · ");
+          return (
+            <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className="flex min-h-9 items-center gap-2.5">
+              <Avatar name={u.userName} index={i} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <b className="truncate text-[13px]">{u.userName}</b>
+                {detail && <span className="truncate text-[11px] text-muted">{detail}</span>}
+              </span>
+              <span className="flex gap-1">
+                {u.protocols.map((p) => (
+                  <span key={p} title={protocolName(p)}>
+                    <Chip mono>{protocolShort(p)}</Chip>
+                  </span>
+                ))}
+              </span>
+              <span className="w-[90px] text-right font-mono text-xs">{fmt.mbit(u.downBps)}</span>
+            </Link>
+          );
+        })}
         {data.onlineUsers.length === 0 && <p className="text-[13px] text-muted">{t("node.nobody")}</p>}
       </section>
       <section className={cardCls}>

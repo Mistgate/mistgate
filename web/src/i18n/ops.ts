@@ -519,6 +519,7 @@ export const en = {
   "node.quick.done": "“{profile}” is on {node}",
 
   "node.onlineHere": "On this node now",
+  "node.connections": "{n} connection|{n} connections",
   "node.nobody": "Nobody right now",
   "node.topToday": "Top today",
   "node.noTopToday": "No traffic today yet",
@@ -1531,6 +1532,7 @@ export const ru: typeof en = {
   "node.quick.done": "«{profile}» стоит на {node}",
 
   "node.onlineHere": "Сейчас на ноде",
+  "node.connections": "{n} подключение|{n} подключения|{n} подключений",
   "node.nobody": "Сейчас никого",
   "node.topToday": "Топ за сегодня",
   "node.noTopToday": "Сегодня трафика ещё нет",

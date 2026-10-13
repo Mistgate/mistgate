@@ -124,7 +124,8 @@ type onlineUserV struct {
 	Protocol    string `json:"protocol"`
 	Device      string `json:"device,omitempty"`
 	ConnectedAt int64  `json:"connected_unix"`
-	DownBps     uint64 `json:"down_bps"`
+	DownBps     uint64 `json:"down_bps"`              // the person's whole rate on this node, not this row's share
+	Connections int    `json:"connections,omitempty"` // more than one: the node reported this row that many times
 }
 
 type topUserV struct {
@@ -208,14 +209,27 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 			State: enumName("INBOUND_STATE_", in.GetState().String()), LastError: clean(in.GetLastError(), 200),
 		})
 	}
-	for i, u := range r.GetOnlineUsers() {
-		if i == maxOnlineUsers {
-			break
+	// one row per person, protocol and device: the node reports each connection, each with the person's whole rate
+	seen := map[string]int{}
+	for _, u := range r.GetOnlineUsers() {
+		key := u.GetUserId() + "|" + u.GetProtocol() + "|" + u.GetDeviceModel()
+		if i, ok := seen[key]; ok {
+			v.OnlineUsers[i].Connections++
+			continue
 		}
+		if len(v.OnlineUsers) == maxOnlineUsers {
+			continue
+		}
+		seen[key] = len(v.OnlineUsers)
 		v.OnlineUsers = append(v.OnlineUsers, onlineUserV{
 			UserID: u.GetUserId(), UserName: nm(u.GetUserName()), Protocol: clean(u.GetProtocol(), 40),
-			Device: nm(u.GetDeviceModel()), ConnectedAt: u.GetConnectedAtUnix(), DownBps: u.GetDownBps(),
+			Device: nm(u.GetDeviceModel()), ConnectedAt: u.GetConnectedAtUnix(), DownBps: u.GetDownBps(), Connections: 1,
 		})
+	}
+	for i := range v.OnlineUsers {
+		if v.OnlineUsers[i].Connections == 1 {
+			v.OnlineUsers[i].Connections = 0 // omitted: the usual case
+		}
 	}
 	return v
 }
