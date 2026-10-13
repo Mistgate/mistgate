@@ -359,7 +359,7 @@ describe("the server's vocabulary is covered", () => {
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
     "access_ended", "user_connection", "users_impacted"];
   const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
-  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path"];
+  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn"];
   const expected = [
     ...checks.flatMap((c) => [`doctor.${c}.title`, `health.doctor.${c}.why`]),
     "health.doctor.dstate_tasks.why.qxl_ttm",
@@ -426,11 +426,11 @@ describe("the server's vocabulary is covered", () => {
     }
   });
   it("fills every placeholder of the alert texts the panel words with the params it sends", () => {
-    // eval.go: no_traffic {failed, total, ports, port}, check_failed {inbound, profile, port, error_code, error_detail},
+    // eval.go: no_traffic {failed, total, ports, port}, check_failed {inbound, profile, port, error_code, error_detail, cdn_host for via_cdn},
     // cert_expiry {inbound|inbound_id, profile, server_name, days_left, reason}, node_down {minutes} worded as {duration}
     const sent: Record<string, string[]> = {
       no_traffic: ["failed", "total", "ports", "port"],
-      check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers", "nodes"],
+      check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers", "nodes", "cdn_host"],
       cert_expiry: ["inbound", "inbound_id", "profile", "server_name", "days_left", "reason", "server_part"],
       node_down: ["duration"],
     };

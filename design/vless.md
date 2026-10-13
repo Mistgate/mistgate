@@ -44,11 +44,16 @@ accepts all); `x_padding_bytes`; a CDN address override (`cdn.host`, `cdn.port`)
 node resolves sniffed names; egress direct or WARP; per-credential rate limit, hard expiry and kick; torrent guard parity
 with hysteria2.
 
+The panel-side synthetic VLESS check runs xray-core in one short-lived helper process per attempt. The panel process
+connects to that helper through an authenticated loopback SOCKS listener; process exit bounds Xray's XHTTP global state
+and isolates Xray panics and races from the panel. A failing profile that dials through a CDN is reported separately
+with the CDN host and does not count toward the node's critical all-checks-failed alert. The stripped panel binary
+includes the helper's Xray code; its size is recorded with the round-two implementation.
+
 Explicitly later: Xray JSON and sing-box subscription formats (the URI list carries everything v1 uses and Happ reads it
 today); VLESS `encryption` (mlkem768x25519plus), REALITY `mldsa65`, VLESS fallbacks; XHTTP `downloadSettings`, xmux
-tuning, header/cookie placement, HTTP/3; gRPC, httpupgrade, mKCP; per-inbound CDN hosts; a panel-side synthetic VLESS
-check (`health.Dialers` has none, so these inbounds are skipped; adding one costs ~5 MB on the panel binary); a decoy
-site for unknown XHTTP paths (Xray answers a bare 404); a TCP port-delivery check.
+tuning, header/cookie placement, HTTP/3; gRPC, httpupgrade, mKCP; per-inbound CDN hosts; a decoy site for unknown
+XHTTP paths (Xray answers a bare 404); a TCP port-delivery check.
 
 ## 2. Node side: `internal/node/vless`
 
@@ -233,7 +238,7 @@ Upstream on Windows: xray's readv there is a blocking WSARecv (`common/buf/readv
 6. Xray JSON for Happ: not in v1; add with sing-box when a feature needs it. — owner: yes (2026-10-09)
 7. REALITY on TCP 443 moves the hysteria2 TCP decoy aside on the same node: yes (REALITY forwards probes to a real
    site). — owner: yes (2026-10-09)
-8. Panel synthetic VLESS check (+~5 MB panel binary): later. — owner: yes (2026-10-09)
+8. Panel synthetic VLESS check: originally deferred; implemented in process with xray-core as described in §1. — original decision: later (2026-10-09); scope updated 2026-10-13.
 
 ## 7. Hysteria2 and VLESS on one node (added 2026-10-09)
 

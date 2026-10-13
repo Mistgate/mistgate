@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	panelvless "github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -222,6 +224,62 @@ func (e *env) inbound(nodeID string, port uint32) string {
 	id := in.Msg.Inbound.Id
 	e.exec(`UPDATE inbound SET state = 'active', cert_pin_sha256 = ?, cert_not_after = ? WHERE id = ?`,
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", e.clock.Now().Add(60*24*time.Hour).Unix(), id)
+	e.s.invalidateSnapshot()
+	return id
+}
+
+func (e *env) vlessInbound(nodeID string, port uint32) string {
+	e.t.Helper()
+	e.n++
+	settings, err := panelvless.New().DefaultSettings()
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	p, err := e.acc.CreateProfile(e.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "vless-" + nodeID + "-" + string(rune('a'+e.n)), SettingsJson: string(settings),
+	}))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	in, err := e.acc.CreateInbound(e.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: p.Msg.Profile.Id, NodeId: nodeID, PortOverride: port}))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	id := in.Msg.Inbound.Id
+	e.exec(`UPDATE inbound SET state = 'active' WHERE id = ?`, id)
+	e.s.invalidateSnapshot()
+	return id
+}
+
+func (e *env) vlessCDNInbound(nodeID string, port uint32) string {
+	e.t.Helper()
+	settingsRaw, err := panelvless.New().DefaultSettings()
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	var settings panelvless.Settings
+	if err := json.Unmarshal(settingsRaw, &settings); err != nil {
+		e.t.Fatal(err)
+	}
+	settings.Security, settings.TLSMode, settings.SNI = "tls", "acme_domain", "origin.example.org"
+	settings.CDN = &panelvless.CDNSettings{Host: "cdn.example.org", Port: 443}
+	settingsRaw, err = json.Marshal(settings)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.n++
+	profile, err := e.acc.CreateProfile(e.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "vless-cdn-" + nodeID + "-" + string(rune('a'+e.n)), SettingsJson: string(settingsRaw),
+	}))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	inbound, err := e.acc.CreateInbound(e.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: profile.Msg.Profile.Id, NodeId: nodeID, PortOverride: port}))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	id := inbound.Msg.Inbound.Id
+	e.exec(`UPDATE inbound SET state = 'active' WHERE id = ?`, id)
 	e.s.invalidateSnapshot()
 	return id
 }

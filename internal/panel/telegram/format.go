@@ -126,6 +126,7 @@ var checkTitles = map[string][2]string{
 
 // whyVariants say in a few words why a check failed (the "variant" of health.alert.<kind>.why.<variant>).
 var whyVariants = map[string][2]string{
+	"via_cdn":          {"the check goes through the CDN; check the CDN and the origin", "проверка идёт через CDN; проверьте CDN и источник"},
 	"udp_blocked":      {"the hoster seems to block UDP on this port", "хостер, похоже, режет UDP на этом порту"},
 	"udp_all_blocked":  {"the hoster seems to block UDP on the whole node", "хостер, похоже, режет весь UDP на ноде"},
 	"timeout":          {"the handshake does not complete", "рукопожатие не завершается"},

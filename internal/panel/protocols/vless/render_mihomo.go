@@ -20,7 +20,7 @@ func renderURI(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if !ok {
 		return plugin.Fragment{}, false
 	}
-	s, host := v.Settings, v.host
+	host := v.params.Host
 	name := fmt.Sprintf("%s · vless · %d", nodeName(in.Inbound.Node, host), in.Inbound.Port)
 	user := url.User(in.Secret).String()
 	if in.MaskSecrets {
@@ -28,34 +28,34 @@ func renderURI(in protocols.RenderInput) (plugin.Fragment, bool) {
 	}
 	q := make(url.Values)
 	q.Set("encryption", "none")
-	if s.Security == "reality" && s.Transport == "tcp" {
-		q.Set("flow", "xtls-rprx-vision")
+	if v.params.Flow != "" {
+		q.Set("flow", v.params.Flow)
 	}
-	q.Set("fp", defaultString(s.Reality.Fingerprint, "chrome")) // TLS profiles need not carry a REALITY block
-	if s.Transport == "xhttp" {
-		if extra := xhttpExtra(s.XHTTP); extra != "" {
-			q.Set("extra", extra)
+	q.Set("fp", v.params.Fingerprint) // TLS profiles need not carry a REALITY block
+	if v.params.Transport == "xhttp" {
+		if v.params.XHTTPExtra != "" {
+			q.Set("extra", v.params.XHTTPExtra)
 		}
-		if v.clientHost != "" {
-			q.Set("host", v.clientHost)
+		if v.params.ClientHost != "" {
+			q.Set("host", v.params.ClientHost)
 		}
-		q.Set("mode", clientXHTTPMode(s))
-		q.Set("path", s.XHTTP.Path)
-	} else if s.Transport == "ws" {
-		if v.clientHost != "" {
-			q.Set("host", v.clientHost)
+		q.Set("mode", v.params.XHTTPMode)
+		q.Set("path", v.params.XHTTPPath)
+	} else if v.params.Transport == "ws" {
+		if v.params.ClientHost != "" {
+			q.Set("host", v.params.ClientHost)
 		}
-		q.Set("path", s.WS.Path)
+		q.Set("path", v.params.WSPath)
 	}
-	q.Set("security", s.Security)
-	if s.Security == "reality" {
-		q.Set("pbk", v.publicKey)
-		q.Set("sid", v.shortID)
-		q.Set("spx", spx(in.DeviceID))
+	q.Set("security", v.params.Security)
+	if v.params.Security == "reality" {
+		q.Set("pbk", v.params.PublicKey)
+		q.Set("sid", v.params.ShortID)
+		q.Set("spx", v.params.SpiderX)
 	}
-	q.Set("sni", v.serverName)
-	q.Set("type", s.Transport)
-	uri := "vless://" + user + "@" + address(host, v.port) + "?" + q.Encode() + "#" + (&url.URL{Fragment: name}).EscapedFragment()
+	q.Set("sni", v.params.SNI)
+	q.Set("type", v.params.Transport)
+	uri := "vless://" + user + "@" + address(host, v.params.Port) + "?" + q.Encode() + "#" + (&url.URL{Fragment: name}).EscapedFragment()
 	return plugin.Fragment{Format: plugin.FormatURIList, Name: name, Data: []byte(uri)}, true
 }
 
@@ -89,7 +89,7 @@ func renderMihomo(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if !ok {
 		return plugin.Fragment{}, false
 	}
-	s, host := v.Settings, v.host
+	host := v.params.Host
 	name := in.DisplayName
 	if name == "" {
 		name = fmt.Sprintf("%s · vless · %d", nodeName(in.Inbound.Node, host), in.Inbound.Port)
@@ -103,40 +103,39 @@ func renderMihomo(in protocols.RenderInput) (plugin.Fragment, bool) {
 	add := func(k string, v *yaml.Node) { kv = append(kv, strNode(k), v) }
 	add("name", quoted(name))
 	add("type", strNode("vless"))
-	add("server", quoted(host))
-	add("port", intNode(int(v.port)))
+	add("server", quoted(v.params.Host))
+	add("port", intNode(int(v.params.Port)))
 	add("uuid", quoted(uuid))
 	add("udp", boolNode(true))
 	add("packet-encoding", strNode("xudp"))
 	add("tls", boolNode(true))
-	add("servername", quoted(v.serverName))
-	add("client-fingerprint", strNode(defaultString(s.Reality.Fingerprint, "chrome")))
+	add("servername", quoted(v.params.SNI))
+	add("client-fingerprint", strNode(v.params.Fingerprint))
 	add("skip-cert-verify", boolNode(false))
-	if s.Security == "reality" && s.Transport == "tcp" {
+	if v.params.Security == "reality" && v.params.Transport == "tcp" {
 		add("network", strNode("tcp"))
-		add("flow", strNode("xtls-rprx-vision"))
-	} else if s.Transport == "xhttp" {
+		add("flow", strNode(v.params.Flow))
+	} else if v.params.Transport == "xhttp" {
 		add("network", strNode("xhttp"))
-		xopts := []*yaml.Node{strNode("path"), quoted(s.XHTTP.Path), strNode("mode"), strNode(clientXHTTPMode(s))}
-		if v.clientHost != "" {
-			xopts = append(xopts, strNode("host"), quoted(v.clientHost))
+		xopts := []*yaml.Node{strNode("path"), quoted(v.params.XHTTPPath), strNode("mode"), strNode(v.params.XHTTPMode)}
+		if v.params.ClientHost != "" {
+			xopts = append(xopts, strNode("host"), quoted(v.params.ClientHost))
 		}
-		padding := defaultString(s.XHTTP.XPaddingBytes, defaultXPaddingBytes)
-		if padding != defaultXPaddingBytes {
-			xopts = append(xopts, strNode("x-padding-bytes"), quoted(padding))
+		if v.params.XHTTPPadding != defaultXPaddingBytes {
+			xopts = append(xopts, strNode("x-padding-bytes"), quoted(v.params.XHTTPPadding))
 		}
 		add("xhttp-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: xopts})
-	} else if s.Transport == "ws" {
+	} else if v.params.Transport == "ws" {
 		add("network", strNode("ws"))
-		wsOpts := []*yaml.Node{strNode("path"), quoted(s.WS.Path)}
-		if v.clientHost != "" {
-			wsOpts = append(wsOpts, strNode("headers"), &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{strNode("Host"), quoted(v.clientHost)}})
+		wsOpts := []*yaml.Node{strNode("path"), quoted(v.params.WSPath)}
+		if v.params.ClientHost != "" {
+			wsOpts = append(wsOpts, strNode("headers"), &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{strNode("Host"), quoted(v.params.ClientHost)}})
 		}
 		add("ws-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: wsOpts})
 	}
-	if s.Security == "reality" {
+	if v.params.Security == "reality" {
 		add("reality-opts", &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
-			strNode("public-key"), quoted(v.publicKey), strNode("short-id"), quoted(v.shortID),
+			strNode("public-key"), quoted(v.params.PublicKey), strNode("short-id"), quoted(v.params.ShortID),
 		}})
 	}
 

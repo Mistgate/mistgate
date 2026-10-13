@@ -159,7 +159,7 @@ A server whose node address is not a plain host name or IP address gets no link 
 
 ## Limits today
 
-- The panel's own client-eye check does not test VLESS servers yet, so a VLESS server is not marked **No traffic** by it. See [Health](../operations/health.md).
+- The panel's client-eye check tests VLESS with the same resolved client settings used by subscriptions, including the handshake and tunnel. See [Health](../operations/health.md).
 - **Check ports** on the node page shows whether a TCP connection reaches Mistgate from one other node, see [Nodes](nodes.md). It is one vantage point and does not run a full REALITY handshake. To see what a client sees, test from another network (`nc -vz de1.example.com 8443`), or by connecting from a phone.
 - The subscription carries no Xray JSON or sing-box format yet.
 - VLESS behind a CDN is not tested against a real CDN yet, see [VLESS behind a CDN](#vless-behind-a-cdn).

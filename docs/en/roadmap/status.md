@@ -130,7 +130,7 @@ Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production
 
 ## Known limits
 
-- The client-eye check probes Hysteria2 and AmneziaWG only, not VLESS. So a node with only VLESS never raises **Alive, but no traffic**, and a node whose Hysteria2 and AmneziaWG servers all fail raises it even when VLESS works. See [VLESS limits](../guide/vless.md#limits-today).
+- Client-eye checks skip VLESS when the node agent does not report the required capability. Agents before v0.1.34 have no VLESS engine; TLS profiles also require `vless-tls/1` (v0.1.36 or later).
 - **Check ports** looks from one vantage point: another node of the fleet or the panel host. On VLESS ports it runs a TLS handshake with the expected name, not a REALITY handshake.
 - The SSH installation logs in with a password only (keyboard-interactive included); key login is not supported. Use the [manual install](../getting-started/add-node.md) for such servers.
 - API tokens and MCP cannot create profiles or groups, or put a profile on a node: the owner does that in the admin.

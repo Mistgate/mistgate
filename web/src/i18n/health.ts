@@ -239,6 +239,7 @@ export const en = {
     "The direct profile of this node works, but “{profile}” does not: its WARP exit is dead. The WARP card of the node shows the handshake, the probes and the last error.",
   "health.alert.check_failed.why.timeout": "“{profile}” does not complete the handshake on port {port}. The profile may be down or the port blocked. Restart it; if that does not help, look at the node.",
   "health.alert.check_failed.why.auth": "“{profile}” refuses the panel’s check account. The node may have an old configuration: restart the profile.",
+  "health.alert.check_failed.why.via_cdn": "“{profile}” fails the check through the CDN {cdn_host} (port {port}). The node itself may be fine: check the CDN settings and that the CDN reaches the node. This profile does not count toward the node’s “no traffic” alert.",
   "health.alert.check_failed.why.tls": "“{profile}” presents a certificate that does not match: the domain, the pin or the certificate itself changed. Check it in the node’s profiles.",
   "health.alert.check_failed.why.refused": "Nothing listens on port {port} of “{profile}”. Restart the profile; if it fails to start, something else holds the port.",
   "health.alert.check_failed.why.exit_unreachable": "The tunnel of “{profile}” comes up, but the node cannot reach the internet through it. Check the node’s DNS and its exit.",
@@ -465,7 +466,7 @@ export const en = {
   "health.fix.reconnect_warp.plan": "Rerun the WARP checks now; reconnect the configured tunnel and reapply its routes only if it is down.",
 
   // ---- check errors (health.check.err.<code>)
-  "health.check.err.timeout": "No handshake: the UDP traffic probably does not arrive",
+  "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
   "health.check.err.auth": "The node refused the panel’s check account",
   "health.check.err.tls": "Certificate or domain does not match",
   "health.check.err.refused": "Connection refused: nothing listens on the port",
@@ -707,6 +708,7 @@ export const ru: typeof en = {
     "Прямой профиль этой ноды работает, а «{profile}» нет: мёртв его выход через WARP. Карточка WARP ноды показывает рукопожатие, проверки и последнюю ошибку.",
   "health.alert.check_failed.why.timeout": "«{profile}» не завершает рукопожатие на порту {port}. Профиль мог упасть, либо порт закрыт. Перезапусти его; не поможет — загляни на ноду.",
   "health.alert.check_failed.why.auth": "«{profile}» отклоняет проверочную учётку панели. На ноде может быть старая конфигурация: перезапусти профиль.",
+  "health.alert.check_failed.why.via_cdn": "«{profile}» не проходит проверку через CDN {cdn_host} (порт {port}). Сама нода может быть в порядке: проверь настройки CDN и что CDN достаёт до ноды. В алерте ноды «трафик не идёт» этот профиль не учитывается.",
   "health.alert.check_failed.why.tls": "«{profile}» показывает сертификат, который не подходит: поменялись домен, отпечаток или сам сертификат. Проверь это в профилях ноды.",
   "health.alert.check_failed.why.refused": "На порту {port} профиля «{profile}» никто не слушает. Перезапусти профиль; если он не стартует, порт занят чем-то другим.",
   "health.alert.check_failed.why.exit_unreachable": "Туннель «{profile}» поднимается, но выйти в интернет через него нода не может. Проверь DNS ноды и её выход.",
@@ -933,7 +935,7 @@ export const ru: typeof en = {
   "health.fix.reconnect_warp.plan": "Запустить проверку WARP сейчас; если туннель отключён, переподключить его и восстановить маршруты.",
 
   // ---- check errors
-  "health.check.err.timeout": "Нет рукопожатия: UDP-трафик, скорее всего, не доходит",
+  "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",
   "health.check.err.auth": "Нода отклонила проверочную учётку панели",
   "health.check.err.tls": "Сертификат или домен не совпадает",
   "health.check.err.refused": "Соединение отклонено: на порту никто не слушает",

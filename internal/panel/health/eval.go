@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"encoding/json"
 	"maps"
 	"slices"
 	"sort"
@@ -328,7 +329,13 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 
 	for _, n := range connected {
 		ps := byNode[n.ID]
-		h := nodeHealth{total: len(ps), doctorFail: worstDoctorFail(docs[n.ID], d.holdDoctor[n.ID])}
+		var nodeProbed, nodeFailing, nodeJudgedFailing []probed
+		for _, p := range ps {
+			if cdnHost(p.t) == "" {
+				nodeProbed = append(nodeProbed, p)
+			}
+		}
+		h := nodeHealth{total: len(nodeProbed), doctorFail: worstDoctorFail(docs[n.ID], d.holdDoctor[n.ID])}
 		var failing, judgedFailing []probed
 		for _, p := range ps {
 			fresh := correlated && p.c.streak >= 1 && p.c.streak <= 3
@@ -340,32 +347,42 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 				if !fresh {
 					judgedFailing = append(judgedFailing, p)
 				}
+				if cdnHost(p.t) == "" {
+					nodeFailing = append(nodeFailing, p)
+					if !fresh {
+						nodeJudgedFailing = append(nodeJudgedFailing, p)
+					}
+				}
 			}
 		}
-		h.failed = len(failing)
+		h.failed = len(nodeFailing)
 		if correlated {
 			for _, p := range ps {
-				if p.c.streak >= 1 && p.c.streak <= 3 {
+				if cdnHost(p.t) == "" && p.c.streak >= 1 && p.c.streak <= 3 {
 					d.holdKeys[key{kNoTraffic, n.ID, ""}] = true
 					break
 				}
 			}
 		}
 		if !d.guard && len(judgedFailing) > 0 {
-			if len(judgedFailing) == len(ps) {
+			if len(nodeProbed) > 0 && len(nodeJudgedFailing) == len(nodeProbed) {
 				h.noTraffic = true
 				params := map[string]string{"failed": strconv.Itoa(h.failed), "total": strconv.Itoa(h.total)}
-				ports := failedPorts(judgedFailing)
+				ports := failedPorts(nodeJudgedFailing)
 				params["ports"] = strings.Join(ports, ", ")
 				if len(ports) == 1 {
 					params["port"] = ports[0]
 				}
-				add(cond{key: key{kNoTraffic, n.ID, ""}, severity: sevCritical, why: "health.alert.no_traffic.why." + allFailVariant(judgedFailing), params: params})
+				add(cond{key: key{kNoTraffic, n.ID, ""}, severity: sevCritical, why: "health.alert.no_traffic.why." + allFailVariant(nodeJudgedFailing), params: params})
 			} else {
 				// the doctor already says the node's WARP is dead: its WARP profiles failing is the same news, said once
 				warpDead := !d.holdDoctor[n.ID] && failsCheck(docs[n.ID], "warp_path")
 				for _, f := range judgedFailing {
 					variant := whyVariant(f, ps)
+					cdn := cdnHost(f.t)
+					if cdn != "" {
+						variant = "via_cdn"
+					}
 					if variant == "warp_path" && warpDead {
 						continue
 					}
@@ -374,10 +391,14 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 						sev = sevCritical // the node's only inbound of that protocol
 					}
 					code := f.c.last.ErrorCode
+					params := map[string]string{"inbound": f.t.in.ID, "profile": f.t.in.ProfileName, "port": strconv.Itoa(int(f.t.spec.Listen.Port)),
+						"error_code": code, "error_detail": f.c.last.ErrorDetail}
+					if cdn != "" {
+						params["cdn_host"] = cdn
+					}
 					add(cond{key: key{kCheckFailed, n.ID, f.t.in.ID}, severity: sev,
-						why: "health.alert.check_failed.why." + variant,
-						params: map[string]string{"inbound": f.t.in.ID, "profile": f.t.in.ProfileName, "port": strconv.Itoa(int(f.t.spec.Listen.Port)),
-							"error_code": code, "error_detail": f.c.last.ErrorDetail}})
+						why:    "health.alert.check_failed.why." + variant,
+						params: params})
 				}
 			}
 		}
@@ -393,6 +414,22 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	}
 	userConds(now, sn, signals, activeKeys, d, add)
 	return d
+}
+
+func cdnHost(t *target) string {
+	if t == nil || t.in.Protocol != "vless" {
+		return ""
+	}
+	var settings struct {
+		Security string `json:"security"`
+		CDN      struct {
+			Host string `json:"host"`
+		} `json:"cdn"`
+	}
+	if json.Unmarshal(t.settings, &settings) != nil || settings.Security != "tls" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(settings.CDN.Host), "."))
 }
 
 // addPortLossyConds derives a port alert from each enabled inbound's current port and its latest stored verdict.
@@ -448,6 +485,9 @@ func whyVariant(f probed, all []probed) string {
 	code := f.c.last.ErrorCode
 	switch code {
 	case "timeout":
+		if !udpProbeProtocol(f.t.spec.Protocol) {
+			break
+		}
 		for _, o := range all {
 			if o.t != f.t && o.passing() && o.t.spec.Listen.Port != f.t.spec.Listen.Port {
 				return "udp_blocked" // another inbound of the node answers on another port: the hoster cuts this one
@@ -468,9 +508,8 @@ func whyVariant(f probed, all []probed) string {
 	return code
 }
 
-// allFailVariant is the diagnosis of a node whose every inbound fails: one shared code names it. A shared timeout
-// while the agent link (TCP) is up is the hoster cutting UDP: all of it when 443 is among the dead ports or two or
-// more ports die (moving to "another port" cannot help then), else the one port (udp_blocked: change it on this node).
+// allFailVariant is the diagnosis of a node whose every inbound fails: one shared code names it. A timeout only points
+// to blocked UDP when all failed inbounds use a UDP protocol; TCP timeouts have a different cause.
 func allFailVariant(failing []probed) string {
 	first := failing[0].c.last.ErrorCode
 	for _, f := range failing[1:] {
@@ -482,12 +521,21 @@ func allFailVariant(failing []probed) string {
 	case "":
 		return "unknown"
 	case "timeout":
+		for _, f := range failing {
+			if !udpProbeProtocol(f.t.spec.Protocol) {
+				return "unknown"
+			}
+		}
 		if ports := failedPorts(failing); len(ports) > 1 || slices.Contains(ports, "443") {
 			return "udp_all_blocked"
 		}
 		return "udp_blocked"
 	}
 	return first
+}
+
+func udpProbeProtocol(protocol string) bool {
+	return protocol == "hysteria2" || protocol == "awg"
 }
 
 // failedPorts are the distinct listen ports of the failing inbounds, in order.

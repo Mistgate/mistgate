@@ -17,7 +17,7 @@ import (
 func TestUDPDiagnosis(t *testing.T) {
 	timeout := func(port uint16) probed {
 		tg := &target{}
-		tg.spec.Listen.Port = port
+		tg.spec.Listen.Port, tg.spec.Protocol = port, "hysteria2"
 		return probed{tg, cell{last: &Result{ErrorCode: "timeout"}, streak: 3}}
 	}
 	for _, tc := range []struct {

@@ -93,6 +93,48 @@ func TestSystemCredentialInTheDesiredState(t *testing.T) {
 	}
 }
 
+func TestVLESSProbeCredentialIsAnOrdinaryStableUUIDAndIsRemovedWithInbound(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider", true)
+	in := e.vlessInbound("de1", 443)
+	desired, err := e.acc.Desired(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	withProbe := e.s.WithProbeCreds(e.ctx, []statehash.Inbound{statehash.Inbound(desired[0])})
+	if len(withProbe) != 1 || len(withProbe[0].Creds) != 1 {
+		t.Fatalf("VLESS probe credential: %+v", withProbe)
+	}
+	cred := withProbe[0].Creds[0]
+	if cred.UserID != "" || cred.DeviceID != "" || cred.RateLimitBps != probeRateLimitBps || !strings.HasPrefix(cred.CredID, "crd_") {
+		t.Fatalf("VLESS system credential is not ordinary and rate limited: %+v", cred)
+	}
+	var data struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(cred.Data, &data); err != nil || data.ID == "" {
+		t.Fatalf("VLESS node credential: %s %v", cred.Data, err)
+	}
+	row, err := e.st.ProbeCred(e.ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := e.v.Open(row.SecretEnc, row.CredID)
+	if err != nil || string(secret) != data.ID {
+		t.Fatalf("VLESS probe UUID differs from its node account: %q %v", secret, err)
+	}
+	second := e.s.WithProbeCreds(e.ctx, []statehash.Inbound{statehash.Inbound(desired[0])})
+	if second[0].Creds[0].CredID != cred.CredID || string(second[0].Creds[0].Data) != string(cred.Data) {
+		t.Fatal("VLESS probe credential changed between desired-state builds")
+	}
+	if err := e.st.Access().DeleteInbound(e.ctx, in, time.Time{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.ProbeCred(e.ctx, in); err != store.ErrNotFound {
+		t.Fatalf("VLESS probe credential outlived its inbound: %v", err)
+	}
+}
+
 func must[T any](v T, err error) T {
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error: %v", err))

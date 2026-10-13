@@ -40,7 +40,10 @@ type Target struct {
 }
 
 // DialOptions bound a dial.
-type DialOptions struct{ HandshakeTimeout time.Duration }
+type DialOptions struct {
+	HandshakeTimeout time.Duration
+	testTLSPin       []byte // loopback TLS test only; deployed probes verify the normal certificate chain
+}
 
 // Dialer connects to an inbound as a client. It returns a *ProbeError for the failures it can name and
 // errClientUnsupported for a configuration it has no client for.
@@ -135,12 +138,25 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 	fail := func(code, format string, a ...any) {
 		bad = append(bad, &ProbeError{Code: code, Detail: store.Clip(fmt.Sprintf(format, a...), 200)})
 	}
+	failRequest := func(label string, err error) {
+		var pe *ProbeError
+		if errors.As(err, &pe) {
+			fail(pe.Code, "%s: %s", label, pe.Detail)
+			return
+		}
+		if c, ok := tn.(requestErrorClassifier); ok {
+			pe = c.ClassifyRequestError(err)
+			fail(pe.Code, "%s: %s", label, pe.Detail)
+			return
+		}
+		fail("exit_unreachable", "%s: %s", label, probeErrText(err))
+	}
 
 	var latency, latencyTrace uint32
 	ok204, okTrace := false, false
 
 	if resp, err := getProbe(ctx, hc, s.cfg.Probe204URL); err != nil {
-		fail("exit_unreachable", "generate_204: %s", probeErrText(err))
+		failRequest("generate_204", err)
 	} else {
 		latency = uint32(max(time.Since(start).Milliseconds(), 1))
 		resp.Body.Close()
@@ -152,7 +168,7 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 	}
 
 	if resp, err := getProbe(ctx, hc, s.cfg.ProbeTraceURL); err != nil {
-		fail("exit_unreachable", "trace: %s", probeErrText(err))
+		failRequest("trace", err)
 	} else {
 		latencyTrace = uint32(max(time.Since(start).Milliseconds(), 1))
 		ip, loc := exitFromTrace(resp.Body)
@@ -227,4 +243,10 @@ func exitFromTrace(r io.Reader) (ip, country string) {
 		}
 	}
 	return ip, country
+}
+
+// requestErrorClassifier is implemented by a tunnel whose dial succeeds at once (a local proxy in front of the real
+// client), so a failed request is the first place its failure shows: it names the failure from what the client reported.
+type requestErrorClassifier interface {
+	ClassifyRequestError(err error) *ProbeError
 }

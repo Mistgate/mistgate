@@ -754,28 +754,50 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	}
 }
 
-// view is what both renderers need of one inbound: the settings, the address, and the per-device picks.
-type view struct {
-	Settings
-	host, publicKey, serverName, shortID, clientHost string
-	port                                             uint16
+// ClientParams are the effective VLESS settings a client consumes after profile and per-credential values are resolved.
+// Both subscription renderers and the panel's synthetic client use this result.
+type ClientParams struct {
+	Host, UUID, Flow, Security, SNI, Fingerprint string
+	PublicKey, ShortID, SpiderX                  string
+	Transport, ClientHost                        string
+	XHTTPPath, XHTTPMode, XHTTPPadding           string
+	XHTTPExtra                                   string
+	WSPath                                       string
+	Port                                         uint16
+	ALPN                                         []string
 }
 
-// renderView checks the inputs a client link depends on and makes the device's picks: the server name and the short
-// id are chosen by fnv32(device id), so the bytes of a subscription stay the same from one fetch to the next.
-func renderView(in protocols.RenderInput) (view, bool) {
+// ResolveClientParams checks the inputs a client link depends on and makes the per-credential picks: the REALITY
+// server name and short id are chosen by fnv32(device id), so the bytes of a subscription stay the same from one fetch
+// to the next. XHTTP and WebSocket ALPN follow the node's TLS front; the URI format leaves those defaults implicit.
+func ResolveClientParams(in protocols.RenderInput) (ClientParams, bool) {
 	s, errs := parse(in.Settings)
 	if len(errs) == 0 {
 		errs = validate(s)
 	}
 	if len(errs) != 0 {
-		return view{}, false
+		return ClientParams{}, false
 	}
 	host, ok := plainHost(in.Inbound.Node.Address)
 	if !ok || in.Inbound.Port == 0 || in.Inbound.Port == 80 {
-		return view{}, false
+		return ClientParams{}, false
 	}
-	v := view{Settings: s, host: host, port: in.Inbound.Port}
+	v := ClientParams{
+		Host: host, Port: in.Inbound.Port, UUID: in.Secret, Security: s.Security, Transport: s.Transport,
+		Fingerprint: defaultString(s.Reality.Fingerprint, "chrome"),
+	}
+	if s.Security == "reality" && s.Transport == "tcp" {
+		v.Flow = "xtls-rprx-vision"
+	}
+	if s.Transport == "xhttp" {
+		v.XHTTPPath = s.XHTTP.Path
+		v.XHTTPMode = clientXHTTPMode(s)
+		v.XHTTPPadding = defaultString(s.XHTTP.XPaddingBytes, defaultXPaddingBytes)
+		v.XHTTPExtra = xhttpExtra(s.XHTTP)
+	}
+	if s.Transport == "ws" {
+		v.WSPath = s.WS.Path
+	}
 	if s.Security == "tls" {
 		name := in.Inbound.TLSServerName
 		if name == "" {
@@ -785,37 +807,40 @@ func renderView(in protocols.RenderInput) (view, bool) {
 			name = in.Inbound.Node.Address
 		}
 		if !validHost(name) {
-			return view{}, false
+			return ClientParams{}, false
 		}
 		name = strings.ToLower(strings.TrimSuffix(name, "."))
-		v.serverName = name
+		v.SNI = name
 		if s.CDN != nil && s.CDN.Host != "" {
+			// Clients dial the CDN host and profile port override, and use the CDN host for TLS SNI and HTTP Host,
+			// exactly as the subscription link does. Without a CDN, they dial the node address and inbound port.
 			cdnHost := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(s.CDN.Host), "."))
 			if !isHostname(cdnHost) || !strings.Contains(cdnHost, ".") {
-				return view{}, false
+				return ClientParams{}, false
 			}
-			v.host = cdnHost
-			v.port = uint16(s.CDN.Port)
-			if v.port == 0 {
-				v.port = 443
+			v.Host = cdnHost
+			v.Port = uint16(s.CDN.Port)
+			if v.Port == 0 {
+				v.Port = 443
 			}
-			v.serverName = cdnHost
-			v.clientHost = cdnHost
+			v.SNI = cdnHost
+			v.ClientHost = cdnHost
 		} else if s.Transport == "xhttp" {
-			v.clientHost = name
+			v.ClientHost = name
 		} else if s.WS != nil {
-			v.clientHost = s.WS.Host
+			v.ClientHost = s.WS.Host
 		}
+		v.ALPN = clientALPN(s.Transport)
 		return v, true
 	}
 	var public struct {
 		PublicKey string `json:"public_key"`
 	}
 	if json.Unmarshal(in.InboundPublic, &public) != nil {
-		return view{}, false
+		return ClientParams{}, false
 	}
 	if key, err := base64.RawURLEncoding.DecodeString(public.PublicKey); err != nil || len(key) != 32 {
-		return view{}, false
+		return ClientParams{}, false
 	}
 	names := effectiveServerNames(s.Reality)
 	if s.Reality.kind() == targetSelf {
@@ -825,16 +850,38 @@ func renderView(in protocols.RenderInput) (view, bool) {
 		}
 	}
 	if len(names) == 0 || len(s.Reality.ShortIDs) == 0 {
-		return view{}, false
+		return ClientParams{}, false
 	}
 	hash := fnv32(in.DeviceID)
-	v.publicKey = public.PublicKey
-	v.serverName = names[hash%uint32(len(names))]
-	v.shortID = strings.ToLower(s.Reality.ShortIDs[hash%uint32(len(s.Reality.ShortIDs))])
+	v.PublicKey = public.PublicKey
+	v.SNI = names[hash%uint32(len(names))]
+	v.ShortID = strings.ToLower(s.Reality.ShortIDs[hash%uint32(len(s.Reality.ShortIDs))])
+	v.SpiderX = spx(in.DeviceID)
 	if s.Transport == "xhttp" {
-		v.clientHost = s.XHTTP.Host
+		v.ClientHost = s.XHTTP.Host
 	}
 	return v, true
+}
+
+func clientALPN(transport string) []string {
+	if transport == "ws" {
+		return []string{"http/1.1"}
+	}
+	return []string{"h2", "http/1.1"}
+}
+
+// view adapts the shared parameter set to the fields the existing renderers use. The renderer output depends on
+// this resolved set, so the synthetic health client and subscriptions select the same address and per-client values.
+type view struct {
+	params ClientParams
+}
+
+func renderView(in protocols.RenderInput) (view, bool) {
+	p, ok := ResolveClientParams(in)
+	if !ok {
+		return view{}, false
+	}
+	return view{params: p}, true
 }
 
 func plainHost(address string) (string, bool) {

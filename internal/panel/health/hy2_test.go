@@ -18,6 +18,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	nodehy2 "github.com/mistgate/mistgate/internal/node/hysteria2"
+	nodevless "github.com/mistgate/mistgate/internal/node/vless"
 	panelhy2 "github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -26,7 +27,11 @@ import (
 // TestMain keeps every socket of this package on loopback: a test binary that listens on all interfaces makes Windows ask
 // for a firewall rule on each run. Covers the real engine (BindIP) and the panel client probing it.
 func TestMain(m *testing.M) {
+	if runVLESSHelperTestSubprocess() {
+		return
+	}
 	nodehy2.BindIP = net.IPv4(127, 0, 0, 1)
+	nodevless.BindIP = net.IPv4(127, 0, 0, 1)
 	probeBindIP = net.IPv4(127, 0, 0, 1)
 	os.Exit(m.Run())
 }

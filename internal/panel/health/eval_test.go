@@ -164,6 +164,44 @@ func TestNoTrafficSupersedesCheckFailed(t *testing.T) {
 	}
 }
 
+func TestVLESSFailuresCountAsNoTrafficWithoutUDPDiagnosis(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider", true)
+	id := e.vlessInbound("de1", 443)
+	e.fail(id, "timeout")
+	e.fail(id, "timeout")
+
+	alerts := e.active()
+	want(t, alerts, "no_traffic/de1/")
+	if alerts["no_traffic/de1/"].WhyKey != "health.alert.no_traffic.why.unknown" {
+		t.Fatalf("VLESS timeout got a UDP-specific diagnosis: %+v", alerts["no_traffic/de1/"])
+	}
+	if noTraffic, failed, total, _ := e.s.NodeHealth("de1"); !noTraffic || failed != 1 || total != 1 {
+		t.Fatalf("VLESS node health = %v %d %d, want true 1 1", noTraffic, failed, total)
+	}
+}
+
+func TestCDNFailureDoesNotMakeNodeNoTraffic(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider", true)
+	id := e.vlessCDNInbound("de1", 443)
+	e.fail(id, "refused")
+	e.fail(id, "refused")
+
+	alerts := e.active()
+	want(t, alerts, "check_failed/de1/"+id)
+	if _, ok := alerts["no_traffic/de1/"]; ok {
+		t.Fatalf("a CDN-only failure opened no_traffic: %+v", alerts["no_traffic/de1/"])
+	}
+	alert := alerts["check_failed/de1/"+id]
+	if alert.WhyKey != "health.alert.check_failed.why.via_cdn" || alert.Params["cdn_host"] != "cdn.example.org" {
+		t.Fatalf("CDN check alert: %+v", alert)
+	}
+	if noTraffic, failed, total, _ := e.s.NodeHealth("de1"); noTraffic || failed != 0 || total != 0 {
+		t.Fatalf("CDN-only node health = %v %d %d, want false 0 0", noTraffic, failed, total)
+	}
+}
+
 func TestMixedErrorsAndOnlyInboundOfProtocolIsCritical(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

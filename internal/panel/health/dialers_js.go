@@ -16,3 +16,7 @@ func dialHysteria2(context.Context, Target, DialOptions) (Tunnel, error) {
 func dialAWG(context.Context, Target, DialOptions) (Tunnel, error) {
 	return nil, errTunnelProbesOnNodes
 }
+
+func dialVLESS(context.Context, Target, DialOptions) (Tunnel, error) {
+	return nil, errClientUnsupported
+}

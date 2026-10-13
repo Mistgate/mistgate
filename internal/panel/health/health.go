@@ -70,7 +70,7 @@ const (
 
 // Config configures Service. The zero value is production: only Actor and Log are usually set.
 type Config struct {
-	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2 and awg. A protocol without one is
+	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2, awg and vless. A protocol without one is
 	// SKIPPED (client_unsupported).
 	Dialers map[string]Dialer
 	// Probe URLs of the two probes; hostnames go into the tunnel unresolved. Defaults: gstatic's generate_204 and Cloudflare's trace.
@@ -169,7 +169,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 		cfg.Now = time.Now
 	}
 	if cfg.Dialers == nil {
-		cfg.Dialers = map[string]Dialer{"hysteria2": dialHysteria2, "awg": dialAWG}
+		cfg.Dialers = map[string]Dialer{"hysteria2": dialHysteria2, "awg": dialAWG, "vless": dialVLESS}
 	}
 	if cfg.Probe204URL == "" {
 		cfg.Probe204URL = "https://www.gstatic.com/generate_204"
