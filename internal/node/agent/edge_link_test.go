@@ -1334,9 +1334,11 @@ func TestEdgeLinkLostRenewAnswerDoesNotLockTheAgentOut(t *testing.T) {
 	newest := agentSerial()
 
 	// Past the grace both older certificates are revoked; the session on the old one is ended by the next step's
-	// recheck, and the agent comes back on the newest certificate.
+	// recheck, and the agent comes back on the newest certificate. The step is an event the agent sends after the
+	// clock moved: an admin request would not do (hours past its liveness the node reads as offline and no step is
+	// made), and the agent's own cert_renewed event may have gone out before the clock moved.
 	r.em.advance(3*time.Hour + time.Minute)
-	_, _ = r.f.RunDoctor(ctx, r.nodeID, nil, 5*time.Second) // any step does: this one meets the recheck
+	ag.a.event(agentv1.Severity_SEVERITY_INFO, "recheck_probe", "", nil)
 	eventually(t, func() bool { return r.session() == 3 }, "the agent reconnects as generation 3")
 	if got := agentSerial(); got != newest {
 		t.Errorf("the agent's certificate moved to %q", got)
