@@ -112,6 +112,7 @@ type tlsFront struct {
 	unixNetwork string
 	unixAddr    string
 	cert        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	protos      []string
 
 	mu     sync.Mutex
 	conns  map[*tlsFrontConn]struct{}
@@ -124,7 +125,16 @@ type tlsFrontConn struct {
 	upstream net.Conn
 }
 
-func startTLSFront(id string, port uint16, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), unixNetwork, unixAddr string) (*tlsFront, error) {
+func tlsFrontProtos(transport string) []string {
+	if transport == "ws" {
+		return []string{"http/1.1", acme.ALPNProto}
+	}
+	return []string{"h2", "http/1.1", acme.ALPNProto}
+}
+
+// startTLSFront listens on the inbound port. protos is the ALPN list: WebSocket speaks HTTP/1.1 only, so h2 is not offered
+// to it (a client that insisted on h2 would reach a WebSocket server with h2 frames).
+func startTLSFront(id string, port uint16, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), protos []string, unixNetwork, unixAddr string) (*tlsFront, error) {
 	host := ""
 	if BindIP != nil {
 		host = BindIP.String()
@@ -134,7 +144,7 @@ func startTLSFront(id string, port uint16, cert func(*tls.ClientHelloInfo) (*tls
 		return nil, fmt.Errorf("TLS front for %q: %w", id, err)
 	}
 	front := &tlsFront{
-		ln: ln, unixNetwork: unixNetwork, unixAddr: unixAddr, cert: cert,
+		ln: ln, unixNetwork: unixNetwork, unixAddr: unixAddr, cert: cert, protos: protos,
 		conns: make(map[*tlsFrontConn]struct{}),
 	}
 	front.wg.Add(1)
@@ -147,7 +157,12 @@ func (f *tlsFront) accept() {
 	for {
 		conn, err := f.ln.Accept()
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			// A transient failure (out of file descriptors) must not leave a running inbound with a dead listener.
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 		state := &tlsFrontConn{client: conn}
 		f.mu.Lock()
@@ -178,7 +193,7 @@ func (f *tlsFront) serve(state *tlsFrontConn) {
 	client := tls.Server(state.client, &tls.Config{
 		MinVersion:     tls.VersionTLS12,
 		GetCertificate: f.cert,
-		NextProtos:     []string{"h2", "http/1.1", acme.ALPNProto},
+		NextProtos:     f.protos,
 	})
 	_ = state.client.SetDeadline(time.Now().Add(10 * time.Second))
 	if err := client.Handshake(); err != nil {
@@ -223,17 +238,18 @@ func (f *tlsFront) Close() {
 		return
 	}
 	f.closed = true
-	conns := make([]*tlsFrontConn, 0, len(f.conns))
+	// upstream is written under f.mu and never after closed is set, so the snapshot here is complete and race-free.
+	var conns []net.Conn
 	for conn := range f.conns {
-		conns = append(conns, conn)
+		conns = append(conns, conn.client)
+		if conn.upstream != nil {
+			conns = append(conns, conn.upstream)
+		}
 	}
 	f.mu.Unlock()
 	_ = f.ln.Close()
 	for _, conn := range conns {
-		_ = conn.client.Close()
-		if conn.upstream != nil {
-			_ = conn.upstream.Close()
-		}
+		_ = conn.Close()
 	}
 	f.wg.Wait()
 }

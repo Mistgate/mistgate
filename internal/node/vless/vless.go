@@ -314,7 +314,7 @@ func (in *inbound) start(ctx context.Context) error {
 		return err
 	}
 	if in.cfg.security == "tls" {
-		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, in.tlsSocketNetwork, in.tlsSocketAddr)
+		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr)
 		if err != nil {
 			return err
 		}

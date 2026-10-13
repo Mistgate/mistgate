@@ -31,7 +31,7 @@ func renderURI(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if s.Security == "reality" && s.Transport == "tcp" {
 		q.Set("flow", "xtls-rprx-vision")
 	}
-	q.Set("fp", s.Reality.Fingerprint)
+	q.Set("fp", defaultString(s.Reality.Fingerprint, "chrome")) // TLS profiles need not carry a REALITY block
 	if s.Transport == "xhttp" {
 		if extra := xhttpExtra(s.XHTTP); extra != "" {
 			q.Set("extra", extra)
@@ -110,7 +110,7 @@ func renderMihomo(in protocols.RenderInput) (plugin.Fragment, bool) {
 	add("packet-encoding", strNode("xudp"))
 	add("tls", boolNode(true))
 	add("servername", quoted(v.serverName))
-	add("client-fingerprint", strNode(s.Reality.Fingerprint))
+	add("client-fingerprint", strNode(defaultString(s.Reality.Fingerprint, "chrome")))
 	add("skip-cert-verify", boolNode(false))
 	if s.Security == "reality" && s.Transport == "tcp" {
 		add("network", strNode("tcp"))

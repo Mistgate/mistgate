@@ -297,3 +297,37 @@ func BenchmarkTLSFrontCopy(b *testing.B) {
 		b.Fatal(err)
 	}
 }
+
+func TestTLSFrontWebSocketOffersNoH2AndDisableFreesPort(t *testing.T) {
+	f, certs := newTLSRuntimeFixture(t)
+	certs.setIssued()
+	spec := f.tlsSpec("tls-ws-protos", "ws", "")
+	if _, err := f.engine.Apply(context.Background(), spec, nil); err != nil {
+		t.Fatal(err)
+	}
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(spec.Listen.Port)))
+	cfg := func(protos ...string) *tls.Config {
+		return &tls.Config{ServerName: tlsTestServerName, InsecureSkipVerify: true, NextProtos: protos}
+	}
+	if conn, err := tls.Dial("tcp", addr, cfg("h2")); err == nil {
+		conn.Close()
+		t.Fatal("a WebSocket inbound accepted an h2-only client")
+	}
+	conn, err := tls.Dial("tcp", addr, cfg("h2", "http/1.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := conn.ConnectionState().NegotiatedProtocol; got != "http/1.1" {
+		t.Fatalf("negotiated %q, want http/1.1", got)
+	}
+	conn.Close()
+
+	spec.Enabled = false
+	if _, err := f.engine.Apply(context.Background(), spec, nil); err != nil {
+		t.Fatal(err)
+	}
+	if conn, err := net.Dial("tcp", addr); err == nil {
+		conn.Close()
+		t.Fatal("the port still listens after the inbound was disabled")
+	}
+}
