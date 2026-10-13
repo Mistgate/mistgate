@@ -132,7 +132,7 @@ const (
 type ClientFormat string
 
 const (
-	FormatURIList    ClientFormat = "uri-list"  // base64(lines of scheme:// URIs); hysteria2:// only so far.
+	FormatURIList    ClientFormat = "uri-list"  // base64(lines of scheme:// URIs); hysteria2:// and vless:// so far.
 	FormatXrayJSON   ClientFormat = "xray-json" // not rendered yet
 	FormatSingbox    ClientFormat = "singbox"   // not rendered yet
 	FormatMihomo     ClientFormat = "mihomo-yaml"
