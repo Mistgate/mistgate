@@ -547,6 +547,17 @@ func (r rpc) plan(ctx context.Context, n store.NodeRow, fix string, params map[s
 	if !cr.Ok {
 		return nil, precondition("the node cannot do this fix: " + store.Clip(cr.Error, 120))
 	}
+	if cr.Params["noop"] == "1" {
+		// Nothing to fix any more: the warning came from an older report. The node re-checks only after a real fix, so
+		// ask it for a fresh report now and let the alert follow the node instead of waiting for the next periodic run.
+		go func() {
+			rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runDoctorWait+5*time.Second)
+			defer cancel()
+			if _, err := s.fl.RunDoctor(rctx, n.ID, nil, runDoctorWait); err != nil {
+				s.log.Debug("health: doctor re-run after a no-op plan", "node", n.ID, "err", err)
+			}
+		}()
+	}
 	now := s.now()
 	id := store.NewID("pln_")
 	s.fixMu.Lock()

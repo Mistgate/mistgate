@@ -429,6 +429,32 @@ func TestRefreshUnitPlanIsDisruptive(t *testing.T) {
 	}
 }
 
+// A plan the node answers with "nothing to do" means the warning behind it is stale: the panel asks for a fresh report
+// so the alert does not wait for the next periodic run (the node re-checks by itself only after a real fix).
+func TestNoopPlanRerunsTheDoctor(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.fl.fix = func(c fixCall) (*agentv1.CommandResult, error) {
+		return &agentv1.CommandResult{Ok: true, Detail: "WARP is up", Params: map[string]string{"noop": "1"}}, nil
+	}
+	ran := make(chan string, 1)
+	e.fl.doctor = func(_ context.Context, node string, _ []string) (*agentv1.DoctorReport, error) {
+		ran <- node
+		return &agentv1.DoctorReport{}, nil
+	}
+	if _, err := (rpc{e.s}).ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "reconnect_warp", DryRun: true})); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case node := <-ran:
+		if node != "de1" {
+			t.Fatalf("doctor re-run on %q", node)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a no-op plan did not re-run the doctor")
+	}
+}
+
 func TestRefreshUnitAlertActionRequiresCapability(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
