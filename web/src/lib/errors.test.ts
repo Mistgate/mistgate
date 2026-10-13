@@ -36,6 +36,25 @@ describe("the panel's refusal codes", () => {
     expect(say("unavailable_in_edition: feature=brand_new", Code.FailedPrecondition)).toBe("Not available in the Cloudflare edition yet: brand_new."); // an id from a newer panel reads as sent
   });
 
+  it("word a refused own decoy archive, with the path it names (url-decoded)", () => {
+    expect(say("decoy_bundle_bad_path: path=assets%2F..%2Fetc%2Fjob", Code.InvalidArgument)).toBe(
+      "The archive has an unsafe path: assets/../etc/job. Paths with “..”, absolute paths, backslashes and colons are refused.",
+    );
+    expect(say("decoy_bundle_duplicate: path=about%2Findex.html", Code.InvalidArgument, "ru")).toBe("Путь повторяется, либо файл стоит на месте папки: about/index.html.");
+    expect(say("decoy_bundle_no_index", Code.InvalidArgument)).toBe(en["err.decoy_bundle_no_index"]); // no path: nothing to fill
+    expect(say("decoy_bundle_not_static", Code.InvalidArgument)).toContain("?"); // a path that did not arrive reads as a question mark, not as a hole
+    for (const r of ["empty", "bad_archive", "too_large", "too_many_files", "bad_path", "not_static", "no_index", "duplicate"]) expect(errorCodes).toContain(`decoy_bundle_${r}`);
+  });
+
+  it("word the panel's own decoy site that cannot be used", () => {
+    for (const c of ["panel_unavailable", "panel_too_large", "panel_no_index", "panel_invalid"] as const) {
+      expect(say(c, Code.FailedPrecondition)).toBe(en[`err.${c}`]);
+      expect(say(c, Code.FailedPrecondition, "ru")).toBe(ru[`err.${c}`]);
+    }
+    expect(say("own decoy bundle is not uploaded", Code.FailedPrecondition)).toBe("own decoy bundle is not uploaded"); // the server's own words stay
+    expect(say("unavailable_in_edition: feature=decoy_own", Code.FailedPrecondition, "ru")).toBe("Пока недоступно в Cloudflare-версии: Свой сайт-обманка.");
+  });
+
   it("localizes known API-token denial reasons and keeps role denial separate", () => {
     const cases = [
       ["this call is not available to API tokens", "err.apiTokenCallUnavailable"],
@@ -69,5 +88,15 @@ describe("the panel's refusal codes", () => {
     const codes = new Set([...go.matchAll(/coded\(connect\.Code\w+, "([a-z_]+)"|errors\.New\("([a-z]+(?:_[a-z]+)+)"\)/g)].map((m) => m[1] ?? m[2]!));
     expect(codes.size).toBeGreaterThan(5);
     for (const c of codes) expect(errorCodes, `no sentence for the server's code ${c}`).toContain(c);
+  });
+  it("cover every refusal of a decoy bundle and of the panel's decoy site (read from the Go source)", () => {
+    const bundle = `${process.cwd()}/../internal/decoy/bundle.go`;
+    const fleet = `${process.cwd()}/../internal/panel/fleet/decoy.go`;
+    if (!existsSync(bundle) || !existsSync(fleet)) return;
+    const reasons = [...readFileSync(bundle, "utf8").matchAll(/Reason\w+\s+= "([a-z_]+)"/g)].map((m) => `decoy_bundle_${m[1]}`);
+    const panel = [...readFileSync(fleet, "utf8").matchAll(/return "(panel_[a-z_]+)"/g)].map((m) => m[1]!);
+    expect(reasons.length).toBeGreaterThan(6);
+    expect(panel.length).toBeGreaterThan(2);
+    for (const c of [...reasons, ...panel]) expect(errorCodes, `no sentence for the server's code ${c}`).toContain(c);
   });
 });

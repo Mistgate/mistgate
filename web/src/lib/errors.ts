@@ -33,6 +33,20 @@ export const errorCodes = [
   "no_clean_port",
   // an RPC that would start work the Cloudflare edition does not run yet (internal/panel/edition), "feature=<id>"
   "unavailable_in_edition",
+  // an own decoy archive the panel refuses (InvalidArgument): "decoy_bundle_<reason>" or "decoy_bundle_<reason>: path=<entry>"
+  "decoy_bundle_empty",
+  "decoy_bundle_bad_archive",
+  "decoy_bundle_too_large",
+  "decoy_bundle_too_many_files",
+  "decoy_bundle_bad_path",
+  "decoy_bundle_not_static",
+  "decoy_bundle_no_index",
+  "decoy_bundle_duplicate",
+  // the panel's own decoy site cannot be used (FailedPrecondition); also the reason a node shows (Node.decoy_reason_code)
+  "panel_unavailable",
+  "panel_too_large",
+  "panel_no_index",
+  "panel_invalid",
 ] as const;
 
 /**
@@ -62,7 +76,8 @@ function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
   if (!errorCodes.includes(code)) return undefined;
   const vars = errorVars(c.rawMessage);
-  return t(`err.${code}`, code === "port_lossy" ? lossyVars(t, vars) : code === "unavailable_in_edition" ? editionVars(t, vars) : vars);
+  const filled = code === "port_lossy" ? lossyVars(t, vars) : code === "unavailable_in_edition" ? editionVars(t, vars) : code.startsWith("decoy_bundle_") ? { path: "?", ...vars } : vars;
+  return t(`err.${code}`, filled);
 }
 
 /** PermissionDenied messages from bearer policy have distinct causes; keep the actual role denial distinct too. */

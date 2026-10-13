@@ -24,6 +24,7 @@ import { CodeBlock } from "@/screens/integrations/parts";
 import { AwgBackendCard } from "./awg-backend";
 import { BandwidthMeasure } from "./bandwidth-measure";
 import { nodeDnsMode, nodeDnsResolvers, type NodeDnsMode } from "./dns";
+import { DecoyCard } from "./decoy";
 import { DnsOptionsCard } from "./dns-options";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
 import { WarpCard } from "./warp";
@@ -313,6 +314,8 @@ function SettingsForm({ data }: { data: Plain<GetNodeResponse> }) {
       </form>
 
       {!retired && <DnsOptionsCard nodeId={node.id} />}
+
+      {!retired && <DecoyCard node={node} />}
 
       <SSHAccessCard nodeId={node.id} />
 

@@ -50,6 +50,7 @@ import { FleetKit } from "./dev-kit-fleet";
 import { SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
 import { EdgeKit } from "./dev-kit-edge";
+import { DecoyKit } from "./dev-kit-decoy";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
 
@@ -504,6 +505,7 @@ export default function DevKit() {
       <SettingsDemos />
       <PolishKit />
       <EdgeKit />
+      <DecoyKit />
 
       <LinkModal
         target={

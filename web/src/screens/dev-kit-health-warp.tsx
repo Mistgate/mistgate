@@ -131,7 +131,7 @@ const warpCards = [
 // ---- node settings
 
 const nodeData = {
-  node: { id: "nod_w_ok", name: "de1", address: "de1.example.com", countryCode: "DE", location: "Frankfurt", provider: "ExampleHost", status: NodeStatus.ONLINE, awgBackend: "auto" },
+  node: { id: "nod_w_ok", name: "de1", address: "de1.example.com", countryCode: "DE", location: "Frankfurt", provider: "ExampleHost", status: NodeStatus.ONLINE, awgBackend: "auto", decoyMode: "builtin", decoySupported: true, decoyReasonCode: "", decoyBundleSha256: "", decoyPanelAvailable: true, decoyOwnAvailable: true, decoyAgentMode: "builtin", decoyAgentSha256: "" },
   inbounds: [],
   onlineUsers: [],
   topToday: [],

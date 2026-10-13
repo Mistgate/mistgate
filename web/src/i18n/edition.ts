@@ -2,7 +2,7 @@
 // (internal/panel/edition); the admin says so in these words instead of showing a button that does nothing. English is the
 // source of truth: `ru` is type-checked against it. The admin speaks «ты». Never rename an id: the server sends them.
 /** The feature ids MeResponse.unavailable carries (internal/panel/edition). */
-export const editionFeatures = ["backups", "telegram", "mcp", "health_checks", "agent_updates", "agent_logs", "panel_update"] as const;
+export const editionFeatures = ["backups", "telegram", "mcp", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own"] as const;
 export type EditionFeature = (typeof editionFeatures)[number];
 
 export const en = {
@@ -15,6 +15,7 @@ export const en = {
   "edition.feature.agent_updates": "Updating nodes",
   "edition.feature.agent_logs": "Node logs",
   "edition.feature.panel_update": "Updating the panel",
+  "edition.feature.decoy_own": "Own decoy site",
   // what to do instead, where there is something
   "edition.hint.mcp": "Tokens you already have are listed and can be revoked; new ones cannot be created yet.",
 };
@@ -28,5 +29,6 @@ export const ru: typeof en = {
   "edition.feature.agent_updates": "Обновление нод",
   "edition.feature.agent_logs": "Логи ноды",
   "edition.feature.panel_update": "Обновление панели",
+  "edition.feature.decoy_own": "Свой сайт-обманка",
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };
