@@ -93,6 +93,9 @@ type fleetDeviceTouchWrite struct {
 	DeviceID   string `json:"device_id"`
 	LastSeenAt int64  `json:"last_seen_at"`
 	NotAfter   int64  `json:"not_after"`
+	// OSVersion and Client are what a subscription fetch reports about its device; a node's touch leaves them out.
+	OSVersion string `json:"os_version,omitempty"`
+	Client    string `json:"client,omitempty"`
 }
 
 // IngestStats commits one StatsBatch in one read batch and one guarded write batch together with node.last_seq
@@ -415,7 +418,9 @@ func deviceTouchStmt(touches []fleetDeviceTouchWrite) (Stmt, error) {
 		return Stmt{}, err
 	}
 	return Stmt{Query: `
-		UPDATE device SET last_seen_at = CAST(json_extract(touch.value, '$.last_seen_at') AS INTEGER)
+		UPDATE device SET last_seen_at = CAST(json_extract(touch.value, '$.last_seen_at') AS INTEGER),
+			os_version = coalesce(nullif(json_extract(touch.value, '$.os_version'), ''), os_version),
+			client = coalesce(nullif(json_extract(touch.value, '$.client'), ''), client)
 		FROM json_each(?1) AS touch
 		WHERE device.id = json_extract(touch.value, '$.device_id')
 			AND device.last_seen_at < CAST(json_extract(touch.value, '$.not_after') AS INTEGER)`,

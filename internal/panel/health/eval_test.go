@@ -697,7 +697,9 @@ func TestUsersImpactedIsSupersededByProtocolChecks(t *testing.T) {
 func addHealthUser(e *env, name, status string, lastTraffic, fetched, expires time.Time) string {
 	e.t.Helper()
 	group := must(e.acc.CreateGroup(e.ctx, req(&adminv1.CreateGroupRequest{Name: name + "-group"}))).Msg.Group.Id
-	user := must(e.acc.CreateUser(e.ctx, req(&adminv1.CreateUserRequest{Name: name, GroupId: group}))).Msg.User
+	created := must(e.acc.CreateUser(e.ctx, req(&adminv1.CreateUserRequest{Name: name, GroupId: group}))).Msg
+	e.appFetch(created) // the app's first fetch makes the device whose last_seen_at the signal reads
+	user := created.User
 	trafficAt := int64(0)
 	if !lastTraffic.IsZero() {
 		trafficAt = lastTraffic.Unix()

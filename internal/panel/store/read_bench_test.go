@@ -29,7 +29,7 @@ func benchmarkSubscriptionStore(b *testing.B) (*Store, time.Time) {
 
 func warmSubscriptionBenchmark(b *testing.B, s *Store, now time.Time) {
 	b.Helper()
-	if _, err := s.Access().SubscriptionData(context.Background(), "bench-user", "bench-group", now, true, now); err != nil {
+	if _, err := s.Access().SubscriptionData(context.Background(), "bench-user", "bench-group", now, true, now, nil); err != nil {
 		b.Fatal(err)
 	}
 }
@@ -41,7 +41,7 @@ func BenchmarkSubscriptionData(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.Access().SubscriptionData(ctx, "bench-user", "bench-group", now, true, now); err != nil {
+		if _, err := s.Access().SubscriptionData(ctx, "bench-user", "bench-group", now, true, now, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -69,7 +69,7 @@ func BenchmarkSubscriptionDataContention(b *testing.B) {
 			for j := range perWorker {
 				i := worker*perWorker + j
 				began := time.Now()
-				if _, err := s.Access().SubscriptionData(ctx, "bench-user", "bench-group", now, true, now); err != nil {
+				if _, err := s.Access().SubscriptionData(ctx, "bench-user", "bench-group", now, true, now, nil); err != nil {
 					b.Errorf("SubscriptionData: %v", err)
 					return
 				}

@@ -919,8 +919,8 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if got, err := st.Access().User(ctx, "usr_user"); err != nil || got.Name != "User" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_user" {
 			t.Fatalf("user = %+v, %v", got, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true, now)
-		if err != nil || data.ImplicitDevice.ID != dev.ID || len(data.ImplicitCreds) != 1 || data.ImplicitCreds[0].ID != cred.ID {
+		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true, now, nil)
+		if err != nil || data.Device.ID != dev.ID || len(data.DeviceCreds) != 1 || data.DeviceCreds[0].ID != cred.ID {
 			t.Fatalf("user implicit credentials = %+v, %+v", data, err)
 		}
 	})
@@ -950,8 +950,8 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil || created || got.ID != "" || len(live) != 0 {
 			t.Fatalf("EnsureImplicitDevice without credentials = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		if _, err := st.Access().ImplicitDevice(ctx, dev.UserID); !errors.Is(err, ErrNotFound) {
-			t.Fatalf("implicit device after empty ensure = %v, want not found", err)
+		if data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_device", now, false, now, nil); err != nil || data.Device.ID != "" || len(data.Devices) != 0 {
+			t.Fatalf("device after empty ensure = %+v, %v, want none", data.Device, err)
 		}
 	})
 	t.Run("EnsureImplicitDeviceAddsCredentials", func(t *testing.T) {
@@ -964,7 +964,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil || !created || got.ID != dev.ID || len(live) != 1 || live[0].ID != cred.ID {
 			t.Fatalf("EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false, now)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false, now, nil)
 		if err != nil || len(data.Devices) != 1 || data.Devices[0].ID != dev.ID || len(data.Devices[0].Protocols) != 1 || data.Devices[0].Protocols[0] != cred.Protocol {
 			t.Fatalf("subscription devices after add credentials = %+v, %v", data.Devices, err)
 		}
@@ -985,7 +985,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("read batch = %q, %v", value, err)
 		}
 
-		dev := AccessDevice{ID: "dev_implicit_device_a", UserID: "usr_implicit_device", Implicit: true, CreatedAt: now, NoInitialSeen: true}
+		dev := AccessDevice{ID: "dev_implicit_device_a", UserID: "usr_implicit_device", Implicit: true, CreatedAt: now}
 		cred := AccessCred{ID: "crd_implicit_device_a", UserID: dev.UserID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`, CreatedAt: now}
 		got, live, created, err := st.Access().EnsureImplicitDevice(ctx, dev, []AccessCred{cred})
 		if err != nil || !created || got.ID != dev.ID || len(live) != 1 {
@@ -1019,6 +1019,60 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("repeat EnsureImplicitAWGCreds = %+v, %v; want one live credential and no additions", result, err)
 		}
 	})
+	t.Run("EnsureLinkDeviceByHWID", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_link_hwid", nil)
+		createUser(t, st, "usr_link_hwid", "Link HWID", "grp_link_hwid")
+		const userID = "usr_link_hwid"
+		issue := func(tag string) LinkIssue {
+			return func(deviceID string, have map[string]bool) ([]AccessCred, error) {
+				if have["hysteria2"] {
+					return nil, nil
+				}
+				return []AccessCred{{ID: "crd_link_hwid_" + tag, UserID: userID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`}}, nil
+			}
+		}
+		hashA, hashB, hashC := HWIDHash(userID, "aaaaaaaaaaaaaaaa"), HWIDHash(userID, "bbbbbbbbbbbbbbbb"), HWIDHash(userID, "cccccccccccccccc")
+		// The shared device (a NULL hash through "IS ?"), taken over by the first HWID with its credential unchanged.
+		shared, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_link_shared", UserID: userID, Implicit: true}, 0, now, issue("s"))
+		if err != nil || shared.Device.ID != "dev_link_shared" || len(shared.Added) != 1 {
+			t.Fatalf("shared device = %+v, %v", shared, err)
+		}
+		a, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_link_a", UserID: userID, HWIDHash: hashA, Platform: "ios", Client: "Happ/3"}, 2, now, issue("a"))
+		if err != nil || a.Device.ID != "dev_link_shared" || a.Device.Implicit || len(a.Added) != 0 || len(a.Creds) != 1 || a.Creds[0].ID != "crd_link_hwid_s" || a.Device.Client != "Happ/3" {
+			t.Fatalf("adoption = %+v, %v", a, err)
+		}
+		b, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_link_b", UserID: userID, HWIDHash: hashB}, 2, now, issue("b"))
+		if err != nil || b.Device.ID != "dev_link_b" || len(b.Added) != 1 {
+			t.Fatalf("second HWID = %+v, %v", b, err)
+		}
+		var limit *AccessLimitError
+		if _, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_link_c", UserID: userID, HWIDHash: hashC}, 2, now, issue("c")); !errors.As(err, &limit) || limit.Used != 2 {
+			t.Fatalf("a device over the ceiling: %v", err)
+		}
+		for hash, want := range map[string]string{string(hashA): "dev_link_shared", string(hashB): "dev_link_b", string(hashC): ""} {
+			data, err := st.Access().SubscriptionData(ctx, userID, "grp_link_hwid", now, false, now, []byte(hash))
+			if err != nil || data.Device.ID != want || len(data.Devices) != 2 {
+				t.Fatalf("SubscriptionData by hash: device %q of %d, %v; want %q", data.Device.ID, len(data.Devices), err, want)
+			}
+		}
+		if err := st.Access().TouchDevice(ctx, "dev_link_b", now.Add(2*time.Hour), now.Add(time.Hour), "18.2", "Happ/4"); err != nil {
+			t.Fatal(err)
+		}
+		signals, err := st.HealthSignals(ctx, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fetched int64
+		for _, u := range signals.Users {
+			if u.ID == userID {
+				fetched = u.SubscriptionFetchAt.Unix()
+			}
+		}
+		if fetched != now.Add(2*time.Hour).Unix() {
+			t.Fatalf("SubscriptionFetchAt = %d, want the touch of the second device %d", fetched, now.Add(2*time.Hour).Unix())
+		}
+	})
 	t.Run("RevokeDevice", func(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_revoke_device", nil)
@@ -1031,7 +1085,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if userID, err := st.Access().RevokeDevice(ctx, dev.ID, now); err != nil || userID != dev.UserID {
 			t.Fatalf("revoke = %q, %v", userID, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_revoke_device", now, false, now)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_revoke_device", now, false, now, nil)
 		if err != nil || len(data.Devices) != 0 {
 			t.Fatalf("subscription devices after revoke = %+v, %v", data.Devices, err)
 		}

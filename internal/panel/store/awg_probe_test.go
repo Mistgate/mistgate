@@ -284,7 +284,7 @@ func TestEnsureImplicitDeviceConcurrentIdempotent(t *testing.T) {
 			if i == 1 {
 				suffix, devID = "b", "dev_implicit_device_b"
 			}
-			dev := AccessDevice{ID: devID, UserID: userID, Implicit: true, CreatedAt: now, NoInitialSeen: true}
+			dev := AccessDevice{ID: devID, UserID: userID, Implicit: true, CreatedAt: now}
 			creds := []AccessCred{
 				{ID: "crd_implicit_device_" + suffix + "_hysteria", DeviceID: dev.ID, UserID: userID, Protocol: "hysteria2", SecretEnc: []byte{1}, DataJSON: `{}`, CreatedAt: now},
 				{ID: "crd_implicit_device_" + suffix + "_tuic", DeviceID: dev.ID, UserID: userID, Protocol: "tuic", SecretEnc: []byte{2}, DataJSON: `{}`, CreatedAt: now},
@@ -328,8 +328,8 @@ func TestEnsureImplicitDeviceConcurrentIdempotent(t *testing.T) {
 	if err := s.R.QueryRowContext(ctx, `SELECT first_seen_at, last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, userID).Scan(&firstSeen, &lastSeen); err != nil {
 		t.Fatal(err)
 	}
-	if firstSeen != 0 || lastSeen != 0 {
-		t.Fatalf("NoInitialSeen stored %d/%d, want 0/0", firstSeen, lastSeen)
+	if firstSeen != now.Unix() || lastSeen != now.Unix() {
+		t.Fatalf("a device made by a fetch stored %d/%d as first/last seen, want %d", firstSeen, lastSeen, now.Unix())
 	}
 }
 
@@ -493,11 +493,11 @@ func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.
 		t.Fatalf("outer call returned %+v after the concurrent call committed both profiles", result)
 	}
 
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true, now)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, live := data.ImplicitDevice, data.ImplicitCreds
+	actual, live := data.Device, data.DeviceCreds
 	if actual.ID != result.Device.ID || len(live) != 2 {
 		t.Fatalf("implicit device = %q with %d live credentials, want returned ID %q with two", actual.ID, len(live), result.Device.ID)
 	}
@@ -550,11 +550,11 @@ func TestEnsureImplicitAWGCredsReturnsFullLiveSetAfterWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true, now)
+	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, live := data.ImplicitDevice, data.ImplicitCreds
+	actual, live := data.Device, data.DeviceCreds
 	if result.Device.ID != actual.ID || !reflect.DeepEqual(result.Creds, live) {
 		t.Fatalf("returned device/credentials = %+v/%+v, database = %+v/%+v", result.Device, result.Creds, actual, live)
 	}

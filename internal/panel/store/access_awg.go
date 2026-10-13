@@ -230,7 +230,7 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 	return resultUserID, nil
 }
 
-// AWGImplicitWant asks for an AWG credential of one profile on the implicit device.
+// AWGImplicitWant asks for an AWG credential of one profile on the request's link device.
 type AWGImplicitWant struct {
 	ProfileID string
 	MaxIdx    int
@@ -269,25 +269,17 @@ func scanAWGDeviceProfile(r rowScanner) (awgDeviceProfile, error) {
 	return awgDeviceProfile{Device: device, Profile: profile}, err
 }
 
-// ImplicitAWGResult is the implicit device and its full live credential set from the read or write batch, plus the
-// credentials this call added.
-type ImplicitAWGResult struct {
-	Device       AccessDevice
-	Creds        []AccessCred
-	Added        []AccessCred
-	FullProfiles []string
-}
-
-// EnsureImplicitAWGCreds gives the user's implicit device (created with a fresh ID when none is live) an AWG
-// credential for every wanted profile that it has none for, and returns the device's full live credential set plus
-// the credentials it added. A subscription in the Mihomo format has no device identity, so every Mihomo client of the
-// user shares this one peer per profile.
-// The device limit is not checked: a subscription fetch must not fail because of it (the implicit device is one
-// per user, so the limit is exceeded by at most one).
-func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev AccessDevice, now time.Time, want []AWGImplicitWant) (ImplicitAWGResult, error) {
+// EnsureLinkAWGCreds gives the request's link device (dev.HWIDHash, nil for the shared one) an AWG credential for every
+// wanted profile that it has none for, and returns the device's full live credential set plus the credentials it added.
+// A subscription in the Mihomo format carries AmneziaWG proxies, so the device that fetches it needs a peer per profile.
+// A device that does not exist is born here, as in EnsureLinkDevice (the person with only the AmneziaVPN access and a
+// HWID-reporting Mihomo app has no other credential to be born with): taken over from the shared device, or new under the
+// ceiling (*AccessLimitError at it; 0 = none). A subscription fetch passes its own ceiling and must not fail for it.
+func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, ceiling int, now time.Time, want []AWGImplicitWant) (LinkDeviceResult, error) {
 	if len(want) == 0 {
-		return ImplicitAWGResult{}, nil
+		return LinkDeviceResult{}, nil
 	}
+	userID := dev.UserID
 	profileIDs := make([]string, 0, len(want))
 	seen := map[string]bool{}
 	for _, w := range want {
@@ -297,30 +289,27 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 	}
 	if len(profileIDs) == 0 {
-		return ImplicitAWGResult{}, nil
+		return LinkDeviceResult{}, nil
 	}
 	cutoff := unix(now.Add(-awgQuarantine))
-	var result ImplicitAWGResult
+	var result LinkDeviceResult
 	results, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
-		result = ImplicitAWGResult{}
-		var implicitRows []implicitDeviceCredRow
+		result = LinkDeviceResult{}
+		var st linkDeviceState
 		var profileEpochs []accessProfileEpoch
-		var userIDs []string
 		var taken []awgTakenIndex
 		r := reads{}
-		r.add(appendRows(&implicitRows, scanImplicitDeviceCredRow), implicitDeviceCredsSQL, userID)
+		st.add(&r, userID, dev.HWIDHash)
 		r.add(appendRows(&profileEpochs, scanAccessProfileEpoch), `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
-		r.add(appendRows(&userIDs, scanString), `SELECT id FROM user WHERE id = ?`, userID)
 		for _, profileID := range profileIDs {
 			r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
 		}
 		if err := r.run(ctx, a.s); err != nil {
 			return nil, accMapErr(err)
 		}
-		if len(userIDs) == 0 {
+		if len(st.userIDs) == 0 {
 			return nil, ErrNotFound
 		}
-		snapshot := implicitDeviceSnapshot(implicitRows)
 		epochs := make(map[string]int64, len(profileEpochs))
 		for _, profile := range profileEpochs {
 			epochs[profile.ID] = profile.Epoch
@@ -332,18 +321,20 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		for _, row := range taken {
 			occupied[row.ProfileID][row.Index] = true
 		}
-		result.Device, result.Creds = snapshot.Device, snapshot.Creds
-		deviceID := snapshot.Device.ID
+		own := linkDeviceSnapshotOf(st.own)
+		result.Device, result.Creds = own.Device, own.Creds
+		fresh := dev
+		fresh.ID = "" // the template's id may be that of a device revoked since: a new device always gets a new id
+		b, err := st.birth(fresh, ceiling, now)
+		if err != nil {
+			return nil, err
+		}
+		deviceID := b.deviceID
 		have := map[string]bool{}
-		for _, cred := range snapshot.Creds {
+		for _, cred := range b.creds {
 			if cred.ProfileID != "" {
 				have[cred.ProfileID] = true
 			}
-		}
-		if deviceID == "" {
-			dev.UserID, dev.Implicit, dev.CreatedAt = userID, true, now
-			dev.ID = NewID("dev_")
-			deviceID = dev.ID
 		}
 		var issues []awgBatchIssue
 		for _, w := range want {
@@ -368,23 +359,18 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 			occupied[w.ProfileID][idx] = true
 			have[w.ProfileID] = true
 		}
-		if len(issues) == 0 {
-			return nil, nil
+		if len(issues) == 0 && (b.exists || b.born) {
+			return nil, nil // nothing to add, and no device is born empty; an adoption still happens
 		}
-		stmts := make([]Stmt, 0, 2+len(issues)*4)
-		if snapshot.Device.ID == "" {
-			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device WHERE user_id = ? AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)`, userID))
-			stmts = append(stmts, accInsertDeviceStmt(dev))
-		} else {
-			stmts = append(stmts, guard(`EXISTS (SELECT 1 FROM device WHERE id = ? AND user_id = ? AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)`, deviceID, userID))
-		}
+		stmts := make([]Stmt, 0, len(b.stmts)+len(issues)*4+1)
+		stmts = append(stmts, b.stmts...)
 		for _, issue := range issues {
 			stmts = append(stmts, guard(`
-				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)
+				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL)
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
 				AND ?3 NOT IN (`+awgTakenSQL+`)`,
-				issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch))
+				issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch, hwidArg(dev.HWIDHash)))
 			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
 			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
@@ -393,17 +379,17 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		for i, issue := range issues {
 			result.Added[i] = issue.cred
 		}
-		stmts = append(stmts, Stmt{Query: implicitDeviceCredsSQL, Args: []any{userID}, Returning: true})
+		stmts = append(stmts, Stmt{Query: linkDeviceCredsSQL, Args: []any{userID, hwidArg(dev.HWIDHash)}, Returning: true})
 		return stmts, nil
 	})
 	if err != nil {
-		return ImplicitAWGResult{}, accMapErr(err)
+		return LinkDeviceResult{}, accMapErr(err)
 	}
 	if len(results) > 0 {
-		var snapshot implicitDeviceCredsSnapshot
+		var snapshot linkDeviceSnapshot
 		for _, row := range results[len(results)-1].Rows {
 			if err := snapshot.scan(batchRow(row)); err != nil {
-				return ImplicitAWGResult{}, err
+				return LinkDeviceResult{}, err
 			}
 		}
 		result.Device, result.Creds = snapshot.Device, snapshot.Creds

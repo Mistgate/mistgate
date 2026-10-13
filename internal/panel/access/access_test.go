@@ -121,7 +121,16 @@ func (e *env) inbound(profileID, nodeID string) *adminv1.Inbound {
 	return must(e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{ProfileId: profileID, NodeId: nodeID}))).Msg.Inbound
 }
 
+// user creates a user and lets the app that holds their link fetch it once: a user has no device until then, and most
+// of the tests are about what a device does. userBare is the user as CreateUser leaves them.
 func (e *env) user(name, groupID string, mut func(*adminv1.CreateUserRequest)) *adminv1.CreateUserResponse {
+	e.t.Helper()
+	r := e.userBare(name, groupID, mut)
+	must(e.s.Subscription(e.ctx, e.tokenOf(r.User.Id)))
+	return r
+}
+
+func (e *env) userBare(name, groupID string, mut func(*adminv1.CreateUserRequest)) *adminv1.CreateUserResponse {
 	e.t.Helper()
 	m := &adminv1.CreateUserRequest{Name: name, GroupId: groupID}
 	if mut != nil {
@@ -218,8 +227,12 @@ func TestEffectiveAccess(t *testing.T) {
 		t.Errorf("nl1 desired = %+v", ins)
 	}
 
-	// Switching Amnezia-only dave to Happ gives him access (and credentials).
+	// Switching Amnezia-only dave to Happ gives him access; his device and credentials are made when his app fetches.
 	must(e.s.UpdateUser(e.ctx, req(&adminv1.UpdateUserRequest{UserId: d.Id, Apps: &adminv1.AppToggles{Happ: true, Amnezia: true}})))
+	if f.desiredCreds()[d.Id] {
+		t.Error("dave has credentials before any app fetched")
+	}
+	must(e.s.Subscription(e.ctx, e.tokenOf(d.Id)))
 	if !f.desiredCreds()[d.Id] {
 		t.Error("dave must get access after enabling Happ")
 	}
@@ -450,7 +463,7 @@ func TestUserRules(t *testing.T) {
 	// Defaults.
 	u := r.User
 	if !u.Apps.Happ || !u.Apps.Amnezia || !u.Nodes.All || u.DeviceLimit != 5 || u.QuotaReset != adminv1.QuotaReset_QUOTA_RESET_MONTH ||
-		u.Status != adminv1.UserStatus_USER_STATUS_ACTIVE || u.DevicesUsed != 1 || u.NextResetUnix != ts("2026-10-01T00:00:00Z").Unix() {
+		u.Status != adminv1.UserStatus_USER_STATUS_ACTIVE || u.DevicesUsed != 0 || u.NextResetUnix != ts("2026-10-01T00:00:00Z").Unix() {
 		t.Errorf("defaults: %+v", u)
 	}
 	if !strings.HasPrefix(r.SubscriptionUrl, "https://sub.example.com/k3xq/") || len(r.SubscriptionUrl) != len("https://sub.example.com/k3xq/")+43 {

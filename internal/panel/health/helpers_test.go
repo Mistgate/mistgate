@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -162,6 +163,13 @@ type env struct {
 	clock *clock
 	s     *Service
 	n     int // counter for names
+}
+
+// appFetch is the fetch of the app that holds the link of a new user: it makes the user's device, which CreateUser does not.
+func (e *env) appFetch(created *adminv1.CreateUserResponse) {
+	e.t.Helper()
+	link := created.SubscriptionUrl
+	must(e.acc.Subscription(e.ctx, link[strings.LastIndex(link, "/")+1:]))
 }
 
 func newEnv(t *testing.T, mut ...func(*Config)) *env {

@@ -705,7 +705,8 @@ func TestSelfServiceIsolation(t *testing.T) {
 func TestSelfServiceLimitsAndSwitches(t *testing.T) {
 	m := newM3Rig(t)
 	h, cache := m.handler(nil)
-	id, tok := m.newUser("alice", func(c *adminv1.CreateUserRequest) { c.DeviceLimit = 3 }) // the implicit device (made by the first request) counts too
+	id, tok := m.newUser("alice", func(c *adminv1.CreateUserRequest) { c.DeviceLimit = 3 })
+	fetch(h, "/"+tok, happUA) // the device an app's first fetch makes counts too
 	c := call{h, t, tok}
 	for i := 0; i < 2; i++ {
 		if rec := c.post("/devices", m.addBody("")); rec.Code != 200 {

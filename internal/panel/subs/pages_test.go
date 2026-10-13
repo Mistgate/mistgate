@@ -333,6 +333,7 @@ func TestUserPageForBrowsers(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, tok := r.user("alice", func(m *adminv1.CreateUserRequest) { m.QuotaBytes = 5000; m.TermDays = 30 })
+	fetch(h, "/"+tok, happUA) // the device the page lists is made by an app's fetch, not by the page
 
 	rec := fetch(h, "/"+tok, chrome, "Accept-Language", "ru-RU,ru;q=0.9")
 	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {

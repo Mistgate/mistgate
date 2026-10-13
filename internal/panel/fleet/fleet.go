@@ -120,6 +120,7 @@ type Fleet struct {
 	owners                 map[string]sessionOwner // authenticated streams claim a generation before Hello
 	stuck                  map[string]stuckSeq     // node id -> the stats batch the database refused last (statsguard.go)
 	liveProjectionWarnings sync.Map                // node id -> struct{}; avoids repeating oversized projection warnings
+	sentSizeWarnings       sync.Map                // node id -> struct{}; the same for the node_sent digest
 
 	kick                 chan struct{}
 	pokeMu               sync.Mutex

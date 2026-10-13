@@ -23,7 +23,7 @@ func TestSystemCredentialInTheDesiredState(t *testing.T) {
 	e.node("de1", "hetzner", true)
 	in := e.inbound("de1", 443)
 	grp := must(e.acc.CreateGroup(e.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "g", ProfileIds: []string{profileOf(e, in)}}))).Msg.Group.Id
-	must(e.acc.CreateUser(e.ctx, connect.NewRequest(&adminv1.CreateUserRequest{Name: "alice", GroupId: grp})))
+	e.appFetch(must(e.acc.CreateUser(e.ctx, connect.NewRequest(&adminv1.CreateUserRequest{Name: "alice", GroupId: grp}))).Msg)
 
 	desired := func() []statehash.Inbound {
 		ins, err := e.acc.Desired(e.ctx, "de1")
@@ -167,6 +167,7 @@ func TestSystemCredentialNeverAppearsInUserFacingViews(t *testing.T) {
 	in := e.inbound("de1", 443)
 	grp := must(e.acc.CreateGroup(e.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "g", ProfileIds: []string{profileOf(e, in)}}))).Msg.Group.Id
 	cu := must(e.acc.CreateUser(e.ctx, connect.NewRequest(&adminv1.CreateUserRequest{Name: "alice", GroupId: grp}))).Msg
+	e.appFetch(cu)
 	uid := cu.User.Id
 
 	e.s.WithProbeCreds(e.ctx, must(toStateHashed(e))) // the credential exists now

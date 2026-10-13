@@ -666,6 +666,17 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 
 const maxFleetLiveJSONBytes = 1_500_000
 
+// maxNodeSentBytes is where the node_sent digest of a node is warned about: under D1's 2 MB per row, with the room a
+// few more devices need. On the VPS edition the row has no such limit and the warning only says how big it has grown.
+const maxNodeSentBytes = 1_500_000
+
+func (f *Fleet) warnOversizedSent(nodeID string, size int) {
+	if _, loaded := f.sentSizeWarnings.LoadOrStore(nodeID, struct{}{}); !loaded {
+		f.log.Warn("node_sent digest of the node is close to the 2 MB row limit of Cloudflare D1: fewer devices or inbounds on it",
+			"node", nodeID, "bytes", size, "warn_at", maxNodeSentBytes)
+	}
+}
+
 func (f *Fleet) warnOversizedLiveProjection(nodeID string) {
 	if _, loaded := f.liveProjectionWarnings.LoadOrStore(nodeID, struct{}{}); !loaded {
 		f.log.Warn("node live projection exceeds the row size limit; retaining the previous row", "node", nodeID)
@@ -957,7 +968,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			if err != nil {
 				return err
 			}
-			if err := c.f.st.NodeDesired(ctx, node.ID, max(node.DesiredRevision, state.HelloAppliedRevision), want.hash, raw); err != nil {
+			if err := c.storeDesired(ctx, node.ID, max(node.DesiredRevision, state.HelloAppliedRevision), want.hash, raw); err != nil {
 				return err
 			}
 			state.SentRevision = digest.Revision
@@ -997,7 +1008,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	if err != nil {
 		return err
 	}
-	if err := c.f.st.NodeDesired(ctx, node.ID, rev, want.hash, raw); err != nil {
+	if err := c.storeDesired(ctx, node.ID, rev, want.hash, raw); err != nil {
 		return err
 	}
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_DesiredState{DesiredState: ds}})
@@ -1009,6 +1020,16 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		state.FullResendPending = false
 	}
 	return nil
+}
+
+// storeDesired records the desired revision and the digest of what was sent to the node (node_sent: one row per node, a
+// fingerprint of every credential on every inbound). A device of its own for every app makes it grow with the devices, and
+// D1 refuses a row of more than 2 MB: the size is checked against maxNodeSentBytes and warned about once per node.
+func (c *SessionCore) storeDesired(ctx context.Context, nodeID string, rev uint64, hash string, raw []byte) error {
+	if len(raw) > maxNodeSentBytes {
+		c.f.warnOversizedSent(nodeID, len(raw))
+	}
+	return c.f.st.NodeDesired(ctx, nodeID, rev, hash, raw)
 }
 
 func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event SessionEvent) error {

@@ -1,19 +1,25 @@
 package access
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/mistgate/mistgate/internal/panel/protocols"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type revokeDeviceOnIssue struct {
 	protocols.Protocol
 	revoke func() error
+	once   sync.Once
 }
 
+// IssueCredential revokes the device the first time it is asked, the moment between the read and the guarded write.
 func (p *revokeDeviceOnIssue) IssueCredential(in protocols.IssueInput) (protocols.Issued, error) {
-	if err := p.revoke(); err != nil {
+	var err error
+	p.once.Do(func() { err = p.revoke() })
+	if err != nil {
 		return protocols.Issued{}, err
 	}
 	return p.Protocol.IssueCredential(in)
@@ -68,7 +74,7 @@ func TestSubscriptionRecreatesImplicitDeviceRevokedAfterRead(t *testing.T) {
 	}
 }
 
-func TestEnsureCredsDoesNotAddCredentialToDeviceRevokedAfterRead(t *testing.T) {
+func TestEnsureLinkCredsDoesNotAddCredentialToDeviceRevokedAfterRead(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
 	u := e.user("alice", f.group, amnOnly()).User
@@ -78,16 +84,17 @@ func TestEnsureCredsDoesNotAddCredentialToDeviceRevokedAfterRead(t *testing.T) {
 	e.revokeDeviceOnNextIssue(t, revokedDeviceID)
 	stored := must(e.st.Access().User(e.ctx, u.Id))
 
-	created, err := e.s.ensureCreds(e.ctx, stored, true)
-	if err != nil || !created {
-		t.Fatalf("ensureCreds after the implicit device was revoked: created=%v err=%v", created, err)
+	// The request read the empty device while it was live; it is revoked before the credentials are written.
+	got, err := e.s.ensureLinkCreds(e.ctx, stored, DeviceHint{}, requestDevice{dev: store.AccessDevice{ID: revokedDeviceID, UserID: stored.ID, Implicit: true}})
+	if err != nil || !got.added || got.dev.ID == revokedDeviceID {
+		t.Fatalf("ensureLinkCreds after the device was revoked: %+v err=%v", got, err)
 	}
 	var credentialDeviceID string
 	if err := e.st.R.QueryRowContext(e.ctx, `SELECT device_id FROM device_credential WHERE user_id = ? AND protocol = 'hysteria2' AND revoked_at IS NULL`, stored.ID).Scan(&credentialDeviceID); err != nil {
 		t.Fatal(err)
 	}
 	if credentialDeviceID == revokedDeviceID {
-		t.Fatalf("ensureCreds added a live credential to revoked device %q", revokedDeviceID)
+		t.Fatalf("ensureLinkCreds added a live credential to revoked device %q", revokedDeviceID)
 	}
 	var revoked int
 	if err := e.st.R.QueryRowContext(e.ctx, `SELECT revoked_at IS NOT NULL FROM device WHERE id = ?`, revokedDeviceID).Scan(&revoked); err != nil {

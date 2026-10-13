@@ -202,8 +202,8 @@ type tokenState struct {
 	mu       sync.Mutex
 	userName string
 
-	cached map[plugin.ClientFormat]cachedView // the data of the last fetch per view format, reused for MinInterval
-	expire *time.Timer                        // empties cached MinInterval after the last fetch (see remember)
+	cached map[viewKey]cachedView // the data of the last fetch per view format and device, reused for MinInterval
+	expire *time.Timer            // empties cached MinInterval after the last fetch (see remember)
 
 	winStart time.Time // start of the current hour; hits counts the fetches in it
 	hits     int
@@ -212,6 +212,16 @@ type tokenState struct {
 	nets     map[uint64]struct{} // keyed hashes of the networks seen today, capped
 	reported bool                // the event for this day was written
 }
+
+// viewKey says whose view a cached fetch is. A device has credentials of its own, so a view is the device's: two HWIDs
+// within MinInterval must not be served each other's keys. hwid is the canonical HWID of the request ("" for none).
+type viewKey struct {
+	format plugin.ClientFormat
+	hwid   string
+}
+
+// maxCachedViews bounds the views one token keeps: MaxPerHour fetches an hour bound it too, but that limit can be off.
+const maxCachedViews = 64
 
 // cachedView is one cached fetch.
 type cachedView struct {
@@ -296,7 +306,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// What the client gets decides which view of the user is built: the Mihomo profile needs the proxies of its
-	// own format (and gives the implicit device its AWG credentials), everything else the URI list.
+	// own format (and gives the device that fetches it its AWG credentials), everything else the URI list.
 	set := h.settings(r.Context())
 	_, sf, _ := Choose(set, r.UserAgent())
 	format := plugin.FormatURIList
@@ -306,10 +316,15 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Only an app counts as "the app received the subscription": a browser (the page, or the decoy) does not.
 	app := sf != adminv1.SubFormat_SUB_FORMAT_USER_PAGE && sf != adminv1.SubFormat_SUB_FORMAT_DECOY
+	var hint access.DeviceHint
+	if app {
+		hint = deviceHint(r) // a browser has no device to report
+	}
+	key := viewKey{format: format, hwid: hint.HWID}
 	st, known := h.tokens.Get(token)
 	admitted := false
 	if known {
-		res, retry, suspect := st.admit(h, ip, now, format, app)
+		res, retry, suspect := st.admit(h, ip, now, key, app)
 		if retry > 0 {
 			tooMany(w, retry)
 			return
@@ -324,7 +339,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		admitted = true
 	}
 
-	v, err := h.fetch(r.Context(), token, format, app, !app)
+	v, err := h.fetch(r.Context(), token, format, hint, app, !app)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
 		h.miss(r.Context(), client)
@@ -339,34 +354,35 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !admitted {
 		st = h.tokens.GetOrCreate(token, func() *tokenState { return &tokenState{} })
-		if _, retry, suspect := st.admit(h, ip, now, format, app); retry > 0 {
+		if _, retry, suspect := st.admit(h, ip, now, key, app); retry > 0 {
 			tooMany(w, retry)
 			return
 		} else if suspect != "" {
 			h.suspect(suspect)
 		}
 	}
-	st.remember(v, format, now, app, h.cfg.MinInterval)
+	st.remember(v, key, now, app, h.cfg.MinInterval)
 	h.respond(w, r, token, v, set, sf, format)
 }
 
 // fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list. touch: an app
-// asked, so the device is marked as having received the subscription (the page view and its calls do not). page: the view
-// carries the data only the page shows (the DNS of each server); an app's fetch and the checks of a call do without it.
-func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, touch, page bool) (access.SubView, error) {
+// asked, so its device is made and marked as having received the subscription (the page view and its calls write nothing).
+// device is what the app says about itself. page: the view carries the data only the page shows (the DNS of each server);
+// an app's fetch and the checks of a call do without it.
+func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, device access.DeviceHint, touch, page bool) (access.SubView, error) {
 	if h.fsrc == nil {
 		return h.src.Subscription(ctx, token)
 	}
 	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{
-		Format: format, NoTouch: !touch, NoPageData: !page,
+		Format: format, Device: device, NoTouch: !touch, NoPageData: !page,
 		IncludeEffectiveDNS: format == plugin.FormatMihomo && h.cfg.DNS != nil,
 	})
 }
 
-// remember keeps the user name and, for keep (MinInterval), the data of a fetch per view format; app: an app's fetch
-// made it. The data is dropped keep after the last fetch: it is never served later, and a token that is not fetched
+// remember keeps the user name and, for keep (MinInterval), the data of a fetch per view format and device; app: an app's
+// fetch made it. The data is dropped keep after the last fetch: it is never served later, and a token that is not fetched
 // again soon (apps refresh about hourly) would hold it, a few KB per user, for as long as the panel runs.
-func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now time.Time, app bool, keep time.Duration) {
+func (st *tokenState) remember(v access.SubView, key viewKey, now time.Time, app bool, keep time.Duration) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.userName = v.UserName
@@ -374,9 +390,12 @@ func (st *tokenState) remember(v access.SubView, format plugin.ClientFormat, now
 		return
 	}
 	if st.cached == nil {
-		st.cached = map[plugin.ClientFormat]cachedView{}
+		st.cached = map[viewKey]cachedView{}
 	}
-	st.cached[format] = cachedView{v: &v, at: now, app: app}
+	if _, replaced := st.cached[key]; !replaced && len(st.cached) >= maxCachedViews {
+		return // a flood of different HWIDs: the ones already kept stay, the rest are rendered each time
+	}
+	st.cached[key] = cachedView{v: &v, at: now, app: app}
 	if st.expire == nil {
 		st.expire = time.AfterFunc(keep, st.drop)
 	} else {
@@ -576,7 +595,7 @@ func (h *handler) missWindow() securitylimit.Window {
 // admit counts one fetch of the token: against the hourly cap (retry > 0: refused), towards the day's
 // distinct networks (suspect is the user name, non-empty once per day when the threshold is crossed), and
 // returns the cached response when it is younger than MinInterval.
-func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, format plugin.ClientFormat, app bool) (res *access.SubView, retry time.Duration, suspect string) {
+func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, key viewKey, app bool) (res *access.SubView, retry time.Duration, suspect string) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if h.cfg.MaxPerHour > 0 {
@@ -609,7 +628,7 @@ func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, format plu
 		}
 	}
 	// A view made for the page does not stand in for an app's fetch (that one must reach the device), nor the other way round (the page's data).
-	if c, ok := st.cached[format]; ok && h.cfg.MinInterval > 0 && now.Sub(c.at) < h.cfg.MinInterval && c.app == app {
+	if c, ok := st.cached[key]; ok && h.cfg.MinInterval > 0 && now.Sub(c.at) < h.cfg.MinInterval && c.app == app {
 		res = c.v
 	}
 	return res, 0, suspect

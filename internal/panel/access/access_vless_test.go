@@ -105,7 +105,7 @@ func TestVLESSSubscriptionOrderWithHysteria2AndAWG(t *testing.T) {
 	}).User
 	token := e.tokenOf(user.Id)
 	view := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{
-		Format: plugin.FormatMihomo, NoTouch: true, NoPageData: true,
+		Format: plugin.FormatMihomo, NoPageData: true,
 		Name: func(s SubServer) string { return s.Protocol },
 	}))
 	if len(view.Servers) != 3 {

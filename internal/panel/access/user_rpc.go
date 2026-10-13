@@ -177,16 +177,24 @@ func (s *Service) subscriptionURL(token string) (string, error) {
 	return base + "/" + token, nil
 }
 
-// newCreds issues a credential for every protocol the apps allow and that is not in have. A per-device protocol
-// (AWG) is skipped: its credentials are issued on request, bound to one profile (AddAWGDevice, and lazily for the
-// implicit device of a Mihomo subscription).
+// missingProtocols are the protocols the apps allow, a device gets one credential for, and that are not in have. A per-device
+// protocol (AWG) is not among them: its credentials are issued on request, bound to one profile (AddAWGDevice, and
+// lazily for the device of a Mihomo subscription).
+func (s *Service) missingProtocols(happ, amnezia bool, have map[string]bool) []protocols.Protocol {
+	var out []protocols.Protocol
+	for _, p := range s.reg.List() {
+		if !have[p.ID()] && !protocols.IsPerDevice(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia)...) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// newCreds issues a credential for every protocol missingProtocols names.
 func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map[string]bool) ([]store.AccessCred, error) {
 	var out []store.AccessCred
 	now := s.now()
-	for _, p := range s.reg.List() {
-		if have[p.ID()] || protocols.IsPerDevice(p) || !protocols.AllowedForApps(p, appsOf(happ, amnezia)...) {
-			continue
-		}
+	for _, p := range s.missingProtocols(happ, amnezia, have) {
 		iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
 		if err != nil {
 			return nil, err
@@ -198,38 +206,6 @@ func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map
 		})
 	}
 	return out, nil
-}
-
-// ensureCreds makes sure the user's implicit device exists and holds a credential for every protocol the
-// user's apps allow (one implicit device, no HWID). It reports whether anything was added.
-// The device is created only when it gets a credential: a user of the Amnezia app alone has none until an AWG
-// credential is issued, and an empty device would take a slot of the device limit.
-// Runs on create, on app-toggle change and on subscription fetch, not on registering a new plugin
-// (a fetch covers that lazily).
-// noInitialSeen leaves a device made by a no-touch page or preview at zero until an app fetch.
-func (s *Service) ensureCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool) (bool, error) {
-	a := s.st.Access()
-	dev, err := a.ImplicitDevice(ctx, u.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		dev = store.AccessDevice{}
-	} else if err != nil {
-		return false, err
-	}
-	have := make(map[string]bool, len(dev.Protocols))
-	for _, protocol := range dev.Protocols {
-		have[protocol] = true
-	}
-	now := s.now()
-	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: now, NoInitialSeen: noInitialSeen}
-	if !noInitialSeen {
-		template.FirstSeenAt, template.LastSeenAt = now, now
-	}
-	creds, err := s.newCreds(u.ID, template.ID, u.AppHapp, u.AppAmnezia, have)
-	if err != nil || len(creds) == 0 {
-		return false, err
-	}
-	_, _, created, err := a.EnsureImplicitDevice(ctx, template, creds)
-	return created, err
 }
 
 func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.CreateUserRequest]) (*connect.Response[adminv1.CreateUserResponse], error) {
@@ -287,12 +263,8 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
 	}
-	dev := store.AccessDevice{ID: store.NewID("dev_"), UserID: id, Implicit: true, CreatedAt: now}
-	creds, err := s.newCreds(id, dev.ID, happ, amnezia, nil)
-	if err != nil {
-		return nil, s.internal("issue credentials", err)
-	}
-	switch err := s.st.Access().CreateUser(ctx, u, dev, creds); {
+	// No device yet: the first app that fetches the subscription makes its own, with its own credentials.
+	switch err := s.st.Access().CreateUser(ctx, u, store.AccessDevice{}, nil); {
 	case errors.Is(err, store.ErrAccessExists):
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
@@ -600,11 +572,8 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	case err != nil:
 		return nil, s.internal("update user", err)
 	}
-	created, err := s.ensureCreds(ctx, u, false) // a newly enabled app may need credentials
-	if err != nil {
-		return nil, s.internal("issue credentials", err)
-	}
-	if created || u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia ||
+	// No credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
+	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		!u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()

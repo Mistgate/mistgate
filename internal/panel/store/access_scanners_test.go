@@ -62,7 +62,7 @@ func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(deviceOnly, wantDevice) {
 		t.Fatalf("scanAWGDevice = %#v, %v; want %#v", deviceOnly, err, wantDevice)
 	}
-	accessDevice, err := scanAccessDevice(batchRow([]any{"dev_null", "usr_null", int64(1), nil, nil, nil, nil, nil, nil, nil, nil}))
+	accessDevice, err := scanAccessDevice(batchRow([]any{"dev_null", "usr_null", int64(1), nil, nil, nil, nil, nil, nil, nil, nil, nil}))
 	if err != nil || !reflect.DeepEqual(accessDevice, AccessDevice{ID: "dev_null", UserID: "usr_null", Implicit: true}) {
 		t.Fatalf("scanAccessDevice = %#v, %v", accessDevice, err)
 	}

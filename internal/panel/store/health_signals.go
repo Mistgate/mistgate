@@ -129,10 +129,10 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 	var reads reads
 	reads.add(appendRows(&out.Users, scanHealthUserSignal), `
 		SELECT u.id AS user_id, u.name AS user_name, u.status AS user_status,
-		       u.last_seen_at AS last_traffic_at, COALESCE(d.last_seen_at, 0) AS subscription_fetch_at,
+		       u.last_seen_at AS last_traffic_at,
+		       COALESCE((SELECT max(d.last_seen_at) FROM device d WHERE d.user_id = u.id AND d.kind = 'link' AND d.revoked_at IS NULL), 0) AS subscription_fetch_at,
 		       CASE WHEN u.status = 'expired' THEN COALESCE(u.expires_at, 0) ELSE u.last_seen_at END AS access_ended_at
 		FROM user u
-		LEFT JOIN device d ON d.user_id = u.id AND d.hwid_hash IS NULL AND d.kind = 'link' AND d.revoked_at IS NULL
 		WHERE u.status IN ('active', 'expired', 'limited')`)
 	reads.add(appendRows(&out.AWGDevices, scanHealthAWGSignal), `
 		SELECT d.id AS device_id, u.id AS user_id, u.name AS user_name, u.status AS user_status,

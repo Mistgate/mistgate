@@ -60,22 +60,25 @@ func scanAccessUser(r rowScanner) (AccessUser, error) {
 }
 
 // Device kinds (device.kind). A key is an AmneziaVPN key made by AddAWGDevice; a link device is anything that takes the
-// subscription link, whatever credentials it holds (the implicit shared device, later devices that report a HWID).
+// subscription link, whatever credentials it holds (the shared device, and a device per HWID that an app reports).
 const (
 	DeviceKindLink = "link"
 	DeviceKindKey  = "key"
 )
 
-// AccessDevice is one device of a user: the implicit per-user device of subscription fetches (no HWID) or an
-// AWG device that holds its own keys.
+// AccessDevice is one device of a user: the shared device of the apps that report no HWID, a device per HWID (a link
+// device), or an AWG device that holds its own keys.
 type AccessDevice struct {
 	ID, UserID, Platform, Model, OSVersion string
+	Client                                 string // the app: first token of its User-Agent
 	Kind                                   string // DeviceKindLink or DeviceKindKey; read back by scanAccessDevice, set on insert by AWG
 	Implicit                               bool   // hwid_hash IS NULL
+	// HWIDHash is the hash of the device's HWID (HWIDHash): set for a link device that reported one, nil for the shared
+	// device. A request's device is looked up by it (EnsureLinkDevice, SubscriptionData).
+	HWIDHash []byte
 	// AWG marks a device created by AddAWGDevice: a synthetic hwid_hash (AWGHwidHash) and first/last seen 0 =
 	// "never connected" until the fleet records a handshake.
 	AWG                                bool
-	NoInitialSeen                      bool // credentials were created by a no-touch subscription view
 	FirstSeenAt, LastSeenAt, CreatedAt time.Time
 	Protocols                          []string // protocols with a live credential
 }
@@ -109,22 +112,21 @@ func accSetUserNodeStmts(userID string, nodeIDs []string) []Stmt {
 }
 
 func accInsertDeviceStmt(d AccessDevice) Stmt {
-	var hwid any // NULL: the implicit device
+	var hwid any // NULL: the shared device
 	kind := DeviceKindLink
 	seen := unix(d.CreatedAt)
-	if d.NoInitialSeen {
-		seen = 0
-	}
 	switch {
 	case d.AWG:
 		hwid, seen, kind = AWGHwidHash(d.ID), 0, DeviceKindKey
+	case len(d.HWIDHash) > 0:
+		hwid = d.HWIDHash
 	case !d.Implicit:
-		// Only tests take this branch today: a link device with a HWID of its own.
+		// Only tests take this branch: a link device with a HWID of its own.
 		hwid = []byte(d.ID)
 	}
-	return Stmt{Query: `INSERT INTO device (id, user_id, hwid_hash, kind, platform, model, os_version, first_seen_at, last_seen_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		Args: []any{d.ID, d.UserID, hwid, kind, d.Platform, d.Model, d.OSVersion, seen, seen, unix(d.CreatedAt)}}
+	return Stmt{Query: `INSERT INTO device (id, user_id, hwid_hash, kind, platform, model, os_version, client, first_seen_at, last_seen_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{d.ID, d.UserID, hwid, kind, d.Platform, d.Model, d.OSVersion, d.Client, seen, seen, unix(d.CreatedAt)}}
 }
 
 func accInsertCredStmts(creds []AccessCred) []Stmt {
@@ -159,9 +161,9 @@ func accInsertCreds(ctx context.Context, tx *sql.Tx, creds []AccessCred) error {
 	return nil
 }
 
-// CreateUser inserts a user with its node list, implicit device and credentials in one transaction. The
-// implicit device exists only to hold credentials: with none (a user of the Amnezia app only) it is not created
-// and not counted against the device limit.
+// CreateUser inserts a user with its node list and, when creds are given, a shared device holding them, in one
+// transaction. The panel gives none: a device is made by the first fetch of an app (EnsureLinkDevice), and without
+// credentials no device is made, so it is not counted against the device limit.
 // ErrAccessExists on a name (or token) clash, ErrNotFound when the group or a node does not exist.
 func (a Access) CreateUser(ctx context.Context, u AccessUser, dev AccessDevice, creds []AccessCred) error {
 	stmts := []Stmt{accInsertUserStmt(u)}
@@ -303,8 +305,10 @@ func accLike(s string) string {
 }
 
 // The grouped CTE counts each live device once and follows the Device.online rule: subscription devices follow the
-// user's online state; AmneziaWG devices follow their latest handshake. The user scope keeps the aggregate bounded
-// by the same query and group_id as the people counts.
+// user's online state (every link device of a person who is online, as GetUser lists them: the nodes report who is online,
+// not which device yet); AmneziaWG devices follow their latest handshake. A person with several link devices counts each
+// once: the join with the credentials is grouped by device. The user scope keeps the aggregate bounded by the same query
+// and group_id as the people counts.
 func accUserDeviceCountsCTE(base string) string {
 	return `live_devices AS (
 		SELECT d.id, d.user_id, d.last_seen_at,
@@ -590,14 +594,16 @@ func (a Access) UserStates(ctx context.Context, ids []string) ([]AccessUserState
 // SubscriptionData reads the independent rows a subscription view needs in one store batch. The access
 // rows are omitted for a user who is not active, because the view returns before it reads them.
 type SubscriptionData struct {
-	Up, Down       uint64
-	Devices        []AccessDevice
-	AWG            []AccessAWGDevice
-	ImplicitDevice AccessDevice
-	ImplicitCreds  []AccessCred
-	Group          AccessGroup
-	Inbounds       []AccessInboundFull
-	LiveNodes      []NodeLiveRow
+	Up, Down uint64
+	Devices  []AccessDevice
+	AWG      []AccessAWGDevice
+	// Device is "the device of this request": the live link device with the request's hwid_hash (the shared device for
+	// none) and its live credentials. The zero value: there is none (yet).
+	Device      AccessDevice
+	DeviceCreds []AccessCred
+	Group       AccessGroup
+	Inbounds    []AccessInboundFull
+	LiveNodes   []NodeLiveRow
 }
 
 type subscriptionTraffic struct{ Up, Down uint64 }
@@ -625,13 +631,13 @@ func scanSubscriptionTraffic(r rowScanner) (subscriptionTraffic, error) {
 
 func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	var d AccessDevice
-	var id, userID, kind, platform, model, osVersion, protocols sql.NullString
+	var id, userID, kind, platform, model, osVersion, client, protocols sql.NullString
 	var implicit, first, last, created sql.NullInt64
-	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &first, &last, &created, &protocols); err != nil {
+	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols); err != nil {
 		return AccessDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
-	d.Kind = kind.String
+	d.Kind, d.Client = kind.String, client.String
 	d.Implicit = implicit.Int64 == 1
 	if first.Valid && first.Int64 != 0 {
 		d.FirstSeenAt = fromUnix(first.Int64)
@@ -646,35 +652,45 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	return d, nil
 }
 
-// implicitDeviceCredsSQL reads one live implicit device and all its live credentials. Its aliases are unique so the
-// query can also be the trailing SELECT of a Returning batch.
-const implicitDeviceCredsSQL = `
+// linkDeviceCredsSQL reads one live link device of a user and all its live credentials: ?1 is the user, ?2 the device's
+// hwid_hash, NULL for the shared device (IS compares NULL too, so one statement serves both). Its aliases are unique so
+// the query can also be the trailing SELECT of a Returning batch.
+const linkDeviceCredsSQL = `
 	SELECT d.id AS device_id, d.user_id AS user_id, coalesce(d.platform, '') AS platform, coalesce(d.model, '') AS model,
-		coalesce(d.os_version, '') AS os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
+		coalesce(d.os_version, '') AS os_version, coalesce(d.client, '') AS client, d.hwid_hash IS NULL AS shared,
+		coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
 		d.created_at AS device_created_at, coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
 		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
 		coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
 	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
-	WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NULL AND d.kind = 'link'
+	WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND d.hwid_hash IS ?2 AND d.kind = 'link'
 	ORDER BY c.protocol, c.profile_id, c.id`
 
-type implicitDeviceCredsSnapshot struct {
+// hwidArg is the ?2 of linkDeviceCredsSQL: NULL, not an empty blob, for the shared device.
+func hwidArg(hash []byte) any {
+	if len(hash) == 0 {
+		return nil
+	}
+	return hash
+}
+
+type linkDeviceSnapshot struct {
 	Device AccessDevice
 	Creds  []AccessCred
 }
 
-type implicitDeviceCredRow struct {
+type linkDeviceCredRow struct {
 	Device  AccessDevice
 	Cred    AccessCred
 	HasCred bool
 }
 
-func scanImplicitDeviceCredRow(row rowScanner) (implicitDeviceCredRow, error) {
-	device, cred, hasCred, err := scanImplicitDeviceCred(row)
-	return implicitDeviceCredRow{Device: device, Cred: cred, HasCred: hasCred}, err
+func scanLinkDeviceCredRow(row rowScanner) (linkDeviceCredRow, error) {
+	device, cred, hasCred, err := scanLinkDeviceCred(row)
+	return linkDeviceCredRow{Device: device, Cred: cred, HasCred: hasCred}, err
 }
 
-func (s *implicitDeviceCredsSnapshot) add(row implicitDeviceCredRow) {
+func (s *linkDeviceSnapshot) add(row linkDeviceCredRow) {
 	if s.Device.ID == "" {
 		s.Device = row.Device
 	}
@@ -686,16 +702,16 @@ func (s *implicitDeviceCredsSnapshot) add(row implicitDeviceCredRow) {
 	}
 }
 
-func implicitDeviceSnapshot(rows []implicitDeviceCredRow) implicitDeviceCredsSnapshot {
-	var snapshot implicitDeviceCredsSnapshot
+func linkDeviceSnapshotOf(rows []linkDeviceCredRow) linkDeviceSnapshot {
+	var snapshot linkDeviceSnapshot
 	for _, row := range rows {
 		snapshot.add(row)
 	}
 	return snapshot
 }
 
-func (s *implicitDeviceCredsSnapshot) scan(row rowScanner) error {
-	value, err := scanImplicitDeviceCredRow(row)
+func (s *linkDeviceSnapshot) scan(row rowScanner) error {
+	value, err := scanLinkDeviceCredRow(row)
 	if err != nil {
 		return err
 	}
@@ -703,16 +719,17 @@ func (s *implicitDeviceCredsSnapshot) scan(row rowScanner) error {
 	return nil
 }
 
-func scanImplicitDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) {
+func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) {
 	var device AccessDevice
+	var shared bool
 	var first, last, deviceCreated, configEpoch, credCreated int64
 	var id, protocol, profile, data string
 	var secret []byte
-	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion,
+	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion, &device.Client, &shared,
 		&first, &last, &deviceCreated, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
 		return AccessDevice{}, AccessCred{}, false, err
 	}
-	device.Implicit = true
+	device.Kind, device.Implicit = DeviceKindLink, shared
 	device.FirstSeenAt, device.LastSeenAt, device.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(deviceCreated)
 	if id == "" {
 		return device, AccessCred{}, false, nil
@@ -722,18 +739,20 @@ func scanImplicitDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, err
 	return device, cred, true, nil
 }
 
-func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool, now time.Time) (SubscriptionData, error) {
+// SubscriptionData reads everything a subscription view needs in one read batch. hwidHash selects the request's own device
+// (SubscriptionData.Device): nil for an app that sends no HWID.
+func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool, now time.Time, hwidHash []byte) (SubscriptionData, error) {
 	var traffic subscriptionTraffic
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
-	var implicitRows []implicitDeviceCredRow
+	var deviceRows []linkDeviceCredRow
 	var group AccessGroup
 	var groupProfileIDs []string
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
 	r := reads{}
 	r.add(oneRow(&traffic, scanSubscriptionTraffic), `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
-	r.add(appendRows(&devices, scanAccessDevice), `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version,
+	r.add(appendRows(&devices, scanAccessDevice), `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols
 			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive+` ORDER BY d.created_at, d.id`, userID)
@@ -744,8 +763,8 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
-	// Read without access too: a denied fetch still touches the implicit device (access.subView).
-	r.add(appendRows(&implicitRows, scanImplicitDeviceCredRow), implicitDeviceCredsSQL, userID)
+	// Read without access too: a denied fetch still touches the device (access.subView).
+	r.add(appendRows(&deviceRows, scanLinkDeviceCredRow), linkDeviceCredsSQL, userID, hwidArg(hwidHash))
 	if active {
 		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
@@ -765,56 +784,13 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	if err := r.run(ctx, a.s); err != nil {
 		return SubscriptionData{}, err
 	}
-	snapshot := implicitDeviceSnapshot(implicitRows)
+	snapshot := linkDeviceSnapshotOf(deviceRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, ImplicitDevice: snapshot.Device, ImplicitCreds: snapshot.Creds}
+		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Device: snapshot.Device, DeviceCreds: snapshot.Creds}
 	if active {
 		out.Group.ProfileIDs = groupProfileIDs
 	}
 	return out, nil
-}
-
-// EnsureImplicitDevice inserts any missing live credentials on the user's one implicit device and reads back its full
-// live state. It does not create an empty implicit device.
-func (a Access) EnsureImplicitDevice(ctx context.Context, dev AccessDevice, creds []AccessCred) (AccessDevice, []AccessCred, bool, error) {
-	if len(creds) == 0 {
-		return AccessDevice{}, nil, false, nil
-	}
-	if dev.ID == "" {
-		dev.ID = NewID("dev_")
-	}
-	dev.Implicit, dev.AWG = true, false
-	deviceStmt := accInsertDeviceStmt(dev)
-	deviceStmt.Query += ` ON CONFLICT(user_id) WHERE hwid_hash IS NULL AND revoked_at IS NULL DO NOTHING`
-	stmts := []Stmt{deviceStmt}
-	for _, cred := range creds {
-		stmts = append(stmts, Stmt{Query: `INSERT INTO device_credential
-				(id, device_id, user_id, protocol, profile_id, secret_enc, data_json, config_epoch, created_at)
-			SELECT ?, d.id, ?, ?, ?, ?, ?, ?, ? FROM device d
-			WHERE d.user_id = ? AND d.hwid_hash IS NULL AND d.kind = 'link' AND d.revoked_at IS NULL
-			ON CONFLICT(device_id, protocol, COALESCE(profile_id, '')) WHERE revoked_at IS NULL DO NOTHING`,
-			Args: []any{cred.ID, dev.UserID, cred.Protocol, accNullStr(cred.ProfileID), cred.SecretEnc, cred.DataJSON,
-				cred.ConfigEpoch, unix(cred.CreatedAt), dev.UserID}})
-	}
-	stmts = append(stmts, Stmt{Query: implicitDeviceCredsSQL, Args: []any{dev.UserID}, Returning: true})
-	results, err := a.s.batch(ctx, stmts...)
-	if err != nil {
-		return AccessDevice{}, nil, false, accMapErr(err)
-	}
-	var snapshot implicitDeviceCredsSnapshot
-	for _, row := range results[len(results)-1].Rows {
-		if err := snapshot.scan(batchRow(row)); err != nil {
-			return AccessDevice{}, nil, false, err
-		}
-	}
-	if snapshot.Device.ID == "" {
-		return AccessDevice{}, nil, false, ErrNotFound
-	}
-	created := false
-	for _, result := range results[:len(results)-1] {
-		created = created || result.RowsAffected > 0
-	}
-	return snapshot.Device, snapshot.Creds, created, nil
 }
 
 // UsersProtocolsSince returns, per user, the protocols with traffic since the given time.
@@ -922,7 +898,7 @@ func (a Access) Devices(ctx context.Context, userID string) ([]AccessDevice, err
 
 func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool) ([]AccessDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.first_seen_at, d.last_seen_at, d.created_at,
+		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client, d.first_seen_at, d.last_seen_at, d.created_at,
 		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')
 		 FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND (? = 0 OR `+accDeviceLive+`) ORDER BY d.created_at, d.id`,
 		userID, accBool(withCredsOnly))
@@ -941,23 +917,10 @@ func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool) 
 	return out, rows.Err()
 }
 
-// ImplicitDevice returns the live implicit device of a user, or ErrNotFound.
-func (a Access) ImplicitDevice(ctx context.Context, userID string) (AccessDevice, error) {
-	ds, err := a.devices(ctx, userID, false) // also an empty one: a second implicit device cannot be inserted
-	if err != nil {
-		return AccessDevice{}, err
-	}
-	for _, d := range ds {
-		if d.Implicit {
-			return d, nil
-		}
-	}
-	return AccessDevice{}, ErrNotFound
-}
-
-// TouchDevice sets last_seen_at unless it is already newer than `not`: a throttle for write-on-read.
-func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time) error {
-	stmt, err := deviceTouchStmt([]fleetDeviceTouchWrite{{DeviceID: id, LastSeenAt: unix(now), NotAfter: unix(not)}})
+// TouchDevice sets last_seen_at unless it is already newer than `not`: a throttle for write-on-read. A fetch that reports
+// an OS version or a client records them too (the empty ones leave the stored values).
+func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time, osVersion, client string) error {
+	stmt, err := deviceTouchStmt([]fleetDeviceTouchWrite{{DeviceID: id, LastSeenAt: unix(now), NotAfter: unix(not), OSVersion: osVersion, Client: client}})
 	if err != nil {
 		return err
 	}

@@ -141,13 +141,16 @@ type SubAWGProfile struct {
 
 // SubOptions says how a subscription view is rendered.
 type SubOptions struct {
-	// Format of the lines; "" = FormatURIList. FormatMihomo also gives the implicit device its AWG credentials
-	// (one per usable AWG profile, made on the first fetch): a Mihomo client has no device identity, so all of the
-	// user's Mihomo clients share them.
+	// Format of the lines; "" = FormatURIList. FormatMihomo also gives the request's device its AWG credentials (one per
+	// usable AWG profile, made on the first fetch).
 	Format plugin.ClientFormat
+	// Device is what the request says about its device (its HWID above all). With a HWID the app gets a device of its own, with
+	// credentials of its own; without one, or when the user has no room for another device, the shared device of the user.
+	Device DeviceHint
 	// Name is the server name a Mihomo proxy carries; nil = "<node> · <profile>".
 	Name func(SubServer) string
-	// NoTouch: the view is for the page, not for an app, so it does not mark the implicit device as having fetched the subscription.
+	// NoTouch: the view is for the page, not for an app, so it writes nothing: no device, no credentials, no mark that the
+	// subscription was fetched. A server the person has no credentials for yet is shown with a throwaway secret.
 	NoTouch bool
 	// NoPageData: the view is for an app, so it leaves out what only the user page shows (the DNS of each node, the
 	// presets they name, the keys that hold an older DNS) and does not read it.
@@ -157,8 +160,8 @@ type SubOptions struct {
 }
 
 // Subscription resolves a token. The lookup is by sha256(token), so the comparison never sees the token
-// itself. For an active user it makes sure the implicit device holds its credentials (created on first
-// fetch if missing, e.g. after a revoke) and renders one line per usable inbound.
+// itself. For an active user it makes sure the request's device holds its credentials (the device is created on the first
+// fetch of an app, e.g. after a revoke) and renders one line per usable inbound.
 func (s *Service) Subscription(ctx context.Context, token string) (SubView, error) {
 	return s.SubscriptionWith(ctx, token, SubOptions{})
 }
@@ -187,7 +190,7 @@ func (s *Service) SubscriptionWith(ctx context.Context, token string, opt SubOpt
 }
 
 // PreviewSubscription is Subscription for the admin's preview of the user page: it looks the user up by id
-// (ErrUnknownToken when there is none), does not record a fetch on the device, and also returns the
+// (ErrUnknownToken when there is none), writes nothing, and also returns the
 // subscription link ("" when the panel has no public address configured).
 func (s *Service) PreviewSubscription(ctx context.Context, userID string) (SubView, string, error) {
 	u, err := s.st.Access().User(ctx, userID)
@@ -267,7 +270,13 @@ func compareSubscriptionInbounds(a, b store.AccessInboundFull) int {
 	return strings.Compare(a.Inbound.ID, b.Inbound.ID)
 }
 
-// subView builds the view of one user; touch records the fetch on the implicit device (real fetches only).
+// linkDeviceCeiling is how many live devices a user may have before the HWID of one more app is no longer given a device of
+// its own: twice the limit. The limit itself is only counted at this step (the mode that refuses comes later); the ceiling
+// is what a client that sends a new HWID with every request runs into.
+func linkDeviceCeiling(limit int) int { return 2 * limit }
+
+// subView builds the view of one user; touch is an app's fetch: it makes the request's device and its credentials and
+// records the fetch on the device. The page and the preview (touch false) write nothing.
 func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, opt SubOptions) (SubView, error) {
 	a := s.st.Access()
 	now := s.now()
@@ -281,7 +290,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia,
 	}
-	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive, now)
+	var hash []byte // the request's device: its HWID, hashed with the user; nil = the shared device
+	if opt.Device.HWID != "" {
+		hash = store.HWIDHash(u.ID, opt.Device.HWID)
+	}
+	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive, now, hash)
 	if err != nil {
 		return SubView{}, err
 	}
@@ -304,7 +317,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		awgByID[d.ID] = d
 	}
 	for _, d := range devs {
-		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, LastSeen: d.LastSeenAt, Online: d.Implicit && userOnline}
+		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && userOnline}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
 				if happ, amnezia, _ := clientApps(p); happ {
@@ -328,39 +341,54 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	v.DevicesUsed = len(devs)
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
-		if dev := data.ImplicitDevice; touch && dev.ID != "" && now.Sub(dev.LastSeenAt) >= deviceTouchEvery {
-			s.touchDevice(dev.ID, now)
+		if touch {
+			dev, m := data.Device, opt.Device.meta()
+			if dev.ID == "" && hash != nil {
+				// An app that reports a HWID no device is known by (and none is made for a person without access): the shared
+				// device stands for it, without taking the app's details.
+				dev, m = sharedDevice(data.Devices), deviceMeta{}
+			}
+			if dev.ID != "" && now.Sub(dev.LastSeenAt) >= deviceTouchEvery {
+				s.touchDevice(dev.ID, now, m)
+			}
 		}
 		return v, nil
 	}
 
-	created, dev, creds, err := s.ensureSubscriptionCreds(ctx, u, !touch, data.ImplicitDevice, data.ImplicitCreds)
-	if err != nil {
-		return SubView{}, err
-	}
+	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
 	g, full := data.Group, data.Inbounds
-	if opt.Format == plugin.FormatMihomo {
-		var added bool
-		dev, creds, added = s.ensureMihomoAWG(ctx, u, g, full, dev, creds)
-		if added {
-			created = true
+	if touch {
+		if rd, err = s.ensureLinkCreds(ctx, u, opt.Device, rd); err != nil {
+			return SubView{}, err
 		}
-	}
-	if created {
-		s.notify.StateChanged()
-	}
-	if dev.ID != "" {
-		if touch && now.Sub(dev.LastSeenAt) >= deviceTouchEvery {
-			s.touchDevice(dev.ID, now)
+		if opt.Format == plugin.FormatMihomo {
+			rd = s.ensureMihomoAWG(ctx, u, g, full, opt.Device, rd)
+		}
+		if rd.added {
+			s.notify.StateChanged()
+		}
+		if rd.dev.ID != "" && now.Sub(rd.dev.LastSeenAt) >= deviceTouchEvery {
+			m := opt.Device.meta()
+			if rd.hash == nil && opt.Device.HWID != "" {
+				m.OSVersion = "" // the app took the shared place: its OS is not the place's
+			}
+			s.touchDevice(rd.dev.ID, now, m)
 		}
 	}
 	secrets := map[string]string{}
-	for _, c := range creds {
+	for _, c := range rd.creds {
 		pt, err := s.vault.Open(c.SecretEnc, c.ID)
 		if err != nil {
 			return SubView{}, err
 		}
 		secrets[credKey(c.Protocol, c.ProfileID)] = string(pt)
+	}
+	if !touch {
+		// The page lists the person's servers, which it renders from a secret: a person with no device yet gets throwaway ones,
+		// issued for nobody and never stored (this view is not an app's, see cachedView.app).
+		if err := s.placeholderSecrets(u, rd.dev.Protocols, secrets); err != nil {
+			return SubView{}, err
+		}
 	}
 
 	format := opt.Format
@@ -450,7 +478,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		in := protocols.RenderInput{
 			Format: format, Settings: merged, Inbound: inboundView(nodeView(f.Node), spec, f.Inbound.CertPinSHA256),
-			UserID: u.ID, UserName: u.Name, DeviceID: dev.ID, Secret: secret,
+			UserID: u.ID, UserName: u.Name, DeviceID: rd.dev.ID, Secret: secret,
 			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON),
 		}
 		if protocols.IsPerDevice(proto) {
@@ -504,25 +532,76 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	return v, nil
 }
 
-func (s *Service) ensureSubscriptionCreds(ctx context.Context, u store.AccessUser, noInitialSeen bool, dev store.AccessDevice, creds []store.AccessCred) (bool, store.AccessDevice, []store.AccessCred, error) {
-	newDevice := dev.ID == ""
-	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, Implicit: true, CreatedAt: s.now(), NoInitialSeen: noInitialSeen}
-	if !noInitialSeen {
-		template.FirstSeenAt, template.LastSeenAt = template.CreatedAt, template.CreatedAt
+// requestDevice is the device a subscription request is served from, with its live credentials. hash is the one it is looked
+// up by (nil: the shared device). added: credentials were issued for it in this request, which the nodes must hear about.
+type requestDevice struct {
+	dev   store.AccessDevice
+	creds []store.AccessCred
+	hash  []byte
+	added bool
+}
+
+// sharedDevice is the shared device among the user's devices, or none.
+func sharedDevice(devs []store.AccessDevice) store.AccessDevice {
+	for _, d := range devs {
+		if d.Implicit && d.Kind == store.DeviceKindLink {
+			return d
+		}
 	}
-	have := make(map[string]bool, len(creds))
-	for _, protocol := range dev.Protocols {
+	return store.AccessDevice{}
+}
+
+// ensureLinkCreds makes the request's device hold a credential for every protocol the user's apps allow. A device that
+// has them all costs nothing (this is the path of every fetch of a known device). Otherwise one store call fills it in,
+// takes the shared device over for the first HWID of the user, or creates the device. A user with twice the limit in live
+// devices already gets no device for one more HWID: that app takes the shared place, as an app without a HWID does.
+func (s *Service) ensureLinkCreds(ctx context.Context, u store.AccessUser, hint DeviceHint, rd requestDevice) (requestDevice, error) {
+	have := make(map[string]bool, len(rd.dev.Protocols))
+	for _, protocol := range rd.dev.Protocols {
 		have[protocol] = true
 	}
-	added, err := s.newCreds(u.ID, template.ID, u.AppHapp, u.AppAmnezia, have)
-	if err != nil || len(added) == 0 {
-		if newDevice {
-			return false, store.AccessDevice{}, nil, err
-		}
-		return false, dev, creds, err
+	if len(s.missingProtocols(u.AppHapp, u.AppAmnezia, have)) == 0 {
+		return rd, nil // a user of the Amnezia app alone has none to give, and no device is made for nothing
 	}
-	device, live, created, err := s.st.Access().EnsureImplicitDevice(ctx, template, added)
-	return created, device, live, err
+	m := hint.meta()
+	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, HWIDHash: rd.hash, Implicit: rd.hash == nil,
+		Platform: m.Platform, Model: m.Model, OSVersion: m.OSVersion, Client: m.Client}
+	ceiling := 0
+	if rd.hash != nil {
+		ceiling = linkDeviceCeiling(u.DeviceLimit)
+	}
+	res, err := s.st.Access().EnsureLinkDevice(ctx, template, ceiling, s.now(), func(deviceID string, have map[string]bool) ([]store.AccessCred, error) {
+		return s.newCreds(u.ID, deviceID, u.AppHapp, u.AppAmnezia, have)
+	})
+	var limit *store.AccessLimitError
+	if errors.As(err, &limit) {
+		hint.HWID = ""
+		return s.ensureLinkCreds(ctx, u, hint, requestDevice{})
+	}
+	if err != nil {
+		return rd, err
+	}
+	if res.Device.ID == "" {
+		return rd, nil
+	}
+	return requestDevice{dev: res.Device, creds: res.Creds, hash: rd.hash, added: len(res.Added) > 0}, nil
+}
+
+// placeholderSecrets fills secrets with a throwaway one for every protocol the user's apps allow and that has none: what the
+// user page needs to list a server for a person whose device does not exist yet. Per-device protocols have none.
+func (s *Service) placeholderSecrets(u store.AccessUser, protocolsHeld []string, secrets map[string]string) error {
+	have := make(map[string]bool, len(protocolsHeld))
+	for _, protocol := range protocolsHeld {
+		have[protocol] = true
+	}
+	for _, p := range s.missingProtocols(u.AppHapp, u.AppAmnezia, have) {
+		iss, err := p.IssueCredential(protocols.IssueInput{UserID: u.ID})
+		if err != nil {
+			return err
+		}
+		secrets[p.ID()] = iss.Secret
+	}
+	return nil
 }
 
 // awgMinClients are the minimum client versions of an AWG profile, from its settings without secrets (the
@@ -535,13 +614,19 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 	return protocols.MinClientsOf(p, json.RawMessage(settings))
 }
 
-// ensureMihomoAWG gives the implicit device an AWG credential for every AWG profile the user can use, for the
-// Mihomo format (see SubOptions). It reports whether any was added. A full profile network is logged and only that
-// profile's proxy is skipped; the subscription itself must not fail for it.
-func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, dev store.AccessDevice, creds []store.AccessCred) (store.AccessDevice, []store.AccessCred, bool) {
+// ensureMihomoAWG gives the request's device an AWG credential for every AWG profile the user can use, for the Mihomo
+// format (see SubOptions). added reports whether any was made. A full profile network is logged and only that profile's
+// proxy is skipped; the subscription itself must not fail for it, nor for the ceiling of devices (the shared device then).
+func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, hint DeviceHint, rd requestDevice) requestDevice {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
-		return dev, creds, false
+		return rd
+	}
+	m := hint.meta()
+	template := store.AccessDevice{ID: rd.dev.ID, UserID: u.ID, HWIDHash: rd.hash, Implicit: rd.hash == nil,
+		Platform: m.Platform, Model: m.Model, OSVersion: m.OSVersion, Client: m.Client}
+	if template.ID == "" {
+		template.ID = store.NewID("dev_")
 	}
 	var want []store.AWGImplicitWant
 	seen := map[string]bool{}
@@ -563,21 +648,34 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		want = append(want, store.AWGImplicitWant{
 			ProfileID: f.Profile.ID,
 			MaxIdx:    maxIdx,
-			Issue:     s.awgIssuer(proto, u.ID, dev.ID, f.Profile.ID, merged),
+			Issue:     s.awgIssuer(proto, u.ID, template.ID, f.Profile.ID, merged),
 		})
 	}
 	if len(want) == 0 {
-		return dev, creds, false
+		return rd
 	}
-	result, err := s.st.Access().EnsureImplicitAWGCreds(ctx, u.ID, dev, s.now(), want)
+	ceiling := 0
+	if rd.hash != nil {
+		ceiling = linkDeviceCeiling(u.DeviceLimit)
+	}
+	result, err := s.st.Access().EnsureLinkAWGCreds(ctx, template, ceiling, s.now(), want)
+	var limit *store.AccessLimitError
+	if errors.As(err, &limit) {
+		// No device of its own for this HWID: the shared device holds the proxies, as for an app without a HWID.
+		hint.HWID = ""
+		return s.ensureMihomoAWG(ctx, u, g, full, hint, requestDevice{added: rd.added})
+	}
 	if err != nil {
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
-		return dev, creds, false
+		return rd
 	}
 	for _, profileID := range result.FullProfiles {
 		s.log.Warn("access: AWG profile network is full for a Mihomo subscription", "user", u.ID, "profile", profileID, "err", store.ErrAccessSubnetFull)
 	}
-	return result.Device, result.Creds, len(result.Added) > 0
+	if result.Device.ID == "" {
+		return rd
+	}
+	return requestDevice{dev: result.Device, creds: result.Creds, hash: rd.hash, added: rd.added || len(result.Added) > 0}
 }
 
 // deviceTouchEvery is how stale a device's last_seen_at must be before a subscription fetch refreshes it.
@@ -588,7 +686,7 @@ const deviceTouchEvery = time.Hour
 // single writer connection that stats ingestion and the admin share. Only a stale last_seen_at (decided from the
 // row the fetch already read) gets here, so a device is written about once an hour; a busy writer delays only
 // this goroutine, never the response.
-func (s *Service) touchDevice(id string, now time.Time) {
+func (s *Service) touchDevice(id string, now time.Time, m deviceMeta) {
 	if _, busy := s.touching.LoadOrStore(id, struct{}{}); busy {
 		return
 	}
@@ -605,7 +703,7 @@ func (s *Service) touchDevice(id string, now time.Time) {
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := s.st.Access().TouchDevice(ctx, id, now, now.Add(-deviceTouchEvery)); err != nil {
+		if err := s.st.Access().TouchDevice(ctx, id, now, now.Add(-deviceTouchEvery), m.OSVersion, m.Client); err != nil {
 			s.log.Warn("access: cannot record subscription fetch", "err", err)
 		}
 	})

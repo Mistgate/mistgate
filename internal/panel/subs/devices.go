@@ -378,7 +378,7 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 	if checker, ok := h.src.(TokenChecker); ok {
 		err = checker.CheckSubscriptionToken(ctx, token)
 	} else {
-		_, err = h.fetch(ctx, token, plugin.FormatURIList, false, false)
+		_, err = h.fetch(ctx, token, plugin.FormatURIList, access.DeviceHint{}, false, false)
 	}
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token)
@@ -451,7 +451,7 @@ func tooManyWrites(w http.ResponseWriter, retry time.Duration) {
 // the fetch budget. page: the view carries the page's own data (the DNS of each server), which the answer of a DNS pick
 // needs; the checks of a call do without it.
 func (h *handler) identify(ctx context.Context, token string, page bool) (access.SubView, *tokenState, error) {
-	v, err := h.fetch(ctx, token, plugin.FormatURIList, false, page) // the page asks, not an app
+	v, err := h.fetch(ctx, token, plugin.FormatURIList, access.DeviceHint{}, false, page) // the page asks, not an app
 	if err != nil {
 		return access.SubView{}, nil, err
 	}

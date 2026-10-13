@@ -40,7 +40,7 @@ func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	}
 	e.sql(`UPDATE node_live SET users = ? WHERE node_id = ?`, string(users), f.nodeID)
 	user := must(e.st.Access().User(e.ctx, created.Id))
-	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.GroupID, user.PeriodStart, true, e.clock)
+	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.GroupID, user.PeriodStart, true, e.clock, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

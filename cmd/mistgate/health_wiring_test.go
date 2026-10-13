@@ -119,8 +119,13 @@ func TestHealthWiring(t *testing.T) {
 	if code, body = call("owner", "GroupService", "CreateGroup", `{"name":"g","profileIds":["`+prof.Profile.ID+`"]}`); code != 200 || json.Unmarshal([]byte(body), &grp) != nil {
 		t.Fatalf("CreateGroup: %d %s", code, body)
 	}
-	if code, body = call("owner", "UserService", "CreateUser", `{"name":"alice","groupId":"`+grp.Group.ID+`"}`); code != 200 {
+	var created struct{ SubscriptionURL string }
+	if code, body = call("owner", "UserService", "CreateUser", `{"name":"alice","groupId":"`+grp.Group.ID+`"}`); code != 200 || json.Unmarshal([]byte(body), &created) != nil {
 		t.Fatalf("CreateUser: %d %s", code, body)
+	}
+	// The user's device, and with it the credential, is made by the first fetch of an app.
+	if _, err := p.access.Subscription(ctx, created.SubscriptionURL[strings.LastIndex(created.SubscriptionURL, "/")+1:]); err != nil {
+		t.Fatalf("the app's first fetch: %v", err)
 	}
 	want, err := p.access.Desired(ctx, node.Node.ID)
 	if err != nil || len(want) != 1 || len(want[0].Creds) != 1 {

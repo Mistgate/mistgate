@@ -60,43 +60,40 @@ func TestPageViewAndCallsDoNotTouchTheDevice(t *testing.T) {
 	}
 }
 
-func TestPageRecreatesImplicitDeviceWithoutClaimingFetch(t *testing.T) {
+// The page makes no device: a person whose app has not fetched yet has none, however often the page is opened, and the page
+// still lists their servers. The first fetch of an app makes the device and marks it fetched.
+func TestPageNeverCreatesADevice(t *testing.T) {
 	r := newRig(t, "/k3xq8")
 	h, _ := r.handler(func(c *subs.Config) { c.MinInterval = -1 })
 	uid, tok := r.user("alice", nil)
 	touches := make(chan bool, 2)
 	r.svc.SetTouchHookForTest(func(started bool) { touches <- started })
-	if _, err := r.st.W.Exec(`UPDATE device SET revoked_at = 1 WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, uid); err != nil {
-		t.Fatal(err)
+	count := func(q string) (n int) {
+		if err := r.st.R.QueryRow(q, uid).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
 	}
 
-	first, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
-	if len(arr(first["devices"])) != 0 {
-		t.Fatalf("the page claims a fetch for the device it just recreated: %v", first["devices"])
-	}
-	var seen int64
-	if err := r.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, uid).Scan(&seen); err != nil {
-		t.Fatal(err)
-	}
-	if seen != 0 {
-		t.Fatalf("page-created implicit device last_seen_at = %d, want 0", seen)
-	}
-
-	second, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
-	devices := arr(second["devices"])
-	if len(devices) != 1 || obj(devices[0])["last_seen_unix"] != float64(0) {
-		t.Fatalf("the page does not represent the never-seen device as zero: %v", devices)
+	for i := 0; i < 2; i++ {
+		d, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+		if len(arr(d["devices"])) != 0 || d["server_count"] != float64(1) {
+			t.Fatalf("page %d: devices %v, servers %v; want none and the person's one server", i, d["devices"], d["server_count"])
+		}
+		if n := count(`SELECT count(*) FROM device WHERE user_id = ?`); n != 0 {
+			t.Fatalf("page %d made %d devices", i, n)
+		}
 	}
 	assertNoTouchStarted(t, touches)
 
 	fetch(h, "/"+tok, happUA)
-	waitTouchEvent(t, touches, true)
-	waitTouchEvent(t, touches, false)
-	if err := r.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, uid).Scan(&seen); err != nil {
-		t.Fatal(err)
+	var seen int64
+	if err := r.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL`, uid).Scan(&seen); err != nil || seen == 0 {
+		t.Fatalf("the app's fetch left the shared device at last_seen_at %d: %v", seen, err)
 	}
-	if seen == 0 {
-		t.Fatal("an app fetch did not touch the recreated device")
+	second, _ := pageData(t, fetch(h, "/"+tok, chrome).Body.String())
+	if devices := arr(second["devices"]); len(devices) != 1 || obj(devices[0])["last_seen_unix"] != float64(seen) {
+		t.Fatalf("the page after the app's fetch: %v", second["devices"])
 	}
 }
 
