@@ -105,6 +105,10 @@ type pageData struct {
 	Apps            []pageApp    `json:"apps"`
 	Access          pageAccess   `json:"access"`
 	Devices         []pageDevice `json:"devices"`
+	// DevicesEndpoint is where the page removes and renames the devices of its person: POST <it>/<device id>/revoke and
+	// /rename {"label"} (the calls the Amnezia section makes, now for every device the person may change; see pageDevice.CanRemove).
+	// "" in the admin's preview, which cannot write, and when the owner switched self-service off.
+	DevicesEndpoint string       `json:"devices_endpoint"`
 	Amnezia         *pageAmnezia `json:"amnezia"` // null unless the user has the Amnezia app and a usable AWG profile (or keys to remove)
 	// Servers are the person's servers, one per node; DNS and DNSPresets are the choice of DNS for each of them.
 	Servers    []pageNode      `json:"servers"`
@@ -169,6 +173,12 @@ type pageDevice struct {
 	App          string `json:"app"`
 	LastSeenUnix int64  `json:"last_seen_unix"`
 	Online       bool   `json:"online"`
+	// Kind is "link" (an app that reports a device ID), "shared" (the common place of the apps that report none) or "key" (an
+	// AmneziaVPN key). CanRemove and CanRename: the person may remove or rename it here, which is every device but the shared
+	// place, while the owner allows self-service and the page can write (see DevicesEndpoint).
+	Kind      string `json:"kind"`
+	CanRemove bool   `json:"can_remove"`
+	CanRename bool   `json:"can_rename"`
 }
 
 var platformName = map[adminv1.Platform]string{
@@ -214,8 +224,13 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 			AddURL: addURL(a.AddLinkTemplate, link, title), Description: a.Description, Recommended: a.Recommended,
 		})
 	}
+	if subsettings.SelfService(set) && !preview && link != "" {
+		d.DevicesEndpoint = link + "/devices"
+	}
 	for _, dv := range v.Devices {
-		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online})
+		own := d.DevicesEndpoint != "" && dv.Kind != "shared"
+		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online,
+			Kind: dv.Kind, CanRemove: own, CanRename: own})
 	}
 	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
 	d.Servers = pageServers(v, set, lang)

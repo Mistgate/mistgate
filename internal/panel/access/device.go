@@ -272,7 +272,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 		if eventErr := s.st.RecordDeviceLimitReached(ctx, u.ID, limit.Used, limit.Limit, now); eventErr != nil {
 			s.log.Warn("access: device limit event", "user", u.ID, "err", eventErr)
 		}
-		return store.AccessAWGDevice{}, nil, failed("device_limit: %d/%d", limit.Used, limit.Limit)
+		return store.AccessAWGDevice{}, nil, failed("device_limit: %d/%d%s", limit.Used, limit.Limit, s.limitDevices(ctx, u.ID))
 	case errors.Is(err, store.ErrAccessSubnetFull):
 		return store.AccessAWGDevice{}, nil, failed("subnet_full")
 	case errors.Is(err, store.ErrNotFound):
@@ -289,6 +289,36 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	// Created at the profile's current epoch: the configs below are the current ones.
 	cfgs, err := s.renderDeviceConfigs(ctx, &deviceScope{user: u, group: g, dev: dev, profile: p, proto: proto, merged: merged, ins: ins}, false, true)
 	return dev, cfgs, err
+}
+
+// limitDevices says which devices fill a limit, for the message of the device_limit error: ": iPhone 15, Pixel 9, shared"
+// (the label of each device, the apps and the keys alike, "shared" for the common place; at most six, then "…"), or "" when
+// they cannot be read. It is the detail the admin's text puts in brackets, so it holds names and no words of a language.
+func (s *Service) limitDevices(ctx context.Context, userID string) string {
+	devs, err := s.st.Access().Devices(ctx, userID)
+	if err != nil || len(devs) == 0 {
+		return ""
+	}
+	const shown = 6
+	names := make([]string, 0, shown+1)
+	for _, d := range devs {
+		if len(names) == shown {
+			names = append(names, "…")
+			break
+		}
+		name := cleanHeader(d.Model, 24)
+		switch {
+		case d.Implicit && d.Kind == store.DeviceKindLink:
+			name = "shared"
+		case name == "":
+			name = d.Platform
+		}
+		if name == "" {
+			name = "?"
+		}
+		names = append(names, name)
+	}
+	return ": " + strings.Join(names, ", ")
 }
 
 // DeviceConfigs renders the configs of a device for every usable node and marks the device as having received the
@@ -333,8 +363,36 @@ func (s *Service) RotateDevice(ctx context.Context, by, owner, deviceID string) 
 	return sc.dev, cfgs, err
 }
 
+// ownDevice finds a live device that a person (owner != "") or the admin (owner "") may remove or rename: an AmneziaVPN key or
+// a device of an app that reports a device ID. The shared device is the place of every app that reports none, no one's
+// device: FailedPrecondition shared_device. Anyone else's device is "not found". A key comes with its AWG row (nil for a
+// link device).
+func (s *Service) ownDevice(ctx context.Context, owner, deviceID string) (store.AccessDevice, *store.AccessAWGDevice, error) {
+	a := s.st.Access()
+	dev, err := a.Device(ctx, deviceID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && owner != "" && dev.UserID != owner) {
+		return store.AccessDevice{}, nil, notFound("device")
+	} else if err != nil {
+		return store.AccessDevice{}, nil, s.internal("get device", err)
+	}
+	if dev.Kind == store.DeviceKindLink && dev.Implicit {
+		return store.AccessDevice{}, nil, failed("shared_device")
+	}
+	if dev.Kind != store.DeviceKindKey {
+		return dev, nil, nil
+	}
+	ad, err := a.AWGDevice(ctx, deviceID)
+	if errors.Is(err, store.ErrNotFound) {
+		return store.AccessDevice{}, nil, notFound("device")
+	} else if err != nil {
+		return store.AccessDevice{}, nil, s.internal("get device", err)
+	}
+	return dev, &ad, nil
+}
+
 // RelabelDevice changes the label of a device (device.model) and returns it (without DNSStale: the page keeps what it
-// knows about that).
+// knows about that). Any device of the person but the shared one: a key or the device of an app (see ownDevice); the
+// result of a link device is an AccessAWGDevice without AWG data (AWG false).
 func (s *Service) RelabelDevice(ctx context.Context, owner, deviceID, label string) (store.AccessAWGDevice, error) {
 	_, label, err := cleanDeviceInput("", label, false)
 	if err != nil {
@@ -343,39 +401,43 @@ func (s *Service) RelabelDevice(ctx context.Context, owner, deviceID, label stri
 	if label == "" {
 		return store.AccessAWGDevice{}, invalid("label must not be empty")
 	}
-	a := s.st.Access()
-	dev, err := a.AWGDevice(ctx, deviceID)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && owner != "" && dev.UserID != owner) {
-		return store.AccessAWGDevice{}, notFound("device")
-	} else if err != nil {
-		return store.AccessAWGDevice{}, s.internal("get device", err)
+	dev, awgDev, err := s.ownDevice(ctx, owner, deviceID)
+	if err != nil {
+		return store.AccessAWGDevice{}, err
 	}
-	if err := a.RenameDevice(ctx, deviceID, label); errors.Is(err, store.ErrNotFound) {
+	if err := s.st.Access().RenameDevice(ctx, deviceID, label); errors.Is(err, store.ErrNotFound) {
 		return store.AccessAWGDevice{}, notFound("device")
 	} else if err != nil {
 		return store.AccessAWGDevice{}, s.internal("rename device", err)
 	}
-	dev.Model = label
-	return dev, nil
+	if awgDev == nil {
+		dev.Model = label
+		return store.AccessAWGDevice{AccessDevice: dev}, nil
+	}
+	awgDev.Model = label
+	return *awgDev, nil
 }
 
-// RevokeOwnDevice revokes an AWG device of the given user (the public page's "remove"); a device of someone else
-// is "not found". The peer leaves the nodes with the next desired state, which ends its sessions.
+// RevokeOwnDevice revokes a device of the given user (the public page's "remove"): an AmneziaVPN key or the device of an app
+// that reports a device ID, not the shared device (see ownDevice). A device of someone else is "not found". Its credentials
+// leave the nodes with the next desired state, which ends its sessions. The same app can register again as a new device
+// (this is no block) if the user has room for it.
 func (s *Service) RevokeOwnDevice(ctx context.Context, by, owner, deviceID string) error {
-	a := s.st.Access()
-	dev, err := a.AWGDevice(ctx, deviceID)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && dev.UserID != owner) {
-		return notFound("device")
-	} else if err != nil {
-		return s.internal("get device", err)
+	dev, awgDev, err := s.ownDevice(ctx, owner, deviceID)
+	if err != nil {
+		return err
 	}
-	if _, err := a.RevokeDevice(ctx, deviceID, s.now()); errors.Is(err, store.ErrNotFound) {
+	if _, err := s.st.Access().RevokeDevice(ctx, deviceID, s.now()); errors.Is(err, store.ErrNotFound) {
 		return notFound("device")
 	} else if err != nil {
 		return s.internal("revoke device", err)
 	}
 	s.notify.StateChanged()
-	s.audit(ctx, by, "device_revoke", map[string]any{"user": owner, "device": deviceID, "profile": dev.ProfileID})
+	params := map[string]any{"user": owner, "device": deviceID, "kind": dev.Kind}
+	if awgDev != nil {
+		params["profile"] = awgDev.ProfileID
+	}
+	s.audit(ctx, by, "device_revoke", params)
 	return nil
 }
 

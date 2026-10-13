@@ -356,6 +356,7 @@ func Build(c Config) (*Panel, error) {
 	sub.Handle("GET /brand/logo.svg", httpserver.NewLogoHandler(st, log))
 	sub.Handle("/", subs.Handler(acc, httpserver.NewDecoy(c.DecoyDir), subCfg))
 	subSvc := subs.NewService(st, cache, reg, brand, dnsSvc, log)
+	subSvc.NotifyWith(fl) // a switch to STRICT revokes the shared devices
 
 	var admin []httpserver.AdminHandler
 	for _, h := range []func() (string, http.Handler){

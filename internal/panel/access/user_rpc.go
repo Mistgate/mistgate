@@ -326,6 +326,8 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 		q.Filter = "expiring"
 	case adminv1.UserFilter_USER_FILTER_OVER_QUOTA:
 		q.Filter = "over_quota"
+	case adminv1.UserFilter_USER_FILTER_OVER_DEVICE_LIMIT:
+		q.Filter = "over_device_limit"
 	default:
 		return nil, invalid("unknown filter")
 	}
@@ -350,6 +352,7 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 	}
 	resp := &adminv1.ListUsersResponse{Counts: &adminv1.UserCounts{
 		All: uint32(counts.All), Online: uint32(counts.Online), Expiring: uint32(counts.Expiring), OverQuota: uint32(counts.OverQuota),
+		OverDeviceLimit: uint32(counts.OverDeviceLimit),
 	}}
 	setListUserCountField(resp.Counts, "devices_used", 5, uint32(counts.DevicesUsed))
 	setListUserCountField(resp.Counts, "devices_online", 6, uint32(counts.DevicesOnline))
@@ -460,6 +463,15 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			}
 		}
 		resp.NodeAccess = append(resp.NodeAccess, na)
+	}
+	blocked, err := a.BlockedDevices(ctx, u.ID)
+	if err != nil {
+		return nil, s.internal("blocked devices", err)
+	}
+	for _, b := range blocked {
+		resp.BlockedDevices = append(resp.BlockedDevices, &adminv1.BlockedDevice{
+			Id: b.ID, Platform: b.Platform, Model: b.Model, Client: b.Client, BlockedUnix: b.BlockedAt.Unix(), Fingerprint: b.Fingerprint,
+		})
 	}
 	// A subscription device holds a credential for every protocol the apps allow (newCreds), a group that gives none
 	// included. It lists only the protocols the person has servers for: the group's, on the nodes they use.
@@ -752,19 +764,49 @@ func maxTime(a, b time.Time) time.Time {
 	return b
 }
 
+// RevokeDevice removes a device of any kind. With block the HWID of an app's device is also refused from now on (the app gets
+// "device_blocked" instead of servers) until UnblockDevice; the shared device and a key have no HWID to block
+// (FailedPrecondition cannot_block). Both write the audit entry device_revoke.
 func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1.RevokeDeviceRequest]) (*connect.Response[adminv1.RevokeDeviceResponse], error) {
-	userID, err := s.st.Access().RevokeDevice(ctx, req.Msg.DeviceId, s.now())
-	if errors.Is(err, store.ErrNotFound) {
+	var userID string
+	var err error
+	if req.Msg.Block {
+		userID, err = s.st.Access().BlockDevice(ctx, req.Msg.DeviceId, s.now())
+	} else {
+		userID, err = s.st.Access().RevokeDevice(ctx, req.Msg.DeviceId, s.now())
+	}
+	switch {
+	case errors.Is(err, store.ErrNotFound):
 		return nil, notFound("device")
-	} else if err != nil {
+	case errors.Is(err, store.ErrCannotBlock):
+		return nil, failed("cannot_block: only the device of an app that reports a device ID can be blocked")
+	case err != nil:
 		return nil, s.internal("revoke device", err)
 	}
 	s.notify.StateChanged()
+	s.audit(ctx, actor(ctx), "device_revoke", map[string]any{"user": userID, "device": req.Msg.DeviceId, "block": req.Msg.Block})
 	users, err := s.loadUsers(ctx, userID)
 	if err != nil || len(users) == 0 {
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.RevokeDeviceResponse{User: users[0]}), nil
+}
+
+// UnblockDevice lets the HWID of a blocked device register again (a new device with new keys, on the next fetch of the app).
+// It writes the audit entry device_unblock. Nothing changes on the nodes.
+func (s *Service) UnblockDevice(ctx context.Context, req *connect.Request[adminv1.UnblockDeviceRequest]) (*connect.Response[adminv1.UnblockDeviceResponse], error) {
+	userID, err := s.st.Access().UnblockDevice(ctx, req.Msg.DeviceId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, notFound("blocked device")
+	} else if err != nil {
+		return nil, s.internal("unblock device", err)
+	}
+	s.audit(ctx, actor(ctx), "device_unblock", map[string]any{"user": userID, "device": req.Msg.DeviceId})
+	users, err := s.loadUsers(ctx, userID)
+	if err != nil || len(users) == 0 {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.UnblockDeviceResponse{User: users[0]}), nil
 }
 
 func (s *Service) DeleteUsers(ctx context.Context, req *connect.Request[adminv1.DeleteUsersRequest]) (*connect.Response[adminv1.DeleteUsersResponse], error) {

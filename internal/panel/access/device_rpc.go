@@ -78,5 +78,9 @@ func (s *Service) RenameDevice(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, err
 	}
+	if !dev.AWG { // the device of an app that reports a device ID: no key, no profile
+		return connect.NewResponse(&adminv1.RenameDeviceResponse{Device: &adminv1.Device{Id: dev.ID, Platform: dev.Platform, Model: dev.Model,
+			FirstSeenUnix: unixOrZero(dev.FirstSeenAt), LastSeenUnix: unixOrZero(dev.LastSeenAt), Protocols: dev.Protocols}}), nil
+	}
 	return connect.NewResponse(&adminv1.RenameDeviceResponse{Device: s.deviceProto(dev)}), nil
 }

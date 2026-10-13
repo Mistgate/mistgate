@@ -35,6 +35,9 @@ service UserService {
   rpc ResetUserTraffic(ResetUserTrafficRequest) returns (ResetUserTrafficResponse);
   // Removes one device: its credentials are revoked and dropped from every node, sessions are kicked.
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  // Lets a blocked device register again (RevokeDeviceRequest.block). Its old keys stay revoked: the app gets new ones
+  // on its next fetch of the subscription.
+  rpc UnblockDevice(UnblockDeviceRequest) returns (UnblockDeviceResponse);
   // Deletes users for good: credentials are dropped from every node, sessions kicked, the link dies.
   // Their per-user traffic history goes too; node-level totals stay. The UI asks for the name first.
   rpc DeleteUsers(DeleteUsersRequest) returns (DeleteUsersResponse);
@@ -70,6 +73,8 @@ enum UserFilter {
   USER_FILTER_EXPIRING = 2;
   // used_bytes > quota_bytes ("Over quota").
   USER_FILTER_OVER_QUOTA = 3;
+  // More live devices than device_limit (a limit of 0 is never over).
+  USER_FILTER_OVER_DEVICE_LIMIT = 4;
 }
 
 enum UserSort {
@@ -186,6 +191,8 @@ message UserCounts {
   // Matching devices whose Device.online value is true, regardless of filter or page. Subscription devices are
   // online while their user is online; AmneziaWG devices are online after a handshake within the 3-minute window.
   uint32 devices_online = 6;
+  // People with more live devices than their device_limit, counted like devices_used.
+  uint32 over_device_limit = 7;
 }
 
 message ListUsersResponse {
@@ -269,7 +276,22 @@ message GetUserResponse {
   // Profiles that come from the group (chips in Access).
   repeated ProfileRef profiles = 5;
   repeated NodeAccess node_access = 6;
+  // Devices the owner revoked with block: their app is refused until UnblockDevice.
+  repeated BlockedDevice blocked_devices = 7;
   // History comes from FleetService.ListEvents(user_id).
+}
+
+// A device that cannot register again (RevokeDeviceRequest.block). The HWID itself is never stored: the fingerprint is the
+// start of its hash, enough to tell two phones of one model apart.
+message BlockedDevice {
+  string id = 1;
+  string platform = 2;
+  string model = 3;
+  // The app that last fetched with it ("Happ/3.4.2").
+  string client = 4;
+  int64 blocked_unix = 5 [jstype = JS_NUMBER];
+  // The first 6 hex characters of the device's hash.
+  string fingerprint = 6;
 }
 
 message CreateUserRequest {
@@ -373,9 +395,21 @@ message ResetUserTrafficResponse {
 
 message RevokeDeviceRequest {
   string device_id = 1;
+  // Also refuse the device's HWID from now on (it cannot register a new device), until UnblockDevice. Only a device that
+  // reported a HWID can be blocked; the common place and an AmneziaVPN key cannot (FAILED_PRECONDITION cannot_block).
+  bool block = 2;
 }
 
 message RevokeDeviceResponse {
+  User user = 1;
+}
+
+message UnblockDeviceRequest {
+  // The id of a device in GetUserResponse.blocked_devices.
+  string device_id = 1;
+}
+
+message UnblockDeviceResponse {
   User user = 1;
 }
 

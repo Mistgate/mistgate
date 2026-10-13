@@ -52,6 +52,9 @@ const (
 	// UserServiceRevokeDeviceProcedure is the fully-qualified name of the UserService's RevokeDevice
 	// RPC.
 	UserServiceRevokeDeviceProcedure = "/mistgate.admin.v1.UserService/RevokeDevice"
+	// UserServiceUnblockDeviceProcedure is the fully-qualified name of the UserService's UnblockDevice
+	// RPC.
+	UserServiceUnblockDeviceProcedure = "/mistgate.admin.v1.UserService/UnblockDevice"
 	// UserServiceDeleteUsersProcedure is the fully-qualified name of the UserService's DeleteUsers RPC.
 	UserServiceDeleteUsersProcedure = "/mistgate.admin.v1.UserService/DeleteUsers"
 	// UserServiceGetSubscriptionLinkProcedure is the fully-qualified name of the UserService's
@@ -75,6 +78,9 @@ type UserServiceClient interface {
 	ResetUserTraffic(context.Context, *connect.Request[v1.ResetUserTrafficRequest]) (*connect.Response[v1.ResetUserTrafficResponse], error)
 	// Removes one device: its credentials are revoked and dropped from every node, sessions are kicked.
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	// Lets a blocked device register again (RevokeDeviceRequest.block). Its old keys stay revoked: the app gets new ones
+	// on its next fetch of the subscription.
+	UnblockDevice(context.Context, *connect.Request[v1.UnblockDeviceRequest]) (*connect.Response[v1.UnblockDeviceResponse], error)
 	// Deletes users for good: credentials are dropped from every node, sessions kicked, the link dies.
 	// Their per-user traffic history goes too; node-level totals stay. The UI asks for the name first.
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
@@ -141,6 +147,12 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("RevokeDevice")),
 			connect.WithClientOptions(opts...),
 		),
+		unblockDevice: connect.NewClient[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse](
+			httpClient,
+			baseURL+UserServiceUnblockDeviceProcedure,
+			connect.WithSchema(userServiceMethods.ByName("UnblockDevice")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteUsers: connect.NewClient[v1.DeleteUsersRequest, v1.DeleteUsersResponse](
 			httpClient,
 			baseURL+UserServiceDeleteUsersProcedure,
@@ -166,6 +178,7 @@ type userServiceClient struct {
 	extendUsers         *connect.Client[v1.ExtendUsersRequest, v1.ExtendUsersResponse]
 	resetUserTraffic    *connect.Client[v1.ResetUserTrafficRequest, v1.ResetUserTrafficResponse]
 	revokeDevice        *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	unblockDevice       *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
 	deleteUsers         *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
 	getSubscriptionLink *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
 }
@@ -210,6 +223,11 @@ func (c *userServiceClient) RevokeDevice(ctx context.Context, req *connect.Reque
 	return c.revokeDevice.CallUnary(ctx, req)
 }
 
+// UnblockDevice calls mistgate.admin.v1.UserService.UnblockDevice.
+func (c *userServiceClient) UnblockDevice(ctx context.Context, req *connect.Request[v1.UnblockDeviceRequest]) (*connect.Response[v1.UnblockDeviceResponse], error) {
+	return c.unblockDevice.CallUnary(ctx, req)
+}
+
 // DeleteUsers calls mistgate.admin.v1.UserService.DeleteUsers.
 func (c *userServiceClient) DeleteUsers(ctx context.Context, req *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error) {
 	return c.deleteUsers.CallUnary(ctx, req)
@@ -236,6 +254,9 @@ type UserServiceHandler interface {
 	ResetUserTraffic(context.Context, *connect.Request[v1.ResetUserTrafficRequest]) (*connect.Response[v1.ResetUserTrafficResponse], error)
 	// Removes one device: its credentials are revoked and dropped from every node, sessions are kicked.
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	// Lets a blocked device register again (RevokeDeviceRequest.block). Its old keys stay revoked: the app gets new ones
+	// on its next fetch of the subscription.
+	UnblockDevice(context.Context, *connect.Request[v1.UnblockDeviceRequest]) (*connect.Response[v1.UnblockDeviceResponse], error)
 	// Deletes users for good: credentials are dropped from every node, sessions kicked, the link dies.
 	// Their per-user traffic history goes too; node-level totals stay. The UI asks for the name first.
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
@@ -298,6 +319,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("RevokeDevice")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceUnblockDeviceHandler := connect.NewUnaryHandler(
+		UserServiceUnblockDeviceProcedure,
+		svc.UnblockDevice,
+		connect.WithSchema(userServiceMethods.ByName("UnblockDevice")),
+		connect.WithHandlerOptions(opts...),
+	)
 	userServiceDeleteUsersHandler := connect.NewUnaryHandler(
 		UserServiceDeleteUsersProcedure,
 		svc.DeleteUsers,
@@ -328,6 +355,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceResetUserTrafficHandler.ServeHTTP(w, r)
 		case UserServiceRevokeDeviceProcedure:
 			userServiceRevokeDeviceHandler.ServeHTTP(w, r)
+		case UserServiceUnblockDeviceProcedure:
+			userServiceUnblockDeviceHandler.ServeHTTP(w, r)
 		case UserServiceDeleteUsersProcedure:
 			userServiceDeleteUsersHandler.ServeHTTP(w, r)
 		case UserServiceGetSubscriptionLinkProcedure:
@@ -371,6 +400,10 @@ func (UnimplementedUserServiceHandler) ResetUserTraffic(context.Context, *connec
 
 func (UnimplementedUserServiceHandler) RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.RevokeDevice is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) UnblockDevice(context.Context, *connect.Request[v1.UnblockDeviceRequest]) (*connect.Response[v1.UnblockDeviceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.UnblockDevice is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error) {

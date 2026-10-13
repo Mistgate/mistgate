@@ -205,6 +205,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.UserServiceExtendUsersProcedure:         levelWrite,
 	adminv1connect.UserServiceResetUserTrafficProcedure:    levelWrite,
 	adminv1connect.UserServiceRevokeDeviceProcedure:        levelWrite,
+	adminv1connect.UserServiceUnblockDeviceProcedure:       levelWrite,
 	adminv1connect.UserServiceDeleteUsersProcedure:         levelWrite,
 	adminv1connect.UserServiceGetSubscriptionLinkProcedure: levelWrite, // the link is the user's credential
 }

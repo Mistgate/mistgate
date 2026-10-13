@@ -35,6 +35,7 @@ var transactionShape1 = map[string]string{
 	"provision.go:createNodeProvisionJob":          "The job insert and optional queued event run in one fixed batch.",
 	"store.go:SetSettingsIfAbsent":                 "Inserts each missing setting and reads the stored values back in one batch.",
 	"store.go:SetSettings":                         "Upserts the supplied settings in one fixed batch.",
+	"access_linkmode.go:SaveSubscriptionSettings":  "The settings upserts, the mode and, for STRICT, the revoke of every shared device run in one fixed batch.",
 	"telegram.go:ClearTelegramBot":                 "Deletes links and the bot as one fixed batch.",
 	"token.go:RevokeAPIToken":                      "Revokes the token and cancels its open plans in one fixed batch.",
 }
@@ -45,7 +46,8 @@ var transactionShape2 = map[string]string{
 	"access_awg.go:RotateAWGDevice":                "A guarded batch retries if the live credential, selected peer, or profile epoch changed.",
 	"access_awg.go:EnsureLinkAWGCreds":             "Guarded batches retry when the link device, its adoption, the device ceiling, profile epoch, or candidate peer allocation changed.",
 	"access_linkdevice.go:EnsureLinkDevice":        "A guarded batch retries when the device appeared, was adopted, was revoked, or the device ceiling was reached by another writer.",
-	"access_user.go:RevokeDevice":                  "A live-device guard precedes device, peer, and credential updates plus a returning user lookup.",
+	"access_user.go:revokeDevice":                  "A live-device guard precedes device, peer, and credential updates plus a returning user lookup.",
+	"access_linkmode.go:UnblockDevice":             "A blocked-device guard precedes the unblock and a returning user lookup.",
 	"access_profile.go:UpdateProfile":              "A version guard precedes the profile and optional epoch and inbound bumps.",
 	"access_profile.go:DeleteProfile":              "A no-inbounds guard precedes device revocation and profile deletion.",
 	"access_profile.go:DeleteInbound":              "A snapshot guard protects retained-key insertion and inbound deletion after the callback runs.",

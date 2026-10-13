@@ -38,6 +38,22 @@ message SubscriptionSettings {
   repeated ServeRule rules = 8;
   // DNS preset for users and groups that have none of their own (DnsService). Empty = the built-in default.
   string default_dns_preset_id = 9;
+  // What a subscription fetch does when a person has no room for one more device (device_limit): count it only, refuse it,
+  // or refuse it and also turn away the apps that report no device ID. Absent in a request = leave the stored mode as it is;
+  // a panel that has never been given one counts only (LINK_DEVICE_LIMIT_TRACK).
+  optional LinkDeviceLimit link_device_limit = 10;
+}
+
+// How the device limit applies to the apps that take the subscription link (a key of AmneziaVPN is always limited).
+enum LinkDeviceLimit {
+  LINK_DEVICE_LIMIT_UNSPECIFIED = 0;
+  // Devices are registered and counted, the limit is shown and an event is written, but nothing is refused. A person
+  // with twice the limit in devices gets no device of their own for one more HWID: that app shares the common place.
+  LINK_DEVICE_LIMIT_TRACK = 1;
+  // A new device over the limit is refused; the apps that report no device ID share one common place, if there is room.
+  LINK_DEVICE_LIMIT_ENFORCE = 2;
+  // As ENFORCE, and an app that reports no device ID is refused. Switching to it revokes every common place at once.
+  LINK_DEVICE_LIMIT_STRICT = 3;
 }
 
 enum Platform {
@@ -115,6 +131,9 @@ message GetSubscriptionSettingsResponse {
   string sample_group = 4;
   // The instance language ("en", "ru", or "zh"). {country} itself is the two-letter code whatever the language.
   string names_language = 5;
+  // People who have a live common (no device ID) place right now: the apps that report none are what STRICT turns away,
+  // so the confirmation of switching to it shows this number.
+  uint32 shared_link_users = 6;
 }
 
 // One server of the preview: what a server name is built from.

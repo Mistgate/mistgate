@@ -14,6 +14,7 @@ import (
 const (
 	retentionEvery = time.Hour
 	eventBatch     = 2000
+	deviceKeep     = 90 * 24 * time.Hour // how long a revoked device (not a blocked one) stays as a row
 )
 
 func (s *Service) runRetention(ctx context.Context) {
@@ -52,6 +53,12 @@ func (s *Service) sweep(ctx context.Context) {
 		s.log.Warn("health: prune events", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned events", "count", n)
+	}
+	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
+	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune devices", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned revoked devices", "count", n)
 	}
 	// the in-memory map of the last fixes only matters for five minutes
 	s.fixMu.Lock()

@@ -103,6 +103,12 @@
   },
   {
     "type": "index",
+    "name": "event_device_limit",
+    "tbl_name": "event",
+    "sql": "CREATE INDEX event_device_limit ON event (ts) WHERE code = 'device_limit_reached'"
+  },
+  {
+    "type": "index",
     "name": "event_node",
     "tbl_name": "event",
     "sql": "CREATE INDEX event_node ON event (node_id, id DESC) WHERE node_id IS NOT NULL"
@@ -345,7 +351,7 @@
     "type": "table",
     "name": "device",
     "tbl_name": "device",
-    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '') STRICT"
+    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER) STRICT"
   },
   {
     "type": "table",

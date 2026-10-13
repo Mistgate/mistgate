@@ -898,7 +898,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	}
 
 	seed := requestDevice{dev: store.AccessDevice{ID: "dev_mihomo_readback", UserID: u.ID, Implicit: true}}
-	if got := e.s.ensureMihomoAWG(e.ctx, u, g, full, DeviceHint{}, seed); !got.added {
+	if got, _ := e.s.ensureMihomoAWG(e.ctx, u, g, full, DeviceHint{}, seed, store.SubscriptionData{}); !got.added {
 		t.Fatal("initial Mihomo call did not add the AWG credential")
 	}
 	wantData, err := a.SubscriptionData(e.ctx, u.ID, g.ID, e.clock, true, e.clock, nil)
@@ -907,7 +907,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	}
 	wantDevice, wantCreds := wantData.Device, wantData.DeviceCreds
 
-	read := e.s.ensureMihomoAWG(e.ctx, u, g, full, DeviceHint{}, seed)
+	read, _ := e.s.ensureMihomoAWG(e.ctx, u, g, full, DeviceHint{}, seed, store.SubscriptionData{})
 	gotDevice, gotCreds := read.dev, read.creds
 	if read.added {
 		t.Fatal("a read-back of an existing device reported a new credential")

@@ -21,6 +21,63 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// How the device limit applies to the apps that take the subscription link (a key of AmneziaVPN is always limited).
+type LinkDeviceLimit int32
+
+const (
+	LinkDeviceLimit_LINK_DEVICE_LIMIT_UNSPECIFIED LinkDeviceLimit = 0
+	// Devices are registered and counted, the limit is shown and an event is written, but nothing is refused. A person
+	// with twice the limit in devices gets no device of their own for one more HWID: that app shares the common place.
+	LinkDeviceLimit_LINK_DEVICE_LIMIT_TRACK LinkDeviceLimit = 1
+	// A new device over the limit is refused; the apps that report no device ID share one common place, if there is room.
+	LinkDeviceLimit_LINK_DEVICE_LIMIT_ENFORCE LinkDeviceLimit = 2
+	// As ENFORCE, and an app that reports no device ID is refused. Switching to it revokes every common place at once.
+	LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT LinkDeviceLimit = 3
+)
+
+// Enum value maps for LinkDeviceLimit.
+var (
+	LinkDeviceLimit_name = map[int32]string{
+		0: "LINK_DEVICE_LIMIT_UNSPECIFIED",
+		1: "LINK_DEVICE_LIMIT_TRACK",
+		2: "LINK_DEVICE_LIMIT_ENFORCE",
+		3: "LINK_DEVICE_LIMIT_STRICT",
+	}
+	LinkDeviceLimit_value = map[string]int32{
+		"LINK_DEVICE_LIMIT_UNSPECIFIED": 0,
+		"LINK_DEVICE_LIMIT_TRACK":       1,
+		"LINK_DEVICE_LIMIT_ENFORCE":     2,
+		"LINK_DEVICE_LIMIT_STRICT":      3,
+	}
+)
+
+func (x LinkDeviceLimit) Enum() *LinkDeviceLimit {
+	p := new(LinkDeviceLimit)
+	*p = x
+	return p
+}
+
+func (x LinkDeviceLimit) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LinkDeviceLimit) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[0].Descriptor()
+}
+
+func (LinkDeviceLimit) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[0]
+}
+
+func (x LinkDeviceLimit) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LinkDeviceLimit.Descriptor instead.
+func (LinkDeviceLimit) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{0}
+}
+
 type Platform int32
 
 const (
@@ -63,11 +120,11 @@ func (x Platform) String() string {
 }
 
 func (Platform) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_subscription_proto_enumTypes[0].Descriptor()
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[1].Descriptor()
 }
 
 func (Platform) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_subscription_proto_enumTypes[0]
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[1]
 }
 
 func (x Platform) Number() protoreflect.EnumNumber {
@@ -76,7 +133,7 @@ func (x Platform) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Platform.Descriptor instead.
 func (Platform) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{0}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
 }
 
 type SubFormat int32
@@ -122,11 +179,11 @@ func (x SubFormat) String() string {
 }
 
 func (SubFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_subscription_proto_enumTypes[1].Descriptor()
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[2].Descriptor()
 }
 
 func (SubFormat) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_subscription_proto_enumTypes[1]
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[2]
 }
 
 func (x SubFormat) Number() protoreflect.EnumNumber {
@@ -135,7 +192,7 @@ func (x SubFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SubFormat.Descriptor instead.
 func (SubFormat) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{2}
 }
 
 type SubscriptionSettings struct {
@@ -160,8 +217,12 @@ type SubscriptionSettings struct {
 	Rules []*ServeRule `protobuf:"bytes,8,rep,name=rules,proto3" json:"rules,omitempty"`
 	// DNS preset for users and groups that have none of their own (DnsService). Empty = the built-in default.
 	DefaultDnsPresetId string `protobuf:"bytes,9,opt,name=default_dns_preset_id,json=defaultDnsPresetId,proto3" json:"default_dns_preset_id,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// What a subscription fetch does when a person has no room for one more device (device_limit): count it only, refuse it,
+	// or refuse it and also turn away the apps that report no device ID. Absent in a request = leave the stored mode as it is;
+	// a panel that has never been given one counts only (LINK_DEVICE_LIMIT_TRACK).
+	LinkDeviceLimit *LinkDeviceLimit `protobuf:"varint,10,opt,name=link_device_limit,json=linkDeviceLimit,proto3,enum=mistgate.admin.v1.LinkDeviceLimit,oneof" json:"link_device_limit,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -255,6 +316,13 @@ func (x *SubscriptionSettings) GetDefaultDnsPresetId() string {
 		return x.DefaultDnsPresetId
 	}
 	return ""
+}
+
+func (x *SubscriptionSettings) GetLinkDeviceLimit() LinkDeviceLimit {
+	if x != nil && x.LinkDeviceLimit != nil {
+		return *x.LinkDeviceLimit
+	}
+	return LinkDeviceLimit_LINK_DEVICE_LIMIT_UNSPECIFIED
 }
 
 // One app the user page recommends: e.g. iOS + APP_HAPP -> "Happ" (App Store link, happ://add/{url}),
@@ -550,8 +618,11 @@ type GetSubscriptionSettingsResponse struct {
 	SampleGroup string `protobuf:"bytes,4,opt,name=sample_group,json=sampleGroup,proto3" json:"sample_group,omitempty"`
 	// The instance language ("en", "ru", or "zh"). {country} itself is the two-letter code whatever the language.
 	NamesLanguage string `protobuf:"bytes,5,opt,name=names_language,json=namesLanguage,proto3" json:"names_language,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// People who have a live common (no device ID) place right now: the apps that report none are what STRICT turns away,
+	// so the confirmation of switching to it shows this number.
+	SharedLinkUsers uint32 `protobuf:"varint,6,opt,name=shared_link_users,json=sharedLinkUsers,proto3" json:"shared_link_users,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetSubscriptionSettingsResponse) Reset() {
@@ -617,6 +688,13 @@ func (x *GetSubscriptionSettingsResponse) GetNamesLanguage() string {
 		return x.NamesLanguage
 	}
 	return ""
+}
+
+func (x *GetSubscriptionSettingsResponse) GetSharedLinkUsers() uint32 {
+	if x != nil {
+		return x.SharedLinkUsers
+	}
+	return 0
 }
 
 // One server of the preview: what a server name is built from.
@@ -1039,7 +1117,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xb3\x03\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x9e\x04\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1050,7 +1128,10 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x04apps\x18\x06 \x03(\v2\x1e.mistgate.admin.v1.PlatformAppR\x04apps\x12?\n" +
 	"\tuser_page\x18\a \x01(\v2\".mistgate.admin.v1.UserPageOptionsR\buserPage\x122\n" +
 	"\x05rules\x18\b \x03(\v2\x1c.mistgate.admin.v1.ServeRuleR\x05rules\x121\n" +
-	"\x15default_dns_preset_id\x18\t \x01(\tR\x12defaultDnsPresetId\"\x99\x02\n" +
+	"\x15default_dns_preset_id\x18\t \x01(\tR\x12defaultDnsPresetId\x12S\n" +
+	"\x11link_device_limit\x18\n" +
+	" \x01(\x0e2\".mistgate.admin.v1.LinkDeviceLimitH\x00R\x0flinkDeviceLimit\x88\x01\x01B\x14\n" +
+	"\x12_link_device_limit\"\x99\x02\n" +
 	"\vPlatformApp\x127\n" +
 	"\bplatform\x18\x01 \x01(\x0e2\x1b.mistgate.admin.v1.PlatformR\bplatform\x12*\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x16.mistgate.admin.v1.AppR\x04kind\x12\x12\n" +
@@ -1073,13 +1154,14 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\vua_contains\x18\x01 \x01(\tR\n" +
 	"uaContains\x124\n" +
 	"\x06format\x18\x02 \x01(\x0e2\x1c.mistgate.admin.v1.SubFormatR\x06format\" \n" +
-	"\x1eGetSubscriptionSettingsRequest\"\xa1\x02\n" +
+	"\x1eGetSubscriptionSettingsRequest\"\xcd\x02\n" +
 	"\x1fGetSubscriptionSettingsResponse\x12C\n" +
 	"\bsettings\x18\x01 \x01(\v2'.mistgate.admin.v1.SubscriptionSettingsR\bsettings\x12'\n" +
 	"\x0feffective_title\x18\x02 \x01(\tR\x0eeffectiveTitle\x12F\n" +
 	"\x0eserver_samples\x18\x03 \x03(\v2\x1f.mistgate.admin.v1.ServerSampleR\rserverSamples\x12!\n" +
 	"\fsample_group\x18\x04 \x01(\tR\vsampleGroup\x12%\n" +
-	"\x0enames_language\x18\x05 \x01(\tR\rnamesLanguage\"\x98\x01\n" +
+	"\x0enames_language\x18\x05 \x01(\tR\rnamesLanguage\x12*\n" +
+	"\x11shared_link_users\x18\x06 \x01(\rR\x0fsharedLinkUsers\"\x98\x01\n" +
 	"\fServerSample\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12!\n" +
 	"\fcountry_code\x18\x02 \x01(\tR\vcountryCode\x12\x18\n" +
@@ -1106,7 +1188,12 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
 	"rule_index\x18\x01 \x01(\x05R\truleIndex\x124\n" +
 	"\x06format\x18\x02 \x01(\x0e2\x1c.mistgate.admin.v1.SubFormatR\x06format\x12\x18\n" +
-	"\abrowser\x18\x03 \x01(\bR\abrowser*\x8a\x01\n" +
+	"\abrowser\x18\x03 \x01(\bR\abrowser*\x8e\x01\n" +
+	"\x0fLinkDeviceLimit\x12!\n" +
+	"\x1dLINK_DEVICE_LIMIT_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17LINK_DEVICE_LIMIT_TRACK\x10\x01\x12\x1d\n" +
+	"\x19LINK_DEVICE_LIMIT_ENFORCE\x10\x02\x12\x1c\n" +
+	"\x18LINK_DEVICE_LIMIT_STRICT\x10\x03*\x8a\x01\n" +
 	"\bPlatform\x12\x18\n" +
 	"\x14PLATFORM_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPLATFORM_IOS\x10\x01\x12\x14\n" +
@@ -1139,54 +1226,56 @@ func file_mistgate_admin_v1_subscription_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_subscription_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_subscription_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_mistgate_admin_v1_subscription_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_mistgate_admin_v1_subscription_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_mistgate_admin_v1_subscription_proto_goTypes = []any{
-	(Platform)(0),                              // 0: mistgate.admin.v1.Platform
-	(SubFormat)(0),                             // 1: mistgate.admin.v1.SubFormat
-	(*SubscriptionSettings)(nil),               // 2: mistgate.admin.v1.SubscriptionSettings
-	(*PlatformApp)(nil),                        // 3: mistgate.admin.v1.PlatformApp
-	(*UserPageOptions)(nil),                    // 4: mistgate.admin.v1.UserPageOptions
-	(*ServeRule)(nil),                          // 5: mistgate.admin.v1.ServeRule
-	(*GetSubscriptionSettingsRequest)(nil),     // 6: mistgate.admin.v1.GetSubscriptionSettingsRequest
-	(*GetSubscriptionSettingsResponse)(nil),    // 7: mistgate.admin.v1.GetSubscriptionSettingsResponse
-	(*ServerSample)(nil),                       // 8: mistgate.admin.v1.ServerSample
-	(*UpdateSubscriptionSettingsRequest)(nil),  // 9: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	(*UpdateSubscriptionSettingsResponse)(nil), // 10: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	(*ClientInfo)(nil),                         // 11: mistgate.admin.v1.ClientInfo
-	(*ListClientsRequest)(nil),                 // 12: mistgate.admin.v1.ListClientsRequest
-	(*ListClientsResponse)(nil),                // 13: mistgate.admin.v1.ListClientsResponse
-	(*TestUserAgentRequest)(nil),               // 14: mistgate.admin.v1.TestUserAgentRequest
-	(*TestUserAgentResponse)(nil),              // 15: mistgate.admin.v1.TestUserAgentResponse
-	(App)(0),                                   // 16: mistgate.admin.v1.App
+	(LinkDeviceLimit)(0),                       // 0: mistgate.admin.v1.LinkDeviceLimit
+	(Platform)(0),                              // 1: mistgate.admin.v1.Platform
+	(SubFormat)(0),                             // 2: mistgate.admin.v1.SubFormat
+	(*SubscriptionSettings)(nil),               // 3: mistgate.admin.v1.SubscriptionSettings
+	(*PlatformApp)(nil),                        // 4: mistgate.admin.v1.PlatformApp
+	(*UserPageOptions)(nil),                    // 5: mistgate.admin.v1.UserPageOptions
+	(*ServeRule)(nil),                          // 6: mistgate.admin.v1.ServeRule
+	(*GetSubscriptionSettingsRequest)(nil),     // 7: mistgate.admin.v1.GetSubscriptionSettingsRequest
+	(*GetSubscriptionSettingsResponse)(nil),    // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse
+	(*ServerSample)(nil),                       // 9: mistgate.admin.v1.ServerSample
+	(*UpdateSubscriptionSettingsRequest)(nil),  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	(*UpdateSubscriptionSettingsResponse)(nil), // 11: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	(*ClientInfo)(nil),                         // 12: mistgate.admin.v1.ClientInfo
+	(*ListClientsRequest)(nil),                 // 13: mistgate.admin.v1.ListClientsRequest
+	(*ListClientsResponse)(nil),                // 14: mistgate.admin.v1.ListClientsResponse
+	(*TestUserAgentRequest)(nil),               // 15: mistgate.admin.v1.TestUserAgentRequest
+	(*TestUserAgentResponse)(nil),              // 16: mistgate.admin.v1.TestUserAgentResponse
+	(App)(0),                                   // 17: mistgate.admin.v1.App
 }
 var file_mistgate_admin_v1_subscription_proto_depIdxs = []int32{
-	3,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
-	4,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
-	5,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
-	0,  // 3: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
-	16, // 4: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
-	1,  // 5: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
-	2,  // 6: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	8,  // 7: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
-	2,  // 8: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	2,  // 9: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	1,  // 10: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
-	11, // 11: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
-	1,  // 12: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
-	6,  // 13: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
-	9,  // 14: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	12, // 15: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
-	14, // 16: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
-	7,  // 17: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
-	10, // 18: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	13, // 19: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
-	15, // 20: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
-	17, // [17:21] is the sub-list for method output_type
-	13, // [13:17] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	4,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
+	5,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
+	6,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
+	0,  // 3: mistgate.admin.v1.SubscriptionSettings.link_device_limit:type_name -> mistgate.admin.v1.LinkDeviceLimit
+	1,  // 4: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
+	17, // 5: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
+	2,  // 6: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
+	3,  // 7: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	9,  // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
+	3,  // 9: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	3,  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	2,  // 11: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
+	12, // 12: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
+	2,  // 13: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
+	7,  // 14: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
+	10, // 15: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	13, // 16: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
+	15, // 17: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
+	8,  // 18: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
+	11, // 19: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	14, // 20: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
+	16, // 21: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
+	18, // [18:22] is the sub-list for method output_type
+	14, // [14:18] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_subscription_proto_init() }
@@ -1195,6 +1284,7 @@ func file_mistgate_admin_v1_subscription_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_common_proto_init()
+	file_mistgate_admin_v1_subscription_proto_msgTypes[0].OneofWrappers = []any{}
 	file_mistgate_admin_v1_subscription_proto_msgTypes[2].OneofWrappers = []any{}
 	file_mistgate_admin_v1_subscription_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
@@ -1202,7 +1292,7 @@ func file_mistgate_admin_v1_subscription_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_subscription_proto_rawDesc), len(file_mistgate_admin_v1_subscription_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,

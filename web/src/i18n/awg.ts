@@ -222,6 +222,8 @@ export const en = {
   "awg.err.no_inbound": "The profile is not deployed on any node this user may use.",
   "awg.err.subnet_full": "The profile’s client network is full. Free an address or use another profile.",
   "awg.err.agent_too_old": "The node’s agent is too old for AmneziaWG. Update it first.",
+  "awg.err.cannot_block": "Only the device of an app that reports a device ID can be blocked.",
+  "awg.err.shared_device": "This is the common place of the apps that report no device ID. It cannot be removed or renamed.",
 
   // ---- node: backend
   "awg.backend.title": "AmneziaWG backend",
@@ -511,6 +513,8 @@ export const ru: typeof en = {
   "awg.err.no_inbound": "Профиль не выложен ни на одну ноду, доступную этому пользователю.",
   "awg.err.subnet_full": "Сеть клиентов профиля заполнена. Освободи адрес или возьми другой профиль.",
   "awg.err.agent_too_old": "Агент ноды слишком старый для AmneziaWG. Сначала обнови его.",
+  "awg.err.cannot_block": "Заблокировать можно только устройство приложения, которое сообщает ID устройства.",
+  "awg.err.shared_device": "Это общее место приложений без ID устройства. Его нельзя удалить или переименовать.",
 
   "awg.backend.title": "Бэкенд AmneziaWG",
   "awg.backend.body": "Как эта нода запускает AmneziaWG. Применяется сразу; подключённые устройства переподключатся.",
@@ -799,6 +803,8 @@ export const zh: typeof en = {
   "awg.err.no_inbound": "该协议配置没有部署到此用户可使用的任何节点。",
   "awg.err.subnet_full": "该协议配置的客户端网段已满。请释放一个地址，或使用其他协议配置。",
   "awg.err.agent_too_old": "节点 Agent 版本过旧，不支持 AmneziaWG。请先更新它。",
+  "awg.err.cannot_block": "只能阻止会提供设备 ID 的应用的设备。",
+  "awg.err.shared_device": "这是未提供设备 ID 的应用共用的名额，不能删除或重命名。",
 
   // ---- node: backend
   "awg.backend.title": "AmneziaWG 后端",

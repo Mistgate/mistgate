@@ -1024,6 +1024,9 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		createGroup(t, st, "grp_link_hwid", nil)
 		createUser(t, st, "usr_link_hwid", "Link HWID", "grp_link_hwid")
 		const userID = "usr_link_hwid"
+		if err := st.SetSettings(ctx, map[string]string{SettingLinkDeviceLimit: LinkModeEnforce}); err != nil { // the limit passed below is the ceiling
+			t.Fatal(err)
+		}
 		issue := func(tag string) LinkIssue {
 			return func(deviceID string, have map[string]bool) ([]AccessCred, error) {
 				if have["hysteria2"] {
@@ -1071,6 +1074,89 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		}
 		if fetched != now.Add(2*time.Hour).Unix() {
 			t.Fatalf("SubscriptionFetchAt = %d, want the touch of the second device %d", fetched, now.Add(2*time.Hour).Unix())
+		}
+	})
+	t.Run("LinkDeviceBlockAndEviction", func(t *testing.T) {
+		st := openD1Store(t)
+		createGroup(t, st, "grp_link_limit", nil)
+		createUser(t, st, "usr_link_limit", "Link limit", "grp_link_limit")
+		const userID = "usr_link_limit"
+		if err := st.SetSettings(ctx, map[string]string{SettingLinkDeviceLimit: LinkModeEnforce}); err != nil {
+			t.Fatal(err)
+		}
+		issue := func(tag string) LinkIssue {
+			return func(deviceID string, have map[string]bool) ([]AccessCred, error) {
+				if have["hysteria2"] {
+					return nil, nil
+				}
+				return []AccessCred{{ID: "crd_link_limit_" + tag, UserID: userID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`}}, nil
+			}
+		}
+		hash := func(tag string) []byte { return HWIDHash(userID, tag+tag+tag+tag+tag+tag+tag+tag+tag+tag) }
+		ensure := func(tag string) (LinkDeviceResult, error) {
+			return st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_ll_" + tag, UserID: userID, HWIDHash: hash(tag), Platform: "ios"}, 2, now, issue(tag))
+		}
+		for _, tag := range []string{"a", "b"} {
+			if _, err := ensure(tag); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var limit *AccessLimitError
+		if _, err := ensure("c"); !errors.As(err, &limit) || limit.Mode != LinkModeEnforce {
+			t.Fatalf("a third device at the limit: %v", err)
+		}
+		// A device silent for 31 days gives its place: the guard of the batch checks the victim and the count.
+		if _, err := st.W.ExecContext(ctx, `UPDATE device SET last_seen_at = ? WHERE id = 'dev_ll_a'`, now.Add(-31*24*time.Hour).Unix()); err != nil {
+			t.Fatal(err)
+		}
+		c, err := ensure("c")
+		if err != nil || c.Device.ID != "dev_ll_c" || c.Replaced != "dev_ll_a" || len(c.Added) != 1 {
+			t.Fatalf("a third device with a silent one = %+v, %v", c, err)
+		}
+		var live, replaced, liveCreds int
+		st.R.QueryRowContext(ctx, `SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, userID).Scan(&live)
+		st.R.QueryRowContext(ctx, `SELECT count(*) FROM event WHERE code = 'device_replaced' AND user_id = ?`, userID).Scan(&replaced)
+		st.R.QueryRowContext(ctx, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_ll_a' AND revoked_at IS NULL`).Scan(&liveCreds)
+		if live != 2 || replaced != 1 || liveCreds != 0 {
+			t.Fatalf("live %d, device_replaced events %d, live credentials of the replaced device %d; want 2, 1, 0", live, replaced, liveCreds)
+		}
+
+		// The block: the device is revoked, its HWID is not born again, the snapshot says so, and the unblock lets it back.
+		if _, err := st.Access().BlockDevice(ctx, "dev_ll_b", now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Access().BlockDevice(ctx, "dev_ll_b", now); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("blocking a revoked device = %v, want ErrNotFound", err)
+		}
+		if _, err := ensure("b"); !errors.Is(err, ErrAccessBlocked) {
+			t.Fatalf("the blocked HWID = %v, want ErrAccessBlocked", err)
+		}
+		data, err := st.Access().SubscriptionData(ctx, userID, "grp_link_limit", now, false, now, hash("b"))
+		if err != nil || !data.Blocked || data.LinkMode != LinkModeEnforce {
+			t.Fatalf("snapshot: blocked %v, mode %q, %v", data.Blocked, data.LinkMode, err)
+		}
+		if list, err := st.Access().BlockedDevices(ctx, userID); err != nil || len(list) != 1 || list[0].ID != "dev_ll_b" || len(list[0].Fingerprint) != 6 {
+			t.Fatalf("BlockedDevices = %+v, %v", list, err)
+		}
+		if _, err := st.Access().UnblockDevice(ctx, "dev_ll_b"); err != nil {
+			t.Fatal(err)
+		}
+		if r, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_ll_b2", UserID: userID, HWIDHash: hash("b")}, 2, now, issue("b2")); err != nil || r.Device.ID != "dev_ll_b2" {
+			t.Fatalf("after the unblock = %+v, %v", r, err)
+		}
+
+		// STRICT revokes the shared devices in the batch that stores the mode; a revoked row older than the cutoff is pruned.
+		if _, err := st.W.ExecContext(ctx, `UPDATE device SET revoked_at = 5 WHERE id = 'dev_ll_a'`); err != nil {
+			t.Fatal(err)
+		}
+		if n, err := st.PruneRevokedDevices(ctx, now.Add(-time.Hour), 10); err != nil || n != 1 {
+			t.Fatalf("PruneRevokedDevices = %d, %v; want the replaced device", n, err)
+		}
+		if n, err := st.SaveSubscriptionSettings(ctx, nil, LinkModeStrict, now); err != nil || n != 0 {
+			t.Fatalf("SaveSubscriptionSettings = %d, %v", n, err)
+		}
+		if _, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_ll_s", UserID: userID, Implicit: true}, 2, now, issue("s")); !errors.Is(err, ErrNoSharedDevice) {
+			t.Fatalf("the shared device in strict = %v, want ErrNoSharedDevice", err)
 		}
 	})
 	t.Run("RevokeDevice", func(t *testing.T) {

@@ -20,7 +20,16 @@ func linkFixture(t *testing.T, user string) *Store {
 	s := openTemp(t)
 	rewriteAccessGroup(t, s, "grp_link", "Link devices")
 	rewriteAccessUser(t, s, user, "u-"+user, "grp_link")
+	setLinkMode(t, s, LinkModeEnforce) // the limit passed to EnsureLinkDevice is the ceiling: ENFORCE holds a HWID and the shared device to it
 	return s
+}
+
+// setLinkMode stores the mode of the device limit, as the panel's settings do.
+func setLinkMode(t *testing.T, s *Store, mode string) {
+	t.Helper()
+	if err := s.SetSettings(context.Background(), map[string]string{SettingLinkDeviceLimit: mode}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 var linkNow = time.Unix(1_800_000_000, 0)

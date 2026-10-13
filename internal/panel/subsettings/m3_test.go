@@ -115,7 +115,9 @@ func TestMigrateM3FreshInstall(t *testing.T) {
 	if v, err := st.Setting(ctx, "sub_rules_m3"); err != nil || v != "1" {
 		t.Errorf("marker = %q, %v", v, err)
 	}
-	if s, _ := Load(ctx, st); !proto.Equal(s, Defaults()) {
+	want := Defaults() // and the mode of the device limit, which a panel that never got one counts only
+	want.LinkDeviceLimit = adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_TRACK.Enum()
+	if s, _ := Load(ctx, st); !proto.Equal(s, want) {
 		t.Error("a fresh install no longer serves the defaults")
 	}
 }

@@ -242,6 +242,9 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 		}
 		return en
 	}
+	if v.Refusal != "" { // an active person whom this app is not given servers: the words of the reason
+		return refusalNote(v, pick)
+	}
 	switch v.Status {
 	case access.StatusExpired:
 		if v.Expires.IsZero() {
@@ -255,6 +258,21 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s重置"), dayText(v.NextReset, now, lang))
 	case access.StatusDisabled:
 		return pick("Доступ приостановлен", "Access paused", "访问已暂停")
+	}
+	return ""
+}
+
+// refusalNote words SubView.Refusal for the apps (at most announceMax characters, the announcement of Happ): the limit with the
+// numbers the person sees on the page, a device the owner turned off, an app that sends no device ID. kl!ck is named as the
+// app to take: it reports one and the page recommends it.
+func refusalNote(v access.SubView, pick func(ru, en, zh string) string) string {
+	switch v.Refusal {
+	case access.RefusalDeviceLimit:
+		return fmt.Sprintf(pick("Лимит устройств: %d из %d. Удалите ненужное на странице подписки", "Device limit: %d of %d. Remove one you no longer use on the subscription page", "设备已达上限：%d / %d。请在订阅页面删除不再使用的设备"), v.DevicesUsed, v.DeviceLimit)
+	case access.RefusalDeviceBlocked:
+		return pick("Это устройство отключено владельцем", "This device was turned off by the owner", "此设备已被所有者停用")
+	case access.RefusalNoDeviceID:
+		return pick("Приложение не сообщает ID устройства. Включите HWID в настройках Happ или возьмите kl!ck", "This app does not report a device ID. Turn on HWID in the settings of Happ, or use kl!ck", "此应用未提供设备 ID。请在 Happ 设置中开启 HWID，或改用 kl!ck")
 	}
 	return ""
 }

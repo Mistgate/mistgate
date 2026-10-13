@@ -62,7 +62,22 @@ type SubView struct {
 	EffectiveDNS *dns.Preset // the Mihomo link resolver, already read with the node choices
 	// Format is what Lines hold (FormatURIList unless the view was asked for another).
 	Format plugin.ClientFormat
+	// Refusal says why an app that is entitled to servers gets none: RefusalDeviceLimit, RefusalDeviceBlocked or
+	// RefusalNoDeviceID. "" for everyone served, for a person without access (Status says why) and for the page, which never
+	// registers a device. Lines and Servers are empty with it; the subscription handler answers with one entry that says why.
+	Refusal string
 }
+
+// The reasons of SubView.Refusal. They are stable words: the subscription handler words them for the apps (subs.stateNote).
+const (
+	// RefusalDeviceLimit: the person has no room for one more device (ENFORCE and STRICT) and none of theirs is silent enough to
+	// give its place away.
+	RefusalDeviceLimit = "device_limit"
+	// RefusalDeviceBlocked: the owner blocked the device of the app.
+	RefusalDeviceBlocked = "device_blocked"
+	// RefusalNoDeviceID: STRICT, and the app reports no device ID (X-HWID).
+	RefusalNoDeviceID = "no_device_id"
+)
 
 // SubNode is one node as the page's server list shows it.
 type SubNode struct {
@@ -112,10 +127,13 @@ type SubServer struct {
 // SubDevice is one device of the user as the public page lists it.
 type SubDevice struct {
 	ID, Platform, Model string
-	App                 string // "happ" | "amnezia" | ""
-	LastSeen            time.Time
-	Online              bool
-	AWG                 *SubAWG // set for an AmneziaWG device
+	// Kind is "link" (an app that reports a device ID), "shared" (the common place of the apps that report none) or "key" (an
+	// AmneziaVPN key). The person can remove and rename the first and the last.
+	Kind     string
+	App      string // "happ" | "amnezia" | ""
+	LastSeen time.Time
+	Online   bool
+	AWG      *SubAWG // set for an AmneziaWG device
 }
 
 // SubAWG is what the public page shows about an AmneziaWG device. The keys are not part of it: the page fetches
@@ -270,11 +288,6 @@ func compareSubscriptionInbounds(a, b store.AccessInboundFull) int {
 	return strings.Compare(a.Inbound.ID, b.Inbound.ID)
 }
 
-// linkDeviceCeiling is how many live devices a user may have before the HWID of one more app is no longer given a device of
-// its own: twice the limit. The limit itself is only counted at this step (the mode that refuses comes later); the ceiling
-// is what a client that sends a new HWID with every request runs into.
-func linkDeviceCeiling(limit int) int { return 2 * limit }
-
 // subView builds the view of one user; touch is an app's fetch: it makes the request's device and its credentials and
 // records the fetch on the device. The page and the preview (touch false) write nothing.
 func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, opt SubOptions) (SubView, error) {
@@ -317,7 +330,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		awgByID[d.ID] = d
 	}
 	for _, d := range devs {
-		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && userOnline}
+		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && userOnline}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
 				if happ, amnezia, _ := clientApps(p); happ {
@@ -358,11 +371,17 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
 	g, full := data.Group, data.Inbounds
 	if touch {
-		if rd, err = s.ensureLinkCreds(ctx, u, opt.Device, rd); err != nil {
+		if rd, v.Refusal, err = s.ensureLinkCreds(ctx, u, opt.Device, rd, data); err != nil {
 			return SubView{}, err
 		}
-		if opt.Format == plugin.FormatMihomo {
-			rd = s.ensureMihomoAWG(ctx, u, g, full, opt.Device, rd)
+		if v.Refusal == "" && opt.Format == plugin.FormatMihomo {
+			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, g, full, opt.Device, rd, data)
+		}
+		if v.Refusal != "" {
+			if rd.added {
+				s.notify.StateChanged()
+			}
+			return v, nil // a refused app gets no server, and the request wrote nothing for it
 		}
 		if rd.added {
 			s.notify.StateChanged()
@@ -541,6 +560,17 @@ type requestDevice struct {
 	added bool
 }
 
+// subDeviceKind is SubDevice.Kind of a device.
+func subDeviceKind(d store.AccessDevice) string {
+	switch {
+	case d.Kind == store.DeviceKindKey:
+		return "key"
+	case d.Implicit:
+		return "shared"
+	}
+	return "link"
+}
+
 // sharedDevice is the shared device among the user's devices, or none.
 func sharedDevice(devs []store.AccessDevice) store.AccessDevice {
 	for _, d := range devs {
@@ -552,39 +582,102 @@ func sharedDevice(devs []store.AccessDevice) store.AccessDevice {
 }
 
 // ensureLinkCreds makes the request's device hold a credential for every protocol the user's apps allow. A device that
-// has them all costs nothing (this is the path of every fetch of a known device). Otherwise one store call fills it in,
-// takes the shared device over for the first HWID of the user, or creates the device. A user with twice the limit in live
-// devices already gets no device for one more HWID: that app takes the shared place, as an app without a HWID does.
-func (s *Service) ensureLinkCreds(ctx context.Context, u store.AccessUser, hint DeviceHint, rd requestDevice) (requestDevice, error) {
+// has them all costs nothing (this is the path of every fetch of a known device). Otherwise the snapshot may already refuse the
+// request (admit: reads only), and one store call fills the device in, takes the shared device over for the first HWID of the
+// user, creates the device, or, in ENFORCE and STRICT, creates it in the place of a device that has been silent for 30 days.
+// In TRACK a user with twice the limit in live devices gets no device for one more HWID: that app takes the shared place, as
+// an app without a HWID does. refusal is a Refusal* reason, "" when the request is served.
+func (s *Service) ensureLinkCreds(ctx context.Context, u store.AccessUser, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string, error) {
 	have := make(map[string]bool, len(rd.dev.Protocols))
 	for _, protocol := range rd.dev.Protocols {
 		have[protocol] = true
 	}
 	if len(s.missingProtocols(u.AppHapp, u.AppAmnezia, have)) == 0 {
-		return rd, nil // a user of the Amnezia app alone has none to give, and no device is made for nothing
+		return rd, "", nil // a user of the Amnezia app alone has none to give, and no device is made for nothing
+	}
+	if refusal := s.admit(u, rd, data); refusal != "" {
+		return rd, refusal, nil
 	}
 	m := hint.meta()
 	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, HWIDHash: rd.hash, Implicit: rd.hash == nil,
 		Platform: m.Platform, Model: m.Model, OSVersion: m.OSVersion, Client: m.Client}
-	ceiling := 0
-	if rd.hash != nil {
-		ceiling = linkDeviceCeiling(u.DeviceLimit)
-	}
-	res, err := s.st.Access().EnsureLinkDevice(ctx, template, ceiling, s.now(), func(deviceID string, have map[string]bool) ([]store.AccessCred, error) {
+	res, err := s.st.Access().EnsureLinkDevice(ctx, template, u.DeviceLimit, s.now(), func(deviceID string, have map[string]bool) ([]store.AccessCred, error) {
 		return s.newCreds(u.ID, deviceID, u.AppHapp, u.AppAmnezia, have)
 	})
-	var limit *store.AccessLimitError
-	if errors.As(err, &limit) {
-		hint.HWID = ""
-		return s.ensureLinkCreds(ctx, u, hint, requestDevice{})
-	}
 	if err != nil {
-		return rd, err
+		if refusal, fallback := s.refusalOf(u, err); refusal != "" {
+			return rd, refusal, nil
+		} else if fallback {
+			hint.HWID = ""
+			return s.ensureLinkCreds(ctx, u, hint, requestDevice{}, data)
+		}
+		return rd, "", err
 	}
 	if res.Device.ID == "" {
-		return rd, nil
+		return rd, "", nil
 	}
-	return requestDevice{dev: res.Device, creds: res.Creds, hash: rd.hash, added: len(res.Added) > 0}, nil
+	s.placed(u, data, res)
+	return requestDevice{dev: res.Device, creds: res.Creds, hash: rd.hash, added: len(res.Added) > 0}, "", nil
+}
+
+// admit is the refusal the snapshot of a fetch already holds for a request whose device does not exist yet. The store makes
+// the same decision again, with guards, when it is called; this one only spares the call (and its reads) to an app that is
+// refused on every refresh.
+func (s *Service) admit(u store.AccessUser, rd requestDevice, data store.SubscriptionData) string {
+	err := data.LinkRefusal(u.DeviceLimit, rd.hash != nil, s.now())
+	if err == nil {
+		return ""
+	}
+	refusal, _ := s.refusalOf(u, err)
+	return refusal
+}
+
+// refusalOf maps what the store said about a new device to a Refusal* reason. fallback: TRACK has no room for this HWID, and
+// the app takes the shared place instead. A limit that was reached makes the device_limit_reached event, once an hour.
+func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fallback bool) {
+	var limit *store.AccessLimitError
+	switch {
+	case errors.Is(err, store.ErrAccessBlocked):
+		return RefusalDeviceBlocked, false
+	case errors.Is(err, store.ErrNoSharedDevice):
+		return RefusalNoDeviceID, false
+	case errors.As(err, &limit):
+		s.limitReached(u.ID, limit.Used, u.DeviceLimit)
+		if limit.Mode == store.LinkModeTrack {
+			return "", true
+		}
+		return RefusalDeviceLimit, false
+	}
+	return "", false
+}
+
+// placed records what a device that was made in this request means for the limit: in TRACK, a person who now has more
+// devices than the limit is an event for the owner to see. A place that a silent device gave away is no such case.
+func (s *Service) placed(u store.AccessUser, data store.SubscriptionData, res store.LinkDeviceResult) {
+	if res.Born && u.DeviceLimit > 0 && res.Replaced == "" && len(data.Devices) >= u.DeviceLimit {
+		s.limitReached(u.ID, len(data.Devices)+1, u.DeviceLimit)
+	}
+}
+
+// limitReached writes the device_limit_reached event off the request (the store keeps one an hour per user; the same hour is
+// remembered here too, so that a refused app that keeps asking does not even queue the read). On Cloudflare the work runs
+// after the response (AfterResponse).
+func (s *Service) limitReached(userID string, used, limit int) {
+	now := s.now()
+	key := "lim:" + userID
+	if at, seen := s.limited.LoadOrStore(key, now); seen {
+		if now.Sub(at.(time.Time)) < time.Hour {
+			return
+		}
+		s.limited.Store(key, now)
+	}
+	s.afterResponse(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.st.RecordDeviceLimitReached(ctx, userID, used, limit, now); err != nil {
+			s.log.Warn("access: device limit event", "user", userID, "err", err)
+		}
+	})
 }
 
 // placeholderSecrets fills secrets with a throwaway one for every protocol the user's apps allow and that has none: what the
@@ -616,11 +709,13 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 
 // ensureMihomoAWG gives the request's device an AWG credential for every AWG profile the user can use, for the Mihomo
 // format (see SubOptions). added reports whether any was made. A full profile network is logged and only that profile's
-// proxy is skipped; the subscription itself must not fail for it, nor for the ceiling of devices (the shared device then).
-func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, hint DeviceHint, rd requestDevice) requestDevice {
+// proxy is skipped; the subscription itself must not fail for it, nor for the ceiling of devices in TRACK (the shared device
+// then). The device may be born here (a person with only the AmneziaVPN access has no link credential to be born with): it
+// is refused like in ensureLinkCreds, and refusal says so.
+func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string) {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
-		return rd
+		return rd, ""
 	}
 	m := hint.meta()
 	template := store.AccessDevice{ID: rd.dev.ID, UserID: u.ID, HWIDHash: rd.hash, Implicit: rd.hash == nil,
@@ -652,30 +747,33 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		})
 	}
 	if len(want) == 0 {
-		return rd
+		return rd, ""
 	}
-	ceiling := 0
-	if rd.hash != nil {
-		ceiling = linkDeviceCeiling(u.DeviceLimit)
+	if rd.dev.ID == "" {
+		if refusal := s.admit(u, rd, data); refusal != "" {
+			return rd, refusal
+		}
 	}
-	result, err := s.st.Access().EnsureLinkAWGCreds(ctx, template, ceiling, s.now(), want)
-	var limit *store.AccessLimitError
-	if errors.As(err, &limit) {
-		// No device of its own for this HWID: the shared device holds the proxies, as for an app without a HWID.
-		hint.HWID = ""
-		return s.ensureMihomoAWG(ctx, u, g, full, hint, requestDevice{added: rd.added})
-	}
+	result, err := s.st.Access().EnsureLinkAWGCreds(ctx, template, u.DeviceLimit, s.now(), want)
 	if err != nil {
+		if refusal, fallback := s.refusalOf(u, err); refusal != "" {
+			return rd, refusal
+		} else if fallback {
+			// No device of its own for this HWID: the shared device holds the proxies, as for an app without a HWID.
+			hint.HWID = ""
+			return s.ensureMihomoAWG(ctx, u, g, full, hint, requestDevice{added: rd.added}, data)
+		}
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "user", u.ID, "err", err)
-		return rd
+		return rd, ""
 	}
 	for _, profileID := range result.FullProfiles {
 		s.log.Warn("access: AWG profile network is full for a Mihomo subscription", "user", u.ID, "profile", profileID, "err", store.ErrAccessSubnetFull)
 	}
 	if result.Device.ID == "" {
-		return rd
+		return rd, ""
 	}
-	return requestDevice{dev: result.Device, creds: result.Creds, hash: rd.hash, added: rd.added || len(result.Added) > 0}
+	s.placed(u, data, result)
+	return requestDevice{dev: result.Device, creds: result.Creds, hash: rd.hash, added: rd.added || len(result.Added) > 0}, ""
 }
 
 // deviceTouchEvery is how stale a device's last_seen_at must be before a subscription fetch refreshes it.

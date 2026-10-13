@@ -188,6 +188,57 @@ func addM3Rules(s *adminv1.SubscriptionSettings) bool {
 	return changed
 }
 
+// The mode of the device limit (SubscriptionSettings.link_device_limit) is stored under its own setting, not in the
+// document: the store reads it inside the batch that decides on a device (a fetch and the switch to STRICT are ordered by it),
+// and an installation that never saved the document keeps the live Defaults(). Its presence is also the marker of
+// MigrateLinkDeviceLimit.
+
+// linkModeProto maps a stored mode to the enum; nothing and anything unknown is TRACK (store.LinkModeOf).
+func linkModeProto(stored string) adminv1.LinkDeviceLimit {
+	switch store.LinkModeOf(stored) {
+	case store.LinkModeEnforce:
+		return adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_ENFORCE
+	case store.LinkModeStrict:
+		return adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT
+	}
+	return adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_TRACK
+}
+
+// linkModeStored maps the enum to the stored word; "" for UNSPECIFIED (leave the stored mode alone).
+func linkModeStored(m adminv1.LinkDeviceLimit) string {
+	switch m {
+	case adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_TRACK:
+		return store.LinkModeTrack
+	case adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_ENFORCE:
+		return store.LinkModeEnforce
+	case adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT:
+		return store.LinkModeStrict
+	}
+	return ""
+}
+
+// MigrateLinkDeviceLimit gives an installation the mode of its device limit, once: a panel that has users counts only
+// (TRACK, so that nobody over the limit is cut off by an upgrade: the owner raises limits and switches to ENFORCE himself),
+// a panel with none refuses from the start (ENFORCE). The setting is its own marker, written only when absent, so a mode the
+// owner chose is never overwritten and isolates that start together agree on the first value. Idempotent.
+func MigrateLinkDeviceLimit(ctx context.Context, st *store.Store) error {
+	if _, err := st.Setting(ctx, store.SettingLinkDeviceLimit); err == nil {
+		return nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	has, err := st.HasUsers(ctx)
+	if err != nil {
+		return err
+	}
+	mode := store.LinkModeEnforce
+	if has {
+		mode = store.LinkModeTrack
+	}
+	_, err = st.SetSettingsIfAbsent(ctx, map[string]string{store.SettingLinkDeviceLimit: mode})
+	return err
+}
+
 var (
 	nameKnown = map[string]bool{"{flag}": true, "{country}": true, "{node}": true, "{profile}": true}
 	addKnown  = map[string]bool{"{url}": true, "{url_enc}": true, "{name_enc}": true}
@@ -252,6 +303,9 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	}
 	if err := text("announcement", s.Announcement, maxAnnouncement); err != nil {
 		return err
+	}
+	if _, ok := adminv1.LinkDeviceLimit_name[int32(s.GetLinkDeviceLimit())]; !ok {
+		return invalid("link_device_limit: unknown mode")
 	}
 	if err := httpsURL("support_url", s.SupportUrl, true); err != nil {
 		return err
@@ -358,15 +412,21 @@ var (
 	unmarshal = protojson.UnmarshalOptions{DiscardUnknown: true}
 )
 
-// Load reads the stored settings; an install that never saved any gets Defaults().
+// Load reads the stored settings; an install that never saved any gets Defaults(). The mode of the device limit, which has a
+// setting of its own (see linkModeKey), is merged in: a panel that was never given one reads as TRACK.
 func Load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, error) {
-	v, err := st.Setting(ctx, Key)
-	if errors.Is(err, store.ErrNotFound) {
-		return Defaults(), nil
-	} else if err != nil {
+	kv, err := st.SettingValues(ctx, []string{Key, store.SettingLinkDeviceLimit})
+	if err != nil {
 		return nil, err
 	}
-	return Parse(v)
+	set := Defaults()
+	if v, ok := kv[Key]; ok {
+		if set, err = Parse(v); err != nil {
+			return nil, err
+		}
+	}
+	set.LinkDeviceLimit = linkModeProto(kv[store.SettingLinkDeviceLimit]).Enum()
+	return set, nil
 }
 
 // Parse reads a stored subscription-settings document. Missing documents should use Defaults instead.
@@ -394,8 +454,8 @@ type Cache struct {
 	at  time.Time
 }
 
-// NewCache makes the cache. log may be nil. It also runs MigrateM3 (the panel builds the cache once at start); a
-// failure is logged and the next start tries again.
+// NewCache makes the cache. log may be nil. It also runs MigrateM3 and MigrateLinkDeviceLimit (the panel builds the cache
+// once at start, in both editions); a failure is logged and the next start tries again.
 func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	if log == nil {
 		log = slog.Default()
@@ -404,6 +464,9 @@ func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	defer cancel()
 	if err := MigrateM3(ctx, st); err != nil {
 		log.Warn("subscription settings: the Mihomo format rules were not added", "err", err)
+	}
+	if err := MigrateLinkDeviceLimit(ctx, st); err != nil {
+		log.Warn("subscription settings: the device limit mode was not set", "err", err)
 	}
 	return &Cache{st: st, log: log, now: time.Now, ttl: time.Minute}
 }
@@ -432,23 +495,42 @@ func (c *Cache) Invalidate() {
 	c.mu.Unlock()
 }
 
-// Update validates, stores and caches s (a copy is stored; s itself is not kept).
+// Update validates, stores and caches s (a copy is stored; s itself is not kept). See UpdateRevoking.
 func (c *Cache) Update(ctx context.Context, s *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
+	out, _, err := c.UpdateRevoking(ctx, s)
+	return out, err
+}
+
+// UpdateRevoking is Update that also says how many people lost their shared device to a switch to STRICT, which revokes
+// them in the same batch that stores the mode (the caller tells the nodes). s.link_device_limit unset leaves the stored mode
+// as it is; the returned settings always carry the mode in force.
+func (c *Cache) UpdateRevoking(ctx context.Context, s *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, int, error) {
 	s = proto.Clone(s).(*adminv1.SubscriptionSettings)
 	s.DefaultDnsPresetId = "" // lives in the DNS module
 	Normalize(s)
 	if err := Validate(s); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	mode := linkModeStored(s.GetLinkDeviceLimit())
+	s.LinkDeviceLimit = nil // not part of the document
 	b, err := marshal.Marshal(s)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	if err := c.st.SetSettings(ctx, map[string]string{Key: string(b)}); err != nil {
-		return nil, err
+	revoked, err := c.st.SaveSubscriptionSettings(ctx, map[string]string{Key: string(b)}, mode, c.now())
+	if err != nil {
+		return nil, 0, err
 	}
+	if mode == "" { // unset: the mode in force is the stored one
+		stored, err := c.st.Setting(ctx, store.SettingLinkDeviceLimit)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return nil, 0, err
+		}
+		mode = stored
+	}
+	s.LinkDeviceLimit = linkModeProto(mode).Enum()
 	c.mu.Lock()
 	c.cur, c.at = s, c.now()
 	c.mu.Unlock()
-	return s, nil
+	return s, revoked, nil
 }

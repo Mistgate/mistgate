@@ -333,6 +333,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.suspect(suspect)
 		}
 		if res != nil {
+			h.notSupported(w, r, hint, app)
 			h.respond(w, r, token, *res, set, sf, format)
 			return
 		}
@@ -362,7 +363,17 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	st.remember(v, key, now, app, h.cfg.MinInterval)
+	h.notSupported(w, r, hint, app)
 	h.respond(w, r, token, v, set, sf, format)
+}
+
+// notSupported tells an app that sent an X-HWID header the panel cannot use (not [A-Za-z0-9=-]{10,64}) that it was taken for
+// an app with no device ID: X-Hwid-Not-Supported, as Remnawave does. The view is the one of a request without a HWID (and may
+// come from the cache), so the header is set apart from it.
+func (h *handler) notSupported(w http.ResponseWriter, r *http.Request, hint access.DeviceHint, app bool) {
+	if app && hint.HWID == "" && firstHeader(r, "X-Hwid") != "" {
+		w.Header().Set("X-Hwid-Not-Supported", "true")
+	}
 }
 
 // fetch builds the view of a token in a format; a Source that cannot render formats gets the URI list. touch: an app
@@ -446,7 +457,7 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	if hours == 0 {
 		hours = subsettings.DefaultUpdateHours
 	}
-	if v.Status != access.StatusActive {
+	if v.Status != access.StatusActive || v.Refusal != "" {
 		hours = updateHoursNoAccess
 	}
 	hd.Set("Profile-Update-Interval", strconv.Itoa(hours))
@@ -464,6 +475,17 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	}
 	if u := set.GetSupportUrl(); u != "" {
 		hd.Set("Support-Url", u)
+	}
+	if v.Refusal != "" {
+		// The headers of Remnawave, 3x-ui and v2RayTun, so the apps that read them say the same: the HWID check is on, and
+		// either the limit is reached (a blocked device is turned away the same way) or the app has no device ID to give.
+		hd.Set("X-Hwid-Active", "true")
+		if v.Refusal == access.RefusalNoDeviceID {
+			hd.Set("X-Hwid-Not-Supported", "true")
+		} else {
+			hd.Set("X-Hwid-Max-Devices-Reached", "true")
+		}
+		hd.Set("X-Hwid-Limit", strconv.Itoa(v.DeviceLimit))
 	}
 	if h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
 		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {

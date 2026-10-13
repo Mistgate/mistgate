@@ -265,7 +265,7 @@ func (a Access) collectUsers(ctx context.Context, rows *sql.Rows) ([]AccessUser,
 	return out, nrows.Err()
 }
 
-// AccessUserQuery is a list request. Filter is "", "online", "expiring" or "over_quota".
+// AccessUserQuery is a list request. Filter is "", "online", "expiring", "over_quota" or "over_device_limit".
 type AccessUserQuery struct {
 	Filter            string
 	Query             string
@@ -295,7 +295,11 @@ const (
 )
 
 // AccessUserCounts are the filter chip badges for one query, ignoring the filter itself.
-type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline int }
+type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline, OverDeviceLimit int }
+
+// accOverDeviceLimit is the condition "the user has more live devices than the limit" over the device_counts join (dc): the
+// same count as devices_used. A limit of 0 is no limit, never over.
+const accOverDeviceLimit = `u.device_limit > 0 AND coalesce(dc.devices_used, 0) > u.device_limit`
 
 const accExpiringWindow = 7 * 24 * time.Hour
 
@@ -363,6 +367,7 @@ func accUserListQuery(q AccessUserQuery, base string, baseArgs []any, lconds str
 		sort = AccessUserSortName
 	}
 	orderBy, needsDeviceCounts := accUserSortOrder(sort, q.Descending)
+	needsDeviceCounts = needsDeviceCounts || q.Filter == "over_device_limit"
 	from := accUserFrom
 	if needsDeviceCounts {
 		from += `LEFT JOIN device_counts dc ON dc.user_id = u.id `
@@ -415,10 +420,11 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 		   coalesce(sum(u.disabled = 0 AND u.expires_at IS NOT NULL AND u.expires_at > ? AND u.expires_at <= ?), 0),
 		   coalesce(sum(u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes), 0),
 		   coalesce(sum(coalesce(dc.devices_used, 0)), 0),
-		   coalesce(sum(coalesce(dc.devices_online, 0)), 0)`+accUserFrom+
+		   coalesce(sum(coalesce(dc.devices_online, 0)), 0),
+		   coalesce(sum(`+accOverDeviceLimit+`), 0)`+accUserFrom+
 			`LEFT JOIN device_counts dc ON dc.user_id = u.id WHERE `+base,
 		countArgs...).
-		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota, &counts.DevicesUsed, &counts.DevicesOnline)
+		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota, &counts.DevicesUsed, &counts.DevicesOnline, &counts.OverDeviceLimit)
 	if err != nil {
 		return nil, false, counts, err
 	}
@@ -433,6 +439,8 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 		largs = append(largs, now, soon)
 	case "over_quota":
 		lconds += ` AND u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes`
+	case "over_device_limit":
+		lconds += ` AND ` + accOverDeviceLimit
 	}
 	sort := q.Sort
 	if sort == AccessUserSortUnspecified {
@@ -600,9 +608,13 @@ type SubscriptionData struct {
 	// none) and its live credentials. The zero value: there is none (yet).
 	Device      AccessDevice
 	DeviceCreds []AccessCred
-	Group       AccessGroup
-	Inbounds    []AccessInboundFull
-	LiveNodes   []NodeLiveRow
+	// LinkMode is the stored mode of the device limit (LinkModeTrack, LinkModeEnforce or LinkModeStrict), read in the same batch.
+	// Blocked: the owner blocked the HWID this request reports (always false for a request without one).
+	LinkMode  string
+	Blocked   bool
+	Group     AccessGroup
+	Inbounds  []AccessInboundFull
+	LiveNodes []NodeLiveRow
 }
 
 type subscriptionTraffic struct{ Up, Down uint64 }
@@ -745,6 +757,8 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
 	var deviceRows []linkDeviceCredRow
+	var mode string
+	var blocked int
 	var group AccessGroup
 	var groupProfileIDs []string
 	var inbounds []AccessInboundFull
@@ -764,6 +778,10 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
 	// Read without access too: a denied fetch still touches the device (access.subView).
 	r.add(appendRows(&deviceRows, scanLinkDeviceCredRow), linkDeviceCredsSQL, userID, hwidArg(hwidHash))
+	r.add(oneRow(&mode, scanString), `SELECT coalesce((SELECT v FROM setting WHERE k = ?), '') AS mode`, SettingLinkDeviceLimit)
+	if len(hwidHash) > 0 {
+		r.add(oneRow(&blocked, scanCount), `SELECT count(*) AS n FROM device WHERE user_id = ? AND hwid_hash = ? AND blocked_at IS NOT NULL`, userID, hwidHash)
+	}
 	if active {
 		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
@@ -785,7 +803,8 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	}
 	snapshot := linkDeviceSnapshotOf(deviceRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Device: snapshot.Device, DeviceCreds: snapshot.Creds}
+		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
+		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
 	if active {
 		out.Group.ProfileIDs = groupProfileIDs
 	}
@@ -930,26 +949,27 @@ func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time, 
 // RevokeDevice soft-deletes a live device and its credentials and returns its user id; ErrNotFound when
 // the device does not exist or is already revoked.
 func (a Access) RevokeDevice(ctx context.Context, id string, now time.Time) (string, error) {
-	results, err := a.s.batch(ctx,
-		guard(`EXISTS (SELECT 1 FROM device WHERE id = ? AND revoked_at IS NULL)`, id),
-		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE id = ?`, Args: []any{unix(now), id}},
-		// The tunnel addresses of its AWG credentials go into quarantine (released_at > 0).
-		Stmt{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
-		   (SELECT id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL)`, Args: []any{unix(now), id}},
-		Stmt{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL`, Args: []any{unix(now), id}},
-		Stmt{Query: `SELECT user_id FROM device WHERE id = ?`, Args: []any{id}, Returning: true},
-	)
+	return a.revokeDevice(ctx, id, now, `EXISTS (SELECT 1 FROM device WHERE id = ? AND revoked_at IS NULL)`)
+}
+
+// revokeDevice runs the revoke of id under the guard (a condition with one ?, the id). extra statements follow the revoke.
+func (a Access) revokeDevice(ctx context.Context, id string, now time.Time, cond string, extra ...Stmt) (string, error) {
+	stmts := append([]Stmt{guard(cond, id)}, revokeDeviceStmts(id, now)...)
+	stmts = append(stmts, extra...)
+	stmts = append(stmts, Stmt{Query: `SELECT user_id FROM device WHERE id = ?`, Args: []any{id}, Returning: true})
+	results, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {
 		return "", ErrNotFound
 	}
 	if err != nil {
 		return "", err
 	}
-	if len(results[4].Rows) == 0 {
+	rows := results[len(results)-1].Rows
+	if len(rows) == 0 {
 		return "", ErrNotFound
 	}
 	var userID string
-	if err := batchRow(results[4].Rows[0]).Scan(&userID); err != nil {
+	if err := batchRow(rows[0]).Scan(&userID); err != nil {
 		return "", err
 	}
 	return userID, nil

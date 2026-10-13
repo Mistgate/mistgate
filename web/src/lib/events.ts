@@ -32,6 +32,7 @@ const textKeys: Record<string, MessageKey> = {
   disk_low: "event.disk_low",
   credential_expired: "event.credential_expired",
   device_limit_reached: "event.device_limit_reached",
+  device_replaced: "event.device_replaced",
   hop_failed: "event.hop_failed",
   hop_rejected: "event.hop_rejected",
   tunnel_failed: "event.tunnel_failed",

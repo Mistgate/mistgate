@@ -84,8 +84,9 @@ func TestLinkDeviceWithAWGCredentialsIsNotAKey(t *testing.T) {
 	if _, err := s.Access().AWGDeviceScope(ctx, "dev_link"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("AWGDeviceScope(link) = %v, want ErrNotFound", err)
 	}
-	if err := s.Access().RenameDevice(ctx, "dev_link", "renamed"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("RenameDevice(link) = %v, want ErrNotFound", err)
+	// Not the AWG operations; naming is for any device with a name of its own (RenameDevice), the key and the link device alike.
+	if err := s.Access().RenameDevice(ctx, "dev_link", "renamed"); err != nil {
+		t.Fatalf("RenameDevice(link) = %v, want nil", err)
 	}
 	if _, err := s.Access().RotateAWGDevice(ctx, "dev_link", time.Now(), func(int) (AccessCred, string, error) {
 		return AccessCred{ID: "crd_rot", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_rot", nil

@@ -85,7 +85,7 @@ func TestEnsureLinkCredsDoesNotAddCredentialToDeviceRevokedAfterRead(t *testing.
 	stored := must(e.st.Access().User(e.ctx, u.Id))
 
 	// The request read the empty device while it was live; it is revoked before the credentials are written.
-	got, err := e.s.ensureLinkCreds(e.ctx, stored, DeviceHint{}, requestDevice{dev: store.AccessDevice{ID: revokedDeviceID, UserID: stored.ID, Implicit: true}})
+	got, _, err := e.s.ensureLinkCreds(e.ctx, stored, DeviceHint{}, requestDevice{dev: store.AccessDevice{ID: revokedDeviceID, UserID: stored.ID, Implicit: true}}, store.SubscriptionData{})
 	if err != nil || !got.added || got.dev.ID == revokedDeviceID {
 		t.Fatalf("ensureLinkCreds after the device was revoked: %+v err=%v", got, err)
 	}

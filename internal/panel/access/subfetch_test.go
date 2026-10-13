@@ -25,12 +25,25 @@ func TestSubscriptionFetchIsReadOnly(t *testing.T) {
 		must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Device: hint}))
 	}
 
+	// A person at the limit of a panel that enforces it: one more HWID is refused, and the refusal reads only.
+	e.setLinkMode("enforce")
+	e.sql(`UPDATE user SET device_limit = 3 WHERE id = ?`, r.User.Id)
+	e.s.afterResponse = func(func()) {} // the limit event is written after the response, and is another test's
+	refused := NewDeviceHint("d3b07384-d113-4ec4-9aa6-238ad5ff0000", "Android", "15", "Pixel 8", "Happ/3.4.2")
+
 	w, err := e.st.W.Conn(e.ctx) // "somebody else" holds the only writer connection
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
 	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(e.ctx, 3*time.Second)
+		start := time.Now()
+		v, err := e.s.SubscriptionWith(ctx, token, SubOptions{Device: refused})
+		cancel()
+		if err != nil || v.Refusal != RefusalDeviceLimit || len(v.Lines) != 0 || time.Since(start) > time.Second {
+			t.Fatalf("refused fetch %d with a busy writer: %v, refusal %q, %d lines, %v", i, err, v.Refusal, len(v.Lines), time.Since(start))
+		}
 		for _, hint := range hints {
 			ctx, cancel := context.WithTimeout(e.ctx, 3*time.Second)
 			start := time.Now()

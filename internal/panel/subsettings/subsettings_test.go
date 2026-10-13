@@ -93,7 +93,9 @@ func TestUpdateInterval(t *testing.T) {
 func TestLoadUpdateAndFallback(t *testing.T) {
 	ctx := context.Background()
 	st := openStore(t)
-	if s, err := Load(ctx, st); err != nil || !proto.Equal(s, Defaults()) {
+	fresh := Defaults() // plus the mode of a panel that never got one
+	fresh.LinkDeviceLimit = adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_TRACK.Enum()
+	if s, err := Load(ctx, st); err != nil || !proto.Equal(s, fresh) {
 		t.Fatalf("fresh database: %v %v", s, err)
 	}
 	c := NewCache(st, nil)

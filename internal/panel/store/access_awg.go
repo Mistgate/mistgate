@@ -52,8 +52,12 @@ func accPublicJSON(s string) string {
 	return s
 }
 
-// AccessLimitError is returned when the user already has as many devices as the limit allows.
-type AccessLimitError struct{ Used, Limit int }
+// AccessLimitError is returned when the user already has as many devices as the limit allows. Limit is the ceiling that was
+// reached (twice the user's limit for a HWID in TRACK mode); Mode is the link-device mode it was decided under ("" for a key).
+type AccessLimitError struct {
+	Used, Limit int
+	Mode        string
+}
 
 func (e *AccessLimitError) Error() string { return fmt.Sprintf("device limit %d/%d", e.Used, e.Limit) }
 
@@ -274,8 +278,9 @@ func scanAWGDeviceProfile(r rowScanner) (awgDeviceProfile, error) {
 // A subscription in the Mihomo format carries AmneziaWG proxies, so the device that fetches it needs a peer per profile.
 // A device that does not exist is born here, as in EnsureLinkDevice (the person with only the AmneziaVPN access and a
 // HWID-reporting Mihomo app has no other credential to be born with): taken over from the shared device, or new under the
-// ceiling (*AccessLimitError at it; 0 = none). A subscription fetch passes its own ceiling and must not fail for it.
-func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, ceiling int, now time.Time, want []AWGImplicitWant) (LinkDeviceResult, error) {
+// ceiling of the stored mode (*AccessLimitError at it, a silent device replaced past it, ErrAccessBlocked, ErrNoSharedDevice:
+// see linkDeviceState.birth); limit is the user's device limit. A subscription fetch must not fail for them.
+func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit int, now time.Time, want []AWGImplicitWant) (LinkDeviceResult, error) {
 	if len(want) == 0 {
 		return LinkDeviceResult{}, nil
 	}
@@ -299,7 +304,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, ceilin
 		var profileEpochs []accessProfileEpoch
 		var taken []awgTakenIndex
 		r := reads{}
-		st.add(&r, userID, dev.HWIDHash)
+		st.add(&r, userID, dev.HWIDHash, now)
 		r.add(appendRows(&profileEpochs, scanAccessProfileEpoch), `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
 		for _, profileID := range profileIDs {
 			r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
@@ -325,7 +330,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, ceilin
 		result.Device, result.Creds = own.Device, own.Creds
 		fresh := dev
 		fresh.ID = "" // the template's id may be that of a device revoked since: a new device always gets a new id
-		b, err := st.birth(fresh, ceiling, now)
+		b, err := st.birth(fresh, limit, now)
 		if err != nil {
 			return nil, err
 		}
@@ -364,6 +369,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, ceilin
 		}
 		stmts := make([]Stmt, 0, len(b.stmts)+len(issues)*4+1)
 		stmts = append(stmts, b.stmts...)
+		result.Replaced, result.Born = b.replaced, b.born
 		for _, issue := range issues {
 			stmts = append(stmts, guard(`
 				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL)
@@ -595,10 +601,11 @@ func (a Access) RecordDeviceConfig(ctx context.Context, credID string, epoch *in
 	return err
 }
 
-// RenameDevice sets the label (device.model) of a live AWG device; ErrNotFound when there is none.
+// RenameDevice sets the label (device.model) of a live device that has a name of its own, a key or a link device that
+// reported a HWID; ErrNotFound when there is none (the shared device is no one's device to name).
 func (a Access) RenameDevice(ctx context.Context, deviceID, label string) error {
 	res, err := a.s.W.ExecContext(ctx,
-		`UPDATE device SET model = ? WHERE id = ? AND revoked_at IS NULL AND kind = 'key'`, label, deviceID)
+		`UPDATE device SET model = ? WHERE id = ? AND revoked_at IS NULL AND (kind = 'key' OR NOT (hwid_hash IS NULL))`, label, deviceID)
 	if err != nil {
 		return err
 	}

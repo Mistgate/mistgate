@@ -74,6 +74,7 @@ type Service struct {
 	afterResponse AfterResponseRunner
 
 	touching                  sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
+	limited                   sync.Map // "lim:<user id>" -> time.Time: when the limit event of the user was last queued (sub.go)
 	touchHookForTest          func(started bool)
 	portChecksReadHookForTest func()
 

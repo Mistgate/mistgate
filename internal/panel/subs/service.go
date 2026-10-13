@@ -33,7 +33,14 @@ type Service struct {
 	brand    func(ctx context.Context) (instance.Settings, error)
 	dns      DefaultPresets // nil = no DNS module: default_dns_preset_id stays empty
 	log      *slog.Logger
+	notify   StateNotifier // told when a switch to STRICT revoked devices; nil = nobody to tell
 }
+
+// StateNotifier is told that credentials left the database and the nodes must hear about it; the fleet implements it.
+type StateNotifier interface{ StateChanged() }
+
+// NotifyWith sets who hears about devices that a switch of the device limit to STRICT revoked.
+func (s *Service) NotifyWith(n StateNotifier) { s.notify = n }
 
 // NewService builds the service; settings is the cache the public handler reads too, brand the loader of the
 // instance brand (for effective_title).
@@ -84,6 +91,11 @@ func (s *Service) GetSubscriptionSettings(ctx context.Context, _ *connect.Reques
 		return nil, s.internal("default dns preset", err)
 	}
 	resp := &adminv1.GetSubscriptionSettingsResponse{Settings: set, EffectiveTitle: s.effectiveTitle(ctx, set)}
+	shared, err := s.st.Access().SharedLinkUsers(ctx)
+	if err != nil {
+		return nil, s.internal("shared link users", err)
+	}
+	resp.SharedLinkUsers = uint32(shared)
 	if resp.SampleGroup, resp.ServerSamples, err = s.nameSamples(ctx); err != nil {
 		return nil, s.internal("server name samples", err)
 	}
@@ -164,7 +176,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
-	set, err := s.settings.Update(ctx, req.Msg.Settings)
+	set, revoked, err := s.settings.UpdateRevoking(ctx, req.Msg.Settings)
 	if errors.Is(err, subsettings.ErrInvalid) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	} else if err != nil {
@@ -182,8 +194,11 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	if err := s.fillDNS(ctx, set); err != nil {
 		return nil, s.internal("default dns preset", err)
 	}
+	if revoked > 0 && s.notify != nil {
+		s.notify.StateChanged() // the shared places are gone from the database: the nodes drop their credentials
+	}
 	// The audit row says that the settings changed and how big they are, never their texts.
-	params, _ := json.Marshal(map[string]int{"apps": len(set.Apps), "rules": len(set.Rules)})
+	params, _ := json.Marshal(map[string]any{"apps": len(set.Apps), "rules": len(set.Rules), "link_device_limit": store.LinkModeOf(linkModeWord(set)), "shared_revoked": revoked})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
 	if ip := auth.ClientIPFrom(ctx); ip.IsValid() {
 		entry.IP = ip.String()
@@ -248,4 +263,15 @@ func (s *Service) TestUserAgent(ctx context.Context, req *connect.Request[adminv
 	}
 	rule, format, browser := Choose(s.settings.Get(ctx), req.Msg.UserAgent)
 	return connect.NewResponse(&adminv1.TestUserAgentResponse{RuleIndex: int32(rule), Format: format, Browser: browser}), nil
+}
+
+// linkModeWord is the stored word of the mode in force in settings (for the audit row).
+func linkModeWord(set *adminv1.SubscriptionSettings) string {
+	switch set.GetLinkDeviceLimit() {
+	case adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_ENFORCE:
+		return store.LinkModeEnforce
+	case adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT:
+		return store.LinkModeStrict
+	}
+	return store.LinkModeTrack
 }
