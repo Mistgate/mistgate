@@ -132,7 +132,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		       u.last_seen_at AS last_traffic_at, COALESCE(d.last_seen_at, 0) AS subscription_fetch_at,
 		       CASE WHEN u.status = 'expired' THEN COALESCE(u.expires_at, 0) ELSE u.last_seen_at END AS access_ended_at
 		FROM user u
-		LEFT JOIN device d ON d.user_id = u.id AND d.hwid_hash IS NULL AND d.revoked_at IS NULL
+		LEFT JOIN device d ON d.user_id = u.id AND d.hwid_hash IS NULL AND d.kind = 'link' AND d.revoked_at IS NULL
 		WHERE u.status IN ('active', 'expired', 'limited')`)
 	reads.add(appendRows(&out.AWGDevices, scanHealthAWGSignal), `
 		SELECT d.id AS device_id, u.id AS user_id, u.name AS user_name, u.status AS user_status,
@@ -143,7 +143,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 		JOIN profile p ON p.id = c.profile_id
 		JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
-		WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL`)
+		WHERE d.revoked_at IS NULL AND d.kind = 'key'`)
 	reads.add(appendRows(&out.NodeHours, scanHealthNodeHour), `
 		SELECT node_id AS node_id, protocol AS protocol, hour_start AS hour_start, peak_users AS peak_users
 		FROM node_traffic_hour

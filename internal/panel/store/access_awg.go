@@ -177,7 +177,7 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 			`SELECT d.user_id, c.id, c.profile_id, ap.idx FROM device d
 				 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 				 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
-				 WHERE d.id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL ORDER BY c.created_at, c.id LIMIT 1`, deviceID).
+				 WHERE d.id = ? AND d.revoked_at IS NULL AND d.kind = 'key' ORDER BY c.created_at, c.id LIMIT 1`, deviceID).
 			Scan(&userID, &oldCred, &profileID, &idx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -206,7 +206,7 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 			SELECT 1 FROM device d
 			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
-			WHERE d.id = ? AND d.user_id = ? AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL
+			WHERE d.id = ? AND d.user_id = ? AND d.revoked_at IS NULL AND d.kind = 'key'
 			AND c.id = ? AND c.profile_id = ? AND ap.idx = ?
 			AND NOT EXISTS (
 				SELECT 1 FROM device_credential c2
@@ -373,14 +373,14 @@ func (a Access) EnsureImplicitAWGCreds(ctx context.Context, userID string, dev A
 		}
 		stmts := make([]Stmt, 0, 2+len(issues)*4)
 		if snapshot.Device.ID == "" {
-			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device WHERE user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL)`, userID))
+			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device WHERE user_id = ? AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)`, userID))
 			stmts = append(stmts, accInsertDeviceStmt(dev))
 		} else {
-			stmts = append(stmts, guard(`EXISTS (SELECT 1 FROM device WHERE id = ? AND user_id = ? AND hwid_hash IS NULL AND revoked_at IS NULL)`, deviceID, userID))
+			stmts = append(stmts, guard(`EXISTS (SELECT 1 FROM device WHERE id = ? AND user_id = ? AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)`, deviceID, userID))
 		}
 		for _, issue := range issues {
 			stmts = append(stmts, guard(`
-				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS NULL AND revoked_at IS NULL)
+				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS NULL AND kind = 'link' AND revoked_at IS NULL)
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
 				AND ?3 NOT IN (`+awgTakenSQL+`)`,
@@ -511,7 +511,7 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 		 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 		 JOIN profile p ON p.id = c.profile_id
-		 WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND `+where+` ORDER BY d.created_at, d.id`, arg)
+		 WHERE d.revoked_at IS NULL AND d.kind = 'key' AND `+where+` ORDER BY d.created_at, d.id`, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -565,7 +565,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
-			WHERE d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL AND d.id = ?`, deviceID)
+			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.id = ?`, deviceID)
 	r.add(oneRow(&user, scanAccessUser), `SELECT `+accUserCols+accUserFrom+`WHERE u.id = (SELECT user_id FROM device WHERE id = ?)`, deviceID)
 	r.add(appendRows(&userNodeIDs, scanString), `SELECT node_id FROM user_node WHERE user_id = (SELECT user_id FROM device WHERE id = ?) ORDER BY node_id`, deviceID)
 	r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
@@ -612,7 +612,7 @@ func (a Access) RecordDeviceConfig(ctx context.Context, credID string, epoch *in
 // RenameDevice sets the label (device.model) of a live AWG device; ErrNotFound when there is none.
 func (a Access) RenameDevice(ctx context.Context, deviceID, label string) error {
 	res, err := a.s.W.ExecContext(ctx,
-		`UPDATE device SET model = ? WHERE id = ? AND revoked_at IS NULL AND hwid_hash IS NOT NULL`, label, deviceID)
+		`UPDATE device SET model = ? WHERE id = ? AND revoked_at IS NULL AND kind = 'key'`, label, deviceID)
 	if err != nil {
 		return err
 	}
@@ -634,7 +634,7 @@ func (a Access) BumpProfileEpoch(ctx context.Context, profileID string) error {
 func (a Access) ProfileLiveAWG(ctx context.Context, profileID string, limit int) (n int, users []string, err error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT u.name FROM device_credential c
-		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL
+		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 		 JOIN user u ON u.id = c.user_id
 		 WHERE c.profile_id = ? AND c.revoked_at IS NULL ORDER BY u.name, c.id`, profileID)
 	if err != nil {
@@ -659,7 +659,7 @@ func (a Access) ProfileLiveAWG(ctx context.Context, profileID string, limit int)
 func (a Access) AWGDevicesPerProfile(ctx context.Context, groupID, userID string) (map[string]int, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT c.profile_id, count(*) FROM device_credential c
-		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.hwid_hash IS NOT NULL
+		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 		 JOIN user u ON u.id = c.user_id
 		 WHERE c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND (? = '' OR u.group_id = ?) AND (? = '' OR u.id = ?)
 		 GROUP BY c.profile_id`, groupID, groupID, userID, userID)

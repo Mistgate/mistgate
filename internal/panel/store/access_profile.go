@@ -116,7 +116,7 @@ func (a Access) DeleteProfile(ctx context.Context, id string, now time.Time) err
 	_, err := a.s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ?)
 			AND NOT EXISTS (SELECT 1 FROM inbound WHERE profile_id = ?)`, id, id),
-		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND hwid_hash IS NOT NULL AND id IN
+		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND kind = 'key' AND id IN
 		   (SELECT device_id FROM device_credential WHERE profile_id = ?)`, Args: []any{unix(now), id}},
 		Stmt{Query: `DELETE FROM profile WHERE id = ?`, Args: []any{id}},
 	)

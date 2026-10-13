@@ -21,11 +21,11 @@ func seedHealthSignals(t *testing.T, s *Store, now time.Time) {
 			VALUES ('usr_limited', 'Limited', 'grp_signals', 'limited', ?, X'02', X'02', ?, ?)`, []any{stamp, stamp, now.Add(-24 * time.Hour).Unix()}},
 		{`INSERT INTO user (id, name, group_id, status, period_start, sub_token_hash, sub_token_enc, created_at, last_seen_at)
 			VALUES ('usr_active', 'Active', 'grp_signals', 'active', ?, X'03', X'03', ?, ?)`, []any{stamp, stamp, now.Add(-2 * 24 * time.Hour).Unix()}},
-		{`INSERT INTO device (id, user_id, hwid_hash, first_seen_at, last_seen_at, created_at) VALUES
-			('dev_expired_implicit', 'usr_expired', NULL, ?, ?, ?),
-			('dev_limited_implicit', 'usr_limited', NULL, ?, ?, ?),
-			('dev_active_implicit', 'usr_active', NULL, ?, ?, ?),
-			('dev_active_awg', 'usr_active', X'01', 0, ?, ?)`, []any{
+		{`INSERT INTO device (id, user_id, hwid_hash, kind, first_seen_at, last_seen_at, created_at) VALUES
+			('dev_expired_implicit', 'usr_expired', NULL, 'link', ?, ?, ?),
+			('dev_limited_implicit', 'usr_limited', NULL, 'link', ?, ?, ?),
+			('dev_active_implicit', 'usr_active', NULL, 'link', ?, ?, ?),
+			('dev_active_awg', 'usr_active', X'01', 'key', 0, ?, ?)`, []any{
 			stamp, now.Add(-time.Hour).Unix(), stamp,
 			stamp, now.Add(-10 * time.Minute).Unix(), stamp,
 			stamp, now.Add(-12 * time.Hour).Unix(), stamp,

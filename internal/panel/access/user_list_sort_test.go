@@ -52,8 +52,8 @@ func addListTestDevice(e *env, userID, deviceID string) {
 }
 
 func addListTestAWGDevice(e *env, userID, profileID, deviceID string, lastSeen int64, idx int) {
-	e.sql(`INSERT INTO device (id, user_id, hwid_hash, first_seen_at, last_seen_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`, deviceID, userID, []byte("awg-"+deviceID), lastSeen, lastSeen, e.clock.Unix())
+	e.sql(`INSERT INTO device (id, user_id, hwid_hash, kind, first_seen_at, last_seen_at, created_at)
+		VALUES (?, ?, ?, 'key', ?, ?, ?)`, deviceID, userID, []byte("awg-"+deviceID), lastSeen, lastSeen, e.clock.Unix())
 	credentialID := "crd_" + deviceID
 	e.sql(`INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, secret_enc, data_json, created_at)
 		VALUES (?, ?, ?, 'awg', ?, ?, '{}', ?)`, credentialID, deviceID, userID, profileID, []byte("sealed"), e.clock.Unix())
