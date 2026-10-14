@@ -171,7 +171,9 @@ func TestCheckerAgainstARealEngine(t *testing.T) {
 				t.Fatalf("%+v", res)
 			}
 			// the split: the tunnel opened first (the handshake is in connect_ms), then one request on the open connection
-			if res.ConnectMS == 0 || res.ConnectMS > res.LatencyMS || res.ResponseMS == 0 || res.ResponseMS >= res.LatencyMS {
+			// (non-zero: it needed no dial). Not compared with the latency: on loopback both are a few milliseconds at most
+			// and can round to the same one; TestRoundSplitsConnectFromResponse holds that with a handshake long enough to see.
+			if res.ConnectMS == 0 || res.ConnectMS > res.LatencyMS || res.ResponseMS == 0 {
 				t.Fatalf("connect %d ms, response %d ms, latency %d ms", res.ConnectMS, res.ResponseMS, res.LatencyMS)
 			}
 			if res.ErrorDetail != "" && !strings.Contains(res.ErrorDetail, "differs") {

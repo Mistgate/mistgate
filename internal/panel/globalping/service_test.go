@@ -50,7 +50,7 @@ func newEnv(t *testing.T) *testEnv {
 		t.Fatal(err)
 	}
 	e := &testEnv{t: t, st: st, v: v, fake: newFakeGlobalping(t), logs: &bytes.Buffer{}, now: time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC), country: "RU"}
-	e.svc, err = New(Config{Store: st, Vault: v, StepUp: func(context.Context) error { e.steps++; return nil }, BaseURL: e.fake.srv.URL,
+	e.svc, err = New(Config{Store: st, Vault: v, StepUp: func(context.Context) error { e.steps++; return nil }, BaseURL: e.fake.srv.URL, HTTPClient: e.fake.client(),
 		PollDelay: time.Millisecond, Log: slog.New(slog.NewTextHandler(e.logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
 		Now:     func() time.Time { e.mu.Lock(); defer e.mu.Unlock(); return e.now },
 		Country: func(context.Context) string { return e.country }})
@@ -506,16 +506,18 @@ func TestSwitchingOffCancelsARoundInFlight(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the round did not end")
 	}
-	n := e.fake.count()
+	// counted as the panel sends them: a GET written just before the switch-off may reach the server's log a moment after
+	// the round has ended, and it was not sent afterwards
+	n := e.fake.sent.Load()
 	time.Sleep(50 * time.Millisecond)
-	if e.fake.count() != n {
+	if e.fake.sent.Load() != n {
 		t.Fatal("requests went on after the round ended")
 	}
 	// a source made before the switch-off does not start either
 	if _, err := src.Measure(context.Background(), round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})); !errors.Is(err, health.ErrCountryStopped) {
 		t.Fatalf("an old source started a round: %v", err)
 	}
-	if e.fake.count() != n {
+	if e.fake.sent.Load() != n {
 		t.Fatal("an old source made a request")
 	}
 }

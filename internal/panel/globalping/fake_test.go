@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -19,7 +20,8 @@ type fakeGlobalping struct {
 	srv *httptest.Server
 
 	mu   sync.Mutex
-	reqs []recorded
+	reqs []recorded   // as the server read them
+	sent atomic.Int32 // as the panel sent them (counted by client): one sent before a cancel can be read after it
 	defs map[string]*fakeDef
 	next int
 
@@ -67,6 +69,19 @@ func newFakeGlobalping(t *testing.T) *fakeGlobalping {
 	t.Cleanup(f.srv.Close)
 	return f
 }
+
+// client is the server's own HTTP client, counting each request in sent as it leaves.
+func (f *fakeGlobalping) client() *http.Client {
+	tr := f.srv.Client().Transport
+	return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		f.sent.Add(1)
+		return tr.RoundTrip(r)
+	})}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func (f *fakeGlobalping) requests() []recorded {
 	f.mu.Lock()
