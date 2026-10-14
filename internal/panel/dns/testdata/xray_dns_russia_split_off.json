@@ -1,0 +1,19 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      },
+      {
+        "address": "1.0.0.1"
+      }
+    ]
+  },
+  "notes": [
+    "split ignored (SplitDirect off)"
+  ]
+}

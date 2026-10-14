@@ -1,0 +1,23 @@
+{
+  "direct": null,
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "tag": "remote",
+        "server": "194.242.2.2",
+        "tls": {
+          "server_name": "dns.mullvad.net"
+        },
+        "detour": "Mistgate"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": null
+}

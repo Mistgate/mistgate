@@ -1,0 +1,23 @@
+{
+  "direct": null,
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "tag": "remote",
+        "server": "94.140.14.14",
+        "tls": {
+          "server_name": "dns.adguard-dns.com"
+        },
+        "detour": "Mistgate"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": null
+}

@@ -1,0 +1,14 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "https://1.1.1.1:8443/custom"
+      }
+    ]
+  },
+  "notes": null
+}

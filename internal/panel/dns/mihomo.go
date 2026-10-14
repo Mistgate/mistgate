@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"fmt"
 	"net/netip"
 	"net/url"
 	"slices"
@@ -51,47 +50,27 @@ const maxBootstrap = 4
 // ("" = no "#group", the queries use the core's own routing). An error means no main server can be expressed; the
 // caller leaves the dns section out.
 func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
-	main, notes := p.mihomoEndpoints(p.Servers)
-	if len(main) == 0 {
-		return MihomoDNS{}, fmt.Errorf("dns: Mihomo cannot carry any main server of preset %q", p.Name)
+	main, split, notes, err := p.ClientPlan(ClientMihomo)
+	if err != nil {
+		return MihomoDNS{}, err
 	}
 	out := MihomoDNS{Notes: notes}
-	var boot []Endpoint
+	boot := slices.Clone(main)
 	for _, e := range main {
 		out.Nameserver = appendUniq(out.Nameserver, mihomoServer(e, group))
 		if e.Kind == KindPlain {
 			out.ProxyServerNameserver = appendUniq(out.ProxyServerNameserver, mihomoServer(e, ""))
 		}
-		boot = append(boot, e)
 	}
-	if len(p.Split) > 0 && !p.SplitDirect {
-		out.Notes = append(out.Notes, "split ignored (SplitDirect off)")
-	}
-	if p.SplitDirect {
-		for i, r := range p.Split {
-			seps, snotes := p.mihomoEndpoints(r.Servers)
-			out.Notes = append(out.Notes, snotes...)
-			if len(seps) == 0 {
-				out.Notes = append(out.Notes, fmt.Sprintf("split rule %d dropped: no server Mihomo can carry", i+1))
-				continue
-			}
-			var servers []string
-			for _, e := range seps {
-				servers = appendUniq(servers, mihomoServer(e, ""))
-				boot = append(boot, e)
-			}
-			for _, sfx := range r.Suffixes {
-				body, err := hostname(suffixBody(sfx)) // punycode, lower case; a stored non-ASCII suffix is converted here
-				if err != nil {
-					out.Notes = append(out.Notes, fmt.Sprintf("suffix %q skipped: not a host name", sfx))
-					continue
-				}
-				if slices.Contains(out.Direct, body) {
-					continue // the first rule that names a suffix wins, like Happ's DirectSites
-				}
-				out.Direct = append(out.Direct, body)
-				out.Policy = append(out.Policy, MihomoPolicy{Domain: "+." + body, Servers: servers})
-			}
+	for _, sp := range split {
+		var servers []string
+		for _, e := range sp.Endpoints {
+			servers = appendUniq(servers, mihomoServer(e, ""))
+			boot = append(boot, e)
+		}
+		for _, body := range sp.Suffixes {
+			out.Direct = append(out.Direct, body)
+			out.Policy = append(out.Policy, MihomoPolicy{Domain: "+." + body, Servers: servers})
 		}
 	}
 	if len(out.ProxyServerNameserver) == 0 {
@@ -99,17 +78,6 @@ func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
 	}
 	out.DefaultNameserver = bootstrapIPs(boot)
 	return out, nil
-}
-
-// mihomoEndpoints is Resolve(ClientMihomo, ...) for a server list with the IPv6 resolver addresses left out: the
-// profile switches IPv6 answers off (the nodes may have no IPv6), so a resolver reached over IPv6 only adds noise. They
-// are kept only when nothing else is left of the list and the preset allows IPv6.
-func (p Preset) mihomoEndpoints(servers []Server) ([]Endpoint, []string) {
-	eps, notes := Resolve(ClientMihomo, p.Transport, servers, true)
-	if len(eps) == 0 && !p.IPv4Only {
-		return Resolve(ClientMihomo, p.Transport, servers, false)
-	}
-	return eps, notes
 }
 
 // mihomoServer is the nameserver string of an endpoint: plain "ip" / "ip:port" (IPv6 in brackets), DoT as tls://,

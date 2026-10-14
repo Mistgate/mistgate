@@ -1,0 +1,17 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "9.9.9.9"
+      },
+      {
+        "address": "149.112.112.112"
+      }
+    ]
+  },
+  "notes": null
+}

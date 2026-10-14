@@ -1,0 +1,23 @@
+{
+  "direct": null,
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "Mistgate"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": [
+    "server 2606:4700:4700::1111 skipped: IPv6",
+    "server [2606:4700:4700::1111]:53 skipped: IPv6"
+  ]
+}

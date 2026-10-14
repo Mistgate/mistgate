@@ -1,0 +1,17 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "hosts": {
+      "dns.adguard-dns.com": "94.140.14.14"
+    },
+    "servers": [
+      {
+        "address": "https://dns.adguard-dns.com/dns-query"
+      }
+    ]
+  },
+  "notes": null
+}

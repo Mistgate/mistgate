@@ -1,0 +1,29 @@
+{
+  "direct": [
+    "ru"
+  ],
+  "directIPs": [
+    "8.8.8.8"
+  ],
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "hosts": {
+      "dns.adguard-dns.com": "94.140.14.14",
+      "dns.google": "8.8.8.8"
+    },
+    "servers": [
+      {
+        "address": "https://dns.adguard-dns.com/dns-query"
+      },
+      {
+        "address": "https://dns.google/dns-query",
+        "domains": [
+          "domain:ru"
+        ],
+        "skipFallback": true
+      }
+    ]
+  },
+  "notes": null
+}

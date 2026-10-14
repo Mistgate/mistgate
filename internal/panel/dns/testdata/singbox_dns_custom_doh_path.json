@@ -1,0 +1,22 @@
+{
+  "direct": null,
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "server_port": 8443,
+        "path": "/custom",
+        "detour": "Mistgate"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": null
+}

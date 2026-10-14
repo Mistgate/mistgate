@@ -1,0 +1,28 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "hosts": {
+      "dns.adguard-dns.com": "94.140.14.14"
+    },
+    "servers": [
+      {
+        "address": "9.9.9.9",
+        "port": 5353
+      },
+      {
+        "address": "https://dns.adguard-dns.com/custom"
+      },
+      {
+        "address": "https://1.1.1.1:8443/dns-query"
+      }
+    ]
+  },
+  "notes": [
+    "server dns.example.com:8853 skipped: DoT not supported",
+    "server dns.quad9.net skipped: DoT not supported",
+    "server https://unknown.example.com/dns-query skipped: no bootstrap IP"
+  ]
+}

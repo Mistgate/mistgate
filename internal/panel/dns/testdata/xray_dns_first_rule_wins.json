@@ -1,0 +1,46 @@
+{
+  "direct": [
+    "a.example",
+    "b.example"
+  ],
+  "directIPs": [
+    "77.88.8.8",
+    "77.88.8.1",
+    "77.88.8.2"
+  ],
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      },
+      {
+        "address": "77.88.8.8",
+        "domains": [
+          "domain:a.example"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "77.88.8.1",
+        "domains": [
+          "domain:b.example"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "77.88.8.2",
+        "domains": [
+          "domain:b.example"
+        ],
+        "skipFallback": true
+      }
+    ]
+  },
+  "notes": [
+    "suffix \"bad,suffix\" skipped: not a host name",
+    "server no/such skipped: not in the catalog",
+    "split rule 4 dropped: no server Xray can carry"
+  ]
+}

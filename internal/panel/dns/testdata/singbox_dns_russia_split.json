@@ -1,0 +1,43 @@
+{
+  "direct": [
+    "ru",
+    "su",
+    "xn--p1ai"
+  ],
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "Mistgate"
+      },
+      {
+        "type": "udp",
+        "tag": "split-1",
+        "server": "77.88.8.8"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "ru",
+          "su",
+          "xn--p1ai"
+        ],
+        "action": "route",
+        "server": "split-1"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": [
+    "1 fallback resolver(s) dropped: sing-box takes one main resolver",
+    "split rule 1: 1 fallback resolver(s) dropped: sing-box takes one resolver per rule"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "hosts": {
+      "dns.mullvad.net": "194.242.2.2"
+    },
+    "servers": [
+      {
+        "address": "https://dns.mullvad.net/dns-query"
+      }
+    ]
+  },
+  "notes": null
+}

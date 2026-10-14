@@ -1,0 +1,17 @@
+{
+  "direct": null,
+  "directIPs": null,
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      }
+    ]
+  },
+  "notes": [
+    "server 2606:4700:4700::1111 skipped: IPv6",
+    "server [2606:4700:4700::1111]:53 skipped: IPv6"
+  ]
+}

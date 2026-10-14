@@ -24,6 +24,10 @@ const (
 	ClientHapp      Client = "happ"
 	ClientMihomo    Client = "mihomo" // the Mihomo core and apps built on it
 	ClientAmneziaWG Client = "amneziawg"
+	// ClientXray is an Xray JSON config (Happ, v2rayNG and the like read it). ClientSingbox is a sing-box profile.
+	// Neither is in Clients yet: the editor and the API do not know them (see XrayDNS, SingboxDNS).
+	ClientXray    Client = "xray"
+	ClientSingbox Client = "singbox"
 )
 
 // Clients lists the clients in display order.
@@ -40,6 +44,10 @@ func (c Client) Transports() []Kind {
 		return []Kind{KindPlain, KindDoH}
 	case ClientMihomo:
 		return []Kind{KindPlain, KindDoT, KindDoH}
+	case ClientXray:
+		return []Kind{KindPlain, KindDoH} // no DoT in the dns block
+	case ClientSingbox:
+		return []Kind{KindPlain, KindDoT, KindDoH}
 	}
 	return []Kind{KindPlain} // AmneziaWG: a dns1/dns2 pair of IPv4 addresses, nothing else
 }
@@ -47,8 +55,8 @@ func (c Client) Transports() []Kind {
 // Supports reports whether the client can carry a transport.
 func (c Client) Supports(k Kind) bool { return slices.Contains(c.Transports(), k) }
 
-// IPv6 reports whether IPv6 resolver addresses are usable: Mihomo takes them; Happ's profile and Amnezia's
-// key and .conf are IPv4 only.
+// IPv6 reports whether IPv6 resolver addresses are usable: Mihomo takes them; Happ's profile, Amnezia's
+// key and .conf and the Xray and sing-box profiles (UseIPv4, ipv4_only) are IPv4 only.
 func (c Client) IPv6() bool { return c == ClientMihomo }
 
 // Endpoint is one resolver as a client gets it.
@@ -131,6 +139,11 @@ func hostIPs(k Kind, host string) []string {
 	return nil
 }
 
+func isIPv4(s string) bool {
+	a, err := netip.ParseAddr(s)
+	return err == nil && a.Is4()
+}
+
 func hostEq(rawURL, host string) bool {
 	u, err := url.Parse(rawURL)
 	return err == nil && u.Hostname() == host
@@ -154,6 +167,16 @@ func (c Client) reject(e Endpoint) string {
 	}
 	if c == ClientHapp && e.Kind == KindDoH && len(e.IPs) == 0 {
 		return "no bootstrap IP" // Happ wants an address next to the DoH URL
+	}
+	if (c == ClientXray && e.Kind == KindDoH) || (c == ClientSingbox && e.Kind != KindPlain) {
+		// Xray resolves a DoH host name from dns.hosts, sing-box takes the server as an IP next to tls.server_name:
+		// both need an IPv4 address of the host.
+		if len(e.IPs) == 0 {
+			return "no bootstrap IP"
+		}
+		if !slices.ContainsFunc(e.IPs, isIPv4) {
+			return "IPv6"
+		}
 	}
 	return ""
 }

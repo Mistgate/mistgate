@@ -1,0 +1,23 @@
+{
+  "direct": null,
+  "dns": {
+    "servers": [
+      {
+        "type": "tls",
+        "tag": "remote",
+        "server": "9.9.9.9",
+        "tls": {
+          "server_name": "dns.quad9.net"
+        },
+        "detour": "Mistgate"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": null
+}
