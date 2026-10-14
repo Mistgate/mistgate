@@ -583,3 +583,87 @@ func TestEdgeScriptNames(t *testing.T) {
 		t.Error("script names")
 	}
 }
+
+// ---- the generated wrangler configs -----------------------------------------------------------------------------------
+
+// The committed edge/worker/wrangler.<role>.example.toml are what NewEdgeConfig renders: a binding changed in one place is
+// changed in both. Fix a failure with `go generate ./internal/release`.
+func TestWranglerConfigsAreCurrent(t *testing.T) {
+	dir := filepath.Join("..", "..", "edge", "worker")
+	cfg := NewEdgeConfig("v0.0.0-dev")
+	want := cfg.WranglerFiles()
+	if len(want) != len(EdgeRoles) {
+		t.Fatalf("%d configs for %d roles", len(want), len(EdgeRoles))
+	}
+	for name, body := range want {
+		got, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Errorf("%s: %v (go generate ./internal/release)", name, err)
+			continue
+		}
+		if strings.ReplaceAll(string(got), "\r\n", "\n") != body {
+			t.Errorf("%s is not what NewEdgeConfig renders: go generate ./internal/release", name)
+		}
+	}
+	// no hand-written config of the single-Worker days is left next to them
+	listed, _ := filepath.Glob(filepath.Join(dir, "wrangler*.example.toml"))
+	for _, f := range listed {
+		if _, ok := want[filepath.Base(f)]; !ok {
+			t.Errorf("%s is not rendered from edge.json: delete it", filepath.Base(f))
+		}
+	}
+}
+
+// Every name a config binds to is the script name of another role, and the entry file it names exists.
+func TestWranglerConfigsPointAtTheirNeighbours(t *testing.T) {
+	cfg := NewEdgeConfig("v0.0.0-dev")
+	worker := filepath.Join("..", "..", "edge", "worker")
+	for _, s := range cfg.Scripts {
+		body := cfg.WranglerConfig(s.Role)
+		if !strings.Contains(body, "name = \""+s.DefaultName+"\"\n") {
+			t.Errorf("%s: name", s.Role)
+		}
+		entry := regexp.MustCompile(`(?m)^main = "(.*)"$`).FindStringSubmatch(body)
+		if entry == nil {
+			t.Fatalf("%s: no main", s.Role)
+		}
+		if _, err := os.Stat(filepath.Join(worker, filepath.FromSlash(entry[1]))); err != nil {
+			t.Errorf("%s: %v", s.Role, err)
+		}
+		for _, d := range s.ExternalObjects {
+			if !strings.Contains(body, "name = \""+d.Binding+"\"\nclass_name = \""+d.ClassName+"\"\nscript_name = \""+cfg.Script(d.ScriptRole).DefaultName+"\"\n") {
+				t.Errorf("%s: object %s", s.Role, d.Binding)
+			}
+		}
+		for _, v := range s.Services {
+			if !strings.Contains(body, "binding = \""+v.Binding+"\"\nservice = \""+cfg.Script(v.ServiceRole).DefaultName+"\"\n") {
+				t.Errorf("%s: service %s", s.Role, v.Binding)
+			}
+		}
+		if (s.Role == RoleFront) == strings.Contains(body, "CompiledWasm") || strings.Contains(body, "[triggers]") != (s.Role == RoleJobs) {
+			t.Errorf("%s: rules or triggers", s.Role)
+		}
+	}
+}
+
+// build-bundle.mjs makes exactly the <role>.js files edge.json names, each from the entry the wrangler config names.
+func TestBundleScriptBuildsTheScriptsOfEdgeJSON(t *testing.T) {
+	src := string(readFile(t, filepath.Join("..", "..", "edge", "worker", "build-bundle.mjs")))
+	block := regexp.MustCompile(`(?s)entryPoints: \{(.*?)\},`).FindStringSubmatch(src)
+	if block == nil {
+		t.Fatal("no entryPoints in build-bundle.mjs")
+	}
+	cfg := NewEdgeConfig("v0.0.0-dev")
+	got := map[string]string{}
+	for _, m := range regexp.MustCompile(`(\w+): "([^"]+)"`).FindAllStringSubmatch(block[1], -1) {
+		got[m[1]] = m[2]
+	}
+	if len(got) != len(cfg.Scripts) {
+		t.Errorf("build-bundle.mjs builds %v, edge.json has %d scripts", got, len(cfg.Scripts))
+	}
+	for _, s := range cfg.Scripts {
+		if got[s.Role] != wranglerEntry(s.Role) {
+			t.Errorf("%s: build-bundle.mjs builds %q, the wrangler config says %q", s.Role, got[s.Role], wranglerEntry(s.Role))
+		}
+	}
+}

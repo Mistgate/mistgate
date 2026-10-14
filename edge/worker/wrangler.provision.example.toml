@@ -1,31 +1,26 @@
-# Template for the second Worker script of the Mistgate edge edition, mistgate-edge-provision: the Provisioner Durable Object
-# that installs nodes over SSH. Copy to wrangler.provision.toml and fill the placeholders; it holds no account id and no secret.
-# Build first (scripts/build-edge.ps1), and deploy this script BEFORE the main Worker (wrangler.example.toml binds to it).
-#
-# Why a script of its own: a TCP socket belongs to the I/O context it was opened in, and the Go panel resumes on any
-# JavaScript event of its isolate. In the main Worker an SSH session would touch its socket from the context of a node link
-# step or a subscription request. Here Go serves only this object. It is the same panel.wasm, in its "serve" role.
+# Generated from internal/release.NewEdgeConfig (go generate ./internal/release). Do not edit: change the config and generate again.
+# Copy to wrangler.provision.toml (or let scripts/build-edge.ps1 make the .dev.toml) and replace the database id; it holds no
+# account id and no secret. Script mistgate-edge-provision: the Provisioner Durable Object: SSH installs of nodes. A TCP socket belongs to the I/O context it was opened in, so Go serves only this object.
 name = "mistgate-edge-provision"
-main = "src/provision-index.ts"
+main = "src/roles/provision.ts"
 compatibility_date = "2026-10-01"
-# No route and no workers.dev name: nothing reaches this script from the internet. Its fetch handler answers 404 without
-# starting Go; the main Worker reaches the Provisioner object through its binding.
 workers_dev = false
 
-# The Go panel is imported by src/panel.ts as a precompiled WebAssembly module.
+# The Go panel of this role (dist/provision.wasm) is imported by src/roles/provision.ts as a precompiled WebAssembly module.
 [[rules]]
 type = "CompiledWasm"
 globs = ["**/*.wasm"]
 fallthrough = true
 
-# The same database as the main Worker: the installs, their events and the sealed logins are rows of the panel's own tables.
-# This script never creates or migrates anything: the main Worker has to run once before the first install.
 [[d1_databases]]
 binding = "DB"
 database_name = "mistgate"
 database_id = "replace-with-your-d1-database-id"
 
-# The Limiter and NodeLink objects belong to the main script; the panel here reaches them by binding.
+[[durable_objects.bindings]]
+name = "PROVISIONER"
+class_name = "Provisioner"
+
 [[durable_objects.bindings]]
 name = "LIMITER"
 class_name = "Limiter"
@@ -36,12 +31,6 @@ name = "NODELINK"
 class_name = "NodeLink"
 script_name = "mistgate-edge"
 
-# The Provisioner itself: one object (idFromName("provisioner")), SQLite-backed. It stores nothing but its alarm; the state
-# of an install is in D1.
-[[durable_objects.bindings]]
-name = "PROVISIONER"
-class_name = "Provisioner"
-
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Provisioner"]
@@ -49,7 +38,6 @@ new_sqlite_classes = ["Provisioner"]
 [observability]
 enabled = false
 
-# Required secret, never a value in this file: the same 64 hex characters as the main Worker's MASTER_KEY (the sealed
-# SSH logins and everything else in D1 are opened with it).
-#   wrangler secret put MASTER_KEY --name mistgate-edge-provision
-# Locally, put MASTER_KEY=<64 hex> in a git-ignored .dev.vars next to the main Worker's, with the same value.
+# Secrets, never a value in this file: wrangler secret put <NAME> --name mistgate-edge-provision. Locally put NAME=value lines in the git-ignored
+# .dev.vars. MASTER_KEY is 32 random bytes as 64 hex characters, the same in every script that has it.
+#   MASTER_KEY

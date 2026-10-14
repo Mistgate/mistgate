@@ -2,8 +2,9 @@
 # never run alone: it uses the helpers, variables and the isolation of the main script (private network namespace,
 # $WORK, $BIN, api, mutate, say, pass, note, die, wait_for, spawn, stop_pid, free_port, SECRETS ...).
 #
-# The panel is the Go js/wasm build running in a local `wrangler dev` (workerd, miniflare D1 and Durable Objects);
-# the node is the same link-only agent a customer would install, talking to the Worker's public WebSocket link.
+# The panel is the five Go js/wasm roles (cmd/mistgate-edge-{link,public,admin,jobs,provision}) behind the FRONT router, all six
+# scripts of the split edition running in one local `wrangler dev` (workerd, miniflare D1 and Durable Objects); the node is the
+# same link-only agent a customer would install, talking to FRONT's public WebSocket link.
 #
 # NOTHING TOUCHES A CLOUDFLARE ACCOUNT. wrangler runs with a HOME of its own (no stored login), without
 # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID, with telemetry off, never with --remote, and the D1 id in its
@@ -11,10 +12,13 @@
 #
 # The Worker is copied into $WORK/worker and installed there: the repo's own edge/worker is never written to.
 #
-# Two scripts run in the one `wrangler dev`: the main Worker and mistgate-edge-provision (the Provisioner Durable Object that
-# installs nodes over SSH). The SSH steps (2d, 8b, 10b; scripts/e2e/sshnode.sh) drive the wizard and real installs through
-# both against a real OpenSSH sshd in this namespace. The wasm is built as a release would be: a tag, a release key, and the
-# download base pointed (-X update.releaseDownloadBase) at a fake release served from this namespace and signed with that key.
+# The six wrangler configs are the ones the release is described by: `go run ./scripts/edgeconfig -dev` renders them from
+# release.NewEdgeConfig (FRONT first, so it is the one that listens; the others are reached by service binding). The cron of
+# JOBS is fired through wrangler's local explorer API (`/cdn-cgi/local/explorer/api/local/scheduled?worker=`), which reaches a
+# script that is not the listening one. The SSH steps (2d, 8b, 10b; scripts/e2e/sshnode.sh) drive the wizard and real installs
+# through the Provisioner object of mistgate-edge-provision against a real OpenSSH sshd in this namespace. The wasm is built as
+# a release would be: a tag, a release key, and the download base pointed (-X update.releaseDownloadBase) at a fake release
+# served from this namespace and signed with that key.
 
 EDGE_HOST=de1.example.com
 EDGE_NS=""
@@ -87,19 +91,28 @@ edge_tls() { # a CA and a leaf for de1.example.com, valid two days
   CURL_CA=$d/ca.pem
 }
 
+EDGE_ROLES="link public admin jobs provision" # the Go roles, one wasm each (cmd/mistgate-edge-<role>); FRONT has no wasm
+EDGE_NAME=mistgate-edge                       # the base name of the scripts: FRONT is $EDGE_NAME, a role $EDGE_NAME-<role>
+
 edge_build() {
-  local w=$WORK/worker src=$REPO/edge/worker
+  local w=$WORK/worker src=$REPO/edge/worker role n
   mkdir -p "$w/dist"
-  GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
-    -o "$w/dist/panel.wasm" ./cmd/mistgate-edge
-  # a -X on a variable the linker does not see as a constant string is silently ignored: look for the value in the program
-  grep -qa "http://127.0.0.1:$REL_PORT/" "$w/dist/panel.wasm" || die "the wasm does not carry the fake release's address: -X update.releaseDownloadBase did not take"
+  WASM_BYTES=0 WASM_GZ=0
+  for role in $EDGE_ROLES; do
+    GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
+      -o "$w/dist/$role.wasm" "./cmd/mistgate-edge-$role"
+    n=$(stat -c %s "$w/dist/$role.wasm")
+    WASM_BYTES=$((WASM_BYTES + n)) WASM_GZ=$((WASM_GZ + $(gzip -9 -c "$w/dist/$role.wasm" | wc -c)))
+    printf '%s %s\n' "$role" "$n" >>"$WORK/wasm-sizes"
+  done
+  # a -X on a variable the linker does not see as a constant string is silently ignored: look for the value in the program that
+  # uses it (the Provisioner downloads the agent from the release)
+  grep -qa "http://127.0.0.1:$REL_PORT/" "$w/dist/provision.wasm" || die "provision.wasm does not carry the fake release's address: -X update.releaseDownloadBase did not take"
   cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$w/dist/wasm_exec.js"
   cp -r "$src/src" "$w/src"
   cp "$src/package.json" "$src/pnpm-lock.yaml" "$src/tsconfig.json" "$w/"
-  WASM_BYTES=$(stat -c %s "$w/dist/panel.wasm") WASM_GZ=$(gzip -9 -c "$w/dist/panel.wasm" | wc -c)
-  # The measurement hook: the Worker's `main` becomes a wrapper that serves /__mgmem (the size of the Go program's
-  # linear memory) and hands everything else to the unmodified src/index.ts. Only in this run's copy.
+  # The measurement hook, in this run's copy only: every role that serves requests (public, admin, link) answers /__mgmem with the
+  # size of its Go program's linear memory, and FRONT hands /__mgmem?role=<role> to the role's service binding.
   cat >"$w/src/memhook.ts" <<'TS'
 // Records the WebAssembly memories of this isolate (measurement only; not part of the product).
 const mems: WebAssembly.Memory[] = ((globalThis as { __mgMems?: WebAssembly.Memory[] }).__mgMems ??= []);
@@ -110,41 +123,56 @@ const real = WebAssembly.instantiate.bind(WebAssembly) as (...a: unknown[]) => P
   if (mem) mems.push(mem);
   return out;
 };
+export function mgMem(): Response {
+  return Response.json({ instances: mems.length, wasmBytes: mems.map((m) => m.buffer.byteLength) });
+}
 TS
-  cat >"$w/src/measure.ts" <<'TS'
-import "./memhook";
-import worker from "./index";
-import type { Env } from "./env";
-export { Limiter, NodeLink, PanelLink } from "./index";
+  # handler.ts is the fetch of the three serving roles: answer /__mgmem before the panel, and load the hook first
+  sed -i -e '1i import { mgMem } from "./memhook";' \
+    -e 's|^  return async (request: Request, env: PanelEnv, ctx: ExecutionContext): Promise<Response> => {$|&\n    if (new URL(request.url).pathname === "/__mgmem") return mgMem();|' "$w/src/handler.ts"
+  grep -q '__mgmem' "$w/src/handler.ts" || die "src/handler.ts: the measurement hook was not applied (the file changed?)"
+  cat >"$w/src/measure-front.ts" <<'TS'
+import front from "./front";
+import type { FrontEnv } from "./env";
+export { Limiter } from "./limiter";
+export { NodeLink } from "./nodelink";
 
 export default {
-  ...worker,
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (new URL(request.url).pathname === "/__mgmem") {
-      const mems = (globalThis as { __mgMems?: WebAssembly.Memory[] }).__mgMems ?? [];
-      return Response.json({ instances: mems.length, wasmBytes: mems.map((m) => m.buffer.byteLength) });
+  ...front,
+  async fetch(request: Request, env: FrontEnv, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/__mgmem") {
+      const role = { public: env.PUBLIC, admin: env.ADMIN, link: env.LINK }[url.searchParams.get("role") ?? ""];
+      return role ? role.fetch(new Request(`${url.origin}/__mgmem`)) : new Response("no such role", { status: 404 });
     }
-    return worker.fetch!(request, env, ctx);
+    return front.fetch!(request, env, ctx);
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<FrontEnv>;
 TS
   (cd "$w" && CI=true pnpm install --frozen-lockfile --store-dir "$WORK/pnpm-store" >"$WORK/pnpm-install.out" 2>&1) \
     || { tail -n 20 "$WORK/pnpm-install.out"; die "pnpm install failed"; }
-  sed -e 's/replace-with-your-d1-database-id/00000000-0000-0000-0000-000000000000/' \
-    -e "s|^directory = .*|directory = \"$REPO/web/dist\"|" \
-    -e 's|^main = .*|main = "src/measure.ts"|' "$src/wrangler.example.toml" >"$w/wrangler.toml"
-  grep -q '00000000-0000-0000-0000-000000000000' "$w/wrangler.toml" || die "wrangler.toml: the zero D1 id was not set"
-  sed -e 's/replace-with-your-d1-database-id/00000000-0000-0000-0000-000000000000/' "$src/wrangler.provision.example.toml" >"$w/wrangler.provision.toml"
-  grep -q '00000000-0000-0000-0000-000000000000' "$w/wrangler.provision.toml" || die "wrangler.provision.toml: the zero D1 id was not set"
-  grep -q '^main = "src/provision-index.ts"' "$w/wrangler.provision.toml" || die "wrangler.provision.toml: unexpected main (template changed?)"
-  grep -q '^main = "src/measure.ts"' "$w/wrangler.toml" || die "wrangler.toml: main was not replaced (template changed?)"
-  grep -q "^directory = \"$REPO/web/dist\"" "$w/wrangler.toml" || die "wrangler.toml: assets directory was not set (template changed?)"
+  # The six configs are rendered from release.NewEdgeConfig, the description the release bundle carries; only this run's
+  # paths are set here: FRONT's main (the measuring wrapper) and the assets directory of public and admin.
+  go run ./scripts/edgeconfig -out "$w" -dev || die "rendering the wrangler configs failed"
+  EDGE_CONFIGS=$(go run ./scripts/edgeconfig -dev -list | sed 's/^/-c /' | tr '\n' ' ')
+  [ "$(wc -w <<<"$EDGE_CONFIGS")" = 12 ] || die "expected six wrangler configs, got: $EDGE_CONFIGS"
+  for role in front $EDGE_ROLES; do
+    grep -q '00000000-0000-0000-0000-000000000000' "$w/wrangler.$role.dev.toml" || die "wrangler.$role.dev.toml: the zero D1 id was not set"
+  done
+  sed -i 's|^main = .*|main = "src/measure-front.ts"|' "$w/wrangler.front.dev.toml"
+  grep -q '^main = "src/measure-front.ts"' "$w/wrangler.front.dev.toml" || die "wrangler.front.dev.toml: main was not replaced"
+  for role in public admin; do
+    sed -i "s|^directory = .*|directory = \"$REPO/web/dist\"|" "$w/wrangler.$role.dev.toml"
+    grep -q "^directory = \"$REPO/web/dist\"" "$w/wrangler.$role.dev.toml" || die "wrangler.$role.dev.toml: the assets directory was not set"
+  done
   MASTER_KEY=$(openssl rand -hex 32)
   ADMIN_SECRET=$(openssl rand -hex 12) SUB_SECRET=$(openssl rand -hex 12)
   # the setup token is the deployer's: the Worker gets its hash only (SETUP_TOKEN_SHA256) and never prints a link
   SETUP_TOKEN=$(openssl rand -hex 32)
   SETUP_HASH=$(printf %s "$SETUP_TOKEN" | sha256sum | cut -d' ' -f1)
   SECRETS+=("$MASTER_KEY" "$ADMIN_SECRET" "$SUB_SECRET" "$SETUP_TOKEN" "$SETUP_HASH")
+  # One .dev.vars next to the six configs, so every script reads it: MASTER_KEY is what the five Go roles share, the rest is read by
+  # the admin role alone (it makes the instance) and is ignored by the others.
   {
     echo "MASTER_KEY=$MASTER_KEY"
     echo "SETUP_TOKEN_SHA256=$SETUP_HASH"
@@ -163,7 +191,7 @@ edge_start_worker() {
   spawn env -C "$WORK/worker" -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID -u CLOUDFLARE_API_KEY -u CLOUDFLARE_EMAIL \
     HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" XDG_CACHE_HOME="$WORK/home/.cache" XDG_DATA_HOME="$WORK/home/.local/share" \
     WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH="$WORK/wrangler-logs" CI=true \
-    node_modules/.bin/wrangler dev -c wrangler.toml -c wrangler.provision.toml --ip 127.0.0.1 --port "$PUB" --local-protocol https \
+    node_modules/.bin/wrangler dev $EDGE_CONFIGS --ip 127.0.0.1 --port "$PUB" --local-protocol https \
     --https-key-path "$WORK/tls/leaf.key" --https-cert-path "$WORK/tls/leaf.pem" --persist-to "$WORK/wrangler-state" \
     </dev/null >>"$WORK/wrangler.log" 2>&1
   WRANGLER_PID=$LAST_PID
@@ -175,10 +203,18 @@ edge_start_worker() {
 # --compressed: a client that sends no Accept-Encoding still gets a gzip body from the panel through wrangler dev (see the report)
 edge_get() { curl -sS --compressed --cacert "$CURL_CA" -m 30 "$@"; }
 edge_url() { echo "https://$EDGE_HOST:$PUB$1"; }
-edge_cron() { edge_get -o /dev/null -w '%{http_code}\n' "https://127.0.0.1:$PUB/cdn-cgi/handler/scheduled?cron=*+*+*+*+*"; }
+# The cron tick of JOBS. /cdn-cgi/handler/scheduled reaches only the script that listens (FRONT, which has no cron); wrangler's local
+# explorer API fires the scheduled handler of any script by name. Prints 200 when the handler finished with outcome "ok".
+edge_cron() {
+  local out code
+  out=$(edge_get -X POST -H 'Content-Type: application/json' -d '{"cron":"* * * * *"}' -w $'\n%{http_code}' \
+    "https://127.0.0.1:$PUB/cdn-cgi/local/explorer/api/local/scheduled?worker=$EDGE_NAME-jobs") || { echo curl-failed; return 1; }
+  code=${out##*$'\n'}
+  if [ "$code" = 200 ] && jq -e '.result.outcome == "ok"' <<<"${out%$'\n'*}" >/dev/null 2>&1; then echo 200; else echo "$code ${out%$'\n'*}" | head -c 300; echo; return 1; fi
+}
 
-edge_mem() { # prints the wasm linear memory in MB (largest instance)
-  edge_get "$(edge_url /__mgmem)" | jq -r '[.wasmBytes[]] | max // 0 | . / 1048576 | . * 10 | round / 10'
+edge_mem() { # <public|admin|link>: the wasm linear memory of that role's isolate in MB (largest instance)
+  edge_get "$(edge_url "/__mgmem?role=${1:?role}")" | jq -r '[.wasmBytes[]] | max // 0 | . / 1048576 | . * 10 | round / 10'
 }
 edge_workerd_rss() { vmrss_mb "$(edge_workerd_pid)"; }
 
@@ -235,14 +271,18 @@ PY
   : >"$WORK/fake-release.log"
 }
 
-# touching the Provisioner's script makes wrangler reload: the runtime restarts, every isolate and object is reset
-sshn_reload_provisioner() {
+# edge_touch <file under src/>: appends a comment to a source file of the Worker copy; wrangler reloads (the runtime restarts, and
+# the isolates and objects with it) and this waits for the reload to be logged.
+edge_touch() {
   # (not "n": wait_for has a local of that name, and a function it runs sees that one)
   RELOADS_BEFORE=$(grep -c 'Reloading' "$WORK/wrangler.log" || true)
-  echo "// reload $(date +%s)" >>"$WORK/worker/src/provision-index.ts"
+  echo "// reload $(date +%s)" >>"$WORK/worker/src/$1"
   reloaded() { [ "$(grep -c 'Reloading' "$WORK/wrangler.log" || true)" -gt "$RELOADS_BEFORE" ]; }
-  wait_for 60 "wrangler to reload the Workers" reloaded || die "wrangler did not reload after provision-index.ts changed"
+  wait_for 60 "wrangler to reload the Workers" reloaded || die "wrangler did not reload after $1 changed"
 }
+
+# touching the Provisioner's script (its role entry)
+sshn_reload_provisioner() { edge_touch roles/provision.ts; }
 
 # The load of another Durable Object and of stateless requests while a job runs in the Provisioner (design 2.6a: in one
 # script the SSH goroutine woke inside a foreign event and the platform refused it): decoy page fetches and admin API
@@ -310,7 +350,7 @@ edge_run() {
   NODE_BIN=$BIN/mistgate-node
   build_hysteria
   edge_release_serve
-  pass "built the wasm panel ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped; tag $SSHN_TAG, a release key and the fake release's address built in), the Worker copy (installed in the work directory, zero D1 id), the node agent, the signed fake release of the agent ($(($(stat -c %s "$SSHN_NODE_BIN") / 1048576)) MB) and the hysteria client"
+  pass "built the five role wasm files ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped; tag $SSHN_TAG, a release key and the fake release's address built in), the Worker copy (installed in the work directory, zero D1 id), the node agent, the signed fake release of the agent ($(($(stat -c %s "$SSHN_NODE_BIN") / 1048576)) MB) and the hysteria client"
 
   step "1. wrangler dev: the Worker answers on $EDGE_HOST:$PUB, first admin from the setup token given as SETUP_TOKEN_SHA256 (no link in the log)"
   edge_start_worker
@@ -426,10 +466,26 @@ PY
   ! new_log | grep -q 'desired state applied.*full=true' || die "the restarted agent was sent a full desired state: $(new_log | grep 'desired state applied' | head -2)"
   pass "agent stopped: the panel showed it offline ${OFF_AFTER} s later (the closed step ran with the socket's close, no liveness wait); started: ONLINE again (session $GEN1 -> $GEN2), persisted state restored, no full DesiredState sent (the Hello matched the stored digest)"
 
-  # touching the Worker's source makes wrangler reload: the runtime restarts, the object is reset, the agent reconnects
+  # A source file of PUBLIC only is touched first (design/cloudflare-edition: a release that changes one role must not make the
+  # agents reconnect). Outside Cloudflare, wrangler dev reloads its one workerd for any script, so this is a measurement, not a
+  # check: it says whether the agent reconnected.
+  GEN_PUBLIC=$(edge_session)
+  edge_touch roles/public.ts
+  public_reconnected() { [ "$(edge_session)" != "$GEN_PUBLIC" ]; }
+  if wait_for 40 "the agent to reconnect after PUBLIC alone was reloaded (expected not to, on Cloudflare)" public_reconnected; then
+    wait_for 60 "node ONLINE after the PUBLIC reload" node_online || die "node not ONLINE after the PUBLIC script reload"
+    PUBLIC_RELOAD_NOTE="wrangler dev restarts its whole runtime for a change in PUBLIC alone: the agent reconnected (session $GEN_PUBLIC -> $(edge_session)); on Cloudflare only that script is replaced"
+  else
+    node_online || die "node not ONLINE after the PUBLIC script reload"
+    PUBLIC_RELOAD_NOTE="a reload of PUBLIC alone left the agent connected (session $GEN_PUBLIC)"
+  fi
+  note "$PUBLIC_RELOAD_NOTE"
+  GEN2=$(edge_session)
+
+  # touching FRONT's source makes wrangler reload: the runtime restarts, the NodeLink object (FRONT's) is reset, the agent reconnects
   LOG_MARK=$(stat -c %s "$WORK/node.log")
   GEN_BEFORE=$GEN2
-  echo "// reload $(date +%s)" >>"$WORK/worker/src/index.ts"
+  edge_touch front.ts
   gen_after() { [ "$(edge_session)" = "$((GEN_BEFORE + 1))" ]; }
   wait_for 120 "the agent to reconnect as generation $((GEN_BEFORE + 1))" gen_after || die "after the reload node_live shows session '$(edge_session)', want $((GEN_BEFORE + 1))"
   wait_for 60 "node ONLINE after the reload" node_online || die "node not ONLINE after the Worker reload"
@@ -514,8 +570,8 @@ PY
   ! grep -qiE 'never generate a response|Promise will never complete|hung' "$WORK/wrangler.log" || { grep -iE 'never generate a response|Promise will never complete|hung' "$WORK/wrangler.log" | head -3; die "the Worker log reports a hung invocation"; }
   node_online || die "the node went offline during the mixed load"
   wait_for 60 "the long download to end" not_alive "$MIX" || true
-  PEAK_WASM_MIX=$(edge_mem)
-  pass "20 parallel subscription fetches (all 200), a cron tick (200) and two admin fan-outs while the agent sent stats frames: no hung invocation, no cross-request I/O error in the Worker log; wasm memory $PEAK_WASM_MIX MB"
+  PEAK_WASM_MIX="public $(edge_mem public), admin $(edge_mem admin), link $(edge_mem link)"
+  pass "20 parallel subscription fetches (all 200), a cron tick (200) and two admin fan-outs while the agent sent stats frames: no hung invocation, no cross-request I/O error in the Worker log; wasm memory (MB) $PEAK_WASM_MIX"
 
   step "6. quota overrun: alice's credential is removed within one stats interval"
   stop_pid "$MAIN_CLIENT"
@@ -627,12 +683,15 @@ PY
 
   step "9. measurements of this run (numbers, not pass/fail)"
   RSS_WORKERD=$(edge_workerd_rss)
-  WASM_MB=$(edge_mem)
-  printf '    %-52s %s\n' "wasm file" "$((WASM_BYTES / 1048576)) MB ($((WASM_GZ / 1048576)) MB gzip -9)"
-  printf '    %-52s %s\n' "wasm linear memory after the e2e mix (limit 128 MB)" "$WASM_MB MB"
+  WASM_MB="public $(edge_mem public), admin $(edge_mem admin), link $(edge_mem link)"
+  while read -r role bytes; do
+    printf '    %-52s %s\n' "$role.wasm" "$((bytes / 1048576)) MB"
+  done <"$WORK/wasm-sizes"
+  printf '    %-52s %s\n' "five wasm files together" "$((WASM_BYTES / 1048576)) MB ($((WASM_GZ / 1048576)) MB gzip -9)"
+  printf '    %-52s %s\n' "wasm linear memory after the e2e mix (limit 128 MB each)" "$WASM_MB"
   printf '    %-52s %s\n' "workerd RSS at the end (whole runtime, all isolates)" "$RSS_WORKERD MB"
   printf '    %-52s %s\n' "node agent: offline after stop" "${OFF_AFTER} s"
-  note "measured: wasm file $WASM_BYTES bytes ($WASM_GZ gzip), wasm memory ${WASM_MB} MB, workerd RSS ${RSS_WORKERD} MB"
+  note "measured: wasm file $WASM_BYTES bytes ($WASM_GZ gzip), wasm memory (MB) ${WASM_MB}, workerd RSS ${RSS_WORKERD} MB"
 
   step "10. retire the node: the agent removes its files, the object keeps nothing, node_live is gone"
   [ "$(edge_do_rows)" -gt 0 ] || die "precondition: the NodeLink object has no stored rows before the retire (_cf_KV is empty)"

@@ -1,0 +1,48 @@
+# Generated from internal/release.NewEdgeConfig (go generate ./internal/release). Do not edit: change the config and generate again.
+# Copy to wrangler.front.toml (or let scripts/build-edge.ps1 make the .dev.toml) and replace the database id; it holds no
+# account id and no secret. Script mistgate-edge: the router and the only entry from outside: the hostname, the Limiter and NodeLink objects, a service binding per role. No wasm, no secret.
+name = "mistgate-edge"
+main = "src/front.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mistgate"
+database_id = "replace-with-your-d1-database-id"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+
+[[services]]
+binding = "PUBLIC"
+service = "mistgate-edge-public"
+
+[[services]]
+binding = "ADMIN"
+service = "mistgate-edge-admin"
+
+[[services]]
+binding = "LINK"
+service = "mistgate-edge-link"
+
+[[services]]
+binding = "PANEL_LINK"
+service = "mistgate-edge-link"
+entrypoint = "PanelLink"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["NodeLink"]
+
+[observability]
+enabled = false

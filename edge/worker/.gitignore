@@ -4,7 +4,6 @@ node_modules/
 dist/
 # local-only configuration; the master key never goes into the repository
 wrangler.toml
-wrangler.dev.toml
+wrangler.*.toml
+!wrangler.*.example.toml
 .dev.vars
-wrangler.provision.toml
-wrangler.provision.dev.toml

@@ -10,9 +10,9 @@ export interface PanelApi {
   init(options: Record<string, unknown>): Promise<unknown>;
   fetch(request: FetchRequest): Promise<FetchResponse>;
   cron(request: { at: number }): Promise<{ waitUntil: Promise<void> }>;
-  /** One step of the agent link (cmd/mistgate-edge/link_js.go); bytes are Uint8Array. */
+  /** One step of the agent link (edge/bridge/link_js.go); bytes are Uint8Array. */
   link(op: string, args: Record<string, unknown>): Promise<unknown>;
-  /** One pass of the Provisioner's alarm (cmd/mistgate-edge/provision_js.go); only the serve role has it. more: another install waits; busy: a pass already runs here. */
+  /** One pass of the Provisioner's alarm (edge/bridge/provision_js.go); only the serve role has it. more: another install waits; busy: a pass already runs here. */
   provision(): Promise<{ more: boolean; busy: boolean; waitUntil: Promise<void> }>;
 }
 

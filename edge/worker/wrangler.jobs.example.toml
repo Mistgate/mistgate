@@ -1,0 +1,38 @@
+# Generated from internal/release.NewEdgeConfig (go generate ./internal/release). Do not edit: change the config and generate again.
+# Copy to wrangler.jobs.toml (or let scripts/build-edge.ps1 make the .dev.toml) and replace the database id; it holds no
+# account id and no secret. Script mistgate-edge-jobs: the cron tick (expiry, node_down, the work of the background services) and nothing else; it takes no request.
+name = "mistgate-edge-jobs"
+main = "src/roles/jobs.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[triggers]
+crons = ["* * * * *"]
+
+# The Go panel of this role (dist/jobs.wasm) is imported by src/roles/jobs.ts as a precompiled WebAssembly module.
+[[rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mistgate"
+database_id = "replace-with-your-d1-database-id"
+
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+script_name = "mistgate-edge"
+
+[[durable_objects.bindings]]
+name = "PROVISIONER"
+class_name = "Provisioner"
+script_name = "mistgate-edge-provision"
+
+[observability]
+enabled = false
+
+# Secrets, never a value in this file: wrangler secret put <NAME> --name mistgate-edge-jobs. Locally put NAME=value lines in the git-ignored
+# .dev.vars. MASTER_KEY is 32 random bytes as 64 hex characters, the same in every script that has it.
+#   MASTER_KEY

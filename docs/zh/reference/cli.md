@@ -187,7 +187,7 @@ mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] 
 | `--source` | `.` | 源代码检出目录。 |
 | `--out` | none | 二进制文件的输出目录。 |
 
-`NAME` 可以是 `mistgate-linux-amd64`、`mistgate-linux-arm64`、`mistgate-node-linux-amd64`、`mistgate-node-linux-arm64` 或 `mistgate-edge.tar.gz`（Cloudflare 版：将 `panel.wasm`、使用固定版本 esbuild 打包的两个 Worker 脚本、`web/dist` 和 `edge.json` 放入确定性 tarball；除 SPA 外，还需在 `edge/worker` 中运行 `pnpm install --frozen-lockfile`）。构建可复现：使用 `CGO_ENABLED=0`、`-trimpath`、`-buildvcs=false`、`go.mod` 中指定的 Go 工具链（本地 Go 版本不同时会下载指定版本）、`GOAMD64=v1` / `GOARM64=v8.0`，并且 `-ldflags` 仅设置版本、构建时间和密钥。面板二进制文件内嵌 `web/dist`：先构建 SPA（`cd web && pnpm install --frozen-lockfile && pnpm build`）。发布工作流和 `make build` 都会调用此命令；命令会显示每个二进制文件的 SHA-256。
+`NAME` 可以是 `mistgate-linux-amd64`、`mistgate-linux-arm64`、`mistgate-node-linux-amd64`、`mistgate-node-linux-arm64` 或 `mistgate-edge.tar.gz`（Cloudflare 版：将五个角色的 wasm 文件、使用固定版本 esbuild 打包的六个 Worker 脚本、`web/dist` 和 `edge.json` 放入确定性 tarball；除 SPA 外，还需在 `edge/worker` 中运行 `pnpm install --frozen-lockfile`）。构建可复现：使用 `CGO_ENABLED=0`、`-trimpath`、`-buildvcs=false`、`go.mod` 中指定的 Go 工具链（本地 Go 版本不同时会下载指定版本）、`GOAMD64=v1` / `GOARM64=v8.0`，并且 `-ldflags` 仅设置版本、构建时间和密钥。面板二进制文件内嵌 `web/dist`：先构建 SPA（`cd web && pnpm install --frozen-lockfile && pnpm build`）。发布工作流和 `make build` 都会调用此命令；命令会显示每个二进制文件的 SHA-256。
 
 ### mistgate release sign
 

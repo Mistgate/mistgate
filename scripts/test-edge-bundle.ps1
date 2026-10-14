@@ -1,8 +1,8 @@
 # Builds the signed-release edge bundle (mistgate-edge.tar.gz) the way the release workflow does and proves it:
 #   1. two builds into different directories are byte for byte the same;
-#   2. worker.js and provision.js load in workerd (Miniflare) from the extracted tarball with panel.wasm as a CompiledWasm
-#      module: the main script answers the decoy with 200, the Provisioner script answers 404 without starting Go
-#      (edge/worker/test/bundle);
+#   2. the six scripts of edge.json (front.js and the five <role>.js with their <role>.wasm as CompiledWasm modules) load in
+#      workerd (Miniflare) from the extracted tarball, and a real request per role goes through FRONT: a subscription, the
+#      admin SPA, a link upgrade, a cron tick, an install request, the empty-database first run (edge/worker/test/bundle);
 #   3. `wrangler deploy --dry-run` of each script, with the bindings edge.json describes, prints "Total Upload": it must stay
 #      under Cloudflare's limit of 64 MiB per Worker (uncompressed; there is no compressed limit since 2026-09-04).
 # Needs Go, Node 22, pnpm and tar. No Cloudflare account, no login, no deploy.
@@ -81,6 +81,11 @@ try {
         foreach ($d in $script.durable_objects_external) {
             $owner = ($edge.scripts | Where-Object { $_.role -eq $d.script_role }).default_name
             $toml.Add("[[durable_objects.bindings]]"); $toml.Add("name = `"$($d.binding)`""); $toml.Add("class_name = `"$($d.class_name)`""); $toml.Add("script_name = `"$owner`"")
+        }
+        foreach ($v in $script.services) {
+            $target = ($edge.scripts | Where-Object { $_.role -eq $v.service_role }).default_name
+            $toml.Add("[[services]]"); $toml.Add("binding = `"$($v.binding)`""); $toml.Add("service = `"$target`"")
+            if ($v.entrypoint) { $toml.Add("entrypoint = `"$($v.entrypoint)`"") }
         }
         foreach ($m in $script.migrations) {
             $toml.Add("[[migrations]]"); $toml.Add("tag = `"$($m.tag)`"")

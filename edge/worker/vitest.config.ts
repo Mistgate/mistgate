@@ -4,7 +4,7 @@ import { adminAux, linkAux, publicAux } from "./test/front/aux-workers";
 
 // What the Provisioner's script looks like to the main Worker, as plain JavaScript (an auxiliary worker is not bundled): one
 // Durable Object that answers a request with what it received and counts kicks. test/do/provision-forward.test.ts sends the
-// main Worker's forwarded request to it across the script boundary, the way the binding in wrangler.example.toml does.
+// main Worker's forwarded request to it across the script boundary, the way the binding in wrangler.admin.example.toml does.
 const provisionAux = `
 import { DurableObject } from "cloudflare:workers";
 export class AuxProvisioner extends DurableObject {

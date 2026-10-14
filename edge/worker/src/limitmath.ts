@@ -5,7 +5,7 @@ export type LimitRequest =
   | { operation: "peek" | "record"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number }
   | { operation: "reset"; name: string; key: string };
 
-/** What every operation resolves to; Go (cmd/mistgate-edge/limiter_js.go) checks the four types. */
+/** What every operation resolves to; Go (edge/bridge/limiter_js.go) checks the four types. */
 export interface LimitReply {
   ok: boolean;
   retryAfterMs: number;

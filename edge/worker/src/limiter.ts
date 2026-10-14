@@ -15,7 +15,7 @@ import { type Bucket, type LimitReply, type WindowState, parseRequest, peekWindo
 const MAX_ALARM_MS = 30 * 24 * 3600 * 1000;
 
 export class Limiter extends DurableObject<Env> {
-  /** The only RPC method: the four operations of cmd/mistgate-edge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
+  /** The only RPC method: the four operations of edge/bridge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
   async limit(raw: unknown): Promise<LimitReply> {
     const req = parseRequest(raw);
     const now = Date.now(); // this object's clock is authoritative

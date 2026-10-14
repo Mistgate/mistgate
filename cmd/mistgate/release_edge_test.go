@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -226,24 +227,48 @@ func TestEdgeBundleRealBuildIsReproducible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"edge.json", "worker.js", "provision.js", "panel.wasm", "assets/index.html"} {
-		if len(files[name]) == 0 {
-			t.Errorf("%s is missing or empty", name)
-		}
+	cfg, err := release.ParseEdgeConfig(files[release.EdgeConfigName])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.CheckFiles(files); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*cfg, release.NewEdgeConfig("v0.0.1")) {
+		t.Error("edge.json is not what NewEdgeConfig builds")
 	}
 	// a path of this machine, however it got there, must not be in a bundle that is signed
-	for _, name := range []string{"worker.js", "provision.js"} {
-		if bytes.Contains(files[name], []byte(filepath.ToSlash(root))) {
-			t.Errorf("%s holds the build directory", name)
+	for _, s := range cfg.Scripts {
+		if bytes.Contains(files[s.MainModule], []byte(filepath.ToSlash(root))) {
+			t.Errorf("%s holds the build directory", s.MainModule)
+		}
+		for _, m := range s.Modules {
+			if m.Type == "compiled_wasm" && !bytes.HasPrefix(files[m.Name], []byte("\x00asm")) {
+				t.Errorf("%s is not WebAssembly", m.Name)
+			}
 		}
 	}
-	if !bytes.HasPrefix(files["panel.wasm"], []byte("\x00asm")) {
-		t.Error("panel.wasm is not WebAssembly")
+	if len(files["front.js"]) > 1<<20 {
+		t.Errorf("front.js is %d bytes, over its 1 MiB limit", len(files["front.js"]))
 	}
-	// the version and the release public key are stamped into the wasm
-	for _, stamp := range []string{"v0.0.1", key} {
-		if !bytes.Contains(files["panel.wasm"], []byte(stamp)) {
-			t.Errorf("%q is not stamped into panel.wasm", stamp)
+	// the version is stamped into every wasm; the release public key only into the roles that link code reading it (the linker
+	// drops a variable nothing uses, so the public role has none), and at least one role must carry it
+	keyed := 0
+	for _, s := range cfg.Scripts {
+		for _, m := range s.Modules {
+			if m.Type != "compiled_wasm" {
+				continue
+			}
+			if !bytes.Contains(files[m.Name], []byte("v0.0.1")) {
+				t.Errorf("the version is not stamped into %s", m.Name)
+			}
+			if bytes.Contains(files[m.Name], []byte(key)) {
+				keyed++
+				t.Logf("%s carries the release key", m.Name)
+			}
 		}
+	}
+	if keyed == 0 {
+		t.Error("no role carries the release key")
 	}
 }

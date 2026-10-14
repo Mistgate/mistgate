@@ -3,10 +3,10 @@
 #   2. the panel for js/wasm -> edge/worker/dist/panel.wasm, and the five role entries of the split edition
 #      (cmd/mistgate-edge-{public,link,jobs,admin,provision}) -> dist/<role>.wasm;
 #   3. wasm_exec.js from the Go toolchain that built the wasm (the two must match) -> edge/worker/dist/wasm_exec.js;
-#   4. edge/worker/wrangler.dev.toml and wrangler.provision.dev.toml (git-ignored): the two scripts' templates with a dummy D1 id,
-#      for `wrangler dev --local -c wrangler.dev.toml -c wrangler.provision.dev.toml` (pnpm dev). The second script, the
-#      Provisioner that installs nodes over SSH, bundles the same dist/panel.wasm through its own entry
-#      (src/provision-index.ts) and needs no build step of its own.
+#   4. edge/worker/wrangler.<role>.dev.toml for the six scripts (front, link, public, admin, jobs, provision; git-ignored): the
+#      configs rendered from release.NewEdgeConfig (scripts/edgeconfig) with a dummy D1 id, for `wrangler dev --local` with all
+#      six (pnpm dev; FRONT is the first and listens).
+#      dist/panel.wasm is the all-roles build of the Node tests and the e2e bridge, not of a Worker of the release.
 # wasm_exec.js is a generated copy, so dist/ is git-ignored and this script is the only way it is produced.
 param([switch]$SkipWeb)
 $ErrorActionPreference = "Stop"
@@ -47,13 +47,12 @@ $goRoot = (& go env GOROOT).Trim()
 if ($LASTEXITCODE -ne 0) { throw "go env GOROOT failed." }
 Copy-Item -LiteralPath (Join-Path $goRoot "lib/wasm/wasm_exec.js") -Destination (Join-Path $dist "wasm_exec.js") -Force
 
-$template = Get-Content -LiteralPath (Join-Path $worker "wrangler.example.toml") -Raw
-$local = $template -replace 'replace-with-your-d1-database-id', '00000000-0000-0000-0000-000000000000'
-[IO.File]::WriteAllText((Join-Path $worker "wrangler.dev.toml"), $local, (New-Object Text.UTF8Encoding $false))
-
-$provisionTemplate = Get-Content -LiteralPath (Join-Path $worker "wrangler.provision.example.toml") -Raw
-$provisionLocal = $provisionTemplate -replace 'replace-with-your-d1-database-id', '00000000-0000-0000-0000-000000000000'
-[IO.File]::WriteAllText((Join-Path $worker "wrangler.provision.dev.toml"), $provisionLocal, (New-Object Text.UTF8Encoding $false))
+Push-Location $repoRoot
+try {
+    Invoke-Native "edge dev configs" { go run ./scripts/edgeconfig -out $worker -dev }
+} finally {
+    Pop-Location
+}
 
 $bytes = (Get-Item -LiteralPath $wasm).Length
 "edge wasm: {0} bytes ({1:N1} MiB, limit in CI 44040192, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (44040192 - $bytes), ((44040192 - $bytes) / 1KB)

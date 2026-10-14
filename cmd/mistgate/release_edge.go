@@ -13,14 +13,18 @@ import (
 // edgeRebuild builds the edge bundle; a test seam (goBuildEdge in production), like releaseRebuild.
 var edgeRebuild = goBuildEdge
 
-// edgeBuildTags are the build tags of panel.wasm. nethttpomithttp2 leaves out net/http's HTTP/2 (about 0.8 MB): a Worker
-// never speaks HTTP/2 itself, Go's js/wasm transport hands every request to fetch. CI's size step and
+// edgeBuildTags are the build tags of the role wasm files. nethttpomithttp2 leaves out net/http's HTTP/2 (about 0.8 MB): a
+// Worker never speaks HTTP/2 itself, Go's js/wasm transport hands every request to fetch. CI's size step and
 // scripts/build-edge.ps1 use the same tag.
 const edgeBuildTags = "nethttpomithttp2"
 
+// edgeWasmRoles are the roles that carry a Go panel, in the bundle's order; each is cmd/mistgate-edge-<role>. FRONT has none.
+// (cmd/mistgate-edge, the build with every role, is for the Node tests and the e2e run, not for a release.)
+var edgeWasmRoles = []string{release.RoleLink, release.RoleProvision, release.RolePublic, release.RoleAdmin, release.RoleJobs}
+
 // goBuildEdge is the one definition of how mistgate-edge.tar.gz is built: CI, `release build` and the rebuild check of
-// `release sign` all run it. The panel is cmd/mistgate-edge for js/wasm with the same flags and Go toolchain as the other
-// release binaries (go.mod's toolchain line); wasm_exec.js is the one of that toolchain; the two Worker scripts are
+// `release sign` all run it. The five roles are cmd/mistgate-edge-<role> for js/wasm with the same flags and Go toolchain as
+// the other release binaries (go.mod's toolchain line); wasm_exec.js is the one of that toolchain; the six Worker scripts are
 // bundled by edge/worker/build-bundle.mjs with the esbuild pinned in edge/worker/package.json (run
 // `pnpm install --frozen-lockfile` there first); the assets are web/dist (build the SPA first).
 func goBuildEdge(src, version string, built int64, key, out string) error {
@@ -52,15 +56,20 @@ func goBuildEdge(src, version string, built int64, key, out string) error {
 	}
 
 	env := releaseEnv(toolchain, "GOOS=js", "GOARCH=wasm")
-	wasm := filepath.Join(tmp, "panel.wasm")
-	if _, err := run(src, env, "go", "build", "-tags", edgeBuildTags, "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key), "-o", wasm, "./cmd/mistgate-edge"); err != nil {
+	scripts := filepath.Join(tmp, "scripts")
+	if err := os.MkdirAll(scripts, 0o755); err != nil {
 		return err
+	}
+	for _, role := range edgeWasmRoles {
+		if _, err := run(src, env, "go", "build", "-tags", edgeBuildTags, "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key),
+			"-o", filepath.Join(scripts, role+".wasm"), "./cmd/mistgate-edge-"+role); err != nil {
+			return err
+		}
 	}
 	goroot, err := run(src, env, "go", "env", "GOROOT")
 	if err != nil {
 		return err
 	}
-	scripts := filepath.Join(tmp, "scripts")
 	if _, err := run(worker, os.Environ(), "node", "build-bundle.mjs", filepath.Join(goroot, "lib", "wasm", "wasm_exec.js"), scripts); err != nil {
 		return err
 	}

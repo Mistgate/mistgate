@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { forwardProvision, kickProvisioner } from "../../src/shell";
 
-// The main Worker's forwarding across the script boundary: the binding in wrangler.example.toml names an object of another
+// The admin Worker's forwarding across the script boundary: the binding in wrangler.admin.example.toml names an object of another
 // script (script_name), and the Provisioner there answers. The other script here is a plain-JavaScript auxiliary worker with an
 // object that echoes what it received (vitest.config.ts), so the real forwardProvision and kickProvisioner run against a
 // real cross-script Durable Object namespace in workerd.

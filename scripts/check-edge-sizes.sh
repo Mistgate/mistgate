@@ -15,8 +15,9 @@ mkdir -p "$out"
 
 # entry:limit in MiB
 entries=(
-  # The released bundle is still this one Worker with every role (the bundle switch is a later step). 42 MiB: about 3 MB above
-  # its size after the October 2026 diet, so a regression like the 7.9 MB template one fails here.
+  # The program with every role: no longer in the release bundle (the five entries below are), it is what the Node tests and the e2e
+  # bridge run, and the size the roles split. 42 MiB: about 3 MB above its size after the October 2026 diet, so a regression like
+  # the 7.9 MB template one fails here.
   "mistgate-edge:42"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"

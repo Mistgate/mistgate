@@ -215,13 +215,20 @@ choice" above).
 |---|---|---|
 | Tunnel health probes (hysteria2 / AWG client dialers, UDP) | the panel dials its own inbounds from the panel host | the agent embeds the dialers from `internal/panel/health` (`Dialers` is already injectable). Each node probes ITSELF and OTHER nodes (cross-node: path quality between datacentres); the panel schedules and stores results (same `health_*` tables). Workers cannot open UDP, and TURN is unreachable (measured). Cloudflare Containers stay optional and out of the core |
 | WARP registration | panel registers | the node does it (`internal/node/warp/cfapi` already exists), reports the account/key hash; the panel keeps desired-state ownership |
-| SSH provisioning | panel `x/crypto/ssh` over `net.Dialer` | VPS: unchanged. Edge (built): `provision`'s dialer is a socket from `cloudflare:sockets connect()`, held by a `Provisioner` Durable Object in a second Worker script (a socket belongs to its I/O context and Go resumes on any event of its isolate: [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)); job state stays in D1, the agent binary is streamed from the signed GitHub release into the SSH upload, the node enrols over the link. Refused for Cloudflare IPs and private networks (`ssh_target_refused`, "refused or unreachable"); those nodes are installed with the manual command |
+| SSH provisioning | panel `x/crypto/ssh` over `net.Dialer` | VPS: unchanged. Edge (built): `provision`'s dialer is a socket from `cloudflare:sockets connect()`, held by a `Provisioner` Durable Object in a script of its own, `<name>-provision` (a socket belongs to its I/O context and Go resumes on any event of its isolate: [ADR 0008](../adr/0008-ssh-installs-in-a-second-worker.md)); job state stays in D1, the agent binary is streamed from the signed GitHub release into the SSH upload, the node enrols over the link. Refused for Cloudflare IPs and private networks (`ssh_target_refused`, "refused or unreachable"); those nodes are installed with the manual command |
 | Doctor, speedtest, bandwidth, update guard | already on nodes | unchanged |
 
 ## 6. Update and release parity
 
-- One release produces: VPS binary + agent bundles (as today) and an edge bundle (`panel.wasm`, Worker JS, static assets,
-  manifest, signature by the same release key).
+- One release produces: VPS binary + agent bundles (as today) and an edge bundle (`mistgate-edge.tar.gz`, manifest and signature by
+  the same release key). The bundle holds six Worker scripts and the SPA, listed by `edge.json` schema 2 in upload order:
+  `link`, `provision`, `public`, `admin`, `jobs` (each `<role>.js` with its own `<role>.wasm`, built from `cmd/mistgate-edge-<role>`)
+  and `front` (`front.js`, no wasm: the router, the hostname, the `Limiter` and `NodeLink` objects, a service binding to each role),
+  plus `assets/` (`web/dist`, uploaded to `public` and `admin`). The bindings, secrets, vars, the cron of `jobs` and the routes of
+  `front` are in `edge.json`; the Wrangler configs of the dev and hand-made deployments are generated from the same description
+  (`edge/worker/wrangler.<role>.example.toml`, `go generate ./internal/release`). The all-roles `cmd/mistgate-edge` is not in the
+  bundle: it is the build of the Node tests. Deploy order and the first-create cycle: `link`, `provision`, `public`, `admin`, `jobs`,
+  FRONT last (a first install creates FRONT without its service bindings first, because `link` binds FRONT's objects).
 - Agent updates (`update/1`): bundle files in R2 (edge) or on disk (VPS), `FetchUpdate` as above; rollout scheduling by
   Cron (1-minute granularity) and DO alarms instead of in-process tickers.
 - **"Update panel" button on the edge** uploads the new signed Worker version through the Cloudflare API

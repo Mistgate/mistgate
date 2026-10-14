@@ -1,0 +1,43 @@
+# Generated from internal/release.NewEdgeConfig (go generate ./internal/release). Do not edit: change the config and generate again.
+# Copy to wrangler.public.toml (or let scripts/build-edge.ps1 make the .dev.toml) and replace the database id; it holds no
+# account id and no secret. Script mistgate-edge-public: subscriptions, the user page and the decoy; the hot path.
+name = "mistgate-edge-public"
+main = "src/roles/public.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+# The Go panel of this role (dist/public.wasm) is imported by src/roles/public.ts as a precompiled WebAssembly module.
+[[rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mistgate"
+database_id = "replace-with-your-d1-database-id"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+script_name = "mistgate-edge"
+
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+script_name = "mistgate-edge"
+
+# Every request goes to the Worker first and the panel reads these files through the ASSETS binding; only an exact file path is a hit.
+[assets]
+directory = "../../web/dist"
+binding = "ASSETS"
+run_worker_first = true
+html_handling = "none"
+not_found_handling = "none"
+
+[observability]
+enabled = false
+
+# Secrets, never a value in this file: wrangler secret put <NAME> --name mistgate-edge-public. Locally put NAME=value lines in the git-ignored
+# .dev.vars. MASTER_KEY is 32 random bytes as 64 hex characters, the same in every script that has it.
+#   MASTER_KEY

@@ -38,8 +38,8 @@ const releaseUsage = `usage:
           --frozen-lockfile && pnpm build).
           The edge bundle (below) given to sign is rebuilt the same way and gets DIR/edge-manifest.json and
           DIR/edge-manifest.sig, signed in a context of its own.
-  edge bundle  the Cloudflare edition: the name mistgate-edge.tar.gz given to build or sign. It holds panel.wasm, the two
-          Worker scripts, the SPA and edge.json, in a deterministic tarball. It needs the SPA built in --source and the pinned
+  edge bundle  the Cloudflare edition: the name mistgate-edge.tar.gz given to build or sign. It holds the five role wasm files,
+          the six Worker scripts, the SPA and edge.json, in a deterministic tarball. It needs the SPA built in --source and the pinned
           esbuild installed there (cd edge/worker && pnpm install --frozen-lockfile).
   trust-key  after a key rotation: make the release key compiled into this binary the installation's key
           (<data-dir>/release.pub). Until then a panel whose compiled key differs from release.pub trusts no bundle.

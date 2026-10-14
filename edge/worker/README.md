@@ -1,26 +1,59 @@
 # Mistgate edge Worker
 
-The thin TypeScript shell that runs the Mistgate panel on Cloudflare Workers: the Go panel compiled to `js/wasm`
-(`cmd/mistgate-edge`, its js side in `edge/bridge`) does everything, this Worker only starts it once per isolate and converts `Request` and `Response`
-to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`. To deploy without Wrangler, use `mistgate edge deploy` (`docs/en/getting-started/install-edge.md`); the Wrangler templates below are for development and hand-made deployments.
+The thin TypeScript shell that runs the Mistgate panel on Cloudflare Workers: the Go panel compiled to `js/wasm` does everything
+(the roles are `cmd/mistgate-edge-*`, their shared js side is `edge/bridge`), the Workers here only start it once per isolate and
+convert `Request` and `Response` to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`. To deploy without
+Wrangler, use `mistgate edge deploy` (`docs/en/getting-started/install-edge.md`); the Wrangler configs below are for development and
+hand-made deployments.
 
-- `src/index.ts`: every request goes to the panel (`mgPanel.fetch`); the Worker does not know the secret admin path.
-  If the panel cannot start, the answer is 503 and the next request tries again.
-- `src/panel.ts`, `src/runtime.ts`: per isolate, instantiate one wasm module once and call `mgPanel.init` once (concurrent first
-  requests share it). `runtime.ts` takes the module as a parameter (`createRuntime(wasm)`); `panel.ts` binds it to `dist/panel.wasm`, the
-  single script's program. `src/handler.ts` holds the fetch and cron entry points over any runtime.
+The edition is **six Worker scripts**: FRONT (the router, no wasm) and five roles of the panel, each with its own wasm. The release
+bundle (`mistgate-edge.tar.gz`) holds exactly these (see "What the release bundle holds" below).
+
+- `src/front.ts`, `src/route.ts`: FRONT, the one script with the hostname. It reads the secret prefixes from D1 and passes each request to a role by service binding. It owns the `Limiter` and `NodeLink` Durable Objects.
+- `src/roles/{public,admin,link,jobs,provision}.ts`, `src/roles/shared.ts`: the entries of the five Go roles, one `dist/<role>.wasm` each. See "The scripts" below.
+- `src/runtime.ts`: per isolate, instantiate one wasm module once and call `mgPanel.init` once (concurrent first requests share it). `createRuntime(wasm)` takes the module as a parameter. `src/handler.ts` holds the fetch and cron entry points over any runtime.
 - `src/shell.ts`: the pure parts (request/response conversion, static-asset reader, init de-duplication, routing of limit calls); tested by `pnpm test`.
 - `src/limiter.ts`, `src/limitmath.ts`: the `Limiter` Durable Object (see below) and its pure math.
 - `src/nodelink.ts`, `src/panellink.ts`: the agent link shell (`NodeLink` Durable Object) and the entrypoint through which it reaches Go (see below).
-- `src/provisioner.ts`, `src/provision-index.ts`, `wrangler.provision.example.toml`: the second script, `mistgate-edge-provision`, with the `Provisioner` Durable Object that installs nodes over SSH (see below).
-- `src/front.ts`, `src/route.ts`, `src/roles/`: the split edition's scripts (see "The split edition" below). Not part of the release bundle yet.
-- `build-bundle.mjs`, `test/bundle/`: the release build of both scripts (`mistgate release build mistgate-edge.tar.gz`, see Releases and signing in the docs): esbuild, pinned in `package.json`, bundles `src/index.ts` and `src/provision-index.ts` into `worker.js` and `provision.js`, with `panel.wasm` left as a separate CompiledWasm module. `scripts/test-edge-bundle.ps1` builds the tarball twice, loads it in workerd (Miniflare) and prints each script's `wrangler deploy --dry-run` upload size against Cloudflare's 64 MiB limit.
+- `src/provisioner.ts`: the `Provisioner` Durable Object that installs nodes over SSH (see below), exported by the provision role.
+- `src/index.ts`, `src/panel.ts`, `src/fetch.ts`, `src/provision-index.ts`: the **all-roles** program as one script over `dist/panel.wasm` (`cmd/mistgate-edge`). It is not in the release: it is what the Node tests and the Go bridge tests (`edge/bridge`, `cmd/mistgate-edge/testdata/bridge.cjs`) run against.
+- `wrangler.<role>.example.toml` (six files): the Wrangler configs, **generated** from `release.NewEdgeConfig` (below).
+- `build-bundle.mjs`, `test/bundle/`: the release build of the six scripts and its test (below).
 
-## The split edition (FRONT and role scripts)
+## What the release bundle holds
 
-One panel script becomes several (design: edge split plan). `<name>` is **FRONT**, a small router with no wasm that keeps the hostname,
-the `Limiter` and `NodeLink` Durable Objects and their migration tags; behind it, through service bindings, are the Go roles. All of it
-is in this package; the single-script entry above is unchanged and still what the release bundle ships.
+`mistgate release build mistgate-edge.tar.gz` (`cmd/mistgate/release_edge.go`) builds the five `cmd/mistgate-edge-<role>` for `js/wasm` with
+the release flags, `build-bundle.mjs` bundles the six scripts with esbuild (pinned in `package.json`; the five roles' wasm stay separate
+CompiledWasm modules), and `release.WriteEdgeBundle` writes the deterministic tarball, `release sign` rebuilds it byte for byte:
+
+```
+edge.json                      schema 2: the six scripts, their bindings, secrets, vars, cron (internal/release/edge.go)
+front.js                       FRONT (about 20 KB)
+link.js     link.wasm          the agent link
+provision.js provision.wasm    the Provisioner object (SSH installs)
+public.js   public.wasm        subscriptions, the user page, the decoy
+admin.js    admin.wasm         the admin API and SPA, the first-run setup
+jobs.js     jobs.wasm          the cron tick
+assets/                        web/dist, uploaded to public and admin
+```
+
+`edge.json` lists the scripts in upload order (link, provision, public, admin, jobs, FRONT): what a script binds is uploaded before it.
+`scripts/test-edge-bundle.ps1` builds the tarball twice (the two must be equal), loads the six scripts in workerd (Miniflare) with the bindings
+`edge.json` gives them, sends a real request per role through FRONT (`test/bundle/bundle.test.ts`) and prints each script's
+`wrangler deploy --dry-run` upload size against Cloudflare's 64 MiB limit.
+
+### The Wrangler configs are generated
+
+`internal/release.NewEdgeConfig` is the one description of the bindings; `wrangler.<role>.example.toml` is rendered from it
+(`go generate ./internal/release`, which runs `go run ./scripts/edgeconfig -out edge/worker`), and `TestWranglerConfigsAreCurrent` fails when a
+committed file differs. Other tests hold the description to this directory: the names in each script's environment interface in `src/env.ts`,
+the entries `build-bundle.mjs` builds, the bindings table in `internal/release/edge_test.go`. A local run copies each file as `wrangler.<role>.dev.toml` with a zero D1
+id (`go run ./scripts/edgeconfig -out edge/worker -dev`, done by `scripts/build-edge.ps1`; git-ignored).
+
+## The scripts
+
+`<name>` is **FRONT**, a small router with no wasm that keeps the hostname, the `Limiter` and `NodeLink` Durable Objects and their
+migration tags; behind it, through service bindings, are the Go roles. A role has no route and no workers.dev name.
 
 | Script | Entry | Wasm | Reached by | Bindings |
 |---|---|---|---|---|
@@ -29,7 +62,7 @@ is in this package; the single-script entry above is unchanged and still what th
 | `<name>-link` | `src/roles/link.ts` | `dist/link.wasm` | FRONT (`LINK`, and `PANEL_LINK` from the `NodeLink` objects) | `DB`, `LIMITER`, `NODELINK` (FRONT's class), `MASTER_KEY`; exports the `PanelLink` entrypoint |
 | `<name>-admin` | `src/roles/admin.ts` | `dist/admin.wasm` | FRONT (`ADMIN`) | `DB`, `ASSETS` (SPA), `LIMITER`, `NODELINK`, `PROVISIONER` (from `<name>-provision`), `MASTER_KEY`, first-run vars and `SETUP_TOKEN_SHA256` |
 | `<name>-jobs` | `src/roles/jobs.ts` | `dist/jobs.wasm` | the cron trigger | `DB`, `NODELINK`, `PROVISIONER`, `MASTER_KEY` |
-| `<name>-provision` | `src/roles/provision.ts` | `dist/provision.wasm` | the binding to its Provisioner object | as `src/provision-index.ts` |
+| `<name>-provision` | `src/roles/provision.ts` | `dist/provision.wasm` | the `PROVISIONER` binding of ADMIN and JOBS | `DB`, `LIMITER` and `NODELINK` (FRONT's classes), its own `PROVISIONER` object, `MASTER_KEY`; exports the `Provisioner` class |
 
 - **Routing** (`src/route.ts`), in the order of `httpserver.Public`: the secret link prefix goes to LINK (the WebSocket upgrade too), a request
   to the admin host goes to ADMIN, the secret admin prefix goes to ADMIN, everything else goes to PUBLIC. The request is passed on
@@ -58,7 +91,7 @@ init option (`take`, `peek`, `record`, `fail`, `reset`) with the semantics of `s
 - State is a bucket (`b`) and/or a window (`w`) in the object's storage. An alarm is set for the moment the bucket is full
   again / the window has ended (the state is then the same as none) and deletes it, so an idle object stores nothing.
 - A malformed request throws; a rejected call, or a missing `limit` option, makes the panel refuse the guarded request
-  (fail closed). The object is created by the `[[migrations]]` entry (`new_sqlite_classes`) of `wrangler.example.toml`.
+  (fail closed). The object is created by the `[[migrations]]` entry (`new_sqlite_classes`) of `wrangler.front.example.toml`.
 
 ## Agent link (`NodeLink` Durable Object, `PanelLink` entrypoint)
 
@@ -88,11 +121,11 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
 
 Installing a node over SSH needs a TCP socket that lives as long as the install, and a socket belongs to the I/O context it was
 opened in, while the Go panel resumes on any JavaScript event of its isolate. So the installs run in a **second Worker script**,
-`mistgate-edge-provision`, whose isolate serves one object: the same `panel.wasm`, in its `serve` role. Deploy it **before** the
-main Worker (which binds to it), with the same `MASTER_KEY` secret and the same D1 database. It has no route and no workers.dev
+`<name>-provision`, whose isolate serves one object: the provision role's wasm, in its `serve` role. Deploy it **before** the
+Workers that bind to it (admin and jobs), with the same `MASTER_KEY` secret and the same D1 database. It has no route and no workers.dev
 name; its own `fetch` answers 404 without starting Go.
 
-- Main Worker: behind the sign-in check the panel answers the ProvisioningService and the install page with 204 and
+- Admin Worker: behind the sign-in check the panel answers the ProvisioningService and the install page with 204 and
   `X-Mistgate-Forward: provision;v=<build>` (`provision.ForwardMarker`); `forwardProvision` (`shell.ts`) sends the request, with the body the panel
   already read and the build in `X-Mistgate-Build`, to the one `Provisioner` (`idFromName("provisioner")`). No binding, or an object that cannot be
   reached: 503 `provisioner_unavailable`. The cron wakes the object (`kick`) while an install is queued, running or being cancelled.
@@ -102,7 +135,7 @@ name; its own `fetch` answers 404 without starting Go.
   nothing but its alarm; the install is in D1, and an evicted pass is requeued (three interruptions fail the install).
 - `openSocket` (`shell.ts`) is the `sshConnect` option of the serve role: `connect()` with an opening limit, `read`, `write`, `close`; the
   platform's refusal text is `refused`.
-- Local development runs both scripts: `pnpm dev` (`wrangler dev -c wrangler.dev.toml -c wrangler.provision.dev.toml`, written by `scripts/build-edge.ps1`).
+- Local development runs all six scripts: `pnpm dev` (`wrangler dev` with the six `wrangler.<role>.dev.toml`, FRONT first because the first config is the one that listens; written by `scripts/build-edge.ps1`).
 
 ## Init contract (`mgPanel.init`)
 
@@ -145,7 +178,7 @@ printf %s "$TOKEN" | sha256sum | cut -d' ' -f1 | wrangler secret put SETUP_TOKEN
 
 ## Scheduled background work
 
-The Wrangler template schedules the Worker once a minute. Each tick sweeps user status and silent nodes; at UTC minute 17
+The jobs Worker (`wrangler.jobs.example.toml`) is the only one with a cron trigger, once a minute. In `wrangler dev` the other scripts are reached by service binding only, and the tick is fired through the local explorer API (`POST /cdn-cgi/local/explorer/api/local/scheduled?worker=<name>-jobs`, body `{"cron":"* * * * *"}`; `/cdn-cgi/handler/scheduled` reaches only the listening script). Each tick sweeps user status and silent nodes; at UTC minute 17
 it also runs health retention, and at minutes divisible by 10 it runs the desired-state safety net.
 
 With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database and
@@ -155,16 +188,17 @@ the link is only re-issued after it expires. With `SETUP_TOKEN_SHA256` set (abov
 ## Build and run locally
 
 ```powershell
-scripts/build-edge.ps1          # web/dist, dist/panel.wasm, dist/wasm_exec.js, wrangler.dev.toml (all git-ignored)
+scripts/build-edge.ps1          # web/dist, dist/<role>.wasm and dist/panel.wasm, dist/wasm_exec.js, wrangler.<role>.dev.toml (all git-ignored)
 cd edge/worker
 pnpm install
 # .dev.vars (git-ignored): MASTER_KEY=<64 hex characters>
 pnpm dev                        # wrangler dev --local over https (the panel only serves https origins; the certificate is self-signed)
 ```
 
-`pnpm test` runs two vitest projects: the pure code under Node (`test/*.test.ts`) and the `Limiter` and `NodeLink` classes in
-workerd with real Durable Object storage (`test/do`, `@cloudflare/vitest-pool-workers`; its own `wrangler.test.toml`). There
-`NodeLink` reaches a scripted fake `PanelLink` (`test/do/worker.ts`) through `ctx.exports`, like the real one.
+`pnpm test` runs four vitest projects: the pure code under Node (`test/*.test.ts`, with the bundling checks of `test/front-bundle.test.ts`), the `Limiter`,
+`NodeLink` and `Provisioner` classes in workerd with real Durable Object storage (`test/do`, `@cloudflare/vitest-pool-workers`; its own
+`wrangler.test.toml`; there `NodeLink` reaches a scripted fake `PanelLink` through `ctx.exports`), FRONT in workerd with stand-in roles
+(`test/front`), and, when `MISTGATE_EDGE_BUNDLE` names an extracted tarball, the built bundle (`test/bundle`, run by `scripts/test-edge-bundle.ps1`).
 
-`dist/` is generated: `wasm_exec.js` must come from the Go toolchain that built `panel.wasm`, so it is copied by the
-build script rather than committed. `wrangler.example.toml` is the deployment template (no account id, no secret).
+`dist/` is generated: `wasm_exec.js` must come from the Go toolchain that built the wasm files, so it is copied by the
+build script rather than committed. `wrangler.<role>.example.toml` are the deployment templates (no account id, no secret).

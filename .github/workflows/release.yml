@@ -96,7 +96,7 @@ jobs:
           path: release/
           if-no-files-found: error
 
-  # The Cloudflare edition: the panel for js/wasm, the two Worker scripts (esbuild, pinned in edge/worker/package.json) and the
+  # The Cloudflare edition: the five panel roles for js/wasm, the six Worker scripts (esbuild, pinned in edge/worker/package.json) and the
   # admin SPA in one deterministic tarball, mistgate-edge.tar.gz. It runs pnpm (third-party code), so read-only too; the
   # bundle is loaded in workerd before it is uploaded. The owner signs it later (edge-manifest.json, edge-manifest.sig).
   edge:

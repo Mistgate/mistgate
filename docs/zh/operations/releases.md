@@ -72,7 +72,7 @@ gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 
 ### Cloudflare 版发布包
 
-`mistgate-edge.tar.gz` 是 Cloudflare 版：为 `js/wasm` 编译的面板（`panel.wasm`，和其他二进制一样写入版本、构建时间和发布公钥）、两个 Worker 脚本（`worker.js` 和 `provision.js`，由 `edge/worker/package.json` 锁定的 esbuild 打包）、管理后台 SPA（`assets/`）以及 `edge.json`。该文件列出脚本、绑定、Durable Object 迁移和 `mistgate edge deploy` 使用的密钥名称。SPA 构建完成并在 `edge/worker` 中运行 `pnpm install --frozen-lockfile` 后，`mistgate release build --version V --key PUBLIC mistgate-edge.tar.gz --out DIR` 会构建发布包；`release sign` 会用相同方式重新构建，如果 tar 包不一致就拒绝签名，并写入 `edge-manifest.json`（含版本、构建时间、有效期、tar 包大小和 SHA-256）与 `edge-manifest.sig`。Edge 清单使用同一个发布密钥在独立的 Ed25519 上下文中签名，因此它不能通过面板或节点签名校验，反之亦然。`panel-manifest.json` 不会更改。
+`mistgate-edge.tar.gz` 是 Cloudflare 版：六个 Worker 脚本和管理后台 SPA。其中五个脚本是面板的角色，各自作为独立程序编译为 `js/wasm`（`link`、`provision`、`public`、`admin` 和 `jobs`：`<角色>.js` 与 `<角色>.wasm`，和其他二进制一样写入版本、构建时间和发布公钥）；第六个 `front.js` 是持有主机名的路由器，没有 wasm。脚本由 `edge/worker/package.json` 锁定的 esbuild 打包。tar 包还包含 SPA（`assets/`，上传到 `public` 和 `admin`）以及 `edge.json`（schema 2）：它按上传顺序列出脚本、绑定、Durable Object 迁移、密钥名称、`jobs` 的 cron 和 `front` 的路由，供 `mistgate edge deploy` 使用。SPA 构建完成并在 `edge/worker` 中运行 `pnpm install --frozen-lockfile` 后，`mistgate release build --version V --key PUBLIC mistgate-edge.tar.gz --out DIR` 会构建发布包；`release sign` 会用相同方式重新构建，如果 tar 包不一致就拒绝签名，并写入 `edge-manifest.json`（含版本、构建时间、有效期、tar 包大小和 SHA-256）与 `edge-manifest.sig`。Edge 清单使用同一个发布密钥在独立的 Ed25519 上下文中签名，因此它不能通过面板或节点签名校验，反之亦然。`panel-manifest.json` 不会更改。
 
 tar 包具有确定性（条目排序、权限模式固定、所有者和时间固定，gzip 头部不含文件名或时间）。要保持一致，Go 工具链必须与 `go.mod` 中的版本相同；`web/dist` 和 `edge/worker/node_modules` 必须来自锁定的 lockfile；签名程序使用的 Go 版本必须与构建 tar 包的版本相同（gzip 层的压缩取决于签名程序使用的 Go 版本；如果压缩结果不同，`release sign` 会拒绝签名，不会转而签署其他内容）。
 

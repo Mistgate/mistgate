@@ -206,7 +206,7 @@ export async function kickProvisioner(ns: DurableObjectNamespace<Provisioner>): 
 /** What `connect()` of cloudflare:sockets is, so that this file runs under plain Node in the tests. */
 export type Connect = (address: SocketAddress | string, options?: SocketOptions) => Socket;
 
-/** The socket object the panel's sshConnect hands to Go (cmd/mistgate-edge/sshconn_js.go). */
+/** The socket object the panel's sshConnect hands to Go (edge/bridge/sshconn_js.go). */
 export type SshSocket =
   | { ok: true; read(): Promise<Uint8Array | null>; write(bytes: Uint8Array): Promise<void>; close(): void }
   | { ok: false; error: "refused" | "failed" | "timeout" };
