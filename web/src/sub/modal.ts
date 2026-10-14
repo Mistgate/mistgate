@@ -58,7 +58,9 @@ export function createModal({ onClose, refocus, label, lastUsed }: ModalDeps): M
       el.setAttribute("aria-label", label());
       const had = el.open;
       const key = had && el.contains(document.activeElement) ? ((document.activeElement as HTMLElement).dataset?.k ?? "") : "";
-      el.replaceChildren(h("div", { class: "mbox" }, ...content));
+      // "scrolled": the sticky title gets its hairline once something has gone under it
+      const scrolled = (e: Event) => (e.currentTarget as HTMLElement).classList.toggle("scrolled", (e.currentTarget as HTMLElement).scrollTop > 0);
+      el.replaceChildren(h("div", { class: "mbox", on: { scroll: scrolled } }, ...content));
       if (!el.isConnected) document.body.append(el);
       if (!had) {
         opener = (document.activeElement as HTMLElement | null)?.dataset?.k || lastUsed?.() || "";
