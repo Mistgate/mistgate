@@ -749,6 +749,10 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 		return renderURI(in)
 	case plugin.FormatMihomo:
 		return renderMihomo(in)
+	case plugin.FormatXrayJSON:
+		return renderXray(in)
+	case plugin.FormatSingbox:
+		return renderSingbox(in)
 	default:
 		return plugin.Fragment{}, false
 	}

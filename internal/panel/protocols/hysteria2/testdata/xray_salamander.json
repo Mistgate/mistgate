@@ -1,0 +1,32 @@
+{
+  "protocol": "hysteria",
+  "settings": {
+    "version": 2,
+    "address": "de2.example.com",
+    "port": 443
+  },
+  "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "tlsSettings": {
+      "serverName": "de1.example.com",
+      "alpn": [
+        "h3"
+      ]
+    },
+    "hysteriaSettings": {
+      "version": 2,
+      "auth": "tok-DEVICE_secret_0123456789abcdefghijklmn"
+    },
+    "finalmask": {
+      "udp": [
+        {
+          "type": "salamander",
+          "settings": {
+            "password": "gawrgura-pw"
+          }
+        }
+      ]
+    }
+  }
+}

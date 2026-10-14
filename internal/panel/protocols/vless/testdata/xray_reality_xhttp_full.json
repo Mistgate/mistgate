@@ -1,0 +1,34 @@
+{
+  "protocol": "vless",
+  "settings": {
+    "vnext": [
+      {
+        "address": "de1.example.com",
+        "port": 443,
+        "users": [
+          {
+            "id": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+            "encryption": "none"
+          }
+        ]
+      }
+    ]
+  },
+  "streamSettings": {
+    "network": "xhttp",
+    "security": "reality",
+    "realitySettings": {
+      "serverName": "second.example.org",
+      "fingerprint": "firefox",
+      "publicKey": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+      "shortId": "ab",
+      "spiderX": "/57999bb8"
+    },
+    "xhttpSettings": {
+      "path": "/q8x2kd7w",
+      "host": "cover.example.org",
+      "mode": "packet-up",
+      "xPaddingBytes": "120-360"
+    }
+  }
+}

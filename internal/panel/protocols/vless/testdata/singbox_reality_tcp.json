@@ -1,0 +1,21 @@
+{
+  "type": "vless",
+  "server": "de1.example.com",
+  "server_port": 443,
+  "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+  "flow": "xtls-rprx-vision",
+  "packet_encoding": "xudp",
+  "tls": {
+    "enabled": true,
+    "server_name": "www.example.org",
+    "utls": {
+      "enabled": true,
+      "fingerprint": "chrome"
+    },
+    "reality": {
+      "enabled": true,
+      "public_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+      "short_id": "0f1e2d3c4b5a6978"
+    }
+  }
+}

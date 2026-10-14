@@ -136,8 +136,8 @@ type ClientFormat string
 
 const (
 	FormatURIList    ClientFormat = "uri-list"  // base64(lines of scheme:// URIs); hysteria2:// and vless:// so far.
-	FormatXrayJSON   ClientFormat = "xray-json" // not rendered yet
-	FormatSingbox    ClientFormat = "singbox"   // not rendered yet
+	FormatXrayJSON   ClientFormat = "xray-json" // one Xray outbound as a JSON object, see Fragment
+	FormatSingbox    ClientFormat = "singbox"   // one sing-box outbound as a JSON object, see Fragment
 	FormatMihomo     ClientFormat = "mihomo-yaml"
 	FormatAmneziaVPN ClientFormat = "amnezia-vpn" // vpn://
 	FormatAWGConf    ClientFormat = "awg-conf"
@@ -151,7 +151,10 @@ type ClientSupport struct {
 }
 
 // Fragment is a piece of a subscription in one format. For FormatURIList, Data is exactly one URI (no
-// newline, no base64; the subscription assembler joins and encodes).
+// newline, no base64; the subscription assembler joins and encodes). For FormatXrayJSON and FormatSingbox, Data is ONE
+// outbound as a JSON object without a "tag", built with encoding/json (never from a string template: node and user
+// names are hostile input, and the plugin puts no name into the object at all); the assembler sets the tag and adds
+// the rest of the config (inbounds, dns, routing). A server the format cannot carry is not rendered (ok == false).
 type Fragment struct {
 	Format ClientFormat
 	Name   string // display name, e.g. "de1 · hy2 · 443"

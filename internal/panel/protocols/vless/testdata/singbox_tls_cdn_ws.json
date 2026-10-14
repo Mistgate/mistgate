@@ -1,0 +1,25 @@
+{
+  "type": "vless",
+  "server": "cdn.example.org",
+  "server_port": 443,
+  "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+  "packet_encoding": "xudp",
+  "tls": {
+    "enabled": true,
+    "server_name": "cdn.example.org",
+    "alpn": [
+      "http/1.1"
+    ],
+    "utls": {
+      "enabled": true,
+      "fingerprint": "chrome"
+    }
+  },
+  "transport": {
+    "type": "ws",
+    "path": "/ws",
+    "headers": {
+      "Host": "cdn.example.org"
+    }
+  }
+}

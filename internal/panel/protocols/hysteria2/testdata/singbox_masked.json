@@ -1,0 +1,17 @@
+{
+  "type": "hysteria2",
+  "server": "de2.example.com",
+  "server_port": 443,
+  "password": "••••",
+  "obfs": {
+    "type": "salamander",
+    "password": "••••"
+  },
+  "tls": {
+    "enabled": true,
+    "server_name": "de1.example.com",
+    "alpn": [
+      "h3"
+    ]
+  }
+}

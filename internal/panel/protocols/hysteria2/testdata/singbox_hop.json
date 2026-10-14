@@ -1,0 +1,20 @@
+{
+  "type": "hysteria2",
+  "server": "de2.example.com",
+  "server_ports": [
+    "20000:30000"
+  ],
+  "hop_interval": "30s",
+  "password": "tok-DEVICE_secret_0123456789abcdefghijklmn",
+  "obfs": {
+    "type": "salamander",
+    "password": "gawrgura-pw"
+  },
+  "tls": {
+    "enabled": true,
+    "server_name": "de1.example.com",
+    "alpn": [
+      "h3"
+    ]
+  }
+}

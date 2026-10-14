@@ -1,0 +1,34 @@
+{
+  "protocol": "vless",
+  "settings": {
+    "vnext": [
+      {
+        "address": "de1.example.com",
+        "port": 443,
+        "users": [
+          {
+            "id": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+            "encryption": "none"
+          }
+        ]
+      }
+    ]
+  },
+  "streamSettings": {
+    "network": "xhttp",
+    "security": "tls",
+    "tlsSettings": {
+      "serverName": "origin.example.com",
+      "fingerprint": "chrome",
+      "alpn": [
+        "h2",
+        "http/1.1"
+      ]
+    },
+    "xhttpSettings": {
+      "path": "/q8x2kd7w",
+      "host": "origin.example.com",
+      "mode": "auto"
+    }
+  }
+}
