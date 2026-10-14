@@ -527,7 +527,7 @@ func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender 
 		defer func() { <-panelUDPSlots }()
 		send := f.sendUDP
 		if send == nil {
-			send = udpcheck.Send
+			send = defaultSendUDP
 		}
 		family, sent, err := send(ctx, target.Address, ports, tag, udpCheckSendCount, udpCheckPPS, udpCheckSize)
 		if err != nil {

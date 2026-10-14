@@ -414,7 +414,7 @@ func (f *Fleet) probeTCPTargets(ctx context.Context, target store.NodeRow, sende
 	if sender.panel {
 		probe := f.probeTCP
 		if probe == nil {
-			probe = tcpcheck.Probe
+			probe = defaultProbeTCP
 		}
 		_, verdicts, err := probe(ctx, target.Address, probes)
 		if err != nil {
