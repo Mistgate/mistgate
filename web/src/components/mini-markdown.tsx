@@ -17,7 +17,9 @@ export type Block =
   | { kind: "paragraph"; children: Inline[] }
   | { kind: "list"; items: { depth: 0 | 1; children: Inline[] }[] };
 
-const inlineRe = /`([^`]+)`|\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
+// Bounded spans: an unclosed "[" or "`" must not make every later position scan to the end of the text (64 KiB of "["
+// took seconds); a real link text, bold run or code span is far shorter.
+const inlineRe = /`([^`\n]{1,400})`|\*\*([^\n]{1,400}?)\*\*|\[([^\]\n]{1,400})\]\(([^)\s]{1,2048})\)/g;
 
 /** The https address of a link, normalised, or "" for anything else (no user info either: it would hide the real host). */
 export function safeHttpsUrl(raw: string): string {

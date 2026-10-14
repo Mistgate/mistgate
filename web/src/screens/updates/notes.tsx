@@ -21,7 +21,8 @@ function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
   const [open, setOpen] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const text = noteText(note, lang);
-  // measured when the (clamped) body appears; a change of language mounts a new body (its key), so it is measured again
+  // measured when the (clamped) body appears; a new text (a change of language, a refreshed note) mounts a new body (its
+  // key), so it is measured again
   const measure = useCallback(
     (el: HTMLDivElement | null) => {
       if (clamp && el) setOverflows(el.scrollHeight > el.clientHeight + 1);
@@ -53,7 +54,7 @@ function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
       {text ? (
         <>
           <div
-            key={lang}
+            key={text}
             ref={measure}
             id={id}
             className={cx(

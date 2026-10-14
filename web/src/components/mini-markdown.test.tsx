@@ -93,4 +93,11 @@ describe("MiniMarkdown", () => {
     expect(render("**unclosed and `unclosed [x](https://a.example").textContent).toBe("**unclosed and `unclosed [x](https://a.example");
     expect(render("- a\r\n- b\r\n").querySelectorAll("li")).toHaveLength(2);
   });
+
+  it("parses a hostile body in linear time", () => {
+    // 64 KiB of unclosed "[" (the per-release cap) took seconds with unbounded spans
+    const started = performance.now();
+    expect(parseMarkdown("[".repeat(64 << 10))).toHaveLength(1);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });

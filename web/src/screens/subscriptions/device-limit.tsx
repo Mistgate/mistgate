@@ -54,9 +54,12 @@ export function DeviceLimitCard({ settings }: { settings: Settings }) {
   function pick(v: LinkDeviceLimit) {
     if (v === mode) return;
     if (v === LinkDeviceLimit.STRICT) {
-      // the count is the panel's of a moment ago: ask again while the dialog is open
-      void qc.invalidateQueries({ queryKey: settingsQuery.queryKey });
-      return ask(v);
+      // the dialog names how many people lose their apps: ask the panel now, not what it said up to 30 s ago
+      void qc.fetchQuery({ ...settingsQuery, staleTime: 0 }).then(
+        () => ask(v),
+        (e: unknown) => toast.error(errorText(e, t)),
+      );
+      return;
     }
     if (v === LinkDeviceLimit.ENFORCE && mode !== LinkDeviceLimit.STRICT && over > 0) return ask(v);
     void apply(v).catch(() => {});
