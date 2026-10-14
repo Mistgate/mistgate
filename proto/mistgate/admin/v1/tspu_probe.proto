@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// TSPU probe: the third source of the country check ("is the node reachable from Russia"). One of YOUR OWN nodes inside the
+// country (the probe node) tests, with TCP SYNs of a limited TTL, whether the connections to the other nodes of the fleet
+// survive the national DPI box (the TSPU). Conventions: common.proto. The method is in agent.proto, "COUNTRY PROBE".
+//
+// WHAT IT SEES. The probe node sits in a data centre, so it sees the filtering of its own uplink, not what a person on a home
+// or mobile network sees: its verdicts carry the confidence "dc_only" (countryreach.Combine) and an eyeball source (Globalping
+// on home networks) outranks them. Only TCP is tested; a Hysteria2 or AWG port is covered through the TCP ports of the node's
+// other profiles.
+//
+// WHAT IT SENDS. Commands to the probe node, over the agent link. The probe node then sends SYN packets to the addresses of the
+// other nodes (and to two fixed reference addresses of the country: a control that is never blocked and a reference that the
+// TSPU always drops). No node address goes to a third party.
+//
+// RUSSIA ONLY, for now; for another country the source says it is not available. It is not built for the Cloudflare edition yet
+// either (a run takes about two minutes and the scheduled jobs of that edition have 30 seconds): there Get says
+// available=false with unavailable_reason "edition" and Update and Test are refused.
+//
+// OFF IS THE DEFAULT AND OFF MEANS OFF. With enabled false no command is sent (neither by the schedule nor by TestTspuProbe) and
+// GetChecksResponse.country_checks shows nothing from this source; the stored rows stay until the retention removes them (7 days).
+// Disconnect also deletes the stored rows and the settings (the probe node, the interval, the last run).
+//
+// WHO MAY CALL WHAT. All of them are OWNER-ONLY; UpdateTspuProbe and DisconnectTspuProbe need a step-up. None of it is open to API
+// tokens or MCP (the results are: GetChecks, checks_results).
+//
+// ERRORS. INVALID_ARGUMENT: "interval_min: 30..1440", "probe_node_unknown", "probe_node_offline", "probe_node_not_capable" (the
+// node's agent does not list country-probe/1). FAILED_PRECONDITION: "tspu_off", "tspu_unavailable_for_country",
+// "tspu_no_probe_node", "tspu_probe_node_unfit" (TestTspuProbe: the probe node is offline or lacks the capability),
+// "tspu_run_in_progress", and "unavailable_in_edition: feature=tspu_probe" on the edge. RESOURCE_EXHAUSTED: tested again within
+// 60 seconds.
+service TspuProbeService {
+  // The settings, the nodes that can be the probe node, and the status of the last run. No secrets.
+  rpc GetTspuProbe(GetTspuProbeRequest) returns (GetTspuProbeResponse);
+  // Changes the settings; absent fields stay. Owner only; needs a step-up. The probe node must be online and declare
+  // country-probe/1; the interval is 30..1440 minutes (default 120).
+  rpc UpdateTspuProbe(UpdateTspuProbeRequest) returns (UpdateTspuProbeResponse);
+  // One run now against the fleet, at most one per 60 seconds. It can take a few minutes (the probe node tests the other nodes
+  // in batches). Returns the status of the run and the verdict per node; stores the rows like a scheduled run.
+  rpc TestTspuProbe(TestTspuProbeRequest) returns (TestTspuProbeResponse);
+  // Disconnect: switches it off AND deletes the stored rows and the settings. Owner only; needs a step-up. Idempotent. A run in
+  // flight is cancelled.
+  rpc DisconnectTspuProbe(DisconnectTspuProbeRequest) returns (DisconnectTspuProbeResponse);
+}
+
+// A node that could be the probe node. The picker lists every active node, those in the selected country first.
+message TspuProbeNode {
+  string id = 1;
+  string name = 2;
+  // ISO 3166-1 alpha-2 of the node (as the owner entered it), "" when unknown.
+  string country_code = 3;
+  // In the shared country of the country check.
+  bool in_country = 4;
+  // The agent lists country-probe/1.
+  bool declares = 5;
+  bool online = 6;
+}
+
+// What the last run of the probe node said. Absent (unset) until the first run.
+message TspuProbeRun {
+  // "ok": the probe ran and rows were stored. "control_failed": the control address is blocked behind the TSPU on this network,
+  // so the method does not apply there (no verdict about any node). "no_dpi_hop": the TSPU could not be placed (every reference
+  // address was tried; check the references). "busy": the agent was busy, tried again later. "failed": no answer or an error.
+  string status = 1;
+  // When it ended.
+  int64 at_unix = 2 [jstype = JS_NUMBER];
+  // The probe node that ran it.
+  string node_id = 3;
+  // The TTL of the last router before the TSPU box, 0 when it was not placed.
+  uint32 dpi_hop = 4;
+  // The reference address (blocked in the country) that placed the TSPU, "" when none did.
+  string blocked_ref = 5;
+  // Nodes that got a verdict in the run.
+  uint32 nodes_checked = 6;
+  // For "failed", a machine word: "agent_too_old", "unreachable", "timeout", "agent_error"; "" otherwise.
+  string detail = 7;
+}
+
+message TspuProbeSettings {
+  // Default false.
+  bool enabled = 1;
+  // false: the shared country of the country check is not Russia, or this is the Cloudflare edition; see unavailable_reason.
+  bool available = 2;
+  // "country" or "edition" when available is false, "" otherwise.
+  string unavailable_reason = 3;
+  // The probe node's id, "" = none chosen (nothing runs).
+  string probe_node_id = 4;
+  // Minutes between runs, 30..1440; default 120.
+  uint32 interval_min = 5;
+  // The picker: every active node, nodes in the selected country first, each with whether it can do the job now.
+  repeated TspuProbeNode nodes = 6;
+  TspuProbeRun last_run = 7;
+}
+
+message GetTspuProbeRequest {}
+message GetTspuProbeResponse { TspuProbeSettings settings = 1; }
+
+message UpdateTspuProbeRequest {
+  optional bool enabled = 1;
+  // "" clears the choice.
+  optional string probe_node_id = 2;
+  optional uint32 interval_min = 3;
+}
+message UpdateTspuProbeResponse { TspuProbeSettings settings = 1; }
+
+// What the probe node saw on one TCP port of a node: "blocked" (the SYN dies at the TSPU), "open" (connected, or a router behind
+// the TSPU answered), "refused" (a reset), "timeout" (no verdict).
+message TspuPort {
+  uint32 port = 1;
+  string verdict = 2;
+}
+
+message TspuNodeVerdict {
+  string node_id = 1;
+  string name = 2;
+  // "blocked" (every tested port), "partial", "open" (none), "unknown" (no verdict).
+  string verdict = 3;
+  repeated TspuPort ports = 4;
+}
+
+message TestTspuProbeRequest {}
+message TestTspuProbeResponse {
+  TspuProbeRun run = 1;
+  // The nodes that got a verdict before the run ended (all of them when run.status is "ok").
+  repeated TspuNodeVerdict nodes = 2;
+}
+
+message DisconnectTspuProbeRequest {}
+message DisconnectTspuProbeResponse { TspuProbeSettings settings = 1; }

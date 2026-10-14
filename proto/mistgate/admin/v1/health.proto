@@ -3,6 +3,7 @@ syntax = "proto3";
 package mistgate.admin.v1;
 
 import "mistgate/admin/v1/common.proto";
+import "mistgate/admin/v1/tspu_probe.proto";
 
 // Health screen (Alerts / Checks / Doctor tabs), the Doctor tab of the node page and the synthetic-check
 // pills of the node Overview tab. Conventions: common.proto.
@@ -314,9 +315,12 @@ message GetChecksResponse {
   // nothing to say.
   UdpLossNotice udp_loss = 5;
   // The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job): the
-  // live Globalping round and what the block lists say, combined into one verdict (CountryCheck.confidence). With
-  // GetChecksRequest.node_id only that node's. Empty while both sources are off.
+  // live Globalping round, the TSPU probe's run and what the block lists say, combined into one verdict (CountryCheck.confidence,
+  // CountryCheck.sources). With GetChecksRequest.node_id only that node's. Empty while all three sources are off.
   repeated CountryCheck country_checks = 6;
+  // The newest run of the TSPU probe (tspu_probe.proto): its status, time, probe node and dpi_hop. Unset while that source is
+  // off or has not run yet. The per-node rows are in country_checks.
+  TspuProbeRun tspu_run = 7;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -382,6 +386,21 @@ message CountryCheck {
   // when unknown or the block lists are off.
   string cdn_provider = 10;
   string cdn_region = 11;
+  // Which sources the verdict rests on, in this order: "globalping", "tspu" (the probe node in the country, tspu_probe.proto),
+  // "lists" (a block list only, verdict LISTED). Empty when there is nothing to say. With both live sources, `confidence` is
+  // "eyeball" or "dc_only" when they agree and "conflict" when they do not (the worse verdict is shown).
+  repeated string sources = 12;
+  // What each live source said on its own (the combined `verdict` hides it): UNSPECIFIED when that source has no verdict.
+  CountryVerdict globalping_verdict = 13;
+  CountryVerdict tspu_verdict = 14;
+  // The TSPU probe, whenever its source is on and has a recent row for the node. Its per-port detail, the TTL of the last
+  // router before the TSPU box (dpi_hop) and the probe node (vantage) with the time of the run. All empty or 0 when it has none.
+  // The probe is a datacentre view: the TSPU's `confidence` is always "dc_only".
+  repeated TspuPort tspu_ports = 15;
+  uint32 dpi_hop = 16;
+  string tspu_vantage_id = 17;
+  string tspu_vantage_name = 18;
+  int64 tspu_at_unix = 19 [jstype = JS_NUMBER];
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
