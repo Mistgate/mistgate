@@ -27,12 +27,14 @@ jobs:
           node-version: 22
       - run: GOOS=js GOARCH=wasm go build ./internal/panel/... ./cmd/mistgate/ ./cmd/mistgate-edge
       - name: edge-entry wasm size
+        # 42 MiB: about 3 MB above panel.wasm after the October 2026 diet, so a regression like the 7.9 MB template one fails here.
+        # The hard ceiling is Cloudflare's 64 MiB per Worker (design/cloudflare-edition/SPIKE.md); lower this again after each cut.
         run: |
           wasm="$RUNNER_TEMP/mistgate-edge.wasm"
           GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o "$wasm" ./cmd/mistgate-edge
           bytes=$(stat -c%s "$wasm")
-          echo "edge-entry wasm size: ${bytes} bytes (limit: 52428800 bytes); headroom: $((52428800 - bytes)) bytes ($(( (52428800 - bytes) / 1024 )) KiB)"
-          if [ "$bytes" -gt 52428800 ]; then exit 1; fi
+          echo "edge-entry wasm size: ${bytes} bytes (limit: 44040192 bytes); headroom: $((44040192 - bytes)) bytes ($(( (44040192 - bytes) / 1024 )) KiB)"
+          if [ "$bytes" -gt 44040192 ]; then exit 1; fi
       - name: edge-entry has no template engine
         run: |
           # text/template looks methods up by name, which makes the linker keep every exported method of every type

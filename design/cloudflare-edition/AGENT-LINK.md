@@ -1038,4 +1038,4 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
 - `debug.SetMemoryLimit` was not added. With the capped batch the Go memory from the OS was 40 MB with no limit and with limits of 64 and 48 MiB,
   and 42 MB with limits of 40 and 32 MiB: the peak is live data (the batch, its JSON and bound arguments), which a GC limit cannot
   free, and a limit near the live set only adds collection work.
-- CI's wasm size step and `scripts/build-edge.ps1` print the remaining headroom under the unchanged 50 MiB limit.
+- CI's wasm size step and `scripts/build-edge.ps1` print the remaining headroom under the CI limit: 50 MiB until 2026-10, then 42 MiB (44,040,192 bytes) after the edge diet left panel.wasm at about 40.6 MB; the Worker ceiling is 64 MiB.

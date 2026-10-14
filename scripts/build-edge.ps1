@@ -51,4 +51,4 @@ $provisionLocal = $provisionTemplate -replace 'replace-with-your-d1-database-id'
 [IO.File]::WriteAllText((Join-Path $worker "wrangler.provision.dev.toml"), $provisionLocal, (New-Object Text.UTF8Encoding $false))
 
 $bytes = (Get-Item -LiteralPath $wasm).Length
-"edge wasm: {0} bytes ({1:N1} MiB, limit in CI 52428800, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (52428800 - $bytes), ((52428800 - $bytes) / 1KB)
+"edge wasm: {0} bytes ({1:N1} MiB, limit in CI 44040192, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (44040192 - $bytes), ((44040192 - $bytes) / 1KB)
