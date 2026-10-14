@@ -451,7 +451,7 @@ describe("the list of devices", () => {
     const el = rows("limit");
     const btn = el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!;
     expect(btn.disabled).toBe(false);
-    expect(text(btn.parentElement!.querySelector(".dev-hint"))).toBe("Все места заняты");
+    expect(text(btn.closest(".dev")!.querySelector(".dev-hint"))).toBe("Все места заняты");
     expect(text(el.querySelector(".slots .only-m"))).toBe("3 из 3");
   });
 

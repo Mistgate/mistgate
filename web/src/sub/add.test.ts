@@ -290,31 +290,36 @@ describe("the keys of the page stay unique (the page puts the keyboard back by t
   });
 });
 
-describe("before any app took the link, its row has an action: copy the link", () => {
-  const row = (el: HTMLElement) => [...el.querySelectorAll(".dev")].find((x) => text(x.querySelector(".dev-n")) === "Приложения по ссылке")!;
-  const page = (name: string, f: (d: MgData) => void = () => {}, a = actions()) => view(data(name, f), state("ios", { returning: true }), a);
+describe("the link, one tap, next to 'Add a device'", () => {
+  const page = (name: string, f: (d: MgData) => void = () => {}, a = actions(), lang: "ru" | "en" | "zh" = "ru") => view(data(name, f), state("ios", { returning: true }, lang), a);
+  const addRow = (el: HTMLElement) => el.querySelector("[data-k=dev-add]")!.closest(".dev")!;
 
-  it("a secondary button in the row's own block of actions, like the keys'; it copies, marks the device, says 'Скопировано' and is announced", () => {
+  it("a square on a phone with its name for a screen reader and a tooltip, its words on a computer; it copies, marks the device and says 'Скопировано'", () => {
     const a = actions();
-    const d = data("amnezia-empty");
+    const d = data("hwid-full");
     const el = view(d, state("ios", { returning: true }), a);
-    const btn = row(el).querySelector<HTMLButtonElement>(".dev-acts [data-k=dev-link-copy]")!;
-    expect(text(btn)).toBe("Скопировать ссылку");
-    expect(btn.classList.contains("sec")).toBe(true);
-    expect(btn.getAttribute("aria-live")).toBe("polite");
-    expect(btn.closest(".dev-acts")?.parentElement).toBe(row(el)); // the same place as the key rows' actions
+    const btn = addRow(el).querySelector<HTMLButtonElement>(".dev-acts [data-k=dev-link-copy]")!;
+    expect(btn.getAttribute("aria-label")).toBe("Скопировать ссылку");
+    expect(btn.querySelector("span.only-w")?.textContent).toBe("Скопировать ссылку"); // the words: a computer only
+    expect(btn.classList.contains("dev-copy")).toBe(true);
+    expect(btn.previousElementSibling).toBeNull(); // in its tooltip wrapper, after "Add a device"
+    expect(btn.parentElement?.previousElementSibling?.getAttribute("data-k")).toBe("dev-add");
+    expect(text(btn.parentElement?.querySelector(".tip"))).toBe("Скопировать ссылку");
     btn.click();
     expect(a.log).toEqual([`copy ${d.subscription_url}`, "mark"]);
     expect(text(btn)).toBe("Скопировано");
-    expect(row(el).textContent).not.toContain(d.subscription_url); // the link is copied, never written out
+    expect(el.querySelector(".card")?.textContent).not.toContain(d.subscription_url); // copied, never written out
   });
 
-  it("English; and no button where there is nothing to copy: no link, an inactive subscription, a key row; the shared place keeps to its one line", () => {
-    expect(text(view(data("amnezia-empty"), state("ios", { returning: true }, "en"), actions()).querySelector("[data-k=dev-link-copy]"))).toBe("Copy link");
-    expect(row(page("amnezia-empty", (d) => (d.subscription_url = ""))).querySelector("[data-k=dev-link-copy]")).toBeNull();
+  it("one place on the page, whatever the devices; en and zh; none without a link, without the link apps or when not active", () => {
+    for (const name of ["hwid-full", "hwid-dense", "amnezia-empty", "happ", "devices-rich"]) expect(page(name).querySelectorAll("[data-k=dev-link-copy]")).toHaveLength(1);
+    expect(page("hwid-full", () => {}, actions(), "en").querySelector("[data-k=dev-link-copy]")?.getAttribute("aria-label")).toBe("Copy link");
+    expect(page("hwid-full", () => {}, actions(), "zh").querySelector("[data-k=dev-link-copy]")?.getAttribute("aria-label")).toBe(dict.zh.copyLink);
+    expect(page("hwid-full", (d) => (d.subscription_url = "")).querySelector("[data-k=dev-link-copy]")).toBeNull();
+    expect(page("keys-only").querySelector("[data-k=dev-link-copy]")).toBeNull();
     expect(view(data("expired"), state("ios"), actions()).querySelector("[data-k=dev-link-copy]")).toBeNull();
-    expect(page("amnezia-empty").querySelectorAll("[data-k=dev-link-copy]")).toHaveLength(1);
-    // an app took the shared place: the row is its name and one line, the link is in "Add a device"
-    expect(page("devices-rich").querySelector("[data-k=dev-link-copy]")).toBeNull();
+    // the empty row of the link has none of its own any more
+    const empty = [...page("amnezia-empty").querySelectorAll(".dev")].find((x) => text(x.querySelector(".dev-n")) === "Приложения по ссылке")!;
+    expect(empty.querySelector("button")).toBeNull();
   });
 });

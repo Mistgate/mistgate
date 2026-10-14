@@ -371,6 +371,18 @@ a { color: inherit; }
 .dev-more .ibtn[aria-expanded="true"] { background: var(--raise); color: var(--text); }
 /* a long list: the fold, a quiet link in the middle */
 .dev.dev-fold { padding-top: 4px; padding-bottom: 4px; min-height: 0; align-items: center; justify-content: center; }
+/* the link, one tap, next to "Add a device": a square on a phone (its words only for a screen reader and the tooltip) */
+.dev-copy { flex: none; width: 48px; padding: 0; }
+/* a tooltip: only where there is a pointer that hovers; shown after a moment on hover or keyboard focus, never moving the layout,
+   gone with Esc (main.ts sets .tips-off until the next tap or focus) */
+.tipwrap { position: relative; display: inline-flex; flex: none; }
+.tip { display: none; }
+@media (hover: hover) {
+  .tip { display: block; position: absolute; z-index: 4; padding: 6px 10px; border-radius: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--pop); font: 600 12px/1.35 var(--sans); white-space: nowrap; opacity: 0; visibility: hidden; transition: opacity 0.12s, visibility 0s linear 0.12s; }
+  :is(:hover, :focus-visible) + .tip, .tip:hover { opacity: 1; visibility: visible; transition-delay: 0.35s, 0.35s; }
+  .tips-off .tip { opacity: 0; visibility: hidden; }
+  .tipwrap > .tip { right: 0; bottom: calc(100% + 6px); }
+}
 .dev-fold .tlink[aria-expanded="true"] .i { transform: rotate(180deg); }
 
 /* things over the page: the menu of a row, the toast */

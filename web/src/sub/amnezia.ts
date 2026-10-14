@@ -42,12 +42,12 @@ export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platfo
  * A button that copies `text` and says so on itself: its label turns into `done` with a tick for a moment. `toast` is the
  * page's toast text. The page's copy() calls back only when the clipboard took the text. `after` runs when it did.
  */
-export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName; live?: boolean }): HTMLButtonElement {
-  const text = h("span", null, o.label);
+export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName; live?: boolean; aria?: string; textCls?: string }): HTMLButtonElement {
+  const text = h("span", { class: o.textCls }, o.label);
   const own = o.cls?.split(" ") ?? [];
   const link = own.includes("tlink");
   const ico = o.ico ?? "copy";
-  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, "aria-live": o.live ? "polite" : false, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
+  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, "aria-label": o.aria, "aria-live": o.live ? "polite" : false, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
   let timer = 0;
   function flash() {
     o.after?.();

@@ -238,11 +238,12 @@ describe("the shared place, by the mode", () => {
     expect(names(page(data("hwid-strict", (d) => (d.devices = []))))).toEqual(["Приложения без ID устройства"]);
   });
 
-  it("before any app took the link: the link's own row (the old one), with the link to copy", () => {
+  it("before any app took the link: the link's own row (the old one); the link to copy is next to 'Add a device'", () => {
     const el = page(data("hwid-track", (d) => (d.devices = [])));
     expect(names(el)).toEqual(["Приложения по ссылке"]);
     expect(line(byName(el, "Приложения по ссылке"))).toBe("ещё не подключались");
-    expect(el.querySelector("[data-k=dev-link-copy]")).not.toBeNull();
+    expect(byName(el, "Приложения по ссылке").querySelector("button")).toBeNull();
+    expect(el.querySelector("[data-k=dev-link-copy]")?.closest(".dev")?.querySelector("[data-k=dev-add]")).not.toBeNull();
   });
 });
 

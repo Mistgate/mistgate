@@ -152,10 +152,10 @@ function linkRow(c: Ctx, x: Device): HTMLElement {
 /**
  * The place the apps without a device ID share (Hiddify, v2rayNG: the server cannot tell them apart), in one short line: they
  * share one place, or (STRICT, a quiet row that is no device) they do not connect. Before any app took the link it is the link's
- * own row, whose one action is the link itself, for an app that does not take "add with one tap".
+ * own row, "not connected yet".
  */
 function sharedRow(c: Ctx, x: Device | null, strict: boolean): HTMLElement {
-  const { d, a, t } = c;
+  const { t } = c;
   const first = !x && !strict;
   // one short line: the time alone, the place's words say what it is
   const line = strict ? [h("span", null, t.strictNote)] : x ? [h("span", null, t.sharedNote), h("span", { "aria-hidden": "true" }, "·"), ...when(c, x.last_seen_unix, x.online, t.linkNever, (w) => w)] : when(c, 0, false, t.linkNever, t.fetched);
@@ -163,8 +163,6 @@ function sharedRow(c: Ctx, x: Device | null, strict: boolean): HTMLElement {
     "div",
     { class: "dev" },
     h("div", { class: "dev-top" }, tile(strict && !x ? "dash" : "sky", "link", { size: 36 }), h("div", { class: "dev-b" }, h("p", { class: "dev-n" }, first ? t.linkApps : t.sharedT), h("p", { class: "dev-m" }, ...line))),
-    // announced: "Скопировано"
-    first && d.user.status === "active" && d.access.happ && d.subscription_url !== "" && h("div", { class: "dev-acts" }, copyButton(a, { text: d.subscription_url, label: t.copyLink, done: t.copiedShort, toast: t.copied, cls: "sec grow", key: "dev-link-copy", after: a.mark, live: true })),
   );
 }
 
@@ -252,7 +250,7 @@ function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
   const inactive = d.user.status !== "active";
   const top = (tone: string, ic: IconName, title: string, text: string, dash = false) =>
     h("div", { class: "dev-top" }, h("span", { class: `tile s36 ${dash ? "dash" : tone}`, "aria-hidden": "true" }, icon(ic)), h("div", { class: "dev-b" }, h("p", { class: "dev-n" }, title), h("p", { class: "sm mut" }, text)));
-  const add = (disabled = false, out = hasRows) => h("button", { class: `btn ${out ? "out" : "sec"}`, type: "button", "data-k": "dev-add", disabled, on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd);
+  const add = (disabled = false, out = hasRows, cls = "") => h("button", { class: `btn ${out ? "out" : "sec"}${cls}`, type: "button", "data-k": "dev-add", disabled, on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd);
 
   if (inactive) {
     return h(
@@ -264,11 +262,20 @@ function addRow(c: Ctx, hasRows: boolean): HTMLElement | null {
   }
   const limit = d.user.device_limit;
   const free = limit > 0 ? limit - d.user.devices_used : 0;
-  // an app with the link: always possible (the limit counts keys; the link's one slot is shared), so the button stays
+  // an app with the link: "Add a device" is the guided way, and next to it the link itself, one tap: copied once, it goes into
+  // every device, and each app takes its own place (or the shared one). On a phone a square with a tooltip, on a computer its words.
   if (d.access.happ) {
     const key = keyAvailability(d);
     const hint = key === "limit" && !linkFull(d) ? [t.slotsFull, true] : key === "ok" && free > 0 ? [t.freeSlots(free), false] : null;
-    return h("div", { class: "dev" }, add(false, true), hint && h("p", { class: `hint dev-hint${hint[1] ? " warn-t b" : ""}` }, hint[0] as string));
+    const link =
+      d.subscription_url !== "" &&
+      h(
+        "span",
+        { class: "tipwrap" },
+        copyButton(a, { text: d.subscription_url, label: t.copyLink, aria: t.copyLink, textCls: "only-w", done: t.copiedShort, toast: t.copied, cls: "out dev-copy", key: "dev-link-copy", after: a.mark }),
+        h("span", { class: "tip only-m", "aria-hidden": "true" }, t.copyLink),
+      );
+    return h("div", { class: "dev" }, h("div", { class: "dev-acts" }, add(false, true, " grow"), link), hint && h("p", { class: `hint dev-hint${hint[1] ? " warn-t b" : ""}` }, hint[0] as string));
   }
   // keys alone
   if (!am) return null;
