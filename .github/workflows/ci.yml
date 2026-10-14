@@ -33,6 +33,14 @@ jobs:
           bytes=$(stat -c%s "$wasm")
           echo "edge-entry wasm size: ${bytes} bytes (limit: 52428800 bytes); headroom: $((52428800 - bytes)) bytes ($(( (52428800 - bytes) / 1024 )) KiB)"
           if [ "$bytes" -gt 52428800 ]; then exit 1; fi
+      - name: edge-entry has no template engine
+        run: |
+          # text/template looks methods up by name, which makes the linker keep every exported method of every type
+          # (7.9 MB of panel.wasm). The install page is Go code (internal/panel/provision/ui_page.go) for that reason.
+          if GOOS=js GOARCH=wasm go list -deps ./cmd/mistgate-edge | grep -Ex 'text/template|html/template'; then
+            echo "::error::cmd/mistgate-edge imports a template engine; see the comment of this step"
+            exit 1
+          fi
       - run: pwsh -File scripts/test-edge-store.ps1
       - run: pwsh -File scripts/test-edge-entry.ps1
 
