@@ -29,8 +29,8 @@
 # subscription lists its inbound, a Hysteria2 client downloads through it). --edge runs the same on the Cloudflare edition.
 # Needs openssh-server installed (its system service stays masked); skipped by --m3-only and --old-node.
 #
-# The tunnel steps (AmneziaWG, WARP, Mihomo, VLESS; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
-# --warp, --mihomo, --vless one by one, run after step 9 and before the retire; --m3-only runs them without the base and
+# The tunnel steps (AmneziaWG, WARP, Mihomo, VLESS, JSON; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
+# --warp, --mihomo, --vless, --json one by one, run after step 9 and before the retire; --m3-only runs them without the base and
 # self-update steps between. Clients and a fake internet sit in anonymous namespaces inside the run's namespace (`unshare -n`, a veth
 # each, interfaces mg3*): real amneziawg-go clients (3.1 and 2.0), a real mihomo, a kernel WireGuard peer that plays
 # WARP. With --old-node the tunnel steps are replaced by a compatibility step: an awg inbound is refused as
@@ -44,6 +44,15 @@
 # the first REALITY handshake after an agent start, and Check ports (TCP): the Hysteria2 site and the REALITY ports are
 # "ours", then a VLESS inbound on 443 claims the site port. The panel sends that check itself (one node, same host), so
 # the step restarts it with the trust file of the REALITY target.
+#
+# --json: the Xray JSON and sing-box documents of the subscription (?format=xray-json, ?format=sing-box, and sing-box by its UA)
+# run in real clients, one server at a time, each in its own namespace: Xray (the version of go.mod) and sing-box 1.12.25 and
+# 1.14.3 (built from source with go install into the cache; with_quic, with_utls). A fixture user's group holds the Hysteria2
+# inbound of step 2, the VLESS inbounds of --vless (so --json turns it on) and, with --warp, a WARP twin of each of Hysteria2
+# and VLESS REALITY. The step asserts the matrix of present and absent servers (sing-box has no self-signed Hysteria2 and no
+# XHTTP), headers and gzip, that every server connects, that a WARP twin leaves through the WARP address, that a preset DNS
+# (a fake resolver in the fake internet, "adblock-like") answers Xray's intercepted DNS, and that a disabled person's
+# placeholder entry connects nowhere. Without --warp the WARP cells are skipped. --m3 includes it.
 #
 # --edge runs the Cloudflare edition instead (scripts/e2e/edge.sh): the panel is the Go js/wasm build inside a local
 # `wrangler dev` (workerd, miniflare D1 and Durable Objects, nothing of a Cloudflare account is touched), the node is a
@@ -70,16 +79,17 @@ OLD_NODE=""
 # scenario and takes what it always took.
 # --decoy runs the decoy-site step alone (scripts/e2e/decoy.sh; --m3 includes it). --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_JSON="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
     --keep) KEEP=1 ;;
-    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_DECOY=1 ;;
+    --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_JSON=1 M3_DECOY=1 ;;
     --awg) M3_AWG=1 ;;
     --warp) M3_WARP=1 ;;
     --mihomo) M3_MIHOMO=1 M3_AWG=1 ;;
     --vless) M3_VLESS=1 ;;
+    --json) M3_JSON=1 M3_VLESS=1 ;;
     --decoy) M3_DECOY=1 ;;
     --m3-only) M3_ONLY=1 ;;
     --edge) EDGE=1 ;;
@@ -91,8 +101,8 @@ while [ $# -gt 0 ]; do
 done
 set -- "${ARGS[@]}"
 [ -z "$OLD_NODE" ] || [ -x "$OLD_NODE" ] || [ -f "$OLD_NODE" ] || { echo "--old-node: no such file: $OLD_NODE" >&2; exit 2; }
-[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_DECOY$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_DECOY=1; }
-M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS"
+[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_JSON$M3_DECOY$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_JSON=1 M3_DECOY=1; }
+M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_JSON"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
 [ -z "$OLD_NODE" ] || M3_DECOY=""
@@ -120,6 +130,7 @@ if [ -n "$M3_LIVE" ]; then
   done
   python3 -c 'import yaml' 2>/dev/null || { echo "the tunnel steps need python3-yaml" >&2; exit 2; }
   [ -z "$M3_WARP" ] || command -v wg >/dev/null || { echo "--warp needs wg (wireguard-tools) and the wireguard kernel module" >&2; exit 2; }
+  [ -z "$M3_JSON" ] || command -v gzip >/dev/null || { echo "--json needs gzip" >&2; exit 2; }
 fi
 
 # ---------------------------------------------------------------- outer: create the namespace, re-run inside it
@@ -1196,6 +1207,7 @@ if [ -n "$M3_LIVE" ]; then
   [ -z "$M3_MIHOMO" ] || m3_mihomo
   [ -z "$M3_VLESS" ] || m3_vless
   [ -z "$M3_WARP" ] || m3_warp
+  [ -z "$M3_JSON" ] || m3_json # after the WARP step: it uses the WARP twin and the VLESS inbounds the steps above left on the node
 fi
 
 # ================================================================ 10. retire

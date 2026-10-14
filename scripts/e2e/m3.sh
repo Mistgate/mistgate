@@ -145,6 +145,15 @@ m3_build() {
     XRAY=$(xray_bin)
     say "xray client $(basename "$XRAY") and the REALITY target scripts/e2e/tlsdest ($M3_CACHE)"
   fi
+  if [ -n "$M3_JSON" ]; then
+    singbox_bin 1.12.25 >/dev/null || { tail -n 5 "$WORK/build-singbox-1.12.25.log" 2>/dev/null; die "building sing-box 1.12.25 failed"; }
+    if singbox_bin 1.14.3 >/dev/null; then SB_VERSIONS="1.12.25 1.14.3"; else
+      tail -n 3 "$WORK/build-singbox-1.14.3.log" 2>/dev/null
+      note "sing-box 1.14.3 could not be built: the profiles are run with 1.12.25 only"
+      SB_VERSIONS="1.12.25"
+    fi
+    say "sing-box clients: $SB_VERSIONS ($M3_CACHE)"
+  fi
 }
 
 # awg_settings <port> [jq filter over the settings]: the default settings of an awg profile (own free networks,
@@ -1054,6 +1063,7 @@ m3_vless() {
   ts=$(make_profile vless e2e-vless-tls-streamup "$(vless_tls_settings "$(free_port tcp)" xhttp '.xhttp.mode = "stream-up"')")
   tw=$(make_profile vless e2e-vless-tls-ws "$(vless_tls_settings "$(free_port tcp)" ws)")
   for i in "$px" "$pt" "$pp" "$tp" "$ts" "$tw"; do [ -n "$i" ] && [ "$i" != null ] || die "CreateProfile(vless) returned no id"; done
+  VL_XHTTP=$px VL_TCP=$pt VL_WS=$tw # (m3_json builds a profile document out of these)
   want=$(($(api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq '.inbounds | length') + 6))
   for i in "$px" "$pt" "$pp" "$tp" "$ts" "$tw"; do make_inbound "$i"; done
   wait_for 90 "the six vless inbounds ACTIVE" inbounds_active "$want" \
@@ -1338,4 +1348,362 @@ PY
     stop_pid "$MHV"
   done
   pass "real mihomo ($(basename "$mh")): all six VLESS proxies of the served profile (REALITY tcp+Vision, xhttp, xhttp packet-up; TLS xhttp packet-up, xhttp stream-up, ws) pass traffic to the fake internet via the node"
+}
+
+# ================================================================ Xray JSON and sing-box
+# singbox_bin <version, e.g. 1.12.25>: the sing-box client, built from source (never downloaded) and cached. The tags are the two
+# the profiles need: with_quic (hysteria2) and with_utls (the uTLS fingerprint and REALITY); the gvisor TUN stack, the clash API and
+# the rest of the release tags are for the TUN inbound and the services that the e2e replaces by a mixed inbound.
+singbox_bin() {
+  local ver=$1 p tmp
+  p=$M3_CACHE/sing-box-$ver
+  if [ ! -x "$p" ]; then
+    mkdir -p "$M3_CACHE"
+    tmp=$(mktemp -d "$M3_CACHE/sing-box-build.XXXXXX")
+    (cd "$WORK" && GOBIN=$tmp GOFLAGS=-mod=mod GOTOOLCHAIN=auto go install -tags with_quic,with_utls "github.com/sagernet/sing-box/cmd/sing-box@v$ver") >"$WORK/build-singbox-$ver.log" 2>&1 \
+      && mv "$tmp/sing-box" "$p" || { rm -rf "$tmp"; return 1; }
+    rm -rf "$tmp"
+  fi
+  echo "$p"
+}
+
+write_json_helpers() {
+  cat >"$WORK/fakedns.py" <<'PY'
+# The resolver of the fake internet (UDP 53). "adblock-like": a name under blocked.example gets 0.0.0.0, every other A query
+# 198.51.100.7, other types an empty answer. Every query is logged: "<unix time> <source> <name> <type>".
+import socket, struct, sys, time
+
+host, log = sys.argv[1], sys.argv[2]
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind((host, 53))
+while True:
+    q, a = s.recvfrom(1500)
+    if len(q) < 17:
+        continue
+    i, labels = 12, []
+    while i < len(q) and q[i]:
+        labels.append(q[i + 1:i + 1 + q[i]].decode("ascii", "replace"))
+        i += q[i] + 1
+    name = ".".join(labels).lower()
+    qtype = struct.unpack(">H", q[i + 1:i + 3])[0]
+    with open(log, "a") as f:
+        f.write("%.3f %s %s %d\n" % (time.time(), a[0], name, qtype))
+    ip = None
+    if qtype == 1:
+        ip = "0.0.0.0" if name.endswith("blocked.example") else "198.51.100.7"
+    head = q[:2] + b"\x81\x80" + q[4:6] + (b"\x00\x01" if ip else b"\x00\x00") + b"\x00\x00\x00\x00"
+    ans = (b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04" + socket.inet_aton(ip)) if ip else b""
+    s.sendto(head + q[12:i + 5] + ans, a)
+PY
+  cat >"$WORK/socksdns.py" <<'PY'
+# socksdns.py <socks port> <name> <destination ip>: one A query to <destination>:53 through the SOCKS5 UDP ASSOCIATE of a local
+# proxy. Prints the addresses of the answer, or "rcode=N answers=M" / "timeout".
+import socket, struct, sys
+
+port, name, dest = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+c = socket.create_connection(("127.0.0.1", port), timeout=10)
+c.sendall(b"\x05\x01\x00")
+assert c.recv(2) == b"\x05\x00", "socks greeting"
+c.sendall(b"\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00")
+r = c.recv(32)
+assert len(r) >= 10 and r[1] == 0, "udp associate refused: %r" % r
+bnd = (socket.inet_ntoa(r[4:8]), struct.unpack(">H", r[8:10])[0])
+if bnd[0] == "0.0.0.0":
+    bnd = ("127.0.0.1", bnd[1])
+u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+u.settimeout(8)
+qn = b"".join(bytes([len(x)]) + x.encode() for x in name.split(".")) + b"\x00"
+q = struct.pack(">HHHHHH", 0x4242, 0x0100, 1, 0, 0, 0) + qn + struct.pack(">HH", 1, 1)
+u.sendto(b"\x00\x00\x00\x01" + socket.inet_aton(dest) + struct.pack(">H", 53) + q, bnd)
+try:
+    d, _ = u.recvfrom(1500)
+except socket.timeout:
+    print("timeout")
+    sys.exit(0)
+d = d[{1: 10, 4: 22}.get(d[3], 10):]
+rcode, an = d[3] & 15, struct.unpack(">H", d[6:8])[0]
+if rcode or not an:
+    print("rcode=%d answers=%d" % (rcode, an))
+    sys.exit(0)
+i = 12
+while d[i]:
+    i += d[i] + 1
+i += 5
+ips = []
+for _ in range(an):
+    if d[i] & 0xC0 == 0xC0:
+        i += 2
+    else:
+        while d[i]:
+            i += d[i] + 1
+        i += 1
+    t, _, _, ln = struct.unpack(">HHIH", d[i:i + 10])
+    i += 10
+    if t == 1:
+        ips.append(socket.inet_ntoa(d[i:i + 4]))
+    i += ln
+print(" ".join(ips))
+PY
+}
+
+# tls_pin <port> <server name>: the sha256 (hex) of the leaf certificate a TLS listener of this namespace presents
+tls_pin() {
+  python3 - "$1" "$2" <<'PY'
+import hashlib, socket, ssl, sys
+ctx = ssl.create_default_context()
+ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+with socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=sys.argv[2]) as t:
+    print(hashlib.sha256(t.getpeercert(binary_form=True)).hexdigest())
+PY
+}
+
+# json_secrets <document>...: the credentials a profile carries (user ids, passwords, hysteria auth, Salamander passwords) join SECRETS
+json_secrets() {
+  local k
+  while read -r k; do SECRETS+=("$k"); done < <(jq -r '[.. | objects | (.id?, .uuid?, .password?, .auth?) | strings | select(length >= 8)] | unique[]' "$@")
+}
+
+# m3_json: the Xray JSON and sing-box documents of a fixture user, run by the real clients (Xray from go.mod, sing-box 1.12.25 and
+# 1.14.3 built from source) one server at a time, each in the namespace cli7, which has nothing but the veth to this namespace. The
+# user's group holds the profiles that are already on the node (the Hysteria2 inbound of step 2, the VLESS inbounds of --vless and the
+# WARP twin of --warp), so the coverage is the matrix of the plan:
+#
+#   server                      Xray     sing-box
+#   hy2 Salamander, self-signed ok       absent (a pin of the whole certificate is not expressible before 1.15)
+#   VLESS REALITY XHTTP         ok       absent (no XHTTP)
+#   VLESS REALITY TCP Vision    ok       ok
+#   VLESS TLS WebSocket         ok       ok
+#   WARP twins (hy2, VLESS)     WARP     WARP (the VLESS one; the hy2 one is absent)
+#
+# The one hy2 + Salamander cell of sing-box that has no panel document here (the e2e node has no ACME name, so every hy2 inbound is
+# self-signed) is covered by a probe: a hand-made hy2 outbound with the credentials of the Xray document.
+m3_json() {
+  step "tunnels.7 Xray JSON and sing-box: the documents of the subscription run in real clients (Xray, sing-box ${SB_VERSIONS:-1.12.25}), placeholders, DNS"
+  local t0 ver sb i k port label tag src
+  t0=$(date +%s)
+  write_json_helpers
+  mk_ns cli7 198.18.57
+  : >"$WORK/fakedns.log"
+  spawn nsenter -t "$inet_PID" -n -- python3 "$WORK/fakedns.py" "$WHOAMI" "$WORK/fakedns.log" >>"$WORK/fakedns.out.log" 2>&1
+  fakedns_up() { [ -n "$(cns "$inet_PID" ss -Hlun 'sport = :53')" ]; }
+  wait_for 5 "the resolver of the fake internet" fakedns_up || die "the fake resolver did not start"
+
+  # ---- the user: a group with the profiles of this run and a DNS preset that points at the fake resolver
+  local pre profiles=("$PROFILE_ID" "$VL_XHTTP" "$VL_TCP" "$VL_WS") twin="" grp want_x want_s
+  mutate_to pre DnsService/CreateDnsPreset "$(jq -nc --arg a "$WHOAMI" '{name:"e2e-fake-dns", description:"the resolver of the fake internet", servers:[{kind:"DNS_SERVER_KIND_PLAIN", address:$a}], ipv4Only:true}')" \
+    || die "CreateDnsPreset failed: $pre"
+  pre=$(jq -r '.preset.id // ""' <<<"$pre")
+  [ -n "$pre" ] || die "CreateDnsPreset returned no preset id"
+  if [ -n "$M3_WARP" ]; then # the WARP twins: the Hysteria2 one of step tunnels.5, and a VLESS REALITY one that sing-box can carry
+    twin=$(make_profile vless e2e-vless-tcp-warp "$(vless_settings "$(free_port tcp)" tcp www.example.net '.egress = "warp"')")
+    [ -n "$twin" ] && [ "$twin" != null ] || die "CreateProfile(vless, egress warp) returned no id"
+    make_inbound "$twin"
+    wait_for 90 "the WARP twin ACTIVE" inbounds_active_all || die "the WARP twin did not start: $(inbound_of "$twin" | jq -c '{state, lastError}')"
+    profiles+=("$HY2WARP" "$twin")
+  fi
+  grp=$(api GroupService/CreateGroup "$(jq -nc --argjson p "$(printf '%s\n' "${profiles[@]}" | jq -R . | jq -sc .)" --arg d "$pre" '{name:"e2e-json", profileIds:$p, dnsPresetId:$d}')" | jq -r .group.id)
+  new_user gina "$grp"
+  local gina=$U_ID j_url=$U_URL
+  want_x=${#profiles[@]} want_s=2
+  [ -z "$twin" ] || want_s=3 # (REALITY TCP, WS, and the WARP twin)
+
+  local -A lab lport
+  for k in "hy2 $PROFILE_ID" "xhttp $VL_XHTTP" "tcp $VL_TCP" "ws $VL_WS" "hy2warp ${HY2WARP:-none}" "tcpwarp ${twin:-none}"; do
+    [ "${k#* }" != none ] || continue
+    port=$(inbound_of "${k#* }" | jq -r .port)
+    [ -n "$port" ] && [ "$port" != null ] || die "no inbound port for ${k%% *}"
+    lab[$port]=${k%% *} lport[${k%% *}]=$port
+  done
+  exp_src() { case $1 in *warp) echo "$WARP_SRC" ;; *) echo "$DIRECT_SRC" ;; esac; }
+
+  # ---- fetch: both documents by ?format=, sing-box once more by its default rule (UA), headers, gzip
+  hdr() { tr -d '\r' <"$1" | sed -n "s/^$2: *//Ip" | head -1; } # (the main script defines this one only in the base steps)
+  local XF=$WORK/json-xray.json SF=$WORK/json-singbox.json UF=$WORK/json-singbox-ua.json GF=$WORK/json-singbox-gz
+  jget() { # <format param> <user agent> <body file> <header file> [accept-encoding]
+    curl -sk -m 15 -A "$2" -D "$4" -o "$3" ${5:+-H "Accept-Encoding: $5"} "$j_url${1:+?format=$1}"
+  }
+  docs_ready() {
+    jget xray-json 'v2rayNG/1.10.20' "$XF" "$WORK/json-xray.hdr" && jget sing-box 'v2rayNG/1.10.20' "$SF" "$WORK/json-singbox.hdr" \
+      && jq -e --argjson n "$want_x" 'type == "array" and length == $n' "$XF" >/dev/null \
+      && jq -e --argjson n "$want_s" '[.outbounds[] | select(.type == "hysteria2" or .type == "vless")] | length == $n' "$SF" >/dev/null
+  }
+  wait_for 60 "the Xray JSON ($want_x servers) and the sing-box profile ($want_s servers)" docs_ready \
+    || die "the documents are not what the group holds: xray $(jq -c 'if type == "array" then length else "not an array" end' "$XF" 2>&1 | head -c 80), sing-box $(jq -c '[.outbounds[] | .type]' "$SF" 2>&1 | head -c 200)"
+  json_secrets "$XF" "$SF"
+  jget '' 'SFA (sing-box 1.14.3; language en_US)' "$UF" "$WORK/json-singbox-ua.hdr" || die "the fetch by the sing-box UA failed"
+  jget sing-box 'v2rayNG/1.10.20' "$GF.gz" "$WORK/json-singbox-gz.hdr" gzip || die "the gzip fetch failed"
+  local h
+  for h in json-xray json-singbox json-singbox-ua json-singbox-gz; do
+    grep -q '^HTTP/[0-9.]* 200' "$WORK/$h.hdr" || die "$h: not 200: $(head -1 "$WORK/$h.hdr")"
+    hdr "$WORK/$h.hdr" content-type | grep -qi '^application/json' || die "$h: Content-Type is '$(hdr "$WORK/$h.hdr" content-type)', want JSON"
+    [ -z "$(hdr "$WORK/$h.hdr" routing)" ] || die "$h: a Routing header went out with a JSON profile"
+    hdr "$WORK/$h.hdr" subscription-userinfo | grep -Eq '^upload=[0-9]+; download=[0-9]+; total=[0-9]+; expire=[0-9]+$' \
+      || die "$h: bad subscription-userinfo: $(hdr "$WORK/$h.hdr" subscription-userinfo)"
+  done
+  hdr "$WORK/json-singbox-gz.hdr" content-encoding | grep -qi '^gzip$' || die "gzip: no Content-Encoding: gzip when the client accepts it"
+  gzip -dc "$GF.gz" >"$GF.json" 2>/dev/null || die "gzip: the body does not decompress"
+  json_secrets "$UF"
+  [ "$(jq -S . "$SF")" = "$(jq -S . "$UF")" ] || die "the sing-box default rule (UA SFA) did not hand out the same profile as ?format=sing-box"
+  [ "$(jq -S . "$SF")" = "$(jq -S . "$GF.json")" ] || die "the gzip body differs from the plain one"
+  pass "fetch: ?format=xray-json (a JSON array of $want_x) and ?format=sing-box, and sing-box by the UA 'SFA (sing-box ...)' without the parameter (the same profile): 200, application/json, no Routing, Subscription-Userinfo present, gzip when accepted and identical once decompressed"
+
+  # ---- which server is in which document: the present cells and the absent ones
+  local -A in_x in_s
+  for ((i = 0; i < want_x; i++)); do
+    port=$(jq -r --argjson i "$i" '.[$i].outbounds[] | select(.tag == "proxy") | (.settings.port // .settings.vnext[0].port)' "$XF")
+    label=${lab[$port]:-}
+    [ -n "$label" ] || die "the Xray document has an element on port $port that no profile of the group owns"
+    [ -z "${in_x[$label]:-}" ] || die "the Xray document holds $label twice"
+    in_x[$label]=$i
+  done
+  jq -e 'all(.[]; (.remarks | type == "string" and length > 0))' "$XF" >/dev/null || die "an Xray element has no remarks"
+  [ "$(jq '[.[].remarks] | unique | length' "$XF")" = "$want_x" ] || die "the remarks of the Xray elements are not unique"
+  for k in "${lab[@]}"; do [ -n "${in_x[$k]:-}" ] || die "Xray JSON: the server $k is missing"; done
+  while read -r port; do
+    label=${lab[$port]:-}
+    [ -n "$label" ] || die "the sing-box profile has a server on port $port that no profile of the group owns"
+    in_s[$label]=1
+  done < <(jq -r '.outbounds[] | select(.type == "hysteria2" or .type == "vless") | .server_port' "$SF")
+  for k in tcp ws tcpwarp; do
+    case $k in tcpwarp) [ -n "$twin" ] || continue ;; esac
+    [ -n "${in_s[$k]:-}" ] || die "sing-box: the server $k is missing"
+  done
+  for k in hy2 xhttp hy2warp; do
+    [ -z "${in_s[$k]:-}" ] || die "sing-box: the server $k must be absent (self-signed Hysteria2 and XHTTP are not expressible) but is in the profile"
+  done
+  jq -e '[.outbounds[] | select(.type == "hysteria2" or .transport.type == "xhttp")] | length == 0' "$SF" >/dev/null || die "the sing-box profile has a hysteria2 or xhttp outbound"
+  jq -e '.outbounds[] | select(.type == "selector") | (.outbounds - ["direct"] | length) == '"$want_s" "$SF" >/dev/null || die "the sing-box selector does not list exactly the $want_s servers"
+  pass "coverage: Xray JSON has all $want_x servers (${!in_x[*]}); sing-box has ${!in_s[*]} and neither the self-signed hysteria2 inbounds nor XHTTP"
+
+  # ---- the sing-box documents are valid for the cores as served
+  for ver in $SB_VERSIONS; do
+    sb=$M3_CACHE/sing-box-$ver
+    for h in "$SF" "$UF"; do
+      "$sb" check -c "$h" >"$WORK/client-singbox-check.log" 2>&1 || { redact <"$WORK/client-singbox-check.log" | tail -n 5; die "sing-box $ver rejects the profile the panel served"; }
+    done
+  done
+  pass "sing-box check accepts the profile as served with every version under test ($SB_VERSIONS)"
+
+  # ---- Xray: every element in a client of its own; the node (or the WARP address) is what the fake internet sees; DNS is intercepted
+  local pin conf cp dns_ok dns_bad
+  cns_listening() { [ -n "$(cns "$cli7_PID" ss -Hltn "sport = :$1")" ]; } # <port>
+  j_who() { # <socks port> <path>: the address whoami saw through a client ("" = none); retries, the first REALITY handshake can take seconds
+    local r out=""
+    for ((r = 0; r < 6; r++)); do
+      out=$(cns "$cli7_PID" curl -s -m 20 --socks5-hostname "127.0.0.1:$1" "http://$WHOAMI/$2" 2>/dev/null | tr -d '\n' || true)
+      [ -n "$out" ] && break
+      sleep 2
+    done
+    printf %s "$out"
+  }
+  for label in "${!in_x[@]}"; do
+    i=${in_x[$label]}
+    pin=""
+    if [ "$label" = ws ]; then # the "CDN" is the node: the client dials it and trusts its self-signed origin certificate by its pin
+      pin=$(tls_pin "$(jq -r --argjson i "$i" '.[$i].outbounds[] | select(.tag == "proxy") | .settings.vnext[0].port' "$XF")" "$(jq -r --argjson i "$i" '.[$i].outbounds[] | select(.tag == "proxy") | .streamSettings.tlsSettings.serverName' "$XF")")
+    fi
+    conf=$WORK/json-xray-$label.json
+    jq --argjson i "$i" --arg gw "$cli7_GW" --arg pin "$pin" '.[$i]
+      | (.outbounds[] | select(.tag == "proxy") | .settings) |= (if has("address") then .address = $gw else . end | if has("vnext") then .vnext[].address = $gw else . end)
+      | if $pin != "" then (.outbounds[] | select(.tag == "proxy") | .streamSettings.tlsSettings).pinnedPeerCertSha256 = $pin else . end' "$XF" >"$conf"
+    spawn nsenter -t "$cli7_PID" -n -- "$XRAY" run -c "$conf" >"$WORK/client-xray-json-$label.log" 2>&1
+    cp=$LAST_PID
+    wait_for 15 "xray ($label) to listen" cns_listening 10808 && alive "$cp" || { redact <"$WORK/client-xray-json-$label.log" | tail -n 8; die "xray ($label) did not start with the served element"; }
+    src=$(j_who 10808 "json-xray-$label")
+    [ "$src" = "$(exp_src "$label")" ] || { redact <"$WORK/client-xray-json-$label.log" | tail -n 8; die "xray $label: the fake internet saw '$src', expected $(exp_src "$label")"; }
+    # DNS: a query to an address that does not exist, so only an interception can answer it; the answers come from the preset's resolver
+    dns_bad=$(cns "$cli7_PID" python3 "$WORK/socksdns.py" 10808 ads.blocked.example 192.0.2.99 2>&1 | tail -n 1)
+    dns_ok=$(cns "$cli7_PID" python3 "$WORK/socksdns.py" 10808 fine.ok.example 192.0.2.99 2>&1 | tail -n 1)
+    [ "$dns_ok" = 198.51.100.7 ] || { redact <"$WORK/client-xray-json-$label.log" | tail -n 8; die "xray $label: DNS for an allowed name answered '$dns_ok' (want the resolver's 198.51.100.7)"; }
+    [ "$dns_bad" = 0.0.0.0 ] || { redact <"$WORK/client-xray-json-$label.log" | tail -n 8; die "xray $label: DNS for a blocked name answered '$dns_bad' (want the blocked answer 0.0.0.0)"; }
+    awk -v e="$(exp_src "$label")" '$3 == "ads.blocked.example" && $2 == e {f = 1} END {exit !f}' "$WORK/fakedns.log" \
+      || die "xray $label: the resolver of the preset never saw the blocked name from $(exp_src "$label") (it saw: $(awk '$3 ~ /blocked/ {print $2}' "$WORK/fakedns.log" | sort -u | tr '\n' ' '))"
+    say "xray $label: the fake internet sees $src; DNS to a dead address: blocked name -> $dns_bad, other -> $dns_ok (via the preset's resolver)"
+    stop_pid "$cp"
+  done
+  pass "real xray ($(basename "$XRAY")): all $want_x elements run (hy2 with its pin, REALITY XHTTP and TCP Vision, TLS WebSocket${twin:+, both WARP twins}), the fake internet sees the node (the WARP address for the twins), and DNS to an unreachable resolver is intercepted and answered from the preset (blocked name -> 0.0.0.0)"
+
+  # ---- sing-box: the TUN inbound is replaced by a mixed one, the selector is pointed at one server at a time
+  local mport sconf sdir sp sbl
+  for ver in $SB_VERSIONS; do
+    sb=$M3_CACHE/sing-box-$ver
+    for label in "${!in_s[@]}"; do
+      tag=$(jq -r --argjson p "${lport[$label]}" '.outbounds[] | select(.type == "vless" and .server_port == $p) | .tag' "$SF")
+      [ -n "$tag" ] || die "sing-box: no outbound for $label in the profile"
+      mport=$(free_port tcp)
+      sconf=$WORK/json-singbox-$ver-$label.json sdir=$WORK/sb-$ver-$label sbl=$WORK/client-singbox-$ver-$label.log
+      mkdir -p "$sdir"
+      jq --arg gw "$cli7_GW" --argjson lp "$mport" --arg tag "$tag" --argjson ins "$([ "$label" = ws ] && echo true || echo false)" '
+        .inbounds = [{type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: $lp}]
+        | (.outbounds[] | select(.type == "selector")).default = $tag
+        | (.outbounds[] | select(.type == "vless" or .type == "hysteria2")).server = $gw
+        | if $ins then (.outbounds[] | select(.tag == $tag)).tls.insecure = true else . end' "$SF" >"$sconf"
+      spawn nsenter -t "$cli7_PID" -n -- "$sb" run -D "$sdir" -c "$sconf" >"$sbl" 2>&1
+      sp=$LAST_PID
+      wait_for 15 "sing-box ($ver $label) to listen" cns_listening "$mport" && alive "$sp" || { redact <"$sbl" | tail -n 8; die "sing-box $ver ($label) did not start with the served profile"; }
+      src=$(j_who "$mport" "json-singbox-$ver-$label")
+      [ "$src" = "$(exp_src "$label")" ] || { redact <"$sbl" | tail -n 8; die "sing-box $ver $label: the fake internet saw '$src', expected $(exp_src "$label")"; }
+      say "sing-box $ver $label: the fake internet sees $src"
+      stop_pid "$sp"
+    done
+    # the hy2 + Salamander probe (not the panel's document: see the comment of m3_json)
+    mport=$(free_port tcp) sconf=$WORK/json-singbox-$ver-hy2probe.json sdir=$WORK/sb-$ver-hy2probe sbl=$WORK/client-singbox-$ver-hy2probe.log
+    mkdir -p "$sdir"
+    jq -n --argjson i "${in_x[hy2]}" --slurpfile x "$XF" --arg gw "$cli7_GW" --argjson lp "$mport" '
+      $x[0][$i].outbounds[] | select(.tag == "proxy") | .streamSettings as $s
+      | {log: {level: "warn"},
+         inbounds: [{type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: $lp}],
+         outbounds: [{type: "hysteria2", tag: "probe", server: $gw, server_port: .settings.port, password: $s.hysteriaSettings.auth,
+                      obfs: {type: "salamander", password: $s.finalmask.udp[0].settings.password},
+                      tls: {enabled: true, insecure: true, alpn: ["h3"]}}],
+         route: {final: "probe"}}' >"$sconf"
+    spawn nsenter -t "$cli7_PID" -n -- "$sb" run -D "$sdir" -c "$sconf" >"$sbl" 2>&1
+    sp=$LAST_PID
+    wait_for 15 "sing-box ($ver hy2 probe) to listen" cns_listening "$mport" && alive "$sp" || { redact <"$sbl" | tail -n 8; die "sing-box $ver (hy2 probe) did not start"; }
+    src=$(j_who "$mport" "json-singbox-$ver-hy2probe")
+    [ "$src" = "$DIRECT_SRC" ] || { redact <"$sbl" | tail -n 8; die "sing-box $ver hy2 probe: the fake internet saw '$src', expected $DIRECT_SRC"; }
+    stop_pid "$sp"
+  done
+  pass "real sing-box ($SB_VERSIONS): the served profile runs server by server (${!in_s[*]}), the fake internet sees the node (the WARP address for the twin); a hand-made hysteria2 + Salamander outbound with the credentials of the Xray document also reaches it"
+
+  # ---- placeholders: a disabled person gets one entry that connects nowhere
+  local note t_fail rc
+  api UserService/SetUsersEnabled "{\"userIds\":[\"$gina\"],\"enabled\":false}" | jq -e '.users[0].status == "USER_STATUS_DISABLED"' >/dev/null || die "could not disable the fixture user"
+  placeholders() {
+    jget xray-json 'v2rayNG/1.10.20' "$XF" "$WORK/json-xray.hdr" && jget sing-box 'v2rayNG/1.10.20' "$SF" "$WORK/json-singbox.hdr" \
+      && jq -e 'type == "array" and length == 1' "$XF" >/dev/null
+  }
+  wait_for 40 "the placeholder documents of a disabled person" placeholders || die "a disabled person's Xray document is not a single entry: $(head -c 200 "$XF" | redact)"
+  jq -e '.[0].remarks | IN("Access paused", "Доступ приостановлен", "访问已暂停")' "$XF" >/dev/null || die "the Xray placeholder is not the state note: $(jq -c '.[0].remarks' "$XF")"
+  note=$(jq -r '.[0].remarks' "$XF")
+  jq -e '.[0].outbounds | length == 1 and .[0].protocol == "socks" and .[0].settings.servers[0].address == "127.0.0.1" and .[0].settings.servers[0].port == 1' "$XF" >/dev/null || die "the Xray placeholder is not a lone socks outbound to 127.0.0.1:1"
+  jq -e --arg n "$note" '[.outbounds[] | select(.type != "direct")] | length == 2 and (.[0].type == "selector") and (.[0].outbounds == [$n]) and (.[1].tag == $n) and (.[1].type == "socks") and (.[1].server_port == 1)' "$SF" >/dev/null \
+    || die "the sing-box placeholder is not a selector with one socks entry named '$note'"
+  for k in xray singbox; do
+    mport=$(free_port tcp)
+    if [ "$k" = xray ]; then
+      jq '.[0]' "$XF" >"$WORK/json-ph-xray.json"
+      spawn nsenter -t "$cli7_PID" -n -- "$XRAY" run -c "$WORK/json-ph-xray.json" >"$WORK/client-xray-json-ph.log" 2>&1
+      sbl=$WORK/client-xray-json-ph.log port=10808
+    else
+      mkdir -p "$WORK/sb-ph"
+      jq --argjson lp "$mport" '.inbounds = [{type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: $lp}]' "$SF" >"$WORK/json-ph-singbox.json"
+      spawn nsenter -t "$cli7_PID" -n -- "$M3_CACHE/sing-box-1.12.25" run -D "$WORK/sb-ph" -c "$WORK/json-ph-singbox.json" >"$WORK/client-singbox-ph.log" 2>&1
+      sbl=$WORK/client-singbox-ph.log port=$mport
+    fi
+    sp=$LAST_PID
+    wait_for 15 "the placeholder client ($k) to listen" cns_listening "$port" && alive "$sp" || { redact <"$sbl" | tail -n 8; die "the $k client did not start with the placeholder"; }
+    t_fail=$(date +%s.%N) rc=0
+    cns "$cli7_PID" curl -s -m 10 -o /dev/null --socks5-hostname "127.0.0.1:$port" "http://$WHOAMI/json-placeholder-$k" || rc=$?
+    t_fail=$(python3 -c "print(round($(date +%s.%N) - $t_fail, 1))")
+    [ "$rc" != 0 ] || die "a request through the $k placeholder succeeded"
+    python3 -c "import sys; sys.exit(0 if $t_fail <= 5 else 1)" || die "the $k placeholder took $t_fail s to fail (want it to fail fast, under 5 s)"
+    [ -z "$(log_srcs json-placeholder-$k)" ] || die "a request through the $k placeholder reached the fake internet"
+    say "placeholder in $k: curl failed in $t_fail s (exit $rc), nothing reached the fake internet"
+    stop_pid "$sp"
+  done
+  api UserService/SetUsersEnabled "{\"userIds\":[\"$gina\"],\"enabled\":true}" | jq -e '.users[0].status == "USER_STATUS_ACTIVE"' >/dev/null || die "could not enable the fixture user again"
+  wait_for 40 "the real documents after enabling" docs_ready || die "after enabling the person the documents are not back to the servers"
+  pass "disabled person: both formats are one entry named '$note' (Xray remarks, sing-box selector and tag) on a socks outbound to 127.0.0.1:1; running it fails fast and nothing reaches the fake internet; enabled again, the servers are back"
+  pass "tunnels.7 took $(($(date +%s) - t0)) s"
 }
