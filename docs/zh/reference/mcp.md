@@ -121,7 +121,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
-| `device_revoke` | 操作员 | `user_id`、`device_id`，可选 `block`（设备在所有者于管理后台解除拉黑前不会再回来；只有会发送设备 ID 的应用才能被拉黑） | 否 |
+| `device_revoke` | 操作员 | `user_id`、`device_id`，可选 `block`（在所有者于管理后台解除拉黑前，这个设备 ID 无法再次注册；报告其他 ID 的应用算作新设备；只有会发送设备 ID 的应用才能被拉黑） | 否 |
 | `alert_mute` | 操作员 | `alert_id`、`duration_s`（最多 604800；0 表示取消静默） | 否 |
 | `subscription_app_upsert` | 操作员 | `platform`（`ios`、`android`、`windows`、`macos`、`linux`）和 `name` 用于指定应用；更改现有应用时只传入变更字段；新应用至少要传入 `kind`：`kind`（`happ` 接收订阅链接，`amnezia` 接收 AmneziaWG 密钥）、`download_url`、`add_link_template`（占位符 `{url}`、`{url_enc}`、`{name_enc}`）、`description`（最多 80 个字符）、`recommended` | 始终 |
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |

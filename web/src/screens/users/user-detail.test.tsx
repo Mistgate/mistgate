@@ -427,7 +427,7 @@ describe("the devices of the user card", () => {
     await menu("Pixel 8");
     await item("Block…");
     expect(dialog().textContent).toContain("Block “Pixel 8”?");
-    expect(dialog().textContent).toContain("cannot come back until you unblock it");
+    expect(dialog().textContent).toContain("cannot connect with this device ID again until you unblock it");
     expect(dialog().textContent).toContain("The person’s other devices keep working.");
     expect(revokeDevice).toHaveBeenCalledTimes(1); // nothing before the confirmation
     await inDialog("Block");

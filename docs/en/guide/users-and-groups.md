@@ -114,7 +114,7 @@ The **⋯** menu of an app on the link:
 
 - **Rename…**: a name of your own, shown here and on the person's page.
 - **Delete…**: the app disconnects, its keys stop working and the place is free. If the app fetches the link again and there is a place, it comes back as a new device with new keys.
-- **Block…**: as **Delete…**, and the device cannot come back, even when the app fetches the link again, until you unblock it. The person's other devices keep working. Only an app with a device ID can be blocked; the shared place and AmneziaVPN keys cannot.
+- **Block…**: as **Delete…**, and the device ID cannot register again, even when the app fetches the link again, until you unblock it. The person's other devices keep working. Only an app with a device ID can be blocked; the shared place and AmneziaVPN keys cannot. The device ID is what the app reports: an app that reports another one is a new device and takes a free place like any other. If the link was passed to someone else, block their device and issue a **New link** as well.
 
 **Blocked (N)** lists the blocked devices. **Unblock** lets the device in again; it gets new keys at its next refresh of the subscription. The menu of the shared place has **Disconnect…**: the apps lose the connection now and connect again at their next refresh.
 

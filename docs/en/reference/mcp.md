@@ -121,7 +121,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
 | `user_reset_traffic` | Operator | `user_ids` (1 to 50) | when more than 3 users |
-| `device_revoke` | Operator | `user_id`, `device_id`, and optionally `block` (the device does not come back until the owner unblocks it in the admin panel; only an app that sends a device ID can be blocked) | no |
+| `device_revoke` | Operator | `user_id`, `device_id`, and optionally `block` (that device ID cannot register again until the owner unblocks it in the admin panel; an app reporting another ID is a new device; only an app that sends a device ID can be blocked) | no |
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |

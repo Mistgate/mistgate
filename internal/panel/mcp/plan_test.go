@@ -664,7 +664,7 @@ func TestDeviceRevokeCanBlock(t *testing.T) {
 			fingerprint = f.Value
 		}
 	}
-	if !strings.Contains(effect, "cannot come back until it is unblocked") || fingerprint != "a1b2c3" {
+	if !strings.Contains(effect, "cannot register again until it is unblocked") || fingerprint != "a1b2c3" {
 		t.Errorf("plan facts = %+v", p.Facts)
 	}
 	applyOf(t, s, "device_revoke", p.ConfirmToken)

@@ -847,14 +847,14 @@ type deviceRevokeArgs struct {
 	ReasonField
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id" jsonschema:"a device id from user_devices"`
-	Block    bool   `json:"block,omitempty" jsonschema:"also refuse the device's ID from now on: its app cannot register again until the owner unblocks it in the admin panel (not possible through this server). Only a device of kind link can be blocked, not the shared place and not an AmneziaVPN key"`
+	Block    bool   `json:"block,omitempty" jsonschema:"also refuse the device's ID from now on: an app reporting that ID cannot register again until the owner unblocks it in the admin panel (not possible through this server). The ID is what the app reports: an app reporting another ID is a new device and takes a free place, so to cut off a link passed to someone else the owner also issues a new link. Only a device of kind link can be blocked, not the shared place and not an AmneziaVPN key"`
 }
 
 var deviceRevoke = changeSpec[deviceRevokeArgs]{
 	name: "device_revoke", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceRevokeDeviceProcedure),
-	desc: "Revoke one device of a user: its credentials are dropped from every node and the device must be set up again. With block, the device does not come back: " +
-		"its app is refused until the owner unblocks it in the admin panel; unblocking is not offered here.",
+	desc: "Revoke one device of a user: its credentials are dropped from every node and the device must be set up again. With block, its device ID is refused " +
+		"until the owner unblocks it in the admin panel (unblocking is not offered here); an app reporting another ID would be a new device.",
 	plan: func(c *call, a deviceRevokeArgs) (*planned, error) {
 		if err := validID("device_id", a.DeviceID); err != nil {
 			return nil, err
@@ -879,7 +879,7 @@ var deviceRevoke = changeSpec[deviceRevokeArgs]{
 					return nil, errors.New("only an app that reported a device ID can be blocked: the shared place and AmneziaVPN keys cannot")
 				}
 				summary = "Revoke and block one device of a user: its credentials leave every node and its app is refused until the owner unblocks it."
-				facts = append(facts[:3], codedFact("effect", "the device is disconnected and cannot come back until it is unblocked in the admin panel", "device_blocked"))
+				facts = append(facts[:3], codedFact("effect", "the device is disconnected and its device ID cannot register again until it is unblocked in the admin panel", "device_blocked"))
 				if d.GetFingerprint() != "" {
 					facts = append(facts, Fact{Key: "fingerprint", Value: d.GetFingerprint()})
 				}

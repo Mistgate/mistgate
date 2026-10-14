@@ -121,7 +121,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_disable` | Оператор | `user_ids` (от 1 до 50) | если пользователей больше 3 |
 | `user_enable` | Оператор | `user_ids` (от 1 до 50) | нет |
 | `user_reset_traffic` | Оператор | `user_ids` (от 1 до 50) | если пользователей больше 3 |
-| `device_revoke` | Оператор | `user_id`, `device_id` и, по желанию, `block` (устройство не вернётся, пока владелец не разблокирует его в админке; заблокировать можно только приложение, которое присылает ID устройства) | нет |
+| `device_revoke` | Оператор | `user_id`, `device_id` и, по желанию, `block` (этот ID устройства не зарегистрируется снова, пока владелец не разблокирует его в админке; приложение с другим ID — новое устройство; заблокировать можно только приложение, которое присылает ID устройства) | нет |
 | `alert_mute` | Оператор | `alert_id`, `duration_s` (не больше 604800; 0 снимает заглушку) | нет |
 | `subscription_app_upsert` | Оператор | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) и `name` указывают приложение; для изменения — только меняемые поля, для нового приложения — как минимум `kind`: `kind` (`happ` принимает ссылку подписки, `amnezia` — ключ AmneziaWG), `download_url`, `add_link_template` (подстановки `{url}`, `{url_enc}`, `{name_enc}`), `description` (не длиннее 80 символов), `recommended` | всегда |
 | `subscription_app_remove` | Оператор | `platform`, `name` | всегда |
