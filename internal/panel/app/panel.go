@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/backup"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
@@ -144,6 +145,7 @@ type Panel struct {
 	Access         *access.Service
 	Health         *health.Service
 	Blocklist      *blocklist.Service
+	CountryProbe   *countryprobe.Service
 	Update         *update.Service
 	Warp           *warp.Service
 	Provision      *nodeprovision.Service
@@ -164,6 +166,7 @@ type jobServices struct {
 	access    *access.Service
 	health    *health.Service
 	blocklist *blocklist.Service
+	probe     *countryprobe.Service
 	update    *update.Service
 	backup    *backup.Service
 	telegram  *telegram.Service

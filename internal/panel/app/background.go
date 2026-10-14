@@ -15,6 +15,7 @@ func backgroundJobs(c Config, s jobServices) []BackgroundJob {
 		{Name: "access", Run: s.access.Run},
 		{Name: "health", Run: s.health.Run},
 		{Name: "blocklist", Run: s.blocklist.Run},
+		{Name: "tspu-probe", Run: s.probe.Run},
 		{Name: "updates", Run: s.update.Run},
 		{Name: "backups", Run: s.backup.Run},
 		{Name: "telegram", Run: s.telegram.Run},

@@ -121,6 +121,17 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 			_, err := adminv1connect.NewApiTokenServiceClient(hc, base).CreateApiToken(ctx, connect.NewRequest(&adminv1.CreateApiTokenRequest{Name: "ops"}))
 			return err
 		}},
+		"UpdateTspuProbe": {edition.TSPUProbe, func(p *Panel, _ *auth.Service) error {
+			enabled := true
+			base, hc := serve(p.CountryProbe.Handler())
+			_, err := adminv1connect.NewTspuProbeServiceClient(hc, base).UpdateTspuProbe(ctx, connect.NewRequest(&adminv1.UpdateTspuProbeRequest{Enabled: &enabled}))
+			return err
+		}},
+		"TestTspuProbe": {edition.TSPUProbe, func(p *Panel, _ *auth.Service) error {
+			base, hc := serve(p.CountryProbe.Handler())
+			_, err := adminv1connect.NewTspuProbeServiceClient(hc, base).TestTspuProbe(ctx, connect.NewRequest(&adminv1.TestTspuProbeRequest{}))
+			return err
+		}},
 		"UploadNodeDecoy": {edition.DecoyOwn, func(p *Panel, _ *auth.Service) error {
 			base, hc := serve(p.Fleet.NodeHandler())
 			_, err := adminv1connect.NewNodeServiceClient(hc, base).UploadNodeDecoy(ctx, connect.NewRequest(&adminv1.UploadNodeDecoyRequest{}))
@@ -138,5 +149,31 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 		if err := c.call(pv, av); err != nil && strings.Contains(err.Error(), edition.Code) {
 			t.Errorf("VPS %s = %v, must not be an edition refusal", name, err)
 		}
+	}
+}
+
+// The TSPU probe is not built for the edge: Get says so (available=false, reason "edition") and the VPS panel offers it. The
+// scheduler is a background job of the VPS only, so nothing of it runs on the edge (TestEdgeBackgroundJobParity).
+func TestBuildEditionSaysTheTSPUProbeIsUnavailableOnTheEdge(t *testing.T) {
+	owner := store.Admin{ID: "adm_owner", Role: store.RoleOwner, DisplayName: "alice"}
+	get := func(p *Panel) *adminv1.TspuProbeSettings {
+		_, h := p.CountryProbe.Handler()
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r.WithContext(auth.WithAdmin(r.Context(), owner)))
+		}))
+		t.Cleanup(srv.Close)
+		r, err := adminv1connect.NewTspuProbeServiceClient(srv.Client(), srv.URL).GetTspuProbe(context.Background(), connect.NewRequest(&adminv1.GetTspuProbeRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Msg.Settings
+	}
+	pe, _ := buildPanel(t, &edgeTickRemote{})
+	if s := get(pe); s.Available || s.UnavailableReason != "edition" || s.Enabled {
+		t.Errorf("edge Get = %+v", s)
+	}
+	pv, _ := buildPanel(t, nil)
+	if s := get(pv); !s.Available || s.UnavailableReason != "" || s.Enabled {
+		t.Errorf("VPS Get = %+v", s)
 	}
 }

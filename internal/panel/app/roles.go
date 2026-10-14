@@ -217,6 +217,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		func() (string, http.Handler) { return k.gp.Handler() },
 		func() (string, http.Handler) { return k.cr.Handler() },
 		func() (string, http.Handler) { return k.bl.Handler() },
+		func() (string, http.Handler) { return k.cp.Handler() },
 	} {
 		path, handler := h()
 		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
@@ -279,7 +280,7 @@ func (k *core) finish(cfg httpserver.Config, prov *nodeprovision.Service, bkp *b
 	p := k.panel()
 	p.Handler, p.Server, p.Provision, p.Backup, p.Surface = srv.Public(), srv, prov, bkp, surfaceOf(cfg)
 	if jobs {
-		p.BackgroundJobs = backgroundJobs(k.c, jobServices{fleet: k.fl, access: k.acc, health: k.hl, blocklist: k.bl, update: k.upd, backup: bkp, telegram: k.tg, provision: prov, store: k.st, log: k.log})
+		p.BackgroundJobs = backgroundJobs(k.c, jobServices{fleet: k.fl, access: k.acc, health: k.hl, blocklist: k.bl, probe: k.cp, update: k.upd, backup: bkp, telegram: k.tg, provision: prov, store: k.st, log: k.log})
 	}
 	return p, nil
 }

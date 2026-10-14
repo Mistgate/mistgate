@@ -2,7 +2,7 @@
 // (internal/panel/edition); the admin says so in these words instead of showing a button that does nothing. English is the
 // source of truth: `ru` is type-checked against it. The admin speaks «ты». Never rename an id: the server sends them.
 /** The feature ids MeResponse.unavailable carries (internal/panel/edition). */
-export const editionFeatures = ["backups", "telegram", "mcp", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own"] as const;
+export const editionFeatures = ["backups", "telegram", "mcp", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own", "tspu_probe"] as const;
 export type EditionFeature = (typeof editionFeatures)[number];
 
 export const en = {
@@ -16,6 +16,7 @@ export const en = {
   "edition.feature.agent_logs": "Node logs",
   "edition.feature.panel_update": "Updating the panel",
   "edition.feature.decoy_own": "Own decoy site",
+  "edition.feature.tspu_probe": "TSPU probe of the country check",
   // what to do instead, where there is something
   "edition.hint.mcp": "Tokens you already have are listed and can be revoked; new ones cannot be created yet.",
 };
@@ -30,6 +31,7 @@ export const ru: typeof en = {
   "edition.feature.agent_logs": "Логи ноды",
   "edition.feature.panel_update": "Обновление панели",
   "edition.feature.decoy_own": "Свой сайт-ширма",
+  "edition.feature.tspu_probe": "ТСПУ-зонд проверки из страны",
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };
 
@@ -44,5 +46,6 @@ export const zh: typeof en = {
   "edition.feature.agent_logs": "节点日志",
   "edition.feature.panel_update": "更新面板",
   "edition.feature.decoy_own": "自有伪装站点",
+  "edition.feature.tspu_probe": "国家可达性检测的 TSPU 探测",
   "edition.hint.mcp": "已有的令牌可以查看和吊销，暂时无法创建新令牌。",
 };

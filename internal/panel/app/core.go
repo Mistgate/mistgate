@@ -14,6 +14,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
@@ -150,6 +151,7 @@ type core struct {
 	cr      *countryreach.Service
 	gp      *globalping.Service
 	bl      *blocklist.Service
+	cp      *countryprobe.Service
 	hl      *health.Service
 	upd     *update.Service
 	wsv     *warp.Service
@@ -226,11 +228,31 @@ func wireCore(c Config) (*core, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The TSPU probe, the third source: one of the owner's own nodes inside the country tests whether SYNs to the other nodes
+	// survive the national DPI box. Off until the owner switches it on; Russia only; not built for the edge edition (a run takes
+	// minutes). The nodes and their ports are read the way the health module reads them, hence the late binding to hl.
+	k.cp, err = countryprobe.New(countryprobe.Config{Store: st, StepUp: authSvc.RequireStepUp, Fleet: fl, Edge: edge, Log: log, Now: c.Clock, Country: k.cr.Country,
+		Nodes: func(ctx context.Context) ([]countryprobe.Node, error) {
+			nodes, err := hl.ProbeNodes(ctx)
+			out := make([]countryprobe.Node, len(nodes))
+			for i, n := range nodes {
+				out[i] = countryprobe.Node(n)
+			}
+			return out, err
+		},
+		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})
+	if err != nil {
+		return nil, err
+	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
 	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
-		Country:      k.gp.Country,
-		Lists:        k.bl.Active,
+		Country: k.gp.Country,
+		Lists:   k.bl.Active,
+		TSPU: func(ctx context.Context) health.TSPUState {
+			st := k.cp.State(ctx)
+			return health.TSPUState(st)
+		},
 		OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	hl = health.New(st, vlt, b.reg, fl, hcfg)
 	k.hl = hl
@@ -303,7 +325,7 @@ func wireCore(c Config) (*core, error) {
 // panel is the Panel of the services the core holds; a role adds what it serves.
 func (k *core) panel() *Panel {
 	return &Panel{
-		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
+		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
 	}
 }

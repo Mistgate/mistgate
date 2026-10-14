@@ -33,6 +33,7 @@ var edgeDeferred = map[string]string{
 	"backups":        "R2",
 	"telegram":       "enqueue remains local and messages are not delivered on edge",
 	"mcp-plan-sweep": "MCP is not served on the edge",
+	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 30 seconds; Get says it is unavailable and nothing runs",
 }
 
 // edgeDeferredFeatures maps every deferred job above to the admin features it takes away: the ids Me reports in
@@ -45,6 +46,7 @@ var edgeDeferredFeatures = map[string][]string{
 	"backups":        {edition.Backups},
 	"telegram":       {edition.Telegram},
 	"mcp-plan-sweep": {edition.MCP},
+	"tspu-probe":     {edition.TSPUProbe},
 }
 
 // EdgeTick runs the scheduled work shared by the edge edition. Each pass gets a fresh timeout so one slow job does not
