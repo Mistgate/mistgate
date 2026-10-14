@@ -22,7 +22,7 @@ func TestInstallPageEscapesUntrustedValues(t *testing.T) {
 		Form:        installForm{Host: `"><svg onload=alert(1)>`, Name: `"><script>alert(1)</script>`},
 		Fingerprint: `"><img src=x onerror=alert(1)>`,
 	}
-	if err := installPageTemplates[pageRU].Execute(&out, data); err != nil {
+	if err := renderInstallPage(&out, pageRU, data); err != nil {
 		t.Fatal(err)
 	}
 	page := out.String()
@@ -37,7 +37,7 @@ func TestInstallPageEscapesUntrustedValues(t *testing.T) {
 func TestInstallWizardOffersSudoLoginAndPasswordRotationWithoutReveal(t *testing.T) {
 	var out strings.Builder
 	data := installPageData{Step: "fingerprint", Form: installForm{Username: "deploy"}, Fingerprint: "SHA256:pin"}
-	if err := installPageTemplates[pageRU].Execute(&out, data); err != nil {
+	if err := renderInstallPage(&out, pageRU, data); err != nil {
 		t.Fatal(err)
 	}
 	page := out.String()
@@ -51,7 +51,7 @@ func TestInstallWizardOffersSudoLoginAndPasswordRotationWithoutReveal(t *testing
 	}
 	out.Reset()
 	data = installPageData{Step: "host", Access: []serverAccessView{{ID: "nod_example", Name: "edge-1", Host: "node.example.com:22", Username: "deploy"}}}
-	if err := installPageTemplates[pageRU].Execute(&out, data); err != nil {
+	if err := renderInstallPage(&out, pageRU, data); err != nil {
 		t.Fatal(err)
 	}
 	accessPage := out.String()
@@ -143,7 +143,7 @@ func TestChinesePageTranslationsHaveEveryEnglishKey(t *testing.T) {
 
 func TestInstallPageInChineseUsesItsLanguageTag(t *testing.T) {
 	var out strings.Builder
-	if err := installPageTemplates[pageZH].Execute(&out, installPageData{Lang: pageZH, Step: "host"}); err != nil {
+	if err := renderInstallPage(&out, pageZH, installPageData{Lang: pageZH, Step: "host"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), `lang="zh"`) {
@@ -199,7 +199,7 @@ func TestInstallPageInEnglishAndChinese(t *testing.T) {
 		for i, page := range pages {
 			page.Lang = lang
 			var out strings.Builder
-			if err := installPageTemplates[lang].Execute(&out, page); err != nil {
+			if err := renderInstallPage(&out, lang, page); err != nil {
 				t.Fatal(err)
 			}
 			html := out.String()
@@ -227,7 +227,7 @@ func TestInstallPageInEnglishAndChinese(t *testing.T) {
 		}
 	}
 	var out strings.Builder
-	if err := installPageTemplates[pageEN].Execute(&out, installPageData{Lang: pageEN, Step: "host", Jobs: jobs[:1]}); err != nil {
+	if err := renderInstallPage(&out, pageEN, installPageData{Lang: pageEN, Step: "host", Jobs: jobs[:1]}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), `href="?lang=en&job=prv_queued"`) {
@@ -240,7 +240,7 @@ func TestInstallPageWordsFitSudoLogins(t *testing.T) {
 	for _, l := range []pageLang{pageRU, pageEN, pageZH} {
 		failed := makeJobView(&adminv1.NodeProvisionJob{Id: "prv_1", State: "failed", ErrorCode: "ssh_authentication_failed"})
 		var out strings.Builder
-		if err := installPageTemplates[l].Execute(&out, installPageData{Lang: l, Step: "job", Job: &failed}); err != nil {
+		if err := renderInstallPage(&out, l, installPageData{Lang: l, Step: "job", Job: &failed}); err != nil {
 			t.Fatal(err)
 		}
 		page := strings.ToLower(out.String())
@@ -404,5 +404,28 @@ func TestPageLinksAndRedirectKeepAdminPrefix(t *testing.T) {
 	resolved := request.URL.ResolveReference(location)
 	if resolved.Path != request.URL.Path || resolved.Query().Get("job") != "prv_example" || resolved.Query().Get("lang") != "en" || response.Code != http.StatusSeeOther {
 		t.Fatalf("job redirect = %d %q, want same page with job query", response.Code, resolved)
+	}
+}
+
+// The page was an html/template and its output is pinned by these escapers: "+" is escaped in text, a link with a scheme
+// other than http, https and mailto is refused, a query value is percent-encoded with lower-case hex.
+func TestInstallPageEscapers(t *testing.T) {
+	if got, want := esc("a\"b'c<d>&e+f\x00"), "a&#34;b&#39;c&lt;d&gt;&amp;e&#43;f�"; got != want {
+		t.Errorf("esc = %q, want %q", got, want)
+	}
+	for in, want := range map[string]string{
+		"ru": "ru", "a b": "a%20b", "é": "%c3%a9", "x-y_z.~": "x-y_z.~", "a&b=c": "a%26b%3dc", "<x>": "%3cx%3e",
+	} {
+		if got := query(in); got != want {
+			t.Errorf("query(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[string]string{
+		"../": "../", "../../nodes": "../../nodes", "?lang=ru&job=1": "?lang=ru&amp;job=1", "a%20b%zz": "a%20b%25zz",
+		"javascript:alert(1)": "#ZgotmplZ", "HTTPS://h/p": "HTTPS://h/p", "a b": "a%20b", "x:y/z": "#ZgotmplZ", "/a:b": "/a:b",
+	} {
+		if got := href(in); got != want {
+			t.Errorf("href(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
