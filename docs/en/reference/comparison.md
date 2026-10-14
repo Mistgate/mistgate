@@ -20,7 +20,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 - **Protocols.** VMess, Trojan, Shadowsocks, TUIC and plain WireGuard are in most other panels. Mistgate has Hysteria2, VLESS (REALITY over XHTTP or TCP with Vision; TLS over XHTTP or WebSocket, direct or behind a CDN) and AmneziaWG.
 - **Subscription formats.** Others serve Xray JSON, sing-box, Clash, Stash or Outline. Mistgate serves a URI list, Mihomo YAML and AmneziaVPN keys; Xray JSON and sing-box are **Planned**.
 - **Community and maturity.** 3x-ui has about 47.7k GitHub stars, s-ui about 10.0k, Hiddify Manager about 9.3k. Mistgate is a new project in early releases.
-- **Device limits.** 3x-ui, PasarGuard and Remnawave limit devices by HWID. Mistgate counts devices.
+- **Device limits.** 3x-ui, PasarGuard and Remnawave limit devices by HWID. Mistgate does too, and gives each device its own keys, online status and traffic, so one device can be removed or blocked without touching the others.
 - **Telegram.** 3x-ui, Marzban, PasarGuard and Hiddify Manager have full Telegram bots. Mistgate sends alerts; a full bot is **Planned**.
 - **Installation.** Mistgate's one-line installer verifies the signed panel manifest before installing the panel.
 
@@ -45,7 +45,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | How a node is added | from the panel over SSH, or a one-time command | by hand: a full 3x-ui per node | by hand | by hand | by hand: a generated compose file | by hand: a child panel | ? |
 | Subscription formats | URI list, Mihomo YAML, AmneziaVPN `vpn://` keys, a web page; Xray JSON and sing-box **Planned** | base64, Xray JSON, Clash/Mihomo | V2ray, Clash, ClashMeta | V2ray, Clash, ClashMeta, sing-box, Outline | Xray JSON, base64, Mihomo, Stash, Clash, sing-box | sub, sub64, Xray, sing-box, Clash, ClashMeta, WireGuard | links, sing-box, Clash.Meta |
 | Traffic and term per user | yes | yes | yes | yes | yes | yes | yes |
-| Device limit | partial: a device count, not HWID | yes: HWID and IP | ? | yes: HWID | yes: HWID | ? | ? |
+| Device limit | yes: HWID, a place and keys per device | yes: HWID and IP | ? | yes: HWID | yes: HWID | ? | ? |
 | Telegram bot | partial: alerts; a full bot **Planned** | yes (and Discord) | yes | yes | partial: notifications, Telegram login | yes | ? |
 | API | yes: Connect, readonly / operator / admin tokens | yes: REST, scoped tokens | yes: REST, webhooks | yes: REST, webhooks | yes: OpenAPI, scoped tokens, webhooks | yes | yes |
 | AI agents (MCP) | yes: built in, plan / apply, owner approvals | ? | ? | ? | no first-party server; community ones exist | ? | ? |

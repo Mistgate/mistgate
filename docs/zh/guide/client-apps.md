@@ -27,7 +27,24 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 | Hiddify、v2rayNG 和同类应用 | 链接列表（base64），除非匹配你设置的规则 | Hysteria2 和 VLESS 服务器。应用能否读取 `hysteria2://` 和 `vless://`（REALITY、XHTTP）链接取决于其版本。 |
 | AmneziaVPN、AmneziaWG 应用 | 不使用订阅：每台设备从用户页面获取一个密钥（`vpn://`、`.conf` 文件或二维码） | 仅 AmneziaWG。 |
 
-只有在用户开启 AmneziaVPN 连接方式（在用户卡片或分组中的**订阅中的应用**设置），且用户所在分组有部署到节点的 AmneziaWG 协议配置时，基于 mihomo 内核的应用才会收到 AmneziaWG 服务器。首次获取订阅时，会为该用户的隐式设备发放 AmneziaWG 密钥。内核版本需要足够新：面板会在每个密钥旁标出 AmneziaWG 3.1 所需的 Mihomo 1.19.30 或更新版本，以及 2.0 所需的 1.19.14 或更新版本（参见[AmneziaWG](amneziawg.md)）。
+只有在用户开启 AmneziaVPN 连接方式（在用户卡片或分组中的**订阅中的应用**设置），且用户所在分组有部署到节点的 AmneziaWG 协议配置时，基于 mihomo 内核的应用才会收到 AmneziaWG 服务器。此类应用首次获取订阅时，会为它的设备发放 AmneziaWG 密钥。内核版本需要足够新：面板会在每个密钥旁标出 AmneziaWG 3.1 所需的 Mihomo 1.19.30 或更新版本，以及 2.0 所需的 1.19.14 或更新版本（参见[AmneziaWG](amneziawg.md)）。
+
+## 哪些应用会发送设备 ID
+
+[设备上限](subscriptions.md#订阅类应用的设备上限)按应用在 `X-HWID` 标头中发送的设备 ID 给应用计数。发送 ID 的应用有自己的名额和密钥；不发送的应用与其他同类应用共用一个名额。最后一列是面板拒绝设备时用户看到的内容（[应用会显示什么](subscriptions.md#设备被拒绝时应用会显示什么)）。
+
+| 应用 | 是否发送设备 ID | 被拒绝时显示什么 |
+|:--|:--|:--|
+| kl!ck | 是。ID 是电脑标识与订阅主机的哈希，同时发送系统和电脑名称。 | 只显示占位记录：它不读取公告。 |
+| Happ | 是，默认发送。用户可以在应用设置中关闭；关闭后它按不提供 ID 的应用计算。 | 公告和记录名称。 |
+| v2RayTun、INCY、FlClashX、Koala Clash、Prizrak-Box、RenoarX、DeskBox | 是。 | v2RayTun 读取 `X-Hwid-Limit`；其他应用显示记录名称。 |
+| Shadowrocket、Karing、Clash Mi、Throne | 支持，但默认关闭。 | 记录名称。 |
+| Hiddify、v2rayN、v2rayNG、Clash Verge Rev、FlClash、sing-box 系应用、Passwall | 否（截至 2026 年 7 月；v2rayN、Hiddify 和 Passwall 已有相关请求）。 | 记录名称。 |
+| Streisand、V2Box | 未确认。 | 记录名称。 |
+
+- 这些信息来自应用和其他面板的文档与源代码，并非逐个应用测试的结果，新版本可能开始或停止发送这个标头。面板以应用实际发送的内容为准：没有发送 ID 的应用会显示在用户卡片的**未提供设备 ID 的应用**下。
+- 使用不发送 ID 的应用的用户，在默认模式下不会被排除在外：这些应用共用一个名额。在**严格**模式下它们无法连接，提示信息会引导用户使用 Happ 或 kl!ck。
+- 全部大写的 ID（INCY 就是这样发送的）或不带连字符的 ID（Happ 在桌面端的备用 ID），面板会视为与普通形式相同的设备。
 
 ## 一键添加链接
 
@@ -56,7 +73,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 **为什么推荐桌面用户使用此应用**。它能读取 Mihomo YAML，这是唯一包含全部三种协议的格式：同时使用 Hysteria2、VLESS 和 AmneziaWG 的用户，可以在同一个应用中通过同一订阅链接获取所有服务器，并使用其 DNS 预设。在 Windows 和 macOS 上，另一种选择是用 Happ 连接 Hysteria2 和 VLESS，再用 AmneziaVPN 管理密钥，需要两个应用和两种添加方式。
 
-**面板需要做哪些设置**。无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**订阅链接**类型。AmneziaWG 服务器的设置见上文。
+**面板需要做哪些设置**。无需特别设置：kl!ck 获取订阅时使用 `mihomo/1.19.31`，因此默认规则 `mihomo` 会向它提供 Mihomo YAML。应用条目使用**订阅链接**类型。AmneziaWG 服务器的设置见上文。kl!ck 会发送设备 ID，因此每台装有 kl!ck 的电脑在设备上限中都有自己的名额。
 
 **下载**。访问发布页面：<https://github.com/vbu00/klick/releases/latest>。Windows 和 macOS 版本分开发布，文件名中包含版本号，因此面板链接到发布页面，而不是具体文件。截至撰写本文时（2026 年 10 月），最新版本是 0.4.0，提供 Windows 安装程序；macOS 端口已合并到源代码，发布后 macOS 安装包会出现在同一页面。
 

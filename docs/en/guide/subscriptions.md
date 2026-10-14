@@ -61,6 +61,31 @@ What counts as a browser: a User-Agent that starts with `Mozilla/`, has a browse
 
 **Try a User-Agent**: paste what an app sends, or pick an example, and the tab shows which rule takes it ("Rule 2 matches → Mihomo YAML", "Nothing matched, and it looks like a browser → web page", "Nothing matched → link list").
 
+## Device limit for apps on the link
+
+An app that fetches the link sends, besides its User-Agent, a device ID in the `X-HWID` header (the standard of Happ, Remnawave and 3x-ui) and often its model and system. The panel counts devices by that ID: one app on one device is one device with its own place in the person's limit and its own keys. Apps that send no ID share one place. How devices appear and are managed: [Users and groups](users-and-groups.md#devices-and-the-device-limit). Which apps send an ID: [Client apps](client-apps.md#which-apps-send-a-device-id).
+
+The mode is set in the card **Device limit for apps on the link**, under the rules of **Who gets what**. It has three options:
+
+| Mode | What it does |
+|:--|:--|
+| **Only count** | Nobody is refused. Devices get their places and keys, the limit is counted, and the users list shows who is over it. A person can have up to twice the limit; beyond that, a new app takes the shared place instead of one of its own, so an app that sends a different ID with every request cannot fill the panel. The event "the device limit is reached" is history only. |
+| **Limit** | A new device over the limit is refused. The devices a person already has stay. A link device silent for 30 days gives its place to a new one. Apps without a device ID share one place, and when the limit is full and there is no shared place yet, such an app is refused too. |
+| **Strict** | As **Limit**, and an app without a device ID is refused. Switching to it removes every shared place at once. |
+
+The default depends on the panel. A panel that already has users gets **Only count** when it is updated, so no one is cut off the day of the update. A new panel with no users gets **Limit**. The owner and helpers change the mode; the change applies at the next fetch.
+
+- **Limit** asks for a confirmation when someone is over the limit: "Turn on the limit?" says how many people are, and that they keep their devices while a new one is refused until they free a place or you raise the limit.
+- **Strict** always asks: "Switch to strict?" says how many people use apps without a device ID right now. They stop connecting, the shared places go at once, and such an app is told that it sends no device ID. Apps that send an ID are not affected.
+
+### How to move from Only count to Limit
+
+1. Open **Users** and press the chip **Over device limit**. These people have more devices than their limit.
+2. Raise **Devices** on the card of those who need more, or ask the others to delete the devices they no longer use on their page.
+3. Switch the mode to **Limit**. The confirmation shows who is still over. Move to **Strict** later, and only once you know who uses an app without a device ID.
+
+After the switch, the alert "An app was turned away at the device limit" tells you when someone was actually refused (see [Health](../operations/health.md)).
+
 ## What the apps receive
 
 Every answer to an app carries, besides the servers, the headers subscription apps read:
@@ -119,6 +144,33 @@ In Russian: «Подписка закончилась 29 сентября. На�
 In Chinese: 「订阅已于9月29日到期。联系我们即可续期」、「流量已用完，10月1日重置」、「流量已用完。联系我们提高额度」、「访问已暂停」.
 
 For such a person the refresh interval drops to 1 hour, so a fix (term extended, quota raised) reaches the app soon. The person's page explains the same in their language.
+
+## What the app shows when a device is refused
+
+An app whose device is refused does not get an error. The answer is a normal one (HTTP 200) with a single placeholder entry that never connects, named after the reason, as for [a subscription that does not work](#when-a-subscription-does-not-work). The announcement carries the same text, the refresh interval drops to 1 hour, and `Profile-Web-Page-Url` is the button to the person's page, where they free a place. The texts are in the panel's default language:
+
+| Reason | Text |
+|:--|:--|
+| The limit is full | "Device limit: 5 of 5. Remove one you no longer use on the subscription page" |
+| The owner blocked the device | "This device was turned off by the owner" |
+| The app sends no device ID (**Strict**) | "This app does not report a device ID. Turn on HWID in the settings of Happ, or use kl!ck" |
+
+In Russian: «Лимит устройств: 5 из 5. Удалите ненужное на странице подписки», «Это устройство отключено владельцем», «Приложение не сообщает ID устройства. Включите HWID в настройках Happ или возьмите kl!ck».
+
+In Chinese: 「设备已达上限：5 / 5。请在订阅页面删除不再使用的设备」、「此设备已被所有者停用」、「此应用未提供设备 ID。请在 Happ 设置中开启 HWID，或改用 kl!ck」.
+
+The answer also carries the headers that Remnawave and 3x-ui use, so the apps that read them behave the same:
+
+| Header | Value |
+|:--|:--|
+| `X-Hwid-Active` | `true` on every refusal: the device check is on. |
+| `X-Hwid-Max-Devices-Reached` | `true` when the limit is full. |
+| `X-Hwid-Not-Supported` | `true` when the app sends no usable device ID. The panel also sets it on the answer to an app whose `X-HWID` value cannot be used (not 10 to 64 letters, digits, `=` and `-`). |
+| `X-Hwid-Limit` | The person's device limit, as a number. v2RayTun reads it. |
+
+A blocked device gets `X-Hwid-Active` and `X-Hwid-Limit` only: the limit is not why it is refused, and an app that reads the flags must not tell the person to free a place. Its announcement says what happened.
+
+Apps differ in what they show of this: Happ shows the announcement and the name of the entry, kl!ck only the entry, since it does not read the announcement. See [Client apps](client-apps.md#which-apps-send-a-device-id).
 
 ## The user page
 

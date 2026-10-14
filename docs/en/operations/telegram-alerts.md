@@ -31,7 +31,7 @@ Once linked you can switch **Send me alerts** off without unlinking, **Send test
 
 | What | Who gets it | When |
 |:--|:--|:--|
-| A [health alert](health.md): node unreachable, alive but no traffic, a failing check, the node doctor's failures (a full disk, WARP down, the AmneziaWG module and so on), a certificate about to expire, a paused update | Every linked admin, whatever the role (every role can read them in the admin) | When it opens, and again when it resolves, with how long it lasted |
+| A [health alert](health.md): node unreachable, alive but no traffic, a failing check, the node doctor's failures (a full disk, WARP down, the AmneziaWG module and so on), a certificate about to expire, a paused update, a person refused at the device limit (once, when it opens) | Every linked admin, whatever the role (every role can read them in the admin) | When it opens, and again when it resolves, with how long it lasted |
 | An AmneziaWG kernel module that failed to build on a node | Owner | Once per failure |
 | A new signed panel release | Owner | Once per version |
 | Node agents behind the release | Owner | Once per version, with the names of the nodes |
@@ -43,7 +43,7 @@ Once linked you can switch **Send me alerts** off without unlinking, **Send test
 How the messages behave:
 
 - **Bursts become one message.** Events that arrive within about 30 seconds of each other are sent together, one message per chat; an identical line is not repeated.
-- **The same open alert is never sent twice.** When it resolves you get one message that says how long it lasted. An alert that a worse one replaced, one you accepted as normal and one you muted end without a message.
+- **The same open alert is never sent twice.** When it resolves you get one message that says how long it lasted. An alert that a worse one replaced, one you accepted as normal and one you muted end without a message, and so does the device-limit alert.
 - **Info-level alerts are not sent.** Only warnings and critical ones are (a fixed floor in this version; there are no quiet hours or filters yet).
 - **Short, in the panel language.** Messages are in English, Russian or Simplified Chinese, whichever the panel's default language is (**Settings → Interface → Default language**). Names that come from data, such as a node, a profile or a token, are escaped and cut to one line.
 - **Never a secret.** A message holds no token, no subscription link and no password.

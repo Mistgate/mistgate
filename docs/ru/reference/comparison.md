@@ -20,7 +20,7 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 - **Протоколы.** VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard есть в большинстве других панелей. В Mistgate есть Hysteria2, VLESS (REALITY по XHTTP или TCP с Vision; TLS по XHTTP или WebSocket, напрямую или за CDN) и AmneziaWG.
 - **Форматы подписок.** Другие отдают Xray JSON, sing-box, Clash, Stash или Outline. Mistgate отдаёт список URI, Mihomo YAML и ключи AmneziaVPN. **Планируется**: Xray JSON и sing-box.
 - **Сообщество и зрелость.** У 3x-ui около 47,7 тыс. звёзд на GitHub, у s-ui около 10,0 тыс., у Hiddify Manager около 9,3 тыс. Mistgate новый проект в ранних версиях.
-- **Лимит устройств.** 3x-ui, PasarGuard и Remnawave ограничивают устройства по HWID. Mistgate считает устройства.
+- **Лимит устройств.** 3x-ui, PasarGuard и Remnawave ограничивают устройства по HWID. Mistgate тоже, и даёт каждому устройству свои ключи, состояние «в сети» и трафик, так что одно устройство можно удалить или заблокировать, не трогая остальные.
 - **Telegram.** У 3x-ui, Marzban, PasarGuard и Hiddify Manager полноценные Telegram-боты. Mistgate отправляет алерты. **Планируется**: полноценный бот.
 - **Установка.** Установщик Mistgate одной командой проверяет подписанный манифест панели, прежде чем её ставить.
 
@@ -45,7 +45,7 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 | Как добавляется нода | из панели по SSH или одноразовой командой | вручную: полная 3x-ui на каждой ноде | вручную | вручную | вручную: сгенерированный compose-файл | вручную: дочерняя панель | ? |
 | Форматы подписок | список URI, Mihomo YAML, ключи AmneziaVPN `vpn://`, веб-страница; Xray JSON и sing-box **Планируется** | base64, Xray JSON, Clash/Mihomo | V2ray, Clash, ClashMeta | V2ray, Clash, ClashMeta, sing-box, Outline | Xray JSON, base64, Mihomo, Stash, Clash, sing-box | sub, sub64, Xray, sing-box, Clash, ClashMeta, WireGuard | ссылки, sing-box, Clash.Meta |
 | Трафик и срок на пользователя | да | да | да | да | да | да | да |
-| Лимит устройств | частично: число устройств, не HWID | да: HWID и IP | ? | да: HWID | да: HWID | ? | ? |
+| Лимит устройств | да: HWID, место и ключи на устройство | да: HWID и IP | ? | да: HWID | да: HWID | ? | ? |
 | Telegram-бот | частично: алерты; полный бот **Планируется** | да (и Discord) | да | да | частично: уведомления, вход через Telegram | да | ? |
 | API | да: Connect, токены readonly / operator / admin | да: REST, токены с правами | да: REST, вебхуки | да: REST, вебхуки | да: OpenAPI, токены с правами, вебхуки | да | да |
 | ИИ-агенты (MCP) | да: встроен, «план → применить», одобрения владельца | ? | ? | ? | своего сервера нет, есть от сообщества | ? | ? |

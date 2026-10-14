@@ -191,7 +191,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
 | `SubscriptionService.UpdateSubscriptionSettings` (one app of the user page) | no | only through an approved MCP plan | only through an approved MCP plan |
 
-Closed to every token: deleting users, the subscription link, devices and their keys, node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), every change to profiles, groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
+Closed to every token: deleting users, the subscription link, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), every change to profiles, groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 
 ## Changes that need the owner
 
@@ -215,5 +215,6 @@ Every token call writes a row to the audit log: "called <procedure>", the HTTP s
 - `CreateUser` called with a token returns the user without the subscription link and the page password. `GetSubscriptionLink` is closed to tokens.
 - Profile secrets come back masked (`••••`), for every caller.
 - Device keys and configurations (`DeviceService`) and WARP accounts are closed to tokens.
+- A device's ID (HWID) is never stored or returned: `Device.fingerprint` is the first six characters of its hash, enough to tell two identical phones apart.
 - Token secrets are never returned after creation, not even to the owner.
 - Audit parameters never contain secrets.

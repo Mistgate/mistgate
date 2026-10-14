@@ -27,7 +27,24 @@ One subscription link serves every app. The panel picks the format by the app's 
 | Hiddify, v2rayNG and other apps of that family | Link list (base64), unless a rule of yours matches them | Hysteria2 and VLESS servers. Whether the app reads `hysteria2://` and `vless://` (REALITY, XHTTP) links depends on its version. |
 | AmneziaVPN, AmneziaWG apps | No subscription: a key per device (`vpn://`, a `.conf` file or a QR code) from the person's page | AmneziaWG only. |
 
-The AmneziaWG servers reach an app on the mihomo core only when the person has the AmneziaVPN way switched on (**Apps in the subscription** on the user card or the group) and the group has an AmneziaWG profile on a node. The first fetch gives the person's implicit device its AmneziaWG keys. The core must be new enough: the panel lists Mihomo 1.19.30 or newer for AmneziaWG 3.1 and 1.19.14 for 2.0, next to every key ([AmneziaWG](amneziawg.md)).
+The AmneziaWG servers reach an app on the mihomo core only when the person has the AmneziaVPN way switched on (**Apps in the subscription** on the user card or the group) and the group has an AmneziaWG profile on a node. The first fetch by such an app gives its device the AmneziaWG keys. The core must be new enough: the panel lists Mihomo 1.19.30 or newer for AmneziaWG 3.1 and 1.19.14 for 2.0, next to every key ([AmneziaWG](amneziawg.md)).
+
+## Which apps send a device ID
+
+The [device limit](subscriptions.md#device-limit-for-apps-on-the-link) counts an app by the device ID it sends in the `X-HWID` header. An app with an ID gets a place and keys of its own; an app without one shares a place with the other such apps. The last column is what a person sees when the panel refuses the device ([what the app shows](subscriptions.md#what-the-app-shows-when-a-device-is-refused)).
+
+| App | Sends a device ID | What it shows on a refusal |
+|:--|:--|:--|
+| kl!ck | Yes. The ID is a hash of the computer's identity and the host of the subscription, with the system and the computer's name. | The placeholder entry only: it does not read the announcement. |
+| Happ | Yes, by default. The person can switch it off in the app's settings; then it counts as an app without an ID. | The announcement and the name of the entry. |
+| v2RayTun, INCY, FlClashX, Koala Clash, Prizrak-Box, RenoarX, DeskBox | Yes. | v2RayTun reads `X-Hwid-Limit`; the others show the name of the entry. |
+| Shadowrocket, Karing, Clash Mi, Throne | Able to, but switched off by default. | The name of the entry. |
+| Hiddify, v2rayN, v2rayNG, Clash Verge Rev, FlClash, sing-box apps, Passwall | No (as of July 2026; requests for it are open at v2rayN, Hiddify and Passwall). | The name of the entry. |
+| Streisand, V2Box | Not confirmed. | The name of the entry. |
+
+- This comes from the documentation and sources of the apps and of other panels, not from a test of every app, and a new version can start or stop sending the header. The panel goes by what an app sends: an app that sent no ID appears in the user card under **Apps without a device ID**.
+- A person on an app without an ID is not left out in the default mode: those apps share one place. In **Strict** they cannot connect, and the message sends them to Happ or kl!ck.
+- The panel reads an ID in capitals (INCY sends one) or without dashes (the alternative ID of Happ on a desktop) as the same device as its ordinary form.
 
 ## One-tap add links
 
@@ -56,7 +73,7 @@ These are the templates of the known apps. Each scheme is confirmed by the app's
 
 **Why it is the desktop recommendation.** It reads the Mihomo YAML, the one format that carries all three protocols: a person with Hysteria2, VLESS and AmneziaWG gets all their servers from the one subscription in the one app, with the DNS section of their preset. On Windows and macOS the alternative is Happ for Hysteria2 and VLESS plus AmneziaVPN for keys, two apps and two ways to add.
 
-**What the panel needs.** Nothing special: kl!ck fetches the subscription as `mihomo/1.19.31`, so the default rule `mihomo` serves it the Mihomo YAML. The app entry is of the kind **By subscription link**. For the AmneziaWG servers, see the switch above.
+**What the panel needs.** Nothing special: kl!ck fetches the subscription as `mihomo/1.19.31`, so the default rule `mihomo` serves it the Mihomo YAML. The app entry is of the kind **By subscription link**. For the AmneziaWG servers, see the switch above. kl!ck sends a device ID, so each computer with kl!ck takes a place of its own in the device limit.
 
 **Download.** The releases page: <https://github.com/vbu00/klick/releases/latest>. The Windows and macOS builds are released separately and the file names carry the version, so the panel links the page, not a file. At the time of writing (October 2026) the latest release is 0.4.0 with a Windows installer; the macOS port is merged in the source, and the macOS package appears on the same page when it is released.
 

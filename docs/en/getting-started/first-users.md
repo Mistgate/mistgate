@@ -75,7 +75,7 @@ If the page asks for a password, the page password is on: **Copy to send** puts 
 
 How you know it works:
 
-- The user's **Devices** list shows a device as soon as an app has fetched the link ("None yet — they appear once your friend opens the link" until then).
+- The user's **Devices** list shows a device as soon as an app has fetched the link ("None yet — they appear once your friend opens the link" until then). An app that sends a device ID gets a row of its own; the others share one row.
 - The node's page and the Overview show the person online, and traffic starts to count.
 - If the link window says the person "gets nothing yet", the group has no profile running on a node the person may use: go back to steps 1 and 2.
 

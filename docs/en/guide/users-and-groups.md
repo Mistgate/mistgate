@@ -36,7 +36,7 @@ Both are offered on the person's page side by side. At least one switch stays on
 The header counts people and how many are online. Above the list:
 
 - **Name or group**: a search by the user's name or group name;
-- the chips **All**, **Online now**, **Expiring soon** (within 7 days) and **Over quota**, each with its count.
+- the chips **All**, **Online now**, **Expiring soon** (within 7 days), **Over quota** and **Over device limit**, each with its count. **Over device limit** shows only while someone is over their limit (or while it is selected): it is the list to look at before you switch the [device limit](subscriptions.md#device-limit-for-apps-on-the-link) from **Only count** to **Limit**.
 
 | Column | What it shows |
 |:--|:--|
@@ -44,7 +44,7 @@ The header counts people and how many are online. Above the list:
 | **Status** | **Active**, **Expired**, **Over quota**, **Device limit** or **Disabled**. |
 | **App** | What the person actually used in the last 7 days: **Happ**, **Amnezia** or **Both**. |
 | **Group** | The group. |
-| **Dev.** | Devices in use and the limit. |
+| **Dev.** | Devices in use and the limit: amber when the limit is full, red ("6/5") when the person is over it. |
 | **Traffic** | Used traffic of the current period, with a bar against the quota. |
 | **Term** | Days left, ∞ for no expiry. |
 | **Last seen** | "now" while online, else how long ago. |
@@ -77,7 +77,7 @@ The API also enables, deletes and resets the traffic of many users in one call. 
 | **Devices** | 5 | 1–100: how many devices can connect. |
 | **Apps in the subscription** | what the group gives | The link-app switch and **AmneziaVPN**. Until you touch them, they follow the group: a way the group gives nothing for starts off, with the reason under it. |
 | **All nodes** | on | New nodes are added by themselves. Off: tick nodes; new nodes will not be added. |
-| **More** → **DNS** | inherited | A DNS preset of the user's own; empty means the group's, or the default. See [DNS](dns.md). |
+| **More** | folded | **DNS**: a preset of the user's own, inherited when empty (see [DNS](dns.md)). **Speed limits**: **Speed per person** and **Speed per device**, both unlimited by default (see [Limits](#limits)). |
 
 When there is no group yet, the form shows the group form inline. **Create** makes the user and opens the link window; the link (and the page password, when pages ask for one) is copied for you to send. If the person would get nothing yet, the window says why before the link goes out.
 
@@ -95,18 +95,30 @@ Under it, a strip explains a stop and offers the quick fix:
 | Quota used up | "The 100 GB quota is used up — access is paused until it resets or you raise it." | **+50 GB** |
 | Device limit | "Device limit (5) reached — a new device can't connect." | **+1 device** |
 
+In the **Only count** mode nothing is refused, so this strip is not shown. A person over the limit gets a quiet line under the heading of **Devices** instead: "The limit only counts for now: apps over it still connect", with a link to **Limit mode**.
+
 ### Traffic
 
 The used traffic of the current period against the quota, the reset period ("resets on the 1st"), a chart of the last 14 days, and the traffic per node and protocol.
 
 ### Devices
 
-The counter shows devices in use against the limit. Two lists:
+The heading shows the devices in use against the limit ("3 of 5"): amber when it is full, red when the person is over it. The panel counts devices, one place each; what a device is and how it appears is in [Devices and the device limit](#devices-and-the-device-limit). The card has these parts:
 
-- **Through the subscription**: one row, **Apps on the link**, for every app on the link on every device: together they take one place in the limit. It says when the apps last fetched the link. **Disconnect** cuts them now; they connect again at their next subscription refresh.
-- **AmneziaVPN keys**: one row per device with its platform, profile and last connection; **Show key** and **Delete**. **Add device** makes a new key. An **outdated** badge means the device needs its config again. See [AmneziaWG](amneziawg.md).
+- **Apps on the link**: a row for every app that sends a device ID. The row shows the name (the model, or the name you gave it) and a quiet line: "online" with the servers it is connected to ("de1, nl1"), or how long ago the app fetched the link. Hover the row for the system and the app with their versions ("iOS 18.1 · Happ 3.4.2"); the **⋯** menu also shows since when, the traffic of the device over all time and its fingerprint. One device on two servers at once is a sign that its config was copied to another device; the row says so on hover.
+- **Apps without a device ID**: one row for every app on the link that does not send one (Hiddify, v2rayNG and the like, or Happ with HWID switched off). They share one place. In the **Strict** mode there is no such place and these apps cannot connect.
+- **AmneziaVPN keys**: one row per device with its platform, profile and last connection; **Show key** and, in the menu, **Delete…**. **Add device** makes a new key. An **outdated** badge means the device needs its config again. See [AmneziaWG](amneziawg.md).
+- **Blocked (N)**: folded; see below.
 
-**Delete** disconnects the device and removes its key from every node.
+The **⋯** menu of an app on the link:
+
+- **Rename…**: a name of your own, shown here and on the person's page.
+- **Delete…**: the app disconnects, its keys stop working and the place is free. If the app fetches the link again and there is a place, it comes back as a new device with new keys.
+- **Block…**: as **Delete…**, and the device cannot come back, even when the app fetches the link again, until you unblock it. The person's other devices keep working. Only an app with a device ID can be blocked; the shared place and AmneziaVPN keys cannot.
+
+**Blocked (N)** lists the blocked devices. **Unblock** lets the device in again; it gets new keys at its next refresh of the subscription. The menu of the shared place has **Disconnect…**: the apps lose the connection now and connect again at their next refresh.
+
+**Delete** on an AmneziaVPN key disconnects the device and removes its key from every node.
 
 ### Subscription page
 
@@ -123,9 +135,17 @@ Once a person has picked a DNS for a server on their page (see **DNS choice on t
 | **Quota** | 10 GB, 0–10000 GB; 0 is **Unlimited**. |
 | **Term** | 5 days, up to 3650; ∞ is **Never**. "−" on ∞ sets 30 days. |
 | **Devices** | 1, from 1 to 100. |
-| **Speed limit** | The switch turns on 20 Mbit/s; then steps of 5 Mbit/s, 5–10000. Experimental, Hysteria2 only. |
+| **Speed per person** | Steps of 5 Mbit/s, 0–10000; 0 is **Unlimited**. All the person's devices together, on one node. Experimental. |
+| **Speed per device** | The same steps. Each device on its own. Experimental. |
 
 A change is saved as soon as you stop clicking.
+
+The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
+
+- **Speed per person** is the total of the person's devices on **one node**. A person connected to two nodes at once can get up to twice the limit, because the nodes do not coordinate. This is the former single speed limit: before devices had keys of their own, all the apps shared one credential, so it was already a limit per person.
+- **Speed per device** caps each device.
+- Both can be set. A byte passes both limits, so a device runs at the smaller of its own limit and what is left of the person's.
+- Sharing the person's limit needs an agent that reports `user-rate-limit/1`. A node with an older agent holds each device to the smaller of the two limits, and the **Settings** tab of the node says so until the agent is updated (see [Nodes](nodes.md#agent-version-and-drift)).
 
 ### Access
 
@@ -146,12 +166,29 @@ A user made in the admin resets on the 1st of every month (UTC). The API can als
 
 ## Devices and the device limit
 
-A device is one place in the limit:
+A device is one place in the limit.
 
-- all subscription apps of a person, on all their devices, are one device ("Apps on the link"); apps on the mihomo core that carry AmneziaWG share that one too;
-- each AmneziaVPN key is one device.
+- An app on the link that sends a device ID (HWID) is one device per ID. Which apps do: [Client apps](client-apps.md#which-apps-send-a-device-id).
+- All apps on the link that send no device ID share one place, **Apps without a device ID**.
+- Each AmneziaVPN key is one device.
 
-When the limit is reached, a new key cannot be made, by you or by the person on their page; the subscription keeps working. Raise the limit or delete a device the person no longer uses.
+### How a device appears
+
+- A device is created by the first fetch of the subscription by an app, one per device ID. Opening the user page, the admin's preview and creating a user never create one: a new person shows "0 of 5" until an app fetches the link, and the first connection waits a few seconds until the nodes have the new keys.
+- Each device has its own keys for Hysteria2, VLESS and AmneziaWG in Mihomo, its own online status and its own traffic. A config copied to another device keeps working until you delete or block that device, but it shows (one device on two servers at once), and removing it leaves the person's other devices alone.
+- The device ID itself is not stored: the panel keeps a hash of it, mixed with the person, so the same phone in two subscriptions is not linked. The card shows the first six characters of the hash as a fingerprint, to tell two identical phones apart.
+- On upgrade nobody has to reconnect. The first app with a device ID takes over the person's old shared device and keeps its keys. Other apps with an ID get keys of their own at their next refresh. Apps without an ID stay on a shared place.
+
+### The limit and the mode
+
+What happens when the limit is full depends on the mode in **Subscriptions → Who gets what → Device limit for apps on the link**: **Only count**, **Limit** or **Strict**. See [Subscriptions](subscriptions.md#device-limit-for-apps-on-the-link). In short: **Only count** refuses nobody, **Limit** refuses a new device over the limit, **Strict** also refuses apps without a device ID.
+
+- A link device that stays silent for 30 days gives its place to a new app with a device ID, when a place is needed. This happens in **Limit** and **Strict** only. An AmneziaVPN key is never replaced. The event "a new device took the place of one silent for 30 days" is written.
+- A key cannot be made when the limit is full, by you or by the person on their page. Raise the limit or delete a device the person no longer uses.
+- A device you delete is cleaned up from the database after 90 days. A blocked device is kept, so the block holds.
+- The refused app is told why: see [What the app shows when a device is refused](subscriptions.md#what-the-app-shows-when-a-device-is-refused).
+
+A person can also delete and rename their own devices on their page, when **Devices on the page** is on; see [User page](user-page.md#my-devices). Blocking is for the owner and helpers.
 
 ## The Groups tab
 

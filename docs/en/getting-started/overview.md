@@ -40,7 +40,7 @@ Mistgate is for a person or a small team that runs a few VPN servers for themsel
 | Server on a node | A profile put on a node. It is what really listens on the node, and what a person sees as one server in their app. Its port and Domain (SNI) can differ per node. The API calls it an inbound. |
 | Group | A set of profiles. Every user is in one group and gets the profiles of that group. A new panel starts with an empty group named "Everyone". |
 | User | A person with access: a group, the apps they use (the subscription link, AmneziaVPN or both), the nodes they get (all or some), a traffic quota, a term and a device limit. Status: Active, Disabled, Expired or Over quota. |
-| Device | A device of a user that holds credentials. For subscription apps a device appears by itself when an app fetches the link. For AmneziaWG a device is one key bound to one profile. The device limit counts devices. |
+| Device | A device of a user that holds credentials. For subscription apps a device appears by itself when an app fetches the link, one per device ID, and has keys of its own; apps that send no device ID share one place. For AmneziaWG a device is one key bound to one profile. The device limit counts devices. |
 | Subscription link | One secret URL per user. An app that fetches it gets the user's servers; a browser gets the user page. A new link replaces the old one at once. |
 | User page | What the link shows in a browser: instructions for the person's platform, a QR code, traffic and term, and, if you allow it, AmneziaWG keys the person makes for their own devices. It can ask for a page password. |
 

@@ -20,7 +20,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 - **协议。** 大多数其他面板支持 VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。Mistgate 支持 Hysteria2、VLESS（REALITY 通过 XHTTP 或带 Vision 的 TCP 传输；TLS 通过 XHTTP 或 WebSocket 传输，可直连或位于 CDN 之后）以及 AmneziaWG。
 - **订阅格式。** 其他面板提供 Xray JSON、sing-box、Clash、Stash 或 Outline。Mistgate 提供 URI 列表、Mihomo YAML 和 AmneziaVPN 密钥；Xray JSON 和 sing-box **计划中**。
 - **社群与成熟度。** 3x-ui 约有 47.7k 个 GitHub 星标，s-ui 约有 10.0k 个，Hiddify Manager 约有 9.3k 个。Mistgate 是处于早期发布阶段的新项目。
-- **设备限制。** 3x-ui、PasarGuard 和 Remnawave 根据 HWID 限制设备数量。Mistgate 按设备计数。
+- **设备限制。** 3x-ui、PasarGuard 和 Remnawave 根据 HWID 限制设备数量。Mistgate 也是如此，并且给每台设备单独的密钥、在线状态和流量，因此可以删除或拉黑一台设备而不影响其他设备。
 - **Telegram。** 3x-ui、Marzban、PasarGuard 和 Hiddify Manager 提供完整的 Telegram 机器人。Mistgate 会发送告警；完整机器人**计划中**。
 - **安装。** Mistgate 的一行安装程序会在安装面板前验证面板签名清单。
 
@@ -45,7 +45,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | 添加节点的方式 | 从面板通过 SSH 添加，或使用一次性命令 | 手动：每个节点运行完整的 3x-ui 面板 | 手动 | 手动 | 手动：使用生成的 compose 文件 | 手动：使用子面板 | ? |
 | 订阅格式 | URI 列表、Mihomo YAML、AmneziaVPN `vpn://` 密钥、网页；Xray JSON 和 sing-box **计划中** | base64、Xray JSON、Clash/Mihomo | V2ray、Clash、ClashMeta | V2ray、Clash、ClashMeta、sing-box、Outline | Xray JSON、base64、Mihomo、Stash、Clash、sing-box | sub、sub64、Xray、sing-box、Clash、ClashMeta、WireGuard | 链接、sing-box、Clash.Meta |
 | 每用户流量与有效期 | 是 | 是 | 是 | 是 | 是 | 是 | 是 |
-| 设备限制 | 部分：按设备数量限制，不按 HWID | 是：HWID 和 IP | ? | 是：HWID | 是：HWID | ? | ? |
+| 设备限制 | 是：HWID，每台设备有自己的名额和密钥 | 是：HWID 和 IP | ? | 是：HWID | 是：HWID | ? | ? |
 | Telegram 机器人 | 部分：告警；完整机器人**计划中** | 是（也支持 Discord） | 是 | 是 | 部分：通知、Telegram 登录 | 是 | ? |
 | API | 是：Connect、只读 / 操作员 / 管理员令牌 | 是：REST、范围受限的令牌 | 是：REST、webhook | 是：REST、webhook | 是：OpenAPI、范围受限的令牌、webhook | 是 | 是 |
 | AI 智能体（MCP） | 是：内置，支持计划 / 执行和所有者审批 | ? | ? | ? | 否：没有官方服务器；社群提供了相关服务器 | ? | ? |

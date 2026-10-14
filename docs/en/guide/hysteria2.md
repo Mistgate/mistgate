@@ -43,7 +43,7 @@ TCP 443 is also where the node answers Let's Encrypt, so keep it free on nodes w
 
 A Hysteria2 client can declare its own speed and ask the server to send at that rate (Brutal). One client that declares a huge speed can then take the whole link of the node. With **Ignore the client-declared speed (always BBR)** on, the node ignores the declared speed and uses BBR congestion control, which shares the link fairly. **BBR profile** tunes how fast BBR ramps up.
 
-**Upload ceiling** and **Download ceiling** cap each client of the profile. A per-person limit is set on the user instead: **Speed limit** on the user card (experimental; it applies to Hysteria2). See [Users and groups](users-and-groups.md).
+**Upload ceiling** and **Download ceiling** cap each client of the profile. Speed can also be limited per person and per device, on the user: **Speed per person** (all their devices together, on one node) and **Speed per device** on the user card (experimental; they apply to Hysteria2 and VLESS). A byte passes both. See [Users and groups](users-and-groups.md#limits).
 
 ## Port hopping
 
