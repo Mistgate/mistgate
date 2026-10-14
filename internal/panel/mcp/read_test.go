@@ -81,6 +81,17 @@ func TestChecksResultsContent(t *testing.T) {
 	if cc.Confidence != "eyeball" || len(cc.ListedBy) != 1 || cc.ListedBy[0] != "antifilter_ipsum" || cc.CDNProvider != "ExampleHost" || cc.CDNRegion != "eu" {
 		t.Errorf("country_check block-list fields: %+v", cc)
 	}
+	// the TSPU probe: its view of the node, how the verdict was made, and the newest run
+	if len(cc.Sources) != 2 || cc.Sources[0] != "globalping" || cc.Sources[1] != "tspu" || cc.GlobalpingVerdict != "tcp_blocked" || cc.TSPUVerdict != "tcp_blocked" {
+		t.Errorf("country_check sources: %+v", cc)
+	}
+	if cc.TSPU == nil || cc.TSPU.Vantage != "probe1" || cc.TSPU.DPIHop != 4 || cc.TSPU.AtUnix != 1700000400 || len(cc.TSPU.Ports) != 2 ||
+		cc.TSPU.Ports[0] != (tspuPortV{Port: 443, Verdict: "blocked"}) || cc.TSPU.Ports[1].Verdict != "open" {
+		t.Errorf("country_check tspu: %+v", cc.TSPU)
+	}
+	if r := v.TSPUProbe; r == nil || r.Status != "ok" || r.ProbeNode != "de1" || r.DPIHop != 4 || r.BlockedRef != "31.13.72.36" || r.NodesChecked != 2 || r.AtUnix != 1700000400 {
+		t.Errorf("tspu_probe run: %+v", v.TSPUProbe)
+	}
 }
 
 func TestFleetStatusContent(t *testing.T) {

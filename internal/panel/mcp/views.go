@@ -1034,10 +1034,57 @@ type countryCheckV struct {
 	Confidence string `json:"confidence,omitempty"`
 	// ListedBy: the block lists that hold the node's address (antifilter_ipsum, antifilter_community). CDNProvider and
 	// CDNRegion: the CDN or hosting range the address is in. All three are empty while the block-list source is off.
-	ListedBy    []string        `json:"listed_by,omitempty"`
-	CDNProvider string          `json:"cdn_provider,omitempty"`
-	CDNRegion   string          `json:"cdn_region,omitempty"`
-	Probes      []countryProbeV `json:"probes"`
+	ListedBy    []string `json:"listed_by,omitempty"`
+	CDNProvider string   `json:"cdn_provider,omitempty"`
+	CDNRegion   string   `json:"cdn_region,omitempty"`
+	// Sources: which sources the verdict rests on (globalping, tspu, lists). With both live sources, a Confidence of conflict
+	// means they disagree and the worse verdict is shown; GlobalpingVerdict and TSPUVerdict are what each said on its own.
+	Sources           []string `json:"sources,omitempty"`
+	GlobalpingVerdict string   `json:"globalping_verdict,omitempty"`
+	TSPUVerdict       string   `json:"tspu_verdict,omitempty"`
+	// TSPU is the probe node's view of this node, when that source is on and has a recent run for it.
+	TSPU   *countryTSPUV   `json:"tspu,omitempty"`
+	Probes []countryProbeV `json:"probes"`
+}
+
+// countryTSPUV: what a node of the fleet inside the country saw with TCP SYNs of a limited TTL. A data-centre view, so its
+// confidence is dc_only. Ports: blocked (the SYN dies at the TSPU), open (connected, or a router behind it answered), refused
+// (a reset) or timeout (no verdict). DPIHop is the TTL of the last router before the TSPU box.
+type countryTSPUV struct {
+	Vantage string      `json:"probe_node"`
+	AtUnix  int64       `json:"at_unix"`
+	DPIHop  uint32      `json:"dpi_hop"`
+	Ports   []tspuPortV `json:"ports"`
+}
+
+type tspuPortV struct {
+	Port    uint32 `json:"port"`
+	Verdict string `json:"verdict"`
+}
+
+// tspuRunV: the newest run of the TSPU probe. Status: ok, control_failed (the method does not apply on the probe node's network),
+// no_dpi_hop (the TSPU could not be placed with the reference addresses), busy, failed (Detail says why). Absent while that
+// source is off or has not run.
+type tspuRunV struct {
+	Status       string `json:"status"`
+	AtUnix       int64  `json:"at_unix"`
+	ProbeNode    string `json:"probe_node,omitempty"`
+	DPIHop       uint32 `json:"dpi_hop,omitempty"`
+	BlockedRef   string `json:"blocked_ref,omitempty"`
+	NodesChecked uint32 `json:"nodes_checked,omitempty"`
+	Detail       string `json:"detail,omitempty"`
+}
+
+func tspuRunView(r *adminv1.TspuProbeRun, names map[string]string) *tspuRunV {
+	if r == nil {
+		return nil
+	}
+	node := r.GetNodeId()
+	if n, ok := names[node]; ok {
+		node = n
+	}
+	return &tspuRunV{Status: clean(r.GetStatus(), 20), AtUnix: r.GetAtUnix(), ProbeNode: nm(node), DPIHop: r.GetDpiHop(), BlockedRef: clean(r.GetBlockedRef(), 45),
+		NodesChecked: r.GetNodesChecked(), Detail: clean(r.GetDetail(), 40)}
 }
 
 func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
@@ -1049,6 +1096,19 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 		CDNProvider: nm(c.GetCdnProvider()), CDNRegion: nm(c.GetCdnRegion()), Probes: []countryProbeV{}}
 	for _, l := range c.GetListedBy() {
 		v.ListedBy = append(v.ListedBy, clean(l, 40))
+	}
+	for _, src := range c.GetSources() {
+		v.Sources = append(v.Sources, clean(src, 20))
+	}
+	if g := c.GetGlobalpingVerdict(); g != adminv1.CountryVerdict_COUNTRY_VERDICT_UNSPECIFIED {
+		v.GlobalpingVerdict = enumName("COUNTRY_VERDICT_", g.String())
+	}
+	if t := c.GetTspuVerdict(); t != adminv1.CountryVerdict_COUNTRY_VERDICT_UNSPECIFIED {
+		v.TSPUVerdict = enumName("COUNTRY_VERDICT_", t.String())
+		v.TSPU = &countryTSPUV{Vantage: nm(c.GetTspuVantageName()), AtUnix: c.GetTspuAtUnix(), DPIHop: c.GetDpiHop(), Ports: []tspuPortV{}}
+		for _, p := range c.GetTspuPorts() {
+			v.TSPU.Ports = append(v.TSPU.Ports, tspuPortV{Port: p.GetPort(), Verdict: clean(p.GetVerdict(), 12)})
+		}
 	}
 	for _, p := range c.GetProbes() {
 		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
@@ -1081,7 +1141,9 @@ type ChecksV struct {
 	Columns   []checkColV `json:"columns"`
 	Rows      []checkRowV `json:"rows"`
 	UdpLoss   *udpLossV   `json:"udp_loss,omitempty"`
-	Truncated bool        `json:"truncated,omitempty"`
+	// TSPUProbe: the newest run of the TSPU probe, while that source is on and has run.
+	TSPUProbe *tspuRunV `json:"tspu_probe,omitempty"`
+	Truncated bool      `json:"truncated,omitempty"`
 }
 
 func (v *ChecksV) shrink() bool {
@@ -1098,6 +1160,11 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 	for _, c := range r.GetCountryChecks() {
 		country[c.GetNodeId()] = c
 	}
+	names := map[string]string{}
+	for _, row := range r.GetRows() {
+		names[row.GetNodeId()] = row.GetNodeName()
+	}
+	v.TSPUProbe = tspuRunView(r.GetTspuRun(), names)
 	for _, row := range r.GetRows() {
 		rv := checkRowV{NodeID: row.GetNodeId(), NodeName: nm(row.GetNodeName()), NodeStatus: nodeStatus(row.GetNodeStatus()), Cells: []checkV{},
 			Country: countryCheckView(country[row.GetNodeId()])}
