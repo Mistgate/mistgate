@@ -1,6 +1,7 @@
 # Builds everything the edge Worker needs in edge/worker/dist and web/dist:
 #   1. the admin SPA and the user page (pnpm --dir web build), served to the panel by the Worker's static assets;
-#   2. the panel for js/wasm -> edge/worker/dist/panel.wasm;
+#   2. the panel for js/wasm -> edge/worker/dist/panel.wasm, and the five role entries of the split edition
+#      (cmd/mistgate-edge-{public,link,jobs,admin,provision}) -> dist/<role>.wasm;
 #   3. wasm_exec.js from the Go toolchain that built the wasm (the two must match) -> edge/worker/dist/wasm_exec.js;
 #   4. edge/worker/wrangler.dev.toml and wrangler.provision.dev.toml (git-ignored): the two scripts' templates with a dummy D1 id,
 #      for `wrangler dev --local -c wrangler.dev.toml -c wrangler.provision.dev.toml` (pnpm dev). The second script, the
@@ -32,6 +33,10 @@ try {
     $env:GOOS = "js"
     $env:GOARCH = "wasm"
     Invoke-Native "go build (js/wasm)" { go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o $wasm ./cmd/mistgate-edge }
+    # The split edition's Workers (edge/worker/src/roles/*.ts) import dist/<role>.wasm.
+    foreach ($role in "public", "link", "jobs", "admin", "provision") {
+        Invoke-Native "go build $role (js/wasm)" { go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o (Join-Path $dist "$role.wasm") "./cmd/mistgate-edge-$role" }
+    }
 } finally {
     $env:GOOS = $previousGoos
     $env:GOARCH = $previousGoarch
@@ -52,3 +57,6 @@ $provisionLocal = $provisionTemplate -replace 'replace-with-your-d1-database-id'
 
 $bytes = (Get-Item -LiteralPath $wasm).Length
 "edge wasm: {0} bytes ({1:N1} MiB, limit in CI 44040192, headroom {2} bytes = {3:N0} KiB)" -f $bytes, ($bytes / 1MB), (44040192 - $bytes), ((44040192 - $bytes) / 1KB)
+foreach ($role in "public", "link", "jobs", "admin", "provision") {
+    "edge {0}.wasm: {1} bytes" -f $role, (Get-Item -LiteralPath (Join-Path $dist "$role.wasm")).Length
+}
