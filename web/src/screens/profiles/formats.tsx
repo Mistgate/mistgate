@@ -53,19 +53,41 @@ function Drop({ formats, note, t }: { formats: SubFormat[]; note: string; t: Tx 
   );
 }
 
-/** Only the drops (the user card): nothing when the profile works in every format, or when its formats are unknown. */
+/**
+ * AmneziaWG is in Mihomo and in the AmneziaVPN keys by design, never in the other formats: a fact of the protocol, not a drop
+ * to notice. Such a profile gets no chip, only "AmneziaVPN keys" in the quiet line.
+ */
+const keysOnly = (drops: { note: string }[]) => drops.length > 0 && drops.every((d) => d.note === "awg");
+
+/** Only the drops (the user card): nothing when the profile works in every format, goes by keys, or its formats are unknown. */
 export function FormatDrops({ formats, t }: { formats: readonly Format[]; t: Tx }) {
-  return dropsOf(formats).map((d) => <Drop key={d.note} {...d} t={t} />);
+  const drops = dropsOf(formats);
+  return keysOnly(drops) ? null : drops.map((d) => <Drop key={d.note} {...d} t={t} />);
+}
+
+/** A quiet item with a dotted underline: there is more to it in a tooltip (hover and keyboard focus) and in its name. */
+function Dotted({ text, label, tip }: { text: string; label: string; tip: string }) {
+  return (
+    <Tip label={tip}>
+      <span tabIndex={0} aria-label={`${label}. ${tip}`} className="relative cursor-default rounded-sm whitespace-nowrap underline decoration-dotted underline-offset-[3px]">
+        {text}
+      </span>
+    </Tip>
+  );
 }
 
 /**
  * In which subscription formats a profile works, in one line that wraps: the formats that carry it, quiet ("Link list ·
  * Mihomo · Xray JSON"), then the drops ("not in sing-box: XHTTP"). A format that writes a port-hopping range as its one
- * port is dotted, with the reason in a tooltip. Nothing at all when the formats are unknown (an empty list).
+ * port is dotted, with the reason in a tooltip; an AmneziaWG profile reads "Mihomo · AmneziaVPN keys", the keys dotted.
+ * Nothing at all when the formats are unknown (an empty list).
  */
 export function FormatsLine({ formats, t, className }: { formats: readonly Format[]; t: Tx; className?: string }) {
   if (formats.length === 0) return null;
   const ok = formats.filter((f) => f.ok);
+  const drops = dropsOf(formats);
+  const keys = keysOnly(drops);
+  const keysName = t("profiles.fmt.keys");
   return (
     <div role="group" aria-label={t("profiles.fmt.title")} className={className}>
       <span className="text-xs leading-[22px] text-muted">
@@ -74,29 +96,24 @@ export function FormatsLine({ formats, t, className }: { formats: readonly Forma
           return (
             <Fragment key={f.format}>
               {i > 0 && " · "}
-              {f.note ? (
-                <Tip label={tip(f.note, t)}>
-                  <span
-                    tabIndex={0}
-                    aria-label={`${t("common.labeled", { label: name, value: why(f.note, t) })}. ${tip(f.note, t)}`}
-                    className="relative cursor-default rounded-sm whitespace-nowrap underline decoration-dotted underline-offset-[3px]"
-                  >
-                    {name}
-                  </span>
-                </Tip>
-              ) : (
-                <span className="whitespace-nowrap">{name}</span>
-              )}
+              {f.note ? <Dotted text={name} label={t("common.labeled", { label: name, value: why(f.note, t) })} tip={tip(f.note, t)} /> : <span className="whitespace-nowrap">{name}</span>}
             </Fragment>
           );
         })}
+        {keys && (
+          <>
+            {ok.length > 0 && " · "}
+            <Dotted text={keysName} label={keysName} tip={tip("awg", t)} />
+          </>
+        )}
       </span>
-      {dropsOf(formats).map((d, i) => (
-        <Fragment key={d.note}>
-          {(ok.length > 0 || i > 0) && " "}
-          <Drop {...d} t={t} />
-        </Fragment>
-      ))}
+      {!keys &&
+        drops.map((d, i) => (
+          <Fragment key={d.note}>
+            {(ok.length > 0 || i > 0) && " "}
+            <Drop {...d} t={t} />
+          </Fragment>
+        ))}
     </div>
   );
 }

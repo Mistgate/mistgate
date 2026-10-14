@@ -15,6 +15,7 @@ const allOk = four([true, ""], [true, ""], [true, ""], [true, ""]);
 const xhttp = four([true, ""], [true, ""], [true, ""], [false, "xhttp"]);
 const selfSigned = four([true, ""], [true, ""], [true, ""], [false, "self_signed"]);
 const awg = four([false, "awg"], [true, ""], [false, "awg"], [false, "awg"]);
+const gecko = four([false, "gecko"], [true, ""], [false, "gecko"], [false, "gecko"]);
 const hop = four([true, "hop_single_port"], [true, ""], [true, "hop_single_port"], [true, ""]);
 
 beforeAll(() => {
@@ -58,10 +59,16 @@ describe("the formats line of a profile", () => {
     expect(marks()).toEqual([{ text: "not in sing-box: XHTTP", label: "not in sing-box: XHTTP. sing-box does not support XHTTP." }]);
   });
 
-  it("puts the three formats AmneziaWG is not in under one chip", () => {
-    render(awg);
+  it("puts the three formats Gecko is not in under one chip", () => {
+    render(gecko);
     expect(quiet()).toBe("Mihomo");
-    expect(marks()).toEqual([{ text: "not in Link list, Xray JSON, sing-box: AmneziaWG", label: "not in Link list, Xray JSON, sing-box: AmneziaWG. AmneziaWG: AmneziaVPN keys and Mihomo only." }]);
+    expect(marks()).toEqual([{ text: "not in Link list, Xray JSON, sing-box: Gecko", label: "not in Link list, Xray JSON, sing-box: Gecko. Only Mihomo has Gecko." }]);
+  });
+
+  it("says AmneziaWG goes by Mihomo and the keys, quietly: no chip, the keys dotted with why", () => {
+    render(awg);
+    expect(host!.querySelector("[role=group]")?.textContent).toBe("Mihomo · AmneziaVPN keys");
+    expect(marks()).toEqual([{ text: "AmneziaVPN keys", label: "AmneziaVPN keys. The link list, Xray JSON and sing-box do not carry AmneziaWG." }]);
   });
 
   it("dots the formats that write a port-hopping range as one port, without a drop", () => {
@@ -85,15 +92,19 @@ describe("the formats line of a profile", () => {
     expect(quiet()).toBe("Список · Mihomo · Xray JSON");
     expect(marks()[0]!.text).toBe("не sing-box: самоподписанный");
     act(() => setLang("zh"));
+    act(() => root!.render(<Line formats={gecko} />));
+    expect(marks()[0]!.text).toBe("链接列表、Xray JSON、sing-box：不可用（Gecko）");
+    expect(marks()[0]!.label).toContain("仅 Mihomo 支持 Gecko。");
     act(() => root!.render(<Line formats={awg} />));
-    expect(marks()[0]!.text).toBe("链接列表、Xray JSON、sing-box：不可用（AmneziaWG）");
-    expect(marks()[0]!.label).toContain("AmneziaWG 仅用于 AmneziaVPN 密钥和 Mihomo。");
+    expect(host!.querySelector("[role=group]")?.textContent).toBe("Mihomo · AmneziaVPN 密钥");
   });
 
   it("gives the user card only the drops", () => {
     render(xhttp, "en", true);
     expect(host!.textContent).toBe("not in sing-box: XHTTP");
     act(() => root!.render(<Line formats={allOk} drops />));
+    expect(host!.innerHTML).toBe("");
+    act(() => root!.render(<Line formats={awg} drops />));
     expect(host!.innerHTML).toBe("");
   });
 

@@ -66,7 +66,7 @@ describe("the profiles list", () => {
     expect(card("lonely")).toContain("Did not start on de1");
   });
 
-  it("says in which formats a profile works, the drop as a mark of its own outside the link, and nothing when unknown", async () => {
+  it("says in which formats a profile works, a drop as a mark of its own outside the link, AmneziaWG quietly, and nothing when unknown", async () => {
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -80,6 +80,8 @@ describe("the profiles list", () => {
     expect(drop.getAttribute("aria-label")).toBe("not in sing-box: XHTTP. sing-box does not support XHTTP.");
     expect(drop.closest("a")).toBeNull();
     expect(cardOf("nowhere").querySelector("[role=group]")).toBeNull();
-    expect(cardOf("lonely").querySelector("[role=group]")?.textContent).toBe("Mihomo not in Link list, Xray JSON, sing-box: AmneziaWG");
+    // AmneziaWG goes by Mihomo and the keys by design: a quiet line, no chip
+    expect(cardOf("lonely").querySelector("[role=group]")?.textContent).toBe("Mihomo · AmneziaVPN keys");
+    expect(cardOf("lonely").querySelector("[role=group] .bg-warn-soft")).toBeNull();
   });
 });
