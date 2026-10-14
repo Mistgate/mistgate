@@ -3,11 +3,9 @@ package access
 import (
 	"cmp"
 	"context"
+	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/text/language"
-	"golang.org/x/text/language/display"
 
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -16,21 +14,31 @@ import (
 
 // What a friend's apps and page call the things they get: a country, never the panel's node names (de1, nl1) or profile names.
 
-// CountryName is the localised name of a country code in lang ("ru", "en", "zh"); the code itself when unknown.
+// CountryName is the localised name of a country code in lang ("ru", "en", "zh"; any other is English); the code itself
+// when unknown.
 func CountryName(cc, lang string) string {
 	cc = strings.ToUpper(strings.TrimSpace(cc))
-	if cc == "" {
-		return ""
-	}
-	r, err := language.ParseRegion(cc)
-	if err != nil || !r.IsCountry() {
+	i, ok := slices.BinarySearchFunc(countryNames[:], cc, func(row countryNameRow, code string) int { return strings.Compare(row.cc, code) })
+	if !ok {
 		return cc
 	}
-	if n := display.Regions(language.Make(lang)).Name(r); n != "" {
-		return n
+	name := countryNames[i].en
+	switch lang {
+	case "ru":
+		name = countryNames[i].ru
+	case "zh":
+		name = countryNames[i].zh
 	}
-	return cc
+	if name == "" {
+		return cc
+	}
+	return name
 }
+
+// countryNameRow is a country code and its names in English, Russian and Chinese (see country_names.go).
+type countryNameRow struct{ cc, en, ru, zh string }
+
+//go:generate go run gen_country_names.go
 
 // keyNaming is what the AmneziaVPN keys of the instance are named after: the subscription title (the settings' title,
 // else the brand), the brand (for file names) and the instance language (for the country). A read that fails leaves

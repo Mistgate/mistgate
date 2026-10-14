@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
+
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg/vpnkey"
@@ -108,5 +111,37 @@ func TestAWGKeysAreNamedByCountry(t *testing.T) {
 	again := must(e.s.GetDeviceConfigs(e.ctx, req(&adminv1.GetDeviceConfigsRequest{DeviceId: r.Device.Id}))).Msg.Configs
 	if names, _ := described(again); names[2] != "Кот VPN · Финляндия" {
 		t.Errorf("with a title: %q", names)
+	}
+}
+
+// CountryName answers from a table (country_names.go) so that the edge edition's wasm does not carry the names of every
+// language of the world. For the two-letter codes a node can have it must say what golang.org/x/text says; if this fails,
+// run `go generate ./internal/panel/access` after a change of that library.
+func TestCountryNamesAreTheLibrarys(t *testing.T) {
+	libraryName := func(cc, lang string) string {
+		r, err := language.ParseRegion(cc)
+		if err != nil || !r.IsCountry() {
+			return cc
+		}
+		if n := display.Regions(language.Make(lang)).Name(r); n != "" {
+			return n
+		}
+		return cc
+	}
+	for a := 'A'; a <= 'Z'; a++ {
+		for b := 'A'; b <= 'Z'; b++ {
+			code := string([]rune{a, b})
+			for _, lang := range []string{"en", "ru", "zh"} {
+				if got, want := CountryName(code, lang), libraryName(code, lang); got != want {
+					t.Errorf("CountryName(%q, %q) = %q, the library says %q", code, lang, got, want)
+				}
+				if got, want := CountryName(strings.ToLower(code)+" ", lang), libraryName(code, lang); got != want {
+					t.Errorf("CountryName(%q, %q) = %q, want %q", strings.ToLower(code)+" ", lang, got, want)
+				}
+			}
+		}
+	}
+	if got := CountryName("DE", "de"); got != "Germany" {
+		t.Errorf("a language the panel does not have: CountryName(DE, de) = %q, want the English name", got)
 	}
 }
