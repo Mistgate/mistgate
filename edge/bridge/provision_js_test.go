@@ -1,6 +1,6 @@
 //go:build js && wasm
 
-package main
+package bridge
 
 import (
 	"context"
@@ -155,8 +155,8 @@ func TestProvisionerRefusesAnEmptyDatabase(t *testing.T) {
 		if publicURL != "" {
 			options.Set("publicURL", publicURL)
 		}
-		if err := initPanel(options); !errors.Is(err, errProvisionerNoPanel) {
-			t.Fatalf("publicURL %q: initPanel = %v, want errProvisionerNoPanel", publicURL, err)
+		if err := initPanel(options); !errors.Is(err, errNoInstance) {
+			t.Fatalf("publicURL %q: initPanel = %v, want errNoInstance", publicURL, err)
 		}
 		if values, err := st.SettingValues(context.Background(), edgeInstanceKeys); err != nil || len(values) != 0 {
 			t.Fatalf("publicURL %q: the Provisioner stored %v (%v)", publicURL, values, err)

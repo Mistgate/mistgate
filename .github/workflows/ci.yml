@@ -25,26 +25,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - run: GOOS=js GOARCH=wasm go build ./internal/panel/... ./cmd/mistgate/ ./cmd/mistgate-edge
-      - name: edge-entry wasm size
-        # 42 MiB: about 3 MB above panel.wasm after the October 2026 diet, so a regression like the 7.9 MB template one fails here.
-        # The hard ceiling is Cloudflare's 64 MiB per Worker (design/cloudflare-edition/SPIKE.md); lower this again after each cut.
-        run: |
-          wasm="$RUNNER_TEMP/mistgate-edge.wasm"
-          GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o "$wasm" ./cmd/mistgate-edge
-          bytes=$(stat -c%s "$wasm")
-          echo "edge-entry wasm size: ${bytes} bytes (limit: 44040192 bytes); headroom: $((44040192 - bytes)) bytes ($(( (44040192 - bytes) / 1024 )) KiB)"
-          if [ "$bytes" -gt 44040192 ]; then exit 1; fi
-      - name: edge-entry has no template engine
-        run: |
-          # text/template looks methods up by name, which makes the linker keep every exported method of every type
-          # (7.9 MB of panel.wasm). The install page is Go code (internal/panel/provision/ui_page.go) for that reason.
-          if GOOS=js GOARCH=wasm go list -deps ./cmd/mistgate-edge | grep -Ex 'text/template|html/template'; then
-            echo "::error::cmd/mistgate-edge imports a template engine; see the comment of this step"
-            exit 1
-          fi
+      - run: GOOS=js GOARCH=wasm go build ./internal/panel/... ./cmd/mistgate/ ./cmd/mistgate-edge... ./edge/...
+      - name: edge wasm sizes and template engines
+        # Every edge entry (the single Worker and the five roles) is built as the release builds it and held to a limit of its
+        # own; none may import a template engine. The limits and their reasons are in the script.
+        run: scripts/check-edge-sizes.sh "$RUNNER_TEMP/edge-wasm"
       - run: pwsh -File scripts/test-edge-store.ps1
       - run: pwsh -File scripts/test-edge-entry.ps1
+      - run: pwsh -File scripts/test-edge-roles.ps1
 
   go:
     runs-on: ubuntu-24.04

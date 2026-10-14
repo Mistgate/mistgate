@@ -23,7 +23,7 @@ try {
         throw "go env GOROOT failed."
     }
 
-    # The SSH tests of cmd/mistgate-edge dial a fake SSH server through a Node stand-in of the Worker's sshConnect.
+    # The SSH tests of edge/bridge dial a fake SSH server through a Node stand-in of the Worker's sshConnect.
     $tempDir = Join-Path ([IO.Path]::GetTempPath()) ("mistgate-edge-store-" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path $tempDir | Out-Null
     $fakeSshd = Start-FakeSshd $repoRoot $tempDir
@@ -36,7 +36,7 @@ try {
 
     $env:GOOS = "js"
     $env:GOARCH = "wasm"
-    & go test "-exec=$exec" @TestArgs ./edge/d1driver/ ./internal/panel/store/ ./cmd/mistgate-edge/
+    & go test "-exec=$exec" @TestArgs ./edge/d1driver/ ./internal/panel/store/ ./edge/bridge/
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

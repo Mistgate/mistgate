@@ -1,6 +1,6 @@
 //go:build js && wasm && !edgeentrytest
 
-package main
+package bridge
 
 import (
 	"net/http"

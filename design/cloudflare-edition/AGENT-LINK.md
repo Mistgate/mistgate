@@ -571,7 +571,7 @@ open questions are in §7.10.
 
 ### 7.0 What the code said before round 6a (gaps and contradictions)
 
-1. The `"step"` op lives in `cmd/mistgate-edge/link_js.go` (not fleet) and still returns `errLinkStep`;
+1. The `"step"` op lives in `edge/bridge/link_js.go` (not fleet) and still returns `errLinkStep`;
    `cmd/mistgate-edge/testdata/bridge.cjs` pins that.
 2. The edge has no link prefix: `newEdgeInstance` / `ensureEdgeSecrets` (`instance_js.go`) fill only `agent_sni` and
    `sub_prefix`, so `app.Build` mounts no `LinkHandler`; the marker is reachable only through the test hook
@@ -659,7 +659,7 @@ nodeLink: {
 is `"lost"`). The text is matched in this one TypeScript function next to the class that throws it; Go never matches
 error text.
 
-Go: `cmd/mistgate-edge/remote_js.go`, `edgeRemote{ask, close, poke js.Value}` implements `fleet.Remote` (with `Poke`,
+Go: `edge/bridge/remote_js.go`, `edgeRemote{ask, close, poke js.Value}` implements `fleet.Remote` (with `Poke`,
 §7.3) and awaits through `d1driver.Await`. `parseInitOptions` accepts `nodeLink` (an object with three functions;
 anything else is an init error). Without `nodeLink`, `Remote` stays nil and `in.LinkPrefix` is cleared before
 `app.Build`: the link is served only with its object behind it.
@@ -810,7 +810,7 @@ client refused; an expiry 70 s ahead then `curl …/cdn-cgi/handler/scheduled?cr
 `--persist-to` has no `_cf_KV` rows, the `node_live` row is gone; (11) the secrets check also covers `wrangler.log`. The
 M3 tunnel steps are not run with `--edge` in step 6.
 
-Scripts: `test-edge-store.ps1` adds `./cmd/mistgate-edge/` (Go js tests of the `step`, `cron` and remote ops on the fake
+Scripts: `test-edge-store.ps1` adds `./edge/bridge/` (Go js tests of the `step`, `cron` and remote ops on the fake
 D1); `test-edge-entry.ps1` (`bridge.cjs`) keeps the budgets, adds fan-out and cron checks, and awaits
 `response.waitUntil` after each count so background queries cannot leak into the next; `pnpm test` gains
 `workerd.test.ts`.
@@ -860,7 +860,7 @@ mix and the 65,536-user batch, against 128 MB.
 
 **Local results (6f, 2026-10-09)** — Node 22 and workerd on a WSL2 VM, the fake D1 (SQLite in the same process, so the Go side is
 reported without the time spent in it). Indicative; the Worker numbers are 6g's. Tests: `internal/panel/store/measure_d1_js_test.go`
-(batch shapes; `GOMEASURE=1` adds the 65,536-user batch), `cmd/mistgate-edge/measure_js_test.go` (CPU per step kind),
+(batch shapes; `GOMEASURE=1` adds the 65,536-user batch), `edge/bridge/measure_js_test.go` (CPU per step kind),
 `cmd/mistgate-edge/testdata/coldstart.cjs` (`node coldstart.cjs <panel.wasm> <wasm_exec.js>`), `scripts/e2e-wsl.sh --edge` step 9 (memory).
 
 | What | Result |
@@ -987,7 +987,7 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
   unmodified `src/index.ts`) and `assets.directory = <repo>/web/dist`.
 - `fake-d1.cjs` now also counts bound-value bytes, time inside SQLite and the statements of each batch (`maxBoundBytes`, `totalBoundBytes`,
   `dbMillis`, `batchSizes`); nothing else about it changed.
-- **Changed in production code:** `loadEdgeInstance` (`cmd/mistgate-edge/instance_js.go`) reads its nine settings in one `SettingValues`
+- **Changed in production code:** `loadEdgeInstance` (`edge/bridge/instance_js.go`) reads its nine settings in one `SettingValues`
   call and `ensureEdgeSecrets` reads its three in one (17 -> 9 D1 reads on a cold start); `TestLoadEdgeInstanceReadsSettingsInOneCall` pins the
   count and the generated `link_prefix` of an older database.
 - **Found, not changed:** a stats batch with more than about 14,500 users exceeds D1's 2 MB value limit, and 65,536 users also exceed the

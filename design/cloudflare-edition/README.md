@@ -31,7 +31,9 @@ Layout inside the main repo:
 
 ```
 cmd/mistgate/              VPS entry (unchanged)
-cmd/mistgate-edge/         edge entry, //go:build js && wasm: builds the same http.Handler, exposes it to the Worker
+cmd/mistgate-edge/         edge entry with every role (the released bundle), //go:build js && wasm
+cmd/mistgate-edge-*/       one entry per role of the split edge: public, link, jobs, admin, provision (see internal/panel/app/roles.go)
+edge/bridge/               the js side every entry shares: init options, fetch/cron/link/provision, adapters for the Worker bindings
 edge/worker/               TypeScript shell: fetch router, NodeLink Durable Object, Cron, Queue consumers, static assets
 edge/d1driver/             database/sql driver over D1 (spike: d1driver/)
 internal/panel/store/      store.go split: open_sqlite.go (!js: modernc, goose, os) and open_d1.go (js: d1driver, migration runner)

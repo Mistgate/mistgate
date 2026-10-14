@@ -1,6 +1,6 @@
 //go:build js && wasm
 
-package main
+package bridge
 
 import (
 	"context"
@@ -26,9 +26,9 @@ import (
 // option a panel is a forwarder with no kick.
 
 var (
-	errInvalidProvision   = errors.New(`provision must be {role: "forward" | "serve", kick?: function, sshConnect?: function}; a serve role needs both functions and a forward role no sshConnect`)
-	errNotProvisioner     = errors.New("mgPanel.provision runs only in the serve role of the Provisioner Worker")
-	errProvisionerNoPanel = errors.New("the Provisioner serves an initialised panel: deploy and open the main Worker first")
+	errInvalidProvision = errors.New(`provision must be {role: "forward" | "serve", kick?: function, sshConnect?: function}; a serve role needs both functions and a forward role no sshConnect`)
+	errNotProvisioner   = errors.New("mgPanel.provision runs only in the serve role of the Provisioner Worker")
+	errNoInstance       = errors.New("the panel is not initialised yet: deploy and open the admin Worker first, it creates the instance")
 )
 
 const (
@@ -107,6 +107,14 @@ func releaseNodeBinaries() *update.ReleaseNodeBinaries {
 // newSSHClient is the SSH client of the Provisioner: its sockets from sshConnect, names through DNS-over-HTTPS.
 func newSSHClient(sshConnect js.Value) *provision.Client {
 	return provision.NewClientWith(sshSockets{connect: sshConnect}.DialContext, provision.DoHLookup(nil))
+}
+
+// provisioner is what the serve role of the Provisioner needs: the SSH client and where the agent binaries come from. Only
+// OpProvision sets it, so the SSH code is part of the wasm of the roles that have that operation and of no other.
+var provisioner func(sshConnect js.Value) (*provision.Client, provision.BinarySource)
+
+func sshProvisioner(sshConnect js.Value) (*provision.Client, provision.BinarySource) {
+	return newSSHClient(sshConnect), releaseNodeBinaries()
 }
 
 // requireBuild answers 503 panel_updating to a request that does not name this build in X-Mistgate-Build: the main Worker

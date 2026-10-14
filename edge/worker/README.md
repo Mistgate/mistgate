@@ -1,7 +1,7 @@
 # Mistgate edge Worker
 
 The thin TypeScript shell that runs the Mistgate panel on Cloudflare Workers: the Go panel compiled to `js/wasm`
-(`cmd/mistgate-edge`) does everything, this Worker only starts it once per isolate and converts `Request` and `Response`
+(`cmd/mistgate-edge`, its js side in `edge/bridge`) does everything, this Worker only starts it once per isolate and converts `Request` and `Response`
 to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`. To deploy without Wrangler, use `mistgate edge deploy` (`docs/en/getting-started/install-edge.md`); the Wrangler templates below are for development and hand-made deployments.
 
 - `src/index.ts`: every request goes to the panel (`mgPanel.fetch`); the Worker does not know the secret admin path.
@@ -65,7 +65,7 @@ init option (`take`, `peek`, `record`, `fail`, `reset`) with the semantics of `s
 One `NodeLink` object per node (`idFromName(node id)`, SQLite-backed) holds the agent's WebSocket and the session state as an
 opaque string; it never reads a frame. The Go panel runs every handshake step and every session step in the Worker's wasm:
 the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint, nothing to bind), which calls
-`mgPanel.link(op, args)` (`cmd/mistgate-edge/link_js.go`: `challenge`, `accept`; `step` is not implemented yet).
+`mgPanel.link(op, args)` (`edge/bridge/link_js.go`: `challenge`, `accept`; `step` is not implemented yet).
 
 - Routing: the panel answers an upgrade on the link path with 204 and `X-Mistgate-Link: <node id>` (`fleet.LinkMarker`); `index.ts`
   forwards the original request to that node's object (`forwardLink` in `shell.ts`); the object takes the node id from its own name (`ctx.id.name`), and the marker never reaches the client.
