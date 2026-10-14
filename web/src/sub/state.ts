@@ -127,6 +127,8 @@ export type State = {
   stepsAgain: boolean;
   /** A long list of devices is unfolded (it shows three rows otherwise). */
   devicesOpen: boolean;
+  /** The device row whose details are open ("iOS 18.1 · Happ 3.4.2"): one at a time. */
+  details: string | null;
   annClosed: boolean;
   /** A returning visitor (computed once when the page opens: the page does not reorder itself while it is read). */
   returning: boolean;
@@ -148,6 +150,8 @@ export type Actions = {
   qrOpen(open: boolean): void;
   stepsAgain(): void;
   devicesOpen(open: boolean): void;
+  /** Opens the details of a device row (null closes them). */
+  details(id: string | null): void;
   closeAnn(): void;
   /** This device set a connection up: remembered (the "returning" mark). */
   mark(): void;

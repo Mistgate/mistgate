@@ -365,9 +365,18 @@ a { color: inherit; }
 .stag .dot { width: 6px; height: 6px; background: var(--warning); }
 .dev .fld { flex: 1; min-width: 0; }
 .dev-hint { text-align: center; }
-/* a link app's device: its "more" button at the end of the row, the menu under it */
+/* a link app's device: its "more" button at the end of the row (above the row's own button), the menu under it */
 .dev-more { position: relative; flex: none; }
-.dev-more .ibtn { background: none; border-color: transparent; color: var(--muted); }
+.dev-more .ibtn { z-index: 1; background: none; border-color: transparent; color: var(--muted); }
+/* a row with details: the name and the line are a button whose target is the whole row; a faint chevron says it opens */
+.dev-top { position: relative; }
+.dev-body { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dev-body::after { content: ""; position: absolute; inset: -6px; border-radius: 14px; }
+.dev-body:focus-visible { outline: none; }
+.dev-body:focus-visible::after { outline: 2px solid var(--accent); }
+.dev-chev { display: inline-flex; margin-left: -2px; color: var(--muted); opacity: 0.6; transition: transform 0.15s; }
+.dev-body[aria-expanded="true"] .dev-chev { transform: rotate(180deg); }
+.dev-det[hidden] { display: none; }
 .dev-more .ibtn[aria-expanded="true"] { background: var(--raise); color: var(--text); }
 /* a long list: the fold, a quiet link in the middle */
 .dev.dev-fold { padding-top: 4px; padding-bottom: 4px; min-height: 0; align-items: center; justify-content: center; }
@@ -382,6 +391,7 @@ a { color: inherit; }
   :is(:hover, :focus-visible) + .tip, .tip:hover { opacity: 1; visibility: visible; transition-delay: 0.35s, 0.35s; }
   .tips-off .tip { opacity: 0; visibility: hidden; }
   .tipwrap > .tip { right: 0; bottom: calc(100% + 6px); }
+  .dev-b > .tip { left: 48px; top: calc(100% + 6px); }
 }
 .dev-fold .tlink[aria-expanded="true"] .i { transform: rotate(180deg); }
 

@@ -98,13 +98,37 @@ function rowError(c: Ctx, id: string): HTMLElement | null {
   return am.error && (am.errorAt === id || am.errorAt === `rename:${id}`) ? note("bad", "warn", c.t.err(am.error, am.retryMin), { cls: "dev-x" }) : null;
 }
 
+/**
+ * The name and the quiet line of a row. With details (what the app said about itself) they are a disclosure: a tap anywhere on
+ * the row but "more" opens a second quiet line in place (one row at a time), and a pointer that hovers sees the same details
+ * as a tooltip after a moment, so nothing moves under it. Without details they are plain text.
+ */
+function rowHead(c: Ctx, id: string, name: string, line: Kid[], details: string): HTMLElement {
+  if (!details) return h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `dev-n-${id}` }, name), h("p", { class: "dev-m" }, ...line));
+  const open = c.s.details === id;
+  return h(
+    "div",
+    { class: "dev-b" },
+    h(
+      "button",
+      { class: "dev-body", type: "button", "data-k": `dev-body-${id}`, "aria-expanded": open, "aria-controls": `dev-det-${id}`, "aria-describedby": open ? false : `dev-tip-${id}`, on: { click: () => c.a.details(open ? null : id) } },
+      // the chevron ends the quiet line: a long name never leaves it alone on a line of its own
+      h("span", { class: "dev-n", id: `dev-n-${id}` }, name),
+      h("span", { class: "dev-m" }, ...line, h("span", { class: "dev-chev", "aria-hidden": "true" }, icon("chev", 14))),
+    ),
+    !open && h("span", { class: "tip", role: "tooltip", id: `dev-tip-${id}` }, details),
+    h("span", { class: "dev-m dev-det", id: `dev-det-${id}`, hidden: !open }, details),
+  );
+}
+
 const menuItem = (key: string, ic: IconName, text: string, on: () => void, bad = false) => h("button", { class: bad ? "bad" : "", type: "button", role: "menuitem", "data-k": key, on: { click: on } }, icon(ic), text);
 
 // ---- rows of the link apps ----
 
 /**
  * A device of an app that reports its ID: the name and one quiet line (online, or when it last updated); rename and remove in
- * "more". What the app said about itself ("iOS 18.1 · Happ 3.4.2") stands in the question, where two phones must be told apart.
+ * "more". What the app said about itself ("iOS 18.1 · Happ 3.4.2") is one tap (or a hover) away, and stands in the question,
+ * where two phones must be told apart.
  */
 function linkRow(c: Ctx, x: Device): HTMLElement {
   const { s, a, t } = c;
@@ -129,7 +153,7 @@ function linkRow(c: Ctx, x: Device): HTMLElement {
       "div",
       { class: "dev-top" },
       tile("sky", ico, { size: 36 }),
-      h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `dev-n-${x.id}` }, name), h("p", { class: "dev-m" }, ...when(c, x.last_seen_unix, x.online, t.linkNever, t.fetchedOne))),
+      rowHead(c, x.id, name, when(c, x.last_seen_unix, x.online, t.linkNever, t.fetchedOne), deviceAbout(x)),
       (x.can_remove || x.can_rename) &&
         h(
           "div",
@@ -159,11 +183,8 @@ function sharedRow(c: Ctx, x: Device | null, strict: boolean): HTMLElement {
   const first = !x && !strict;
   // one short line: the time alone, the place's words say what it is
   const line = strict ? [h("span", null, t.strictNote)] : x ? [h("span", null, t.sharedNote), h("span", { "aria-hidden": "true" }, "·"), ...when(c, x.last_seen_unix, x.online, t.linkNever, (w) => w)] : when(c, 0, false, t.linkNever, t.fetched);
-  return h(
-    "div",
-    { class: "dev" },
-    h("div", { class: "dev-top" }, tile(strict && !x ? "dash" : "sky", "link", { size: 36 }), h("div", { class: "dev-b" }, h("p", { class: "dev-n" }, first ? t.linkApps : t.sharedT), h("p", { class: "dev-m" }, ...line))),
-  );
+  const app = x && !strict ? deviceAbout(x) : "";
+  return h("div", { class: "dev" }, h("div", { class: "dev-top" }, tile(strict && !x ? "dash" : "sky", "link", { size: 36 }), rowHead(c, x?.id ?? "link", first ? t.linkApps : t.sharedT, line, app && t.lastApp(app))));
 }
 
 // ---- the key devices ----

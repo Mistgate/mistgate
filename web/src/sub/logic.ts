@@ -660,8 +660,9 @@ export const isShared = (x: Device) => x.kind === "shared";
 
 const osNames: Record<string, string> = { ios: "iOS", android: "Android", windows: "Windows", macos: "macOS", linux: "Linux" };
 
-/** What a link app said about its device, to tell two phones apart: "iOS 18.1 · Happ 3.4.2"; either part may be missing. */
+/** What a link app said about its device, to tell two phones apart: "iOS 18.1 · Happ 3.4.2"; either part may be missing; "" when it said nothing. */
 export function deviceAbout(x: Device): string {
+  if (!x.os_version && !x.client) return ""; // the platform alone is what the icon already says
   const os = osNames[x.platform] ?? "";
   const sys = x.os_version && os && !x.os_version.toLowerCase().startsWith(os.toLowerCase()) ? `${os} ${x.os_version}` : x.os_version || os;
   return [sys, x.client.replace("/", " ")].filter(Boolean).join(" · ");

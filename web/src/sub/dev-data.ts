@@ -55,7 +55,7 @@ const dev = (id: string, platform: string, model: string, app: string, ago: numb
   return { id, platform, model, app, last_seen_unix: now - ago, online, kind, can_remove: own, can_rename: own, os_version, client };
 };
 // the place the link apps without a device ID share (Hiddify, v2rayNG; Happ with its device ID turned off)
-const shared = (ago: number, online = false) => [dev("d1", "", "", "happ", ago, online, "shared")];
+const shared = (ago: number, online = false, client = "") => [dev("d1", "", "", "happ", ago, online, "shared", "", client)];
 // the devices of the apps that report a device ID: each one is a device of its own (made-up models)
 const iphone = dev("l1", "ios", "iPhone 15", "happ", 40, true, "link", "18.1", "Happ/3.4.2");
 const galaxy = dev("l2", "android", "Pixel 8", "happ", 2 * day, false, "link", "15", "Happ/3.4.1");
@@ -217,15 +217,15 @@ const linkOnly = (devices: Device[], user: Partial<MgData["user"]>, mode: MgData
 
 export const cases: Record<string, MgData> = {
   // three devices of their own (one online) and the shared place; every place taken and a new app refused (ENFORCE)
-  "hwid-full": linkOnly([iphone, galaxy, desktop, ...shared(9 * day)], { device_limit: 4 }, "enforce"),
+  "hwid-full": linkOnly([iphone, galaxy, desktop, ...shared(9 * day, false, "HiddifyNext/2.5.7")], { device_limit: 4 }, "enforce"),
   // the same, counted only (TRACK): no hint, nobody is refused
-  "hwid-track": linkOnly([iphone, galaxy, desktop, ...shared(9 * day)], { device_limit: 5 }, "track"),
+  "hwid-track": linkOnly([iphone, galaxy, desktop, ...shared(9 * day, false, "HiddifyNext/2.5.7")], { device_limit: 5 }, "track"),
   // STRICT: no shared place; the row says the apps without a device ID do not connect
   "hwid-strict": linkOnly([iphone, galaxy, desktop], { device_limit: 5 }, "strict"),
   // the dense list: 5 of 5, one online, with a key (every place taken, so nothing folds)
-  "hwid-dense": { ...linkOnly([iphone, galaxy, desktop, ...shared(9 * day), asDevice(router)], { device_limit: 5 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
+  "hwid-dense": { ...linkOnly([iphone, galaxy, desktop, ...shared(9 * day, false, "HiddifyNext/2.5.7"), asDevice(router)], { device_limit: 5 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
   // a long list with room left: it folds to three rows
-  "hwid-long": { ...linkOnly([iphone, galaxy, desktop, tablet, ...shared(9 * day), asDevice(router)], { device_limit: 10 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
+  "hwid-long": { ...linkOnly([iphone, galaxy, desktop, tablet, ...shared(9 * day, false, "HiddifyNext/2.5.7"), asDevice(router)], { device_limit: 10 }, "enforce"), access: { happ: true, amnezia: true }, amnezia: keys([router]) },
   // a first visit: nothing set up yet
   first: base,
   // a returning visit

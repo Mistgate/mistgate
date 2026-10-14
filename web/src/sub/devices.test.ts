@@ -18,7 +18,7 @@ const names = (el: HTMLElement) => [...card(el).querySelectorAll(".dev .dev-n")]
 const row = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`#amz-row-${id}`)!;
 const byName = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>(".dev")].find((x) => text(x.querySelector(".dev-n")) === name)!;
 /** The line under a name, part by part. */
-const line = (r: HTMLElement) => [...r.querySelector(".dev-m")!.children].map(text).filter((x) => x !== "·").join(" · ");
+const line = (r: HTMLElement) => [...r.querySelector(".dev-m")!.children].map(text).filter((x) => x !== "·" && x !== "").join(" · ");
 
 function fakeApi(over: Partial<Api> = {}): Api & { calls: string[] } {
   const calls: string[] = [];
@@ -77,6 +77,7 @@ describe("the page data of the link devices", () => {
     expect(deviceAbout(x("android", "Android 14", ""))).toBe("Android 14");
     expect(deviceAbout(x("windows", "", "mihomo/1.19.31"))).toBe("Windows · mihomo 1.19.31");
     expect(deviceAbout(x("", "", ""))).toBe("");
+    expect(deviceAbout(x("ios", "", ""))).toBe(""); // the platform alone is no detail
   });
 
   it("an app that took a device of its own counts as having fetched the subscription (the returning visitor)", () => {
@@ -93,8 +94,11 @@ describe("the rows of the link devices", () => {
     expect(names(el)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства"]);
     expect(line(row(el, "l1"))).toBe("в сети");
     expect(line(row(el, "l2"))).toBe("обновлялось позавчера");
-    expect(row(el, "l1").querySelectorAll(".dev-m")).toHaveLength(1);
-    expect(card(el).textContent).not.toMatch(/18\.1|Happ\/|mihomo|HWID/);
+    expect(row(el, "l1").querySelectorAll(".dev-m:not(.dev-det)")).toHaveLength(1);
+    // what the apps said is in the details (hidden until asked) and the tooltip, never in the list itself
+    const seen = card(el).cloneNode(true) as HTMLElement;
+    seen.querySelectorAll("[hidden], [role=tooltip]").forEach((x) => x.remove());
+    expect(seen.textContent).not.toMatch(/18\.1|Happ|mihomo|HWID/);
     // the one online sorts first whatever the server's order
     expect(names(page(data("hwid-track", (d) => d.devices.reverse())))[0]).toBe("iPhone 15");
   });
@@ -106,8 +110,8 @@ describe("the rows of the link devices", () => {
     expect(more.getAttribute("aria-expanded")).toBe("false");
     expect(more.getAttribute("aria-label")).toBe("Ещё: переименовать, удалить");
     expect(more.getAttribute("aria-describedby")).toBe("dev-n-l2"); // the name of the device it belongs to
-    expect(row(el, "l2").querySelectorAll("button")).toHaveLength(1);
-    expect(byName(el, "Приложения без ID устройства").querySelector("button")).toBeNull();
+    expect([...row(el, "l2").querySelectorAll("button")].map((b) => b.getAttribute("data-k"))).toEqual(["dev-body-l2", "amz-more-l2"]); // the row's own details, and "more"
+    expect(byName(el, "Приложения без ID устройства").querySelector("[data-k^=amz-more-]")).toBeNull();
   });
 
   it("the menu: rename, then a red remove; they start the rename and the question", () => {
@@ -293,5 +297,58 @@ describe("a long list folds", () => {
     expect(names(dense)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства", "Router"]);
     expect(dense.querySelector("[data-k=dev-fold]")).toBeNull();
     expect(page(data("hwid-track")).querySelector("[data-k=dev-fold]")).toBeNull();
+  });
+});
+
+describe("the details of a row: one tap, or a hover", () => {
+  it("the row is a disclosure: a button with aria-expanded and aria-controls, the details hidden, a tooltip describing it", () => {
+    const a = actions();
+    const el = page(data("hwid-full"), {}, "ru", a);
+    const btn = row(el, "l1").querySelector<HTMLButtonElement>("button.dev-body")!;
+    expect(btn.getAttribute("data-k")).toBe("dev-body-l1");
+    expect(btn.getAttribute("aria-expanded")).toBe("false");
+    const det = el.querySelector<HTMLElement>(`#${btn.getAttribute("aria-controls")}`)!;
+    expect(det.hidden).toBe(true);
+    expect(text(det)).toBe("iOS 18.1 · Happ 3.4.2");
+    const tip = el.querySelector(`#${btn.getAttribute("aria-describedby")}`)!;
+    expect(tip.getAttribute("role")).toBe("tooltip");
+    expect(text(tip)).toBe("iOS 18.1 · Happ 3.4.2");
+    expect(btn.nextElementSibling).toBe(tip); // the CSS shows it for the button's hover and focus
+    expect(btn.querySelector(".dev-chev")?.getAttribute("aria-hidden")).toBe("true");
+    expect(text(btn.querySelector(".dev-n"))).toBe("iPhone 15");
+    btn.click();
+    expect(a.log).toEqual(["details l1"]);
+  });
+
+  it("open: the second line shows in place, the chevron turns, the tooltip is gone; a tap closes it; one row at a time", () => {
+    const a = actions();
+    const el = page(data("hwid-full"), { details: "l2" }, "ru", a);
+    const btn = row(el, "l2").querySelector<HTMLButtonElement>("button.dev-body")!;
+    expect(btn.getAttribute("aria-expanded")).toBe("true");
+    expect(btn.hasAttribute("aria-describedby")).toBe(false);
+    expect(row(el, "l2").querySelector("[role=tooltip]")).toBeNull();
+    const det = row(el, "l2").querySelector<HTMLElement>(".dev-det")!;
+    expect(det.hidden).toBe(false);
+    expect(text(det)).toBe("Android 15 · Happ 3.4.1");
+    expect(row(el, "l1").querySelector<HTMLElement>(".dev-det")!.hidden).toBe(true);
+    btn.click();
+    expect(a.log).toEqual(["details null"]);
+  });
+
+  it("only rows with something to show: a device that said nothing, the shared place without a last app, a key, STRICT's row", () => {
+    const quiet = page(data("hwid-full", (d) => d.devices.forEach((x) => ((x.os_version = ""), (x.client = "")))));
+    expect(quiet.querySelector(".dev-body, .dev-chev, [role=tooltip]")).toBeNull();
+    expect(names(quiet)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства"]);
+    expect(page(data("hwid-dense")).querySelector("#amz-row-d6 .dev-body")).toBeNull();
+    expect(page(data("hwid-strict")).querySelectorAll(".dev-body")).toHaveLength(3);
+  });
+
+  it("the shared place opens to the last app that used it", () => {
+    const el = page(data("hwid-full"), { details: "d1" });
+    const r = byName(el, "Приложения без ID устройства");
+    expect(text(r.querySelector(".dev-det"))).toBe("последнее приложение: HiddifyNext 2.5.7");
+    expect(line(r)).toBe("одно место на всех · 9 дней назад");
+    expect(text(byName(page(data("hwid-full"), { details: "d1" }, "en"), "Apps without a device ID").querySelector(".dev-det"))).toBe("last app: HiddifyNext 2.5.7");
+    expect(text(byName(page(data("hwid-full"), { details: "d1" }, "zh"), "不提供设备 ID 的应用").querySelector(".dev-det"))).toBe("最近的应用：HiddifyNext 2.5.7");
   });
 });

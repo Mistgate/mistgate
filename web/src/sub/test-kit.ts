@@ -39,6 +39,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
     qrOpen: (o) => log.push(`qr ${o}`),
     stepsAgain: () => log.push("steps-again"),
     devicesOpen: (o) => log.push(`devices-open ${o}`),
+    details: (id) => log.push(`details ${id}`),
     closeAnn: () => log.push("closed"),
     mark: () => log.push("mark"),
     copy: (text, _m, done) => {
@@ -64,6 +65,7 @@ export function state(platform: State["platform"] = "ios", over: Partial<State> 
     qrOpen: false,
     stepsAgain: false,
     devicesOpen: false,
+    details: null,
     annClosed: false,
     returning: false,
     marked: false,

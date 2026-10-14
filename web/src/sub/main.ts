@@ -145,6 +145,7 @@ if (data.locked) {
     qrOpen: false,
     stepsAgain: false,
     devicesOpen: false,
+    details: null,
     annClosed: stored(ann) === "1",
     returning: isReturning(data, stored("setup") === "1"),
     marked: stored("setup") === "1",
@@ -197,6 +198,10 @@ if (data.locked) {
     },
     devicesOpen(open) {
       st.devicesOpen = open;
+      render();
+    },
+    details(id) {
+      st.details = id;
       render();
     },
     closeAnn() {
@@ -288,7 +293,7 @@ if (data.locked) {
     modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : deviceModal(ctx())) : []);
   };
 
-  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &ask=remove:<id>|rotate:<id> its question
+  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &open=<device id> its details, &ask=remove:<id>|rotate:<id> its question
   if (import.meta.env.DEV) {
     const sheet = devQuery.get("sheet");
     if (sheet === "pick" || sheet === "link" || sheet === "key") {
@@ -296,6 +301,7 @@ if (data.locked) {
       st.amz.pane = sheet;
     }
     st.amz.menu = devQuery.get("menu");
+    st.details = devQuery.get("open");
     if (devQuery.get("way") === "key") st.way = "key";
     const [kind, id] = (devQuery.get("ask") ?? "").split(":");
     if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
