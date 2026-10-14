@@ -75,3 +75,49 @@ func (s *Store) PruneTSPUChecks(ctx context.Context, before time.Time) (int64, e
 	}
 	return res.RowsAffected()
 }
+
+// TSPUHistory reads the newest perNode rows of every node from one vantage (of the given nodes only, when there are any),
+// newest first within a node, ordered by node id. The alert reads the last few runs from it.
+func (s *Store) TSPUHistory(ctx context.Context, vantage string, perNode int, nodeIDs ...string) ([]TSPUCheck, error) {
+	q := `SELECT node_id, vantage, at, verdict, dpi_hop, control_ok, detail_json FROM (
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY at DESC) AS rank FROM country_tspu_check WHERE vantage = ?`
+	args := []any{vantage}
+	if len(nodeIDs) > 0 {
+		q += ` AND node_id IN (SELECT value FROM json_each(?))`
+		args = append(args, jsonStrings(nodeIDs))
+	}
+	rows, err := s.R.QueryContext(ctx, q+`) WHERE rank <= ? ORDER BY node_id, at DESC`, append(args, perNode)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TSPUCheck
+	for rows.Next() {
+		var c TSPUCheck
+		var at, controlOK int64
+		if err := rows.Scan(&c.NodeID, &c.Vantage, &at, &c.Verdict, &c.DPIHop, &controlOK, &c.DetailJSON); err != nil {
+			return nil, err
+		}
+		c.At, c.ControlOK = fromUnix(at), controlOK != 0
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// LastTSPUCheckAt is the time of the newest row from one vantage, zero when there is none.
+func (s *Store) LastTSPUCheckAt(ctx context.Context, vantage string) (time.Time, error) {
+	var at int64
+	if err := s.R.QueryRowContext(ctx, `SELECT COALESCE(MAX(at), 0) FROM country_tspu_check WHERE vantage = ?`, vantage).Scan(&at); err != nil {
+		return time.Time{}, err
+	}
+	if at == 0 {
+		return time.Time{}, nil
+	}
+	return fromUnix(at), nil
+}
+
+// DeleteTSPUChecks forgets every stored row (Disconnect).
+func (s *Store) DeleteTSPUChecks(ctx context.Context) error {
+	_, err := s.W.ExecContext(ctx, `DELETE FROM country_tspu_check`)
+	return err
+}

@@ -236,6 +236,12 @@ func (s *Store) SetSettings(ctx context.Context, kv map[string]string) error {
 	return err
 }
 
+// DeleteSettings removes the settings; a key that is not there is ignored.
+func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
+	_, err := s.W.ExecContext(ctx, `DELETE FROM setting WHERE k IN (SELECT value FROM json_each(?))`, accJSON(keys))
+	return err
+}
+
 // SetSettingsIfAbsent stores each setting of kv that has no value yet and returns the stored value of every key of kv
 // (the supplied one, or the one that was there first). Isolates that generate the same first-run settings at the same
 // time all end up with the stored ones.
