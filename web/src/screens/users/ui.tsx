@@ -65,7 +65,8 @@ export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: 
   const mbit = Math.round(bps / 1e6);
   return (
     <SettingRow label={label} hint={hint} className="py-1.5">
-      <div className="w-[130px] flex-none">
+      {/* a little wider than the other steppers: "50 Мбит/с" is longer than "100 GB" */}
+      <div className="w-[150px] flex-none">
         <Stepper
           decrementLabel={t("users.less", { what: label })}
           incrementLabel={t("users.more", { what: label })}

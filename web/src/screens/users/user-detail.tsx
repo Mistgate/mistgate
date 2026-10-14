@@ -37,7 +37,8 @@ import { useTx, type Tx } from "./t";
 import { Check, ConfirmModal, Panel, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
-const WIDE = "w-[130px]";
+// the steppers of the Limits panel, wide enough for "50 Мбит/с" (the speed pair) so they all line up
+const WIDE = "w-[150px]";
 
 /** A change to a user in plain numbers; `write` turns the 64-bit ones into bigints for the wire. */
 type Patch = Partial<{
