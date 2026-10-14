@@ -3,23 +3,22 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.41`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.40
+  meta: v0.1.0 – v0.1.41
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.40
+      release: v0.1.41
       current: true
       points:
-        - "**Xray JSON 与 sing-box JSON**，与链接列表和 Mihomo YAML 并列。Xray JSON 只按你添加的规则下发，例如 `v2rayng`；面板会获得规则 `sing-box` → sing-box JSON，供官方 sing-box 应用使用。参见 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
-        - "每张协议配置卡片和编辑器中都有**订阅格式**：服务器被某种格式排除时，标记会说明原因。参见[协议配置的订阅格式](../guide/profiles.md#协议配置的订阅格式)。"
-        - "链接末尾的 `?format=` 可为单次请求指定格式，便于在写规则前先试用应用。参见[下发规则](../guide/subscriptions.md#下发规则)。"
-        - "**Happ 6** 显示为 Happ 6.0.0，后台的设备行以系统开头。"
+        - "**从国家视角检测。** 俄罗斯境内家庭宽带和移动网络中的探测点会 ping 每个节点并连接其 TCP 端口（Globalping），antifilter 封锁名单则在面板上比对。每个来源都是独立的集成，默认关闭。结果显示为**运行状况 → 检测**中的「从俄罗斯访问」列和节点页面上的一行；连续两轮异常后会打开告警。参见[国家视角检测](../operations/health.md#国家视角检测)。"
+        - "客户端视角检测新增**响应时间与连接时间**：通过已建立隧道的响应时间、单独显示的连接时间、连接缓慢的标记，以及面板所在主机丢失入站 UDP 时的提示。参见[数字的含义](../operations/health.md#数字的含义)。"
+        - "**Cloudflare 版改为六个 Worker：** 一个保留地址的小型 JS 路由器，加上按角色划分的五个面板 Worker，各有自己的 wasm。`mistgate edge deploy` 会部署全部六个，跳过没有变化的脚本，并支持 `--rollback`。仍是预览版。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
     - title: 协议配置
       section: profiles
       points:
@@ -53,6 +52,8 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`�
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
+        - "[国家视角检测](../operations/health.md#国家视角检测)：通过 Globalping 使用俄罗斯境内的探测点，并比对 antifilter 封锁名单；每个来源都是独立的集成，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
     - title: 更新
@@ -77,7 +78,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.40
+  meta: v0.1.34 – v0.1.41
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -92,6 +93,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`�
     - title: 在每个节点上使用伪装站点
       section: nodes
       text: "每个节点都可以使用内置站点、面板站点或自己的站点压缩包。v0.1.36 之前创建的节点会继续使用内置页面，直到你选择其他选项。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
+    - title: 在生产环境中测试国家视角检测
+      section: health
+      text: "Globalping 和封锁名单默认关闭。请先开启其中一个，观察「从俄罗斯访问」列，再决定是否依赖它的告警：探测点不属于面板，而 `listed`（在名录中）只是名录中的标记，不是实测结果。参见[国家视角检测](../operations/health.md#国家视角检测)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
@@ -99,10 +103,10 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`�
     - title: 在真实账户上运行 Cloudflare 版
       icon: globe
       tag: 预览版
-      text: "首次在真实 Cloudflare 账户上运行 `mistgate edge deploy`。目前只在模拟的 Cloudflare 环境中测试过命令和面板。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
+      text: "首次在真实 Cloudflare 账户上运行 `mistgate edge deploy`：六个 Worker、带域名的路由器和 `--rollback`。目前只在模拟的 Cloudflare 环境中测试过命令和面板。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
     - title: 让 Cloudflare 版具备与 VPS 版相同的功能
       icon: layers
-      text: "补齐目前尚未提供的功能："
+      text: "为六个 Worker 的版本补齐目前尚未提供的功能："
       points:
         - "加密备份和恢复；"
         - "Telegram 告警；"
@@ -143,9 +147,10 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`�
 - API 令牌和 MCP 无法创建协议配置或分组，也无法将协议配置部署到节点；这些操作由所有者在管理后台执行。
 - 备份只能保存到 Cloudflare R2；恢复时必须离线运行 `mistgate backup restore` 命令，并指定新的数据目录。
 - 面板不会创建 Cloudflare 账户、存储桶或令牌；你需要提供一个仅限存储桶且具有读取、写入和删除权限的令牌。
-- Cloudflare 版仍处于预览阶段，尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本中尚不可用的功能)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。
+- Cloudflare 版仍处于预览阶段，尚未在真实 Cloudflare 账户上试过，也尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本中尚不可用的功能)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。
 - 设备 ID 由应用自己报告。拉黑会拒绝该 ID；报告其他 ID 的应用算作新设备，并占用一个空闲名额。要让被转给他人的链接失效，还需要重新签发一个新链接。
 - **每用户限速**按节点计算，因此同时连接两个节点的用户最多可获得上限的 2 倍。v0.1.39 之前的节点 Agent 会把每台设备限制在两个限速中较小的一个。
 - 在 Cloudflare 版中，面板记录的已发送到节点的内容摘要必须放进 D1 的一行（2 MB），约合每个节点 38,000 个凭据。参见[此版本的限制](../getting-started/install-edge.md#此版本中尚不可用的功能)。
 - sing-box JSON 没有 XHTTP，也无法按指纹校验自签名的 Hysteria2 证书；Gecko 和 AmneziaWG 只通过 Mihomo YAML 下发。格式无法承载的服务器不会出现在该格式中。参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。
+- 国家视角检测只从少数探测点观察，而不是从每个网络观察，封锁名单也只覆盖俄罗斯。`listed`（在名录中）表示地址在名录里，不表示它的流量被丢弃。
 - 部分默认值偏向俄罗斯用户（俄罗斯节点使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设）；这些都可以在设置中修改。

@@ -43,7 +43,7 @@ VLESS runs over TCP, with XHTTP or with RAW and Vision, or over TLS with XHTTP o
 Type its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld, installs the signed agent and waits for it to connect. The node gets its Let's Encrypt certificate itself, and **Enable WARP** gives it a Cloudflare exit. [Install a node over SSH](docs/en/getting-started/ssh-install.md)
 
 **You find out first.**
-Every 5 minutes the panel connects to every server the way an app does and loads a test page through the tunnel. On each node a doctor runs 17 host checks (disk, journal, resolver, clock, ports, BBR) and offers six fixes that run only after you confirm. Warnings go to Telegram. [Health](docs/en/operations/health.md)
+Every 5 minutes the panel connects to every server the way an app does and loads a test page through the tunnel. On each node a doctor runs 17 host checks (disk, journal, resolver, clock, ports, BBR) and offers six fixes that run only after you confirm. Warnings go to Telegram. Optionally, the panel also checks whether each node is reachable from Russia: through Globalping probes there and against public block lists. Both are off by default. [Health](docs/en/operations/health.md)
 
 **Light and hidden.**
 Two static Go binaries, one for the panel and one for the node agent. SQLite and systemd: no Docker, no database server. On a small test server (1 vCPU / 1 GB) the panel alone idles at 16-20 MiB of private memory (3x-ui 68-74, PasarGuard 262-265, Remnawave 426-454); panel, node and database together on one 2 vCPU / 2 GB server take 57 MiB (the same three: 74, 297 and 761). In that test, adding and removing users and restarting the panel dropped no connections, while 3x-ui restarts its core when users change. A stranger who opens the panel's address sees a decoy site; the admin sits behind a secret path or host name. Releases are reproducible and signed offline, and nodes install only signed builds. Torrent protection blocks plaintext BitTorrent on the node; its events keep what matched and the destination port, and no address leaves the node. [Security](docs/en/operations/security.md) · [Releases and signing](docs/en/operations/releases.md) · [Benchmarks, including where Mistgate is slower](docs/en/reference/benchmarks.md)
@@ -51,7 +51,7 @@ Two static Go binaries, one for the panel and one for the node agent. SQLite and
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
 
-> **Coming soon, not in a release yet:** a full Telegram bot for the fleet and for users. The edition of the panel that runs on Cloudflare Workers is in the releases since v0.1.36 as a [preview](docs/en/getting-started/install-edge.md) and has not run on a real Cloudflare account yet.
+> **Coming soon, not in a release yet:** a full Telegram bot for the fleet and for users. The edition of the panel that runs on Cloudflare Workers is in the releases since v0.1.36 (six Workers since v0.1.41) as a [preview](docs/en/getting-started/install-edge.md) and has not run on a real Cloudflare account yet.
 
 ## Screenshots
 
@@ -100,7 +100,7 @@ Then:
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | VMess, Trojan, Shadowsocks | ❌ | ✅ | partial | ✅ | ✅ | ✅ |
 | Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
-| Health checks and alerts | ✅ client-eye checks, doctor with fixes | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | partial | partial | ? |
+| Health checks and alerts | ✅ client-eye checks, doctor with fixes, reachability from a country (Globalping, block lists) | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | partial | partial | ? |
 | Telegram bot | alerts only, full bot soon | ✅ | partial | ✅ | ✅ | ? |
 | HWID device limit | ✅ | ✅ | ✅ | ? | ✅ | ? |
 | Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |

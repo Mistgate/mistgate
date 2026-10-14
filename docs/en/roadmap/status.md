@@ -3,23 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.41`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.40
+  meta: v0.1.0 – v0.1.41
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.40
+      release: v0.1.41
       current: true
       points:
-        - "**Xray JSON and sing-box JSON** next to the link list and Mihomo YAML. Xray JSON goes out only by a rule you add, for example `v2rayng`; panels get the rule `sing-box` → sing-box JSON for the official sing-box apps. See [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json)."
-        - "**Subscription formats** on every profile card and in the editor: where a server drops out of a format, a mark gives the reason. See [Subscription formats of a profile](../guide/profiles.md#subscription-formats-of-a-profile)."
-        - "**`?format=`** at the end of a link picks the format for one request, to try an app before writing a rule. See [Who gets what](../guide/subscriptions.md#who-gets-what)."
-        - "**Happ 6** shows as Happ 6.0.0, and the admin's device line starts with the system."
+        - "**Reachability from a country.** Probes in home and mobile networks inside Russia ping each node and connect to its TCP ports (Globalping), and the antifilter block lists are checked on the panel. Each source is its own integration and off by default. The result is the *From Russia* column in Health → Checks and a row on the node page; an alert opens after two bad rounds. See [Country check](../operations/health.md#country-check)."
+        - "**Response and connect time** in the client-eye checks: the response through a tunnel that is already open, the connect time apart from it, a mark for a slow connect, and a notice when the panel's own host loses inbound UDP. See [What the numbers mean](../operations/health.md#what-the-numbers-mean)."
+        - "**The Cloudflare edition is six Workers:** a small JS router that keeps the address and five panel roles, each with its own wasm. `mistgate edge deploy` deploys all six, skips scripts that did not change and has `--rollback`. Still a preview. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
     - title: Profiles
       section: profiles
       points:
@@ -53,6 +52,8 @@ Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
+        - "The [country check](../operations/health.md#country-check): probes inside Russia through Globalping and the antifilter block lists, each an integration of its own and off by default, with an alert when a node is unreachable from the country."
+        - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
     - title: Updates
@@ -77,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.40
+  meta: v0.1.34 – v0.1.41
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -92,6 +93,9 @@ Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production
     - title: A decoy site on every node
       section: nodes
       text: "The built-in site, the panel's site or an archive of its own for each node. Nodes created before v0.1.36 stay on the built-in page until you pick another option. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
+    - title: The country check in production
+      section: health
+      text: "Globalping and the block lists are off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Country check](../operations/health.md#country-check)."
 - status: next
   title: Next
   lead: The next items in the queue.
@@ -99,10 +103,10 @@ Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production
     - title: The Cloudflare edition on a real account
       icon: globe
       tag: Preview
-      text: "The first run of `mistgate edge deploy` on a real Cloudflare account. So far the command and the panel have been tested against a simulated Cloudflare only. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
+      text: "The first run of `mistgate edge deploy` on a real Cloudflare account: the six Workers, the router with the domain, and `--rollback`. So far the command and the panel have been tested against a simulated Cloudflare only. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
     - title: The Cloudflare edition on par with the VPS
       icon: layers
-      text: "Bring over what it does not have yet:"
+      text: "Bring to the six-Worker edition what it does not have yet:"
       points:
         - "encrypted backups and restore;"
         - "Telegram alerts;"
@@ -143,9 +147,10 @@ Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production
 - API tokens and MCP cannot create profiles or groups, or put a profile on a node: the owner does that in the admin.
 - Backups go to Cloudflare R2 only, and a restore is the offline `mistgate backup restore` command into a new data directory.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.
-- The Cloudflare edition is a preview: some features are not available in it yet (see [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet)), and a fleet cannot be moved between it and a VPS panel.
+- The Cloudflare edition is a preview, not yet tried on a real Cloudflare account: some features are not available in it yet (see [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet)), and a fleet cannot be moved between it and a VPS panel.
 - A device ID is what the app reports. Blocking refuses that ID; an app that reports another ID is a new device and takes a free place. To cut off a link that was passed on, issue a new link as well.
 - **Speed per person** is per node, so a person on two nodes at once can get up to twice the limit. Node agents before v0.1.39 hold each device to the smaller of the two limits.
 - In the Cloudflare edition the digest of what was sent to a node must fit one D1 row (2 MB), about 38,000 credentials per node. See [the limits of this edition](../getting-started/install-edge.md#not-available-in-this-edition-yet).
 - sing-box JSON has no XHTTP and cannot pin a self-signed Hysteria2 certificate; Gecko and AmneziaWG go out only in Mihomo YAML. A server a format cannot carry is left out of that format. See [What works where](../guide/subscriptions.md#what-works-where).
+- The country check looks from a few probes, not from every network, and the block lists cover Russia only. `listed` means the address is in a registry, not that its traffic is cut.
 - Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.
