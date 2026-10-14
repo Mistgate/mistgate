@@ -411,7 +411,7 @@
     "type": "table",
     "name": "health_check_sample",
     "tbl_name": "health_check_sample",
-    "sql": "CREATE TABLE health_check_sample ( inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, at INTEGER NOT NULL, status INTEGER NOT NULL CHECK (status BETWEEN 1 AND 3), latency_ms INTEGER NOT NULL DEFAULT 0, exit_ip TEXT NOT NULL DEFAULT '', exit_country TEXT NOT NULL DEFAULT '', error_code TEXT NOT NULL DEFAULT '', error_detail TEXT NOT NULL DEFAULT '', PRIMARY KEY (inbound_id, at) ) STRICT, WITHOUT ROWID"
+    "sql": "CREATE TABLE health_check_sample ( inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, at INTEGER NOT NULL, status INTEGER NOT NULL CHECK (status BETWEEN 1 AND 3), latency_ms INTEGER NOT NULL DEFAULT 0, exit_ip TEXT NOT NULL DEFAULT '', exit_country TEXT NOT NULL DEFAULT '', error_code TEXT NOT NULL DEFAULT '', error_detail TEXT NOT NULL DEFAULT '', connect_ms INTEGER NOT NULL DEFAULT 0, response_ms INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (inbound_id, at) ) STRICT, WITHOUT ROWID"
   },
   {
     "type": "table",

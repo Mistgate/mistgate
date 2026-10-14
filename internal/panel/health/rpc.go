@@ -271,8 +271,88 @@ func (r rpc) MuteAlert(ctx context.Context, req *connect.Request[adminv1.MuteAle
 
 const buckets = 48 // half-hour buckets = 24 h
 
+// median is the middle value of l (the upper one for an even count), 0 for none. It sorts l.
+func median(l []uint32) uint32 {
+	if len(l) == 0 {
+		return 0
+	}
+	slices.Sort(l)
+	return l[len(l)/2]
+}
+
+// The thresholds of the UDP-loss notice come from the retry timers of the probe clients: a lost handshake packet costs a
+// whole timer, about 2.5 s for QUIC (Hysteria2) and 5 s for WireGuard (AWG). A round that opened its tunnel and first
+// connection in under 2 s did not wait for a retry; one at or above did.
+const (
+	udpRetryMS = 2000
+	// A node is flagged when this share (percent) of its UDP rounds over the last hour waited for a retry. Plain
+	// jitter and one lost packet in a while stay below it; the hosts that drop bursts of inbound UDP sit at 35-55 %.
+	udpLossNodeShare = 20
+	// The panel's TCP probes (vless) must be fine: below this share (percent) with connect_ms at or above udpRetryMS.
+	// TCP has its own retransmit timers, so a handful of slow rounds is normal, and many mean the panel's own network
+	// is the problem, not UDP.
+	tcpSlowShareMax = 5
+	// A node needs this many UDP rounds in the hour before it can be flagged (one slow round of one is not a trend).
+	udpLossMinRounds = 3
+	// Without any TCP round to compare with, only a pattern on this many nodes at once is trusted.
+	udpLossNodesWithoutTCP = 2
+)
+
+// protoRounds are the connect_ms of the last hour's OK rounds of one inbound.
+type protoRounds struct {
+	nodeID, protocol string
+	connect          []uint32
+}
+
+// udpLossNotice says that the panel's host loses inbound UDP: UDP probes of some nodes keep needing a handshake retry
+// while the panel's TCP probes are fine. nil when there is nothing to say. Rounds come in node order, which the
+// notice keeps.
+func udpLossNotice(rounds []protoRounds) *adminv1.UdpLossNotice {
+	type count struct{ total, slow int }
+	perNode := map[string]*count{}
+	var order []string
+	var tcp count
+	for _, r := range rounds {
+		var c *count
+		switch {
+		case udpProbeProtocol(r.protocol):
+			if perNode[r.nodeID] == nil {
+				perNode[r.nodeID] = &count{}
+				order = append(order, r.nodeID)
+			}
+			c = perNode[r.nodeID]
+		case r.protocol == "vless":
+			c = &tcp
+		default:
+			continue
+		}
+		for _, ms := range r.connect {
+			c.total++
+			if ms >= udpRetryMS {
+				c.slow++
+			}
+		}
+	}
+	if tcp.total > 0 && tcp.slow*100 >= tcpSlowShareMax*tcp.total {
+		return nil
+	}
+	var ids []string
+	var total, slow int
+	for _, id := range order {
+		c := perNode[id]
+		if c.total >= udpLossMinRounds && c.slow*100 >= udpLossNodeShare*c.total {
+			ids = append(ids, id)
+			total, slow = total+c.total, slow+c.slow
+		}
+	}
+	if len(ids) == 0 || (tcp.total == 0 && len(ids) < udpLossNodesWithoutTCP) {
+		return nil
+	}
+	return &adminv1.UdpLossNotice{NodeIds: ids, SharePercent: uint32((slow*100 + total/2) / total)}
+}
+
 func resultMsg(r Result) *adminv1.CheckResult {
-	return &adminv1.CheckResult{Status: r.Status, AtUnix: r.At.Unix(), LatencyMs: r.LatencyMS, ExitIp: r.ExitIP, ExitCountry: r.ExitCountry,
+	return &adminv1.CheckResult{Status: r.Status, AtUnix: r.At.Unix(), LatencyMs: r.LatencyMS, ConnectMs: r.ConnectMS, ResponseMs: r.ResponseMS, ExitIp: r.ExitIP, ExitCountry: r.ExitCountry,
 		ErrorCode: r.ErrorCode, ErrorDetail: r.ErrorDetail}
 }
 
@@ -312,7 +392,10 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 	}
 	hist := map[string][buckets]acc{}
 	hourAgo := now.Add(-time.Hour)
-	hourLat := map[string][]uint32{} // OK-round latencies of the last hour, for the cell median
+	hourLat := map[string][]uint32{}  // latencies of the last hour's non-failed rounds, for the cell median
+	hourConn := map[string][]uint32{} // their connect_ms (0 = not measured, left out)
+	hourResp := map[string][]uint32{} // their response_ms (0 = not measured, left out)
+	hourOK := map[string][]uint32{}   // connect_ms of the last hour's OK rounds, for the UDP-loss notice
 	for _, x := range samples {
 		i := int((x.At.Unix() - first) / 1800)
 		if i < 0 || i >= buckets {
@@ -327,6 +410,17 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 				h[i].lat = append(h[i].lat, x.LatencyMS)
 				if !x.At.Before(hourAgo) {
 					hourLat[x.InboundID] = append(hourLat[x.InboundID], x.LatencyMS)
+				}
+			}
+			if !x.At.Before(hourAgo) {
+				if x.ConnectMS > 0 {
+					hourConn[x.InboundID] = append(hourConn[x.InboundID], x.ConnectMS)
+					if x.Status == int(adminv1.CheckStatus_CHECK_STATUS_OK) {
+						hourOK[x.InboundID] = append(hourOK[x.InboundID], x.ConnectMS)
+					}
+				}
+				if x.ResponseMS > 0 {
+					hourResp[x.InboundID] = append(hourResp[x.InboundID], x.ResponseMS)
 				}
 			}
 		}
@@ -354,6 +448,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		colIdx[c.ProfileId] = i
 	}
 	resp.Columns = cols
+	var udpRounds []protoRounds
 	for _, n := range sn.nodes {
 		if req.Msg.NodeId != "" && n.ID != req.Msg.NodeId {
 			continue
@@ -365,10 +460,10 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		}
 		for _, t := range sn.byNode[n.ID] {
 			cell := &adminv1.CheckCell{Deployed: true, InboundId: t.in.ID, History: make([]*adminv1.CheckBucket, buckets)}
-			if l := hourLat[t.in.ID]; len(l) > 0 {
-				slices.Sort(l)
-				cell.LatencyHourMs = l[len(l)/2]
-			}
+			cell.LatencyHourMs = median(hourLat[t.in.ID])
+			cell.ConnectHourMs = median(hourConn[t.in.ID])
+			cell.ResponseHourMs = median(hourResp[t.in.ID])
+			udpRounds = append(udpRounds, protoRounds{nodeID: n.ID, protocol: t.in.Protocol, connect: hourOK[t.in.ID]})
 			c := s.cellOf(ctx, t.in.ID)
 			cell.FailStreak = uint32(c.streak)
 			if why := s.skipReason(t, live[t.node.ID]); why != "" {
@@ -389,6 +484,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		}
 		resp.Rows = append(resp.Rows, row)
 	}
+	resp.UdpLoss = udpLossNotice(udpRounds)
 	return connect.NewResponse(resp), nil
 }
 

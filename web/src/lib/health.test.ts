@@ -87,8 +87,8 @@ const item = (over: Partial<DoctorItem> = {}): DoctorItem => ({
   ...over,
 });
 
-const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], latencyHourMs: 0, ...over });
-const at = (status: CheckStatus, latencyMs = 0, errorCode = "") => ({ status, atUnix: 1, latencyMs, exitIp: "", exitCountry: "", errorCode, errorDetail: "" });
+const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], latencyHourMs: 0, responseHourMs: 0, connectHourMs: 0, ...over });
+const at = (status: CheckStatus, latencyMs = 0, errorCode = "") => ({ status, atUnix: 1, latencyMs, exitIp: "", exitCountry: "", errorCode, errorDetail: "", connectMs: 0, responseMs: 0 });
 
 describe("lookup", () => {
   it("fills the placeholders of a known key", () => {

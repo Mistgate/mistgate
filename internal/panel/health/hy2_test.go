@@ -170,6 +170,10 @@ func TestCheckerAgainstARealEngine(t *testing.T) {
 			if res.Status != cOK || res.ExitIP != "203.0.113.9" || res.ExitCountry != "DE" || res.LatencyMS == 0 || res.ErrorCode != "" {
 				t.Fatalf("%+v", res)
 			}
+			// the split: the tunnel opened first (the handshake is in connect_ms), then one request on the open connection
+			if res.ConnectMS == 0 || res.ConnectMS > res.LatencyMS || res.ResponseMS == 0 || res.ResponseMS >= res.LatencyMS {
+				t.Fatalf("connect %d ms, response %d ms, latency %d ms", res.ConnectMS, res.ResponseMS, res.LatencyMS)
+			}
 			if res.ErrorDetail != "" && !strings.Contains(res.ErrorDetail, "differs") {
 				t.Fatalf("detail %q", res.ErrorDetail)
 			}

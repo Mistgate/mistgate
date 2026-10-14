@@ -350,13 +350,14 @@ type CheckSample struct {
 	At                                          time.Time
 	Status                                      int
 	LatencyMS                                   uint32
+	ConnectMS, ResponseMS                       uint32 // migration 00065; 0 = not measured
 	ExitIP, ExitCountry, ErrorCode, ErrorDetail string
 }
 
 // InsertSample stores a round. A second round of the same inbound in the same second replaces the first.
 func (s *Store) InsertSample(ctx context.Context, c CheckSample) error {
-	_, err := s.W.ExecContext(ctx, `INSERT OR REPLACE INTO health_check_sample (inbound_id, at, status, latency_ms, exit_ip, exit_country, error_code, error_detail)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, c.InboundID, unix(c.At), c.Status, c.LatencyMS, c.ExitIP, c.ExitCountry, c.ErrorCode, c.ErrorDetail)
+	_, err := s.W.ExecContext(ctx, `INSERT OR REPLACE INTO health_check_sample (inbound_id, at, status, latency_ms, connect_ms, response_ms, exit_ip, exit_country, error_code, error_detail)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, c.InboundID, unix(c.At), c.Status, c.LatencyMS, c.ConnectMS, c.ResponseMS, c.ExitIP, c.ExitCountry, c.ErrorCode, c.ErrorDetail)
 	if err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
 		return ErrNotFound // the inbound was deleted while the round ran
 	}
@@ -365,13 +366,13 @@ func (s *Store) InsertSample(ctx context.Context, c CheckSample) error {
 
 // SamplesSince returns every stored round at or after since, oldest first, per inbound.
 func (s *Store) SamplesSince(ctx context.Context, since time.Time) ([]CheckSample, error) {
-	return s.samples(ctx, `SELECT inbound_id, at, status, latency_ms, exit_ip, exit_country, error_code, error_detail
+	return s.samples(ctx, `SELECT inbound_id, at, status, latency_ms, connect_ms, response_ms, exit_ip, exit_country, error_code, error_detail
 		FROM health_check_sample WHERE at >= ? ORDER BY inbound_id, at`, unix(since))
 }
 
 // RecentSamples returns the newest n rounds of an inbound, newest first (to rebuild the fail streak after a restart).
 func (s *Store) RecentSamples(ctx context.Context, inboundID string, n int) ([]CheckSample, error) {
-	return s.samples(ctx, `SELECT inbound_id, at, status, latency_ms, exit_ip, exit_country, error_code, error_detail
+	return s.samples(ctx, `SELECT inbound_id, at, status, latency_ms, connect_ms, response_ms, exit_ip, exit_country, error_code, error_detail
 		FROM health_check_sample WHERE inbound_id = ? ORDER BY at DESC LIMIT ?`, inboundID, n)
 }
 
@@ -384,11 +385,11 @@ func (s *Store) samples(ctx context.Context, q string, args ...any) ([]CheckSamp
 	var out []CheckSample
 	for rows.Next() {
 		var c CheckSample
-		var at, lat int64
-		if err := rows.Scan(&c.InboundID, &at, &c.Status, &lat, &c.ExitIP, &c.ExitCountry, &c.ErrorCode, &c.ErrorDetail); err != nil {
+		var at, lat, conn, resp int64
+		if err := rows.Scan(&c.InboundID, &at, &c.Status, &lat, &conn, &resp, &c.ExitIP, &c.ExitCountry, &c.ErrorCode, &c.ErrorDetail); err != nil {
 			return nil, err
 		}
-		c.At, c.LatencyMS = fromUnix(at), uint32(max(lat, 0))
+		c.At, c.LatencyMS, c.ConnectMS, c.ResponseMS = fromUnix(at), uint32(max(lat, 0)), uint32(max(conn, 0)), uint32(max(resp, 0))
 		out = append(out, c)
 	}
 	return out, rows.Err()

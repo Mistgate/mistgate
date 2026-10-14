@@ -223,8 +223,10 @@ message CheckColumn {
 message CheckResult {
   CheckStatus status = 1;
   int64 at_unix = 2 [jstype = JS_NUMBER];
-  // Time from the start of the dial to the first response byte of the generate_204 probe, milliseconds;
-  // 0 when the tunnel did not come up.
+  // The cold time of the round: from the start of the dial to the first response byte of the generate_204 probe,
+  // milliseconds. It is measured on the panel's server, not on a person's device, and includes the tunnel handshake,
+  // a fresh TCP + TLS connection to the probe host through the tunnel, and the request. A lost UDP packet of the
+  // handshake adds a whole retry timer (about 2.5 s for QUIC, 5 s for WireGuard). 0 when the tunnel did not come up.
   uint32 latency_ms = 3;
   // Exit IP and ISO 3166-1 alpha-2 country as seen by https://www.cloudflare.com/cdn-cgi/trace ("ip=", "loc=");
   // empty when that probe failed.
@@ -236,6 +238,16 @@ message CheckResult {
   string error_code = 6;
   // Short English fact for the mono caption ("handshake timeout after 8s"). Never secrets.
   string error_detail = 7;
+  // From the start of the dial until the tunnel was up and the first connection through it was open, milliseconds,
+  // measured on the panel's server. Hysteria2: the QUIC handshake and auth, then the TCP connect to the probe host.
+  // AWG: the handshake, then the TCP connect. VLESS: the start of the local Xray client, then TCP and REALITY/TLS to
+  // the node (the connect to the probe host is not in it). 0 = not measured (rounds from before this field, or a failed
+  // round).
+  uint32 connect_ms = 8;
+  // One more generate_204 request on the HTTPS connection that the first one opened, right after it: what a person feels
+  // while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
+  // request failed, or the round is from before this field).
+  uint32 response_ms = 9;
 }
 
 // Half-hour bucket of one cell. start is aligned to :00 or :30 UTC.
@@ -259,8 +271,15 @@ message CheckCell {
   uint32 fail_streak = 4;
   // Exactly 48 buckets, oldest first, the last one is the current partial bucket.
   repeated CheckBucket history = 5;
-  // Median latency of the OK rounds over the last hour, ms; 0 = no data.
+  // Median of latency_ms (the cold time of the whole round, see CheckResult) over the last hour of rounds whose tunnel
+  // came up, ms; 0 = no data. Measured on the panel's server.
   uint32 latency_hour_ms = 6;
+  // Median of response_ms (a request on an already open connection) over the last hour, ms; rounds without it are
+  // left out; 0 = no data. Measured on the panel's server.
+  uint32 response_hour_ms = 7;
+  // Median of connect_ms (the time to open the tunnel and the first connection) over the last hour, ms; rounds without
+  // it are left out; 0 = no data. Measured on the panel's server.
+  uint32 connect_hour_ms = 8;
 }
 
 message CheckRow {
@@ -284,6 +303,18 @@ message GetChecksResponse {
   repeated CheckColumn columns = 3;
   // Name order. Retired nodes are omitted.
   repeated CheckRow rows = 4;
+  // Set when UDP handshakes of the panel's own probes keep needing a retry while its TCP probes are fine: the panel's
+  // host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
+  // nothing to say.
+  UdpLossNotice udp_loss = 5;
+}
+
+// The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
+// (vless) were not: at least 20 % of the node's UDP rounds had connect_ms of 2000 or more.
+message UdpLossNotice {
+  repeated string node_ids = 1;
+  // Share of slow UDP rounds across the listed nodes, 0-100.
+  uint32 share_percent = 2;
 }
 
 message RunChecksNowRequest {

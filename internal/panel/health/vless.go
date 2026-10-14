@@ -348,14 +348,29 @@ func errorText(err error) string {
 }
 
 type tailBuffer struct {
-	mu    sync.Mutex
-	limit int
-	data  []byte
+	mu       sync.Mutex
+	limit    int
+	data     []byte
+	markerAt time.Time // when the tunnel marker was first seen in the stream
+}
+
+// noteMarker stamps the first time the tunnel marker is in the buffer (b.mu held).
+func (b *tailBuffer) noteMarker() {
+	if b.markerAt.IsZero() && strings.Contains(string(b.data), vlesswire.TunnelMarker) {
+		b.markerAt = time.Now()
+	}
+}
+
+func (b *tailBuffer) markerTime() time.Time {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.markerAt
 }
 
 func (b *tailBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	defer b.noteMarker()
 	if len(p) >= b.limit {
 		b.data = append(b.data[:0], p[len(p)-b.limit:]...)
 		return len(p), nil
@@ -372,6 +387,11 @@ func (b *tailBuffer) String() string {
 	defer b.mu.Unlock()
 	return string(b.data)
 }
+
+// ConnectedAt is when Xray reported the VLESS transport up ("tunneling request": TCP and REALITY/TLS to the node are
+// done, the VLESS request goes out next). The SOCKS5 reply of the helper comes before that, so a dial through this
+// tunnel says nothing about the node. Zero until the helper has logged it.
+func (t *vlessTunnel) ConnectedAt() time.Time { return t.stderr.markerTime() }
 
 // ClassifyRequestError names a failed HTTP request made through the tunnel, including the probe's own deadline.
 func (t *vlessTunnel) ClassifyRequestError(err error) *ProbeError { return t.probeError(err, nil) }

@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -18,8 +19,13 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-// roundBudget bounds one attempt: 8 s handshake and two 10 s probes would be 28 s (the limit is 25 s).
+// roundBudget bounds one attempt: 8 s handshake, two 10 s probes and the short request on the open connection would be
+// 31 s (the limit is 25 s).
 const roundBudget = 25 * time.Second
+
+// reuseTimeout bounds the extra generate_204 request on the already open connection: it needs one round trip, so
+// a slow tunnel must not eat the time of the trace probe after it.
+const reuseTimeout = 3 * time.Second
 
 // Tunnel is an open client session of one inbound: a dialer that goes out through the node.
 type Tunnel interface {
@@ -64,7 +70,9 @@ var errClientUnsupported = &ProbeError{Code: skipClientMissing, Detail: errUnsup
 type Result struct {
 	Status                 adminv1.CheckStatus
 	At                     time.Time
-	LatencyMS              uint32
+	LatencyMS              uint32 // the cold time of the round: dial start to the first generate_204 response
+	ConnectMS              uint32 // dial start to the first connection through the tunnel being open; 0 = not measured
+	ResponseMS             uint32 // one more generate_204 on that connection; 0 = not measured or the connection was not reused
 	ExitIP, ExitCountry    string
 	ErrorCode, ErrorDetail string
 }
@@ -72,8 +80,8 @@ type Result struct {
 func (r Result) failed() bool { return r.Status == adminv1.CheckStatus_CHECK_STATUS_FAILED }
 
 func (r Result) sample(inboundID string) store.CheckSample {
-	return store.CheckSample{InboundID: inboundID, At: r.At, Status: int(r.Status), LatencyMS: r.LatencyMS, ExitIP: r.ExitIP,
-		ExitCountry: r.ExitCountry, ErrorCode: r.ErrorCode, ErrorDetail: r.ErrorDetail}
+	return store.CheckSample{InboundID: inboundID, At: r.At, Status: int(r.Status), LatencyMS: r.LatencyMS, ConnectMS: r.ConnectMS,
+		ResponseMS: r.ResponseMS, ExitIP: r.ExitIP, ExitCountry: r.ExitCountry, ErrorCode: r.ErrorCode, ErrorDetail: r.ErrorDetail}
 }
 
 // classify names a dial error. Anything that is not clearly a certificate, credential or refusal problem is a
@@ -106,7 +114,7 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		return Result{}, true
 	}
 	start := s.now()
-	rctx, cancel := context.WithTimeout(ctx, min(s.cfg.HandshakeTimeout+2*s.cfg.ProbeTimeout, roundBudget))
+	rctx, cancel := context.WithTimeout(ctx, min(s.cfg.HandshakeTimeout+2*s.cfg.ProbeTimeout+reuseTimeout, roundBudget))
 	defer cancel()
 	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: t.node, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
 		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout})
@@ -122,14 +130,28 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 	return s.probe(rctx, tn, t.node, start), false
 }
 
-// probe runs the two probes through an open tunnel: generate_204 (latency, from the start of the dial to the
-// first response byte) and the Cloudflare trace (exit IP and country).
+// probe runs the probes through an open tunnel, all measured on the panel's server: generate_204 (latency, from
+// the start of the dial to the first response byte), the same request once more on the connection the first one
+// opened (response time, what a person feels while the tunnel is up) and the Cloudflare trace (exit IP and country).
+// connect_ms is the time from start to the first successful dial through the tunnel; see connectReporter for a
+// tunnel whose dial returns before the node is reached.
 func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, start time.Time) Result {
-	hc := &http.Client{
-		Transport: &http.Transport{
-			DialContext: tn.DialContext, TLSClientConfig: s.cfg.ProbeTLS, DisableKeepAlives: true,
-			TLSHandshakeTimeout: s.cfg.ProbeTimeout, Proxy: nil,
+	var connectNS atomic.Int64 // nanoseconds from start to the first successful dial; 0 = none yet
+	var dials atomic.Int32     // dials started, to see whether a request reused a connection
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dials.Add(1)
+			c, err := tn.DialContext(ctx, network, addr)
+			if err == nil {
+				connectNS.CompareAndSwap(0, max(int64(time.Since(start)), 1))
+			}
+			return c, err
 		},
+		TLSClientConfig: s.cfg.ProbeTLS, TLSHandshakeTimeout: s.cfg.ProbeTimeout, Proxy: nil,
+	}
+	defer tr.CloseIdleConnections() // keep-alive is on for the second request; nothing may outlive the round
+	hc := &http.Client{
+		Transport:     tr,
 		Timeout:       s.cfg.ProbeTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
@@ -152,22 +174,23 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 		fail("exit_unreachable", "%s: %s", label, probeErrText(err))
 	}
 
-	var latency, latencyTrace uint32
+	var latency, latencyTrace, responseMS uint32
 	ok204, okTrace := false, false
 
-	if resp, err := getProbe(ctx, hc, s.cfg.Probe204URL); err != nil {
+	if resp, err := getProbe(ctx, hc, s.cfg.Probe204URL, false); err != nil {
 		failRequest("generate_204", err)
 	} else {
 		latency = uint32(max(time.Since(start).Milliseconds(), 1))
-		resp.Body.Close()
+		drainClose(resp.Body)
 		if resp.StatusCode == http.StatusNoContent {
 			ok204 = true
+			responseMS = reusedProbe(ctx, hc, s.cfg.Probe204URL, &dials)
 		} else {
 			fail("http_status", "generate_204 answered %d", resp.StatusCode)
 		}
 	}
 
-	if resp, err := getProbe(ctx, hc, s.cfg.ProbeTraceURL); err != nil {
+	if resp, err := getProbe(ctx, hc, s.cfg.ProbeTraceURL, true); err != nil {
 		failRequest("trace", err)
 	} else {
 		latencyTrace = uint32(max(time.Since(start).Milliseconds(), 1))
@@ -199,17 +222,56 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 	default:
 		res.Status = adminv1.CheckStatus_CHECK_STATUS_FAILED
 	}
+	if res.Status != adminv1.CheckStatus_CHECK_STATUS_FAILED {
+		connect := time.Duration(connectNS.Load())
+		if rep, ok := tn.(connectReporter); ok {
+			if at := rep.ConnectedAt(); !at.IsZero() {
+				connect = max(connect, at.Sub(start))
+			}
+		}
+		res.ConnectMS, res.ResponseMS = uint32(max(connect.Milliseconds(), 1)), responseMS
+	}
 	if res.Status != adminv1.CheckStatus_CHECK_STATUS_OK && len(bad) > 0 {
 		res.ErrorCode, res.ErrorDetail = bad[0].Code, bad[0].Detail
 	}
 	return res
 }
 
-func getProbe(ctx context.Context, hc *http.Client, u string) (*http.Response, error) {
+// reusedProbe is one more GET of u, right after a first one that left its connection open. It returns the time of the
+// request in milliseconds, or 0 when it failed, did not answer 204, or the transport opened a new connection (then it
+// measured a handshake and not the response time; the dial counter of the transport tells, since a reused connection
+// needs no dial).
+func reusedProbe(ctx context.Context, hc *http.Client, u string, dials *atomic.Int32) uint32 {
+	ctx, cancel := context.WithTimeout(ctx, reuseTimeout)
+	defer cancel()
+	before := dials.Load()
+	t0 := time.Now()
+	resp, err := getProbe(ctx, hc, u, true)
+	if err != nil {
+		return 0
+	}
+	ms := max(time.Since(t0).Milliseconds(), 1)
+	drainClose(resp.Body)
+	if resp.StatusCode != http.StatusNoContent || dials.Load() != before {
+		return 0
+	}
+	return uint32(ms)
+}
+
+// drainClose reads what is left of a small body so that the connection can be reused, then closes it.
+func drainClose(b io.ReadCloser) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(b, 4096))
+	b.Close()
+}
+
+// getProbe is one GET of u. last asks the server to close the connection after the answer: the request is the last on
+// it, and a server that hangs up first leaves nothing half-closed behind when the tunnel is torn down right after.
+func getProbe(ctx context.Context, hc *http.Client, u string, last bool) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Close = last
 	return hc.Do(req)
 }
 
@@ -249,4 +311,11 @@ func exitFromTrace(r io.Reader) (ip, country string) {
 // client), so a failed request is the first place its failure shows: it names the failure from what the client reported.
 type requestErrorClassifier interface {
 	ClassifyRequestError(err error) *ProbeError
+}
+
+// connectReporter is implemented by a tunnel whose DialContext returns before the node is reached (VLESS: the loopback
+// SOCKS5 reply of the local Xray helper comes at once). ConnectedAt is the moment the transport to the node (TCP and
+// REALITY/TLS) was up, or the zero time when it is not known; connect_ms then runs to that moment.
+type connectReporter interface {
+	ConnectedAt() time.Time
 }

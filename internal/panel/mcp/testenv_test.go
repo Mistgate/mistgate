@@ -618,9 +618,11 @@ func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksReq
 	return connect.NewResponse(&adminv1.GetChecksResponse{
 		Columns: []*adminv1.CheckColumn{{ProfileId: "prf_1", ProfileName: "Main", Protocol: "hysteria2"}},
 		Rows: []*adminv1.CheckRow{{NodeId: nodeA, NodeName: "de1", Cells: []*adminv1.CheckCell{{
-			Deployed: true, Last: &adminv1.CheckResult{Status: adminv1.CheckStatus_CHECK_STATUS_OK, ExitIp: canaryAddr, ExitCountry: "DE", ErrorDetail: "x " + canaryTK},
-			History: []*adminv1.CheckBucket{{Ok: 5, Failed: 1}},
+			Deployed: true, Last: &adminv1.CheckResult{Status: adminv1.CheckStatus_CHECK_STATUS_OK, ExitIp: canaryAddr, ExitCountry: "DE", ErrorDetail: "x " + canaryTK,
+				LatencyMs: 2600, ConnectMs: 2400, ResponseMs: 90},
+			History: []*adminv1.CheckBucket{{Ok: 5, Failed: 1}}, LatencyHourMs: 2500, ConnectHourMs: 2300, ResponseHourMs: 80,
 		}}}},
+		UdpLoss: &adminv1.UdpLossNotice{NodeIds: []string{nodeA}, SharePercent: 40},
 	}), nil
 }
 

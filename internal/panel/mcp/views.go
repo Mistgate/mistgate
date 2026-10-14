@@ -977,16 +977,22 @@ func eventsView(evs []*adminv1.Event, code string, hasMore bool) *EventsV {
 }
 
 type checkV struct {
-	Deployed   bool   `json:"deployed"`
-	Status     string `json:"status,omitempty"`
-	AtUnix     int64  `json:"at_unix,omitempty"`
-	LatencyMs  uint32 `json:"latency_ms,omitempty"`
-	ExitCtry   string `json:"exit_country,omitempty"`
-	ErrorCode  string `json:"error_code,omitempty"`
-	ErrorInfo  string `json:"error_detail,omitempty"`
-	FailStreak uint32 `json:"fail_streak,omitempty"`
-	OK24h      uint32 `json:"ok_24h"`
-	Failed24h  uint32 `json:"failed_24h"`
+	Deployed  bool   `json:"deployed"`
+	Status    string `json:"status,omitempty"`
+	AtUnix    int64  `json:"at_unix,omitempty"`
+	LatencyMs uint32 `json:"latency_ms,omitempty"` // cold time of the last round, from the panel's server
+	// connect_ms and response_ms of the last round: the time to open the tunnel and the first connection, and one more
+	// request on that connection (0 = not measured). The *_hour_ms fields are medians over the last hour (0 = no data).
+	ConnectMs      uint32 `json:"connect_ms,omitempty"`
+	ResponseMs     uint32 `json:"response_ms,omitempty"`
+	ResponseHourMs uint32 `json:"response_hour_ms,omitempty"`
+	ConnectHourMs  uint32 `json:"connect_hour_ms,omitempty"`
+	ExitCtry       string `json:"exit_country,omitempty"`
+	ErrorCode      string `json:"error_code,omitempty"`
+	ErrorInfo      string `json:"error_detail,omitempty"`
+	FailStreak     uint32 `json:"fail_streak,omitempty"`
+	OK24h          uint32 `json:"ok_24h"`
+	Failed24h      uint32 `json:"failed_24h"`
 }
 
 type checkRowV struct {
@@ -1002,12 +1008,21 @@ type checkColV struct {
 	Protocol  string `json:"protocol"`
 }
 
+// udpLossV is set when the panel's host loses inbound UDP: its UDP probes of these nodes keep needing a handshake retry
+// while its TCP probes are fine. People connect to the nodes directly and are not affected.
+type udpLossV struct {
+	Nodes        []string `json:"nodes"`
+	SharePercent uint32   `json:"share_percent"`
+}
+
 // ChecksV is the checks_results result: the node x profile matrix, one cell per column in the order of columns.
+// All times are measured on the panel's server, not on a person's device.
 type ChecksV struct {
 	NowUnix   int64       `json:"now_unix"`
 	IntervalS uint32      `json:"interval_s"`
 	Columns   []checkColV `json:"columns"`
 	Rows      []checkRowV `json:"rows"`
+	UdpLoss   *udpLossV   `json:"udp_loss,omitempty"`
 	Truncated bool        `json:"truncated,omitempty"`
 }
 
@@ -1024,10 +1039,11 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 	for _, row := range r.GetRows() {
 		rv := checkRowV{NodeID: row.GetNodeId(), NodeName: nm(row.GetNodeName()), NodeStatus: nodeStatus(row.GetNodeStatus()), Cells: []checkV{}}
 		for _, c := range row.GetCells() {
-			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak()}
+			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak(), ResponseHourMs: c.GetResponseHourMs(), ConnectHourMs: c.GetConnectHourMs()}
 			if l := c.GetLast(); l != nil {
 				cv.Status = enumName("CHECK_STATUS_", l.GetStatus().String())
 				cv.AtUnix, cv.LatencyMs, cv.ExitCtry = l.GetAtUnix(), l.GetLatencyMs(), clean(l.GetExitCountry(), 8)
+				cv.ConnectMs, cv.ResponseMs = l.GetConnectMs(), l.GetResponseMs()
 				cv.ErrorCode, cv.ErrorInfo = clean(l.GetErrorCode(), 60), clean(l.GetErrorDetail(), 200)
 			}
 			for _, b := range c.GetHistory() {
@@ -1037,6 +1053,19 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 			rv.Cells = append(rv.Cells, cv)
 		}
 		v.Rows = append(v.Rows, rv)
+	}
+	if u := r.GetUdpLoss(); u != nil {
+		names := map[string]string{}
+		for _, row := range r.GetRows() {
+			names[row.GetNodeId()] = nm(row.GetNodeName())
+		}
+		uv := &udpLossV{Nodes: []string{}, SharePercent: u.GetSharePercent()}
+		for _, id := range u.GetNodeIds() {
+			if n := names[id]; n != "" {
+				uv.Nodes = append(uv.Nodes, n)
+			}
+		}
+		v.UdpLoss = uv
 	}
 	return v
 }

@@ -1421,8 +1421,11 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 			t.Fatal(err)
 		}
 		at := now.Unix() - 2*86400 + 100
-		if err := st.InsertSample(ctx, CheckSample{InboundID: "inb_health", At: time.Unix(at, 0), Status: 1, LatencyMS: 50}); err != nil {
+		if err := st.InsertSample(ctx, CheckSample{InboundID: "inb_health", At: time.Unix(at, 0), Status: 1, LatencyMS: 50, ConnectMS: 30, ResponseMS: 20}); err != nil {
 			t.Fatal(err)
+		}
+		if got, err := st.SamplesSince(ctx, time.Unix(at, 0)); err != nil || len(got) != 1 || got[0].ConnectMS != 30 || got[0].ResponseMS != 20 {
+			t.Fatalf("D1 sample columns: %+v %v", got, err)
 		}
 		if err := st.InsertSample(ctx, CheckSample{InboundID: "inb_health", At: time.Unix(at+1, 0), Status: 2, LatencyMS: 100}); err != nil {
 			t.Fatal(err)

@@ -334,7 +334,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("checks_results", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceGetChecksProcedure),
-			"The health checks: a matrix of nodes by profile with the last result, the failure streak and the last 24 hours of passes and failures.",
+			"The health checks: a matrix of nodes by profile with the last result, the failure streak and the last 24 hours of passes and failures. Times are measured on the panel's server: response_ms is a request through an open tunnel (what a person feels), connect_ms is the time to open the tunnel, latency_ms is both plus a fresh TLS connection; *_hour_ms are medians of the last hour. udp_loss names the nodes whose UDP probes keep losing handshake packets at the panel's host while its TCP probes are fine: not a problem of the nodes.",
 			func(c *call, in checksArg) (any, error) {
 				req := &adminv1.GetChecksRequest{}
 				if in.Node != "" {

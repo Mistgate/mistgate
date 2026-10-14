@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/health.proto.
  */
 export const file_mistgate_admin_v1_health: GenFile = /*@__PURE__*/
-  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS9oZWFsdGgucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIuQDCgVBbGVydBIKCgJpZBgBIAEoCRIyCghzZXZlcml0eRgCIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLkFsZXJ0U2V2ZXJpdHkSKgoEa2luZBgDIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLkFsZXJ0S2luZBIPCgdub2RlX2lkGAQgASgJEhEKCW5vZGVfbmFtZRgFIAEoCRIPCgdzdWJqZWN0GAYgASgJEhEKCXRpdGxlX2tleRgHIAEoCRI0CgZwYXJhbXMYCCADKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5BbGVydC5QYXJhbXNFbnRyeRIPCgd3aHlfa2V5GAkgASgJEhsKD2ZpcnN0X3NlZW5fdW5peBgKIAEoA0ICMAISGgoObGFzdF9zZWVuX3VuaXgYCyABKANCAjACEhwKEHJlc29sdmVkX2F0X3VuaXgYDCABKANCAjACEhIKCnJlc29sdXRpb24YDSABKAkSHAoQbXV0ZWRfdW50aWxfdW5peBgOIAEoA0ICMAISDwoHYWN0aW9ucxgPIAMoCRIXCgtvcGVuZWRfdW5peBgQIAEoA0ICMAIaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI+ChFMaXN0QWxlcnRzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhgKEGhpc3Rvcnlfd2luZG93X3MYAiABKA0ifwoSTGlzdEFsZXJ0c1Jlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhIoCgZhY3RpdmUYAiADKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5BbGVydBIpCgdoaXN0b3J5GAMgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuQWxlcnQiOAoQTXV0ZUFsZXJ0UmVxdWVzdBIQCghhbGVydF9pZBgBIAEoCRISCgpkdXJhdGlvbl9zGAIgASgNIjwKEU11dGVBbGVydFJlc3BvbnNlEicKBWFsZXJ0GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuQWxlcnQiSQoLQ2hlY2tDb2x1bW4SEgoKcHJvZmlsZV9pZBgBIAEoCRIUCgxwcm9maWxlX25hbWUYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkitwEKC0NoZWNrUmVzdWx0Ei4KBnN0YXR1cxgBIAEoDjIeLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrU3RhdHVzEhMKB2F0X3VuaXgYAiABKANCAjACEhIKCmxhdGVuY3lfbXMYAyABKA0SDwoHZXhpdF9pcBgEIAEoCRIUCgxleGl0X2NvdW50cnkYBSABKAkSEgoKZXJyb3JfY29kZRgGIAEoCRIUCgxlcnJvcl9kZXRhaWwYByABKAkiVQoLQ2hlY2tCdWNrZXQSFgoKc3RhcnRfdW5peBgBIAEoA0ICMAISCgoCb2sYAiABKA0SDgoGZmFpbGVkGAMgASgNEhIKCmxhdGVuY3lfbXMYBCABKA0ivgEKCUNoZWNrQ2VsbBIQCghkZXBsb3llZBgBIAEoCBISCgppbmJvdW5kX2lkGAIgASgJEiwKBGxhc3QYAyABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1Jlc3VsdBITCgtmYWlsX3N0cmVhaxgEIAEoDRIvCgdoaXN0b3J5GAUgAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tCdWNrZXQSFwoPbGF0ZW5jeV9ob3VyX21zGAYgASgNIqUBCghDaGVja1JvdxIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRIUCgxjb3VudHJ5X2NvZGUYAyABKAkSMgoLbm9kZV9zdGF0dXMYBCABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlU3RhdHVzEisKBWNlbGxzGAUgAygLMhwubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tDZWxsIiMKEEdldENoZWNrc1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSKZAQoRR2V0Q2hlY2tzUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEhIKCmludGVydmFsX3MYAiABKA0SLwoHY29sdW1ucxgDIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrQ29sdW1uEikKBHJvd3MYBCADKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JvdyImChNSdW5DaGVja3NOb3dSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiOgoUUnVuQ2hlY2tzTm93UmVzcG9uc2USEQoJc2NoZWR1bGVkGAEgASgNEg8KB3NraXBwZWQYAiABKA0i8QIKCkRvY3Rvckl0ZW0SCgoCaWQYASABKAkSLwoGc3RhdHVzGAIgASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuRG9jdG9yU3RhdHVzEhEKCXRpdGxlX2tleRgDIAEoCRIOCgZkZXRhaWwYBCABKAkSOQoGcGFyYW1zGAUgAygLMikubWlzdGdhdGUuYWRtaW4udjEuRG9jdG9ySXRlbS5QYXJhbXNFbnRyeRIPCgd3aHlfa2V5GAYgASgJEg4KBmZpeF9pZBgHIAEoCRIZCg1tZWFzdXJlZF91bml4GAggASgDQgIwAhITCgtkZXRhaWxfY29kZRgJIAEoCRIZCg1hY2NlcHRlZF91bml4GAogASgDQgIwAhITCgthY2NlcHRlZF9ieRgLIAEoCRIYChBhY2NlcHRlZF9ieV9uYW1lGAwgASgJGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiqwIKCk5vZGVEb2N0b3ISDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSMgoLbm9kZV9zdGF0dXMYAyABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlU3RhdHVzEhcKD2FnZW50X3N1cHBvcnRlZBgEIAEoCBISCgpoYXNfcmVwb3J0GAUgASgIEhkKDXJlY2VpdmVkX3VuaXgYBiABKANCAjACEg0KBWFnZV9zGAcgASgNEg0KBXN0YWxlGAggASgIEiwKBWl0ZW1zGAkgAygLMh0ubWlzdGdhdGUuYWRtaW4udjEuRG9jdG9ySXRlbRIVCg1hZ2VudF92ZXJzaW9uGAogASgJEhoKDmxhc3Rfc2Vlbl91bml4GAsgASgDQgIwAiIjChBHZXREb2N0b3JSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiVwoRR2V0RG9jdG9yUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEiwKBW5vZGVzGAIgAygLMh0ubWlzdGdhdGUuYWRtaW4udjEuTm9kZURvY3RvciIjChBSdW5Eb2N0b3JSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiVwoRUnVuRG9jdG9yUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEiwKBW5vZGVzGAIgAygLMh0ubWlzdGdhdGUuYWRtaW4udjEuTm9kZURvY3RvciK3AQoHRml4UGxhbhIOCgZmaXhfaWQYASABKAkSEQoJdGl0bGVfa2V5GAIgASgJEjYKBnBhcmFtcxgDIAMoCzImLm1pc3RnYXRlLmFkbWluLnYxLkZpeFBsYW4uUGFyYW1zRW50cnkSDgoGZGV0YWlsGAQgASgJEhIKCmRpc3J1cHRpdmUYBSABKAgaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLDAQoPQXBwbHlGaXhSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDgoGZml4X2lkGAIgASgJEj4KBnBhcmFtcxgDIAMoCzIuLm1pc3RnYXRlLmFkbWluLnYxLkFwcGx5Rml4UmVxdWVzdC5QYXJhbXNFbnRyeRIPCgdkcnlfcnVuGAQgASgIEg8KB3BsYW5faWQYBSABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLQAgoQQXBwbHlGaXhSZXNwb25zZRIoCgRwbGFuGAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuRml4UGxhbhIPCgdwbGFuX2lkGAIgASgJEh0KEXBsYW5fZXhwaXJlc191bml4GAMgASgDQgIwAhIPCgdhcHBsaWVkGAQgASgIEg0KBWVycm9yGAUgASgJEhAKCGFmZmVjdGVkGAYgASgNEkwKDXJlc3VsdF9wYXJhbXMYByADKAsyNS5taXN0Z2F0ZS5hZG1pbi52MS5BcHBseUZpeFJlc3BvbnNlLlJlc3VsdFBhcmFtc0VudHJ5Ei0KBmRvY3RvchgIIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVEb2N0b3IaMwoRUmVzdWx0UGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI8ChdBY2NlcHREb2N0b3JJdGVtUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhAKCGNoZWNrX2lkGAIgASgJIkkKGEFjY2VwdERvY3Rvckl0ZW1SZXNwb25zZRItCgZkb2N0b3IYASABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlRG9jdG9yIj4KGVVuYWNjZXB0RG9jdG9ySXRlbVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIQCghjaGVja19pZBgCIAEoCSJLChpVbmFjY2VwdERvY3Rvckl0ZW1SZXNwb25zZRItCgZkb2N0b3IYASABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlRG9jdG9yKoEBCg1BbGVydFNldmVyaXR5Eh4KGkFMRVJUX1NFVkVSSVRZX1VOU1BFQ0lGSUVEEAASFwoTQUxFUlRfU0VWRVJJVFlfSU5GTxABEhoKFkFMRVJUX1NFVkVSSVRZX1dBUk5JTkcQAhIbChdBTEVSVF9TRVZFUklUWV9DUklUSUNBTBADKo8ECglBbGVydEtpbmQSGgoWQUxFUlRfS0lORF9VTlNQRUNJRklFRBAAEhgKFEFMRVJUX0tJTkRfTk9ERV9ET1dOEAESGAoUQUxFUlRfS0lORF9IT1NUX0JMSVAQAhIZChVBTEVSVF9LSU5EX05PX1RSQUZGSUMQAxIbChdBTEVSVF9LSU5EX0NIRUNLX0ZBSUxFRBAEEhoKFkFMRVJUX0tJTkRfRE9DVE9SX1dBUk4QBRIaChZBTEVSVF9LSU5EX0RPQ1RPUl9GQUlMEAYSGgoWQUxFUlRfS0lORF9TVEFURV9EUklGVBAHEhQKEEFMRVJUX0tJTkRfUVVPVEEQCBIaChZBTEVSVF9LSU5EX0NFUlRfRVhQSVJZEAkSKgomQUxFUlRfS0lORF9TVUJTQ1JJUFRJT05fU0hBUkVEX1NVU1BFQ1QQChIcChhBTEVSVF9LSU5EX1VQREFURV9GQUlMRUQQCxIbChdBTEVSVF9LSU5EX0FDQ0VTU19FTkRFRBAMEh4KGkFMRVJUX0tJTkRfVVNFUl9DT05ORUNUSU9OEA0SHQoZQUxFUlRfS0lORF9VU0VSU19JTVBBQ1RFRBAOEhYKEkFMRVJUX0tJTkRfVE9SUkVOVBAPEhkKFUFMRVJUX0tJTkRfUE9SVF9MT1NTWRAQEhsKF0FMRVJUX0tJTkRfREVWSUNFX0xJTUlUEBEqjgEKC0NoZWNrU3RhdHVzEhwKGENIRUNLX1NUQVRVU19VTlNQRUNJRklFRBAAEhMKD0NIRUNLX1NUQVRVU19PSxABEhkKFUNIRUNLX1NUQVRVU19ERUdSQURFRBACEhcKE0NIRUNLX1NUQVRVU19GQUlMRUQQAxIYChRDSEVDS19TVEFUVVNfU0tJUFBFRBAEKosBCgxEb2N0b3JTdGF0dXMSHQoZRE9DVE9SX1NUQVRVU19VTlNQRUNJRklFRBAAEhQKEERPQ1RPUl9TVEFUVVNfT0sQARIWChJET0NUT1JfU1RBVFVTX1dBUk4QAhIWChJET0NUT1JfU1RBVFVTX0ZBSUwQAxIWChJET0NUT1JfU1RBVFVTX1NLSVAQBDLgBgoNSGVhbHRoU2VydmljZRJZCgpMaXN0QWxlcnRzEiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdEFsZXJ0c1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0QWxlcnRzUmVzcG9uc2USVgoJTXV0ZUFsZXJ0EiMubWlzdGdhdGUuYWRtaW4udjEuTXV0ZUFsZXJ0UmVxdWVzdBokLm1pc3RnYXRlLmFkbWluLnYxLk11dGVBbGVydFJlc3BvbnNlElYKCUdldENoZWNrcxIjLm1pc3RnYXRlLmFkbWluLnYxLkdldENoZWNrc1JlcXVlc3QaJC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDaGVja3NSZXNwb25zZRJfCgxSdW5DaGVja3NOb3cSJi5taXN0Z2F0ZS5hZG1pbi52MS5SdW5DaGVja3NOb3dSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuUnVuQ2hlY2tzTm93UmVzcG9uc2USVgoJR2V0RG9jdG9yEiMubWlzdGdhdGUuYWRtaW4udjEuR2V0RG9jdG9yUmVxdWVzdBokLm1pc3RnYXRlLmFkbWluLnYxLkdldERvY3RvclJlc3BvbnNlElYKCVJ1bkRvY3RvchIjLm1pc3RnYXRlLmFkbWluLnYxLlJ1bkRvY3RvclJlcXVlc3QaJC5taXN0Z2F0ZS5hZG1pbi52MS5SdW5Eb2N0b3JSZXNwb25zZRJTCghBcHBseUZpeBIiLm1pc3RnYXRlLmFkbWluLnYxLkFwcGx5Rml4UmVxdWVzdBojLm1pc3RnYXRlLmFkbWluLnYxLkFwcGx5Rml4UmVzcG9uc2USawoQQWNjZXB0RG9jdG9ySXRlbRIqLm1pc3RnYXRlLmFkbWluLnYxLkFjY2VwdERvY3Rvckl0ZW1SZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuQWNjZXB0RG9jdG9ySXRlbVJlc3BvbnNlEnEKElVuYWNjZXB0RG9jdG9ySXRlbRIsLm1pc3RnYXRlLmFkbWluLnYxLlVuYWNjZXB0RG9jdG9ySXRlbVJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5VbmFjY2VwdERvY3Rvckl0ZW1SZXNwb25zZULGAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgtIZWFsdGhQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS9oZWFsdGgucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIuQDCgVBbGVydBIKCgJpZBgBIAEoCRIyCghzZXZlcml0eRgCIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLkFsZXJ0U2V2ZXJpdHkSKgoEa2luZBgDIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLkFsZXJ0S2luZBIPCgdub2RlX2lkGAQgASgJEhEKCW5vZGVfbmFtZRgFIAEoCRIPCgdzdWJqZWN0GAYgASgJEhEKCXRpdGxlX2tleRgHIAEoCRI0CgZwYXJhbXMYCCADKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5BbGVydC5QYXJhbXNFbnRyeRIPCgd3aHlfa2V5GAkgASgJEhsKD2ZpcnN0X3NlZW5fdW5peBgKIAEoA0ICMAISGgoObGFzdF9zZWVuX3VuaXgYCyABKANCAjACEhwKEHJlc29sdmVkX2F0X3VuaXgYDCABKANCAjACEhIKCnJlc29sdXRpb24YDSABKAkSHAoQbXV0ZWRfdW50aWxfdW5peBgOIAEoA0ICMAISDwoHYWN0aW9ucxgPIAMoCRIXCgtvcGVuZWRfdW5peBgQIAEoA0ICMAIaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI+ChFMaXN0QWxlcnRzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhgKEGhpc3Rvcnlfd2luZG93X3MYAiABKA0ifwoSTGlzdEFsZXJ0c1Jlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhIoCgZhY3RpdmUYAiADKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5BbGVydBIpCgdoaXN0b3J5GAMgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuQWxlcnQiOAoQTXV0ZUFsZXJ0UmVxdWVzdBIQCghhbGVydF9pZBgBIAEoCRISCgpkdXJhdGlvbl9zGAIgASgNIjwKEU11dGVBbGVydFJlc3BvbnNlEicKBWFsZXJ0GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuQWxlcnQiSQoLQ2hlY2tDb2x1bW4SEgoKcHJvZmlsZV9pZBgBIAEoCRIUCgxwcm9maWxlX25hbWUYAiABKAkSEAoIcHJvdG9jb2wYAyABKAki4AEKC0NoZWNrUmVzdWx0Ei4KBnN0YXR1cxgBIAEoDjIeLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrU3RhdHVzEhMKB2F0X3VuaXgYAiABKANCAjACEhIKCmxhdGVuY3lfbXMYAyABKA0SDwoHZXhpdF9pcBgEIAEoCRIUCgxleGl0X2NvdW50cnkYBSABKAkSEgoKZXJyb3JfY29kZRgGIAEoCRIUCgxlcnJvcl9kZXRhaWwYByABKAkSEgoKY29ubmVjdF9tcxgIIAEoDRITCgtyZXNwb25zZV9tcxgJIAEoDSJVCgtDaGVja0J1Y2tldBIWCgpzdGFydF91bml4GAEgASgDQgIwAhIKCgJvaxgCIAEoDRIOCgZmYWlsZWQYAyABKA0SEgoKbGF0ZW5jeV9tcxgEIAEoDSLxAQoJQ2hlY2tDZWxsEhAKCGRlcGxveWVkGAEgASgIEhIKCmluYm91bmRfaWQYAiABKAkSLAoEbGFzdBgDIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVzdWx0EhMKC2ZhaWxfc3RyZWFrGAQgASgNEi8KB2hpc3RvcnkYBSADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja0J1Y2tldBIXCg9sYXRlbmN5X2hvdXJfbXMYBiABKA0SGAoQcmVzcG9uc2VfaG91cl9tcxgHIAEoDRIXCg9jb25uZWN0X2hvdXJfbXMYCCABKA0ipQEKCENoZWNrUm93Eg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEhQKDGNvdW50cnlfY29kZRgDIAEoCRIyCgtub2RlX3N0YXR1cxgEIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTdGF0dXMSKwoFY2VsbHMYBSADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja0NlbGwiIwoQR2V0Q2hlY2tzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIs0BChFHZXRDaGVja3NSZXNwb25zZRIUCghub3dfdW5peBgBIAEoA0ICMAISEgoKaW50ZXJ2YWxfcxgCIAEoDRIvCgdjb2x1bW5zGAMgAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tDb2x1bW4SKQoEcm93cxgEIAMoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUm93EjIKCHVkcF9sb3NzGAUgASgLMiAubWlzdGdhdGUuYWRtaW4udjEuVWRwTG9zc05vdGljZSI4Cg1VZHBMb3NzTm90aWNlEhAKCG5vZGVfaWRzGAEgAygJEhUKDXNoYXJlX3BlcmNlbnQYAiABKA0iJgoTUnVuQ2hlY2tzTm93UmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIjoKFFJ1bkNoZWNrc05vd1Jlc3BvbnNlEhEKCXNjaGVkdWxlZBgBIAEoDRIPCgdza2lwcGVkGAIgASgNIvECCgpEb2N0b3JJdGVtEgoKAmlkGAEgASgJEi8KBnN0YXR1cxgCIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLkRvY3RvclN0YXR1cxIRCgl0aXRsZV9rZXkYAyABKAkSDgoGZGV0YWlsGAQgASgJEjkKBnBhcmFtcxgFIAMoCzIpLm1pc3RnYXRlLmFkbWluLnYxLkRvY3Rvckl0ZW0uUGFyYW1zRW50cnkSDwoHd2h5X2tleRgGIAEoCRIOCgZmaXhfaWQYByABKAkSGQoNbWVhc3VyZWRfdW5peBgIIAEoA0ICMAISEwoLZGV0YWlsX2NvZGUYCSABKAkSGQoNYWNjZXB0ZWRfdW5peBgKIAEoA0ICMAISEwoLYWNjZXB0ZWRfYnkYCyABKAkSGAoQYWNjZXB0ZWRfYnlfbmFtZRgMIAEoCRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIqsCCgpOb2RlRG9jdG9yEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEjIKC25vZGVfc3RhdHVzGAMgASgOMh0ubWlzdGdhdGUuYWRtaW4udjEuTm9kZVN0YXR1cxIXCg9hZ2VudF9zdXBwb3J0ZWQYBCABKAgSEgoKaGFzX3JlcG9ydBgFIAEoCBIZCg1yZWNlaXZlZF91bml4GAYgASgDQgIwAhINCgVhZ2VfcxgHIAEoDRINCgVzdGFsZRgIIAEoCBIsCgVpdGVtcxgJIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkRvY3Rvckl0ZW0SFQoNYWdlbnRfdmVyc2lvbhgKIAEoCRIaCg5sYXN0X3NlZW5fdW5peBgLIAEoA0ICMAIiIwoQR2V0RG9jdG9yUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIlcKEUdldERvY3RvclJlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhIsCgVub2RlcxgCIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVEb2N0b3IiIwoQUnVuRG9jdG9yUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIlcKEVJ1bkRvY3RvclJlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhIsCgVub2RlcxgCIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVEb2N0b3IitwEKB0ZpeFBsYW4SDgoGZml4X2lkGAEgASgJEhEKCXRpdGxlX2tleRgCIAEoCRI2CgZwYXJhbXMYAyADKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5GaXhQbGFuLlBhcmFtc0VudHJ5Eg4KBmRldGFpbBgEIAEoCRISCgpkaXNydXB0aXZlGAUgASgIGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiwwEKD0FwcGx5Rml4UmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEg4KBmZpeF9pZBgCIAEoCRI+CgZwYXJhbXMYAyADKAsyLi5taXN0Z2F0ZS5hZG1pbi52MS5BcHBseUZpeFJlcXVlc3QuUGFyYW1zRW50cnkSDwoHZHJ5X3J1bhgEIAEoCBIPCgdwbGFuX2lkGAUgASgJGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi0AIKEEFwcGx5Rml4UmVzcG9uc2USKAoEcGxhbhgBIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLkZpeFBsYW4SDwoHcGxhbl9pZBgCIAEoCRIdChFwbGFuX2V4cGlyZXNfdW5peBgDIAEoA0ICMAISDwoHYXBwbGllZBgEIAEoCBINCgVlcnJvchgFIAEoCRIQCghhZmZlY3RlZBgGIAEoDRJMCg1yZXN1bHRfcGFyYW1zGAcgAygLMjUubWlzdGdhdGUuYWRtaW4udjEuQXBwbHlGaXhSZXNwb25zZS5SZXN1bHRQYXJhbXNFbnRyeRItCgZkb2N0b3IYCCABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlRG9jdG9yGjMKEVJlc3VsdFBhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiPAoXQWNjZXB0RG9jdG9ySXRlbVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIQCghjaGVja19pZBgCIAEoCSJJChhBY2NlcHREb2N0b3JJdGVtUmVzcG9uc2USLQoGZG9jdG9yGAEgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuTm9kZURvY3RvciI+ChlVbmFjY2VwdERvY3Rvckl0ZW1SZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSEAoIY2hlY2tfaWQYAiABKAkiSwoaVW5hY2NlcHREb2N0b3JJdGVtUmVzcG9uc2USLQoGZG9jdG9yGAEgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuTm9kZURvY3RvciqBAQoNQWxlcnRTZXZlcml0eRIeChpBTEVSVF9TRVZFUklUWV9VTlNQRUNJRklFRBAAEhcKE0FMRVJUX1NFVkVSSVRZX0lORk8QARIaChZBTEVSVF9TRVZFUklUWV9XQVJOSU5HEAISGwoXQUxFUlRfU0VWRVJJVFlfQ1JJVElDQUwQAyqPBAoJQWxlcnRLaW5kEhoKFkFMRVJUX0tJTkRfVU5TUEVDSUZJRUQQABIYChRBTEVSVF9LSU5EX05PREVfRE9XThABEhgKFEFMRVJUX0tJTkRfSE9TVF9CTElQEAISGQoVQUxFUlRfS0lORF9OT19UUkFGRklDEAMSGwoXQUxFUlRfS0lORF9DSEVDS19GQUlMRUQQBBIaChZBTEVSVF9LSU5EX0RPQ1RPUl9XQVJOEAUSGgoWQUxFUlRfS0lORF9ET0NUT1JfRkFJTBAGEhoKFkFMRVJUX0tJTkRfU1RBVEVfRFJJRlQQBxIUChBBTEVSVF9LSU5EX1FVT1RBEAgSGgoWQUxFUlRfS0lORF9DRVJUX0VYUElSWRAJEioKJkFMRVJUX0tJTkRfU1VCU0NSSVBUSU9OX1NIQVJFRF9TVVNQRUNUEAoSHAoYQUxFUlRfS0lORF9VUERBVEVfRkFJTEVEEAsSGwoXQUxFUlRfS0lORF9BQ0NFU1NfRU5ERUQQDBIeChpBTEVSVF9LSU5EX1VTRVJfQ09OTkVDVElPThANEh0KGUFMRVJUX0tJTkRfVVNFUlNfSU1QQUNURUQQDhIWChJBTEVSVF9LSU5EX1RPUlJFTlQQDxIZChVBTEVSVF9LSU5EX1BPUlRfTE9TU1kQEBIbChdBTEVSVF9LSU5EX0RFVklDRV9MSU1JVBARKo4BCgtDaGVja1N0YXR1cxIcChhDSEVDS19TVEFUVVNfVU5TUEVDSUZJRUQQABITCg9DSEVDS19TVEFUVVNfT0sQARIZChVDSEVDS19TVEFUVVNfREVHUkFERUQQAhIXChNDSEVDS19TVEFUVVNfRkFJTEVEEAMSGAoUQ0hFQ0tfU1RBVFVTX1NLSVBQRUQQBCqLAQoMRG9jdG9yU3RhdHVzEh0KGURPQ1RPUl9TVEFUVVNfVU5TUEVDSUZJRUQQABIUChBET0NUT1JfU1RBVFVTX09LEAESFgoSRE9DVE9SX1NUQVRVU19XQVJOEAISFgoSRE9DVE9SX1NUQVRVU19GQUlMEAMSFgoSRE9DVE9SX1NUQVRVU19TS0lQEAQy4AYKDUhlYWx0aFNlcnZpY2USWQoKTGlzdEFsZXJ0cxIkLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RBbGVydHNSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuTGlzdEFsZXJ0c1Jlc3BvbnNlElYKCU11dGVBbGVydBIjLm1pc3RnYXRlLmFkbWluLnYxLk11dGVBbGVydFJlcXVlc3QaJC5taXN0Z2F0ZS5hZG1pbi52MS5NdXRlQWxlcnRSZXNwb25zZRJWCglHZXRDaGVja3MSIy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDaGVja3NSZXF1ZXN0GiQubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2hlY2tzUmVzcG9uc2USXwoMUnVuQ2hlY2tzTm93EiYubWlzdGdhdGUuYWRtaW4udjEuUnVuQ2hlY2tzTm93UmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJ1bkNoZWNrc05vd1Jlc3BvbnNlElYKCUdldERvY3RvchIjLm1pc3RnYXRlLmFkbWluLnYxLkdldERvY3RvclJlcXVlc3QaJC5taXN0Z2F0ZS5hZG1pbi52MS5HZXREb2N0b3JSZXNwb25zZRJWCglSdW5Eb2N0b3ISIy5taXN0Z2F0ZS5hZG1pbi52MS5SdW5Eb2N0b3JSZXF1ZXN0GiQubWlzdGdhdGUuYWRtaW4udjEuUnVuRG9jdG9yUmVzcG9uc2USUwoIQXBwbHlGaXgSIi5taXN0Z2F0ZS5hZG1pbi52MS5BcHBseUZpeFJlcXVlc3QaIy5taXN0Z2F0ZS5hZG1pbi52MS5BcHBseUZpeFJlc3BvbnNlEmsKEEFjY2VwdERvY3Rvckl0ZW0SKi5taXN0Z2F0ZS5hZG1pbi52MS5BY2NlcHREb2N0b3JJdGVtUmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLkFjY2VwdERvY3Rvckl0ZW1SZXNwb25zZRJxChJVbmFjY2VwdERvY3Rvckl0ZW0SLC5taXN0Z2F0ZS5hZG1pbi52MS5VbmFjY2VwdERvY3Rvckl0ZW1SZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuVW5hY2NlcHREb2N0b3JJdGVtUmVzcG9uc2VCxgEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUILSGVhbHRoUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Alert
@@ -287,8 +287,10 @@ export type CheckResult = Message<"mistgate.admin.v1.CheckResult"> & {
   atUnix: bigint;
 
   /**
-   * Time from the start of the dial to the first response byte of the generate_204 probe, milliseconds;
-   * 0 when the tunnel did not come up.
+   * The cold time of the round: from the start of the dial to the first response byte of the generate_204 probe,
+   * milliseconds. It is measured on the panel's server, not on a person's device, and includes the tunnel handshake,
+   * a fresh TCP + TLS connection to the probe host through the tunnel, and the request. A lost UDP packet of the
+   * handshake adds a whole retry timer (about 2.5 s for QUIC, 5 s for WireGuard). 0 when the tunnel did not come up.
    *
    * @generated from field: uint32 latency_ms = 3;
    */
@@ -322,6 +324,26 @@ export type CheckResult = Message<"mistgate.admin.v1.CheckResult"> & {
    * @generated from field: string error_detail = 7;
    */
   errorDetail: string;
+
+  /**
+   * From the start of the dial until the tunnel was up and the first connection through it was open, milliseconds,
+   * measured on the panel's server. Hysteria2: the QUIC handshake and auth, then the TCP connect to the probe host.
+   * AWG: the handshake, then the TCP connect. VLESS: the start of the local Xray client, then TCP and REALITY/TLS to
+   * the node (the connect to the probe host is not in it). 0 = not measured (rounds from before this field, or a failed
+   * round).
+   *
+   * @generated from field: uint32 connect_ms = 8;
+   */
+  connectMs: number;
+
+  /**
+   * One more generate_204 request on the HTTPS connection that the first one opened, right after it: what a person feels
+   * while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
+   * request failed, or the round is from before this field).
+   *
+   * @generated from field: uint32 response_ms = 9;
+   */
+  responseMs: number;
 };
 
 /**
@@ -409,11 +431,28 @@ export type CheckCell = Message<"mistgate.admin.v1.CheckCell"> & {
   history: CheckBucket[];
 
   /**
-   * Median latency of the OK rounds over the last hour, ms; 0 = no data.
+   * Median of latency_ms (the cold time of the whole round, see CheckResult) over the last hour of rounds whose tunnel
+   * came up, ms; 0 = no data. Measured on the panel's server.
    *
    * @generated from field: uint32 latency_hour_ms = 6;
    */
   latencyHourMs: number;
+
+  /**
+   * Median of response_ms (a request on an already open connection) over the last hour, ms; rounds without it are
+   * left out; 0 = no data. Measured on the panel's server.
+   *
+   * @generated from field: uint32 response_hour_ms = 7;
+   */
+  responseHourMs: number;
+
+  /**
+   * Median of connect_ms (the time to open the tunnel and the first connection) over the last hour, ms; rounds without
+   * it are left out; 0 = no data. Measured on the panel's server.
+   *
+   * @generated from field: uint32 connect_hour_ms = 8;
+   */
+  connectHourMs: number;
 };
 
 /**
@@ -508,6 +547,15 @@ export type GetChecksResponse = Message<"mistgate.admin.v1.GetChecksResponse"> &
    * @generated from field: repeated mistgate.admin.v1.CheckRow rows = 4;
    */
   rows: CheckRow[];
+
+  /**
+   * Set when UDP handshakes of the panel's own probes keep needing a retry while its TCP probes are fine: the panel's
+   * host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
+   * nothing to say.
+   *
+   * @generated from field: mistgate.admin.v1.UdpLossNotice udp_loss = 5;
+   */
+  udpLoss?: UdpLossNotice | undefined;
 };
 
 /**
@@ -516,6 +564,33 @@ export type GetChecksResponse = Message<"mistgate.admin.v1.GetChecksResponse"> &
  */
 export const GetChecksResponseSchema: GenMessage<GetChecksResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_health, 11);
+
+/**
+ * The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
+ * (vless) were not: at least 20 % of the node's UDP rounds had connect_ms of 2000 or more.
+ *
+ * @generated from message mistgate.admin.v1.UdpLossNotice
+ */
+export type UdpLossNotice = Message<"mistgate.admin.v1.UdpLossNotice"> & {
+  /**
+   * @generated from field: repeated string node_ids = 1;
+   */
+  nodeIds: string[];
+
+  /**
+   * Share of slow UDP rounds across the listed nodes, 0-100.
+   *
+   * @generated from field: uint32 share_percent = 2;
+   */
+  sharePercent: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UdpLossNotice.
+ * Use `create(UdpLossNoticeSchema)` to create a new message.
+ */
+export const UdpLossNoticeSchema: GenMessage<UdpLossNotice> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_health, 12);
 
 /**
  * @generated from message mistgate.admin.v1.RunChecksNowRequest
@@ -534,7 +609,7 @@ export type RunChecksNowRequest = Message<"mistgate.admin.v1.RunChecksNowRequest
  * Use `create(RunChecksNowRequestSchema)` to create a new message.
  */
 export const RunChecksNowRequestSchema: GenMessage<RunChecksNowRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 12);
+  messageDesc(file_mistgate_admin_v1_health, 13);
 
 /**
  * @generated from message mistgate.admin.v1.RunChecksNowResponse
@@ -560,7 +635,7 @@ export type RunChecksNowResponse = Message<"mistgate.admin.v1.RunChecksNowRespon
  * Use `create(RunChecksNowResponseSchema)` to create a new message.
  */
 export const RunChecksNowResponseSchema: GenMessage<RunChecksNowResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 13);
+  messageDesc(file_mistgate_admin_v1_health, 14);
 
 /**
  * @generated from message mistgate.admin.v1.DoctorItem
@@ -648,7 +723,7 @@ export type DoctorItem = Message<"mistgate.admin.v1.DoctorItem"> & {
  * Use `create(DoctorItemSchema)` to create a new message.
  */
 export const DoctorItemSchema: GenMessage<DoctorItem> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 14);
+  messageDesc(file_mistgate_admin_v1_health, 15);
 
 /**
  * The doctor state of one node.
@@ -729,7 +804,7 @@ export type NodeDoctor = Message<"mistgate.admin.v1.NodeDoctor"> & {
  * Use `create(NodeDoctorSchema)` to create a new message.
  */
 export const NodeDoctorSchema: GenMessage<NodeDoctor> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 15);
+  messageDesc(file_mistgate_admin_v1_health, 16);
 
 /**
  * @generated from message mistgate.admin.v1.GetDoctorRequest
@@ -748,7 +823,7 @@ export type GetDoctorRequest = Message<"mistgate.admin.v1.GetDoctorRequest"> & {
  * Use `create(GetDoctorRequestSchema)` to create a new message.
  */
 export const GetDoctorRequestSchema: GenMessage<GetDoctorRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 16);
+  messageDesc(file_mistgate_admin_v1_health, 17);
 
 /**
  * @generated from message mistgate.admin.v1.GetDoctorResponse
@@ -772,7 +847,7 @@ export type GetDoctorResponse = Message<"mistgate.admin.v1.GetDoctorResponse"> &
  * Use `create(GetDoctorResponseSchema)` to create a new message.
  */
 export const GetDoctorResponseSchema: GenMessage<GetDoctorResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 17);
+  messageDesc(file_mistgate_admin_v1_health, 18);
 
 /**
  * @generated from message mistgate.admin.v1.RunDoctorRequest
@@ -791,7 +866,7 @@ export type RunDoctorRequest = Message<"mistgate.admin.v1.RunDoctorRequest"> & {
  * Use `create(RunDoctorRequestSchema)` to create a new message.
  */
 export const RunDoctorRequestSchema: GenMessage<RunDoctorRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 18);
+  messageDesc(file_mistgate_admin_v1_health, 19);
 
 /**
  * @generated from message mistgate.admin.v1.RunDoctorResponse
@@ -813,7 +888,7 @@ export type RunDoctorResponse = Message<"mistgate.admin.v1.RunDoctorResponse"> &
  * Use `create(RunDoctorResponseSchema)` to create a new message.
  */
 export const RunDoctorResponseSchema: GenMessage<RunDoctorResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 19);
+  messageDesc(file_mistgate_admin_v1_health, 20);
 
 /**
  * What a fix will do (dry run) or did.
@@ -859,7 +934,7 @@ export type FixPlan = Message<"mistgate.admin.v1.FixPlan"> & {
  * Use `create(FixPlanSchema)` to create a new message.
  */
 export const FixPlanSchema: GenMessage<FixPlan> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 20);
+  messageDesc(file_mistgate_admin_v1_health, 21);
 
 /**
  * @generated from message mistgate.admin.v1.ApplyFixRequest
@@ -902,7 +977,7 @@ export type ApplyFixRequest = Message<"mistgate.admin.v1.ApplyFixRequest"> & {
  * Use `create(ApplyFixRequestSchema)` to create a new message.
  */
 export const ApplyFixRequestSchema: GenMessage<ApplyFixRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 21);
+  messageDesc(file_mistgate_admin_v1_health, 22);
 
 /**
  * @generated from message mistgate.admin.v1.ApplyFixResponse
@@ -966,7 +1041,7 @@ export type ApplyFixResponse = Message<"mistgate.admin.v1.ApplyFixResponse"> & {
  * Use `create(ApplyFixResponseSchema)` to create a new message.
  */
 export const ApplyFixResponseSchema: GenMessage<ApplyFixResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 22);
+  messageDesc(file_mistgate_admin_v1_health, 23);
 
 /**
  * @generated from message mistgate.admin.v1.AcceptDoctorItemRequest
@@ -990,7 +1065,7 @@ export type AcceptDoctorItemRequest = Message<"mistgate.admin.v1.AcceptDoctorIte
  * Use `create(AcceptDoctorItemRequestSchema)` to create a new message.
  */
 export const AcceptDoctorItemRequestSchema: GenMessage<AcceptDoctorItemRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 23);
+  messageDesc(file_mistgate_admin_v1_health, 24);
 
 /**
  * @generated from message mistgate.admin.v1.AcceptDoctorItemResponse
@@ -1009,7 +1084,7 @@ export type AcceptDoctorItemResponse = Message<"mistgate.admin.v1.AcceptDoctorIt
  * Use `create(AcceptDoctorItemResponseSchema)` to create a new message.
  */
 export const AcceptDoctorItemResponseSchema: GenMessage<AcceptDoctorItemResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 24);
+  messageDesc(file_mistgate_admin_v1_health, 25);
 
 /**
  * @generated from message mistgate.admin.v1.UnacceptDoctorItemRequest
@@ -1031,7 +1106,7 @@ export type UnacceptDoctorItemRequest = Message<"mistgate.admin.v1.UnacceptDocto
  * Use `create(UnacceptDoctorItemRequestSchema)` to create a new message.
  */
 export const UnacceptDoctorItemRequestSchema: GenMessage<UnacceptDoctorItemRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 25);
+  messageDesc(file_mistgate_admin_v1_health, 26);
 
 /**
  * @generated from message mistgate.admin.v1.UnacceptDoctorItemResponse
@@ -1048,7 +1123,7 @@ export type UnacceptDoctorItemResponse = Message<"mistgate.admin.v1.UnacceptDoct
  * Use `create(UnacceptDoctorItemResponseSchema)` to create a new message.
  */
 export const UnacceptDoctorItemResponseSchema: GenMessage<UnacceptDoctorItemResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_health, 26);
+  messageDesc(file_mistgate_admin_v1_health, 27);
 
 /**
  * @generated from enum mistgate.admin.v1.AlertSeverity

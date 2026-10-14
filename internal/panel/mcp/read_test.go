@@ -59,6 +59,21 @@ func TestReadToolsLeakNothing(t *testing.T) {
 	}
 }
 
+// checks_results splits the response time from the connect time and names the UDP loss of the panel's host.
+func TestChecksResultsContent(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	v := decode[ChecksV](t, mustOK(t, s, "checks_results", map[string]any{}))
+	c := v.Rows[0].Cells[0]
+	if c.LatencyMs != 2600 || c.ConnectMs != 2400 || c.ResponseMs != 90 || c.ResponseHourMs != 80 || c.ConnectHourMs != 2300 {
+		t.Errorf("cell: %+v", c)
+	}
+	if v.UdpLoss == nil || len(v.UdpLoss.Nodes) != 1 || v.UdpLoss.Nodes[0] != "de1" || v.UdpLoss.SharePercent != 40 {
+		t.Errorf("udp_loss: %+v", v.UdpLoss)
+	}
+}
+
 func TestFleetStatusContent(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileReadonly)

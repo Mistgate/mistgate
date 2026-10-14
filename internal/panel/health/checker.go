@@ -62,7 +62,7 @@ func (s *Service) cellOf(ctx context.Context, inboundID string) cell {
 }
 
 func sampleResult(x store.CheckSample) Result {
-	return Result{Status: adminv1.CheckStatus(x.Status), At: x.At, LatencyMS: x.LatencyMS, ExitIP: x.ExitIP, ExitCountry: x.ExitCountry,
+	return Result{Status: adminv1.CheckStatus(x.Status), At: x.At, LatencyMS: x.LatencyMS, ConnectMS: x.ConnectMS, ResponseMS: x.ResponseMS, ExitIP: x.ExitIP, ExitCountry: x.ExitCountry,
 		ErrorCode: x.ErrorCode, ErrorDetail: x.ErrorDetail}
 }
 

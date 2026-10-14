@@ -150,6 +150,44 @@ func TestDoctorRowsReplaceAndMerge(t *testing.T) {
 	}
 }
 
+// Migration 00065: connect_ms and response_ms are stored and read back by every query that reads rounds; 0 stays 0 (not
+// measured) and the daily aggregates do not look at them.
+func TestSamplesKeepConnectAndResponse(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	_, in := fixtureInbound(t, s, "a")
+	at := time.Unix(20_000*86400+100, 0)
+	for i, c := range []CheckSample{
+		{InboundID: in, At: at, Status: 1, LatencyMS: 2700, ConnectMS: 2600, ResponseMS: 95},
+		{InboundID: in, At: at.Add(time.Second), Status: 1, LatencyMS: 120}, // a round from before the columns
+	} {
+		if err := s.InsertSample(ctx, c); err != nil {
+			t.Fatal(i, err)
+		}
+	}
+	since, err := s.SamplesSince(ctx, at)
+	if err != nil || len(since) != 2 || since[0].ConnectMS != 2600 || since[0].ResponseMS != 95 || since[0].LatencyMS != 2700 || since[1].ConnectMS != 0 || since[1].ResponseMS != 0 {
+		t.Fatalf("since: %+v %v", since, err)
+	}
+	recent, err := s.RecentSamples(ctx, in, 1)
+	if err != nil || len(recent) != 1 || recent[0].ConnectMS != 0 || recent[0].ResponseMS != 0 || recent[0].LatencyMS != 120 {
+		t.Fatalf("recent: %+v %v", recent, err)
+	}
+	// the same second again replaces the round, columns included
+	if err := s.InsertSample(ctx, CheckSample{InboundID: in, At: at, Status: 1, LatencyMS: 80, ConnectMS: 50, ResponseMS: 30}); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := s.SamplesSince(ctx, at); len(again) != 2 || again[0].ConnectMS != 50 || again[0].ResponseMS != 30 {
+		t.Fatalf("replaced: %+v", again)
+	}
+	if err := s.RollupDaily(ctx, at.Add(48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := s.DailyRows(ctx, in); len(rows) != 1 || rows[0].P50MS != 80 || rows[0].P95MS != 120 {
+		t.Fatalf("daily stays on latency_ms: %+v", rows)
+	}
+}
+
 func TestSamplesRollupAndPrune(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)
