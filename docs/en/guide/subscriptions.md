@@ -3,7 +3,7 @@ title: Subscriptions
 description: "One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription."
 ---
 
-Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has five tabs: **Apps & formats**, **Who gets what**, **Names & texts**, **User page** and **DNS**.
+Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has five tabs: **Apps & formats**, **Who gets what**, **Names & texts**, **User page** and **DNS**.
 
 ## The link
 
@@ -24,6 +24,8 @@ https://sub.example.com/<secret prefix>/<token>
 | **Link list (base64)** | One share link per server in a plain list. Happ, v2rayNG, Hiddify and most other apps read it. | Any app without a rule. |
 | **Web page** | The person's page: instructions, a QR code, their traffic. See [User page](user-page.md). | Anyone who opens the link in a browser. |
 | **Mihomo YAML** | A ready config for Mihomo and Clash Meta with every protocol the person has. | Apps on the mihomo core (kl!ck, Clash Meta, FlClash, Clash Verge), by the rules `mihomo` and `clash`. |
+| **Xray JSON** | A JSON array with one Xray config per server, for v2rayNG, v2rayN and other apps on the Xray core. | Nobody, until you add a rule for it. |
+| **sing-box JSON** | One profile for the official sing-box apps (SFA, SFI, SFM): every server in one switch, with the person's DNS. | The official sing-box apps, by the rule `sing-box`. |
 | **Fake 404** | Pretends the link does not exist. Handy to shut out a scraper by its User-Agent. | Nobody, until you add a rule for it. |
 
 ```mermaid
@@ -42,16 +44,49 @@ sequenceDiagram
   P-->>B: the person's page
 ```
 
-The **Apps & formats** tab lists the apps the protocols work with and what each reads: Happ reads the link list, Mihomo / Clash Meta (kl!ck and the other apps on the mihomo core) reads the Mihomo YAML, and AmneziaVPN does not read the subscription at all (it takes a `vpn://` key from the person's page).
+The **Apps & formats** tab lists the apps the protocols work with and what each reads: Happ reads the link list (and Xray JSON, when a rule gives it), Mihomo / Clash Meta (kl!ck and the other apps on the mihomo core) reads the Mihomo YAML, sing-box reads the sing-box JSON, and AmneziaVPN does not read the subscription at all (it takes a `vpn://` key from the person's page).
 
-**Planned:** more formats (Xray JSON, sing-box) and subscription mirrors.
+### Xray JSON and sing-box JSON
+
+Both are built from the same profiles and the same access as the link list. They differ in what a format can carry ([What works where](#what-works-where)) and in how the app is wired.
+
+- **Xray JSON** is an array of configs, one per server; the server's name is the `remarks` of its config. Each config opens a local SOCKS proxy on `127.0.0.1:10808`, which the app's own VPN mode feeds. Other apps on the device can see that port, and some VPN checks look for it. There is no HTTP proxy, no API and no statistics port. The DNS preset is written into every config.
+- **sing-box JSON** is one profile: a switch with every server (the first is the default), a TUN interface, and the DNS preset. It opens no local proxy. It needs sing-box 1.12 or newer.
+
+The names follow the template of [Names & texts](#names-texts). Xray JSON keeps the link list's 30-character limit and, for Happ, the load; sing-box JSON keeps the full names and never adds the load.
+
+**Planned:** subscription mirrors.
+
+## What works where
+
+A server that a format cannot carry is left out of that format without a word, as Gecko is already left out of the link list. The person's page is built from the link list and does not change. The **Subscription formats** line on each profile says the same ([Profiles](profiles.md#subscription-formats-of-a-profile)).
+
+| Profile | Link list | Mihomo YAML | Xray JSON | sing-box JSON |
+|:--|:--|:--|:--|:--|
+| Hysteria2, Let's Encrypt (with or without Salamander) | yes | yes | yes | yes |
+| Hysteria2, self-signed (pinned) | yes | yes | yes | no |
+| Hysteria2 with Gecko | no | yes | no | no |
+| Hysteria2 with port hopping | one port | the range | one port | the range |
+| VLESS REALITY over XHTTP (the default) | yes | yes | yes | no |
+| VLESS REALITY over TCP (RAW + Vision) | yes | yes | yes | yes |
+| VLESS TLS over XHTTP, direct or behind a CDN | yes | yes | yes | no |
+| VLESS TLS over WebSocket, direct or behind a CDN | yes | yes | yes | yes |
+| AmneziaWG 2.0 and 3.1 | no | yes | no | no |
+| The WARP copy of any of these | as its original | as its original | as its original | as its original |
+
+- sing-box has no XHTTP transport and cannot check a self-signed certificate by its fingerprint. Gecko is carried by Mihomo only.
+- AmneziaWG reaches an app only through Mihomo YAML or an AmneziaVPN key.
+- A WARP copy is the node's exit; nothing changes on the client, so it follows the profile it copies.
+- A person for whom a format has no server at all gets a placeholder entry: see [When no server fits the app](#when-no-server-fits-the-app).
 
 ## Who gets what
 
 The **Who gets what** tab is a list of rules, top to bottom. A rule is a piece of text and a format: an app whose User-Agent contains the text (case does not matter) gets that format. The first rule that matches decides. Whatever matches nothing lands on the last line, **Everything else**: a browser gets the page, any app gets the link list.
 
-A fresh panel has two rules: `mihomo` and `clash`, both to **Mihomo YAML**.
+A fresh panel has three rules: `mihomo` and `clash`, both to **Mihomo YAML**, and `sing-box` to **sing-box JSON**, as the last rule. The official sing-box apps send a User-Agent such as `SFA (sing-box 1.14.3; language en_US)`, which the last rule takes.
 
+- A panel that was made before this rule existed gets it once, when it is updated, at the end of its list. It is not added when a rule with the text `sing-box` is already there (whatever its format) or the list is full, and it does not come back after you delete it.
+- Hiddify stays on **Mihomo YAML**: its User-Agent contains `ClashMeta`, and the rule `clash` is above `sing-box`. Happ stays on the link list. Xray JSON goes out only by a rule of yours, for example **User-Agent contains** `v2rayng`, **Serve** **Xray JSON**.
 - **Add rule**: **User-Agent contains** and **Serve**.
 - Drag a rule, or use the arrows, to change the order. The order is saved at once.
 - A removed rule can be brought back from the message for a few seconds.
@@ -59,7 +94,9 @@ A fresh panel has two rules: `mihomo` and `clash`, both to **Mihomo YAML**.
 
 What counts as a browser: a User-Agent that starts with `Mozilla/`, has a browser engine (`AppleWebKit`, `Gecko/`, `Firefox/`, `Trident/`) and does not name a known VPN app (Happ, v2ray, clash, mihomo, hiddify, sing-box, streisand, shadowrocket, karing, flclash, nekobox, okhttp, cfnetwork). An unusual app that looks like a browser is steered with a rule.
 
-**Try a User-Agent**: paste what an app sends, or pick an example, and the tab shows which rule takes it ("Rule 2 matches → Mihomo YAML", "Nothing matched, and it looks like a browser → web page", "Nothing matched → link list").
+**Try a User-Agent**: paste what an app sends, or pick an example, and the tab shows which rule takes it ("Rule 2 matches → Mihomo YAML", "Nothing matched, and it looks like a browser → web page", "Nothing matched → link list"). The examples include `sing-box` and `v2rayNG`.
+
+**Trying a format on one request.** `?format=xray-json` or `?format=sing-box` at the end of a subscription link picks the format for that request, whatever the rules say. It is meant for trying an app that no rule names yet. It grants nothing more than a rule does: a link nobody owns still gets the fake 404, a link whose rule is **Fake 404** stays the fake 404, and any other value is ignored. The user page never shows a link with the parameter.
 
 ## Device limit for apps on the link
 
@@ -98,9 +135,9 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Profile-Web-Page-Url` | The link itself: the app's button to the person's page. |
 | `Announce` | The announcement, or the reason the subscription does not work. |
 | `Support-Url` | The support link. |
-| `Routing` | Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). |
+| `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
 
-The Mihomo YAML carries the same headers, one proxy group with every server, and a `dns:` section from the person's DNS preset.
+The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has one proxy group with every server and a `dns:` section; Xray JSON has one config per server; sing-box JSON has one switch with every server. Each takes the person's DNS preset in its own form.
 
 ## Names & texts
 
@@ -143,7 +180,17 @@ In Russian: «Подписка закончилась 29 сентября. На�
 
 In Chinese: 「订阅已于9月29日到期。联系我们即可续期」、「流量已用完，10月1日重置」、「流量已用完。联系我们提高额度」、「访问已暂停」.
 
+In Xray JSON the entry is one config named after the reason; in sing-box JSON it is a switch with one entry of that name. Both never connect.
+
 For such a person the refresh interval drops to 1 hour, so a fix (term extended, quota raised) reaches the app soon. The person's page explains the same in their language.
+
+### When no server fits the app
+
+Xray JSON and sing-box JSON never answer an active person with an empty document. When none of the person's servers can be carried in the format (all of them use XHTTP and the app reads sing-box, or the person has only AmneziaWG, or there is no server at all), the app gets one entry that never connects, named "Your servers do not work in this app. The subscription page shows which app does". The announcement carries the same text.
+
+In Russian: «Ваши серверы не работают в этом приложении. Какое подойдёт — на странице подписки».
+
+In Chinese: 「这些服务器无法在此应用中使用。适用的应用请在订阅页面查看」.
 
 ## What the app shows when a device is refused
 
@@ -170,6 +217,8 @@ The answer also carries the headers that Remnawave and 3x-ui use, so the apps th
 
 A blocked device gets `X-Hwid-Active` and `X-Hwid-Limit` only: the limit is not why it is refused, and an app that reads the flags must not tell the person to free a place. Its announcement says what happened.
 
+SFA and SFI send no device ID, so in **Strict** they get the refusal entry instead ("This app does not report a device ID…", in sing-box JSON) and cannot connect.
+
 Apps differ in what they show of this: Happ shows the announcement and the name of the entry, kl!ck only the entry, since it does not read the announcement. See [Client apps](client-apps.md#which-apps-send-a-device-id).
 
 ## The user page
@@ -189,7 +238,7 @@ The page shows one card per app on each platform, in the order of this list. Sev
 | **Description on the card** | Plain text, up to 80 characters. Empty: the card says how the app connects. |
 | **Recommended** | A badge on the card; the recommended app leads its platform. |
 
-**Add app** takes a platform and either a **Known app** (kl!ck, Happ, AmneziaVPN, Clash Verge Rev, FlClash, Clash Meta for Android, Hiddify, v2rayNG: it fills in the name, the kind, the download link and the "add" template of that platform) or a kind (**Takes**) for a blank card. Every field stays editable. The arrows move an app among the apps of its platform. Up to 30 apps.
+**Add app** takes a platform and either a **Known app** (kl!ck, Happ, AmneziaVPN, Clash Verge Rev, FlClash, Clash Meta for Android, Hiddify, v2rayNG, sing-box: it fills in the name, the kind, the download link and the "add" template of that platform) or a kind (**Takes**) for a blank card. Every field stays editable. The arrows move an app among the apps of its platform. Up to 30 apps.
 
 A fresh panel recommends kl!ck on Windows and macOS (Happ second) and Happ on iOS and Android, and offers AmneziaVPN for keys on all five platforms (from the store on phones, from the AmneziaVPN site elsewhere). Which app suits which platform, what each one receives and how the one-tap links work: [Client apps](client-apps.md).
 

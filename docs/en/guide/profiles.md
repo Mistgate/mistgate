@@ -30,6 +30,29 @@ Every profile is a card: its name, the protocol, a short line of its settings ("
 
 **New profile** opens the editor.
 
+Each card carries a quiet line that says in which subscription formats the profile works: see [Subscription formats of a profile](#subscription-formats-of-a-profile).
+
+## Subscription formats of a profile
+
+Not every subscription format can carry every profile: sing-box has no XHTTP, only Mihomo has Gecko and AmneziaWG. Each card of the list, and the editor under **What the client sees** → **Subscription formats**, shows where the profile works. The table of profile kinds is on [Subscriptions](subscriptions.md#what-works-where).
+
+- The line lists the formats that carry the profile: "Link list · Mihomo · Xray JSON · sing-box". A profile that works everywhere has only this line.
+- A yellow chip marks a real loss: "not in sing-box: XHTTP". Formats that lose the profile for the same reason share one chip: "not in Link list, Xray JSON, sing-box: Gecko". Hover or focus a chip for the full sentence.
+- AmneziaWG is not a loss, it is how it works: the line ends "Mihomo · AmneziaVPN keys", with no chip.
+- A Hysteria2 port-hopping range is not a loss either. The link list and Xray JSON write it as one port, so their names carry a dotted underline and a tip: "The port range is written as one port."
+- In the editor the line follows your settings as you type, and it is hidden while the draft has errors. On the user card, next to a subscription profile that some format leaves out, only the yellow chip shows.
+
+The reasons are stable codes. The panel's API and [MCP](../reference/mcp.md) return them as `note` on each format of a profile.
+
+| Code | Chip | Meaning |
+|:--|:--|:--|
+| `xhttp` | XHTTP | sing-box has no XHTTP transport: VLESS over XHTTP, REALITY or TLS, direct or behind a CDN, and the node's own site. |
+| `self_signed` | self-signed | sing-box cannot check a self-signed Hysteria2 certificate by its fingerprint. |
+| `gecko` | Gecko | Only Mihomo carries Hysteria2 with Gecko. |
+| `awg` | AmneziaVPN keys | The link list, Xray JSON and sing-box do not carry AmneziaWG. Shown as a dotted word, not a chip. |
+| `unsupported` | unsupported | The format renders nothing for this profile and gives no reason of its own, for example a bad address. |
+| `hop_single_port` | one port | The format carries the profile with the port-hopping range written as one port. Not a loss. |
+
 ## Creating a profile
 
 1. **New profile**. If the panel has more than one protocol, pick it under **Protocol**. The form starts from the plugin's defaults, with every secret already generated.
@@ -40,7 +63,7 @@ Every profile is a card: its name, the protocol, a short line of its settings ("
    - **Add it to groups**: the groups that have no profile of this protocol yet are ticked (without one, their people get nothing in that app); groups that already have one are not, because a second profile is usually a test or a variant. With no groups at all, the switch **Create the group "Everyone" with this profile** is offered.
 5. **Create profile**. The profile is created, added to the groups, then put on the nodes one by one in the same window. A node that refuses keeps the window open with the reason and a field to fix it (another port, a domain).
 
-The panel on the right, **What the client sees**, shows what a client would get for this profile, with secrets hidden: the share link for Hysteria2 ("Subscription link · URI list"), the `.conf` for AmneziaWG ("AmneziaVPN · .conf").
+The panel on the right, **What the client sees**, shows what a client would get for this profile, with secrets hidden: the share link for Hysteria2 ("Subscription link · URI list"), the `.conf` for AmneziaWG ("AmneziaVPN · .conf"). Under it, **Subscription formats** shows where the profile works.
 
 ## Where it runs
 

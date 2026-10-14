@@ -24,7 +24,9 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 | kl!ck | Mihomo YAML（kl!ck 发送 `User-Agent: mihomo/…`，会匹配默认规则 `mihomo`） | Hysteria2、VLESS 和 AmneziaWG 服务器、一个服务器组，以及根据用户 DNS 预设生成的 `dns:` 部分。 |
 | Clash Verge Rev、FlClash、Clash Meta for Android | Mihomo YAML，应用的 User-Agent 包含 `clash` 或 `mihomo` 时（匹配两条默认规则之一） | 与 kl!ck 相同。没有匹配任何规则的应用会获取链接列表：添加包含其部分 User-Agent 的规则。 |
 | Happ | 链接列表（base64） | Hysteria2 和 VLESS 服务器；Happ 不支持 AmneziaWG。Happ 还会收到包含 DNS 预设的 `Routing` 响应头，以及服务器名称中的负载信息。 |
-| Hiddify、v2rayNG 和同类应用 | 链接列表（base64），除非匹配你设置的规则 | Hysteria2 和 VLESS 服务器。应用能否读取 `hysteria2://` 和 `vless://`（REALITY、XHTTP）链接取决于其版本。 |
+| Hiddify | Mihomo YAML：它的 User-Agent 包含 `ClashMeta`，默认规则 `clash` 会在 `sing-box` 之前匹配到它 | Mihomo YAML。应用会使用其中的哪些服务器取决于其版本。 |
+| v2rayNG、v2rayN 和其他基于 Xray 内核的应用 | 链接列表（base64），或按你设置的规则提供 Xray JSON | Hysteria2 和 VLESS 服务器。在链接列表中，应用能否读取 `hysteria2://` 和 `vless://`（REALITY、XHTTP）链接取决于其版本。在 Xray JSON 中，每台服务器一份配置；不含 AmneziaWG，也不含使用 Gecko 的 Hysteria2。 |
+| sing-box 应用（SFA、SFI、SFM） | sing-box JSON：它们的 User-Agent 以 `SFA (sing-box …`、`SFI (sing-box …` 或 `SFM (sing-box …` 开头，由默认规则 `sing-box` 匹配 | 一个选择器，包含 Hysteria2（Let's Encrypt，不含 Gecko）和 VLESS（TCP 或 WebSocket）服务器，并带有用户的 DNS。参见 [sing-box](#sing-box)。 |
 | AmneziaVPN、AmneziaWG 应用 | 不使用订阅：每台设备从用户页面获取一个密钥（`vpn://`、`.conf` 文件或二维码） | 仅 AmneziaWG。 |
 
 只有在用户开启 AmneziaVPN 连接方式（在用户卡片或分组中的**订阅中的应用**设置），且用户所在分组有部署到节点的 AmneziaWG 协议配置时，基于 mihomo 内核的应用才会收到 AmneziaWG 服务器。此类应用首次获取订阅时，会为它的设备发放 AmneziaWG 密钥。内核版本需要足够新：面板会在每个密钥旁标出 AmneziaWG 3.1 所需的 Mihomo 1.19.30 或更新版本，以及 2.0 所需的 1.19.14 或更新版本（参见[AmneziaWG](amneziawg.md)）。
@@ -46,6 +48,8 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 - 使用不发送 ID 的应用的用户，在默认模式下不会被排除在外：这些应用共用一个名额。在**严格**模式下它们无法连接，提示信息会引导用户使用 Happ 或 kl!ck。
 - 全部大写的 ID（INCY 就是这样发送的）或不带连字符的 ID（Happ 在桌面端的备用 ID），面板会视为与普通形式相同的设备。
 
+Xray JSON 只会按规则（**订阅 → 下发规则**）提供给应用。v2rayNG 可以读取它，v2rayN 的文档说明从 6.40 版本起支持；v2RayTun、Streisand 等应用尚未确认。Happ 也被列为可以读取，但仍使用链接列表。编写规则之前，可以先在订阅链接后加上 `?format=xray-json` 试用该应用（参见[订阅](subscriptions.md#下发规则)）。
+
 ## 一键添加链接
 
 用户页面上的**添加**按钮会打开应用，并自动填入订阅链接。此按钮使用应用自己的链接方案，并将订阅链接填入应用的 **「添加」链接模板**（占位符 `{url}`、`{url_enc}`、`{name_enc}`；参见[订阅](subscriptions.md)）。模板为空或应用无法识别链接时，页面会提供**复制链接**：在应用的添加订阅页面中粘贴链接。
@@ -61,10 +65,11 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 | Clash Meta for Android | Android | `clashmeta://install-config?url={url_enc}&name={name_enc}` |
 | Hiddify | Android、iOS、Windows、macOS、Linux | `hiddify://import/{url}#{name_enc}` |
 | v2rayNG | Android | `v2rayng://install-sub?url={url_enc}` |
+| sing-box | iOS、Android、macOS | `sing-box://import-remote-profile?url={url_enc}#{name_enc}` |
 | AmneziaVPN | 所有平台 | 无：每台设备使用独立密钥，不使用订阅 |
 
 - Happ 自己的文档没有说明 `happ://add/`。其他面板的订阅页面使用此格式，Mistgate 默认也采用这种格式。如果手机上点击按钮没有反应，用户可以复制链接。
-- 暂不在选择器中提供以下应用，因为它们的链接方案无法确认：Streisand 和 Shadowrocket（将模板留空，让用户粘贴链接）。sing-box 完全不提供：它只能打开 Mistgate 不提供的 sing-box JSON 配置。
+- 暂不在选择器中提供以下应用，因为它们的链接方案无法确认：Streisand 和 Shadowrocket（将模板留空，让用户粘贴链接）。
 - 多种 Clash 应用都会注册 `clash://` 方案，因此系统可能会打开其他应用。使用上表中的应用专属方案。
 
 ## kl!ck
@@ -79,12 +84,26 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 **一键添加及其限制**。kl!ck 支持 `klick://add?url=<percent-encoded https link>&name=<optional name>`（也支持 `klick://add/<link>`）。它不会自动添加订阅：它会打开**添加**页面并填入订阅链接，只显示链接的域名，需要用户确认。链接必须使用 `https://`。kl!ck 在 0.4.0 之后才加入此处理方式，因此**一键添加需要使用比 0.4.0 更新的 kl!ck 版本**。旧版无法识别此方案：用户需要从页面复制链接，然后在 kl!ck 中手动添加。
 
+## sing-box
+
+官方应用是 sing-box 项目的 SFA（Android）、SFI（iOS）和 SFM（macOS）。Windows 和 Linux 没有官方的 sing-box 应用，因此选择器中这两个平台没有它。Mistgate 的配置需要 sing-box 1.12 或更高版本。
+
+**面板需要做什么。** 不需要：这些应用发送形如 `SFA (sing-box 1.14.3; language en_US)` 的 User-Agent，默认规则 `sing-box` 会向它们提供 sing-box JSON（参见[订阅](subscriptions.md#下发规则)）。新面板的用户页面上没有它们；通过**已知应用** → sing-box 添加。
+
+**它们会收到什么。** 一个选择器，包含它们能够使用的所有服务器（默认选第一台），以及用户的 DNS 预设。Hysteria2 仅限 Let's Encrypt 证书且不含 Gecko；VLESS 使用 TCP（RAW + Vision）或 WebSocket。不含 AmneziaWG、使用 XHTTP 的 VLESS 和自签名的 Hysteria2：参见[各格式支持哪些协议配置](subscriptions.md#各格式支持哪些协议配置)。
+
+**设备 ID。** SFA 和 SFI 不发送设备 ID。设备上限为**严格**模式时，它们会被拒绝，并看到「此应用未提供设备 ID」。
+
+**下载。** Android：Google Play（<https://play.google.com/store/apps/details?id=io.nekohasekai.sfa>）。iOS：App Store（<https://apps.apple.com/app/sing-box-mt/id6785326793>，名称为「sing-box MT」）。macOS：该项目的发布页面（<https://github.com/SagerNet/sing-box/releases/latest>），其中 SFM 是单独的安装包。
+
+**一键添加。** `sing-box://import-remote-profile?url=<百分号编码的 https 链接>#<名称>` 会把订阅作为远程配置导入。该方案来自 sing-box 的文档和应用源代码，尚未在设备上试过。
+
 ## 在管理后台配置应用
 
 **订阅 → 用户页面 → 页面上的应用**是页面显示的应用卡片列表（参见[订阅](subscriptions.md#用户页面中的应用)）。添加应用的步骤如下：
 
 1. 在列表下方选择一个**平台**。
-2. 选择一个**已知应用**：kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify 或 v2rayNG。列表只显示该平台上可用的应用。**自定义应用，手动填写**可保留原有方式：选择**接入方式**并自行填写字段。
+2. 选择一个**已知应用**：kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify、v2rayNG 或 sing-box。列表只显示该平台上可用的应用。**自定义应用，手动填写**可保留原有方式：选择**接入方式**并自行填写字段。
 3. 点击**添加应用**。卡片会自动填入应用名称、类型、该平台的下载链接和「添加」链接模板。你可以编辑任一字段，添加最多 80 个字符的说明，并开启**推荐**。
 4. 使用箭头移动卡片：推荐应用会排在该平台的最前面；推荐状态相同时，列表中位置靠前的应用排在前面。点击**保存**。
 
@@ -97,7 +116,7 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 - Windows 和 macOS：先显示并推荐 kl!ck（发布页面和 `klick://add?url={url_enc}&name={name_enc}`），然后是 Happ。
 - iOS 和 Android：Happ，并设为推荐应用，使用 `happ://add/{url}`。
 - 所有五个平台：AmneziaVPN 密钥（手机端提供应用商店链接，其他平台提供 AmneziaVPN 网站链接）。
-- 两条规则：`mihomo` 和 `clash`，都指向 Mihomo YAML。
+- 三条规则：`mihomo` 和 `clash`，都指向 Mihomo YAML，以及指向 sing-box JSON 的 `sing-box`。
 
 以上默认值只会在尚未保存设置的面板中显示。设置保存后，面板会完整保留你保存的列表；更新不会重写它。
 

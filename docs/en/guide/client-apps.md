@@ -24,7 +24,9 @@ One subscription link serves every app. The panel picks the format by the app's 
 | kl!ck | Mihomo YAML (kl!ck sends `User-Agent: mihomo/…`, which the default rule `mihomo` takes) | Hysteria2, VLESS and AmneziaWG servers, one server group, a `dns:` section from the person's DNS preset. |
 | Clash Verge Rev, FlClash, Clash Meta for Android | Mihomo YAML, when the app's User-Agent contains `clash` or `mihomo` (the two default rules) | The same as for kl!ck. An app that matches no rule gets the link list: add a rule with part of its User-Agent. |
 | Happ | Link list (base64) | Hysteria2 and VLESS servers: Happ cannot carry AmneziaWG. Happ alone also gets the `Routing` header with the DNS preset and the load in the server names. |
-| Hiddify, v2rayNG and other apps of that family | Link list (base64), unless a rule of yours matches them | Hysteria2 and VLESS servers. Whether the app reads `hysteria2://` and `vless://` (REALITY, XHTTP) links depends on its version. |
+| Hiddify | Mihomo YAML: its User-Agent contains `ClashMeta`, which the default rule `clash` takes before `sing-box` | The Mihomo YAML. Which of its servers the app uses depends on its version. |
+| v2rayNG, v2rayN and other apps on the Xray core | Link list (base64), or Xray JSON by a rule of yours | Hysteria2 and VLESS servers. In the link list, whether the app reads `hysteria2://` and `vless://` (REALITY, XHTTP) links depends on its version. In Xray JSON, one config per server; no AmneziaWG, no Hysteria2 with Gecko. |
+| sing-box apps (SFA, SFI, SFM) | sing-box JSON: their User-Agent starts with `SFA (sing-box …`, `SFI (sing-box …` or `SFM (sing-box …`, which the default rule `sing-box` takes | One switch with Hysteria2 (Let's Encrypt, no Gecko) and VLESS (TCP or WebSocket) servers and the person's DNS. See [sing-box](#sing-box). |
 | AmneziaVPN, AmneziaWG apps | No subscription: a key per device (`vpn://`, a `.conf` file or a QR code) from the person's page | AmneziaWG only. |
 
 The AmneziaWG servers reach an app on the mihomo core only when the person has the AmneziaVPN way switched on (**Apps in the subscription** on the user card or the group) and the group has an AmneziaWG profile on a node. The first fetch by such an app gives its device the AmneziaWG keys. The core must be new enough: the panel lists Mihomo 1.19.30 or newer for AmneziaWG 3.1 and 1.19.14 for 2.0, next to every key ([AmneziaWG](amneziawg.md)).
@@ -46,6 +48,8 @@ The [device limit](subscriptions.md#device-limit-for-apps-on-the-link) counts an
 - A person on an app without an ID is not left out in the default mode: those apps share one place. In **Strict** they cannot connect, and the message sends them to Happ or kl!ck.
 - The panel reads an ID in capitals (INCY sends one) or without dashes (the alternative ID of Happ on a desktop) as the same device as its ordinary form.
 
+Xray JSON reaches an app only by a rule (**Subscriptions → Who gets what**). v2rayNG reads it, and v2rayN is documented to from version 6.40; for v2RayTun, Streisand and the like it is not confirmed. Happ is listed as able to read it too, but stays on the link list. Before you write a rule, try the app with `?format=xray-json` added to a subscription link (see [Subscriptions](subscriptions.md#who-gets-what)).
+
 ## One-tap add links
 
 The **Add** button on the user page opens the app with the subscription already in it. It is the app's own link scheme with the subscription link filled into the **"Add" link template** of the app (placeholders `{url}`, `{url_enc}`, `{name_enc}`: see [Subscriptions](subscriptions.md)). When the template is empty, or the app does not understand the link, the page offers **Copy link**: paste it in the app's add-subscription screen.
@@ -61,10 +65,11 @@ These are the templates of the known apps. Each scheme is confirmed by the app's
 | Clash Meta for Android | Android | `clashmeta://install-config?url={url_enc}&name={name_enc}` |
 | Hiddify | Android, iOS, Windows, macOS, Linux | `hiddify://import/{url}#{name_enc}` |
 | v2rayNG | Android | `v2rayng://install-sub?url={url_enc}` |
+| sing-box | iOS, Android, macOS | `sing-box://import-remote-profile?url={url_enc}#{name_enc}` |
 | AmneziaVPN | all | none: a key per device, not a subscription |
 
 - Happ's own documentation does not describe `happ://add/`. It is the form subscription pages of other panels use, and the one Mistgate has shipped by default. If the button does nothing on a phone, the person copies the link instead.
-- Not offered in the picker, because their schemes are not confirmed: Streisand and Shadowrocket (leave the template empty and people paste the link). Not offered at all: sing-box, which opens only a sing-box JSON profile that Mistgate does not serve.
+- Not offered in the picker, because their schemes are not confirmed: Streisand and Shadowrocket (leave the template empty and people paste the link).
 - The `clash://` scheme is claimed by several Clash apps, so the system may open another one. Use the app's own scheme, as above.
 
 ## kl!ck
@@ -79,12 +84,26 @@ These are the templates of the known apps. Each scheme is confirmed by the app's
 
 **One-tap add, and its limit.** kl!ck handles `klick://add?url=<percent-encoded https link>&name=<optional name>` (also `klick://add/<link>`). It adds nothing by itself: it opens its **Add** screen with the subscription filled in, showing only the domain of the link, and the person confirms. The link must be `https://`. This handler was added to kl!ck after 0.4.0, so **one-tap needs a kl!ck build newer than 0.4.0**. Older builds do not know the scheme: the person copies the link from the page and adds it in kl!ck by hand.
 
+## sing-box
+
+The official apps are SFA (Android), SFI (iOS) and SFM (macOS), from the sing-box project. Windows and Linux have no official sing-box app, so the picker has none there. Mistgate's profile needs sing-box 1.12 or newer.
+
+**What the panel needs.** Nothing: the apps send a User-Agent of the form `SFA (sing-box 1.14.3; language en_US)`, and the default rule `sing-box` serves them the sing-box JSON (see [Subscriptions](subscriptions.md#who-gets-what)). They are not on the user page of a fresh panel; add them with **Known app** → sing-box.
+
+**What they get.** One switch with every server they can carry, the first one chosen, and the person's DNS preset. Hysteria2 only with a Let's Encrypt certificate and without Gecko; VLESS over TCP (RAW + Vision) or WebSocket. No AmneziaWG, no VLESS over XHTTP and no self-signed Hysteria2: [what works where](subscriptions.md#what-works-where).
+
+**Device ID.** SFA and SFI send no device ID. With the device limit on **Strict** they are refused and see "This app does not report a device ID".
+
+**Download.** Android: Google Play (<https://play.google.com/store/apps/details?id=io.nekohasekai.sfa>). iOS: the App Store (<https://apps.apple.com/app/sing-box-mt/id6785326793>, named "sing-box MT"). macOS: the releases page of the project (<https://github.com/SagerNet/sing-box/releases/latest>), where SFM is a separate package.
+
+**One-tap add.** `sing-box://import-remote-profile?url=<percent-encoded https link>#<name>` imports the subscription as a remote profile. The scheme comes from the sing-box documentation and the apps' sources; it has not been tried on a device yet.
+
 ## Set the apps up in the admin
 
 **Subscriptions → User page → Apps on the page** is the list of cards the page shows (see [Subscriptions](subscriptions.md#apps-on-the-page)). To add an app:
 
 1. Under the list choose a **Platform**.
-2. Choose a **Known app**: kl!ck, Happ, AmneziaVPN, Clash Verge Rev, FlClash, Clash Meta for Android, Hiddify or v2rayNG. The list holds the apps that exist on that platform. **Custom app, fill in by hand** keeps the old way: you pick the kind (**Takes**) and fill the fields yourself.
+2. Choose a **Known app**: kl!ck, Happ, AmneziaVPN, Clash Verge Rev, FlClash, Clash Meta for Android, Hiddify, v2rayNG or sing-box. The list holds the apps that exist on that platform. **Custom app, fill in by hand** keeps the old way: you pick the kind (**Takes**) and fill the fields yourself.
 3. Press **Add app**. The card is filled with the name, the kind, the download link of that platform and the "add" link template. Edit any field, add a description (80 characters), switch **Recommended** on.
 4. Move the card with the arrows: the recommended app leads its platform, and among equals the first in the list does. Press **Save**.
 
@@ -97,7 +116,7 @@ A panel that has not saved its subscription settings yet shows these defaults:
 - Windows and macOS: kl!ck first and recommended (the releases page, `klick://add?url={url_enc}&name={name_enc}`), then Happ.
 - iOS and Android: Happ, recommended, with `happ://add/{url}`.
 - All five platforms: AmneziaVPN for keys (from the store on phones, from the AmneziaVPN site elsewhere).
-- Two rules, `mihomo` and `clash`, both to the Mihomo YAML.
+- Three rules: `mihomo` and `clash`, both to the Mihomo YAML, and `sing-box` to the sing-box JSON.
 
 The defaults are only what an unsaved panel shows. Once you have saved the settings, the panel keeps your list exactly as saved: an update never rewrites it.
 

@@ -3,7 +3,7 @@ title: 订阅
 description: 每位用户使用一个链接访问所有应用：每个应用会获取哪种格式、面板如何决定、服务器如何命名、应用会显示什么，以及订阅的各项设置。
 ---
 
-每位用户都有一个订阅链接。同一个链接会向订阅类应用提供服务器列表，向基于 mihomo 内核的应用提供完整配置，也会在浏览器中打开该用户自己的页面。**订阅**部分决定每个应用会获取什么，以及用户会看到什么。此部分有五个标签页：**应用与格式**、**下发规则**、**名称与文本**、**用户页面** 和 **DNS**。
+每位用户都有一个订阅链接。同一个链接会向订阅类应用提供服务器列表，向基于 mihomo 内核的应用提供完整配置，向基于 Xray 或 sing-box 内核的应用提供它们各自的 JSON 配置，也会在浏览器中打开该用户自己的页面。**订阅**部分决定每个应用会获取什么，以及用户会看到什么。此部分有五个标签页：**应用与格式**、**下发规则**、**名称与文本**、**用户页面** 和 **DNS**。
 
 ## 链接
 
@@ -24,6 +24,8 @@ https://sub.example.com/<secret prefix>/<token>
 | **链接列表（base64）** | 每台服务器对应一个分享链接，按纯文本列表排列。Happ、v2rayNG、Hiddify 和大多数其他应用都支持。 | 没有匹配规则的应用。 |
 | **网页** | 用户页面：包含说明、二维码和用户流量。参见[用户页面](user-page.md)。 | 在浏览器中打开链接的所有人。 |
 | **Mihomo YAML** | 适用于 Mihomo 和 Clash Meta 的完整配置，包含用户拥有的所有协议。 | 按 `mihomo` 和 `clash` 规则匹配的基于 mihomo 内核的应用（kl!ck、Clash Meta、FlClash、Clash Verge）。 |
+| **Xray JSON** | JSON 数组，每台服务器对应一份 Xray 配置，适用于 v2rayNG、v2rayN 等基于 Xray 内核的应用。 | 无，需先为它添加规则。 |
+| **sing-box JSON** | 适用于官方 sing-box 应用（SFA、SFI、SFM）的单个配置：所有服务器在同一个选择器中，并带有用户的 DNS。 | 官方 sing-box 应用，按规则 `sing-box`。 |
 | **伪装 404** | 模拟链接不存在。适合按 User-Agent 屏蔽爬虫。 | 尚未设置匹配规则时，无人使用。 |
 
 ```mermaid
@@ -42,16 +44,49 @@ sequenceDiagram
   P-->>B: the person's page
 ```
 
-**应用与格式**标签页会列出各协议支持的应用及其读取格式：Happ 读取链接列表，Mihomo / Clash Meta（kl!ck 和其他基于 mihomo 内核的应用）读取 Mihomo YAML，AmneziaVPN 则不读取订阅（它从用户页面获取 `vpn://` 密钥）。
+**应用与格式**标签页会列出各协议支持的应用及其读取格式：Happ 读取链接列表（有规则指定时也读取 Xray JSON），Mihomo / Clash Meta（kl!ck 和其他基于 mihomo 内核的应用）读取 Mihomo YAML，sing-box 读取 sing-box JSON，AmneziaVPN 则不读取订阅（它从用户页面获取 `vpn://` 密钥）。
 
-**计划中**：更多格式（Xray JSON、sing-box）和订阅镜像。
+### Xray JSON 与 sing-box JSON
+
+两者都由与链接列表相同的协议配置和相同的访问权限生成。区别在于各格式能包含哪些内容（参见[各格式支持哪些协议配置](#各格式支持哪些协议配置)），以及应用的工作方式。
+
+- **Xray JSON** 是一个配置数组，每台服务器一份；服务器名称就是该配置的 `remarks`。每份配置都会在 `127.0.0.1:10808` 上开启本地 SOCKS 代理，由应用自己的 VPN 模式把流量送入其中。设备上的其他应用能看到这个端口，部分 VPN 检测会查找它。没有 HTTP 代理、API 和统计端口。DNS 预设会写入每份配置。
+- **sing-box JSON** 是一个配置：包含所有服务器的选择器（默认选第一台）、TUN 接口和 DNS 预设。它不会开启本地代理。需要 sing-box 1.12 或更高版本。
+
+名称遵循[名称与文本](#名称与文本)中的模板。Xray JSON 沿用链接列表的 30 个字符限制，Happ 还会收到负载信息；sing-box JSON 保留完整名称，不附带负载。
+
+**计划中**：订阅镜像。
+
+## 各格式支持哪些协议配置
+
+格式无法包含的服务器会直接从该格式中省略，就像链接列表现在省略 Gecko 一样。用户页面根据链接列表生成，不受影响。每个协议配置上的**订阅格式**一行说明的是同样的内容（参见[协议配置](profiles.md#协议配置的订阅格式)）。
+
+| 协议配置 | 链接列表 | Mihomo YAML | Xray JSON | sing-box JSON |
+|:--|:--|:--|:--|:--|
+| Hysteria2，Let's Encrypt（有或没有 Salamander） | 是 | 是 | 是 | 是 |
+| Hysteria2，自签名（固定指纹） | 是 | 是 | 是 | 否 |
+| 使用 Gecko 的 Hysteria2 | 否 | 是 | 否 | 否 |
+| 使用端口跳跃的 Hysteria2 | 单端口 | 整个范围 | 单端口 | 整个范围 |
+| VLESS REALITY，XHTTP（默认） | 是 | 是 | 是 | 否 |
+| VLESS REALITY，TCP（RAW + Vision） | 是 | 是 | 是 | 是 |
+| VLESS TLS，XHTTP，直连或经 CDN | 是 | 是 | 是 | 否 |
+| VLESS TLS，WebSocket，直连或经 CDN | 是 | 是 | 是 | 是 |
+| AmneziaWG 2.0 和 3.1 | 否 | 是 | 否 | 否 |
+| 以上任一项的 WARP 副本 | 同原协议配置 | 同原协议配置 | 同原协议配置 | 同原协议配置 |
+
+- sing-box 没有 XHTTP 传输，也无法按指纹校验自签名证书。Gecko 仅 Mihomo 支持。
+- AmneziaWG 只能通过 Mihomo YAML 或 AmneziaVPN 密钥送达应用。
+- WARP 副本是节点的出口，客户端上没有任何变化，因此它与所复制的协议配置表现一致。
+- 如果某个格式中一台服务器也没有，用户会收到一条占位记录：参见[没有适用于此应用的服务器时](#没有适用于此应用的服务器时)。
 
 ## 下发规则
 
 **下发规则**标签页会按从上到下的顺序列出规则。每条规则包含一段文本和一种格式：User-Agent 中包含此文本（不区分大小写）的应用会获取对应格式。按顺序使用第一个匹配规则。没有匹配项时，使用最后一行**其他所有情况**：浏览器会获取网页，其他应用会获取链接列表。
 
-新面板默认有两条规则：`mihomo` 和 `clash`，两者都使用 **Mihomo YAML**。
+新面板默认有三条规则：`mihomo` 和 `clash`，两者都使用 **Mihomo YAML**；最后一条 `sing-box` 使用 **sing-box JSON**。官方 sing-box 应用发送的 User-Agent 形如 `SFA (sing-box 1.14.3; language en_US)`，由最后一条规则匹配。
 
+- 在这条规则出现之前创建的面板，会在更新时获得它一次，放在列表末尾。如果已有文本为 `sing-box` 的规则（无论格式），或列表已满，则不会添加；删除后它也不会再回来。
+- Hiddify 仍使用 **Mihomo YAML**：它的 User-Agent 包含 `ClashMeta`，而规则 `clash` 排在 `sing-box` 之前。Happ 仍使用链接列表。Xray JSON 只会按你自己添加的规则提供，例如 **User-Agent 包含** `v2rayng`，**提供** **Xray JSON**。
 - **添加规则**：设置 **User-Agent 包含**和**提供**。
 - 拖动规则或使用箭头调整顺序。更改会立即保存。
 - 删除规则后，几秒内可以通过提示消息将其恢复。
@@ -59,7 +94,9 @@ sequenceDiagram
 
 浏览器的判定方法：User-Agent 以 `Mozilla/` 开头，包含浏览器引擎（`AppleWebKit`、`Gecko/`、`Firefox/`、`Trident/`），且未标明已知 VPN 应用（Happ、v2ray、clash、mihomo、hiddify、sing-box、streisand、shadowrocket、karing、flclash、nekobox、okhttp、cfnetwork）。如果某个不常见的应用看起来像浏览器，可以为它添加规则。
 
-**测试 User-Agent**：粘贴应用发送的内容，或选择示例；标签页会显示匹配的规则（「规则 2 匹配 → Mihomo YAML」、「没有匹配的规则，且看起来是浏览器 → 网页」、「没有匹配的规则 → 链接列表」）。
+**测试 User-Agent**：粘贴应用发送的内容，或选择示例；标签页会显示匹配的规则（「规则 2 匹配 → Mihomo YAML」、「没有匹配的规则，且看起来是浏览器 → 网页」、「没有匹配的规则 → 链接列表」）。示例中包含 `sing-box` 和 `v2rayNG`。
+
+**在单次请求中试用某个格式。** 在订阅链接末尾加上 `?format=xray-json` 或 `?format=sing-box`，即可为这一次请求指定格式，不受规则影响。它用于试用尚无对应规则的应用。它给出的权限不超过规则：无人拥有的链接仍然得到伪装 404，规则为**伪装 404** 的链接仍然是伪装 404，其他取值会被忽略。用户页面从不显示带此参数的链接。
 
 ## 订阅类应用的设备上限
 
@@ -98,9 +135,9 @@ sequenceDiagram
 | `Profile-Web-Page-Url` | 链接本身，即应用中指向用户页面的按钮。 |
 | `Announce` | 公告，或订阅无法使用的原因。 |
 | `Support-Url` | 支持链接。 |
-| `Routing` | 仅供 Happ 使用：用户的 DNS 预设，以 Happ 路由配置形式提供。参见[DNS](dns.md)。 |
+| `Routing` | 仅供 Happ 使用，且仅随链接列表发送：用户的 DNS 预设，以 Happ 路由配置形式提供。参见[DNS](dns.md)。其他格式自带 DNS，因此不发送 `Routing`。 |
 
-Mihomo YAML 会包含相同的响应头、包含所有服务器的一个代理组，以及根据用户 DNS 预设生成的 `dns:` 部分。
+Mihomo YAML、Xray JSON 和 sing-box JSON 包含相同的响应头，但没有 `Routing`。Mihomo YAML 有包含所有服务器的一个代理组和 `dns:` 部分；Xray JSON 每台服务器一份配置；sing-box JSON 是包含所有服务器的一个选择器。各格式都以自己的形式带上用户的 DNS 预设。
 
 ## 名称与文本
 
@@ -141,7 +178,15 @@ Mihomo YAML 会包含相同的响应头、包含所有服务器的一个代理�
 
 英语界面对应：「Subscription ended on 29 September. Message us to renew」、「Traffic used up, resets on 1 October」、「Traffic used up. Message us to raise the limit」、「Access paused」。俄语界面对应：「Подписка закончилась 29 сентября. Напишите — продлим」、「Трафик закончился, обнулится 1 октября」、「Трафик закончился. Напишите — увеличим」、「Доступ приостановлен」。
 
+在 Xray JSON 中，这条记录是以原因命名的一份配置；在 sing-box JSON 中，则是只含一条同名记录的选择器。它们都无法连接。
+
 此类用户的更新间隔会缩短到 1 小时，因此问题修复后（延长有效期、提高配额）很快就会同步到应用。用户页面也会以用户使用的语言说明相同情况。
+
+### 没有适用于此应用的服务器时
+
+Xray JSON 和 sing-box JSON 绝不会向活跃用户返回空文档。如果用户的服务器都无法用该格式提供（例如全部使用 XHTTP 而应用读取的是 sing-box，或者用户只有 AmneziaWG，或者根本没有服务器），应用会收到一条无法连接的记录，名称为「这些服务器无法在此应用中使用。适用的应用请在订阅页面查看」。公告中也是同样的文本。
+
+英语界面对应：「Your servers do not work in this app. The subscription page shows which app does」。俄语界面对应：「Ваши серверы не работают в этом приложении. Какое подойдёт — на странице подписки」。
 
 ## 设备被拒绝时应用会显示什么
 
@@ -166,6 +211,8 @@ Mihomo YAML 会包含相同的响应头、包含所有服务器的一个代理�
 
 被拉黑的设备只会收到 `X-Hwid-Active` 和 `X-Hwid-Limit`：拒绝的原因不是上限，读取这些标志的应用不应提示用户去腾出名额。具体发生了什么，由公告说明。
 
+SFA 和 SFI 不发送设备 ID，因此在**严格**模式下，它们收到的是拒绝记录（「此应用未提供设备 ID……」，sing-box JSON 格式），无法连接。
+
 各应用显示的内容不同：Happ 会显示公告和记录名称，kl!ck 只显示记录，因为它不读取公告。参见[客户端应用](client-apps.md#哪些应用会发送设备-id)。
 
 ## 用户页面
@@ -185,7 +232,7 @@ Mihomo YAML 会包含相同的响应头、包含所有服务器的一个代理�
 | **卡片上的说明** | 纯文本，最多 80 个字符。留空时，卡片会说明应用的连接方式。 |
 | **推荐** | 卡片上的标记；推荐应用会排在该平台应用的前面。 |
 
-**添加应用**时需要选择平台，然后选择**已知应用**（kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify、v2rayNG；系统会填入该平台应用的名称、类型、下载链接和添加链接模板），或者选择一种**接入方式**来创建空白卡片。所有字段都可以编辑。箭头可调整同一平台下应用的顺序。最多可添加 30 个应用。
+**添加应用**时需要选择平台，然后选择**已知应用**（kl!ck、Happ、AmneziaVPN、Clash Verge Rev、FlClash、Clash Meta for Android、Hiddify、v2rayNG、sing-box；系统会填入该平台应用的名称、类型、下载链接和添加链接模板），或者选择一种**接入方式**来创建空白卡片。所有字段都可以编辑。箭头可调整同一平台下应用的顺序。最多可添加 30 个应用。
 
 新面板会在 Windows 和 macOS 上推荐 kl!ck（Happ 排在第二位），在 iOS 和 Android 上推荐 Happ，并在所有五个平台上提供 AmneziaVPN 密钥（手机端提供应用商店链接，其他平台提供 AmneziaVPN 网站链接）。有关各平台适用的应用、应用会获取的内容和一键链接工作方式，参见[客户端应用](client-apps.md)。
 

@@ -98,10 +98,10 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
 | `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
 | `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
-| `user_get` | Read only | One user: limits (including both speed limits), status, devices, profiles, node access. No subscription link, no keys. |
+| `user_get` | Read only | One user: limits (including both speed limits), status, devices, profiles (each with the subscription formats that carry it), node access. No subscription link, no keys. |
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with kind, platform, model, OS version, app, traffic, last seen, online and on which nodes, a short fingerprint of the device ID, and for AmneziaWG the profile and tunnel address; the blocked devices apart. Never a key or a config. |
-| `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles and nodes the user's access gives. Not the subscription itself, and no link. |
+| `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles (each with the subscription formats that carry it) and nodes the user's access gives. Not the subscription itself, and no link. |
 | `subscription_settings_get` | Read only | The subscription page every user sees: the apps per platform in display order (name, kind, download link, add-link template, description, recommended), the page options (including `dns_choice`, the switch for DNS choice on the page), the server-name template, and the subscription title, announcement, support link and refresh interval. No user's link. |
 | `alerts_list` | Read only | Active alerts; with `include_history` also the closed ones (`window_s` up to 30 days). |
 | `events_search` | Read only | The event feed by node, user, `min_severity` (`info`, `warning`, `error`) or exact `code`; paged with `before_id`. |
@@ -109,6 +109,10 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `updates_status` | Read only | The panel build, the bundle's status and version, each node's update state and any saved schedule, the active or last rollout, and the fixed UTC offset used for new schedules. |
 | `node_server_access_list` | Admin | Saved node SSH endpoint, login and fingerprint, plus whether a password rotation needs recovery and whether the node is retired (its access stays until the owner forgets it). Never a password. |
 | `audit_search` | Admin | The audit log, filtered by `source` (`panel`, `bot`, `mcp`, `api`), actor or action; paged with `before_id`. |
+
+**Formats in the results.** `subscription_preview` names formats like this: `base64_uris` (the link list), `mihomo_yaml`, `xray_json`, `singbox_json`, `user_page` and `decoy`. A client has its `formats`, a User-Agent has the `format` it is served, and the client ids include `singbox`. `subscription_settings_get` does not return the rules of **Who gets what**: to see what a User-Agent gets, pass it to `subscription_preview`.
+
+A profile in `user_get` and `subscription_preview` has `formats`, a list of `format`, `ok` and `note` for each of the four serving formats. `ok: false` means the format leaves the profile out. `note` is a code, never text: `xhttp`, `self_signed`, `gecko`, `awg` or `unsupported`. With `ok: true`, `hop_single_port` means the port-hopping range is written as one port. The codes are explained in [Profiles](../guide/profiles.md#subscription-formats-of-a-profile).
 
 ### Change tools
 

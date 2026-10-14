@@ -31,7 +31,7 @@ A server from the catalog is a provider variant ("Cloudflare", "AdGuard Family",
 
 Each app gets the preferred transport when it can carry it and the server has an endpoint for it; otherwise the next one down the chain DoH → DoT → plain. Custom servers keep their own kind: an app that cannot carry that kind skips the server. DoH and DoT matter mostly for the sites that go direct (the "direct" split): inside the tunnel the queries are encrypted already.
 
-The editor shows the result under **What each app gets**, for example "Happ: DoH ✓ · Mihomo: DoH ✓ · Amnezia: Plain — a key can only hold IP addresses".
+The editor shows the result under **What each app gets**, for example "Happ: DoH ✓ · Mihomo: DoH ✓ · Amnezia: Plain — a key can only hold IP addresses". The rows for Xray JSON and sing-box are there too: when DoT is preferred, Xray JSON says "Xray JSON has no DoT", and sing-box says "only the first resolver, no fallback" when the preset has more than one.
 
 ### Split rules
 
@@ -111,6 +111,7 @@ The first that applies wins:
 | The AmneziaWG proxies of a Mihomo profile (Clash Verge Rev, FlClash and the like) | Yes | At the next subscription update. |
 | Hysteria2 in Mihomo | No | One resolver for the whole subscription: the user's, the group's or the instance's preset. A person's choice does not reach it. |
 | Happ | No | The same: one resolver for the whole subscription. |
+| Xray JSON and sing-box JSON | No | The same: the preset of the user, the group or the instance, one for all servers. A person's choice does not reach them. |
 | Other base64 apps (v2rayNG, Hiddify, Streisand, Shadowrocket) | No | They get no DNS from the panel at all. |
 
 The admin warns about it next to the switch: "In Happ and for Hysteria2 in Mihomo the DNS is one for all nodes — it works per node only for AmneziaWG keys."
@@ -129,13 +130,15 @@ This table is about the preset that applies to the person. A per-server choice r
 |:--|:--|:--|
 | Happ | A routing profile in the `routing` header of the subscription, applied when the app refreshes it. | One resolver for the tunnel and one for direct traffic; plain DNS (port 53 only) and DoH, no DoT. Only the first main server is used. A split works only with **Split domains go direct** on, and then only the split rules with the same servers as the first one (Happ has a single resolver for direct traffic); their suffixes become direct sites. **IPv4 only** is ignored. |
 | Apps on the mihomo core | The `dns:` section of the Mihomo YAML. | Plain, DoT and DoH, IPv6 addresses too. The main servers are asked through the tunnel; with **Split domains go direct** on, the split's suffixes are asked at their servers directly and their traffic goes direct. Some Mihomo-based apps ignore the section and use their own. |
+| Xray JSON | The `dns` block of every config, and a routing rule `port 53 → dns-out` that hands the DNS queries of the device's apps to it. | Plain DNS (any port) and DoH, no DoT. Every main server, in order: Xray asks the next one when a query fails. The main servers are asked through the tunnel. With **Split domains go direct** on, the split's suffixes are asked at their own servers and their traffic goes direct. Only IPv4 addresses of resolvers are used and only IPv4 answers are asked for, whatever **IPv4 only** says. With no preset that Xray can carry, the config has no `dns` block and the app uses its system resolver. |
+| sing-box JSON | The `dns` block of the profile, and `hijack-dns`, which hands the DNS queries that reach the tunnel to it. | Plain DNS, DoT and DoH. One main resolver: the first of the preset, no fallback; it is asked through the tunnel. With **Split domains go direct** on, the split's suffixes are asked at their own resolver directly and their traffic goes direct. IPv4 only. With no preset that sing-box can carry (or no DNS module), the profile uses a local fallback: the system resolver, which resolves outside the tunnel. |
 | AmneziaVPN and AmneziaWG apps | `DNS =` in the `.conf`, the two DNS fields of the `vpn://` key. | Exactly two plain IPv4 addresses: the first two of the main servers. No split. When the preset has no plain IPv4 server, 1.1.1.1 and 8.8.8.8 are written and the key window says so. |
 
 Without a split, Happ's direct resolver is set to the main one too, so a site a person's own Happ rules send direct still uses the preset (an ad-blocking preset stays ad-blocking).
 
 ## When a change reaches people
 
-- **Apps on the link** (Happ, apps on the mihomo core) get it with their next subscription update: within the refresh interval, 12 hours by default. A person can refresh the subscription by hand.
+- **Apps on the link** (Happ, apps on the mihomo core, Xray JSON and sing-box apps) get it with their next subscription update: within the refresh interval, 12 hours by default. A person can refresh the subscription by hand.
 - **AmneziaVPN** only in new keys: the DNS is written into the key, so a person gets the new servers when they import their key again (or a new one).
 
 Every DNS select (the default, a group's, a user's) says the same under it: "When it arrives: the apps on the link (Happ) with the next subscription update; AmneziaVPN only in new keys." The brackets name the link apps of the **User page** tab.
