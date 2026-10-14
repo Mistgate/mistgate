@@ -14,6 +14,7 @@ import { useTx, type Tx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
 import { formatKey, move, ruleFormats, type Rule, type Settings } from "./model";
 import { testAgentQuery, useSaveSettings } from "./queries";
+import { DeviceLimitCard } from "./device-limit";
 import { Lead } from "./ui";
 
 // Client User-Agents to try: the chip label and what it fills in.
@@ -150,6 +151,7 @@ export function RulesTab({ settings }: { settings: Settings }) {
           </div>
         </Card>
       </div>
+      <DeviceLimitCard settings={settings} />
     </div>
   );
 }

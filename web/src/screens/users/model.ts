@@ -1,11 +1,12 @@
-import type { Device, GetUserResponse, ListUsersResponse, NodeAccess, ProfileRef, User } from "@/gen/mistgate/admin/v1/user_pb";
+import type { BlockedDevice, Device, GetUserResponse, ListUsersResponse, NodeAccess, ProfileRef, User } from "@/gen/mistgate/admin/v1/user_pb";
 
 // protobuf-es gives every 64-bit field as a bigint. Counters and Unix times here stay far below 2^53, so the
 // screens work with plain numbers: the conversion happens once, where a response comes in. (The other way,
 // a write, uses BigInt(Math.round(x)) at the call.)
-type Int64 = "usedBytes" | "quotaBytes" | "nextResetUnix" | "expiresUnix" | "lastSeenUnix" | "speedLimitBps" | "createdUnix";
+type Int64 = "usedBytes" | "quotaBytes" | "nextResetUnix" | "expiresUnix" | "lastSeenUnix" | "speedLimitBps" | "deviceSpeedLimitBps" | "createdUnix";
 export type UserN = Omit<User, Int64> & Record<Int64, number>;
-export type DeviceN = Omit<Device, "firstSeenUnix" | "lastSeenUnix" | "lastHandshakeUnix"> & { firstSeenUnix: number; lastSeenUnix: number; lastHandshakeUnix: number };
+export type DeviceN = Omit<Device, "firstSeenUnix" | "lastSeenUnix" | "lastHandshakeUnix" | "usedBytes"> & { firstSeenUnix: number; lastSeenUnix: number; lastHandshakeUnix: number; usedBytes: number };
+export type BlockedN = Omit<BlockedDevice, "blockedUnix"> & { blockedUnix: number };
 export type DetailN = {
   user: UserN;
   devices: DeviceN[];
@@ -13,6 +14,7 @@ export type DetailN = {
   nodeTraffic: { nodeId: string; nodeName: string; protocol: string; bytes: number }[];
   profiles: ProfileRef[];
   nodeAccess: NodeAccess[];
+  blocked: BlockedN[];
 };
 
 export const userN = (u: User): UserN => ({
@@ -23,6 +25,7 @@ export const userN = (u: User): UserN => ({
   expiresUnix: Number(u.expiresUnix),
   lastSeenUnix: Number(u.lastSeenUnix),
   speedLimitBps: Number(u.speedLimitBps),
+  deviceSpeedLimitBps: Number(u.deviceSpeedLimitBps),
   createdUnix: Number(u.createdUnix),
 });
 
@@ -31,11 +34,12 @@ export const usersPageN = (r: ListUsersResponse) => ({ users: r.users.map(userN)
 export function detailN(r: GetUserResponse): DetailN {
   return {
     user: userN(r.user!),
-    devices: r.devices.map((d) => ({ ...d, firstSeenUnix: Number(d.firstSeenUnix), lastSeenUnix: Number(d.lastSeenUnix), lastHandshakeUnix: Number(d.lastHandshakeUnix) })),
+    devices: r.devices.map((d) => ({ ...d, firstSeenUnix: Number(d.firstSeenUnix), lastSeenUnix: Number(d.lastSeenUnix), lastHandshakeUnix: Number(d.lastHandshakeUnix), usedBytes: Number(d.usedBytes ?? 0) })),
     dailyTraffic: r.dailyTraffic.map((d) => ({ dayUnix: Number(d.dayUnix), bytes: Number(d.bytes) })),
     nodeTraffic: r.nodeTraffic.map((n) => ({ nodeId: n.nodeId, nodeName: n.nodeName, protocol: n.protocol, bytes: Number(n.bytes) })),
     profiles: r.profiles,
     nodeAccess: r.nodeAccess,
+    blocked: (r.blockedDevices ?? []).map((b) => ({ ...b, blockedUnix: Number(b.blockedUnix) })),
   };
 }
 

@@ -5,7 +5,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
-import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { UserScreen } from "./user-detail";
 
 const getUser = vi.fn();
@@ -15,10 +17,21 @@ const getUserDnsChoices = vi.fn();
 const resetUserDnsChoices = vi.fn();
 const me = vi.fn();
 const listAlerts = vi.fn();
+const revokeDevice = vi.fn();
+const unblockDevice = vi.fn();
+const renameDevice = vi.fn();
+const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   health: { listAlerts: (...a: unknown[]) => listAlerts(...a) },
-  users: { getUser: (...a: unknown[]) => getUser(...a), updateUser: (...a: unknown[]) => updateUser(...a), setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a) },
+  users: {
+    getUser: (...a: unknown[]) => getUser(...a),
+    updateUser: (...a: unknown[]) => updateUser(...a),
+    setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a),
+    revokeDevice: (...a: unknown[]) => revokeDevice(...a),
+    unblockDevice: (...a: unknown[]) => unblockDevice(...a),
+  },
+  devices: { renameDevice: (...a: unknown[]) => renameDevice(...a) },
   groups: {
     listGroups: () =>
       Promise.resolve({
@@ -36,7 +49,8 @@ vi.mock("@/lib/api", async (orig) => ({
   },
   auth: { me: () => me() },
   subscriptions: {
-    getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.HAPP, name: "FlClash" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }] }, effectiveTitle: "" }),
+    getSubscriptionSettings: () =>
+      Promise.resolve({ settings: { apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.HAPP, name: "FlClash" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }], linkDeviceLimit: subsMode.v }, effectiveTitle: "" }),
   },
 }));
 // the select as a native one: what matters here is what a pick does
@@ -72,7 +86,8 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice]) m.mockReset();
+  subsMode.v = LinkDeviceLimit.ENFORCE;
 });
 
 const user = {
@@ -92,18 +107,25 @@ const user = {
   lastSeenUnix: 0n,
   nextResetUnix: 0n,
   speedLimitBps: 0n,
+  deviceSpeedLimitBps: 0n,
   createdUnix: 0n,
   nodes: { all: true, nodeIds: [] },
   dnsPresetId: "",
   accessHapp: true,
   accessAmnezia: true,
 };
+// a device as GetUser sends it: every field there, the ones a test cares about set
+const dev = (over: object) => ({
+  id: "", platform: "", model: "", firstSeenUnix: 0n, lastSeenUnix: 0n, online: false, protocols: ["hysteria2"], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n,
+  kind: DeviceKind.LINK, osVersion: "", client: "", usedBytes: 0n, onlineNodeIds: [] as string[], fingerprint: "", ...over,
+});
 const detail = {
   user,
   devices: [
-    { id: "dev_i", platform: "", model: "", firstSeenUnix: 0n, lastSeenUnix: 0n, online: true, protocols: ["hysteria2"], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n },
-    { id: "dev_k", platform: "android", model: "Pixel", firstSeenUnix: 0n, lastSeenUnix: 0n, online: false, protocols: ["awg"], awgProfileId: "p_awg", awgProfileName: "AWG 3.1", awgVersion: "3.1", stale: false, address: "10.66.4.2", lastHandshakeUnix: 0n },
+    dev({ id: "dev_i", kind: DeviceKind.LINK_SHARED, online: true, client: "Hiddify/2.5" }),
+    dev({ id: "dev_k", kind: DeviceKind.KEY, platform: "android", model: "Pixel", protocols: ["awg"], awgProfileId: "p_awg", awgProfileName: "AWG 3.1", awgVersion: "3.1", address: "10.66.4.2" }),
   ],
+  blockedDevices: [] as object[],
   dailyTraffic: [],
   nodeTraffic: [],
   profiles: [
@@ -123,12 +145,12 @@ const choice = (nodeName: string, presetName: string, over: object = {}) => ({
   nodeId: `nod_${nodeName}`, nodeName, presetId: `dns_${presetName}`, presetName, offered: true, effectivePresetId: `dns_${presetName}`, effectivePresetName: presetName, updatedUnix: 0n, ...over,
 });
 
-async function mount(role = 1, choices: object[] = [], alerts: object[] = []) {
+async function mount(role = 1, choices: object[] = [], alerts: object[] = [], data: object = detail) {
   me.mockResolvedValue({ admin: { id: "adm_1", role } });
   listAlerts.mockResolvedValue({ nowUnix: NOW, active: alerts, history: [] });
   getUserDnsChoices.mockResolvedValue({ choices });
   resetUserDnsChoices.mockResolvedValue({ removed: choices.length });
-  getUser.mockResolvedValue(detail);
+  getUser.mockResolvedValue(data);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -205,15 +227,15 @@ describe("the user card", () => {
 
   it("splits the devices into the subscription's apps and the AmneziaVPN keys, and lists both", async () => {
     await mount();
-    expect(text()).toContain("Through the subscription");
     expect(text()).toContain("Apps on the link");
-    expect(text()).toContain("Every app on the link (Happ, FlClash), on every device: one place in the limit · online");
+    expect(text()).toContain("Apps without a device ID");
+    expect(text()).toContain("Hiddify 2.5 · share one place");
     expect(text()).toContain("AmneziaVPN keys");
     expect(text()).toContain("Pixel");
     expect(text()).toContain("never connected yet");
     expect(text()).not.toContain("10.66.4.2"); // the address is in the key's window, not the row
     expect(button("Show key")).toBeDefined();
-    expect(button("Disconnect")).toBeDefined();
+    expect(button("Disconnect")).toBeUndefined(); // in the row's menu
   });
 
   it("shows the group's profiles in the two ways as links, and the group as a link in the hint", async () => {
@@ -300,5 +322,163 @@ describe("the user card", () => {
     await click(button("Undo"));
     await settle();
     expect(setUsersEnabled).toHaveBeenLastCalledWith({ userIds: ["usr_1"], enabled: true });
+  });
+});
+
+describe("the devices of the user card", () => {
+  const T = Math.floor(Date.now() / 1000);
+  const many = {
+    ...detail,
+    user: { ...user, devicesUsed: 4, deviceLimit: 3 },
+    devices: [
+      dev({ id: "dev_a", platform: "ios", model: "iPhone 15", osVersion: "iOS 18.1", client: "Happ/3.4.2", online: true, onlineNodeIds: ["nod_1", "nod_2"], fingerprint: "a1b2c3", usedBytes: 2_400_000_000n, firstSeenUnix: BigInt(T - 30 * 86_400), lastSeenUnix: BigInt(T - 20) }),
+      dev({ id: "dev_b", platform: "android", model: "Pixel 8", osVersion: "Android 15", client: "Happ/3.4.0", online: true, onlineNodeIds: ["nod_1"], fingerprint: "d4e5f6" }),
+      dev({ id: "dev_c", platform: "macos", model: "MacBook", osVersion: "macOS 15", client: "FlClash/0.8", lastSeenUnix: BigInt(T - 300), fingerprint: "0a0b0c" }),
+      dev({ id: "dev_s", kind: DeviceKind.LINK_SHARED, client: "Hiddify/2.5", lastSeenUnix: BigInt(T - 7200) }),
+      dev({ id: "dev_k", kind: DeviceKind.KEY, platform: "android", model: "Router", protocols: ["awg"], awgProfileId: "p_awg", awgProfileName: "AWG 3.1", awgVersion: "3.1" }),
+    ],
+    nodeAccess: [...detail.nodeAccess, { nodeId: "nod_2", nodeName: "nl1", countryCode: "NL", location: "", provider: "", protocols: ["hysteria2"], nodeProtocols: ["hysteria2"], selected: true }],
+    blockedDevices: [{ id: "dev_x", platform: "windows", model: "Work PC", client: "v2rayN/7.1", blockedUnix: BigInt(T - 86_400), fingerprint: "778899" }],
+  };
+  /** Base UI opens a menu on the press, not on the click. */
+  const press = async (el: Element | null | undefined) => {
+    expect(el).toBeTruthy();
+    await act(async () => {
+      for (const type of ["pointerdown", "mousedown"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+      for (const type of ["pointerup", "mouseup", "click"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+    });
+    await settle();
+  };
+  const row = (name: string) => [...document.querySelectorAll("li")].find((li) => li.textContent?.startsWith(name))!;
+  const menu = (name: string) => press(document.querySelector(`button[aria-label='Actions for ${name}']`));
+  const items = () => [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+  const item = (label: string) => click([...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent === label));
+  const dialog = () => [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+  const inDialog = (label: string) => click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === label));
+
+  it("shows a calm row per app on the link, the badge only on the device that is on two servers, the shared place and the keys", async () => {
+    await mount(1, [], [], many);
+    const iphone = row("iPhone 15");
+    expect(iphone.textContent).toContain("de1, nl1");
+    expect(iphone.textContent).toContain("iOS 18.1 · Happ 3.4.2");
+    expect(iphone.textContent).toContain("on 2 servers");
+    // since when, all-time traffic and the fingerprint wait in the tooltip, named for a screen reader
+    expect(iphone.textContent).not.toContain("a1b2c3");
+    expect(iphone.textContent).not.toContain("2.4 GB");
+    const details = iphone.querySelector("[aria-label^='iOS 18.1']")!.getAttribute("aria-label")!;
+    expect(details).toContain("All-time traffic: 2.4 GB");
+    expect(details).toContain("Fingerprint a1b2c3: tells two identical phones apart");
+    expect(details).toContain("updated just now");
+    expect(row("Pixel 8").textContent).toContain("online· de1");
+    expect(row("Pixel 8").textContent).not.toContain("servers");
+    expect(row("MacBook").textContent).toContain("5 min ago");
+    expect(text().match(/on 2 servers/g)).toHaveLength(1);
+    expect(row("Apps without a device ID").textContent).toContain("Hiddify 2.5 · share one place");
+    expect(text()).toContain("Router"); // the key, as before
+    // the header counts with the limit, red when over it
+    const count = [...document.querySelectorAll("span")].find((s) => s.textContent === "4 of 3")!;
+    expect(count.className).toContain("text-danger-text");
+  });
+
+  it("folds the blocked devices and unblocks one from its menu", async () => {
+    unblockDevice.mockResolvedValue({ user });
+    await mount(1, [], [], many);
+    const fold = button("Blocked (1)")!;
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(text()).not.toContain("Work PC");
+    await click(fold);
+    expect(row("Work PC").textContent).toContain("v2rayN 7.1 · blocked");
+    await menu("Work PC");
+    expect(items()).toEqual(["Unblock"]);
+    await item("Unblock");
+    await settle();
+    expect(unblockDevice).toHaveBeenCalledWith({ deviceId: "dev_x" });
+    expect(text()).toContain("Unblocked. The app gets new keys at its next subscription refresh.");
+  });
+
+  it("renames, deletes and blocks from the row menu with the right calls; blocking asks first", async () => {
+    renameDevice.mockResolvedValue({ device: {} });
+    revokeDevice.mockResolvedValue({ user });
+    await mount(1, [], [], many);
+    await menu("Pixel 8");
+    expect(items()).toEqual(["Rename…", "Delete…", "Block…"]);
+    expect(text()).toContain("Fingerprint d4e5f6"); // the details, for a touch screen
+
+    await item("Rename…");
+    const field = dialog().querySelector("input")!;
+    expect(field.value).toBe("Pixel 8");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "  work phone ");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await inDialog("Save");
+    await settle();
+    expect(renameDevice).toHaveBeenCalledWith({ deviceId: "dev_b", label: "work phone" });
+
+    await menu("Pixel 8");
+    await item("Delete…");
+    expect(dialog().textContent).toContain("Delete “Pixel 8”?");
+    await inDialog("Delete");
+    await settle();
+    expect(revokeDevice).toHaveBeenCalledWith({ deviceId: "dev_b" });
+
+    await menu("Pixel 8");
+    await item("Block…");
+    expect(dialog().textContent).toContain("Block “Pixel 8”?");
+    expect(dialog().textContent).toContain("cannot come back until you unblock it");
+    expect(dialog().textContent).toContain("The person’s other devices keep working.");
+    expect(revokeDevice).toHaveBeenCalledTimes(1); // nothing before the confirmation
+    await inDialog("Block");
+    await settle();
+    expect(revokeDevice).toHaveBeenLastCalledWith({ deviceId: "dev_b", block: true });
+    expect(text()).toContain("Device blocked");
+  });
+
+  it("disconnects the shared place from its menu", async () => {
+    revokeDevice.mockResolvedValue({ user });
+    await mount(1, [], [], many);
+    await menu("Apps without a device ID");
+    expect(items()).toEqual(["Disconnect…"]);
+    await item("Disconnect…");
+    expect(dialog().textContent).toContain("Disconnect the apps without a device ID?");
+    await inDialog("Disconnect");
+    await settle();
+    expect(revokeDevice).toHaveBeenCalledWith({ deviceId: "dev_s" });
+  });
+
+  it("says in the panel's words why a device cannot be blocked", async () => {
+    revokeDevice.mockRejectedValue(new ConnectError("cannot_block", Code.FailedPrecondition));
+    await mount(1, [], [], many);
+    await menu("iPhone 15");
+    await item("Block…");
+    await inDialog("Block");
+    await settle();
+    expect(text()).toContain("Only the device of an app that reports a device ID can be blocked.");
+  });
+
+  it("in the “only count” mode gives a person over the limit one quiet line to the setting instead of the alert", async () => {
+    subsMode.v = LinkDeviceLimit.TRACK;
+    await mount(1, [], [], many);
+    expect(text()).toContain("The limit only counts for now: apps over it still connect.");
+    expect(anchor("Limit mode")?.dataset.search).toBe(JSON.stringify({ tab: "rules" }));
+    expect(button("+1 device")).toBeUndefined();
+  });
+
+  it("keeps the alert and drops the line when the limit refuses", async () => {
+    await mount(1, [], [], many);
+    expect(text()).not.toContain("The limit only counts for now");
+    expect(button("+1 device")).toBeDefined();
+  });
+
+  it("sets the two speed limits on their own steppers, 0 = no limit", async () => {
+    updateUser.mockResolvedValue({ user });
+    await mount(1, [], [], { ...many, user: { ...many.user, speedLimitBps: 20_000_000n } });
+    expect(text()).toContain("Speed per person");
+    expect(text()).toContain("20 Mbit/s");
+    expect(text()).toContain("Speed per device");
+    await click(document.querySelector("[aria-label='Increase Speed per device']"));
+    expect(text()).toContain("5 Mbit/s");
+    await act(async () => void (await new Promise((r) => setTimeout(r, 600))));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", deviceSpeedLimitBps: 5_000_000n });
   });
 });

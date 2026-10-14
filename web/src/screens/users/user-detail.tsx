@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Code } from "@connectrpc/connect";
 import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
+import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { QuotaReset, UserStatus, type AccessImpact, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
 import { Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -22,17 +23,18 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { useT } from "@/i18n";
 import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
 import { plain } from "@/lib/plain";
-import { useLinkAppNames } from "@/screens/subscriptions/queries";
+import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DAY, GB, agoText, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
 import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup, wayMark } from "./groups";
+import { BlockedList, LinkDeviceRows, SharedRow, splitDevices } from "./link-devices";
 import { LinkModal, linkTargetOf } from "./link-modal";
-import { big, detailN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
+import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
 import { useGo } from "./nav";
 import { groupsQuery, isCode, protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
-import { Check, ConfirmModal, Panel, SettingRow, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
+import { Check, ConfirmModal, Panel, SettingRow, SpeedRow, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 const WIDE = "w-[130px]";
@@ -46,15 +48,17 @@ type Patch = Partial<{
   expiresUnix: number;
   deviceLimit: number;
   speedLimitBps: number;
+  deviceSpeedLimitBps: number;
   dnsPresetId: string;
   apps: { happ: boolean; amnezia: boolean };
   nodes: { all: boolean; nodeIds: string[] };
 }>;
-const write = ({ quotaBytes, expiresUnix, speedLimitBps, ...rest }: Patch) => ({
+const write = ({ quotaBytes, expiresUnix, speedLimitBps, deviceSpeedLimitBps, ...rest }: Patch) => ({
   ...rest,
   ...(quotaBytes !== undefined && { quotaBytes: big(quotaBytes) }),
   ...(expiresUnix !== undefined && { expiresUnix: big(expiresUnix) }),
   ...(speedLimitBps !== undefined && { speedLimitBps: big(speedLimitBps) }),
+  ...(deviceSpeedLimitBps !== undefined && { deviceSpeedLimitBps: big(deviceSpeedLimitBps) }),
 });
 
 export function UserScreen() {
@@ -223,6 +227,8 @@ function UserDetail({ data }: { data: DetailN }) {
           <DevicesPanel
             user={user}
             devices={data.devices}
+            blocked={data.blocked}
+            nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? data.nodeTraffic.find((n) => n.nodeId === id)?.nodeName ?? id}
             profiles={data.profiles}
             actions={actions}
             onEditGroup={() => setGroupOpen(true)}
@@ -440,6 +446,8 @@ export function ConnectionPanel({ userId }: { userId: string }) {
 // ---- alert strip ----
 
 function AlertStrip({ user, now, fmt, t, actions }: { user: User; now: number; fmt: Fmt; t: Tx; actions: Actions }) {
+  // in the "only count" mode nothing is refused at the limit: the devices panel says so instead
+  const mode = useQuery(settingsQuery).data?.settings.linkDeviceLimit;
   let text = "";
   let button = "";
   let onClick: () => void = () => {};
@@ -454,7 +462,7 @@ function AlertStrip({ user, now, fmt, t, actions }: { user: User; now: number; f
     text = t("users.alert.quota", { q: fmt.bytes(user.quotaBytes) });
     button = t("users.alert.quotaBtn");
     onClick = () => void actions.update({ quotaBytes: user.quotaBytes + 50 * GB }).catch(() => {});
-  } else if (shownStatus(user) === "devices") {
+  } else if (shownStatus(user) === "devices" && mode !== LinkDeviceLimit.TRACK) {
     text = t.n("users.alert.devices", user.deviceLimit);
     button = t("users.alert.devicesBtn");
     onClick = () => void actions.update({ deviceLimit: user.deviceLimit + 1 }).catch(() => {});
@@ -555,13 +563,17 @@ function WayHead({ way, title, hint, action }: { way: "sub" | "awg"; title: stri
 }
 
 /**
- * The person's devices, in the two ways of the page. "Through the subscription": the apps on the link,
- * one row for all of them. "AmneziaVPN keys": a key per device, with its profile, when it last connected, the key itself
- * and "Delete". A way the person does not have and has nothing in stays out.
+ * The person's devices, in the two ways of the page. "Apps on the link": a row per app with a device ID of its own, then
+ * the place the apps without one share. "AmneziaVPN keys": a key per device, with its profile, when it last connected, the
+ * key itself and "Delete". A way the person does not have and has nothing in stays out. Blocked devices are folded at the
+ * end. The count in the header is amber when the limit is full and red when the person is over it; in the "only count"
+ * mode a person over it gets one quiet line on why nothing is refused.
  */
 export function DevicesPanel({
   user,
   devices,
+  blocked = [],
+  nodeName = (id) => id,
   profiles,
   actions,
   onEditGroup,
@@ -570,6 +582,9 @@ export function DevicesPanel({
 }: {
   user: User;
   devices: Device[];
+  blocked?: BlockedN[];
+  /** The name of a node by its id, for "online · de1". */
+  nodeName?: (id: string) => string;
   profiles: ProfileRef[];
   actions: Actions;
   onEditGroup: () => void;
@@ -578,19 +593,19 @@ export function DevicesPanel({
   onAutoAddDone?: () => void;
 }) {
   const t = useTx();
-  const linkApps = useLinkAppNames();
+  const mode = useQuery(settingsQuery).data?.settings.linkDeviceLimit;
   // the device stays set while the dialog fades out, so its text does not go blank
   const [asking, setAsking] = useState<Device | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [opened, setOpened] = useState<{ device: DeviceRef; initial?: DeviceConfig[] } | null>(null);
   const full = user.deviceLimit > 0 && user.devicesUsed >= user.deviceLimit;
+  const over = user.deviceLimit > 0 && user.devicesUsed > user.deviceLimit;
   const awgProfiles = profiles.filter((p) => p.protocol === "awg");
   const canAdd = !!user.apps?.amnezia && awgProfiles.length > 0;
   const [adding, setAdding] = useState(!!autoAdd && canAdd && !full);
   const now = nowSec();
-  const sub = devices.filter((d) => d.awgProfileId === "");
-  const keys = devices.filter((d) => d.awgProfileId !== "");
-  const showSub = !!user.apps?.happ || sub.length > 0;
+  const { link, shared, keys } = splitDevices(devices);
+  const showSub = !!user.apps?.happ || link.length > 0 || shared.length > 0;
   const showKeys = !!user.apps?.amnezia || keys.length > 0;
   const nameOf = (d: Device) => d.model || platformLabel(d.platform, t);
   const refOf = (d: Device): DeviceRef => ({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale });
@@ -598,7 +613,7 @@ export function DevicesPanel({
     setAsking(d);
     setAskOpen(true);
   };
-  const askingSub = asking !== null && asking.awgProfileId === "";
+  const askingSub = asking !== null && !keys.includes(asking);
 
   return (
     <Panel
@@ -606,36 +621,34 @@ export function DevicesPanel({
       icon="phone"
       tone="mint"
       aside={
-        <span className={cx("font-mono text-xs", full ? "text-warn-text" : "text-muted")}>
-          {user.devicesUsed} / {user.deviceLimit}
+        <span className={cx("font-mono text-xs", over ? "font-semibold text-danger-text" : full ? "text-warn-text" : "text-muted")}>
+          {user.deviceLimit > 0 ? t("users.devCount", { n: user.devicesUsed, limit: user.deviceLimit }) : user.devicesUsed}
         </span>
       }
       className="pb-2"
     >
+      {over && mode === LinkDeviceLimit.TRACK && (
+        <p className="-mt-1 text-xs leading-snug text-pretty text-muted">
+          {t("users.devTrack")}{" "}
+          <Link to="/subscriptions" search={{ tab: "rules" }} hash="device-limit" className="font-bold whitespace-nowrap text-accent-text hover:underline">
+            {t("users.devTrackLink")}
+          </Link>
+        </p>
+      )}
       {!showSub && !showKeys && <p className="border-t border-line pt-3.5 pb-1 text-[13px] text-muted">{t("users.noDevices")}</p>}
 
       {showSub && (
         <section className="flex flex-col">
-          <WayHead way="sub" title={t("users.devSub")} />
-          {sub.length === 0 ? (
+          <WayHead way="sub" title={t("users.devSubApps")} />
+          {link.length === 0 && shared.length === 0 ? (
             <p className="py-2.5 pl-[34px] text-xs text-muted">{t("users.devSubNever")}</p>
           ) : (
-            sub.map((d) => (
-              <div key={d.id} className="flex min-h-[52px] items-center gap-3 py-1.5 pl-[34px]">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex items-center gap-2 text-[13px] font-bold">
-                    <StatusDot kind={d.online ? "ok" : "off"} />
-                    {t("users.devSubApps")}
-                  </span>
-                  <span className="text-xs leading-snug text-muted">
-                    {t("users.devSubHint", { apps: linkApps })} · {d.online ? t("users.devKeyOnline") : d.lastSeenUnix > 0 ? t("users.devSubSeen", { when: agoText(d.lastSeenUnix, t, now) }) : t("users.devSubNever")}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => ask(d)}>
-                  {t("users.devSubOff")}
-                </Button>
-              </div>
-            ))
+            <ul className="flex flex-col">
+              <LinkDeviceRows devices={link} nodeName={nodeName} now={now} onChanged={actions.refresh} />
+              {shared.map((d) => (
+                <SharedRow key={d.id} d={d} mode={mode} now={now} onDisconnect={() => ask(d)} />
+              ))}
+            </ul>
           )}
         </section>
       )}
@@ -696,11 +709,13 @@ export function DevicesPanel({
         </section>
       )}
 
+      <BlockedList blocked={blocked} onChanged={actions.refresh} />
+
       <ConfirmModal
         open={askOpen}
         onOpenChange={setAskOpen}
         title={askingSub ? t("users.devSubOffT") : t("users.revokeT")}
-        description={askingSub ? t("users.devSubOffBody", { apps: linkApps }) : t("users.revokeBody", { model: asking ? nameOf(asking) : "" })}
+        description={askingSub ? t("users.devSubOffBody") : t("users.revokeBody", { model: asking ? nameOf(asking) : "" })}
         confirmLabel={askingSub ? t("users.devSubOff") : t("users.revoke")}
         danger
         onConfirm={() => actions.revoke(asking!.id, askingSub ? t("users.devSubOffDone") : undefined)}
@@ -744,7 +759,7 @@ function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
 
   const [devices, setDevices] = useDraft(user.deviceLimit, (v) => actions.update({ deviceLimit: v }));
   const [speed, setSpeed] = useDraft(user.speedLimitBps, (v) => actions.update({ speedLimitBps: v }));
-  const mbit = Math.round(speed / 1e6);
+  const [devSpeed, setDevSpeed] = useDraft(user.deviceSpeedLimitBps, (v) => actions.update({ deviceSpeedLimitBps: v }));
 
   const stepper = (what: string, text: ReactNode, value: number, set: (v: number) => void, by: number, min: number, max: number) => (
     <Stepper
@@ -779,17 +794,8 @@ function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
         <SettingRow label={t("users.devices")}>
           <div className={WIDE}>{stepper(t("users.devices"), String(devices), devices, setDevices, 1, 1, 100)}</div>
         </SettingRow>
-        <SwitchRow
-          label={t("users.speed")}
-          hint={speed > 0 ? t("users.speedHint", { n: mbit }) : t("users.speedHintOff")}
-          checked={speed > 0}
-          onCheckedChange={(on) => setSpeed(on ? 20e6 : 0)}
-        />
-        {speed > 0 && (
-          <SettingRow label={t("users.speed")}>
-            <div className={WIDE}>{stepper(t("users.speed"), `${mbit} ${t("users.unitMbit")}`, mbit, (v) => setSpeed(v * 1e6), 5, 5, 10000)}</div>
-          </SettingRow>
-        )}
+        <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={speed} onChange={setSpeed} />
+        <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={devSpeed} onChange={setDevSpeed} />
       </div>
     </Panel>
   );

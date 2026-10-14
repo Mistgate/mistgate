@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
-import { UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { setLang } from "@/i18n";
 import { groupTone } from "./format";
 import { UsersScreen } from "./list";
@@ -491,5 +491,42 @@ describe("the count line under the title", () => {
     withCounts({ all: 17, online: 6, devicesUsed: 31, devicesOnline: 8 });
     await mount();
     expect(line()).toBe("17 人·31 台设备·6 人在线（8 台设备）");
+  });
+});
+
+describe("the device limit in the list", () => {
+  const chip = () => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.startsWith("Over device limit"));
+  const answer = (overDeviceLimit: number) => ({
+    users: [person({ id: "usr_a", name: "alice", devicesUsed: 6 }), person({ id: "usr_b", name: "bob", devicesUsed: 5 }), person({ id: "usr_c", name: "carol", devicesUsed: 2 })],
+    nextPageToken: "",
+    counts: { all: 3, online: 0, expiring: 0, overQuota: 0, overDeviceLimit },
+  });
+
+  it("hides the chip while nobody is over the limit", async () => {
+    listUsers.mockResolvedValue(answer(0));
+    await mount();
+    expect(chip()).toBeUndefined();
+  });
+
+  it("shows the chip with its count, asks the server for the filter, and keeps the chip while it is in use", async () => {
+    // once the filter is in use, the last person over the limit got a higher one: its count is 0
+    listUsers.mockImplementation(async (r: { filter?: UserFilter }) => answer(r.filter === UserFilter.OVER_DEVICE_LIMIT ? 0 : 1));
+    await mount();
+    expect(chip()?.textContent).toBe("Over device limit1");
+    await click(chip());
+    await settle();
+    expect(listUsers.mock.calls.at(-1)![0]).toMatchObject({ filter: UserFilter.OVER_DEVICE_LIMIT, offset: 0 });
+    expect(chip()?.getAttribute("aria-checked")).toBe("true");
+    expect(chip()?.textContent).toBe("Over device limit0"); // still there, so the filter can be left
+  });
+
+  it("paints the devices like the traffic bar: quiet with room, amber when full, red and named when over", async () => {
+    listUsers.mockResolvedValue(answer(1));
+    await mount();
+    const cell = (v: string) => [...document.querySelectorAll("td")].find((td) => td.textContent === v)!;
+    expect(cell("6/5").className).toContain("text-danger-text");
+    expect(cell("6/5").getAttribute("title")).toBe("Over device limit");
+    expect(cell("5/5").className).toContain("text-warn-text");
+    expect(cell("2/5").className).toContain("text-muted");
   });
 });

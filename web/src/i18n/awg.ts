@@ -803,7 +803,7 @@ export const zh: typeof en = {
   "awg.err.no_inbound": "该协议配置没有部署到此用户可使用的任何节点。",
   "awg.err.subnet_full": "该协议配置的客户端网段已满。请释放一个地址，或使用其他协议配置。",
   "awg.err.agent_too_old": "节点 Agent 版本过旧，不支持 AmneziaWG。请先更新它。",
-  "awg.err.cannot_block": "只能阻止会提供设备 ID 的应用的设备。",
+  "awg.err.cannot_block": "只能拉黑会提供设备 ID 的应用的设备。",
   "awg.err.shared_device": "这是未提供设备 ID 的应用共用的名额，不能删除或重命名。",
 
   // ---- node: backend

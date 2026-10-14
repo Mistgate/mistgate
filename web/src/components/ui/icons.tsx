@@ -48,6 +48,10 @@ const paths = {
   gauge: "M4 17a8 8 0 1 1 16 0M12 17l4-5M7 17h.01",
   key: "M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2",
   phone: "M7 3h10v18H7zM11 18h2",
+  // the platforms of a device: phone (iPhone), android, monitor (Windows), laptop (Mac), terminal (Linux)
+  android: "M7 3h10v18H7zM12 6h.01M10 18h4",
+  monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
+  laptop: "M5 5h14v10H5zM2 19h20",
   calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
   list: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
   pulse: "M3 12h4l3-7 4 14 3-7h4",

@@ -36,12 +36,13 @@ import { Pending, QueryError } from "@/components/ui/query-error";
 
 const PAGE = 50;
 const pageSizes = [25, PAGE, 100] as const;
-type FilterId = "all" | "online" | "expiring" | "over";
+type FilterId = "all" | "online" | "expiring" | "over" | "devices";
 const filterValue: Record<FilterId, UserFilter> = {
   all: UserFilter.UNSPECIFIED,
   online: UserFilter.ONLINE,
   expiring: UserFilter.EXPIRING,
   over: UserFilter.OVER_QUOTA,
+  devices: UserFilter.OVER_DEVICE_LIMIT,
 };
 
 const sortValue: Record<SortId, UserSort> = {
@@ -169,7 +170,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
 
   const rows = list.data?.users ?? [];
   const counts = list.data?.counts;
-  const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota }[filter] : 0;
+  const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota, devices: counts.overDeviceLimit }[filter] : 0;
   const page = clampPage(paging.page, total, paging.size);
   // rows went away (a bulk disable, an expiry) and the page is past the end now: step back to the last one
   useEffect(() => {
@@ -239,7 +240,10 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
     online: [t("users.filter.online"), counts?.online],
     expiring: [t("users.filter.expiring"), counts?.expiring],
     over: [t("users.filter.over"), counts?.overQuota],
+    devices: [t("users.filter.overDevices"), counts?.overDeviceLimit],
   };
+  // "Over device limit" shows only while somebody is (or while it is the filter in use, so it can be left)
+  const filterIds = (Object.keys(filterLabels) as FilterId[]).filter((id) => id !== "devices" || filter === "devices" || (counts?.overDeviceLimit ?? 0) > 0);
   const hasNone = !list.isPending && counts?.all === 0 && filter === "all" && query === "" && groupId === "";
 
   // a container: the table's columns, and the switch to cards, follow the width the list really has (not the window's)
@@ -287,7 +291,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
               aria-label={t("users.filters")}
               value={filter}
               onValueChange={changeFilter}
-              options={(Object.keys(filterLabels) as FilterId[]).map((id) => ({
+              options={filterIds.map((id) => ({
                 value: id,
                 label: (
                   <>
@@ -621,6 +625,9 @@ const toneClass = { muted: "text-muted", fg: "font-semibold text-fg", bad: "font
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 /** "2/5"; no limit is "2/∞". */
 const devicesOf = (u: User) => `${u.devicesUsed}/${u.deviceLimit > 0 ? u.deviceLimit : "∞"}`;
+/** The devices count like the traffic bar: quiet with room, amber when the limit is full, red when the person is over it. */
+const devicesTone = (u: User) => (u.deviceLimit <= 0 ? "" : u.devicesUsed > u.deviceLimit ? "font-semibold text-danger-text" : u.devicesUsed === u.deviceLimit ? "font-semibold text-warn-text" : "");
+const devicesTitle = (u: User, t: Tx) => (u.deviceLimit > 0 && u.devicesUsed > u.deviceLimit ? t("users.filter.overDevices") : undefined);
 /** ∞ a size up: at 12px the glyph is a speck next to the digits. */
 const Inf = ({ title }: { title: string }) => (
   <span title={title} className="text-[15px] leading-none">
@@ -633,7 +640,6 @@ const TermText = ({ u, text, t }: { u: User; text: string; t: Tx }) => (u.expire
 function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
-  const full = shownStatus(u) === "devices";
   return (
     <tr
       onClick={onOpen}
@@ -665,7 +671,9 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
           <GroupChip id={u.groupId} name={u.groupName} color={u.groupColor} />
         </span>
       </td>
-      <td className={cx(col.devices, "font-mono text-xs", full ? "font-semibold text-warn-text" : "text-muted")}>{devicesOf(u)}</td>
+      <td title={devicesTitle(u, t)} className={cx(col.devices, "font-mono text-xs", devicesTone(u) || "text-muted")}>
+        {devicesOf(u)}
+      </td>
       <td className={col.traffic}>
         <span className="flex items-center gap-3">
           <UsageBar pct={use.pct} tone={use.tone} className={cx("w-10 min-w-4 @min-[900px]:w-16", u.quotaBytes <= 0 && "invisible")} />
@@ -691,7 +699,6 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
 function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
-  const full = shownStatus(u) === "devices";
   return (
     <div
       onClick={onOpen}
@@ -722,7 +729,7 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         </span>
         <AppIcons u={u} t={t} />
         <span className="flex-1" />
-        <span title={t("users.sortBy.devices")} className={cx("flex items-center gap-1 font-mono whitespace-nowrap", full && "font-semibold text-warn-text")}>
+        <span title={devicesTitle(u, t) ?? t("users.sortBy.devices")} className={cx("flex items-center gap-1 font-mono whitespace-nowrap", devicesTone(u))}>
           <Icon name="phone" size={12} />
           <span className="sr-only">{t("users.sortBy.devices")}</span>
           {devicesOf(u)}

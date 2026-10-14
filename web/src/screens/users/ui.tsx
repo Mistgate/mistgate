@@ -5,6 +5,7 @@ import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import type { IconName, Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
+import { Infinite, Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { cx } from "@/lib/cx";
@@ -51,6 +52,31 @@ export function SettingRow({ label, hint, children, className }: { label: ReactN
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * A speed limit in Mbit/s on a stepper, 5 at a time: 0 is "no limit" (∞), the first "+" sets 5. The person limit and the
+ * device limit both use it, on the user card and in the new-user form.
+ */
+export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: string; bps: number; onChange: (bps: number) => void }) {
+  const t = useTx();
+  const mbit = Math.round(bps / 1e6);
+  return (
+    <SettingRow label={label} hint={hint} className="py-2">
+      <div className="w-[130px] flex-none">
+        <Stepper
+          decrementLabel={t("users.less", { what: label })}
+          incrementLabel={t("users.more", { what: label })}
+          onDecrement={() => onChange(Math.max(0, mbit - 5) * 1e6)}
+          onIncrement={() => onChange(Math.min(10000, mbit + 5) * 1e6)}
+          decrementDisabled={mbit <= 0}
+          incrementDisabled={mbit >= 10000}
+        >
+          {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
+        </Stepper>
+      </div>
+    </SettingRow>
   );
 }
 

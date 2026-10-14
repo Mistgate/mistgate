@@ -110,6 +110,31 @@ describe("the new user form", () => {
     expect(document.querySelector("details summary")?.textContent).toContain("More");
   });
 
+  it("offers the two speed limits under “More”, both off by default, and sends them in bit/s", async () => {
+    createUser.mockResolvedValue({});
+    await mount([group()]);
+    const more = document.querySelector("details")!;
+    expect(more.textContent).toContain("Speed per person");
+    expect(more.textContent).toContain("all devices on one node together · experimental");
+    expect(more.textContent).toContain("Speed per device");
+    expect(more.textContent).toContain("each device on its own · experimental");
+    const step = (label: string) => click(document.querySelector(`[aria-label='${label}']`));
+    expect(document.querySelector<HTMLButtonElement>("[aria-label='Decrease Speed per device']")?.disabled).toBe(true); // 0 = no limit, ∞
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");
+    await click(button("Create"));
+    await settle();
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ speedLimitBps: 0n, deviceSpeedLimitBps: 0n }));
+
+    await step("Increase Speed per person");
+    await step("Increase Speed per person");
+    await step("Increase Speed per device");
+    expect(more.textContent).toContain("10 Mbit/s");
+    expect(more.textContent).toContain("5 Mbit/s");
+    await click(button("Create"));
+    await settle();
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", speedLimitBps: 10_000_000n, deviceSpeedLimitBps: 5_000_000n }));
+  });
+
   it("without a profile says to make one first, with the way to Profiles", async () => {
     await mount([group({ profileIds: [], happNodes: 0 })], []);
     expect(text()).toContain("Create a profile first and put it on a node.");

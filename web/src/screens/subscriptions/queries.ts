@@ -13,7 +13,8 @@ export const settingsQuery = queryOptions({
     const r = await subscriptions.getSubscriptionSettings({}, { signal });
     // the servers of the busiest group, for the preview of the server names (empty: the preview makes some up)
     const samples = (r.serverSamples ?? []).map((s) => ({ node: s.node, countryCode: s.countryCode, profile: s.profile, loadPercent: s.loadPercent }));
-    return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "" };
+    // sharedLinkUsers: people on the place the apps without a device ID share, for the "strict" confirmation
+    return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "", sharedLinkUsers: r.sharedLinkUsers ?? 0 };
   },
   staleTime: 30_000,
 });

@@ -20,7 +20,7 @@ import { DnsSelect, useInheritedDns } from "./dns-select";
 import { defaultGroup, GroupEditModal, GroupForm, PillToggle, ReachLine } from "./groups";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx } from "./t";
-import { SettingRow, SwitchRow } from "./ui";
+import { SettingRow, SpeedRow, SwitchRow } from "./ui";
 
 export { GroupEditModal, PillToggle } from "./groups";
 
@@ -60,6 +60,8 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
   const [picked, setPicked] = useState<string[]>([]);
   const [editingGroup, setEditingGroup] = useState(false);
   const [dnsPreset, setDnsPreset] = useState(""); // "" = inherit
+  const [speed, setSpeed] = useState(0); // bit/s, 0 = no limit
+  const [devSpeed, setDevSpeed] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const groups = groupList.data ?? [];
@@ -87,6 +89,8 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
         apps: { happ, amnezia },
         nodes: { all: allNodes, nodeIds: allNodes ? [] : picked.filter((id) => allIds.includes(id)) },
         dnsPresetId: dnsPreset,
+        speedLimitBps: big(speed),
+        deviceSpeedLimitBps: big(devSpeed),
       }),
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ["users"] });
@@ -252,6 +256,10 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
           <Icon name="chevronRight" size={14} className="text-muted transition-transform duration-200 group-open:rotate-90" />
           {t("users.advanced")}
         </summary>
+        <div className="border-t border-line">
+          <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={speed} onChange={setSpeed} />
+          <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={devSpeed} onChange={setDevSpeed} />
+        </div>
         <div className="flex flex-col gap-2 border-t border-line py-3">
           <span className="text-[13px] font-bold">{t("subs.dns.field")}</span>
           <DnsSelect value={dnsPreset} inherited={inheritedDns} onChange={setDnsPreset} />

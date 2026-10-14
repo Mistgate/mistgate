@@ -195,9 +195,17 @@ function AfterDemo() {
 
 const kitUser = { id: "usr_demo", name: "Марина", groupName: "Все", deviceLimit: 5, devicesUsed: 2, apps: { happ: true, amnezia: true } } as never;
 const kitDevices = [
-  { id: "dev_i", platform: "", model: "", awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: true, lastSeenUnix: 0, firstSeenUnix: 0, lastHandshakeUnix: 0, stale: false, address: "" },
+  // kind: 1 an app on the link with its device ID, 2 the place the apps without one share, 3 an AmneziaVPN key
+  { id: "dev_l", kind: 1, platform: "ios", model: "iPhone 15", osVersion: "iOS 18.1", client: "Happ/3.4.2", fingerprint: "a1b2c3", usedBytes: 4.8e9, onlineNodeIds: ["de1"], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: true, lastSeenUnix: Math.floor(Date.now() / 1000) - 60, firstSeenUnix: Math.floor(Date.now() / 1000) - 9 * 86400, lastHandshakeUnix: 0, stale: false, address: "" },
+  { id: "dev_i", kind: 2, platform: "", model: "", osVersion: "", client: "Hiddify/2.5.7", fingerprint: "", usedBytes: 0, onlineNodeIds: [], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: false, lastSeenUnix: Math.floor(Date.now() / 1000) - 7200, firstSeenUnix: 0, lastHandshakeUnix: 0, stale: false, address: "" },
   {
     id: "dev_k",
+    kind: 3,
+    osVersion: "",
+    client: "",
+    fingerprint: "",
+    usedBytes: 0,
+    onlineNodeIds: [],
     platform: "android",
     model: "Pixel 7",
     awgProfileId: "p_awg",
