@@ -9,12 +9,17 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/edition"
 )
 
-const edgeTickJobTimeout = 20 * time.Second
+const (
+	edgeTickJobTimeout = 20 * time.Second
+	// A country round creates a measurement per node and port and waits for them together, up to a minute; the Worker's cron
+	// invocation allows it, and the round's own deadline (health.Config.CountryRoundTimeout) is the same minute.
+	edgeCountryTimeout = 55 * time.Second
+)
 
 var edgeTickJobs = map[string]string{
 	"access":    "user status sweep every tick",
 	"fleet":     "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health":    "health retention at minute 17",
+	"health":    "health retention at minute 17, and the country check when a round is due",
 	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 }
 
@@ -68,6 +73,15 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 			}
 			return p.provisionKick(ctx)
 		})
+	}
+	if p.Health != nil {
+		// Nothing happens (no request, no data sent) while the Globalping integration is off, which is its default; the one read
+		// is its setting. Switching it off or disconnecting it reconciles the alerts at once (globalping.Config.OnChange).
+		cctx, cancel := context.WithTimeout(ctx, edgeCountryTimeout)
+		if p.Health.CountryTick(cctx) {
+			p.Health.ReconcileCountry(cctx)
+		}
+		cancel()
 	}
 	if now.UTC().Minute() == 17 {
 		run("health retention", func(ctx context.Context) error {

@@ -485,6 +485,9 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		resp.Rows = append(resp.Rows, row)
 	}
 	resp.UdpLoss = udpLossNotice(udpRounds)
+	if resp.CountryChecks, err = s.countryChecks(ctx, req.Msg.NodeId); err != nil {
+		return nil, s.internal("country checks", err)
+	}
 	return connect.NewResponse(resp), nil
 }
 

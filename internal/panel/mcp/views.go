@@ -1000,6 +1000,52 @@ type checkRowV struct {
 	NodeName   string   `json:"node_name"`
 	NodeStatus string   `json:"node_status"`
 	Cells      []checkV `json:"cells"`
+	// Country is the latest country check of the node: how it looks from probes inside a country. Absent while that check
+	// is off or has not run for the node.
+	Country *countryCheckV `json:"country_check,omitempty"`
+}
+
+type countryPortV struct {
+	Port uint32 `json:"port"`
+	OK   bool   `json:"ok"`
+	Ms   uint32 `json:"ms,omitempty"`
+}
+
+type countryProbeV struct {
+	Network string         `json:"network"`
+	ASN     uint32         `json:"asn,omitempty"`
+	City    string         `json:"city,omitempty"`
+	ICMPOK  bool           `json:"icmp_ok"`
+	ICMPMs  uint32         `json:"icmp_ms,omitempty"`
+	TCP     []countryPortV `json:"tcp,omitempty"`
+	Valid   bool           `json:"valid"` // false: it failed the control site or went offline; shown, not counted
+}
+
+// countryCheckV: verdict is ok, tcp_blocked (ICMP passes, TCP is cut), blocked or unknown (reason says why). Network names
+// come from a third party and are shown as data.
+type countryCheckV struct {
+	Country string          `json:"country"`
+	Verdict string          `json:"verdict"`
+	AtUnix  int64           `json:"at_unix"`
+	Reason  string          `json:"reason,omitempty"`
+	Eyeball bool            `json:"eyeball,omitempty"` // the probes are home or mobile networks
+	Probes  []countryProbeV `json:"probes"`
+}
+
+func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
+	if c == nil {
+		return nil
+	}
+	v := &countryCheckV{Country: clean(c.GetCountry(), 8), Verdict: enumName("COUNTRY_VERDICT_", c.GetVerdict().String()), AtUnix: c.GetAtUnix(),
+		Reason: clean(c.GetReason(), 40), Eyeball: c.GetEyeball(), Probes: []countryProbeV{}}
+	for _, p := range c.GetProbes() {
+		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
+		for _, t := range p.GetTcp() {
+			pv.TCP = append(pv.TCP, countryPortV{Port: t.GetPort(), OK: t.GetOk(), Ms: t.GetMs()})
+		}
+		v.Probes = append(v.Probes, pv)
+	}
+	return v
 }
 
 type checkColV struct {
@@ -1036,8 +1082,13 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 	for _, c := range r.GetColumns() {
 		v.Columns = append(v.Columns, checkColV{ProfileID: c.GetProfileId(), Profile: nm(c.GetProfileName()), Protocol: clean(c.GetProtocol(), 40)})
 	}
+	country := map[string]*adminv1.CountryCheck{}
+	for _, c := range r.GetCountryChecks() {
+		country[c.GetNodeId()] = c
+	}
 	for _, row := range r.GetRows() {
-		rv := checkRowV{NodeID: row.GetNodeId(), NodeName: nm(row.GetNodeName()), NodeStatus: nodeStatus(row.GetNodeStatus()), Cells: []checkV{}}
+		rv := checkRowV{NodeID: row.GetNodeId(), NodeName: nm(row.GetNodeName()), NodeStatus: nodeStatus(row.GetNodeStatus()), Cells: []checkV{},
+			Country: countryCheckView(country[row.GetNodeId()])}
 		for _, c := range row.GetCells() {
 			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak(), ResponseHourMs: c.GetResponseHourMs(), ConnectHourMs: c.GetConnectHourMs()}
 			if l := c.GetLast(); l != nil {

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -102,6 +103,14 @@ type Config struct {
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 	// CheckPortsUDP is the same without the TCP half, for the confirming second sample after UDP loss. nil = CheckPorts.
 	CheckPortsUDP func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
+	// Country returns the owner's choice for the country check and the source that measures it (the Globalping integration),
+	// read on every use so that a change applies at once. nil, or Enabled false, or a nil source: the check is off.
+	Country func(context.Context) (CountryConfig, CountrySource)
+	// Resolve looks a node's name up on the panel's side, for the country check. Default: the system resolver (DNS over
+	// HTTPS on the Cloudflare edition, which has none).
+	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)
+	// CountryRoundTimeout bounds one whole country round. Default 60 s.
+	CountryRoundTimeout time.Duration
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
 	Log          *slog.Logger
@@ -139,6 +148,9 @@ type Service struct {
 	sched   map[string]*schedule // inbound id -> when it is probed next
 	work    chan string          // inbound ids to probe now
 	queued  map[string]bool
+
+	countryMu        sync.Mutex // one country round at a time
+	countryStretched bool       // the stretched interval was logged
 
 	evalMu sync.Mutex // serialises evaluate
 	kick   chan struct{}
@@ -188,6 +200,9 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 	if cfg.Workers <= 0 {
 		cfg.Workers = 4
 	}
+	if cfg.Resolve == nil {
+		cfg.Resolve = defaultResolve
+	}
 	if cfg.Actor == nil {
 		cfg.Actor = func(ctx context.Context) string {
 			if a, ok := auth.AdminFrom(ctx); ok {
@@ -215,7 +230,7 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 func (s *Service) Run(ctx context.Context) {
 	s.startedAt = s.now()
 	var wg sync.WaitGroup
-	for _, f := range []func(context.Context){s.runChecker, s.runEvaluator, s.runRetention, s.runPortRechecks} {
+	for _, f := range []func(context.Context){s.runChecker, s.runEvaluator, s.runRetention, s.runPortRechecks, s.runCountryChecks} {
 		wg.Add(1)
 		go func() { defer wg.Done(); f(ctx) }()
 	}

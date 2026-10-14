@@ -18,8 +18,10 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/backup"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
+	"github.com/mistgate/mistgate/internal/panel/globalping"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 	settings "github.com/mistgate/mistgate/internal/panel/instance"
@@ -240,9 +242,18 @@ func Build(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Globalping, an integration of its own: off until the owner switches it on. The country check of the health module
+	// measures through it and does nothing while it is off. The country it looks from is the shared one of countryreach.
+	cr := countryreach.New(st, log, c.Clock)
+	gp, err := globalping.New(globalping.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: cr.Country,
+		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})
+	if err != nil {
+		return nil, err
+	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
 	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
+		Country:      gp.Country,
 		OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	hl = health.New(st, vlt, reg, fl, hcfg)
 	fl.SetHealth(hl)
@@ -369,6 +380,8 @@ func Build(c Config) (*Panel, error) {
 		func() (string, http.Handler) { return upd.Handler() },
 		func() (string, http.Handler) { return bkp.Handler() },
 		func() (string, http.Handler) { return tg.Handler() },
+		func() (string, http.Handler) { return gp.Handler() },
+		func() (string, http.Handler) { return cr.Handler() },
 	} {
 		path, handler := h()
 		admin = append(admin, httpserver.AdminHandler{Path: path, Handler: handler})

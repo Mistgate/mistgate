@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Globalping (globalping.io): a free network of probes in many countries. The panel uses it for the country check
+// (health.proto CountryCheck): from probes inside one country, ping every online node and open TCP connections to its ports,
+// to notice a block that the panel's own server cannot see. Conventions: common.proto.
+//
+// IT SENDS NODE ADDRESSES TO A THIRD PARTY. That is why it is off until the owner switches it on: with it on, every
+// round tells Globalping the IPv4 address of each online node (and nothing else about it). The panel never sends an
+// address anywhere else, and TestGlobalping sends none at all.
+//
+// THE COUNTRY is not a setting of this integration: it is shared by every source of the country check and lives in
+// CountryReachabilityService (country_reachability.proto). Globalping reads it from there.
+//
+// ONE SETTING PER PANEL, like the Telegram bot. The token is optional (it raises the free limit from 250 to 500 tests an
+// hour); it is sealed in the panel vault and never comes back: the screen shows "set". The checks run on the VPS edition and
+// on the Cloudflare edition alike.
+//
+// OFF IS THE DEFAULT AND OFF MEANS OFF. With enabled false the panel starts no round and makes no call to Globalping; a round
+// in flight is cancelled when the setting is changed. The stored results stay until the retention removes them, but the API
+// then reports the check as off (GetChecksResponse.country_checks empty), so a screen can hide it.
+//
+// WHO MAY CALL WHAT. All of them are OWNER-ONLY; changing the settings needs a step-up. None of it is open to API tokens or MCP
+// (the verdicts are: GetChecks, checks_results).
+//
+// ERRORS. INVALID_ARGUMENT: an interval below 10 minutes or above 1440, a token that is not shaped like one
+// ("token_invalid"). FAILED_PRECONDITION: "globalping_unauthorized" (Globalping refused the token). UNAVAILABLE:
+// "globalping_unreachable". RESOURCE_EXHAUSTED: asked again too soon.
+service GlobalpingService {
+  // The settings. No secrets.
+  rpc GetGlobalping(GetGlobalpingRequest) returns (GetGlobalpingResponse);
+  // Changes the settings; absent fields stay. Owner only; needs a step-up.
+  rpc UpdateGlobalping(UpdateGlobalpingRequest) returns (UpdateGlobalpingResponse);
+  // One harmless call to Globalping's rate-limit endpoint (GET /v1/limits) with the stored token (or without one): says
+  // whether the token works and how many tests are left this hour. Sends no address and uses no test.
+  rpc TestGlobalping(TestGlobalpingRequest) returns (TestGlobalpingResponse);
+  // Disconnect: switches it off AND forgets the token. Owner only; needs a step-up. Idempotent. Rounds in flight are
+  // cancelled; stored results stay until the retention removes them (7 days), but GetChecks stops returning them.
+  rpc DisconnectGlobalping(DisconnectGlobalpingRequest) returns (DisconnectGlobalpingResponse);
+}
+
+message GlobalpingSettings {
+  // Default false.
+  bool enabled = 1;
+  // Minutes between rounds, 10..1440; default 15. When the hourly limit of Globalping needs it, the probes per measurement go
+  // down from three to two, and then the rounds come less often than this.
+  uint32 interval_min = 2;
+  // A token is stored. The token itself is never returned.
+  bool has_token = 3;
+}
+
+message GetGlobalpingRequest {}
+message GetGlobalpingResponse { GlobalpingSettings settings = 1; }
+
+message UpdateGlobalpingRequest {
+  optional bool enabled = 1;
+  optional uint32 interval_min = 2;
+  // A token from https://dash.globalping.io/tokens, at most 256 characters, no spaces; write-only. "" removes it.
+  optional string token = 3;
+}
+message UpdateGlobalpingResponse { GlobalpingSettings settings = 1; }
+
+message TestGlobalpingRequest {}
+message TestGlobalpingResponse {
+  // Globalping answered. false never happens here: a failure is the error above.
+  bool reachable = 1;
+  // The stored token was sent and accepted. false with has_token true cannot happen (a refused token is the error above).
+  bool token_used = 2;
+  // The hourly limit that applies (250 without a token, 500 with one), what is left of it and the seconds until it resets.
+  uint32 limit = 3;
+  uint32 remaining = 4;
+  uint32 reset_s = 5;
+  // Credits of the account; 0 without a token.
+  uint32 credits = 6;
+}
+
+message DisconnectGlobalpingRequest {}
+message DisconnectGlobalpingResponse { GlobalpingSettings settings = 1; }

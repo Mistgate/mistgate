@@ -54,6 +54,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kTorrent:        adminv1.AlertKind_ALERT_KIND_TORRENT,
 	kPortLossy:      adminv1.AlertKind_ALERT_KIND_PORT_LOSSY,
 	kDeviceLimit:    adminv1.AlertKind_ALERT_KIND_DEVICE_LIMIT,
+	kCountryBlocked: adminv1.AlertKind_ALERT_KIND_COUNTRY_BLOCKED,
 }
 
 const (
@@ -416,6 +417,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 		activeKeys[key{alert.Kind, alert.NodeID, alert.Subject}] = true
 	}
 	userConds(now, sn, signals, activeKeys, d, add)
+	s.addCountryConds(ctx, sn, live, activeKeys, d, add)
 	return d
 }
 

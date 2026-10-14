@@ -126,6 +126,12 @@ enum AlertKind {
   // user_name, used, limit, count, last_unix}. Open while a refusal is under 24 hours old; in TRACK mode nobody is refused,
   // so the events it writes stay history and raise nothing.
   ALERT_KIND_DEVICE_LIMIT = 17;
+  // The country check (a source of probes inside the country, see CountryCheck) found the node cut off from the country for
+  // two rounds in a row: verdict BLOCKED or TCP_BLOCKED. WARNING. node_id = node id, subject = "" (one per node and country),
+  // params{country, verdict, networks, ports}. "networks" is the probe networks that failed, comma separated; "ports" the TCP
+  // ports tried. Opens after 2 consecutive rounds with a bad verdict and closes after 2 rounds with OK; UNKNOWN rounds
+  // neither open nor close it. Muting works like for any other kind.
+  ALERT_KIND_COUNTRY_BLOCKED = 18;
 }
 
 message Alert {
@@ -307,6 +313,61 @@ message GetChecksResponse {
   // host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
   // nothing to say.
   UdpLossNotice udp_loss = 5;
+  // The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job).
+  // With GetChecksRequest.node_id only that node's. Empty while the country check is off.
+  repeated CountryCheck country_checks = 6;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Country check ("reachable from a country"). The synthetic checks above run on the panel's server and cannot see a block
+// inside another country. When the owner switches the country check on (the Globalping integration, globalping.proto), the
+// panel asks probes in that country, on home and mobile networks first, to ping every online node (ICMP) and to open a TCP
+// connection to its TCP ports, and compares the answers. Probes also test a control site that is never blocked in that
+// country; a probe that cannot reach it is thrown away for that round. There is no UDP test: a Hysteria2 or AWG port is
+// covered only through the node's IP address (ICMP) and the TCP ports of its other profiles.
+
+enum CountryVerdict {
+  COUNTRY_VERDICT_UNSPECIFIED = 0;
+  // TCP connects from at least half of the valid probes (for a node without a TCP port: ICMP answers on half).
+  COUNTRY_VERDICT_OK = 1;
+  // ICMP answers on at least half of the valid probes, but TCP fails on all of them: the SYN is dropped, not the address.
+  COUNTRY_VERDICT_TCP_BLOCKED = 2;
+  // Both ICMP and TCP fail on all valid probes.
+  COUNTRY_VERDICT_BLOCKED = 3;
+  // Fewer than 2 valid probes, a Globalping error or limit, a timeout, or a mixed picture that says nothing.
+  COUNTRY_VERDICT_UNKNOWN = 4;
+}
+
+message PortResult {
+  uint32 port = 1;
+  bool ok = 2;
+  // Average round trip of the received packets, milliseconds; 0 when none came back.
+  uint32 ms = 3;
+}
+
+message CountryProbe {
+  // Network name of the probe ("Rostelecom"), its AS number and city. No address of the probe is kept.
+  string network = 1;
+  uint32 asn = 2;
+  string city = 3;
+  bool icmp_ok = 4;
+  uint32 icmp_ms = 5;
+  repeated PortResult tcp = 6;
+  // False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
+  bool valid = 7;
+}
+
+message CountryCheck {
+  string node_id = 1;
+  // ISO 3166-1 alpha-2 of the probes, "RU".
+  string country = 2;
+  CountryVerdict verdict = 3;
+  int64 at_unix = 4 [jstype = JS_NUMBER];
+  repeated CountryProbe probes = 5;
+  // Machine code when the verdict is UNKNOWN: "too_few_probes", "rate_limited", "source_error", "timeout". Empty otherwise.
+  string reason = 6;
+  // The probes were home or mobile networks; false: any network (too few of them were online).
+  bool eyeball = 7;
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes

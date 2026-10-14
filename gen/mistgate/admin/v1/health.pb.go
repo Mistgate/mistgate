@@ -139,6 +139,12 @@ const (
 	// user_name, used, limit, count, last_unix}. Open while a refusal is under 24 hours old; in TRACK mode nobody is refused,
 	// so the events it writes stay history and raise nothing.
 	AlertKind_ALERT_KIND_DEVICE_LIMIT AlertKind = 17
+	// The country check (a source of probes inside the country, see CountryCheck) found the node cut off from the country for
+	// two rounds in a row: verdict BLOCKED or TCP_BLOCKED. WARNING. node_id = node id, subject = "" (one per node and country),
+	// params{country, verdict, networks, ports}. "networks" is the probe networks that failed, comma separated; "ports" the TCP
+	// ports tried. Opens after 2 consecutive rounds with a bad verdict and closes after 2 rounds with OK; UNKNOWN rounds
+	// neither open nor close it. Muting works like for any other kind.
+	AlertKind_ALERT_KIND_COUNTRY_BLOCKED AlertKind = 18
 )
 
 // Enum value maps for AlertKind.
@@ -162,6 +168,7 @@ var (
 		15: "ALERT_KIND_TORRENT",
 		16: "ALERT_KIND_PORT_LOSSY",
 		17: "ALERT_KIND_DEVICE_LIMIT",
+		18: "ALERT_KIND_COUNTRY_BLOCKED",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -182,6 +189,7 @@ var (
 		"ALERT_KIND_TORRENT":                     15,
 		"ALERT_KIND_PORT_LOSSY":                  16,
 		"ALERT_KIND_DEVICE_LIMIT":                17,
+		"ALERT_KIND_COUNTRY_BLOCKED":             18,
 	}
 )
 
@@ -272,6 +280,65 @@ func (CheckStatus) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{2}
 }
 
+type CountryVerdict int32
+
+const (
+	CountryVerdict_COUNTRY_VERDICT_UNSPECIFIED CountryVerdict = 0
+	// TCP connects from at least half of the valid probes (for a node without a TCP port: ICMP answers on half).
+	CountryVerdict_COUNTRY_VERDICT_OK CountryVerdict = 1
+	// ICMP answers on at least half of the valid probes, but TCP fails on all of them: the SYN is dropped, not the address.
+	CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED CountryVerdict = 2
+	// Both ICMP and TCP fail on all valid probes.
+	CountryVerdict_COUNTRY_VERDICT_BLOCKED CountryVerdict = 3
+	// Fewer than 2 valid probes, a Globalping error or limit, a timeout, or a mixed picture that says nothing.
+	CountryVerdict_COUNTRY_VERDICT_UNKNOWN CountryVerdict = 4
+)
+
+// Enum value maps for CountryVerdict.
+var (
+	CountryVerdict_name = map[int32]string{
+		0: "COUNTRY_VERDICT_UNSPECIFIED",
+		1: "COUNTRY_VERDICT_OK",
+		2: "COUNTRY_VERDICT_TCP_BLOCKED",
+		3: "COUNTRY_VERDICT_BLOCKED",
+		4: "COUNTRY_VERDICT_UNKNOWN",
+	}
+	CountryVerdict_value = map[string]int32{
+		"COUNTRY_VERDICT_UNSPECIFIED": 0,
+		"COUNTRY_VERDICT_OK":          1,
+		"COUNTRY_VERDICT_TCP_BLOCKED": 2,
+		"COUNTRY_VERDICT_BLOCKED":     3,
+		"COUNTRY_VERDICT_UNKNOWN":     4,
+	}
+)
+
+func (x CountryVerdict) Enum() *CountryVerdict {
+	p := new(CountryVerdict)
+	*p = x
+	return p
+}
+
+func (x CountryVerdict) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CountryVerdict) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_health_proto_enumTypes[3].Descriptor()
+}
+
+func (CountryVerdict) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_health_proto_enumTypes[3]
+}
+
+func (x CountryVerdict) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CountryVerdict.Descriptor instead.
+func (CountryVerdict) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{3}
+}
+
 type DoctorStatus int32
 
 const (
@@ -312,11 +379,11 @@ func (x DoctorStatus) String() string {
 }
 
 func (DoctorStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_health_proto_enumTypes[3].Descriptor()
+	return file_mistgate_admin_v1_health_proto_enumTypes[4].Descriptor()
 }
 
 func (DoctorStatus) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_health_proto_enumTypes[3]
+	return &file_mistgate_admin_v1_health_proto_enumTypes[4]
 }
 
 func (x DoctorStatus) Number() protoreflect.EnumNumber {
@@ -325,7 +392,7 @@ func (x DoctorStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DoctorStatus.Descriptor instead.
 func (DoctorStatus) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{4}
 }
 
 type Alert struct {
@@ -1232,7 +1299,10 @@ type GetChecksResponse struct {
 	// Set when UDP handshakes of the panel's own probes keep needing a retry while its TCP probes are fine: the panel's
 	// host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
 	// nothing to say.
-	UdpLoss       *UdpLossNotice `protobuf:"bytes,5,opt,name=udp_loss,json=udpLoss,proto3" json:"udp_loss,omitempty"`
+	UdpLoss *UdpLossNotice `protobuf:"bytes,5,opt,name=udp_loss,json=udpLoss,proto3" json:"udp_loss,omitempty"`
+	// The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job).
+	// With GetChecksRequest.node_id only that node's. Empty while the country check is off.
+	CountryChecks []*CountryCheck `protobuf:"bytes,6,rep,name=country_checks,json=countryChecks,proto3" json:"country_checks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1302,6 +1372,263 @@ func (x *GetChecksResponse) GetUdpLoss() *UdpLossNotice {
 	return nil
 }
 
+func (x *GetChecksResponse) GetCountryChecks() []*CountryCheck {
+	if x != nil {
+		return x.CountryChecks
+	}
+	return nil
+}
+
+type PortResult struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Port  uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Ok    bool                   `protobuf:"varint,2,opt,name=ok,proto3" json:"ok,omitempty"`
+	// Average round trip of the received packets, milliseconds; 0 when none came back.
+	Ms            uint32 `protobuf:"varint,3,opt,name=ms,proto3" json:"ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortResult) Reset() {
+	*x = PortResult{}
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortResult) ProtoMessage() {}
+
+func (x *PortResult) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortResult.ProtoReflect.Descriptor instead.
+func (*PortResult) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PortResult) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PortResult) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *PortResult) GetMs() uint32 {
+	if x != nil {
+		return x.Ms
+	}
+	return 0
+}
+
+type CountryProbe struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Network name of the probe ("Rostelecom"), its AS number and city. No address of the probe is kept.
+	Network string        `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"`
+	Asn     uint32        `protobuf:"varint,2,opt,name=asn,proto3" json:"asn,omitempty"`
+	City    string        `protobuf:"bytes,3,opt,name=city,proto3" json:"city,omitempty"`
+	IcmpOk  bool          `protobuf:"varint,4,opt,name=icmp_ok,json=icmpOk,proto3" json:"icmp_ok,omitempty"`
+	IcmpMs  uint32        `protobuf:"varint,5,opt,name=icmp_ms,json=icmpMs,proto3" json:"icmp_ms,omitempty"`
+	Tcp     []*PortResult `protobuf:"bytes,6,rep,name=tcp,proto3" json:"tcp,omitempty"`
+	// False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
+	Valid         bool `protobuf:"varint,7,opt,name=valid,proto3" json:"valid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountryProbe) Reset() {
+	*x = CountryProbe{}
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountryProbe) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountryProbe) ProtoMessage() {}
+
+func (x *CountryProbe) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountryProbe.ProtoReflect.Descriptor instead.
+func (*CountryProbe) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CountryProbe) GetNetwork() string {
+	if x != nil {
+		return x.Network
+	}
+	return ""
+}
+
+func (x *CountryProbe) GetAsn() uint32 {
+	if x != nil {
+		return x.Asn
+	}
+	return 0
+}
+
+func (x *CountryProbe) GetCity() string {
+	if x != nil {
+		return x.City
+	}
+	return ""
+}
+
+func (x *CountryProbe) GetIcmpOk() bool {
+	if x != nil {
+		return x.IcmpOk
+	}
+	return false
+}
+
+func (x *CountryProbe) GetIcmpMs() uint32 {
+	if x != nil {
+		return x.IcmpMs
+	}
+	return 0
+}
+
+func (x *CountryProbe) GetTcp() []*PortResult {
+	if x != nil {
+		return x.Tcp
+	}
+	return nil
+}
+
+func (x *CountryProbe) GetValid() bool {
+	if x != nil {
+		return x.Valid
+	}
+	return false
+}
+
+type CountryCheck struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// ISO 3166-1 alpha-2 of the probes, "RU".
+	Country string          `protobuf:"bytes,2,opt,name=country,proto3" json:"country,omitempty"`
+	Verdict CountryVerdict  `protobuf:"varint,3,opt,name=verdict,proto3,enum=mistgate.admin.v1.CountryVerdict" json:"verdict,omitempty"`
+	AtUnix  int64           `protobuf:"varint,4,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	Probes  []*CountryProbe `protobuf:"bytes,5,rep,name=probes,proto3" json:"probes,omitempty"`
+	// Machine code when the verdict is UNKNOWN: "too_few_probes", "rate_limited", "source_error", "timeout". Empty otherwise.
+	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The probes were home or mobile networks; false: any network (too few of them were online).
+	Eyeball       bool `protobuf:"varint,7,opt,name=eyeball,proto3" json:"eyeball,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountryCheck) Reset() {
+	*x = CountryCheck{}
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountryCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountryCheck) ProtoMessage() {}
+
+func (x *CountryCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountryCheck.ProtoReflect.Descriptor instead.
+func (*CountryCheck) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CountryCheck) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *CountryCheck) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+func (x *CountryCheck) GetVerdict() CountryVerdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return CountryVerdict_COUNTRY_VERDICT_UNSPECIFIED
+}
+
+func (x *CountryCheck) GetAtUnix() int64 {
+	if x != nil {
+		return x.AtUnix
+	}
+	return 0
+}
+
+func (x *CountryCheck) GetProbes() []*CountryProbe {
+	if x != nil {
+		return x.Probes
+	}
+	return nil
+}
+
+func (x *CountryCheck) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *CountryCheck) GetEyeball() bool {
+	if x != nil {
+		return x.Eyeball
+	}
+	return false
+}
+
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
 // (vless) were not: at least 20 % of the node's UDP rounds had connect_ms of 2000 or more.
 type UdpLossNotice struct {
@@ -1315,7 +1642,7 @@ type UdpLossNotice struct {
 
 func (x *UdpLossNotice) Reset() {
 	*x = UdpLossNotice{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1327,7 +1654,7 @@ func (x *UdpLossNotice) String() string {
 func (*UdpLossNotice) ProtoMessage() {}
 
 func (x *UdpLossNotice) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1340,7 +1667,7 @@ func (x *UdpLossNotice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UdpLossNotice.ProtoReflect.Descriptor instead.
 func (*UdpLossNotice) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UdpLossNotice) GetNodeIds() []string {
@@ -1367,7 +1694,7 @@ type RunChecksNowRequest struct {
 
 func (x *RunChecksNowRequest) Reset() {
 	*x = RunChecksNowRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1379,7 +1706,7 @@ func (x *RunChecksNowRequest) String() string {
 func (*RunChecksNowRequest) ProtoMessage() {}
 
 func (x *RunChecksNowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1392,7 +1719,7 @@ func (x *RunChecksNowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunChecksNowRequest.ProtoReflect.Descriptor instead.
 func (*RunChecksNowRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RunChecksNowRequest) GetNodeId() string {
@@ -1414,7 +1741,7 @@ type RunChecksNowResponse struct {
 
 func (x *RunChecksNowResponse) Reset() {
 	*x = RunChecksNowResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1426,7 +1753,7 @@ func (x *RunChecksNowResponse) String() string {
 func (*RunChecksNowResponse) ProtoMessage() {}
 
 func (x *RunChecksNowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1439,7 +1766,7 @@ func (x *RunChecksNowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunChecksNowResponse.ProtoReflect.Descriptor instead.
 func (*RunChecksNowResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RunChecksNowResponse) GetScheduled() uint32 {
@@ -1486,7 +1813,7 @@ type DoctorItem struct {
 
 func (x *DoctorItem) Reset() {
 	*x = DoctorItem{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1498,7 +1825,7 @@ func (x *DoctorItem) String() string {
 func (*DoctorItem) ProtoMessage() {}
 
 func (x *DoctorItem) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1511,7 +1838,7 @@ func (x *DoctorItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DoctorItem.ProtoReflect.Descriptor instead.
 func (*DoctorItem) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DoctorItem) GetId() string {
@@ -1625,7 +1952,7 @@ type NodeDoctor struct {
 
 func (x *NodeDoctor) Reset() {
 	*x = NodeDoctor{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1637,7 +1964,7 @@ func (x *NodeDoctor) String() string {
 func (*NodeDoctor) ProtoMessage() {}
 
 func (x *NodeDoctor) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1650,7 +1977,7 @@ func (x *NodeDoctor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeDoctor.ProtoReflect.Descriptor instead.
 func (*NodeDoctor) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *NodeDoctor) GetNodeId() string {
@@ -1740,7 +2067,7 @@ type GetDoctorRequest struct {
 
 func (x *GetDoctorRequest) Reset() {
 	*x = GetDoctorRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1752,7 +2079,7 @@ func (x *GetDoctorRequest) String() string {
 func (*GetDoctorRequest) ProtoMessage() {}
 
 func (x *GetDoctorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1765,7 +2092,7 @@ func (x *GetDoctorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDoctorRequest.ProtoReflect.Descriptor instead.
 func (*GetDoctorRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetDoctorRequest) GetNodeId() string {
@@ -1786,7 +2113,7 @@ type GetDoctorResponse struct {
 
 func (x *GetDoctorResponse) Reset() {
 	*x = GetDoctorResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1798,7 +2125,7 @@ func (x *GetDoctorResponse) String() string {
 func (*GetDoctorResponse) ProtoMessage() {}
 
 func (x *GetDoctorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1811,7 +2138,7 @@ func (x *GetDoctorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDoctorResponse.ProtoReflect.Descriptor instead.
 func (*GetDoctorResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetDoctorResponse) GetNowUnix() int64 {
@@ -1838,7 +2165,7 @@ type RunDoctorRequest struct {
 
 func (x *RunDoctorRequest) Reset() {
 	*x = RunDoctorRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1850,7 +2177,7 @@ func (x *RunDoctorRequest) String() string {
 func (*RunDoctorRequest) ProtoMessage() {}
 
 func (x *RunDoctorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1863,7 +2190,7 @@ func (x *RunDoctorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunDoctorRequest.ProtoReflect.Descriptor instead.
 func (*RunDoctorRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RunDoctorRequest) GetNodeId() string {
@@ -1883,7 +2210,7 @@ type RunDoctorResponse struct {
 
 func (x *RunDoctorResponse) Reset() {
 	*x = RunDoctorResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1895,7 +2222,7 @@ func (x *RunDoctorResponse) String() string {
 func (*RunDoctorResponse) ProtoMessage() {}
 
 func (x *RunDoctorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1908,7 +2235,7 @@ func (x *RunDoctorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunDoctorResponse.ProtoReflect.Descriptor instead.
 func (*RunDoctorResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RunDoctorResponse) GetNowUnix() int64 {
@@ -1943,7 +2270,7 @@ type FixPlan struct {
 
 func (x *FixPlan) Reset() {
 	*x = FixPlan{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1955,7 +2282,7 @@ func (x *FixPlan) String() string {
 func (*FixPlan) ProtoMessage() {}
 
 func (x *FixPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1968,7 +2295,7 @@ func (x *FixPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixPlan.ProtoReflect.Descriptor instead.
 func (*FixPlan) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *FixPlan) GetFixId() string {
@@ -2022,7 +2349,7 @@ type ApplyFixRequest struct {
 
 func (x *ApplyFixRequest) Reset() {
 	*x = ApplyFixRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2034,7 +2361,7 @@ func (x *ApplyFixRequest) String() string {
 func (*ApplyFixRequest) ProtoMessage() {}
 
 func (x *ApplyFixRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2047,7 +2374,7 @@ func (x *ApplyFixRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyFixRequest.ProtoReflect.Descriptor instead.
 func (*ApplyFixRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ApplyFixRequest) GetNodeId() string {
@@ -2108,7 +2435,7 @@ type ApplyFixResponse struct {
 
 func (x *ApplyFixResponse) Reset() {
 	*x = ApplyFixResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2120,7 +2447,7 @@ func (x *ApplyFixResponse) String() string {
 func (*ApplyFixResponse) ProtoMessage() {}
 
 func (x *ApplyFixResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2133,7 +2460,7 @@ func (x *ApplyFixResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyFixResponse.ProtoReflect.Descriptor instead.
 func (*ApplyFixResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ApplyFixResponse) GetPlan() *FixPlan {
@@ -2203,7 +2530,7 @@ type AcceptDoctorItemRequest struct {
 
 func (x *AcceptDoctorItemRequest) Reset() {
 	*x = AcceptDoctorItemRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2215,7 +2542,7 @@ func (x *AcceptDoctorItemRequest) String() string {
 func (*AcceptDoctorItemRequest) ProtoMessage() {}
 
 func (x *AcceptDoctorItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2228,7 +2555,7 @@ func (x *AcceptDoctorItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptDoctorItemRequest.ProtoReflect.Descriptor instead.
 func (*AcceptDoctorItemRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AcceptDoctorItemRequest) GetNodeId() string {
@@ -2255,7 +2582,7 @@ type AcceptDoctorItemResponse struct {
 
 func (x *AcceptDoctorItemResponse) Reset() {
 	*x = AcceptDoctorItemResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2267,7 +2594,7 @@ func (x *AcceptDoctorItemResponse) String() string {
 func (*AcceptDoctorItemResponse) ProtoMessage() {}
 
 func (x *AcceptDoctorItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2280,7 +2607,7 @@ func (x *AcceptDoctorItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptDoctorItemResponse.ProtoReflect.Descriptor instead.
 func (*AcceptDoctorItemResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *AcceptDoctorItemResponse) GetDoctor() *NodeDoctor {
@@ -2300,7 +2627,7 @@ type UnacceptDoctorItemRequest struct {
 
 func (x *UnacceptDoctorItemRequest) Reset() {
 	*x = UnacceptDoctorItemRequest{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2312,7 +2639,7 @@ func (x *UnacceptDoctorItemRequest) String() string {
 func (*UnacceptDoctorItemRequest) ProtoMessage() {}
 
 func (x *UnacceptDoctorItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2325,7 +2652,7 @@ func (x *UnacceptDoctorItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnacceptDoctorItemRequest.ProtoReflect.Descriptor instead.
 func (*UnacceptDoctorItemRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *UnacceptDoctorItemRequest) GetNodeId() string {
@@ -2351,7 +2678,7 @@ type UnacceptDoctorItemResponse struct {
 
 func (x *UnacceptDoctorItemResponse) Reset() {
 	*x = UnacceptDoctorItemResponse{}
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2363,7 +2690,7 @@ func (x *UnacceptDoctorItemResponse) String() string {
 func (*UnacceptDoctorItemResponse) ProtoMessage() {}
 
 func (x *UnacceptDoctorItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_health_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_health_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2376,7 +2703,7 @@ func (x *UnacceptDoctorItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnacceptDoctorItemResponse.ProtoReflect.Descriptor instead.
 func (*UnacceptDoctorItemResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_health_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UnacceptDoctorItemResponse) GetDoctor() *NodeDoctor {
@@ -2473,14 +2800,36 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"nodeStatus\x122\n" +
 	"\x05cells\x18\x05 \x03(\v2\x1c.mistgate.admin.v1.CheckCellR\x05cells\"+\n" +
 	"\x10GetChecksRequest\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\xf9\x01\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\xc1\x02\n" +
 	"\x11GetChecksResponse\x12\x1d\n" +
 	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12\x1d\n" +
 	"\n" +
 	"interval_s\x18\x02 \x01(\rR\tintervalS\x128\n" +
 	"\acolumns\x18\x03 \x03(\v2\x1e.mistgate.admin.v1.CheckColumnR\acolumns\x12/\n" +
 	"\x04rows\x18\x04 \x03(\v2\x1b.mistgate.admin.v1.CheckRowR\x04rows\x12;\n" +
-	"\budp_loss\x18\x05 \x01(\v2 .mistgate.admin.v1.UdpLossNoticeR\audpLoss\"O\n" +
+	"\budp_loss\x18\x05 \x01(\v2 .mistgate.admin.v1.UdpLossNoticeR\audpLoss\x12F\n" +
+	"\x0ecountry_checks\x18\x06 \x03(\v2\x1f.mistgate.admin.v1.CountryCheckR\rcountryChecks\"@\n" +
+	"\n" +
+	"PortResult\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\x12\x0e\n" +
+	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x0e\n" +
+	"\x02ms\x18\x03 \x01(\rR\x02ms\"\xc7\x01\n" +
+	"\fCountryProbe\x12\x18\n" +
+	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x10\n" +
+	"\x03asn\x18\x02 \x01(\rR\x03asn\x12\x12\n" +
+	"\x04city\x18\x03 \x01(\tR\x04city\x12\x17\n" +
+	"\aicmp_ok\x18\x04 \x01(\bR\x06icmpOk\x12\x17\n" +
+	"\aicmp_ms\x18\x05 \x01(\rR\x06icmpMs\x12/\n" +
+	"\x03tcp\x18\x06 \x03(\v2\x1d.mistgate.admin.v1.PortResultR\x03tcp\x12\x14\n" +
+	"\x05valid\x18\a \x01(\bR\x05valid\"\x86\x02\n" +
+	"\fCountryCheck\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
+	"\acountry\x18\x02 \x01(\tR\acountry\x12;\n" +
+	"\averdict\x18\x03 \x01(\x0e2!.mistgate.admin.v1.CountryVerdictR\averdict\x12\x1b\n" +
+	"\aat_unix\x18\x04 \x01(\x03B\x020\x02R\x06atUnix\x127\n" +
+	"\x06probes\x18\x05 \x03(\v2\x1f.mistgate.admin.v1.CountryProbeR\x06probes\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x18\n" +
+	"\aeyeball\x18\a \x01(\bR\aeyeball\"O\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
 	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\".\n" +
@@ -2581,7 +2930,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\x8f\x04\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xaf\x04\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -2601,13 +2950,20 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x19ALERT_KIND_USERS_IMPACTED\x10\x0e\x12\x16\n" +
 	"\x12ALERT_KIND_TORRENT\x10\x0f\x12\x19\n" +
 	"\x15ALERT_KIND_PORT_LOSSY\x10\x10\x12\x1b\n" +
-	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11*\x8e\x01\n" +
+	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11\x12\x1e\n" +
+	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +
 	"\x15CHECK_STATUS_DEGRADED\x10\x02\x12\x17\n" +
 	"\x13CHECK_STATUS_FAILED\x10\x03\x12\x18\n" +
-	"\x14CHECK_STATUS_SKIPPED\x10\x04*\x8b\x01\n" +
+	"\x14CHECK_STATUS_SKIPPED\x10\x04*\xa4\x01\n" +
+	"\x0eCountryVerdict\x12\x1f\n" +
+	"\x1bCOUNTRY_VERDICT_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12COUNTRY_VERDICT_OK\x10\x01\x12\x1f\n" +
+	"\x1bCOUNTRY_VERDICT_TCP_BLOCKED\x10\x02\x12\x1b\n" +
+	"\x17COUNTRY_VERDICT_BLOCKED\x10\x03\x12\x1b\n" +
+	"\x17COUNTRY_VERDICT_UNKNOWN\x10\x04*\x8b\x01\n" +
 	"\fDoctorStatus\x12\x1d\n" +
 	"\x19DOCTOR_STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DOCTOR_STATUS_OK\x10\x01\x12\x16\n" +
@@ -2639,99 +2995,107 @@ func file_mistgate_admin_v1_health_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_health_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_health_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_mistgate_admin_v1_health_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_mistgate_admin_v1_health_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_mistgate_admin_v1_health_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_mistgate_admin_v1_health_proto_goTypes = []any{
 	(AlertSeverity)(0),                 // 0: mistgate.admin.v1.AlertSeverity
 	(AlertKind)(0),                     // 1: mistgate.admin.v1.AlertKind
 	(CheckStatus)(0),                   // 2: mistgate.admin.v1.CheckStatus
-	(DoctorStatus)(0),                  // 3: mistgate.admin.v1.DoctorStatus
-	(*Alert)(nil),                      // 4: mistgate.admin.v1.Alert
-	(*ListAlertsRequest)(nil),          // 5: mistgate.admin.v1.ListAlertsRequest
-	(*ListAlertsResponse)(nil),         // 6: mistgate.admin.v1.ListAlertsResponse
-	(*MuteAlertRequest)(nil),           // 7: mistgate.admin.v1.MuteAlertRequest
-	(*MuteAlertResponse)(nil),          // 8: mistgate.admin.v1.MuteAlertResponse
-	(*CheckColumn)(nil),                // 9: mistgate.admin.v1.CheckColumn
-	(*CheckResult)(nil),                // 10: mistgate.admin.v1.CheckResult
-	(*CheckBucket)(nil),                // 11: mistgate.admin.v1.CheckBucket
-	(*CheckCell)(nil),                  // 12: mistgate.admin.v1.CheckCell
-	(*CheckRow)(nil),                   // 13: mistgate.admin.v1.CheckRow
-	(*GetChecksRequest)(nil),           // 14: mistgate.admin.v1.GetChecksRequest
-	(*GetChecksResponse)(nil),          // 15: mistgate.admin.v1.GetChecksResponse
-	(*UdpLossNotice)(nil),              // 16: mistgate.admin.v1.UdpLossNotice
-	(*RunChecksNowRequest)(nil),        // 17: mistgate.admin.v1.RunChecksNowRequest
-	(*RunChecksNowResponse)(nil),       // 18: mistgate.admin.v1.RunChecksNowResponse
-	(*DoctorItem)(nil),                 // 19: mistgate.admin.v1.DoctorItem
-	(*NodeDoctor)(nil),                 // 20: mistgate.admin.v1.NodeDoctor
-	(*GetDoctorRequest)(nil),           // 21: mistgate.admin.v1.GetDoctorRequest
-	(*GetDoctorResponse)(nil),          // 22: mistgate.admin.v1.GetDoctorResponse
-	(*RunDoctorRequest)(nil),           // 23: mistgate.admin.v1.RunDoctorRequest
-	(*RunDoctorResponse)(nil),          // 24: mistgate.admin.v1.RunDoctorResponse
-	(*FixPlan)(nil),                    // 25: mistgate.admin.v1.FixPlan
-	(*ApplyFixRequest)(nil),            // 26: mistgate.admin.v1.ApplyFixRequest
-	(*ApplyFixResponse)(nil),           // 27: mistgate.admin.v1.ApplyFixResponse
-	(*AcceptDoctorItemRequest)(nil),    // 28: mistgate.admin.v1.AcceptDoctorItemRequest
-	(*AcceptDoctorItemResponse)(nil),   // 29: mistgate.admin.v1.AcceptDoctorItemResponse
-	(*UnacceptDoctorItemRequest)(nil),  // 30: mistgate.admin.v1.UnacceptDoctorItemRequest
-	(*UnacceptDoctorItemResponse)(nil), // 31: mistgate.admin.v1.UnacceptDoctorItemResponse
-	nil,                                // 32: mistgate.admin.v1.Alert.ParamsEntry
-	nil,                                // 33: mistgate.admin.v1.DoctorItem.ParamsEntry
-	nil,                                // 34: mistgate.admin.v1.FixPlan.ParamsEntry
-	nil,                                // 35: mistgate.admin.v1.ApplyFixRequest.ParamsEntry
-	nil,                                // 36: mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
-	(NodeStatus)(0),                    // 37: mistgate.admin.v1.NodeStatus
+	(CountryVerdict)(0),                // 3: mistgate.admin.v1.CountryVerdict
+	(DoctorStatus)(0),                  // 4: mistgate.admin.v1.DoctorStatus
+	(*Alert)(nil),                      // 5: mistgate.admin.v1.Alert
+	(*ListAlertsRequest)(nil),          // 6: mistgate.admin.v1.ListAlertsRequest
+	(*ListAlertsResponse)(nil),         // 7: mistgate.admin.v1.ListAlertsResponse
+	(*MuteAlertRequest)(nil),           // 8: mistgate.admin.v1.MuteAlertRequest
+	(*MuteAlertResponse)(nil),          // 9: mistgate.admin.v1.MuteAlertResponse
+	(*CheckColumn)(nil),                // 10: mistgate.admin.v1.CheckColumn
+	(*CheckResult)(nil),                // 11: mistgate.admin.v1.CheckResult
+	(*CheckBucket)(nil),                // 12: mistgate.admin.v1.CheckBucket
+	(*CheckCell)(nil),                  // 13: mistgate.admin.v1.CheckCell
+	(*CheckRow)(nil),                   // 14: mistgate.admin.v1.CheckRow
+	(*GetChecksRequest)(nil),           // 15: mistgate.admin.v1.GetChecksRequest
+	(*GetChecksResponse)(nil),          // 16: mistgate.admin.v1.GetChecksResponse
+	(*PortResult)(nil),                 // 17: mistgate.admin.v1.PortResult
+	(*CountryProbe)(nil),               // 18: mistgate.admin.v1.CountryProbe
+	(*CountryCheck)(nil),               // 19: mistgate.admin.v1.CountryCheck
+	(*UdpLossNotice)(nil),              // 20: mistgate.admin.v1.UdpLossNotice
+	(*RunChecksNowRequest)(nil),        // 21: mistgate.admin.v1.RunChecksNowRequest
+	(*RunChecksNowResponse)(nil),       // 22: mistgate.admin.v1.RunChecksNowResponse
+	(*DoctorItem)(nil),                 // 23: mistgate.admin.v1.DoctorItem
+	(*NodeDoctor)(nil),                 // 24: mistgate.admin.v1.NodeDoctor
+	(*GetDoctorRequest)(nil),           // 25: mistgate.admin.v1.GetDoctorRequest
+	(*GetDoctorResponse)(nil),          // 26: mistgate.admin.v1.GetDoctorResponse
+	(*RunDoctorRequest)(nil),           // 27: mistgate.admin.v1.RunDoctorRequest
+	(*RunDoctorResponse)(nil),          // 28: mistgate.admin.v1.RunDoctorResponse
+	(*FixPlan)(nil),                    // 29: mistgate.admin.v1.FixPlan
+	(*ApplyFixRequest)(nil),            // 30: mistgate.admin.v1.ApplyFixRequest
+	(*ApplyFixResponse)(nil),           // 31: mistgate.admin.v1.ApplyFixResponse
+	(*AcceptDoctorItemRequest)(nil),    // 32: mistgate.admin.v1.AcceptDoctorItemRequest
+	(*AcceptDoctorItemResponse)(nil),   // 33: mistgate.admin.v1.AcceptDoctorItemResponse
+	(*UnacceptDoctorItemRequest)(nil),  // 34: mistgate.admin.v1.UnacceptDoctorItemRequest
+	(*UnacceptDoctorItemResponse)(nil), // 35: mistgate.admin.v1.UnacceptDoctorItemResponse
+	nil,                                // 36: mistgate.admin.v1.Alert.ParamsEntry
+	nil,                                // 37: mistgate.admin.v1.DoctorItem.ParamsEntry
+	nil,                                // 38: mistgate.admin.v1.FixPlan.ParamsEntry
+	nil,                                // 39: mistgate.admin.v1.ApplyFixRequest.ParamsEntry
+	nil,                                // 40: mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
+	(NodeStatus)(0),                    // 41: mistgate.admin.v1.NodeStatus
 }
 var file_mistgate_admin_v1_health_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.Alert.severity:type_name -> mistgate.admin.v1.AlertSeverity
 	1,  // 1: mistgate.admin.v1.Alert.kind:type_name -> mistgate.admin.v1.AlertKind
-	32, // 2: mistgate.admin.v1.Alert.params:type_name -> mistgate.admin.v1.Alert.ParamsEntry
-	4,  // 3: mistgate.admin.v1.ListAlertsResponse.active:type_name -> mistgate.admin.v1.Alert
-	4,  // 4: mistgate.admin.v1.ListAlertsResponse.history:type_name -> mistgate.admin.v1.Alert
-	4,  // 5: mistgate.admin.v1.MuteAlertResponse.alert:type_name -> mistgate.admin.v1.Alert
+	36, // 2: mistgate.admin.v1.Alert.params:type_name -> mistgate.admin.v1.Alert.ParamsEntry
+	5,  // 3: mistgate.admin.v1.ListAlertsResponse.active:type_name -> mistgate.admin.v1.Alert
+	5,  // 4: mistgate.admin.v1.ListAlertsResponse.history:type_name -> mistgate.admin.v1.Alert
+	5,  // 5: mistgate.admin.v1.MuteAlertResponse.alert:type_name -> mistgate.admin.v1.Alert
 	2,  // 6: mistgate.admin.v1.CheckResult.status:type_name -> mistgate.admin.v1.CheckStatus
-	10, // 7: mistgate.admin.v1.CheckCell.last:type_name -> mistgate.admin.v1.CheckResult
-	11, // 8: mistgate.admin.v1.CheckCell.history:type_name -> mistgate.admin.v1.CheckBucket
-	37, // 9: mistgate.admin.v1.CheckRow.node_status:type_name -> mistgate.admin.v1.NodeStatus
-	12, // 10: mistgate.admin.v1.CheckRow.cells:type_name -> mistgate.admin.v1.CheckCell
-	9,  // 11: mistgate.admin.v1.GetChecksResponse.columns:type_name -> mistgate.admin.v1.CheckColumn
-	13, // 12: mistgate.admin.v1.GetChecksResponse.rows:type_name -> mistgate.admin.v1.CheckRow
-	16, // 13: mistgate.admin.v1.GetChecksResponse.udp_loss:type_name -> mistgate.admin.v1.UdpLossNotice
-	3,  // 14: mistgate.admin.v1.DoctorItem.status:type_name -> mistgate.admin.v1.DoctorStatus
-	33, // 15: mistgate.admin.v1.DoctorItem.params:type_name -> mistgate.admin.v1.DoctorItem.ParamsEntry
-	37, // 16: mistgate.admin.v1.NodeDoctor.node_status:type_name -> mistgate.admin.v1.NodeStatus
-	19, // 17: mistgate.admin.v1.NodeDoctor.items:type_name -> mistgate.admin.v1.DoctorItem
-	20, // 18: mistgate.admin.v1.GetDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
-	20, // 19: mistgate.admin.v1.RunDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
-	34, // 20: mistgate.admin.v1.FixPlan.params:type_name -> mistgate.admin.v1.FixPlan.ParamsEntry
-	35, // 21: mistgate.admin.v1.ApplyFixRequest.params:type_name -> mistgate.admin.v1.ApplyFixRequest.ParamsEntry
-	25, // 22: mistgate.admin.v1.ApplyFixResponse.plan:type_name -> mistgate.admin.v1.FixPlan
-	36, // 23: mistgate.admin.v1.ApplyFixResponse.result_params:type_name -> mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
-	20, // 24: mistgate.admin.v1.ApplyFixResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	20, // 25: mistgate.admin.v1.AcceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	20, // 26: mistgate.admin.v1.UnacceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	5,  // 27: mistgate.admin.v1.HealthService.ListAlerts:input_type -> mistgate.admin.v1.ListAlertsRequest
-	7,  // 28: mistgate.admin.v1.HealthService.MuteAlert:input_type -> mistgate.admin.v1.MuteAlertRequest
-	14, // 29: mistgate.admin.v1.HealthService.GetChecks:input_type -> mistgate.admin.v1.GetChecksRequest
-	17, // 30: mistgate.admin.v1.HealthService.RunChecksNow:input_type -> mistgate.admin.v1.RunChecksNowRequest
-	21, // 31: mistgate.admin.v1.HealthService.GetDoctor:input_type -> mistgate.admin.v1.GetDoctorRequest
-	23, // 32: mistgate.admin.v1.HealthService.RunDoctor:input_type -> mistgate.admin.v1.RunDoctorRequest
-	26, // 33: mistgate.admin.v1.HealthService.ApplyFix:input_type -> mistgate.admin.v1.ApplyFixRequest
-	28, // 34: mistgate.admin.v1.HealthService.AcceptDoctorItem:input_type -> mistgate.admin.v1.AcceptDoctorItemRequest
-	30, // 35: mistgate.admin.v1.HealthService.UnacceptDoctorItem:input_type -> mistgate.admin.v1.UnacceptDoctorItemRequest
-	6,  // 36: mistgate.admin.v1.HealthService.ListAlerts:output_type -> mistgate.admin.v1.ListAlertsResponse
-	8,  // 37: mistgate.admin.v1.HealthService.MuteAlert:output_type -> mistgate.admin.v1.MuteAlertResponse
-	15, // 38: mistgate.admin.v1.HealthService.GetChecks:output_type -> mistgate.admin.v1.GetChecksResponse
-	18, // 39: mistgate.admin.v1.HealthService.RunChecksNow:output_type -> mistgate.admin.v1.RunChecksNowResponse
-	22, // 40: mistgate.admin.v1.HealthService.GetDoctor:output_type -> mistgate.admin.v1.GetDoctorResponse
-	24, // 41: mistgate.admin.v1.HealthService.RunDoctor:output_type -> mistgate.admin.v1.RunDoctorResponse
-	27, // 42: mistgate.admin.v1.HealthService.ApplyFix:output_type -> mistgate.admin.v1.ApplyFixResponse
-	29, // 43: mistgate.admin.v1.HealthService.AcceptDoctorItem:output_type -> mistgate.admin.v1.AcceptDoctorItemResponse
-	31, // 44: mistgate.admin.v1.HealthService.UnacceptDoctorItem:output_type -> mistgate.admin.v1.UnacceptDoctorItemResponse
-	36, // [36:45] is the sub-list for method output_type
-	27, // [27:36] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	11, // 7: mistgate.admin.v1.CheckCell.last:type_name -> mistgate.admin.v1.CheckResult
+	12, // 8: mistgate.admin.v1.CheckCell.history:type_name -> mistgate.admin.v1.CheckBucket
+	41, // 9: mistgate.admin.v1.CheckRow.node_status:type_name -> mistgate.admin.v1.NodeStatus
+	13, // 10: mistgate.admin.v1.CheckRow.cells:type_name -> mistgate.admin.v1.CheckCell
+	10, // 11: mistgate.admin.v1.GetChecksResponse.columns:type_name -> mistgate.admin.v1.CheckColumn
+	14, // 12: mistgate.admin.v1.GetChecksResponse.rows:type_name -> mistgate.admin.v1.CheckRow
+	20, // 13: mistgate.admin.v1.GetChecksResponse.udp_loss:type_name -> mistgate.admin.v1.UdpLossNotice
+	19, // 14: mistgate.admin.v1.GetChecksResponse.country_checks:type_name -> mistgate.admin.v1.CountryCheck
+	17, // 15: mistgate.admin.v1.CountryProbe.tcp:type_name -> mistgate.admin.v1.PortResult
+	3,  // 16: mistgate.admin.v1.CountryCheck.verdict:type_name -> mistgate.admin.v1.CountryVerdict
+	18, // 17: mistgate.admin.v1.CountryCheck.probes:type_name -> mistgate.admin.v1.CountryProbe
+	4,  // 18: mistgate.admin.v1.DoctorItem.status:type_name -> mistgate.admin.v1.DoctorStatus
+	37, // 19: mistgate.admin.v1.DoctorItem.params:type_name -> mistgate.admin.v1.DoctorItem.ParamsEntry
+	41, // 20: mistgate.admin.v1.NodeDoctor.node_status:type_name -> mistgate.admin.v1.NodeStatus
+	23, // 21: mistgate.admin.v1.NodeDoctor.items:type_name -> mistgate.admin.v1.DoctorItem
+	24, // 22: mistgate.admin.v1.GetDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 23: mistgate.admin.v1.RunDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
+	38, // 24: mistgate.admin.v1.FixPlan.params:type_name -> mistgate.admin.v1.FixPlan.ParamsEntry
+	39, // 25: mistgate.admin.v1.ApplyFixRequest.params:type_name -> mistgate.admin.v1.ApplyFixRequest.ParamsEntry
+	29, // 26: mistgate.admin.v1.ApplyFixResponse.plan:type_name -> mistgate.admin.v1.FixPlan
+	40, // 27: mistgate.admin.v1.ApplyFixResponse.result_params:type_name -> mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
+	24, // 28: mistgate.admin.v1.ApplyFixResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 29: mistgate.admin.v1.AcceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 30: mistgate.admin.v1.UnacceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	6,  // 31: mistgate.admin.v1.HealthService.ListAlerts:input_type -> mistgate.admin.v1.ListAlertsRequest
+	8,  // 32: mistgate.admin.v1.HealthService.MuteAlert:input_type -> mistgate.admin.v1.MuteAlertRequest
+	15, // 33: mistgate.admin.v1.HealthService.GetChecks:input_type -> mistgate.admin.v1.GetChecksRequest
+	21, // 34: mistgate.admin.v1.HealthService.RunChecksNow:input_type -> mistgate.admin.v1.RunChecksNowRequest
+	25, // 35: mistgate.admin.v1.HealthService.GetDoctor:input_type -> mistgate.admin.v1.GetDoctorRequest
+	27, // 36: mistgate.admin.v1.HealthService.RunDoctor:input_type -> mistgate.admin.v1.RunDoctorRequest
+	30, // 37: mistgate.admin.v1.HealthService.ApplyFix:input_type -> mistgate.admin.v1.ApplyFixRequest
+	32, // 38: mistgate.admin.v1.HealthService.AcceptDoctorItem:input_type -> mistgate.admin.v1.AcceptDoctorItemRequest
+	34, // 39: mistgate.admin.v1.HealthService.UnacceptDoctorItem:input_type -> mistgate.admin.v1.UnacceptDoctorItemRequest
+	7,  // 40: mistgate.admin.v1.HealthService.ListAlerts:output_type -> mistgate.admin.v1.ListAlertsResponse
+	9,  // 41: mistgate.admin.v1.HealthService.MuteAlert:output_type -> mistgate.admin.v1.MuteAlertResponse
+	16, // 42: mistgate.admin.v1.HealthService.GetChecks:output_type -> mistgate.admin.v1.GetChecksResponse
+	22, // 43: mistgate.admin.v1.HealthService.RunChecksNow:output_type -> mistgate.admin.v1.RunChecksNowResponse
+	26, // 44: mistgate.admin.v1.HealthService.GetDoctor:output_type -> mistgate.admin.v1.GetDoctorResponse
+	28, // 45: mistgate.admin.v1.HealthService.RunDoctor:output_type -> mistgate.admin.v1.RunDoctorResponse
+	31, // 46: mistgate.admin.v1.HealthService.ApplyFix:output_type -> mistgate.admin.v1.ApplyFixResponse
+	33, // 47: mistgate.admin.v1.HealthService.AcceptDoctorItem:output_type -> mistgate.admin.v1.AcceptDoctorItemResponse
+	35, // 48: mistgate.admin.v1.HealthService.UnacceptDoctorItem:output_type -> mistgate.admin.v1.UnacceptDoctorItemResponse
+	40, // [40:49] is the sub-list for method output_type
+	31, // [31:40] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_health_proto_init() }
@@ -2745,8 +3109,8 @@ func file_mistgate_admin_v1_health_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_health_proto_rawDesc), len(file_mistgate_admin_v1_health_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   33,
+			NumEnums:      5,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

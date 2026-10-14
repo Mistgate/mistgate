@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -210,6 +211,9 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты", "UDP 正在丢包")
 	case "device_limit":
 		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
+	case "country_blocked":
+		c := data(access.CountryName(p["country"], string(l)), 60) // the names are nominative; Russian says "from the country: X"
+		return l.pick("Node is unreachable from "+c, "Нода недоступна из страны: "+c, "节点在"+c+"无法访问")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -291,6 +295,8 @@ func alertReason(l L, a store.HealthAlert) string {
 		return deviceLimitReason(l, p)
 	case "port_lossy":
 		return portLossReason(l, p)
+	case "country_blocked":
+		return countryBlockedReason(l, p)
 	case "users_impacted":
 		protocol := a.Subject
 		switch protocol {
@@ -310,6 +316,18 @@ func alertReason(l L, a store.HealthAlert) string {
 			protocol+" 的在线用户：现在 "+data(p["now"], 8)+" 人，此时段通常约 "+data(p["usual"], 8)+" 人，而节点在线。这看起来是用户侧网络封锁。")
 	}
 	return ""
+}
+
+// countryBlockedReason is the sentence of a COUNTRY_BLOCKED alert: what fails from the probe networks, and what still passes.
+func countryBlockedReason(l L, p map[string]string) string {
+	where := ""
+	if nets := data(p["networks"], 160); nets != "" {
+		where = l.pick(" ("+nets+")", " ("+nets+")", "（"+nets+"）")
+	}
+	if p["verdict"] == "tcp_blocked" {
+		return l.pick("TCP is being cut"+where+". ICMP passes.", "TCP режут"+where+". ICMP проходит.", "TCP 被阻断"+where+"，ICMP 仍可通过。")
+	}
+	return l.pick("Neither ICMP nor TCP gets through"+where+".", "Не проходят ни ICMP, ни TCP"+where+".", "ICMP 和 TCP 都无法通过"+where+"。")
 }
 
 func portLossReason(l L, p map[string]string) string {

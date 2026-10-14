@@ -72,6 +72,11 @@ func TestChecksResultsContent(t *testing.T) {
 	if v.UdpLoss == nil || len(v.UdpLoss.Nodes) != 1 || v.UdpLoss.Nodes[0] != "de1" || v.UdpLoss.SharePercent != 40 {
 		t.Errorf("udp_loss: %+v", v.UdpLoss)
 	}
+	cc := v.Rows[0].Country
+	if cc == nil || cc.Verdict != "tcp_blocked" || cc.Country != "RU" || !cc.Eyeball || len(cc.Probes) != 2 || cc.Probes[0].Network != "Rostelecom" ||
+		!cc.Probes[0].ICMPOK || cc.Probes[0].TCP[0].Port != 443 || cc.Probes[0].TCP[0].OK || cc.Probes[1].Valid {
+		t.Errorf("country_check: %+v", cc)
+	}
 }
 
 func TestFleetStatusContent(t *testing.T) {

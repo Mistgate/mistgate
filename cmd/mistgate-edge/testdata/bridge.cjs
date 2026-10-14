@@ -454,12 +454,12 @@ async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, 
     return countedJob("cron tick with installs", () => Promise.race([forwardPanel.cron({ at: at.getTime() }), wasmFailure]));
   };
   await insertJob("prv_done", "failed");
-  assert.equal((await tick(3)).queries.sequentialQueries, 4);
+  assert.equal((await tick(3)).queries.sequentialQueries, 5);
   assert.equal(provisionKicks, 0, "a finished install wakes nothing");
   for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
     await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
     await insertJob("prv_open", state);
-    assert.equal((await tick(3)).queries.sequentialQueries, 4, "waking costs no query beyond the look");
+    assert.equal((await tick(3)).queries.sequentialQueries, 5, "waking costs no query beyond the look");
     assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
   }
   await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
@@ -1058,8 +1058,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      4,
-      "a normal cron tick costs 4 D1 calls: status, node list, node live and the look for pending installs",
+      5,
+      "a normal cron tick costs 5 D1 calls: status, node list, node live, the look for pending installs and the country-check setting (off: nothing more)",
     );
 
     liveProjectionQueries = 0;
@@ -1073,8 +1073,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      5,
-      "one cron tick costs 5 D1 calls: status, node list, node live, pending installs, fan-out live",
+      6,
+      "one cron tick costs 6 D1 calls: status, node list, node live, pending installs, the country-check setting, fan-out live",
     );
     assert.equal(liveProjectionQueries, 2, "the node-down sweep and ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
@@ -1088,8 +1088,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      11,
-      "a minute 17 cron tick costs 11 D1 calls: 4 normal and 7 retention (the 7th prunes old revoked devices)",
+      13,
+      "a minute 17 cron tick costs 13 D1 calls: 5 normal and 8 retention (the 7th prunes old revoked devices, the 8th old country checks)",
     );
 
     assert.equal(provisionKicks, 0, "cron ticks without an install wake no Provisioner");

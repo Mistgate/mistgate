@@ -130,6 +130,17 @@ var procedureLevels = map[string]level{
 	adminv1connect.HealthServiceAcceptDoctorItemProcedure:   levelWrite,
 	adminv1connect.HealthServiceUnacceptDoctorItemProcedure: levelWrite,
 
+	// GlobalpingService: the integration that sends node addresses to a third party. All of it is the owner's; changing it
+	// also needs a step-up (the handlers). Not open to tokens (policy_tokens.go).
+	adminv1connect.GlobalpingServiceGetGlobalpingProcedure:        levelOwner,
+	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:     levelOwner, // also needs a step-up
+	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure: levelOwner, // also needs a step-up
+	adminv1connect.GlobalpingServiceTestGlobalpingProcedure:       levelOwner,
+	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
+	// so no step-up. Not open to tokens.
+	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,
+	adminv1connect.CountryReachabilityServiceUpdateCountryReachabilityProcedure: levelOwner,
+
 	// UpdateService: the page is readable by everyone; every change decides what code runs as root on all
 	// nodes (or on the panel itself), so it is owner-only and the handler also requires a fresh step-up
 	// (auth.Service.RequireStepUp, like passkey removal). Not relaxed for helpers.

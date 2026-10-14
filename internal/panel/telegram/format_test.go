@@ -29,7 +29,7 @@ func TestChineseTelegramMessagesAreTranslated(t *testing.T) {
 		t.Errorf("Chinese text = %q, want the Chinese variant", got)
 	}
 	for _, kind := range []string{"node_down", "no_traffic", "check_failed", "state_drift", "cert_expiry", "update_failed", "quota",
-		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy", "device_limit"} {
+		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy", "device_limit", "country_blocked"} {
 		a := store.HealthAlert{Kind: kind, Params: map[string]string{"profile": "HY2"}}
 		zh, en := alertTitle("zh", a), alertTitle("en", a)
 		if zh == en || !hasHan(zh) {
@@ -378,5 +378,38 @@ func TestDeviceLimitAlertIsLocalized(t *testing.T) {
 				t.Errorf("%s message %q lacks %q", lang, got, w)
 			}
 		}
+	}
+}
+
+func TestCountryBlockedAlertTextsAreLocalized(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	a := store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "nl1", WhyKey: "health.alert.country_blocked.why.tcp_blocked",
+		Params:    map[string]string{"node": "nl1", "country": "RU", "verdict": "tcp_blocked", "networks": "Rostelecom, Beeline <x>", "ports": "443"},
+		FirstSeen: now, OpenedAt: now, ResolvedAt: now.Add(time.Hour)}
+	for _, tc := range []struct {
+		lang  L
+		parts []string
+	}{
+		{"en", []string{"Node is unreachable from Russia", "Node: <b>nl1</b>", "TCP is being cut (Rostelecom, Beeline &lt;x&gt;). ICMP passes."}},
+		{"ru", []string{"Нода недоступна из страны: Россия", "Нода: <b>nl1</b>", "TCP режут (Rostelecom, Beeline &lt;x&gt;). ICMP проходит."}},
+		{"zh", []string{"节点在俄罗斯无法访问", "TCP 被阻断（Rostelecom, Beeline &lt;x&gt;），ICMP 仍可通过。"}},
+	} {
+		opened := alertOpened(tc.lang, a, "nl1", "")
+		for _, part := range tc.parts {
+			if !strings.Contains(opened, part) {
+				t.Errorf("%s message %q lacks %q", tc.lang, opened, part)
+			}
+		}
+		if resolved := alertResolved(tc.lang, a, "nl1"); !strings.Contains(resolved, tc.parts[0]) {
+			t.Errorf("%s resolved message %q lacks the title", tc.lang, resolved)
+		}
+	}
+	a.Params["verdict"] = "blocked"
+	if got := alertOpened("en", a, "nl1", ""); !strings.Contains(got, "Neither ICMP nor TCP gets through (Rostelecom") {
+		t.Errorf("blocked text = %q", got)
+	}
+	a.Params["country"] = "DE"
+	if got := alertTitle("ru", a); got != "Нода недоступна из страны: Германия" {
+		t.Errorf("country title = %q", got)
 	}
 }

@@ -109,6 +109,20 @@ People are not affected: they connect to the nodes directly. The checks still pa
 
 A green cell means that, within the last few minutes, a client from the panel's network completed the handshake with this profile on this node and reached two well-known sites through the node's exit. It does not prove that the port-hopping range works, that your users' networks let the traffic through, or that every app handles the profile.
 
+## Country check
+
+The checks above run on the panel's server, which is not inside the country where your users are, so they cannot see a block there. The country check asks probes inside one country (home and mobile networks first) to ping every online node and to open TCP connections to its ports, and compares the answers. It uses [Globalping](https://globalping.io), a free network of probes, and is an **integration** of its own: **off by default**, because switching it on sends the IPv4 address of each online node to Globalping and to nobody else.
+
+- **Settings** (owner only): for Globalping, on or off, the interval in minutes (default 15, at least 10) and an optional token, which is write-only and raises the free limit from 250 to 500 tests an hour. The **country** (default `RU`) is a separate, shared setting, *Country reachability*, because every source of the check (Globalping now, block lists and a probe inside the country later) looks from the same one. **Test** reads Globalping's rate-limit endpoint and sends no address. **Disconnect** switches the integration off and forgets the token.
+- **Off means off.** With the integration off no round starts and nothing is sent. A round in flight is cancelled when you switch it off. Stored results stay for 7 days, but the API stops returning them.
+- **What is asked.** Three probes (two when the budget needs it) take part in every round. Each node gets an ICMP ping of its address and a TCP ping of each TCP port of its active profiles (VLESS, and the HTTPS site of Hysteria2). A node with only UDP profiles gets the ICMP ping alone: Globalping has no UDP test.
+- **Control.** Every round the same probes also open TCP 443 to a large site that is never blocked in that country (`ya.ru` for `RU`). A probe that cannot reach it is thrown away for that round. With fewer than two valid probes the verdict is `unknown`.
+- **Verdict per node.** `ok`: TCP connects from at least half of the valid probes (ICMP for a node without TCP ports). `tcp_blocked`: ICMP answers from at least half, but TCP fails from all of them: the connection requests are dropped while the address is not. `blocked`: nothing passes. `unknown`: too few probes, a limit, an error, a timeout, or a split picture that proves nothing.
+- **Budget.** A round costs (1 control + for each node 1 + its TCP ports) x probes tests. If the rounds of an hour would use more than 80 % of the limit, the probes go down to two, and if that is still too much the interval is stretched (the panel logs it once). On a rate limit the round is `unknown` and the next one waits until the limit resets.
+- **Both editions.** The VPS panel looks every 30 seconds whether a round is due; the Cloudflare edition does it from its once-a-minute cron.
+
+The alert `country_blocked` opens after two rounds in a row with `blocked` or `tcp_blocked`, and closes after two rounds with `ok`; `unknown` rounds change nothing.
+
 ## Node doctor
 
 Every node agent runs 17 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
@@ -211,6 +225,7 @@ An alert that fires again within an hour of closing reopens with its original id
 | Alive, but no traffic | `no_traffic` | Critical | The agent is connected and the profiles run, but every checked profile of the node failed two rounds in a row. The node's status turns to "no traffic". |
 | "<profile>" fails the client-eye check | `check_failed` | Warning; Critical when it is the node's only profile of that protocol | Some, not all, profiles of an online node failed two rounds in a row. |
 | UDP packet loss on a profile port | `port_lossy` | Warning | The latest check finds loss on the current port of an enabled inbound. Closes after a clean re-check, or when the inbound changes port, is disabled or removed, or the node is retired. |
+| A node is unreachable from the country | `country_blocked` | Warning | The [country check](#country-check) saw `blocked` or `tcp_blocked` in two rounds in a row. Closes after two rounds with `ok`; `unknown` rounds change nothing. Muting works as for any other alert. |
 | The panel cannot reach many nodes | `check_failed` (fleet-wide) | Warning | The last round failed for at least 80% of the checked profiles, on nodes of at least three different **Provider** values. The panel's own connection is the suspect: per-node check alerts are paused until a round passes. Fresh failures (streaks 1–3) on nodes from at least two providers also open one fleet-wide warning; they do not open per-node alerts, existing alerts stay unchanged, and failures that reach streak 4 (about 20 minutes) are judged per node. |
 | The doctor item's title | `doctor_warn` / `doctor_fail` | Warning / Critical | A doctor check reports Attention / Problem. A kernel headers warning on a node without an AmneziaWG profile is Info. |
 | The node's state differs from the panel's | `state_drift` | Warning | The configuration the node applied differs from the panel's even after an automatic full resend. |

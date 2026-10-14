@@ -298,6 +298,11 @@ export const en = {
   "health.alert.device_limit.title": "An app was turned away at the device limit",
   "health.alert.device_limit.why":
     "{user_name} is at the device limit ({used} of {limit}) and an app asking for a new place was turned away. They can remove an old device on their page, or you can raise the limit. It closes after a day without a refusal.",
+  "health.alert.country_blocked.title": "Unreachable from {country}",
+  "health.alert.country_blocked.why.tcp_blocked":
+    "Probes inside {country} ({networks}) reach the node’s address, but TCP to port {ports} does not connect: the connection requests are dropped on the way. Two checks in a row saw it. It closes after two clean checks.",
+  "health.alert.country_blocked.why.blocked":
+    "Probes inside {country} ({networks}) reach neither the node’s address nor TCP port {ports}. Two checks in a row saw it. It closes after two clean checks.",
   "health.alert.torrent.attempts": "{n} attempt|{n} attempts",
   "health.alert.torrent.proof": " Evidence: {evidence}.",
   "health.alert.torrent.proofPorts": " Evidence: {evidence}, port {ports}.| Evidence: {evidence}, ports {ports}.",
@@ -797,6 +802,11 @@ export const ru: typeof en = {
   "health.alert.device_limit.title": "Приложению отказали: лимит устройств",
   "health.alert.device_limit.why":
     "У {user_name} заняты все места для устройств ({used} из {limit}), и приложению, которое просило новое место, отказали. Человек может удалить старое устройство на своей странице, или можно поднять лимит. Алерт закроется после суток без отказов.",
+  "health.alert.country_blocked.title": "Недоступна из страны {country}",
+  "health.alert.country_blocked.why.tcp_blocked":
+    "Проверяющие внутри {country} ({networks}) достают до адреса ноды, но TCP на порт {ports} не соединяется: запросы на соединение режут по дороге. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+  "health.alert.country_blocked.why.blocked":
+    "Проверяющие внутри {country} ({networks}) не достают ни до адреса ноды, ни до TCP-порта {ports}. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.torrent.attempts": "{n} попытка|{n} попытки|{n} попыток",
   "health.alert.torrent.proof": " Доказательство: {evidence}.",
   "health.alert.torrent.proofPorts": " Доказательство: {evidence}, порт {ports}.| Доказательство: {evidence}, порты {ports}.| Доказательство: {evidence}, порты {ports}.",
@@ -1263,6 +1273,9 @@ export const zh: typeof en = {
   "health.alert.torrent.why": "{user_name} 正在 {nodes} 上尝试使用 BT 下载：一天内 {attempts}，均已被拦截。{proof}满一天没有新的尝试后，告警会关闭。",
   "health.alert.device_limit.title": "有应用因设备数上限被拒绝",
   "health.alert.device_limit.why": "{user_name} 的设备数已达上限（{used} / {limit}），有应用申请新名额，被拒绝了。本人可以在自己的页面删除旧设备，你也可以提高上限。满一天没有新的拒绝后，告警会关闭。",
+  "health.alert.country_blocked.title": "在 {country} 无法访问",
+  "health.alert.country_blocked.why.tcp_blocked": "{country} 境内的探测点（{networks}）能到达节点地址，但 TCP 端口 {ports} 连不上：连接请求在途中被丢弃。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+  "health.alert.country_blocked.why.blocked": "{country} 境内的探测点（{networks}）既到不了节点地址，也连不上 TCP 端口 {ports}。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.torrent.attempts": "{n} 次尝试",
   "health.alert.torrent.proof": "判定依据：{evidence}。",
   "health.alert.torrent.proofPorts": "判定依据：{evidence}，端口 {ports}。",

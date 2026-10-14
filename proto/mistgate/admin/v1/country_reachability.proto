@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// The country the country check looks from. Every source of the check (the Globalping integration today, block lists and a
+// probe inside the country later) reads this one setting, so it lives here and not in any of them. Conventions: common.proto.
+// The check itself and its verdicts: health.proto CountryCheck.
+//
+// OWNER-ONLY, like the integrations; not open to API tokens or MCP. The country only says where to look from; it sends nothing
+// anywhere, so it needs no step-up.
+//
+// ERRORS. INVALID_ARGUMENT: a country that is not two letters.
+service CountryReachabilityService {
+  rpc GetCountryReachability(GetCountryReachabilityRequest) returns (GetCountryReachabilityResponse);
+  // Changes the country. The rounds that follow look from it; the stored rounds of another country stay for the retention.
+  rpc UpdateCountryReachability(UpdateCountryReachabilityRequest) returns (UpdateCountryReachabilityResponse);
+}
+
+message CountryReachability {
+  // ISO 3166-1 alpha-2, upper case. Default "RU".
+  string country = 1;
+}
+
+message GetCountryReachabilityRequest {}
+message GetCountryReachabilityResponse { CountryReachability settings = 1; }
+
+message UpdateCountryReachabilityRequest {
+  // Two letters; stored in upper case.
+  string country = 1;
+}
+message UpdateCountryReachabilityResponse { CountryReachability settings = 1; }
