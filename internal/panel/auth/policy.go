@@ -143,6 +143,13 @@ var procedureLevels = map[string]level{
 	adminv1connect.BlocklistServiceUpdateBlocklistProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.BlocklistServiceDisconnectBlocklistProcedure: levelOwner, // also needs a step-up
 	adminv1connect.BlocklistServiceTestBlocklistProcedure:       levelOwner,
+	// TspuProbeService: the TSPU probe of the country check. A node of the owner inside the country sends SYNs to the other nodes;
+	// nothing goes to a third party. All of it is the owner's; changing it also needs a step-up (the handlers). Not open to tokens
+	// (policy_tokens.go).
+	adminv1connect.TspuProbeServiceGetTspuProbeProcedure:        levelOwner,
+	adminv1connect.TspuProbeServiceUpdateTspuProbeProcedure:     levelOwner, // also needs a step-up
+	adminv1connect.TspuProbeServiceDisconnectTspuProbeProcedure: levelOwner, // also needs a step-up
+	adminv1connect.TspuProbeServiceTestTspuProbeProcedure:       levelOwner,
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
 	// so no step-up. Not open to tokens.
 	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,

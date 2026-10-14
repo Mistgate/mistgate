@@ -116,6 +116,8 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure:       true,
 	adminv1connect.BlocklistServiceUpdateBlocklistProcedure:             true,
 	adminv1connect.BlocklistServiceDisconnectBlocklistProcedure:         true,
+	adminv1connect.TspuProbeServiceUpdateTspuProbeProcedure:             true,
+	adminv1connect.TspuProbeServiceDisconnectTspuProbeProcedure:         true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,
