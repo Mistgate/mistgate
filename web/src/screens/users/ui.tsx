@@ -3,11 +3,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import type { IconName, Tone } from "@/components/ui/icons";
+import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
+import { Tip } from "@/components/ui/tooltip";
 import { cx } from "@/lib/cx";
 import { useTx } from "./t";
 
@@ -63,7 +64,7 @@ export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: 
   const t = useTx();
   const mbit = Math.round(bps / 1e6);
   return (
-    <SettingRow label={label} hint={hint} className="py-2">
+    <SettingRow label={label} hint={hint} className="py-1.5">
       <div className="w-[130px] flex-none">
         <Stepper
           decrementLabel={t("users.less", { what: label })}
@@ -77,6 +78,35 @@ export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: 
         </Stepper>
       </div>
     </SettingRow>
+  );
+}
+
+/**
+ * The two speed limits under one quiet caption with the "experimental" mark: per person (all their devices on one node
+ * together) and per device. The user card and the new-user form both show them this way.
+ */
+export function SpeedPair({ person, device, onPerson, onDevice }: { person: number; device: number; onPerson: (bps: number) => void; onDevice: (bps: number) => void }) {
+  const t = useTx();
+  return (
+    <div className="flex flex-col border-t border-line first:border-t-0">
+      <div className="flex items-center gap-2 pt-3 pb-0.5">
+        <span className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">{t("users.speedT")}</span>
+        <span className="rounded-md border border-line px-1.5 py-px text-[10px] font-semibold text-muted">{t("users.experimental")}</span>
+      </div>
+      <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={person} onChange={onPerson} />
+      <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={device} onChange={onDevice} />
+    </div>
+  );
+}
+
+/** A small (i) whose tooltip holds the fine print of a field; the text is its accessible name too. */
+export function InfoTip({ lines }: { lines: string[] }) {
+  return (
+    <Tip label={<span className="flex flex-col gap-1">{lines.map((l) => <span key={l}>{l}</span>)}</span>}>
+      <button type="button" aria-label={lines.join(" ")} className="grid size-5 flex-none place-items-center rounded-full text-muted transition-colors hover:text-fg">
+        <Icon name="info" size={14} />
+      </button>
+    </Tip>
   );
 }
 

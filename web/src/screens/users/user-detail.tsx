@@ -9,7 +9,7 @@ import { QuotaReset, UserStatus, type AccessImpact, type NodeAccess, type Profil
 import { Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Icon, IconChip } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { StatusDot, kindTextClass } from "@/components/ui/status";
@@ -24,17 +24,17 @@ import { useT } from "@/i18n";
 import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
 import { plain } from "@/lib/plain";
 import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
-import { DAY, GB, agoText, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
+import { DAY, GB, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, shownText } from "./format";
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
-import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup, wayMark } from "./groups";
-import { BlockedList, LinkDeviceRows, SharedRow, splitDevices } from "./link-devices";
+import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup } from "./groups";
+import { BlockedList, DeviceRow, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
 import { useGo } from "./nav";
 import { groupsQuery, isCode, protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
-import { Check, ConfirmModal, Panel, SettingRow, SpeedRow, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
+import { Check, ConfirmModal, Panel, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 const WIDE = "w-[130px]";
@@ -545,29 +545,13 @@ function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
 
 // ---- devices ----
 
-/** A small header inside a panel: the tinted mark of the way, its name, a quiet line and an action on the right. */
-function WayHead({ way, title, hint, action }: { way: "sub" | "awg"; title: string; hint?: string; action?: ReactNode }) {
-  return (
-    <div className="flex items-start gap-2.5 border-t border-line pt-3">
-      <IconChip icon={wayMark[way].icon} tone={wayMark[way].tone} size={24} />
-      {/* the title has a real basis: on a phone the action wraps under it, in line with the rows, instead of squeezing it */}
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <div className="flex min-h-6 min-w-0 flex-[1_1_10rem] flex-col justify-center">
-          <span className="text-[13px] font-bold">{title}</span>
-          {hint && <span className="text-[11px] leading-snug text-muted">{hint}</span>}
-        </div>
-        {action}
-      </div>
-    </div>
-  );
-}
-
 /**
- * The person's devices, in the two ways of the page. "Apps on the link": a row per app with a device ID of its own, then
- * the place the apps without one share. "AmneziaVPN keys": a key per device, with its profile, when it last connected, the
- * key itself and "Delete". A way the person does not have and has nothing in stays out. Blocked devices are folded at the
- * end. The count in the header is amber when the limit is full and red when the person is over it; in the "only count"
- * mode a person over it gets one quiet line on why nothing is refused.
+ * The person's devices, in the two ways of the page, every row alike (link-devices.tsx: a tile, the name over one quiet
+ * line, the status and the ⋯ on the right). "Apps on the link": a row per app with a device ID of its own, then the place
+ * the apps without one share. "AmneziaVPN keys": a key per device, with its profile, when it last connected, "Show key"
+ * and "Delete…" in its menu. A way the person does not have and has nothing in stays out. Blocked devices are folded at
+ * the end. The count in the header is amber when the limit is full and red when the person is over it; in the "only
+ * count" mode a person over it gets one quiet line on why nothing is refused.
  */
 export function DevicesPanel({
   user,
@@ -625,7 +609,8 @@ export function DevicesPanel({
           {user.deviceLimit > 0 ? t("users.devCount", { n: user.devicesUsed, limit: user.deviceLimit }) : user.devicesUsed}
         </span>
       }
-      className="pb-2"
+      // a container: on a narrow card a row's status keeps the servers and drops the word, a key's button its text
+      className="@container pb-2"
     >
       {over && mode === LinkDeviceLimit.TRACK && (
         <p className="-mt-1 text-xs leading-snug text-pretty text-muted">
@@ -639,9 +624,9 @@ export function DevicesPanel({
 
       {showSub && (
         <section className="flex flex-col">
-          <WayHead way="sub" title={t("users.devSubApps")} />
+          <SectionHead title={t("users.devSubApps")} />
           {link.length === 0 && shared.length === 0 ? (
-            <p className="py-2.5 pl-[34px] text-xs text-muted">{t("users.devSubNever")}</p>
+            <p className="py-2.5 text-xs text-muted">{t("users.devSubNever")}</p>
           ) : (
             <ul className="flex flex-col">
               <LinkDeviceRows devices={link} nodeName={nodeName} now={now} onChanged={actions.refresh} />
@@ -655,21 +640,20 @@ export function DevicesPanel({
 
       {showKeys && (
         <section className="flex flex-col">
-          <WayHead
-            way="awg"
+          <SectionHead
             title={t("users.devKeys")}
-            hint={full && canAdd ? t("awg.dev.full") : t("users.devKeysHint")}
+            hint={full && canAdd ? t("awg.dev.full") : undefined}
             action={
               canAdd && (
-                <Button variant="secondary" size="sm" disabled={full} onClick={() => setAdding(true)}>
+                <Button variant="secondary" size="sm" disabled={full} aria-label={t("awg.dev.add")} onClick={() => setAdding(true)}>
                   <Icon name="plus" size={12} />
-                  {t("awg.dev.add")}
+                  <span className="@max-[400px]:sr-only">{t("awg.dev.add")}</span>
                 </Button>
               )
             }
           />
           {!!user.apps?.amnezia && awgProfiles.length === 0 && (
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2 pl-[34px]">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2">
               <span className="min-w-0 flex-1 text-[11px] leading-snug text-muted">{t("users.awgMissing", { name: user.groupName })}</span>
               <button type="button" onClick={onEditGroup} className="text-xs font-bold text-accent-text transition-colors hover:text-fg">
                 {t("users.groupEdit")}
@@ -677,34 +661,40 @@ export function DevicesPanel({
             </div>
           )}
           {keys.length === 0 ? (
-            <p className="py-2.5 pl-[34px] text-xs text-muted">{t("users.devKeysNone")}</p>
+            <p className="py-2.5 text-xs text-muted">{t("users.devKeysNone")}</p>
           ) : (
-            keys.map((d) => (
-              <div key={d.id} className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pl-[34px]">
-                <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-2 text-[13px] font-bold">
-                    <StatusDot kind={d.online ? "ok" : "off"} />
-                    <span className="truncate">{nameOf(d)}</span>
-                    {d.stale && <span className="flex-none rounded-md border border-warn-line bg-warn-soft px-1.5 py-px text-[10px] font-extrabold text-warn-text">{t("awg.dev.stale")}</span>}
-                  </span>
-                  <span className="text-xs leading-snug break-words text-muted">
-                    {platformLabel(d.platform, t)} ·{" "}
-                    <Link to="/profiles/$id" params={{ id: d.awgProfileId }} className="font-semibold text-fg hover:text-accent-text hover:underline">
-                      {d.awgProfileName}
-                    </Link>{" "}
-                    · {d.online ? t("users.devKeyOnline") : d.lastHandshakeUnix > 0 ? t("users.devKeySeen", { when: agoText(d.lastHandshakeUnix, t, now) }) : t("users.devKeyNever")}
-                  </span>
-                </div>
-                <span className="flex gap-1">
-                  <Button variant="secondary" size="sm" onClick={() => setOpened({ device: refOf(d) })}>
-                    {t("users.devKeyShow")}
-                  </Button>
-                  <Button variant="ghostDanger" size="sm" onClick={() => ask(d)}>
-                    {t("users.revoke")}
-                  </Button>
-                </span>
-              </div>
-            ))
+            <ul className="flex flex-col">
+              {keys.map((d) => (
+                <DeviceRow
+                  key={d.id}
+                  tile={<Tile icon="key" tone="mint" />}
+                  name={nameOf(d)}
+                  badge={d.stale && <span className="flex-none rounded-md border border-warn-line bg-warn-soft px-1.5 py-px text-[10px] font-extrabold text-warn-text">{t("awg.dev.stale")}</span>}
+                  line={
+                    <Secondary
+                      text={
+                        <>
+                          {platformLabel(d.platform, t)} ·{" "}
+                          <Link to="/profiles/$id" params={{ id: d.awgProfileId }} className="font-semibold text-fg hover:text-accent-text hover:underline">
+                            {d.awgProfileName}
+                          </Link>
+                        </>
+                      }
+                    />
+                  }
+                  right={
+                    <>
+                      <Seen online={d.online} lastSeen={d.lastHandshakeUnix} never={t("users.devKeyNever")} t={t} now={now} />
+                      <Button variant="secondary" size="sm" aria-label={t("users.devKeyShow")} onClick={() => setOpened({ device: refOf(d) })}>
+                        <Icon name="key" size={12} />
+                        <span className="@max-[400px]:sr-only">{t("users.devKeyShow")}</span>
+                      </Button>
+                    </>
+                  }
+                  menu={<RowMenu label={t("users.dev.menu", { name: nameOf(d) })} items={[{ label: t("users.dev.delete"), onClick: () => ask(d), danger: true }]} />}
+                />
+              ))}
+            </ul>
           )}
         </section>
       )}
@@ -794,8 +784,7 @@ function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
         <SettingRow label={t("users.devices")}>
           <div className={WIDE}>{stepper(t("users.devices"), String(devices), devices, setDevices, 1, 1, 100)}</div>
         </SettingRow>
-        <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={speed} onChange={setSpeed} />
-        <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={devSpeed} onChange={setDevSpeed} />
+        <SpeedPair person={speed} device={devSpeed} onPerson={setSpeed} onDevice={setDevSpeed} />
       </div>
     </Panel>
   );

@@ -20,7 +20,7 @@ import { DnsSelect, useInheritedDns } from "./dns-select";
 import { defaultGroup, GroupEditModal, GroupForm, PillToggle, ReachLine } from "./groups";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx } from "./t";
-import { SettingRow, SpeedRow, SwitchRow } from "./ui";
+import { InfoTip, SettingRow, SpeedPair, SwitchRow } from "./ui";
 
 export { GroupEditModal, PillToggle } from "./groups";
 
@@ -30,7 +30,7 @@ const Box = ({ children }: { children: ReactNode }) => <div className="rounded-c
 export function CreateUserModal({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (user: User, url: string, password: string) => void }) {
   const t = useTx();
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={t("users.new")} closeLabel={t("common.close")}>
+    <Modal wide open={open} onOpenChange={onOpenChange} title={t("users.new")} closeLabel={t("common.close")}>
       <CreateForm onCreated={onCreated} />
     </Modal>
   );
@@ -39,7 +39,8 @@ export function CreateUserModal({ open, onOpenChange, onCreated }: { open: boole
 /**
  * New user. The group comes first ("Everyone" when there is one) and right under it what the person will get: the
  * subscription and AmneziaVPN keys, on how many nodes, in words; the app switches follow it until they are touched, so a
- * person never gets a way that gives nothing. The group form shows inline only when there is no group at all.
+ * person never gets a way that gives nothing. The group form shows inline only when there is no group at all. On a wide
+ * window two columns: who and how much on the left, the apps, the nodes and "More" on the right; "Create" stays in view.
  */
 function CreateForm({ onCreated }: { onCreated: (user: User, url: string, password: string) => void }) {
   const t = useTx();
@@ -146,6 +147,8 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
         }
       }}
     >
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+      <div className="flex min-w-0 flex-col gap-4">
       <TextField icon="person" tone="lavender" label={t("users.name")} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("users.namePh")} autoFocus autoComplete="off" maxLength={64} />
 
       <Box>
@@ -224,6 +227,9 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
           </div>
         </SettingRow>
       </Box>
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-4">
 
       <Box>
         <SettingRow label={t("users.apps")} hint={t("users.appsHint")} className="min-h-14 py-2" />
@@ -256,21 +262,27 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
           <Icon name="chevronRight" size={14} className="text-muted transition-transform duration-200 group-open:rotate-90" />
           {t("users.advanced")}
         </summary>
-        <div className="border-t border-line">
-          <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={speed} onChange={setSpeed} />
-          <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={devSpeed} onChange={setDevSpeed} />
-        </div>
+        <SpeedPair person={speed} device={devSpeed} onPerson={setSpeed} onDevice={setDevSpeed} />
         <div className="flex flex-col gap-2 border-t border-line py-3">
           <span className="text-[13px] font-bold">{t("subs.dns.field")}</span>
-          <DnsSelect value={dnsPreset} inherited={inheritedDns} onChange={setDnsPreset} />
-          <span className="text-[11px] leading-snug text-muted">{t("subs.dns.inheritHint")}</span>
+          <DnsSelect value={dnsPreset} inherited={inheritedDns} onChange={setDnsPreset} note={false} />
+          {/* one line; when it reaches the apps and what "empty" means wait behind the (i) */}
+          <span className="flex items-start gap-1.5 text-[11px] leading-snug text-muted">
+            <span className="min-w-0 flex-1">{t("subs.dns.scopeUser")}</span>
+            <InfoTip lines={[t("subs.dns.delivery", { apps: linkApps }), t("subs.dns.inheritHint")]} />
+          </span>
         </div>
       </details>
+      </div>
+      </div>
 
-      {error && <Notice tone="danger">{error}</Notice>}
-      <Button type="submit" variant="primary" size="lg" full disabled={!ready}>
-        {t("users.createBtn")}
-      </Button>
+      {/* the button stays in view while the form scrolls under it */}
+      <div className="sticky -bottom-1 flex flex-col gap-3 bg-surface pt-1 pb-1 before:pointer-events-none before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-linear-to-t before:from-surface before:to-transparent">
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" variant="primary" size="lg" full disabled={!ready}>
+          {t("users.createBtn")}
+        </Button>
+      </div>
       <GroupEditModal group={group} open={editingGroup} onOpenChange={setEditingGroup} />
     </form>
   );

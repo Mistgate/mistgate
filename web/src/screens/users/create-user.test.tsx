@@ -115,9 +115,12 @@ describe("the new user form", () => {
     await mount([group()]);
     const more = document.querySelector("details")!;
     expect(more.textContent).toContain("Speed per person");
-    expect(more.textContent).toContain("all devices on one node together · experimental");
+    expect(more.textContent).toContain("all devices on one node");
     expect(more.textContent).toContain("Speed per device");
-    expect(more.textContent).toContain("each device on its own · experimental");
+    expect(more.textContent).toContain("each device on its own");
+    expect(more.textContent?.match(/experimental/g)).toHaveLength(1); // one mark for the pair
+    // the DNS keeps one line; when it reaches the apps and what "empty" means are behind the (i)
+    expect(more.querySelector("button[aria-label^='When it arrives']")?.getAttribute("aria-label")).toContain("Empty means the group’s preset");
     const step = (label: string) => click(document.querySelector(`[aria-label='${label}']`));
     expect(document.querySelector<HTMLButtonElement>("[aria-label='Decrease Speed per device']")?.disabled).toBe(true); // 0 = no limit, ∞
     await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");

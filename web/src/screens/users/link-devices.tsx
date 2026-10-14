@@ -30,20 +30,64 @@ export function splitDevices(devices: Device[]) {
   };
 }
 
-const platformIcon: Record<string, IconName> = { ios: "phone", android: "android", windows: "monitor", macos: "laptop", linux: "terminal" };
+/** The glyph of a device: a phone, an Android phone, a tablet (an iPad), a laptop (Mac), a desktop (Windows), Linux, or any other. */
+export function platformGlyph(d: { platform: string; model: string; osVersion?: string }): IconName {
+  if (d.platform === "ios") return /ipad/i.test(`${d.model} ${d.osVersion ?? ""}`) ? "tablet" : "phone";
+  return ({ android: "android", macos: "laptop", windows: "monitor", linux: "terminal" } as Record<string, IconName>)[d.platform] ?? "globe";
+}
 
-/** The name a device goes by: its label (a rename writes it over the model), else the model, else the platform. */
-export const deviceName = (d: { model: string; platform: string }, t: Tx) => d.model || platformLabel(d.platform || "other", t);
+/**
+ * The tile in front of a device row, as on the person's page: a rounded square in the soft tint of the way (sky for the
+ * link, mint for the keys) with the glyph in the tone's dark shade; grey for a blocked device.
+ */
+export function Tile({ icon, tone, muted }: { icon: IconName; tone: "sky" | "mint"; muted?: boolean }) {
+  return (
+    <span aria-hidden data-tone={muted ? undefined : tone} style={{ borderRadius: 11 }} className={cx("grid size-9 flex-none place-items-center", muted ? "bg-surface-2 text-faint" : "tone-chip")}>
+      <Icon name={icon} size={18} />
+    </span>
+  );
+}
+
+/** A quiet label over a group of rows ("APPS ON THE LINK"), with an action on its right and a muted line under it. */
+export function SectionHead({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 border-t border-line pt-3">
+      <div className="flex min-h-7 items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.06em] text-muted uppercase">{title}</h3>
+        {action}
+      </div>
+      {hint && <p className="text-[11px] leading-snug text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * A device row, the same for every kind: the tile, the name (and a badge for a real problem) over one quiet line, and one
+ * block on the right, centred on the tile: the status, a button when the row has one, the ⋯.
+ */
+export function DeviceRow({ tile, name, badge, line, right, menu, wrapName }: { tile: ReactNode; name: string; badge?: ReactNode; line: ReactNode; right?: ReactNode; menu: ReactNode; wrapName?: boolean }) {
+  return (
+    <li className="flex min-h-[60px] items-center gap-3 border-t border-line py-2.5 first:border-t-0">
+      {tile}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cx("min-w-0 text-[13px] leading-tight font-bold", wrapName ? "break-words" : "truncate")}>{name}</span>
+          {badge}
+        </span>
+        {line}
+      </div>
+      <div className="flex flex-none items-center gap-1.5">
+        {right}
+        {menu}
+      </div>
+    </li>
+  );
+}
 
 /** "iOS 18.1 · Happ 3.4.2": the OS version and the app, as the device last said them ("Happ/3.4.2" reads "Happ 3.4.2"). */
 const appLine = (d: { osVersion?: string; client: string }) => [d.osVersion, d.client.replace("/", " ")].filter(Boolean).join(" · ");
 
-/** The platform as a quiet glyph that names itself to a screen reader. */
-function PlatformIcon({ platform, t, faint }: { platform: string; t: Tx; faint?: boolean }) {
-  return <Icon name={platformIcon[platform] ?? "phone"} size={16} role="img" aria-hidden={false} aria-label={platformLabel(platform || "other", t)} className={cx("flex-none", faint ? "text-faint" : "text-muted")} />;
-}
-
-/** What a row keeps out of sight: since when and when it last updated, all-time traffic, the fingerprint. One fact per line. */
+/** What a link row keeps out of sight: since when and the last update, all-time traffic, the fingerprint. One fact per line. */
 function detailsOf(d: Device, t: Tx, fmt: Fmt, now: number): string[] {
   return [
     [d.firstSeenUnix > 0 && t("users.dev.since", { date: fmt.date(d.firstSeenUnix) }), d.lastSeenUnix > 0 && t("users.dev.updated", { when: agoText(d.lastSeenUnix, t, now) })].filter(Boolean).join(" · "),
@@ -64,12 +108,46 @@ const Lines = ({ lines }: { lines: string[] }) => (
  * The quiet second line of a row. Its details show on hover and keyboard focus (the row menu repeats them, for a touch
  * screen); a screen reader hears the line and the details at once.
  */
-function Secondary({ text, details }: { text: string; details: string[] }) {
-  if (details.length === 0) return <span className="min-w-0 truncate text-xs leading-snug text-muted">{text}</span>;
+export function Secondary({ text, details = [] }: { text: ReactNode; details?: string[] }) {
+  const cls = "min-w-0 truncate text-xs leading-snug text-muted";
+  if (details.length === 0) return <span className={cls}>{text}</span>;
   return (
     <Tip label={<Lines lines={details} />}>
-      <span tabIndex={0} aria-label={[text, ...details].filter(Boolean).join(". ")} className="min-w-0 cursor-default truncate rounded-sm text-xs leading-snug text-muted">
+      <span tabIndex={0} aria-label={[text, ...details].filter(Boolean).join(". ")} className={cx(cls, "cursor-default rounded-sm")}>
         {text || "—"}
+      </span>
+    </Tip>
+  );
+}
+
+/**
+ * The status on the right of a row: online with the dot, the word and the servers (two of them are the sign of a copied
+ * config, which the tooltip says), or how long ago, quiet. In a narrow card the word steps aside for the servers.
+ */
+export function Seen({ online, nodes = [], lastSeen, never, t, now }: { online: boolean; nodes?: string[]; lastSeen: number; never?: string; t: Tx; now: number }) {
+  if (!online) return <span className="text-xs whitespace-nowrap text-muted">{lastSeen > 0 ? agoText(lastSeen, t, now) : (never ?? "—")}</span>;
+  const status = (
+    <span className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+      <span className="tone-ok tone-text flex items-center gap-1.5 font-semibold">
+        <StatusDot kind="ok" />
+        <span className={cx(nodes.length > 0 && "@max-[400px]:sr-only")}>{t("users.devKeyOnline")}</span>
+      </span>
+      {nodes.length > 0 && (
+        <span className="text-muted">
+          <span aria-hidden className="@max-[400px]:hidden">
+            ·{" "}
+          </span>
+          {nodes.join(", ")}
+        </span>
+      )}
+    </span>
+  );
+  if (nodes.length < 2) return status;
+  const why = t.n("users.dev.twoNodesTip", nodes.length);
+  return (
+    <Tip label={why}>
+      <span tabIndex={0} aria-label={`${t("users.devKeyOnline")} · ${nodes.join(", ")}. ${why}`} className="cursor-default rounded-sm">
+        {status}
       </span>
     </Tip>
   );
@@ -80,7 +158,7 @@ const itemClass = "flex min-h-10 cursor-pointer items-center rounded-ctl px-2.5 
 type Item = { label: string; onClick: () => void; danger?: boolean };
 
 /** The ⋯ of a row: the row's details on top (quiet, for a touch screen), then its actions. */
-function RowMenu({ label, details = [], items }: { label: string; details?: string[]; items: Item[] }) {
+export function RowMenu({ label, details = [], items }: { label: string; details?: string[]; items: Item[] }) {
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -109,47 +187,15 @@ function RowMenu({ label, details = [], items }: { label: string; details?: stri
   );
 }
 
-/** A device row: the platform, the name with the status on its right, one quiet line with its own right end, the ⋯. */
-function Row({ icon, name, status, line, lineEnd, menu, wrapName }: { icon: ReactNode; name: string; status?: ReactNode; line: ReactNode; lineEnd?: ReactNode; menu: ReactNode; wrapName?: boolean }) {
-  return (
-    <li className="flex min-h-[52px] items-center gap-2.5 border-t border-line py-2 pl-[34px] first:border-t-0">
-      {icon}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className={cx("min-w-0 text-[13px] font-bold", wrapName ? "break-words" : "truncate")}>{name}</span>
-          {status && <span className="ml-auto flex-none text-xs">{status}</span>}
-        </span>
-        <span className="flex min-w-0 items-center gap-2">
-          {line}
-          {lineEnd && <span className="ml-auto flex-none">{lineEnd}</span>}
-        </span>
-      </div>
-      {menu}
-    </li>
-  );
-}
-
-/** Online: the dot, the word and the servers; otherwise how long ago, quiet. */
-function Seen({ online, nodes, lastSeen, t, now }: { online: boolean; nodes: string[]; lastSeen: number; t: Tx; now: number }) {
-  if (!online) return <span className="text-muted">{lastSeen > 0 ? agoText(lastSeen, t, now) : t("users.devKeyNever")}</span>;
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="tone-ok tone-text flex items-center gap-1.5 font-semibold">
-        <StatusDot kind="ok" />
-        {t("users.devKeyOnline")}
-      </span>
-      {nodes.length > 0 && <span className="font-mono text-muted">· {nodes.join(", ")}</span>}
-    </span>
-  );
-}
+/** The name a device goes by: its label (a rename writes it over the model), else the model, else the platform. */
+export const deviceName = (d: { model: string; platform: string }, t: Tx) => d.model || platformLabel(d.platform || "other", t);
 
 type Doing = { what: "rename" | "delete" | "block"; d: Device };
 
 /**
- * The apps on the link, one row per device: the platform, the name, online on which servers (or how long ago), and one
- * quiet line, "iOS 18.1 · Happ 3.4.2". Since when, all-time traffic and the fingerprint wait in a tooltip and in the menu.
- * Only a device on two servers at once (the sign of a copied config) gets a badge. The menu renames, deletes (the app may
- * come back with new keys) or blocks (it may not, until unblocked).
+ * The apps on the link, one row per device: the tile of its platform, the name over "iOS 18.1 · Happ 3.4.2", and online on
+ * which servers (or how long ago) on the right. Since when, all-time traffic and the fingerprint wait in a tooltip and in
+ * the menu. The menu renames, deletes (the app may come back with new keys) or blocks (it may not, until unblocked).
  */
 export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices: Device[]; nodeName: (id: string) => string; now: number; onChanged: () => Promise<unknown> }) {
   const t = useTx();
@@ -185,25 +231,16 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices:
         const nodes = d.online ? d.onlineNodeIds.map(nodeName) : [];
         const details = detailsOf(d, t, fmt, now);
         return (
-          <Row
+          <DeviceRow
             key={d.id}
-            icon={<PlatformIcon platform={d.platform} t={t} />}
+            tile={<Tile icon={platformGlyph(d)} tone="sky" />}
             name={n}
-            status={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
             line={<Secondary text={appLine(d) || platformLabel(d.platform || "other", t)} details={details} />}
-            lineEnd={
-              nodes.length >= 2 && (
-                <Tip label={t.n("users.dev.twoNodesTip", nodes.length)}>
-                  <span tabIndex={0} className="block cursor-default rounded-md border border-warn-line bg-warn-soft px-1.5 py-px text-[10px] font-extrabold whitespace-nowrap text-warn-text">
-                    {t.n("users.dev.twoNodes", nodes.length)}
-                  </span>
-                </Tip>
-              )
-            }
+            right={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
             menu={
               <RowMenu
                 label={t("users.dev.menu", { name: n })}
-                details={details}
+                details={nodes.length >= 2 ? [t.n("users.dev.twoNodesTip", nodes.length), ...details] : details}
                 items={[
                   { label: t("users.dev.rename"), onClick: () => start("rename", d) },
                   { label: t("users.dev.delete"), onClick: () => start("delete", d) },
@@ -248,26 +285,27 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices:
 }
 
 /**
- * The place the apps without a device ID share, in one row: the app that fetched last and what the mode does with such
- * apps (they share one place; in the strict mode they cannot connect), when they were last seen, "Disconnect" in the menu.
+ * The place the apps without a device ID share, in one row: the link tile, the app that fetched last and what the mode
+ * does with such apps (they share one place; in the strict mode they cannot connect), when they were last seen, and
+ * "Disconnect" in the menu.
  */
 export function SharedRow({ d, mode, now, onDisconnect }: { d: Device; mode: LinkDeviceLimit | undefined; now: number; onDisconnect: () => void }) {
   const t = useTx();
   const name = t("users.dev.shared");
   const what = mode === LinkDeviceLimit.STRICT ? t("users.dev.sharedStrict") : t("users.dev.sharedShare");
   return (
-    <Row
-      icon={<Icon name="link" size={16} className="flex-none text-muted" />}
+    <DeviceRow
+      tile={<Tile icon="link" tone="sky" />}
       name={name}
       wrapName
-      status={<Seen online={d.online} nodes={[]} lastSeen={d.lastSeenUnix} t={t} now={now} />}
-      line={<span className="min-w-0 truncate text-xs leading-snug text-muted">{[d.client.replace("/", " "), what].filter(Boolean).join(" · ")}</span>}
+      line={<Secondary text={[d.client.replace("/", " "), what].filter(Boolean).join(" · ")} />}
+      right={<Seen online={d.online} lastSeen={d.lastSeenUnix} t={t} now={now} />}
       menu={<RowMenu label={t("users.dev.menu", { name })} items={[{ label: t("users.dev.disconnect"), onClick: onDisconnect }]} />}
     />
   );
 }
 
-/** "Blocked (N)", folded: what each blocked device was and since when; "Unblock" in its menu (the app may register again, with new keys). */
+/** "Blocked (N)", folded: what each blocked device was and since when, its tile in grey; "Unblock" in its menu (the app may register again, with new keys). */
 export function BlockedList({ blocked, onChanged }: { blocked: BlockedN[]; onChanged: () => Promise<unknown> }) {
   const t = useTx();
   const fmt = useFmt();
@@ -286,9 +324,9 @@ export function BlockedList({ blocked, onChanged }: { blocked: BlockedN[]; onCha
   }
 
   return (
-    <section className="flex flex-col border-t border-line pt-1">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-10 items-center gap-2 text-left text-xs font-bold text-muted transition-colors hover:text-fg">
-        <Icon name="chevronRight" size={14} className={cx("flex-none transition-transform duration-300 ease-spring", open && "rotate-90")} />
+    <section className="flex flex-col border-t border-line pt-1.5">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-9 items-center gap-1.5 text-left text-[11px] font-bold tracking-[0.06em] text-muted uppercase transition-colors hover:text-fg">
+        <Icon name="chevronRight" size={13} className={cx("flex-none transition-transform duration-300 ease-spring", open && "rotate-90")} />
         {t("users.dev.blockedList", { n: blocked.length })}
       </button>
       {open && (
@@ -297,9 +335,9 @@ export function BlockedList({ blocked, onChanged }: { blocked: BlockedN[]; onCha
             const n = deviceName(b, t);
             const details = b.fingerprint ? [t("users.dev.fp", { fp: b.fingerprint })] : [];
             return (
-              <Row
+              <DeviceRow
                 key={b.id}
-                icon={<PlatformIcon platform={b.platform} t={t} faint />}
+                tile={<Tile icon={platformGlyph(b)} tone="sky" muted />}
                 name={n}
                 line={<Secondary text={[appLine(b), b.blockedUnix > 0 && t("users.dev.blockedAt", { date: fmt.date(b.blockedUnix) })].filter(Boolean).join(" · ")} details={details} />}
                 menu={<RowMenu label={t("users.dev.menu", { name: n })} details={details} items={[{ label: t("users.dev.unblock"), onClick: () => void unblock(b.id) }]} />}

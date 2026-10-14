@@ -356,12 +356,14 @@ describe("the devices of the user card", () => {
   const dialog = () => [...document.querySelectorAll("[role=dialog]")].at(-1)!;
   const inDialog = (label: string) => click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === label));
 
-  it("shows a calm row per app on the link, the badge only on the device that is on two servers, the shared place and the keys", async () => {
+  it("shows a calm row per app on the link with its tile, two servers explained only where they are, the shared place and the keys", async () => {
     await mount(1, [], [], many);
     const iphone = row("iPhone 15");
     expect(iphone.textContent).toContain("de1, nl1");
     expect(iphone.textContent).toContain("iOS 18.1 · Happ 3.4.2");
-    expect(iphone.textContent).toContain("on 2 servers");
+    // the two servers say it themselves; the tooltip (and the status's name) explains what that means
+    expect(iphone.querySelector("[aria-label*='The same keys are connected to 2 servers right now']")).not.toBeNull();
+    expect(iphone.querySelector("[data-tone='sky']")).not.toBeNull(); // the tile of the way, as on the person's page
     // since when, all-time traffic and the fingerprint wait in the tooltip, named for a screen reader
     expect(iphone.textContent).not.toContain("a1b2c3");
     expect(iphone.textContent).not.toContain("2.4 GB");
@@ -372,9 +374,9 @@ describe("the devices of the user card", () => {
     expect(row("Pixel 8").textContent).toContain("online· de1");
     expect(row("Pixel 8").textContent).not.toContain("servers");
     expect(row("MacBook").textContent).toContain("5 min ago");
-    expect(text().match(/on 2 servers/g)).toHaveLength(1);
+    expect(document.querySelectorAll("[aria-label*='The same keys are connected']")).toHaveLength(1);
     expect(row("Apps without a device ID").textContent).toContain("Hiddify 2.5 · share one place");
-    expect(text()).toContain("Router"); // the key, as before
+    expect(row("Router").querySelector("[data-tone='mint']")).not.toBeNull(); // a key: the same row, the mint tile
     // the header counts with the limit, red when over it
     const count = [...document.querySelectorAll("span")].find((s) => s.textContent === "4 of 3")!;
     expect(count.className).toContain("text-danger-text");
