@@ -14,7 +14,3 @@ import (
 func mcpEndpoint(*auth.Service, *store.Store, *slog.Logger, func(tool, tokenName string), func() time.Time) func(api http.Handler) http.Handler {
 	return nil
 }
-
-func mcpBackgroundJobs(*store.Store, *slog.Logger, func() time.Time) []BackgroundJob {
-	return nil
-}

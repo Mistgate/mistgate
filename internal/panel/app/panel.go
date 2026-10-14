@@ -403,33 +403,25 @@ func Build(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
-	jobs := mcpBackgroundJobs(st, log, c.Clock)
-	jobs = append(jobs, []BackgroundJob{
-		{Name: "fleet", Run: func(ctx context.Context) { _ = fl.Run(ctx) }},
-		{Name: "access", Run: acc.Run},
-		{Name: "health", Run: hl.Run},
-		{Name: "updates", Run: upd.Run},
-		{Name: "backups", Run: bkp.Run},
-		{Name: "telegram", Run: tg.Run},
-		{Name: "provision", Run: func(ctx context.Context) {
-			for ctx.Err() == nil {
-				if err := prov.Run(ctx); err != nil && ctx.Err() == nil {
-					log.Error("provision worker stopped; retrying", "err", err)
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second):
-				}
-			}
-		}},
-	}...)
-	jobs = append(jobs, c.BackgroundStarters...)
+	jobs := backgroundJobs(c, jobServices{fleet: fl, access: acc, health: hl, update: upd, backup: bkp, telegram: tg, provision: prov, store: st, log: log})
 	return &Panel{
 		Handler: srv.Public(), Server: srv, Fleet: fl, Access: acc, Health: hl, Update: upd,
 		Warp: wsv, Provision: prov, Backup: bkp, Telegram: tg, Store: st, Desired: desired,
 		BackgroundJobs: jobs, provisionKick: c.ProvisionKick,
 	}, nil
+}
+
+// jobServices are the services the background jobs of the VPS edition run (see backgroundJobs).
+type jobServices struct {
+	fleet     *fleet.Fleet
+	access    *access.Service
+	health    *health.Service
+	update    *update.Service
+	backup    *backup.Service
+	telegram  *telegram.Service
+	provision *nodeprovision.Service
+	store     *store.Store
+	log       *slog.Logger
 }
 
 // backupResult is backup.Config.OnResult: a failed backup is announced once, the next one that works resolves it.
