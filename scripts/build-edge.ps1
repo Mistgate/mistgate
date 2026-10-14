@@ -31,7 +31,7 @@ Push-Location $repoRoot
 try {
     $env:GOOS = "js"
     $env:GOARCH = "wasm"
-    Invoke-Native "go build (js/wasm)" { go build -ldflags="-s -w" -trimpath -o $wasm ./cmd/mistgate-edge }
+    Invoke-Native "go build (js/wasm)" { go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o $wasm ./cmd/mistgate-edge }
 } finally {
     $env:GOOS = $previousGoos
     $env:GOARCH = $previousGoarch

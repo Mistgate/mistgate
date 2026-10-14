@@ -24,7 +24,7 @@ try {
     $oracle = Join-Path $resolvedTempDir "vps-oracle.exe"
     $env:GOOS = "js"
     $env:GOARCH = "wasm"
-    & go build -tags=edgeentrytest -o $wasm ./cmd/mistgate-edge
+    & go build "-tags=edgeentrytest,nethttpomithttp2" -o $wasm ./cmd/mistgate-edge
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

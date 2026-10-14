@@ -29,7 +29,7 @@ jobs:
       - name: edge-entry wasm size
         run: |
           wasm="$RUNNER_TEMP/mistgate-edge.wasm"
-          GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o "$wasm" ./cmd/mistgate-edge
+          GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o "$wasm" ./cmd/mistgate-edge
           bytes=$(stat -c%s "$wasm")
           echo "edge-entry wasm size: ${bytes} bytes (limit: 52428800 bytes); headroom: $((52428800 - bytes)) bytes ($(( (52428800 - bytes) / 1024 )) KiB)"
           if [ "$bytes" -gt 52428800 ]; then exit 1; fi

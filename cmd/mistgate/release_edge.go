@@ -13,6 +13,11 @@ import (
 // edgeRebuild builds the edge bundle; a test seam (goBuildEdge in production), like releaseRebuild.
 var edgeRebuild = goBuildEdge
 
+// edgeBuildTags are the build tags of panel.wasm. nethttpomithttp2 leaves out net/http's HTTP/2 (about 0.8 MB): a Worker
+// never speaks HTTP/2 itself, Go's js/wasm transport hands every request to fetch. CI's size step and
+// scripts/build-edge.ps1 use the same tag.
+const edgeBuildTags = "nethttpomithttp2"
+
 // goBuildEdge is the one definition of how mistgate-edge.tar.gz is built: CI, `release build` and the rebuild check of
 // `release sign` all run it. The panel is cmd/mistgate-edge for js/wasm with the same flags and Go toolchain as the other
 // release binaries (go.mod's toolchain line); wasm_exec.js is the one of that toolchain; the two Worker scripts are
@@ -48,7 +53,7 @@ func goBuildEdge(src, version string, built int64, key, out string) error {
 
 	env := releaseEnv(toolchain, "GOOS=js", "GOARCH=wasm")
 	wasm := filepath.Join(tmp, "panel.wasm")
-	if _, err := run(src, env, "go", "build", "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key), "-o", wasm, "./cmd/mistgate-edge"); err != nil {
+	if _, err := run(src, env, "go", "build", "-tags", edgeBuildTags, "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key), "-o", wasm, "./cmd/mistgate-edge"); err != nil {
 		return err
 	}
 	goroot, err := run(src, env, "go", "env", "GOROOT")

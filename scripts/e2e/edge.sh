@@ -90,7 +90,7 @@ edge_tls() { # a CA and a leaf for de1.example.com, valid two days
 edge_build() {
   local w=$WORK/worker src=$REPO/edge/worker
   mkdir -p "$w/dist"
-  GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
+  GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
     -o "$w/dist/panel.wasm" ./cmd/mistgate-edge
   # a -X on a variable the linker does not see as a constant string is silently ignored: look for the value in the program
   grep -qa "http://127.0.0.1:$REL_PORT/" "$w/dist/panel.wasm" || die "the wasm does not carry the fake release's address: -X update.releaseDownloadBase did not take"

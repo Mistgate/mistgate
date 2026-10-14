@@ -784,7 +784,7 @@ behalf of a different request" and no hung-invocation message. The `edgeTaskRunn
 
 `scripts/e2e-wsl.sh --edge`: the same scenario against both builds (ADR 0006), in the run's own network namespace.
 
-Build: `GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" ./cmd/mistgate-edge` into `$WORK/worker/dist` plus
+Build: `GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w" ./cmd/mistgate-edge` into `$WORK/worker/dist` plus
 `wasm_exec.js` from the same GOROOT; copy `src/`, `package.json`, `pnpm-lock.yaml`, `tsconfig.json` to `$WORK/worker` and
 `pnpm install --frozen-lockfile` there (never into the repo's Windows `node_modules`). `web/dist` from the repo.
 
