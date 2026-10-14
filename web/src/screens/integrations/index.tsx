@@ -7,14 +7,16 @@ import { useT } from "@/i18n";
 import { approvalsQuery } from "@/lib/integrations";
 import { useIsOwner } from "@/lib/updates";
 import { ApprovalHistory, ApprovalQueue } from "./approvals";
+import { CountryGroup } from "./country";
 import { McpCard } from "./mcp";
 import { TelegramCard } from "./telegram";
 import { TokensCard } from "./tokens";
 
 /**
- * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, the Telegram alerts and the
- * owner's inbox of what an agent planned that needs a human. Tokens and approvals are owner-only on the server; anyone else
- * gets a calm line, and their own Telegram link (every admin links their own chat).
+ * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, the Telegram alerts, the
+ * sources of the country check (each an integration of its own, off by default) and the owner's inbox of what an agent
+ * planned that needs a human. Tokens, approvals and the country check are owner-only on the server; anyone else gets a
+ * calm line, and their own Telegram link (every admin links their own chat).
  */
 export function IntegrationsScreen() {
   const t = useT();
@@ -53,6 +55,7 @@ export function IntegrationsScreen() {
         <McpCard />
       </div>
       <TelegramCard owner />
+      <CountryGroup />
       {q.data && <ApprovalHistory data={q.data} />}
     </div>
   );

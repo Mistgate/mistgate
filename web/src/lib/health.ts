@@ -6,10 +6,12 @@ import {
   AlertKind,
   AlertSeverity,
   CheckStatus,
+  CountryVerdict,
   DoctorStatus,
   type Alert as AlertMsg,
   type CheckBucket as BucketMsg,
   type CheckCell as CellMsg,
+  type CountryCheck as CountryCheckMsg,
   type DoctorItem as DoctorItemMsg,
   type NodeDoctor as NodeDoctorMsg,
 } from "@/gen/mistgate/admin/v1/health_pb";
@@ -106,6 +108,7 @@ export function alertTitle(t: T, a: Alert): string {
   // the blind-panel alerts are fleet-wide and have no profile to name
   if (a.kind === AlertKind.CHECK_FAILED && (a.subject === "panel_egress" || a.subject === "probe_path")) key += "." + a.subject;
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
+  if (a.kind === AlertKind.COUNTRY_BLOCKED) params.country = countryIn(t, params.country ?? "");
   return lookup(t, key, params) ?? a.titleKey;
 }
 
@@ -123,6 +126,12 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
   if (a.kind === AlertKind.TORRENT) return lookup(t, a.whyKey, torrentParams(t, params)) ?? "";
+  if (a.kind === AlertKind.COUNTRY_BLOCKED) {
+    // "RU" and "443, 8443" as the sentence needs them: "from Russia", "ports 443 and 8443"
+    params.country = countryIn(t, a.params.country ?? "");
+    const ports = (a.params.ports ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+    params.ports = ports.length ? t.n("cr.alert.ports", ports.length, { ports: listOf(fmt.locale, ports) }) : "";
+  }
   if (a.kind === AlertKind.PORT_LOSSY) {
     params.lost = String(lossPct(Number(a.params.sent), Number(a.params.got)));
     params.sender = senderLabel(t, a.params.sender ?? "");
@@ -308,6 +317,88 @@ export function cellLook(t: T, fmt: Fmt, cell: CheckCell, nodeStatus: NodeStatus
           return only("off", t("hl.cell.off"), err);
       }
   }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Reachability from a country (GetChecksResponse.country_checks): what probes inside one country saw of each node. The
+// server sends only codes and numbers; empty while the integration is off.
+
+export type CountryCheck = Plain<CountryCheckMsg>;
+type CountryProbe = CountryCheck["probes"][number];
+
+/** A country as it stands after "from" ("from Russia", "из России"); a code the dictionary does not know stays a code. */
+export function countryIn(t: T, code: string): string {
+  const key = `cr.in.${code}`;
+  return hasKey(key) ? t(key) : t("cr.in", { code });
+}
+
+/** Why a round has no verdict ("too few probes answered"); empty for a code the SPA does not know. */
+export function countryReason(t: T, code: string): string {
+  const key = `cr.reason.${code}`;
+  return code && hasKey(key) ? t(key) : "";
+}
+
+export type CountryLook = {
+  /** OK and UNKNOWN stay quiet: only the two blocks take a problem colour. */
+  kind: "ok" | "warn" | "bad" | "unknown";
+  /** What the cell says: "reachable", "TCP blocked", "unreachable", "no data". */
+  label: string;
+  /** The verdict in a sentence: the tooltip's first line and the screen reader's state. */
+  head: string;
+  /** The quiet line of a row, where a phone has no tooltip: the networks that saw it and when, or why there is no verdict. */
+  line: string;
+  /** The tooltip under the verdict: each probe (where it is, what it got, whether it counted), the round's time, how the probes were picked. */
+  probes: { where: string; result: string; counted: boolean }[];
+  at: string;
+  via: string;
+};
+
+/** A probe for the tooltip: "Rostelecom, Moscow" and "ICMP 42 ms · TCP 443, 8443 ✕" (ports that differ get a mark each). */
+function probeOf(t: T, p: CountryProbe): CountryLook["probes"][number] {
+  const icmp = `ICMP ${p.icmpOk ? (p.icmpMs > 0 ? `${p.icmpMs} ${t("hl.ms")}` : "✓") : "✕"}`;
+  const mark = (ok: boolean) => (ok ? "✓" : "✕");
+  const same = p.tcp.every((x) => x.ok === p.tcp[0]?.ok);
+  const ports = same ? `${p.tcp.map((x) => x.port).join(", ")} ${mark(!!p.tcp[0]?.ok)}` : p.tcp.map((x) => `${x.port} ${mark(x.ok)}`).join(", ");
+  const where = [p.network, p.city].filter(Boolean).join(", ") || "?";
+  return { where: p.valid ? where : t("cr.tip.skipped", { line: where }), result: p.tcp.length ? `${icmp} · TCP ${ports}` : icmp, counted: p.valid };
+}
+
+export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
+  const networks = [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ");
+  const seen = [networks, fmt.ago(c.atUnix)].filter(Boolean).join(" · ");
+  const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => ({
+    kind,
+    label,
+    head,
+    line,
+    probes: c.probes.map((p) => probeOf(t, p)),
+    at: t("cr.tip.at", { time: fmt.stamp(c.atUnix) }),
+    via: t(c.eyeball ? "cr.tip.eyeball" : "cr.tip.dc"),
+  });
+  switch (c.verdict) {
+    case CountryVerdict.OK:
+      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), seen);
+    case CountryVerdict.TCP_BLOCKED:
+      return look("warn", t("cr.v.tcp"), t("cr.tip.tcp"), `${t("cr.icmpPasses")} · ${seen}`);
+    case CountryVerdict.BLOCKED:
+      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), seen);
+    default: {
+      const reason = countryReason(t, c.reason);
+      return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), [reason, fmt.ago(c.atUnix)].filter(Boolean).join(" · "));
+    }
+  }
+}
+
+export type CountryColumn = { code: string; byNode: ReadonlyMap<string, CountryCheck> };
+
+/**
+ * The country column of the checks: the country of the newest round (it names the column) and each node's latest check.
+ * Null when there is nothing to show: the integration is off (the server then sends no checks) or no round has run yet.
+ */
+export function countryColumn(checks: readonly CountryCheck[] | undefined): CountryColumn | null {
+  if (!checks?.length) return null;
+  const newest = checks.reduce((a, c) => (c.atUnix > a.atUnix ? c : a));
+  return { code: newest.country, byNode: new Map(checks.map((c) => [c.nodeId, c])) };
 }
 
 /** "de1, nl1 and fi1" in the UI language; zh gets the half-width spaces of its glossary around 和 between Latin names. */

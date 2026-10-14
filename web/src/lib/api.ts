@@ -2,10 +2,12 @@ import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AuthService } from "@/gen/mistgate/admin/v1/auth_pb";
 import { BackupService } from "@/gen/mistgate/admin/v1/backup_pb";
+import { CountryReachabilityService } from "@/gen/mistgate/admin/v1/country_reachability_pb";
 import { AwgService } from "@/gen/mistgate/admin/v1/awg_pb";
 import { DeviceService } from "@/gen/mistgate/admin/v1/device_pb";
 import { DnsService } from "@/gen/mistgate/admin/v1/dns_pb";
 import { FleetService } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { GlobalpingService } from "@/gen/mistgate/admin/v1/globalping_pb";
 import { GroupService } from "@/gen/mistgate/admin/v1/group_pb";
 import { HealthService } from "@/gen/mistgate/admin/v1/health_pb";
 import { InstanceService } from "@/gen/mistgate/admin/v1/instance_pb";
@@ -50,6 +52,8 @@ export const warp = createClient(WarpService, transport);
 export const apiTokens = createClient(ApiTokenService, transport);
 export const approvals = createClient(ApprovalService, transport);
 export const telegram = createClient(TelegramService, transport);
+export const globalping = createClient(GlobalpingService, transport);
+export const countryReach = createClient(CountryReachabilityService, transport);
 
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
 export const assetUrl = (path: string) => new URL(path, document.baseURI).href;

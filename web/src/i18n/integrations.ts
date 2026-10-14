@@ -284,6 +284,7 @@ export const en = {
   "approval.alert.doctor_warn": "A doctor warning",
   "approval.alert.doctor_fail": "A doctor failure",
   "approval.alert.quota": "A user reached the quota",
+  "approval.alert.country_blocked": "A node is unreachable from the chosen country",
 };
 
 export const ru: Record<keyof typeof en, string> = {
@@ -562,6 +563,7 @@ export const ru: Record<keyof typeof en, string> = {
   "approval.alert.doctor_warn": "Предупреждение доктора",
   "approval.alert.doctor_fail": "Доктор нашёл ошибку",
   "approval.alert.quota": "Пользователь выбрал квоту",
+  "approval.alert.country_blocked": "Нода недоступна из выбранной страны",
 };
 
 export const zh: typeof en = {
@@ -844,4 +846,5 @@ export const zh: typeof en = {
   "approval.alert.doctor_warn": "诊断警告",
   "approval.alert.doctor_fail": "诊断失败",
   "approval.alert.quota": "用户已达到流量配额",
+  "approval.alert.country_blocked": "从所选国家无法连接节点",
 };

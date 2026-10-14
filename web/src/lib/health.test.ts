@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { AlertKind, AlertSeverity, CheckStatus, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
+import { AlertKind, AlertSeverity, CheckStatus, CountryVerdict, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { dictionaries, fill, langs, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
+import { zh } from "@/i18n/zh";
 import { healthKind } from "./fleet";
+import { factWords } from "./integrations";
 import { makeFmt } from "./format";
 import {
   alertFix,
   alertIsAbout,
+  countryColumn,
+  countryIn,
+  countryLook,
+  countryReason,
   alertTitle,
   alertWhy,
   barsOf,
@@ -36,6 +42,7 @@ import {
   severityKind,
   type Alert,
   type CheckCell,
+  type CountryCheck,
   type DoctorItem,
   type NodeDoctor,
 } from "./health";
@@ -429,7 +436,7 @@ describe("the server's vocabulary is covered", () => {
   const fixes = ["journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit"];
   const errors = ["timeout", "auth", "tls", "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active", "inbound_failed", "inbound_disabled", "inbound_pending"];
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
-    "access_ended", "user_connection", "users_impacted"];
+    "access_ended", "user_connection", "users_impacted", "country_blocked"];
   const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
   const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn"];
   const expected = [
@@ -456,6 +463,8 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.access_ended.why.quota",
     ...["never_connected", "stale_key", "silent"].map((v) => `health.alert.user_connection.why.${v}`),
     "health.alert.users_impacted.why.gone",
+    "health.alert.country_blocked.why.tcp_blocked",
+    "health.alert.country_blocked.why.blocked",
     "hl.res.accepted",
     "hl.res.superseded",
     "hl.fix.err.unknown_fix",
@@ -509,6 +518,7 @@ describe("the server's vocabulary is covered", () => {
       cert_expiry: ["inbound", "inbound_id", "profile", "server_name", "days_left", "reason", "server_part"],
       node_down: ["duration"],
       device_limit: ["user_name", "used", "limit"],
+      country_blocked: ["country", "networks", "ports"],
     };
     for (const [kind, params] of Object.entries(sent)) {
       for (const key of Object.keys(en).filter((k) => k.startsWith(`health.alert.${kind}.why`))) {
@@ -540,5 +550,150 @@ describe("alerts about people", () => {
     expect(alertIsAbout({ ...silent, params: {} }, "usr_3")).toBe(true);
     expect(alertIsAbout({ ...device, params: {} }, "usr_2")).toBe(false);
     expect(alertIsAbout(impacted, "hysteria2")).toBe(false);
+  });
+});
+// ---------------------------------------------------------------------------------------------------
+// Reachability from a country
+
+describe("reachability from a country", () => {
+  const tZhPlural = plural(zh, "zh");
+  const fmtZh = makeFmt("zh", tZhPlural);
+  const roundAt = Math.floor(Date.now() / 1000) - 240;
+  const probe = (network: string, city: string, icmpMs: number, tcp: [number, boolean][], valid = true) => ({
+    network,
+    asn: 1,
+    city,
+    icmpOk: icmpMs > 0,
+    icmpMs,
+    tcp: tcp.map(([port, ok]) => ({ port, ok, ms: ok ? 40 : 0 })),
+    valid,
+  });
+  const check = (over: Partial<CountryCheck> = {}): CountryCheck => ({
+    nodeId: "nod_1",
+    country: "RU",
+    verdict: CountryVerdict.OK,
+    atUnix: roundAt,
+    eyeball: true,
+    reason: "",
+    probes: [probe("Rostelecom", "Moscow", 42, [[443, true], [8443, true]]), probe("Beeline", "Kazan", 47, [[443, true], [8443, true]])],
+    ...over,
+  });
+  const tcpCut = check({
+    verdict: CountryVerdict.TCP_BLOCKED,
+    probes: [
+      probe("Rostelecom", "Moscow", 51, [[443, false], [8443, false]]),
+      probe("Beeline", "", 55, [[443, false], [8443, false]]),
+      probe("MegaFon", "Kazan", 0, [[443, true], [8443, false]], false),
+    ],
+  });
+  const cut = check({ verdict: CountryVerdict.BLOCKED, probes: [probe("Rostelecom", "Moscow", 0, [[443, false]]), probe("MTS", "Omsk", 0, [])] });
+  const none = check({ verdict: CountryVerdict.UNKNOWN, reason: "too_few_probes", eyeball: false, probes: [probe("Selectel", "Moscow", 38, [[443, true]])] });
+
+  it("says each verdict in a word, calm for OK and no data, in a problem tone only for the two blocks", () => {
+    const looks = [check(), tcpCut, cut, none].map((c) => countryLook(tPlural, fmt, c));
+    expect(looks.map((l) => [l.kind, l.label])).toEqual([
+      ["ok", "reachable"],
+      ["warn", "TCP blocked"],
+      ["bad", "unreachable"],
+      ["unknown", "no data"],
+    ]);
+    expect(looks.map((l) => l.head)).toEqual(["Reachable from Russia", "TCP is blocked, ICMP passes", "Neither ICMP nor TCP gets through", "No data: too few probes answered"]);
+    // the quiet line of a row: who saw it and when; TCP blocked adds that ICMP passes; no data says why
+    expect(looks.map((l) => l.line)).toEqual([
+      "Rostelecom, Beeline · 4 min ago",
+      "ICMP passes · Rostelecom, Beeline · 4 min ago",
+      "Rostelecom, MTS · 4 min ago",
+      "too few probes answered · 4 min ago",
+    ]);
+  });
+
+  it("words the same in Russian, the country in the genitive, and in Chinese", () => {
+    const inRu = [check(), tcpCut, cut, none].map((c) => countryLook(tRuPlural, fmtRu, c));
+    expect(inRu.map((l) => l.label)).toEqual(["доступна", "TCP режут", "недоступна", "нет данных"]);
+    expect(inRu.map((l) => l.head)).toEqual(["Доступна из России", "TCP режут, ICMP проходит", "Не проходят ни ICMP, ни TCP", "Нет данных: ответило слишком мало зондов"]);
+    const inZh = [check(), tcpCut, cut, none].map((c) => countryLook(tZhPlural, fmtZh, c));
+    expect(inZh.map((l) => l.label)).toEqual(["可访问", "TCP 被封锁", "无法连接", "无数据"]);
+    expect(inZh.map((l) => l.head)).toEqual(["从俄罗斯可以访问", "TCP 被封锁，ICMP 可通", "ICMP 和 TCP 都不通", "无数据：响应的探测点太少"]);
+  });
+
+  it("fills the tooltip: each probe with its network and city, ICMP and TCP per port, the time, how the probes were picked", () => {
+    const l = countryLook(tPlural, fmt, tcpCut);
+    expect(l.probes).toEqual([
+      { where: "Rostelecom, Moscow", result: "ICMP 51 ms · TCP 443, 8443 ✕", counted: true },
+      { where: "Beeline", result: "ICMP 55 ms · TCP 443, 8443 ✕", counted: true },
+      // ports that differ get a mark each; a probe thrown away for the round is shown, and says so
+      { where: "MegaFon, Kazan (not counted)", result: "ICMP ✕ · TCP 443 ✓, 8443 ✕", counted: false },
+    ]);
+    expect(l.at).toBe(`Last round: ${fmt.stamp(roundAt)}`);
+    expect(l.via).toBe("Checked via Globalping from home and mobile networks");
+    // a node without TCP ports has ICMP alone; probes from any network are said to be data centers
+    expect(countryLook(tPlural, fmt, cut).probes[1]).toEqual({ where: "MTS, Omsk", result: "ICMP ✕", counted: true });
+    expect(countryLook(tPlural, fmt, none).via).toBe("Checked via Globalping from data centers");
+    expect(countryLook(tRuPlural, fmtRu, none).via).toBe("Проверено через Globalping из датацентров");
+    expect(countryLook(tRuPlural, fmtRu, check()).via).toBe("Проверено через Globalping из домашних и мобильных сетей");
+    expect(countryLook(tRuPlural, fmtRu, tcpCut).probes[2]!.where).toBe("MegaFon, Kazan (не учтён)");
+    expect(countryLook(tZhPlural, fmtZh, tcpCut).probes[2]!.where).toBe("MegaFon, Kazan（未计入）");
+    expect(countryLook(tZhPlural, fmtZh, none).via).toBe("通过 Globalping 从数据中心检测");
+    expect(countryLook(tZhPlural, fmtZh, check()).probes[0]!.result).toBe("ICMP 42 ms · TCP 443, 8443 ✓");
+  });
+
+  it("has no reason for a code it does not know, and names an unknown country by its code", () => {
+    expect(countryReason(tPlural, "brand_new")).toBe("");
+    expect(countryReason(tPlural, "")).toBe("");
+    expect(countryLook(tPlural, fmt, check({ verdict: CountryVerdict.UNKNOWN, reason: "brand_new" })).head).toBe("No data");
+    expect(["RU", "BY", "KZ", "CN", "IR", "TR"].map((c) => countryIn(tRuPlural, c))).toEqual(["России", "Беларуси", "Казахстана", "Китая", "Ирана", "Турции"]);
+    expect(countryIn(tPlural, "KZ")).toBe("Kazakhstan");
+    expect(countryIn(tZhPlural, "CN")).toBe("中国");
+    expect(countryIn(tRuPlural, "UZ")).toBe("страны UZ");
+    expect(countryIn(tPlural, "UZ")).toBe("UZ");
+  });
+
+  it("makes a column only when there are checks, named by the country of the newest round", () => {
+    expect(countryColumn(undefined)).toBeNull();
+    expect(countryColumn([])).toBeNull();
+    const col = countryColumn([check({ nodeId: "nod_1", country: "RU", atUnix: roundAt }), check({ nodeId: "nod_2", country: "KZ", atUnix: roundAt + 60 })])!;
+    expect(col.code).toBe("KZ");
+    expect(col.byNode.get("nod_1")?.country).toBe("RU");
+    expect(col.byNode.has("nod_3")).toBe(false);
+  });
+
+  it("words the country_blocked alert with the country after “from” and the ports as a list", () => {
+    const base = { kind: AlertKind.COUNTRY_BLOCKED, nodeName: "nl1", titleKey: "health.alert.country_blocked.title" };
+    const tcp = alert({
+      ...base,
+      whyKey: "health.alert.country_blocked.why.tcp_blocked",
+      params: { node: "nl1", country: "RU", verdict: "tcp_blocked", networks: "Beeline, Rostelecom", ports: "443, 8443" },
+    });
+    const one = { ...tcp, params: { ...tcp.params, ports: "443" } };
+    const blocked = alert({ ...base, whyKey: "health.alert.country_blocked.why.blocked", params: { node: "fi1", country: "RU", verdict: "blocked", networks: "MTS", ports: "" } });
+    expect(alertTitle(tPlural, tcp)).toBe("Unreachable from Russia");
+    expect(alertTitle(tRuPlural, tcp)).toBe("Недоступна из России");
+    expect(alertTitle(tZhPlural, tcp)).toBe("从俄罗斯无法连接");
+    expect(alertWhy(tPlural, fmt, tcp)).toBe(
+      "Probes inside Russia (Beeline, Rostelecom) reach the node’s address, but TCP to ports 443 and 8443 does not connect: the connection requests are dropped on the way. Two checks in a row saw it. It closes after two clean checks.",
+    );
+    expect(alertWhy(tPlural, fmt, one)).toContain("but TCP to port 443 does not connect");
+    expect(alertWhy(tRuPlural, fmtRu, tcp)).toBe(
+      "Зонды внутри России (Beeline, Rostelecom) достают до адреса ноды, но TCP на порты 443 и 8443 не соединяется: запросы на соединение режут по дороге. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, one)).toContain("но TCP на порт 443 не соединяется");
+    expect(alertWhy(tZhPlural, fmtZh, tcp)).toBe(
+      "俄罗斯境内的探测点（Beeline, Rostelecom）能到达节点地址，但 TCP 端口 443 和 8443 连不上：连接请求在途中被丢弃。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+    );
+    // a node with nothing but UDP profiles has no TCP port to name
+    expect(alertWhy(tPlural, fmt, blocked)).toBe(
+      "Probes inside Russia (MTS) cannot reach the node at all: no answer to ping, no TCP connection. Two checks in a row saw it. It closes after two clean checks.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, blocked)).toBe(
+      "Зонды внутри России (MTS) совсем не достают до ноды: нет ответа ни на ping, ни по TCP. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+    );
+    expect(alertWhy(tZhPlural, fmtZh, blocked)).toBe("俄罗斯境内的探测点（MTS）完全无法到达节点：ping 和 TCP 都没有响应。连续两次检测都是如此。连续两次正常后，告警会关闭。");
+  });
+
+  it("names the alert in an approval, where there is no country to fill in", () => {
+    const fact = { key: "alert", value: "", untrusted: false, code: "alert", params: { kind: "country_blocked", severity: "warning" }, untrustedParams: [] };
+    expect(factWords(tPlural, fmt, fact)).toEqual(["A node is unreachable from the chosen country · Warning"]);
+    expect(factWords(tRuPlural, fmtRu, fact)).toEqual(["Нода недоступна из выбранной страны · Внимание"]);
+    expect(factWords(tZhPlural, fmtZh, fact)).toEqual(["从所选国家无法连接节点 · 警告"]);
   });
 });

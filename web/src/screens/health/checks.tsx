@@ -7,12 +7,13 @@ import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
-import { cellLook, listOf, SLOW_CONNECT_MS, type CheckCell } from "@/lib/health";
+import { cellLook, countryColumn, listOf, SLOW_CONNECT_MS, type CheckCell, type CountryColumn } from "@/lib/health";
 import type { GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
 import { protocolName } from "@/lib/series";
 import { CheckRows } from "@/screens/node/checks";
+import { CountryCell, CountryHead, CountryRow } from "./country";
 import { CellTip, HistoryCard, SlowMark, useRunChecks } from "./history";
 
 type Checks = Plain<GetChecksResponse>;
@@ -85,14 +86,18 @@ export function CheckLegend({ slow = false }: { slow?: boolean }) {
   );
 }
 
-/** Node × profile matrix of the synthetic checks; a click opens the 24 h history of that cell under it. A phone gets a card per node. */
+/**
+ * Node × profile matrix of the synthetic checks; a click opens the 24 h history of that cell under it. A phone gets a card per
+ * node. With the country check on, a last column (a last row on the phone) says what probes inside that country saw.
+ */
 export function ChecksTab({ data }: { data: Checks }) {
   const t = useT();
   const fmt = useFmt();
   const run = useRunChecks();
   const [sel, setSel] = useState<{ node: string; col: number } | null>(null);
   const cols = data.columns;
-  const min = 90 + cols.length * 102;
+  const country = countryColumn(data.countryChecks);
+  const min = 90 + cols.length * 102 + (country ? 128 : 0);
 
   const picked = sel && data.rows.find((r) => r.nodeId === sel.node);
   const cell: CheckCell | undefined = sel ? picked?.cells[sel.col] : undefined;
@@ -123,15 +128,16 @@ export function ChecksTab({ data }: { data: Checks }) {
         <UdpLossNotice data={data} />
         {/* the padding gives the selection ring and the hover scale room inside the scrolling box */}
         <div className="no-scrollbar -m-1 overflow-x-auto p-1 max-md:hidden">
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: `90px repeat(${cols.length}, minmax(90px, 1fr))`, minWidth: min }}>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `90px repeat(${cols.length}, minmax(90px, 1fr))${country ? " minmax(122px, 1.2fr)" : ""}`, minWidth: min }}>
             <span />
             {cols.map((c) => (
               <span key={c.profileId} className="line-clamp-2 self-end px-1 pb-1 font-mono text-[11px] leading-tight font-bold break-words text-muted" title={c.profileName}>
                 {c.profileName}
               </span>
             ))}
+            {country && <CountryHead code={country.code} />}
             {data.rows.map((r) => (
-              <Row key={r.nodeId} row={r} cols={cols} selected={sel?.node === r.nodeId ? sel.col : -1} onPick={(col) => setSel({ node: r.nodeId, col })} />
+              <Row key={r.nodeId} row={r} cols={cols} country={country} selected={sel?.node === r.nodeId ? sel.col : -1} onPick={(col) => setSel({ node: r.nodeId, col })} />
             ))}
           </div>
         </div>
@@ -144,6 +150,7 @@ export function ChecksTab({ data }: { data: Checks }) {
                 <span className="font-mono">{r.nodeName}</span>
               </Link>
               <CheckRows row={r} columns={cols} onRun={run.can ? () => run.run() : undefined} running={run.running} />
+              {country && <CountryRow check={country.byNode.get(r.nodeId)} code={country.code} />}
             </div>
           ))}
         </div>
@@ -165,7 +172,19 @@ export function ChecksTab({ data }: { data: Checks }) {
   );
 }
 
-function Row({ row, cols, selected, onPick }: { row: Checks["rows"][number]; cols: Checks["columns"]; selected: number; onPick: (col: number) => void }) {
+function Row({
+  row,
+  cols,
+  country,
+  selected,
+  onPick,
+}: {
+  row: Checks["rows"][number];
+  cols: Checks["columns"];
+  country: CountryColumn | null;
+  selected: number;
+  onPick: (col: number) => void;
+}) {
   const t = useT();
   const fmt = useFmt();
   return (
@@ -208,6 +227,7 @@ function Row({ row, cols, selected, onPick }: { row: Checks["rows"][number]; col
           </CellTip>
         );
       })}
+      {country && <CountryCell check={country.byNode.get(row.nodeId)} node={row.nodeName} code={country.code} />}
     </>
   );
 }

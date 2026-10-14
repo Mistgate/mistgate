@@ -3,11 +3,14 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { CheckStatus } from "@/gen/mistgate/admin/v1/health_pb";
+import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { setLang } from "@/i18n";
+import { NodeChecks } from "@/screens/node/checks";
 import { ChecksTab } from "./checks";
 
+const getChecks = vi.fn();
 vi.mock("@/lib/api", () => ({
-  health: { runChecksNow: () => Promise.resolve({ scheduled: 1, skipped: 0 }) },
+  health: { runChecksNow: () => Promise.resolve({ scheduled: 1, skipped: 0 }), getChecks: (...a: unknown[]) => getChecks(...a) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: 1 } }) },
   fleet: {},
   nodes: {},
@@ -148,5 +151,144 @@ describe("the checks matrix", () => {
     await act(async () => void row.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(row.getAttribute("aria-expanded")).toBe("true");
     expect(row.nextElementSibling?.textContent).toContain("24 h"); // the history card follows its row
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// Reachability from a country: the last column, the phone rows and the node page
+
+const at = Math.floor(Date.now() / 1000) - 240;
+const probe = (network: string, city: string, icmpMs: number, ports: [number, boolean][], valid = true) => ({
+  network,
+  asn: 1,
+  city,
+  icmpOk: icmpMs > 0,
+  icmpMs,
+  tcp: ports.map(([port, open]) => ({ port, ok: open, ms: open ? 40 : 0 })),
+  valid,
+});
+const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({ nodeId, country: "RU", verdict: v, atUnix: at, probes, reason: "", eyeball: true, ...over });
+const countryChecks = [
+  verdict("nod_1", CountryVerdict.OK, [probe("Rostelecom", "Moscow", 42, [[443, true]]), probe("Beeline", "Kazan", 47, [[443, true]])]),
+  verdict("nod_2", CountryVerdict.TCP_BLOCKED, [probe("Rostelecom", "Moscow", 51, [[443, false], [8443, false]]), probe("MegaFon", "Kazan", 0, [[443, false], [8443, false]], false)]),
+  verdict("nod_3", CountryVerdict.BLOCKED, [probe("MTS", "Omsk", 0, [[443, false]])]),
+];
+const four = {
+  ...checks,
+  rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_4", nodeName: "fi1", countryCode: "FI" }, { ...checks.rows[0]!, nodeId: "nod_5", nodeName: "fi2", countryCode: "FI" }],
+  countryChecks: [...countryChecks, verdict("nod_4", CountryVerdict.UNKNOWN, [probe("Selectel", "Moscow", 38, [[443, true]])], { reason: "too_few_probes", eyeball: false })],
+};
+// zh writes "{node}，{profile}：{state}"
+const countryCell = (node: string) => [...document.querySelectorAll<HTMLElement>("[role=img][aria-label]")].find((b) => new RegExp(`^${node}[,，]`).test(b.getAttribute("aria-label") ?? ""));
+const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+
+describe("the country column", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("is not there while the integration is off or before a round", async () => {
+    await mount();
+    expect(document.body.textContent).not.toContain("From Russia");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount({ ...checks, countryChecks: [] });
+    expect(document.body.textContent).not.toContain("From Russia");
+    expect(document.querySelector("[data-testid=country-row]")).toBeNull();
+  });
+
+  it("shows each verdict: OK and no data quiet, the two blocks in their tone with a glyph", async () => {
+    await mount(four);
+    expect(document.body.textContent).toContain("From Russia");
+    const fine = countryCell("de1")!;
+    expect(fine.textContent).toBe("reachable");
+    expect(fine.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia");
+    expect(fine.className).not.toMatch(/tone-/);
+    const tcp = countryCell("de2")!;
+    expect(tcp.textContent).toBe("!TCP blockedICMP passes");
+    expect(tcp.className).toContain("tone-warn");
+    expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes");
+    const cut = countryCell("nl1")!;
+    expect(cut.textContent).toBe("×unreachable");
+    expect(cut.className).toContain("tone-bad");
+    const none = countryCell("fi1")!;
+    expect(none.textContent).toBe("no data");
+    expect(none.className).not.toMatch(/tone-(warn|bad)/);
+    expect(none.getAttribute("aria-label")).toBe("fi1, From Russia: No data: too few probes answered");
+    // a node with no round yet has a dash that says so
+    expect(document.body.textContent).toContain("fi2, From Russia: not checked yet");
+  });
+
+  it("opens the tooltip on keyboard focus: the probes, ICMP and TCP per port, the round, where it was checked from", async () => {
+    await mount(four);
+    await act(async () => countryCell("de2")!.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of [
+      "TCP is blocked, ICMP passes",
+      "Rostelecom, Moscow",
+      "ICMP 51 ms · TCP 443, 8443 ✕",
+      "MegaFon, Kazan (not counted)",
+      "ICMP ✕ · TCP 443, 8443 ✕",
+      "Last round: ",
+      "Checked via Globalping from home and mobile networks",
+    ])
+      expect(text).toContain(line);
+  });
+
+  it("gives every phone card a row in words, where there is no hover", async () => {
+    await mount(four);
+    const rows = [...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent);
+    expect(rows).toEqual([
+      "From RussiareachableRostelecom, Beeline · 4 min ago",
+      "!From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago",
+      "×From RussiaunreachableMTS · 4 min ago",
+      "From Russiano datatoo few probes answered · 4 min ago",
+      "From Russia—not checked yet",
+    ]);
+  });
+
+  it("speaks Russian, the country in the genitive", async () => {
+    act(() => setLang("ru"));
+    await mount(four);
+    expect(document.body.textContent).toContain("Из России");
+    expect(countryCell("de2")?.textContent).toBe("!TCP режутICMP проходит");
+    expect(countryCell("nl1")?.textContent).toBe("×недоступна");
+    expect(countryCell("de1")?.textContent).toBe("доступна");
+    expect(countryCell("fi1")?.getAttribute("aria-label")).toBe("fi1, Из России: Нет данных: ответило слишком мало зондов");
+  });
+
+  it("speaks Chinese", async () => {
+    act(() => setLang("zh"));
+    await mount(four);
+    expect(document.body.textContent).toContain("从俄罗斯访问");
+    expect(countryCell("de2")?.textContent).toBe("!TCP 被封锁ICMP 可通");
+    expect(countryCell("fi1")?.textContent).toBe("无数据");
+  });
+});
+
+describe("the country row on the node page", () => {
+  async function mountNode(data: object) {
+    getChecks.mockResolvedValue(data);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+  }
+  const own = { ...checks, rows: [checks.rows[1]!] };
+
+  it("comes after the checks with the same verdict and tooltip, and is not there while the integration is off", async () => {
+    await mountNode({ ...own, countryChecks: [countryChecks[1]] });
+    expect(getChecks).toHaveBeenCalledWith({ nodeId: "nod_2" }, expect.anything());
+    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
+    expect(row.textContent).toBe("!From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago");
+    expect(row.className).toContain("tone-warn");
+    await act(async () => row.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.body.textContent).toContain("ICMP 51 ms · TCP 443, 8443 ✕");
+    act(() => root?.unmount());
+    host?.remove();
+    await mountNode({ ...own, countryChecks: [] });
+    expect(document.querySelector("[data-testid=country-row]")).toBeNull();
   });
 });

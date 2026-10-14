@@ -9,8 +9,9 @@ import type { CheckColumn, CheckRow } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { cellLook, checksQuery, type CheckCell } from "@/lib/health";
+import { cellLook, checksQuery, countryColumn, type CheckCell } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
+import { CountryRow } from "@/screens/health/country";
 import { CellTip, HistoryCard, ResultLine, SlowMark, useRunChecks } from "@/screens/health/history";
 
 const tint: Record<string, string> = {
@@ -69,7 +70,7 @@ export function CheckRows({ row, columns, onRun, running }: { row: Plain<CheckRo
   );
 }
 
-/** The client-side checks of one node, on its Overview. */
+/** The client-side checks of one node, on its Overview; with the country check on, what probes inside the country saw comes last. */
 export function NodeChecks({ nodeId }: { nodeId: string }) {
   const t = useT();
   const fmt = useFmt();
@@ -79,6 +80,7 @@ export function NodeChecks({ nodeId }: { nodeId: string }) {
   const row = q.data?.rows.find((r) => r.nodeId === nodeId);
   const deployed = (row?.cells ?? []).filter((c) => c.deployed);
   const newest = Math.max(0, ...deployed.map((c) => c.last?.atUnix ?? 0));
+  const country = countryColumn(q.data?.countryChecks);
 
   return (
     <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
@@ -102,6 +104,7 @@ export function NodeChecks({ nodeId }: { nodeId: string }) {
       {q.isError && !q.data && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
       {q.data && deployed.length === 0 && <p className="rounded-field border border-dashed border-line p-3.5 text-[13px] text-muted">{t("hl.checks.noneOnNode")}</p>}
       {q.data && row && <CheckRows row={row} columns={q.data.columns} onRun={run.can ? run.run : undefined} running={run.running} />}
+      {country && <CountryRow check={country.byNode.get(nodeId)} code={country.code} />}
     </section>
   );
 }
