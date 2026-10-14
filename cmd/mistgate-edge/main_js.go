@@ -8,11 +8,11 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/netip"
 	"net/url"
 	"os"
@@ -370,22 +370,62 @@ func serve(handler http.Handler, req *http.Request) edgeResponse {
 	ctx, cancel := context.WithCancel(req.Context())
 	defer cancel()
 	req = req.WithContext(ctx)
-	recorder := httptest.NewRecorder()
-	writer := flushRecorder{ResponseRecorder: recorder, cancel: cancel}
-	handler.ServeHTTP(writer, req)
-	if recorder.Flushed {
+	w := &responseBuffer{code: http.StatusOK, header: make(http.Header), cancel: cancel}
+	handler.ServeHTTP(w, req)
+	if w.flushed {
 		return unsupportedStreamResponse()
 	}
-	return edgeResponse{status: recorder.Code, headers: recorder.Header(), body: recorder.Body.Bytes()}
+	return edgeResponse{status: w.code, headers: w.header, body: w.body.Bytes()}
 }
 
-type flushRecorder struct {
-	*httptest.ResponseRecorder
-	cancel context.CancelFunc
+// responseBuffer is the http.ResponseWriter of one buffered response. It does what net/http/httptest's ResponseRecorder
+// did here, which the bridge used before and which pulled the test server's flag and TLS code into every panel.wasm:
+// the status is 200 until WriteHeader says otherwise (the first call wins; a code outside 100-999 panics), a handler that
+// set no Content-Type gets one sniffed from its first write, and a body written for a status without one is kept and
+// refused with http.ErrBodyNotAllowed. A Flush ends the request: the response is unsupported (streaming) and cancel stops
+// the handler.
+type responseBuffer struct {
+	code        int
+	header      http.Header
+	body        bytes.Buffer
+	wroteHeader bool
+	flushed     bool
+	cancel      context.CancelFunc
 }
 
-func (w flushRecorder) Flush() {
-	w.ResponseRecorder.Flush()
+func (w *responseBuffer) Header() http.Header { return w.header }
+
+func (w *responseBuffer) WriteHeader(code int) {
+	if w.wroteHeader {
+		return
+	}
+	if code < 100 || code > 999 {
+		panic(fmt.Sprintf("invalid WriteHeader code %v", code))
+	}
+	w.code = code
+	w.wroteHeader = true
+}
+
+func (w *responseBuffer) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		_, hasType := w.header["Content-Type"]
+		if !hasType && w.header.Get("Transfer-Encoding") == "" {
+			w.header.Set("Content-Type", http.DetectContentType(data))
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+	w.body.Write(data)
+	if w.code >= 100 && w.code <= 199 || w.code == http.StatusNoContent || w.code == http.StatusNotModified {
+		return 0, http.ErrBodyNotAllowed
+	}
+	return len(data), nil
+}
+
+func (w *responseBuffer) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.flushed = true
 	w.cancel()
 }
 
