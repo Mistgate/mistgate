@@ -1,0 +1,44 @@
+# Test-only configuration of the FRONT script (src/front.ts) for @cloudflare/vitest-pool-workers: its two Durable Objects, a D1
+# database and service bindings to the stand-in roles of vitest.config.ts (public-aux, admin-aux, link-aux). FRONT has no
+# PanelLink of its own, so a NodeLink object that gets its Go side at all gets it through PANEL_LINK.
+name = "front-test"
+main = "../../src/front.ts"
+compatibility_date = "2026-08-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "front-test"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[durable_objects.bindings]]
+name = "NODELINK"
+class_name = "NodeLink"
+
+[[services]]
+binding = "PUBLIC"
+service = "public-aux"
+
+[[services]]
+binding = "ADMIN"
+service = "admin-aux"
+
+[[services]]
+binding = "LINK"
+service = "link-aux"
+
+[[services]]
+binding = "PANEL_LINK"
+service = "link-aux"
+entrypoint = "PanelLink"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["NodeLink"]

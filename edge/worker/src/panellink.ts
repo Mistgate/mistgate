@@ -1,11 +1,13 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
-import type { Env } from "./env";
-import { getPanel } from "./panel";
+import type { PanelEnv } from "./env";
+import type { GetPanel } from "./handler";
+import type { PanelApi } from "./runtime";
 import { detachWaitUntil, type WaitUntilOutput } from "./shell";
 
 // The Go side of the agent link. A NodeLink object holds the socket and an opaque state string and reaches Go through
-// this entrypoint (this.ctx.exports.PanelLink, a loopback call into the Worker): the Go panel wasm lives in the Worker's
-// isolates, never in the object. Go runs every handshake step and every session step; the object never reads a frame.
+// this entrypoint: in the single script through its own loopback (this.ctx.exports.PanelLink), in the split edition through the
+// PANEL_LINK service binding to the link script. The Go panel wasm lives in the Worker's isolates, never in the object. Go runs every
+// handshake step and every session step; the object never reads a frame.
 //
 // Two rules for the Go side of a step:
 // - `closed{owned:false}` is not only a takeover by a second socket: it also follows a deploy or reset that took the
@@ -52,7 +54,13 @@ export interface LinkChallenge {
 
 export type LinkAccept = { ok: true; frame: Uint8Array; certSerial: string; certNotAfterUnix: number } | { ok: false };
 
-export class PanelLink extends WorkerEntrypoint<Env> {
+/**
+ * The entrypoint's methods over a panel that a subclass names. A class is made per script (panelLinkOf) because the panel
+ * belongs to one wasm: the single script's PanelLink uses dist/panel.wasm, the link role's uses dist/link.wasm.
+ */
+export abstract class PanelLinkBase extends WorkerEntrypoint<PanelEnv> {
+  protected abstract panel(): Promise<PanelApi>;
+
   challenge(audience: string): Promise<LinkChallenge> {
     return this.call<LinkChallenge>("challenge", { audience });
   }
@@ -67,7 +75,19 @@ export class PanelLink extends WorkerEntrypoint<Env> {
 
   // The Go op's answer is the shape its caller names; only its waitUntil is taken off before it crosses the RPC.
   private async call<T>(op: string, args: Record<string, unknown>): Promise<T> {
-    const panel = await getPanel(this.env, this.env.PUBLIC_URL || "");
+    const panel = await this.panel();
     return detachWaitUntil((await panel.link(op, args)) as WaitUntilOutput, this.ctx) as unknown as T;
   }
+}
+
+/** What a NodeLink object calls: the entrypoint, whichever script it lives in. */
+export type PanelLink = PanelLinkBase;
+
+/** The concrete PanelLink class of a script, over its own panel. The script must export a subclass of it named `PanelLink`. */
+export function panelLinkOf(getPanel: GetPanel) {
+  return class extends PanelLinkBase {
+    protected panel(): Promise<PanelApi> {
+      return getPanel(this.env, this.env.PUBLIC_URL || "");
+    }
+  };
 }

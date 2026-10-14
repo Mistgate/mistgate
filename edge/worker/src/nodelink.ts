@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import type { Env } from "./env";
+import type { NodeLinkEnv } from "./env";
 import type { LinkAccept, LinkEvent, LinkStepOut, PanelLink } from "./panellink";
 
 // The shell of one node's agent link: one object per node (idFromName(node id)), holding the agent's WebSocket and the
@@ -83,7 +83,7 @@ function shut(ws: WebSocket, code: number, reason: string): void {
   }
 }
 
-export class NodeLink extends DurableObject<Env> {
+export class NodeLink extends DurableObject<NodeLinkEnv> {
   private waiters = new Map<string, Waiter>();
   /** The end of the current serial block's Go budget. */
   private until = 0;
@@ -96,9 +96,12 @@ export class NodeLink extends DurableObject<Env> {
     return this.ctx.storage.kv;
   }
 
-  /** The Go side, through the Worker's own loopback (ctx.exports). */
+  /**
+   * The Go side. In the split edition the link role's PanelLink entrypoint, bound to this script as PANEL_LINK; in the single
+   * script (no such binding) its own, through the Worker's loopback (ctx.exports).
+   */
   private get panel(): Service<PanelLink> {
-    return (this.ctx.exports as unknown as { PanelLink: Service<PanelLink> }).PanelLink;
+    return this.env.PANEL_LINK ?? (this.ctx.exports as unknown as { PanelLink: Service<PanelLink> }).PanelLink;
   }
 
   /**

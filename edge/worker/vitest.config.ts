@@ -1,5 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+import { adminAux, linkAux, publicAux } from "./test/front/aux-workers";
 
 // What the Provisioner's script looks like to the main Worker, as plain JavaScript (an auxiliary worker is not bundled): one
 // Durable Object that answers a request with what it received and counts kicks. test/do/provision-forward.test.ts sends the
@@ -28,8 +29,9 @@ export class AuxProvisioner extends DurableObject {
 export default { fetch: () => new Response("Not Found", { status: 404 }) };
 `;
 
-// Three projects: the pure code runs under plain Node; the Durable Object classes run in workerd (test/do); the built bundle
-// runs in a workerd of its own (test/bundle).
+// Four projects: the pure code runs under plain Node; the Durable Object classes run in workerd (test/do); the FRONT router of the
+// split edition runs in workerd with stand-in roles behind its service bindings (test/front); the built bundle runs in a
+// workerd of its own (test/bundle).
 export default defineConfig({
   test: {
     // workerd reports an exception thrown inside a Durable Object as an unhandled rejection even when the caller catches
@@ -65,6 +67,30 @@ export default defineConfig({
           }),
         ],
         test: { name: "workers", include: ["test/do/*.test.ts"] },
+      },
+      {
+        plugins: [
+          cloudflareTest({
+            main: "./src/front.ts",
+            wrangler: { configPath: "./test/front/wrangler.test.toml" },
+            miniflare: {
+              workers: [
+                { name: "public-aux", modules: true, script: publicAux, compatibilityDate: "2026-08-01" },
+                { name: "admin-aux", modules: true, script: adminAux, compatibilityDate: "2026-08-01" },
+                {
+                  // the link role: the PanelLink entrypoint, and NodeLink objects that belong to FRONT's script (external). FRONT is the pool's runner
+                  // worker, which the pool names vitest-pool-workers-runner-<project>: if a pool update renames it, change scriptName below.
+                  name: "link-aux",
+                  modules: true,
+                  script: linkAux,
+                  compatibilityDate: "2026-08-01",
+                  durableObjects: { NODELINK: { className: "NodeLink", scriptName: "vitest-pool-workers-runner-front" } },
+                },
+              ],
+            },
+          }),
+        ],
+        test: { name: "front", include: ["test/front/*.test.ts"] },
       },
     ],
   },

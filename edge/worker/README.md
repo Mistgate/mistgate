@@ -6,13 +6,45 @@ to the panel's fetch contract. Design: `design/cloudflare-edition/README.md`. To
 
 - `src/index.ts`: every request goes to the panel (`mgPanel.fetch`); the Worker does not know the secret admin path.
   If the panel cannot start, the answer is 503 and the next request tries again.
-- `src/panel.ts`: per isolate, instantiates `dist/panel.wasm` once and calls `mgPanel.init` once (concurrent first
-  requests share it).
+- `src/panel.ts`, `src/runtime.ts`: per isolate, instantiate one wasm module once and call `mgPanel.init` once (concurrent first
+  requests share it). `runtime.ts` takes the module as a parameter (`createRuntime(wasm)`); `panel.ts` binds it to `dist/panel.wasm`, the
+  single script's program. `src/handler.ts` holds the fetch and cron entry points over any runtime.
 - `src/shell.ts`: the pure parts (request/response conversion, static-asset reader, init de-duplication, routing of limit calls); tested by `pnpm test`.
 - `src/limiter.ts`, `src/limitmath.ts`: the `Limiter` Durable Object (see below) and its pure math.
 - `src/nodelink.ts`, `src/panellink.ts`: the agent link shell (`NodeLink` Durable Object) and the entrypoint through which it reaches Go (see below).
 - `src/provisioner.ts`, `src/provision-index.ts`, `wrangler.provision.example.toml`: the second script, `mistgate-edge-provision`, with the `Provisioner` Durable Object that installs nodes over SSH (see below).
+- `src/front.ts`, `src/route.ts`, `src/roles/`: the split edition's scripts (see "The split edition" below). Not part of the release bundle yet.
 - `build-bundle.mjs`, `test/bundle/`: the release build of both scripts (`mistgate release build mistgate-edge.tar.gz`, see Releases and signing in the docs): esbuild, pinned in `package.json`, bundles `src/index.ts` and `src/provision-index.ts` into `worker.js` and `provision.js`, with `panel.wasm` left as a separate CompiledWasm module. `scripts/test-edge-bundle.ps1` builds the tarball twice, loads it in workerd (Miniflare) and prints each script's `wrangler deploy --dry-run` upload size against Cloudflare's 64 MiB limit.
+
+## The split edition (FRONT and role scripts)
+
+One panel script becomes several (design: edge split plan). `<name>` is **FRONT**, a small router with no wasm that keeps the hostname,
+the `Limiter` and `NodeLink` Durable Objects and their migration tags; behind it, through service bindings, are the Go roles. All of it
+is in this package; the single-script entry above is unchanged and still what the release bundle ships.
+
+| Script | Entry | Wasm | Reached by | Bindings |
+|---|---|---|---|---|
+| `<name>` FRONT | `src/front.ts` | none | the route (custom domain) | `DB`; services `PUBLIC`, `ADMIN`, `LINK`, `PANEL_LINK` (the link script, entrypoint `PanelLink`); own DOs `LIMITER`, `NODELINK` |
+| `<name>-public` | `src/roles/public.ts` | `dist/public.wasm` | FRONT (`PUBLIC`) | `DB`, `ASSETS` (sub.html), `LIMITER` and `NODELINK` (FRONT's classes), `MASTER_KEY` |
+| `<name>-link` | `src/roles/link.ts` | `dist/link.wasm` | FRONT (`LINK`, and `PANEL_LINK` from the `NodeLink` objects) | `DB`, `LIMITER`, `NODELINK` (FRONT's class), `MASTER_KEY`; exports the `PanelLink` entrypoint |
+| `<name>-admin` | `src/roles/admin.ts` | `dist/admin.wasm` | FRONT (`ADMIN`) | `DB`, `ASSETS` (SPA), `LIMITER`, `NODELINK`, `PROVISIONER` (from `<name>-provision`), `MASTER_KEY`, first-run vars and `SETUP_TOKEN_SHA256` |
+| `<name>-jobs` | `src/roles/jobs.ts` | `dist/jobs.wasm` | the cron trigger | `DB`, `NODELINK`, `PROVISIONER`, `MASTER_KEY` |
+| `<name>-provision` | `src/roles/provision.ts` | `dist/provision.wasm` | the binding to its Provisioner object | as `src/provision-index.ts` |
+
+- **Routing** (`src/route.ts`), in the order of `httpserver.Public`: the secret link prefix goes to LINK (the WebSocket upgrade too), a request
+  to the admin host goes to ADMIN, the secret admin prefix goes to ADMIN, everything else goes to PUBLIC. The request is passed on
+  unchanged, and the roles answer with their own decoy; FRONT never makes a page. While the database holds no instance (first run) every
+  request goes to ADMIN, the only role that creates it.
+- **Where the prefixes come from:** one `SELECT` of `link_prefix`, `admin_prefix` and `admin_host` from `setting`, cached per isolate for 5 minutes.
+  A value no panel writes is ignored. If D1 fails, the last good values are used (and tried again after 5 s); with none, the request goes to
+  ADMIN, which answers 503 itself when the database is down. An answer of "no instance" is never cached.
+- **Constant time:** prefixes and the admin host are compared with `crypto.subtle.timingSafeEqual` over zero-padded buffers, like `hasSecretPrefix` in Go.
+- **NodeLink to Go:** `this.env.PANEL_LINK` when the script has that binding, else `ctx.exports.PanelLink` (the single script).
+- **One wasm per script:** a role entry imports `dist/wasm_exec.js` and its `dist/<role>.wasm` and passes the module to `createRuntime`; the rest is
+  `src/roles/shared.ts`, which runs under a fake runtime in `test/front/roles.test.ts`. A role without `ASSETS`, `LIMITER` or `NODELINK` gets rejecting
+  callbacks in its `init`, so the panel refuses the guarded request instead of the Worker throwing.
+- Tests: `test/front/` runs FRONT in workerd with D1, real service bindings to stand-in roles (`vitest.config.ts`), a `NodeLink` object and a WebSocket
+  through FRONT to it; `test/front-bundle.test.ts` bundles every entry the way `build-bundle.mjs` does and holds FRONT under 1 MiB.
 
 ## Security limits (`Limiter` Durable Object)
 
