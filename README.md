@@ -102,16 +102,16 @@ Then:
 | Xray JSON or sing-box subscriptions | soon | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
 | Health checks and alerts | ✅ client-eye checks, doctor with fixes | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | partial | partial | ? |
 | Telegram bot | alerts only, full bot soon | ✅ | partial | ✅ | ✅ | ? |
-| HWID device limit | device count only | ✅ | ✅ | ? | ✅ | ? |
+| HWID device limit | ✅ | ✅ | ✅ | ? | ✅ | ? |
 | Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say.
 
-Others are ahead in protocol breadth, community size, HWID limits and full Telegram bots. The full table with sources, checked on 2026-10-09, is in [Comparison with other panels](docs/en/reference/comparison.md).
+Others are ahead in protocol breadth, community size and full Telegram bots. The full table with sources, checked on 2026-10-09, is in [Comparison with other panels](docs/en/reference/comparison.md).
 
 ## Status and roadmap
 
-Mistgate is in beta. The current release is [`v0.1.36`](https://github.com/Mistgate/mistgate/releases/latest), and it runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
+Mistgate is in beta. The [latest release](https://github.com/Mistgate/mistgate/releases/latest) runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
 Next: the first run of the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)) on a real account and bringing it on par with the VPS panel, then Xray JSON and sing-box subscriptions; later a Telegram bot for the fleet and for users. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 

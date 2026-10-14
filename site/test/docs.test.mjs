@@ -50,7 +50,7 @@ test("the status page draws its roadmap block as phases with cards, listed and s
     assert.ok(toc.includes(phases[2]) && !toc.includes(card), `${lang}: the table of contents lists phases, not cards`);
     assert.ok(html.includes(`<h3 id=`) && html.includes(card));
     assert.ok(html.includes(`href="${base}/getting-started/install-edge/"`), `${lang}: card links point to site pages`);
-    assert.ok(html.includes('<span class="rm-ver">v0.1.36</span>'));
+    assert.ok(/<span class="rm-ver">v0\.1\.\d+<\/span>/.test(html), `${lang}: the current release card carries a version badge`);
     const index = JSON.parse(readFileSync(join(dist, lang === "en" ? "search-index.json" : "ru/search-index.json"), "utf8")).find((p) => p.u === `${base}/roadmap/status/`);
     assert.ok(index.h.some(([t]) => t === card), `${lang}: cards are in the search index`);
     assert.ok(index.k.some(([c]) => c === "mistgate edge deploy"), `${lang}: names in cards are searchable`);

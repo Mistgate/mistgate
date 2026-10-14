@@ -3,22 +3,23 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.36
+  meta: v0.1.0 – v0.1.39
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.36
+      release: v0.1.39
       current: true
       points:
-        - "**VLESS over TLS**, direct or behind a CDN: XHTTP and WebSocket over TLS next to REALITY. See [VLESS behind a CDN](../guide/vless.md#vless-behind-a-cdn)."
-        - "**A decoy site per node**: the built-in one, the panel's site or an archive of its own, for one node or several at once. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
-        - "**The Cloudflare edition in a release for the first time**, as a preview: the signed `mistgate-edge.tar.gz` bundle, installed with `mistgate edge deploy`, and SSH installation of nodes from the edition itself. It has not run on a real Cloudflare account yet. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
+        - "**Devices by device ID**: each app that reports an ID gets its own device, keys, online status and traffic; apps without one share one place. The limit has three modes, **Only count** / **Limit** / **Strict**, and existing panels start in **Only count**. You can block and unblock a device, and people remove and rename their own. See [Devices and the device limit](../guide/users-and-groups.md#devices-and-the-device-limit)."
+        - "**Speed per person and speed per device**: the per-person limit counts all of a person's devices on one node. See [Limits](../guide/users-and-groups.md#limits)."
+        - "**The Users list sorts by any column** and counts devices; the filter **Over device limit** shows who is over. See [The People tab](../guide/users-and-groups.md#the-people-tab)."
+        - "**What's new** on the Updates page: the release notes between your version and the available one. See [What's new](../operations/updates.md#whats-new)."
     - title: Profiles
       section: profiles
       points:
@@ -34,27 +35,30 @@ Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production
         - "[WARP egress](../guide/warp.md) that fails closed when the WARP link drops, and [torrent protection](../guide/torrent-protection.md) on every node."
         - "[Check ports](../guide/nodes.md#ports): UDP delivery and a TCP connection to every port of the node from another node of the fleet."
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
+        - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
     - title: Users
       section: users
       points:
-        - "[Users and groups](../guide/users-and-groups.md): traffic quotas with periods, terms, device limits."
-        - "The People tab and bulk actions on several users at once."
+        - "[Users and groups](../guide/users-and-groups.md): traffic quotas with periods, terms, [devices by device ID](../guide/users-and-groups.md#devices-and-the-device-limit) with a limit in three modes, speed per person and per device."
+        - "The People tab sorted by any column, with device counts, and bulk actions on several users at once."
     - title: Subscriptions
       section: subscriptions
       points:
         - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core."
-        - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, the person's own devices, `vpn://` keys for AmneziaVPN."
+        - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
+        - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
         - "[DNS presets](../guide/dns.md) and a DNS choice per server on the user page."
     - title: Health
       section: health
       points:
-        - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does."
-        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes."
+        - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
+        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
     - title: Updates
       section: updates
       points:
+        - "[What's new](../operations/updates.md#whats-new): the release notes between your version and the available one, in the interface language."
         - "[Signed node agent updates](../operations/updates.md), one node at a time, now or on a schedule, with a health gate and automatic rollback."
         - "Panel self-update from signed GitHub releases, with a rollback when the new panel does not stay up."
         - "[A one-line panel install](../getting-started/install-panel.md#one-line-install) that verifies the release signature."
@@ -68,17 +72,20 @@ Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production
     - title: Settings
       section: settings
       points:
-        - "The admin in English, Russian and Simplified Chinese; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
+        - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.36
+  meta: v0.1.34 – v0.1.39
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
       section: profiles
       text: "REALITY since v0.1.34, the node's own site as the target since v0.1.35, TLS and a CDN since v0.1.36. VLESS has not been tried behind a real CDN yet: in the end-to-end test the node itself stands in for the CDN. See [VLESS behind a CDN](../guide/vless.md#vless-behind-a-cdn)."
+    - title: Devices by device ID in production
+      section: subscriptions
+      text: "Existing panels run in **Only count**, so you see who is over the limit before you switch to **Limit**. See [How to move from Only count to Limit](../guide/subscriptions.md#how-to-move-from-only-count-to-limit)."
     - title: A decoy site on every node
       section: nodes
       text: "The built-in site, the panel's site or an archive of its own for each node. Nodes created before v0.1.36 stay on the built-in page until you pick another option. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
@@ -137,4 +144,7 @@ Mistgate is in **beta**; the current release is `v0.1.36`. It runs in production
 - Backups go to Cloudflare R2 only, and a restore is the offline `mistgate backup restore` command into a new data directory.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.
 - The Cloudflare edition is a preview: some features are not available in it yet (see [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet)), and a fleet cannot be moved between it and a VPS panel.
+- A device ID is what the app reports. Blocking refuses that ID; an app that reports another ID is a new device and takes a free place. To cut off a link that was passed on, issue a new link as well.
+- **Speed per person** is per node, so a person on two nodes at once can get up to twice the limit. Node agents before v0.1.39 hold each device to the smaller of the two limits.
+- In the Cloudflare edition the digest of what was sent to a node must fit one D1 row (2 MB), about 38,000 credentials per node. See [the limits of this edition](../getting-started/install-edge.md#not-available-in-this-edition-yet).
 - Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.

@@ -102,16 +102,16 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 | Xray JSON 或 sing-box 订阅 | 即将推出 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
 | 健康检查和告警 | ✅ 客户端视角检测，带修复的诊断 | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 部分 | 部分 | ? |
 | Telegram 机器人 | 仅告警，完整机器人即将推出 | ✅ | 部分 | ✅ | ✅ | ? |
-| HWID 设备限制 | 仅限设备数量 | ✅ | ✅ | ? | ✅ | ? |
+| HWID 设备限制 | ✅ | ✅ | ✅ | ? | ✅ | ? |
 | 面向 AI 智能体的内置 MCP 服务器 | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](https://mistgate.app/zh/reference/benchmarks/)。「?」表示该项目自己的 README 和文档中没有说明。
 
-在协议覆盖范围、社区规模、HWID 设备限制和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09）见[与其他面板的对比](https://mistgate.app/zh/reference/comparison/)。
+在协议覆盖范围、社区规模和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09）见[与其他面板的对比](https://mistgate.app/zh/reference/comparison/)。
 
 ## 状态和路线图
 
-Mistgate 处于测试阶段。当前发布版本是 [`v0.1.36`](https://github.com/Mistgate/mistgate/releases/latest)，它已在生产环境中运行。在 1.0 之前，API、已存储的设置和节点协议仍可能变化。适用于 amd64 和 arm64 的 Linux 二进制文件在 [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) 上提供。
+Mistgate 处于测试阶段。[最新发布版本](https://github.com/Mistgate/mistgate/releases/latest)已在生产环境中运行。在 1.0 之前，API、已存储的设置和节点协议仍可能变化。适用于 amd64 和 arm64 的 Linux 二进制文件在 [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) 上提供。
 
 下一步：先在真实账户上运行 Cloudflare Workers 版（[预览版](https://mistgate.app/zh/getting-started/install-edge/)），并让它具备与 VPS 版相同的功能，然后是 Xray JSON 和 sing-box 订阅；再往后是面向集群和用户的 Telegram 机器人。部分默认值偏向俄罗斯用户（俄罗斯节点默认使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设），这些都可以在设置中修改。详情和已知限制见[状态和路线图](https://mistgate.app/zh/roadmap/status/)。
 
