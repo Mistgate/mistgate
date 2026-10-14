@@ -226,10 +226,11 @@ mistgate release trust-key [--data-dir DIR] [--dev]
 
 ```text
 mistgate edge deploy --host HOST [--name NAME] [--d1-location LOC] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
+mistgate edge deploy --host HOST [--name NAME] --rollback [--dry-run]
 mistgate edge setup-link --file FILE
 ```
 
-`edge deploy` 会创建 D1 数据库和 Cloudflare 版的两个 Worker 脚本，将 `HOST` 绑定为自定义域名，并显示管理后台地址和一次性设置链接。它只从 `CLOUDFLARE_API_TOKEN` 读取 API 令牌，并将新面板的密钥写入当前目录中的 `mistgate-edge-<name>.json`：请备份该文件。`--dry-run` 只读取 Cloudflare 信息并显示计划；`--resume` 会继续此前中断的运行。若不带 `--resume` 再次运行，则会更新部署。`edge setup-link` 会显示密钥文件中保存的设置链接。所有标志、令牌权限和首次登录方式见[安装 Cloudflare 版](../getting-started/install-edge.md)。
+`edge deploy` 会创建 D1 数据库和 Cloudflare 版的六个 Worker 脚本，将 `HOST` 绑定为自定义域名，并显示管理后台地址和一次性设置链接。它只从 `CLOUDFLARE_API_TOKEN` 读取 API 令牌，并将新面板的密钥写入当前目录中的 `mistgate-edge-<name>.json`：请备份该文件。`--dry-run` 只读取 Cloudflare 信息并显示计划；`--resume` 会继续此前中断的运行。若不带 `--resume` 再次运行，则会更新部署并只上传有变化的脚本；`--rollback` 会让每个脚本回到上次更新之前的版本。`edge setup-link` 会显示密钥文件中保存的设置链接。所有标志、令牌权限和首次登录方式见[安装 Cloudflare 版](../getting-started/install-edge.md)。
 
 ### mistgate version
 

@@ -226,10 +226,11 @@ Run on the panel server, as the panel's service user or root, after you rotated 
 
 ```text
 mistgate edge deploy --host HOST [--name NAME] [--d1-location LOC] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
+mistgate edge deploy --host HOST [--name NAME] --rollback [--dry-run]
 mistgate edge setup-link --file FILE
 ```
 
-`edge deploy` creates the D1 database and the two Worker scripts of the Cloudflare edition, attaches `HOST` as a custom domain and prints the admin address and a one-time setup link. It reads the API token only from `CLOUDFLARE_API_TOKEN`, and writes the keys of the new panel to `mistgate-edge-<name>.json` in the current directory: back that file up. `--dry-run` only reads from Cloudflare and prints the plan; `--resume` continues a run that stopped. Run again without `--resume`, it updates the deployment. `edge setup-link` prints the stored setup link of a key file. Every flag, the token's permissions and the first sign-in are in [Install the Cloudflare edition](../getting-started/install-edge.md).
+`edge deploy` creates the D1 database and the six Worker scripts of the Cloudflare edition, attaches `HOST` as a custom domain and prints the admin address and a one-time setup link. It reads the API token only from `CLOUDFLARE_API_TOKEN`, and writes the keys of the new panel to `mistgate-edge-<name>.json` in the current directory: back that file up. `--dry-run` only reads from Cloudflare and prints the plan; `--resume` continues a run that stopped. Run again without `--resume`, it updates the deployment and uploads only the scripts that changed; `--rollback` puts every script back on the version it had before the last update. `edge setup-link` prints the stored setup link of a key file. Every flag, the token's permissions and the first sign-in are in [Install the Cloudflare edition](../getting-started/install-edge.md).
 
 ### mistgate version
 

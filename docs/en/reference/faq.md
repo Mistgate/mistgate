@@ -44,7 +44,7 @@ Cloudflare then sees the admin's traffic, including its secret address. The Clou
 
 ## Can the panel run on Cloudflare Workers, with no server?
 
-As a preview, yes: `mistgate edge deploy` puts the panel on two Workers and a D1 database in your Cloudflare account. It needs Workers Paid and a domain on Cloudflare DNS, it has not been run on a real account yet, and backups, Telegram alerts, MCP, tunnel checks and updates are not available in it. See [Install the Cloudflare edition](../getting-started/install-edge.md).
+As a preview, yes: `mistgate edge deploy` puts the panel on six Workers and a D1 database in your Cloudflare account. It needs Workers Paid and a domain on Cloudflare DNS, it has not been run on a real account yet, and backups, Telegram alerts, MCP, tunnel checks and updates are not available in it. See [Install the Cloudflare edition](../getting-started/install-edge.md).
 
 ## Can I migrate from another panel?
 

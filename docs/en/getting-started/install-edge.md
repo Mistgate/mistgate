@@ -3,7 +3,7 @@ title: Install the Cloudflare edition
 description: "Run the panel on Cloudflare Workers instead of a server with mistgate edge deploy: what you need, the API token, the key file you must back up, the first sign-in and what is not available yet. A preview."
 ---
 
-The Cloudflare edition is the same panel, built for WebAssembly and run by two Cloudflare Workers with a D1 database, instead of a binary on your own Linux server. One command, `mistgate edge deploy`, creates everything on your Cloudflare account. The nodes are still your servers, added from the admin as usual. This page takes you from a Cloudflare account to the owner account in the admin. The examples use `panel.example.com`.
+The Cloudflare edition is the same panel, built for WebAssembly and run by six Cloudflare Workers with a D1 database, instead of a binary on your own Linux server. One command, `mistgate edge deploy`, creates everything on your Cloudflare account. The nodes are still your servers, added from the admin as usual. This page takes you from a Cloudflare account to the owner account in the admin. The examples use `panel.example.com`.
 
 > **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare, not yet on a real account (that is the next round of work). The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
 
@@ -25,9 +25,9 @@ The command talks to the Cloudflare API with a token you create. In the Cloudfla
 |:--|:--|:--|
 | Account | Account Settings: Read | `GET /accounts`, the first call: it lists the accounts the token sees and so also checks the token. |
 | Zone | Zone: Read | `GET /zones`: finds the zone of the host. |
-| Account | Workers Scripts: Edit | Lists the scripts, uploads both of them with their static files, sets the cron schedule and turns the `workers.dev` name off (`/workers/scripts/...`). |
+| Account | Workers Scripts: Edit | Lists the scripts and reads their deployments, uploads all six with the static files, sets the cron schedule, turns the `workers.dev` name off and, on a rollback, puts the earlier versions back (`/workers/scripts/...`). One permission covers all six scripts. |
 | Account | D1: Edit | Finds or creates the database (`/d1/database`). |
-| Zone | Workers Routes: Edit | Attaches the host to the Worker as a custom domain (`PUT /workers/domains`). |
+| Zone | Workers Routes: Edit | Attaches the host to the front Worker as a custom domain (`PUT /workers/domains`). |
 
 Under **Account Resources** pick your account, and under **Zone Resources** the one zone of the host.
 
@@ -58,13 +58,25 @@ mistgate edge deploy --host panel.example.com
 | Flag | Default | Meaning |
 |:--|:--|:--|
 | `--host` | none, required | The public name of the panel, without scheme, port or path. |
-| `--name` | `mistgate-edge` | The name of the main Worker script and of the D1 database. The second script is `<name>-provision`. Give another name to run a second panel in the same account. |
+| `--name` | `mistgate-edge` | The name of the front Worker script and of the D1 database; the other five are `<name>-link`, `<name>-public`, `<name>-admin`, `<name>-jobs` and `<name>-provision`. Give another name to run a second panel in the same account. |
 | `--d1-location` | `weur` | Where D1 should keep the database: `wnam`, `enam`, `weur`, `eeur`, `apac` or `oc`. A hint to Cloudflare; choose the region nearest to you. |
 | `--version` | the binary's own release | The edge release to download, `vX.Y.Z`. |
 | `--bundle` | none | A directory with an edge bundle already on disk (`mistgate-edge.tar.gz`, `edge-manifest.json`, `edge-manifest.sig`) instead of the download. Not together with `--version`. |
 | `--resume` | off | Continue a run that stopped, from the key file. See below. |
-| `--dry-run` | off | Print the plan; read from Cloudflare, change nothing. |
+| `--dry-run` | off | Print the planned calls (the names of the bindings, no values); read from Cloudflare, change nothing. |
+| `--rollback` | off | Put every Worker back on the version it had before the last update. See "Roll back" below. |
 | `--insecure-skip-signature` | off | For a development bundle you built yourself, with `--bundle` only: skips the signature check and prints a warning. Never use it on a bundle you did not build. |
+
+The panel is six Workers. Only the first has the domain; the others have no address of their own and are reached through it:
+
+- `<name>`, the front Worker: a small router with no WebAssembly. It sends each request to one of the others by its path, and owns the Durable Objects that the nodes' agents connect to.
+- `<name>-public`: subscriptions, the user page and the decoy site.
+- `<name>-link`: the panel's side of the agent link.
+- `<name>-admin`: the admin and its API. It is the only one that creates the panel on an empty database.
+- `<name>-jobs`: the job that the cron trigger starts every minute.
+- `<name>-provision`: SSH installs of nodes.
+
+All six use the one D1 database.
 
 A run does these steps, in this order, and stops at the first failure:
 
@@ -73,21 +85,21 @@ A run does these steps, in this order, and stops at the first failure:
 3. Refuses to go on if a Worker script or a D1 database with that name already exists while the key file is missing: it never adopts or replaces what it cannot open with its own keys.
 4. Writes the key file (see below), **before** it creates anything.
 5. Creates the D1 database.
-6. Uploads the admin's static files and the two Worker scripts: the main one, then the one for SSH installs, then the main one again with the binding to it. The secrets go up with the scripts: `MASTER_KEY` in both, and the secret admin path, the subscription path and the hash of the setup token in the main one.
-7. Sets a cron trigger that runs every minute, turns off the `workers.dev` name and the preview URLs of both scripts, and attaches `panel.example.com` to the main script as a custom domain. Cloudflare creates the DNS record and the certificate.
+6. Uploads the six scripts in this order: link, provision, public, admin, jobs, and the front Worker last, so that a script is there before the one that binds it. The very first time the front Worker goes up before all of them, with no bindings to the others, because the link Worker binds its Durable Objects; it goes up again at the end with them. The admin's static files go up with public and admin. The secrets go up with each script: `MASTER_KEY` in the five scripts that run the panel, and the secret admin path, the subscription path and the hash of the setup token in admin only. A script whose content is the same as at the last run is not uploaded again.
+7. Turns off the `workers.dev` name and the preview URLs of each script right after its upload, sets a cron trigger that runs every minute on the jobs script, and attaches `panel.example.com` to the front Worker as a custom domain. Cloudflare creates the DNS record and the certificate.
 8. Waits up to five minutes for the decoy page at `https://panel.example.com/` to answer, then prints the links.
 
-Workers Logs are switched off on both scripts.
+Workers Logs are switched off on all six scripts.
 
 ## The key file
 
-The command writes `mistgate-edge-<name>.json` in the current directory (`mistgate-edge-mistgate-edge.json` with the default name) and prints its full path. It holds everything that cannot be read back from Cloudflare: the **master key** of the panel, the secret admin path and subscription path, the setup token, and the ids of your account, zone and database.
+The command writes `mistgate-edge-<name>.json` in the current directory (`mistgate-edge-mistgate-edge.json` with the default name) and prints its full path. It holds everything that cannot be read back from Cloudflare: the **master key** of the panel, the secret admin path and subscription path, the setup token, and the ids of your account, zone and database. After an update it also holds the version each script had before it, for a rollback.
 
 > **Warning:** back this file up as soon as the command prints its path: keep a copy in your password manager or on an encrypted drive. Cloudflare does not show a secret again after it is set. If the file is lost, so is the master key, and with it everything the panel sealed in its database (the saved SSH passwords, device keys, the fleet's CA); a later `deploy` also refuses to touch the scripts and the database it created, because it no longer has their keys. Anyone who gets the file can open what the panel seals, so never put it in a repository or a shared folder.
 
 On Linux and macOS the file is created with mode 0600. On Windows the mode is not enforced: the file inherits the folder's permissions, so keep it in a private folder (the command warns about this). `--resume` needs the file in the folder you run the command from, and `setup-link` takes its path.
 
-If a run stops half way (a network error, Ctrl+C, a Cloudflare error), nothing is rolled back and the key file stays. Fix the cause and run the same command again with `--resume`: it reads the key file and the bundle version recorded in it, and continues with the same keys and the same setup token. Without `--resume`, a run that finds the key file counts as an update (see below).
+If a run stops half way (a network error, Ctrl+C, a Cloudflare error), nothing is rolled back and the key file stays. Fix the cause and run the same command again with `--resume`: it reads the key file and the bundle version recorded in it, and continues with the same keys and the same setup token; scripts that were uploaded already are not uploaded again. Without `--resume`, a run that finds the key file counts as an update (see below).
 
 ## After the deploy
 
@@ -147,7 +159,21 @@ Download a newer `mistgate` (or pass `--version vX.Y.Z`) and run the command aga
 mistgate edge deploy --host panel.example.com
 ```
 
-It reads the key file, so the keys, the database and the secret paths stay. It uploads the new scripts, applies the new Durable Object migrations and makes a new setup token, which you can ignore. A bundle that is older than what is deployed is refused before anything is uploaded. While the scripts are replaced, connected agents reconnect on their own and an SSH install in progress is retried (its third interruption fails it). The key file is rewritten with the new bundle version; the master key stays, so your earlier backup of the file still opens everything. Read the release notes first: there is no backup of the database to go back to.
+It reads the key file, so the keys, the database and the secret paths stay. It uploads the scripts whose content changed (a release that leaves the front Worker alone does not restart the agents' connections), applies the new Durable Object migrations and makes a new setup token, which you can ignore (it is why admin is uploaded every time). A bundle that is older than what is deployed is refused before anything is uploaded. While the front Worker is replaced, connected agents reconnect on their own and an SSH install in progress is retried (its third interruption fails it). The key file is rewritten with the new bundle version; the master key stays, so your earlier backup of the file still opens everything. Read the release notes first: there is no backup of the database to go back to, and a rollback does not touch it.
+
+## Roll back
+
+If an update misbehaves, run this from the folder with the key file:
+
+```sh
+mistgate edge deploy --host panel.example.com --rollback
+```
+
+Before an update uploads anything, the command notes in the key file the active version of each of the six scripts and its cron schedule. `--rollback` puts them back through Cloudflare's deployments, the front Worker first and then the others in the reverse order of the upload, and restores the schedules. It uses the same token, takes no bundle and uploads nothing; with `--dry-run` it only lists what it would restore. A script that the last update created has no earlier version and stays as it is.
+
+- The D1 database is not rolled back. A release is meant to change its schema only by adding to it, so the version before the update still runs on it.
+- It goes back one update: the key file keeps the versions before the last new bundle. After the first deploy there is nothing to go back to.
+- The next `mistgate edge deploy` uploads all six scripts again.
 
 ## Moving between a VPS panel and the edge
 
@@ -165,6 +191,7 @@ Not supported yet. There is no way to carry users, nodes and subscription links 
 | this is a development build with no release version: pass --version vX.Y.Z or --bundle DIR | Tell the command which bundle to use. |
 | the deployed script is at migration ..., which this bundle does not know | The bundle is older than what is deployed. Use a newer release. |
 | --resume requires the local deployment file ... | There is no key file for this `--name` in the current folder. |
+| nothing to roll back: the local deployment file records no earlier version | Nothing was updated since the first deploy, so no earlier version was noted. A rollback needs an update to go back from. |
 
 ## Next
 

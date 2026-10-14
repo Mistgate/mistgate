@@ -226,10 +226,11 @@ mistgate release trust-key [--data-dir DIR] [--dev]
 
 ```text
 mistgate edge deploy --host HOST [--name NAME] [--d1-location LOC] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
+mistgate edge deploy --host HOST [--name NAME] --rollback [--dry-run]
 mistgate edge setup-link --file FILE
 ```
 
-`edge deploy` создаёт базу D1 и два скрипта Worker Cloudflare-версии, привязывает `HOST` как custom domain и печатает адрес админки и одноразовую ссылку настройки. API-токен он читает только из `CLOUDFLARE_API_TOKEN`, а ключи новой панели записывает в `mistgate-edge-<name>.json` в текущем каталоге: сохраните этот файл. `--dry-run` только читает из Cloudflare и печатает план; `--resume` продолжает остановившийся запуск. Запущенный снова без `--resume`, он обновляет развёртывание. `edge setup-link` печатает сохранённую ссылку настройки из файла с ключами. Все флаги, права токена и первый вход описаны в [Установке Cloudflare-версии](../getting-started/install-edge.md).
+`edge deploy` создаёт базу D1 и шесть скриптов Worker Cloudflare-версии, привязывает `HOST` как custom domain и печатает адрес админки и одноразовую ссылку настройки. API-токен он читает только из `CLOUDFLARE_API_TOKEN`, а ключи новой панели записывает в `mistgate-edge-<name>.json` в текущем каталоге: сохраните этот файл. `--dry-run` только читает из Cloudflare и печатает план; `--resume` продолжает остановившийся запуск. Запущенный снова без `--resume`, он обновляет развёртывание и загружает только изменившиеся скрипты; `--rollback` возвращает каждый скрипт на версию, которая была до последнего обновления. `edge setup-link` печатает сохранённую ссылку настройки из файла с ключами. Все флаги, права токена и первый вход описаны в [Установке Cloudflare-версии](../getting-started/install-edge.md).
 
 ### mistgate version
 
