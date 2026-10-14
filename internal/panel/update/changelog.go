@@ -97,8 +97,31 @@ func parseReleaseBody(body string) (n ReleaseNote) {
 		}
 		*dst += p
 	}
-	n.Security = securityHeading.MatchString(n.En) || securityHeading.MatchString(n.Ru) || securityHeading.MatchString(n.Zh)
+	for _, part := range []string{n.En, n.Ru, n.Zh} {
+		n.Security = n.Security || securityHeading.MatchString(withoutFences(part))
+	}
 	return n
+}
+
+// withoutFences drops fenced code blocks (``` or ~~~), so a "## Security" in a code sample is no security section.
+func withoutFences(s string) string {
+	var b strings.Builder
+	fence := ""
+	for _, line := range strings.Split(s, "\n") {
+		t := strings.TrimSpace(line)
+		switch {
+		case fence != "":
+			if strings.HasPrefix(t, fence) {
+				fence = ""
+			}
+		case strings.HasPrefix(t, "```"), strings.HasPrefix(t, "~~~"):
+			fence = t[:3]
+		default:
+			b.WriteString(line)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 // scriptOf names the language of a text by its dominant script, ignoring code, links and URLs. A Han character weighs four
@@ -163,8 +186,8 @@ func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag strin
 	default:
 		return nil, "", false, fmt.Errorf("GitHub releases API returned HTTP %d", resp.StatusCode)
 	}
-	var list []githubNotesRelease
-	if err := json.NewDecoder(io.LimitReader(resp.Body, notesMaxResponse)).Decode(&list); err != nil {
+	list, err := decodeReleaseList(io.LimitReader(resp.Body, notesMaxResponse))
+	if err != nil {
 		return nil, "", false, fmt.Errorf("decode GitHub release list: %w", err)
 	}
 	for _, r := range list {
@@ -183,6 +206,26 @@ func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag strin
 		notes = notes[:notesMaxReleases]
 	}
 	return notes, resp.Header.Get("ETag"), false, nil
+}
+
+// decodeReleaseList reads the first notesMaxReleases entries of a JSON array one by one and stops there: the page asks for
+// that many, and an answer of many small entries (a hostile or broken one) must not be allocated whole before the cap.
+func decodeReleaseList(r io.Reader) ([]githubNotesRelease, error) {
+	dec := json.NewDecoder(r)
+	if tok, err := dec.Token(); err != nil {
+		return nil, err
+	} else if tok != json.Delim('[') {
+		return nil, errors.New("not a JSON array")
+	}
+	var list []githubNotesRelease
+	for len(list) < notesMaxReleases && dec.More() {
+		var rel githubNotesRelease
+		if err := dec.Decode(&rel); err != nil {
+			return nil, err
+		}
+		list = append(list, rel)
+	}
+	return list, nil
 }
 
 // ReleaseNotes is the last list read from GitHub, newest first (empty until the first good read, and kept when a later
@@ -220,16 +263,17 @@ func (u *GitHubPanelUpdater) refreshNotes(ctx context.Context) {
 	u.notesMu.Unlock()
 }
 
-// versionCore is the vX.Y.Z of a version: a build from git describe ("v0.1.38-3-gabc1234") counts as the release it
+// gitDescribeSuffix is what git describe adds after a tag: commits since it and the hash, and "-dirty".
+var gitDescribeSuffix = regexp.MustCompile(`(-[0-9]+-g[0-9a-f]+)?(-dirty)?$`)
+
+// versionCore is the version a build stands at: a build from git describe ("v0.1.38-3-gabc1234") counts as the release it
 // follows, and "0.1.38" as "v0.1.38". "" when it is not a version at all (a dev build says "dev").
 func versionCore(v string) string {
 	v = strings.TrimSpace(v)
 	if v != "" && v[0] != 'v' {
 		v = "v" + v
 	}
-	if i := strings.IndexAny(v, "-+"); i >= 0 {
-		v = v[:i]
-	}
+	v = gitDescribeSuffix.ReplaceAllString(v, "") // a real prerelease ("-rc.1") stays one: it comes before its release
 	if !semver.IsValid(v) {
 		return ""
 	}

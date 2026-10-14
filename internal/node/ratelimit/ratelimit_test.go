@@ -130,11 +130,16 @@ func TestByteWaitsForBothBuckets(t *testing.T) {
 	}
 }
 
-func TestChunkBiggerThanTheBurstDoesNotWaitForever(t *testing.T) {
+func TestChunkBiggerThanTheBurstIsChargedInFull(t *testing.T) {
 	fc := newFakeClock()
 	l := newWithClock(8*minBurst, fc.clock()) // 64 KiB/s, burst 64 KiB
+	t0 := fc.clock().now()
 	if !l.WaitUp(context.Background(), 10*minBurst) {
-		t.Fatal("an oversized chunk must be clamped to the burst, not refused")
+		t.Fatal("an oversized chunk must be charged in parts, not refused")
+	}
+	// the first 64 KiB are the full bucket, the other 576 KiB take 9 s at 64 KiB/s
+	if got := fc.since(t0); got < 9*time.Second-time.Millisecond {
+		t.Fatalf("640 KiB at 64 KiB/s passed in %v, want about 9 s", got)
 	}
 }
 

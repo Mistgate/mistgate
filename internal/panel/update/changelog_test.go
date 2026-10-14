@@ -103,6 +103,8 @@ func TestParseReleaseBodySecurity(t *testing.T) {
 		"empty":          "",
 		"not a heading":  "Security\n\n- x",
 		"in a code span": "## Fixes\n\n`## Security`",
+		"in a fence":     "## Fixes\n\n```md\n## Security\n```\n",
+		"in a ~~~ fence": "~~~\n### Безопасность\n~~~",
 	} {
 		if parseReleaseBody(body).Security {
 			t.Errorf("%s: marked", name)
@@ -125,7 +127,9 @@ func TestVersionRange(t *testing.T) {
 		{"v0.1.39", "v0.1.37", ""},                           // a node ahead of the bundle
 		{"0.1.37", "v0.1.38", "v0.1.38"},                     // without the v
 		{"v0.1.37-5-gabc1234", "v0.1.39", "v0.1.39 v0.1.38"}, // a build from git describe counts as the release it follows
-		{"dev", "v0.1.39", ""},                               // no version, no claim
+		{"v0.1.37-5-gabc1234-dirty", "v0.1.38", "v0.1.38"},
+		{"v0.1.39-rc.1", "v0.1.39", "v0.1.39"}, // a prerelease comes before its release
+		{"dev", "v0.1.39", ""},                 // no version, no claim
 		{"v0.1.37", "", ""},
 		{"v0.1.20", "v0.1.40", "v0.1.40 v0.1.39 v0.1.38 v0.1.37 v0.1.36"},
 	} {
@@ -248,7 +252,7 @@ func TestFetchReleaseNotesFiltersAndOrders(t *testing.T) {
 func TestFetchReleaseNotesCaps(t *testing.T) {
 	api := &notesAPI{}
 	var list []githubNotesRelease
-	for i := 0; i < 45; i++ {
+	for i := 44; i >= 0; i-- { // GitHub lists newest first; only the first page's worth is read
 		list = append(list, rel(fmt.Sprintf("v0.2.%d", i), "- x"))
 	}
 	api.set(list)
@@ -274,6 +278,18 @@ func TestFetchReleaseNotesCaps(t *testing.T) {
 	api.status = http.StatusForbidden
 	if _, _, _, err = fetchReleaseNotes(context.Background(), api.client(), GitHubReleaseNotesURL, ""); err == nil {
 		t.Fatal("HTTP 403 was accepted")
+	}
+}
+
+// A listing of many small entries is not allocated whole: decoding stops at the cap.
+func TestDecodeReleaseListStopsAtTheCap(t *testing.T) {
+	body := "[" + strings.Repeat("{},", 100_000) + "{}]"
+	list, err := decodeReleaseList(strings.NewReader(body))
+	if err != nil || len(list) != notesMaxReleases {
+		t.Fatalf("decoded %d entries, err %v", len(list), err)
+	}
+	if _, err := decodeReleaseList(strings.NewReader(`{"message":"Not Found"}`)); err == nil {
+		t.Fatal("an object was read as a list")
 	}
 }
 

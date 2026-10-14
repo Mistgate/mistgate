@@ -92,15 +92,22 @@ func WaitDown(ctx context.Context, device, person *Limiter, n uint64) bool {
 	return (device == nil || device.WaitDown(ctx, n)) && (person == nil || person.WaitDown(ctx, n))
 }
 
-// wait reserves n bytes (clamped to the burst, so a chunk bigger than the bucket cannot wait forever) and sleeps
-// until they are due; it is rate.Limiter.WaitN with the clock made injectable.
+// wait charges n bytes in parts no bigger than the burst (a reservation above it can never be granted) and sleeps until
+// each is due: a write bigger than the bucket waits for all of it, not for one burst (a 128 KiB VLESS buffer charged
+// as 64 KiB let a device run at twice its limit).
 func (l *Limiter) wait(ctx context.Context, b *rate.Limiter, n uint64) bool {
-	if n == 0 {
-		return true
+	for n > 0 {
+		part := min(n, uint64(b.Burst()))
+		if !l.waitPart(ctx, b, part) {
+			return false
+		}
+		n -= part
 	}
-	if burst := uint64(b.Burst()); n > burst {
-		n = burst
-	}
+	return true
+}
+
+// waitPart is rate.Limiter.WaitN for n ≤ burst bytes, with the clock made injectable.
+func (l *Limiter) waitPart(ctx context.Context, b *rate.Limiter, n uint64) bool {
 	now := l.clk.now()
 	r := b.ReserveN(now, int(n))
 	if !r.OK() { // cannot happen after the clamp; fail closed rather than pass unshaped
