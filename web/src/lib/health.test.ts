@@ -575,6 +575,10 @@ describe("reachability from a country", () => {
     atUnix: roundAt,
     eyeball: true,
     reason: "",
+    confidence: "eyeball",
+    listedBy: [],
+    cdnProvider: "",
+    cdnRegion: "",
     probes: [probe("Rostelecom", "Moscow", 42, [[443, true], [8443, true]]), probe("Beeline", "Kazan", 47, [[443, true], [8443, true]])],
     ...over,
   });

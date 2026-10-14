@@ -1635,3 +1635,7 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 func TestD1CountryChecksStorage(t *testing.T) {
 	countryCheckStoreProof(t, openD1Store(t))
 }
+
+func TestD1BlocklistChecksStorage(t *testing.T) {
+	blocklistCheckStoreProof(t, openD1Store(t))
+}

@@ -313,8 +313,9 @@ message GetChecksResponse {
   // host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
   // nothing to say.
   UdpLossNotice udp_loss = 5;
-  // The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job).
-  // With GetChecksRequest.node_id only that node's. Empty while the country check is off.
+  // The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job): the
+  // live Globalping round and what the block lists say, combined into one verdict (CountryCheck.confidence). With
+  // GetChecksRequest.node_id only that node's. Empty while both sources are off.
   repeated CountryCheck country_checks = 6;
 }
 
@@ -336,6 +337,9 @@ enum CountryVerdict {
   COUNTRY_VERDICT_BLOCKED = 3;
   // Fewer than 2 valid probes, a Globalping error or limit, a timeout, or a mixed picture that says nothing.
   COUNTRY_VERDICT_UNKNOWN = 4;
+  // No live observation from inside the country, but the node's address (or its subnet) is in a public block list
+  // (blocklist.proto). A context signal: in the registry, not proven dropped. Never opens an alert.
+  COUNTRY_VERDICT_LISTED = 5;
 }
 
 message PortResult {
@@ -368,6 +372,16 @@ message CountryCheck {
   string reason = 6;
   // The probes were home or mobile networks; false: any network (too few of them were online).
   bool eyeball = 7;
+  // Where `verdict` comes from: "eyeball" (a live check from home or mobile networks), "dc_only" (a live check from data
+  // centres only), "listed" (a block list only, no live check), "" (nothing to say, UNKNOWN). Computed when read.
+  string confidence = 8;
+  // The block lists that hold the node's address, whatever the verdict ("antifilter_ipsum", "antifilter_community"); empty
+  // when the block lists are off or the address is in none.
+  repeated string listed_by = 9;
+  // Provider and region of the CDN or hosting range of the node's address (context, from the block lists' CDN list); empty
+  // when unknown or the block lists are off.
+  string cdn_provider = 10;
+  string cdn_region = 11;
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes

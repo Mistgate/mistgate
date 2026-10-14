@@ -292,6 +292,9 @@ const (
 	CountryVerdict_COUNTRY_VERDICT_BLOCKED CountryVerdict = 3
 	// Fewer than 2 valid probes, a Globalping error or limit, a timeout, or a mixed picture that says nothing.
 	CountryVerdict_COUNTRY_VERDICT_UNKNOWN CountryVerdict = 4
+	// No live observation from inside the country, but the node's address (or its subnet) is in a public block list
+	// (blocklist.proto). A context signal: in the registry, not proven dropped. Never opens an alert.
+	CountryVerdict_COUNTRY_VERDICT_LISTED CountryVerdict = 5
 )
 
 // Enum value maps for CountryVerdict.
@@ -302,6 +305,7 @@ var (
 		2: "COUNTRY_VERDICT_TCP_BLOCKED",
 		3: "COUNTRY_VERDICT_BLOCKED",
 		4: "COUNTRY_VERDICT_UNKNOWN",
+		5: "COUNTRY_VERDICT_LISTED",
 	}
 	CountryVerdict_value = map[string]int32{
 		"COUNTRY_VERDICT_UNSPECIFIED": 0,
@@ -309,6 +313,7 @@ var (
 		"COUNTRY_VERDICT_TCP_BLOCKED": 2,
 		"COUNTRY_VERDICT_BLOCKED":     3,
 		"COUNTRY_VERDICT_UNKNOWN":     4,
+		"COUNTRY_VERDICT_LISTED":      5,
 	}
 )
 
@@ -1300,8 +1305,9 @@ type GetChecksResponse struct {
 	// host loses inbound UDP, and people, who connect to the nodes directly, are not affected. Unset when there is
 	// nothing to say.
 	UdpLoss *UdpLossNotice `protobuf:"bytes,5,opt,name=udp_loss,json=udpLoss,proto3" json:"udp_loss,omitempty"`
-	// The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job).
-	// With GetChecksRequest.node_id only that node's. Empty while the country check is off.
+	// The latest country check of every node that has one (a node with an alert-worthy verdict first is the SPA's job): the
+	// live Globalping round and what the block lists say, combined into one verdict (CountryCheck.confidence). With
+	// GetChecksRequest.node_id only that node's. Empty while both sources are off.
 	CountryChecks []*CountryCheck `protobuf:"bytes,6,rep,name=country_checks,json=countryChecks,proto3" json:"country_checks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1545,7 +1551,17 @@ type CountryCheck struct {
 	// Machine code when the verdict is UNKNOWN: "too_few_probes", "rate_limited", "source_error", "timeout". Empty otherwise.
 	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
 	// The probes were home or mobile networks; false: any network (too few of them were online).
-	Eyeball       bool `protobuf:"varint,7,opt,name=eyeball,proto3" json:"eyeball,omitempty"`
+	Eyeball bool `protobuf:"varint,7,opt,name=eyeball,proto3" json:"eyeball,omitempty"`
+	// Where `verdict` comes from: "eyeball" (a live check from home or mobile networks), "dc_only" (a live check from data
+	// centres only), "listed" (a block list only, no live check), "" (nothing to say, UNKNOWN). Computed when read.
+	Confidence string `protobuf:"bytes,8,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	// The block lists that hold the node's address, whatever the verdict ("antifilter_ipsum", "antifilter_community"); empty
+	// when the block lists are off or the address is in none.
+	ListedBy []string `protobuf:"bytes,9,rep,name=listed_by,json=listedBy,proto3" json:"listed_by,omitempty"`
+	// Provider and region of the CDN or hosting range of the node's address (context, from the block lists' CDN list); empty
+	// when unknown or the block lists are off.
+	CdnProvider   string `protobuf:"bytes,10,opt,name=cdn_provider,json=cdnProvider,proto3" json:"cdn_provider,omitempty"`
+	CdnRegion     string `protobuf:"bytes,11,opt,name=cdn_region,json=cdnRegion,proto3" json:"cdn_region,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1627,6 +1643,34 @@ func (x *CountryCheck) GetEyeball() bool {
 		return x.Eyeball
 	}
 	return false
+}
+
+func (x *CountryCheck) GetConfidence() string {
+	if x != nil {
+		return x.Confidence
+	}
+	return ""
+}
+
+func (x *CountryCheck) GetListedBy() []string {
+	if x != nil {
+		return x.ListedBy
+	}
+	return nil
+}
+
+func (x *CountryCheck) GetCdnProvider() string {
+	if x != nil {
+		return x.CdnProvider
+	}
+	return ""
+}
+
+func (x *CountryCheck) GetCdnRegion() string {
+	if x != nil {
+		return x.CdnRegion
+	}
+	return ""
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
@@ -2821,7 +2865,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\aicmp_ok\x18\x04 \x01(\bR\x06icmpOk\x12\x17\n" +
 	"\aicmp_ms\x18\x05 \x01(\rR\x06icmpMs\x12/\n" +
 	"\x03tcp\x18\x06 \x03(\v2\x1d.mistgate.admin.v1.PortResultR\x03tcp\x12\x14\n" +
-	"\x05valid\x18\a \x01(\bR\x05valid\"\x86\x02\n" +
+	"\x05valid\x18\a \x01(\bR\x05valid\"\x85\x03\n" +
 	"\fCountryCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
 	"\acountry\x18\x02 \x01(\tR\acountry\x12;\n" +
@@ -2829,7 +2873,15 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\aat_unix\x18\x04 \x01(\x03B\x020\x02R\x06atUnix\x127\n" +
 	"\x06probes\x18\x05 \x03(\v2\x1f.mistgate.admin.v1.CountryProbeR\x06probes\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x18\n" +
-	"\aeyeball\x18\a \x01(\bR\aeyeball\"O\n" +
+	"\aeyeball\x18\a \x01(\bR\aeyeball\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\b \x01(\tR\n" +
+	"confidence\x12\x1b\n" +
+	"\tlisted_by\x18\t \x03(\tR\blistedBy\x12!\n" +
+	"\fcdn_provider\x18\n" +
+	" \x01(\tR\vcdnProvider\x12\x1d\n" +
+	"\n" +
+	"cdn_region\x18\v \x01(\tR\tcdnRegion\"O\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
 	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\".\n" +
@@ -2957,13 +3009,14 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +
 	"\x15CHECK_STATUS_DEGRADED\x10\x02\x12\x17\n" +
 	"\x13CHECK_STATUS_FAILED\x10\x03\x12\x18\n" +
-	"\x14CHECK_STATUS_SKIPPED\x10\x04*\xa4\x01\n" +
+	"\x14CHECK_STATUS_SKIPPED\x10\x04*\xc0\x01\n" +
 	"\x0eCountryVerdict\x12\x1f\n" +
 	"\x1bCOUNTRY_VERDICT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12COUNTRY_VERDICT_OK\x10\x01\x12\x1f\n" +
 	"\x1bCOUNTRY_VERDICT_TCP_BLOCKED\x10\x02\x12\x1b\n" +
 	"\x17COUNTRY_VERDICT_BLOCKED\x10\x03\x12\x1b\n" +
-	"\x17COUNTRY_VERDICT_UNKNOWN\x10\x04*\x8b\x01\n" +
+	"\x17COUNTRY_VERDICT_UNKNOWN\x10\x04\x12\x1a\n" +
+	"\x16COUNTRY_VERDICT_LISTED\x10\x05*\x8b\x01\n" +
 	"\fDoctorStatus\x12\x1d\n" +
 	"\x19DOCTOR_STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DOCTOR_STATUS_OK\x10\x01\x12\x16\n" +

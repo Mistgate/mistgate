@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Block lists: the second source of the country check ("is the node reachable from Russia"). The panel downloads the public
+// lists of blocked addresses and compares every node's IPv4 address with them ON THE PANEL: no node address leaves it, which is
+// the difference from Globalping (globalping.proto), where probes in the country ping the node. Conventions: common.proto.
+//
+// THE LISTS (Russia only; for another country the source says it is not available):
+//   - antifilter.download ipsum.lst (the RKN registry summed up to /24 subnets; antifilter.network is the fallback mirror) and
+//     community.lst (addresses the community found cut). A hit is "listed".
+//   - 123jjck/cdn-ip-ranges all.csv: ranges of CDN and hosting providers. Context only: the provider and region of the node's
+//     subnet, shown next to a verdict; it never makes one.
+// domains.lst (31 MiB) is not used in this step.
+//
+// A HIT MEANS "LISTED", NOT "BLOCKED". The registry says the address (or its subnet) is written down, not that the TSPU drops
+// the packets. So a list hit alone is a context signal (CountryVerdict LISTED, health.proto) and never opens an alert; only a
+// live verdict of a source that really looked from inside the country does.
+//
+// OFF IS THE DEFAULT AND OFF MEANS OFF. With enabled false nothing is downloaded (neither by the schedule nor by
+// TestBlocklist) and GetChecksResponse.country_checks shows nothing from this source. Disconnect also forgets the downloaded
+// lists and the stored results. Lists are refreshed every 6 hours; the stored per-node results live 7 days.
+//
+// WHO MAY CALL WHAT. All of them are OWNER-ONLY; UpdateBlocklist and DisconnectBlocklist need a step-up. None of it is open to
+// API tokens or MCP (the results are: GetChecks, checks_results).
+//
+// ERRORS. FAILED_PRECONDITION: "blocklist_off" (TestBlocklist while off), "blocklist_unavailable_for_country" (the shared country
+// of the country check is not Russia). UNAVAILABLE: "blocklist_unreachable" (no list could be downloaded and none is held).
+// RESOURCE_EXHAUSTED: tested again too soon.
+service BlocklistService {
+  // The settings and the state of the last check. No secrets.
+  rpc GetBlocklist(GetBlocklistRequest) returns (GetBlocklistResponse);
+  // Changes the settings; absent fields stay. Owner only; needs a step-up.
+  rpc UpdateBlocklist(UpdateBlocklistRequest) returns (UpdateBlocklistResponse);
+  // Downloads the lists now (a conditional request: an unchanged list costs a 304), checks every node and stores the result.
+  // Reports the date of the lists, the number of prefixes and how many nodes match. Sends no node address anywhere. Only while
+  // the source is on and available.
+  rpc TestBlocklist(TestBlocklistRequest) returns (TestBlocklistResponse);
+  // Disconnect: switches it off AND forgets the downloaded lists and every stored result. Owner only; needs a step-up.
+  // Idempotent. A check in flight is cancelled.
+  rpc DisconnectBlocklist(DisconnectBlocklistRequest) returns (DisconnectBlocklistResponse);
+}
+
+message BlocklistSettings {
+  // Default false.
+  bool enabled = 1;
+  // false: the shared country of the country check (CountryReachabilityService) is not Russia, so this source does nothing and
+  // a screen says "not available for this country". Only Russia has lists for now.
+  bool available = 2;
+  // When the newest stored check ran, and the date of the lists it used; 0 = no check yet. Read from the stored results, so
+  // it is the same on every process of the panel.
+  int64 checked_unix = 3 [jstype = JS_NUMBER];
+  int64 lists_unix = 4 [jstype = JS_NUMBER];
+}
+
+message GetBlocklistRequest {}
+message GetBlocklistResponse { BlocklistSettings settings = 1; }
+
+message UpdateBlocklistRequest {
+  optional bool enabled = 1;
+}
+message UpdateBlocklistResponse { BlocklistSettings settings = 1; }
+
+message TestBlocklistRequest {}
+message TestBlocklistResponse {
+  // Date of the newest list in use (its Last-Modified, else the time it was downloaded).
+  int64 lists_unix = 1 [jstype = JS_NUMBER];
+  // Prefixes of the registry lists (ipsum and community) and of the CDN list; IPv6 ranges are not counted.
+  uint32 prefixes = 2;
+  uint32 cdn_ranges = 3;
+  // Active nodes that were checked, and how many of them are in the registry lists.
+  uint32 nodes_checked = 4;
+  uint32 nodes_listed = 5;
+  // The fallback mirror served ipsum.lst because the main address did not answer.
+  bool mirror_used = 6;
+}
+
+message DisconnectBlocklistRequest {}
+message DisconnectBlocklistResponse { BlocklistSettings settings = 1; }

@@ -49,6 +49,12 @@
   },
   {
     "type": "index",
+    "name": "country_blocklist_check_at",
+    "tbl_name": "country_blocklist_check",
+    "sql": "CREATE INDEX country_blocklist_check_at ON country_blocklist_check (at)"
+  },
+  {
+    "type": "index",
     "name": "country_check_at",
     "tbl_name": "country_check",
     "sql": "CREATE INDEX country_check_at ON country_check (at)"
@@ -352,6 +358,12 @@
     "name": "batch_guard",
     "tbl_name": "batch_guard",
     "sql": "CREATE TABLE batch_guard ( failed INTEGER NOT NULL, CONSTRAINT batch_guard CHECK (failed = 0) )"
+  },
+  {
+    "type": "table",
+    "name": "country_blocklist_check",
+    "tbl_name": "country_blocklist_check",
+    "sql": "CREATE TABLE country_blocklist_check ( node_id TEXT NOT NULL, at INTEGER NOT NULL, in_rkn INTEGER NOT NULL DEFAULT 0 CHECK (in_rkn IN (0, 1)), rkn_subnet TEXT NOT NULL DEFAULT '', listed_by TEXT NOT NULL DEFAULT '', cdn_provider TEXT NOT NULL DEFAULT '', cdn_region TEXT NOT NULL DEFAULT '', lists_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, at) ) STRICT"
   },
   {
     "type": "table",
