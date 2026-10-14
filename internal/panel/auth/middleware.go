@@ -49,6 +49,15 @@ func (s *Service) WithClientIP(r *http.Request) *http.Request {
 	return r.WithContext(s.ContextWithClientIP(r.Context(), r))
 }
 
+// PeerIP is the address of the TCP peer of r, with no proxy trusted: the client address of a server that has no auth
+// service. (The edge sets RemoteAddr from CF-Connecting-IP.)
+func PeerIP(r *http.Request) netip.Addr { return ProxyTrust{}.ClientIP(r.RemoteAddr, r.Header) }
+
+// ContextWithPeerIP returns ctx carrying PeerIP(r) for ClientIPFrom.
+func ContextWithPeerIP(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, clientIPKey{}, PeerIP(r))
+}
+
 // ContextWithClientIP returns ctx carrying r's client address for ClientIPFrom.
 func (s *Service) ContextWithClientIP(ctx context.Context, r *http.Request) context.Context {
 	return context.WithValue(ctx, clientIPKey{}, s.ClientIP(r))

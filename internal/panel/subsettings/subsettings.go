@@ -528,6 +528,15 @@ func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	if err := MigrateLinkDeviceLimit(ctx, st); err != nil {
 		log.Warn("subscription settings: the device limit mode was not set", "err", err)
 	}
+	return NewCacheWithoutMigrations(st, log)
+}
+
+// NewCacheWithoutMigrations is NewCache that leaves the data migrations to the Worker that owns them: the edge's public
+// Worker only reads, and spends no database reads on them when it starts. log may be nil.
+func NewCacheWithoutMigrations(st *store.Store, log *slog.Logger) *Cache {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &Cache{st: st, log: log, now: time.Now, ttl: time.Minute}
 }
 

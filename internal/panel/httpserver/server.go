@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"path"
 	"sort"
 	"strings"
@@ -94,6 +95,11 @@ type Config struct {
 	AgentLinkPrefix  string
 	AgentLinkHandler http.Handler
 
+	// ReservedPrefixes are secret path prefixes that another Worker of the edge serves (the edge splits the panel into
+	// Workers that each serve one surface). They are not served here; New only checks that none of them overlaps what is.
+	// Empty entries are ignored.
+	ReservedPrefixes []string
+
 	// UserPagePreview, if set, serves GET <admin>/preview/user-page/<user id>: the public user page as that user
 	// would see it, for the admin to show in a frame. The server checks the session and the right to see the user's
 	// link (GetSubscriptionLink: helper or owner, never a token) and validates the id; the function writes the
@@ -152,11 +158,16 @@ const agentUnauthBody = 32 << 10
 // Server builds the HTTP handlers.
 type Server struct {
 	cfg   Config
-	auth  *auth.Service
+	auth  *auth.Service // nil on a public-only server (NewPublic)
 	st    *store.Store
 	decoy *decoy
 	dist  fs.FS
-	cop   *http.CrossOriginProtection
+	cop   *http.CrossOriginProtection // admin only
+
+	// clientIP finds the client address of a request and withIP puts it into the request context: the admin server asks
+	// its auth service (trusted proxies), a public-only server takes the TCP peer.
+	clientIP func(*http.Request) netip.Addr
+	withIP   func(context.Context, *http.Request) context.Context
 
 	api       apiRouter
 	pages     map[string]http.Handler
@@ -175,8 +186,8 @@ type Server struct {
 }
 
 // withPublicContext adds both public-listener values before cloning the request once.
-func withPublicContext(r *http.Request, a *auth.Service) *http.Request {
-	ctx := a.ContextWithClientIP(r.Context(), r)
+func (s *Server) withPublicContext(r *http.Request) *http.Request {
+	ctx := s.withIP(r.Context(), r)
 	ctx = context.WithValue(ctx, startKey{}, time.Now())
 	return r.WithContext(ctx)
 }
@@ -226,28 +237,16 @@ func validSecretPrefix(p string) bool {
 // New validates cfg and builds the server. st is the panel database (instance settings,
 // logo).
 func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
-	if cfg.Log == nil {
-		cfg.Log = slog.Default()
+	if a == nil {
+		return nil, errors.New("httpserver: an auth service is required (NewPublic serves without one)")
 	}
-	if cfg.AdminPrefix != "" && !validSecretPrefix(cfg.AdminPrefix) {
-		return nil, fmt.Errorf("admin prefix %q must look like /secret/", cfg.AdminPrefix)
+	s, err := newServer(cfg, st, a.ClientIP, a.ContextWithClientIP)
+	if err != nil {
+		return nil, err
 	}
-	if (cfg.AgentLinkPrefix == "") != (cfg.AgentLinkHandler == nil) {
-		return nil, errors.New("AgentLinkPrefix and AgentLinkHandler go together")
-	}
-	if cfg.AgentLinkPrefix != "" && (!validSecretPrefix(cfg.AgentLinkPrefix) || len(strings.Trim(cfg.AgentLinkPrefix, "/")) < 16 ||
-		cfg.AgentLinkPrefix == cfg.AdminPrefix || (cfg.AdminPrefix != "" &&
-		(strings.HasPrefix(cfg.AgentLinkPrefix, cfg.AdminPrefix) || strings.HasPrefix(cfg.AdminPrefix, cfg.AgentLinkPrefix)))) {
-		return nil, errors.New("AgentLinkPrefix must be a separate secret path prefix of at least 16 characters")
-	}
-	cfg.AdminHost = strings.ToLower(strings.TrimSuffix(cfg.AdminHost, "."))
-	s := &Server{cfg: cfg, auth: a, st: st, decoy: newDecoy(cfg.DecoyDir), dist: cfg.Dist, cop: http.NewCrossOriginProtection()}
-	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: 10, Burst: 60})
-	s.adminLim = cfg.Limits.limiter(cfg.Limits.Admin, Rate{PerSecond: 30, Burst: 200}) // a page load and its polling
-	s.agentLim = cfg.Limits.limiter(cfg.Limits.Agent, Rate{PerSecond: 5, Burst: 30})
-	if s.dist == nil {
-		s.dist = web.Dist()
-	}
+	cfg = s.cfg
+	s.auth = a
+	s.cop = http.NewCrossOriginProtection()
 	for _, o := range cfg.TrustedOrigins {
 		if err := s.cop.AddTrustedOrigin(o); err != nil {
 			return nil, fmt.Errorf("trusted origin %q: %w", o, err)
@@ -281,6 +280,55 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 	if cfg.MCP != nil {
 		s.mcp = cfg.MCP(a.RequireSession(s.api))
 	}
+	if cfg.UserPagePreview != nil {
+		s.preview = s.requireLinkAccess(http.HandlerFunc(s.servePreview))
+	}
+	if cfg.AdminHost != "" {
+		s.hostAdmin = s.newAdmin("/")
+	}
+	if cfg.AdminPrefix != "" {
+		s.prefixAdmin = http.StripPrefix(strings.TrimSuffix(cfg.AdminPrefix, "/"), s.newAdmin(cfg.AdminPrefix))
+	}
+	return s, nil
+}
+
+// NewPublic builds a server without an admin: the secret public mounts, the agent link and the decoy, with the client
+// address taken from the TCP peer (no proxy is trusted). The Workers of the edge that serve only a public surface use it, so
+// the admin code is not part of them. cfg must carry no admin, agent endpoint, MCP or preview setting.
+func NewPublic(cfg Config, st *store.Store) (*Server, error) {
+	if cfg.AdminHost != "" || cfg.AdminPrefix != "" || len(cfg.AdminHandlers) != 0 || len(cfg.AdminPages) != 0 ||
+		cfg.MCP != nil || cfg.UserPagePreview != nil || cfg.AgentTLS != nil || cfg.AgentHandler != nil {
+		return nil, errors.New("httpserver: NewPublic serves no admin, agent endpoint, MCP or preview")
+	}
+	return newServer(cfg, st, auth.PeerIP, auth.ContextWithPeerIP)
+}
+
+// newServer is what a public and an admin server have in common: the checks of the prefixes, the decoy, the limits, the
+// public mounts, the agent link and the agent endpoint. clientIP and withIP say how the client address of a request is found
+// and put into its context.
+func newServer(cfg Config, st *store.Store, clientIP func(*http.Request) netip.Addr, withIP func(context.Context, *http.Request) context.Context) (*Server, error) {
+	if cfg.Log == nil {
+		cfg.Log = slog.Default()
+	}
+	if cfg.AdminPrefix != "" && !validSecretPrefix(cfg.AdminPrefix) {
+		return nil, fmt.Errorf("admin prefix %q must look like /secret/", cfg.AdminPrefix)
+	}
+	if (cfg.AgentLinkPrefix == "") != (cfg.AgentLinkHandler == nil) {
+		return nil, errors.New("AgentLinkPrefix and AgentLinkHandler go together")
+	}
+	if cfg.AgentLinkPrefix != "" && (!validSecretPrefix(cfg.AgentLinkPrefix) || len(strings.Trim(cfg.AgentLinkPrefix, "/")) < 16 ||
+		cfg.AgentLinkPrefix == cfg.AdminPrefix || (cfg.AdminPrefix != "" &&
+		(strings.HasPrefix(cfg.AgentLinkPrefix, cfg.AdminPrefix) || strings.HasPrefix(cfg.AdminPrefix, cfg.AgentLinkPrefix)))) {
+		return nil, errors.New("AgentLinkPrefix must be a separate secret path prefix of at least 16 characters")
+	}
+	cfg.AdminHost = strings.ToLower(strings.TrimSuffix(cfg.AdminHost, "."))
+	s := &Server{cfg: cfg, st: st, decoy: newDecoy(cfg.DecoyDir), dist: cfg.Dist, clientIP: clientIP, withIP: withIP}
+	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: 10, Burst: 60})
+	s.adminLim = cfg.Limits.limiter(cfg.Limits.Admin, Rate{PerSecond: 30, Burst: 200}) // a page load and its polling
+	s.agentLim = cfg.Limits.limiter(cfg.Limits.Agent, Rate{PerSecond: 5, Burst: 30})
+	if s.dist == nil {
+		s.dist = web.Dist()
+	}
 
 	for prefix, h := range cfg.PublicMounts {
 		if !validSecretPrefix(prefix) || h == nil || prefix == cfg.AdminPrefix ||
@@ -301,6 +349,9 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 	if cfg.AgentLinkHandler != nil {
 		s.agentLink = http.StripPrefix(strings.TrimSuffix(cfg.AgentLinkPrefix, "/"), s.decoy.swapErrors(cfg.AgentLinkHandler))
 	}
+	if err := checkReserved(cfg, s.mounts); err != nil {
+		return nil, err
+	}
 
 	if (cfg.AgentTLS == nil) != (cfg.AgentHandler == nil) || (cfg.AgentTLS != nil && cfg.AgentSNI == "") {
 		return nil, errors.New("AgentTLS and AgentHandler go together and need AgentSNI")
@@ -311,17 +362,29 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 			return nil, fmt.Errorf("agent SNI %q must be a host name like abc123.invalid", cfg.AgentSNI)
 		}
 	}
-
-	if cfg.UserPagePreview != nil {
-		s.preview = s.requireLinkAccess(http.HandlerFunc(s.servePreview))
-	}
-	if cfg.AdminHost != "" {
-		s.hostAdmin = s.newAdmin("/")
-	}
-	if cfg.AdminPrefix != "" {
-		s.prefixAdmin = http.StripPrefix(strings.TrimSuffix(cfg.AdminPrefix, "/"), s.newAdmin(cfg.AdminPrefix))
-	}
 	return s, nil
+}
+
+// checkReserved refuses a prefix of another Worker (Config.ReservedPrefixes) that overlaps one served here.
+func checkReserved(cfg Config, mounts []mount) error {
+	served := []string{cfg.AdminPrefix, cfg.AgentLinkPrefix}
+	for _, m := range mounts {
+		served = append(served, m.prefix)
+	}
+	for _, other := range cfg.ReservedPrefixes {
+		if other == "" {
+			continue
+		}
+		if !validSecretPrefix(other) {
+			return fmt.Errorf("reserved prefix %q must look like /secret/", other)
+		}
+		for _, mine := range served {
+			if mine != "" && (strings.HasPrefix(mine, other) || strings.HasPrefix(other, mine)) {
+				return fmt.Errorf("prefix %q overlaps %q, which another Worker serves", mine, other)
+			}
+		}
+	}
+	return nil
 }
 
 func validAdminPagePath(route string) bool {
@@ -369,7 +432,7 @@ func agentStream(r *http.Request) bool {
 
 // allow takes a token of l for the client of r; when there is none it writes the 429 and returns false.
 func (s *Server) allow(l *ratelimit.Limiter, w http.ResponseWriter, r *http.Request) bool {
-	ok, retry := l.Allow(auth.SourceKey(s.auth.ClientIP(r)))
+	ok, retry := l.Allow(auth.SourceKey(s.clientIP(r)))
 	if !ok {
 		s.decoy.tooMany(w, r, retry)
 	}
@@ -381,7 +444,7 @@ func (s *Server) allow(l *ratelimit.Limiter, w http.ResponseWriter, r *http.Requ
 // paths all get the decoy.
 func (s *Server) Public() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r = withPublicContext(r, s.auth) // auth.ClientIPFrom for the mounts and the agent endpoint
+		r = s.withPublicContext(r) // auth.ClientIPFrom for the mounts and the agent endpoint
 		if s.agentRequest(r) {
 			s.serveAgent(w, r) // its own limit
 			return
