@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ import (
 	"github.com/mistgate/mistgate/internal/release"
 )
 
-const stateVersion = 1
+const stateVersion = 2
 
 var (
 	// dnsLabelRe is a DNS label; a Worker script name has the same shape.
@@ -48,6 +49,7 @@ type Options struct {
 	DefaultVersion        string
 	Resume                bool
 	DryRun                bool
+	Rollback              bool
 	InsecureSkipSignature bool
 	Token                 string
 	StatePath             string
@@ -63,22 +65,43 @@ type Options struct {
 	DecoyURL              string
 }
 
+// localState is the key file. Schema 2 is the split edge: the names of the six scripts, what each one was before the last
+// bundle replaced it (for --rollback), the bundle that is being deployed and the steps of this run that are done.
 type localState struct {
-	Schema        int    `json:"schema"`
-	Host          string `json:"host"`
-	Name          string `json:"name"`
-	ProvisionName string `json:"provision_name"`
-	AccountID     string `json:"account_id"`
-	ZoneID        string `json:"zone_id"`
-	DatabaseID    string `json:"database_id"` // "" until the D1 database exists
-	DatabaseName  string `json:"database_name"`
-	PublicURL     string `json:"public_url"`
-	AdminPrefix   string `json:"admin_prefix"`
-	SubPrefix     string `json:"sub_prefix"`
-	MasterKey     string `json:"master_key"`
-	SetupToken    string `json:"setup_token"`
-	BundleVersion string `json:"bundle_version"`
-	BundleSHA256  string `json:"bundle_sha256"`
+	Schema        int                    `json:"schema"`
+	Host          string                 `json:"host"`
+	Name          string                 `json:"name"`
+	Scripts       map[string]scriptState `json:"scripts"` // by role: link, provision, public, admin, jobs, front
+	AccountID     string                 `json:"account_id"`
+	ZoneID        string                 `json:"zone_id"`
+	DatabaseID    string                 `json:"database_id"` // "" until the D1 database exists
+	DatabaseName  string                 `json:"database_name"`
+	PublicURL     string                 `json:"public_url"`
+	AdminPrefix   string                 `json:"admin_prefix"`
+	SubPrefix     string                 `json:"sub_prefix"`
+	MasterKey     string                 `json:"master_key"`
+	SetupToken    string                 `json:"setup_token"`
+	BundleVersion string                 `json:"bundle_version"`
+	BundleSHA256  string                 `json:"bundle_sha256"`
+	// Steps are the steps of the current run that finished, in order: a role name for a script, "domain". --resume prints
+	// them; the work that is skipped is decided by each script's Fingerprint.
+	Steps []string `json:"steps,omitempty"`
+}
+
+// scriptState is what the key file knows of one script.
+type scriptState struct {
+	Name string `json:"name"`
+	// Fingerprint identifies what the last complete upload of the script sent (modules, bindings with the secret values,
+	// migrations, assets). An upload that would send the same is skipped, so a release that leaves FRONT alone does not
+	// restart the NodeLink objects. It is empty until an upload finishes and after a rollback.
+	Fingerprint string `json:"fingerprint,omitempty"`
+	// Previous is the deployment the script had before the current bundle replaced it; nil for a script the bundle created.
+	Previous *previousScript `json:"previous,omitempty"`
+}
+
+type previousScript struct {
+	Versions []deploymentVersion `json:"versions"`
+	Crons    []string            `json:"crons"`
 }
 
 type assetManifestEntry struct {
@@ -122,6 +145,8 @@ type workerBinding struct {
 	ClassName  string  `json:"class_name,omitempty"`
 	ScriptName string  `json:"script_name,omitempty"`
 	Text       *string `json:"text,omitempty"`
+	Service    string  `json:"service,omitempty"`
+	Entrypoint string  `json:"entrypoint,omitempty"`
 }
 
 type assetMetadata struct {
@@ -162,6 +187,7 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	if opts.Name == "" {
 		opts.Name = "mistgate-edge"
 	}
+	// The longest script name is <name>-provision.
 	if !dnsLabelRe.MatchString(opts.Name) || len(opts.Name)+len("-provision") > 63 {
 		return errors.New("--name must be a lowercase DNS-style Worker name of at most 53 characters")
 	}
@@ -176,6 +202,9 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	}
 	if opts.InsecureSkipSignature && opts.BundleDir == "" {
 		return errors.New("--insecure-skip-signature is only available with --bundle DIR")
+	}
+	if opts.Rollback && (opts.Resume || opts.BundleDir != "" || opts.Version != "") {
+		return errors.New("--rollback restores what the local deployment file recorded and cannot be used with --resume, --bundle or --version")
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -203,8 +232,12 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	if err != nil {
 		return err
 	}
-	if opts.Resume && !hasState {
-		return fmt.Errorf("--resume requires the local deployment file %s", opts.StatePath)
+	if (opts.Resume || opts.Rollback) && !hasState {
+		flag := "--resume"
+		if opts.Rollback {
+			flag = "--rollback"
+		}
+		return fmt.Errorf("%s requires the local deployment file %s", flag, opts.StatePath)
 	}
 	if hasState {
 		if err := validateState(state); err != nil {
@@ -213,6 +246,9 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 		if state.Host != strings.ToLower(opts.Host) || state.Name != opts.Name {
 			return errors.New("local deployment file belongs to a different host or Worker name")
 		}
+	}
+	if opts.Rollback {
+		return rollback(ctx, opts, state, out)
 	}
 	if opts.BundleDir == "" && opts.Version == "" {
 		switch {
@@ -233,32 +269,23 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 		return errors.New("resumed edge bundle differs from the bundle recorded in the local deployment file")
 	}
 
-	// The first account request is also the token check: a bad token fails here with a clear message.
 	api := newCFClient(opts.APIBaseURL, opts.Token, opts.HTTPClient)
-	accounts, err := api.accounts(ctx)
+	accountID, foundZone, err := locate(ctx, api, opts, state, hasState)
 	if err != nil {
 		return err
-	}
-	if len(accounts) == 0 {
-		return errors.New("Cloudflare API token cannot access an account")
-	}
-	accountID, foundZone, err := findZone(ctx, api, strings.ToLower(opts.Host), accounts)
-	if err != nil {
-		return err
-	}
-	if hasState && (state.AccountID != accountID || state.ZoneID != foundZone.ID) {
-		return errors.New("the Cloudflare account or zone for this host changed since the local deployment file was created")
 	}
 
-	provisionName := opts.Name + "-provision"
+	names := scriptNames(opts.Name)
 	tags, err := api.scripts(ctx, accountID)
 	if err != nil {
 		return err
 	}
-	_, mainExists := tags[opts.Name]
-	_, provisionExists := tags[provisionName]
-	if !hasState && (mainExists || provisionExists) {
-		return errors.New("a Worker script with this name already exists but its local key file is missing; refusing to replace its secrets")
+	if !hasState {
+		for _, name := range names {
+			if _, exists := tags[name]; exists {
+				return errors.New("a Worker script with this name already exists but its local key file is missing; refusing to replace its secrets")
+			}
+		}
 	}
 
 	databases, err := api.databases(ctx, accountID, opts.Name)
@@ -280,43 +307,47 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 		return fmt.Errorf("more than one D1 database is named %s; remove the extra ones or set database_id in the local deployment file", opts.Name)
 	}
 
-	mainScript, provisionScript := bundle.config.Scripts[1], bundle.config.Scripts[0]
 	// A bundle older than what is deployed is refused before anything is uploaded.
-	for name, script := range map[string]release.EdgeScript{opts.Name: mainScript, provisionName: provisionScript} {
-		if _, err := planMigration(script.Migrations, tags[name]); err != nil {
-			return fmt.Errorf("script %s: %w", name, err)
+	for _, script := range bundle.config.Scripts {
+		if _, err := planMigration(script.Migrations, tags[names[script.Role]]); err != nil {
+			return fmt.Errorf("script %s: %w", names[script.Role], err)
 		}
 	}
 	if opts.DryRun {
-		printPlan(out, opts, bundle, databases, mainExists)
+		printPlan(out, opts, bundle, databases, tags)
 		return nil
 	}
 
 	// The keys reach the local file before anything is created or uploaded; a run without --resume mints a new setup token.
 	if !hasState {
-		state, err = newLocalState(opts, accountID, foundZone.ID, bundle, provisionName)
+		state, err = newLocalState(opts, accountID, foundZone.ID, bundle)
 		if err != nil {
 			return err
 		}
 		if err := createStateFile(opts.StatePath, state); err != nil {
 			return fmt.Errorf("write local deployment file before creating anything: %w", err)
 		}
-	} else {
-		changed := state.BundleVersion != bundle.manifest.Version || state.BundleSHA256 != bundle.manifest.SHA256
-		state.BundleVersion, state.BundleSHA256 = bundle.manifest.Version, bundle.manifest.SHA256
-		if !opts.Resume {
-			if state.SetupToken, err = newSetupToken(opts.Random); err != nil {
+	} else if !opts.Resume {
+		// What the scripts were before this bundle is read once, when the bundle is new to the file. --resume and a rerun of
+		// the same bundle keep it: by then some scripts already hold the new version.
+		if state.BundleSHA256 != bundle.manifest.SHA256 {
+			if err := recordPrevious(ctx, api, accountID, &state, tags); err != nil {
 				return err
 			}
-			changed = true
 		}
-		if changed {
-			if err := replaceStateFile(opts.StatePath, state); err != nil {
-				return fmt.Errorf("update local deployment file before Worker upload: %w", err)
-			}
+		state.BundleVersion, state.BundleSHA256 = bundle.manifest.Version, bundle.manifest.SHA256
+		if state.SetupToken, err = newSetupToken(opts.Random); err != nil {
+			return err
+		}
+		state.Steps = nil
+		if err := replaceStateFile(opts.StatePath, state); err != nil {
+			return fmt.Errorf("update local deployment file before Worker upload: %w", err)
 		}
 	}
 	printKeyFile(out, opts.StatePath)
+	if opts.Resume && len(state.Steps) != 0 {
+		fmt.Fprintf(out, "Resuming; steps of the stopped run that finished: %s\n", strings.Join(state.Steps, ", "))
+	}
 
 	if state.DatabaseID == "" {
 		var database d1Database
@@ -341,59 +372,12 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	if err != nil {
 		return err
 	}
-	modules := map[string][]byte{"worker.js": bundle.files["worker.js"], "provision.js": bundle.files["provision.js"], "panel.wasm": bundle.files["panel.wasm"]}
-	// put uploads one script. The main script's assets are uploaded again before every PUT (see uploadAssets), and its
-	// migrations are only the steps after the tag the script is at; a successful PUT moves that tag to the last step.
-	put := func(name string, script release.EdgeScript, includeExternal bool) error {
-		var assets *assetMetadata
-		if script.Assets != nil {
-			jwt, err := api.uploadAssets(ctx, accountID, name, assetManifest, assetContents)
-			if err != nil {
-				return err
-			}
-			assets = &assetMetadata{JWT: jwt, Config: assetSettings{RunWorkerFirst: true, HTMLHandling: "none", NotFoundHandling: "none"}}
-		}
-		migration, err := planMigration(script.Migrations, tags[name])
-		if err != nil {
-			return fmt.Errorf("script %s: %w", name, err)
-		}
-		if err := api.putScript(ctx, accountID, name, makeScriptMetadata(script, state, bundle, assets, includeExternal, migration), modules); err != nil {
-			return err
-		}
-		if n := len(script.Migrations); n != 0 {
-			tags[name] = script.Migrations[n-1].Tag
-		} else {
-			tags[name] = ""
-		}
-		return nil
+	run := &deployRun{
+		ctx: ctx, api: api, opts: opts, state: &state, bundle: bundle, tags: tags, accountID: accountID,
+		assetManifest: assetManifest, assetContents: assetContents,
 	}
-	// The scripts bind each other's Durable Objects: a first deploy puts main without PROVISIONER, then provision, then main.
-	if !mainExists {
-		if err := put(opts.Name, mainScript, false); err != nil {
-			return err
-		}
-	}
-	if err := put(provisionName, provisionScript, true); err != nil {
+	if err := run.deploy(); err != nil {
 		return err
-	}
-	if err := put(opts.Name, mainScript, true); err != nil {
-		return err
-	}
-
-	if len(mainScript.Cron) != 0 {
-		if err := api.putSchedules(ctx, accountID, opts.Name, mainScript.Cron); err != nil {
-			return err
-		}
-	}
-	for _, name := range []string{opts.Name, provisionName} {
-		if err := api.disableSubdomain(ctx, accountID, name); err != nil {
-			return err
-		}
-	}
-	if mainScript.Routes {
-		if err := api.putDomain(ctx, accountID, state.ZoneID, state.Host, opts.Name); err != nil {
-			return err
-		}
 	}
 
 	decoyURL := opts.DecoyURL
@@ -416,6 +400,209 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 		fmt.Fprintf(out, "Note: %s did not answer HTTP 200 yet; Cloudflare may still be issuing the domain's certificate. The deploy is finished: open the link in a few minutes.\n", state.PublicURL)
 	}
 	return nil
+}
+
+// locate is the first account request, which is also the token check (a bad token fails here with a clear message), and
+// finds the account and the zone of the host. A key file pins both: a different account or zone is an error.
+func locate(ctx context.Context, api *cfClient, opts Options, state localState, hasState bool) (string, zone, error) {
+	accounts, err := api.accounts(ctx)
+	if err != nil {
+		return "", zone{}, err
+	}
+	if len(accounts) == 0 {
+		return "", zone{}, errors.New("Cloudflare API token cannot access an account")
+	}
+	accountID, foundZone, err := findZone(ctx, api, strings.ToLower(opts.Host), accounts)
+	if err != nil {
+		return "", zone{}, err
+	}
+	if hasState && (state.AccountID != accountID || state.ZoneID != foundZone.ID) {
+		return "", zone{}, errors.New("the Cloudflare account or zone for this host changed since the local deployment file was created")
+	}
+	return accountID, foundZone, nil
+}
+
+// scriptNames maps a role to the name of its script under the base name.
+func scriptNames(name string) map[string]string {
+	names := make(map[string]string, len(release.EdgeRoles))
+	for _, role := range release.EdgeRoles {
+		names[role] = release.EdgeScriptName(name, role)
+	}
+	return names
+}
+
+// recordPrevious writes down, for every script that exists, the versions of its active deployment and its cron schedule:
+// what --rollback puts back. A script that does not exist yet has nothing to go back to.
+func recordPrevious(ctx context.Context, api *cfClient, accountID string, state *localState, tags map[string]string) error {
+	for _, role := range release.EdgeRoles {
+		script := state.Scripts[role]
+		script.Previous = nil
+		if _, exists := tags[script.Name]; exists {
+			versions, err := api.activeDeployment(ctx, accountID, script.Name)
+			if err != nil {
+				return err
+			}
+			crons, err := api.schedules(ctx, accountID, script.Name)
+			if err != nil {
+				return err
+			}
+			if len(versions) != 0 {
+				script.Previous = &previousScript{Versions: versions, Crons: crons}
+			}
+		}
+		state.Scripts[role] = script
+	}
+	return nil
+}
+
+// deployRun is one upload of the bundle. Every step is idempotent, so a stopped run is repeated from the start with --resume;
+// a script whose last upload finished with the same content is not uploaded again.
+type deployRun struct {
+	ctx           context.Context
+	api           *cfClient
+	opts          Options
+	state         *localState
+	bundle        *bundle
+	tags          map[string]string // script name -> migration tag; present = the script exists
+	accountID     string
+	assetManifest map[string]assetManifestEntry
+	assetContents map[string]assetContent
+}
+
+// deploy uploads the scripts in the order of the bundle (what a script binds is uploaded before it, FRONT last) and attaches
+// the domain to the script that takes the routes. A FRONT that does not exist yet goes up first with no service bindings:
+// link binds FRONT's Durable Objects and FRONT binds the other scripts as services.
+func (d *deployRun) deploy() error {
+	for _, script := range d.bundle.config.Scripts {
+		if _, exists := d.tags[d.name(script.Role)]; len(script.Services) != 0 && !exists {
+			// The script that is about to exist without its services must not count as uploaded, whatever an earlier
+			// upload of it left in the key file: its upload with the services must happen.
+			scriptState := d.state.Scripts[script.Role]
+			scriptState.Fingerprint = ""
+			d.state.Scripts[script.Role] = scriptState
+			if err := replaceStateFile(d.opts.StatePath, *d.state); err != nil {
+				return fmt.Errorf("update local deployment file before Worker upload: %w", err)
+			}
+			if err := d.put(script, false); err != nil {
+				return err
+			}
+			if err := d.api.disableSubdomain(d.ctx, d.accountID, d.name(script.Role)); err != nil {
+				return err
+			}
+		}
+	}
+	for _, script := range d.bundle.config.Scripts {
+		if err := d.deployScript(script); err != nil {
+			return err
+		}
+	}
+	for _, script := range d.bundle.config.Scripts {
+		if script.Routes {
+			if err := d.api.putDomain(d.ctx, d.accountID, d.state.ZoneID, d.state.Host, d.name(script.Role)); err != nil {
+				return err
+			}
+			if err := d.done("domain"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (d *deployRun) name(role string) string { return d.state.Scripts[role].Name }
+
+// done records a finished step in the key file; a step that a resumed run repeats is recorded once.
+func (d *deployRun) done(step string) error {
+	if !slices.Contains(d.state.Steps, step) {
+		d.state.Steps = append(d.state.Steps, step)
+	}
+	if err := replaceStateFile(d.opts.StatePath, *d.state); err != nil {
+		return fmt.Errorf("record step %s in the local deployment file: %w", step, err)
+	}
+	return nil
+}
+
+func (d *deployRun) deployScript(script release.EdgeScript) error {
+	name := d.name(script.Role)
+	fingerprint, err := d.fingerprint(script)
+	if err != nil {
+		return err
+	}
+	pending, err := planMigration(script.Migrations, d.tags[name])
+	if err != nil {
+		return fmt.Errorf("script %s: %w", name, err)
+	}
+	_, exists := d.tags[name]
+	if !exists || pending != nil || d.state.Scripts[script.Role].Fingerprint != fingerprint {
+		if err := d.put(script, true); err != nil {
+			return err
+		}
+	}
+	// A script that is not uploaded again still gets the cheap, idempotent calls: they repair what was changed by hand.
+	if err := d.api.disableSubdomain(d.ctx, d.accountID, name); err != nil {
+		return err
+	}
+	if len(script.Cron) != 0 {
+		if err := d.api.putSchedules(d.ctx, d.accountID, name, script.Cron); err != nil {
+			return err
+		}
+	}
+	scriptState := d.state.Scripts[script.Role]
+	scriptState.Fingerprint = fingerprint
+	d.state.Scripts[script.Role] = scriptState
+	return d.done(script.Role)
+}
+
+// put uploads one script. The assets of a script are uploaded again before every PUT (see uploadAssets), and its migrations
+// are only the steps after the tag the script is at; a successful PUT moves that tag to the last step.
+func (d *deployRun) put(script release.EdgeScript, withServices bool) error {
+	name := d.name(script.Role)
+	var assets *assetMetadata
+	if script.Assets != nil {
+		jwt, err := d.api.uploadAssets(d.ctx, d.accountID, name, d.assetManifest, d.assetContents)
+		if err != nil {
+			return err
+		}
+		assets = &assetMetadata{JWT: jwt, Config: assetSettings{RunWorkerFirst: true, HTMLHandling: "none", NotFoundHandling: "none"}}
+	}
+	migration, err := planMigration(script.Migrations, d.tags[name])
+	if err != nil {
+		return fmt.Errorf("script %s: %w", name, err)
+	}
+	if err := d.api.putScript(d.ctx, d.accountID, name, makeScriptMetadata(script, *d.state, d.bundle, assets, withServices, migration), d.bundle.files); err != nil {
+		return err
+	}
+	d.tags[name] = ""
+	if n := len(script.Migrations); n != 0 {
+		d.tags[name] = script.Migrations[n-1].Tag
+	}
+	return nil
+}
+
+// fingerprint hashes everything an upload of the script would send, but the one-off assets token: the metadata with the
+// secret values (so a new secret uploads the script), the migration steps, the modules and the assets. The secrets are in the
+// hash only; the key file keeps nothing it did not keep before.
+func (d *deployRun) fingerprint(script release.EdgeScript) (string, error) {
+	modules := make(map[string]string, len(script.Modules))
+	for _, m := range script.Modules {
+		sum := sha256.Sum256(d.bundle.files[m.Name])
+		modules[m.Name] = hex.EncodeToString(sum[:])
+	}
+	content := struct {
+		Metadata   scriptMetadata
+		Migrations []release.EdgeMigrate
+		Modules    map[string]string
+		Assets     map[string]assetManifestEntry
+	}{Metadata: makeScriptMetadata(script, *d.state, d.bundle, nil, true, nil), Migrations: script.Migrations, Modules: modules}
+	if script.Assets != nil {
+		content.Assets = d.assetManifest
+	}
+	raw, err := json.Marshal(content)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func printKeyFile(out io.Writer, statePath string) {
@@ -545,8 +732,16 @@ func loadExistingState(path string) (localState, bool, error) {
 }
 
 func validateState(state localState) error {
-	if state.Schema != stateVersion || validateHost(state.Host) != nil || !dnsLabelRe.MatchString(state.Name) || state.ProvisionName != state.Name+"-provision" {
-		return errors.New("unsupported or malformed state")
+	if state.Schema != stateVersion || validateHost(state.Host) != nil || !dnsLabelRe.MatchString(state.Name) {
+		return fmt.Errorf("unsupported or malformed state (this mistgate reads schema %d)", stateVersion)
+	}
+	if len(state.Scripts) != len(release.EdgeRoles) {
+		return errors.New("the script names are missing")
+	}
+	for role, name := range scriptNames(state.Name) {
+		if state.Scripts[role].Name != name {
+			return fmt.Errorf("the name of the %s script is not %s", role, name)
+		}
 	}
 	if state.PublicURL != "https://"+state.Host || !prefixRe.MatchString(state.AdminPrefix) || !prefixRe.MatchString(state.SubPrefix) {
 		return errors.New("invalid public URL or secret path prefix")
@@ -574,7 +769,7 @@ func newSetupToken(r io.Reader) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw[:]), nil
 }
 
-func newLocalState(opts Options, accountID, zoneID string, bundle *bundle, provisionName string) (localState, error) {
+func newLocalState(opts Options, accountID, zoneID string, bundle *bundle) (localState, error) {
 	var master [32]byte
 	var prefixAdmin, prefixSub [15]byte
 	if _, err := io.ReadFull(opts.Random, master[:]); err != nil {
@@ -590,8 +785,12 @@ func newLocalState(opts Options, accountID, zoneID string, bundle *bundle, provi
 	if err != nil {
 		return localState{}, err
 	}
+	scripts := make(map[string]scriptState, len(release.EdgeRoles))
+	for role, name := range scriptNames(opts.Name) {
+		scripts[role] = scriptState{Name: name}
+	}
 	return localState{
-		Schema: stateVersion, Host: strings.ToLower(opts.Host), Name: opts.Name, ProvisionName: provisionName,
+		Schema: stateVersion, Host: strings.ToLower(opts.Host), Name: opts.Name, Scripts: scripts,
 		AccountID: accountID, ZoneID: zoneID, DatabaseName: opts.Name,
 		PublicURL:   "https://" + strings.ToLower(opts.Host),
 		AdminPrefix: secretPrefix(prefixAdmin[:]), SubPrefix: secretPrefix(prefixSub[:]),
@@ -710,7 +909,7 @@ func buildAssetManifest(files map[string][]byte) (map[string]assetManifestEntry,
 	return manifest, contents, nil
 }
 
-func makeScriptMetadata(script release.EdgeScript, state localState, b *bundle, assets *assetMetadata, includeExternal bool, migration *migrationRequest) scriptMetadata {
+func makeScriptMetadata(script release.EdgeScript, state localState, b *bundle, assets *assetMetadata, withServices bool, migration *migrationRequest) scriptMetadata {
 	meta := scriptMetadata{
 		MainModule: script.MainModule, CompatibilityDate: b.config.CompatibilityDate,
 		CompatibilityFlags: append([]string{}, b.config.CompatibilityFlags...),
@@ -724,13 +923,13 @@ func makeScriptMetadata(script release.EdgeScript, state localState, b *bundle, 
 	for _, object := range script.DurableObjects {
 		meta.Bindings = append(meta.Bindings, workerBinding{Type: "durable_object_namespace", Name: object.Binding, ClassName: object.ClassName})
 	}
-	if includeExternal {
-		for _, object := range script.ExternalObjects {
-			scriptName := state.Name
-			if object.ScriptRole == "provision" {
-				scriptName = state.ProvisionName
-			}
-			meta.Bindings = append(meta.Bindings, workerBinding{Type: "durable_object_namespace", Name: object.Binding, ClassName: object.ClassName, ScriptName: scriptName})
+	for _, object := range script.ExternalObjects {
+		meta.Bindings = append(meta.Bindings, workerBinding{Type: "durable_object_namespace", Name: object.Binding, ClassName: object.ClassName, ScriptName: state.Scripts[object.ScriptRole].Name})
+	}
+	// A FRONT that does not exist yet goes up without these: the scripts they name are not there (see deployRun.deploy).
+	if withServices {
+		for _, service := range script.Services {
+			meta.Bindings = append(meta.Bindings, workerBinding{Type: "service", Name: service.Binding, Service: state.Scripts[service.ServiceRole].Name, Entrypoint: service.Entrypoint})
 		}
 	}
 	if script.Assets != nil {
@@ -765,22 +964,85 @@ func textBinding(kind, name, text string) workerBinding {
 	return workerBinding{Type: kind, Name: name, Text: &text}
 }
 
-func printPlan(out io.Writer, opts Options, b *bundle, databases []d1Database, mainExists bool) {
-	fmt.Fprintf(out, "Plan for %s (edge bundle %s):\n", opts.Host, b.manifest.Version)
-	fmt.Fprintf(out, "  account and zone: check the token, find the Cloudflare DNS zone for %s\n", opts.Host)
+// printPlan lists the calls of a real run, in order. It names the bindings and never prints a value.
+func printPlan(out io.Writer, opts Options, b *bundle, databases []d1Database, tags map[string]string) {
+	names := scriptNames(opts.Name)
+	scripts := make(map[string]scriptState, len(names))
+	for role, name := range names {
+		scripts[role] = scriptState{Name: name}
+	}
+	state := localState{Name: opts.Name, Scripts: scripts, DatabaseID: "(the D1 database)"}
+	n := 0
+	call := func(format string, a ...any) {
+		n++
+		fmt.Fprintf(out, "  %2d. %s\n", n, fmt.Sprintf(format, a...))
+	}
+	fmt.Fprintf(out, "Plan for %s (edge bundle %s). Already done by this dry run: GET the accounts, the zone of the host, the scripts and the D1 databases.\n", opts.Host, b.manifest.Version)
 	if len(databases) == 1 {
-		fmt.Fprintf(out, "  D1: reuse database %s (%s)\n", databases[0].Name, databases[0].UUID)
+		call("D1: reuse database %s (%s)", databases[0].Name, databases[0].UUID)
 	} else {
-		fmt.Fprintf(out, "  D1: create database %s in %s\n", opts.Name, opts.D1Location)
+		call("POST d1/database: create %s in %s", opts.Name, opts.D1Location)
 	}
-	provisionName := opts.Name + "-provision"
-	if !mainExists {
-		fmt.Fprintf(out, "  scripts: %s without PROVISIONER, %s, %s with PROVISIONER\n", opts.Name, provisionName, opts.Name)
-	} else {
-		fmt.Fprintf(out, "  scripts: %s, %s\n", provisionName, opts.Name)
+	upload := func(script release.EdgeScript, withServices bool, note string) {
+		name := names[script.Role]
+		if script.Assets != nil {
+			call("POST scripts/%s/assets-upload-session, then POST workers/assets/upload for the files Cloudflare asks for", name)
+		}
+		var items []string
+		for _, binding := range makeScriptMetadata(script, state, b, nil, withServices, nil).Bindings {
+			items = append(items, describeBinding(binding))
+		}
+		modules := make([]string, 0, len(script.Modules))
+		for _, m := range script.Modules {
+			modules = append(modules, m.Name)
+		}
+		call("PUT scripts/%s%s: %s; %s", name, note, strings.Join(modules, ", "), strings.Join(items, ", "))
 	}
-	fmt.Fprintln(out, "  schedules: main script; disable workers.dev and previews on both scripts; attach the custom domain")
-	fmt.Fprintln(out, "  final check: GET the decoy page until it returns HTTP 200")
+	for _, script := range b.config.Scripts {
+		if _, exists := tags[names[script.Role]]; len(script.Services) != 0 && !exists {
+			upload(script, false, " (first create, without its service bindings)")
+			call("POST scripts/%s/subdomain: workers.dev and previews off", names[script.Role])
+		}
+	}
+	for _, script := range b.config.Scripts {
+		note := ""
+		if _, exists := tags[names[script.Role]]; exists {
+			note = " (skipped when it is unchanged since the last deploy)"
+		}
+		upload(script, true, note)
+		call("POST scripts/%s/subdomain: workers.dev and previews off", names[script.Role])
+		if len(script.Cron) != 0 {
+			call("PUT scripts/%s/schedules: %s", names[script.Role], strings.Join(script.Cron, ", "))
+		}
+	}
+	for _, script := range b.config.Scripts {
+		if script.Routes {
+			call("PUT workers/domains: %s -> %s", opts.Host, names[script.Role])
+		}
+	}
+	call("GET https://%s/ until it returns HTTP 200", opts.Host)
+}
+
+func describeBinding(b workerBinding) string {
+	switch b.Type {
+	case "d1":
+		return "d1 " + b.Name
+	case "durable_object_namespace":
+		if b.ScriptName != "" {
+			return fmt.Sprintf("do %s (%s of %s)", b.Name, b.ClassName, b.ScriptName)
+		}
+		return fmt.Sprintf("do %s (own %s)", b.Name, b.ClassName)
+	case "service":
+		if b.Entrypoint != "" {
+			return fmt.Sprintf("service %s -> %s#%s", b.Name, b.Service, b.Entrypoint)
+		}
+		return fmt.Sprintf("service %s -> %s", b.Name, b.Service)
+	case "secret_text":
+		return "secret " + b.Name
+	case "plain_text":
+		return "var " + b.Name
+	}
+	return b.Type + " " + b.Name
 }
 
 func redactError(err error, token string) error {

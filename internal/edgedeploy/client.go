@@ -288,8 +288,8 @@ type uploadSession struct {
 	Buckets [][]string `json:"buckets"`
 }
 
-// uploadAssets runs the direct-upload flow for the main script and returns the completion token that its next PUT carries
-// in assets.jwt. It is called before every PUT of the main script: a hash Cloudflare already has is not asked for again,
+// uploadAssets runs the direct-upload flow for a script and returns the completion token that its next PUT carries
+// in assets.jwt. It is called before every PUT of a script with assets: a hash Cloudflare already has is not asked for again,
 // so the second call usually has no buckets and the session token is itself the completion token.
 func (c *cfClient) uploadAssets(ctx context.Context, accountID, script string, manifest map[string]assetManifestEntry, contents map[string]assetContent) (string, error) {
 	var session uploadSession
@@ -417,6 +417,57 @@ func (c *cfClient) putSchedules(ctx context.Context, accountID, name string, cro
 		return fmt.Errorf("set Worker schedules: %w", err)
 	}
 	return nil
+}
+
+// deploymentVersion is one version of a deployment and the share of the traffic it takes.
+type deploymentVersion struct {
+	VersionID  string  `json:"version_id"`
+	Percentage float64 `json:"percentage"`
+}
+
+// activeDeployment returns the versions of the script's current deployment: the first of the list, which the API sorts newest
+// first. nil if the script has no deployment.
+func (c *cfClient) activeDeployment(ctx context.Context, accountID, name string) ([]deploymentVersion, error) {
+	var result struct {
+		Deployments []struct {
+			Versions []deploymentVersion `json:"versions"`
+		} `json:"deployments"`
+	}
+	if err := c.get(ctx, "/accounts/"+url.PathEscape(accountID)+"/workers/scripts/"+url.PathEscape(name)+"/deployments", &result); err != nil {
+		return nil, fmt.Errorf("read the deployment of Worker %s: %w", name, err)
+	}
+	if len(result.Deployments) == 0 {
+		return nil, nil
+	}
+	return result.Deployments[0].Versions, nil
+}
+
+// setDeployment makes the given versions the active deployment of the script. force is needed because a secret may have been
+// changed since the version was uploaded (Cloudflare refuses a deployment of older secrets otherwise).
+func (c *cfClient) setDeployment(ctx context.Context, accountID, name string, versions []deploymentVersion) error {
+	path := "/accounts/" + url.PathEscape(accountID) + "/workers/scripts/" + url.PathEscape(name) + "/deployments?force=true"
+	body := map[string]any{"strategy": "percentage", "versions": versions}
+	if err := c.json(ctx, http.MethodPost, path, body, nil); err != nil {
+		return fmt.Errorf("set the deployment of Worker %s: %w", name, err)
+	}
+	return nil
+}
+
+// schedules returns the cron expressions of the script, in the order the API gives them.
+func (c *cfClient) schedules(ctx context.Context, accountID, name string) ([]string, error) {
+	var result struct {
+		Schedules []struct {
+			Cron string `json:"cron"`
+		} `json:"schedules"`
+	}
+	if err := c.get(ctx, "/accounts/"+url.PathEscape(accountID)+"/workers/scripts/"+url.PathEscape(name)+"/schedules", &result); err != nil {
+		return nil, fmt.Errorf("read the schedules of Worker %s: %w", name, err)
+	}
+	crons := make([]string, 0, len(result.Schedules))
+	for _, s := range result.Schedules {
+		crons = append(crons, s.Cron)
+	}
+	return crons, nil
 }
 
 // disableSubdomain turns off the script's workers.dev name and its preview URLs (POST, not PUT).

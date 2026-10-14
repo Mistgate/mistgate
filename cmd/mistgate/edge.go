@@ -17,6 +17,7 @@ import (
 
 const edgeUsage = `usage:
   mistgate edge deploy --host panel.example.com [--name mistgate-edge] [--d1-location weur] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
+  mistgate edge deploy --host panel.example.com [--name mistgate-edge] --rollback [--dry-run]
   mistgate edge setup-link --file mistgate-edge-<name>.json
 
 The Cloudflare API token is read only from CLOUDFLARE_API_TOKEN.
@@ -56,12 +57,13 @@ func runEdgeDeploy(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("mistgate edge deploy", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	host := fs.String("host", "", "public panel hostname, without scheme or path")
-	name := fs.String("name", "mistgate-edge", "main Worker script name")
+	name := fs.String("name", "mistgate-edge", "base name of the Workers: the front Worker has it, the others are <name>-link, -public, -admin, -jobs and -provision; also the name of the D1 database")
 	d1Location := fs.String("d1-location", "weur", "Cloudflare D1 location")
 	bundleDir := fs.String("bundle", "", "local edge release directory")
 	version := fs.String("version", "", "edge release tag, vX.Y.Z (default: this binary's own release)")
 	resume := fs.Bool("resume", false, "resume using the local deployment file")
 	dryRun := fs.Bool("dry-run", false, "print the plan and make GET requests only")
+	rollback := fs.Bool("rollback", false, "put every Worker back on the version it had before the last deploy (the D1 database is not rolled back)")
 	skipSignature := fs.Bool("insecure-skip-signature", false, "skip signature verification for a local development bundle")
 	if err := fs.Parse(args); err != nil {
 		return edgeParseError(err, out)
@@ -84,7 +86,7 @@ func runEdgeDeploy(args []string, out io.Writer) error {
 	defer stop()
 	return edgedeploy.Deploy(ctx, edgedeploy.Options{
 		Host: *host, Name: *name, D1Location: *d1Location, BundleDir: *bundleDir, Version: *version, DefaultVersion: edgeDefaultVersion(),
-		Resume: *resume, DryRun: *dryRun, InsecureSkipSignature: *skipSignature,
+		Resume: *resume, DryRun: *dryRun, Rollback: *rollback, InsecureSkipSignature: *skipSignature,
 		Token: os.Getenv("CLOUDFLARE_API_TOKEN"), PublicKey: pub,
 	}, out)
 }

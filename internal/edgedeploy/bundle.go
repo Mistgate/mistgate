@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -94,30 +93,20 @@ func readBundle(ctx context.Context, opts Options, httpClient *http.Client, now 
 	if !ok {
 		return nil, errors.New("edge bundle is missing edge.json")
 	}
-	var config release.EdgeConfig
-	dec := json.NewDecoder(bytes.NewReader(configBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&config); err != nil {
-		return nil, fmt.Errorf("decode edge.json: %w", err)
+	// ParseEdgeConfig refuses a schema other than 2 with a message that says what to do (schema 1 is the single-Worker edition).
+	parsed, err := release.ParseEdgeConfig(configBytes)
+	if err != nil {
+		return nil, err
 	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return nil, errors.New("decode edge.json: trailing data")
-	}
-	if config.Schema != release.EdgeSchema || config.Version != manifest.Version {
-		return nil, fmt.Errorf("edge.json schema or version does not match the signed manifest")
+	config := *parsed
+	if config.Version != manifest.Version {
+		return nil, errors.New("edge.json version does not match the signed manifest")
 	}
 	if !reflect.DeepEqual(config, release.NewEdgeConfig(manifest.Version)) {
 		return nil, errors.New("edge.json bindings, migrations, or script modules do not match the release contract")
 	}
-	for _, name := range []string{"worker.js", "provision.js", "panel.wasm"} {
-		if _, ok := files[name]; !ok {
-			return nil, fmt.Errorf("edge bundle is missing %s", name)
-		}
-	}
-	for name := range files {
-		if name != release.EdgeConfigName && name != "worker.js" && name != "provision.js" && name != "panel.wasm" && !strings.HasPrefix(name, "assets/") {
-			return nil, fmt.Errorf("edge bundle contains unexpected file %s", name)
-		}
+	if err := config.CheckFiles(files); err != nil {
+		return nil, err
 	}
 	return &bundle{manifest: manifest, config: config, files: files}, nil
 }

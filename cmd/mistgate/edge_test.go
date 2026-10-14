@@ -57,3 +57,20 @@ func TestEdgeDeployOfADevelopmentBuildNeedsAVersion(t *testing.T) {
 		t.Fatalf("development build without a version: %v", err)
 	}
 }
+
+func TestEdgeRollbackIsAFlagAndNeedsTheKeyFile(t *testing.T) {
+	var usage bytes.Buffer
+	if err := runEdge([]string{"help"}, &usage); err != nil || !strings.Contains(usage.String(), "--rollback") {
+		t.Fatalf("usage lacks --rollback: %v %q", err, usage.String())
+	}
+	t.Setenv("CLOUDFLARE_API_TOKEN", "token-value-must-not-appear")
+	t.Chdir(t.TempDir())
+	err := runEdgeDeploy([]string{"--host", "panel.example.com", "--rollback"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "--rollback requires the local deployment file") || strings.Contains(err.Error(), "token-value") {
+		t.Fatalf("rollback without a key file: %v", err)
+	}
+	err = runEdgeDeploy([]string{"--host", "panel.example.com", "--rollback", "--resume"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "cannot be used with") {
+		t.Fatalf("rollback with --resume: %v", err)
+	}
+}
