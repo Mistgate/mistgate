@@ -61,8 +61,8 @@ VLESS 可以通过 TCP 运行（搭配 XHTTP，或搭配 RAW 和 Vision），也
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-zh.webp"><img alt="客户端视角检测：按协议列出各节点，并显示通过每条隧道的延迟" src="docs/images/readme/health-dark-zh.webp" width="100%"></picture><br><sub><b>客户端视角检测。</b>每个节点上的每种协议，以及通过隧道的延迟。</sub></td>
 </tr>
 <tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/user-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/user-light-zh.webp"><img alt="用户页面：流量配额、有效期、按设备 ID 区分的每台设备、AmneziaVPN 密钥，以及计入配额的流量" src="docs/images/readme/user-dark-zh.webp" width="100%"></picture><br><sub><b>用户。</b>流量配额、有效期、按设备 ID 区分的每台设备，以及计入配额的流量。</sub></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/phone-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/phone-light-zh.webp"><img alt="手机上的用户页面：剩余天数、流量，以及应用中的服务器" src="docs/images/readme/phone-dark-zh.webp" width="100%"></picture><br><sub><b>用户在浏览器中打开自己的链接。</b>剩余天数、流量和他的服务器。</sub></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/user-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/user-light-zh.webp"><img alt="用户页面：流量、按设备 ID 区分的每台设备和 AmneziaVPN 密钥，以及流量配额、有效期、设备上限和限速" src="docs/images/readme/user-dark-zh.webp" width="100%"></picture><br><sub><b>用户。</b>按设备 ID 区分的设备、计入配额的流量和各项限制。</sub></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/phone-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/phone-light-zh.webp"><img alt="手机上的用户页面：剩余天数、流量，以及他的设备和「添加设备」按钮" src="docs/images/readme/phone-dark-zh.webp" width="100%"></picture><br><sub><b>用户在浏览器中打开自己的链接。</b>剩余天数、流量和他的设备。</sub></td>
 </tr>
 </table>
 
