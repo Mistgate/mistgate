@@ -136,6 +136,13 @@ var procedureLevels = map[string]level{
 	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure: levelOwner, // also needs a step-up
 	adminv1connect.GlobalpingServiceTestGlobalpingProcedure:       levelOwner,
+	// BlocklistService: the block-list source of the country check. It sends nothing anywhere (the lists are downloaded, no
+	// address goes out), but it is an integration like the other, so all of it is the owner's; changing it also needs a step-up
+	// (the handlers). Not open to tokens (policy_tokens.go).
+	adminv1connect.BlocklistServiceGetBlocklistProcedure:        levelOwner,
+	adminv1connect.BlocklistServiceUpdateBlocklistProcedure:     levelOwner, // also needs a step-up
+	adminv1connect.BlocklistServiceDisconnectBlocklistProcedure: levelOwner, // also needs a step-up
+	adminv1connect.BlocklistServiceTestBlocklistProcedure:       levelOwner,
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
 	// so no step-up. Not open to tokens.
 	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,

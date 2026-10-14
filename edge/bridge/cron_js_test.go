@@ -125,9 +125,9 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, waitUntil)
 	counts := binding.Call("__endQueryCount")
 	ended = true
-	// four for the sweeps, one for the country-check setting (off by default: nothing else happens)
-	if got := counts.Get("sequentialQueries").Int(); got != 5 {
-		t.Fatalf("cron used %d sequential D1 calls, want 5", got)
+	// four for the sweeps, one each for the settings of the two country sources (off by default: nothing else happens)
+	if got := counts.Get("sequentialQueries").Int(); got != 6 {
+		t.Fatalf("cron used %d sequential D1 calls, want 6", got)
 	}
 	if got := remote.pokeCount(); got != 1 {
 		t.Fatalf("minute 10 remote fan-outs = %d, want 1", got)
@@ -149,8 +149,8 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, retentionOut.Get("waitUntil"))
 	retentionCounts := binding.Call("__endQueryCount")
 	retentionEnded = true
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 12 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 12 (4 tick + 8 retention: the prunes of old revoked devices and of old country checks are two of them)", got)
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 14 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 14 (5 tick + 9 retention: the prunes of old revoked devices, of old country checks and of old block-list checks are three of them)", got)
 	}
 	// Two batches: the node-down sweep's live read (every tick) and the daily rollup; the prunes are single statements.
 	if got := retentionCounts.Get("batchCalls").Int(); got != 2 {

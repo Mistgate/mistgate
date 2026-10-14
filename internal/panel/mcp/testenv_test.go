@@ -624,6 +624,7 @@ func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksReq
 		}}}},
 		UdpLoss: &adminv1.UdpLossNotice{NodeIds: []string{nodeA}, SharePercent: 40},
 		CountryChecks: []*adminv1.CountryCheck{{NodeId: nodeA, Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED, AtUnix: 1700000500, Eyeball: true,
+			Confidence: "eyeball", ListedBy: []string{"antifilter_ipsum"}, CdnProvider: "ExampleHost", CdnRegion: "eu",
 			Probes: []*adminv1.CountryProbe{
 				{Network: "Rostelecom", Asn: 12389, City: "Moscow", IcmpOk: true, IcmpMs: 23, Valid: true, Tcp: []*adminv1.PortResult{{Port: 443}}},
 				{Network: "Beeline", Valid: false},

@@ -1021,15 +1021,23 @@ type countryProbeV struct {
 	Valid   bool           `json:"valid"` // false: it failed the control site or went offline; shown, not counted
 }
 
-// countryCheckV: verdict is ok, tcp_blocked (ICMP passes, TCP is cut), blocked or unknown (reason says why). Network names
-// come from a third party and are shown as data.
+// countryCheckV: verdict is ok, tcp_blocked (ICMP passes, TCP is cut), blocked, listed (no live check, but the node's address
+// is in a public block list: in the registry, not proven dropped) or unknown (reason says why a live round was not enough).
+// Network names come from a third party and are shown as data.
 type countryCheckV struct {
-	Country string          `json:"country"`
-	Verdict string          `json:"verdict"`
-	AtUnix  int64           `json:"at_unix"`
-	Reason  string          `json:"reason,omitempty"`
-	Eyeball bool            `json:"eyeball,omitempty"` // the probes are home or mobile networks
-	Probes  []countryProbeV `json:"probes"`
+	Country string `json:"country"`
+	Verdict string `json:"verdict"`
+	AtUnix  int64  `json:"at_unix"`
+	Reason  string `json:"reason,omitempty"`
+	Eyeball bool   `json:"eyeball,omitempty"` // the probes are home or mobile networks
+	// Confidence: eyeball or dc_only (a live check), listed (a block list only); absent when there is nothing to say.
+	Confidence string `json:"confidence,omitempty"`
+	// ListedBy: the block lists that hold the node's address (antifilter_ipsum, antifilter_community). CDNProvider and
+	// CDNRegion: the CDN or hosting range the address is in. All three are empty while the block-list source is off.
+	ListedBy    []string        `json:"listed_by,omitempty"`
+	CDNProvider string          `json:"cdn_provider,omitempty"`
+	CDNRegion   string          `json:"cdn_region,omitempty"`
+	Probes      []countryProbeV `json:"probes"`
 }
 
 func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
@@ -1037,7 +1045,11 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 		return nil
 	}
 	v := &countryCheckV{Country: clean(c.GetCountry(), 8), Verdict: enumName("COUNTRY_VERDICT_", c.GetVerdict().String()), AtUnix: c.GetAtUnix(),
-		Reason: clean(c.GetReason(), 40), Eyeball: c.GetEyeball(), Probes: []countryProbeV{}}
+		Reason: clean(c.GetReason(), 40), Eyeball: c.GetEyeball(), Confidence: clean(c.GetConfidence(), 16),
+		CDNProvider: nm(c.GetCdnProvider()), CDNRegion: nm(c.GetCdnRegion()), Probes: []countryProbeV{}}
+	for _, l := range c.GetListedBy() {
+		v.ListedBy = append(v.ListedBy, clean(l, 40))
+	}
 	for _, p := range c.GetProbes() {
 		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
 		for _, t := range p.GetTcp() {

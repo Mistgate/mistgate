@@ -14,12 +14,15 @@ const (
 	// A country round creates a measurement per node and port and waits for them together, up to a minute; the Worker's cron
 	// invocation allows it, and the round's own deadline (health.Config.CountryRoundTimeout) is the same minute.
 	edgeCountryTimeout = 55 * time.Second
+	// The block lists download about a megabyte when a check is due (every six hours, or for a node without a result).
+	edgeBlocklistTimeout = 30 * time.Second
 )
 
 var edgeTickJobs = map[string]string{
 	"access":    "user status sweep every tick",
 	"fleet":     "node-down sweep every tick and desired-state safety net every 10 minutes",
 	"health":    "health retention at minute 17, and the country check when a round is due",
+	"blocklist": "the block-list check of the country check, when one is due (one setting read while it is off)",
 	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 }
 
@@ -82,6 +85,14 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 			p.Health.ReconcileCountry(cctx)
 		}
 		cancel()
+		// The block lists, the second source: off by default, then it costs one read (its setting) and sends nothing. When it is
+		// on, a check is due for a node without a result and every six hours; the lists are then downloaded and kept for the
+		// life of this isolate only.
+		if p.Blocklist != nil {
+			bctx, bcancel := context.WithTimeout(ctx, edgeBlocklistTimeout)
+			p.Blocklist.Tick(bctx)
+			bcancel()
+		}
 	}
 	if now.UTC().Minute() == 17 {
 		run("health retention", func(ctx context.Context) error {

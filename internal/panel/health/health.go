@@ -106,6 +106,10 @@ type Config struct {
 	// Country returns the owner's choice for the country check and the source that measures it (the Globalping integration),
 	// read on every use so that a change applies at once. nil, or Enabled false, or a nil source: the check is off.
 	Country func(context.Context) (CountryConfig, CountrySource)
+	// Lists says whether the block-list source of the country check (internal/panel/blocklist) is on and covers the country,
+	// read on every use. When it is, GetChecks adds what the lists say of each node to the verdict (countryreach.Combine).
+	// nil: it is off. The lists never open an alert.
+	Lists func(context.Context) bool
 	// Resolve looks a node's name up on the panel's side, for the country check. Default: the system resolver (DNS over
 	// HTTPS on the Cloudflare edition, which has none).
 	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)

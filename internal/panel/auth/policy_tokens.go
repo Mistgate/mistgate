@@ -114,6 +114,8 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.TelegramServiceBeginTelegramLinkProcedure:            true,
 	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:           true,
 	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure:       true,
+	adminv1connect.BlocklistServiceUpdateBlocklistProcedure:             true,
+	adminv1connect.BlocklistServiceDisconnectBlocklistProcedure:         true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,

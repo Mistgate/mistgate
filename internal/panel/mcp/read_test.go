@@ -77,6 +77,10 @@ func TestChecksResultsContent(t *testing.T) {
 		!cc.Probes[0].ICMPOK || cc.Probes[0].TCP[0].Port != 443 || cc.Probes[0].TCP[0].OK || cc.Probes[1].Valid {
 		t.Errorf("country_check: %+v", cc)
 	}
+	// the block lists ride next to the live round: which lists hold the address and the hosting range it is in
+	if cc.Confidence != "eyeball" || len(cc.ListedBy) != 1 || cc.ListedBy[0] != "antifilter_ipsum" || cc.CDNProvider != "ExampleHost" || cc.CDNRegion != "eu" {
+		t.Errorf("country_check block-list fields: %+v", cc)
+	}
 }
 
 func TestFleetStatusContent(t *testing.T) {

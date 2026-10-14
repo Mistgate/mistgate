@@ -59,6 +59,11 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned country checks", "count", n)
 	}
+	if n, err := s.st.PruneBlocklistChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune block-list checks", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned block-list checks", "count", n)
+	}
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune devices", "err", err)

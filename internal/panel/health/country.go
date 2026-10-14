@@ -12,6 +12,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -28,6 +29,7 @@ const (
 	verdictTCPBlocked = "tcp_blocked"
 	verdictBlocked    = "blocked"
 	verdictUnknown    = "unknown"
+	verdictListed     = "listed" // only ever in the combined view (countryreach.Combine), never stored by a live round
 
 	countryMaxProbes   = 3                  // probes per measurement
 	countryMinProbes   = 2                  // fewer is no comparison; the budget never cuts below it
@@ -398,6 +400,7 @@ func (s *Service) countryFailure(ctx context.Context, src CountrySource, err err
 var countryVerdictProto = map[string]adminv1.CountryVerdict{
 	verdictOK: adminv1.CountryVerdict_COUNTRY_VERDICT_OK, verdictTCPBlocked: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED,
 	verdictBlocked: adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED, verdictUnknown: adminv1.CountryVerdict_COUNTRY_VERDICT_UNKNOWN,
+	verdictListed: adminv1.CountryVerdict_COUNTRY_VERDICT_LISTED,
 }
 
 // countryCheckMsg is the API form of a stored round.
@@ -415,23 +418,78 @@ func countryCheckMsg(r store.CountryCheck) *adminv1.CountryCheck {
 	return m
 }
 
-// countryChecks are the latest round of every node (or of one), for GetChecks. Empty while the check is off.
+// combineCountry sets the verdict a node shows on m: its live round (nil: none) and what the block lists say (nil: off or
+// not checked), merged by countryreach.Combine. The probes and the reason stay those of the live round.
+func combineCountry(m *adminv1.CountryCheck, live *countryreach.Live, b *store.BlocklistCheck) {
+	var list *countryreach.Listing
+	if b != nil {
+		list = &countryreach.Listing{CDNProvider: b.CDNProvider, CDNRegion: b.CDNRegion}
+		if b.InRKN && b.ListedBy != "" {
+			list.ListedBy = strings.Split(b.ListedBy, ",")
+		}
+	}
+	c := countryreach.Combine(live, list)
+	m.Verdict, m.Confidence, m.ListedBy, m.CdnProvider, m.CdnRegion = countryVerdictProto[c.Verdict], c.Confidence, c.ListedBy, c.CDNProvider, c.CDNRegion
+}
+
+// NodeIPv4 is a node's IPv4 address as the country sources use it: the address itself, or for a name the first IPv4 the panel
+// resolves it to (DNS over HTTPS on the Cloudflare edition). ok is false when it has none.
+func (s *Service) NodeIPv4(ctx context.Context, n store.NodeRow) (netip.Addr, bool) {
+	ip, ok := s.countryAddress(ctx, n)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	a, err := netip.ParseAddr(ip)
+	return a, err == nil
+}
+
+// countryChecks are the latest verdict of every node (or of one), for GetChecks: the live round of the country check and what
+// the block lists say, combined. Empty while both sources are off; a source that is off shows nothing of its own.
 func (s *Service) countryChecks(ctx context.Context, nodeID string) ([]*adminv1.CountryCheck, error) {
-	if _, _, on := s.countryConfig(ctx); !on {
+	_, _, liveOn := s.countryConfig(ctx)
+	listsOn := s.cfg.Lists != nil && s.cfg.Lists(ctx)
+	if !liveOn && !listsOn {
 		return nil, nil
 	}
 	var ids []string
 	if nodeID != "" {
 		ids = []string{nodeID}
 	}
-	rows, err := s.st.RecentCountryChecks(ctx, 1, ids...)
-	if err != nil {
-		return nil, err
+	var rounds []store.CountryCheck
+	var lists []store.BlocklistCheck
+	var err error
+	if liveOn {
+		if rounds, err = s.st.RecentCountryChecks(ctx, 1, ids...); err != nil {
+			return nil, err
+		}
 	}
-	out := make([]*adminv1.CountryCheck, len(rows))
-	for i, r := range rows {
-		out[i] = countryCheckMsg(r)
+	if listsOn {
+		if lists, err = s.st.RecentBlocklistChecks(ctx, ids...); err != nil {
+			return nil, err
+		}
 	}
+	byList := make(map[string]*store.BlocklistCheck, len(lists))
+	for i := range lists {
+		byList[lists[i].NodeID] = &lists[i]
+	}
+	out := make([]*adminv1.CountryCheck, 0, len(rounds)+len(lists))
+	for _, r := range rounds {
+		var d countryDetail
+		_ = json.Unmarshal([]byte(r.Detail), &d)
+		m := countryCheckMsg(r)
+		combineCountry(m, &countryreach.Live{Verdict: r.Verdict, Eyeball: d.Eyeball}, byList[r.NodeID])
+		delete(byList, r.NodeID)
+		out = append(out, m)
+	}
+	for _, b := range lists { // nodes that only the lists have a say about
+		if _, ok := byList[b.NodeID]; !ok {
+			continue
+		}
+		m := &adminv1.CountryCheck{NodeId: b.NodeID, Country: countryreach.BlocklistCountry, AtUnix: b.At.Unix()}
+		combineCountry(m, nil, &b)
+		out = append(out, m)
+	}
+	slices.SortFunc(out, func(a, b *adminv1.CountryCheck) int { return strings.Compare(a.NodeId, b.NodeId) })
 	return out, nil
 }
 

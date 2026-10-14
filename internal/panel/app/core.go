@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"runtime"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/blocklist"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
@@ -147,6 +149,7 @@ type core struct {
 	acc     *access.Service
 	cr      *countryreach.Service
 	gp      *globalping.Service
+	bl      *blocklist.Service
 	hl      *health.Service
 	upd     *update.Service
 	wsv     *warp.Service
@@ -215,10 +218,19 @@ func wireCore(c Config) (*core, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Block lists, the second source of the country check: the panel downloads the public lists and compares its nodes' addresses
+	// with them, so no address leaves it. Off until the owner switches it on; Russia only. A node's address is read the way the
+	// health module reads it (the panel resolves a name itself), hence the late binding to hl.
+	k.bl, err = blocklist.New(blocklist.Config{Store: st, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
+		Address: func(ctx context.Context, n store.NodeRow) (netip.Addr, bool) { return hl.NodeIPv4(ctx, n) }})
+	if err != nil {
+		return nil, err
+	}
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
 	hcfg := health.Config{Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
 		Country:      k.gp.Country,
+		Lists:        k.bl.Active,
 		OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
 	hl = health.New(st, vlt, b.reg, fl, hcfg)
 	k.hl = hl
@@ -291,7 +303,7 @@ func wireCore(c Config) (*core, error) {
 // panel is the Panel of the services the core holds; a role adds what it serves.
 func (k *core) panel() *Panel {
 	return &Panel{
-		Fleet: k.fl, Access: k.acc, Health: k.hl, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
+		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
 	}
 }
