@@ -26,6 +26,7 @@ import {
   itemFix,
   itemTitle,
   itemWhy,
+  listOf,
   lookup,
   manualSteps,
   muteChoices,
@@ -234,9 +235,9 @@ describe("healthKind", () => {
 });
 
 describe("cellLook", () => {
-  const look = (last: CheckCell["last"], status = NodeStatus.ONLINE) => cellLook(t, cell({ last }), status);
+  const look = (last: CheckCell["last"], status = NodeStatus.ONLINE) => cellLook(t, fmt, cell({ last }), status);
   it("shows a dash for a profile that is not deployed and waits for a first result", () => {
-    expect(cellLook(t, cell({ deployed: false }), NodeStatus.ONLINE)).toMatchObject({ kind: "none", label: "—" });
+    expect(cellLook(t, fmt, cell({ deployed: false }), NodeStatus.ONLINE)).toMatchObject({ kind: "none", label: "—" });
     expect(look(undefined)).toMatchObject({ kind: "off", label: "…" });
   });
   it("shows latency for ok and degraded, the failure for a failed round", () => {
@@ -246,12 +247,53 @@ describe("cellLook", () => {
     expect(failed).toMatchObject({ kind: "bad", label: "✕ fails" });
     expect(failed.state).toBe(en["health.check.err.timeout"]);
   });
-  it("shows the last hour's median in the cell and both numbers in the tooltip, the last latency without a median", () => {
-    const withMedian = (last: CheckCell["last"]) => cellLook(t, cell({ last, latencyHourMs: 70 }), NodeStatus.ONLINE);
-    const hour = fill(en["hl.cell.latencyHour"], { median: 70, last: 3400 });
-    expect(withMedian(at(CheckStatus.OK, 3400))).toMatchObject({ kind: "ok", label: "70 ms", state: hour });
-    expect(withMedian(at(CheckStatus.DEGRADED, 3400, "timeout"))).toMatchObject({ kind: "warn", label: "70 ms", state: `${hour} · ${en["health.check.err.timeout"]}` });
-    expect(look(at(CheckStatus.OK, 3400))).toMatchObject({ kind: "ok", label: "3400 ms", state: "3400 ms" });
+  // a round that passed: cold time 2658 ms, as the old panels showed it
+  const ok = (over: Partial<CheckCell>, last: Partial<NonNullable<CheckCell["last"]>> = {}, status = CheckStatus.OK) =>
+    cellLook(t, fmt, cell({ ...over, last: { ...at(status, 2658), ...last } }), NodeStatus.ONLINE);
+  it("shows the hour's response median, else the last round's response, else the old cold time", () => {
+    expect(ok({ responseHourMs: 48, latencyHourMs: 2600 }, { responseMs: 51 })).toMatchObject({ kind: "ok", label: "48 ms" });
+    expect(ok({ latencyHourMs: 2600 }, { responseMs: 51 })).toMatchObject({ label: "51 ms" });
+    expect(ok({ latencyHourMs: 2600 })).toMatchObject({ label: "2600 ms" });
+    expect(ok({})).toMatchObject({ label: "2658 ms" });
+    // the tooltip says which of the three it is
+    expect(ok({ responseHourMs: 48 }).tip[0]).toBe("Response 48 ms, median over the last hour");
+    expect(ok({}, { responseMs: 51 }).tip[0]).toBe("Response 51 ms in the last round");
+    expect(ok({ latencyHourMs: 2600 }).tip[0]).toBe("2600 ms from scratch: no response time yet");
+    expect(ok({ responseHourMs: 48 }, {}, CheckStatus.DEGRADED)).toMatchObject({ kind: "warn", label: "48 ms" });
+  });
+  it("marks a connect median of 2 s or more on a second line, in the cell's calm tone, and says it to a screen reader", () => {
+    expect(ok({ responseHourMs: 48, connectHourMs: 2600 })).toMatchObject({ kind: "ok", label: "48 ms", slow: "2.6 s" });
+    expect(ok({ responseHourMs: 48, connectHourMs: 2000 }).slow).toBe("2 s");
+    expect(ok({ responseHourMs: 48, connectHourMs: 1999 }).slow).toBe("");
+    expect(ok({ responseHourMs: 48 }).slow).toBe("");
+    expect(ok({ responseHourMs: 48, connectHourMs: 2600 }).state).toBe("Response 48 ms, median over the last hour · Connect 2.6 s, median over the last hour");
+    expect(ok({ responseHourMs: 48, connectHourMs: 300 }).state).toBe("Response 48 ms, median over the last hour");
+    expect(cellLook(tRu, fmtRu, cell({ responseHourMs: 48, connectHourMs: 2600, last: at(CheckStatus.OK) }), NodeStatus.ONLINE)).toMatchObject({ label: "48 мс", slow: "2,6 с" });
+  });
+  it("lists the hour's medians, the last round, the 24 h counts and where it is measured in the tooltip", () => {
+    const history = [
+      { startUnix: 0, ok: 10, failed: 0, latencyMs: 90 },
+      { startUnix: 1800, ok: 5, failed: 2, latencyMs: 2600 },
+    ];
+    const atUnix = 1_760_000_000;
+    expect(ok({ responseHourMs: 48, connectHourMs: 2600, history }, { atUnix, responseMs: 51, connectMs: 2700 }).tip).toEqual([
+      "Response 48 ms, median over the last hour",
+      "Connect 2.6 s, median over the last hour",
+      `Last round ${fmt.clock(atUnix)}: response 51 ms, connect 2.7 s`,
+      "24 h: 15 ok, 2 failed",
+      "Measured from the panel's server",
+    ]);
+    // a round before the panel measured them has neither; a degraded round says what failed
+    expect(ok({ latencyHourMs: 2600, history }, { atUnix, errorCode: "http_status" }, CheckStatus.DEGRADED).tip.slice(1, 3)).toEqual([
+      `Last round ${fmt.clock(atUnix)}: response —, connect —`,
+      en["health.check.err.http_status"],
+    ]);
+    // a failed round: why, the counts and where from, no numbers
+    expect(cellLook(t, fmt, cell({ history, last: at(CheckStatus.FAILED, 0, "timeout") }), NodeStatus.ONLINE).tip).toEqual([
+      en["health.check.err.timeout"],
+      "24 h: 15 ok, 2 failed",
+      "Measured from the panel's server",
+    ]);
   });
   it("shows a skipped cell as updating while the node updates, else by why it was skipped", () => {
     expect(look(at(CheckStatus.SKIPPED, 0, "node_offline"), NodeStatus.UPDATING)).toMatchObject({ kind: "busy", label: "upd." });
@@ -270,6 +312,29 @@ describe("cellLook", () => {
   it("shows an error code it has no sentence for as it is", () => {
     expect(checkError(t, "weird")).toBe("weird");
     expect(checkError(t, "")).toBe("");
+  });
+});
+
+describe("listOf", () => {
+  it("joins names the language's way, with half-width spaces around 和 in zh", () => {
+    expect(listOf("en", ["de1", "nl1", "fi1"])).toBe("de1, nl1, and fi1");
+    expect(listOf("ru", ["de1", "nl1", "fi1"])).toBe("de1, nl1 и fi1");
+    expect(listOf("zh-CN", ["de1", "nl1", "fi1"])).toBe("de1、nl1 和 fi1");
+    expect(listOf("ru", ["de1"])).toBe("de1");
+  });
+});
+
+describe("the check texts", () => {
+  it("exist in English, Russian and Chinese", () => {
+    const keys = ["hl.legend.ms", "hl.legend.slow", "hl.cell.connect", "hl.tip.response", "hl.tip.responseLast", "hl.tip.cold", "hl.tip.connect", "hl.tip.last", "hl.tip.day", "hl.tip.where", "hl.udp.title", "hl.udp.body", "hl.udp.to", "hl.udp.tcpOk", "hl.hist.sub", "hl.hist.bar"] as const;
+    for (const key of keys) {
+      expect(en[key], key).toMatch(/[a-z]/i);
+      expect(ru[key], key).toMatch(/[а-яё]/i);
+      expect(dictionaries.zh[key], key).toMatch(/\p{Script=Han}/u);
+    }
+    // the bars stay the old cold time, and say so
+    expect(en["hl.hist.bar"]).toContain("from scratch");
+    expect(ru["hl.hist.bar"]).toContain("с нуля");
   });
 });
 

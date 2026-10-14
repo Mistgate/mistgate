@@ -230,43 +230,92 @@ export type CellLook = {
   kind: StatusKind | "none";
   /** What the 44 px cell says: "42 ms", "✕ failed", "upd.", "—". */
   label: string;
-  /** Longer form for the tooltip and the screen reader. */
+  /** Longer form for the screen reader: the cell's numbers or its state. */
   state: string;
+  /** The hour's connect median ("2.6 s") when it is slow, for the cell's second line; empty otherwise. */
+  slow: string;
+  /** The tooltip, one line each. */
+  tip: string[];
 };
 
-export function cellLook(t: T, cell: CheckCell, nodeStatus: NodeStatus): CellLook {
-  if (!cell.deployed) return { kind: "none", label: t("hl.cell.none"), state: t("hl.cell.notDeployed") };
+/**
+ * A connect median at or over this is a handshake that waited for a retry (QUIC about 2.5 s, WireGuard 5 s): the same
+ * line as udpRetryMS of the server's UDP-loss notice (internal/panel/health/rpc.go).
+ */
+export const SLOW_CONNECT_MS = 2000;
+
+/**
+ * The cell's number and where it comes from: the hour's median of the response through an open tunnel, else the last
+ * round's response, else the old cold time (rounds from before the panel measured the response have only that).
+ */
+export function cellMs(cell: CheckCell): { ms: number; from: "hour" | "last" | "cold" } {
+  if (cell.responseHourMs > 0) return { ms: cell.responseHourMs, from: "hour" };
+  const last = cell.last?.responseMs ?? 0;
+  if (last > 0) return { ms: last, from: "last" };
+  return { ms: cell.latencyHourMs || (cell.last?.latencyMs ?? 0), from: "cold" };
+}
+
+/** "48 ms" under a second, "2.6 s" from there on. */
+export const msText = (t: T, fmt: Fmt, ms: number) => (ms < 1000 ? `${ms} ${t("hl.ms")}` : `${fmt.num(ms / 1000, 1)} ${t("unit.s")}`);
+
+const tipFrom = { hour: "hl.tip.response", last: "hl.tip.responseLast", cold: "hl.tip.cold" } as const;
+
+export function cellLook(t: T, fmt: Fmt, cell: CheckCell, nodeStatus: NodeStatus): CellLook {
+  const only = (kind: CellLook["kind"], label: string, state: string): CellLook => ({ kind, label, state, slow: "", tip: [state] });
+  if (!cell.deployed) return only("none", t("hl.cell.none"), t("hl.cell.notDeployed"));
   const last = cell.last;
-  if (!last || last.status === CheckStatus.UNSPECIFIED) return { kind: "off", label: t("hl.cell.wait"), state: t("hl.cell.noResult") };
-  const ms = `${last.latencyMs} ${t("hl.ms")}`;
-  // the cell shows the median of the last hour when there is one, so a single spike does not read as the latency
-  const median = cell.latencyHourMs > 0;
-  const label = median ? `${cell.latencyHourMs} ${t("hl.ms")}` : ms;
-  const latency = median ? t("hl.cell.latencyHour", { median: cell.latencyHourMs, last: last.latencyMs }) : ms;
+  if (!last || last.status === CheckStatus.UNSPECIFIED) return only("off", t("hl.cell.wait"), t("hl.cell.noResult"));
   const err = checkError(t, last.errorCode);
+  const ok = cell.history.reduce((n, b) => n + b.ok, 0);
+  const failed = cell.history.reduce((n, b) => n + b.failed, 0);
+  const day = t("hl.tip.day", { ok, failed });
+  const where = t("hl.tip.where");
   switch (last.status) {
     case CheckStatus.OK:
-      return { kind: "ok", label, state: latency };
-    case CheckStatus.DEGRADED:
-      return { kind: "warn", label, state: [latency, err].filter(Boolean).join(" · ") };
+    case CheckStatus.DEGRADED: {
+      const { ms, from } = cellMs(cell);
+      const main = t(tipFrom[from], { ms: `${ms} ${t("hl.ms")}` });
+      const connect = cell.connectHourMs > 0 ? t("hl.tip.connect", { time: msText(t, fmt, cell.connectHourMs) }) : "";
+      const slow = cell.connectHourMs >= SLOW_CONNECT_MS ? msText(t, fmt, cell.connectHourMs) : "";
+      const dash = t("hl.cell.none");
+      const round = t("hl.tip.last", {
+        time: fmt.clock(last.atUnix),
+        response: last.responseMs > 0 ? msText(t, fmt, last.responseMs) : dash,
+        connect: last.connectMs > 0 ? msText(t, fmt, last.connectMs) : dash,
+      });
+      return {
+        kind: last.status === CheckStatus.OK ? "ok" : "warn",
+        label: `${ms} ${t("hl.ms")}`,
+        state: [main, slow && connect, err].filter(Boolean).join(" · "),
+        slow,
+        tip: [main, connect, round, err, day, where].filter(Boolean),
+      };
+    }
     case CheckStatus.FAILED:
-      return { kind: "bad", label: t("hl.cell.fail"), state: err || t("hl.cell.fail") };
+      return { ...only("bad", t("hl.cell.fail"), err || t("hl.cell.fail")), tip: [err || t("hl.cell.fail"), day, where] };
     default: // skipped on purpose: a profile that failed to start must not look like one switched off
-      if (nodeStatus === NodeStatus.UPDATING) return { kind: "busy", label: t("hl.cell.upd"), state: err };
+      if (nodeStatus === NodeStatus.UPDATING) return only("busy", t("hl.cell.upd"), err);
       switch (last.errorCode) {
         case "inbound_failed":
-          return { kind: "bad", label: t("hl.cell.failed"), state: err };
+          return only("bad", t("hl.cell.failed"), err);
         case "inbound_pending":
-          return { kind: "busy", label: t("hl.cell.starting"), state: err };
+          return only("busy", t("hl.cell.starting"), err);
         case "node_offline":
-          return { kind: "blip", label: t("hl.cell.offline"), state: err };
+          return only("blip", t("hl.cell.offline"), err);
         case "client_unsupported":
-          return { kind: "off", label: t("hl.cell.na"), state: err };
+          return only("off", t("hl.cell.na"), err);
         default: // inbound_disabled, and inbound_not_active of an older panel
-          return { kind: "off", label: t("hl.cell.off"), state: err };
+          return only("off", t("hl.cell.off"), err);
       }
   }
 }
+
+/** "de1, nl1 and fi1" in the UI language; zh gets the half-width spaces of its glossary around 和 between Latin names. */
+export const listOf = (locale: string, items: readonly string[]) =>
+  new Intl.ListFormat(locale, { type: "conjunction" })
+    .formatToParts(items)
+    .map((p) => (p.type === "literal" && /^\p{Script=Han}+$/u.test(p.value) ? ` ${p.value} ` : p.value))
+    .join("");
 
 /** The sentence for a check error code; empty for none. An unknown code is shown as it is. */
 export function checkError(t: T, code: string): string {

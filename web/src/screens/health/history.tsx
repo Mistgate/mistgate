@@ -1,9 +1,11 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ReactElement, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
 import { StatusDot } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
+import { Tip } from "@/components/ui/tooltip";
 import { CheckStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { health } from "@/lib/api";
@@ -11,7 +13,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { barsOf, checkError, useCan, type Bar, type CheckCell } from "@/lib/health";
+import { barsOf, checkError, useCan, type Bar, type CellLook, type CheckCell } from "@/lib/health";
 import { plain } from "@/lib/plain";
 
 const toneCls: Record<Bar["tone"], string> = {
@@ -49,6 +51,30 @@ export function Bars({ cell }: { cell: CheckCell }) {
         <span>{t("hl.hist.now")}</span>
       </div>
     </div>
+  );
+}
+
+/** The tooltip of a cell or a row: its lines, the last one (where it is measured from) quieter. */
+export function CellTip({ look, children }: { look: CellLook; children: ReactElement }) {
+  const label = (
+    <span className="flex flex-col gap-0.5">
+      {look.tip.map((line, i) => (
+        <span key={i} className={cx(i > 0 && i === look.tip.length - 1 && "font-normal text-muted")}>
+          {line}
+        </span>
+      ))}
+    </span>
+  );
+  return <Tip label={label}>{children}</Tip>;
+}
+
+/** The second line of a cell whose connect is slow: a clock, not a colour, because the tunnel itself works. */
+export function SlowMark({ text, className }: { text: string; className?: string }) {
+  return (
+    <span className={cx("flex items-center gap-0.5 font-sans text-[10px] font-semibold text-muted", className)}>
+      <Icon name="clock" size={10} aria-hidden />
+      {text}
+    </span>
   );
 }
 

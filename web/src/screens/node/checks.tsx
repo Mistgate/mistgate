@@ -11,7 +11,7 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { cellLook, checksQuery, type CheckCell } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
-import { HistoryCard, ResultLine, useRunChecks } from "@/screens/health/history";
+import { CellTip, HistoryCard, ResultLine, SlowMark, useRunChecks } from "@/screens/health/history";
 
 const tint: Record<string, string> = {
   ok: "tone-ok tint",
@@ -23,11 +23,12 @@ const tint: Record<string, string> = {
 };
 
 /**
- * The checks of one node as a client sees them: a row per profile with its latency and exit IP (or why it fails), and its
+ * The checks of one node as a client sees them: a row per profile with its response time and exit IP (or why it fails), and its
  * 24 h history right under the row a click opens. The node Overview shows it, and the Health matrix on a phone.
  */
 export function CheckRows({ row, columns, onRun, running }: { row: Plain<CheckRow>; columns: readonly Plain<CheckColumn>[]; onRun?: () => void; running?: boolean }) {
   const t = useT();
+  const fmt = useFmt();
   const [open, setOpen] = useState<string | null>(null);
   const entries = row.cells
     .map((cell, i) => ({ cell, col: columns[i] }))
@@ -35,26 +36,31 @@ export function CheckRows({ row, columns, onRun, running }: { row: Plain<CheckRo
   return (
     <div className="flex flex-col gap-2">
       {entries.map(({ cell, col }) => {
-        const look = cellLook(t, cell, row.nodeStatus);
+        const look = cellLook(t, fmt, cell, row.nodeStatus);
         const kind = look.kind === "none" ? "off" : look.kind;
         const on = open === col.profileId;
         return (
           <Fragment key={col.profileId}>
-            <button
-              type="button"
-              aria-expanded={on}
-              onClick={() => setOpen(on ? null : col.profileId)}
-              className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-left text-[13px]", tint[kind], on && "outline-2 outline-offset-2 outline-accent")}
-            >
-              <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
-                <StatusDot kind={kind} />
-                <b className="break-words">{col.profileName}</b>
-              </span>
-              <span className="font-mono text-xs font-bold">{look.label}</span>
-              <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">
-                <ResultLine cell={cell} />
-              </span>
-            </button>
+            <CellTip look={look}>
+              <button
+                type="button"
+                aria-expanded={on}
+                aria-label={t("hl.cell.aria", { node: row.nodeName, profile: col.profileName, state: look.state })}
+                onClick={() => setOpen(on ? null : col.profileId)}
+                className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-left text-[13px]", tint[kind], on && "outline-2 outline-offset-2 outline-accent")}
+              >
+                <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
+                  <StatusDot kind={kind} />
+                  <b className="break-words">{col.profileName}</b>
+                </span>
+                <span className="font-mono text-xs font-bold">{look.label}</span>
+                {/* a slow connect leads the quiet line, so the number stays where it is in every row */}
+                <span className="flex min-w-0 flex-[2_1_160px] flex-wrap items-center gap-x-2.5 text-[11px] leading-snug text-muted">
+                  {look.slow && <SlowMark text={t("hl.cell.connect", { time: look.slow })} className="text-[11px]" />}
+                  <ResultLine cell={cell} />
+                </span>
+              </button>
+            </CellTip>
             {on && <HistoryCard title={col.profileName} nested cell={cell} onRun={onRun} running={running} />}
           </Fragment>
         );

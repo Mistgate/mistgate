@@ -3,14 +3,17 @@ import { useState } from "react";
 import { EditionNotice } from "@/components/edition-notice";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
+import { Notice } from "@/components/ui/notice";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
-import { cellLook, type CheckCell } from "@/lib/health";
+import { cellLook, listOf, SLOW_CONNECT_MS, type CheckCell } from "@/lib/health";
 import type { GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
+import { protocolName } from "@/lib/series";
 import { CheckRows } from "@/screens/node/checks";
-import { HistoryCard, useRunChecks } from "./history";
+import { CellTip, HistoryCard, SlowMark, useRunChecks } from "./history";
 
 type Checks = Plain<GetChecksResponse>;
 
@@ -25,8 +28,36 @@ const toneCls: Record<string, string> = {
   none: "border border-line text-faint",
 };
 
+/**
+ * "The panel's server loses inbound UDP" (GetChecksResponse.udp_loss): the slow UDP connects come from the panel's own
+ * network, people are not affected. Calm and grey, it is not a problem of the nodes.
+ */
+export function UdpLossNotice({ data }: { data: Checks }) {
+  const t = useT();
+  const fmt = useFmt();
+  const loss = data.udpLoss;
+  if (!loss || loss.nodeIds.length === 0) return null;
+  const nodes = loss.nodeIds.map((id) => data.rows.find((r) => r.nodeId === id)?.nodeName ?? id);
+  const udp = [...new Set(data.columns.filter((c) => c.protocol === "hysteria2" || c.protocol === "awg" || c.protocol === "amneziawg").map((c) => protocolName(c.protocol)))];
+  const title = t("hl.udp.title");
+  const body = t("hl.udp.body", {
+    protocols: listOf(fmt.locale, udp),
+    to: t.n("hl.udp.to", nodes.length, { nodes: listOf(fmt.locale, nodes) }),
+    share: loss.sharePercent,
+    tcp: data.columns.some((c) => c.protocol === "vless") ? t("hl.udp.tcpOk") : "",
+  });
+  return (
+    <Notice tone="quiet">
+      {/* no space after a full-width colon (zh) */}
+      <b>{title}</b>
+      {title.endsWith("：") ? "" : " "}
+      {body}
+    </Notice>
+  );
+}
+
 /** What the words in the cells mean, under the matrix: the tooltip says it too, but a phone has no hover. */
-export function CheckLegend() {
+export function CheckLegend({ slow = false }: { slow?: boolean }) {
   const t = useT();
   const items: [string, "hl.legend.ms" | "hl.legend.fail" | "hl.legend.failed" | "hl.legend.off" | "hl.legend.offline" | "hl.legend.na"][] = [
     ["ok", "hl.legend.ms"],
@@ -44,6 +75,12 @@ export function CheckLegend() {
           {t(key)}
         </li>
       ))}
+      {slow && (
+        <li className="flex items-center gap-1.5">
+          <Icon name="clock" size={10} aria-hidden className="flex-none" />
+          {t("hl.legend.slow")}
+        </li>
+      )}
     </ul>
   );
 }
@@ -60,6 +97,7 @@ export function ChecksTab({ data }: { data: Checks }) {
   const picked = sel && data.rows.find((r) => r.nodeId === sel.node);
   const cell: CheckCell | undefined = sel ? picked?.cells[sel.col] : undefined;
   const newest = Math.max(0, ...data.rows.flatMap((r) => r.cells.map((c) => c.last?.atUnix ?? 0)));
+  const slow = data.rows.some((r) => r.cells.some((c) => c.connectHourMs >= SLOW_CONNECT_MS));
 
   if (cols.length === 0)
     return <p className="rounded-card border border-dashed border-line px-4 py-6 text-center text-[13px] text-muted">{t("hl.checks.noProfiles")}</p>;
@@ -82,6 +120,7 @@ export function ChecksTab({ data }: { data: Checks }) {
           )}
         </div>
         <EditionNotice feature="health_checks" />
+        <UdpLossNotice data={data} />
         {/* the padding gives the selection ring and the hover scale room inside the scrolling box */}
         <div className="no-scrollbar -m-1 overflow-x-auto p-1 max-md:hidden">
           <div className="grid gap-1.5" style={{ gridTemplateColumns: `90px repeat(${cols.length}, minmax(90px, 1fr))`, minWidth: min }}>
@@ -109,7 +148,7 @@ export function ChecksTab({ data }: { data: Checks }) {
           ))}
         </div>
         <div className="border-t border-line pt-3">
-          <CheckLegend />
+          <CheckLegend slow={slow} />
         </div>
       </section>
       {picked && cell?.deployed && (
@@ -128,6 +167,7 @@ export function ChecksTab({ data }: { data: Checks }) {
 
 function Row({ row, cols, selected, onPick }: { row: Checks["rows"][number]; cols: Checks["columns"]; selected: number; onPick: (col: number) => void }) {
   const t = useT();
+  const fmt = useFmt();
   return (
     <>
       <div className="flex min-w-0 items-center gap-2">
@@ -139,26 +179,33 @@ function Row({ row, cols, selected, onPick }: { row: Checks["rows"][number]; col
       {cols.map((col, i) => {
         const c = row.cells[i];
         if (!c) return <span key={col.profileId} />;
-        const look = cellLook(t, c, row.nodeStatus);
+        const look = cellLook(t, fmt, c, row.nodeStatus);
         const inert = look.kind === "none";
-        return (
+        const button = (
           <button
             key={col.profileId}
             type="button"
             disabled={inert}
             onClick={() => onPick(i)}
-            title={look.state}
+            title={inert ? look.state : undefined}
             aria-label={t("hl.cell.aria", { node: row.nodeName, profile: col.profileName, state: look.state })}
             aria-pressed={selected === i}
             className={cx(
-              "box-border flex h-11 items-center justify-center rounded-[11px] border px-1.5 text-center font-mono text-xs leading-tight font-bold transition-transform duration-200 ease-spring",
+              "box-border flex h-11 flex-col items-center justify-center rounded-[11px] border px-1.5 text-center font-mono text-xs leading-tight font-bold transition-transform duration-200 ease-spring",
               toneCls[look.kind],
               inert ? "cursor-default" : "cursor-pointer hover:scale-[1.03]",
               selected === i && "outline-2 outline-offset-2 outline-accent",
             )}
           >
             {look.label}
+            {look.slow && <SlowMark text={look.slow} />}
           </button>
+        );
+        // a disabled button gets no pointer events: the dash keeps its plain title
+        return inert ? button : (
+          <CellTip key={col.profileId} look={look}>
+            {button}
+          </CellTip>
         );
       })}
     </>
