@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -325,16 +326,47 @@ func alertReason(l L, a store.HealthAlert) string {
 // ruFromCountry is a country after Russian "из" (genitive), for the countries the check offers (web/src/i18n/country.ts).
 var ruFromCountry = map[string]string{"RU": "России", "BY": "Беларуси", "KZ": "Казахстана", "CN": "Китая", "IR": "Ирана", "TR": "Турции"}
 
-// countryBlockedReason is the sentence of a COUNTRY_BLOCKED alert: what fails from the probe networks, and what still passes.
+// countryBlockedReason is the sentence of a COUNTRY_BLOCKED alert: what fails and from where, then which sources saw it. The
+// sources ("globalping", "tspu", comma separated) and the confidence ("conflict" when two live sources disagree) come from the
+// alert; an older alert has none and gets the Globalping wording.
 func countryBlockedReason(l L, p map[string]string) string {
+	sources := strings.Split(p["sources"], ",")
+	has := func(name string) bool { return slices.Contains(sources, name) }
 	where := ""
-	if nets := data(p["networks"], 160); nets != "" {
+	if nets := data(p["networks"], 160); nets != "" && (has("globalping") || p["sources"] == "") {
 		where = l.pick(" ("+nets+")", " ("+nets+")", "（"+nets+"）")
 	}
-	if p["verdict"] == "tcp_blocked" {
-		return l.pick("TCP is being cut"+where+". ICMP passes.", "TCP режут"+where+". ICMP проходит.", "TCP 被阻断"+where+"，ICMP 仍可通过。")
+	var line string
+	switch {
+	case has("tspu") && !has("globalping"):
+		// the probe node alone: it sees only TCP, and only from a data centre
+		ports := ""
+		if v := data(p["ports"], 60); v != "" {
+			ports = l.pick(" to port "+v, " на порт "+v, "（端口 "+v+"）")
+		}
+		line = l.pick("TCP"+ports+" is being cut, seen from your probe node in the country (a data-centre view).",
+			"TCP"+ports+" режут, это видно с вашей ноды-зонда в стране (взгляд из дата-центра).",
+			"TCP"+ports+" 被阻断，由您在该国的探测节点发现（机房视角）。")
+	case p["verdict"] == "tcp_blocked":
+		line = l.pick("TCP is being cut"+where+". ICMP passes.", "TCP режут"+where+". ICMP проходит.", "TCP 被阻断"+where+"，ICMP 仍可通过。")
+	default:
+		line = l.pick("Neither ICMP nor TCP gets through"+where+".", "Не проходят ни ICMP, ни TCP"+where+".", "ICMP 和 TCP 都无法通过"+where+"。")
 	}
-	return l.pick("Neither ICMP nor TCP gets through"+where+".", "Не проходят ни ICMP, ни TCP"+where+".", "ICMP 和 TCP 都无法通过"+where+"。")
+	var seen []string
+	if has("globalping") {
+		seen = append(seen, l.pick("Globalping", "Globalping", "Globalping"))
+	}
+	if has("tspu") {
+		seen = append(seen, l.pick("the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"))
+	}
+	if len(seen) == 0 {
+		return line
+	}
+	line += l.gap() + l.pick("Seen by: ", "Видели: ", "发现方：") + strings.Join(seen, l.list()) + l.stop()
+	if p["confidence"] == "conflict" {
+		line += l.gap() + l.pick("The sources disagree; the worse result is shown.", "Источники расходятся; показан худший результат.", "各来源的结果不一致，此处显示较差的一项。")
+	}
+	return line
 }
 
 func portLossReason(l L, p map[string]string) string {

@@ -413,3 +413,41 @@ func TestCountryBlockedAlertTextsAreLocalized(t *testing.T) {
 		t.Errorf("country title = %q", got)
 	}
 }
+
+// The alert says which sources saw the block: the probe node alone (a data-centre view of TCP only), Globalping with it, and a
+// disagreement between the two.
+func TestCountryBlockedAlertNamesTheSources(t *testing.T) {
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	alert := func(params map[string]string) store.HealthAlert {
+		return store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "nl1", WhyKey: "health.alert.country_blocked.why." + params["verdict"],
+			Params: params, FirstSeen: now, OpenedAt: now}
+	}
+	tspuOnly := alert(map[string]string{"node": "nl1", "country": "RU", "verdict": "tcp_blocked", "confidence": "dc_only", "sources": "tspu", "networks": "", "ports": "443"})
+	both := alert(map[string]string{"node": "nl1", "country": "RU", "verdict": "tcp_blocked", "confidence": "eyeball", "sources": "globalping,tspu", "networks": "Rostelecom", "ports": "443"})
+	conflict := alert(map[string]string{"node": "nl1", "country": "RU", "verdict": "tcp_blocked", "confidence": "conflict", "sources": "globalping,tspu", "networks": "Rostelecom", "ports": "443"})
+	for _, tc := range []struct {
+		name  string
+		a     store.HealthAlert
+		lang  L
+		parts []string
+	}{
+		{"probe node alone", tspuOnly, "en", []string{"TCP to port 443 is being cut, seen from your probe node in the country (a data-centre view).", "Seen by: the TSPU probe on your node."}},
+		{"probe node alone", tspuOnly, "ru", []string{"TCP на порт 443 режут", "Видели: зонд ТСПУ на вашей ноде."}},
+		{"probe node alone", tspuOnly, "zh", []string{"TCP（端口 443） 被阻断", "发现方：您节点上的 TSPU 探测。"}},
+		{"both", both, "en", []string{"TCP is being cut (Rostelecom). ICMP passes.", "Seen by: Globalping, the TSPU probe on your node."}},
+		{"both", both, "ru", []string{"TCP режут (Rostelecom). ICMP проходит.", "Видели: Globalping, зонд ТСПУ на вашей ноде."}},
+		{"conflict", conflict, "en", []string{"The sources disagree; the worse result is shown."}},
+		{"conflict", conflict, "ru", []string{"Источники расходятся; показан худший результат."}},
+		{"conflict", conflict, "zh", []string{"各来源的结果不一致，此处显示较差的一项。"}},
+	} {
+		got := alertOpened(tc.lang, tc.a, "nl1", "")
+		for _, part := range tc.parts {
+			if !strings.Contains(got, part) {
+				t.Errorf("%s (%s): %q lacks %q", tc.name, tc.lang, got, part)
+			}
+		}
+	}
+	if got := alertOpened("en", tspuOnly, "nl1", ""); strings.Contains(got, "ICMP") {
+		t.Errorf("the probe node tests TCP only, but the text mentions ICMP: %q", got)
+	}
+}

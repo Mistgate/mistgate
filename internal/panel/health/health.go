@@ -110,6 +110,10 @@ type Config struct {
 	// read on every use. When it is, GetChecks adds what the lists say of each node to the verdict (countryreach.Combine).
 	// nil: it is off. The lists never open an alert.
 	Lists func(context.Context) bool
+	// TSPU says whether the TSPU probe source (internal/panel/countryprobe) is on and covers the country, which probe node's rows to
+	// read and how old a row may be, read on every use. When it is, the probe node's verdicts join the live round in the combined
+	// verdict (countryreach.Combine) and in the COUNTRY_BLOCKED alert. nil: it is off.
+	TSPU func(context.Context) TSPUState
 	// Resolve looks a node's name up on the panel's side, for the country check. Default: the system resolver (DNS over
 	// HTTPS on the Cloudflare edition, which has none).
 	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)

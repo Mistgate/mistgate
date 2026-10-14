@@ -488,6 +488,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 	if resp.CountryChecks, err = s.countryChecks(ctx, req.Msg.NodeId); err != nil {
 		return nil, s.internal("country checks", err)
 	}
+	resp.TspuRun = s.tspuState(ctx).Run
 	return connect.NewResponse(resp), nil
 }
 

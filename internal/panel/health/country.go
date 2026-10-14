@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/netip"
 	"slices"
 	"sort"
@@ -418,9 +419,10 @@ func countryCheckMsg(r store.CountryCheck) *adminv1.CountryCheck {
 	return m
 }
 
-// combineCountry sets the verdict a node shows on m: its live round (nil: none) and what the block lists say (nil: off or
-// not checked), merged by countryreach.Combine. The probes and the reason stay those of the live round.
-func combineCountry(m *adminv1.CountryCheck, live *countryreach.Live, b *store.BlocklistCheck) {
+// combineCountry sets the verdict a node shows on m: its live round (nil: none), the probe node's verdict (nil: none, too old or
+// the source is off) and what the block lists say (nil: off or not checked), merged by countryreach.Combine. The probes and the
+// reason stay those of the live round.
+func combineCountry(m *adminv1.CountryCheck, live *countryreach.Live, tspu *countryreach.TSPU, b *store.BlocklistCheck) {
 	var list *countryreach.Listing
 	if b != nil {
 		list = &countryreach.Listing{CDNProvider: b.CDNProvider, CDNRegion: b.CDNRegion}
@@ -428,8 +430,8 @@ func combineCountry(m *adminv1.CountryCheck, live *countryreach.Live, b *store.B
 			list.ListedBy = strings.Split(b.ListedBy, ",")
 		}
 	}
-	c := countryreach.Combine(live, list)
-	m.Verdict, m.Confidence, m.ListedBy, m.CdnProvider, m.CdnRegion = countryVerdictProto[c.Verdict], c.Confidence, c.ListedBy, c.CDNProvider, c.CDNRegion
+	c := countryreach.Combine(live, tspu, list)
+	m.Verdict, m.Confidence, m.Sources, m.ListedBy, m.CdnProvider, m.CdnRegion = countryVerdictProto[c.Verdict], c.Confidence, c.Sources, c.ListedBy, c.CDNProvider, c.CDNRegion
 }
 
 // NodeIPv4 is a node's IPv4 address as the country sources use it: the address itself, or for a name the first IPv4 the panel
@@ -443,54 +445,117 @@ func (s *Service) NodeIPv4(ctx context.Context, n store.NodeRow) (netip.Addr, bo
 	return a, err == nil
 }
 
-// countryChecks are the latest verdict of every node (or of one), for GetChecks: the live round of the country check and what
-// the block lists say, combined. Empty while both sources are off; a source that is off shows nothing of its own.
+// countryChecks are the latest verdict of every node (or of one), for GetChecks: the live round of the country check, the probe
+// node's run and what the block lists say, combined. Empty while all three sources are off; a source that is off shows nothing
+// of its own.
 func (s *Service) countryChecks(ctx context.Context, nodeID string) ([]*adminv1.CountryCheck, error) {
 	_, _, liveOn := s.countryConfig(ctx)
 	listsOn := s.cfg.Lists != nil && s.cfg.Lists(ctx)
-	if !liveOn && !listsOn {
+	tspu := s.tspuState(ctx)
+	if !liveOn && !listsOn && !tspu.On {
 		return nil, nil
 	}
 	var ids []string
 	if nodeID != "" {
 		ids = []string{nodeID}
 	}
-	var rounds []store.CountryCheck
-	var lists []store.BlocklistCheck
-	var err error
+	byRound := map[string]store.CountryCheck{}
+	byList := map[string]store.BlocklistCheck{}
+	byTSPU := map[string]tspuRound{}
 	if liveOn {
-		if rounds, err = s.st.RecentCountryChecks(ctx, 1, ids...); err != nil {
+		rounds, err := s.st.RecentCountryChecks(ctx, 1, ids...)
+		if err != nil {
 			return nil, err
+		}
+		for _, r := range rounds {
+			byRound[r.NodeID] = r
 		}
 	}
 	if listsOn {
-		if lists, err = s.st.RecentBlocklistChecks(ctx, ids...); err != nil {
+		lists, err := s.st.RecentBlocklistChecks(ctx, ids...)
+		if err != nil {
 			return nil, err
 		}
-	}
-	byList := make(map[string]*store.BlocklistCheck, len(lists))
-	for i := range lists {
-		byList[lists[i].NodeID] = &lists[i]
-	}
-	out := make([]*adminv1.CountryCheck, 0, len(rounds)+len(lists))
-	for _, r := range rounds {
-		var d countryDetail
-		_ = json.Unmarshal([]byte(r.Detail), &d)
-		m := countryCheckMsg(r)
-		combineCountry(m, &countryreach.Live{Verdict: r.Verdict, Eyeball: d.Eyeball}, byList[r.NodeID])
-		delete(byList, r.NodeID)
-		out = append(out, m)
-	}
-	for _, b := range lists { // nodes that only the lists have a say about
-		if _, ok := byList[b.NodeID]; !ok {
-			continue
+		for _, b := range lists {
+			byList[b.NodeID] = b
 		}
-		m := &adminv1.CountryCheck{NodeId: b.NodeID, Country: countryreach.BlocklistCountry, AtUnix: b.At.Unix()}
-		combineCountry(m, nil, &b)
+	}
+	vantageName := ""
+	if tspu.On {
+		rows, err := s.st.TSPUHistory(ctx, tspu.Vantage, 1, ids...)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range tspuRounds(rows) {
+			if s.now().Sub(r.row.At) <= tspu.MaxAge { // an old run (the probe node was off) says nothing now
+				byTSPU[r.row.NodeID] = r
+			}
+		}
+		vantageName = s.nodeName(ctx, tspu.Vantage)
+	}
+	// every node that any source has something on
+	known := map[string]bool{}
+	for id := range byRound {
+		known[id] = true
+	}
+	for id := range byTSPU {
+		known[id] = true
+	}
+	for id := range byList {
+		known[id] = true
+	}
+	order := slices.Sorted(maps.Keys(known))
+	out := make([]*adminv1.CountryCheck, 0, len(order))
+	for _, id := range order {
+		var m *adminv1.CountryCheck
+		var live *countryreach.Live
+		if r, ok := byRound[id]; ok {
+			var d countryDetail
+			_ = json.Unmarshal([]byte(r.Detail), &d)
+			m, live = countryCheckMsg(r), &countryreach.Live{Verdict: r.Verdict, Eyeball: d.Eyeball}
+			m.GlobalpingVerdict = countryVerdictProto[r.Verdict]
+		} else {
+			m = &adminv1.CountryCheck{NodeId: id, Country: countryreach.BlocklistCountry}
+		}
+		at := time.Unix(m.AtUnix, 0)
+		var t *countryreach.TSPU
+		if r, ok := byTSPU[id]; ok {
+			t = &countryreach.TSPU{Verdict: r.verdict}
+			m.TspuVerdict, m.DpiHop = countryVerdictProto[r.verdict], uint32(max(r.row.DPIHop, 0))
+			m.TspuVantageId, m.TspuVantageName, m.TspuAtUnix = tspu.Vantage, vantageName, r.row.At.Unix()
+			for _, p := range r.ports {
+				m.TspuPorts = append(m.TspuPorts, &adminv1.TspuPort{Port: uint32(p.Port), Verdict: p.Verdict})
+			}
+			if r.row.At.After(at) {
+				at = r.row.At
+			}
+		}
+		var b *store.BlocklistCheck
+		if l, ok := byList[id]; ok {
+			b = &l
+			if l.At.After(at) {
+				at = l.At
+			}
+		}
+		if m.AtUnix == 0 { // no live round: the newest of the others
+			m.AtUnix = at.Unix()
+		}
+		combineCountry(m, live, t, b)
 		out = append(out, m)
 	}
-	slices.SortFunc(out, func(a, b *adminv1.CountryCheck) int { return strings.Compare(a.NodeId, b.NodeId) })
 	return out, nil
+}
+
+// nodeName is a node's name, its id when the node is not known.
+func (s *Service) nodeName(ctx context.Context, id string) string {
+	if sn, err := s.snapshot(ctx); err == nil {
+		for _, n := range sn.nodes {
+			if n.ID == id {
+				return n.Name
+			}
+		}
+	}
+	return id
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -500,27 +565,47 @@ func countryBad(verdict string) bool {
 	return verdict == verdictTCPBlocked || verdict == verdictBlocked
 }
 
-// addCountryConds derives COUNTRY_BLOCKED from the stored rounds: it opens after two rounds in a row with a bad verdict
-// and closes after two with OK. Unknown rounds are skipped, as if they had not happened; anything in between keeps the
-// alert as it is (held), open or closed. While a node is not connected an open alert is held and nothing new is raised;
-// with the check switched off the alerts are let go.
+// addCountryConds derives COUNTRY_BLOCKED from the stored rounds of the live sources (Globalping, the probe node): it opens after
+// two rounds in a row with a bad combined verdict and closes after two with OK. Unknown rounds are skipped, as if they had not
+// happened; anything in between keeps the alert as it is (held), open or closed. A round is one measurement of either source,
+// combined with the newest of the other (countryEvents). A block list never counts. While a node is not connected an open alert
+// is held and nothing new is raised; with every live source switched off the alerts are let go.
 func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[string]store.NodeLiveRow, activeKeys map[key]bool, d *derived, add func(cond)) {
-	if _, _, on := s.countryConfig(ctx); !on {
+	_, _, liveOn := s.countryConfig(ctx)
+	tspu := s.tspuState(ctx)
+	if !liveOn && !tspu.On {
 		return
 	}
-	rows, err := s.st.RecentCountryChecks(ctx, countryRecent)
-	if err != nil {
-		s.log.Warn("health: country check rounds", "err", err)
+	hold := func() {
 		for k := range activeKeys {
 			if k.kind == kCountryBlocked {
 				d.holdKeys[k] = true
 			}
 		}
-		return
 	}
 	byNode := map[string][]store.CountryCheck{}
-	for _, r := range rows {
-		byNode[r.NodeID] = append(byNode[r.NodeID], r)
+	if liveOn {
+		rows, err := s.st.RecentCountryChecks(ctx, countryRecent)
+		if err != nil {
+			s.log.Warn("health: country check rounds", "err", err)
+			hold()
+			return
+		}
+		for _, r := range rows {
+			byNode[r.NodeID] = append(byNode[r.NodeID], r)
+		}
+	}
+	tspuByNode := map[string][]tspuRound{}
+	if tspu.On {
+		rows, err := s.st.TSPUHistory(ctx, tspu.Vantage, countryRecent)
+		if err != nil {
+			s.log.Warn("health: country check TSPU rounds", "err", err)
+			hold()
+			return
+		}
+		for _, r := range tspuRounds(rows) {
+			tspuByNode[r.row.NodeID] = append(tspuByNode[r.row.NodeID], r)
+		}
 	}
 	for _, n := range sn.nodes {
 		k := key{kCountryBlocked, n.ID, ""}
@@ -528,46 +613,130 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 			d.holdKeys[k] = true
 			continue
 		}
-		var seen []store.CountryCheck
-		for _, r := range byNode[n.ID] { // newest first
-			if r.Verdict == verdictUnknown {
-				continue
-			}
-			if len(seen) > 0 && r.Country != seen[0].Country {
-				break
-			}
-			if seen = append(seen, r); len(seen) == countryAlertRounds {
-				break
-			}
-		}
+		seen := countryEvents(byNode[n.ID], tspuByNode[n.ID], tspu.MaxAge)
+		seen = seen[:min(len(seen), countryAlertRounds)]
 		switch {
-		case len(seen) == countryAlertRounds && countryBad(seen[0].Verdict) && countryBad(seen[1].Verdict):
+		case len(seen) == countryAlertRounds && countryBad(seen[0].combined.Verdict) && countryBad(seen[1].combined.Verdict):
 			add(countryCond(n, seen[0]))
-		case len(seen) == countryAlertRounds && seen[0].Verdict == verdictOK && seen[1].Verdict == verdictOK:
+		case len(seen) == countryAlertRounds && seen[0].combined.Verdict == verdictOK && seen[1].combined.Verdict == verdictOK:
 		default:
 			d.holdKeys[k] = true
 		}
 	}
 }
 
-// countryCond is the alert of a node from its newest bad round.
-func countryCond(n store.NodeRow, r store.CountryCheck) cond {
-	var d countryDetail
-	_ = json.Unmarshal([]byte(r.Detail), &d)
+// tspuRound is a stored row of the probe node with its verdict on the shared scale and its ports.
+type tspuRound struct {
+	row     store.TSPUCheck
+	verdict string
+	ports   []countryreach.TSPUPort
+}
+
+func tspuRounds(rows []store.TSPUCheck) []tspuRound {
+	out := make([]tspuRound, len(rows))
+	for i, r := range rows {
+		ports := countryreach.ParseTSPUDetail(r.DetailJSON)
+		out[i] = tspuRound{row: r, verdict: countryreach.TSPUVerdict(r.Verdict, ports), ports: ports}
+	}
+	return out
+}
+
+// countryEvent is one measurement of a live source that counts for the alert, with the verdict the node shows at that moment.
+type countryEvent struct {
+	at       time.Time
+	combined countryreach.Combined
+	round    *store.CountryCheck // the Globalping round in force at that moment, nil when none
+	tspu     *tspuRound          // likewise the probe node's run, nil when none or older than maxAge
+}
+
+// countryEvents are the rounds of one node that count for its alert, newest first: every Globalping round and every run of the
+// probe node that has a verdict (an unknown one is skipped), each combined with the newest verdict of the other source at that
+// moment (the probe node's only while it is no older than maxAge). So a node that only the probe node sees gets a round per run,
+// and a source that has no verdict now does not repeat an old measurement of the other as a new round. rounds and tspu are
+// newest first.
+func countryEvents(rounds []store.CountryCheck, tspu []tspuRound, maxAge time.Duration) []countryEvent {
+	for i := range rounds { // a change of country starts the history over
+		if rounds[i].Country != rounds[0].Country {
+			rounds = rounds[:i]
+			break
+		}
+	}
+	var times []time.Time
+	for _, r := range rounds {
+		if r.Verdict != verdictUnknown {
+			times = append(times, r.At)
+		}
+	}
+	for _, r := range tspu {
+		if r.verdict != verdictUnknown {
+			times = append(times, r.row.At)
+		}
+	}
+	slices.SortStableFunc(times, func(a, b time.Time) int { return b.Compare(a) })
+	times = slices.CompactFunc(times, func(a, b time.Time) bool { return a.Equal(b) }) // two measurements in one second are one round
+	out := make([]countryEvent, 0, len(times))
+	for _, at := range times {
+		e := countryEvent{at: at}
+		var live *countryreach.Live
+		for i := range rounds {
+			if !rounds[i].At.After(at) {
+				var d countryDetail
+				_ = json.Unmarshal([]byte(rounds[i].Detail), &d)
+				e.round, live = &rounds[i], &countryreach.Live{Verdict: rounds[i].Verdict, Eyeball: d.Eyeball}
+				break
+			}
+		}
+		var t *countryreach.TSPU
+		for i := range tspu {
+			if !tspu[i].row.At.After(at) {
+				if at.Sub(tspu[i].row.At) <= maxAge {
+					e.tspu, t = &tspu[i], &countryreach.TSPU{Verdict: tspu[i].verdict}
+				}
+				break
+			}
+		}
+		e.combined = countryreach.Combine(live, t, nil)
+		out = append(out, e)
+	}
+	return out
+}
+
+// countryCond is the alert of a node from its newest bad round. The params say which sources saw it and how sure the verdict is;
+// networks are those of the Globalping probes, ports the TCP ports that were tried (Globalping) or found blocked (the probe node).
+func countryCond(n store.NodeRow, e countryEvent) cond {
+	c := e.combined
+	country := countryreach.TSPUCountry
+	if e.round != nil {
+		country = e.round.Country
+	}
 	var networks []string
-	for _, p := range d.Probes {
-		if p.Valid && p.Network != "" && !slices.Contains(networks, p.Network) {
-			networks = append(networks, p.Network)
+	var ports []uint16
+	if e.round != nil && slices.Contains(c.Sources, countryreach.SourceGlobalping) {
+		var d countryDetail
+		_ = json.Unmarshal([]byte(e.round.Detail), &d)
+		for _, p := range d.Probes {
+			if p.Valid && p.Network != "" && !slices.Contains(networks, p.Network) {
+				networks = append(networks, p.Network)
+			}
+		}
+		ports = append(ports, d.Ports...)
+	}
+	if e.tspu != nil && slices.Contains(c.Sources, countryreach.SourceTSPU) {
+		for _, p := range e.tspu.ports {
+			if p.Verdict == "blocked" && !slices.Contains(ports, p.Port) {
+				ports = append(ports, p.Port)
+			}
 		}
 	}
 	sort.Strings(networks)
-	ports := make([]string, len(d.Ports))
-	for i, p := range d.Ports {
-		ports[i] = strconv.Itoa(int(p))
+	slices.Sort(ports)
+	portStrs := make([]string, len(ports))
+	for i, p := range ports {
+		portStrs[i] = strconv.Itoa(int(p))
 	}
-	return cond{key: key{kCountryBlocked, n.ID, ""}, severity: sevWarning, why: "health.alert.country_blocked.why." + r.Verdict,
-		params: map[string]string{"node": n.Name, "country": r.Country, "verdict": r.Verdict, "networks": strings.Join(networks, ", "),
-			"ports": strings.Join(ports, ", ")}}
+	return cond{key: key{kCountryBlocked, n.ID, ""}, severity: sevWarning, why: "health.alert.country_blocked.why." + c.Verdict,
+		params: map[string]string{"node": n.Name, "country": country, "verdict": c.Verdict, "confidence": c.Confidence,
+			"sources": strings.Join(c.Sources, ","), "networks": strings.Join(networks, ", "), "ports": strings.Join(portStrs, ", ")}}
 }
 
 // ReconcileCountry brings the COUNTRY_BLOCKED alerts up to date without the full evaluator, which the Cloudflare edition

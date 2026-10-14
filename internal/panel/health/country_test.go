@@ -84,6 +84,7 @@ type countryEnv struct {
 	cfg   *CountryConfig
 	names map[string][]netip.Addr
 	lists *atomic.Bool // the block-list source (Config.Lists)
+	tspu  *TSPUState   // the TSPU probe source (Config.TSPU)
 }
 
 func newCountryEnv(t *testing.T) *countryEnv {
@@ -92,8 +93,10 @@ func newCountryEnv(t *testing.T) *countryEnv {
 	src := &fakeCountrySource{limit: 250, mode: map[string]string{}}
 	names := map[string][]netip.Addr{}
 	lists := &atomic.Bool{}
+	tspu := &TSPUState{}
 	e := newEnv(t, func(c *Config) {
 		c.Lists = func(context.Context) bool { return lists.Load() }
+		c.TSPU = func(context.Context) TSPUState { return *tspu }
 		c.Country = func(context.Context) (CountryConfig, CountrySource) {
 			if !cfg.Enabled {
 				return *cfg, nil
@@ -107,7 +110,7 @@ func newCountryEnv(t *testing.T) *countryEnv {
 			return nil, errors.New("no such host")
 		}
 	})
-	return &countryEnv{env: e, src: src, cfg: cfg, names: names, lists: lists}
+	return &countryEnv{env: e, src: src, cfg: cfg, names: names, lists: lists, tspu: tspu}
 }
 
 // onlineNode adds an online node known by the name <id>.example.com, which resolves to ip, with a VLESS inbound on 443 and a
