@@ -104,11 +104,16 @@ func cleanHeader(s string, max int) string {
 	return s
 }
 
-// clientOf is the app of a User-Agent: its first token ("Happ/3.4.2"), at most 40 characters.
+// clientOf is the app of a User-Agent: its first token, name and version only ("Happ/3.4.2"; Happ 6 sends
+// "Happ/6.0.0/ios/2609301456616", whose platform and build the device row has or does not need), at most 40 characters.
 func clientOf(ua string) string {
 	ua = strings.TrimSpace(ua)
 	if i := strings.IndexAny(ua, " \t"); i >= 0 {
 		ua = ua[:i]
+	}
+	if name, rest, ok := strings.Cut(ua, "/"); ok {
+		version, _, _ := strings.Cut(rest, "/")
+		ua = name + "/" + version
 	}
 	return cleanHeader(ua, 40)
 }

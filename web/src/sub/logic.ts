@@ -665,7 +665,7 @@ export function deviceAbout(x: Device): string {
   if (!x.os_version && !x.client) return ""; // the platform alone is what the icon already says
   const os = osNames[x.platform] ?? "";
   const sys = x.os_version && os && !x.os_version.toLowerCase().startsWith(os.toLowerCase()) ? `${os} ${x.os_version}` : x.os_version || os;
-  return [sys, x.client.replace("/", " ")].filter(Boolean).join(" · ");
+  return [sys, x.client.split("/").slice(0, 2).join(" ")].filter(Boolean).join(" · "); // "Happ/6.0.0/ios/…" reads "Happ 6.0.0"
 }
 
 /** Every place is taken and a new app on the link is refused (ENFORCE, STRICT): the list says how to free one. TRACK refuses nobody. */

@@ -84,8 +84,18 @@ export function DeviceRow({ tile, name, badge, line, right, menu, wrapName }: { 
   );
 }
 
-/** "iOS 18.1 · Happ 3.4.2": the OS version and the app, as the device last said them ("Happ/3.4.2" reads "Happ 3.4.2"). */
-const appLine = (d: { osVersion?: string; client: string }) => [d.osVersion, d.client.replace("/", " ")].filter(Boolean).join(" · ");
+const osNames: Record<string, string> = { ios: "iOS", android: "Android", windows: "Windows", macos: "macOS", linux: "Linux" };
+
+/** The app of a User-Agent token, name and version: "Happ/3.4.2" and "Happ/6.0.0/ios/2609301456616" read "Happ 3.4.2", "Happ 6.0.0". */
+const appOf = (client: string) => client.split("/").slice(0, 2).join(" ");
+
+/** "iOS 18.1 · Happ 3.4.2": the system with its version and the app, as the device last said them (as the person's page says it). */
+const appLine = (d: { platform?: string; osVersion?: string; client: string }) => {
+  const os = osNames[d.platform ?? ""] ?? "";
+  const v = d.osVersion ?? "";
+  const sys = v && os && !v.toLowerCase().startsWith(os.toLowerCase()) ? `${os} ${v}` : v;
+  return [sys, appOf(d.client)].filter(Boolean).join(" · ");
+};
 
 /** What a link row keeps out of sight: since when and the last update, all-time traffic, the fingerprint. One fact per line. */
 function detailsOf(d: Device, t: Tx, fmt: Fmt, now: number): string[] {
@@ -298,7 +308,7 @@ export function SharedRow({ d, mode, now, onDisconnect }: { d: Device; mode: Lin
       tile={<Tile icon="link" tone="sky" />}
       name={name}
       wrapName
-      line={<Secondary text={[d.client.replace("/", " "), what].filter(Boolean).join(" · ")} />}
+      line={<Secondary text={[appOf(d.client), what].filter(Boolean).join(" · ")} />}
       right={<Seen online={d.online} lastSeen={d.lastSeenUnix} t={t} now={now} />}
       menu={<RowMenu label={t("users.dev.menu", { name })} items={[{ label: t("users.dev.disconnect"), onClick: onDisconnect }]} />}
     />

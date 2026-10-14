@@ -74,6 +74,7 @@ describe("the page data of the link devices", () => {
   it("what the app said, for telling two phones apart: the OS and its version, the app and its version", () => {
     const x = (platform: string, os_version: string, client: string) => ({ platform, os_version, client }) as Device;
     expect(deviceAbout(x("ios", "18.1", "Happ/3.4.2"))).toBe("iOS 18.1 · Happ 3.4.2");
+    expect(deviceAbout(x("ios", "27.0", "Happ/6.0.0/ios/2609301456616"))).toBe("iOS 27.0 · Happ 6.0.0"); // as stored before the panel cut it
     expect(deviceAbout(x("android", "Android 14", ""))).toBe("Android 14");
     expect(deviceAbout(x("windows", "", "mihomo/1.19.31"))).toBe("Windows · mihomo 1.19.31");
     expect(deviceAbout(x("", "", ""))).toBe("");

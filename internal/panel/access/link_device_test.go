@@ -61,6 +61,7 @@ func TestDeviceHintMeta(t *testing.T) {
 		want deviceMeta
 	}{
 		{"ios", NewDeviceHint(hwidPhone, "iOS", "18.1", "iPhone 15", "Happ/3.4.2 (iOS 18.1)"), deviceMeta{"ios", "iPhone 15", "18.1", "Happ/3.4.2"}},
+		{"Happ 6 agent", NewDeviceHint(hwidPhone, "iOS", "27.0", "iPhone 14 Pro", "Happ/6.0.0/ios/2609301456616"), deviceMeta{"ios", "iPhone 14 Pro", "27.0", "Happ/6.0.0"}},
 		{"android", NewDeviceHint(hwidPhone, "Android", "15", "Pixel", "Happ/3.4.2"), deviceMeta{"android", "Pixel", "15", "Happ/3.4.2"}},
 		{"windows", NewDeviceHint(hwidPhone, "Windows", "11", "DESKTOP-1", "mihomo/1.19.31"), deviceMeta{"windows", "DESKTOP-1", "11", "mihomo/1.19.31"}},
 		{"mac", NewDeviceHint(hwidPhone, "macOS", "15.0", "MacBook", ""), deviceMeta{"macos", "MacBook", "15.0", ""}},
