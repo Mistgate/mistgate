@@ -1088,8 +1088,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      15,
-      "a minute 17 cron tick costs 15 D1 calls: 6 normal and 9 retention (the 7th prunes old revoked devices, the 8th old country checks, the 9th old block-list checks)",
+      16,
+      "a minute 17 cron tick costs 16 D1 calls: 6 normal and 10 retention (the 7th prunes old revoked devices, the 8th old country checks, the 9th old block-list checks, the 10th old TSPU checks)",
     );
 
     assert.equal(provisionKicks, 0, "cron ticks without an install wake no Provisioner");

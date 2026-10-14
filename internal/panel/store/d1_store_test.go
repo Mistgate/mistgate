@@ -1639,3 +1639,7 @@ func TestD1CountryChecksStorage(t *testing.T) {
 func TestD1BlocklistChecksStorage(t *testing.T) {
 	blocklistCheckStoreProof(t, openD1Store(t))
 }
+
+func TestD1TSPUChecksStorage(t *testing.T) {
+	tspuCheckStoreProof(t, openD1Store(t))
+}

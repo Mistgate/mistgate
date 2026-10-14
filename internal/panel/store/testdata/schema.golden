@@ -61,6 +61,12 @@
   },
   {
     "type": "index",
+    "name": "country_tspu_check_at",
+    "tbl_name": "country_tspu_check",
+    "sql": "CREATE INDEX country_tspu_check_at ON country_tspu_check (at)"
+  },
+  {
+    "type": "index",
     "name": "device_credential_live",
     "tbl_name": "device_credential",
     "sql": "CREATE UNIQUE INDEX device_credential_live ON device_credential (device_id, protocol, COALESCE(profile_id, '')) WHERE revoked_at IS NULL"
@@ -370,6 +376,12 @@
     "name": "country_check",
     "tbl_name": "country_check",
     "sql": "CREATE TABLE country_check ( node_id TEXT NOT NULL, at INTEGER NOT NULL, country TEXT NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(detail_json)), PRIMARY KEY (node_id, at) ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "country_tspu_check",
+    "tbl_name": "country_tspu_check",
+    "sql": "CREATE TABLE country_tspu_check ( node_id TEXT NOT NULL, vantage TEXT NOT NULL, at INTEGER NOT NULL, verdict TEXT NOT NULL, dpi_hop INTEGER NOT NULL DEFAULT 0, control_ok INTEGER NOT NULL DEFAULT 0 CHECK (control_ok IN (0, 1)), detail_json TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (node_id, vantage, at) ) STRICT"
   },
   {
     "type": "table",

@@ -149,8 +149,8 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, retentionOut.Get("waitUntil"))
 	retentionCounts := binding.Call("__endQueryCount")
 	retentionEnded = true
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 14 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 14 (5 tick + 9 retention: the prunes of old revoked devices, of old country checks and of old block-list checks are three of them)", got)
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 15 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 15 (5 tick + 10 retention: the prunes of old revoked devices, of old country checks, of old block-list checks and of old TSPU checks are four of them)", got)
 	}
 	// Two batches: the node-down sweep's live read (every tick) and the daily rollup; the prunes are single statements.
 	if got := retentionCounts.Get("batchCalls").Int(); got != 2 {
