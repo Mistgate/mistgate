@@ -105,7 +105,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：各平台上的应用及其显示顺序（名称、类型、下载链接、添加链接模板、说明、是否推荐）、页面选项（包括 `dns_choice`，即页面上的 DNS 选择开关）、服务器名称模板，以及订阅标题、公告、联系链接和更新间隔。不含任何用户的链接。 |
 | `alerts_list` | 只读 | 活跃告警；设置 `include_history` 后也会返回已关闭的告警（`window_s` 最长为 30 天）。 |
 | `events_search` | 只读 | 按节点、用户、`min_severity`（`info`、`warning`、`error`）或精确 `code` 搜索事件流；使用 `before_id` 分页。 |
-| `checks_results` | 只读 | 客户端视角检测：按协议配置列出节点、最近一次结果、连续失败次数和最近 24 小时的历史记录。含通过已建立隧道的响应时间、连接时间和最近一小时的中位数（均在面板服务器上测得）；面板主机丢失入站 UDP 时返回 `udp_loss`。开启国家视角检测后（见[健康](../operations/health.md#国家视角检测)），每行带有 `country_check`（该国境内探测点给出的最新结论及所用网络）。 |
+| `checks_results` | 只读 | 客户端视角检测：按协议配置列出节点、最近一次结果、连续失败次数和最近 24 小时的历史记录。含通过已建立隧道的响应时间、连接时间和最近一小时的中位数（均在面板服务器上测得）；面板主机丢失入站 UDP 时返回 `udp_loss`。开启国家视角检测后（见[健康](../operations/health.md#国家视角检测)），每行带有 `country_check`：该国境内探测点给出的最新结论及所用网络，以及结论的 `confidence`（`eyeball`：家庭和移动网络；`dc_only`：仅数据中心；`listed`：仅依据封锁名单）。开启[封锁名单](../operations/health.md#封锁名单)后，还带有 `listed_by`（`antifilter_ipsum`、`antifilter_community`）、`cdn_provider` 和 `cdn_region`，结论也可能是 `listed`：地址在名录中、未经实测，且从不触发告警。 |
 | `updates_status` | 只读 | 面板构建版本、发布包状态和版本、各节点更新状态及已保存的计划、当前或最近一次滚动更新，以及新计划使用的固定 UTC 偏移量。 |
 | `node_server_access_list` | 管理员 | 节点已保存的 SSH 端点、登录名和指纹，以及密码轮换是否需要恢复、节点是否已退役（访问凭据会一直保留到所有者清除）。绝不返回密码。 |
 | `audit_search` | 管理员 | 审计日志，可按 `source`（`panel`、`bot`、`mcp`、`api`）、操作者或操作筛选；使用 `before_id` 分页。 |
