@@ -212,8 +212,12 @@ func alertTitle(l L, a store.HealthAlert) string {
 	case "device_limit":
 		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
 	case "country_blocked":
-		c := data(access.CountryName(p["country"], string(l)), 60) // the names are nominative; Russian says "from the country: X"
-		return l.pick("Node is unreachable from "+c, "Нода недоступна из страны: "+c, "节点在"+c+"无法访问")
+		c := data(access.CountryName(p["country"], string(l)), 60)
+		ru := "Нода недоступна из страны: " + c // the names are nominative; the countries on offer have their genitive
+		if g, ok := ruFromCountry[p["country"]]; ok {
+			ru = "Нода недоступна из " + g
+		}
+		return l.pick("Node is unreachable from "+c, ru, "节点从"+c+"无法连接")
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -317,6 +321,9 @@ func alertReason(l L, a store.HealthAlert) string {
 	}
 	return ""
 }
+
+// ruFromCountry is a country after Russian "из" (genitive), for the countries the check offers (web/src/i18n/country.ts).
+var ruFromCountry = map[string]string{"RU": "России", "BY": "Беларуси", "KZ": "Казахстана", "CN": "Китая", "IR": "Ирана", "TR": "Турции"}
 
 // countryBlockedReason is the sentence of a COUNTRY_BLOCKED alert: what fails from the probe networks, and what still passes.
 func countryBlockedReason(l L, p map[string]string) string {

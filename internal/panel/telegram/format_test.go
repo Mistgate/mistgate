@@ -391,8 +391,8 @@ func TestCountryBlockedAlertTextsAreLocalized(t *testing.T) {
 		parts []string
 	}{
 		{"en", []string{"Node is unreachable from Russia", "Node: <b>nl1</b>", "TCP is being cut (Rostelecom, Beeline &lt;x&gt;). ICMP passes."}},
-		{"ru", []string{"Нода недоступна из страны: Россия", "Нода: <b>nl1</b>", "TCP режут (Rostelecom, Beeline &lt;x&gt;). ICMP проходит."}},
-		{"zh", []string{"节点在俄罗斯无法访问", "TCP 被阻断（Rostelecom, Beeline &lt;x&gt;），ICMP 仍可通过。"}},
+		{"ru", []string{"Нода недоступна из России", "Нода: <b>nl1</b>", "TCP режут (Rostelecom, Beeline &lt;x&gt;). ICMP проходит."}},
+		{"zh", []string{"节点从俄罗斯无法连接", "TCP 被阻断（Rostelecom, Beeline &lt;x&gt;），ICMP 仍可通过。"}},
 	} {
 		opened := alertOpened(tc.lang, a, "nl1", "")
 		for _, part := range tc.parts {
