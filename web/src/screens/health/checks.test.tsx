@@ -167,7 +167,7 @@ const probe = (network: string, city: string, icmpMs: number, ports: [number, bo
   tcp: ports.map(([port, open]) => ({ port, ok: open, ms: open ? 40 : 0 })),
   valid,
 });
-const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({ nodeId, country: "RU", verdict: v, atUnix: at, probes, reason: "", eyeball: true, ...over });
+const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({ nodeId, country: "RU", verdict: v, atUnix: at, probes, reason: "", eyeball: true, confidence: "", listedBy: [] as string[], cdnProvider: "", cdnRegion: "", ...over });
 const countryChecks = [
   verdict("nod_1", CountryVerdict.OK, [probe("Rostelecom", "Moscow", 42, [[443, true]]), probe("Beeline", "Kazan", 47, [[443, true]])]),
   verdict("nod_2", CountryVerdict.TCP_BLOCKED, [probe("Rostelecom", "Moscow", 51, [[443, false], [8443, false]]), probe("MegaFon", "Kazan", 0, [[443, false], [8443, false]], false)]),
@@ -290,5 +290,117 @@ describe("the country row on the node page", () => {
     host?.remove();
     await mountNode({ ...own, countryChecks: [] });
     expect(document.querySelector("[data-testid=country-row]")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// The block lists in the same column: LISTED, a row of the lists alone, a live verdict with their detail
+
+const hetzner = { cdnProvider: "Hetzner", cdnRegion: "DE" };
+const withLists = {
+  ...four,
+  countryChecks: [
+    verdict("nod_1", CountryVerdict.OK, [probe("Rostelecom", "Moscow", 42, [[443, true]]), probe("Beeline", "Kazan", 47, [[443, true]])], { confidence: "eyeball", ...hetzner }),
+    verdict("nod_2", CountryVerdict.TCP_BLOCKED, [probe("Rostelecom", "Moscow", 51, [[443, false], [8443, false]]), probe("MegaFon", "Kazan", 0, [[443, false], [8443, false]], false)], {
+      confidence: "eyeball",
+      listedBy: ["antifilter_ipsum"],
+      ...hetzner,
+    }),
+    // the lists alone: no probes, no reason
+    verdict("nod_3", CountryVerdict.LISTED, [], { confidence: "listed", eyeball: false, listedBy: ["antifilter_ipsum", "antifilter_community"], ...hetzner }),
+    verdict("nod_4", CountryVerdict.UNKNOWN, [], { eyeball: false }),
+  ],
+};
+
+describe("the block lists in the country column", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("shows LISTED in its own word and glyph, the warn colour drawn dashed, apart from TCP blocked", async () => {
+    await mount(withLists);
+    const listed = countryCell("nl1")!;
+    expect(listed.textContent).toBe("listed");
+    expect(listed.className).toContain("tone-warn");
+    expect(listed.className).toContain("tint-dashed");
+    expect(listed.querySelector("svg")).not.toBeNull(); // the list mark, not the "!" of TCP blocked
+    expect(listed.getAttribute("aria-label")).toBe("nl1, From Russia: In the RKN registry, not checked live");
+    expect(countryCell("de2")!.className).not.toContain("tint-dashed");
+  });
+
+  it("explains LISTED in the tooltip: not checked live, from the lists only, which lists, the subnet, when they were compared", async () => {
+    await mount(withLists);
+    await act(async () => countryCell("nl1")!.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of ["In the RKN registry, not checked live", "Lists: RKN registry (antifilter ipsum), community list (antifilter)", "Hetzner subnet, DE", "Lists compared: ", "From the block lists only"])
+      expect(text).toContain(line);
+    expect(text).not.toContain("Last round");
+  });
+
+  it("shows a row of the lists alone that holds no hit as no data, and says why", async () => {
+    await mount(withLists);
+    const none = countryCell("fi1")!;
+    expect(none.textContent).toBe("no data");
+    expect(none.className).not.toMatch(/tone-/);
+    expect(none.getAttribute("aria-label")).toBe("fi1, From Russia: Not in the block lists, not checked live");
+  });
+
+  it("keeps a live verdict with the lists' detail, adds the list mark, and shows both in the tooltip", async () => {
+    await mount(withLists);
+    const tcp = countryCell("de2")!;
+    expect(tcp.textContent).toBe("!TCP blockedICMP passes");
+    expect(tcp.querySelector("[data-testid=also-listed]")).not.toBeNull();
+    expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes · in the RKN registry");
+    // the subnet alone adds no mark
+    expect(countryCell("de1")!.querySelector("[data-testid=also-listed]")).toBeNull();
+    await act(async () => tcp.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of ["TCP is blocked, ICMP passes", "ICMP 51 ms · TCP 443, 8443 ✕", "Last round: ", "Lists: RKN registry (antifilter ipsum)", "Hetzner subnet, DE", "Checked via Globalping from home and mobile networks"])
+      expect(text).toContain(line);
+  });
+
+  it("gives every phone card the same in words", async () => {
+    await mount(withLists);
+    expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
+      "From RussiareachableRostelecom, Beeline · Hetzner subnet, DE · 4 min ago",
+      "!From RussiaTCP blockedICMP passes · Rostelecom · in the RKN registry · Hetzner subnet, DE · 4 min ago",
+      "From RussialistedRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago",
+      "From Russiano datanot in the block lists · 4 min ago",
+      "From Russia—not checked yet",
+    ]);
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    await mount(withLists);
+    expect(countryCell("nl1")?.textContent).toBe("в реестре");
+    expect(countryCell("nl1")?.getAttribute("aria-label")).toBe("nl1, Из России: В реестре РКН, живьём не проверено");
+    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2, Из России: TCP режут, ICMP проходит · в реестре РКН");
+    expect(document.querySelectorAll("[data-testid=country-row]")[2]?.textContent).toBe("Из Россиив реестререестр РКН (antifilter ipsum), список сообщества (antifilter) · подсеть Hetzner, DE · 4 мин назад");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    await mount(withLists);
+    expect(countryCell("nl1")?.textContent).toBe("在名录中");
+    expect(countryCell("nl1")?.getAttribute("aria-label")).toBe("nl1，从俄罗斯访问：在 RKN 封锁名录中，未经实测");
+  });
+});
+
+describe("the block lists on the node page", () => {
+  it("shows LISTED in the country row, with its tooltip", async () => {
+    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[2]!], countryChecks: [withLists.countryChecks[2]] });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_3" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
+    expect(row.textContent).toBe("From RussialistedRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago");
+    expect(row.className).toContain("tint-dashed");
+    await act(async () => row.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.body.textContent).toContain("In the RKN registry, not checked live");
+    expect(document.body.textContent).toContain("From the block lists only");
   });
 });

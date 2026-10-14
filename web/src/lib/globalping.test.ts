@@ -11,7 +11,8 @@ import type { CountryCheck } from "./health";
 const tOf = (dict: Record<string, string>) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dict[key]!, vars), { n: () => "" }) as unknown as T;
 const t = tOf(en);
 
-const round = (atUnix: number, verdict = CountryVerdict.OK, reason = ""): CountryCheck => ({ nodeId: "nod_1", country: "RU", verdict, atUnix, probes: [], reason, eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "" });
+const probe = { network: "Rostelecom", asn: 1, city: "Moscow", icmpOk: true, icmpMs: 42, tcp: [], valid: true };
+const round = (atUnix: number, verdict = CountryVerdict.OK, reason = ""): CountryCheck => ({ nodeId: "nod_1", country: "RU", verdict, atUnix, probes: reason ? [] : [probe], reason, eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "" });
 const limits: GlobalpingTest = { reachable: true, tokenUsed: true, limit: 500, remaining: 412, resetS: 1800, credits: 0 };
 const on = { enabled: true };
 

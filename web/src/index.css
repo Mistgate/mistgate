@@ -204,6 +204,10 @@
   background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
   border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));
 }
+/* the tint drawn dashed: a state on record that nobody saw live (a node in a block list) */
+.tint-dashed {
+  border-style: dashed;
+}
 .pill {
   background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
   border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));

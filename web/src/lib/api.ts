@@ -2,6 +2,7 @@ import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AuthService } from "@/gen/mistgate/admin/v1/auth_pb";
 import { BackupService } from "@/gen/mistgate/admin/v1/backup_pb";
+import { BlocklistService } from "@/gen/mistgate/admin/v1/blocklist_pb";
 import { CountryReachabilityService } from "@/gen/mistgate/admin/v1/country_reachability_pb";
 import { AwgService } from "@/gen/mistgate/admin/v1/awg_pb";
 import { DeviceService } from "@/gen/mistgate/admin/v1/device_pb";
@@ -54,6 +55,7 @@ export const approvals = createClient(ApprovalService, transport);
 export const telegram = createClient(TelegramService, transport);
 export const globalping = createClient(GlobalpingService, transport);
 export const countryReach = createClient(CountryReachabilityService, transport);
+export const blocklist = createClient(BlocklistService, transport);
 
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
 export const assetUrl = (path: string) => new URL(path, document.baseURI).href;

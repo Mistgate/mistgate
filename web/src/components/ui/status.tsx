@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/en";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
@@ -71,9 +72,10 @@ export function StatusPill({
 
 /**
  * The pill's round 14px glyph on its own: a tick, "!", "×" or "–" on the status colour, so a state reads by its shape as
- * well as its hue. Decorative: whoever shows it names the state (aria-label, a word beside it).
+ * well as its hue. Decorative: whoever shows it names the state (aria-label, a word beside it). `glyph` replaces the mark
+ * for a state that shares a colour with another (a node in a block list: the warn colour, a list mark instead of "!").
  */
-export function StatusGlyph({ kind }: { kind: StatusKind }) {
+export function StatusGlyph({ kind, glyph }: { kind: StatusKind; glyph?: ReactNode }) {
   return (
     <span
       aria-hidden
@@ -82,7 +84,7 @@ export function StatusGlyph({ kind }: { kind: StatusKind }) {
         kind === "busy" ? "animate-[mg-ui-spin_1s_linear_infinite] border-2 border-(color:--c) border-t-transparent" : "bg-(--c)",
       )}
     >
-      {kind === "ok" ? <span className="-mt-0.5 h-1.5 w-[3px] rotate-45 border-r-2 border-b-2 border-on-accent" /> : kinds[kind].glyph}
+      {glyph ?? (kind === "ok" ? <span className="-mt-0.5 h-1.5 w-[3px] rotate-45 border-r-2 border-b-2 border-on-accent" /> : kinds[kind].glyph)}
     </span>
   );
 }

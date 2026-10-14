@@ -591,7 +591,7 @@ describe("reachability from a country", () => {
     ],
   });
   const cut = check({ verdict: CountryVerdict.BLOCKED, probes: [probe("Rostelecom", "Moscow", 0, [[443, false]]), probe("MTS", "Omsk", 0, [])] });
-  const none = check({ verdict: CountryVerdict.UNKNOWN, reason: "too_few_probes", eyeball: false, probes: [probe("Selectel", "Moscow", 38, [[443, true]])] });
+  const none = check({ verdict: CountryVerdict.UNKNOWN, reason: "too_few_probes", eyeball: false, confidence: "", probes: [probe("Selectel", "Moscow", 38, [[443, true]])] });
 
   it("says each verdict in a word, calm for OK and no data, in a problem tone only for the two blocks", () => {
     const looks = [check(), tcpCut, cut, none].map((c) => countryLook(tPlural, fmt, c));
@@ -650,6 +650,60 @@ describe("reachability from a country", () => {
     expect(countryIn(tZhPlural, "CN")).toBe("中国");
     expect(countryIn(tRuPlural, "UZ")).toBe("страны UZ");
     expect(countryIn(tPlural, "UZ")).toBe("UZ");
+  });
+
+  // the block lists: a node in the registry that nobody checked live, a row of the lists alone, a live verdict with their detail
+  const listsOnly = (over: Partial<CountryCheck> = {}) =>
+    check({ verdict: CountryVerdict.LISTED, confidence: "listed", eyeball: false, probes: [], listedBy: ["antifilter_ipsum", "antifilter_community"], cdnProvider: "Hetzner", cdnRegion: "DE", ...over });
+
+  it("says LISTED in its own word: in the registry, not checked live, from the lists only, with the lists and the subnet", () => {
+    const l = countryLook(tPlural, fmt, listsOnly());
+    expect([l.kind, l.label, l.head, l.state, l.alsoListed]).toEqual(["listed", "listed", "In the RKN registry, not checked live", "In the RKN registry, not checked live", false]);
+    expect(l.probes).toEqual([]);
+    expect(l.at).toBe(""); // no live round
+    expect(l.lists).toEqual(["Lists: RKN registry (antifilter ipsum), community list (antifilter)", "Hetzner subnet, DE", `Lists compared: ${fmt.stamp(roundAt)}`]);
+    expect(l.via).toBe("From the block lists only");
+    expect(l.line).toBe("RKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago");
+    // a list the dictionary does not know keeps its code; a subnet without a region has none
+    expect(countryLook(tPlural, fmt, listsOnly({ listedBy: ["brand_new"], cdnRegion: "" })).lists.slice(0, 2)).toEqual(["Lists: brand_new", "Hetzner subnet"]);
+  });
+
+  it("says LISTED in Russian and Chinese", () => {
+    const ruL = countryLook(tRuPlural, fmtRu, listsOnly());
+    expect([ruL.label, ruL.head, ruL.via]).toEqual(["в реестре", "В реестре РКН, живьём не проверено", "Только по спискам блокировок"]);
+    expect(ruL.lists).toEqual(["Списки: реестр РКН (antifilter ipsum), список сообщества (antifilter)", "Подсеть Hetzner, DE", `Сверено со списками: ${fmtRu.stamp(roundAt)}`]);
+    const zhL = countryLook(tZhPlural, fmtZh, listsOnly());
+    expect([zhL.label, zhL.head, zhL.via]).toEqual(["在名录中", "在 RKN 封锁名录中，未经实测", "仅依据封锁名单"]);
+    expect(zhL.lists.slice(0, 2)).toEqual(["名单：RKN 封锁名录（antifilter ipsum）、社区名单（antifilter）", "Hetzner 网段（DE）"]);
+  });
+
+  it("says why an unknown live round left the lists to decide", () => {
+    const l = countryLook(tPlural, fmt, listsOnly({ reason: "too_few_probes", probes: [probe("Selectel", "Moscow", 38, [[443, true]])] }));
+    expect(l.kind).toBe("listed");
+    expect(l.at).toBe(`Last round: ${fmt.stamp(roundAt)}`);
+    expect(l.lists[0]).toBe("No live verdict: too few probes answered");
+    expect(l.lists).not.toContain(`Lists compared: ${fmt.stamp(roundAt)}`);
+  });
+
+  it("calls a row of the lists alone that holds no hit not listed, without a live verdict", () => {
+    const l = countryLook(tPlural, fmt, listsOnly({ verdict: CountryVerdict.UNKNOWN, confidence: "", listedBy: [] }));
+    expect([l.kind, l.label, l.head, l.via]).toEqual(["unknown", "no data", "Not in the block lists, not checked live", ""]);
+    expect(l.line).toBe("not in the block lists · Hetzner subnet, DE · 4 min ago");
+    expect(countryLook(tRuPlural, fmtRu, listsOnly({ verdict: CountryVerdict.UNKNOWN, confidence: "", listedBy: [] })).head).toBe("Нет в списках блокировок, живьём не проверено");
+  });
+
+  it("keeps a live verdict and adds what the lists say", () => {
+    const l = countryLook(tPlural, fmt, { ...tcpCut, listedBy: ["antifilter_ipsum"], cdnProvider: "Hetzner", cdnRegion: "DE" });
+    expect([l.kind, l.label, l.head, l.alsoListed]).toEqual(["warn", "TCP blocked", "TCP is blocked, ICMP passes", true]);
+    expect(l.state).toBe("TCP is blocked, ICMP passes · in the RKN registry");
+    expect(l.probes).toHaveLength(3);
+    expect(l.lists).toEqual(["Lists: RKN registry (antifilter ipsum)", "Hetzner subnet, DE"]);
+    expect(l.via).toBe("Checked via Globalping from home and mobile networks");
+    expect(l.line).toBe("ICMP passes · Rostelecom, Beeline · in the RKN registry · Hetzner subnet, DE · 4 min ago");
+    // the subnet alone rides along with any verdict, without the list mark
+    const ok = countryLook(tPlural, fmt, check({ cdnProvider: "Hetzner", cdnRegion: "DE" }));
+    expect([ok.alsoListed, ok.lists, ok.line]).toEqual([false, ["Hetzner subnet, DE"], "Rostelecom, Beeline · Hetzner subnet, DE · 4 min ago"]);
+    expect(countryLook(tPlural, fmt, check({ confidence: "dc_only", eyeball: false })).via).toBe("Checked via Globalping from data centers");
   });
 
   it("makes a column only when there are checks, named by the country of the newest round", () => {

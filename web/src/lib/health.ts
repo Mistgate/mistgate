@@ -320,11 +320,29 @@ export function cellLook(t: T, fmt: Fmt, cell: CheckCell, nodeStatus: NodeStatus
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Reachability from a country (GetChecksResponse.country_checks): what probes inside one country saw of each node. The
-// server sends only codes and numbers; empty while the integration is off.
+// Reachability from a country (GetChecksResponse.country_checks): what probes inside one country saw of each node and what
+// the block lists say of its address, combined by the server into one verdict. The server sends only codes and numbers;
+// empty while both sources are off.
 
 export type CountryCheck = Plain<CountryCheckMsg>;
 type CountryProbe = CountryCheck["probes"][number];
+
+/** A row from a live round (it has probes, or a reason why it has none); a row of the block lists alone has neither. */
+export const isLive = (c: Pick<CountryCheck, "probes" | "reason">) => c.probes.length > 0 || c.reason !== "";
+
+/** A block list by its name ("RKN registry (antifilter ipsum)"); a code the dictionary does not know stays a code. */
+export function listName(t: T, code: string): string {
+  const key = `cr.list.${code}`;
+  return hasKey(key) ? t(key) : code;
+}
+
+/** The CDN or hosting range of the node's address, "Hetzner subnet, DE"; empty when the lists know none. */
+export function cdnOf(t: T, c: Pick<CountryCheck, "cdnProvider" | "cdnRegion">): string {
+  if (!c.cdnProvider) return "";
+  return c.cdnRegion ? t("cr.cdn.region", { provider: c.cdnProvider, region: c.cdnRegion }) : t("cr.cdn", { provider: c.cdnProvider });
+}
+
+const capital = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
 /** A country as it stands after "from" ("from Russia", "из России"); a code the dictionary does not know stays a code. */
 export function countryIn(t: T, code: string): string {
@@ -339,17 +357,24 @@ export function countryReason(t: T, code: string): string {
 }
 
 export type CountryLook = {
-  /** OK and UNKNOWN stay quiet: only the two blocks take a problem colour. */
-  kind: "ok" | "warn" | "bad" | "unknown";
-  /** What the cell says: "reachable", "TCP blocked", "unreachable", "no data". */
+  /** OK and UNKNOWN stay quiet: only the two blocks and a node in a block list take the problem colours. */
+  kind: "ok" | "warn" | "bad" | "listed" | "unknown";
+  /** What the cell says: "reachable", "TCP blocked", "unreachable", "listed", "no data". */
   label: string;
-  /** The verdict in a sentence: the tooltip's first line and the screen reader's state. */
+  /** The verdict in a sentence: the tooltip's first line. */
   head: string;
-  /** The quiet line of a row, where a phone has no tooltip: the networks that saw it and when, or why there is no verdict. */
+  /** What a screen reader says: the verdict, and that a live verdict's address is in the registry too. */
+  state: string;
+  /** A live verdict whose address is in a block list as well: the cell and the row carry the list mark beside the verdict. */
+  alsoListed: boolean;
+  /** The quiet line of a row, where a phone has no tooltip: the networks that saw it, the lists, and when, or why there is no verdict. */
   line: string;
-  /** The tooltip under the verdict: each probe (where it is, what it got, whether it counted), the round's time, how the probes were picked. */
+  /** The tooltip under the verdict: each probe (where it is, what it got, whether it counted) and the round's time; empty without a live round. */
   probes: { where: string; result: string; counted: boolean }[];
   at: string;
+  /** What the block lists add: why the live round said nothing, the lists, the CDN range, when the lists were compared. */
+  lists: string[];
+  /** Where the verdict comes from: home and mobile networks, data centers, or the block lists only. */
   via: string;
 };
 
@@ -363,29 +388,50 @@ function probeOf(t: T, p: CountryProbe): CountryLook["probes"][number] {
   return { where: p.valid ? where : t("cr.tip.skipped", { line: where }), result: p.tcp.length ? `${icmp} · TCP ${ports}` : icmp, counted: p.valid };
 }
 
+const viaKeys: Record<string, MessageKey> = { eyeball: "cr.tip.eyeball", dc_only: "cr.tip.dc", listed: "cr.tip.listsOnly" };
+
 export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
+  const live = isLive(c);
+  const reason = countryReason(t, c.reason);
+  const listed = c.listedBy.length > 0;
+  const cdn = cdnOf(t, c);
+  const names = c.listedBy.map((l) => listName(t, l));
   const networks = [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ");
-  const seen = [networks, fmt.ago(c.atUnix)].filter(Boolean).join(" · ");
+  const ago = fmt.ago(c.atUnix);
+  // the phone's line: what the live round saw, then what the lists add, then when
+  const lineOf = (...first: string[]) => [...first, cdn, ago].filter(Boolean).join(" · ");
   const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => ({
     kind,
     label,
     head,
+    state: listed && kind !== "listed" ? `${head} · ${t("cr.line.listed")}` : head,
+    alsoListed: listed && kind !== "listed",
     line,
     probes: c.probes.map((p) => probeOf(t, p)),
-    at: t("cr.tip.at", { time: fmt.stamp(c.atUnix) }),
-    via: t(c.eyeball ? "cr.tip.eyeball" : "cr.tip.dc"),
+    at: live ? t("cr.tip.at", { time: fmt.stamp(c.atUnix) }) : "",
+    lists: [
+      kind === "listed" && reason ? t("cr.tip.liveNone", { reason }) : "",
+      listed ? t("cr.tip.listedBy", { lists: names.join(t("cr.tip.sep")) }) : "",
+      capital(cdn),
+      live ? "" : t("cr.tip.listsAt", { time: fmt.stamp(c.atUnix) }),
+    ].filter(Boolean),
+    // an unknown round has no confidence of its own: its probes still say where it looked from
+    via: viaKeys[c.confidence] ? t(viaKeys[c.confidence]!) : c.probes.length ? t(c.eyeball ? "cr.tip.eyeball" : "cr.tip.dc") : "",
   });
+  const inList = listed ? t("cr.line.listed") : "";
   switch (c.verdict) {
     case CountryVerdict.OK:
-      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), seen);
+      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(networks, inList));
     case CountryVerdict.TCP_BLOCKED:
-      return look("warn", t("cr.v.tcp"), t("cr.tip.tcp"), `${t("cr.icmpPasses")} · ${seen}`);
+      return look("warn", t("cr.v.tcp"), t("cr.tip.tcp"), lineOf(t("cr.icmpPasses"), networks, inList));
     case CountryVerdict.BLOCKED:
-      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), seen);
-    default: {
-      const reason = countryReason(t, c.reason);
-      return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), [reason, fmt.ago(c.atUnix)].filter(Boolean).join(" · "));
-    }
+      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), lineOf(networks, inList));
+    case CountryVerdict.LISTED:
+      return look("listed", t("cr.v.listed"), t("cr.tip.listed"), lineOf(names.join(t("cr.tip.sep"))));
+    default:
+      // with no live round the row is the lists' alone, and they do not hold the address
+      if (!live) return look("unknown", t("cr.v.unknown"), t("cr.tip.notListed"), lineOf(t("cr.line.notListed")));
+      return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), lineOf(reason));
   }
 }
 

@@ -3,12 +3,11 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { useToast } from "@/components/ui/toast";
 import type { GlobalpingSettings as SettingsMsg, TestGlobalpingResponse } from "@/gen/mistgate/admin/v1/globalping_pb";
-import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { countryReach, globalping } from "./api";
 import { errorText } from "./errors";
-import { countryIn, type CountryCheck } from "./health";
+import { countryIn, isLive, type CountryCheck } from "./health";
 import { plain, type Plain } from "./plain";
 
 // The "Reachability from a country" group of the Integrations screen: the shared country (country_reachability.proto) and the
@@ -37,22 +36,27 @@ export const intervalOptions = [10, 15, 30, 60, 180, 360] as const;
 /** The shape of a token: up to 256 characters, no spaces. The server checks it again; this only saves a round trip. */
 export const looksLikeToken = (s: string) => /^\S{1,256}$/.test(s.trim());
 
+/**
+ * A failed call of a source card as one sentence: a test asked again too soon, the source's own codes (`keys`, from the
+ * message of the error), the rest through errorText.
+ */
+export function sourceErrorText(e: unknown, t: T, keys: Record<string, MessageKey>): string {
+  const c = ConnectError.from(e);
+  if (c.code === Code.ResourceExhausted) return t("cr.tooSoon");
+  if (c.code !== Code.PermissionDenied) {
+    const key = keys[c.rawMessage];
+    if (key) return t(key);
+  }
+  return errorText(e, t);
+}
+
 const errorKeys: Record<string, MessageKey> = {
   token_invalid: "gp.err.token",
   globalping_unauthorized: "gp.err.unauthorized",
   globalping_unreachable: "gp.err.unreachable",
 };
 
-/** A failed call as one sentence: the panel's own codes are worded here, the rest goes through errorText. */
-export function globalpingErrorText(e: unknown, t: T): string {
-  const c = ConnectError.from(e);
-  if (c.code === Code.ResourceExhausted) return t("gp.err.tooSoon");
-  if (c.code !== Code.PermissionDenied) {
-    const key = errorKeys[c.rawMessage];
-    if (key) return t(key);
-  }
-  return errorText(e, t);
-}
+export const globalpingErrorText = (e: unknown, t: T) => sourceErrorText(e, t, errorKeys);
 
 /** What the last Test said, and when (unix seconds): the server keeps no record of it, so it lives as long as the page. */
 export type TestOutcome = { at: number } & ({ ok: GlobalpingTest } | { error: unknown });
@@ -70,13 +74,15 @@ export type CardState =
 /**
  * The state line of the card (plan: off, on and working, failing, never tested). The newer of the last Test and the newest
  * round decides: a Test that failed after a good round is a failure, a good round after a failed Test is working again.
+ * Only live rounds count: a row of the block lists alone says nothing about Globalping.
  */
-export function cardState(s: Pick<GlobalpingSettings, "enabled">, test: TestOutcome | null, rounds: readonly CountryCheck[]): CardState {
+export function cardState(s: Pick<GlobalpingSettings, "enabled">, test: TestOutcome | null, rows: readonly CountryCheck[]): CardState {
   if (!s.enabled) return { kind: "off" };
-  const round = rounds.reduce<CountryCheck | undefined>((a, c) => (!a || c.atUnix > a.atUnix ? c : a), undefined);
+  const round = rows.filter(isLive).reduce<CountryCheck | undefined>((a, c) => (!a || c.atUnix > a.atUnix ? c : a), undefined);
   if (test && (!round || test.at >= round.atUnix)) return "ok" in test ? { kind: "works", test: test.ok } : { kind: "fails", error: test.error };
   if (round) {
-    if (round.verdict === CountryVerdict.UNKNOWN && sourceReasons.includes(round.reason)) return { kind: "noData", reason: round.reason, at: round.atUnix };
+    // the reason is the live round's own, whatever the lists made of the verdict (an unknown round and a list hit: listed)
+    if (sourceReasons.includes(round.reason)) return { kind: "noData", reason: round.reason, at: round.atUnix };
     return { kind: "works", roundAt: round.atUnix };
   }
   return { kind: "untested" };

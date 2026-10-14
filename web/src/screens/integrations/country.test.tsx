@@ -13,7 +13,17 @@ const testGlobalping = vi.fn();
 const disconnectGlobalping = vi.fn();
 const getCountryReachability = vi.fn();
 const getChecks = vi.fn();
+const getBlocklist = vi.fn();
+const updateBlocklist = vi.fn();
+const testBlocklist = vi.fn();
+const disconnectBlocklist = vi.fn();
 vi.mock("@/lib/api", () => ({
+  blocklist: {
+    getBlocklist: (...a: unknown[]) => getBlocklist(...a),
+    updateBlocklist: (...a: unknown[]) => updateBlocklist(...a),
+    testBlocklist: (...a: unknown[]) => testBlocklist(...a),
+    disconnectBlocklist: (...a: unknown[]) => disconnectBlocklist(...a),
+  },
   globalping: {
     getGlobalping: (...a: unknown[]) => getGlobalping(...a),
     updateGlobalping: (...a: unknown[]) => updateGlobalping(...a),
@@ -39,16 +49,18 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   getCountryReachability.mockResolvedValue({ settings: { country: "RU" } });
   getChecks.mockResolvedValue({ nowUnix: 0, intervalS: 300, columns: [], rows: [], countryChecks: [] });
+  getBlocklist.mockResolvedValue({ settings: lists() });
 });
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
   act(() => setLang("en"));
-  for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks]) m.mockReset();
+  for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
 });
 
 const settings = (over: Record<string, unknown> = {}) => ({ enabled: false, intervalMin: 15, hasToken: false, ...over });
+const lists = (over: Record<string, unknown> = {}) => ({ enabled: false, available: true, checkedUnix: 0, listsUnix: 0, ...over });
 
 async function mount(first: object) {
   getGlobalping.mockResolvedValue({ settings: first });
@@ -168,7 +180,8 @@ describe("the Globalping card", () => {
 
   it("works on the rounds alone, and has no data when the newest round failed on Globalping's side", async () => {
     const at = Math.floor(Date.now() / 1000) - 240;
-    const round = (verdict: number, reason = "") => ({ nodeId: "nod_1", country: "RU", verdict, atUnix: at, probes: [], reason, eyeball: true });
+    const probe = { network: "Rostelecom", asn: 1, city: "Moscow", icmpOk: true, icmpMs: 42, tcp: [], valid: true };
+    const round = (verdict: number, reason = "") => ({ nodeId: "nod_1", country: "RU", verdict, atUnix: at, probes: reason ? [] : [probe], reason, eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "" });
     getChecks.mockResolvedValue({ nowUnix: at, intervalS: 300, columns: [], rows: [], countryChecks: [round(CountryVerdict.OK)] });
     await mount(settings({ enabled: true, hasToken: true }));
     expect(state()?.textContent).toBe("Works · last round 4 min ago");
@@ -210,5 +223,125 @@ describe("the Globalping card", () => {
     expect(text()).toContain("节点地址会发送给 Globalping 及其志愿者探测点。");
     expect(button("测试")).toBeDefined();
     expect(button("断开连接")).toBeDefined();
+  });
+});
+
+describe("the block-list card", () => {
+  // the card of its own, next to Globalping's: its state line, its buttons
+  const card = (title = "Block lists") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
+  const listsState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const listsButton = (label: string, title?: string) => [...(card(title)?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
+  const listsSwitch = () => card()?.querySelector("[role=switch]");
+  const at = Math.floor(Date.now() / 1000) - 240;
+  const listsAt = Math.floor(new Date(2026, 9, 14, 18, 5).getTime() / 1000);
+
+  it("sits next to the Globalping card in the group, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
+    await mount(settings());
+    const grid = card()?.parentElement;
+    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists"]);
+    expect(listsState()?.dataset.state).toBe("off");
+    expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
+    expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");
+    expect(listsSwitch()?.getAttribute("aria-label")).toBe("Use the block lists");
+    expect(listsButton("Test")).toBeUndefined();
+    expect(listsButton("Disconnect")).toBeUndefined();
+    expect(card()?.textContent).toContain("The lists are downloaded to the panel and compared here: no node address leaves the panel.");
+    expect(testBlocklist).not.toHaveBeenCalled();
+  });
+
+  it("switches on and off through UpdateBlocklist, then waits for a first test", async () => {
+    updateBlocklist.mockResolvedValue({ settings: lists({ enabled: true }) });
+    await mount(settings());
+    await click(listsSwitch());
+    expect(updateBlocklist).toHaveBeenCalledWith({ enabled: true });
+    expect(updateGlobalping).not.toHaveBeenCalled();
+    expect(listsState()?.dataset.state).toBe("untested");
+    expect(listsState()?.textContent).toBe("On · not tested yet");
+    expect(listsButton("Test")).toBeDefined();
+    expect(listsButton("Disconnect")).toBeDefined();
+    updateBlocklist.mockResolvedValue({ settings: lists() });
+    await click(listsSwitch());
+    expect(updateBlocklist).toHaveBeenLastCalledWith({ enabled: false });
+    expect(listsState()?.dataset.state).toBe("off");
+  });
+
+  it("says only for Russia when the country is another one, and offers no test", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, available: false }) });
+    await mount(settings());
+    expect(listsState()?.dataset.state).toBe("unavailable");
+    expect(listsState()?.textContent).toBe("Not available · only for Russia; nothing is downloaded");
+    expect(listsButton("Test")).toBeUndefined();
+    expect(listsButton("Disconnect")).toBeDefined();
+  });
+
+  it("works on the stored check: the date of the lists and when they were compared", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, checkedUnix: at, listsUnix: listsAt }) });
+    await mount(settings());
+    expect(listsState()?.dataset.state).toBe("works");
+    expect(listsState()?.textContent).toBe("Works · lists of Oct 14, 18:05 · compared 4 min ago");
+  });
+
+  it("tests through TestBlocklist and says what it found: prefixes, CDN ranges, nodes listed, the mirror", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true }) });
+    testBlocklist.mockResolvedValue({ listsUnix: listsAt, prefixes: 20580, cdnRanges: 1234, nodesChecked: 4, nodesListed: 1, mirrorUsed: true });
+    await mount(settings());
+    await click(listsButton("Test"));
+    expect(testBlocklist).toHaveBeenCalledTimes(1);
+    expect(testBlocklist).toHaveBeenCalledWith({});
+    expect(testGlobalping).not.toHaveBeenCalled();
+    expect(listsState()?.dataset.state).toBe("works");
+    expect(listsState()?.textContent).toBe("Works · lists of Oct 14, 18:05 · 20,580 prefixes · 1,234 CDN ranges · 1 of 4 nodes listed · main list from the mirror");
+  });
+
+  it("fails when the test fails, in words, and does not count a test asked for too soon", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true }) });
+    testBlocklist.mockRejectedValue(new ConnectError("blocklist_unreachable", Code.Unavailable));
+    await mount(settings());
+    await click(listsButton("Test"));
+    expect(listsState()?.dataset.state).toBe("fails");
+    expect(listsState()?.textContent).toBe("Does not work · Could not download the lists, and the panel holds no earlier copy.");
+    testBlocklist.mockRejectedValue(new ConnectError("tested a moment ago", Code.ResourceExhausted));
+    await click(listsButton("Test"));
+    expect(listsState()?.dataset.state).toBe("fails"); // still the last real answer, the toast says to wait
+  });
+
+  it("disconnects only after a confirmation, through DisconnectBlocklist, which also deletes the results", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, checkedUnix: at, listsUnix: listsAt }) });
+    disconnectBlocklist.mockResolvedValue({ settings: lists() });
+    await mount(settings());
+    await click(listsButton("Disconnect"));
+    expect(disconnectBlocklist).not.toHaveBeenCalled();
+    expect(dialog()?.textContent).toContain("Disconnect the block lists?");
+    expect(dialog()?.textContent).toContain("the downloaded lists and every stored result are deleted");
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Disconnect"));
+    expect(disconnectBlocklist).toHaveBeenCalledTimes(1);
+    expect(disconnectBlocklist).toHaveBeenCalledWith({});
+    expect(updateBlocklist).not.toHaveBeenCalled();
+    expect(disconnectGlobalping).not.toHaveBeenCalled();
+    expect(listsState()?.dataset.state).toBe("off");
+    expect(listsButton("Disconnect")).toBeUndefined();
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, available: false }) });
+    await mount(settings());
+    expect(listsState("Списки блокировок")?.textContent).toBe("Недоступно · только для России, ничего не скачивается");
+    expect(card("Списки блокировок")?.textContent).toContain("Списки скачиваются на панель и сверяются здесь же: адреса нод не покидают панель.");
+    expect(listsButton("Отключить", "Списки блокировок")).toBeDefined();
+    act(() => root?.unmount());
+    host?.remove();
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true }) });
+    testBlocklist.mockResolvedValue({ listsUnix: listsAt, prefixes: 20581, cdnRanges: 2, nodesChecked: 1, nodesListed: 1, mirrorUsed: false });
+    await mount(settings());
+    await click(listsButton("Проверить", "Списки блокировок"));
+    expect(listsState("Списки блокировок")?.textContent).toBe(`Работает · списки от 14 окт., 18:05 · ${(20581).toLocaleString("ru-RU")} префикс · 2 диапазона CDN · в реестре 1 из 1 ноды`);
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    getBlocklist.mockResolvedValue({ settings: lists() });
+    await mount(settings());
+    expect(listsState("封锁名单")?.textContent).toBe("已关闭 · 不会下载任何内容。");
+    expect(card("封锁名单")?.textContent).toContain("名单会下载到面板，并在面板上比对：节点地址不会离开面板。");
   });
 });
