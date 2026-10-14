@@ -153,6 +153,9 @@ func (a *Agent) capabilities() []string {
 	if _, ok := a.host.(hostctl.UDPCounter); ok {
 		caps = append(caps, capUDPCheck)
 	}
+	if a.country.canProbe() {
+		caps = append(caps, capCountryProbe)
+	}
 	if a.cfg.UnitGen >= 3 {
 		caps = append(caps, capUnit3)
 	}

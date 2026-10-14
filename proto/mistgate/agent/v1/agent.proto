@@ -379,6 +379,30 @@ package mistgate.agent.v1;
 //   - ERRORS (CommandResult.error): busy (a mark already armed, 4 probes running, or a bandwidth test running),
 //     bad_params, unsupported_host, no_route (resolve failed), "failed: <short message>".
 
+// COUNTRY PROBE (additive, protocol api_version stays 1)
+//   Does a TCP SYN to a fleet node survive the national DPI (the Russian TSPU)? Run on a node INSIDE that country, so the
+//   answer is for the network of that node's datacenter. The method needs no raw socket and no capability: a plain TCP
+//   socket with IP_TTL and IP_RECVERR, and the ICMP Time Exceeded of a router arrives in the socket error (and its error
+//   queue) while the connection is in SYN_SENT.
+//   - CAPABILITY GATE. An agent lists "country-probe/1" in Hello.capabilities only on a host that can do it (Linux, a TCP
+//     socket accepts IP_TTL and IP_RECVERR). The panel sends CountryProbe ONLY to a stream that listed it.
+//   - METHOD. (1) dpi_hop: SYNs to blocked_ref (an address known to be blocked in that country) with TTL 1..max_ttl; the
+//     DPI box drops them without an ICMP answer, so dpi_hop is the highest TTL a router answered (a late answer is looked
+//     for one hop on). (2) Control: SYNs to control_target:443 with TTL dpi_hop+1..dpi_hop+hop_limit; at least one hop
+//     behind the DPI must answer (ICMP, RST or an established connection), else the method does not apply to this network
+//     and the answer is control_failed (not a verdict about any node). (3) Each host:port of the targets the same way:
+//     established or ICMP behind the DPI = "open", a RST = "refused", silence at every hop = "blocked". Every "blocked" is
+//     checked again, alone and with more patience (parallel probes trip ICMP rate limits). All ports are TCP.
+//   - SAFETY. Only the addresses in the message are probed. control_target and blocked_ref are IPv4 literals; a target
+//     host is an IPv4/IPv6 literal or a name the agent resolves (IPv4 first; an IPv6-only name has no verdict). Unspecified,
+//     multicast, broadcast and link-local destinations are refused (unsupported_host). Caps: 1-8 targets, 1-4 ports each,
+//     at most 16 host:port pairs, hop_limit 1-8, max_ttl 1-32, 120 s in total; one run at a time (busy).
+//   - ANSWER. One CommandResult. ok = true: params{"dpi_hop": "<n>", "control": "ok", "t<host>:<port>": verdict}, verdict =
+//     blocked | open | refused | timeout (timeout = no verdict was reached for that pair: the deadline ran out, or the name
+//     did not resolve). ok = false: error = bad_params | unsupported_host | busy | unsupported | no_dpi_hop (blocked_ref
+//     was empty, silent from the first hop, or reachable, so the DPI box cannot be placed) | control_failed (params{
+//     "dpi_hop", "control": "fail"}) | "failed: <short message>".
+//
 // NODE DECOY SITE (additive, protocol api_version stays 1)
 //   A node reports the active mode and bundle SHA-256 in Hello. Agents that implement this command list "decoy/1".
 //   SetDecoy changes the site used by Hysteria2 masquerade and VLESS REALITY self. files is omitted when the agent
@@ -516,7 +540,7 @@ message Hello {
   // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
-  // "SPEED LIMITS").
+  // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -852,6 +876,8 @@ message ConnectResponse {
     TcpProbe tcp_probe = 29;
     // Only sent to agents with "decoy/1" in Hello.capabilities (see "NODE DECOY SITE").
     SetDecoy set_decoy = 30;
+    // Only sent to agents with "country-probe/1" in Hello.capabilities (see "COUNTRY PROBE").
+    CountryProbe country_probe = 31;
   }
 }
 
@@ -940,6 +966,33 @@ message TcpTarget {
   bytes token = 5;
   // http_mark: 32 bytes; the expected body is <base64url of token>.<base64url of answer>.
   bytes answer = 6;
+}
+
+// Test from this node, which stands inside a country, whether TCP SYNs to other nodes of the fleet die at the national DPI
+// (see "COUNTRY PROBE"). One CommandResult after the last target.
+message CountryProbe {
+  string request_id = 1;
+  // An address that is certainly not blocked in the country, IPv4 literal, port 443 (RU: 77.88.55.88). Its SYNs must get
+  // past the DPI box, else the method does not apply (control_failed).
+  string control_target = 2;
+  // The server name of the control target. Reserved: the SYN method of this agent does not send a TLS hello.
+  string control_sni = 3;
+  // An IPv4 literal that is certainly blocked in the country, port 443 (RU: a Telegram address). The last router that
+  // answers its SYNs is the hop in front of the DPI box. Empty = no_dpi_hop.
+  string blocked_ref = 4;
+  // 1-8 targets; only addresses of fleet nodes, as the panel knows them.
+  repeated CountryProbeTarget targets = 5;
+  // How many hops behind the DPI box to probe, 1-8; 0 = 3.
+  uint32 hop_limit = 6;
+  // The highest TTL the search for the DPI hop tries, 1-32; 0 = 30.
+  uint32 max_ttl = 7;
+}
+
+message CountryProbeTarget {
+  // The node's address (node.address): an IP, or a name this node resolves (IPv4 first).
+  string host = 1;
+  // 1-4 distinct TCP ports.
+  repeated uint32 ports = 2;
 }
 
 // Ask the node to put the AmneziaWG kernel module on itself (or, with dry_run, only say whether that is needed and
