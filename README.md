@@ -135,3 +135,13 @@ Report vulnerabilities privately: see [SECURITY.md](SECURITY.md). Back up the pa
 ## Licence
 
 Mistgate is free software under the [GNU Affero General Public License v3.0 only](LICENSE). If you run a modified panel for others, its admin shows a "Source code" link (`serve --source-url`) that should point to your source.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mistgate%2Fmistgate&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+ </picture>
+</a>

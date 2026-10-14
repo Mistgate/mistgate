@@ -135,3 +135,13 @@ Mistgate 处于测试阶段。[最新发布版本](https://github.com/Mistgate/m
 ## 许可证
 
 Mistgate 是自由软件，采用 [GNU Affero General Public License v3.0 only](LICENSE)。如果你为他人运行修改过的面板，其管理后台会显示一个「源代码」链接（`serve --source-url`），它应指向你的源代码。
+
+## Star 历史
+
+<a href="https://www.star-history.com/?repos=mistgate%2Fmistgate&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+   <img alt="Star 历史图表" src="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+ </picture>
+</a>

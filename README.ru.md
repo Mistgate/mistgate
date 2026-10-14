@@ -135,3 +135,13 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 ## Лицензия
 
 Mistgate распространяется как свободное ПО под [GNU Affero General Public License v3.0 only](LICENSE). Если вы запускаете изменённую панель для других, ссылка «Исходный код» в её админке (`serve --source-url`) должна вести на ваши исходники.
+
+## История звёзд
+
+<a href="https://www.star-history.com/?repos=mistgate%2Fmistgate&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+   <img alt="График звёзд на GitHub" src="https://api.star-history.com/chart?repos=mistgate/mistgate&type=date&legend=top-left" />
+ </picture>
+</a>
