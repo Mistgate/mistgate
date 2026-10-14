@@ -13,7 +13,7 @@ For every profile on a node the panel opens a tunnel with a built-in client and,
 
 | Request | What it proves |
 |---|---|
-| `https://www.gstatic.com/generate_204` | The tunnel carries traffic. Must answer 204. The latency shown is the time from the start of the connection to the first byte of this answer. |
+| `https://www.gstatic.com/generate_204` | The tunnel carries traffic. Must answer 204. The panel then asks for it once more over the same connection; the times are explained below. |
 | `https://www.cloudflare.com/cdn-cgi/trace` | Where the traffic leaves: the exit IP and its country. |
 
 The host names are resolved by the node, not by the panel, so a broken resolver on the node shows up as a failed check.
@@ -21,7 +21,7 @@ The host names are resolved by the node, not by the panel, so a broken resolver 
 A result is one of:
 
 - **OK**: both pages answered.
-- **Degraded**: the tunnel works but one of the two pages did not answer. The latency is shown in the warning colour. A degraded result never opens an alert by itself.
+- **Degraded**: the tunnel works but one of the two pages did not answer. The number is shown in the warning colour. A degraded result never opens an alert by itself.
 - **Failed**: the tunnel did not come up, or neither page answered.
 
 The client depends on the protocol:
@@ -50,11 +50,12 @@ The check uses a hidden system account on each profile of each node: it belongs 
 
 ### Reading the matrix
 
-**Health → Checks** is a table of nodes (rows) by profiles (columns). A cell shows the latency in milliseconds or a state:
+**Health → Checks** is a table of nodes (rows) by profiles (columns). A cell shows the response time in milliseconds or a state:
 
 | Cell | Meaning |
 |---|---|
-| `123 ms` | The last round passed. |
+| `123 ms` | The last round passed. The number is the response time, median of the last hour. |
+| `2.6 s` with a clock, under the number | Connecting took 2 s or more, median of the last hour. The tunnel works, so the colour stays calm. |
 | ✕ fails | The profile fails the check. |
 | ✕ not started | The node could not start the profile. |
 | off | You switched the profile off on this node. |
@@ -67,7 +68,7 @@ The check uses a hidden system account on each profile of each node: it belongs 
 
 Only "fails" counts as a failure. The other states are skipped rounds: they are not stored and do not touch the failure streak.
 
-Click a cell to see the last 24 hours in half-hour bars (red where a round failed), the exit IP and **Failed in a row**. An alert opens after two failed rounds in a row.
+Click a cell to see the last 24 hours in half-hour bars as tall as the time from scratch (red where a round failed), the exit IP and **Failed in a row**. An alert opens after two failed rounds in a row.
 
 When a round fails, the cell says why:
 
@@ -79,6 +80,30 @@ When a round fails, the cell says why:
 | `refused` | Connection refused: nothing listens on the port |
 | `exit_unreachable` | The tunnel works, but the node's exit to the internet does not |
 | `http_status` | The test sites answer with an error |
+
+### What the numbers mean
+
+All three numbers are measured on the panel's server, not on a person's device.
+
+| Number | What it is |
+|---|---|
+| Response | The number in the cell. Right after the first answer, the panel asks for `generate_204` once more over the same connection: the time of a request while the tunnel is up, which is what a person feels. The cell shows the median of the last hour; until there is one, the last round, then the time from scratch. |
+| Connect | From the start of the round until the tunnel carries its first connection: the Hysteria2 or AmneziaWG handshake, or VLESS with its TCP and REALITY or TLS. Median of the last hour. From 2 s on, the cell gets a second line with a clock. |
+| From scratch | From the start of the round to the first byte of the first answer: the handshake, a fresh TLS connection to the test site through the tunnel, and the request. The 24 h bars show this number. Older panels showed it in the cell. |
+
+Hover a cell, or move to it with Tab, to see the response and connect medians of the hour, the last round with its time, response and connect, and the passed and failed rounds of the last 24 hours. On the node page, the rows of **Client-eye checks** show the same.
+
+### When the panel's server loses UDP
+
+Some hosters drop bursts of inbound UDP. A Hysteria2 or AmneziaWG check from the panel's server then waits for a handshake retry: about 2.5 s for QUIC and 5 s for WireGuard. Connect times of several seconds on these profiles, while VLESS on the same nodes connects quickly, point at the panel's network, not at the nodes.
+
+The panel then says so above the matrix, names the nodes and gives the share of slow UDP rounds. It shows the notice when, over the last hour:
+
+- at least 20% of a node's Hysteria2 and AmneziaWG rounds (and at least 3 of them) took 2 s or more to connect;
+- under 5% of the VLESS rounds did;
+- with no VLESS profile at all, at least two nodes match the first rule.
+
+People are not affected: they connect to the nodes directly. The checks still pass, and no alert opens because of it. If the notice keeps coming back, ask the hoster of the panel's server about inbound UDP filtering or rate limits, or move the panel to another server.
 
 ### What green means
 
