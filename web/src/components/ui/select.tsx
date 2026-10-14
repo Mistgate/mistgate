@@ -44,8 +44,9 @@ export function Select({ value, onValueChange, options, compact, className, ...r
         )}
         {...rest}
       >
-        <BaseSelect.Value />
-        <BaseSelect.Icon className="text-muted">
+        {/* one line always: a long label is cut with an ellipsis, never wrapped out of the box */}
+        <BaseSelect.Value className="min-w-0 truncate" />
+        <BaseSelect.Icon className="flex-none text-muted">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 4.5l3 3 3-3" />
           </svg>

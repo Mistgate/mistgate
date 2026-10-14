@@ -93,7 +93,8 @@ export function RulesTab({ settings }: { settings: Settings }) {
             </div>
           )}
 
-          <div className="flex flex-col gap-1">
+          {/* a container: a rule row is one line where the list is wide, and puts its format under the text where it is not */}
+          <div className="@container flex flex-col gap-1">
             <RuleList
               rules={rules}
               hit={hit}
@@ -111,7 +112,7 @@ export function RulesTab({ settings }: { settings: Settings }) {
             <div className={cx("flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed px-3 py-2 transition-colors duration-200", shown && hit < 0 ? "border-accent-line bg-accent-soft" : "border-line")}>
               <Icon name="arrowDown" size={14} className="text-faint" />
               <b className="text-[13px]">{t("subs.rules.fallback")}</b>
-              <span className="min-w-0 flex-1 text-xs text-muted">{t("subs.rules.fallbackV")}</span>
+              <span className="min-w-[180px] flex-1 text-xs text-muted">{t("subs.rules.fallbackV")}</span>
             </div>
           </div>
         </Card>
@@ -270,8 +271,10 @@ function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, 
         spellCheck={false}
         className="h-[30px] min-w-[120px] flex-1 rounded-lg border border-line bg-canvas px-2.5 font-mono text-xs text-fg outline-none transition-colors duration-200 focus:border-accent"
       />
-      <span aria-hidden className="hidden text-faint sm:inline">→</span>
-      <div className="w-[170px] max-w-full">
+      <span aria-hidden className="hidden text-faint @min-[520px]:inline">→</span>
+      {/* as wide as the add-rule select, so the longest format ("Список ссылок (base64)") stays on one line; in a narrow list
+          it takes its own line under the text, from the text's left edge */}
+      <div className="order-last basis-full pl-[60px] @min-[520px]:order-none @min-[520px]:basis-[210px] @min-[520px]:pl-0">
         <Select
           compact
           aria-label={t("subs.rules.formatLabel", { n })}
@@ -280,16 +283,17 @@ function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, 
           options={ruleFormats.map((f) => ({ value: String(f), label: fmtOption(f) }))}
         />
       </div>
-      <span className="flex-1" />
-      <IconButton aria-label={t("subs.rules.up", { n })} variant="flat" disabled={i === 0} onClick={() => onMove(i, i - 1)}>
-        <Icon name="arrowUp" size={14} />
-      </IconButton>
-      <IconButton aria-label={t("subs.rules.down", { n })} variant="flat" disabled={i === total - 1} onClick={() => onMove(i, i + 1)}>
-        <Icon name="arrowDown" size={14} />
-      </IconButton>
-      <IconButton aria-label={t("subs.rules.remove", { n })} variant="flat" onClick={() => onRemove(i)}>
-        <Icon name="trash" size={14} />
-      </IconButton>
+      <span className="ml-auto flex flex-none gap-0.5">
+        <IconButton aria-label={t("subs.rules.up", { n })} variant="flat" disabled={i === 0} onClick={() => onMove(i, i - 1)}>
+          <Icon name="arrowUp" size={14} />
+        </IconButton>
+        <IconButton aria-label={t("subs.rules.down", { n })} variant="flat" disabled={i === total - 1} onClick={() => onMove(i, i + 1)}>
+          <Icon name="arrowDown" size={14} />
+        </IconButton>
+        <IconButton aria-label={t("subs.rules.remove", { n })} variant="flat" onClick={() => onRemove(i)}>
+          <Icon name="trash" size={14} />
+        </IconButton>
+      </span>
     </div>
   );
 }
