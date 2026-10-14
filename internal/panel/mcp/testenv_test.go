@@ -384,8 +384,21 @@ func newWorld() *world {
 			Devices:      devs,
 			DailyTraffic: []*adminv1.DayTraffic{{DayUnix: 1700000000, Bytes: 1 << 20}},
 			NodeTraffic:  []*adminv1.NodeTraffic{{NodeId: nodeA, NodeName: "de1", Protocol: "hysteria2", Bytes: 5 << 20}},
-			Profiles:     []*adminv1.ProfileRef{{Id: "prf_1", Name: "Main", Protocol: "hysteria2"}},
-			NodeAccess:   []*adminv1.NodeAccess{{NodeId: nodeA, NodeName: "de1", Selected: true, Protocols: []string{"hysteria2"}}},
+			Profiles: []*adminv1.ProfileRef{
+				{Id: "prf_1", Name: "Main", Protocol: "hysteria2", Formats: []*adminv1.ProfileFormat{
+					{Format: adminv1.SubFormat_SUB_FORMAT_BASE64_URIS, Ok: true, Note: "hop_single_port"},
+					{Format: adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML, Ok: true},
+					{Format: adminv1.SubFormat_SUB_FORMAT_XRAY_JSON, Ok: true, Note: "hop_single_port"},
+					{Format: adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON, Ok: true},
+				}},
+				{Id: "prf_2", Name: "Web", Protocol: "vless", Formats: []*adminv1.ProfileFormat{
+					{Format: adminv1.SubFormat_SUB_FORMAT_BASE64_URIS, Ok: true},
+					{Format: adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML, Ok: true},
+					{Format: adminv1.SubFormat_SUB_FORMAT_XRAY_JSON, Ok: true},
+					{Format: adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON, Note: "xhttp"},
+				}},
+			},
+			NodeAccess: []*adminv1.NodeAccess{{NodeId: nodeA, NodeName: "de1", Selected: true, Protocols: []string{"hysteria2"}}},
 		}
 	}
 	mk("usr_alice", "alice", &adminv1.Device{Id: "dev_1", Platform: "ios", Model: "iPhone", Address: "10.8.0.2", Online: true},

@@ -398,7 +398,7 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if s.Obfs.Type == "gecko" {
 		// No app that reads the URI list speaks Gecko (Happ, v2rayNG, Hiddify and the other Xray / sing-box apps know
 		// salamander only): the server would sit in their list and never connect. The Mihomo profile carries it.
-		return plugin.Fragment{}, false
+		return plugin.Skipped(plugin.NoteGecko)
 	}
 	host := in.Inbound.Node.Address
 	if !isIP(host) && !isHostname(host) {
@@ -438,7 +438,15 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 		uri += "?" + strings.Join(q, "&")
 	}
 	uri += "#" + (&url.URL{Fragment: frag}).EscapedFragment()
-	return plugin.Fragment{Format: plugin.FormatURIList, Name: frag, Data: []byte(uri)}, true
+	return plugin.Fragment{Format: plugin.FormatURIList, Name: frag, Data: []byte(uri), Note: hopNote(in)}, true
+}
+
+// hopNote is the note of a format that writes the one listening port where the inbound hops over a range.
+func hopNote(in protocols.RenderInput) string {
+	if in.Inbound.HopFrom != 0 && in.Inbound.HopTo != 0 {
+		return plugin.NoteHopSinglePort
+	}
+	return ""
 }
 
 func isIP(s string) bool {

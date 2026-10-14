@@ -71,6 +71,8 @@ func renderSingbox(in protocols.RenderInput) (plugin.Fragment, bool) {
 			t.Headers = map[string]string{"Host": p.ClientHost}
 		}
 		o.Transport = t
+	case p.Transport == "xhttp":
+		return plugin.Skipped(plugin.NoteXHTTP)
 	default:
 		return plugin.Fragment{}, false
 	}

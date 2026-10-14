@@ -156,8 +156,27 @@ type ClientSupport struct {
 // outbound as a JSON object without a "tag", built with encoding/json (never from a string template: node and user
 // names are hostile input, and the plugin puts no name into the object at all); the assembler sets the tag and adds
 // the rest of the config (inbounds, dns, routing). A server the format cannot carry is not rendered (ok == false).
+//
+// Note says why, in a stable code that the admin UI turns into text. With ok == false the fragment is otherwise empty
+// and Note is the reason the format leaves this server out (NoteXHTTP, NoteSelfSigned, NoteGecko, NoteAWG; empty for
+// a cause that has no code of its own, such as an address the format cannot carry). With ok == true it names a
+// degraded rendering (NoteHopSinglePort); empty means carried in full. The assembler ignores it: it exists so that
+// "which formats carry this profile" is answered by the same Render call as the subscription, not by a second rule.
 type Fragment struct {
 	Format ClientFormat
 	Name   string // display name, e.g. "de1 · hy2 · 443"
 	Data   []byte
+	Note   string
 }
+
+// Fragment.Note codes. They are part of the admin API (ProfileFormat.note in profile.proto).
+const (
+	NoteXHTTP         = "xhttp"           // not rendered: the format has no XHTTP transport
+	NoteSelfSigned    = "self_signed"     // not rendered: the format cannot pin a self-signed certificate
+	NoteGecko         = "gecko"           // not rendered: the format has no Gecko obfuscation
+	NoteAWG           = "awg"             // not rendered: the format cannot carry AmneziaWG
+	NoteHopSinglePort = "hop_single_port" // rendered: the port-hopping range is written as its one listening port
+)
+
+// Skipped is the result of a Render that leaves the server out for a reason with a code.
+func Skipped(note string) (Fragment, bool) { return Fragment{Note: note}, false }

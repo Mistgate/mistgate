@@ -284,3 +284,39 @@ func TestSubscriptionPreviewHasNoLink(t *testing.T) {
 		}
 	}
 }
+
+// The profiles of a user, in user_get and in subscription_preview, say in which subscription formats each one works: the
+// format names are those of the clients (base64_uris, mihomo_yaml, xray_json, singbox_json), the note is a code, never text.
+func TestProfilesShowTheirFormats(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	want := map[string]string{
+		"Main": "base64_uris:ok:hop_single_port,mihomo_yaml:ok,xray_json:ok:hop_single_port,singbox_json:ok",
+		"Web":  "base64_uris:ok,mihomo_yaml:ok,xray_json:ok,singbox_json:no:xhttp",
+	}
+	check := func(where string, ps []profileRefV) {
+		t.Helper()
+		if len(ps) != 2 {
+			t.Fatalf("%s: %d profiles", where, len(ps))
+		}
+		for _, p := range ps {
+			var parts []string
+			for _, f := range p.Formats {
+				part := f.Format + ":no"
+				if f.OK {
+					part = f.Format + ":ok"
+				}
+				if f.Note != "" {
+					part += ":" + f.Note
+				}
+				parts = append(parts, part)
+			}
+			if got := strings.Join(parts, ","); got != want[p.Name] {
+				t.Errorf("%s, %s: formats %q, want %q", where, p.Name, got, want[p.Name])
+			}
+		}
+	}
+	check("user_get", decode[UserGetV](t, mustOK(t, s, "user_get", map[string]any{"user_id": "usr_alice"})).Profiles)
+	check("subscription_preview", decode[SubscriptionPreviewV](t, mustOK(t, s, "subscription_preview", map[string]any{"user_id": "usr_alice"})).Profiles)
+}

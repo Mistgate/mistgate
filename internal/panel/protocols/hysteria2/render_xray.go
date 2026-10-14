@@ -10,8 +10,10 @@ import (
 )
 
 // jsonView is what the Xray and sing-box renderers share: the checked host, the pin, the secrets (masked on request)
-// and the fallback server name. ok == false from newJSONView means the server is not rendered in these formats.
+// and the fallback server name. ok == false from newJSONView means the server is not rendered in these formats; note
+// is then the code of the reason, when it has one.
 type jsonView struct {
+	note             string
 	s                Settings
 	host, pin, name  string
 	password, obfsPw string
@@ -26,6 +28,7 @@ func newJSONView(in protocols.RenderInput) (jsonView, bool) {
 	}
 	// Gecko is in neither format: Xray's finalmask has no such mask, and sing-box carries it from 1.14 only.
 	if v.s.Obfs.Type == "gecko" {
+		v.note = plugin.NoteGecko
 		return v, false
 	}
 	v.host = strings.Trim(in.Inbound.Node.Address, "[]")
@@ -111,7 +114,7 @@ type xrayHy2Mask struct {
 func renderXray(in protocols.RenderInput) (plugin.Fragment, bool) {
 	v, ok := newJSONView(in)
 	if !ok {
-		return plugin.Fragment{}, false
+		return plugin.Skipped(v.note)
 	}
 	o := xrayHy2{
 		Protocol: "hysteria",
@@ -132,5 +135,5 @@ func renderXray(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if err != nil {
 		return plugin.Fragment{}, false
 	}
-	return plugin.Fragment{Format: plugin.FormatXrayJSON, Name: v.name, Data: data}, true
+	return plugin.Fragment{Format: plugin.FormatXrayJSON, Name: v.name, Data: data, Note: hopNote(in)}, true
 }

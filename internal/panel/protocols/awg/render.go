@@ -153,7 +153,7 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	switch in.Format {
 	case plugin.FormatAWGConf, plugin.FormatAmneziaVPN, plugin.FormatMihomo:
 	default:
-		return plugin.Fragment{}, false // Happ and the URI list cannot carry AWG
+		return plugin.Skipped(plugin.NoteAWG) // Happ and the URI list cannot carry AWG, nor can Xray or sing-box
 	}
 	if in.Format == plugin.FormatAmneziaVPN && in.MaskSecrets {
 		return plugin.Fragment{}, false // a masked key would import as a broken one

@@ -80,18 +80,19 @@ func (s *Service) profileSummary(ctx context.Context, p store.AccessProfile, inb
 	if err != nil {
 		return nil, s.internal("open profile secrets", err)
 	}
-	return s.summaryOf(ctx, p, proto, proto.Summary(merged), inbounds)
+	return s.summaryOf(ctx, p, proto, merged, inbounds)
 }
 
-func (s *Service) summaryOf(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, summary string, inbounds []store.AccessInbound) (*adminv1.ProfileSummary, error) {
+func (s *Service) summaryOf(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, merged json.RawMessage, inbounds []store.AccessInbound) (*adminv1.ProfileSummary, error) {
 	happ, amnezia, _ := clientApps(proto)
 	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
 	out := &adminv1.ProfileSummary{
-		Id: p.ID, Name: p.Name, Protocol: p.Protocol, Summary: summary,
+		Id: p.ID, Name: p.Name, Protocol: p.Protocol, Summary: proto.Summary(merged),
 		NodeCount: uint32(len(inbounds)), UserCount: uint32(len(users)), Version: p.Version,
+		Formats: s.profileFormats(proto, merged),
 	}
 	for _, i := range inbounds {
 		if i.State == "failed" {
@@ -243,7 +244,7 @@ func (s *Service) CreateProfile(ctx context.Context, req *connect.Request[adminv
 	}
 	p.Version = 1
 	s.audit(ctx, actor(ctx), "profile_create", map[string]any{"profile": id, "name": name, "protocol": proto.ID()})
-	sum, err := s.summaryOf(ctx, p, proto, proto.Summary(merged), nil)
+	sum, err := s.summaryOf(ctx, p, proto, merged, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +489,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			s.auditLossyPort(ctx, changed.node.Name, changed.listen.Port)
 		}
 	}
-	sum, err := s.summaryOf(ctx, next, proto, proto.Summary(newMerged), inbounds)
+	sum, err := s.summaryOf(ctx, next, proto, newMerged, inbounds)
 	if err != nil {
 		return nil, err
 	}
@@ -532,14 +533,9 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 			return nil, s.internal("get node", err)
 		}
 	}
-	in := protocols.InboundInput{Profile: protocols.ProfileView{Settings: merged}, Node: nodeView(node), Enabled: true, SpecVersion: 1}
-	if ini, ok := proto.(protocols.InboundInitializer); ok {
-		// A throwaway key, only so that the inbound can be built; the preview never shows it.
-		made, err := ini.InitInbound(protocols.InboundInitInput{Profile: in.Profile, Node: in.Node})
-		if err != nil {
-			return nil, s.internal("preview key", err)
-		}
-		in.PluginState, in.PluginPublic = made.State, made.Public
+	in, err := s.trialInbound(proto, merged, node)
+	if err != nil {
+		return nil, s.internal("preview key", err)
 	}
 	spec, err := proto.BuildInbound(in)
 	if err != nil {
@@ -550,13 +546,10 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 	if protocols.IsPerDevice(proto) { // an L3 protocol: Happ cannot carry it, the .conf is what Amnezia users import
 		format, resp.ClientLabel = plugin.FormatAWGConf, "AmneziaVPN · .conf"
 	}
-	frag, ok := proto.Render(protocols.RenderInput{
-		Format: format, Settings: merged, UserName: "user", MaskSecrets: true,
-		Inbound: inboundView(nodeView(node), spec, ""), InboundPublic: in.PluginPublic, NodeAddr: node.Address,
-	})
-	if ok {
+	if frag, ok := trialRender(proto, merged, node, in, spec, format, ""); ok {
 		resp.ClientPreview = string(frag.Data)
 	}
+	resp.Formats = trialFormats(proto, merged, node, in, spec)
 	return connect.NewResponse(resp), nil
 }
 

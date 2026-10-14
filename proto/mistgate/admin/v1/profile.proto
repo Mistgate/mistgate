@@ -3,6 +3,7 @@ syntax = "proto3";
 package mistgate.admin.v1;
 
 import "mistgate/admin/v1/common.proto";
+import "mistgate/admin/v1/subscription.proto";
 
 // Profiles screen (protocol presets) and the placement of a profile on nodes (inbounds).
 //
@@ -83,6 +84,28 @@ message ProfileSummary {
   // Plugin or fleet warning for the amber dot, e.g. code "udp_blocked_on_node" + params.
   repeated StatusReason warnings = 7;
   uint32 version = 8;
+  // In which subscription formats the profile works, with the reason where it does not (see ProfileFormat). Order: link
+  // list, Mihomo, Xray JSON, sing-box JSON. Empty when the profile could not be trial-rendered.
+  repeated ProfileFormat formats = 9;
+}
+
+// Whether a profile is carried by one subscription format. It comes from a masked trial render in that format with
+// the same functions the subscription uses, so it cannot drift from what people really get. `note` is a stable code,
+// the UI owns the text:
+//   ok = false, the reason the format leaves the profile out:
+//     "xhttp"        the format has no XHTTP transport (sing-box)
+//     "self_signed"  the format cannot pin a self-signed certificate (sing-box)
+//     "gecko"        the format has no Gecko obfuscation (link list, Xray JSON, sing-box)
+//     "awg"          the format cannot carry AmneziaWG (link list, Xray JSON, sing-box)
+//     "unsupported"  any other case in which the plugin renders nothing
+//   ok = true, a degraded rendering:
+//     "hop_single_port"  a Hysteria2 port-hopping range is written as its one listening port (link list, Xray JSON)
+// Empty `note` with ok = true: carried in full.
+message ProfileFormat {
+  // One of BASE64_URIS, MIHOMO_YAML, XRAY_JSON, SINGBOX_JSON.
+  SubFormat format = 1;
+  bool ok = 2;
+  string note = 3;
 }
 
 message ListProfilesRequest {}
@@ -173,6 +196,8 @@ message PreviewProfileResponse {
   repeated FieldError warnings = 5;
   // AWG only, absent otherwise and while there are errors.
   ObfuscationScore obfuscation_score = 6;
+  // In which subscription formats the draft works (as ProfileSummary.formats). Empty while there are errors.
+  repeated ProfileFormat formats = 7;
 }
 
 // How far an AWG profile is from the fingerprints a censor knows, 0-100, and why. value = clamp(base + the sum of

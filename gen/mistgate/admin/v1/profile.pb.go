@@ -192,8 +192,11 @@ type ProfileSummary struct {
 	// Users whose group contains this profile and whose app toggles allow the protocol.
 	UserCount uint32 `protobuf:"varint,6,opt,name=user_count,json=userCount,proto3" json:"user_count,omitempty"`
 	// Plugin or fleet warning for the amber dot, e.g. code "udp_blocked_on_node" + params.
-	Warnings      []*StatusReason `protobuf:"bytes,7,rep,name=warnings,proto3" json:"warnings,omitempty"`
-	Version       uint32          `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	Warnings []*StatusReason `protobuf:"bytes,7,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	Version  uint32          `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	// In which subscription formats the profile works, with the reason where it does not (see ProfileFormat). Order: link
+	// list, Mihomo, Xray JSON, sing-box JSON. Empty when the profile could not be trial-rendered.
+	Formats       []*ProfileFormat `protobuf:"bytes,9,rep,name=formats,proto3" json:"formats,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -284,6 +287,88 @@ func (x *ProfileSummary) GetVersion() uint32 {
 	return 0
 }
 
+func (x *ProfileSummary) GetFormats() []*ProfileFormat {
+	if x != nil {
+		return x.Formats
+	}
+	return nil
+}
+
+// Whether a profile is carried by one subscription format. It comes from a masked trial render in that format with
+// the same functions the subscription uses, so it cannot drift from what people really get. `note` is a stable code,
+// the UI owns the text:
+//
+//	ok = false, the reason the format leaves the profile out:
+//	  "xhttp"        the format has no XHTTP transport (sing-box)
+//	  "self_signed"  the format cannot pin a self-signed certificate (sing-box)
+//	  "gecko"        the format has no Gecko obfuscation (link list, Xray JSON, sing-box)
+//	  "awg"          the format cannot carry AmneziaWG (link list, Xray JSON, sing-box)
+//	  "unsupported"  any other case in which the plugin renders nothing
+//	ok = true, a degraded rendering:
+//	  "hop_single_port"  a Hysteria2 port-hopping range is written as its one listening port (link list, Xray JSON)
+//
+// Empty `note` with ok = true: carried in full.
+type ProfileFormat struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One of BASE64_URIS, MIHOMO_YAML, XRAY_JSON, SINGBOX_JSON.
+	Format        SubFormat `protobuf:"varint,1,opt,name=format,proto3,enum=mistgate.admin.v1.SubFormat" json:"format,omitempty"`
+	Ok            bool      `protobuf:"varint,2,opt,name=ok,proto3" json:"ok,omitempty"`
+	Note          string    `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProfileFormat) Reset() {
+	*x = ProfileFormat{}
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProfileFormat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProfileFormat) ProtoMessage() {}
+
+func (x *ProfileFormat) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProfileFormat.ProtoReflect.Descriptor instead.
+func (*ProfileFormat) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ProfileFormat) GetFormat() SubFormat {
+	if x != nil {
+		return x.Format
+	}
+	return SubFormat_SUB_FORMAT_UNSPECIFIED
+}
+
+func (x *ProfileFormat) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *ProfileFormat) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 type ListProfilesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -292,7 +377,7 @@ type ListProfilesRequest struct {
 
 func (x *ListProfilesRequest) Reset() {
 	*x = ListProfilesRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +389,7 @@ func (x *ListProfilesRequest) String() string {
 func (*ListProfilesRequest) ProtoMessage() {}
 
 func (x *ListProfilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +402,7 @@ func (x *ListProfilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProfilesRequest.ProtoReflect.Descriptor instead.
 func (*ListProfilesRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{5}
 }
 
 type ListProfilesResponse struct {
@@ -329,7 +414,7 @@ type ListProfilesResponse struct {
 
 func (x *ListProfilesResponse) Reset() {
 	*x = ListProfilesResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -341,7 +426,7 @@ func (x *ListProfilesResponse) String() string {
 func (*ListProfilesResponse) ProtoMessage() {}
 
 func (x *ListProfilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -354,7 +439,7 @@ func (x *ListProfilesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProfilesResponse.ProtoReflect.Descriptor instead.
 func (*ListProfilesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListProfilesResponse) GetProfiles() []*ProfileSummary {
@@ -373,7 +458,7 @@ type GetProfileRequest struct {
 
 func (x *GetProfileRequest) Reset() {
 	*x = GetProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -385,7 +470,7 @@ func (x *GetProfileRequest) String() string {
 func (*GetProfileRequest) ProtoMessage() {}
 
 func (x *GetProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -398,7 +483,7 @@ func (x *GetProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetProfileRequest) GetProfileId() string {
@@ -420,7 +505,7 @@ type GetProfileResponse struct {
 
 func (x *GetProfileResponse) Reset() {
 	*x = GetProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -432,7 +517,7 @@ func (x *GetProfileResponse) String() string {
 func (*GetProfileResponse) ProtoMessage() {}
 
 func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -445,7 +530,7 @@ func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetProfileResponse) GetProfile() *ProfileSummary {
@@ -480,7 +565,7 @@ type CreateProfileRequest struct {
 
 func (x *CreateProfileRequest) Reset() {
 	*x = CreateProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +577,7 @@ func (x *CreateProfileRequest) String() string {
 func (*CreateProfileRequest) ProtoMessage() {}
 
 func (x *CreateProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +590,7 @@ func (x *CreateProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateProfileRequest.ProtoReflect.Descriptor instead.
 func (*CreateProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateProfileRequest) GetProtocol() string {
@@ -538,7 +623,7 @@ type CreateProfileResponse struct {
 
 func (x *CreateProfileResponse) Reset() {
 	*x = CreateProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -550,7 +635,7 @@ func (x *CreateProfileResponse) String() string {
 func (*CreateProfileResponse) ProtoMessage() {}
 
 func (x *CreateProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -563,7 +648,7 @@ func (x *CreateProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateProfileResponse.ProtoReflect.Descriptor instead.
 func (*CreateProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateProfileResponse) GetProfile() *ProfileSummary {
@@ -588,7 +673,7 @@ type UpdateProfileRequest struct {
 
 func (x *UpdateProfileRequest) Reset() {
 	*x = UpdateProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -600,7 +685,7 @@ func (x *UpdateProfileRequest) String() string {
 func (*UpdateProfileRequest) ProtoMessage() {}
 
 func (x *UpdateProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +698,7 @@ func (x *UpdateProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdateProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateProfileRequest) GetProfileId() string {
@@ -679,7 +764,7 @@ type ProfileImpact struct {
 
 func (x *ProfileImpact) Reset() {
 	*x = ProfileImpact{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +776,7 @@ func (x *ProfileImpact) String() string {
 func (*ProfileImpact) ProtoMessage() {}
 
 func (x *ProfileImpact) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +789,7 @@ func (x *ProfileImpact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfileImpact.ProtoReflect.Descriptor instead.
 func (*ProfileImpact) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProfileImpact) GetInboundsRestarted() uint32 {
@@ -752,7 +837,7 @@ type UpdateProfileResponse struct {
 
 func (x *UpdateProfileResponse) Reset() {
 	*x = UpdateProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +849,7 @@ func (x *UpdateProfileResponse) String() string {
 func (*UpdateProfileResponse) ProtoMessage() {}
 
 func (x *UpdateProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +862,7 @@ func (x *UpdateProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProfileResponse.ProtoReflect.Descriptor instead.
 func (*UpdateProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateProfileResponse) GetProfile() *ProfileSummary {
@@ -809,7 +894,7 @@ type FieldError struct {
 
 func (x *FieldError) Reset() {
 	*x = FieldError{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -821,7 +906,7 @@ func (x *FieldError) String() string {
 func (*FieldError) ProtoMessage() {}
 
 func (x *FieldError) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -834,7 +919,7 @@ func (x *FieldError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldError.ProtoReflect.Descriptor instead.
 func (*FieldError) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *FieldError) GetPointer() string {
@@ -877,7 +962,7 @@ type PreviewProfileRequest struct {
 
 func (x *PreviewProfileRequest) Reset() {
 	*x = PreviewProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -889,7 +974,7 @@ func (x *PreviewProfileRequest) String() string {
 func (*PreviewProfileRequest) ProtoMessage() {}
 
 func (x *PreviewProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -902,7 +987,7 @@ func (x *PreviewProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewProfileRequest.ProtoReflect.Descriptor instead.
 func (*PreviewProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PreviewProfileRequest) GetProtocol() string {
@@ -940,13 +1025,15 @@ type PreviewProfileResponse struct {
 	Warnings []*FieldError `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	// AWG only, absent otherwise and while there are errors.
 	ObfuscationScore *ObfuscationScore `protobuf:"bytes,6,opt,name=obfuscation_score,json=obfuscationScore,proto3" json:"obfuscation_score,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// In which subscription formats the draft works (as ProfileSummary.formats). Empty while there are errors.
+	Formats       []*ProfileFormat `protobuf:"bytes,7,rep,name=formats,proto3" json:"formats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PreviewProfileResponse) Reset() {
 	*x = PreviewProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -958,7 +1045,7 @@ func (x *PreviewProfileResponse) String() string {
 func (*PreviewProfileResponse) ProtoMessage() {}
 
 func (x *PreviewProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -971,7 +1058,7 @@ func (x *PreviewProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewProfileResponse.ProtoReflect.Descriptor instead.
 func (*PreviewProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PreviewProfileResponse) GetErrors() []*FieldError {
@@ -1016,6 +1103,13 @@ func (x *PreviewProfileResponse) GetObfuscationScore() *ObfuscationScore {
 	return nil
 }
 
+func (x *PreviewProfileResponse) GetFormats() []*ProfileFormat {
+	if x != nil {
+		return x.Formats
+	}
+	return nil
+}
+
 // How far an AWG profile is from the fingerprints a censor knows, 0-100, and why. value = clamp(base + the sum of
 // the items' delta, 0, 100). It rates the configuration, not a censor.
 type ObfuscationScore struct {
@@ -1033,7 +1127,7 @@ type ObfuscationScore struct {
 
 func (x *ObfuscationScore) Reset() {
 	*x = ObfuscationScore{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1045,7 +1139,7 @@ func (x *ObfuscationScore) String() string {
 func (*ObfuscationScore) ProtoMessage() {}
 
 func (x *ObfuscationScore) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1058,7 +1152,7 @@ func (x *ObfuscationScore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObfuscationScore.ProtoReflect.Descriptor instead.
 func (*ObfuscationScore) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ObfuscationScore) GetValue() uint32 {
@@ -1105,7 +1199,7 @@ type ScoreItem struct {
 
 func (x *ScoreItem) Reset() {
 	*x = ScoreItem{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1211,7 @@ func (x *ScoreItem) String() string {
 func (*ScoreItem) ProtoMessage() {}
 
 func (x *ScoreItem) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1224,7 @@ func (x *ScoreItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScoreItem.ProtoReflect.Descriptor instead.
 func (*ScoreItem) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ScoreItem) GetCode() string {
@@ -1192,7 +1286,7 @@ type CreateInboundRequest struct {
 
 func (x *CreateInboundRequest) Reset() {
 	*x = CreateInboundRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1298,7 @@ func (x *CreateInboundRequest) String() string {
 func (*CreateInboundRequest) ProtoMessage() {}
 
 func (x *CreateInboundRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1311,7 @@ func (x *CreateInboundRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInboundRequest.ProtoReflect.Descriptor instead.
 func (*CreateInboundRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateInboundRequest) GetProfileId() string {
@@ -1280,7 +1374,7 @@ type CreateInboundResponse struct {
 
 func (x *CreateInboundResponse) Reset() {
 	*x = CreateInboundResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1292,7 +1386,7 @@ func (x *CreateInboundResponse) String() string {
 func (*CreateInboundResponse) ProtoMessage() {}
 
 func (x *CreateInboundResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1305,7 +1399,7 @@ func (x *CreateInboundResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInboundResponse.ProtoReflect.Descriptor instead.
 func (*CreateInboundResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateInboundResponse) GetInbound() *Inbound {
@@ -1345,7 +1439,7 @@ type UpdateInboundRequest struct {
 
 func (x *UpdateInboundRequest) Reset() {
 	*x = UpdateInboundRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1357,7 +1451,7 @@ func (x *UpdateInboundRequest) String() string {
 func (*UpdateInboundRequest) ProtoMessage() {}
 
 func (x *UpdateInboundRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1370,7 +1464,7 @@ func (x *UpdateInboundRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInboundRequest.ProtoReflect.Descriptor instead.
 func (*UpdateInboundRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateInboundRequest) GetInboundId() string {
@@ -1427,7 +1521,7 @@ type UpdateInboundResponse struct {
 
 func (x *UpdateInboundResponse) Reset() {
 	*x = UpdateInboundResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1439,7 +1533,7 @@ func (x *UpdateInboundResponse) String() string {
 func (*UpdateInboundResponse) ProtoMessage() {}
 
 func (x *UpdateInboundResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1452,7 +1546,7 @@ func (x *UpdateInboundResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInboundResponse.ProtoReflect.Descriptor instead.
 func (*UpdateInboundResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateInboundResponse) GetInbound() *Inbound {
@@ -1494,7 +1588,7 @@ type TwinProfileRequest struct {
 
 func (x *TwinProfileRequest) Reset() {
 	*x = TwinProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1506,7 +1600,7 @@ func (x *TwinProfileRequest) String() string {
 func (*TwinProfileRequest) ProtoMessage() {}
 
 func (x *TwinProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1519,7 +1613,7 @@ func (x *TwinProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TwinProfileRequest.ProtoReflect.Descriptor instead.
 func (*TwinProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TwinProfileRequest) GetProfileId() string {
@@ -1579,7 +1673,7 @@ type TwinProfileResponse struct {
 
 func (x *TwinProfileResponse) Reset() {
 	*x = TwinProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1591,7 +1685,7 @@ func (x *TwinProfileResponse) String() string {
 func (*TwinProfileResponse) ProtoMessage() {}
 
 func (x *TwinProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1604,7 +1698,7 @@ func (x *TwinProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TwinProfileResponse.ProtoReflect.Descriptor instead.
 func (*TwinProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *TwinProfileResponse) GetProfile() *ProfileSummary {
@@ -1672,7 +1766,7 @@ type DeleteProfileRequest struct {
 
 func (x *DeleteProfileRequest) Reset() {
 	*x = DeleteProfileRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +1778,7 @@ func (x *DeleteProfileRequest) String() string {
 func (*DeleteProfileRequest) ProtoMessage() {}
 
 func (x *DeleteProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +1791,7 @@ func (x *DeleteProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProfileRequest.ProtoReflect.Descriptor instead.
 func (*DeleteProfileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DeleteProfileRequest) GetProfileId() string {
@@ -1715,7 +1809,7 @@ type DeleteProfileResponse struct {
 
 func (x *DeleteProfileResponse) Reset() {
 	*x = DeleteProfileResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1727,7 +1821,7 @@ func (x *DeleteProfileResponse) String() string {
 func (*DeleteProfileResponse) ProtoMessage() {}
 
 func (x *DeleteProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1740,7 +1834,7 @@ func (x *DeleteProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProfileResponse.ProtoReflect.Descriptor instead.
 func (*DeleteProfileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{26}
 }
 
 type DeleteInboundRequest struct {
@@ -1752,7 +1846,7 @@ type DeleteInboundRequest struct {
 
 func (x *DeleteInboundRequest) Reset() {
 	*x = DeleteInboundRequest{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1764,7 +1858,7 @@ func (x *DeleteInboundRequest) String() string {
 func (*DeleteInboundRequest) ProtoMessage() {}
 
 func (x *DeleteInboundRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1777,7 +1871,7 @@ func (x *DeleteInboundRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInboundRequest.ProtoReflect.Descriptor instead.
 func (*DeleteInboundRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DeleteInboundRequest) GetInboundId() string {
@@ -1795,7 +1889,7 @@ type DeleteInboundResponse struct {
 
 func (x *DeleteInboundResponse) Reset() {
 	*x = DeleteInboundResponse{}
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1807,7 +1901,7 @@ func (x *DeleteInboundResponse) String() string {
 func (*DeleteInboundResponse) ProtoMessage() {}
 
 func (x *DeleteInboundResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_profile_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1820,14 +1914,14 @@ func (x *DeleteInboundResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInboundResponse.ProtoReflect.Descriptor instead.
 func (*DeleteInboundResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_profile_proto_rawDescGZIP(), []int{28}
 }
 
 var File_mistgate_admin_v1_profile_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\n" +
-	"\x1fmistgate/admin/v1/profile.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xd3\x01\n" +
+	"\x1fmistgate/admin/v1/profile.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a$mistgate/admin/v1/subscription.proto\"\xd3\x01\n" +
 	"\fProtocolInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x120\n" +
@@ -1836,7 +1930,7 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x04apps\x18\x05 \x03(\x0e2\x16.mistgate.admin.v1.AppR\x04apps\"\x16\n" +
 	"\x14ListProtocolsRequest\"V\n" +
 	"\x15ListProtocolsResponse\x12=\n" +
-	"\tprotocols\x18\x01 \x03(\v2\x1f.mistgate.admin.v1.ProtocolInfoR\tprotocols\"\xff\x01\n" +
+	"\tprotocols\x18\x01 \x03(\v2\x1f.mistgate.admin.v1.ProtocolInfoR\tprotocols\"\xbb\x02\n" +
 	"\x0eProfileSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
@@ -1847,7 +1941,12 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\n" +
 	"user_count\x18\x06 \x01(\rR\tuserCount\x12;\n" +
 	"\bwarnings\x18\a \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x18\n" +
-	"\aversion\x18\b \x01(\rR\aversion\"\x15\n" +
+	"\aversion\x18\b \x01(\rR\aversion\x12:\n" +
+	"\aformats\x18\t \x03(\v2 .mistgate.admin.v1.ProfileFormatR\aformats\"i\n" +
+	"\rProfileFormat\x124\n" +
+	"\x06format\x18\x01 \x01(\x0e2\x1c.mistgate.admin.v1.SubFormatR\x06format\x12\x0e\n" +
+	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\x15\n" +
 	"\x13ListProfilesRequest\"U\n" +
 	"\x14ListProfilesResponse\x12=\n" +
 	"\bprofiles\x18\x01 \x03(\v2!.mistgate.admin.v1.ProfileSummaryR\bprofiles\"2\n" +
@@ -1895,14 +1994,15 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x15PreviewProfileRequest\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12#\n" +
 	"\rsettings_json\x18\x02 \x01(\tR\fsettingsJson\x12\x17\n" +
-	"\anode_id\x18\x03 \x01(\tR\x06nodeId\"\xc0\x02\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\"\xfc\x02\n" +
 	"\x16PreviewProfileResponse\x125\n" +
 	"\x06errors\x18\x01 \x03(\v2\x1d.mistgate.admin.v1.FieldErrorR\x06errors\x12%\n" +
 	"\x0eclient_preview\x18\x02 \x01(\tR\rclientPreview\x12!\n" +
 	"\fclient_label\x18\x03 \x01(\tR\vclientLabel\x12\x18\n" +
 	"\asummary\x18\x04 \x01(\tR\asummary\x129\n" +
 	"\bwarnings\x18\x05 \x03(\v2\x1d.mistgate.admin.v1.FieldErrorR\bwarnings\x12P\n" +
-	"\x11obfuscation_score\x18\x06 \x01(\v2#.mistgate.admin.v1.ObfuscationScoreR\x10obfuscationScore\"\x84\x01\n" +
+	"\x11obfuscation_score\x18\x06 \x01(\v2#.mistgate.admin.v1.ObfuscationScoreR\x10obfuscationScore\x12:\n" +
+	"\aformats\x18\a \x03(\v2 .mistgate.admin.v1.ProfileFormatR\aformats\"\x84\x01\n" +
 	"\x10ObfuscationScore\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\rR\x05value\x12\x12\n" +
 	"\x04base\x18\x02 \x01(\rR\x04base\x12\x12\n" +
@@ -1997,92 +2097,97 @@ func file_mistgate_admin_v1_profile_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_profile_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_mistgate_admin_v1_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_mistgate_admin_v1_profile_proto_goTypes = []any{
 	(*ProtocolInfo)(nil),           // 0: mistgate.admin.v1.ProtocolInfo
 	(*ListProtocolsRequest)(nil),   // 1: mistgate.admin.v1.ListProtocolsRequest
 	(*ListProtocolsResponse)(nil),  // 2: mistgate.admin.v1.ListProtocolsResponse
 	(*ProfileSummary)(nil),         // 3: mistgate.admin.v1.ProfileSummary
-	(*ListProfilesRequest)(nil),    // 4: mistgate.admin.v1.ListProfilesRequest
-	(*ListProfilesResponse)(nil),   // 5: mistgate.admin.v1.ListProfilesResponse
-	(*GetProfileRequest)(nil),      // 6: mistgate.admin.v1.GetProfileRequest
-	(*GetProfileResponse)(nil),     // 7: mistgate.admin.v1.GetProfileResponse
-	(*CreateProfileRequest)(nil),   // 8: mistgate.admin.v1.CreateProfileRequest
-	(*CreateProfileResponse)(nil),  // 9: mistgate.admin.v1.CreateProfileResponse
-	(*UpdateProfileRequest)(nil),   // 10: mistgate.admin.v1.UpdateProfileRequest
-	(*ProfileImpact)(nil),          // 11: mistgate.admin.v1.ProfileImpact
-	(*UpdateProfileResponse)(nil),  // 12: mistgate.admin.v1.UpdateProfileResponse
-	(*FieldError)(nil),             // 13: mistgate.admin.v1.FieldError
-	(*PreviewProfileRequest)(nil),  // 14: mistgate.admin.v1.PreviewProfileRequest
-	(*PreviewProfileResponse)(nil), // 15: mistgate.admin.v1.PreviewProfileResponse
-	(*ObfuscationScore)(nil),       // 16: mistgate.admin.v1.ObfuscationScore
-	(*ScoreItem)(nil),              // 17: mistgate.admin.v1.ScoreItem
-	(*CreateInboundRequest)(nil),   // 18: mistgate.admin.v1.CreateInboundRequest
-	(*CreateInboundResponse)(nil),  // 19: mistgate.admin.v1.CreateInboundResponse
-	(*UpdateInboundRequest)(nil),   // 20: mistgate.admin.v1.UpdateInboundRequest
-	(*UpdateInboundResponse)(nil),  // 21: mistgate.admin.v1.UpdateInboundResponse
-	(*TwinProfileRequest)(nil),     // 22: mistgate.admin.v1.TwinProfileRequest
-	(*TwinProfileResponse)(nil),    // 23: mistgate.admin.v1.TwinProfileResponse
-	(*DeleteProfileRequest)(nil),   // 24: mistgate.admin.v1.DeleteProfileRequest
-	(*DeleteProfileResponse)(nil),  // 25: mistgate.admin.v1.DeleteProfileResponse
-	(*DeleteInboundRequest)(nil),   // 26: mistgate.admin.v1.DeleteInboundRequest
-	(*DeleteInboundResponse)(nil),  // 27: mistgate.admin.v1.DeleteInboundResponse
-	nil,                            // 28: mistgate.admin.v1.FieldError.ParamsEntry
-	nil,                            // 29: mistgate.admin.v1.ScoreItem.ParamsEntry
-	(App)(0),                       // 30: mistgate.admin.v1.App
-	(*StatusReason)(nil),           // 31: mistgate.admin.v1.StatusReason
-	(*Inbound)(nil),                // 32: mistgate.admin.v1.Inbound
-	(*PortCheck)(nil),              // 33: mistgate.admin.v1.PortCheck
+	(*ProfileFormat)(nil),          // 4: mistgate.admin.v1.ProfileFormat
+	(*ListProfilesRequest)(nil),    // 5: mistgate.admin.v1.ListProfilesRequest
+	(*ListProfilesResponse)(nil),   // 6: mistgate.admin.v1.ListProfilesResponse
+	(*GetProfileRequest)(nil),      // 7: mistgate.admin.v1.GetProfileRequest
+	(*GetProfileResponse)(nil),     // 8: mistgate.admin.v1.GetProfileResponse
+	(*CreateProfileRequest)(nil),   // 9: mistgate.admin.v1.CreateProfileRequest
+	(*CreateProfileResponse)(nil),  // 10: mistgate.admin.v1.CreateProfileResponse
+	(*UpdateProfileRequest)(nil),   // 11: mistgate.admin.v1.UpdateProfileRequest
+	(*ProfileImpact)(nil),          // 12: mistgate.admin.v1.ProfileImpact
+	(*UpdateProfileResponse)(nil),  // 13: mistgate.admin.v1.UpdateProfileResponse
+	(*FieldError)(nil),             // 14: mistgate.admin.v1.FieldError
+	(*PreviewProfileRequest)(nil),  // 15: mistgate.admin.v1.PreviewProfileRequest
+	(*PreviewProfileResponse)(nil), // 16: mistgate.admin.v1.PreviewProfileResponse
+	(*ObfuscationScore)(nil),       // 17: mistgate.admin.v1.ObfuscationScore
+	(*ScoreItem)(nil),              // 18: mistgate.admin.v1.ScoreItem
+	(*CreateInboundRequest)(nil),   // 19: mistgate.admin.v1.CreateInboundRequest
+	(*CreateInboundResponse)(nil),  // 20: mistgate.admin.v1.CreateInboundResponse
+	(*UpdateInboundRequest)(nil),   // 21: mistgate.admin.v1.UpdateInboundRequest
+	(*UpdateInboundResponse)(nil),  // 22: mistgate.admin.v1.UpdateInboundResponse
+	(*TwinProfileRequest)(nil),     // 23: mistgate.admin.v1.TwinProfileRequest
+	(*TwinProfileResponse)(nil),    // 24: mistgate.admin.v1.TwinProfileResponse
+	(*DeleteProfileRequest)(nil),   // 25: mistgate.admin.v1.DeleteProfileRequest
+	(*DeleteProfileResponse)(nil),  // 26: mistgate.admin.v1.DeleteProfileResponse
+	(*DeleteInboundRequest)(nil),   // 27: mistgate.admin.v1.DeleteInboundRequest
+	(*DeleteInboundResponse)(nil),  // 28: mistgate.admin.v1.DeleteInboundResponse
+	nil,                            // 29: mistgate.admin.v1.FieldError.ParamsEntry
+	nil,                            // 30: mistgate.admin.v1.ScoreItem.ParamsEntry
+	(App)(0),                       // 31: mistgate.admin.v1.App
+	(*StatusReason)(nil),           // 32: mistgate.admin.v1.StatusReason
+	(SubFormat)(0),                 // 33: mistgate.admin.v1.SubFormat
+	(*Inbound)(nil),                // 34: mistgate.admin.v1.Inbound
+	(*PortCheck)(nil),              // 35: mistgate.admin.v1.PortCheck
 }
 var file_mistgate_admin_v1_profile_proto_depIdxs = []int32{
-	30, // 0: mistgate.admin.v1.ProtocolInfo.apps:type_name -> mistgate.admin.v1.App
+	31, // 0: mistgate.admin.v1.ProtocolInfo.apps:type_name -> mistgate.admin.v1.App
 	0,  // 1: mistgate.admin.v1.ListProtocolsResponse.protocols:type_name -> mistgate.admin.v1.ProtocolInfo
-	31, // 2: mistgate.admin.v1.ProfileSummary.warnings:type_name -> mistgate.admin.v1.StatusReason
-	3,  // 3: mistgate.admin.v1.ListProfilesResponse.profiles:type_name -> mistgate.admin.v1.ProfileSummary
-	3,  // 4: mistgate.admin.v1.GetProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
-	32, // 5: mistgate.admin.v1.GetProfileResponse.inbounds:type_name -> mistgate.admin.v1.Inbound
-	3,  // 6: mistgate.admin.v1.CreateProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
-	3,  // 7: mistgate.admin.v1.UpdateProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
-	11, // 8: mistgate.admin.v1.UpdateProfileResponse.impact:type_name -> mistgate.admin.v1.ProfileImpact
-	28, // 9: mistgate.admin.v1.FieldError.params:type_name -> mistgate.admin.v1.FieldError.ParamsEntry
-	13, // 10: mistgate.admin.v1.PreviewProfileResponse.errors:type_name -> mistgate.admin.v1.FieldError
-	13, // 11: mistgate.admin.v1.PreviewProfileResponse.warnings:type_name -> mistgate.admin.v1.FieldError
-	16, // 12: mistgate.admin.v1.PreviewProfileResponse.obfuscation_score:type_name -> mistgate.admin.v1.ObfuscationScore
-	17, // 13: mistgate.admin.v1.ObfuscationScore.items:type_name -> mistgate.admin.v1.ScoreItem
-	29, // 14: mistgate.admin.v1.ScoreItem.params:type_name -> mistgate.admin.v1.ScoreItem.ParamsEntry
-	32, // 15: mistgate.admin.v1.CreateInboundResponse.inbound:type_name -> mistgate.admin.v1.Inbound
-	31, // 16: mistgate.admin.v1.CreateInboundResponse.warnings:type_name -> mistgate.admin.v1.StatusReason
-	32, // 17: mistgate.admin.v1.UpdateInboundResponse.inbound:type_name -> mistgate.admin.v1.Inbound
-	31, // 18: mistgate.admin.v1.UpdateInboundResponse.warnings:type_name -> mistgate.admin.v1.StatusReason
-	3,  // 19: mistgate.admin.v1.TwinProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
-	33, // 20: mistgate.admin.v1.TwinProfileResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
-	1,  // 21: mistgate.admin.v1.ProfileService.ListProtocols:input_type -> mistgate.admin.v1.ListProtocolsRequest
-	4,  // 22: mistgate.admin.v1.ProfileService.ListProfiles:input_type -> mistgate.admin.v1.ListProfilesRequest
-	6,  // 23: mistgate.admin.v1.ProfileService.GetProfile:input_type -> mistgate.admin.v1.GetProfileRequest
-	8,  // 24: mistgate.admin.v1.ProfileService.CreateProfile:input_type -> mistgate.admin.v1.CreateProfileRequest
-	10, // 25: mistgate.admin.v1.ProfileService.UpdateProfile:input_type -> mistgate.admin.v1.UpdateProfileRequest
-	14, // 26: mistgate.admin.v1.ProfileService.PreviewProfile:input_type -> mistgate.admin.v1.PreviewProfileRequest
-	24, // 27: mistgate.admin.v1.ProfileService.DeleteProfile:input_type -> mistgate.admin.v1.DeleteProfileRequest
-	18, // 28: mistgate.admin.v1.ProfileService.CreateInbound:input_type -> mistgate.admin.v1.CreateInboundRequest
-	20, // 29: mistgate.admin.v1.ProfileService.UpdateInbound:input_type -> mistgate.admin.v1.UpdateInboundRequest
-	26, // 30: mistgate.admin.v1.ProfileService.DeleteInbound:input_type -> mistgate.admin.v1.DeleteInboundRequest
-	22, // 31: mistgate.admin.v1.ProfileService.TwinProfile:input_type -> mistgate.admin.v1.TwinProfileRequest
-	2,  // 32: mistgate.admin.v1.ProfileService.ListProtocols:output_type -> mistgate.admin.v1.ListProtocolsResponse
-	5,  // 33: mistgate.admin.v1.ProfileService.ListProfiles:output_type -> mistgate.admin.v1.ListProfilesResponse
-	7,  // 34: mistgate.admin.v1.ProfileService.GetProfile:output_type -> mistgate.admin.v1.GetProfileResponse
-	9,  // 35: mistgate.admin.v1.ProfileService.CreateProfile:output_type -> mistgate.admin.v1.CreateProfileResponse
-	12, // 36: mistgate.admin.v1.ProfileService.UpdateProfile:output_type -> mistgate.admin.v1.UpdateProfileResponse
-	15, // 37: mistgate.admin.v1.ProfileService.PreviewProfile:output_type -> mistgate.admin.v1.PreviewProfileResponse
-	25, // 38: mistgate.admin.v1.ProfileService.DeleteProfile:output_type -> mistgate.admin.v1.DeleteProfileResponse
-	19, // 39: mistgate.admin.v1.ProfileService.CreateInbound:output_type -> mistgate.admin.v1.CreateInboundResponse
-	21, // 40: mistgate.admin.v1.ProfileService.UpdateInbound:output_type -> mistgate.admin.v1.UpdateInboundResponse
-	27, // 41: mistgate.admin.v1.ProfileService.DeleteInbound:output_type -> mistgate.admin.v1.DeleteInboundResponse
-	23, // 42: mistgate.admin.v1.ProfileService.TwinProfile:output_type -> mistgate.admin.v1.TwinProfileResponse
-	32, // [32:43] is the sub-list for method output_type
-	21, // [21:32] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	32, // 2: mistgate.admin.v1.ProfileSummary.warnings:type_name -> mistgate.admin.v1.StatusReason
+	4,  // 3: mistgate.admin.v1.ProfileSummary.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	33, // 4: mistgate.admin.v1.ProfileFormat.format:type_name -> mistgate.admin.v1.SubFormat
+	3,  // 5: mistgate.admin.v1.ListProfilesResponse.profiles:type_name -> mistgate.admin.v1.ProfileSummary
+	3,  // 6: mistgate.admin.v1.GetProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
+	34, // 7: mistgate.admin.v1.GetProfileResponse.inbounds:type_name -> mistgate.admin.v1.Inbound
+	3,  // 8: mistgate.admin.v1.CreateProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
+	3,  // 9: mistgate.admin.v1.UpdateProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
+	12, // 10: mistgate.admin.v1.UpdateProfileResponse.impact:type_name -> mistgate.admin.v1.ProfileImpact
+	29, // 11: mistgate.admin.v1.FieldError.params:type_name -> mistgate.admin.v1.FieldError.ParamsEntry
+	14, // 12: mistgate.admin.v1.PreviewProfileResponse.errors:type_name -> mistgate.admin.v1.FieldError
+	14, // 13: mistgate.admin.v1.PreviewProfileResponse.warnings:type_name -> mistgate.admin.v1.FieldError
+	17, // 14: mistgate.admin.v1.PreviewProfileResponse.obfuscation_score:type_name -> mistgate.admin.v1.ObfuscationScore
+	4,  // 15: mistgate.admin.v1.PreviewProfileResponse.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	18, // 16: mistgate.admin.v1.ObfuscationScore.items:type_name -> mistgate.admin.v1.ScoreItem
+	30, // 17: mistgate.admin.v1.ScoreItem.params:type_name -> mistgate.admin.v1.ScoreItem.ParamsEntry
+	34, // 18: mistgate.admin.v1.CreateInboundResponse.inbound:type_name -> mistgate.admin.v1.Inbound
+	32, // 19: mistgate.admin.v1.CreateInboundResponse.warnings:type_name -> mistgate.admin.v1.StatusReason
+	34, // 20: mistgate.admin.v1.UpdateInboundResponse.inbound:type_name -> mistgate.admin.v1.Inbound
+	32, // 21: mistgate.admin.v1.UpdateInboundResponse.warnings:type_name -> mistgate.admin.v1.StatusReason
+	3,  // 22: mistgate.admin.v1.TwinProfileResponse.profile:type_name -> mistgate.admin.v1.ProfileSummary
+	35, // 23: mistgate.admin.v1.TwinProfileResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
+	1,  // 24: mistgate.admin.v1.ProfileService.ListProtocols:input_type -> mistgate.admin.v1.ListProtocolsRequest
+	5,  // 25: mistgate.admin.v1.ProfileService.ListProfiles:input_type -> mistgate.admin.v1.ListProfilesRequest
+	7,  // 26: mistgate.admin.v1.ProfileService.GetProfile:input_type -> mistgate.admin.v1.GetProfileRequest
+	9,  // 27: mistgate.admin.v1.ProfileService.CreateProfile:input_type -> mistgate.admin.v1.CreateProfileRequest
+	11, // 28: mistgate.admin.v1.ProfileService.UpdateProfile:input_type -> mistgate.admin.v1.UpdateProfileRequest
+	15, // 29: mistgate.admin.v1.ProfileService.PreviewProfile:input_type -> mistgate.admin.v1.PreviewProfileRequest
+	25, // 30: mistgate.admin.v1.ProfileService.DeleteProfile:input_type -> mistgate.admin.v1.DeleteProfileRequest
+	19, // 31: mistgate.admin.v1.ProfileService.CreateInbound:input_type -> mistgate.admin.v1.CreateInboundRequest
+	21, // 32: mistgate.admin.v1.ProfileService.UpdateInbound:input_type -> mistgate.admin.v1.UpdateInboundRequest
+	27, // 33: mistgate.admin.v1.ProfileService.DeleteInbound:input_type -> mistgate.admin.v1.DeleteInboundRequest
+	23, // 34: mistgate.admin.v1.ProfileService.TwinProfile:input_type -> mistgate.admin.v1.TwinProfileRequest
+	2,  // 35: mistgate.admin.v1.ProfileService.ListProtocols:output_type -> mistgate.admin.v1.ListProtocolsResponse
+	6,  // 36: mistgate.admin.v1.ProfileService.ListProfiles:output_type -> mistgate.admin.v1.ListProfilesResponse
+	8,  // 37: mistgate.admin.v1.ProfileService.GetProfile:output_type -> mistgate.admin.v1.GetProfileResponse
+	10, // 38: mistgate.admin.v1.ProfileService.CreateProfile:output_type -> mistgate.admin.v1.CreateProfileResponse
+	13, // 39: mistgate.admin.v1.ProfileService.UpdateProfile:output_type -> mistgate.admin.v1.UpdateProfileResponse
+	16, // 40: mistgate.admin.v1.ProfileService.PreviewProfile:output_type -> mistgate.admin.v1.PreviewProfileResponse
+	26, // 41: mistgate.admin.v1.ProfileService.DeleteProfile:output_type -> mistgate.admin.v1.DeleteProfileResponse
+	20, // 42: mistgate.admin.v1.ProfileService.CreateInbound:output_type -> mistgate.admin.v1.CreateInboundResponse
+	22, // 43: mistgate.admin.v1.ProfileService.UpdateInbound:output_type -> mistgate.admin.v1.UpdateInboundResponse
+	28, // 44: mistgate.admin.v1.ProfileService.DeleteInbound:output_type -> mistgate.admin.v1.DeleteInboundResponse
+	24, // 45: mistgate.admin.v1.ProfileService.TwinProfile:output_type -> mistgate.admin.v1.TwinProfileResponse
+	35, // [35:46] is the sub-list for method output_type
+	24, // [24:35] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_profile_proto_init() }
@@ -2091,15 +2196,16 @@ func file_mistgate_admin_v1_profile_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_common_proto_init()
-	file_mistgate_admin_v1_profile_proto_msgTypes[10].OneofWrappers = []any{}
-	file_mistgate_admin_v1_profile_proto_msgTypes[20].OneofWrappers = []any{}
+	file_mistgate_admin_v1_subscription_proto_init()
+	file_mistgate_admin_v1_profile_proto_msgTypes[11].OneofWrappers = []any{}
+	file_mistgate_admin_v1_profile_proto_msgTypes[21].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_profile_proto_rawDesc), len(file_mistgate_admin_v1_profile_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -446,7 +446,13 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 	}
 	for _, p := range profs {
 		if inGroup[p.ID] {
-			resp.Profiles = append(resp.Profiles, &adminv1.ProfileRef{Id: p.ID, Name: p.Name, Protocol: p.Protocol})
+			ref := &adminv1.ProfileRef{Id: p.ID, Name: p.Name, Protocol: p.Protocol}
+			if proto, ok := s.reg.Get(p.Protocol); ok {
+				if merged, err := s.mergedSettings(p); err == nil { // the formats are a hint: a profile that will not open still shows
+					ref.Formats = s.profileFormats(proto, merged)
+				}
+			}
+			resp.Profiles = append(resp.Profiles, ref)
 		}
 	}
 

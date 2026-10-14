@@ -670,9 +670,19 @@ type nodeAccessV struct {
 }
 
 type profileRefV struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Protocol string `json:"protocol"`
+	ID       string           `json:"id"`
+	Name     string           `json:"name"`
+	Protocol string           `json:"protocol"`
+	Formats  []profileFormatV `json:"formats,omitempty"`
+}
+
+// profileFormatV says whether one subscription format (link_list, mihomo, xray_json, singbox_json) carries a profile.
+// note is a stable code, never text: why the format leaves the profile out (xhttp, self_signed, gecko, awg, unsupported),
+// or, with ok, a loss (hop_single_port).
+type profileFormatV struct {
+	Format string `json:"format"`
+	OK     bool   `json:"ok"`
+	Note   string `json:"note,omitempty"`
 }
 
 // UserGetV is the user_get result: no subscription link, no keys.
@@ -692,7 +702,11 @@ func (v *UserGetV) shrink() bool {
 func profileRefs(ps []*adminv1.ProfileRef) []profileRefV {
 	var out []profileRefV
 	for _, p := range ps {
-		out = append(out, profileRefV{ID: p.GetId(), Name: nm(p.GetName()), Protocol: clean(p.GetProtocol(), 40)})
+		r := profileRefV{ID: p.GetId(), Name: nm(p.GetName()), Protocol: clean(p.GetProtocol(), 40)}
+		for _, f := range p.GetFormats() {
+			r.Formats = append(r.Formats, profileFormatV{Format: subFormat(f.GetFormat()), OK: f.GetOk(), Note: clean(f.GetNote(), 40)})
+		}
+		out = append(out, r)
 	}
 	return out
 }

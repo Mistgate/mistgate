@@ -1517,10 +1517,12 @@ func (x *NodeAccess) GetSelected() bool {
 }
 
 type ProfileRef struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Protocol      string                 `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Protocol string                 `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	// In which subscription formats the profile works (ProfileSummary.formats). Empty when it could not be trial-rendered.
+	Formats       []*ProfileFormat `protobuf:"bytes,4,rep,name=formats,proto3" json:"formats,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1574,6 +1576,13 @@ func (x *ProfileRef) GetProtocol() string {
 		return x.Protocol
 	}
 	return ""
+}
+
+func (x *ProfileRef) GetFormats() []*ProfileFormat {
+	if x != nil {
+		return x.Formats
+	}
+	return nil
 }
 
 type GetUserResponse struct {
@@ -2953,7 +2962,7 @@ var File_mistgate_admin_v1_user_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/user.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\":\n" +
+	"\x1cmistgate/admin/v1/user.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1fmistgate/admin/v1/profile.proto\":\n" +
 	"\n" +
 	"AppToggles\x12\x12\n" +
 	"\x04happ\x18\x01 \x01(\bR\x04happ\x12\x18\n" +
@@ -3070,12 +3079,13 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x1c\n" +
 	"\tprotocols\x18\x06 \x03(\tR\tprotocols\x12%\n" +
 	"\x0enode_protocols\x18\a \x03(\tR\rnodeProtocols\x12\x1a\n" +
-	"\bselected\x18\b \x01(\bR\bselected\"L\n" +
+	"\bselected\x18\b \x01(\bR\bselected\"\x88\x01\n" +
 	"\n" +
 	"ProfileRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
-	"\bprotocol\x18\x03 \x01(\tR\bprotocol\"\xc0\x03\n" +
+	"\bprotocol\x18\x03 \x01(\tR\bprotocol\x12:\n" +
+	"\aformats\x18\x04 \x03(\v2 .mistgate.admin.v1.ProfileFormatR\aformats\"\xc0\x03\n" +
 	"\x0fGetUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x123\n" +
 	"\adevices\x18\x02 \x03(\v2\x19.mistgate.admin.v1.DeviceR\adevices\x12B\n" +
@@ -3301,6 +3311,7 @@ var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(*GetSubscriptionLinkRequest)(nil),  // 38: mistgate.admin.v1.GetSubscriptionLinkRequest
 	(*GetSubscriptionLinkResponse)(nil), // 39: mistgate.admin.v1.GetSubscriptionLinkResponse
 	(App)(0),                            // 40: mistgate.admin.v1.App
+	(*ProfileFormat)(nil),               // 41: mistgate.admin.v1.ProfileFormat
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
@@ -3314,56 +3325,57 @@ var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	8,  // 8: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
 	10, // 9: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
 	5,  // 10: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
-	8,  // 11: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
-	13, // 12: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
-	14, // 13: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
-	15, // 14: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
-	17, // 15: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
-	16, // 16: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
-	19, // 17: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
-	1,  // 18: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	6,  // 19: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	7,  // 20: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	8,  // 21: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
-	1,  // 22: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	6,  // 23: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	7,  // 24: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	8,  // 25: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
-	24, // 26: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	25, // 27: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
-	25, // 28: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
-	8,  // 29: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 30: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 31: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 32: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	8,  // 33: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	9,  // 34: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	12, // 35: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	20, // 36: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	22, // 37: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	26, // 38: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	28, // 39: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	30, // 40: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	32, // 41: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	34, // 42: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
-	36, // 43: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	38, // 44: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	11, // 45: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	18, // 46: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	21, // 47: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	23, // 48: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	27, // 49: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	29, // 50: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	31, // 51: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	33, // 52: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	35, // 53: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
-	37, // 54: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	39, // 55: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	45, // [45:56] is the sub-list for method output_type
-	34, // [34:45] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	41, // 11: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	8,  // 12: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
+	13, // 13: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
+	14, // 14: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
+	15, // 15: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
+	17, // 16: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
+	16, // 17: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
+	19, // 18: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
+	1,  // 19: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	6,  // 20: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	7,  // 21: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	8,  // 22: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
+	1,  // 23: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	6,  // 24: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	7,  // 25: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	8,  // 26: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
+	24, // 27: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	25, // 28: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
+	25, // 29: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
+	8,  // 30: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
+	8,  // 31: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
+	8,  // 32: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
+	8,  // 33: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	8,  // 34: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	9,  // 35: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	12, // 36: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	20, // 37: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	22, // 38: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	26, // 39: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	28, // 40: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	30, // 41: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	32, // 42: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	34, // 43: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
+	36, // 44: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	38, // 45: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	11, // 46: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	18, // 47: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	21, // 48: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	23, // 49: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	27, // 50: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	29, // 51: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	31, // 52: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	33, // 53: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	35, // 54: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
+	37, // 55: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	39, // 56: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	46, // [46:57] is the sub-list for method output_type
+	35, // [35:46] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -3372,6 +3384,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_common_proto_init()
+	file_mistgate_admin_v1_profile_proto_init()
 	file_mistgate_admin_v1_user_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

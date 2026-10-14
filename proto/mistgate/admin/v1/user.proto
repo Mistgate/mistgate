@@ -3,6 +3,7 @@ syntax = "proto3";
 package mistgate.admin.v1;
 
 import "mistgate/admin/v1/common.proto";
+import "mistgate/admin/v1/profile.proto";
 
 // Users screen, create-user modal, user detail. Product rules:
 //  - Every user gets BOTH apps by default. Two toggles (Happ, Amnezia), at least one on.
@@ -293,6 +294,8 @@ message ProfileRef {
   string id = 1;
   string name = 2;
   string protocol = 3;
+  // In which subscription formats the profile works (ProfileSummary.formats). Empty when it could not be trial-rendered.
+  repeated ProfileFormat formats = 4;
 }
 
 message GetUserResponse {

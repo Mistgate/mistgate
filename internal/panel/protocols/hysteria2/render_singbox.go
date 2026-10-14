@@ -38,8 +38,11 @@ type singboxHy2TLS struct {
 // `server_port` is ignored next to it, so it is left out (the node forwards the range to the listening port).
 func renderSingbox(in protocols.RenderInput) (plugin.Fragment, bool) {
 	v, ok := newJSONView(in)
-	if !ok || v.selfSigned {
-		return plugin.Fragment{}, false
+	if !ok {
+		return plugin.Skipped(v.note)
+	}
+	if v.selfSigned {
+		return plugin.Skipped(plugin.NoteSelfSigned)
 	}
 	o := singboxHy2{
 		Type: "hysteria2", Server: v.host, Password: v.password,
