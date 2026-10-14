@@ -51,7 +51,7 @@ Two static Go binaries, one for the panel and one for the node agent. SQLite and
 **Let your AI agent help.**
 The panel has a built-in MCP server. Claude Code, Codex or another agent reads the fleet and changes it through plan → apply. Installing a node, a doctor fix or a server password change waits until you approve it in the admin. Agents never receive subscription links, device keys or passwords. [AI agent guide](docs/en/getting-started/ai-agents.md) · [MCP](docs/en/reference/mcp.md)
 
-> **Coming soon, not in a release yet:** Xray JSON and sing-box subscriptions, and a full Telegram bot for the fleet and for users. The edition of the panel that runs on Cloudflare Workers is in the releases since v0.1.36 as a [preview](docs/en/getting-started/install-edge.md) and has not run on a real Cloudflare account yet.
+> **Coming soon, not in a release yet:** a full Telegram bot for the fleet and for users. The edition of the panel that runs on Cloudflare Workers is in the releases since v0.1.36 as a [preview](docs/en/getting-started/install-edge.md) and has not run on a real Cloudflare account yet.
 
 ## Screenshots
 
@@ -99,7 +99,7 @@ Then:
 | AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ? | ? | ? | ? |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | VMess, Trojan, Shadowsocks | ❌ | ✅ | partial | ✅ | ✅ | ✅ |
-| Xray JSON or sing-box subscriptions | soon | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
+| Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
 | Health checks and alerts | ✅ client-eye checks, doctor with fixes | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | partial | partial | ? |
 | Telegram bot | alerts only, full bot soon | ✅ | partial | ✅ | ✅ | ? |
 | HWID device limit | ✅ | ✅ | ✅ | ? | ✅ | ? |
@@ -113,7 +113,7 @@ Others are ahead in protocol breadth, community size and full Telegram bots. The
 
 Mistgate is in beta. The [latest release](https://github.com/Mistgate/mistgate/releases/latest) runs in production. Until 1.0 the API, the stored settings and the node protocol may still change. Linux binaries for amd64 and arm64 are on [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest).
 
-Next: the first run of the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)) on a real account and bringing it on par with the VPS panel, then Xray JSON and sing-box subscriptions; later a Telegram bot for the fleet and for users. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
+Next: the first run of the Cloudflare Workers edition (a [preview](docs/en/getting-started/install-edge.md)) on a real account and bringing it on par with the VPS panel; later a Telegram bot for the fleet and for users. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings. Details and the known limits: [Status and roadmap](docs/en/roadmap/status.md).
 
 ## Documentation
 

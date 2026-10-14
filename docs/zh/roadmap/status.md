@@ -3,23 +3,23 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.40`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.39
+  meta: v0.1.0 – v0.1.40
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.39
+      release: v0.1.40
       current: true
       points:
-        - "**按设备 ID 区分设备**：每个报告设备 ID 的应用都有自己的设备、密钥、在线状态和流量；不提供 ID 的应用共用一个名额。设备上限有三种模式：**仅计数**、**限制**和**严格**；现有面板默认使用**仅计数**。你可以拉黑和解除拉黑设备，用户也可以自己删除和重命名设备。参见[设备和设备上限](../guide/users-and-groups.md#设备和设备上限)。"
-        - "**每用户限速和每设备限速**：每用户限速按同一节点上该用户的所有设备合计计算。参见[限制](../guide/users-and-groups.md#限制)。"
-        - "**用户列表可按任意列排序**，并显示设备数；筛选项**超出设备上限**可以找出超限的用户。参见[用户标签页](../guide/users-and-groups.md#用户标签页)。"
-        - "「更新」页面新增**更新内容**：显示你当前版本与可用版本之间的发布说明。参见[更新内容](../operations/updates.md#更新内容)。"
+        - "**Xray JSON 与 sing-box JSON**，与链接列表和 Mihomo YAML 并列。Xray JSON 只按你添加的规则下发，例如 `v2rayng`；面板会获得规则 `sing-box` → sing-box JSON，供官方 sing-box 应用使用。参见 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
+        - "每张协议配置卡片和编辑器中都有**订阅格式**：服务器被某种格式排除时，标记会说明原因。参见[协议配置的订阅格式](../guide/profiles.md#协议配置的订阅格式)。"
+        - "链接末尾的 `?format=` 可为单次请求指定格式，便于在写规则前先试用应用。参见[下发规则](../guide/subscriptions.md#下发规则)。"
+        - "**Happ 6** 显示为 Happ 6.0.0，后台的设备行以系统开头。"
     - title: 协议配置
       section: profiles
       points:
@@ -44,7 +44,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`�
     - title: 订阅
       section: subscriptions
       points:
-        - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML。"
+        - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML，为使用 Xray 和 sing-box 内核的应用提供 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
         - "[订阅类应用的设备上限](../guide/subscriptions.md#订阅类应用的设备上限)有三种模式：**仅计数**、**限制**和**严格**。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、供 AmneziaVPN 使用的 `vpn://` 密钥，以及用户自己的设备；用户可以[重命名和删除](../guide/user-page.md#自助管理设备)这些设备，页面上还有复制链接的按钮。"
         - "提供 [DNS 预设](../guide/dns.md)，并可让用户在用户页面中为每台服务器选择 DNS。"
@@ -77,7 +77,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.39
+  meta: v0.1.34 – v0.1.40
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -86,6 +86,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`�
     - title: 在生产环境中测试按设备 ID 区分的设备
       section: subscriptions
       text: "现有面板运行在**仅计数**模式，因此你可以在切换到**限制**之前先看到谁超出了上限。参见[如何从「仅计数」切换到「限制」](../guide/subscriptions.md#如何从仅计数切换到限制)。"
+    - title: 在生产环境中测试 Xray JSON 与 sing-box JSON
+      section: subscriptions
+      text: "默认没有规则下发 Xray JSON：请为需要的应用添加规则，或先在其链接末尾加上 `?format=xray-json` 试用。参见[下发规则](../guide/subscriptions.md#下发规则)。"
     - title: 在每个节点上使用伪装站点
       section: nodes
       text: "每个节点都可以使用内置站点、面板站点或自己的站点压缩包。v0.1.36 之前创建的节点会继续使用内置页面，直到你选择其他选项。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
@@ -107,9 +110,6 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`�
         - "客户端视角隧道检测；"
         - "从管理后台更新节点和面板；"
         - "实时节点日志、节点自有站点伪装以及 WARP 注册。"
-    - title: Xray JSON 和 sing-box 订阅
-      section: subscriptions
-      text: "除链接列表和 Mihomo YAML 外，也为使用 Xray 和 sing-box 核心的应用提供可直接使用的配置。参见[订阅](../guide/subscriptions.md#格式)。"
 - status: later
   title: 以后
   lead: 已计划，但尚未进入下一批队列。
@@ -147,4 +147,5 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.39`�
 - 设备 ID 由应用自己报告。拉黑会拒绝该 ID；报告其他 ID 的应用算作新设备，并占用一个空闲名额。要让被转给他人的链接失效，还需要重新签发一个新链接。
 - **每用户限速**按节点计算，因此同时连接两个节点的用户最多可获得上限的 2 倍。v0.1.39 之前的节点 Agent 会把每台设备限制在两个限速中较小的一个。
 - 在 Cloudflare 版中，面板记录的已发送到节点的内容摘要必须放进 D1 的一行（2 MB），约合每个节点 38,000 个凭据。参见[此版本的限制](../getting-started/install-edge.md#此版本中尚不可用的功能)。
+- sing-box JSON 没有 XHTTP，也无法按指纹校验自签名的 Hysteria2 证书；Gecko 和 AmneziaWG 只通过 Mihomo YAML 下发。格式无法承载的服务器不会出现在该格式中。参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。
 - 部分默认值偏向俄罗斯用户（俄罗斯节点使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设）；这些都可以在设置中修改。

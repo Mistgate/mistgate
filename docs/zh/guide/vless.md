@@ -114,7 +114,7 @@ TCP 443 也用于 Hysteria2 协议配置提供网站。同一节点上的 VLESS 
 
 ## 应用收到的内容
 
-VLESS 有两种格式；应用会收到哪种格式，由[订阅](subscriptions.md)中的规则决定。VLESS 与 Hysteria2 共用**订阅中的应用**开关：能获得 Hysteria2 服务器的用户也会获得其分组中的 VLESS 服务器。
+VLESS 有四种格式（下面的两种，以及 Xray JSON 和 sing-box JSON）；应用会收到哪种格式，由[订阅](subscriptions.md)中的规则决定。VLESS 与 Hysteria2 共用**订阅中的应用**开关：能获得 Hysteria2 服务器的用户也会获得其分组中的 VLESS 服务器。
 
 **链接列表。** 每台服务器对应一个分享链接，供 Happ 和其他应用读取。以下示例使用 REALITY 的 XHTTP：
 
@@ -161,5 +161,5 @@ vless://<uuid>@de1.example.com:443?encryption=none&fp=chrome&mode=auto&path=%2Fq
 
 - 面板的客户端视角检测会使用与订阅相同的解析后客户端设置测试 VLESS，包括握手和隧道。请参阅[运行状况](../operations/health.md)。
 - 节点页面的**检测端口**会从另一台节点检查 TCP 连接能否抵达 Mistgate，详见[节点](nodes.md)。这只是一个观测点，不会执行完整的 REALITY 握手。要查看客户端实际能看到的内容，请从其他网络测试（`nc -vz de1.example.com 8443`），或使用手机连接。
-- 订阅暂不包含 Xray JSON 或 sing-box 格式。
+- sing-box JSON 只承载基于 TCP（RAW + Vision）和 WebSocket 的 VLESS，不支持 XHTTP；Xray JSON 和 Mihomo YAML 支持所有类型。参见[各格式支持哪些协议配置](subscriptions.md#各格式支持哪些协议配置)。
 - 尚未使用真实 CDN 测试经 CDN 连接的 VLESS，详见[VLESS 经 CDN 连接](#vless-经-cdn-连接)。

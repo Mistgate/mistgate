@@ -3,23 +3,23 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.40`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.39
+  meta: v0.1.0 – v0.1.40
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.39
+      release: v0.1.40
       current: true
       points:
-        - "**Devices by device ID**: each app that reports an ID gets its own device, keys, online status and traffic; apps without one share one place. The limit has three modes, **Only count** / **Limit** / **Strict**, and existing panels start in **Only count**. You can block and unblock a device, and people remove and rename their own. See [Devices and the device limit](../guide/users-and-groups.md#devices-and-the-device-limit)."
-        - "**Speed per person and speed per device**: the per-person limit counts all of a person's devices on one node. See [Limits](../guide/users-and-groups.md#limits)."
-        - "**The Users list sorts by any column** and counts devices; the filter **Over device limit** shows who is over. See [The People tab](../guide/users-and-groups.md#the-people-tab)."
-        - "**What's new** on the Updates page: the release notes between your version and the available one. See [What's new](../operations/updates.md#whats-new)."
+        - "**Xray JSON and sing-box JSON** next to the link list and Mihomo YAML. Xray JSON goes out only by a rule you add, for example `v2rayng`; panels get the rule `sing-box` → sing-box JSON for the official sing-box apps. See [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json)."
+        - "**Subscription formats** on every profile card and in the editor: where a server drops out of a format, a mark gives the reason. See [Subscription formats of a profile](../guide/profiles.md#subscription-formats-of-a-profile)."
+        - "**`?format=`** at the end of a link picks the format for one request, to try an app before writing a rule. See [Who gets what](../guide/subscriptions.md#who-gets-what)."
+        - "**Happ 6** shows as Happ 6.0.0, and the admin's device line starts with the system."
     - title: Profiles
       section: profiles
       points:
@@ -44,7 +44,7 @@ Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production
     - title: Subscriptions
       section: subscriptions
       points:
-        - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core."
+        - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core, [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json) for apps on those cores."
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
         - "[DNS presets](../guide/dns.md) and a DNS choice per server on the user page."
@@ -77,7 +77,7 @@ Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.39
+  meta: v0.1.34 – v0.1.40
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -86,6 +86,9 @@ Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production
     - title: Devices by device ID in production
       section: subscriptions
       text: "Existing panels run in **Only count**, so you see who is over the limit before you switch to **Limit**. See [How to move from Only count to Limit](../guide/subscriptions.md#how-to-move-from-only-count-to-limit)."
+    - title: Xray JSON and sing-box JSON in production
+      section: subscriptions
+      text: "No rule hands out Xray JSON by default: add one for the apps you want, or try an app first with `?format=xray-json` on its link. See [Who gets what](../guide/subscriptions.md#who-gets-what)."
     - title: A decoy site on every node
       section: nodes
       text: "The built-in site, the panel's site or an archive of its own for each node. Nodes created before v0.1.36 stay on the built-in page until you pick another option. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
@@ -107,9 +110,6 @@ Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production
         - "client-eye tunnel checks;"
         - "node and panel updates from the admin;"
         - "live node logs, an Own site decoy for a node, and WARP registration."
-    - title: Xray JSON and sing-box subscriptions
-      section: subscriptions
-      text: "Ready configs for apps on the Xray and sing-box cores, next to the link list and Mihomo YAML. See [Subscriptions](../guide/subscriptions.md#formats)."
 - status: later
   title: Later
   lead: Planned, but not next in the queue.
@@ -147,4 +147,5 @@ Mistgate is in **beta**; the current release is `v0.1.39`. It runs in production
 - A device ID is what the app reports. Blocking refuses that ID; an app that reports another ID is a new device and takes a free place. To cut off a link that was passed on, issue a new link as well.
 - **Speed per person** is per node, so a person on two nodes at once can get up to twice the limit. Node agents before v0.1.39 hold each device to the smaller of the two limits.
 - In the Cloudflare edition the digest of what was sent to a node must fit one D1 row (2 MB), about 38,000 credentials per node. See [the limits of this edition](../getting-started/install-edge.md#not-available-in-this-edition-yet).
+- sing-box JSON has no XHTTP and cannot pin a self-signed Hysteria2 certificate; Gecko and AmneziaWG go out only in Mihomo YAML. A server a format cannot carry is left out of that format. See [What works where](../guide/subscriptions.md#what-works-where).
 - Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.

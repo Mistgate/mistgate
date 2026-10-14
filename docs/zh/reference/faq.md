@@ -19,7 +19,7 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 - **Hysteria2 和 VLESS**：使用 Happ 等订阅类应用（获取 URI 列表），或使用基于 mihomo 内核的应用，例如 kl!ck、Clash Verge 或 FlClash（获取 Mihomo YAML 配置）。在浏览器中打开链接会进入该用户的页面，其中包含使用说明。
 - **AmneziaWG**：使用 AmneziaVPN 应用，每台设备单独使用密钥；kl!ck 和其他基于 mihomo 内核的应用通过订阅获取配置。
 
-带有自签名证书的 Hysteria2 协议配置已使用官方 Hysteria2 客户端和 Mihomo 验证；尚未使用 Happ 验证。更多订阅格式（Xray JSON、sing-box）**计划中**。参见[订阅](../guide/subscriptions.md)和[客户端应用](../guide/client-apps.md)：Mistgate 推荐在 Windows 和 macOS 上使用 kl!ck。
+带有自签名证书的 Hysteria2 协议配置已使用官方 Hysteria2 客户端和 Mihomo 验证；尚未使用 Happ 验证。Xray JSON 和 sing-box JSON 格式也已提供；sing-box 不支持自签名的 Hysteria2 证书和 XHTTP（参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)）。参见[订阅](../guide/subscriptions.md)和[客户端应用](../guide/client-apps.md)：Mistgate 推荐在 Windows 和 macOS 上使用 kl!ck。
 
 ## 可以管理多少用户和节点？
 

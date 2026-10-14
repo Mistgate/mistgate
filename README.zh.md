@@ -51,7 +51,7 @@ VLESS 可以通过 TCP 运行（搭配 XHTTP，或搭配 RAW 和 Vision），也
 **让 AI 智能体帮忙。**
 面板内置 MCP 服务器。Claude Code、Codex 或其他智能体可以读取集群状态，并通过「计划 → 执行」来修改它。安装节点、诊断修复或更换服务器密码，都要等你在管理后台批准后才会执行。智能体永远拿不到订阅链接、设备密钥或密码。[AI 智能体指南](https://mistgate.app/zh/getting-started/ai-agents/) · [MCP](https://mistgate.app/zh/reference/mcp/)
 
-> **即将推出，尚未包含在任何发布版本中：** Xray JSON 和 sing-box 订阅，以及可管理集群和用户的完整 Telegram 机器人。在 Cloudflare Workers 上运行的 Cloudflare 版面板自 v0.1.36 起已包含在发布版本中，作为[预览版](https://mistgate.app/zh/getting-started/install-edge/)提供，尚未在真实的 Cloudflare 账户上运行过。
+> **即将推出，尚未包含在任何发布版本中：** 可管理集群和用户的完整 Telegram 机器人。在 Cloudflare Workers 上运行的 Cloudflare 版面板自 v0.1.36 起已包含在发布版本中，作为[预览版](https://mistgate.app/zh/getting-started/install-edge/)提供，尚未在真实的 Cloudflare 账户上运行过。
 
 ## 截图
 
@@ -99,7 +99,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 | AmneziaWG | ✅ 2.0 和 3.1 | ✅ 3.1 | ? | ? | ? | ? |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | VMess、Trojan、Shadowsocks | ❌ | ✅ | 部分 | ✅ | ✅ | ✅ |
-| Xray JSON 或 sing-box 订阅 | 即将推出 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
+| Xray JSON 或 sing-box 订阅 | ✅ 两者都有 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
 | 健康检查和告警 | ✅ 客户端视角检测，带修复的诊断 | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 部分 | 部分 | ? |
 | Telegram 机器人 | 仅告警，完整机器人即将推出 | ✅ | 部分 | ✅ | ✅ | ? |
 | HWID 设备限制 | ✅ | ✅ | ✅ | ? | ✅ | ? |
@@ -113,7 +113,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 
 Mistgate 处于测试阶段。[最新发布版本](https://github.com/Mistgate/mistgate/releases/latest)已在生产环境中运行。在 1.0 之前，API、已存储的设置和节点协议仍可能变化。适用于 amd64 和 arm64 的 Linux 二进制文件在 [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) 上提供。
 
-下一步：先在真实账户上运行 Cloudflare Workers 版（[预览版](https://mistgate.app/zh/getting-started/install-edge/)），并让它具备与 VPS 版相同的功能，然后是 Xray JSON 和 sing-box 订阅；再往后是面向集群和用户的 Telegram 机器人。部分默认值偏向俄罗斯用户（俄罗斯节点默认使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设），这些都可以在设置中修改。详情和已知限制见[状态和路线图](https://mistgate.app/zh/roadmap/status/)。
+下一步：先在真实账户上运行 Cloudflare Workers 版（[预览版](https://mistgate.app/zh/getting-started/install-edge/)），并让它具备与 VPS 版相同的功能；再往后是面向集群和用户的 Telegram 机器人。部分默认值偏向俄罗斯用户（俄罗斯节点默认使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设），这些都可以在设置中修改。详情和已知限制见[状态和路线图](https://mistgate.app/zh/roadmap/status/)。
 
 ## 文档
 

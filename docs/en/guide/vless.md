@@ -114,7 +114,7 @@ Two profiles cannot listen on the same TCP port of a node. A TCP port and a UDP 
 
 ## What the apps receive
 
-Two formats carry VLESS; which one an app gets is decided by the rules on [Subscriptions](subscriptions.md). VLESS rides the same switch as Hysteria2, the link-app switch of **Apps in the subscription**: a person who gets Hysteria2 servers gets the VLESS servers of their group too.
+Four formats carry VLESS (the two below, Xray JSON and sing-box JSON); which one an app gets is decided by the rules on [Subscriptions](subscriptions.md). VLESS rides the same switch as Hysteria2, the link-app switch of **Apps in the subscription**: a person who gets Hysteria2 servers gets the VLESS servers of their group too.
 
 **Link list.** One share link per server, read by Happ and other apps. XHTTP with REALITY:
 
@@ -161,5 +161,5 @@ A server whose node address is not a plain host name or IP address gets no link 
 
 - The panel's client-eye check tests VLESS with the same resolved client settings used by subscriptions, including the handshake and tunnel. See [Health](../operations/health.md).
 - **Check ports** on the node page shows whether a TCP connection reaches Mistgate from one other node, see [Nodes](nodes.md). It is one vantage point and does not run a full REALITY handshake. To see what a client sees, test from another network (`nc -vz de1.example.com 8443`), or by connecting from a phone.
-- The subscription carries no Xray JSON or sing-box format yet.
+- sing-box JSON carries VLESS over TCP (RAW + Vision) and WebSocket only, not XHTTP; Xray JSON and Mihomo YAML carry all of them. See [what works where](subscriptions.md#what-works-where).
 - VLESS behind a CDN is not tested against a real CDN yet, see [VLESS behind a CDN](#vless-behind-a-cdn).
