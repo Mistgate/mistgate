@@ -8,6 +8,7 @@ import { cx } from "@/lib/cx";
 import { AppLink, useGo } from "@/screens/users/nav";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
+import { FormatsLine } from "./formats";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
 import type { StatusReason } from "@/gen/mistgate/admin/v1/common_pb";
@@ -80,40 +81,46 @@ function ProfileCard({ p, t, protocol, inGroup }: { p: ProfileSummary; t: Tx; pr
   const accent = !tone && (protocol?.apps.includes(App.HAPP) ?? false);
   const labels = [p.nodeCount === 0 && t("profiles.label.nowhere"), inGroup === false && t("profiles.label.noGroup")].filter((x): x is string => !!x);
   return (
-    <AppLink to="/profiles/$id" params={{ id: p.id }} className="block rounded-card-lg outline-offset-2">
-      <Card lg lift className="flex h-full flex-col gap-3 p-4">
-        <div className="flex items-center gap-2">
-          <b className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.01em]">{p.name}</b>
-          <span
-            data-tone={tone}
-            className={cx("flex h-[22px] items-center rounded-[7px] px-2 font-mono text-[10px] font-bold uppercase", tone ? "tone-chip" : accent ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-fg")}
-          >
-            {protocol?.displayName ?? p.protocol}
-          </span>
-        </div>
-        <span className="font-mono text-xs leading-normal break-words text-muted">{p.summary || "—"}</span>
-        {labels.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {labels.map((l) => (
-              <Label key={l}>{l}</Label>
-            ))}
-          </div>
-        )}
-        <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2.5 text-xs text-muted">
-          <span>
-            <b className="font-mono text-fg">{p.nodeCount}</b> {t.n("profiles.nodes", p.nodeCount)}
-          </span>
-          <span>
-            <b className="font-mono text-fg">{p.userCount}</b> {t.n("profiles.users", p.userCount)}
-          </span>
-          {p.warnings.map((w, i) => (
-            <span key={i} className="flex items-center gap-1.5 text-fg">
-              <span aria-hidden className="size-[7px] rounded-full bg-warn" />
-              {warnText(w, t)}
-            </span>
+    <Card lg lift className="relative flex h-full flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        {/* the name is the card's link and its ::after covers the card, so the format marks below can take focus of their own */}
+        <AppLink
+          to="/profiles/$id"
+          params={{ id: p.id }}
+          className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-[-0.01em] after:absolute after:inset-0 after:rounded-card-lg focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-accent"
+        >
+          {p.name}
+        </AppLink>
+        <span
+          data-tone={tone}
+          className={cx("flex h-[22px] items-center rounded-[7px] px-2 font-mono text-[10px] font-bold uppercase", tone ? "tone-chip" : accent ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-fg")}
+        >
+          {protocol?.displayName ?? p.protocol}
+        </span>
+      </div>
+      <span className="font-mono text-xs leading-normal break-words text-muted">{p.summary || "—"}</span>
+      <FormatsLine formats={p.formats} t={t} />
+      {labels.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {labels.map((l) => (
+            <Label key={l}>{l}</Label>
           ))}
         </div>
-      </Card>
-    </AppLink>
+      )}
+      <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2.5 text-xs text-muted">
+        <span>
+          <b className="font-mono text-fg">{p.nodeCount}</b> {t.n("profiles.nodes", p.nodeCount)}
+        </span>
+        <span>
+          <b className="font-mono text-fg">{p.userCount}</b> {t.n("profiles.users", p.userCount)}
+        </span>
+        {p.warnings.map((w, i) => (
+          <span key={i} className="flex items-center gap-1.5 text-fg">
+            <span aria-hidden className="size-[7px] rounded-full bg-warn" />
+            {warnText(w, t)}
+          </span>
+        ))}
+      </div>
+    </Card>
   );
 }

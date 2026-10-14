@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
+import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { meQuery } from "@/lib/session";
+import { FormatDrops } from "@/screens/profiles/formats";
 import { presetName } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DnsSelect, useInheritedDns } from "./dns-select";
@@ -108,9 +110,20 @@ export function GroupChip({ id, name, color, className }: { id: string; name: st
 
 /**
  * The profiles of a group sorted into the two ways, each a row with its tinted mark, its label (and, with `reach`, on how
- * many nodes it works now) and the profiles as links. A way without a profile says so, quietly.
+ * many nodes it works now) and the profiles as links. A way without a profile says so, quietly. With `drops` (the user
+ * card) a link profile that some subscription format leaves out carries the yellow mark of it ("not in sing-box: XHTTP").
  */
-export function WaysOfGroup({ profiles, reach, compact }: { profiles: { id: string; name: string; protocol: string }[]; reach?: { sub: number; awg: number }; compact?: boolean }) {
+export function WaysOfGroup({
+  profiles,
+  reach,
+  compact,
+  drops,
+}: {
+  profiles: { id: string; name: string; protocol: string; formats?: ProfileFormat[] }[];
+  reach?: { sub: number; awg: number };
+  compact?: boolean;
+  drops?: boolean;
+}) {
   const t = useTx();
   const protocols = useQuery(protocolsQuery);
   const apps = useLinkAppNames();
@@ -133,9 +146,16 @@ export function WaysOfGroup({ profiles, reach, compact }: { profiles: { id: stri
               </span>
               {list.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {list.map((p) => (
-                    <ProfileLink key={p.id} id={p.id} name={p.name} />
-                  ))}
+                  {list.map((p) =>
+                    drops && w === "sub" && p.formats?.some((f) => !f.ok) ? (
+                      <span key={p.id} className="inline-flex max-w-full flex-wrap items-center gap-1">
+                        <ProfileLink id={p.id} name={p.name} />
+                        <FormatDrops formats={p.formats} t={t} />
+                      </span>
+                    ) : (
+                      <ProfileLink key={p.id} id={p.id} name={p.name} />
+                    ),
+                  )}
                 </div>
               )}
             </div>

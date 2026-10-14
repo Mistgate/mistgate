@@ -6,7 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { UserScreen } from "./user-detail";
 
@@ -119,6 +119,9 @@ const dev = (over: object) => ({
   id: "", platform: "", model: "", firstSeenUnix: 0n, lastSeenUnix: 0n, online: false, protocols: ["hysteria2"], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n,
   kind: DeviceKind.LINK, osVersion: "", client: "", usedBytes: 0n, onlineNodeIds: [] as string[], fingerprint: "", ...over,
 });
+/** A profile's four formats in the order of the API, each [ok, note]. */
+const fmts = (...rows: [boolean, string][]) =>
+  rows.map(([ok, note], i) => ({ format: [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON][i]!, ok, note }));
 const detail = {
   user,
   devices: [
@@ -129,8 +132,9 @@ const detail = {
   dailyTraffic: [],
   nodeTraffic: [],
   profiles: [
-    { id: "p_hy", name: "hy2 · 443", protocol: "hysteria2" },
-    { id: "p_awg", name: "AWG 3.1", protocol: "awg" },
+    { id: "p_hy", name: "hy2 · 443", protocol: "hysteria2", formats: fmts([true, ""], [true, ""], [true, ""], [true, ""]) },
+    { id: "p_vl", name: "vless · xhttp", protocol: "vless", formats: fmts([true, ""], [true, ""], [true, ""], [false, "xhttp"]) },
+    { id: "p_awg", name: "AWG 3.1", protocol: "awg", formats: fmts([false, "awg"], [true, ""], [false, "awg"], [false, "awg"]) },
   ],
   nodeAccess: [{ nodeId: "nod_1", nodeName: "de1", countryCode: "DE", location: "", provider: "", protocols: ["hysteria2", "awg"], nodeProtocols: ["hysteria2", "awg"], selected: true }],
 };
@@ -247,6 +251,14 @@ describe("the user card", () => {
     const group = document.querySelector<HTMLAnchorElement>('a[aria-label="Open group “Everyone”"]')!;
     expect(group.dataset.search).toBe(JSON.stringify({ tab: "groups", group: "grp_all" }));
     expect(anchor("de1")?.dataset.search).toBe(JSON.stringify({ tab: "profiles" }));
+  });
+
+  it("marks a link profile that a subscription format leaves out, and only that one", async () => {
+    await mount();
+    const vl = [...document.querySelectorAll<HTMLAnchorElement>("a[href='/profiles/$id']")].find((a) => a.textContent === "vless · xhttp")!;
+    expect(vl.parentElement!.textContent).toBe("vless · xhttpnot in sing-box: XHTTP");
+    // one mark in the card: hy2 works everywhere, and AmneziaWG's own way already says it goes by keys
+    expect(text().match(/not in /g)).toHaveLength(1);
   });
 
   it("asks before a new group, with what the person loses, and only the confirmation moves them", async () => {

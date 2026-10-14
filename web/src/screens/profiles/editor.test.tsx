@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { hy2, vless } from "./schema.fixtures";
 import { ProfileEditorScreen } from "./editor";
 
@@ -32,6 +33,14 @@ const awgSchema = JSON.stringify({
 const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target_kind: "self", target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
 const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
+// what the server says of a draft: VLESS over XHTTP is not in sing-box, everything else works in the four formats
+const formatsOf = ({ protocol, settingsJson }: { protocol: string; settingsJson: string }) => {
+  const xhttp = protocol === "vless" && (JSON.parse(settingsJson) as { transport?: string }).transport === "xhttp";
+  return [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON].map((format) =>
+    format === SubFormat.SINGBOX_JSON && xhttp ? { format, ok: false, note: "xhttp" } : { format, ok: true, note: "" },
+  );
+};
+
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   profiles: {
@@ -41,7 +50,8 @@ vi.mock("@/lib/api", async (orig) => ({
       { id: "vless", displayName: "VLESS", settingsSchemaJson: vless, defaultSettingsJson: vlessDefaults, apps: [App.HAPP] },
     ] }),
     listProfiles: () => Promise.resolve({ profiles: [{ id: "p_old", name: "hy2 · 443", protocol: "hysteria2" }] }),
-    previewProfile: () => Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list" }),
+    previewProfile: (r: { protocol: string; settingsJson: string }) =>
+      Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list", formats: formatsOf(r) }),
     getProfile: () =>
       Promise.resolve({
         profile: { id: "p_old", name: "hy2 · 443", protocol: "hysteria2", version: 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
@@ -226,6 +236,22 @@ describe("a new VLESS profile", () => {
     expect(text()).toContain("Exit"); // the rest of the group stays
     await click(radio("XHTTP"));
     expect(field("Path")).not.toBeNull();
+  });
+
+  it("says in which formats the draft works, live: XHTTP leaves sing-box out, TCP brings it back", async () => {
+    const formats = () => document.querySelector("[role=group][aria-label='Subscription formats']")?.textContent;
+    // the preview follows the form after a 350 ms pause
+    const debounce = () => act(async () => void (await new Promise((r) => setTimeout(r, 400))));
+    await mount();
+    expect(formats()).toBe("Link list · Mihomo · Xray JSON · sing-box");
+    await click(radio("VLESS"));
+    await debounce();
+    await settle();
+    expect(formats()).toBe("Link list · Mihomo · Xray JSON not in sing-box: XHTTP");
+    await click(radio("TCP (RAW + Vision)"));
+    await debounce();
+    await settle();
+    expect(formats()).toBe("Link list · Mihomo · Xray JSON · sing-box");
   });
 
   it("shows the node's own site as the target at first, without the fields of another site, and brings them with the other segment", async () => {

@@ -33,6 +33,7 @@ import { AwgPanel, awgHidden, handTyped } from "./awg-panel";
 import { ConfLine } from "./conf-preview";
 import { DeployDialog, type DeployProfile } from "./deploy";
 import { EgressNote } from "./egress-note";
+import { FormatsLine } from "./formats";
 import { SchemaForm, type Problem } from "./schema-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
 import { WherePanel } from "./where";
@@ -423,6 +424,13 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
             </div>
           )}
           <span className="text-xs leading-normal text-pretty text-muted">{t("profiles.previewHint")}</span>
+          {/* where the draft works, live: switching VLESS to XHTTP drops sing-box here (no formats while the draft has errors) */}
+          {!preview.isError && (preview.data?.formats.length ?? 0) > 0 && (
+            <div className="flex flex-col gap-1 border-t border-line pt-3">
+              <span className="text-[13px] font-bold">{t("profiles.fmt.title")}</span>
+              <FormatsLine formats={preview.data!.formats} t={t} />
+            </div>
+          )}
         </Panel>
       </div>
 

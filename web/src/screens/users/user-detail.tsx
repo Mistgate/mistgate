@@ -896,7 +896,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
               )}
             </div>
           </SettingRow>
-          {data.profiles.length === 0 ? <span className="text-xs text-muted">{t("users.noProfiles")}</span> : <WaysOfGroup profiles={data.profiles} compact />}
+          {data.profiles.length === 0 ? <span className="text-xs text-muted">{t("users.noProfiles")}</span> : <WaysOfGroup profiles={data.profiles} compact drops />}
           <p className="text-xs leading-normal text-pretty text-muted">
             {withNode(t("users.accessHint"), "group", <GroupLink id={user.groupId} name={user.groupName}>{t("common.quoted", { name: user.groupName })}</GroupLink>)}
           </p>
