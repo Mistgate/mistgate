@@ -298,13 +298,21 @@ func TestAPIVariantsAndTransport(t *testing.T) {
 		t.Errorf("variant = %v", mv)
 	}
 	sup := map[adminv1.DnsClient][]adminv1.DnsTransport{}
+	var order []adminv1.DnsClient
 	for _, c := range l.Msg.ClientSupport {
 		sup[c.Client] = c.Transports
+		order = append(order, c.Client)
+		if c.Ipv6 != (c.Client == adminv1.DnsClient_DNS_CLIENT_MIHOMO) {
+			t.Errorf("%v ipv6 = %v", c.Client, c.Ipv6)
+		}
 	}
-	if len(l.Msg.ClientSupport) != 3 ||
-		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_HAPP], []adminv1.DnsTransport{adminv1.DnsTransport_DNS_TRANSPORT_DOH, adminv1.DnsTransport_DNS_TRANSPORT_PLAIN}) ||
-		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_MIHOMO], []adminv1.DnsTransport{adminv1.DnsTransport_DNS_TRANSPORT_DOH, adminv1.DnsTransport_DNS_TRANSPORT_DOT, adminv1.DnsTransport_DNS_TRANSPORT_PLAIN}) ||
-		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_AMNEZIAWG], []adminv1.DnsTransport{adminv1.DnsTransport_DNS_TRANSPORT_PLAIN}) {
+	doh, dot, plain := adminv1.DnsTransport_DNS_TRANSPORT_DOH, adminv1.DnsTransport_DNS_TRANSPORT_DOT, adminv1.DnsTransport_DNS_TRANSPORT_PLAIN
+	if !slices.Equal(order, []adminv1.DnsClient{adminv1.DnsClient_DNS_CLIENT_HAPP, adminv1.DnsClient_DNS_CLIENT_MIHOMO, adminv1.DnsClient_DNS_CLIENT_XRAY, adminv1.DnsClient_DNS_CLIENT_SINGBOX, adminv1.DnsClient_DNS_CLIENT_AMNEZIAWG}) ||
+		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_HAPP], []adminv1.DnsTransport{doh, plain}) ||
+		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_MIHOMO], []adminv1.DnsTransport{doh, dot, plain}) ||
+		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_XRAY], []adminv1.DnsTransport{doh, plain}) || // no DoT in an Xray dns block
+		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_SINGBOX], []adminv1.DnsTransport{doh, dot, plain}) ||
+		!slices.Equal(sup[adminv1.DnsClient_DNS_CLIENT_AMNEZIAWG], []adminv1.DnsTransport{plain}) {
 		t.Errorf("client support = %v", l.Msg.ClientSupport)
 	}
 }

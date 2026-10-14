@@ -72,6 +72,10 @@ enum DnsClient {
   DNS_CLIENT_MIHOMO = 2;
   // AmneziaWG (.conf and the Amnezia vpn:// key).
   DNS_CLIENT_AMNEZIAWG = 3;
+  // An Xray JSON subscription (v2rayNG, v2rayN and other Xray-based apps).
+  DNS_CLIENT_XRAY = 4;
+  // A sing-box profile (the official sing-box apps).
+  DNS_CLIENT_SINGBOX = 5;
 }
 
 // A resolver of a preset: a catalog variant (provider_variant set; kind and address are then filled with a plain

@@ -278,10 +278,19 @@ function Section({ title, hint, icon, tone, children }: { title: string; hint?: 
   );
 }
 
-const appName: Partial<Record<DnsClient, Key>> = { [DnsClient.HAPP]: "subs.dns.app.happ", [DnsClient.MIHOMO]: "subs.dns.app.mihomo", [DnsClient.AMNEZIAWG]: "subs.dns.app.amneziawg" };
-const appWhy: Partial<Record<DnsClient, Key>> = { [DnsClient.HAPP]: "subs.dns.why.happ", [DnsClient.MIHOMO]: "subs.dns.why.mihomo", [DnsClient.AMNEZIAWG]: "subs.dns.why.amneziawg" };
+const appName: Partial<Record<DnsClient, Key>> = {
+  [DnsClient.HAPP]: "subs.dns.app.happ",
+  [DnsClient.MIHOMO]: "subs.dns.app.mihomo",
+  [DnsClient.XRAY]: "subs.dns.app.xray",
+  [DnsClient.SINGBOX]: "subs.dns.app.singbox",
+  [DnsClient.AMNEZIAWG]: "subs.dns.app.amneziawg",
+};
+const appWhy: Partial<Record<DnsClient, Key>> = { [DnsClient.HAPP]: "subs.dns.why.happ", [DnsClient.MIHOMO]: "subs.dns.why.mihomo", [DnsClient.XRAY]: "subs.dns.why.xray", [DnsClient.AMNEZIAWG]: "subs.dns.why.amneziawg" };
 
-/** "Happ: DoH ✓ · Amnezia: Plain, a key can only hold IP addresses": what each app ends up with for the preset as it is drafted. */
+/**
+ * "Happ: DoH ✓ · Amnezia: Plain, a key can only hold IP addresses": what each app ends up with for the preset as it is
+ * drafted. sing-box takes one main resolver (internal/panel/dns/singbox.go): with more than one it says the rest are dropped.
+ */
 function AppsRow({ servers, transport, data, catalog, t }: { servers: DnsServerN[]; transport: DnsTransport; data: DnsData; catalog: Catalog; t: Tx }) {
   const results = appResults(servers, transport, data.clientSupport, catalog);
   return (
@@ -296,6 +305,7 @@ function AppsRow({ servers, transport, data, catalog, t }: { servers: DnsServerN
               <b className="font-bold">{t(appName[r.client] ?? "subs.dns.app.happ")}:</b>
               <span className={cx(got === null && "text-muted")}>{got === null ? t("subs.dns.res.none") : t(transportKey[got])}</span>
               {ok ? <Icon name="check" size={12} strokeWidth={3} className="flex-none text-accent-text" /> : <span className="text-muted">— {t(appWhy[r.client] ?? "subs.dns.why.mihomo")}</span>}
+              {ok && r.client === DnsClient.SINGBOX && r.resolvers > 1 && <span className="text-muted">— {t("subs.dns.why.singbox")}</span>}
             </li>
           );
         })}

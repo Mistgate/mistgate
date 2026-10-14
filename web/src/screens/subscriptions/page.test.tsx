@@ -205,9 +205,9 @@ describe("the known-apps picker", () => {
 
   it("offers the apps that exist on the platform: kl!ck on a computer, not on a phone", async () => {
     await mount(settingsOf({ apps: [] }));
-    expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "Happ", "AmneziaVPN", "Hiddify"]); // iOS, the platform it opens on
+    expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "Happ", "AmneziaVPN", "Hiddify", "sing-box"]); // iOS, the platform it opens on
     await choose("Platform", "macOS");
-    expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "kl!ck", "Happ", "AmneziaVPN", "Clash Verge Rev", "FlClash", "Hiddify"]);
+    expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "kl!ck", "Happ", "AmneziaVPN", "Clash Verge Rev", "FlClash", "Hiddify", "sing-box"]);
   });
 
   it("an AmneziaVPN pick is the key kind and has no add link; a change of platform takes the pick back to a blank card", async () => {
@@ -243,7 +243,16 @@ describe("the known-apps catalog", () => {
       }
     }
     expect(knownApps.map((k) => k.id)).not.toEqual(expect.arrayContaining(["streisand"]));
-    expect(knownApps.some((k) => /^(streisand|sub|sing-box):/.test(k.addLinkTemplate))).toBe(false);
+    expect(knownApps.some((k) => /^(streisand|sub):/.test(k.addLinkTemplate))).toBe(false);
+  });
+
+  it("has the official sing-box apps with their remote-profile import (sing-box.sagernet.org/clients/)", () => {
+    const sb = knownApps.find((k) => k.id === "sing-box")!;
+    expect(sb.addLinkTemplate).toBe("sing-box://import-remote-profile?url={url_enc}#{name_enc}");
+    expect(Object.keys(sb.downloads).map(Number).sort()).toEqual([Platform.IOS, Platform.ANDROID, Platform.MACOS].sort());
+    expect(appOf("sing-box", Platform.ANDROID)).toMatchObject({ kind: App.HAPP, name: "sing-box", downloadUrl: "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa" });
+    expect(appOf("sing-box", Platform.MACOS)?.downloadUrl).toBe("https://github.com/SagerNet/sing-box/releases/latest"); // SFM: the App Store build is iOS and tvOS only
+    expect(appOf("sing-box", Platform.WINDOWS)).toBeNull();
   });
 
   it("kl!ck is on Windows and macOS only; the defaults' Happ and AmneziaVPN links are the catalog's", () => {

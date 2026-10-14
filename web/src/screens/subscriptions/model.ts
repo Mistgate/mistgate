@@ -34,7 +34,13 @@ export const formatDescKey: Partial<Record<SubFormat, Key>> = {
   [SubFormat.SINGBOX_JSON]: "subs.fmt.singbox.desc",
 };
 /** The formats a rule can hand out, in the order the pickers list them. */
-export const ruleFormats = [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.USER_PAGE, SubFormat.DECOY] as const;
+export const ruleFormats = [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON, SubFormat.USER_PAGE, SubFormat.DECOY] as const;
+
+/** The rule a User-Agent lands on, as the panel picks it (internal/panel/subs/format.go Choose): the first one whose text it contains, case aside; -1 for none. */
+export const ruleFor = (rules: readonly Rule[], ua: string): number => rules.findIndex((r) => r.uaContains !== "" && ua.toLowerCase().includes(r.uaContains.toLowerCase()));
+
+/** What the official sing-box apps send as their User-Agent (sing-box-for-android HTTPClient.kt, sing-box-for-apple HTTPClient.swift). */
+export const singboxAgents = ["SFA (sing-box 1.14.3; language en_US)", "SFI (sing-box 1.14.3; language en_US)", "SFM (sing-box 1.14.3; language en_US)"] as const;
 
 export const platformKey: Partial<Record<Platform, Key>> = {
   [Platform.IOS]: "subs.platform.ios",
@@ -148,18 +154,21 @@ type ServerLike = { address: string; kind?: DnsServerKind; providerVariant?: str
 
 const hasTransport = (v: Variant, t: DnsTransport) => (t === DnsTransport.PLAIN ? v.plain : t === DnsTransport.DOT ? v.dotHost !== "" : v.dohUrl !== "");
 
-/** What one app gets out of a preset's servers: the transport of the first server it can carry, null when it carries none. */
-export type AppResult = { client: DnsClient; transport: DnsTransport | null };
+/**
+ * What one app gets out of a preset's servers: the transport of the first server it can carry (null when it carries none)
+ * and about how many resolvers it is handed (a catalog variant in plain DNS is its IPv4 addresses; no IPv6, the link apps
+ * take IPv4 only). sing-box keeps only the first of them.
+ */
+export type AppResult = { client: DnsClient; transport: DnsTransport | null; resolvers: number };
 export function appResults(servers: readonly ServerLike[], preferred: DnsTransport, support: readonly ClientSupport[], catalog: Catalog): AppResult[] {
   return support.map(({ client, transports }) => {
-    for (const s of servers) {
-      if (s.providerVariant) {
-        const v = catalog.get(s.providerVariant)?.variant;
-        const t = v && transportOrder(preferred).find((x) => transports.includes(x) && hasTransport(v, x));
-        if (t !== undefined) return { client, transport: t };
-      } else if (s.kind !== undefined && transports.includes(kindTransport[s.kind])) return { client, transport: kindTransport[s.kind] };
-    }
-    return { client, transport: null };
+    const got = servers.flatMap((s) => {
+      if (!s.providerVariant) return s.kind !== undefined && transports.includes(kindTransport[s.kind]) ? [{ t: kindTransport[s.kind], n: 1 }] : [];
+      const v = catalog.get(s.providerVariant)?.variant;
+      const t = v && transportOrder(preferred).find((x) => transports.includes(x) && hasTransport(v, x));
+      return v && t !== undefined ? [{ t, n: t === DnsTransport.PLAIN ? Math.max(1, v.ipv4.length) : 1 }] : [];
+    });
+    return { client, transport: got[0]?.t ?? null, resolvers: got.reduce((n, g) => n + g.n, 0) };
   });
 }
 

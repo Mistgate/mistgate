@@ -6,8 +6,7 @@ import type { PlatformApp } from "./model";
  * Apps the admin's "Add app" can fill in with one choice: the name, the kind, the download link of the chosen platform
  * and the "add" link template. Only apps whose add link is confirmed by the app's own docs or source (the client-apps page
  * of the docs says where); the defaults of a fresh install (subsettings.Defaults) carry the same data. Every field stays editable.
- * Left out on purpose: Streisand and Shadowrocket (the scheme is not confirmed), sing-box (it needs a JSON profile the panel
- * does not serve).
+ * Left out on purpose: Streisand and Shadowrocket (the scheme is not confirmed).
  */
 export type KnownApp = { id: string; name: string; kind: App; addLinkTemplate: string; downloads: Partial<Record<Platform, string>> };
 
@@ -56,6 +55,19 @@ export const knownApps: readonly KnownApp[] = [
     },
   },
   { id: "v2rayng", name: "v2rayNG", kind: App.HAPP, addLinkTemplate: "v2rayng://install-sub?url={url_enc}", downloads: everywhere(gh("2dust/v2rayNG"), ANDROID) },
+  // SFA, SFI and SFM, as sing-box.sagernet.org/clients/ lists them: the App Store build is iOS and tvOS only, the Mac one is
+  // the standalone SFM from the releases. The add link is the remote-profile import of /clients/general/.
+  {
+    id: "sing-box",
+    name: "sing-box",
+    kind: App.HAPP,
+    addLinkTemplate: "sing-box://import-remote-profile?url={url_enc}#{name_enc}",
+    downloads: {
+      [IOS]: "https://apps.apple.com/app/sing-box-mt/id6785326793",
+      [ANDROID]: "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa",
+      [MACOS]: gh("SagerNet/sing-box"),
+    },
+  },
 ];
 
 /** The known apps that exist on a platform, in catalog order. */

@@ -4,7 +4,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, formatDescKey, formatKey, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -272,6 +272,32 @@ describe("appResults", () => {
   });
 });
 
+describe("appResults for the JSON formats", () => {
+  const { PLAIN, DOT, DOH } = DnsTransport;
+  // as ListDnsPresets sends them (internal/panel/dns transport.go Clients)
+  const all: ClientSupport[] = [
+    support[0]!,
+    support[1]!,
+    { client: DnsClient.XRAY, transports: [DOH, PLAIN], ipv6: false },
+    { client: DnsClient.SINGBOX, transports: [DOH, DOT, PLAIN], ipv6: false },
+    support[2]!,
+  ];
+  const two = variantServer("cloudflare/family");
+  const pairCatalog = catalogOf([{ id: "cloudflare", name: "Cloudflare", variants: [variant("cloudflare/family", { ipv4: ["1.1.1.3", "1.0.0.3"] })] }]);
+  const singbox = (servers: Parameters<typeof appResults>[0], pref: DnsTransport, cat = catalog) => appResults(servers, pref, all, cat).find((r) => r.client === DnsClient.SINGBOX)!;
+  it("Xray JSON has no DoT and steps down to plain; sing-box carries DoT", () => {
+    expect(appResults([variantServer("cloudflare/standard")], DOT, all, catalog).map((r) => r.transport)).toEqual([PLAIN, DOT, PLAIN, DOT, PLAIN]);
+    expect(appResults([{ kind: DnsServerKind.DOT, address: "dns.example.com", providerVariant: "" }], DOH, all, catalog).map((r) => r.transport)).toEqual([null, DOT, null, DOT, null]);
+  });
+  it("counts the resolvers an app is handed, so the editor can say sing-box keeps only the first", () => {
+    expect(singbox([two], PLAIN, pairCatalog).resolvers).toBe(2); // a variant's two plain addresses
+    expect(singbox([two], DOH, pairCatalog).resolvers).toBe(1); // one DoH URL
+    expect(singbox([variantServer("cloudflare/standard"), variantServer("mullvad/adblock")], DOH).resolvers).toBe(2);
+    expect(singbox([variantServer("cloudflare/standard"), { kind: DnsServerKind.PLAIN, address: "9.9.9.9", providerVariant: "" }], DOH).resolvers).toBe(2);
+    expect(singbox([], DOH)).toMatchObject({ transport: null, resolvers: 0 });
+  });
+});
+
 describe("the subtitle and the look of a catalog preset", () => {
   const direct = (s: string) => `${s} direct`;
   const name = (t: DnsTransport) => (t === DnsTransport.DOH ? "DoH" : "DoT");
@@ -301,5 +327,14 @@ describe("format labels", () => {
     }
     expect(en[formatKey[SubFormat.SINGBOX_JSON]!]).toBe("sing-box JSON");
     expect(formatKey[SubFormat.XRAY_JSON]).not.toBe(formatKey[SubFormat.BASE64_URIS]);
+  });
+
+  it("offer both JSON formats to a rule, and every new line of theirs is written in all three languages", () => {
+    expect(ruleFormats).toEqual([SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON, SubFormat.USER_PAGE, SubFormat.DECOY]);
+    const keys = ["subs.fmt.who.singbox", "subs.fmt.xray.out", "subs.fmt.singbox.out", "subs.clientSingbox", "subs.dns.app.xray", "subs.dns.app.singbox", "subs.dns.why.xray", "subs.dns.why.singbox"] as const;
+    for (const k of keys) for (const dict of [en, ru, zh]) expect(dict[k].trim(), k).not.toBe("");
+    expect(ru["subs.fmt.who.singbox"].split("|")).toHaveLength(3); // one, few, many
+    expect(en["subs.fmt.who.singbox"].split("|")).toHaveLength(2);
+    for (const k of keys) expect(zh[k], k).not.toMatch(/您|["“”]/); // the glossary: 你 or nothing, quotes are 「」
   });
 });

@@ -7,15 +7,18 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf16"
 
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -425,5 +428,57 @@ func TestChooseFormat(t *testing.T) {
 	}
 	if rule, format, _ := Choose(&adminv1.SubscriptionSettings{}, chrome); rule != -1 || format != adminv1.SubFormat_SUB_FORMAT_USER_PAGE {
 		t.Errorf("no rules: %d %v", rule, format)
+	}
+}
+
+// TestChooseMatchesTheAdmin: the admin's "Apps & formats" and its User-Agent examples (subs-truth.test.tsx) read the same
+// table, so they pick what Choose picks: the default rules, then an owner's v2rayng rule.
+func TestChooseMatchesTheAdmin(t *testing.T) {
+	var table struct {
+		Rules []struct {
+			UAContains string `json:"ua_contains"`
+			Format     string `json:"format"`
+		} `json:"rules"`
+		Cases []struct {
+			UA     string `json:"ua"`
+			Rule   int    `json:"rule"`
+			Format string `json:"format"`
+		} `json:"cases"`
+	}
+	b, err := os.ReadFile("testdata/choose_admin.json")
+	if err == nil {
+		err = json.Unmarshal(b, &table)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	format := func(name string) adminv1.SubFormat {
+		v, ok := adminv1.SubFormat_value["SUB_FORMAT_"+name]
+		if !ok {
+			t.Fatalf("no format %q", name)
+		}
+		return adminv1.SubFormat(v)
+	}
+	set := &adminv1.SubscriptionSettings{}
+	for _, r := range table.Rules {
+		set.Rules = append(set.Rules, &adminv1.ServeRule{UaContains: r.UAContains, Format: format(r.Format)})
+	}
+	def := subsettings.Defaults().GetRules()
+	if len(set.Rules) != len(def)+1 {
+		t.Fatalf("the table has %d rules, want the %d defaults and one more", len(set.Rules), len(def))
+	}
+	for i, r := range def {
+		if !proto.Equal(r, set.Rules[i]) {
+			t.Errorf("rule %d = %v, the default is %v", i, set.Rules[i], r)
+		}
+	}
+	for _, c := range table.Cases {
+		if rule, f, _ := Choose(set, c.UA); rule != c.Rule || f != format(c.Format) {
+			t.Errorf("Choose(%q) = %d %v, the admin expects %d %s", c.UA, rule, f, c.Rule, c.Format)
+		}
+	}
+	// without the owner's rule no default hands out Xray JSON: v2rayNG keeps the link list
+	if rule, f, _ := Choose(&adminv1.SubscriptionSettings{Rules: def}, "v2rayNG/1.10.20"); rule != -1 || f != adminv1.SubFormat_SUB_FORMAT_BASE64_URIS {
+		t.Errorf("v2rayNG on the defaults = %d %v", rule, f)
 	}
 }

@@ -1,23 +1,32 @@
 import { useQuery } from "@tanstack/react-query";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { Avatar, Card, Chip, SectionLabel } from "@/components/ui/bits";
+import { Icon } from "@/components/ui/icons";
 import { protocolsQuery } from "@/screens/users/rpc";
-import { useTx, type Tx } from "@/screens/users/t";
+import { useTx, type Key, type Tx } from "@/screens/users/t";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { formatDescKey, formatKey, ruleFormats, type Rule } from "./model";
+import { formatDescKey, formatKey, ruleFor, ruleFormats, singboxAgents, type Rule } from "./model";
 import { clientsQuery, settingsQuery } from "./queries";
 import { Lead } from "./ui";
 
 /**
- * "Who gets it" of a format the rules hand out (Mihomo YAML, the fake 404): the rules that pick it, by their text, or
- * nobody while no rule does. The link list and the page have their own sentences (every other app, every browser).
+ * "Who gets it" of a format the rules hand out (Mihomo YAML, Xray JSON, sing-box JSON, the fake 404): the rules that pick
+ * it, by their text, or nobody while no rule does. The official sing-box apps are named only while the rules really hand
+ * every one of them sing-box JSON (an earlier rule or a narrower text would take some away). The link list and the page
+ * have their own sentences (every other app, every browser).
  */
 export function whoByRules(t: Tx, f: SubFormat, rules: readonly Rule[]) {
   const texts = rules.filter((r) => r.format === f).map((r) => (t.lang === "ru" ? `«${r.uaContains}»` : t.lang === "zh" ? `「${r.uaContains}」` : `“${r.uaContains}”`));
   if (texts.length === 0) return t("subs.fmt.who.decoy");
   const list = new Intl.ListFormat(t.locale, { type: "conjunction" }).format(texts);
-  return t.n(f === SubFormat.MIHOMO_YAML ? "subs.fmt.who.mihomo" : "subs.fmt.who.rules", texts.length, { rules: list });
+  const official = f === SubFormat.SINGBOX_JSON && singboxAgents.every((ua) => rules[ruleFor(rules, ua)]?.format === f);
+  return t.n(f === SubFormat.MIHOMO_YAML ? "subs.fmt.who.mihomo" : official ? "subs.fmt.who.singbox" : "subs.fmt.who.rules", texts.length, { rules: list });
 }
+
+// What a JSON format leaves out of a person's servers (the panel renders nothing for them there), one line per card.
+const leftOut: Partial<Record<SubFormat, Key>> = { [SubFormat.XRAY_JSON]: "subs.fmt.xray.out", [SubFormat.SINGBOX_JSON]: "subs.fmt.singbox.out" };
+// What an app carries, where the protocol chips alone would promise too much.
+const clientNote: Record<string, Key> = { singbox: "subs.clientSingbox" };
 
 /** "Apps & formats": which apps we work with and what they read, then what the link can hand out. Read-only; the choice lives in "Who gets what". */
 export function FormatsTab({ go }: { go: (tab: string) => void }) {
@@ -56,6 +65,7 @@ export function FormatsTab({ go }: { go: (tab: string) => void }) {
                     <Chip key={p}>{protoName(p)}</Chip>
                   ))}
                 </span>
+                {clientNote[c.id] && <p className="text-xs leading-snug text-muted">{t(clientNote[c.id]!)}</p>}
                 <div className="flex flex-col gap-1.5 border-t border-line pt-3">
                   <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.clientFormats")}</span>
                   {c.formats.length === 0 ? (
@@ -105,6 +115,12 @@ export function FormatsTab({ go }: { go: (tab: string) => void }) {
                   <b className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.01em]">{fmtName(f)}</b>
                 </div>
                 <p className="text-xs leading-normal text-muted">{t(formatDescKey[f]!)}</p>
+                {leftOut[f] && (
+                  <p className="flex items-start gap-1.5 text-xs leading-normal text-muted">
+                    <Icon name="x" size={12} strokeWidth={3} className="mt-[3px] flex-none text-faint" />
+                    <span className="min-w-0">{t(leftOut[f])}</span>
+                  </p>
+                )}
                 <div className="mt-auto flex flex-col gap-1 border-t border-line pt-3">
                   <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.fmt.who")}</span>
                   <span className="text-[13px] leading-snug">{who}</span>

@@ -1,0 +1,19 @@
+{
+  "note": "Read by TestChooseMatchesTheAdmin and by web/src/screens/subscriptions/subs-truth.test.tsx: the admin picks what Choose picks. The rules are subsettings.Defaults() plus an owner's v2rayng rule; no browser User-Agents (the admin only matches rules).",
+  "rules": [
+    { "ua_contains": "mihomo", "format": "MIHOMO_YAML" },
+    { "ua_contains": "clash", "format": "MIHOMO_YAML" },
+    { "ua_contains": "sing-box", "format": "SINGBOX_JSON" },
+    { "ua_contains": "v2rayng", "format": "XRAY_JSON" }
+  ],
+  "cases": [
+    { "ua": "SFA (sing-box 1.14.3; language en_US)", "rule": 2, "format": "SINGBOX_JSON" },
+    { "ua": "SFI (sing-box 1.14.3; language ru_RU)", "rule": 2, "format": "SINGBOX_JSON" },
+    { "ua": "SFM (sing-box 1.12.25; language zh_CN)", "rule": 2, "format": "SINGBOX_JSON" },
+    { "ua": "v2rayNG/1.10.20", "rule": 3, "format": "XRAY_JSON" },
+    { "ua": "HiddifyNext/2.5.7 (android) like ClashMeta v2ray sing-box", "rule": 1, "format": "MIHOMO_YAML" },
+    { "ua": "mihomo/1.18.9", "rule": 0, "format": "MIHOMO_YAML" },
+    { "ua": "Happ/3.2.1 (iPhone; iOS 18.0)", "rule": -1, "format": "BASE64_URIS" },
+    { "ua": "AmneziaVPN/4.8.2 Android", "rule": -1, "format": "BASE64_URIS" }
+  ]
+}

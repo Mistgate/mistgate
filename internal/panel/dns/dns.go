@@ -460,6 +460,10 @@ func clientProto(c Client) adminv1.DnsClient {
 		return adminv1.DnsClient_DNS_CLIENT_MIHOMO
 	case ClientAmneziaWG:
 		return adminv1.DnsClient_DNS_CLIENT_AMNEZIAWG
+	case ClientXray:
+		return adminv1.DnsClient_DNS_CLIENT_XRAY
+	case ClientSingbox:
+		return adminv1.DnsClient_DNS_CLIENT_SINGBOX
 	}
 	return adminv1.DnsClient_DNS_CLIENT_UNSPECIFIED
 }

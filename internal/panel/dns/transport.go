@@ -25,13 +25,13 @@ const (
 	ClientMihomo    Client = "mihomo" // the Mihomo core and apps built on it
 	ClientAmneziaWG Client = "amneziawg"
 	// ClientXray is an Xray JSON config (Happ, v2rayNG and the like read it). ClientSingbox is a sing-box profile.
-	// Neither is in Clients yet: the editor and the API do not know them (see XrayDNS, SingboxDNS).
+	// See XrayDNS and SingboxDNS for what each takes of a preset.
 	ClientXray    Client = "xray"
 	ClientSingbox Client = "singbox"
 )
 
-// Clients lists the clients in display order.
-var Clients = []Client{ClientHapp, ClientMihomo, ClientAmneziaWG}
+// Clients lists the clients in display order (the DNS editor's "what each app gets"): the apps on the link, then the key.
+var Clients = []Client{ClientHapp, ClientMihomo, ClientXray, ClientSingbox, ClientAmneziaWG}
 
 // chain is the fallback order of transports.
 var chain = []Kind{KindDoH, KindDoT, KindPlain}

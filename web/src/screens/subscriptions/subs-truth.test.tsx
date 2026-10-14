@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -14,11 +15,18 @@ import { fill, pickForm } from "@/i18n";
 import { DnsSelect } from "@/screens/users/dns-select";
 import type { Tx } from "@/screens/users/t";
 import { FormatsTab, whoByRules } from "./formats";
-import type { Rule, Settings } from "./model";
+import { ruleFor, type Rule, type Settings } from "./model";
 import { RulesTab } from "./rules";
 
 // "Apps & formats" and "Who gets what" tell the same story; a removed rule can be put back; every preset select
 // says when a change reaches the apps.
+
+// What the panel's subs.Choose picks for the example User-Agents, with the default rules and an owner's v2rayng rule: the
+// same file is checked against Choose by internal/panel/subs TestChooseMatchesTheAdmin (vitest runs in web/).
+type Table = { rules: { ua_contains: string; format: keyof typeof SubFormat }[]; cases: { ua: string; rule: number; format: keyof typeof SubFormat }[] };
+const table = JSON.parse(readFileSync(`${process.cwd()}/../internal/panel/subs/testdata/choose_admin.json`, "utf8")) as Table;
+const tableRules = table.rules.map((r) => ({ uaContains: r.ua_contains, format: SubFormat[r.format] }) as Rule);
+const defaultRules = tableRules.slice(0, 3); // subsettings.Defaults()
 
 let settings: Settings;
 const updateSubscriptionSettings = vi.fn();
@@ -29,11 +37,16 @@ vi.mock("@/lib/api", async (orig) => ({
     updateSubscriptionSettings: (...a: unknown[]) => updateSubscriptionSettings(...a),
     listClients: async () => ({
       clients: [
-        { id: "happ", name: "Happ", protocols: [], formats: [SubFormat.BASE64_URIS] },
+        // as ListClients answers: Happ can read Xray JSON, although no default rule hands it out
+        { id: "happ", name: "Happ", protocols: [], formats: [SubFormat.BASE64_URIS, SubFormat.XRAY_JSON] },
+        { id: "singbox", name: "sing-box", protocols: ["hysteria2", "vless"], formats: [SubFormat.SINGBOX_JSON] },
         { id: "amnezia", name: "AmneziaVPN", protocols: [], formats: [] },
       ],
     }),
-    testUserAgent: async () => ({ ruleIndex: -1, format: SubFormat.BASE64_URIS, browser: false }),
+    testUserAgent: async ({ userAgent }: { userAgent: string }) => {
+      const c = table.cases.find((x) => x.ua === userAgent);
+      return { ruleIndex: c?.rule ?? -1, format: c ? SubFormat[c.format] : SubFormat.BASE64_URIS, browser: false };
+    },
   },
   profiles: { listProtocols: async () => ({ protocols: [] }) },
   groups: { listGroups: async () => ({ groups: [] }) },
@@ -56,6 +69,11 @@ afterEach(() => {
 });
 
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+/** Base UI opens a Select on the press. */
+const pressOn = (el: Element) =>
+  act(async () => {
+    for (const ev of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(ev, { bubbles: true, button: 0 }));
+  });
 const text = () => document.body.textContent ?? "";
 const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -102,6 +120,61 @@ describe("who gets a format", () => {
     expect(text()).toContain(en["subs.clientNoSub"]);
     expect(text()).toContain(en["subs.fmt.who.decoy"]); // the fake 404: no rule picks it
     expect(text()).not.toMatch(/\bSoon\b/);
+  });
+});
+
+describe("the JSON formats", () => {
+  const card = (title: string) => [...document.querySelectorAll("b")].find((b) => b.textContent === title)!.parentElement!.parentElement!;
+
+  it("are picked for the example User-Agents as the panel's subs.Choose picks them", () => {
+    for (const c of table.cases) {
+      const i = ruleFor(tableRules, c.ua);
+      expect([i, i < 0 ? SubFormat.BASE64_URIS : tableRules[i]!.format], c.ua).toEqual([c.rule, SubFormat[c.format]]);
+    }
+    expect(ruleFor(defaultRules, "v2rayNG/1.10.20")).toBe(-1); // no default rule hands out Xray JSON
+  });
+
+  it("do not list Happ under Xray JSON while no rule names it; sing-box goes to the official apps by the default rule", async () => {
+    settings = settingsWith(defaultRules);
+    await mount(<FormatsTab go={() => {}} />);
+    expect(card("Xray JSON").textContent).toContain(en["subs.fmt.who.decoy"]);
+    expect(card("Xray JSON").textContent).not.toContain("Happ");
+    expect(card("sing-box JSON").textContent).toContain("The official sing-box apps (SFA, SFI, SFM), by the rule “sing-box”");
+    // what each leaves out, and what the sing-box app carries
+    expect(card("Xray JSON").textContent).toContain(en["subs.fmt.xray.out"]);
+    expect(card("sing-box JSON").textContent).toContain(en["subs.fmt.singbox.out"]);
+    expect(card("sing-box").textContent).toContain(en["subs.clientSingbox"]);
+    expect(card("Happ").textContent).toContain("Xray JSON"); // what Happ can read is not who gets it
+  });
+
+  it("follow the owner's rules: a v2rayng rule, a sing-box rule narrowed to SFA, an earlier rule, a rule removed", async () => {
+    const inRu = (rules: Rule[]) => whoByRules(tx("ru"), SubFormat.SINGBOX_JSON, rules);
+    const narrowed = tableRules.map((r) => (r.uaContains === "sing-box" ? { ...r, uaContains: "SFA" } : r));
+    expect(whoByRules(tx("en"), SubFormat.XRAY_JSON, tableRules)).toBe("Apps that the rule “v2rayng” catches");
+    expect(inRu(defaultRules)).toBe("Официальным приложениям sing-box (SFA, SFI, SFM) — по правилу «sing-box»");
+    expect(whoByRules(tx("zh"), SubFormat.SINGBOX_JSON, defaultRules)).toBe(fill(zh["subs.fmt.who.singbox"], { rules: "「sing-box」" }));
+    expect(inRu(narrowed)).toBe(fill(pickForm(ru["subs.fmt.who.rules"], 1, "ru"), { rules: "«SFA»" })); // SFI and SFM no longer get it
+    expect(inRu([rule("sing", SubFormat.BASE64_URIS), ...defaultRules])).toBe(fill(pickForm(ru["subs.fmt.who.rules"], 1, "ru"), { rules: "«sing-box»" })); // an earlier rule takes them first
+    expect(inRu(defaultRules.slice(0, 2))).toBe(ru["subs.fmt.who.decoy"]);
+    settings = settingsWith(tableRules);
+    await mount(<FormatsTab go={() => {}} />);
+    expect(card("Xray JSON").textContent).toContain("Apps that the rule “v2rayng” catches");
+  });
+
+  it("are offered by a rule's format select, and the examples land on them as the panel decides", async () => {
+    settings = settingsWith(tableRules);
+    await mount(<RulesTab settings={settings} />);
+    await pressOn(document.querySelector("[aria-label='Format of rule 3']")!);
+    for (let i = 0; i < 100 && document.querySelectorAll("[role=option]").length === 0; i++) await settle();
+    expect([...document.querySelectorAll("[role=option]")].map((o) => o.textContent?.trim())).toEqual(["Link list (base64)", "Mihomo YAML", "Xray JSON", "sing-box JSON", "Web page", "Fake 404"]);
+    for (const [chip, want] of [
+      ["sing-box", "Rule 3 matches → sing-box JSON"],
+      ["v2rayNG", "Rule 4 matches → Xray JSON"],
+    ] as const) {
+      await click([...document.querySelectorAll("button")].find((b) => b.textContent === chip));
+      for (let i = 0; i < 40 && !text().includes(want); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 25)))); // the probe is debounced
+      expect(text()).toContain(want);
+    }
   });
 });
 

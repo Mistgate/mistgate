@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useTx, type Tx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
-import { formatKey, move, ruleFormats, type Rule, type Settings } from "./model";
+import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
 import { testAgentQuery, useSaveSettings } from "./queries";
 import { DeviceLimitCard } from "./device-limit";
 import { Lead } from "./ui";
@@ -22,6 +22,8 @@ const samples = [
   ["Happ", "Happ/3.2.1 (iPhone; iOS 18.0)"],
   ["AmneziaVPN", "AmneziaVPN/4.8.2 Android"],
   ["Mihomo", "mihomo/1.18.9"],
+  ["sing-box", singboxAgents[0]],
+  ["v2rayNG", "v2rayNG/1.10.20"],
   ["Safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"],
 ] as const;
 

@@ -203,6 +203,10 @@ const (
 	DnsClient_DNS_CLIENT_MIHOMO DnsClient = 2
 	// AmneziaWG (.conf and the Amnezia vpn:// key).
 	DnsClient_DNS_CLIENT_AMNEZIAWG DnsClient = 3
+	// An Xray JSON subscription (v2rayNG, v2rayN and other Xray-based apps).
+	DnsClient_DNS_CLIENT_XRAY DnsClient = 4
+	// A sing-box profile (the official sing-box apps).
+	DnsClient_DNS_CLIENT_SINGBOX DnsClient = 5
 )
 
 // Enum value maps for DnsClient.
@@ -212,12 +216,16 @@ var (
 		1: "DNS_CLIENT_HAPP",
 		2: "DNS_CLIENT_MIHOMO",
 		3: "DNS_CLIENT_AMNEZIAWG",
+		4: "DNS_CLIENT_XRAY",
+		5: "DNS_CLIENT_SINGBOX",
 	}
 	DnsClient_value = map[string]int32{
 		"DNS_CLIENT_UNSPECIFIED": 0,
 		"DNS_CLIENT_HAPP":        1,
 		"DNS_CLIENT_MIHOMO":      2,
 		"DNS_CLIENT_AMNEZIAWG":   3,
+		"DNS_CLIENT_XRAY":        4,
+		"DNS_CLIENT_SINGBOX":     5,
 	}
 )
 
@@ -1892,12 +1900,14 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x14DNS_CATEGORY_REGULAR\x10\x02\x12\x17\n" +
 	"\x13DNS_CATEGORY_NO_ADS\x10\x03\x12\x17\n" +
 	"\x13DNS_CATEGORY_FAMILY\x10\x04\x12\x19\n" +
-	"\x15DNS_CATEGORY_SECURITY\x10\x05*m\n" +
+	"\x15DNS_CATEGORY_SECURITY\x10\x05*\x9a\x01\n" +
 	"\tDnsClient\x12\x1a\n" +
 	"\x16DNS_CLIENT_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDNS_CLIENT_HAPP\x10\x01\x12\x15\n" +
 	"\x11DNS_CLIENT_MIHOMO\x10\x02\x12\x18\n" +
-	"\x14DNS_CLIENT_AMNEZIAWG\x10\x032\xfa\x06\n" +
+	"\x14DNS_CLIENT_AMNEZIAWG\x10\x03\x12\x13\n" +
+	"\x0fDNS_CLIENT_XRAY\x10\x04\x12\x16\n" +
+	"\x12DNS_CLIENT_SINGBOX\x10\x052\xfa\x06\n" +
 	"\n" +
 	"DnsService\x12e\n" +
 	"\x0eListDnsPresets\x12(.mistgate.admin.v1.ListDnsPresetsRequest\x1a).mistgate.admin.v1.ListDnsPresetsResponse\x12h\n" +
