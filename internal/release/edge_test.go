@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -135,12 +136,17 @@ func writeTree(t *testing.T, root string, files map[string]string) {
 func edgeInputs(t *testing.T) EdgeInputs {
 	t.Helper()
 	dir := t.TempDir()
-	writeTree(t, dir, map[string]string{
-		"worker.js": "export default {};\n", "provision.js": "export default {};\n", "panel.wasm": "\x00asm\x01\x00\x00\x00",
-		"web/index.html": "<html>", "web/assets/a-1.js": "a", "web/assets/b-2.css": "b", "web/.gitkeep": "",
-	})
-	return EdgeInputs{Version: "v0.1.40", WorkerJS: filepath.Join(dir, "worker.js"), ProvisionJS: filepath.Join(dir, "provision.js"),
-		Wasm: filepath.Join(dir, "panel.wasm"), AssetsDir: filepath.Join(dir, "web")}
+	files := map[string]string{"web/index.html": "<html>", "web/assets/a-1.js": "a", "web/assets/b-2.css": "b", "web/.gitkeep": ""}
+	for _, s := range NewEdgeConfig("v0.1.40").Scripts {
+		for _, m := range s.Modules {
+			files["modules/"+m.Name] = "export default {};\n"
+			if strings.HasSuffix(m.Name, ".wasm") {
+				files["modules/"+m.Name] = "\x00asm\x01\x00\x00\x00" + m.Name // a different body per role
+			}
+		}
+	}
+	writeTree(t, dir, files)
+	return EdgeInputs{Version: "v0.1.40", ModulesDir: filepath.Join(dir, "modules"), AssetsDir: filepath.Join(dir, "web")}
 }
 
 func bundleOf(t *testing.T, in EdgeInputs) []byte {
@@ -159,7 +165,7 @@ func TestEdgeBundleIsDeterministic(t *testing.T) {
 	// the same content in another place, with other mtimes and modes
 	b := edgeInputs(t)
 	later := time.Now().Add(-1000 * time.Hour)
-	for _, p := range []string{b.WorkerJS, b.Wasm, filepath.Join(b.AssetsDir, "index.html"), filepath.Join(b.AssetsDir, "assets", "a-1.js")} {
+	for _, p := range []string{filepath.Join(b.ModulesDir, "front.js"), filepath.Join(b.ModulesDir, "admin.wasm"), filepath.Join(b.AssetsDir, "index.html"), filepath.Join(b.AssetsDir, "assets", "a-1.js")} {
 		if err := os.Chtimes(p, later, later); err != nil {
 			t.Fatal(err)
 		}
@@ -210,7 +216,8 @@ func TestEdgeBundleIsDeterministic(t *testing.T) {
 	if !sort.StringsAreSorted(trimmed) {
 		t.Fatalf("entries are not sorted: %v", names)
 	}
-	want := []string{"assets/", "assets/assets/", "assets/assets/a-1.js", "assets/assets/b-2.css", "assets/index.html", "edge.json", "panel.wasm", "provision.js", "worker.js"}
+	want := []string{"admin.js", "admin.wasm", "assets/", "assets/assets/", "assets/assets/a-1.js", "assets/assets/b-2.css", "assets/index.html", "edge.json",
+		"front.js", "jobs.js", "jobs.wasm", "link.js", "link.wasm", "provision.js", "provision.wasm", "public.js", "public.wasm"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("entries %v, want %v (.gitkeep is not part of the assets)", names, want)
 	}
@@ -219,8 +226,15 @@ func TestEdgeBundleIsDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(files["worker.js"]) != "export default {};\n" || string(files["assets/index.html"]) != "<html>" || !bytes.HasPrefix(files["panel.wasm"], []byte("\x00asm")) {
+	if string(files["front.js"]) != "export default {};\n" || string(files["assets/index.html"]) != "<html>" || !bytes.HasPrefix(files["jobs.wasm"], []byte("\x00asm")) {
 		t.Fatalf("contents: %q", files)
+	}
+	parsed, err := ParseEdgeConfig(files["edge.json"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsed.CheckFiles(files); err != nil {
+		t.Fatal(err)
 	}
 	cfg, err := NewEdgeConfig("v0.1.40").Marshal()
 	if err != nil || !bytes.Equal(files["edge.json"], cfg) {
@@ -234,8 +248,9 @@ func TestEdgeBundleRefusals(t *testing.T) {
 	in := edgeInputs(t)
 	for name, mutate := range map[string]func(*EdgeInputs){
 		"no index.html":   func(i *EdgeInputs) { os.Remove(filepath.Join(i.AssetsDir, "index.html")) },
-		"missing worker":  func(i *EdgeInputs) { i.WorkerJS = filepath.Join(filepath.Dir(i.WorkerJS), "nope.js") },
-		"missing wasm":    func(i *EdgeInputs) { i.Wasm = "" },
+		"missing front":   func(i *EdgeInputs) { os.Remove(filepath.Join(i.ModulesDir, "front.js")) },
+		"missing wasm":    func(i *EdgeInputs) { os.Remove(filepath.Join(i.ModulesDir, "public.wasm")) },
+		"no modules dir":  func(i *EdgeInputs) { i.ModulesDir = "" },
 		"a bad version":   func(i *EdgeInputs) { i.Version = "v1 2" },
 		"missing assets":  func(i *EdgeInputs) { i.AssetsDir = filepath.Join(i.AssetsDir, "nope") },
 		"an empty folder": func(i *EdgeInputs) { i.AssetsDir = t.TempDir() },
@@ -301,75 +316,12 @@ func TestReadEdgeBundleBoundsTheUnpackedSize(t *testing.T) {
 	}
 }
 
-// ---- edge.json against the wrangler templates --------------------------------------------------------------------------
+// ---- edge.json against the TypeScript side ----------------------------------------------------------------------------
 
-type tomlDoc map[string][]map[string]any // "" is the top level; [x] and [[x]] append a table named x
-
-// parseTOML reads the subset the wrangler templates use: tables, and key = "string" | true | false | ["a", "b"] lines. Anything
-// else is an error, so a template that grows past this fails the test instead of being half read.
-func parseTOML(t *testing.T, path string) tomlDoc {
-	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	doc := tomlDoc{"": {{}}}
-	cur := doc[""][0]
-	for n, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if strings.HasPrefix(line, "[") {
-			name := strings.Trim(line, "[]")
-			cur = map[string]any{}
-			if strings.HasPrefix(line, "[[") || len(doc[name]) == 0 {
-				doc[name] = append(doc[name], cur)
-			} else {
-				cur = doc[name][0]
-			}
-			continue
-		}
-		key, val, ok := strings.Cut(line, "=")
-		if !ok {
-			t.Fatalf("%s:%d: not key = value: %q", path, n+1, line)
-		}
-		key, val = strings.TrimSpace(key), strings.TrimSpace(val)
-		switch {
-		case strings.HasPrefix(val, `"`) && strings.HasSuffix(val, `"`) && strings.Count(val, `"`) == 2:
-			cur[key] = val[1 : len(val)-1]
-		case val == "true" || val == "false":
-			cur[key] = val == "true"
-		case strings.HasPrefix(val, "[") && strings.HasSuffix(val, "]"):
-			list := []string{}
-			for _, item := range strings.Split(strings.Trim(val, "[]"), ",") {
-				if item = strings.TrimSpace(item); item != "" {
-					if !strings.HasPrefix(item, `"`) || !strings.HasSuffix(item, `"`) {
-						t.Fatalf("%s:%d: array item %q", path, n+1, item)
-					}
-					list = append(list, strings.Trim(item, `"`))
-				}
-			}
-			cur[key] = list
-		default:
-			t.Fatalf("%s:%d: value %q", path, n+1, val)
-		}
-	}
-	return doc
-}
-
-func (d tomlDoc) str(table, key string) string {
-	if len(d[table]) == 0 {
-		return ""
-	}
-	s, _ := d[table][0][key].(string)
-	return s
-}
-
-// interfaceFields lists the members of `export interface <name> {` in env.ts.
+// interfaceFields lists the members of `export interface <name> {` (or `... extends X {`) in env.ts.
 func interfaceFields(t *testing.T, src, name string) []string {
 	t.Helper()
-	m := regexp.MustCompile(`(?s)export interface ` + name + ` \{(.*?)\n\}`).FindStringSubmatch(src)
+	m := regexp.MustCompile(`(?s)export interface ` + name + `(?: extends \w+)? \{(.*?)\n\}`).FindStringSubmatch(src)
 	if m == nil {
 		t.Fatalf("no interface %s in env.ts", name)
 	}
@@ -387,177 +339,6 @@ func sortedCopy(in []string) []string {
 	return out
 }
 
-// edge.json is written by Go (NewEdgeConfig); the templates in edge/worker are what a developer deploys by hand and what the
-// Worker code was written against. They must say the same thing about bindings, classes, migrations, cron, secrets and date.
-func TestEdgeConfigMatchesWranglerTemplates(t *testing.T) {
-	worker := filepath.Join("..", "..", "edge", "worker")
-	cfg := NewEdgeConfig("v0.1.40")
-	templates := map[string]struct {
-		file, entry, envInterface string
-	}{
-		"main":      {"wrangler.example.toml", "src/index.ts", "Env"},
-		"provision": {"wrangler.provision.example.toml", "src/provision-index.ts", "ProvisionEnv"},
-	}
-	docs := map[string]tomlDoc{}
-	roleOfScript := map[string]string{}
-	for role, tpl := range templates {
-		docs[role] = parseTOML(t, filepath.Join(worker, tpl.file))
-		roleOfScript[docs[role].str("", "name")] = role
-	}
-	envRaw, err := os.ReadFile(filepath.Join(worker, "src", "env.ts"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bundleScript, err := os.ReadFile(filepath.Join(worker, "build-bundle.mjs"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.Scripts) != len(templates) {
-		t.Fatalf("%d scripts in edge.json, %d templates", len(cfg.Scripts), len(templates))
-	}
-
-	for _, s := range cfg.Scripts {
-		tpl, ok := templates[s.Role]
-		if !ok {
-			t.Fatalf("script role %q has no template", s.Role)
-		}
-		doc := docs[s.Role]
-		t.Run(s.Role, func(t *testing.T) {
-			if name := doc.str("", "name"); s.DefaultName != name {
-				t.Errorf("default_name %q, template %q", s.DefaultName, name)
-			}
-			if date := doc.str("", "compatibility_date"); cfg.CompatibilityDate != date {
-				t.Errorf("compatibility_date %q, template %q", cfg.CompatibilityDate, date)
-			}
-			if len(cfg.CompatibilityFlags) != 0 || doc[""][0]["compatibility_flags"] != nil {
-				t.Error("compatibility flags: edge.json and the template must both have none")
-			}
-			// the entry module of the template is the one build-bundle.mjs bundles into main_module
-			if !strings.Contains(string(bundleScript), strings.TrimSuffix(s.MainModule, ".js")+`: "`+doc.str("", "main")+`"`) || doc.str("", "main") != tpl.entry {
-				t.Errorf("main_module %s is not built from the template's main %q", s.MainModule, doc.str("", "main"))
-			}
-
-			// modules: the script and the wasm the template's CompiledWasm rule is for
-			wantModules := []EdgeModule{{Name: s.MainModule, Type: "esm"}, {Name: "panel.wasm", Type: "compiled_wasm"}}
-			if !reflect.DeepEqual(s.Modules, wantModules) {
-				t.Errorf("modules %v", s.Modules)
-			}
-			if rules := doc["rules"]; len(rules) != 1 || rules[0]["type"] != "CompiledWasm" || !reflect.DeepEqual(rules[0]["globs"], []string{"**/*.wasm"}) {
-				t.Errorf("rules %v: the wasm is not imported as CompiledWasm", rules)
-			}
-
-			// Durable Objects: no script_name = ours; script_name = the other script's, named by role
-			var own, external []EdgeDO
-			for _, b := range doc["durable_objects.bindings"] {
-				d := EdgeDO{Binding: b["name"].(string), ClassName: b["class_name"].(string)}
-				if sn, ok := b["script_name"].(string); ok {
-					if d.ScriptRole = roleOfScript[sn]; d.ScriptRole == "" || d.ScriptRole == s.Role {
-						t.Errorf("binding %s: script_name %q is not the other script", d.Binding, sn)
-					}
-					external = append(external, d)
-				} else {
-					own = append(own, d)
-				}
-			}
-			if !reflect.DeepEqual(s.DurableObjects, own) {
-				t.Errorf("durable_objects %v, template %v", s.DurableObjects, own)
-			}
-			if !reflect.DeepEqual(s.ExternalObjects, external) {
-				t.Errorf("durable_objects_external %v, template %v", s.ExternalObjects, external)
-			}
-
-			var migrations []EdgeMigrate
-			for _, m := range doc["migrations"] {
-				if len(m) != 2 {
-					t.Fatalf("migration with keys other than tag and new_sqlite_classes: %v", m)
-				}
-				migrations = append(migrations, EdgeMigrate{Tag: m["tag"].(string), NewSqliteClasses: m["new_sqlite_classes"].([]string)})
-			}
-			if !reflect.DeepEqual(s.Migrations, migrations) {
-				t.Errorf("migrations %v, template %v", s.Migrations, migrations)
-			}
-			// every class of the script has a migration that creates it
-			created := map[string]bool{}
-			for _, m := range migrations {
-				for _, c := range m.NewSqliteClasses {
-					created[c] = true
-				}
-			}
-			for _, d := range s.DurableObjects {
-				if !created[d.ClassName] {
-					t.Errorf("class %s has no migration", d.ClassName)
-				}
-			}
-
-			var d1 []EdgeBinding
-			for _, b := range doc["d1_databases"] {
-				d1 = append(d1, EdgeBinding{Binding: b["binding"].(string)})
-			}
-			if !reflect.DeepEqual(s.D1, d1) {
-				t.Errorf("d1 %v, template %v", s.D1, d1)
-			}
-
-			bound := map[string]bool{}
-			for _, b := range d1 {
-				bound[b.Binding] = true
-			}
-			for _, d := range append(append([]EdgeDO{}, own...), external...) {
-				bound[d.Binding] = true
-			}
-			if len(doc["assets"]) == 0 {
-				if s.Assets != nil {
-					t.Errorf("assets %v but the template has none", s.Assets)
-				}
-			} else {
-				a := doc["assets"][0]
-				if s.Assets == nil || s.Assets.Binding != a["binding"] || s.Assets.Directory != "assets" {
-					t.Errorf("assets %v, template %v (the directory is the tarball's assets/)", s.Assets, a)
-				}
-				bound[a["binding"].(string)] = true
-			}
-
-			var cron []string
-			if len(doc["triggers"]) > 0 {
-				cron = doc["triggers"][0]["crons"].([]string)
-			}
-			if !reflect.DeepEqual(s.Cron, cron) {
-				t.Errorf("cron %v, template %v", s.Cron, cron)
-			}
-
-			// secrets and vars: everything in the script's env interface that is not a binding is one or the other, once, and
-			// the template mentions each by name
-			var names []string
-			for _, n := range append(append([]string{}, s.Secrets...), s.Vars...) {
-				names = append(names, n)
-				if !regexp.MustCompile(`\b` + n + `\b`).MatchString(string(readFile(t, filepath.Join(worker, tpl.file)))) {
-					t.Errorf("%s is not mentioned in %s", n, tpl.file)
-				}
-			}
-			var settings []string
-			for _, f := range interfaceFields(t, string(envRaw), tpl.envInterface) {
-				if !bound[f] {
-					settings = append(settings, f)
-				}
-			}
-			if !reflect.DeepEqual(sortedCopy(names), settings) {
-				t.Errorf("secrets+vars %v, but %s has these settings besides its bindings: %v", sortedCopy(names), tpl.envInterface, settings)
-			}
-			// ...and every binding in the interface is declared by the template
-			for _, f := range interfaceFields(t, string(envRaw), tpl.envInterface) {
-				if bound[f] {
-					delete(bound, f)
-				}
-			}
-			if len(bound) != 0 {
-				t.Errorf("bindings in the template but not in %s: %v", tpl.envInterface, bound)
-			}
-		})
-	}
-	if !cfg.Scripts[1].Routes || cfg.Scripts[0].Routes {
-		t.Error("only the main script takes routes")
-	}
-}
-
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -565,4 +346,240 @@ func readFile(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// describe renders everything a script is bound to in one line, so that the table below reads like the bindings table of
+// the design (design/cloudflare-edition) and a difference is one line in the failure.
+func describe(s EdgeScript) string {
+	list := func(items []string) string {
+		if len(items) == 0 {
+			return "-"
+		}
+		return strings.Join(items, ",")
+	}
+	var mods, own, ext, svc, d1 []string
+	for _, m := range s.Modules {
+		mods = append(mods, m.Name+":"+m.Type)
+	}
+	for _, d := range s.DurableObjects {
+		own = append(own, d.Binding+"="+d.ClassName)
+	}
+	for _, d := range s.ExternalObjects {
+		ext = append(ext, d.Binding+"="+d.ScriptRole+"."+d.ClassName)
+	}
+	for _, v := range s.Services {
+		entry := ""
+		if v.Entrypoint != "" {
+			entry = "#" + v.Entrypoint
+		}
+		svc = append(svc, v.Binding+">"+v.ServiceRole+entry)
+	}
+	for _, b := range s.D1 {
+		d1 = append(d1, b.Binding)
+	}
+	assets := "-"
+	if s.Assets != nil {
+		assets = s.Assets.Binding + "=" + s.Assets.Directory + "/"
+	}
+	var migrations []string
+	for _, m := range s.Migrations {
+		migrations = append(migrations, m.Tag+":"+strings.Join(m.NewSqliteClasses, "+"))
+	}
+	return fmt.Sprintf("name=%s modules=%s do=%s ext=%s mig=%s d1=%s svc=%s assets=%s secrets=%s vars=%s cron=%s routes=%t",
+		s.DefaultName, list(mods), list(own), list(ext), list(migrations), list(d1), list(svc), assets, list(s.Secrets), list(s.Vars), list(s.Cron), s.Routes)
+}
+
+// The bindings of every script, as edge/worker/src/{front.ts,roles/*.ts,env.ts} read them (step 3's report, "Bindings each
+// script expects"). The ADMIN_PREFIX and SUB_PREFIX of the admin role are secrets, not vars: they are the secret paths.
+var wantBindings = map[string]string{
+	RoleFront: "name=mistgate-edge modules=front.js:esm do=LIMITER=Limiter,NODELINK=NodeLink ext=- mig=v1:Limiter,v2:NodeLink d1=DB " +
+		"svc=PUBLIC>public,ADMIN>admin,LINK>link,PANEL_LINK>link#PanelLink assets=- secrets=- vars=- cron=- routes=true",
+	RoleLink: "name=mistgate-edge-link modules=link.js:esm,link.wasm:compiled_wasm do=- ext=LIMITER=front.Limiter,NODELINK=front.NodeLink mig=- d1=DB " +
+		"svc=- assets=- secrets=MASTER_KEY vars=- cron=- routes=false",
+	RolePublic: "name=mistgate-edge-public modules=public.js:esm,public.wasm:compiled_wasm do=- ext=LIMITER=front.Limiter,NODELINK=front.NodeLink mig=- d1=DB " +
+		"svc=- assets=ASSETS=assets/ secrets=MASTER_KEY vars=- cron=- routes=false",
+	RoleAdmin: "name=mistgate-edge-admin modules=admin.js:esm,admin.wasm:compiled_wasm do=- " +
+		"ext=LIMITER=front.Limiter,NODELINK=front.NodeLink,PROVISIONER=provision.Provisioner mig=- d1=DB svc=- assets=ASSETS=assets/ " +
+		"secrets=MASTER_KEY,ADMIN_PREFIX,SUB_PREFIX,SETUP_TOKEN_SHA256 vars=PUBLIC_URL,ADMIN_HOST cron=- routes=false",
+	RoleJobs: "name=mistgate-edge-jobs modules=jobs.js:esm,jobs.wasm:compiled_wasm do=- ext=NODELINK=front.NodeLink,PROVISIONER=provision.Provisioner mig=- d1=DB " +
+		"svc=- assets=- secrets=MASTER_KEY vars=- cron=* * * * * routes=false",
+	RoleProvision: "name=mistgate-edge-provision modules=provision.js:esm,provision.wasm:compiled_wasm do=PROVISIONER=Provisioner " +
+		"ext=LIMITER=front.Limiter,NODELINK=front.NodeLink mig=v1:Provisioner d1=DB svc=- assets=- secrets=MASTER_KEY vars=- cron=- routes=false",
+}
+
+func TestEdgeConfigBindings(t *testing.T) {
+	cfg := NewEdgeConfig("v0.1.40")
+	if cfg.Schema != 2 || EdgeSchema != 2 {
+		t.Fatalf("schema %d", cfg.Schema)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, s := range cfg.Scripts {
+		order = append(order, s.Role)
+		want, ok := wantBindings[s.Role]
+		if !ok {
+			t.Fatalf("role %q is not in the bindings table", s.Role)
+		}
+		if got := describe(s); got != want {
+			t.Errorf("%s:\n got %s\nwant %s", s.Role, got, want)
+		}
+	}
+	if want := []string{"link", "provision", "public", "admin", "jobs", "front"}; !reflect.DeepEqual(order, want) {
+		t.Errorf("scripts are in the order %v, want the upload order %v", order, want)
+	}
+	if len(order) != len(wantBindings) {
+		t.Errorf("%d scripts, %d in the table", len(order), len(wantBindings))
+	}
+	if cfg.CompatibilityDate != "2026-10-01" || len(cfg.CompatibilityFlags) != 0 {
+		t.Errorf("compatibility %q %v", cfg.CompatibilityDate, cfg.CompatibilityFlags)
+	}
+	// the cron and the routes are each in one script
+	for _, s := range cfg.Scripts {
+		if (len(s.Cron) > 0) != (s.Role == RoleJobs) || s.Routes != (s.Role == RoleFront) {
+			t.Errorf("%s: cron %v, routes %v", s.Role, s.Cron, s.Routes)
+		}
+	}
+}
+
+// Nothing in edge.json is bound that the TypeScript of the role does not read, and nothing it reads is missing: the names
+// of the bindings, secrets and vars of a script are the fields of its environment interface in env.ts.
+func TestEdgeConfigMatchesTheEnvironmentOfEachRole(t *testing.T) {
+	env := string(readFile(t, filepath.Join("..", "..", "edge", "worker", "src", "env.ts")))
+	interfaces := map[string][]string{
+		RoleFront: {"FrontEnv", "NodeLinkEnv"}, RoleLink: {"LinkEnv"}, RolePublic: {"PublicEnv"},
+		RoleAdmin: {"Env"}, RoleJobs: {"JobsEnv"}, RoleProvision: {"ProvisionEnv"},
+	}
+	for _, s := range NewEdgeConfig("v0.1.40").Scripts {
+		var bound []string
+		for _, b := range s.D1 {
+			bound = append(bound, b.Binding)
+		}
+		for _, d := range append(append([]EdgeDO{}, s.DurableObjects...), s.ExternalObjects...) {
+			bound = append(bound, d.Binding)
+		}
+		for _, v := range s.Services {
+			bound = append(bound, v.Binding)
+		}
+		if s.Assets != nil {
+			bound = append(bound, s.Assets.Binding)
+		}
+		bound = append(append(bound, s.Secrets...), s.Vars...)
+		var fields []string
+		for _, name := range interfaces[s.Role] {
+			fields = append(fields, interfaceFields(t, env, name)...)
+		}
+		if !reflect.DeepEqual(sortedCopy(bound), sortedCopy(fields)) {
+			t.Errorf("%s: edge.json binds %v, but its environment (%v) has %v", s.Role, sortedCopy(bound), interfaces[s.Role], sortedCopy(fields))
+		}
+	}
+}
+
+// A script that binds a role that does not exist, a class nobody owns, or itself, is refused, and so is an order other than
+// the upload order.
+func TestEdgeConfigRefusesBindingsThatLeadNowhere(t *testing.T) {
+	mutations := map[string]func(c *EdgeConfig){
+		"a service in a role that does not exist": func(c *EdgeConfig) { c.Script(RoleFront).Services[0].ServiceRole = "ghost" },
+		"a service on itself":                     func(c *EdgeConfig) { c.Script(RoleFront).Services[0].ServiceRole = RoleFront },
+		"an object in a role that does not exist": func(c *EdgeConfig) { c.Script(RoleAdmin).ExternalObjects[0].ScriptRole = "ghost" },
+		"an object in the script itself":          func(c *EdgeConfig) { c.Script(RoleAdmin).ExternalObjects[0].ScriptRole = RoleAdmin },
+		"a class the role does not own":           func(c *EdgeConfig) { c.Script(RoleAdmin).ExternalObjects[2].ClassName = "Ghost" },
+		"a migration for a class not owned":       func(c *EdgeConfig) { c.Script(RoleFront).Migrations[0].NewSqliteClasses = []string{"Ghost"} },
+		"an owned class without a migration":      func(c *EdgeConfig) { c.Script(RoleProvision).Migrations = nil },
+		"a binding used twice":                    func(c *EdgeConfig) { c.Script(RoleJobs).Secrets = append(c.Script(RoleJobs).Secrets, "DB") },
+		"a missing role":                          func(c *EdgeConfig) { c.Scripts = c.Scripts[:5] },
+		"a repeated role":                         func(c *EdgeConfig) { c.Scripts[1] = c.Scripts[0] },
+		"another order":                           func(c *EdgeConfig) { c.Scripts[0], c.Scripts[5] = c.Scripts[5], c.Scripts[0] },
+		"a module of another role":                func(c *EdgeConfig) { c.Script(RolePublic).Modules[1].Name = "admin.wasm" },
+		"a wasm in front": func(c *EdgeConfig) {
+			c.Script(RoleFront).Modules = append(c.Script(RoleFront).Modules, EdgeModule{Name: "front.wasm", Type: "compiled_wasm"})
+		},
+		"an assets folder elsewhere": func(c *EdgeConfig) { c.Script(RolePublic).Assets.Directory = "static" },
+		"a name of another role":     func(c *EdgeConfig) { c.Script(RoleLink).DefaultName = "mistgate-edge-admin" },
+		"another schema":             func(c *EdgeConfig) { c.Schema = 1 },
+	}
+	for name, mutate := range mutations {
+		cfg := NewEdgeConfig("v0.1.40")
+		// deep copy through JSON, so that a mutation of a shared slice does not reach the next case
+		raw, err := cfg.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg = EdgeConfig{}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		mutate(&cfg)
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestParseEdgeConfig(t *testing.T) {
+	good, err := NewEdgeConfig("v0.1.40").Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ParseEdgeConfig(good)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*cfg, NewEdgeConfig("v0.1.40")) {
+		t.Error("what edge.json says is not what NewEdgeConfig built")
+	}
+	// the single-Worker bundle gets a message that names the reason, not a decode error
+	_, err = ParseEdgeConfig([]byte(`{"schema": 1, "version": "v0.1.40", "scripts": [{"role": "main"}]}`))
+	if !errors.Is(err, ErrEdgeSchema) || !strings.Contains(err.Error(), "single-Worker") {
+		t.Errorf("schema 1: %v", err)
+	}
+	if _, err = ParseEdgeConfig([]byte(`{"schema": 3}`)); !errors.Is(err, ErrEdgeSchema) {
+		t.Errorf("schema 3: %v", err)
+	}
+	for name, bad := range map[string][]byte{
+		"unknown field": bytes.Replace(good, []byte(`"routes"`), []byte(`"extra": 1, "routes"`), 1),
+		"trailing data": append(append([]byte{}, good...), []byte("{}")...),
+		"not json":      []byte("nope"),
+		"no schema":     []byte(`{}`),
+	} {
+		if _, err := ParseEdgeConfig(bad); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestEdgeConfigCheckFiles(t *testing.T) {
+	cfg := NewEdgeConfig("v0.1.40")
+	full := func() map[string][]byte {
+		files := map[string][]byte{EdgeConfigName: {'{'}, "assets/index.html": {'<'}, "assets/x/a.js": {'a'}}
+		for _, s := range cfg.Scripts {
+			for _, m := range s.Modules {
+				files[m.Name] = []byte{1}
+			}
+		}
+		return files
+	}
+	if err := cfg.CheckFiles(full()); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(map[string][]byte){
+		"a missing wasm":  func(f map[string][]byte) { delete(f, "jobs.wasm") },
+		"an empty module": func(f map[string][]byte) { f["front.js"] = nil },
+		"an extra module": func(f map[string][]byte) { f["worker.js"] = []byte{1} },
+		"a front wasm":    func(f map[string][]byte) { f["front.wasm"] = []byte{1} },
+		"no SPA":          func(f map[string][]byte) { delete(f, "assets/index.html") },
+	} {
+		f := full()
+		mutate(f)
+		if err := cfg.CheckFiles(f); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestEdgeScriptNames(t *testing.T) {
+	if EdgeScriptName("acme", RoleFront) != "acme" || EdgeScriptName("acme", RoleLink) != "acme-link" {
+		t.Error("script names")
+	}
 }

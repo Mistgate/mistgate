@@ -72,8 +72,7 @@ func goBuildEdge(src, version string, built int64, key, out string) error {
 	}
 	defer os.Remove(f.Name())
 	err = release.WriteEdgeBundle(f, release.EdgeInputs{
-		Version: version, WorkerJS: filepath.Join(scripts, "worker.js"), ProvisionJS: filepath.Join(scripts, "provision.js"),
-		Wasm: wasm, AssetsDir: filepath.Join(src, "web", "dist"),
+		Version: version, ModulesDir: scripts, AssetsDir: filepath.Join(src, "web", "dist"),
 	})
 	if cerr := f.Close(); err == nil {
 		err = cerr
