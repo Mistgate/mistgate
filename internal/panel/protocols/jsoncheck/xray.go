@@ -138,3 +138,42 @@ func XraySecurity(t testing.TB, s *internet.StreamConfig) proto.Message {
 	}
 	return msg
 }
+
+// XrayBuildArray checks a whole Xray JSON subscription: a non-empty array in which every element is a complete config
+// the core builds. `remarks` is the app's own key (the core does not know it), so it is dropped; every other key of the
+// config, and every key of the outbounds, has to be one the core knows. It returns the elements.
+func XrayBuildArray(t testing.TB, doc []byte) []map[string]json.RawMessage {
+	t.Helper()
+	var elems []map[string]json.RawMessage
+	if err := json.Unmarshal(doc, &elems); err != nil || len(elems) == 0 {
+		t.Fatalf("not a non-empty array of configs: %v\n%s", err, doc)
+	}
+	for i, e := range elems {
+		if _, ok := e["remarks"]; !ok {
+			t.Errorf("config %d has no remarks", i)
+		}
+		for _, key := range []string{"inbounds", "outbounds", "routing"} { // v2rayNG takes a config only with all three
+			if _, ok := e[key]; !ok {
+				t.Errorf("config %d has no %s", i, key)
+			}
+		}
+		rest := make(map[string]json.RawMessage, len(e))
+		for k, v := range e {
+			if k != "remarks" {
+				rest[k] = v
+			}
+		}
+		raw, err := json.Marshal(rest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var strict conf.Config
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&strict); err != nil {
+			t.Fatalf("config %d has a key the core does not know: %v\n%s", i, err, raw)
+		}
+		XrayBuild(t, raw)
+	}
+	return elems
+}

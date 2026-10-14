@@ -269,7 +269,18 @@ func TestSubscriptionPreviewHasNoLink(t *testing.T) {
 		t.Errorf("preview: %+v", v)
 	}
 	v = decode[SubscriptionPreviewV](t, mustOK(t, s, "subscription_preview", map[string]any{"user_id": "usr_alice", "client": "happ"}))
-	if v.Client == nil || v.Client.ID != "happ" || v.Serve != nil {
+	if v.Client == nil || v.Client.ID != "happ" || v.Serve != nil || strings.Join(v.Client.Formats, ",") != "base64_uris,xray_json" {
 		t.Errorf("known client: %+v", v)
+	}
+	// The JSON formats show under their names, for a known client and for a User-Agent.
+	v = decode[SubscriptionPreviewV](t, mustOK(t, s, "subscription_preview", map[string]any{"user_id": "usr_alice", "client": "singbox"}))
+	if v.Client == nil || strings.Join(v.Client.Formats, ",") != "singbox_json" {
+		t.Errorf("sing-box client: %+v", v)
+	}
+	for ua, want := range map[string]string{"SFA (sing-box 1.14.3; language en_US)": "singbox_json", "v2rayNG/1.10.20": "xray_json"} {
+		v = decode[SubscriptionPreviewV](t, mustOK(t, s, "subscription_preview", map[string]any{"user_id": "usr_alice", "client": ua}))
+		if v.Serve == nil || v.Serve.Format != want {
+			t.Errorf("%s: %+v", ua, v.Serve)
+		}
 	}
 }

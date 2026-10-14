@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -424,10 +425,12 @@ func TestBuildTLSInboundUsesOriginCertificateAndCDNClientSettings(t *testing.T) 
 	}
 }
 
+// The Xray JSON array rides on the Happ toggle (the apps of the link), the sing-box profile on the sing-box client, which has no toggle of its own.
 func TestClients(t *testing.T) {
 	clients := New().Clients()
-	if len(clients) != 2 || clients[0].Client != plugin.ClientHapp || clients[0].Formats[0] != plugin.FormatURIList ||
-		clients[1].Client != plugin.ClientMihomo || clients[1].Formats[0] != plugin.FormatMihomo {
+	if len(clients) != 3 || clients[0].Client != plugin.ClientHapp || !slices.Equal(clients[0].Formats, []plugin.ClientFormat{plugin.FormatURIList, plugin.FormatXrayJSON}) ||
+		clients[1].Client != plugin.ClientMihomo || clients[1].Formats[0] != plugin.FormatMihomo ||
+		clients[2].Client != plugin.ClientSingbox || !slices.Equal(clients[2].Formats, []plugin.ClientFormat{plugin.FormatSingbox}) {
 		t.Fatalf("clients = %+v", clients)
 	}
 	if !protocols.AllowedForApps(New(), plugin.ClientHapp) || !protocols.AllowedForApps(New(), plugin.ClientMihomo) || protocols.AllowedForApps(New(), plugin.ClientAmnezia) {

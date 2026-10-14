@@ -148,6 +148,10 @@ const (
 	SubFormat_SUB_FORMAT_DECOY SubFormat = 3
 	// Mihomo / Clash Meta YAML with every protocol the user has.
 	SubFormat_SUB_FORMAT_MIHOMO_YAML SubFormat = 4
+	// An array of Xray configs, one per server, each with its remarks (v2rayNG, Happ and the other Xray-based apps).
+	SubFormat_SUB_FORMAT_XRAY_JSON SubFormat = 5
+	// One sing-box profile: a TUN inbound, a selector over the servers, the DNS of the user's preset (sing-box 1.12 and later).
+	SubFormat_SUB_FORMAT_SINGBOX_JSON SubFormat = 6
 )
 
 // Enum value maps for SubFormat.
@@ -158,13 +162,17 @@ var (
 		2: "SUB_FORMAT_USER_PAGE",
 		3: "SUB_FORMAT_DECOY",
 		4: "SUB_FORMAT_MIHOMO_YAML",
+		5: "SUB_FORMAT_XRAY_JSON",
+		6: "SUB_FORMAT_SINGBOX_JSON",
 	}
 	SubFormat_value = map[string]int32{
-		"SUB_FORMAT_UNSPECIFIED": 0,
-		"SUB_FORMAT_BASE64_URIS": 1,
-		"SUB_FORMAT_USER_PAGE":   2,
-		"SUB_FORMAT_DECOY":       3,
-		"SUB_FORMAT_MIHOMO_YAML": 4,
+		"SUB_FORMAT_UNSPECIFIED":  0,
+		"SUB_FORMAT_BASE64_URIS":  1,
+		"SUB_FORMAT_USER_PAGE":    2,
+		"SUB_FORMAT_DECOY":        3,
+		"SUB_FORMAT_MIHOMO_YAML":  4,
+		"SUB_FORMAT_XRAY_JSON":    5,
+		"SUB_FORMAT_SINGBOX_JSON": 6,
 	}
 )
 
@@ -1200,13 +1208,15 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x10PLATFORM_ANDROID\x10\x02\x12\x14\n" +
 	"\x10PLATFORM_WINDOWS\x10\x03\x12\x12\n" +
 	"\x0ePLATFORM_MACOS\x10\x04\x12\x12\n" +
-	"\x0ePLATFORM_LINUX\x10\x05*\x8f\x01\n" +
+	"\x0ePLATFORM_LINUX\x10\x05*\xc6\x01\n" +
 	"\tSubFormat\x12\x1a\n" +
 	"\x16SUB_FORMAT_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16SUB_FORMAT_BASE64_URIS\x10\x01\x12\x18\n" +
 	"\x14SUB_FORMAT_USER_PAGE\x10\x02\x12\x14\n" +
 	"\x10SUB_FORMAT_DECOY\x10\x03\x12\x1a\n" +
-	"\x16SUB_FORMAT_MIHOMO_YAML\x10\x042\xe6\x03\n" +
+	"\x16SUB_FORMAT_MIHOMO_YAML\x10\x04\x12\x18\n" +
+	"\x14SUB_FORMAT_XRAY_JSON\x10\x05\x12\x1b\n" +
+	"\x17SUB_FORMAT_SINGBOX_JSON\x10\x062\xe6\x03\n" +
 	"\x13SubscriptionService\x12\x80\x01\n" +
 	"\x17GetSubscriptionSettings\x121.mistgate.admin.v1.GetSubscriptionSettingsRequest\x1a2.mistgate.admin.v1.GetSubscriptionSettingsResponse\x12\x89\x01\n" +
 	"\x1aUpdateSubscriptionSettings\x124.mistgate.admin.v1.UpdateSubscriptionSettingsRequest\x1a5.mistgate.admin.v1.UpdateSubscriptionSettingsResponse\x12\\\n" +

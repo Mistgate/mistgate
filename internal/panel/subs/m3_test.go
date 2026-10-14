@@ -365,6 +365,13 @@ func TestFormatsDoNotShareTheResponseCache(t *testing.T) {
 		if got := decodeList(t, l.Body.String()); len(got) != 1 || !strings.HasPrefix(got[0], "hysteria2://") {
 			t.Fatalf("round %d: Happ got %q", i, got)
 		}
+		// The Xray JSON array and the sing-box profile have caches of their own, too.
+		if x := fetch(h, "/"+tok+"?format=xray-json", happUA); !strings.HasPrefix(x.Body.String(), "[") || len(parseXray(t, x.Body.Bytes())) != 1 {
+			t.Fatalf("round %d: xray got %s", i, x.Body.String())
+		}
+		if sb := fetch(h, "/"+tok, sfaUA); len(parseSingbox(t, sb.Body.Bytes()).Outbounds) != 3 {
+			t.Fatalf("round %d: sing-box got %s", i, sb.Body.String())
+		}
 	}
 }
 

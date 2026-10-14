@@ -362,11 +362,13 @@ func (*Protocol) IssueCredential(protocols.IssueInput) (protocols.Issued, error)
 
 // Clients: Happ (and other Xray/sing-box based apps that take a URI list) carry Hysteria2, and so do the Mihomo
 // core and its apps (Clash Verge, FlClash, ...) from a Mihomo YAML profile; Amnezia does not.
-// The xray-json and sing-box formats are rendered (Render) but not offered here until the subscription serves them.
+// The Xray JSON array (Happ and the other Xray apps, by a rule of the owner) and the sing-box profile (the official
+// sing-box apps) are served from the same Render.
 func (*Protocol) Clients() []plugin.ClientSupport {
 	return []plugin.ClientSupport{
-		{Client: plugin.ClientHapp, Formats: []plugin.ClientFormat{plugin.FormatURIList}},
+		{Client: plugin.ClientHapp, Formats: []plugin.ClientFormat{plugin.FormatURIList, plugin.FormatXrayJSON}},
 		{Client: plugin.ClientMihomo, Formats: []plugin.ClientFormat{plugin.FormatMihomo}},
+		{Client: plugin.ClientSingbox, Formats: []plugin.ClientFormat{plugin.FormatSingbox}},
 	}
 }
 

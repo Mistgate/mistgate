@@ -1,0 +1,53 @@
+[
+  {
+    "remarks": "Subscription ended on 13 October. Message us to renew",
+    "log": {
+      "loglevel": "warning"
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "tag": "proxy",
+        "protocol": "socks",
+        "settings": {
+          "servers": [
+            {
+              "address": "127.0.0.1",
+              "port": 1
+            }
+          ]
+        }
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  }
+]

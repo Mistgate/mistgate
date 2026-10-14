@@ -22,12 +22,16 @@ export const formatKey: Partial<Record<SubFormat, Key>> = {
   [SubFormat.USER_PAGE]: "subs.fmt.page",
   [SubFormat.DECOY]: "subs.fmt.decoy",
   [SubFormat.MIHOMO_YAML]: "subs.fmt.mihomo",
+  [SubFormat.XRAY_JSON]: "subs.fmt.xray",
+  [SubFormat.SINGBOX_JSON]: "subs.fmt.singbox",
 };
 export const formatDescKey: Partial<Record<SubFormat, Key>> = {
   [SubFormat.BASE64_URIS]: "subs.fmt.base64.desc",
   [SubFormat.USER_PAGE]: "subs.fmt.page.desc",
   [SubFormat.DECOY]: "subs.fmt.decoy.desc",
   [SubFormat.MIHOMO_YAML]: "subs.fmt.mihomo.desc",
+  [SubFormat.XRAY_JSON]: "subs.fmt.xray.desc",
+  [SubFormat.SINGBOX_JSON]: "subs.fmt.singbox.desc",
 };
 /** The formats a rule can hand out, in the order the pickers list them. */
 export const ruleFormats = [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.USER_PAGE, SubFormat.DECOY] as const;

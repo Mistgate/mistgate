@@ -70,6 +70,11 @@ const DefaultUpdateHours = 12
 // and Clash Meta apps) and the Clash family `clash...`; both get the Mihomo YAML.
 var m3Rules = []string{"mihomo", "clash"}
 
+// singboxRule is the format rule of the sing-box profile: the official sing-box apps (SFA, SFI, SFM) name themselves
+// `SFA (sing-box 1.14.3; ...)` and read nothing but their own JSON. It is the last default rule, so a Clash-like UA that also
+// says "sing-box" (Hiddify: `... like ClashMeta v2ray sing-box`) keeps the Mihomo profile.
+const singboxRule = "sing-box"
+
 // klickRelease is the release page of kl!ck (github.com/vbu00/klick): the asset names carry the version and the
 // Windows and macOS builds are released separately, so the page, not a file, is the stable link.
 const klickRelease = "https://github.com/vbu00/klick/releases/latest"
@@ -96,6 +101,7 @@ func Defaults() *adminv1.SubscriptionSettings {
 	for _, ua := range m3Rules {
 		rules = append(rules, &adminv1.ServeRule{UaContains: ua, Format: adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML})
 	}
+	rules = append(rules, &adminv1.ServeRule{UaContains: singboxRule, Format: adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON})
 	return &adminv1.SubscriptionSettings{
 		Rules:               rules,
 		UpdateIntervalHours: DefaultUpdateHours,
@@ -186,6 +192,57 @@ func addM3Rules(s *adminv1.SubscriptionSettings) bool {
 		}
 	}
 	return changed
+}
+
+// singboxRulesKey marks an installation whose stored settings were given the sing-box format rule (see MigrateSingbox).
+const singboxRulesKey = "sub_rules_singbox"
+
+// MigrateSingbox gives an installation whose saved settings predate the sing-box profile the rule `sing-box` -> sing-box JSON,
+// once, at the end of the list: the marker setting sub_rules_singbox = 1 is written in the same transaction, so a rule the
+// admin deletes later is not added back. The apps this rule catches (SFA, SFI) got a link list they cannot read before, so
+// there is nothing to lose. A rule of the same User-Agent text (any case), whatever its format, is the admin's and is left
+// alone. An installation that never saved settings needs nothing (Defaults() has the rule); it only gets the marker.
+// Idempotent and safe to call at every start.
+func MigrateSingbox(ctx context.Context, st *store.Store) error {
+	if _, err := st.Setting(ctx, singboxRulesKey); err == nil {
+		return nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	kv := map[string]string{singboxRulesKey: "1"}
+	switch v, err := st.Setting(ctx, Key); {
+	case errors.Is(err, store.ErrNotFound): // never saved
+	case err != nil:
+		return err
+	default:
+		s := &adminv1.SubscriptionSettings{}
+		if err := unmarshal.Unmarshal([]byte(v), s); err != nil {
+			return fmt.Errorf("stored subscription settings: %w", err)
+		}
+		if addSingboxRule(s) {
+			b, err := marshal.Marshal(s)
+			if err != nil {
+				return err
+			}
+			kv[Key] = string(b)
+		}
+	}
+	return st.SetSettings(ctx, kv)
+}
+
+// addSingboxRule appends the sing-box format rule unless the document has a rule of that User-Agent text; it reports whether it
+// changed the document. The list stays within MaxRules.
+func addSingboxRule(s *adminv1.SubscriptionSettings) bool {
+	for _, e := range s.Rules {
+		if strings.EqualFold(strings.TrimSpace(e.GetUaContains()), singboxRule) {
+			return false
+		}
+	}
+	if len(s.Rules) >= MaxRules {
+		return false
+	}
+	s.Rules = append(s.Rules, &adminv1.ServeRule{UaContains: singboxRule, Format: adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON})
+	return true
 }
 
 // The mode of the device limit (SubscriptionSettings.link_device_limit) is stored under its own setting, not in the
@@ -381,7 +438,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 			return invalid("%s: ua_contains is required", w)
 		case utf8.RuneCountInString(r.UaContains) > maxUA:
 			return invalid("%s: ua_contains is too long", w)
-		case r.Format < adminv1.SubFormat_SUB_FORMAT_BASE64_URIS || r.Format > adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML:
+		case r.Format < adminv1.SubFormat_SUB_FORMAT_BASE64_URIS || r.Format > adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON:
 			return invalid("%s: unknown format", w)
 		}
 	}
@@ -454,7 +511,7 @@ type Cache struct {
 	at  time.Time
 }
 
-// NewCache makes the cache. log may be nil. It also runs MigrateM3 and MigrateLinkDeviceLimit (the panel builds the cache
+// NewCache makes the cache. log may be nil. It also runs MigrateM3, MigrateSingbox and MigrateLinkDeviceLimit (the panel builds the cache
 // once at start, in both editions); a failure is logged and the next start tries again.
 func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	if log == nil {
@@ -464,6 +521,9 @@ func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	defer cancel()
 	if err := MigrateM3(ctx, st); err != nil {
 		log.Warn("subscription settings: the Mihomo format rules were not added", "err", err)
+	}
+	if err := MigrateSingbox(ctx, st); err != nil {
+		log.Warn("subscription settings: the sing-box format rule was not added", "err", err)
 	}
 	if err := MigrateLinkDeviceLimit(ctx, st); err != nil {
 		log.Warn("subscription settings: the device limit mode was not set", "err", err)

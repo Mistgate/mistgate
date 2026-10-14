@@ -1,0 +1,41 @@
+{
+  "log": {
+    "level": "warn"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "strict_route": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Example VPN",
+      "outbounds": [
+        "Your servers do not work in this app. The subscription page shows which app does"
+      ],
+      "default": "Your servers do not work in this app. The subscription page shows which app does"
+    },
+    {
+      "type": "socks",
+      "tag": "Your servers do not work in this app. The subscription page shows which app does",
+      "server": "127.0.0.1",
+      "server_port": 1
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "final": "Example VPN",
+    "auto_detect_interface": true
+  }
+}

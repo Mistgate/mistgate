@@ -648,7 +648,8 @@ func (w *world) ListAudit(context.Context, *connect.Request[adminv1.ListAuditReq
 
 func (w *world) ListClients(context.Context, *connect.Request[adminv1.ListClientsRequest]) (*connect.Response[adminv1.ListClientsResponse], error) {
 	return connect.NewResponse(&adminv1.ListClientsResponse{Clients: []*adminv1.ClientInfo{
-		{Id: "happ", Name: "Happ", Protocols: []string{"hysteria2"}, Formats: []adminv1.SubFormat{adminv1.SubFormat_SUB_FORMAT_BASE64_URIS}},
+		{Id: "happ", Name: "Happ", Protocols: []string{"hysteria2"}, Formats: []adminv1.SubFormat{adminv1.SubFormat_SUB_FORMAT_BASE64_URIS, adminv1.SubFormat_SUB_FORMAT_XRAY_JSON}},
+		{Id: "singbox", Name: "sing-box", Protocols: []string{"hysteria2"}, Formats: []adminv1.SubFormat{adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON}},
 	}}), nil
 }
 
@@ -671,6 +672,12 @@ func (w *world) UpdateSubscriptionSettings(_ context.Context, r *connect.Request
 }
 
 func (w *world) TestUserAgent(_ context.Context, r *connect.Request[adminv1.TestUserAgentRequest]) (*connect.Response[adminv1.TestUserAgentResponse], error) {
+	switch ua := strings.ToLower(r.Msg.GetUserAgent()); {
+	case strings.Contains(ua, "sfa"):
+		return connect.NewResponse(&adminv1.TestUserAgentResponse{RuleIndex: 3, Format: adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON}), nil
+	case strings.Contains(ua, "v2rayng"):
+		return connect.NewResponse(&adminv1.TestUserAgentResponse{RuleIndex: 4, Format: adminv1.SubFormat_SUB_FORMAT_XRAY_JSON}), nil
+	}
 	return connect.NewResponse(&adminv1.TestUserAgentResponse{RuleIndex: 2, Format: adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML}), nil
 }
 

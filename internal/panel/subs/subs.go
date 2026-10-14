@@ -1,6 +1,7 @@
 // Package subs serves the public subscription endpoint: GET <prefix>/<token> returns base64 of the user's
 // client lines (hysteria2:// and vless:// URIs) with the headers Happ and other Xray/sing-box apps read, or, for a client the
-// settings send to the Mihomo format, a Mihomo YAML profile (mihomo.go); a browser gets the user page. Under the same
+// settings send to the Mihomo format, a Mihomo YAML profile (mihomo.go), to the Xray JSON format an array of Xray configs (xrayjson.go), to the
+// sing-box format a sing-box profile (singbox.go; a hidden ?format=xray-json|sing-box on the link picks one of the two for a request); a browser gets the user page. Under the same
 // prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go). Unknown tokens get the
 // decoy, so the endpoint cannot be told from any other path of the site.
 //
@@ -33,6 +34,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/httpserver/ratelimit"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
@@ -305,14 +307,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// What the client gets decides which view of the user is built: the Mihomo profile needs the proxies of its
-	// own format (and gives the device that fetches it its AWG credentials), everything else the URI list.
+	// What the client gets decides which view of the user is built: the Mihomo profile, the Xray JSON array and the
+	// sing-box profile need the outbounds of their own format (the Mihomo one also gives the device that fetches it its AWG
+	// credentials), everything else the URI list.
 	set := h.settings(r.Context())
 	_, sf, _ := Choose(set, r.UserAgent())
-	format := plugin.FormatURIList
-	if sf == adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML && h.fsrc != nil {
-		format = plugin.FormatMihomo
-	}
+	sf = formatParam(r, sf)
+	format := viewFormat(sf, h.fsrc != nil)
 
 	// Only an app counts as "the app received the subscription": a browser (the page, or the decoy) does not.
 	app := sf != adminv1.SubFormat_SUB_FORMAT_USER_PAGE && sf != adminv1.SubFormat_SUB_FORMAT_DECOY
@@ -386,7 +387,7 @@ func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientF
 	}
 	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{
 		Format: format, Device: device, NoTouch: !touch, NoPageData: !page,
-		IncludeEffectiveDNS: format == plugin.FormatMihomo && h.cfg.DNS != nil,
+		IncludeEffectiveDNS: format != plugin.FormatURIList && h.cfg.DNS != nil,
 	})
 }
 
@@ -417,7 +418,7 @@ func (st *tokenState) remember(v access.SubView, key viewKey, now time.Time, app
 // respond renders the answer for a valid token from its data, the settings and the brand of this moment
 // (only the data is cached, so an edit of the settings or a rename shows up without waiting for MinInterval).
 // sf is the format chosen for this request, format the one the view was built in (the URI list unless the Source can
-// render the Mihomo one).
+// render the format sf asks for).
 func (h *handler) respond(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, sf adminv1.SubFormat, format plugin.ClientFormat) {
 	switch sf {
 	case adminv1.SubFormat_SUB_FORMAT_DECOY:
@@ -440,13 +441,91 @@ func (h *handler) respond(w http.ResponseWriter, r *http.Request, token string, 
 			h.writeMihomo(w, r, token, v, set)
 			return
 		}
+	case adminv1.SubFormat_SUB_FORMAT_XRAY_JSON:
+		if format == plugin.FormatXrayJSON {
+			h.writeXrayJSON(w, r, token, v, set)
+			return
+		}
+	case adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON:
+		if format == plugin.FormatSingbox {
+			h.writeSingbox(w, r, token, v, set)
+			return
+		}
 	}
 	h.writeList(w, r, token, v, set)
 }
 
+// viewFormat is the format the view of a request is built in for the serving format sf: the Xray JSON and sing-box outbounds,
+// the Mihomo proxies, else the URI list (also when the Source cannot render formats: canFormat false).
+func viewFormat(sf adminv1.SubFormat, canFormat bool) plugin.ClientFormat {
+	if canFormat {
+		switch sf {
+		case adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML:
+			return plugin.FormatMihomo
+		case adminv1.SubFormat_SUB_FORMAT_XRAY_JSON:
+			return plugin.FormatXrayJSON
+		case adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON:
+			return plugin.FormatSingbox
+		}
+	}
+	return plugin.FormatURIList
+}
+
+// formatParam is the hidden ?format= of the link (xray-json, sing-box): it picks the JSON format for this request whatever the
+// User-Agent rules say, so that a format can be tried in an app that no rule names, before a rule is written for it. It grants
+// nothing beyond what a rule can: a decoy stays the decoy, an unknown value is ignored, and it is read only after the token was
+// found (an unknown token gets the decoy whatever the query says). The user page never shows a link with it.
+func formatParam(r *http.Request, sf adminv1.SubFormat) adminv1.SubFormat {
+	if r.URL.RawQuery == "" || sf == adminv1.SubFormat_SUB_FORMAT_DECOY {
+		return sf
+	}
+	switch r.URL.Query().Get("format") {
+	case "xray-json":
+		return adminv1.SubFormat_SUB_FORMAT_XRAY_JSON
+	case "sing-box":
+		return adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON
+	}
+	return sf
+}
+
+// appNote is the one entry an app gets instead of servers, "" while it gets servers: the reason the subscription does not work
+// (stateNote); for the link list the Mihomo-only servers; for the JSON formats, which never answer an active person with nothing,
+// that none of their servers work in this app (noServersNote).
+func (h *handler) appNote(v access.SubView, lang string, format plugin.ClientFormat) string {
+	if note := stateNote(v, lang, h.cfg.Now()); note != "" {
+		return note
+	}
+	if format == plugin.FormatXrayJSON || format == plugin.FormatSingbox {
+		if v.Status == access.StatusActive && len(v.Lines) == 0 {
+			return noServersNote(lang)
+		}
+		return ""
+	}
+	return mihomoOnlyNote(v, lang)
+}
+
+// linkPreset is the DNS preset the document of a link carries (Mihomo, Xray JSON, sing-box): the one read with the view, else the
+// user's effective preset; nil when there is none (no DNS module, or it failed: the document has no dns section).
+func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset {
+	if v.EffectiveDNS != nil {
+		return v.EffectiveDNS
+	}
+	if h.cfg.DNS == nil || v.UserID == "" {
+		return nil
+	}
+	pre, _, err := h.cfg.DNS.Effective(ctx, v.UserID)
+	if err != nil {
+		h.cfg.Log.Warn("profile: no dns section", "err", err)
+		return nil
+	}
+	return &pre
+}
+
 // headers sets what every subscription answer carries: the name, usage and term the apps show, the refresh
-// interval, the user's page and the announcement and support link.
-func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings) {
+// interval, the user's page and the announcement and support link. format is the one of the answer: the Happ `routing` header goes
+// out with the link list only (the other formats carry their own DNS, and Happ's routing profile is global: it would act on the
+// person's other subscriptions too).
+func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, format plugin.ClientFormat) {
 	ctx := r.Context()
 	hd := w.Header()
 	hd["Cache-Control"] = headerCacheNoStore[:1:1]
@@ -463,11 +542,7 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	hd.Set("Profile-Update-Interval", strconv.Itoa(hours))
 	hd.Set("Profile-Web-Page-Url", h.link(r, token))
 	ann := set.GetAnnouncement()
-	note := stateNote(v, b.Language, h.cfg.Now())
-	if note == "" {
-		note = mihomoOnlyNote(v, b.Language)
-	}
-	if note != "" {
+	if note := h.appNote(v, b.Language, format); note != "" {
 		ann = note // the reason the app stopped working is the announcement that matters now
 	}
 	if a := cutAnnounce(ann, announceMax); a != "" {
@@ -489,7 +564,7 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 		}
 		hd.Set("X-Hwid-Limit", strconv.Itoa(v.DeviceLimit))
 	}
-	if h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
+	if format == plugin.FormatURIList && h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
 		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {
 			h.cfg.Log.Warn("happ routing header skipped", "err", err) // no user id, no token in the log
 		} else if val != "" {
@@ -510,25 +585,23 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	} else if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {
 		p.names = remarks(v.Servers, set.GetServerNameTemplate(), b.Language)
 	}
-	if v.EffectiveDNS != nil {
-		p.preset = v.EffectiveDNS
-	} else if h.cfg.DNS != nil && v.UserID != "" {
-		if pre, _, err := h.cfg.DNS.Effective(ctx, v.UserID); err != nil {
-			h.cfg.Log.Warn("mihomo profile: no dns section", "err", err)
-		} else {
-			p.preset = &pre
-		}
-	}
+	p.preset = h.linkPreset(ctx, v)
 	body, err := p.build()
 	if err != nil {
 		h.cfg.Log.Error("mihomo profile", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	h.headers(w, r, token, v, set, b)
+	h.writeDocument(w, r, token, v, set, b, headerContentTypeYAML, body, plugin.FormatMihomo)
+}
+
+// writeDocument sends a profile (Mihomo YAML, Xray JSON, sing-box JSON): the headers every answer carries, the content type, the
+// file name the app saves it under, and gzip when the client accepts it.
+func (h *handler) writeDocument(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, contentType []string, body []byte, format plugin.ClientFormat) {
+	h.headers(w, r, token, v, set, b, format)
 	hd := w.Header()
-	hd["Content-Type"] = headerContentTypeYAML[:1:1]
-	hd.Set("Content-Disposition", "attachment; filename*=UTF-8''"+pctEncode(title))
+	hd["Content-Type"] = contentType[:1:1]
+	hd.Set("Content-Disposition", "attachment; filename*=UTF-8''"+pctEncode(h.title(set, b)))
 	if _, ok := hd["Vary"]; ok {
 		hd.Add("Vary", "Accept-Encoding")
 	} else {
@@ -544,7 +617,7 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 // writeList answers with the base64 list of share links and the headers apps read.
 func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
-	h.headers(w, r, token, v, set, b)
+	h.headers(w, r, token, v, set, b, plugin.FormatURIList)
 	w.Header()["Content-Type"] = headerContentTypePlainText[:1:1]
 	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b, isHapp(r.UserAgent())), "\n")))))
 }
@@ -553,11 +626,7 @@ func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string
 // Servers (a fake source) keeps its Lines as they are. A person without access gets the one entry that says why.
 // happ: the client is Happ, whose names carry the load percentage.
 func (h *handler) lines(v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, happ bool) []string {
-	note := stateNote(v, b.Language, h.cfg.Now())
-	if note == "" {
-		note = mihomoOnlyNote(v, b.Language)
-	}
-	if note != "" {
+	if note := h.appNote(v, b.Language, plugin.FormatURIList); note != "" {
 		return []string{withRemark(placeholderURI, note)}
 	}
 	if len(v.Servers) == 0 {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { en } from "@/i18n/en";
+import { ru } from "@/i18n/ru";
+import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -284,5 +288,18 @@ describe("the subtitle and the look of a catalog preset", () => {
     expect(presetLook({ id: "dns_builtin_cloudflare_family", category: DnsCategory.FAMILY }).glyph).toBe("family");
     expect(presetLook({ id: "dns_builtin_ru_split", category: DnsCategory.RUSSIA }).tone).toBe("sky");
     expect(presetLook({ id: "dns_x", category: DnsCategory.UNSPECIFIED })).toEqual({ glyph: "server", tone: "muted" });
+  });
+});
+
+describe("format labels", () => {
+  it("name every format a rule can hold, in all three languages, so a migrated rule is not shown as the link list", () => {
+    for (const f of [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON]) {
+      for (const key of [formatKey[f], formatDescKey[f]]) {
+        expect(key).toBeTruthy();
+        for (const dict of [en, ru, zh] as Record<string, string>[]) expect(dict[key!]).toBeTruthy();
+      }
+    }
+    expect(en[formatKey[SubFormat.SINGBOX_JSON]!]).toBe("sing-box JSON");
+    expect(formatKey[SubFormat.XRAY_JSON]).not.toBe(formatKey[SubFormat.BASE64_URIS]);
   });
 });

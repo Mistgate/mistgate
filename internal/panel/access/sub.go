@@ -179,7 +179,7 @@ type SubOptions struct {
 	// NoPageData: the view is for an app, so it leaves out what only the user page shows (the DNS of each node, the
 	// presets they name, the keys that hold an older DNS) and does not read it.
 	NoPageData bool
-	// IncludeEffectiveDNS lets the Mihomo writer reuse the effective preset read with node DNS.
+	// IncludeEffectiveDNS lets the writer of a profile (Mihomo, Xray JSON, sing-box) reuse the effective preset read with node DNS.
 	IncludeEffectiveDNS bool
 }
 
@@ -538,7 +538,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		v.Nodes[i].Online = liveByNode[v.Nodes[i].ID].Connected
 	}
 	if opt.NoPageData {
-		if format == plugin.FormatMihomo && opt.IncludeEffectiveDNS && nd != nil {
+		if format != plugin.FormatURIList && opt.IncludeEffectiveDNS && nd != nil {
 			if preset, ok := nd.withoutNode(); ok {
 				v.EffectiveDNS = &preset
 			}

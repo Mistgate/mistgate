@@ -181,7 +181,13 @@ func TestListClientsFromTheRegistry(t *testing.T) {
 			c = x
 		}
 	}
-	if c.Id != "happ" || c.Name != "Happ" || len(c.Protocols) != 2 || c.Protocols[0] != "hysteria2" || c.Protocols[1] != "vless" || len(c.Formats) != 1 || c.Formats[0] != adminv1.SubFormat_SUB_FORMAT_BASE64_URIS {
+	if c.Id != "happ" || c.Name != "Happ" || len(c.Protocols) != 2 || c.Protocols[0] != "hysteria2" || c.Protocols[1] != "vless" || len(c.Formats) != 2 || c.Formats[0] != adminv1.SubFormat_SUB_FORMAT_BASE64_URIS || c.Formats[1] != adminv1.SubFormat_SUB_FORMAT_XRAY_JSON {
 		t.Errorf("client: %v", c)
 	}
+	for _, x := range r.Msg.Clients {
+		if x.Id == "singbox" && x.Name == "sing-box" && len(x.Formats) == 1 && x.Formats[0] == adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON {
+			return
+		}
+	}
+	t.Errorf("no sing-box client in %v", r.Msg.Clients)
 }

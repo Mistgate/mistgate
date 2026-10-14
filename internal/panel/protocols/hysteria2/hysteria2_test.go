@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -263,9 +264,12 @@ func TestIssueCredential(t *testing.T) {
 	}
 }
 
+// The Xray JSON array rides on the Happ toggle (the apps of the link), the sing-box profile on the sing-box client, which has no toggle of its own.
 func TestClients(t *testing.T) {
 	cs := New().Clients()
-	if len(cs) != 2 || cs[0].Client != plugin.ClientHapp || cs[1].Client != plugin.ClientMihomo || cs[1].Formats[0] != plugin.FormatMihomo {
+	if len(cs) != 3 || cs[0].Client != plugin.ClientHapp || !slices.Equal(cs[0].Formats, []plugin.ClientFormat{plugin.FormatURIList, plugin.FormatXrayJSON}) ||
+		cs[1].Client != plugin.ClientMihomo || cs[1].Formats[0] != plugin.FormatMihomo ||
+		cs[2].Client != plugin.ClientSingbox || !slices.Equal(cs[2].Formats, []plugin.ClientFormat{plugin.FormatSingbox}) {
 		t.Fatalf("clients = %+v", cs)
 	}
 	if !protocols.AllowedForApps(New(), plugin.ClientHapp) || protocols.AllowedForApps(New(), plugin.ClientAmnezia) {

@@ -1,0 +1,41 @@
+{
+  "log": {
+    "level": "warn"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "strict_route": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Example VPN",
+      "outbounds": [
+        "Device limit: 3 of 3. Remove one you no longer use on the subscription page"
+      ],
+      "default": "Device limit: 3 of 3. Remove one you no longer use on the subscription page"
+    },
+    {
+      "type": "socks",
+      "tag": "Device limit: 3 of 3. Remove one you no longer use on the subscription page",
+      "server": "127.0.0.1",
+      "server_port": 1
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "final": "Example VPN",
+    "auto_detect_interface": true
+  }
+}

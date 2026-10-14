@@ -1,0 +1,162 @@
+{
+  "log": {
+    "level": "warn"
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "Example VPN"
+      },
+      {
+        "type": "udp",
+        "tag": "split-1",
+        "server": "77.88.8.8"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "ru",
+          "su",
+          "xn--p1ai"
+        ],
+        "action": "route",
+        "server": "split-1"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "strict_route": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Example VPN",
+      "outbounds": [
+        "🇩🇪 DE · Hysteria2",
+        "🇩🇪 DE · VLESS",
+        "🇳🇱 NL · VLESS WS",
+        "direct"
+      ],
+      "default": "🇩🇪 DE · Hysteria2"
+    },
+    {
+      "obfs": {
+        "type": "salamander",
+        "password": "gawrgura-pw"
+      },
+      "password": "tok-DEVICE_secret_0123456789abcdefghijklmn",
+      "server": "de2.example.com",
+      "server_port": 443,
+      "tag": "🇩🇪 DE · Hysteria2",
+      "tls": {
+        "enabled": true,
+        "server_name": "de1.example.com",
+        "alpn": [
+          "h3"
+        ]
+      },
+      "type": "hysteria2"
+    },
+    {
+      "flow": "xtls-rprx-vision",
+      "packet_encoding": "xudp",
+      "server": "de1.example.com",
+      "server_port": 443,
+      "tag": "🇩🇪 DE · VLESS",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.example.org",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+          "short_id": "0f1e2d3c4b5a6978"
+        }
+      },
+      "type": "vless",
+      "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc"
+    },
+    {
+      "packet_encoding": "xudp",
+      "server": "de1.example.com",
+      "server_port": 443,
+      "tag": "🇳🇱 NL · VLESS WS",
+      "tls": {
+        "enabled": true,
+        "server_name": "origin.example.com",
+        "alpn": [
+          "http/1.1"
+        ],
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": "/ws"
+      },
+      "type": "vless",
+      "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "ru",
+          "su",
+          "xn--p1ai"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      }
+    ],
+    "final": "Example VPN",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "local"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  }
+}

@@ -736,8 +736,9 @@ func (*Protocol) IssueCredential(protocols.IssueInput) (protocols.Issued, error)
 
 func (*Protocol) Clients() []plugin.ClientSupport {
 	return []plugin.ClientSupport{
-		{Client: plugin.ClientHapp, Formats: []plugin.ClientFormat{plugin.FormatURIList}},
+		{Client: plugin.ClientHapp, Formats: []plugin.ClientFormat{plugin.FormatURIList, plugin.FormatXrayJSON}},
 		{Client: plugin.ClientMihomo, Formats: []plugin.ClientFormat{plugin.FormatMihomo}},
+		{Client: plugin.ClientSingbox, Formats: []plugin.ClientFormat{plugin.FormatSingbox}},
 	}
 }
 

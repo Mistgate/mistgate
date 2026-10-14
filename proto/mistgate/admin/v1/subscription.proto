@@ -110,6 +110,10 @@ enum SubFormat {
   SUB_FORMAT_DECOY = 3;
   // Mihomo / Clash Meta YAML with every protocol the user has.
   SUB_FORMAT_MIHOMO_YAML = 4;
+  // An array of Xray configs, one per server, each with its remarks (v2rayNG, Happ and the other Xray-based apps).
+  SUB_FORMAT_XRAY_JSON = 5;
+  // One sing-box profile: a TUN inbound, a selector over the servers, the DNS of the user's preset (sing-box 1.12 and later).
+  SUB_FORMAT_SINGBOX_JSON = 6;
 }
 
 message ServeRule {

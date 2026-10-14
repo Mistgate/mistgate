@@ -295,6 +295,19 @@ func mihomoOnlyNote(v access.SubView, lang string) string {
 	return "These servers work only in kl!ck and other Mihomo apps"
 }
 
+// noServersNote is what the Xray JSON and sing-box apps show an active person none of whose servers their format can carry (all
+// XHTTP in sing-box, all AmneziaWG keys, no server at all): the one entry that says so, instead of an empty answer. Under
+// announceMax characters in every language, so it goes into the announcement whole.
+func noServersNote(lang string) string {
+	switch lang {
+	case "ru":
+		return "Ваши серверы не работают в этом приложении. Какое подойдёт — на странице подписки"
+	case "zh":
+		return "这些服务器无法在此应用中使用。适用的应用请在订阅页面查看"
+	}
+	return "Your servers do not work in this app. The subscription page shows which app does"
+}
+
 // cutAnnounce shortens an announcement to the max runes Happ shows: at the last word boundary in the second half when
 // the cut lands inside a word, and with "…" at the end. web/src/screens/subscriptions/model.ts cutAnnounce draws the
 // admin's counter and preview by the same rule.
