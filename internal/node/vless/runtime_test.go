@@ -442,11 +442,7 @@ func TestXrayClientTrafficCountersAndObserved(t *testing.T) {
 				failed, collectErr := f.engine.Collect(context.Background())
 				t.Fatalf("exchange failed: %v; traffic: %+v collectErr=%v health=%+v slog: %s", err, failed.Traffic, collectErr, f.engine.Health(), f.logs.String())
 			}
-			collected, err := f.engine.Collect(context.Background())
-			if err != nil {
-				t.Fatal(err)
-			}
-			up, down := trafficOf(collected, cred.CredID)
+			up, down, collected := waitTraffic(t, f.engine, cred.CredID, n)
 			if !withinPercent(up, n, 1) || !withinPercent(down, n, 1) {
 				t.Fatalf("traffic counters swapped or out of tolerance: up=%d down=%d payload=%d", up, down, n)
 			}
@@ -924,6 +920,26 @@ func trafficOf(collected engine.Collected, credID string) (up, down uint64) {
 		}
 	}
 	return
+}
+
+// waitTraffic collects until credID has counted at least want bytes in each direction and returns the sums with the
+// last Collect. countWriter counts a chunk after its write returns, and the peer can read that chunk first (on XHTTP
+// the h2 handler wakes only after its frame went out), so right after an exchange the counters may still trail it.
+func waitTraffic(t *testing.T, e *eng, credID string, want uint64) (up, down uint64, last engine.Collected) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		collected, err := e.Collect(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		u, d := trafficOf(collected, credID)
+		up, down, last = up+u, down+d, collected
+		if up >= want && down >= want || time.Now().After(deadline) {
+			return up, down, last
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func sessionsOf(collected engine.Collected, credID string) int {

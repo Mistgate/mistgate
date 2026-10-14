@@ -144,11 +144,7 @@ func TestXrayClientTLSFrontTransportsAndTraffic(t *testing.T) {
 			if _, err := exchange(conn, payload(size)); err != nil {
 				t.Fatalf("TLS %s exchange: %v; health=%+v logs=%s", tc.transport, err, f.engine.Health(), f.logs.String())
 			}
-			collected, err := f.engine.Collect(context.Background())
-			if err != nil {
-				t.Fatal(err)
-			}
-			up, down := trafficOf(collected, cred.CredID)
+			up, down, _ := waitTraffic(t, f.engine, cred.CredID, size)
 			if !withinPercent(up, size, 1) || !withinPercent(down, size, 1) {
 				t.Fatalf("traffic counters up=%d down=%d, want %d in both directions", up, down, size)
 			}
