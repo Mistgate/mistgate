@@ -143,6 +143,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 | 节点日志 | 不显示节点 Agent 的实时日志。 |
 | 更新面板 | 不支持自更新：需再次运行命令更新（见下文）。 |
 | 自有伪装站点 | 节点无法使用**自有站点**伪装内容：此版本不保存上传的站点包。 |
+| TSPU 探测 | 国家视角检测的 [TSPU 探测](../operations/health.md#tspu-探测)不运行：一次运行需要几分钟，而此版本的定时任务只有几秒。卡片会说明它不可用。Globalping 和封锁名单可用。 |
 
 此版本中与设备相关的限制：
 

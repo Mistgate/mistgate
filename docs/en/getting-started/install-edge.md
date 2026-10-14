@@ -143,6 +143,7 @@ The admin shows "Not available in the Cloudflare edition yet" in the places belo
 | Node logs | The live log of a node's agent is not shown. |
 | Updating the panel | There is no self-update: update by running the command again (below). |
 | Own decoy site | A node cannot get the **Own site** decoy: this edition does not store uploaded bundles. |
+| TSPU probe | The [TSPU probe](../operations/health.md#tspu-probe) of the country check does not run: a run takes minutes and the scheduled jobs of this edition have seconds. The card says it is unavailable. Globalping and the block lists work. |
 
 Limits of this edition that matter for devices:
 
