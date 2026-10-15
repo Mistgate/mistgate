@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/httpserver/ratelimit"
@@ -205,7 +206,7 @@ type apiRouter []AdminHandler
 func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, h := range a {
 		if strings.HasPrefix(r.URL.Path, h.Path) {
-			if isStream(r) {
+			if isStream(r) || longUnary[r.URL.Path] {
 				liftDeadlines(w)
 			}
 			h.Handler.ServeHTTP(w, r)
@@ -214,6 +215,9 @@ func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	http.NotFound(w, r)
 }
+
+// longUnary are the admin calls that answer after more than the listener's write timeout: a TSPU probe test runs for minutes.
+var longUnary = map[string]bool{adminv1connect.TspuProbeServiceTestTspuProbeProcedure: true}
 
 // isStream reports a Connect or gRPC streaming-capable request: its response may last
 // longer than the listener's write timeout.

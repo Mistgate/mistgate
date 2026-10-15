@@ -760,7 +760,11 @@ func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestT
 		return nil, fail(connect.CodeFailedPrecondition, "tspu_run_in_progress")
 	}
 	defer s.runMu.Unlock()
-	res, err := s.runNow(ctx, st, probe, nodes)
+	// A run takes minutes: it outlives the owner closing the tab (the rows and the run status are stored either way), and the
+	// HTTP server lifts its write deadline for this procedure (httpserver.longUnary).
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runBudget)
+	defer cancel()
+	res, err := s.runNow(rctx, st, probe, nodes)
 	switch {
 	case errors.Is(err, errSwitchedOff):
 		return nil, fail(connect.CodeFailedPrecondition, "tspu_off")
