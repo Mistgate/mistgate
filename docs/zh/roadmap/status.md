@@ -3,21 +3,21 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.43`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.42
+  meta: v0.1.0 – v0.1.43
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.42
+      release: v0.1.43
       current: true
       points:
-        - "**TSPU 探测**：从俄罗斯访问的第三个来源。你在俄罗斯境内的一台节点会在自己的路径上找到过滤设备，并逐个端口检查到每台节点的 TCP 是否在那里被切断。默认关闭，每 2 小时运行一次，节点地址只发送到你的探测节点；这是数据中心的视角，只检测 TCP。参见[TSPU 探测](../operations/reachability.md#tspu-探测)。"
-        - "**来源结果不一致**时显示较差的结论，标注「来源结果不一致」，并列出各来源看到的情况；告警会说明是哪个来源发现了封锁。"
+        - "**「可达性」成为独立部分**，位于运行状况之后：按结论汇总、每个节点在各来源下最近一周的情况、最近 7 天的告警，以及原先位于集成中的三个来源卡片。参见[可达性](../operations/reachability.md)。"
+        - "**用户页面上的订阅类应用 DNS**：用户可以为 Happ、Mihomo 类应用、Xray JSON 和 sing-box 自行选择一个 DNS，选项来自你在「订阅 → 用户页面」中提供的预设。服务器上的 DNS 行现在只作用于 AmneziaVPN 密钥。页面上的预设名称跟随页面语言。参见[订阅类应用的 DNS](../guide/dns.md#订阅类应用的-dns)。"
     - title: 协议配置
       section: profiles
       points:
@@ -45,13 +45,13 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
         - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML，为使用 Xray 和 sing-box 内核的应用提供 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
         - "[订阅类应用的设备上限](../guide/subscriptions.md#订阅类应用的设备上限)有三种模式：**仅计数**、**限制**和**严格**。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、供 AmneziaVPN 使用的 `vpn://` 密钥，以及用户自己的设备；用户可以[重命名和删除](../guide/user-page.md#自助管理设备)这些设备，页面上还有复制链接的按钮。"
-        - "提供 [DNS 预设](../guide/dns.md)，并可让用户在用户页面中为每台服务器选择 DNS。"
+        - "提供 [DNS 预设](../guide/dns.md)；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
     - title: 运行状况
       section: health
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
-        - "[国家视角检测](../operations/reachability.md)：通过 Globalping 使用俄罗斯境内的探测点，并比对 antifilter 封锁名单；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点、比对 antifilter 封锁名单，并从你在俄罗斯的节点运行 TSPU 探测；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
@@ -77,7 +77,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.42
+  meta: v0.1.34 – v0.1.43
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -94,7 +94,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
       text: "每个节点都可以使用内置站点、面板站点或自己的站点压缩包。v0.1.36 之前创建的节点会继续使用内置页面，直到你选择其他选项。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
     - title: 在生产环境中测试国家视角检测
       section: health
-      text: "Globalping 和封锁名单默认关闭。请先开启其中一个，观察「从俄罗斯访问」列，再决定是否依赖它的告警：探测点不属于面板，而 `listed`（在名录中）只是名录中的标记，不是实测结果。参见[国家视角检测](../operations/reachability.md)。"
+      text: "所有来源默认关闭。请先开启其中一个，观察「从俄罗斯访问」列，再决定是否依赖它的告警：Globalping 探测点不属于面板，而 `listed`（在名录中）只是名录中的标记，不是实测结果。参见[可达性](../operations/reachability.md)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。

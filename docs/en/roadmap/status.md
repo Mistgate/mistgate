@@ -3,21 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.43`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.42
+  meta: v0.1.0 – v0.1.43
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.42
+      release: v0.1.43
       current: true
       points:
-        - "**TSPU probe**, a third source for reachability from Russia: one of your own nodes inside Russia finds the filtering box on its path and checks, port by port, whether TCP to each node dies there. Off by default, every 2 hours, node addresses go only to your probe node; a datacenter view, TCP only. See [TSPU probe](../operations/reachability.md#tspu-probe)."
-        - "**Sources that disagree** show the worse verdict marked *sources disagree*, with what each source saw; the alert says which source saw the block."
+        - "**Reachability, a section of its own**, after Health: a summary by verdict, each node's week per source, the alerts of the last 7 days and the three source cards that used to sit in Integrations. See [Reachability](../operations/reachability.md)."
+        - "**DNS for the link apps on the user page:** a person picks one DNS for Happ, the Mihomo apps, Xray JSON and sing-box, from the presets you offer in Subscriptions → User page. The DNS rows on the servers now apply only to AmneziaVPN keys. Preset names on the page follow its language. See [DNS for the apps on the link](../guide/dns.md#dns-for-the-apps-on-the-link)."
     - title: Profiles
       section: profiles
       points:
@@ -45,13 +45,13 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
         - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core, [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json) for apps on those cores."
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
-        - "[DNS presets](../guide/dns.md) and a DNS choice per server on the user page."
+        - "[DNS presets](../guide/dns.md); on the user page, a DNS choice for the link apps and one per server for the keys."
     - title: Health
       section: health
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
-        - "The [country check](../operations/reachability.md): probes inside Russia through Globalping and the antifilter block lists, each switched on separately and off by default, with an alert when a node is unreachable from the country."
+        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, the antifilter block lists and a TSPU probe from your own node in Russia, each switched on separately and off by default, with an alert when a node is unreachable from the country."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
@@ -77,7 +77,7 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.42
+  meta: v0.1.34 – v0.1.43
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -94,7 +94,7 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
       text: "The built-in site, the panel's site or an archive of its own for each node. Nodes created before v0.1.36 stay on the built-in page until you pick another option. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
     - title: The country check in production
       section: health
-      text: "Globalping and the block lists are off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Country check](../operations/reachability.md)."
+      text: "Every source is off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the Globalping probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Reachability](../operations/reachability.md)."
 - status: next
   title: Next
   lead: The next items in the queue.
