@@ -109,8 +109,13 @@ export function runLook(t: T, fmt: Fmt, run: TspuRun): { kind: StatusKind; word:
         detail: line(at, run.dpiHop ? t("tp.run.hop", { hop: run.dpiHop }) : "", run.blockedRef ? t("tp.run.ref", { ref: run.blockedRef }) : "", t.n("tp.run.nodes", run.nodesChecked)),
       };
     case "control_failed":
-    case "no_dpi_hop":
-      return { kind: "warn", word: t(`tp.run.${run.status}`), detail: line(t(`tp.run.${run.status}.why`), at) };
+      return { kind: "warn", word: t("tp.run.control_failed"), detail: line(t("tp.run.control_failed.why"), at) };
+    case "no_dpi_hop": {
+      // the agent and the panel say why when they can ("refs_pass", "no_hops"); no reason, or one this page does not know: the general words
+      const k = `tp.run.no_dpi_hop.${run.reason}` as const;
+      if (run.reason && hasKey(k)) return { kind: "warn", word: t(k), detail: line(t(`${k}.why` as MessageKey), at) };
+      return { kind: "warn", word: t("tp.run.no_dpi_hop"), detail: line(t("tp.run.no_dpi_hop.why"), at) };
+    }
     case "busy":
       return { kind: "blip", word: t("tp.run.busy"), detail: line(t("tp.run.busy.why"), at) };
     default: // "failed", and a status this page does not know

@@ -21,7 +21,7 @@ const fmtRu = makeFmt("ru", tRu);
 const fmtZh = makeFmt("zh", tZh);
 
 const ago12 = Math.floor(Date.now() / 1000) - 12 * 60;
-const run = (over: Partial<TspuRun> = {}): TspuRun => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", ...over });
+const run = (over: Partial<TspuRun> = {}): TspuRun => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", reason: "", ...over });
 const node = (over: Partial<TspuNode> = {}): TspuNode => ({ id: "nod_probe1", name: "probe1", countryCode: "RU", inCountry: true, declares: true, online: true, ...over });
 const s = (over: Partial<TspuSettings> = {}): TspuSettings => ({
   enabled: true,
@@ -85,6 +85,27 @@ describe("a run in words", () => {
       "no reference address placed it: they pass on this path, or the probe node’s kernel does not report router answers · last run 12 min ago",
     );
     expect(runLook(tZh, fmtZh, run({ status: "no_dpi_hop" })).word).toBe("未能在路径上找到 TSPU");
+    // the reason of a no_dpi_hop changes the words: the references pass (no TSPU on this path), or no router answers
+    expect(runLook(t, fmt, run({ status: "no_dpi_hop", reason: "refs_pass" }))).toEqual({
+      kind: "warn",
+      word: "No TSPU on the probe node’s path",
+      detail: "blocked addresses open from it, so it cannot test anything: the probe needs a node whose provider filters · last run 12 min ago",
+    });
+    expect(runLook(tRu, fmtRu, run({ status: "no_dpi_hop", reason: "refs_pass" }))).toEqual({
+      kind: "warn",
+      word: "На пути ноды-зонда нет ТСПУ",
+      detail: "заблокированные адреса с неё открываются, проверять с неё нечего: нужна нода у провайдера, который режет · последний запуск 12 мин назад",
+    });
+    expect(runLook(tZh, fmtZh, run({ status: "no_dpi_hop", reason: "refs_pass" })).word).toBe("探测节点的路径上没有 TSPU");
+    expect(runLook(t, fmt, run({ status: "no_dpi_hop", reason: "no_hops" }))).toEqual({
+      kind: "warn",
+      word: "Routers on the path do not answer",
+      detail: "the route from the probe node is hidden, so the TSPU cannot be placed · last run 12 min ago",
+    });
+    expect(runLook(tRu, fmtRu, run({ status: "no_dpi_hop", reason: "no_hops" })).word).toBe("Роутеры на пути не отвечают");
+    expect(runLook(tZh, fmtZh, run({ status: "no_dpi_hop", reason: "no_hops" })).detail).toBe("探测节点出发的路由被隐藏，因此无法定位 TSPU · 上次运行 12 分钟前");
+    // no reason (an older agent) or one this page does not know: the general words
+    expect(runLook(t, fmt, run({ status: "no_dpi_hop", reason: "brand_new" })).word).toBe("Could not find the TSPU on the path");
     expect(runLook(t, fmt, run({ status: "busy" }))).toEqual({ kind: "blip", word: "The probe node was busy", detail: "the panel asks again 5 min later · last run 12 min ago" });
     expect(runLook(t, fmt, run({ status: "failed", detail: "agent_too_old" }))).toEqual({ kind: "bad", word: "Does not work", detail: "the probe node’s agent is too old: update it · last run 12 min ago" });
     expect(runLook(tRu, fmtRu, run({ status: "failed", detail: "unreachable" })).detail).toBe("нода-зонд не ответила · последний запуск 12 мин назад");

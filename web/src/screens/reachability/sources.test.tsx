@@ -366,7 +366,7 @@ describe("the TSPU probe card", () => {
   const probeButton = (label: string, title?: string) => [...(card(title)?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
   const probeSwitch = () => card()?.querySelector("[role=switch]");
   const ago12 = Math.floor(Date.now() / 1000) - 12 * 60;
-  const run = (over: Record<string, unknown> = {}) => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", ...over });
+  const run = (over: Record<string, unknown> = {}) => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", reason: "", ...over });
   const nodes = [
     { id: "nod_probe1", name: "probe1", countryCode: "RU", inCountry: true, declares: true, online: true },
     { id: "nod_ru2", name: "ru2", countryCode: "RU", inCountry: true, declares: false, online: true },
@@ -480,6 +480,18 @@ describe("the TSPU probe card", () => {
     getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "no_dpi_hop" }) }) });
     await mount(settings());
     expect(probeState()?.textContent).toMatch(/^Could not find the TSPU on the path · no reference address placed it/);
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "no_dpi_hop", reason: "refs_pass" }) }) });
+    await mount(settings());
+    expect(probeState()?.textContent).toBe(
+      "No TSPU on the probe node’s path · blocked addresses open from it, so it cannot test anything: the probe needs a node whose provider filters · last run 12 min ago",
+    );
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "no_dpi_hop", reason: "no_hops" }) }) });
+    await mount(settings());
+    expect(probeState()?.textContent).toBe("Routers on the path do not answer · the route from the probe node is hidden, so the TSPU cannot be placed · last run 12 min ago");
     act(() => root?.unmount());
     host?.remove();
     getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "failed", detail: "unreachable" }) }) });
