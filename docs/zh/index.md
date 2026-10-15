@@ -57,6 +57,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 ### 运维
 
 - [运行状况](operations/health.md)：客户端视角检测、节点诊断和告警。
+- [可达性](operations/reachability.md)：能否从某个国家境内访问节点：Globalping、封锁名单、TSPU 探测、每个节点的最近一周和告警。
 - [Telegram 告警](operations/telegram-alerts.md)：机器人、绑定聊天、发送内容和对象，以及面板监视器。
 - [面板监视器](operations/panel-watcher.md)：Cloudflare 每分钟检查一次面板，并通过 Telegram 报告服务中断。
 - [更新](operations/updates.md)：节点自更新、立即或定时更新节点、回滚以及更新面板。

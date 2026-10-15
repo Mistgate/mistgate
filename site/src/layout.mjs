@@ -11,7 +11,7 @@ export const T = {
     onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
     language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
     license: "Released under AGPL-3.0", other: "Other",
-    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", updates: "Updates", integrations: "Integrations", settings: "Settings" },
+    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", reachability: "Reachability", updates: "Updates", integrations: "Integrations", settings: "Settings" },
     notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
   },
   ru: {
@@ -21,7 +21,7 @@ export const T = {
     onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub",
     language: "Язык", copy: "Копировать", copied: "Скопировано", table: "Таблица", plain: "Текст", diagram: "Схема", permalink: "Ссылка на раздел", pending: "Эта страница ещё не написана", roadmap: "Этапы плана",
     license: "Лицензия AGPL-3.0", other: "Прочее",
-    inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
+    inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", reachability: "Доступность", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
   },
   zh: {
@@ -31,7 +31,7 @@ export const T = {
     onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate",
     language: "语言", copy: "复制", copied: "已复制", table: "表格", plain: "文本", diagram: "示意图", permalink: "链接到此小节", pending: "此页尚未撰写", roadmap: "路线图阶段",
     license: "基于 AGPL-3.0 发布", other: "其他",
-    inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", updates: "更新", integrations: "集成", settings: "设置" },
+    inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", reachability: "可达性", updates: "更新", integrations: "集成", settings: "设置" },
     notFound: "页面不存在", notFoundText: "没有这个页面。它可能已移动，或尚未撰写。", toHome: "前往文档",
   },
 };
@@ -54,6 +54,7 @@ export const PAGE_SECTION = {
   "guide/profiles": "profiles", "guide/hysteria2": "profiles", "guide/amneziawg": "profiles",
   "guide/subscriptions": "subscriptions", "guide/client-apps": "subscriptions", "guide/user-page": "subscriptions", "guide/dns": "subscriptions",
   "operations/health": "health", "operations/troubleshooting": "health",
+  "operations/reachability": "reachability",
   "operations/updates": "updates", "operations/releases": "updates",
   "getting-started/ai-agents": "integrations", "operations/telegram-alerts": "integrations", "reference/api": "integrations", "reference/mcp": "integrations",
   "getting-started/install-panel": "settings", "guide/decoy-site": "settings", "operations/backups": "settings", "operations/security": "settings", "operations/panel-watcher": "settings",

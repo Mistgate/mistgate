@@ -19,7 +19,7 @@ export function parseIcons(tsx) {
 
 const panel = parseIcons(readFileSync(SRC, "utf8"));
 
-/** Section icons and tones of the panel's sidebar: overview, nodes, users, profiles, subscriptions, health, updates, integrations, settings. */
+/** Section icons and tones of the panel's sidebar: overview, nodes, users, profiles, subscriptions, health, reachability, updates, integrations, settings. */
 export const NAV = panel.nav;
 
 // the few the panel does not draw (theme toggle, drawer button)

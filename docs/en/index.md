@@ -57,6 +57,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 ### Operations
 
 - [Health](operations/health.md): client-eye checks, the node doctor and alerts.
+- [Reachability](operations/reachability.md): whether the nodes open from inside a country: Globalping, the block lists, the TSPU probe, each node's week and the alert.
 - [Telegram alerts](operations/telegram-alerts.md): the bot, linking your chat, what is sent and to whom, and the panel watcher.
 - [Panel watcher](operations/panel-watcher.md): Cloudflare checks the panel once a minute and reports outages in Telegram.
 - [Updates](operations/updates.md): node self-update, updating a node now or on a schedule, rollbacks, and updating the panel.

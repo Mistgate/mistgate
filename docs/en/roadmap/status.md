@@ -16,7 +16,7 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
       release: v0.1.42
       current: true
       points:
-        - "**TSPU probe**, a third source for reachability from Russia: one of your own nodes inside Russia finds the filtering box on its path and checks, port by port, whether TCP to each node dies there. Off by default, every 2 hours, node addresses go only to your probe node; a datacenter view, TCP only. See [TSPU probe](../operations/health.md#tspu-probe)."
+        - "**TSPU probe**, a third source for reachability from Russia: one of your own nodes inside Russia finds the filtering box on its path and checks, port by port, whether TCP to each node dies there. Off by default, every 2 hours, node addresses go only to your probe node; a datacenter view, TCP only. See [TSPU probe](../operations/reachability.md#tspu-probe)."
         - "**Sources that disagree** show the worse verdict marked *sources disagree*, with what each source saw; the alert says which source saw the block."
     - title: Profiles
       section: profiles
@@ -51,7 +51,7 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
-        - "The [country check](../operations/health.md#country-check): probes inside Russia through Globalping and the antifilter block lists, each an integration of its own and off by default, with an alert when a node is unreachable from the country."
+        - "The [country check](../operations/reachability.md): probes inside Russia through Globalping and the antifilter block lists, each switched on separately and off by default, with an alert when a node is unreachable from the country."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
@@ -94,7 +94,7 @@ Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production
       text: "The built-in site, the panel's site or an archive of its own for each node. Nodes created before v0.1.36 stay on the built-in page until you pick another option. See [Your own decoy site](../guide/decoy-site.md#nodes-three-options)."
     - title: The country check in production
       section: health
-      text: "Globalping and the block lists are off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Country check](../operations/health.md#country-check)."
+      text: "Globalping and the block lists are off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Country check](../operations/reachability.md)."
 - status: next
   title: Next
   lead: The next items in the queue.

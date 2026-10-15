@@ -16,7 +16,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
       release: v0.1.42
       current: true
       points:
-        - "**TSPU 探测**：从俄罗斯访问的第三个来源。你在俄罗斯境内的一台节点会在自己的路径上找到过滤设备，并逐个端口检查到每台节点的 TCP 是否在那里被切断。默认关闭，每 2 小时运行一次，节点地址只发送到你的探测节点；这是数据中心的视角，只检测 TCP。参见[TSPU 探测](../operations/health.md#tspu-探测)。"
+        - "**TSPU 探测**：从俄罗斯访问的第三个来源。你在俄罗斯境内的一台节点会在自己的路径上找到过滤设备，并逐个端口检查到每台节点的 TCP 是否在那里被切断。默认关闭，每 2 小时运行一次，节点地址只发送到你的探测节点；这是数据中心的视角，只检测 TCP。参见[TSPU 探测](../operations/reachability.md#tspu-探测)。"
         - "**来源结果不一致**时显示较差的结论，标注「来源结果不一致」，并列出各来源看到的情况；告警会说明是哪个来源发现了封锁。"
     - title: 协议配置
       section: profiles
@@ -51,7 +51,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
-        - "[国家视角检测](../operations/health.md#国家视角检测)：通过 Globalping 使用俄罗斯境内的探测点，并比对 antifilter 封锁名单；每个来源都是独立的集成，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[国家视角检测](../operations/reachability.md)：通过 Globalping 使用俄罗斯境内的探测点，并比对 antifilter 封锁名单；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
@@ -94,7 +94,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.42`�
       text: "每个节点都可以使用内置站点、面板站点或自己的站点压缩包。v0.1.36 之前创建的节点会继续使用内置页面，直到你选择其他选项。参见[自己的伪装站点](../guide/decoy-site.md#节点三种选项)。"
     - title: 在生产环境中测试国家视角检测
       section: health
-      text: "Globalping 和封锁名单默认关闭。请先开启其中一个，观察「从俄罗斯访问」列，再决定是否依赖它的告警：探测点不属于面板，而 `listed`（在名录中）只是名录中的标记，不是实测结果。参见[国家视角检测](../operations/health.md#国家视角检测)。"
+      text: "Globalping 和封锁名单默认关闭。请先开启其中一个，观察「从俄罗斯访问」列，再决定是否依赖它的告警：探测点不属于面板，而 `listed`（在名录中）只是名录中的标记，不是实测结果。参见[国家视角检测](../operations/reachability.md)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
